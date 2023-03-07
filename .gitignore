@@ -1,6 +1,6 @@
 /.idea/
 /.vs/
-.DS_Store
+*.DS_Store
 # Temporary experiments
 /tmp/
 
@@ -10,4 +10,4 @@ node_modules/
 .env
 package-lock.json
 
-*instances/
+*instances/.DS_Store

@@ -1,0 +1,117 @@
+{
+    "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Message-v1.json",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Common Message Object",
+    "type": "object",
+    "properties":{
+        "Schema_UUID": {
+            "const": "962dded4-a1d2-488f-8985-f8a8d0f12a52"
+        },
+        "Instance_UUID": {
+            "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+            "type": "string",
+            "format": "uuid"
+        },
+        "Message_Type": {
+            "allOf": [
+                {
+                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+                },
+                {
+                    "properties": {
+                        "Sparkplug_Type": {
+                            "enum": [
+                                "String"
+                            ]
+                        },
+                        "Value": {
+                            "type": "string",
+                            "enum": ["Alarm", "Condition", "Warning", "Error", "Monitoring", "Command", "Response", "Other", "Unknown"]
+                        },
+                        "Documentation": {
+                            "default": "An indication of the type of message."
+                        }
+                    }
+                }
+            ]
+        },
+        "Message_Status": {
+            "allOf":[
+                {
+                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+                }
+                ,
+                {
+                    "properties": {
+                        "Sparkplug_Type": {
+                            "enum": ["String"]  
+                        },
+                        "Documentation": {
+                            "default": "Additional status information about the message (if applicable)."
+                        }
+                    }
+                }
+            ]
+        },
+        "Message_Content": {
+            "allOf":[
+                {
+                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+                }
+                ,
+                {
+                    "properties": {
+                        "Sparkplug_Type": {
+                            "enum": ["String"]  
+                        },
+                        "Documentation": {
+                            "default": "Contents of the message."
+                        }
+                    }
+                }
+            ]
+        },
+        "Timestamp": {
+            "allOf":[
+                {
+                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+                }
+                ,
+                {
+                    "properties": {
+                        "Sparkplug_Type": {
+                            "enum": ["String"]  
+                        },
+                        "Documentation": {
+                            "default": "Timestamp of the message."
+                        }
+                    }
+                }
+            ]
+        },
+        "Error_Code": {
+            "allOf":[
+                {
+                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+                }
+                ,
+                {
+                    "properties": {
+                        "Sparkplug_Type": {
+                            "enum": ["String"]  
+                        },
+                        "Documentation": {
+                            "default": "Some form of error code associated with an error message."
+                        }
+                    }
+                }
+            ]
+        }
+    },
+    "required": [
+        "Schema_UUID",
+        "Instance_UUID",
+        "Message_Type",
+        "Message_Content"
+    ]
+}

@@ -1,0 +1,468 @@
+{
+    "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Smart_Tool/Tightening_Result-v1.json",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Smart Tool Tightening Result",
+    "description": "A JSON Schema representation of a Tightening Result object of a Smart Tool.",
+    "type": "object",
+    "properties": {
+        "Schema_UUID": {
+            "const": "e915533f-3cf3-4221-8c71-4cdb4a134310"
+        },
+        "Instance_UUID": {
+            "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+            "type": "string",
+            "format": "uuid"
+        },
+        "Torque_Controller_Name": {
+            "allOf": [
+                {
+                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+                },
+                {
+                    "properties": {
+                        "Sparkplug_Type": {
+                            "enum": [
+                                "String"
+                            ]
+                        },
+                        "Documentation": {
+                            "default": "The controller name is 25 bytes long and is specified by 25 ASCII characters."
+                        }
+                    }
+                }
+            ]
+        },
+        "VIN_Number": {
+            "allOf": [
+                {
+                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+                },
+                {
+                    "properties": {
+                        "Sparkplug_Type": {
+                            "enum": [
+                                "String"
+                            ]
+                        },
+                        "Documentation": {
+                            "default": "The VIN (Vehicle ID - identifies the tightening result) number is 25 bytes long and is specified by 25 ASCII characters."
+                        }
+                    }
+                }
+            ]
+        },
+        "Job_ID": {
+            "allOf": [
+                {
+                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+                },
+                {
+                    "properties": {
+                        "Sparkplug_Type": {
+                            "enum": [
+                                "UInt16BE"
+                            ]
+                        },
+                        "Documentation": {
+                            "default": "The Job ID is two bytes long and specified by two ASCII digits. Range: 00-99."
+                        }
+                    }
+                }
+            ]
+        },
+        "Parameter_Set_ID": {
+            "allOf": [
+                {
+                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+                },
+                {
+                    "properties": {
+                        "Sparkplug_Type": {
+                            "enum": [
+                                "UInt32BE"
+                            ]
+                        },
+                        "Documentation": {
+                            "default": "The parameter set ID is three bytes long and specified by three ASCII digits. Range: 000-999."
+                        }
+                    }
+                }
+            ]
+        },
+        "Batch_Size": {
+            "allOf": [
+                {
+                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+                },
+                {
+                    "properties": {
+                        "Sparkplug_Type": {
+                            "enum": [
+                                "UInt32BE"
+                            ]
+                        },
+                        "Documentation": {
+                            "default": "This parameter gives the total number of tightening in the batch. The batch size is four bytes long and specified by four ASCII digits. Range: 0000-9999."
+                        }
+                    }
+                }
+            ]
+        },
+        "Batch_Counter": {
+            "allOf": [
+                {
+                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+                },
+                {
+                    "properties": {
+                        "Sparkplug_Type": {
+                            "enum": [
+                                "UInt32BE"
+                            ]
+                        },
+                        "Documentation": {
+                            "default": "The batch counter information is four bytes long specifying and specified by four ASCII digits. Range: 0000-9999."
+                        }
+                    }
+                }
+            ]
+        },
+        "Tightening_Status": {
+            "allOf": [
+                {
+                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+                },
+                {
+                    "properties": {
+                        "Sparkplug_Type": {
+                            "enum": [
+                                "UInt8"
+                            ]
+                        },
+                        "Value": {
+                            "enum": [
+                                "",
+                                "0",
+                                "1"
+                            ]
+                        },
+                        "Documentation": {
+                            "default": "The tightening status is one byte long and specified by one ASCII digit. 0=tightening NOK, 1=tightening OK."
+                        }
+                    }
+                }
+            ]
+        },
+        "Torque_Status": {
+            "allOf": [
+                {
+                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+                },
+                {
+                    "properties": {
+                        "Sparkplug_Type": {
+                            "enum": [
+                                "UInt8"
+                            ]
+                        },
+                        "Value": {
+                            "enum": [
+                                "",
+                                "0",
+                                "1",
+                                "2"
+                            ]
+                        },
+                        "Documentation": {
+                            "default": "Torque status 0=Low, 1=OK, 2=High."
+                        }
+                    }
+                }
+            ]
+        },
+        "Angle_Status": {
+            "allOf": [
+                {
+                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+                },
+                {
+                    "properties": {
+                        "Sparkplug_Type": {
+                            "enum": [
+                                "UInt8"
+                            ]
+                        },
+                        "Value": {
+                            "enum": [
+                                "",
+                                "0",
+                                "1",
+                                "2"
+                            ]
+                        },
+                        "Documentation": {
+                            "default": "Angle status 0=Low, 1=OK, 2=High."
+                        }
+                    }
+                }
+            ]
+        },
+        "Torque_Min_Limit": {
+            "allOf": [
+                {
+                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+                },
+                {
+                    "properties": {
+                        "Sparkplug_Type": {
+                            "enum": [
+                                "UInt64BE"
+                            ]
+                        },
+                        "Documentation": {
+                            "default": "The torque min limit is multiplied by 100 and sent as an integer (2 decimals truncated). It is six bytes long and is specified by six ASCII digits."
+                        }
+                    }
+                }
+            ]
+        },
+        "Torque_Max_Limit": {
+            "allOf": [
+                {
+                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+                },
+                {
+                    "properties": {
+                        "Sparkplug_Type": {
+                            "enum": [
+                                "UInt64BE"
+                            ]
+                        },
+                        "Documentation": {
+                            "default": "The torque max limit is multiplied by 100 and sent as an integer (2 decimals truncated). It is six bytes long and is specified by six ASCII digits."
+                        }
+                    }
+                }
+            ]
+        },
+        "Torque_Final_Target": {
+            "allOf": [
+                {
+                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+                },
+                {
+                    "properties": {
+                        "Sparkplug_Type": {
+                            "enum": [
+                                "UInt64BE"
+                            ]
+                        },
+                        "Documentation": {
+                            "default": "The torque final target is multiplied by 100 and sent as an integer (2 decimals truncated). It is six bytes long and is specified by six ASCII digits."
+                        }
+                    }
+                }
+            ]
+        },
+        "Torque": {
+            "allOf": [
+                {
+                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+                },
+                {
+                    "properties": {
+                        "Sparkplug_Type": {
+                            "enum": [
+                                "UInt64BE"
+                            ]
+                        },
+                        "Documentation": {
+                            "default": "The torque value is multiplied by 100 and sent as an integer (2 decimals truncated). It is six bytes long and is specified by six ASCII digits."
+                        }
+                    }
+                }
+            ]
+        },
+        "Angle_Min": {
+            "allOf": [
+                {
+                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+                },
+                {
+                    "properties": {
+                        "Sparkplug_Type": {
+                            "enum": [
+                                "UInt64BE"
+                            ]
+                        },
+                        "Documentation": {
+                            "default": "The angle min value in degrees. Each turn represents 360 degrees. It is five bytes long and specified by five ASCII digits. Range: 00000-99999."
+                        }
+                    }
+                }
+            ]
+        },
+        "Angle_Max": {
+            "allOf": [
+                {
+                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+                },
+                {
+                    "properties": {
+                        "Sparkplug_Type": {
+                            "enum": [
+                                "UInt64BE"
+                            ]
+                        },
+                        "Documentation": {
+                            "default": "The angle max value in degrees. Each turn represents 360 degrees. It is five bytes long and specified by five ASCII digits. Range: 00000-99999."
+                        }
+                    }
+                }
+            ]
+        },
+        "Final_Angle_Target": {
+            "allOf": [
+                {
+                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+                },
+                {
+                    "properties": {
+                        "Sparkplug_Type": {
+                            "enum": [
+                                "UInt64BE"
+                            ]
+                        },
+                        "Documentation": {
+                            "default": "The target angle value in degrees. Each turn represents 360 degrees. It is five bytes long and specified by five ASCII digits. Range: 00000-99999."
+                        }
+                    }
+                }
+            ]
+        },
+        "Angle": {
+            "allOf": [
+                {
+                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+                },
+                {
+                    "properties": {
+                        "Sparkplug_Type": {
+                            "enum": [
+                                "UInt64BE"
+                            ]
+                        },
+                        "Documentation": {
+                            "default": "The turning angle value in degrees. Each turn represents 360 degrees. It is five bytes long and specified by five ASCII digits. Range: 00000-99999."
+                        }
+                    }
+                }
+            ]
+        },
+        "Time_Stamp": {
+            "allOf": [
+                {
+                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+                },
+                {
+                    "properties": {
+                        "Sparkplug_Type": {
+                            "enum": [
+                                "String"
+                            ]
+                        },
+                        "Documentation": {
+                            "default": "Time stamp for each tightening. It is 19 bytes long and is specified by 19 ASCII characters (YYYY-MM-DD:HH:MM:SS)."
+                        }
+                    }
+                }
+            ]
+        },
+        "Last_Parameter_Set_Change": {
+            "allOf": [
+                {
+                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+                },
+                {
+                    "properties": {
+                        "Sparkplug_Type": {
+                            "enum": [
+                                "String"
+                            ]
+                        },
+                        "Documentation": {
+                            "default": "Time stamp for the last change in the current parameter set settings. It is 19 bytes long and is specified by 19 ASCII characters (YYYY-MM-DD:HH:MM:SS)."
+                        }
+                    }
+                }
+            ]
+        },
+        "Batch_Status": {
+            "allOf": [
+                {
+                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+                },
+                {
+                    "properties": {
+                        "Sparkplug_Type": {
+                            "enum": [
+                                "UInt8"
+                            ]
+                        },
+                        "Value": {
+                            "enum": [
+                                "",
+                                "0",
+                                "1",
+                                "2"
+                            ]
+                        },
+                        "Documentation": {
+                            "default": "The batch status is specified by one ASCII character. 0=batch NOK (batch not completed), 1=batch OK, 2=batch not used."
+                        }
+                    }
+                }
+            ]
+        },
+        "Tightening_ID": {
+            "allOf": [
+                {
+                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+                },
+                {
+                    "properties": {
+                        "Sparkplug_Type": {
+                            "enum": [
+                                "UInt64BE"
+                            ]
+                        },
+                        "Documentation": {
+                            "default": "The tightening ID is a unique ID for each tightening result. It is incremented after each tightening. 10 ASCII digits. Max 4294967295"
+                        }
+                    }
+                }
+            ]
+        }
+    },
+    "required": [
+        "Schema_UUID",
+        "Instance_UUID",
+        "Torque_Controller_Name",
+        "VIN_Number",
+        "Job_ID",
+        "Parameter_Set_ID",
+        "Batch_Size",
+        "Batch_Counter",
+        "Tightening_Status",
+        "Torque_Status",
+        "Angle_Status",
+        "Torque_Min_Limit",
+        "Torque_Max_Limit",
+        "Torque_Final_Target",
+        "Torque",
+        "Angle_Min",
+        "Angle_Max",
+        "Final_Angle_Target",
+        "Angle"
+    ]
+}

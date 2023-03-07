@@ -1,0 +1,7 @@
+{
+    "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Units/Eng_Units-v1.json",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "This schema contains the available Engineering units for the Eng_Unit element across Factory+ data schemas",
+    "$comment": "To ensure interoperability and consistency of notation, tags that are transported around the Factory+ network must have units in the form of the OPC UA Engineering units (more information can be found in https://reference.opcfoundation.org/v104/Core/docs/Part8/5.6.3/). The list of all available units can be found in the csv file http://www.opcfoundation.org/UA/EngineeringUnits/UNECE/UNECE_to_OPCUA.csv. The list of units in this sheet was copied from the UNECE_to_OPCUA.csv file on 09/12/2020.",
+    "type": "string"
+}

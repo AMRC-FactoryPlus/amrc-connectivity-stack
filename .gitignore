@@ -1,0 +1,13 @@
+/.idea/
+/.vs/
+
+# Temporary experiments
+/tmp/
+
+# Vim swapfile
+*.swp
+node_modules/
+.env
+package-lock.json
+
+*instances/

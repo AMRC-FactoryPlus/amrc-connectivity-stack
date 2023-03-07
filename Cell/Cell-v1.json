@@ -1,0 +1,41 @@
+{
+    "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Cell/Cell-v1.json",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Cell",
+    "type": "object",
+    "properties": {
+        "Schema_UUID": {
+            "const": "aa8f98ad-2c6e-4fef-86d1-f01b576b35ed"
+        },
+        "Instance_UUID": {
+            "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+            "type": "string",
+            "format": "uuid"
+        },
+        "Safety": {
+            "type": "object",
+            "properties": {
+                "Emergency_Stops": {
+                    "type": "object",
+                    "patternProperties": {
+                        "^[a-zA-Z0-9_]*$": {
+                            "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Cell/Emergency_Stop-v1.json"
+                        }
+                    }
+                },
+                "Protective_Stops": {
+                    "type": "object",
+                    "patternProperties": {
+                        "^[a-zA-Z0-9_]*$": {
+                            "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Cell/Protective_Stop-v1.json"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "required": [
+        "Schema_UUID",
+        "Instance_UUID"
+    ]
+}

@@ -1,0 +1,62 @@
+{
+  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Robot/Robot-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Robotic Object",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "6012580d-fd0a-442c-8d71-7f31f7155633"
+    },
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "Controller_UUID": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "UUID"
+              ]
+            },
+            "Documentation": {
+              "default": "A reference to the controller that this robot uses"
+            }
+          }
+        }
+      ]
+    },
+    "Device_Information": {
+      "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Device_Information-v1.json"
+    },
+    "Axes": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-zA-Z0-9_]*$": {
+          "$comment": "An axis name or identifier - can be any regular string",
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Axis-v1.json"
+        }
+      }
+    },
+    "End_Effectors": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-zA-Z0-9_]*$": {
+          "$comment": "An end effector position identifier",
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/End_Effector-v1.json"
+        }
+      }
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID",
+    "Device_Information",
+    "Axes"
+  ]
+}

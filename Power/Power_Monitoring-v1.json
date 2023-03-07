@@ -1,0 +1,108 @@
+{
+  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Power/Power_Monitoring-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Power Monitoring",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "481dbce2-cabc-4fb1-b402-ee51f49f62b0"
+    },
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "Device_Information": {
+      "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Device_Information-v1.json"
+    },
+    "Phases": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-zA-Z0-9_]*$": {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Power/Phase-v1.json"
+        }
+      }
+    },
+    "In_Use": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "Boolean"
+              ]
+            },
+            "Documentation": {
+              "default": "Whether or not the device has detected if the device is drawing power"
+            }
+          }
+        }
+      ]
+    },
+    "Relay_Closed": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "Boolean"
+              ]
+            },
+            "Documentation": {
+              "default": "Whether or not the relay is open"
+            }
+          }
+        }
+      ]
+    },
+    "Energy_Total": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "DoubleLE",
+                "DoubleBE"
+              ]
+            },
+            "Documentation": {
+              "default": "The total energy consumed by the device (kWh)"
+            }
+          }
+        }
+      ]
+    },
+    "Status": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "String"
+              ]
+            },
+            "Documentation": {
+              "default": "The status of the device"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID"
+  ]
+}

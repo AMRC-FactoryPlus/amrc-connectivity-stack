@@ -12,9 +12,9 @@
             "type": "string",
             "format": "uuid"
         }
-    }
+    },
     "required": [
         "Schema_UUID",
-        "Instance_UUID",
+        "Instance_UUID"
     ]
 }

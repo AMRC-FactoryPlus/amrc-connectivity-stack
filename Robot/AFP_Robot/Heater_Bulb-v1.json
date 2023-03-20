@@ -1,0 +1,23 @@
+{
+  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Robot/AFP_Robot/Heater_Bulb-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AFP Heater Bulb",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "8a453114-cea6-4d36-b078-4be936778ae4"
+    },
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "Power": {
+      "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Power/Phase-v1.json"
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID"
+  ]
+}

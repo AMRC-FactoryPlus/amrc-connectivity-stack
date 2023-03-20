@@ -12,8 +12,13 @@
       "type": "string",
       "format": "uuid"
     },
-    "Power": {
-      "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Power/Phase-v1.json"
+    "Bulbs": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-zA-Z0-9_]*$": {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Robot/AFP_Robot/Heater_Bulb-v1.json"
+        }
+      }
     },
     "Temperature": {
       "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Commanded_Value-v1.json"

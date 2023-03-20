@@ -1,0 +1,40 @@
+{
+  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Robot/AFP_Robot/Head-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AFP Head",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "d50b78ea-83c5-4a5d-8514-68fd882eaa0b"
+    },
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "Base_End_Effector": {
+      "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/End_Effector-v1.json"
+    },
+    "Heaters": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-zA-Z0-9_]*$": {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Robot/AFP_Robot/Heater-v1.json"
+        }
+      }
+    },
+    "Feed_Axis_Angle": {
+      "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Commanded_Value-v1.json"
+    },
+    "Layup_Speed": {
+      "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Commanded_Value-v1.json"
+    },
+    "Compaction": {
+      "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Commanded_Value-v1.json"
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID"
+  ]
+}

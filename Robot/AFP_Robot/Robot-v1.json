@@ -1,0 +1,71 @@
+{
+  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Robot/AFP_Robot/Robot-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AFP Robot",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "240ae2d4-2010-476d-a9ce-f03a2c419adc"
+    },
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "Base_Robot": {
+      "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Robot/Robot-v1.json"
+    },
+    "Machine_State": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "Int32LE",
+                "Int32BE"
+              ]
+            },
+            "Documentation": {
+              "default": "An integer that represents the machine being in one of several possible states."
+            }
+          }
+        }
+      ]
+    },
+    "Current_Course_Duration": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "FloatLE",
+                "FloatBE"
+              ]
+            },
+            "Documentation": {
+              "default": "A value representing the time in seconds that the current course has been running"
+            }
+          }
+        }
+      ]
+    },
+    "Heads": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-zA-Z0-9_]*$": {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Robot/AFP_Robot/Head-v1.json"
+        }
+      }
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID"
+  ]
+}

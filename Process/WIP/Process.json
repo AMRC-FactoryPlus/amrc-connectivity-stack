@@ -1,0 +1,58 @@
+{
+  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Process/WIP/Process-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "634d8f97-7b15-4f36-b9f4-9645930e6885"
+    },
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "Started_At": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "DateTime"
+              ]
+            },
+            "Documentation": {
+              "default": "The date and time that this process started"
+            }
+          }
+        }
+      ]
+    },
+    "Completed_At": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "DateTime"
+              ]
+            },
+            "Documentation": {
+              "default": "The date and time that this process completed"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID"
+  ]
+}

@@ -1,5 +1,5 @@
 {
-  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/SpatialPosition-v1.json",
+  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Spatial_Position-v1.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Spatial Position",
   "type": "object",

@@ -1,0 +1,12 @@
+# Vim swap
+*.swp
+
+# Environment
+.env
+
+# Secrets
+/keytabs/
+/volumes/
+
+# IDE
+.idea/

@@ -1,0 +1,10 @@
+# Vim swap
+*.swp
+
+# Secrets
+/keytabs/
+/volumes/
+
+# Docker stuff
+.env
+.idea/

@@ -1,6 +1,5 @@
 # ACS Directory Service
 
-> **Note**
 > The [AMRC Connectivity Stack (ACS)](https://github.com/AMRC-FactoryPlus/amrc-connectivity-stack) is an open-source implementation of the AMRC's [Factory+ Framework](https://factoryplus.app.amrc.co.uk).
 
 This `acs-directory` service satisfies the **Directory** component of the Factory+ framework and allows consuming applications to find what devices are currently online. It allows queries to be made asking which devices are publishing what types of data and it allows queries about a device's online/offline history.

@@ -1,0 +1,315 @@
+openapi: 3.0.0
+info:
+    title: Factory+ Config Store
+    description: Factory+ Config Store
+    version: 1.0.0
+
+servers:
+    -   url: /v1
+
+security:
+    - basic: []
+
+# NOTE: This API is rooted at /v1 on its server. The servers: entry
+# above records this. This means that the URLs passed to the server are
+# actually /v1/config and so on.
+paths:
+    /object:
+        get:
+            summary: List objects
+            responses:
+                "200":
+                    description: List of all registered objects.
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/UuidList" }
+        post:
+            summary: Register new object
+            requestBody:
+                description: New object information
+                required: true
+                content:
+                    application/json:
+                        schema: { $ref: "#/components/schemas/ObjectRegistration" }
+            responses:
+                "200":
+                    description: Object already registered.
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/ObjectRegistration" }
+                "201":
+                    description: Object newly registered.
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/ObjectRegistration" }
+                "400":
+                    description: Invalid class UUID (not a class).
+                "404":
+                    description: Class not found.
+                "409":
+                    description: Object already registered as a different class.
+
+    /app:
+        get:
+            summary: List the known apps.
+            responses:
+                "200":
+                    description: List of the registered apps.
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/UuidList" }
+                "401":
+                    description: Unauthenticated access
+                "403":
+                    description: Unauthorised acccess
+        post:
+            summary: Register an app.
+            requestBody:
+                description: The app summary information
+                required: true
+                content:
+                    application/json:
+                        schema: { $ref: "#/components/schemas/Application" }
+            responses:
+                "204":
+                    description: App registered
+                "401":
+                    description: Unauthenticated access
+                "403":
+                    description: Unauthorised access
+
+    /app/{app}:
+        parameters:
+            -   { $ref: "#/components/parameters/app" }
+        get:
+            summary: Return information about a registered app.
+            responses:
+                "200":
+                    description: Information about the app.
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/Application" }
+                "404":
+                    description: App not known
+                "401":
+                    description: Unauthenticated access
+                "403":
+                    description: Unauthorised access
+
+    /app/{app}/config:
+        parameters:
+            -   { $ref: "#/components/parameters/app" }
+        get:
+            summary: Get app general configuration.
+            responses:
+                "200":
+                    description: App configuration.
+                    content:
+                        application/json: {}
+                "404":
+                    description: App config not set
+        put:
+            summary: Set app general configuration.
+            requestBody:
+                description: App configuration.
+                required: true
+                content:
+                    application/json: {}
+            responses:
+                "204":
+                    description: Config set
+                "403":
+                    description: Config not valid according to schema.
+                "404":
+                    description: App not known
+        delete:
+            summary: Delete an app's general configuration.
+            responses:
+                "204":
+                    description: Config deleted
+                "404":
+                    description: App not known
+
+    /app/{app}/config-schema:
+        parameters:
+            -   { $ref: "#/components/parameters/app" }
+        get:
+            summary: Fetch the JSON schema for an app.
+            responses:
+                "200":
+                    description: App schema.
+                    content:
+                        application/json: {}
+                "404":
+                    description: App not found or schema not set.
+        put:
+            summary: Set the JSON schema for an app.
+            requestBody:
+                description: New schema for app.
+                required: true
+                content:
+                    application/json: {}
+            responses:
+                "204":
+                    description: Schema updated successfully.
+                "404":
+                    description: App not registered.
+                "409":
+                    description: >
+                        The existing config information for this app
+                        does not validate against the new schema. The
+                        new schema has been rejected. Returns a list of
+                        devices for which validation failed.
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/UuidList" }
+
+
+    /app/{app}/find:
+        get:
+            summary: Search for configs by property values.
+            parameters:
+                -   { $ref: "#/components/parameters/app" }
+                -   name: query
+                    in: query
+                    style: form
+                    schema:
+                        type: object
+                        # These are schema'd as type:string, but they
+                        # are expected to be JSON scalar values.
+                        additionalProperties:
+                            type: string
+            responses:
+                "200":
+                    description: List of objects found.
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/UuidList" }
+                            
+    /app/{app}/{kind}:
+        get:
+            summary: Find all the objects of this kind this app has configuration for.
+            parameters:
+                -   { $ref: "#/components/parameters/app" }
+                -   { $ref: "#/components/parameters/kind" }
+            responses:
+                "200":
+                    description: List of devices we have config for.
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/UuidList" }
+                "401":
+                    description: Unauthenticated access
+                "403":
+                    description: Unauthorised access
+
+    /app/{app}/{kind}/{object}:
+        parameters:
+            -   { $ref: "#/components/parameters/app" }
+            -   { $ref: "#/components/parameters/kind" }
+            -   { $ref: "#/components/parameters/object" }
+        get:
+            summary: Get config for a particular object.
+            responses:
+                "200":
+                    description: Config for the object
+                    content:
+                        application/json: {}
+        put:
+            summary: Set config for a particular object.
+            requestBody: { $ref: "#/components/requestBodies/config" }
+            responses:
+                "204":
+                    description: Config successfully recorded
+                "404":
+                    description: App not known
+                "401":
+                    description: Unauthorised access
+                "403":
+                    description: Config not valid according to schema
+                "405":
+                    description: Invalid operation for object registration.
+        delete:
+            summary: Delete config for a particular object.
+            responses:
+                "204":
+                    description: Config delete
+                "404":
+                    description: App or object not known
+                "401":
+                    description: Unauthenticated access
+                "405":
+                    description: Invalid operation for object registration.
+
+components:
+    securitySchemes:
+        basic:
+            type: http
+            description: User/password HTTP Basic auth
+            scheme: Basic
+
+    parameters:
+        app:
+            description: The application UUID.
+            name: app
+            in: path
+            required: true
+            schema: { type: string, format: uuid }                
+        kind:
+            description: The type of object.
+            name: kind
+            in: path
+            required: true
+            schema: 
+                type: string
+                enum: ["object", "class", "device", "schema", "app"]
+        object:
+            description: The object UUID.
+            name: object
+            in: path
+            required: true
+            schema: { type: string, format: uuid }
+
+    requestBodies:
+        config:
+            description: A config snippet to store
+            required: true
+            content:
+                application/json:
+                    schema: { type: object }
+    
+    schemas:
+        Application:
+            description: Information about a registered app.
+            type: object
+            required: [uuid, name]
+            properties:
+                uuid: { type: string, format: uuid }
+                name:
+                    type: string
+                    description: A human-readable name for the application.
+
+        ConfigList:
+            description: A list of config snippets with metadata
+            type: array
+            items:
+                type: object
+                required: [config]
+                properties:
+                    app: { type: string, format: uuid }
+                    schema: { type: string, format: uuid }
+                    device: { type: string, format: uuid }
+                    config: { type: object }
+
+        ObjectRegistration:
+            description: Object registration information
+            type: object
+            required: [class]
+            properties:
+                uuid: { type: string, format: uuid }
+                class: { type: string, format: uuid }
+
+        UuidList:
+            description: A list of UUIDs
+            type: array
+            items: { type: string, format: uuid }

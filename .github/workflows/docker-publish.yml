@@ -47,6 +47,7 @@ jobs:
           body: Update the version of `package.json` as part of release process
           delete-branch: true
           base: main
+          token: ${{ secrets.CREATE_PULL_REQUEST_TOKEN }}
 
       # Install the cosign tool except on PR
       # https://github.com/sigstore/cosign-installer

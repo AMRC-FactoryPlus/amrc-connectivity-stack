@@ -1,0 +1,27 @@
+{
+  "name": "acs-directory",
+  "version": "0.0.1",
+  "description": "The Directory component of the AMRC Connectivity Stack",
+  "author": "AMRC",
+  "license": "MIT",
+  "keywords": [
+    "amrc",
+    "factory-plus",
+    "factoryplus",
+    "acs",
+    "amrc-connectivity-stack",
+    "mqtt",
+    "sparkplug"
+  ],
+  "type": "module",
+  "scripts": {
+    "mqtt": "node bin/directory-mqtt",
+    "webapi": "node bin/directory-webapi"
+  },
+  "dependencies": {
+    "@amrc-factoryplus/utilities": "^1.0.6",
+    "async": "^3.2.4",
+    "express": "^4.17.1",
+    "express-openapi-validator": "^4.13.2"
+  }
+}

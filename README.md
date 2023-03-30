@@ -1,6 +1,5 @@
 # ACS Identity Service
 
-> **Note**
 > The [AMRC Connectivity Stack (ACS)](https://github.com/AMRC-FactoryPlus/amrc-connectivity-stack) is an open-source implementation of the AMRC's [Factory+ Framework](https://factoryplus.app.amrc.co.uk).
 
 This `acs-kdc` service satisfies the **Identity** component of the Factory+ framework and provides a Kerberos Key Distribution Center (KDC) to centralise identity management.

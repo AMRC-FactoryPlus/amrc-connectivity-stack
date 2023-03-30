@@ -16,8 +16,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-      # This is used to complete the identity challenge
-      # with sigstore/fulcio when running outside of PRs.
       id-token: write
       pull-requests: write
 
@@ -42,6 +40,7 @@ jobs:
           body: Update the version of `package.json` as part of release process
           delete-branch: true
           base: main
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       # Install the cosign tool except on PR
       # https://github.com/sigstore/cosign-installer

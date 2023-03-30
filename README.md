@@ -55,7 +55,6 @@ This returns information about a particular device; in particular, if an applica
 If bad data is received via Sparkplug it will be recorded and returned. In particular, if two devices publish on the same Sparkplug address at the same time the data returned from the directory will be very confusing.
 
 ### Authentication & Authorisation
-The API requires HTTP Basic authentication on every request. (This means external access MUST be over HTTPS). The credentials required are the client's MQTT server credentials; currently they are checked rather crudely by attempting to connect to the MQTT broker using the supplied credentials (this happens for every request, which is not ideal).
 
 There are no ACLs currently. Any authenticated client has access to all data. This is subject to further specification.
 
@@ -84,8 +83,6 @@ This is indicative of a more general problem: since we have no reliability mecha
 In addition to the metrics required for command escalation, the mqtt component publishes a string metric `Service/Directory` containing the URL configured for clients to use.
 
 ## Known issues
-
-- Authenticating every request against the MQTT server is crude and inefficient (if we could maintain the TLS connection and simply send a new CONNECT every time it would not be so bad, but MQTT does not allow that).
 
 - There are no ACLs; all users are provided with all information. It is not clear what the right thing to do is, here.
 

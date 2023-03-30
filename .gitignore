@@ -1,4 +1,4 @@
-/node_modules/
+node_modules/
 
 # Vim swap
 *.swp
@@ -12,3 +12,15 @@
 
 # IDE
 .idea/
+
+
+.vscode/
+config/secrets.json
+config/conf.json
+config/backups
+!config/.gitkeep
+lib/**/*.js*
+coverage
+build/
+*.js
+*.js.*

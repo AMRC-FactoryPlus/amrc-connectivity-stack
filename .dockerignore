@@ -1,0 +1,5 @@
+node_modules
+.env
+config/conf.json
+config/secrets.json
+build

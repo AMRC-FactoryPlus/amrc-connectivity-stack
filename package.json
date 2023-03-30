@@ -1,0 +1,30 @@
+{
+  "name": "acs-auth",
+  "version": "0.2.5",
+  "description": "The Authorisation component of the AMRC Connectivity Stack",
+  "type": "module",
+  "main": "index.js",
+  "directories": {},
+  "scripts": {
+    "authn": "k5start -Uf ${CLIENT_KEYTAB} node bin/authn.js",
+    "load-dump": "node bin/load-dump.js"
+  },
+  "keywords": [
+    "amrc",
+    "factory-plus",
+    "factoryplus",
+    "acs",
+    "amrc-connectivity-stack",
+    "mqtt",
+    "sparkplug"
+  ],
+  "author": "AMRC",
+  "license": "MIT",
+  "dependencies": {
+    "@amrc-factoryplus/utilities": "1.0.6",
+    "express": "^4.18.1",
+    "express-basic-auth": "^1.2.1",
+    "http-errors": "^2.0.0",
+    "timers-promises": "^1.0.1"
+  }
+}

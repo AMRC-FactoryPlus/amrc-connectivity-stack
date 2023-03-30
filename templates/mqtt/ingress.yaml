@@ -1,0 +1,38 @@
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRouteTCP
+metadata:
+  name: mqtt-ingressroute
+  namespace: default
+spec:
+  entryPoints:
+    - mqtt
+  routes:
+    - match: HostSNI(`*`)
+      services:
+        - name: mqtt
+          port: 1883
+          namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+  tls:
+    secretName: {{ .Values.tlsSecretName | required "values.tlsSecretName is required!" }}
+    domains:
+      - main: mqtt.{{.Values.baseUrl | required "values.baseUrl is required"}}
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: mqtt-ws-ingressroute
+  namespace: default
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`mqtt.{{.Values.baseUrl | required "values.baseUrl is required"}}`)
+      kind: Rule
+      services:
+        - name: mqtt
+          port: 9001
+          namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+  tls:
+    secretName: {{ .Values.tlsSecretName | required "values.tlsSecretName is required!" }}
+    domains:
+      - main: mqtt.{{.Values.baseUrl | required "values.baseUrl is required"}}

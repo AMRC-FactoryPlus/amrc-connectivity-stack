@@ -1,0 +1,13 @@
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: directory-database-pv-claim
+  namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+  labels:
+    factory-plus.service: directory
+spec:
+  resources:
+    requests:
+      storage: 5Gi
+  accessModes:
+    - ReadWriteOnce

@@ -1,0 +1,33 @@
+apiVersion: v2
+version: 0.0.1
+appVersion: "1.0.0"
+name: amrc-connectivity-stack
+icon: https://www.sheffield.ac.uk/themes/custom/uos/favicon.svg
+description: The AMRC Connectivity Stack (ACS) is a collection of open-source services developed by the AMRC that enables an end-to-end implementation of the Factory+ framework.
+home: factoryplus.app.amrc.co.uk
+type: application
+keywords:
+  - factoryplus
+  - sheffield
+  - mqtt
+  - sparkplug
+  - iiot
+maintainers:
+  - name: Alex Godbehere
+    email: alex.godbehere@amrc.co.uk
+dependencies:
+  - name: traefik
+    version: 10.19.*
+    repository: https://helm.traefik.io/traefik
+  - name: sealed-secrets
+    version: 2.8.1
+    repository: https://bitnami-labs.github.io/sealed-secrets/
+  - name: loki
+    version: 4.8.0
+    repository: https://grafana.github.io/helm-charts
+  - name: promtail
+    version: 6.9.3
+    repository: https://grafana.github.io/helm-charts
+  - name: grafana
+    version: 6.52.4
+    repository: https://grafana.github.io/helm-charts

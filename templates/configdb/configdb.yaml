@@ -1,0 +1,145 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: configdb
+  namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+  labels:
+    component: configdb
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: configdb
+  template:
+    metadata:
+      labels:
+        component: configdb
+        factory-plus.service: configdb
+    spec:
+      volumes:
+        - name: krb5-conf
+          configMap:
+            name: krb5-conf
+        # We have two logical volumes of the secret because the containers need different credentials.
+        - name: krb5-keytabs-dbinit
+          secret:
+            secretName: krb5-keytabs
+            items:
+              - path: dbadmin
+                key: op1pgadmin
+        - name: krb5-keytabs
+          secret:
+            secretName: krb5-keytabs
+            items:
+              - path: client
+                key: sv1configdb
+              - path: server
+                key: http.configdb
+        - name: json-dumps
+          configMap:
+            name: configdb-json-dumps
+
+      initContainers:
+        - name: db-init
+          image: "{{ .Values.configdb.image.registry }}/{{ .Values.configdb.image.repository }}:{{ .Values.configdb.image.tag }}"
+          command: [ "/usr/bin/k5start", "-Uf", "/keytabs/dbadmin", "/usr/local/bin/psql" ]
+          args: [ "-w", "-q", "-f", "/home/node/app/sql/migrate.sql" ]
+          env:
+            - name: KRB5_CONFIG
+              value: /config/krb5-conf/krb5.conf
+            - name: PGHOST
+              value: postgres.{{ .Values.namespace | required "values.namespace is required!" }}.svc.cluster.local
+            - name: PGUSER
+              value: op1pgadmin
+            - name: PGDATABASE
+              value: postgres
+            - name: SRV_DATABASE
+              value: configdb
+            - name: SRV_USER
+              value: sv1configdb
+          volumeMounts:
+            - mountPath: /config/krb5-conf
+              name: krb5-conf
+            - mountPath: /keytabs
+              name: krb5-keytabs-dbinit
+
+        - name: load-dumps
+          image: "{{ .Values.configdb.image.registry }}/{{ .Values.configdb.image.repository }}:{{ .Values.configdb.image.tag }}"
+          command: [ "/usr/bin/k5start", "-Uf", "/keytabs/client" ]
+          args: [ "npm", "run", "load-dump", "/dumps" ]
+          env:
+            - name: KRB5_CONFIG
+              value: /config/krb5-conf/krb5.conf
+            - name: PGHOST
+              value: postgres.{{ .Values.namespace | required "values.namespace is required!" }}.svc.cluster.local
+            - name: PGUSER
+              value: sv1configdb
+            - name: PGDATABASE
+              value: configdb
+          volumeMounts:
+            - mountPath: /config/krb5-conf
+              name: krb5-conf
+            - mountPath: /keytabs
+              name: krb5-keytabs
+            - mountPath: /dumps
+              name: json-dumps
+
+      containers:
+        - name: webapi
+          image: "{{ .Values.configdb.image.registry }}/{{ .Values.configdb.image.repository }}:{{ .Values.configdb.image.tag }}"
+          env:
+            - name: KRB5_CONFIG
+              value: /config/krb5-conf/krb5.conf
+            - name: CLIENT_KEYTAB
+              value: /keytabs/client
+            - name: SERVER_KEYTAB
+              value: /keytabs/server
+            # These two are used to verify Basic auth.
+            - name: HOSTNAME
+              value: configdb.{{ .Values.namespace | required "values.namespace is required!" }}.svc.cluster.local
+            - name: REALM
+              value: {{ .Values.identity.realm | required "values.identity.realm is required!" }}
+            - name: DEVICE_UUID
+              value: 36861e8d-9152-40c4-8f08-f51c2d7e3c25
+            - name: SPARKPLUG_ADDRESS
+              value: AMRC-Service-Config_DB/Config_DB
+            - name: PORT
+              value: "8080"
+            - name: PGHOST
+              value: postgres.{{ .Values.namespace | required "values.namespace is required!" }}.svc.cluster.local
+            - name: PGUSER
+              value: sv1configdb
+            - name: PGDATABASE
+              value: configdb
+            - name: VERBOSE
+              value: "1"
+            - name: CACHE_MAX_AGE
+              value: "10"
+            # If this is set it names a principal which overrides all ACLs. This should be turned off in production.
+            - name: ROOT_PRINCIPAL
+              value: fplusadmin@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+            # This is the value published via MQTT. It is also used by the editor so it needs to be externally resolvable.
+            - name: HTTP_API_URL
+              value: https://configdb.{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+            # This is used for service discovery so it does not need to be externally resolvable.
+            - name: DIRECTORY_URL
+              value: http://directory.{{ .Values.namespace | required "values.namespace is required!" }}.svc.cluster.local
+
+          volumeMounts:
+            - mountPath: /config/krb5-conf
+              name: krb5-conf
+            - mountPath: /keytabs
+              name: krb5-keytabs
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: configdb
+  namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+spec:
+  ports:
+    - name: "web"
+      port: 80
+      targetPort: 8080
+  selector:
+    factory-plus.service: configdb

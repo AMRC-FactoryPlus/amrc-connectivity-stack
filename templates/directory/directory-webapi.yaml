@@ -1,0 +1,116 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: directory-webapi
+  namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+  labels:
+    component: directory-webapi
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: directory-webapi
+  template:
+    metadata:
+      labels:
+        component: directory-webapi
+        factory-plus.service: directory-webapi
+    spec:
+      volumes:
+        - name: krb5-conf
+          configMap:
+            name: krb5-conf
+        # We have two logical volumes of the secret because the containers need different credentials.
+        - name: krb5-keytabs-dbinit
+          secret:
+            secretName: krb5-keytabs
+            items:
+              - path: dbadmin
+                key: op1pgadmin
+        - name: krb5-keytabs
+          secret:
+            secretName: krb5-keytabs
+            items:
+              - path: client
+                key: sv1directory
+              - path: server
+                key: http.directory
+        - name: json-dumps
+          configMap:
+            name: directory-json-dumps
+
+      initContainers:
+        - name: db-init
+          image: "{{ .Values.directory.image.registry }}/{{ .Values.directory.image.repository }}:{{ .Values.directory.image.tag }}"
+          command: [ "/usr/bin/k5start", "-Uf", "/keytabs/dbadmin", "/usr/local/bin/psql" ]
+          args: [ "-w", "-q", "-f", "/home/node/app/sql/migrate.sql" ]
+          env:
+            - name: KRB5_CONFIG
+              value: /config/krb5-conf/krb5.conf
+            - name: PGHOST
+              value: postgres.{{ .Values.namespace | required "values.namespace is required!" }}.svc.cluster.local
+            - name: PGUSER
+              value: op1pgadmin
+            - name: PGDATABASE
+              value: postgres
+            - name: SRV_DATABASE
+              value: directory
+            - name: SRV_USER
+              value: sv1directory
+          volumeMounts:
+            - mountPath: /config/krb5-conf
+              name: krb5-conf
+            - mountPath: /keytabs
+              name: krb5-keytabs-dbinit
+
+      containers:
+        - name: webapi
+          image: "{{ .Values.directory.image.registry }}/{{ .Values.directory.image.repository }}:{{ .Values.directory.image.tag }}"
+          command: [ "/usr/bin/k5start", "-Uf", "/keytabs/client" ]
+          args: [ "npm", "run", "webapi" ]
+          env:
+            - name: KRB5_CONFIG
+              value: /config/krb5-conf/krb5.conf
+            - name: SERVER_KEYTAB
+              value: /keytabs/server
+            # These two are used to verify Basic auth.
+            - name: HOSTNAME
+              value: directory.{{ .Values.namespace | required "values.namespace is required!" }}.svc.cluster.local
+            - name: REALM
+              value: {{ .Values.identity.realm | required "values.identity.realm is required!" }}
+            - name: PORT
+              value: "8080"
+            - name: PGHOST
+              value: postgres.{{ .Values.namespace | required "values.namespace is required!" }}.svc.cluster.local
+            - name: PGUSER
+              value: sv1directory
+            - name: PGDATABASE
+              value: directory
+            - name: VERBOSE
+              value: "1"
+            - name: CACHE_MAX_AGE
+              value: "120"
+            # If this is set it names a principal which overrides all ACLs. This should be turned off in production.
+            - name: ROOT_PRINCIPAL
+              value: admin@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+            # This is used to check our ACLs so it does not need to be externally resolvable.
+            - name: AUTHN_URL
+              value: http://auth.{{ .Values.namespace | required "values.namespace is required!" }}.svc.cluster.local
+          volumeMounts:
+            - mountPath: /config/krb5-conf
+              name: krb5-conf
+            - mountPath: /keytabs
+              name: krb5-keytabs
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: directory
+  namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+spec:
+  ports:
+    - name: "web"
+      port: 80
+      targetPort: 8080
+  selector:
+    factory-plus.service: directory-webapi

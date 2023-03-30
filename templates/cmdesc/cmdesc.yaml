@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cmdescd
+  namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+  labels:
+    component: cmdescd
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: cmdescd
+  template:
+    metadata:
+      labels:
+        component: cmdescd
+        factory-plus.service: cmdescd
+    spec:
+      volumes:
+        - name: krb5-conf
+          configMap:
+            name: krb5-conf
+        - name: krb5-keytabs
+          secret:
+            secretName: krb5-keytabs
+            items:
+              - key: sv1cmdesc
+                path: client
+              - key: http.cmdesc
+                path: server
+
+      containers:
+        - name: mqtt
+          image: "{{ .Values.cmdesc.image.registry }}/{{ .Values.cmdesc.image.repository }}:{{ .Values.cmdesc.image.tag }}"
+          command: [ "/usr/bin/k5start", "-Uf", "/keytabs/client" ]
+          args: [ "npm", "start" ]
+          env:
+            - name: KRB5_CONFIG
+              value: /config/krb5-conf/krb5.conf
+            - name: CLIENT_KEYTAB
+              value: /keytabs/client
+            - name: SERVER_KEYTAB
+              value: /keytabs/server
+            - name: HOSTNAME
+              value: cmdesc.{{ .Values.namespace | required "values.namespace is required!" }}.svc.cluster.local
+            - name: REALM
+              value: {{ .Values.identity.realm | required "values.identity.realm is required!" }}
+            - name: SPARKPLUG_ADDRESS
+              value: {{ .Values.organisation | required "values.organisation is required!" }}-Service-Core/Command_Escalation"
+            - name: DEVICE_UUID
+              value: 23d4e8f9-76c0-49d5-addc-00b6ac05ee58
+            - name: ROOT_PRINCIPAL
+              value: admin@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+            - name: VERBOSE
+              value: {{.Values.cmdesc.verbosity | quote | required "values.cmdesc.verbosity is required!"}}
+            - name: HTTP_API_URL
+              value: http://cmdesc.{{ .Values.namespace | required "values.namespace is required!" }}.svc.cluster.local
+            - name: PORT
+              value: "8080"
+            - name: CACHE_MAX_AGE
+              value: "300"
+            - name: DIRECTORY_URL
+              value: http://directory.{{ .Values.namespace | required "values.namespace is required!" }}.svc.cluster.local
+          volumeMounts:
+            - mountPath: /config/krb5-conf
+              name: krb5-conf
+            - mountPath: /keytabs
+              name: krb5-keytabs
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cmdesc
+  namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+spec:
+  ports:
+    - name: "web"
+      port: 80
+      targetPort: 8080
+  selector:
+    factory-plus.service: cmdescd

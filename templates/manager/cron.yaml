@@ -1,0 +1,35 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: manager-cron
+  namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+spec:
+  concurrencyPolicy: Forbid
+  failedJobsHistoryLimit: 1
+  schedule: "*/1 * * * *"
+  startingDeadlineSeconds: 30
+  successfulJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: 240
+      backoffLimit: 1
+      template:
+        spec:
+          containers:
+            - name: cron
+              image: "{{ .Values.manager.image.registry }}/{{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}"
+              imagePullPolicy: IfNotPresent
+              command: [ "php", "artisan", "schedule:run" ]
+              envFrom:
+                - secretRef:
+                    name: manager-secrets
+                - configMapRef:
+                    name: manager-config
+              resources:
+                limits:
+                  memory: 300Mi
+                  cpu: 200m
+                requests:
+                  memory: 200Mi
+                  cpu: 100m
+          restartPolicy: Never

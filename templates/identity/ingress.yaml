@@ -1,0 +1,44 @@
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRouteTCP
+metadata:
+  name: kdc-ingressroute
+  namespace: default
+spec:
+  entryPoints:
+    - kdc
+  routes:
+    - match: HostSNI(`*`)
+      services:
+        - name: kdc
+          port: kerberos
+          namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRouteTCP
+metadata:
+  name: kpasswd-ingressroute
+  namespace: default
+spec:
+  entryPoints:
+    - kpasswd
+  routes:
+    - match: HostSNI(`*`)
+      services:
+        - name: kadmin
+          port: kpasswd
+          namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRouteTCP
+metadata:
+  name: kadmin-ingressroute
+  namespace: default
+spec:
+  entryPoints:
+    - kadmin
+  routes:
+    - match: HostSNI(`*`)
+      services:
+        - name: kadmin
+          port: kerberos-adm
+          namespace: {{ .Values.namespace | required "values.namespace is required!" }}

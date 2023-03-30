@@ -1,0 +1,189 @@
+## The K8s namespace to install the components in
+namespace: factory-plus
+
+## The organisation where ACS is being deployed
+organisation: AMRC
+
+## The base URL that services will be served from
+baseUrl: localhost
+
+## The name of the secret holding the wildcard certificate for the above domain
+tlsSecretName: factoryplus-tls
+
+## The values for the Identity component of ACS
+identity:
+  ## The Kerberos realm for this Factory+ deployment.
+  realm: LOCALHOST
+  kdc:
+    ## The location and version of the Key Distribution Center (KDC) image
+    image:
+      registry: ghcr.io/amrc-factoryplus
+      repository: acs-kdc
+      tag: latest
+      pullPolicy: IfNotPresent
+  krbKeysOperator:
+    ## The location and version of the Kerberos keys operator image
+    image:
+      registry: ghcr.io/amrc-factoryplus
+      repository: acs-krb-keys-operator
+      tag: latest
+      pullPolicy: IfNotPresent
+
+## The values for the Authorisation component of ACS
+auth:
+  image:
+    registry: ghcr.io/amrc-factoryplus
+    repository: acs-auth
+    tag: latest
+    pullPolicy: IfNotPresent
+
+## The values for the Directory component of ACS
+directory:
+  image:
+    registry: ghcr.io/amrc-factoryplus
+    repository: acs-directory
+    tag: latest
+    pullPolicy: IfNotPresent
+
+## The values for the ConfigDB component of ACS
+configdb:
+  image:
+    registry: ghcr.io/amrc-factoryplus
+    repository: acs-configdb
+    tag: latest
+    pullPolicy: IfNotPresent
+
+## The values for the MQTT component of ACS
+mqtt:
+  image:
+    registry: ghcr.io/amrc-factoryplus
+    repository: acs-mqtt
+    tag: latest
+    pullPolicy: IfNotPresent
+
+## The values for the Manager component of ACS
+manager:
+  image:
+    registry: ghcr.io/amrc-factoryplus
+    repository: acs-manager
+    tag: latest
+    pullPolicy: IfNotPresent
+  translator:
+    registry: ghcr.io/amrc-factoryplus
+    repository: acs-translator
+    tag: latest
+  database:
+    host: "localhost"
+    port: "3306"
+    database: "manager"
+    username: "root"
+    password: "secret"
+  minio:
+    key: management-app
+    secret: ""
+  meilisearch:
+    key: masterKey
+  name: Factory+ Manager
+  env: production
+  debug: false
+  logLevel: warning
+
+## The values for the Command Escalation component of ACS
+cmdesc:
+  image:
+    registry: ghcr.io/amrc-factoryplus
+    repository: acs-cmdesc
+    tag: latest
+    pullPolicy: IfNotPresent
+  # Possible values are either 1 to enable all possible debugging, or a comma-separated list of debug tags
+  # (the tags printed before the log lines). No logging is specified as an empty string.
+  verbosity: 1
+
+## The values for the Files component of ACS
+files:
+  image:
+    registry: ghcr.io/amrc-factoryplus
+    repository: acs-files
+    tag: latest
+    pullPolicy: IfNotPresent
+  logLevel: warning
+  verbosity: 1
+
+## The values for the built-in MinIO instance
+minio:
+  exposeConsole: false
+
+## The values for the built-in postgres instance
+#postgres:
+#  passwordOverride: manuallyDefineAPassword
+#  replicationPasswordOverride: manuallyDefineAPassword
+
+## The values for the Traefik subchart
+traefik:
+  ports:
+    web:
+      redirectTo: websecure
+    mqtt:
+      port: 8883
+      expose: true
+      exposedPort: 8883
+      protocol: TCP
+    kdc:
+      port: 8888
+      expose: true
+      exposedPort: 88
+      protocol: TCP
+    kpasswd:
+      port: 8464
+      expose: true
+      exposedPort: 464
+      protocol: TCP
+    kadmin:
+      port: 8749
+      expose: true
+      exposedPort: 749
+      protocol: TCP
+  additionalArguments:
+    - --metrics.prometheus=true
+    - --entryPoints.mqtt.address=:8883
+    - --serverstransport.insecureskipverify=true
+  ingressRoute:
+    dashboard:
+      enabled: false
+  ## [AZURE] Enable the below section to expose your instance of Factory+/ACS over the internet, replacing the <Value>
+  ## tags with the details of your pre-configured load balancer.
+  #service:
+  #  spec:
+  #    loadBalancerIP: <External IP address here>
+  #  annotations:
+  #    service.beta.kubernetes.io/azure-load-balancer-resource-group: <Load Balancer Resource Group here>
+  providers:
+    kubernetesCRD:
+      allowCrossNamespace: true
+  logs:
+    general:
+      # Logging levels are DEBUG, PANIC, FATAL, ERROR, WARN, and INFO.
+      level: DEBUG
+
+## The values for the Loki subchart
+loki:
+  loki:
+    auth_enabled: false
+    commonConfig:
+      replication_factor: 1
+    storage:
+      type: filesystem
+  singleBinary:
+    replicas: 1
+    persistence:
+      size: 10Gi
+
+## The values for the Promtail subchart
+promtail:
+  loki:
+    serviceName: loki
+
+## The values for the Grafana subchart
+grafana:
+  persistence:
+    enabled: true

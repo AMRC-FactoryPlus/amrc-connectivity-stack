@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: manager
+  namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: manager
+  template:
+    metadata:
+      labels:
+        component: manager
+        factory-plus.service: manager
+    spec:
+      serviceAccountName: factoryplus-manager
+      volumes:
+        - name: manager-meilisearch-storage
+          persistentVolumeClaim:
+            claimName: manager-meilisearch-pvc
+        - name: manager-keytab
+          secret:
+            secretName: manager-keytab
+        - name: krb5-conf
+          configMap:
+            name: krb5-conf
+      containers:
+        - name: app
+          image: "{{ .Values.manager.image.registry }}/{{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}"
+          env:
+            - name: KRB5_CONFIG
+              value: /config/krb5-conf/krb5.conf
+          envFrom:
+            - configMapRef:
+                name: manager-config
+            - secretRef:
+                name: manager-secrets
+          volumeMounts:
+            - mountPath: /config/keytab
+              name: manager-keytab
+            - mountPath: /config/krb5-conf
+              name: krb5-conf
+        - name: meilisearch
+          image: getmeili/meilisearch:v0.30.0
+          volumeMounts:
+            - mountPath: "/data.ms"
+              name: manager-meilisearch-storage
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: manager-meilisearch-pvc
+  namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+  labels:
+    factory-plus.service: manager-meilisearch
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: manager
+  namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+spec:
+  ports:
+    - name: "web"
+      port: 80
+      targetPort: 80
+  selector:
+    factory-plus.service: manager

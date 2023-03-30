@@ -1,0 +1,149 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth
+  namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+  labels:
+    component: auth
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: auth
+  template:
+    metadata:
+      labels:
+        component: auth
+        factory-plus.service: auth
+    spec:
+      volumes:
+        - name: krb5-conf
+          configMap:
+            name: krb5-conf
+        # We map this secret to two different logical volumes,
+        # because the different containers need different creds.
+        - name: krb5-keytabs-dbinit
+          secret:
+            secretName: krb5-keytabs
+            items:
+              - path: dbadmin
+                key: op1pgadmin
+        - name: krb5-keytabs
+          secret:
+            secretName: krb5-keytabs
+            items:
+              - path: client
+                key: sv1auth
+              - path: server
+                key: http.auth
+        - name: json-dumps
+          configMap:
+            name: auth-json-dumps
+
+      initContainers:
+        - name: db-init
+          image: "{{ .Values.auth.image.registry }}/{{ .Values.auth.image.repository }}:{{ .Values.auth.image.tag }}"
+          imagePullPolicy: Always
+          command: [ "/usr/bin/k5start", "-Uf", "/keytabs/dbadmin", "/usr/local/bin/psql" ]
+          args: [ "-w", "-q", "-f", "/home/node/app/sql/migrate.sql" ]
+          env:
+            - name: KRB5_CONFIG
+              value: /config/krb5-conf/krb5.conf
+            - name: PGHOST
+              value: postgres.{{ .Values.namespace | required "values.namespace is required!" }}.svc.cluster.local
+            - name: PGUSER
+              value: op1pgadmin
+            - name: PGDATABASE
+              value: postgres
+            - name: SRV_DATABASE
+              value: auth
+            - name: SRV_USER
+              value: sv1auth
+          volumeMounts:
+            - mountPath: /config/krb5-conf
+              name: krb5-conf
+            - mountPath: /keytabs
+              name: krb5-keytabs-dbinit
+
+        - name: load-dumps
+          image: "{{ .Values.auth.image.registry }}/{{ .Values.auth.image.repository }}:{{ .Values.auth.image.tag }}"
+          imagePullPolicy: Always
+          command: [ "/usr/bin/k5start", "-Uf", "/keytabs/client" ]
+          args: [ "npm", "run", "load-dump", "/dumps" ]
+          env:
+            - name: KRB5_CONFIG
+              value: /config/krb5-conf/krb5.conf
+            - name: PGHOST
+              value: postgres.{{ .Values.namespace | required "values.namespace is required!" }}.svc.cluster.local
+            - name: PGUSER
+              value: sv1auth
+            - name: PGDATABASE
+              value: auth
+            - name: VERBOSE
+              value: "1"
+          volumeMounts:
+            - mountPath: /config/krb5-conf
+              name: krb5-conf
+            - mountPath: /keytabs
+              name: krb5-keytabs
+            - mountPath: /dumps
+              name: json-dumps
+
+      containers:
+        - name: webapi
+          image: "{{ .Values.auth.image.registry }}/{{ .Values.auth.image.repository }}:{{ .Values.auth.image.tag }}"
+          imagePullPolicy: Always
+          env:
+            - name: KRB5_CONFIG
+              value: /config/krb5-conf/krb5.conf
+            - name: CLIENT_KEYTAB
+              value: /keytabs/client
+            - name: SERVER_KEYTAB
+              value: /keytabs/server
+            # These two values are used to construct a principal name we have a key for, to verify
+            # passwords for Basic auth. They are not used for anything else.
+            - name: HOSTNAME
+              value: auth.{{ .Values.namespace | required "values.namespace is required!" }}.svc.cluster.local
+            - name: REALM
+              value: {{ .Values.identity.realm | required "values.identity.realm is required!" }}
+            - name: PORT
+              value: "8080"
+            - name: PGHOST
+              value: postgres.{{ .Values.namespace | required "values.namespace is required!" }}.svc.cluster.local
+            - name: PGUSER
+              value: sv1auth
+            - name: PGDATABASE
+              value: auth
+            - name: VERBOSE
+              value: "1"
+            - name: CACHE_MAX_AGE
+              value: "10"
+            # These are currently only used for the editor. They need to be resolvable by the
+            # user's browser, so in-cluster names will not work.
+            - name: HTTP_API_URL
+              value: https://auth.{{.Values.baseUrl | required "values.baseUrl is required"}}
+            - name: CONFIGDB_URL
+              value: https://configdb.{{.Values.baseUrl | required "values.baseUrl is required"}}
+            # This principal, if configured, bypasses all ACLs. This is important for
+            # bootstrapping but perhaps shouldn't be left in place once we can bootstrap without
+            # manual intervention.
+            - name: ROOT_PRINCIPAL
+              value: admin@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+          volumeMounts:
+            - mountPath: /config/krb5-conf
+              name: krb5-conf
+            - mountPath: /keytabs
+              name: krb5-keytabs
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth
+  namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+spec:
+  ports:
+    - name: "web"
+      port: 80
+      targetPort: 8080
+  selector:
+    factory-plus.service: auth

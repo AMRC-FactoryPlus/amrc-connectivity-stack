@@ -1,0 +1,8 @@
+apiVersion: traefik.containo.us/v1alpha1
+kind: TLSStore
+metadata:
+  name: default
+  namespace: default
+spec:
+  defaultCertificate:
+    secretName: {{ .Values.tlsSecretName | required "values.tlsSecretName is required!" }}

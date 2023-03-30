@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: files
+  namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+  labels:
+    component: files
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: files
+  template:
+    metadata:
+      labels:
+        component: files
+        factory-plus.service: files
+    spec:
+      volumes:
+        - name: krb5-conf
+          configMap:
+            name: krb5-conf
+        - name: krb5-keytabs
+          secret:
+            secretName: files-keytab
+
+      containers:
+        - name: webapi
+          image: "{{ .Values.files.image.registry }}/{{ .Values.files.image.repository }}:{{ .Values.files.image.tag }}"
+          command: [ "/usr/bin/k5start", "-Uf", "/keytabs/client" ]
+          args: [ "npm", "run", "start" ]
+          imagePullPolicy: Always
+          env:
+            - name: KRB5_CONFIG
+              value: /config/krb5-conf/krb5.conf
+            - name: CLIENT_KEYTAB
+              value: /keytabs/client
+            - name: SERVER_KEYTAB
+              value: /keytabs/server
+          envFrom:
+            - secretRef:
+                name: files-secrets
+            - configMapRef:
+                name: files-config
+          volumeMounts:
+            - mountPath: /config/krb5-conf
+              name: krb5-conf
+            - mountPath: /keytabs
+              name: krb5-keytabs
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: files
+  namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+spec:
+  ports:
+    - name: "web"
+      port: 80
+      targetPort: 3000
+  selector:
+    factory-plus.service: files

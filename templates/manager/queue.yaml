@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: manager-queue-default
+  namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+  labels:
+    app: manager-queue-default
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 50%
+      maxSurge: 2
+  selector:
+    matchLabels:
+      app: manager-queue-default
+  template:
+    metadata:
+      labels:
+        app: manager-queue-default
+    spec:
+      containers:
+        - name: queue-default
+          image: "{{ .Values.manager.image.registry }}/{{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}"
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - secretRef:
+                name: manager-secrets
+            - configMapRef:
+                name: manager-config
+          command: ["/bin/sh", "-c", "php artisan queue:work --queue=default"]
+          resources:
+            requests:
+              memory: 250Mi
+              cpu: 350m

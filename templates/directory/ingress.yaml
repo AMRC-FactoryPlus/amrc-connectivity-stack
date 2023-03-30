@@ -1,0 +1,19 @@
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: directory-ingressroute
+  namespace: default
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`directory.{{.Values.baseUrl | required "values.baseUrl is required"}}`)
+      kind: Rule
+      services:
+        - name: directory
+          port: 80
+          namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+  tls:
+    secretName: {{ .Values.tlsSecretName | required "values.tlsSecretName is required!" }}
+    domains:
+      - main: directory.{{.Values.baseUrl | required "values.baseUrl is required"}}

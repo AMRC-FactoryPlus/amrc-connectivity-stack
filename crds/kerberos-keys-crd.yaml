@@ -1,0 +1,89 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+    name: kerberos-keys.factoryplus.app.amrc.co.uk
+spec:
+    group: factoryplus.app.amrc.co.uk
+    names:
+        kind: KerberosKey
+        plural: kerberos-keys
+        shortNames: [krb, krbs]
+        categories:
+            - all
+    scope: Namespaced
+    versions:
+        -   name: v1
+            served: true
+            storage: true
+            additionalPrinterColumns:
+                -   name: Type
+                    jsonPath: ".spec.type"
+                    type: string
+                -   name: Principal
+                    jsonPath: ".spec.principal"
+                    type: string
+                -   name: Secret
+                    jsonPath: ".spec.secret"
+                    type: string
+                -   name: SealWith
+                    jsonPath: ".spec.sealWith"
+                    type: string
+            schema:
+                openAPIV3Schema:
+                    type: object
+                    required: [spec]
+                    properties:
+                        spec:
+                            type: object
+                            required: [type, principal]
+                            properties:
+                                type:
+                                    description: >
+                                        The kind of principal to create. Random is a fully random key which
+                                        will be recorded as a keytab in the keytabs secret. Password generates
+                                        a random (machine) password and records it in the passwords secret.
+                                        PresetPassword expects a password to have already been recorded in the
+                                        passwords secret; this password will be used as-is. HumanPassword
+                                        generates a password for a human user.
+                                    type: string
+                                    enum: [Random, Password, PresetPassword, HumanPassword]
+                                principal:
+                                    description: The Kerberos principal name.
+                                    type: string
+                                additionalPrincipals:
+                                    description: >
+                                        Additional principals to include in the keytab (useful for multi-homed
+                                        servers). Only valid with type Random.
+                                    type: array
+                                    items:
+                                        type: string
+                                email:
+                                    description: >
+                                        The human user's email address, for automatic password changes.
+                                    type: string
+                                    format: email
+                                secret:
+                                    description: >
+                                        The name of the secret and key to store the keytab/password
+                                        for this principal in, in the format 'secret/key'. The
+                                        secret will be located in the same namespace as this object.
+
+                                        Defaults to the secret configured in the operator for
+                                        keytabs or passwords and the name of this object as key.
+                                        This default should be considered deprecated, and will only
+                                        be applied for objects in the operator's default namespace
+                                        where the default secrets are.
+                                    type: string
+                                    pattern: "^[a-z0-9.-]+/[a-zA-Z0-9._-]+$"
+                                sealWith:
+                                    description: >
+                                        The name of a ConfigMap entry to seal the created secret
+                                        with, in the format 'configmap/key'. This ConfigMap entry
+                                        should contain a PEM-encoded X.509 certificate to sign to.
+                                        This will create a SealedSecret object rather than a Secret.
+                                        The ConfigMap needs to be in the same namespace as this
+                                        object.
+                                    type: string
+                                    pattern: "^[a-z0-9.-]+/[a-zA-Z0-9._-]+$"
+            subresources:
+                status: {}

@@ -1,0 +1,24 @@
+# Operator (cluster administration) Kerberos principals.
+
+# This principal has root level access to some services, in particular the authentication database (if enabled).
+# This means it can be used for I-locked-my-keys-in-the-car disaster recovery.
+---
+apiVersion: factoryplus.app.amrc.co.uk/v1
+kind: KerberosKey
+metadata:
+    name: admin
+    namespace: {{ .Values.namespace | quote | required "values.namespace is required!" }}
+spec:
+    type: Password
+    principal: admin@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+
+# Postgres database initialisation account
+---
+apiVersion: factoryplus.app.amrc.co.uk/v1
+kind: KerberosKey
+metadata:
+    name: op1pgadmin
+    namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+spec:
+    type: Random
+    principal: op1pgadmin@{{ .Values.identity.realm | required "values.identity.realm is required!" }}

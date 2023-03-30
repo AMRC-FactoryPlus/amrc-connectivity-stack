@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: manager-redis
+  namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: manager-redis
+  template:
+    metadata:
+      labels:
+        component: manager-redis
+        factory-plus.service: manager-redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:alpine
+          volumeMounts:
+            - mountPath: "/data"
+              name: manager-redis-storage
+      volumes:
+        - name: manager-redis-storage
+          persistentVolumeClaim:
+            claimName: manager-redis-pvc
+
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: manager-redis-pvc
+  namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+  labels:
+    factory-plus.service: manager-redis
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: manager-redis
+  namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+spec:
+  ports:
+    - name: "redis"
+      port: 6379
+      targetPort: 6379
+  selector:
+    factory-plus.service: manager-redis

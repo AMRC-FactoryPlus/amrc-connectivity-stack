@@ -1,0 +1,97 @@
+# This must run after-bootstrap as it uses the Kubegres CRD.
+
+apiVersion: kubegres.reactive-tech.io/v1
+kind: Kubegres
+metadata:
+  name: postgres
+  namespace: "{{ .Values.namespace | required "values.namespace is required!" }}"
+
+spec:
+  replicas: 1
+  image: postgres:14.3
+
+  database:
+    size: 10Gi
+
+  env:
+    # These secrets should never be used in normal operation. Create
+    # database accounts for me1 users and grant them appropriate
+    # access.
+    - name: POSTGRES_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: postgres-secret
+          key: postgres-password
+    - name: POSTGRES_REPLICATION_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: postgres-secret
+          key: replication-password
+    # Create a database superuser, authenticating via Kerberos, that can be given to pod
+    # initContainers so they can set up their databases.
+    - name: POSTGRES_OP_USER
+      value: op1pgadmin
+
+  customConfig: postgres-conf
+
+  volume:
+    volumes:
+      - name: keytabs
+        secret:
+          secretName: krb5-keytabs
+          items:
+            - key: postgres.postgres
+              path: server
+    volumeMounts:
+      - mountPath: /keytabs
+        name: keytabs
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-conf
+  namespace: "{{ .Values.namespace | required "values.namespace is required!" }}"
+
+data:
+  primary_init_script.sh: |
+    #!/bin/sh
+    set -e
+
+    echo "DB init running as $(id -a)"
+
+    echo "Creating Pg ops superuser $POSTGRES_OP_USER..."
+    # With a bit more care we could manage with just createrole/db, which would be a lot safer.
+    psql <<-PSQL
+    create user $POSTGRES_OP_USER superuser createrole createdb;
+
+    # Remove public write access to the database
+    revoke all on database postgres from public;
+    grant connect on database postgres to public;
+
+    PSQL
+
+    echo "Done."
+
+  postgres.conf: |
+    # This is required for Kubegres
+    listen_addresses = '*'
+
+    # Match this to the keytab volume mount
+    krb_server_keyfile = 'FILE:/keytabs/server'
+
+  pg_hba.conf: |
+    # TYPE      DATABASE        USER            ADDRESS     METHOD
+    # Allow replication
+    host        replication     replication     all         scram-sha-256
+
+    # All ordinary connections are GSS (Kerberos) authenticated.
+    # With these options only local-realm principals will be
+    # allowed, and the database user name will not include the realm.
+    hostgssenc  all             all             all         gss include_realm=0 krb_realm={{ .Values.identity.realm | required "values.identity.realm is required!" }}
+
+    # Allow postgres with password for disaster recovery
+    host        all             postgres        all         scram-sha-256
+
+    # Allow local postgres with peer auth for bootstrap
+    local       all             postgres                    peer

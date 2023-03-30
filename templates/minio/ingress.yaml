@@ -1,0 +1,43 @@
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: data-ingressroute
+  namespace: default
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`data."{{.Values.baseUrl | required "values.baseUrl is required"}}"`)
+      kind: Rule
+      services:
+        - name: fplus-minio-core-hl
+          port: 9000
+          scheme: https
+          namespace: "{{ .Values.namespace | required "values.namespace is required!" }}"
+  tls:
+    secretName: "{{ .Values.tlsSecretName | required "values.tlsSecretName is required!" }}"
+    domains:
+      - main: data."{{.Values.baseUrl | required "values.baseUrl is required"}}"
+---
+{{if .Values.minio.exposeConsole}}
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: fplus-minio-core-console
+  namespace: default
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`minio."{{.Values.baseUrl | required "values.baseUrl is required"}}"`)
+      kind: Rule
+      services:
+        - name: fplus-minio-core-console
+          port: 9443
+          scheme: https
+          namespace: "{{ .Values.namespace | required "values.namespace is required!" }}"
+  tls:
+    secretName: "{{ .Values.tlsSecretName | required "values.tlsSecretName is required!" }}"
+    domains:
+      - main: minio."{{.Values.baseUrl | required "values.baseUrl is required"}}"
+{{end}}

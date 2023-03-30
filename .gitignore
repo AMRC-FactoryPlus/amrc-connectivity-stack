@@ -1,14 +1,8 @@
-/node_modules/
-
-# Vim swap
+/**/*.plain.yaml
+/**/*.plain.json
+*.cert
+*.pem
+*.key
 *.swp
-
-# Environment
-.env
-
-# Secrets
-/keytabs/
-/volumes/
-
-# IDE
-.idea/
+/.idea
+/charts/

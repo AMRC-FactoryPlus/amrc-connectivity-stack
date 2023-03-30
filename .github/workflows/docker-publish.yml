@@ -11,6 +11,27 @@ on:
       - 'v[0-9]+.[0-9]+.[0-9]+'
 
 jobs:
+  update-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Update version in package.json
+        run: |
+          CURRENT_TAG=${GITHUB_REF#refs/tags/}
+          echo "Current tag: $CURRENT_TAG"
+          VERSION="${CURRENT_TAG#v}"
+          echo "Updating version to: $VERSION"
+          jq ".version = \"$VERSION\"" package.json > package.json.tmp
+          mv package.json.tmp package.json
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v4
+        with:
+          title: Update package.json version
+          branch: update-version
+          commit-message: Update package.json version
+          body: Update the version of `package.json` as part of release process
+          delete-branch: true
+          base: main
   build:
     runs-on: ubuntu-latest
     permissions:
@@ -21,26 +42,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-
-      - name: Update version in package.json
-        run: |
-          CURRENT_TAG=${GITHUB_REF#refs/tags/}
-          echo "Current tag: $CURRENT_TAG"
-          VERSION="${CURRENT_TAG#v}"
-          echo "Updating version to: $VERSION"
-          jq ".version = \"$VERSION\"" package.json > package.json.tmp
-          mv package.json.tmp package.json
-
-      - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v4
-        with:
-          title: Update package.json version
-          branch: update-version
-          commit-message: Update package.json version
-          body: Update the version of `package.json` as part of release process
-          delete-branch: true
-          base: main
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       # Install the cosign tool except on PR
       # https://github.com/sigstore/cosign-installer

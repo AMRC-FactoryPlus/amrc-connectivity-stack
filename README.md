@@ -1,9 +1,9 @@
-# AMRC Connectivity Stack (ACS) Directory
+# AMRC Connectivity Stack (ACS) Directory Service
+
+This `acs-directory` service satisfies the **Directory** component of the Factory+ framework and allows consuming applications to find what devices are currently online. It allows queries to be made asking which devices are publishing what types of data and it allows queries about a device's online/offline history.
 
 > **Note**
 > The [AMRC Connectivity Stack](https://github.com/AMRC-FactoryPlus/amrc-connectivity-stack) is an open-source implementation of the AMRC's [Factory+ Framework](https://factoryplus.app.amrc.co.uk). For more information about the Directory component of Factory+ see the [Directory specification](https://factoryplus.app.amrc.co.uk) or for an example of how to deploy this service see the [ACS repository](https://github.com/AMRC-FactoryPlus/amrc-connectivity-stack).
-
-This `acs-directory` service satisfies the **Directory** component of the Factory+ framework and allows consuming applications to find what devices are currently online. It allows queries to be made asking which devices are publishing what types of data and it allows queries about a device's online/offline history.
 
 There are three components to this service:
 

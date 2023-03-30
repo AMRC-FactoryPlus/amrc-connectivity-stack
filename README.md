@@ -1,15 +1,9 @@
 # AMRC Connectivity Stack (ACS) Directory
 
-> >
-*
-*Note
-**
-> The AMRC Connectivity Stack is an open-source implementation of the AMRC's [Factory+ Framework](https://factoryplus.app.amrc.co.uk/). For more information about the Directory component of Factory+, including the API, see the [Connectivity Stack specification](https://factoryplus.app.amrc.co.uk).
+> **Note**
+> The AMRC Connectivity Stack is an open-source implementation of the AMRC's Factory+ Framework. For more information about the Directory component of Factory+, including the API, see the [Factory+ Framework portal](https://factoryplus.app.amrc.co.uk).
 
-This `acs-directory` service satisfies the
-*
-*Directory
-** component of the Factory+ framework and allows consuming applications to find what devices are currently online. It allows queries to be made asking which devices are publishing what types of data and it allows queries about a device's online/offline history.
+This `acs-directory` service satisfies the **Directory** component of the Factory+ framework and allows consuming applications to find what devices are currently online. It allows queries to be made asking which devices are publishing what types of data and it allows queries about a device's online/offline history.
 
 There are three components to this service:
 
@@ -53,6 +47,7 @@ The `mqtt` component acts as an MQTT/Sparkplug client and records births and dea
 | MQTT_PASSWORD     | Password on the MQTT broker.                   |
 | SPARKPLUG_ADDRESS | Sparkplug node address to publish on.          |
 | HTTP_API_URL      | URL to publish for clients to contact the API. |
+
 
 ## Known issues
 

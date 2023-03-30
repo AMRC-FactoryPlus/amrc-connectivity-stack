@@ -1,6 +1,6 @@
 {
   "name": "acs-cmdesc",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "The Command Escalation component of the AMRC Connectivity Stack",
   "author": "AMRC",
   "license": "MIT",

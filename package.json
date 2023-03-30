@@ -1,6 +1,6 @@
 {
   "name": "acs-configdb",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "The Config Store component of the AMRC Connectivity Stack",
   "author": "AMRC",
   "license": "MIT",

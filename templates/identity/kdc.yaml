@@ -44,7 +44,7 @@ spec:
         # Do as little work as possible as root... We need to chown the storage
         # as the default permissions will not be correct.
         - name: chown-storage
-          image: "{{ .Values.identity.kdc.image.registry }}/{{ .Values.identity.kdc.image.repository }}:{{ .Values.identity.kdc.image.tag }}"
+          image: "{{ .Values.identity.identity.image.registry }}/{{ .Values.identity.identity.image.repository }}:{{ .Values.identity.identity.image.tag }}"
           command: ["/bin/sh", "-c"]
           args:
             - |
@@ -61,7 +61,7 @@ spec:
 
         # Initialise the Kerberos database on first boot.
         - name: kdb-init
-          image: "{{ .Values.identity.kdc.image.registry }}/{{ .Values.identity.kdc.image.repository }}:{{ .Values.identity.kdc.image.tag }}"
+          image: "{{ .Values.identity.identity.image.registry }}/{{ .Values.identity.identity.image.repository }}:{{ .Values.identity.identity.image.tag }}"
           command: ["/bin/sh"]
           args: [ "/usr/sbin/init-kdb.sh" ]
           #args: ["-c", "while true; do sleep 10; done"]
@@ -117,7 +117,7 @@ spec:
       containers:
         # The KDC issues tickets to clients.
         - name: kdc
-          image: "{{ .Values.identity.kdc.image.registry }}/{{ .Values.identity.kdc.image.repository }}:{{ .Values.identity.kdc.image.tag }}"
+          image: "{{ .Values.identity.identity.image.registry }}/{{ .Values.identity.identity.image.repository }}:{{ .Values.identity.identity.image.tag }}"
           command: ["/usr/sbin/krb5kdc"]
           args: [ "-n" ]
           env:
@@ -136,7 +136,7 @@ spec:
         # Kadmind performs Kerberos database administration, including password
         # changes for users.
         - name: kadmind
-          image: "{{ .Values.identity.kdc.image.registry }}/{{ .Values.identity.kdc.image.repository }}:{{ .Values.identity.kdc.image.tag }}"
+          image: "{{ .Values.identity.identity.image.registry }}/{{ .Values.identity.identity.image.repository }}:{{ .Values.identity.identity.image.tag }}"
           command: ["/usr/sbin/kadmind"]
           args: [ "-nofork" ]
           env:

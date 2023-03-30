@@ -14,11 +14,11 @@ tlsSecretName: factoryplus-tls
 identity:
   ## The Kerberos realm for this Factory+ deployment.
   realm: LOCALHOST
-  kdc:
+  identity:
     ## The location and version of the Key Distribution Center (KDC) image
     image:
       registry: ghcr.io/amrc-factoryplus
-      repository: acs-kdc
+      repository: acs-identity
       tag: latest
       pullPolicy: IfNotPresent
   krbKeysOperator:

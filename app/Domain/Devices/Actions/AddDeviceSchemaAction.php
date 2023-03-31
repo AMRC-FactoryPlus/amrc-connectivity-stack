@@ -10,7 +10,6 @@ namespace App\Domain\Devices\Actions;
     use App\DeviceSchema;
     use App\DeviceSchemaVersion;
     use App\Exceptions\ActionFailException;
-    use App\Exceptions\ActionForbiddenException;
 
     class AddDeviceSchemaAction
     {

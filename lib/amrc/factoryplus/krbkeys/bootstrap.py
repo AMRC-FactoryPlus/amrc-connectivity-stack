@@ -26,7 +26,7 @@ class KrbKeysBs:
         self.kadm = Kadm("bootstrap", kadm=kadm)
 
         k8s.config.load_incluster_config()
-        self.k8s = K8s(namespace)
+        self.k8s = K8s()
 
     def ensure_keytab (self):
         op = self.principal

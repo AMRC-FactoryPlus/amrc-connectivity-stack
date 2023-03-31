@@ -86,4 +86,4 @@ metadata:
 spec:
   type: Random
   principal: sv1files@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
-  secret: file-service-keytab/client
+  secret: files-keytab/client

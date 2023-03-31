@@ -97,4 +97,4 @@ spec:
   principal: HTTP/file-service.{{ .Values.namespace | required "values.namespace is required!" }}.svc.cluster.local@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
   additionalPrincipals:
     - HTTP/file-service.{{.Values.baseUrl | required "values.baseUrl is required"}}@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
-  secret: file-service-keytab/server
+  secret: files-keytab/server

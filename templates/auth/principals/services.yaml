@@ -1,100 +1,100 @@
 # Service server principals.
-#
-# These are the principals that services use in their capacity as servers: they fulfil
-# much the same function as a TLS server certificate. These principals MUST NOT be
-# granted any rights in any ACLs.
-#
-# The format of the principal name for these is fixed: it must always be
-# SERVICE/FQDN@REALM. The service name is defined by the spec for using Kerberos auth
-# for the protocol in question, and is normally the lowercase service name from
-# /etc/services; HTTP is in caps because Microsoft. A principal name must be added for
-# each FQDN the service can potentially be contacted at.
+  #
+  # These are the principals that services use in their capacity as servers: they fulfil
+  # much the same function as a TLS server certificate. These principals MUST NOT be
+  # granted any rights in any ACLs.
+  #
+  # The format of the principal name for these is fixed: it must always be
+  # SERVICE/FQDN@REALM. The service name is defined by the spec for using Kerberos auth
+  # for the protocol in question, and is normally the lowercase service name from
+  # /etc/services; HTTP is in caps because Microsoft. A principal name must be added for
+  # each FQDN the service can potentially be contacted at.
 
 ---
 apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey
 metadata:
-    name: http.auth
-    namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+  name: http.auth
+  namespace: {{ .Values.namespace | required "values.namespace is required!" }}
 spec:
-    type: Random
-    principal: HTTP/auth."{{ .Values.namespace | required "values.namespace is required!" }}".svc.cluster.local@"{{ .Values.identity.realm | required "values.identity.realm is required!" }}"
-    additionalPrincipals:
-        - HTTP/auth."{{.Values.baseUrl | required "values.baseUrl is required"}}"@"{{ .Values.identity.realm | required "values.identity.realm is required!" }}"
+  type: Random
+  principal: HTTP/auth.{{ .Values.namespace | required "values.namespace is required!" }}.svc.cluster.local@"{{ .Values.identity.realm | required "values.identity.realm is required!" }}"
+  additionalPrincipals:
+    - HTTP/auth."{{.Values.baseUrl | required "values.baseUrl is required"}}"@"{{ .Values.identity.realm | required "values.identity.realm is required!" }}"
 ---
 apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey
 metadata:
-    name: http.cmdesc
-    namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+  name: http.cmdesc
+  namespace: {{ .Values.namespace | required "values.namespace is required!" }}
 spec:
-    type: Random
-    principal: HTTP/cmdesc."{{ .Values.namespace | required "values.namespace is required!" }}".svc.cluster.local@"{{ .Values.identity.realm | required "values.identity.realm is required!" }}"
-    additionalPrincipals:
-        - HTTP/cmdesc."{{.Values.baseUrl | required "values.baseUrl is required"}}"@"{{ .Values.identity.realm | required "values.identity.realm is required!" }}"
+  type: Random
+  principal: HTTP/cmdesc.{{ .Values.namespace | required "values.namespace is required!" }}.svc.cluster.local@"{{ .Values.identity.realm | required "values.identity.realm is required!" }}"
+  additionalPrincipals:
+    - HTTP/cmdesc."{{.Values.baseUrl | required "values.baseUrl is required"}}"@"{{ .Values.identity.realm | required "values.identity.realm is required!" }}"
 ---
 apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey
 metadata:
-    name: http.configdb
-    namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+  name: http.configdb
+  namespace: {{ .Values.namespace | required "values.namespace is required!" }}
 spec:
-    type: Random
-    principal: HTTP/configdb."{{ .Values.namespace | required "values.namespace is required!" }}".svc.cluster.local@"{{ .Values.identity.realm | required "values.identity.realm is required!" }}"
-    additionalPrincipals:
-        - HTTP/configdb."{{.Values.baseUrl | required "values.baseUrl is required"}}"@"{{ .Values.identity.realm | required "values.identity.realm is required!" }}"
+  type: Random
+  principal: HTTP/configdb.{{ .Values.namespace | required "values.namespace is required!" }}.svc.cluster.local@"{{ .Values.identity.realm | required "values.identity.realm is required!" }}"
+  additionalPrincipals:
+    - HTTP/configdb."{{.Values.baseUrl | required "values.baseUrl is required"}}"@"{{ .Values.identity.realm | required "values.identity.realm is required!" }}"
 ---
 apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey
 metadata:
-    name: http.directory
-    namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+  name: http.directory
+  namespace: {{ .Values.namespace | required "values.namespace is required!" }}
 spec:
-    type: Random
-    principal: HTTP/directory."{{ .Values.namespace | required "values.namespace is required!" }}".svc.cluster.local@"{{ .Values.identity.realm | required "values.identity.realm is required!" }}"
-    additionalPrincipals:
-        - HTTP/directory."{{.Values.baseUrl | required "values.baseUrl is required"}}"@"{{ .Values.identity.realm | required "values.identity.realm is required!" }}"
+  type: Random
+  principal: HTTP/directory.{{ .Values.namespace | required "values.namespace is required!" }}.svc.cluster.local@"{{ .Values.identity.realm | required "values.identity.realm is required!" }}"
+  additionalPrincipals:
+    - HTTP/directory."{{.Values.baseUrl | required "values.baseUrl is required"}}"@"{{ .Values.identity.realm | required "values.identity.realm is required!" }}"
 ---
 apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey
 metadata:
-    name: mqtt.mqtt
-    namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+  name: mqtt.mqtt
+  namespace: {{ .Values.namespace | required "values.namespace is required!" }}
 spec:
-    type: Random
-    principal: mqtt/mqtt."{{ .Values.namespace | required "values.namespace is required!" }}".svc.cluster.local@"{{ .Values.identity.realm | required "values.identity.realm is required!" }}"
-    additionalPrincipals:
-        - mqtt/mqtt."{{.Values.baseUrl | required "values.baseUrl is required"}}"@"{{ .Values.identity.realm | required "values.identity.realm is required!" }}"
+  type: Random
+  principal: mqtt/mqtt.{{ .Values.namespace | required "values.namespace is required!" }}.svc.cluster.local@"{{ .Values.identity.realm | required "values.identity.realm is required!" }}"
+  additionalPrincipals:
+    - mqtt/mqtt."{{.Values.baseUrl | required "values.baseUrl is required"}}"@"{{ .Values.identity.realm | required "values.identity.realm is required!" }}"
 ---
 apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey
 metadata:
-    name: http.manager
-    namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+  name: http.manager
+  namespace: {{ .Values.namespace | required "values.namespace is required!" }}
 spec:
-    type: Random
-    principal: HTTP/manager."{{ .Values.namespace | required "values.namespace is required!" }}".svc.cluster.local@"{{ .Values.identity.realm | required "values.identity.realm is required!" }}"
-    additionalPrincipals:
-        - HTTP/manager."{{.Values.baseUrl | required "values.baseUrl is required"}}"@"{{ .Values.identity.realm | required "values.identity.realm is required!" }}"
-    secret: manager-keytab/keytab
+  type: Random
+  principal: HTTP/manager.{{ .Values.namespace | required "values.namespace is required!" }}.svc.cluster.local@"{{ .Values.identity.realm | required "values.identity.realm is required!" }}"
+  additionalPrincipals:
+    - HTTP/manager."{{.Values.baseUrl | required "values.baseUrl is required"}}"@"{{ .Values.identity.realm | required "values.identity.realm is required!" }}"
+  secret: manager-keytab/keytab
 ---
 apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey
 metadata:
-    name: postgres.postgres
-    namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+  name: postgres.postgres
+  namespace: {{ .Values.namespace | required "values.namespace is required!" }}
 spec:
-    type: Random
-    principal: postgres/postgres."{{ .Values.namespace | required "values.namespace is required!" }}".svc.cluster.local@"{{ .Values.identity.realm | required "values.identity.realm is required!" }}"
+  type: Random
+  principal: postgres/postgres.{{ .Values.namespace | required "values.namespace is required!" }}.svc.cluster.local@"{{ .Values.identity.realm | required "values.identity.realm is required!" }}"
 ---
 apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey
 metadata:
-    name: http.file-service
-    namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+  name: http.file-service
+  namespace: {{ .Values.namespace | required "values.namespace is required!" }}
 spec:
-    type: Random
-    principal: HTTP/file-service."{{ .Values.namespace | required "values.namespace is required!" }}".svc.cluster.local@"{{ .Values.identity.realm | required "values.identity.realm is required!" }}"
-    additionalPrincipals:
-        - HTTP/file-service."{{.Values.baseUrl | required "values.baseUrl is required"}}"@"{{ .Values.identity.realm | required "values.identity.realm is required!" }}"
-    secret: file-service-keytab/server
+  type: Random
+  principal: HTTP/file-service.{{ .Values.namespace | required "values.namespace is required!" }}.svc.cluster.local@"{{ .Values.identity.realm | required "values.identity.realm is required!" }}"
+  additionalPrincipals:
+    - HTTP/file-service."{{.Values.baseUrl | required "values.baseUrl is required"}}"@"{{ .Values.identity.realm | required "values.identity.realm is required!" }}"
+  secret: file-service-keytab/server

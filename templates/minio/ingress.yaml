@@ -13,7 +13,7 @@ spec:
         - name: fplus-minio-core-hl
           port: 9000
           scheme: https
-          namespace: "{{ .Values.namespace | required "values.namespace is required!" }}"
+          namespace: {{ .Values.namespace | required "values.namespace is required!" }}
   tls:
     secretName: "{{ .Values.tlsSecretName | required "values.tlsSecretName is required!" }}"
     domains:
@@ -35,7 +35,7 @@ spec:
         - name: fplus-minio-core-console
           port: 9443
           scheme: https
-          namespace: "{{ .Values.namespace | required "values.namespace is required!" }}"
+          namespace: {{ .Values.namespace | required "values.namespace is required!" }}
   tls:
     secretName: "{{ .Values.tlsSecretName | required "values.tlsSecretName is required!" }}"
     domains:

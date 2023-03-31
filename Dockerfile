@@ -12,7 +12,7 @@ RUN echo extension=krb5.so >> /opt/docker/etc/php/php.ini
 ENV WEB_DOCUMENT_ROOT=/app/public
 ENV PHP_DISMOD=bz2,calendar,exiif,ffi,intl,gettext,ldap,mysqli,imap,soap,sockets,sysvmsg,sysvsm,sysvshm,shmop,xsl,zip,gd,apcu,vips,imagick,mongodb,amqp
 WORKDIR /app
-COPY . .
+COPY .docker/app .
 
 # PHP & JS dependencies & UI build
 RUN composer install --no-interaction --optimize-autoloader --no-dev && rm -rf /root/.composer/cache

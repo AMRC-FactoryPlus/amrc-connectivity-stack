@@ -1,0 +1,11 @@
+<?php
+
+namespace {{ namespace }};
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use App\Support\Models\Model;
+
+class {{ class }} extends Model
+{
+    use HasFactory;
+}

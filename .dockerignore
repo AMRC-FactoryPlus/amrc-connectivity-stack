@@ -1,0 +1,6 @@
+node_modules
+storage
+vendor
+!storage/json
+.env
+.env*

@@ -8,8 +8,8 @@ For more information about the Edge Agent component of Factory+ see the [specifi
 
 The general application flow is as follows:
 
-1. The config file is fetched from the management app and read.
-2. A sparkplug client is created using the credentials and settings in the config file
+1. The config file is fetched from the Manager
+2. A Sparkplug client is created using the credentials and settings in the config file
 3. A device connection is instantiated for each provided in the config file.
 4. Within each device connection a device is instantiated for each device within the connection configuration which aggregates the sparkplug and device connection instances.
 5. Once the sparkplug client is online, the device classes begin polling the physical device connection and any changes are passed to the sparkplug client, which publishes these tags according to the provided settings.

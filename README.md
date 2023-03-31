@@ -1,15 +1,10 @@
-# ACS Command Escalation Service
+# ACS Edge Service
 
 > The [AMRC Connectivity Stack (ACS)](https://github.com/AMRC-FactoryPlus/amrc-connectivity-stack) is an open-source implementation of the AMRC's [Factory+ Framework](https://factoryplus.app.amrc.co.uk).
 
-This `acs-edge` service satisfies the
+This `acs-edge` service satisfies the **Edge Agent** component of the Factory+ framework and provides edge translation services from end-devices to Factory+ compatible Sparkplug messages, formatted according to the pre-configured schema for the device. The configuration for each specific edge translation application is fetched from the Manager.
 
-*
-
-*Edge
-** component of the Factory+ framework and provides edge translation services from end-devices to Factory+ compatible Sparkplug messages, formatted according to the pre-configured schema for the device. The configuration for each specific edge translation application is fetched from the Manager.
-
-For more information about the Edge component of Factory+ see the [specification](https://factoryplus.app.amrc.co.uk) or for an example of how to deploy this service see the [AMRC Connectivity Stack repository](https://github.com/AMRC-FactoryPlus/amrc-connectivity-stack).
+For more information about the Edge Agent component of Factory+ see the [specification](https://factoryplus.app.amrc.co.uk) or for an example of how to deploy this service see the [AMRC Connectivity Stack repository](https://github.com/AMRC-FactoryPlus/amrc-connectivity-stack).
 
 The general application flow is as follows:
 

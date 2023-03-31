@@ -342,7 +342,7 @@ data:
             "name": "CCL: Rebirth"
           },
           "6335f100-e68e-4e4d-b46d-85b42f85a036": {
-            "name": "CCL: Reload Translation App Config"
+            "name": "CCL: Reload Edge Agent Config"
           },
           "7213f5a3-0bb1-4151-ad83-d27dcb368980": {
             "name": "File Service"
@@ -536,7 +536,7 @@ data:
           ],
           "6335f100-e68e-4e4d-b46d-85b42f85a036": [
             {
-              "name": "Node Control/Reload Translation App Config",
+              "name": "Node Control/Reload Edge Agent Config",
               "type": "Boolean"
             }
           ]

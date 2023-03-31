@@ -508,19 +508,19 @@ data:
         "8e32801b-f35a-4cbf-a5c3-2af64d3debd7": {
           "5cc3b068-938f-4bb2-8ceb-64338a02fbeb": {
             "node_id": "Directory",
-            "group_id": "{{ .Values.organisation | required "values.organisation is required!" }}-Service-DIR-Directory"
+            "group_id": "{{ .Values.organisation }}-Service-DIR-Directory"
           },
           "36861e8d-9152-40c4-8f08-f51c2d7e3c25": {
             "node_id": "Config_DB",
-            "group_id": "{{ .Values.organisation | required "values.organisation is required!" }}-Service-Config_DB"
+            "group_id": "{{ .Values.organisation }}-Service-Config_DB"
           },
           "23d4e8f9-76c0-49d5-addc-00b6ac05ee58": {
             "node_id": "Command_Escalation",
-            "group_id": "{{ .Values.organisation | required "values.organisation is required!" }}-Service-Core"
+            "group_id": "{{ .Values.organisation }}-Service-Core"
           },
           "3e821f50-502c-420b-b5a6-dc9281f7f4a1": {
               "node_id": "Files",
-              "group_id": "{{ .Values.organisation | required "values.organisation is required!" }}-Service-Core"
+              "group_id": "{{ .Values.organisation }}-Service-Core"
           }
         },
         "60e99f28-67fe-4344-a6ab-b1edb8b8e810": {

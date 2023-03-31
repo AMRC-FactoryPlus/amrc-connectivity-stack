@@ -223,39 +223,39 @@ data:
       "principals": [
         {
           "uuid": "d53f476a-29dd-4d79-b614-5b7fe9bc8acf",
-          "kerberos": "admin@{{ .Values.identity.realm | required "values.identity.realm is required!" }}"
+          "kerberos": "admin@{{ .Values.identity.realm }}"
         },
         {
           "uuid": "5cc3b068-938f-4bb2-8ceb-64338a02fbeb",
-          "kerberos": "sv1directory@{{ .Values.identity.realm | required "values.identity.realm is required!" }}"
+          "kerberos": "sv1directory@{{ .Values.identity.realm }}"
         },
         {
           "uuid": "1e1989ab-14e4-42bd-8171-495230acc406",
-          "kerberos": "sv1auth@{{ .Values.identity.realm | required "values.identity.realm is required!" }}"
+          "kerberos": "sv1auth@{{ .Values.identity.realm }}"
         },
         {
           "uuid": "36861e8d-9152-40c4-8f08-f51c2d7e3c25",
-          "kerberos": "sv1configdb@{{ .Values.identity.realm | required "values.identity.realm is required!" }}"
+          "kerberos": "sv1configdb@{{ .Values.identity.realm }}"
         },
         {
           "uuid": "2340e706-1280-420c-84a6-016547b55e95",
-          "kerberos": "sv1manager@{{ .Values.identity.realm | required "values.identity.realm is required!" }}"
+          "kerberos": "sv1manager@{{ .Values.identity.realm }}"
         },
         {
           "uuid": "23d4e8f9-76c0-49d5-addc-00b6ac05ee58",
-          "kerberos": "sv1cmdesc@{{ .Values.identity.realm | required "values.identity.realm is required!" }}"
+          "kerberos": "sv1cmdesc@{{ .Values.identity.realm }}"
         },
         {
           "uuid": "2f42daeb-4521-4522-8e19-85dfb73db88e",
-          "kerberos": "sv1mqtt@{{ .Values.identity.realm | required "values.identity.realm is required!" }}"
+          "kerberos": "sv1mqtt@{{ .Values.identity.realm }}"
         },
         {
           "uuid": "3e821f50-502c-420b-b5a6-dc9281f7f4a1",
-          "kerberos": "sv1files@{{ .Values.identity.realm | required "values.identity.realm is required!" }}"
+          "kerberos": "sv1files@{{ .Values.identity.realm }}"
         },
         {
           "uuid": "388ddbdc-4eb4-4ae8-bbd0-9be32f3c31e8",
-          "kerberos": "sv1historian@{{ .Values.identity.realm | required "values.identity.realm is required!" }}"
+          "kerberos": "sv1historian@{{ .Values.identity.realm }}"
         }
       ]
     }

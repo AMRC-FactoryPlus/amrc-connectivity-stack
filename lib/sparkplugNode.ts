@@ -76,7 +76,7 @@ export class SparkplugNode extends (
             {
                 name: "Node Properties/Type",
                 type: sparkplugDataType.string,
-                value: "Factory+ Translation App"
+                value: "ACS Edge Agent"
             },
             {
                 name: "Node Control/Rebirth", // Rebirth command
@@ -91,7 +91,7 @@ export class SparkplugNode extends (
             },
             {
                 // Command to reload the node configuration from the Management App
-                name: "Node Control/Reload Translation App Config",
+                name: "Node Control/Reload Edge Agent Config",
                 type: sparkplugDataType.boolean,
                 value: false
             },
@@ -444,7 +444,7 @@ export class SparkplugNode extends (
                     case "Node Control/Rebirth": // New Birth certificate requested
                         await this.#publishNBirth();
                         break;
-                    case "Node Control/Reload Translation App Config": // Reload configuration by stopping the node
+                    case "Node Control/Reload Edge Agent Config": // Reload configuration by stopping the node
                         log('Config reload requested. Stopping...');
 
                         this.emit('stop');

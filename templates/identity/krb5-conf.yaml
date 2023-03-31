@@ -17,7 +17,7 @@ data:
 
     [realms]
             {{ .Values.identity.realm | required "values.identity.realm is required!" }} = {
-            kdc = kdc.{{.Values.baseUrl | required "values.baseUrl is required"}}.svc.cluster.local
+            kdc = kdc.{{.Values.namespace | required "values.namespace is required"}}.svc.cluster.local
             admin_server = kadmin.{{ .Values.namespace | required "values.namespace is required!" }}.svc.cluster.local
             disable_encrypted_timestamp = true
         }

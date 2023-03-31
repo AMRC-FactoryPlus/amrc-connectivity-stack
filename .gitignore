@@ -47,3 +47,5 @@ client-keytab
 client-keytab-enc
 client-keytab-amrc
 client-keytab-enc-amrc
+!/.phpstorm.meta.php
+!/_ide_helper.php

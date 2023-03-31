@@ -40,6 +40,6 @@ data:
   CMDESC_SERVICE_ENDPOINT: "http://cmdesc.{{ .Values.namespace | required "values.namespace is required!" }}.svc.cluster.local"
   AUTH_SERVICE_URL: "http://auth.{{ .Values.namespace | required "values.namespace is required!" }}.svc.cluster.local"
   CONFIGDB_SERVICE_URL: "http://configdb.{{ .Values.namespace | required "values.namespace is required!" }}.svc.cluster.local"
-  NEW_TRANSLATION_APP_REGISTRY: {{.Values.manager.translator.registry | quote | required "values.manager.translator.registry is required!"}}
-  NEW_TRANSLATION_APP_REPOSITORY: {{.Values.manager.translator.repository | quote | required "values.manager.translator.repository is required!"}}
-  NEW_TRANSLATION_APP_VERSION: {{.Values.manager.translator.tag | quote | required "values.manager.translator.tag is required!"}}
+  NEW_TRANSLATION_APP_REGISTRY: {{.Values.manager.edge.registry | quote | required "values.manager.edge.registry is required!"}}
+  NEW_TRANSLATION_APP_REPOSITORY: {{.Values.manager.edge.repository | quote | required "values.manager.edge.repository is required!"}}
+  NEW_TRANSLATION_APP_VERSION: {{.Values.manager.edge.tag | quote | required "values.manager.edge.tag is required!"}}

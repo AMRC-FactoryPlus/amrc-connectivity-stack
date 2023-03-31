@@ -68,9 +68,9 @@ manager:
     repository: acs-manager
     tag: latest
     pullPolicy: IfNotPresent
-  translator:
+  edge:
     registry: ghcr.io/amrc-factoryplus
-    repository: acs-translator
+    repository: acs-edge
     tag: latest
   database:
     host: "localhost"

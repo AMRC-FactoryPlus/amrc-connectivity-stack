@@ -7,7 +7,7 @@ spec:
   entryPoints:
     - websecure
   routes:
-    - match: Host(`data."{{.Values.baseUrl | required "values.baseUrl is required"}}"`)
+    - match: Host(`data.{{.Values.baseUrl | required "values.baseUrl is required"}}`)
       kind: Rule
       services:
         - name: fplus-minio-core-hl
@@ -17,7 +17,7 @@ spec:
   tls:
     secretName: "{{ .Values.tlsSecretName | required "values.tlsSecretName is required!" }}"
     domains:
-      - main: data."{{.Values.baseUrl | required "values.baseUrl is required"}}"
+      - main: data.{{.Values.baseUrl | required "values.baseUrl is required"}}
 ---
 {{if .Values.minio.exposeConsole}}
 apiVersion: traefik.containo.us/v1alpha1
@@ -29,7 +29,7 @@ spec:
   entryPoints:
     - websecure
   routes:
-    - match: Host(`minio."{{.Values.baseUrl | required "values.baseUrl is required"}}"`)
+    - match: Host(`minio.{{.Values.baseUrl | required "values.baseUrl is required"}}`)
       kind: Rule
       services:
         - name: fplus-minio-core-console
@@ -39,5 +39,5 @@ spec:
   tls:
     secretName: "{{ .Values.tlsSecretName | required "values.tlsSecretName is required!" }}"
     domains:
-      - main: minio."{{.Values.baseUrl | required "values.baseUrl is required"}}"
+      - main: minio.{{.Values.baseUrl | required "values.baseUrl is required"}}
 {{end}}

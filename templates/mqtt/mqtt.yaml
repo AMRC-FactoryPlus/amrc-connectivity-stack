@@ -39,7 +39,7 @@ spec:
                 secretKeyRef:
                   name: krb5-passwords
                   key: sv1mqtt
-          command: [ 'sh', '-c', 'curl -s -u "sv1mqtt:${PASSWORD}" -H "Content-Type: application/json" --data-raw "{ \"url\": \"mqtt://mqtt.{{.Values.acs.baseUrl}}\" }" http://directory.{{.Values.acs.namespace}}.svc.cluster.local/v1/service/feb27ba3-bd2c-4916-9269-79a61ebc4a47/advertisment' ]
+          command: [ 'sh', '-c', 'curl -v -s -u "sv1mqtt:${PASSWORD}" -H "Content-Type: application/json" --data-raw "{ \"url\": \"mqtt://mqtt.{{.Values.acs.baseUrl}}\" }" http://directory.{{.Values.acs.namespace}}.svc.cluster.local/v1/service/feb27ba3-bd2c-4916-9269-79a61ebc4a47/advertisment' ]
       containers:
         - name: hivemq
           image: "{{ .Values.mqtt.image.registry }}/{{ .Values.mqtt.image.repository }}:{{ .Values.mqtt.image.tag }}"

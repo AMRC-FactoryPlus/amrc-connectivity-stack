@@ -1,0 +1,355 @@
+openapi: 3.0.0
+info:
+    title: Factory+ Auth Service
+    description: Factory+ Auth Service
+    version: 0.0.1
+
+servers:
+    -   url: /
+
+security:
+    - basic: []
+    - gssapi: []
+    - bearer: []
+
+paths:
+    /authn/authenticate:
+        post:
+            description: >
+                Always returns 200 for a request with valid credentials.
+                This can be used to verify passwords.
+            responses:
+                "200":
+                    description: Credentials OK.
+
+    /authz/acl:
+        parameters:
+            -   name: principal
+                description: Principal to look up ACL entries for.
+                in: query
+                style: form
+                explode: false
+                schema:
+                    oneOf:
+                        -   { $ref: "#/components/schemas/principal" }
+                        -   { $ref: "#/components/schemas/kerberos" }
+            -   name: "by-uuid"
+                description: >
+                    If this parameter is supplied and true, the
+                    principal param is a principal UUID. Otherwise the
+                    principal param is a Kerberos principal name.
+                in: query
+                style: form
+                explode: false
+                schema: { $ref: "#/components/schemas/boolean" }
+            -   name: permission
+                description: Permission group to return ACEs for.
+        get:
+            summary: Fetch ACL for a given principal.
+            description: >
+                Fetch all permissions for a given principal in a given
+                permission group. The requesting client must have
+                `Read_ACL` permission on the permission group.
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/acl" }
+
+    /authz/ace:
+        get:
+            summary: Fetch all ACEs.
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/acl" }
+        post:
+            summary: Add or remove an ACE.
+            requestBody:
+                description: Action to take.
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            allOf:
+                                -   { $ref: "#/components/schemas/acl" }
+                                -   type: object
+                                    required: [action]
+                                    properties:
+                                        action:
+                                            description: Action to take.
+                                            type: string
+                                            enum: [add, delete]
+            responses:
+                "204":
+                    description: Action successful.
+
+    /authz/principal:
+        get:
+            summary: Fetch all Kerberos principal mappings.
+            responses:
+                "200":
+                    description: List of principal mappings.
+                    content:
+                        application/json:
+                            schema:
+                                type: array
+                                items: { $ref: "#/components/schemas/principal-mapping" }
+        post:
+            summary: Add a new principal mapping.
+            requestBody:
+                description: Principal mapping to add.
+                required: true
+                content:
+                    application/json:
+                        schema: { $ref: "#/components/schemas/principal-mapping" }
+            responses:
+                "204":
+                    description: Principal successfully added.
+                "409":
+                    description: Principal already exists.
+
+    /authz/principal/find:
+        parameters:
+            -   name: kerberos
+                in: query
+                style: form
+                explode: false
+                schema: { $ref: "#/components/schemas/kerberos" }
+        get:
+            summary: Find a principal by Kerberos principal name.
+            responses:
+                "200":
+                    description: Principal UUID.
+                    content:
+                        application/json:
+                            schema: { type: string, format: uuid }
+                "404":
+                    description: Principal not found.
+
+    /authz/principal/{principal}:
+        parameters:
+            -   { $ref: "#/components/parameters/principal" }
+        get:
+            summary: Get mapping details for a principal.
+            responses:
+                "200":
+                    description: Principal mapping.
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/principal-mapping" }
+                "404":
+                    description: Bad principal UUID.
+                "404":
+                    description: Principal not found.
+        delete:
+            summary: Delete a principal mapping.
+            responses:
+                "204": Principal mapping deleted.
+                "404": Principal mapping not found.
+
+    /authz/group:
+        get:
+            summary: List all groups.
+            responses:
+                "200":
+                    content:
+                        application/json: { $ref: "#/components/schemas/uuid-list" }
+
+    /authz/group/{group}:
+        parameters:
+            -   { $ref: "#/components/parameters/group" }
+        get:
+            summary: Fetch members of a group.
+            responses:
+                "200":
+                    content:
+                        application/json: { $ref: "#/components/schemas/uuid-list" }
+
+    /authz/group/{group}/{member}:
+            -   { $ref: "#/components/parameters/group" }
+            -   { $ref: "#/components/parameters/member" }
+        put:
+            summary: Add a member to a group.
+            description: >
+                Adding a member to a non-existent group will create the
+                group.
+            responses:
+                "204":
+                    description: Member successfully added.
+        delete:
+            summary: Delete a member from a group.
+            description: >
+                Deleting all members from a group also deletes the
+                group.
+            responses:
+                "204":
+                    description: Member successfully deleted.
+
+    /authz/effective:
+        get:
+            summary: List all Kerberos principal names.
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                type: array
+                                items: { $ref: "#/components/schemas/kerberos" }
+
+    /authz/effective/{principal}:
+        parameters:
+            -   { $ref: "#/components/parameters/principal" }
+        get:
+            summary: Fetch effective permissions for a principal.
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/acl" }
+
+    /authz/load:
+        post:
+            summary: Load a dump into the database.
+            requestBody:
+                description: Dump to load.
+                required: true
+                schema: { $ref: "#/components/schemas/dump-file" }
+            responses:
+                "204":
+                    description: Dump successfully loaded.
+                "400":
+                    description: Bad dump format.
+
+    /authz/save:
+        get:
+            summary: Fetch a database dump.
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/dump-file" }
+
+components:
+    securitySchemes:
+        basic:
+            type: http
+            description: User/password HTTP Basic auth
+            scheme: Basic
+        gssapi:
+            type: http
+            description: GSSAPI/Kerberos HTTP auth
+            scheme: Negotiate
+        bearer:
+            type: http
+            description: Token HTTP auth
+            scheme: Bearer
+
+    parameters:
+        group:
+            name: group
+            in: path
+            required: true
+            schema: { type: string: format: uuid }
+        member:
+            name: member
+            in: path
+            required: true
+            schema: { type: string: format: uuid }
+        principal:
+            name: principal
+            in: path
+            required: true
+            schema: { type: string, format: uuid }
+
+    schemas:
+        ace:
+            description: Access control list entry.
+            type: object
+            required: [permission, target]
+            properties:
+                permission:
+                    description: >
+                        The permission granted by the ACE.
+                    type: string
+                    format: uuid
+                target:
+                    description: >
+                        The target of the ACE. This is the object the
+                        permission is granted on (the object the action
+                        is performed on).
+                    type: string
+                    format: uuid
+                principal:
+                    description: >
+                        The principal of the ACE. This is the object
+                        that is granted the permission (the object
+                        performing the action).
+                    type: string
+                    format: uuid
+                kerberos:
+                    $ref: "#/components/schemas/kerberos"
+
+        acl:
+            description: Access control list.
+            type: array
+            items: { $ref: "#/components/schemas/ace" }
+
+        kerberos:
+            description: Kerberos principal name.
+            type: string
+            pattern: "^[a-zA-Z0-9_./-]+@[A-Z0-9-.]+$"
+
+        principal-mapping:
+            description: Principal identifier mapping.
+            type: object
+            required: [uuid, kerberos]
+            properties:
+                uuid: { type: string, format: uuid }
+                kerberos: { $ref: "#/components/schemas/kerberos" }
+
+        uuid-list:
+            description: List of UUIDs.
+            type: array
+            items: { type: string, format: uuid }
+
+        dump-file:
+            description: Auth service JSON dump
+            type: object
+            required: [service, version]
+            properties:
+                service:
+                    description: Identifies the service this dump is for.
+                    const: "cab2642a-f7d9-42e5-8845-8f35affe1fd4"
+                version:
+                    description: Dump format version number.
+                    const: 1
+                principals:
+                    description: Kerberos mappings.
+                    type: array
+                    items:
+                        type: object
+                        properties:
+                            uuid: { type: string, format: uuid }
+                            kerberos: { type: string }
+                groups:
+                    description: Groups to create.
+                    type: object
+                    propertyNames:
+                        description: Group UUID.
+                        type: string
+                        format: uuid
+                    additionalProperties:
+                        description: List of members to add.
+                        type: array
+                        items: { type: string, format: uuid }
+                aces:
+                    description: ACL entries to add.
+                    type: array
+                    items:
+                        type: object
+                        properties:
+                            principal: { type: string, format: uuid }
+                            permission: { type: string, format: uuid }
+                            target: { type: string, format: uuid }

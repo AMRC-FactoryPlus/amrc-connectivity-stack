@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: directory-webapi
-  namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+  namespace: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
   labels:
     component: directory-webapi
 spec:
@@ -48,7 +48,7 @@ spec:
             - name: KRB5_CONFIG
               value: /config/krb5-conf/krb5.conf
             - name: PGHOST
-              value: postgres.{{ .Values.namespace | required "values.namespace is required!" }}.svc.cluster.local
+              value: postgres.{{ .Values.acs.namespace | required "values.acs.namespace is required!" }}.svc.cluster.local
             - name: PGUSER
               value: op1pgadmin
             - name: PGDATABASE
@@ -75,13 +75,13 @@ spec:
               value: /keytabs/server
             # These two are used to verify Basic auth.
             - name: HOSTNAME
-              value: directory.{{ .Values.namespace | required "values.namespace is required!" }}.svc.cluster.local
+              value: directory.{{ .Values.acs.namespace | required "values.acs.namespace is required!" }}.svc.cluster.local
             - name: REALM
               value: {{ .Values.identity.realm | required "values.identity.realm is required!" }}
             - name: PORT
               value: "8080"
             - name: PGHOST
-              value: postgres.{{ .Values.namespace | required "values.namespace is required!" }}.svc.cluster.local
+              value: postgres.{{ .Values.acs.namespace | required "values.acs.namespace is required!" }}.svc.cluster.local
             - name: PGUSER
               value: sv1directory
             - name: PGDATABASE
@@ -95,7 +95,7 @@ spec:
               value: admin@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
             # This is used to check our ACLs so it does not need to be externally resolvable.
             - name: AUTHN_URL
-              value: http://auth.{{ .Values.namespace | required "values.namespace is required!" }}.svc.cluster.local
+              value: http://auth.{{ .Values.acs.namespace | required "values.acs.namespace is required!" }}.svc.cluster.local
           volumeMounts:
             - mountPath: /config/krb5-conf
               name: krb5-conf
@@ -106,7 +106,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: directory
-  namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+  namespace: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
 spec:
   ports:
     - name: "web"

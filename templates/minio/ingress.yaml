@@ -5,19 +5,21 @@ metadata:
   namespace: default
 spec:
   entryPoints:
-    - websecure
+    - {{ .Values.acs.secure | ternary "websecure" "web" }}
   routes:
-    - match: Host(`data.{{.Values.baseUrl | required "values.baseUrl is required"}}`)
+    - match: Host(`data.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}`)
       kind: Rule
       services:
         - name: fplus-minio-core-hl
           port: 9000
           scheme: https
-          namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+          namespace: {{ .Values.acs.namespace | required "values.namespace is required!" }}
+  {{- if .Values.acs.secure }}
   tls:
-    secretName: "{{ .Values.tlsSecretName | required "values.tlsSecretName is required!" }}"
+    secretName: "{{ .Values.acs.tlsSecretName | required "values.acs.tlsSecretName is required!" }}"
     domains:
-      - main: data.{{.Values.baseUrl | required "values.baseUrl is required"}}
+      - main: data.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
+  {{- end -}}
 ---
 {{if .Values.minio.exposeConsole}}
 apiVersion: traefik.containo.us/v1alpha1
@@ -27,17 +29,19 @@ metadata:
   namespace: default
 spec:
   entryPoints:
-    - websecure
+    - {{ .Values.acs.secure | ternary "websecure" "web" }}
   routes:
-    - match: Host(`minio.{{.Values.baseUrl | required "values.baseUrl is required"}}`)
+    - match: Host(`minio.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}`)
       kind: Rule
       services:
         - name: fplus-minio-core-console
           port: 9443
           scheme: https
-          namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+          namespace: {{ .Values.acs.namespace | required "values.namespace is required!" }}
+  {{- if .Values.acs.secure }}
   tls:
-    secretName: "{{ .Values.tlsSecretName | required "values.tlsSecretName is required!" }}"
+    secretName: "{{ .Values.acs.tlsSecretName | required "values.acs.tlsSecretName is required!" }}"
     domains:
-      - main: minio.{{.Values.baseUrl | required "values.baseUrl is required"}}
-{{end}}
+      - main: minio.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
+  {{- end -}}
+{{- end -}}

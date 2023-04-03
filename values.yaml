@@ -1,124 +1,162 @@
-## The K8s namespace to install the components in
-namespace: factory-plus
+acs:
+  # -- The K8s namespace to install the components in
+  namespace: factory-plus
+  # -- The organisation where ACS is being deployed
+  organisation: AMRC
+  # -- The base URL that services will be served from
+  baseUrl: localhost
+  # -- Whether or not services should be served over HTTPS
+  secure: true
+  # -- The name of the secret holding the wildcard certificate for the above domain. Only used if secure=true.
+  tlsSecretName: factoryplus-tls
 
-## The organisation where ACS is being deployed
-organisation: AMRC
-
-## The base URL that services will be served from
-baseUrl: localhost
-
-## The name of the secret holding the wildcard certificate for the above domain
-tlsSecretName: factoryplus-tls
-
-## The values for the Identity component of ACS
 identity:
-  ## The Kerberos realm for this Factory+ deployment.
+  # -- The Kerberos realm for this Factory+ deployment.
   realm: LOCALHOST
   identity:
-    ## The location and version of the Key Distribution Center (KDC) image
     image:
+      # -- The registry of the Identity component
       registry: ghcr.io/amrc-factoryplus
+      # -- The repository of the Identity component
       repository: acs-identity
+      # -- The tag of the Identity component
       tag: latest
+      # @ignore
       pullPolicy: IfNotPresent
   krbKeysOperator:
-    ## The location and version of the Kerberos keys operator image
+    # -- The location and version of the Kerberos keys operator image
     image:
+      # -- The registry of the KerberosKey Operator
       registry: ghcr.io/amrc-factoryplus
+      # -- The repository of the KerberosKey Operator
       repository: acs-krb-keys-operator
+      # -- The tag of the KerberosKey Operator
       tag: latest
+      # @ignore
       pullPolicy: IfNotPresent
 
-## The values for the Authorisation component of ACS
 auth:
   image:
+    # -- The registry of the Authorisation component
     registry: ghcr.io/amrc-factoryplus
+    # -- The repository of the Authorisation component
     repository: acs-auth
+    # -- The tag of the Authorisation component
     tag: latest
+    # @ignore
     pullPolicy: IfNotPresent
 
-## The values for the Directory component of ACS
 directory:
   image:
+    # -- The registry of the Directory component
     registry: ghcr.io/amrc-factoryplus
+    # -- The repository of the Directory component
     repository: acs-directory
+    # -- The tag of the Directory component
     tag: latest
+    # @ignore
     pullPolicy: IfNotPresent
 
-## The values for the ConfigDB component of ACS
 configdb:
   image:
+    # -- The registry of the Configuration Store component
     registry: ghcr.io/amrc-factoryplus
+    # -- The repository of the Configuration Store component
     repository: acs-configdb
+    # -- The tag of the Configuration Store component
     tag: latest
+    # @ignore
     pullPolicy: IfNotPresent
 
-## The values for the MQTT component of ACS
 mqtt:
   image:
+    # -- The registry of the MQTT component
     registry: ghcr.io/amrc-factoryplus
+    # -- The repository of the MQTT component
     repository: acs-mqtt
+    # -- The tag of the MQTT component
     tag: latest
+    # @ignore
     pullPolicy: IfNotPresent
 
-## The values for the Manager component of ACS
 manager:
   image:
+    # -- The registry of the Manager component
     registry: ghcr.io/amrc-factoryplus
+    # -- The repository of the Manager component
     repository: acs-manager
+    # -- The tag of the Manager component
     tag: latest
+    # @ignore
     pullPolicy: IfNotPresent
   edge:
+    # -- The registry of the Edge Agent component
     registry: ghcr.io/amrc-factoryplus
+    # -- The repository of the Edge Agent component
     repository: acs-edge
+    # -- The tag of the Edge Agent component
     tag: latest
   database:
+    # -- The hostname of the manager's Postgres database
     host: "localhost"
+    # -- The port of the manager's Postgres database
     port: "3306"
+    # -- The database name of the manager's Postgres database
     database: "manager"
+    # -- The username that the manager uses to connect to the database
     username: "root"
+    # -- The password that the manager uses to connect to the database
     password: "secret"
   minio:
+    # -- The key that the management app uses to connect to MinIO
     key: management-app
+    # -- The secret that the management app uses to connect to MinIO
     secret: ""
   meilisearch:
+    # -- The key that the manager uses to connect to the Meilisearch search engine
     key: masterKey
+  # -- A string used to customise the branding of the manager
   name: Factory+ Manager
+  # -- The environment that the manager is running in
   env: production
+  # -- Whether debug mode is enabled. DO NOT USE THIS IN PRODUCTION.
   debug: false
+  # -- The minimum log level that the manager will log messages at
   logLevel: warning
 
-## The values for the Command Escalation component of ACS
 cmdesc:
   image:
+    # -- The registry of the Commands component
     registry: ghcr.io/amrc-factoryplus
+    # -- The repository of the Commands component
     repository: acs-cmdesc
+    # -- The tag of the Commands component
     tag: latest
+    # @ignore
     pullPolicy: IfNotPresent
-  # Possible values are either 1 to enable all possible debugging, or a comma-separated list of debug tags
-  # (the tags printed before the log lines). No logging is specified as an empty string.
+  # -- Possible values are either 1 to enable all possible debugging, or a comma-separated list of debug tags (the tags printed before the log lines). No logging is specified as an empty string.
   verbosity: 1
 
-## The values for the Files component of ACS
 files:
   image:
+    # -- The registry of the Files plugin component
     registry: ghcr.io/amrc-factoryplus
+    # -- The repository of the Files plugin component
     repository: acs-files
+    # -- The tag of the Files plugin component
     tag: latest
+    # @ignore
     pullPolicy: IfNotPresent
+  # -- The minimum log level that the Files service will log messages at
   logLevel: warning
+  # -- Possible values are either 1 to enable all possible debugging, or a comma-separated list of debug tags (the tags printed before the log lines). No logging is specified as an empty string.
   verbosity: 1
 
-## The values for the built-in MinIO instance
 minio:
+  # -- Whether or not to expose the MinIO console outside of the cluster
   exposeConsole: false
 
-## The values for the built-in postgres instance
-#postgres:
-#  passwordOverride: manuallyDefineAPassword
-#  replicationPasswordOverride: manuallyDefineAPassword
-
-## The values for the Traefik subchart
+# @ignore
 traefik:
   ports:
     web:
@@ -150,8 +188,8 @@ traefik:
   ingressRoute:
     dashboard:
       enabled: false
-  ## [AZURE] Enable the below section to expose your instance of Factory+/ACS over the internet, replacing the <Value>
-  ## tags with the details of your pre-configured load balancer.
+  # -- [AZURE] Enable the below section to expose your instance of Factory+/ACS over the internet, replacing the <Value>
+  # -- tags with the details of your pre-configured load balancer.
   #service:
   #  spec:
   #    loadBalancerIP: <External IP address here>
@@ -162,10 +200,9 @@ traefik:
       allowCrossNamespace: true
   logs:
     general:
-      # Logging levels are DEBUG, PANIC, FATAL, ERROR, WARN, and INFO.
       level: DEBUG
 
-## The values for the Loki subchart
+# -- The values for the Loki subchart
 loki:
   loki:
     auth_enabled: false
@@ -178,12 +215,12 @@ loki:
     persistence:
       size: 10Gi
 
-## The values for the Promtail subchart
+# -- The values for the Promtail subchart
 promtail:
   loki:
     serviceName: loki
 
-## The values for the Grafana subchart
+# -- The values for the Grafana subchart
 grafana:
   persistence:
     enabled: true

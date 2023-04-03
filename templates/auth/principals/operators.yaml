@@ -7,7 +7,7 @@ apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey
 metadata:
     name: admin
-    namespace: {{ .Values.namespace | quote | required "values.namespace is required!" }}
+    namespace: {{ .Values.acs.namespace | quote | required "values.acs.namespace is required!" }}
 spec:
     type: Password
     principal: admin@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
@@ -18,7 +18,7 @@ apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey
 metadata:
     name: op1pgadmin
-    namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+    namespace: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
 spec:
     type: Random
     principal: op1pgadmin@{{ .Values.identity.realm | required "values.identity.realm is required!" }}

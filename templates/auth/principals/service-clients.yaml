@@ -18,7 +18,7 @@ apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey
 metadata:
   name: sv1auth
-  namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+  namespace: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
 spec:
   type: Random
   principal: sv1auth@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
@@ -27,7 +27,7 @@ apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey
 metadata:
   name: sv1cmdesc
-  namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+  namespace: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
 spec:
   type: Random
   principal: sv1cmdesc@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
@@ -36,7 +36,7 @@ apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey
 metadata:
   name: sv1configdb
-  namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+  namespace: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
 spec:
   type: Random
   principal: sv1configdb@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
@@ -45,7 +45,7 @@ apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey
 metadata:
   name: sv1directory
-  namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+  namespace: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
 spec:
   type: Random
   principal: sv1directory@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
@@ -54,7 +54,7 @@ apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey
 metadata:
   name: sv1mqtt
-  namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+  namespace: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
 spec:
   type: Password
   principal: sv1mqtt@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
@@ -63,7 +63,7 @@ apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey
 metadata:
   name: sv1manager
-  namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+  namespace: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
 spec:
   type: Random
   principal: sv1manager@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
@@ -73,7 +73,7 @@ apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey
 metadata:
   name: sv1historian
-  namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+  namespace: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
 spec:
   type: Password
   principal: sv1historian@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
@@ -82,7 +82,7 @@ apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey
 metadata:
   name: sv1files
-  namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+  namespace: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
 spec:
   type: Random
   principal: sv1files@{{ .Values.identity.realm | required "values.identity.realm is required!" }}

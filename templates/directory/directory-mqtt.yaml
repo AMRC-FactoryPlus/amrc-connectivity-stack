@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: directory-mqtt
-  namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+  namespace: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
   labels:
     component: directory-mqtt
 spec:
@@ -44,7 +44,7 @@ spec:
             - name: KRB5_CONFIG
               value: /config/krb5-conf/krb5.conf
             - name: PGHOST
-              value: postgres.{{ .Values.namespace | required "values.namespace is required!" }}.svc.cluster.local
+              value: postgres.{{ .Values.acs.namespace | required "values.acs.namespace is required!" }}.svc.cluster.local
             - name: PGUSER
               value: op1pgadmin
             - name: PGDATABASE
@@ -70,11 +70,11 @@ spec:
             - name: DEVICE_UUID
               value: 5cc3b068-938f-4bb2-8ceb-64338a02fbeb
             - name: SPARKPLUG_ADDRESS
-              value: {{ .Values.organisation | required "values.organisation is required!" }}-Service-DIR-Directory/Directory
+              value: {{ .Values.acs.organisation | required "values.acs.organisation is required!" }}-Service-DIR-Directory/Directory
             - name: PORT
               value: "8080"
             - name: PGHOST
-              value: postgres.{{ .Values.namespace | required "values.namespace is required!" }}.svc.cluster.local
+              value: postgres.{{ .Values.acs.namespace | required "values.acs.namespace is required!" }}.svc.cluster.local
             - name: PGUSER
               value: sv1directory
             - name: PGDATABASE
@@ -86,12 +86,12 @@ spec:
               value: admin@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
             # This is the value published via MQTT. It is also used by the editor so it needs to be externally resolvable.
             - name: HTTP_API_URL
-              value: https://directory.{{.Values.baseUrl | required "values.baseUrl is required"}}
+              value: https://directory.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
             # This is used to check our ACLs so it does not need to be externally resolvable.
             - name: AUTHN_URL
-              value: http://auth.{{ .Values.namespace | required "values.namespace is required!" }}.svc.cluster.local
+              value: http://auth.{{ .Values.acs.namespace | required "values.acs.namespace is required!" }}.svc.cluster.local
             - name: MQTT_BROKER
-              value: mqtt://mqtt.{{ .Values.namespace | required "values.namespace is required!" }}.svc.cluster.local
+              value: mqtt://mqtt.{{ .Values.acs.namespace | required "values.acs.namespace is required!" }}.svc.cluster.local
           volumeMounts:
             - mountPath: /config/krb5-conf
               name: krb5-conf

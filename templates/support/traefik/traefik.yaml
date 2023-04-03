@@ -5,4 +5,4 @@ metadata:
   namespace: default
 spec:
   defaultCertificate:
-    secretName: {{ .Values.tlsSecretName | required "values.tlsSecretName is required!" }}
+    secretName: {{ .Values.acs.tlsSecretName | required "values.acs.tlsSecretName is required!" }}

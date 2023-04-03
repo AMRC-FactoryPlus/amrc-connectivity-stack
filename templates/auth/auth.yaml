@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: auth
-  namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+  namespace: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
   labels:
     component: auth
 spec:
@@ -50,7 +50,7 @@ spec:
             - name: KRB5_CONFIG
               value: /config/krb5-conf/krb5.conf
             - name: PGHOST
-              value: postgres.{{ .Values.namespace | required "values.namespace is required!" }}.svc.cluster.local
+              value: postgres.{{ .Values.acs.namespace | required "values.acs.namespace is required!" }}.svc.cluster.local
             - name: PGUSER
               value: op1pgadmin
             - name: PGDATABASE
@@ -74,7 +74,7 @@ spec:
             - name: KRB5_CONFIG
               value: /config/krb5-conf/krb5.conf
             - name: PGHOST
-              value: postgres.{{ .Values.namespace | required "values.namespace is required!" }}.svc.cluster.local
+              value: postgres.{{ .Values.acs.namespace | required "values.acs.namespace is required!" }}.svc.cluster.local
             - name: PGUSER
               value: sv1auth
             - name: PGDATABASE
@@ -103,13 +103,13 @@ spec:
             # These two values are used to construct a principal name we have a key for, to verify
             # passwords for Basic auth. They are not used for anything else.
             - name: HOSTNAME
-              value: auth.{{ .Values.namespace | required "values.namespace is required!" }}.svc.cluster.local
+              value: auth.{{ .Values.acs.namespace | required "values.acs.namespace is required!" }}.svc.cluster.local
             - name: REALM
               value: {{ .Values.identity.realm | required "values.identity.realm is required!" }}
             - name: PORT
               value: "8080"
             - name: PGHOST
-              value: postgres.{{ .Values.namespace | required "values.namespace is required!" }}.svc.cluster.local
+              value: postgres.{{ .Values.acs.namespace | required "values.acs.namespace is required!" }}.svc.cluster.local
             - name: PGUSER
               value: sv1auth
             - name: PGDATABASE
@@ -121,9 +121,9 @@ spec:
             # These are currently only used for the editor. They need to be resolvable by the
             # user's browser, so in-cluster names will not work.
             - name: HTTP_API_URL
-              value: https://auth.{{.Values.baseUrl | required "values.baseUrl is required"}}
+              value: https://auth.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
             - name: CONFIGDB_URL
-              value: https://configdb.{{.Values.baseUrl | required "values.baseUrl is required"}}
+              value: https://configdb.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
             # This principal, if configured, bypasses all ACLs. This is important for
             # bootstrapping but perhaps shouldn't be left in place once we can bootstrap without
             # manual intervention.
@@ -139,7 +139,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: auth
-  namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+  namespace: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
 spec:
   ports:
     - name: "web"

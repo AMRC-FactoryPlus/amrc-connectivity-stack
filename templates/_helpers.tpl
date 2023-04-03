@@ -8,7 +8,7 @@ Expand the name of the chart.
 {{/*
 Define the namespace from the values file
 */}}
-{{- $namespace := .Values.namespace | required "values.namespace is required!" }}
+{{- $namespace := .Values.acs.namespace | required "values.acs.namespace is required!" }}
 
 {{/*
 Create a default fully qualified app name.

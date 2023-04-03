@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: krb5-conf
-  namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+  namespace: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
 data:
   krb5.conf: >
     [libdefaults]
@@ -13,11 +13,11 @@ data:
 
     [domain_realm]
         cluster.local = {{ .Values.identity.realm | required "values.identity.realm is required!" }}
-            {{.Values.baseUrl | required "values.baseUrl is required"}} = {{ .Values.identity.realm | required "values.identity.realm is required!" }}
+            {{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}} = {{ .Values.identity.realm | required "values.identity.realm is required!" }}
 
     [realms]
             {{ .Values.identity.realm | required "values.identity.realm is required!" }} = {
-            kdc = kdc.{{.Values.namespace | required "values.namespace is required"}}.svc.cluster.local
-            admin_server = kadmin.{{ .Values.namespace | required "values.namespace is required!" }}.svc.cluster.local
+            kdc = kdc.{{.Values.acs.namespace | required "values.acs.namespace is required"}}.svc.cluster.local
+            admin_server = kadmin.{{ .Values.acs.namespace | required "values.acs.namespace is required!" }}.svc.cluster.local
             disable_encrypted_timestamp = true
         }

@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: mqtt
-  namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+  namespace: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
   labels:
     component: mqtt
 spec:
@@ -39,12 +39,12 @@ spec:
               value: /keytabs/server
             # This needs to name a principal available in the keytab, used for verifying passwords.
             - name: SERVER_PRINCIPAL
-              value: mqtt/mqtt.{{ .Values.namespace | required "values.namespace is required!" }}.svc.cluster.local
+              value: mqtt/mqtt.{{ .Values.acs.namespace | required "values.acs.namespace is required!" }}.svc.cluster.local
             # These should be discovered, but aren't yet in the Java client.
             - name: AUTHN_URL
-              value: http://auth.{{ .Values.namespace | required "values.namespace is required!" }}.svc.cluster.local
+              value: http://auth.{{ .Values.acs.namespace | required "values.acs.namespace is required!" }}.svc.cluster.local
             - name: CONFIGDB_URL
-              value: http://configdb.{{ .Values.namespace | required "values.namespace is required!" }}.svc.cluster.local
+              value: http://configdb.{{ .Values.acs.namespace | required "values.acs.namespace is required!" }}.svc.cluster.local
             # The Java client still only supports Basic auth.
             - name: SERVICE_USERNAME
               value: sv1mqtt
@@ -67,7 +67,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: mqtt-config
-  namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+  namespace: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
   labels:
     component: mqtt
 data:

@@ -4,7 +4,7 @@ apiVersion: kubegres.reactive-tech.io/v1
 kind: Kubegres
 metadata:
   name: postgres
-  namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+  namespace: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
 
 spec:
   replicas: 1
@@ -51,7 +51,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: postgres-conf
-  namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+  namespace: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
 
 data:
   primary_init_script.sh: |

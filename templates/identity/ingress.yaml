@@ -11,7 +11,7 @@ spec:
       services:
         - name: kdc
           port: kerberos
-          namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+          namespace: {{ .Values.acs.namespace | required "values.namespace is required!" }}
 ---
 apiVersion: traefik.containo.us/v1alpha1
 kind: IngressRouteTCP
@@ -26,7 +26,7 @@ spec:
       services:
         - name: kadmin
           port: kpasswd
-          namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+          namespace: {{ .Values.acs.namespace | required "values.namespace is required!" }}
 ---
 apiVersion: traefik.containo.us/v1alpha1
 kind: IngressRouteTCP
@@ -41,4 +41,4 @@ spec:
       services:
         - name: kadmin
           port: kerberos-adm
-          namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+          namespace: {{ .Values.acs.namespace | required "values.namespace is required!" }}

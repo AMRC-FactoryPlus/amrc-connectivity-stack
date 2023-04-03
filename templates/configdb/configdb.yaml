@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: configdb
-  namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+  namespace: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
   labels:
     component: configdb
 spec:
@@ -48,7 +48,7 @@ spec:
             - name: KRB5_CONFIG
               value: /config/krb5-conf/krb5.conf
             - name: PGHOST
-              value: postgres.{{ .Values.namespace | required "values.namespace is required!" }}.svc.cluster.local
+              value: postgres.{{ .Values.acs.namespace | required "values.acs.namespace is required!" }}.svc.cluster.local
             - name: PGUSER
               value: op1pgadmin
             - name: PGDATABASE
@@ -71,7 +71,7 @@ spec:
             - name: KRB5_CONFIG
               value: /config/krb5-conf/krb5.conf
             - name: PGHOST
-              value: postgres.{{ .Values.namespace | required "values.namespace is required!" }}.svc.cluster.local
+              value: postgres.{{ .Values.acs.namespace | required "values.acs.namespace is required!" }}.svc.cluster.local
             - name: PGUSER
               value: sv1configdb
             - name: PGDATABASE
@@ -96,7 +96,7 @@ spec:
               value: /keytabs/server
             # These two are used to verify Basic auth.
             - name: HOSTNAME
-              value: configdb.{{ .Values.namespace | required "values.namespace is required!" }}.svc.cluster.local
+              value: configdb.{{ .Values.acs.namespace | required "values.acs.namespace is required!" }}.svc.cluster.local
             - name: REALM
               value: {{ .Values.identity.realm | required "values.identity.realm is required!" }}
             - name: DEVICE_UUID
@@ -106,7 +106,7 @@ spec:
             - name: PORT
               value: "8080"
             - name: PGHOST
-              value: postgres.{{ .Values.namespace | required "values.namespace is required!" }}.svc.cluster.local
+              value: postgres.{{ .Values.acs.namespace | required "values.acs.namespace is required!" }}.svc.cluster.local
             - name: PGUSER
               value: sv1configdb
             - name: PGDATABASE
@@ -123,7 +123,7 @@ spec:
               value: https://configdb.{{ .Values.identity.realm | required "values.identity.realm is required!" }}
             # This is used for service discovery so it does not need to be externally resolvable.
             - name: DIRECTORY_URL
-              value: http://directory.{{ .Values.namespace | required "values.namespace is required!" }}.svc.cluster.local
+              value: http://directory.{{ .Values.acs.namespace | required "values.acs.namespace is required!" }}.svc.cluster.local
 
           volumeMounts:
             - mountPath: /config/krb5-conf
@@ -135,7 +135,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: configdb
-  namespace: {{ .Values.namespace | required "values.namespace is required!" }}
+  namespace: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
 spec:
   ports:
     - name: "web"

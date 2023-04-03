@@ -1,7 +1,7 @@
-FROM hivemq/hivemq-ce:2022.1
+FROM hivemq/hivemq-ce:2023.2
 
 ARG krb_zipfile=hivemq-auth-krb-0.1.5-distribution.zip
-
+RUN rm /opt/hivemq/extensions/hivemq-kafka-extension/DISABLED
 COPY ${krb_zipfile} /tmp
 
 RUN touch extensions/hivemq-allow-all-extension/DISABLED \

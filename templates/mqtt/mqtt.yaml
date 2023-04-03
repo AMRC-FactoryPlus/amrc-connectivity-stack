@@ -31,7 +31,7 @@ spec:
           configMap:
             name: mqtt-config
       initContainers:
-        - name: init-curl
+        - name: register-with-directory
           image: appropriate/curl:latest
           env:
             - name: PASSWORD

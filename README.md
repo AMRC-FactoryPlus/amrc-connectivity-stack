@@ -44,11 +44,6 @@ The AMRC Connectivity Stack (ACS) is a collection of open-source services develo
 | directory.image.registry | string | `"ghcr.io/amrc-factoryplus"` | The registry of the Directory component |
 | directory.image.repository | string | `"acs-directory"` | The repository of the Directory component |
 | directory.image.tag | string | `"latest"` | The tag of the Directory component |
-| files.image.registry | string | `"ghcr.io/amrc-factoryplus"` | The registry of the Files plugin component |
-| files.image.repository | string | `"acs-files"` | The repository of the Files plugin component |
-| files.image.tag | string | `"latest"` | The tag of the Files plugin component |
-| files.logLevel | string | `"warning"` | The minimum log level that the Files service will log messages at |
-| files.verbosity | int | `1` | Possible values are either 1 to enable all possible debugging, or a comma-separated list of debug tags (the tags printed before the log lines). No logging is specified as an empty string. |
 | identity.identity.image.registry | string | `"ghcr.io/amrc-factoryplus"` | The registry of the Identity component |
 | identity.identity.image.repository | string | `"acs-identity"` | The repository of the Identity component |
 | identity.identity.image.tag | string | `"latest"` | The tag of the Identity component |

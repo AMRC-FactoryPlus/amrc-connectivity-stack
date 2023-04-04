@@ -77,13 +77,3 @@ metadata:
 spec:
   type: Password
   principal: sv1historian@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
----
-apiVersion: factoryplus.app.amrc.co.uk/v1
-kind: KerberosKey
-metadata:
-  name: sv1files
-  namespace: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
-spec:
-  type: Random
-  principal: sv1files@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
-  secret: files-keytab/client

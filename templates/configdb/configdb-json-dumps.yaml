@@ -27,8 +27,6 @@ data:
         "ca24f925-c7f2-4f9e-8932-b5a9b8284e88",
         "00da3c0b-f62b-4761-a689-39ad0c33f864",
         "5bee4d24-32e1-44f8-b953-1f86ff4b3e87",
-        "743211dd-398d-45b6-b41f-28b0c7dc9744",
-        "f42291d3-fbf3-4c91-b00b-00dbcbbfbada",
         "c0175497-be87-45d1-a187-557cb653d359"
       ],
       "objects": {
@@ -38,9 +36,7 @@ data:
           "1266ddf1-156c-4266-9808-d6949418b185",
           "8e32801b-f35a-4cbf-a5c3-2af64d3debd7",
           "60e99f28-67fe-4344-a6ab-b1edb8b8e810",
-          "253e14b5-9bd1-4c82-8d17-41e4568c4cd3",
-          "751f5524-3e67-4d0e-ac72-65172bae1cee",
-          "75f3cbde-210a-440f-a7c3-6f5325a1ab65"
+          "253e14b5-9bd1-4c82-8d17-41e4568c4cd3"
         ],
         "83ee28d4-023e-4c2c-ab86-12c24e86372c": [
           "05688a03-730e-4cda-9932-172e2c62e45c",
@@ -59,7 +55,6 @@ data:
         ],
         "265d481f-87a7-4f93-8fc6-53fa64dc11bb": [
           "af15f175-78a0-4e05-97c0-2a0bb82b9f3b",
-          "7213f5a3-0bb1-4151-ad83-d27dcb368980",
           "78ea7071-24ac-4916-8351-aa3e549d8ccd",
           "af4a1d66-e6f7-43c4-8a67-0fa3be2b1cf9",
           "cab2642a-f7d9-42e5-8845-8f35affe1fd4",
@@ -127,16 +122,9 @@ data:
           "2340e706-1280-420c-84a6-016547b55e95",
           "1e1989ab-14e4-42bd-8171-495230acc406",
           "23d4e8f9-76c0-49d5-addc-00b6ac05ee58",
-          "3e821f50-502c-420b-b5a6-dc9281f7f4a1",
           "388ddbdc-4eb4-4ae8-bbd0-9be32f3c31e8"
         ],
         "00da3c0b-f62b-4761-a689-39ad0c33f864": [],
-        "743211dd-398d-45b6-b41f-28b0c7dc9744": [
-          "17ffd50f-2254-484b-86b2-5886e1a072c1",
-          "af431695-f5ee-4c95-835d-3668ae7daf19",
-          "b8f89a59-060b-4896-88b2-f3f53c1908a5",
-          "ed7854fc-2251-48c6-bd63-0b507cb33506"
-        ],
         "c0175497-be87-45d1-a187-557cb653d359": [
           "39bd8f49-7ff9-4896-a415-474c111e3eee"
         ]
@@ -344,9 +332,6 @@ data:
           "6335f100-e68e-4e4d-b46d-85b42f85a036": {
             "name": "CCL: Reload Edge Agent Config"
           },
-          "7213f5a3-0bb1-4151-ad83-d27dcb368980": {
-            "name": "File Service"
-          },
           "78ea7071-24ac-4916-8351-aa3e549d8ccd": {
             "name": "Command Escalation Service"
           },
@@ -358,27 +343,6 @@ data:
           },
           "feb27ba3-bd2c-4916-9269-79a61ebc4a47": {
             "name": "MQTT Broker"
-          },
-          "253e14b5-9bd1-4c82-8d17-41e4568c4cd3": {
-            "name": "File Service: Schema File Type Mapping Application"
-          },
-          "743211dd-398d-45b6-b41f-28b0c7dc9744": {
-            "name": "File Service Definition: File Type"
-          },
-          "f42291d3-fbf3-4c91-b00b-00dbcbbfbada": {
-            "name": "File Service Definition: File"
-          },
-          "17ffd50f-2254-484b-86b2-5886e1a072c1": {
-            "name": "technical_datasheet"
-          },
-          "af431695-f5ee-4c95-835d-3668ae7daf19": {
-            "name": "qif_measurement_result"
-          },
-          "b8f89a59-060b-4896-88b2-f3f53c1908a5": {
-            "name": "measurement_result"
-          },
-          "ed7854fc-2251-48c6-bd63-0b507cb33506": {
-            "name": "method_statement"
           },
           "c0175497-be87-45d1-a187-557cb653d359": {
             "name": "Node Group"
@@ -422,12 +386,6 @@ data:
           "f08c79a8-997d-4556-8673-941e27bd63eb": {
             "name": "PLC V1"
           },
-          "751f5524-3e67-4d0e-ac72-65172bae1cee": {
-            "name": "File Service: File Entries Application"
-          },
-          "75f3cbde-210a-440f-a7c3-6f5325a1ab65": {
-            "name": "File Service: File Type List Application"
-          },
           "1e1989ab-14e4-42bd-8171-495230acc406": {
             "name": "Auth Service"
           },
@@ -439,9 +397,6 @@ data:
           },
           "9584ee09-a35a-4278-bc13-21a8be1f007c": {
             "name": "CCL Permissions"
-          },
-          "3e821f50-502c-420b-b5a6-dc9281f7f4a1": {
-            "name": "File Service"
           },
           "388ddbdc-4eb4-4ae8-bbd0-9be32f3c31e8": {
             "name": "Historian"
@@ -517,10 +472,6 @@ data:
           "23d4e8f9-76c0-49d5-addc-00b6ac05ee58": {
             "node_id": "Command_Escalation",
             "group_id": "{{ .Values.acs.organisation }}-Service-Core"
-          },
-          "3e821f50-502c-420b-b5a6-dc9281f7f4a1": {
-              "node_id": "Files",
-              "group_id": "{{ .Values.acs.organisation }}-Service-Core"
           }
         },
         "60e99f28-67fe-4344-a6ab-b1edb8b8e810": {
@@ -540,132 +491,6 @@ data:
               "type": "Boolean"
             }
           ]
-        },
-        "253e14b5-9bd1-4c82-8d17-41e4568c4cd3": {
-          "24a01fa5-9232-40f5-98e5-0414e383ba9d": [
-            {
-              "key": "technical_datasheet",
-              "tags": null,
-              "title": "Technical Datasheet",
-              "mime_type": {
-                "mime": "application/pdf"
-              }
-            }
-          ],
-          "6012580d-fd0a-442c-8d71-7f31f7155633": [
-            {
-              "key": "technical_datasheet",
-              "tags": null,
-              "title": "Technical Datasheet",
-              "mime_type": {
-                "mime": "application/pdf"
-              }
-            }
-          ],
-          "94d42772-6202-4565-9b9a-f67d332b2e54": [
-            {
-              "key": "qif_measurement_result",
-              "tags": {
-                "process": "boolean"
-              },
-              "title": "QIF Measurement result",
-              "mime_type": {
-                "mime": "application/octet-stream",
-                "custom": {
-                  "extensions": [
-                    "qif"
-                  ]
-                }
-              }
-            },
-            {
-              "key": "cmm_measurement_result",
-              "tags": {
-                "process": "boolean"
-              },
-              "title": "CMM Measurement result",
-              "mime_type": {
-                "mime": "application/octet-stream",
-                "custom": {
-                  "extensions": [
-                    "rtf",
-                    "txt"
-                  ]
-                }
-              }
-            },
-            {
-              "key": "technical_datasheet",
-              "tags": null,
-              "title": "Technical Datasheet",
-              "mime_type": {
-                "mime": "application/pdf"
-              }
-            },
-            {
-              "key": "method_statement",
-              "tags": null,
-              "title": "Method statement 1",
-              "mime_type": {
-                "mime": "application/pdf"
-              }
-            }
-          ]
-        },
-        "751f5524-3e67-4d0e-ac72-65172bae1cee": {},
-        "75f3cbde-210a-440f-a7c3-6f5325a1ab65": {
-          "17ffd50f-2254-484b-86b2-5886e1a072c1": {
-            "key": "technical_datasheet",
-            "tags": null,
-            "uuid": "17ffd50f-2254-484b-86b2-5886e1a072c1",
-            "title": "Technical Datasheet",
-            "mime_type": {
-              "mime": "application/pdf"
-            }
-          },
-          "af431695-f5ee-4c95-835d-3668ae7daf19": {
-            "key": "qif_measurement_result",
-            "tags": {
-              "process": "boolean"
-            },
-            "uuid": "af431695-f5ee-4c95-835d-3668ae7daf19",
-            "title": "QIF measurement result",
-            "mime_type": {
-              "mime": "application/octet-stream",
-              "custom": {
-                "extensions": [
-                  "qif",
-                  "rtf"
-                ]
-              }
-            }
-          },
-          "b8f89a59-060b-4896-88b2-f3f53c1908a5": {
-            "key": "measurement_result",
-            "tags": {
-              "process": "boolean"
-            },
-            "uuid": "b8f89a59-060b-4896-88b2-f3f53c1908a5",
-            "title": "Measurement result",
-            "mime_type": {
-              "mime": "application/octet-stream",
-              "custom": {
-                "extensions": [
-                  "csv",
-                  "rtf"
-                ]
-              }
-            }
-          },
-          "ed7854fc-2251-48c6-bd63-0b507cb33506": {
-            "key": "method_statement",
-            "tags": null,
-            "uuid": "ed7854fc-2251-48c6-bd63-0b507cb33506",
-            "title": "Method statement",
-            "mime_type": {
-              "mime": "application/pdf"
-            }
-          }
         }
       }
     }

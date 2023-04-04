@@ -86,15 +86,3 @@ metadata:
 spec:
   type: Random
   principal: postgres/postgres.{{ .Values.acs.namespace | required "values.acs.namespace is required!" }}.svc.cluster.local@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
----
-apiVersion: factoryplus.app.amrc.co.uk/v1
-kind: KerberosKey
-metadata:
-  name: http.file-service
-  namespace: {{ .Values.acs.namespace | required "values.namespace is required!" }}
-spec:
-  type: Random
-  principal: HTTP/file-service.{{ .Values.acs.namespace | required "values.namespace is required!" }}.svc.cluster.local@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
-  additionalPrincipals:
-    - HTTP/file-service.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
-  secret: files-keytab/server

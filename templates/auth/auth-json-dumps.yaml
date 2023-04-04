@@ -96,31 +96,6 @@ data:
           "target": "9584ee09-a35a-4278-bc13-21a8be1f007c"
         },
         {
-          "principal": "3e821f50-502c-420b-b5a6-dc9281f7f4a1",
-          "permission": "4a339562-cd57-408d-9d1a-6529a383ea4b",
-          "target": "253e14b5-9bd1-4c82-8d17-41e4568c4cd3"
-        },
-        {
-          "principal": "3e821f50-502c-420b-b5a6-dc9281f7f4a1",
-          "permission": "4a339562-cd57-408d-9d1a-6529a383ea4b",
-          "target": "751f5524-3e67-4d0e-ac72-65172bae1cee"
-        },
-        {
-          "principal": "3e821f50-502c-420b-b5a6-dc9281f7f4a1",
-          "permission": "6c799ccb-d2ad-4715-a2a7-3c8728d6c0bf",
-          "target": "751f5524-3e67-4d0e-ac72-65172bae1cee"
-        },
-        {
-          "principal": "3e821f50-502c-420b-b5a6-dc9281f7f4a1",
-          "permission": "87e4a5b7-9a89-4796-a216-39666a47b9d2",
-          "target": "3e821f50-502c-420b-b5a6-dc9281f7f4a1"
-        },
-        {
-          "principal": "3e821f50-502c-420b-b5a6-dc9281f7f4a1",
-          "permission": "f0b7917b-d475-4888-9d5a-2af96b3c26b6",
-          "target": "f42291d3-fbf3-4c91-b00b-00dbcbbfbada"
-        },
-        {
           "principal": "388ddbdc-4eb4-4ae8-bbd0-9be32f3c31e8",
           "permission": "6958c812-fbe2-4e6c-b997-6f850b89f679",
           "target": "00000000-0000-0000-0000-000000000000"
@@ -253,10 +228,6 @@ data:
         {
           "uuid": "2f42daeb-4521-4522-8e19-85dfb73db88e",
           "kerberos": "sv1mqtt@{{ .Values.identity.realm }}"
-        },
-        {
-          "uuid": "3e821f50-502c-420b-b5a6-dc9281f7f4a1",
-          "kerberos": "sv1files@{{ .Values.identity.realm }}"
         },
         {
           "uuid": "388ddbdc-4eb4-4ae8-bbd0-9be32f3c31e8",

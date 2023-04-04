@@ -46,7 +46,7 @@ spec:
             - name: REALM
               value: {{ .Values.identity.realm | required "values.identity.realm is required!" }}
             - name: SPARKPLUG_ADDRESS
-              value: {{ .Values.acs.organisation | required "values.acs.organisation is required!" }}-Service-Core/Command_Escalation"
+              value: {{ .Values.acs.organisation | required "values.acs.organisation is required!" }}-Service-Core/Command_Escalation
             - name: DEVICE_UUID
               value: 23d4e8f9-76c0-49d5-addc-00b6ac05ee58
             - name: ROOT_PRINCIPAL

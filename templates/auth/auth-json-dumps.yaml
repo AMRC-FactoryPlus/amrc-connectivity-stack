@@ -33,7 +33,7 @@ data:
         {
           "principal": "5cc3b068-938f-4bb2-8ceb-64338a02fbeb",
           "permission": "ba566181-0e8a-405b-b16e-3fb89130fbee",
-          "target": "972f7314-aa39-41b6-9e57-9ec6cb83b897"
+          "target": "58b5da47-d098-44f7-8c1d-6e4bd800e718"
         },
         {
           "principal": "5cc3b068-938f-4bb2-8ceb-64338a02fbeb",
@@ -137,7 +137,7 @@ data:
         }
       ],
       "groups": {
-        "972f7314-aa39-41b6-9e57-9ec6cb83b897": [
+        "58b5da47-d098-44f7-8c1d-6e4bd800e718": [
           "3bda2ab2-4128-463d-83c9-16b976a8d83e",
           "97dcf2a1-7f4b-476c-b561-e40fc42440ee",
           "4db4c39a-f18d-4e83-aeb0-5af2c14ddc2b"

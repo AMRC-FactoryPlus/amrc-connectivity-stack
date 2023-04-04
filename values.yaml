@@ -136,21 +136,6 @@ cmdesc:
   # -- Possible values are either 1 to enable all possible debugging, or a comma-separated list of debug tags (the tags printed before the log lines). No logging is specified as an empty string.
   verbosity: 1
 
-files:
-  image:
-    # -- The registry of the Files plugin component
-    registry: ghcr.io/amrc-factoryplus
-    # -- The repository of the Files plugin component
-    repository: acs-files
-    # -- The tag of the Files plugin component
-    tag: latest
-    # @ignore
-    pullPolicy: IfNotPresent
-  # -- The minimum log level that the Files service will log messages at
-  logLevel: warning
-  # -- Possible values are either 1 to enable all possible debugging, or a comma-separated list of debug tags (the tags printed before the log lines). No logging is specified as an empty string.
-  verbosity: 1
-
 minio:
   # -- Whether or not to expose the MinIO console outside of the cluster
   exposeConsole: false

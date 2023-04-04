@@ -24,7 +24,6 @@ identity:
       # @ignore
       pullPolicy: IfNotPresent
   krbKeysOperator:
-    # -- The location and version of the Kerberos keys operator image
     image:
       # -- The registry of the KerberosKey Operator
       registry: ghcr.io/amrc-factoryplus
@@ -202,7 +201,7 @@ traefik:
     general:
       level: DEBUG
 
-# -- The values for the Loki subchart
+# @ignore
 loki:
   loki:
     auth_enabled: false
@@ -215,12 +214,12 @@ loki:
     persistence:
       size: 10Gi
 
-# -- The values for the Promtail subchart
+# @ignore
 promtail:
   loki:
     serviceName: loki
 
-# -- The values for the Grafana subchart
+# @ignore
 grafana:
   persistence:
     enabled: true

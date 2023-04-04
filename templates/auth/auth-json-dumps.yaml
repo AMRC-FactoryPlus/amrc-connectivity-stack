@@ -129,6 +129,11 @@ data:
           "principal": "388ddbdc-4eb4-4ae8-bbd0-9be32f3c31e8",
           "permission": "50f1e694-7e18-4930-aa59-97cc90a6a1ec",
           "target": "00000000-0000-0000-0000-000000000000"
+        },
+        {
+          "principal": "2f42daeb-4521-4522-8e19-85dfb73db88e",
+          "permission": "4db4c39a-f18d-4e83-aeb0-5af2c14ddc2b",
+          "target": "feb27ba3-bd2c-4916-9269-79a61ebc4a47"
         }
       ],
       "groups": {

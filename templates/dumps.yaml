@@ -1,32 +1,32 @@
 # Only run this if the ConfigMaps don't already exist
 {{- if not (and (lookup "v1" "ConfigMap" .Values.acs.namespace "configdb-json-dumps") (lookup "v1" "ConfigMap" .Values.acs.namespace "auth-json-dumps")) }}
 # Generate the required UUIDS to use across both dumps
-{{$classDef_wildcard := "00000000-0000-0000-0000-000000000000"}}
-{{$classDef_cellGateway := "00da3c0b-f62b-4761-a689-39ad0c33f864"}}
-{{$classDef_classDefinition := "04a1c90d-2295-4cbe-b33a-74eded62cbf1"}}
-{{$classDef_sparkplugDevice := "18773d6d-a70d-443a-b29a-3f1583195290"}}
-{{$classDef_clientRole := "1c567e3c-5519-4418-8682-6086f22fbc13"}}
-{{$classDef_serviceFunction := "265d481f-87a7-4f93-8fc6-53fa64dc11bb"}}
-{{$classDef_softGateway := "5bee4d24-32e1-44f8-b953-1f86ff4b3e87"}}
-{{$classDef_permission := "8ae784bb-c4b5-4995-9bf6-799b3c7f21ad"}}
-{{$classDef_userAccount := "8b3e8f35-78e5-4f93-bf21-7238bcb2ba9d"}}
-{{$classDef_permissionGroup := "ac0d5288-6136-4ced-a372-325fbbcdd70d"}}
-{{$classDef_nodeGroup := "c0175497-be87-45d1-a187-557cb653d359"}}
-{{$classDef_application := "d319bd87-f42b-4b66-be4f-f82ff48b93f0"}}
-{{$classDef_serviceAccount := "e463b4ae-a322-46cc-8976-4ba76838e908"}}
-{{$classDef_userGroup := "f1fabdd1-de90-4399-b3da-ccf6c2b2c08b"}}
+{{$classDef_wildcard := "00000000-0000-0000-0000-000000000000" | quote}}
+{{$classDef_cellGateway := "00da3c0b-f62b-4761-a689-39ad0c33f864" | quote}}
+{{$classDef_classDefinition := "04a1c90d-2295-4cbe-b33a-74eded62cbf1" | quote}}
+{{$classDef_sparkplugDevice := "18773d6d-a70d-443a-b29a-3f1583195290" | quote}}
+{{$classDef_clientRole := "1c567e3c-5519-4418-8682-6086f22fbc13" | quote}}
+{{$classDef_serviceFunction := "265d481f-87a7-4f93-8fc6-53fa64dc11bb" | quote}}
+{{$classDef_softGateway := "5bee4d24-32e1-44f8-b953-1f86ff4b3e87" | quote}}
+{{$classDef_permission := "8ae784bb-c4b5-4995-9bf6-799b3c7f21ad" | quote}}
+{{$classDef_userAccount := "8b3e8f35-78e5-4f93-bf21-7238bcb2ba9d" | quote}}
+{{$classDef_permissionGroup := "ac0d5288-6136-4ced-a372-325fbbcdd70d" | quote}}
+{{$classDef_nodeGroup := "c0175497-be87-45d1-a187-557cb653d359" | quote}}
+{{$classDef_application := "d319bd87-f42b-4b66-be4f-f82ff48b93f0" | quote}}
+{{$classDef_serviceAccount := "e463b4ae-a322-46cc-8976-4ba76838e908" | quote}}
+{{$classDef_userGroup := "f1fabdd1-de90-4399-b3da-ccf6c2b2c08b" | quote}}
 
-{{$application_objectRegistration := "cb40bed5-49ad-4443-a7f5-08c75009da8f"}}
-{{$application_generalObjectInformation := "64a8bfa9-7772-45c4-9d1a-9e6290690957"}}
-{{$application_mqttPermissionTemplate := "1266ddf1-156c-4266-9808-d6949418b185"}}
-{{$application_sparkplugAddressInformation := "8e32801b-f35a-4cbf-a5c3-2af64d3debd7"}}
-{{$application_commandEscalation := "60e99f28-67fe-4344-a6ab-b1edb8b8e810"}}
+{{$application_objectRegistration := "cb40bed5-49ad-4443-a7f5-08c75009da8f" | quote}}
+{{$application_generalObjectInformation := "64a8bfa9-7772-45c4-9d1a-9e6290690957" | quote}}
+{{$application_mqttPermissionTemplate := "1266ddf1-156c-4266-9808-d6949418b185" | quote}}
+{{$application_sparkplugAddressInformation := "8e32801b-f35a-4cbf-a5c3-2af64d3debd7" | quote}}
+{{$application_commandEscalation := "60e99f28-67fe-4344-a6ab-b1edb8b8e810" | quote}}
 
-{{$service_configStore := "af15f175-78a0-4e05-97c0-2a0bb82b9f3b"}}
-{{$service_commandEscalation := "78ea7071-24ac-4916-8351-aa3e549d8ccd"}}
-{{$service_directory := "af4a1d66-e6f7-43c4-8a67-0fa3be2b1cf9"}}
-{{$service_authorisation := "cab2642a-f7d9-42e5-8845-8f35affe1fd4"}}
-{{$service_mqtt := "feb27ba3-bd2c-4916-9269-79a61ebc4a47"}}
+{{$service_configStore := "af15f175-78a0-4e05-97c0-2a0bb82b9f3b" | quote}}
+{{$service_commandEscalation := "78ea7071-24ac-4916-8351-aa3e549d8ccd" | quote}}
+{{$service_directory := "af4a1d66-e6f7-43c4-8a67-0fa3be2b1cf9" | quote}}
+{{$service_authorisation := "cab2642a-f7d9-42e5-8845-8f35affe1fd4" | quote}}
+{{$service_mqtt := "feb27ba3-bd2c-4916-9269-79a61ebc4a47" | quote}}
 
 {{$role_administrator := uuidv4 | quote}}
 {{$role_gatewayBridge := uuidv4 | quote}}

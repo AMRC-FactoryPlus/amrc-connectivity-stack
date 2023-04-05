@@ -129,7 +129,7 @@ data:
           {{$application_generalObjectInformation}},
           {{$application_mqttPermissionTemplate}},
           {{$application_sparkplugAddressInformation}},
-          {{$application_commandEscalation}},
+          {{$application_commandEscalation}}
         ],
         {{$classDef_serviceFunction}}: [
           {{$service_configStore}},
@@ -160,7 +160,7 @@ data:
           {{$permission_auth_readEffectivePermissions}},
           {{$permission_auth_manageACLsPerPermission}},
           {{$permission_auth_readACLEntry}},
-          {{$permission_auth_manageGroups}}
+          {{$permission_auth_manageGroups}},
           {{$permission_configStore_readConfigForApp}},
           {{$permission_configStore_writeConfigForApp}},
           {{$permission_configStore_manageAppSchema}},
@@ -700,7 +700,7 @@ data:
           {{$permission_auth_readACLEntry}},
           {{$permission_auth_readEffectivePermissions}},
           {{$permission_auth_manageACLsPerPermission}},
-          {{$permission_auth_manageGroups}}
+          {{$permission_auth_manageGroups}},
           {{$permission_auth_manageKerberosMappings}},
           {{$permission_auth_readKerberosMapping}}
         ],

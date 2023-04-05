@@ -11,7 +11,7 @@ data:
   VITE_BRANDING_NAME: {{.Values.manager.name | quote | required "values.manager.name is required!"}}
   MQTT_SERVER_FROM_EDGE: "mqtts://mqtt.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}:8883"
   MANAGEMENT_APP_FROM_EDGE: "https://manager.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"
-  MANAGER_SERVICE_PRINCIPAL: "HTTP/manager.{{ .Values.identity.realm | required "values.identity.realm is required!" }}"
+  MANAGER_SERVICE_PRINCIPAL: "HTTP/manager.{{ .Values.acs.namespace | required "values.acs.namespace is required!" }}.svc.cluster.local"
   APP_URL: "https://manager.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"
   ASSET_URL: "https://manager.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"
   KRB_DOMAIN: {{.Values.identity.realm | quote | required "values.identity.realm is required!"}}

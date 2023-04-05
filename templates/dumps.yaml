@@ -1,0 +1,772 @@
+# Only run this if the ConfigMaps don't already exist
+{{- if (not (lookup "v1" "ConfigMap" .Values.acs.namespace "configdb-json-dumps") and (not lookup "v1" "ConfigMap" .Values.acs.namespace "auth-json-dumps")) }}
+
+# Generate the required UUIDS to use across both dumps
+{{$classDef_wildcard := "00000000-0000-0000-0000-000000000000"}}
+{{$classDef_cellGateway := "00da3c0b-f62b-4761-a689-39ad0c33f864"}}
+{{$classDef_classDefinition := "04a1c90d-2295-4cbe-b33a-74eded62cbf1"}}
+{{$classDef_sparkplugDevice := "18773d6d-a70d-443a-b29a-3f1583195290"}}
+{{$classDef_clientRole := "1c567e3c-5519-4418-8682-6086f22fbc13"}}
+{{$classDef_serviceFunction := "265d481f-87a7-4f93-8fc6-53fa64dc11bb"}}
+{{$classDef_softGateway := "5bee4d24-32e1-44f8-b953-1f86ff4b3e87"}}
+{{$classDef_permission := "8ae784bb-c4b5-4995-9bf6-799b3c7f21ad"}}
+{{$classDef_userAccount := "8b3e8f35-78e5-4f93-bf21-7238bcb2ba9d"}}
+{{$classDef_permissionGroup := "ac0d5288-6136-4ced-a372-325fbbcdd70d"}}
+{{$classDef_nodeGroup := "c0175497-be87-45d1-a187-557cb653d359"}}
+{{$classDef_application := "d319bd87-f42b-4b66-be4f-f82ff48b93f0"}}
+{{$classDef_serviceAccount := "e463b4ae-a322-46cc-8976-4ba76838e908"}}
+{{$classDef_userGroup := "f1fabdd1-de90-4399-b3da-ccf6c2b2c08b"}}
+
+{{$application_objectRegistration := "cb40bed5-49ad-4443-a7f5-08c75009da8f"}}
+{{$application_generalObjectInformation := "64a8bfa9-7772-45c4-9d1a-9e6290690957"}}
+{{$application_mqttPermissionTemplate := "1266ddf1-156c-4266-9808-d6949418b185"}}
+{{$application_sparkplugAddressInformation := "8e32801b-f35a-4cbf-a5c3-2af64d3debd7"}}
+{{$application_commandEscalation := "60e99f28-67fe-4344-a6ab-b1edb8b8e810"}}
+
+{{$service_configStore := "af15f175-78a0-4e05-97c0-2a0bb82b9f3b"}}
+{{$service_commandEscalation := "78ea7071-24ac-4916-8351-aa3e549d8ccd"}}
+{{$service_directory := "af4a1d66-e6f7-43c4-8a67-0fa3be2b1cf9"}}
+{{$service_authorisation := "cab2642a-f7d9-42e5-8845-8f35affe1fd4"}}
+{{$service_mqtt := "feb27ba3-bd2c-4916-9269-79a61ebc4a47"}}
+
+{{$role_administrator := uuidv4 | quote}}
+{{$role_gatewayBridge := uuidv4 | quote}}
+{{$role_edgeNodeConsumer := uuidv4 | quote}}
+{{$role_globalDebugger := uuidv4 | quote}}
+{{$role_edgeNode := uuidv4 | quote}}
+{{$role_globalPrimaryApplication := uuidv4 | quote}}
+{{$role_manager := uuidv4 | quote}}
+{{$role_commandEscalation := uuidv4 | quote}}
+{{$role_warehouse := uuidv4 | quote}}
+
+{{$user_admin := uuidv4 | quote}}
+
+{{$userGroup_administrators := uuidv4 | quote}}
+
+{{$permission_auth_manageKerberosMappings := uuidv4 | quote}}
+{{$permission_auth_readEffectivePermissions := uuidv4 | quote}}
+{{$permission_auth_manageACLsPerPermission := uuidv4 | quote}}
+{{$permission_auth_readACLEntry := uuidv4 | quote}}
+{{$permission_auth_manageGroups := uuidv4 | quote}}
+{{$permission_auth_readKerberosMapping := uuidv4 | quote}}
+
+{{$permission_configStore_readConfigForApp := uuidv4 | quote}}
+{{$permission_configStore_writeConfigForApp := uuidv4 | quote}}
+{{$permission_configStore_manageAppSchema := uuidv4 | quote}}
+{{$permission_configStore_manageObjects := uuidv4 | quote}}
+{{$permission_configStore_deleteObjects := uuidv4 | quote}}
+
+{{$permission_mqtt_subscribeReadNode := uuidv4 | quote}}
+{{$permission_mqtt_subscribeToWholeNamespace := uuidv4 | quote}}
+{{$permission_mqtt_subscribeReadWholeNamespace := uuidv4 | quote}}
+{{$permission_mqtt_issueGlobalCommands := uuidv4 | quote}}
+{{$permission_mqtt_publishAllFromGroup := uuidv4 | quote}}
+{{$permission_mqtt_subscribeReadAllStates := uuidv4 | quote}}
+{{$permission_mqtt_updateGroupState := uuidv4 | quote}}
+{{$permission_mqtt_particpateAsNode := uuidv4 | quote}}
+{{$permission_mqtt_updateOwnState := uuidv4 | quote}}
+{{$permission_mqtt_issueGroupCommands := uuidv4 | quote}}
+{{$permission_mqtt_subscribeReadOwnGroup := uuidv4 | quote}}
+{{$permission_mqtt_representDevices := uuidv4 | quote}}
+{{$permission_mqtt_readAllBirthMessages := uuidv4 | quote}}
+
+{{$permission_directory_overrideServiceAdvertisementPermissions := uuidv4 | quote}}
+{{$permission_directory_advertiseService := uuidv4 | quote}}
+{{$permission_directory_manageServiceAdvertisementForOwner := uuidv4 | quote}}
+{{$permission_directory_ := uuidv4 | quote}}
+
+{{$permission_ccl_rebirth := uuidv4 | quote}}
+{{$permission_ccl_reloadEdgeAgentConfig := uuidv4 | quote}}
+
+{{$permissionGroup_authorisation := uuidv4 | quote}}
+{{$permissionGroup_configStore := uuidv4 | quote}}
+{{$permissionGroup_mqtt := uuidv4 | quote}}
+{{$permissionGroup_directory := uuidv4 | quote}}
+{{$permissionGroup_commands := uuidv4 | quote}}
+
+{{$serviceAccount_mqtt := uuidv4 | quote}}
+{{$serviceAccount_directory := uuidv4 | quote}}
+{{$serviceAccount_ := uuidv4 | quote}}
+{{$serviceAccount_configStore := uuidv4 | quote}}
+{{$serviceAccount_manager := uuidv4 | quote}}
+{{$serviceAccount_authorisation := uuidv4 | quote}}
+{{$serviceAccount_commandEscalation := uuidv4 | quote}}
+{{$serviceAccount_dataWarehouse := uuidv4 | quote}}
+
+{{$nodeGroup_serviceProvider := uuidv4 | quote}}
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: configdb-json-dumps
+  namespace: {{ .Values.acs.namespace | required "values.namespace is required!" }}
+  labels:
+    component: configdb
+data:
+  # Pre-seed required
+  bootstrap: |
+    {
+      "service": {{$service_configStore}},
+      "version": 1,
+      "classes": [
+        {{$classDef_classDefinition}},
+        {{$classDef_application}},
+        {{$classDef_sparkplugDevice}},
+        {{$classDef_serviceFunction}},
+        {{$classDef_clientRole}},
+        {{$classDef_userAccount}},
+        {{$classDef_userGroup}},
+        {{$classDef_permission}},
+        {{$classDef_permissionGroup}},
+        {{$classDef_wildcard}},
+        {{$classDef_serviceAccount}},
+        {{$classDef_cellGateway}},
+        {{$classDef_softGateway}},
+        {{$classDef_nodeGroup}}
+      ],
+      "objects": {
+        {{$classDef_application}}: [
+          {{$application_objectRegistration}},
+          {{$application_generalObjectInformation}},
+          {{$application_mqttPermissionTemplate}},
+          {{$application_sparkplugAddressInformation}},
+          {{$application_commandEscalation}},
+        ],
+        {{$classDef_serviceFunction}}: [
+          {{$service_configStore}},
+          {{$service_commandEscalation}},
+          {{$service_directory}},
+          {{$service_authorisation}},
+          {{$service_mqtt}}
+        ],
+        {{$classDef_clientRole}}: [
+          {{$role_administrator}},
+          {{$role_gatewayBridge}},
+          {{$role_edgeNodeConsumer}},
+          {{$role_globalDebugger}},
+          {{$role_edgeNode}},
+          {{$role_globalPrimaryApplication}},
+          {{$role_manager}},
+          {{$role_commandEscalation}},
+          {{$role_warehouse}}
+        ],
+        {{$classDef_userAccount}}: [
+          {{$user_admin}}
+        ],
+        {{$classDef_userGroup}}: [
+          {{$userGroup_administrators}}
+        ],
+        {{$classDef_permission}}: [
+          {{$permission_auth_manageKerberosMappings}},
+          {{$permission_auth_readEffectivePermissions}},
+          {{$permission_auth_manageACLsPerPermission}},
+          {{$permission_auth_readACLEntry}},
+          {{$permission_auth_manageGroups}}
+          {{$permission_configStore_readConfigForApp}},
+          {{$permission_configStore_writeConfigForApp}},
+          {{$permission_configStore_manageAppSchema}},
+          {{$permission_configStore_manageObjects}},
+          {{$permission_configStore_deleteObjects}},
+          {{$permission_mqtt_subscribeReadNode}},
+          {{$permission_mqtt_subscribeToWholeNamespace}},
+          {{$permission_mqtt_issueGlobalCommands}},
+          {{$permission_mqtt_publishAllFromGroup}},
+          {{$permission_mqtt_subscribeReadWholeNamespace}},
+          {{$permission_mqtt_subscribeReadAllStates}},
+          {{$permission_mqtt_updateGroupState}},
+          {{$permission_mqtt_particpateAsNode}},
+          {{$permission_mqtt_updateOwnState}},
+          {{$permission_mqtt_issueGroupCommands}},
+          {{$permission_mqtt_subscribeReadOwnGroup}},
+          {{$permission_mqtt_representDevices}},
+          {{$permission_directory_overrideServiceAdvertisementPermissions}},
+          {{$permission_directory_advertiseService}},
+          {{$permission_directory_manageServiceAdvertisementForOwner}},
+          {{$permission_auth_readKerberosMapping}},
+          {{$permission_mqtt_readAllBirthMessages}},
+          {{$permission_ccl_rebirth}},
+          {{$permission_ccl_reloadEdgeAgentConfig}}
+        ],
+        {{$classDef_permissionGroup}}: [
+          {{$permissionGroup_authorisation}},
+          {{$permissionGroup_configStore}},
+          {{$permissionGroup_mqtt}},
+          {{$permissionGroup_directory}},
+          {{$permissionGroup_commands}}
+        ],
+        {{$classDef_serviceAccount}}: [
+          {{$serviceAccount_mqtt}},
+          {{$serviceAccount_directory}},
+          {{$serviceAccount_configStore}},
+          {{$serviceAccount_manager}},
+          {{$serviceAccount_authorisation}},
+          {{$serviceAccount_commandEscalation}},
+          {{$serviceAccount_dataWarehouse}}
+        ],
+        {{$classDef_cellGateway}}: [],
+        {{$classDef_nodeGroup}}: [
+          {{$nodeGroup_serviceProvider}}
+        ]
+      },
+      "configs": {
+        {{$application_generalObjectInformation}}: {
+          {{$classDef_classDefinition}}: {
+            "name": "Class Definition"
+          },
+          {{$classDef_application}}: {
+            "name": "Application"
+          },
+          {{$classDef_sparkplugDevice}}: {
+            "name": "Sparkplug Device"
+          },
+          {{$classDef_serviceFunction}}: {
+            "name": "Service Function"
+          },
+          {{$application_objectRegistration}}: {
+            "name": "Object Registration Application"
+          },
+          {{$application_generalObjectInformation}}: {
+            "name": "General Object Information Application"
+          },
+          {{$service_configStore}}: {
+            "name": "Configuration Store"
+          },
+          {{$classDef_clientRole}}: {
+            "name": "Client Role"
+          },
+          {{$classDef_userAccount}}: {
+            "name": "User Account"
+          },
+          {{$classDef_userGroup}}: {
+            "name": "User Group"
+          },
+          {{$role_administrator}}: {
+            "name": "Role: Administrator"
+          },
+          {{$user_admin}}: {
+            "name": "Global Administrator Account"
+          },
+          {{$userGroup_administrators}}: {
+            "name": "Administrators"
+          },
+          {{$classDef_permission}}: {
+            "name": "Permission"
+          },
+          {{$classDef_permissionGroup}}: {
+            "name": "Permission Group"
+          },
+          {{$permission_auth_manageKerberosMappings}}: {
+            "name": "Auth: Manage Kerberos mappings"
+          },
+          {{$permission_auth_readEffectivePermissions}}: {
+            "name": "Auth: Read effective permissions"
+          },
+          {{$permission_auth_manageACLsPerPermission}}: {
+            "name": "Auth: Manage ACLs (per permission)"
+          },
+          {{$permission_auth_readACLEntry}}: {
+            "name": "Auth: Read ACL entry"
+          },
+          {{$permission_auth_manageGroups}}: {
+            "name": "Auth: Manage groups"
+          },
+          {{$permissionGroup_authorisation}}: {
+            "name": "Auth permissions"
+          },
+          {{$classDef_wildcard}}: {
+            "name": "Wildcard UUID"
+          },
+          {{$permission_configStore_readConfigForApp}}: {
+            "name": "ConfigDB: Read config for app"
+          },
+          {{$permission_configStore_writeConfigForApp}}: {
+            "name": "ConfigDB: Write config for app"
+          },
+          {{$permission_configStore_manageAppSchema}}: {
+            "name": "ConfigDB: Manage application schema"
+          },
+          {{$permission_configStore_manageObjects}}: {
+            "name": "ConfigDB: Manage objects"
+          },
+          {{$permission_configStore_deleteObjects}}: {
+            "name": "ConfigDB: Delete objects"
+          },
+          {{$permissionGroup_configStore}}: {
+            "name": "ConfigDB Permissions"
+          },
+          {{$permissionGroup_mqtt}}: {
+            "name": "MQTT Permissions"
+          },
+          {{$application_mqttPermissionTemplate}}: {
+            "name": "MQTT Permission Template Application"
+          },
+          {{$application_sparkplugAddressInformation}}: {
+            "name": "Sparkplug Address Information Application"
+          },
+          {{$role_gatewayBridge}}: {
+            "name": "Role: Gateway Bridge"
+          },
+          {{$role_edgeNodeConsumer}}: {
+            "name": "Role: Edge Node Consumer"
+          },
+          {{$role_globalDebugger}}: {
+            "name": "Role: Global Debugger"
+          },
+          {{$role_edgeNode}}: {
+            "name": "Role: Edge Node"
+          },
+          {{$role_globalPrimaryApplication}}: {
+            "name": "Role: Global Primary Application"
+          },
+          {{$permission_mqtt_subscribeReadNode}}: {
+            "name": "MQTT: Subscribe and read Node"
+          },
+          {{$permission_mqtt_subscribeToWholeNamespace}}: {
+            "name": "MQTT: Subscribe to whole namespace"
+          },
+          {{$permission_mqtt_issueGlobalCommands}}: {
+            "name": "MQTT: Issue global commands"
+          },
+          {{$permission_mqtt_publishAllFromGroup}}: {
+            "name": "MQTT: Publish all from group"
+          },
+          {{$permission_mqtt_subscribeReadWholeNamespace}}: {
+            "name": "MQTT: Subscribe and read whole namespace"
+          },
+          {{$permission_mqtt_subscribeReadAllStates}}: {
+            "name": "MQTT: Subscribe and read all STATEs"
+          },
+          {{$permission_mqtt_updateGroupState}}: {
+            "name": "MQTT: Update group STATE"
+          },
+          {{$permission_mqtt_particpateAsNode}}: {
+            "name": "MQTT: Participate as Node"
+          },
+          {{$permission_mqtt_updateOwnState}}: {
+            "name": "MQTT: Update own STATE"
+          },
+          {{$permission_mqtt_issueGroupCommands}}: {
+            "name": "MQTT: Issue group commands"
+          },
+          {{$permission_mqtt_subscribeReadOwnGroup}}: {
+            "name": "MQTT: Subscribe and read own group"
+          },
+          {{$permission_mqtt_representDevices}}: {
+            "name": "MQTT: Represent Devices"
+          },
+          {{$classDef_serviceAccount}}: {
+            "name": "Service Account"
+          },
+          {{$permissionGroup_directory}}: {
+            "name": "Directory permissions"
+          },
+          {{$permission_directory_overrideServiceAdvertisementPermissions}}: {
+            "name": "Directory: Override service advertisement permissions"
+          },
+          {{$permission_directory_advertiseService}}: {
+            "name": "Directory: Advertise service"
+          },
+          {{$permission_directory_manageServiceAdvertisementForOwner}}: {
+            "name": "Directory: Manage service advertisement for owner"
+          },
+          {{$permission_auth_readKerberosMapping}}: {
+            "name": "Auth: Read Kerberos mapping"
+          },
+          {{$permission_mqtt_readAllBirthMessages}}: {
+            "name": "MQTT: Read all BIRTHs"
+          },
+          {{$serviceAccount_mqtt}}: {
+            "name": "MQTT Service"
+          },
+          {{$serviceAccount_directory}}: {
+            "name": "Directory Service"
+          },
+          {{$serviceAccount_configStore}}: {
+            "name": "ConfigDB Service"
+          },
+          {{$classDef_cellGateway}}: {
+            "name": "Cell Gateway"
+          },
+          {{$classDef_softGateway}}: {
+            "name": "Soft Gateway"
+          },
+          {{$serviceAccount_manager}}: {
+            "name": "Manager"
+          },
+          {{$role_manager}}: {
+            "name": "Role: Manager"
+          },
+          {{$application_commandEscalation}}: {
+            "name": "Command Escalation Application"
+          },
+          {{$permission_ccl_rebirth}}: {
+            "name": "CCL: Rebirth"
+          },
+          {{$permission_ccl_reloadEdgeAgentConfig}}: {
+            "name": "CCL: Reload Edge Agent Config"
+          },
+          {{$service_commandEscalation}}: {
+            "name": "Command Escalation Service"
+          },
+          {{$service_directory}}: {
+            "name": "Directory Service"
+          },
+          {{$service_authorisation}}: {
+            "name": "Authentication Service"
+          },
+          {{$service_mqtt}}: {
+            "name": "MQTT Broker"
+          },
+          {{$classDef_nodeGroup}}: {
+            "name": "Node Group"
+          },
+          {{$nodeGroup_serviceProvider}}: {
+            "name": "Service Provider Nodes"
+          },
+          {{$serviceAccount_authorisation}}: {
+            "name": "Auth Service"
+          },
+          {{$serviceAccount_commandEscalation}}: {
+            "name": "Command Escalation Service"
+          },
+          {{$role_commandEscalation}}: {
+            "name": "Role: Command Escalation Service"
+          },
+          {{$permissionGroup_commands}}: {
+            "name": "CCL Permissions"
+          },
+          {{$serviceAccount_dataWarehouse}}: {
+            "name": "Data Warehouse"
+          },
+          {{$role_warehouse}}: {
+            "name": "Role: warehouse"
+          }
+        },
+        {{$application_mqttPermissionTemplate}}: {
+          {{$permission_mqtt_subscribeReadNode}}: {
+            "spBv1.0/%g/NDATA/%n": "rs",
+            "spBv1.0/DDEATH/%n/+": "rs",
+            "spBv1.0/%g/NBIRTH/%n": "rs",
+            "spBv1.0/%g/NDEATH/%n": "rs",
+            "spBv1.0/%g/DDATA/%n/+": "rs",
+            "spBv1.0/%g/DBIRTH/%n/+": "rs"
+          },
+          {{$permission_mqtt_subscribeToWholeNamespace}}: {
+            "spBv1.0/#": "s"
+          },
+          {{$permission_mqtt_issueGlobalCommands}}: {
+            "spBv1.0/+/NCMD/+": "w",
+            "spBv1.0/+/DCMD/+/+": "w"
+          },
+          {{$permission_mqtt_publishAllFromGroup}}: {
+            "spBv1.0/%g/#": "w"
+          },
+          {{$permission_mqtt_subscribeReadWholeNamespace}}: {
+            "spBv1.0/#": "rs"
+          },
+          {{$permission_mqtt_subscribeReadAllStates}}: {
+            "STATE/+": "rs"
+          },
+          {{$permission_mqtt_updateGroupState}}: {
+            "STATE/%g": "w"
+          },
+          {{$permission_mqtt_particpateAsNode}}: {
+            "spBv1.0/%g/NDATA/%n": "w",
+            "spBv1.0/%g/NBIRTH/%n": "w",
+            "spBv1.0/%g/NCMD/%n/#": "rs",
+            "spBv1.0/%g/NDEATH/%n": "w"
+          },
+          {{$permission_mqtt_updateOwnState}}: {
+            "STATE/%n": "w"
+          },
+          {{$permission_mqtt_issueGroupCommands}}: {
+            "spBv1.0/%g/NCMD/+": "w",
+            "spBv1.0/%g/DCMD/+/+": "w"
+          },
+          {{$permission_mqtt_subscribeReadOwnGroup}}: {
+            "spBv1.0/%g/#": "rs"
+          },
+          {{$permission_mqtt_representDevices}}: {
+            "spBv1.0/%g/DCMD/%n/+": "rs",
+            "spBv1.0/%g/DDATA/%n/+": "w",
+            "spBv1.0/%g/DBIRTH/%n/+": "w",
+            "spBv1.0/%g/DDEATH/%n/+": "w"
+          },
+          {{$permission_mqtt_readAllBirthMessages}}: {
+            "spBv1.0/+/NBIRTH/+": "rs",
+            "spBv1.0/+/DBIRTH/+/+": "rs"
+          }
+        },
+        {{$application_sparkplugAddressInformation}}: {
+          {{$serviceAccount_directory}}: {
+            "node_id": "Directory",
+            "group_id": "{{ .Values.acs.organisation }}-Service-DIR-Directory"
+          },
+          {{$serviceAccount_configStore}}: {
+            "node_id": "Config_DB",
+            "group_id": "{{ .Values.acs.organisation }}-Service-Config_DB"
+          },
+          {{$serviceAccount_commandEscalation}}: {
+            "node_id": "Command_Escalation",
+            "group_id": "{{ .Values.acs.organisation }}-Service-Core"
+          }
+        },
+        {{$application_commandEscalation}}: {
+          {{$permission_ccl_rebirth}}: [
+            {
+              "name": "Node Control/Rebirth",
+              "type": "Boolean"
+            },
+            {
+              "name": "Device Control/Rebirth",
+              "type": "Boolean"
+            }
+          ],
+          {{$permission_ccl_reloadEdgeAgentConfig}}: [
+            {
+              "name": "Node Control/Reload Edge Agent Config",
+              "type": "Boolean"
+            }
+          ]
+        }
+      }
+    }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: auth-json-dumps
+  namespace: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
+  annotations:
+    "helm.sh/hook": pre-install
+    "helm.sh/hook-weight": "20"
+  labels:
+    component: auth
+data:
+  # Pre-seed required ACEs, Groups and Principals
+  bootstrap: |
+    {
+      "service": {{$service_authorisation}},
+      "version": 1,
+      "aces": [
+        {
+          "principal": {{$userGroup_administrators}},
+          "permission": {{$role_administrator}},
+          "target": {{$classDef_wildcard}}
+        },
+        {
+          "principal": {{$serviceAccount_directory}},
+          "permission": {{$permission_mqtt_subscribeReadWholeNamespace}},
+          "target": {{$classDef_wildcard}}
+        },
+        {
+          "principal": {{$serviceAccount_directory}},
+          "permission": {{$role_edgeNode}},
+          "target": {{$serviceAccount_directory}}
+        },
+        {
+          "principal": {{$serviceAccount_directory}},
+          "permission": {{$permission_auth_readACLEntry}},
+          "target": {{$permissionGroup_directory}}
+        },
+        {
+          "principal": {{$serviceAccount_directory}},
+          "permission": {{$permission_auth_readKerberosMapping}},
+          "target": {{$classDef_wildcard}}
+        },
+        {
+          "principal": {{$serviceAccount_mqtt}},
+          "permission": {{$permission_auth_readACLEntry}},
+          "target": {{$permissionGroup_mqtt}}
+        },
+        {
+          "principal": {{$serviceAccount_mqtt}},
+          "permission": {{$permission_configStore_readConfigForApp}},
+          "target": {{$application_mqttPermissionTemplate}}
+        },
+        {
+          "principal": {{$serviceAccount_mqtt}},
+          "permission": {{$permission_configStore_readConfigForApp}},
+          "target": {{$application_sparkplugAddressInformation}}
+        },
+        {
+          "principal": {{$serviceAccount_configStore}},
+          "permission": {{$permission_auth_readACLEntry}},
+          "target": {{$permissionGroup_configStore}}
+        },
+        {
+          "principal": {{$serviceAccount_configStore}},
+          "permission": {{$role_edgeNode}},
+          "target": {{$serviceAccount_configStore}}
+        },
+        {
+          "principal": {{$serviceAccount_manager}},
+          "permission": {{$role_manager}},
+          "target": {{$classDef_wildcard}}
+        },
+        {
+          "principal": {{$serviceAccount_commandEscalation}},
+          "permission": {{$role_commandEscalation}},
+          "target": {{$classDef_wildcard}}
+        },
+        {
+          "principal": {{$serviceAccount_commandEscalation}},
+          "permission": {{$permission_configStore_readConfigForApp}},
+          "target": {{$application_commandEscalation}}
+        },
+        {
+          "principal": {{$serviceAccount_commandEscalation}},
+          "permission": {{$permission_configStore_readConfigForApp}},
+          "target": {{$application_sparkplugAddressInformation}}
+        },
+        {
+          "principal": {{$serviceAccount_commandEscalation}},
+          "permission": {{$role_edgeNode}},
+          "target": {{$serviceAccount_commandEscalation}}
+        },
+        {
+          "principal": {{$serviceAccount_commandEscalation}},
+          "permission": {{$permission_auth_readACLEntry}},
+          "target": {{$permissionGroup_commands}}
+        },
+        {
+          "principal": {{$serviceAccount_dataWarehouse}},
+          "permission": {{$role_warehouse}},
+          "target": {{$classDef_wildcard}}
+        },
+        {
+          "principal": {{$serviceAccount_dataWarehouse}},
+          "permission": {{$permission_mqtt_issueGlobalCommands}},
+          "target": {{$classDef_wildcard}}
+        },
+        {
+          "principal": {{$serviceAccount_mqtt}},
+          "permission": {{$permission_directory_advertiseService}},
+          "target": {{$service_mqtt}}
+        }
+      ],
+      "groups": {
+        {{$permissionGroup_directory}}: [
+          {{$permission_directory_overrideServiceAdvertisementPermissions}},
+          {{$permission_directory_manageServiceAdvertisementForOwner}},
+          {{$permission_directory_advertiseService}}
+        ],
+        {{$role_gatewayBridge}}: [
+          {{$permission_mqtt_subscribeToWholeNamespace}},
+          {{$permission_mqtt_publishAllFromGroup}},
+          {{$permission_mqtt_subscribeReadAllStates}},
+          {{$permission_mqtt_updateGroupState}},
+          {{$permission_mqtt_subscribeReadOwnGroup}}
+        ],
+        {{$role_administrator}}: [
+          {{$role_globalDebugger}},
+          {{$permissionGroup_authorisation}},
+          {{$permissionGroup_configStore}}
+        ],
+        {{$role_edgeNodeConsumer}}: [
+          {{$permission_mqtt_subscribeReadNode}}
+        ],
+        {{$role_warehouse}}: [
+          {{$permission_mqtt_subscribeReadWholeNamespace}},
+          {{$permission_ccl_rebirth}}
+        ],
+        {{$role_commandEscalation}}: [
+          {{$permission_mqtt_issueGlobalCommands}},
+          {{$permission_mqtt_subscribeReadWholeNamespace}}
+        ],
+        {{$role_edgeNode}}: [
+          {{$permission_mqtt_subscribeReadAllStates}},
+          {{$permission_mqtt_particpateAsNode}},
+          {{$permission_mqtt_representDevices}}
+        ],
+        {{$permissionGroup_commands}}: [
+          {{$permission_ccl_reloadEdgeAgentConfig}},
+          {{$permission_ccl_rebirth}}
+        ],
+        {{$role_globalPrimaryApplication}}: [
+          {{$permission_mqtt_issueGlobalCommands}},
+          {{$permission_mqtt_subscribeReadWholeNamespace}},
+          {{$permission_mqtt_subscribeReadAllStates}},
+          {{$permission_mqtt_updateOwnState}}
+        ],
+        {{$role_manager}}: [
+          {{$permission_auth_manageKerberosMappings}},
+          {{$permission_auth_readEffectivePermissions}},
+          {{$permission_auth_manageACLsPerPermission}},
+          {{$permission_configStore_writeConfigForApp}},
+          {{$permission_configStore_manageObjects}},
+          {{$permission_ccl_reloadEdgeAgentConfig}}
+        ],
+        {{$permissionGroup_authorisation}}: [
+          {{$permission_auth_readACLEntry}},
+          {{$permission_auth_readEffectivePermissions}},
+          {{$permission_auth_manageACLsPerPermission}},
+          {{$permission_auth_manageGroups}}
+          {{$permission_auth_manageKerberosMappings}},
+          {{$permission_auth_readKerberosMapping}}
+        ],
+        {{$role_globalDebugger}}: [
+          {{$permission_mqtt_subscribeReadWholeNamespace}}
+        ],
+        {{$permissionGroup_mqtt}}: [
+          {{$permission_mqtt_subscribeReadNode}},
+          {{$permission_mqtt_subscribeToWholeNamespace}},
+          {{$permission_mqtt_issueGlobalCommands}},
+          {{$permission_mqtt_publishAllFromGroup}},
+          {{$permission_mqtt_subscribeReadWholeNamespace}},
+          {{$permission_mqtt_subscribeReadAllStates}},
+          {{$permission_mqtt_updateGroupState}},
+          {{$permission_mqtt_particpateAsNode}},
+          {{$permission_mqtt_updateOwnState}},
+          {{$permission_mqtt_issueGroupCommands}},
+          {{$permission_mqtt_subscribeReadOwnGroup}},
+          {{$permission_mqtt_representDevices}},
+          {{$permission_mqtt_readAllBirthMessages}}
+        ],
+        {{$permissionGroup_configStore}}: [
+          {{$permission_configStore_readConfigForApp}},
+          {{$permission_configStore_writeConfigForApp}},
+          {{$permission_configStore_manageAppSchema}},
+          {{$permission_configStore_manageObjects}},
+          {{$permission_configStore_deleteObjects}}
+        ],
+        {{$userGroup_administrators}}: [
+          {{$user_admin}}
+        ]
+      },
+      "principals": [
+        {
+          "uuid": {{$user_admin}},
+          "kerberos": "admin@{{ .Values.identity.realm }}"
+        },
+        {
+          "uuid": {{$serviceAccount_directory}},
+          "kerberos": "sv1directory@{{ .Values.identity.realm }}"
+        },
+        {
+          "uuid": {{$serviceAccount_authorisation}},
+          "kerberos": "sv1auth@{{ .Values.identity.realm }}"
+        },
+        {
+          "uuid": {{$serviceAccount_configStore}},
+          "kerberos": "sv1configdb@{{ .Values.identity.realm }}"
+        },
+        {
+          "uuid": {{$serviceAccount_manager}},
+          "kerberos": "sv1manager@{{ .Values.identity.realm }}"
+        },
+        {
+          "uuid": {{$serviceAccount_commandEscalation}},
+          "kerberos": "sv1cmdesc@{{ .Values.identity.realm }}"
+        },
+        {
+          "uuid": {{$serviceAccount_mqtt}},
+          "kerberos": "sv1mqtt@{{ .Values.identity.realm }}"
+        },
+        {
+          "uuid": {{$serviceAccount_dataWarehouse}},
+          "kerberos": "sv1warehouse@{{ .Values.identity.realm }}"
+        }
+      ]
+    }
+{{end}}

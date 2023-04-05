@@ -55,7 +55,7 @@ spec:
             # This secret is managed by the administrator, and read by the
             # operator. It contains passwords for situations where the
             # actual password used must be known (e.g. off-swarm services
-            # like the historian).
+            # like the warehouse).
             - name: PRESETS_SECRET
               value: krb5-presets
           volumeMounts:

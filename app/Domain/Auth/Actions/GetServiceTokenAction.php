@@ -159,7 +159,7 @@ class GetServiceTokenAction
                     'auth_header' => ('Negotiate ' . base64_encode(
                         $token
                     )),
-                    'endpoint' => 'https://' . $service . '.' . config(
+                    'endpoint' => config('manager.service_scheme') . '://' . $service . '.' . config(
                         'manager.service_domain'
                     ) . '/token',
                 ]
@@ -174,7 +174,7 @@ class GetServiceTokenAction
                 ]
             )
                 ->post(
-                    'https://' . $service . '.' . config(
+                    config('manager.service_scheme') . '://' . $service . '.' . config(
                         'manager.service_domain'
                     ) . '/token'
                 );

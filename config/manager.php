@@ -15,6 +15,7 @@ return [
     'mqtt_server_from_edge' => env('MQTT_SERVER_FROM_EDGE', 'mqtt://mqtt:1883'),
     'management_app_from_edge' => env('MANAGEMENT_APP_FROM_EDGE', 'http://manager'),
     'tgt_lifetime' => 3600,
+    'service_scheme' => env('SERVICE_SCHEME', 'https'),
     'auth_service_url' => env('AUTH_SERVICE_URL'),
     'configdb_service_url' => env('CONFIGDB_SERVICE_URL'),
     'file_service_url' => env('FILE_SERVICE_ENDPOINT', 'http://localhost:9990') . '/api',

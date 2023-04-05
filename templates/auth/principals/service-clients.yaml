@@ -72,8 +72,8 @@ spec:
 apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey
 metadata:
-  name: sv1historian
+  name: sv1warehouse
   namespace: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
 spec:
   type: Password
-  principal: sv1historian@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+  principal: sv1warehouse@{{ .Values.identity.realm | required "values.identity.realm is required!" }}

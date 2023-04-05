@@ -20,6 +20,12 @@ spec:
               image: "{{ .Values.manager.image.registry }}/{{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}"
               imagePullPolicy: IfNotPresent
               command: [ "php", "artisan", "schedule:run" ]
+              env:
+                - name: DB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: manager-database-secret
+                      key: postgres-password
               envFrom:
                 - secretRef:
                     name: manager-secrets

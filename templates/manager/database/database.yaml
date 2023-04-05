@@ -1,0 +1,45 @@
+apiVersion: kubegres.reactive-tech.io/v1
+kind: Kubegres
+metadata:
+  name: manager-database
+  namespace: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
+
+spec:
+  replicas: 1
+  image: postgres:14.3
+
+  database:
+    size: 1Gi
+
+  env:
+    - name: POSTGRES_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: manager-database-secret
+          key: postgres-password
+    - name: POSTGRES_REPLICATION_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: manager-database-secret
+          key: replication-password
+
+  customConfig: manager-database-conf
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: manager-database-conf
+  namespace: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
+
+data:
+  primary_init_script.sh: |
+    #!/bin/sh
+    set -e
+
+    echo "Creating manager database..."
+    psql <<-PSQL
+    create database manager;
+    PSQL
+
+    echo "Done."

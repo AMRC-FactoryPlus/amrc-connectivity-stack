@@ -95,17 +95,6 @@ manager:
     repository: acs-edge
     # -- The tag of the Edge Agent component
     tag: latest
-  database:
-    # -- The hostname of the manager's Postgres database
-    host: "localhost"
-    # -- The port of the manager's Postgres database
-    port: "3306"
-    # -- The database name of the manager's Postgres database
-    database: "manager"
-    # -- The username that the manager uses to connect to the database
-    username: "root"
-    # -- The password that the manager uses to connect to the database
-    password: "secret"
   minio:
     # -- The key that the management app uses to connect to MinIO
     key: management-app

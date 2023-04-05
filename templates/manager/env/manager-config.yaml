@@ -24,10 +24,10 @@ data:
   QUEUE_CONNECTION: "redis"
   SESSION_LIFETIME: "10080"
   DB_CONNECTION: "pgsql"
-  DB_HOST: {{.Values.manager.database.host | required "manager.database.host is required!" | quote}}
-  DB_PORT: {{.Values.manager.database.port | required "manager.database.port is required!" | quote}}
-  DB_DATABASE: {{.Values.manager.database.database | required "manager.database.database is required!" | quote}}
-  DB_USERNAME: {{.Values.manager.database.username | required "manager.database.username is required!" | quote}}
+  DB_HOST: "manager-database.{{ .Values.acs.namespace | required "values.acs.namespace is required!" }}.svc.cluster.local"
+  DB_PORT: "5432"
+  DB_DATABASE: "manager"
+  DB_USERNAME: "postgres"
   REDIS_HOST: "manager-redis.{{ .Values.acs.namespace | required "values.acs.namespace is required!" }}.svc.cluster.local"
   REDIS_PORT: "6379"
   FILESYSTEM_CLOUD: "minio"

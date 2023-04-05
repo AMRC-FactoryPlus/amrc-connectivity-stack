@@ -1,5 +1,3 @@
-# This must run after-bootstrap as it uses the Kubegres CRD.
-
 apiVersion: kubegres.reactive-tech.io/v1
 kind: Kubegres
 metadata:

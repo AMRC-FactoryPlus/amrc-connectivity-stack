@@ -51,11 +51,6 @@ The AMRC Connectivity Stack (ACS) is a collection of open-source services develo
 | identity.krbKeysOperator.image.repository | string | `"acs-krb-keys-operator"` | The repository of the KerberosKey Operator |
 | identity.krbKeysOperator.image.tag | string | `"latest"` | The tag of the KerberosKey Operator |
 | identity.realm | string | `"LOCALHOST"` | The Kerberos realm for this Factory+ deployment. |
-| manager.database.database | string | `"manager"` | The database name of the manager's Postgres database |
-| manager.database.host | string | `"localhost"` | The hostname of the manager's Postgres database |
-| manager.database.password | string | `"secret"` | The password that the manager uses to connect to the database |
-| manager.database.port | string | `"3306"` | The port of the manager's Postgres database |
-| manager.database.username | string | `"root"` | The username that the manager uses to connect to the database |
 | manager.debug | bool | `false` | Whether debug mode is enabled. DO NOT USE THIS IN PRODUCTION. |
 | manager.edge.registry | string | `"ghcr.io/amrc-factoryplus"` | The registry of the Edge Agent component |
 | manager.edge.repository | string | `"acs-edge"` | The repository of the Edge Agent component |

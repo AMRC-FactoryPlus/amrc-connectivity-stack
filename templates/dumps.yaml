@@ -1,6 +1,12 @@
 # Only run this if the ConfigMaps don't already exist
 {{- if and (not (lookup "v1" "ConfigMap" .Values.acs.namespace "configdb-json-dumps")) (not (lookup "v1" "ConfigMap" .Values.acs.namespace "auth-json-dumps")) }}
-# Generate the required UUIDS to use across both dumps
+
+# ====================================================
+# Ensure that well-known UUIDs are used where required
+# ----------------------------------------------------
+# ⚠ Do not change these!
+# ====================================================
+
 {{$classDef_wildcard := "00000000-0000-0000-0000-000000000000" | quote}}
 {{$classDef_cellGateway := "00da3c0b-f62b-4761-a689-39ad0c33f864" | quote}}
 {{$classDef_classDefinition := "04a1c90d-2295-4cbe-b33a-74eded62cbf1" | quote}}
@@ -11,7 +17,6 @@
 {{$classDef_permission := "8ae784bb-c4b5-4995-9bf6-799b3c7f21ad" | quote}}
 {{$classDef_userAccount := "8b3e8f35-78e5-4f93-bf21-7238bcb2ba9d" | quote}}
 {{$classDef_permissionGroup := "ac0d5288-6136-4ced-a372-325fbbcdd70d" | quote}}
-{{$classDef_nodeGroup := "c0175497-be87-45d1-a187-557cb653d359" | quote}}
 {{$classDef_application := "d319bd87-f42b-4b66-be4f-f82ff48b93f0" | quote}}
 {{$classDef_serviceAccount := "e463b4ae-a322-46cc-8976-4ba76838e908" | quote}}
 {{$classDef_userGroup := "f1fabdd1-de90-4399-b3da-ccf6c2b2c08b" | quote}}
@@ -28,6 +33,50 @@
 {{$service_authorisation := "cab2642a-f7d9-42e5-8845-8f35affe1fd4" | quote}}
 {{$service_mqtt := "feb27ba3-bd2c-4916-9269-79a61ebc4a47" | quote}}
 
+{{$permission_auth_manageKerberosMappings := "327c4cc8-9c46-4e1e-bb6b-257ace37b0f6" | quote}}
+{{$permission_auth_readEffectivePermissions := "35252562-51e5-4dd8-84cd-ba0fafa62669" | quote}}
+{{$permission_auth_manageACLsPerPermission := "3a41f5ce-fc08-4669-9762-ec9e71061168" | quote}}
+{{$permission_auth_readACLEntry := "ba566181-0e8a-405b-b16e-3fb89130fbee" | quote}}
+{{$permission_auth_manageGroups := "be9b6d47-c845-49b2-b9d5-d87b83f11c3b" | quote}}
+{{$permission_auth_readKerberosMapping := "e8c9c0f7-0d54-4db2-b8d6-cd80c45f6a5c" | quote}}
+
+{{$permission_configStore_readConfigForApp := "4a339562-cd57-408d-9d1a-6529a383ea4b" | quote}}
+{{$permission_configStore_writeConfigForApp := "6c799ccb-d2ad-4715-a2a7-3c8728d6c0bf" | quote}}
+{{$permission_configStore_manageAppSchema := "95c7cbcb-ce60-49ed-aa81-2fe3eec4559d" | quote}}
+{{$permission_configStore_manageObjects := "f0b7917b-d475-4888-9d5a-2af96b3c26b6" | quote}}
+{{$permission_configStore_deleteObjects := "6957174b-7b08-45ca-ac5c-c03ab6928a6e" | quote}}
+
+{{$permission_mqtt_subscribeReadNode := "046d6603-fa62-4208-9400-65d61f8b1ec4" | quote}}
+{{$permission_mqtt_subscribeToWholeNamespace := "21000098-3a53-48da-8d3e-cc0650603d8e" | quote}}
+{{$permission_mqtt_subscribeReadWholeNamespace := "81833dbb-1150-4078-b1db-978c646ba73e" | quote}}
+{{$permission_mqtt_issueGlobalCommands := "50f1e694-7e18-4930-aa59-97cc90a6a1ec" | quote}}
+{{$permission_mqtt_publishAllFromGroup := "64c019f8-6754-4270-8917-6659a5628b86" | quote}}
+{{$permission_mqtt_subscribeReadAllStates := "8790cf3d-b793-423c-b373-8cfcf9f63529" | quote}}
+{{$permission_mqtt_updateGroupState := "9a32f195-a8cc-4562-a87a-d4653279474f" | quote}}
+{{$permission_mqtt_particpateAsNode := "a1314953-8226-44f4-8a3e-e87b09310579" | quote}}
+{{$permission_mqtt_updateOwnState := "bdc96a3e-d6fb-48ed-b790-0aa95cf826f0" | quote}}
+{{$permission_mqtt_issueGroupCommands := "cff45682-f2f0-4c72-91f3-7dda20d43509" | quote}}
+{{$permission_mqtt_subscribeReadOwnGroup := "d617e37c-3908-41b1-8820-d3f8d41a4280" | quote}}
+{{$permission_mqtt_representDevices := "e82456b3-a7d9-4971-9d8c-fd0be4545ab4" | quote}}
+{{$permission_mqtt_readAllBirthMessages := "67dc4dd0-0939-42b1-b1f9-9049f4d91d40" | quote}}
+
+{{$permission_directory_overrideServiceAdvertisementPermissions := "3bda2ab2-4128-463d-83c9-16b976a8d83e" | quote}}
+{{$permission_directory_advertiseService := "4db4c39a-f18d-4e83-aeb0-5af2c14ddc2b" | quote}}
+{{$permission_directory_manageServiceAdvertisementForOwner := "97dcf2a1-7f4b-476c-b561-e40fc42440ee" | quote}}
+
+{{$permission_ccl_rebirth := "fbb9c25d-386d-4966-a325-f16471d9f7be" | quote}}
+{{$permission_ccl_reloadEdgeAgentConfig := "6335f100-e68e-4e4d-b46d-85b42f85a036" | quote}}
+
+{{$permissionGroup_authorisation := "50b727d4-3faa-40dc-b347-01c99a226c58" | quote}}
+{{$permissionGroup_configStore := "c43c7157-a50b-4d2a-ac1a-86ff8e8e88c1" | quote}}
+{{$permissionGroup_mqtt := "a637134a-d06b-41e7-ad86-4bf62fde914a" | quote}}
+{{$permissionGroup_directory := "58b5da47-d098-44f7-8c1d-6e4bd800e718" | quote}}
+{{$permissionGroup_commands := "9584ee09-a35a-4278-bc13-21a8be1f007c" | quote}}
+
+# ================================================
+# Generate unique UUIDs for each instance deployed
+# ================================================
+
 {{$role_administrator := uuidv4 | quote}}
 {{$role_gatewayBridge := uuidv4 | quote}}
 {{$role_edgeNodeConsumer := uuidv4 | quote}}
@@ -42,47 +91,6 @@
 
 {{$userGroup_administrators := uuidv4 | quote}}
 
-{{$permission_auth_manageKerberosMappings := uuidv4 | quote}}
-{{$permission_auth_readEffectivePermissions := uuidv4 | quote}}
-{{$permission_auth_manageACLsPerPermission := uuidv4 | quote}}
-{{$permission_auth_readACLEntry := uuidv4 | quote}}
-{{$permission_auth_manageGroups := uuidv4 | quote}}
-{{$permission_auth_readKerberosMapping := uuidv4 | quote}}
-
-{{$permission_configStore_readConfigForApp := uuidv4 | quote}}
-{{$permission_configStore_writeConfigForApp := uuidv4 | quote}}
-{{$permission_configStore_manageAppSchema := uuidv4 | quote}}
-{{$permission_configStore_manageObjects := uuidv4 | quote}}
-{{$permission_configStore_deleteObjects := uuidv4 | quote}}
-
-{{$permission_mqtt_subscribeReadNode := uuidv4 | quote}}
-{{$permission_mqtt_subscribeToWholeNamespace := uuidv4 | quote}}
-{{$permission_mqtt_subscribeReadWholeNamespace := uuidv4 | quote}}
-{{$permission_mqtt_issueGlobalCommands := uuidv4 | quote}}
-{{$permission_mqtt_publishAllFromGroup := uuidv4 | quote}}
-{{$permission_mqtt_subscribeReadAllStates := uuidv4 | quote}}
-{{$permission_mqtt_updateGroupState := uuidv4 | quote}}
-{{$permission_mqtt_particpateAsNode := uuidv4 | quote}}
-{{$permission_mqtt_updateOwnState := uuidv4 | quote}}
-{{$permission_mqtt_issueGroupCommands := uuidv4 | quote}}
-{{$permission_mqtt_subscribeReadOwnGroup := uuidv4 | quote}}
-{{$permission_mqtt_representDevices := uuidv4 | quote}}
-{{$permission_mqtt_readAllBirthMessages := uuidv4 | quote}}
-
-{{$permission_directory_overrideServiceAdvertisementPermissions := uuidv4 | quote}}
-{{$permission_directory_advertiseService := uuidv4 | quote}}
-{{$permission_directory_manageServiceAdvertisementForOwner := uuidv4 | quote}}
-{{$permission_directory_ := uuidv4 | quote}}
-
-{{$permission_ccl_rebirth := uuidv4 | quote}}
-{{$permission_ccl_reloadEdgeAgentConfig := uuidv4 | quote}}
-
-{{$permissionGroup_authorisation := uuidv4 | quote}}
-{{$permissionGroup_configStore := uuidv4 | quote}}
-{{$permissionGroup_mqtt := uuidv4 | quote}}
-{{$permissionGroup_directory := uuidv4 | quote}}
-{{$permissionGroup_commands := uuidv4 | quote}}
-
 {{$serviceAccount_mqtt := uuidv4 | quote}}
 {{$serviceAccount_directory := uuidv4 | quote}}
 {{$serviceAccount_ := uuidv4 | quote}}
@@ -92,7 +100,6 @@
 {{$serviceAccount_commandEscalation := uuidv4 | quote}}
 {{$serviceAccount_dataWarehouse := uuidv4 | quote}}
 
-{{$nodeGroup_serviceProvider := uuidv4 | quote}}
 
 apiVersion: v1
 kind: ConfigMap
@@ -121,7 +128,6 @@ data:
         {{$classDef_serviceAccount}},
         {{$classDef_cellGateway}},
         {{$classDef_softGateway}},
-        {{$classDef_nodeGroup}}
       ],
       "objects": {
         {{$classDef_application}}: [
@@ -203,9 +209,7 @@ data:
           {{$serviceAccount_dataWarehouse}}
         ],
         {{$classDef_cellGateway}}: [],
-        {{$classDef_nodeGroup}}: [
-          {{$nodeGroup_serviceProvider}}
-        ]
+
       },
       "configs": {
         {{$application_generalObjectInformation}}: {
@@ -415,12 +419,6 @@ data:
           },
           {{$service_mqtt}}: {
             "name": "MQTT Broker"
-          },
-          {{$classDef_nodeGroup}}: {
-            "name": "Node Group"
-          },
-          {{$nodeGroup_serviceProvider}}: {
-            "name": "Service Provider Nodes"
           },
           {{$serviceAccount_authorisation}}: {
             "name": "Auth Service"

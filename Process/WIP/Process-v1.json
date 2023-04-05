@@ -1,7 +1,7 @@
 {
   "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Process/WIP/Process-v1.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "",
+  "title": "WIP Process",
   "type": "object",
   "properties": {
     "Schema_UUID": {

@@ -1,0 +1,80 @@
+{
+  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Sensors/Accelerometer-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Accelerometer",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "3ad967aa-9cec-429b-b31d-53e62b25c0c6"
+    },
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "X": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "FloatLE",
+                "FloatBE"
+              ]
+            },
+            "Documentation": {
+              "default": "The X component"
+            }
+          }
+        }
+      ]
+    },
+    "Y": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "FloatLE",
+                "FloatBE"
+              ]
+            },
+            "Documentation": {
+              "default": "The Y component"
+            }
+          }
+        }
+      ]
+    },
+    "Z": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "FloatLE",
+                "FloatBE"
+              ]
+            },
+            "Documentation": {
+              "default": "The Z component"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID"
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Sensors/Temperature-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Temperature",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "abaaabad-ccfd-4a93-8ad6-1aca9f863ee8"
+    },
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "Temperature": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "FloatLE",
+                "FloatBE"
+              ]
+            },
+            "Documentation": {
+              "default": "The temperature measured by the sensor"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID"
+  ]
+}

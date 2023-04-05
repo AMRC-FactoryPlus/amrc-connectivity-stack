@@ -25,6 +25,39 @@ spec:
         - name: krb5-conf
           configMap:
             name: krb5-conf
+      initContainers:
+        - name: migrate-database
+          image: "{{ .Values.manager.image.registry }}/{{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}"
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: manager-database-secret
+                  key: postgres-password
+          envFrom:
+            - configMapRef:
+                name: manager-config
+            - secretRef:
+                name: manager-secrets
+          command: [ 'sh', '-c', 'php artisan migrate --force' ]
+        - name: create-admin-user
+          image: "{{ .Values.manager.image.registry }}/{{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}"
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: manager-database-secret
+                  key: postgres-password
+          envFrom:
+            - configMapRef:
+                name: manager-config
+            - secretRef:
+                name: manager-secrets
+          command:
+            - "sh"
+            - "-c"
+            - |
+              php artisan tinker --execute="if (User::count() === 0) {User::create(['username' => 'admin@{{.Values.identity.realm}}', 'administrator' => 1]);}"
       containers:
         - name: app
           image: "{{ .Values.manager.image.registry }}/{{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}"

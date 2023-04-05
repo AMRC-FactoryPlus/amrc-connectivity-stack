@@ -1,6 +1,5 @@
 # Only run this if the ConfigMaps don't already exist
-{{- if (not (lookup "v1" "ConfigMap" .Values.acs.namespace "configdb-json-dumps") and (not lookup "v1" "ConfigMap" .Values.acs.namespace "auth-json-dumps")) }}
-
+{{- if not (and (lookup "v1" "ConfigMap" .Values.acs.namespace "configdb-json-dumps") (lookup "v1" "ConfigMap" .Values.acs.namespace "auth-json-dumps")) }}
 # Generate the required UUIDS to use across both dumps
 {{$classDef_wildcard := "00000000-0000-0000-0000-000000000000"}}
 {{$classDef_cellGateway := "00da3c0b-f62b-4761-a689-39ad0c33f864"}}

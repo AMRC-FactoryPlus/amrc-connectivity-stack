@@ -127,7 +127,7 @@ data:
         {{$classDef_wildcard}},
         {{$classDef_serviceAccount}},
         {{$classDef_cellGateway}},
-        {{$classDef_softGateway}},
+        {{$classDef_softGateway}}
       ],
       "objects": {
         {{$classDef_application}}: [
@@ -208,7 +208,7 @@ data:
           {{$serviceAccount_commandEscalation}},
           {{$serviceAccount_dataWarehouse}}
         ],
-        {{$classDef_cellGateway}}: [],
+        {{$classDef_cellGateway}}: []
 
       },
       "configs": {

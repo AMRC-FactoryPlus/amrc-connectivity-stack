@@ -14,5 +14,11 @@ dependencies:
 - name: grafana
   repository: https://grafana.github.io/helm-charts
   version: 6.52.4
-digest: sha256:4fe7628861402ccc953e771d10118fa8db77fee9bfa4d6d7573f4777c6cbfbc0
-generated: "2023-03-29T10:43:48.185669+01:00"
+- name: operator
+  repository: https://operator.min.io
+  version: 5.0.3
+- name: tenant
+  repository: https://operator.min.io
+  version: 5.0.3
+digest: sha256:15e590037058991fbeda322b01d1d0647f4fc4baef63a1a1013ecf3a42721784
+generated: "2023-04-06T07:58:39.991895+01:00"

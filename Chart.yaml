@@ -31,3 +31,9 @@ dependencies:
   - name: grafana
     version: 6.52.4
     repository: https://grafana.github.io/helm-charts
+  - name: operator
+    repository: https://operator.min.io
+    version: 5.0.3
+  - name: tenant
+    repository: https://operator.min.io
+    version: 5.0.3

@@ -197,3 +197,28 @@ promtail:
 grafana:
   persistence:
     enabled: true
+
+# @ignore
+tenant:
+  ## Secret with default environment variable configurations to be used by MinIO Tenant.
+  ## Not recommended for production deployments! Create the secret manually instead.
+  secrets:
+    name: myminio-env-configuration
+    # MinIO root user and password
+    accessKey: minio
+    secretKey: minio123
+  tenant:
+    name: fplus-minio-core
+    pools:
+      - servers: 1
+        name: pool-0
+        volumesPerServer: 1
+        size: 20Gi
+    ## List of bucket names to create during tenant provisioning
+    buckets:
+      - device-configurations
+      - device-connections
+      - edge-agent-configs
+    ## List of secret names to use for generating MinIO users during tenant provisioning
+    users:
+      - manager

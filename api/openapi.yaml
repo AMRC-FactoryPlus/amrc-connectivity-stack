@@ -140,8 +140,6 @@ paths:
                         application/json:
                             schema: { $ref: "#/components/schemas/principal-mapping" }
                 "404":
-                    description: Bad principal UUID.
-                "404":
                     description: Principal not found.
         delete:
             summary: Delete a principal mapping.

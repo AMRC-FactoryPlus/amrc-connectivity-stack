@@ -49,6 +49,7 @@ The `mqtt` component acts as an MQTT/Sparkplug client and records births and dea
 | SPARKPLUG_ADDRESS | Sparkplug node address to publish on.          |
 | HTTP_API_URL      | URL to publish for clients to contact the API. |
 
+`SPARKPLUG_ADDRESS` should be in the format `GROUP-ID/NODE-ID`, and should be set to a well-known address for the directory service.
 
 ## Known issues
 

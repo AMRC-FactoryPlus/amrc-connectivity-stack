@@ -9,6 +9,8 @@ servers:
 
 security:
     - basic: []
+    - gssapi: []
+    - bearer: []
 
 # NOTE: This API is rooted at /v1 on its server. The servers: entry
 # above records this. This means that the URLs passed to the server are
@@ -165,7 +167,7 @@ paths:
                             schema: { $ref: "#/components/schemas/UuidList" }
 
 
-    /app/{app}/find:
+    /app/{app}/search:
         get:
             summary: Search for configs by property values.
             parameters:
@@ -173,6 +175,7 @@ paths:
                 -   name: query
                     in: query
                     style: form
+                    explode: true
                     schema:
                         type: object
                         # These are schema'd as type:string, but they
@@ -181,10 +184,21 @@ paths:
                             type: string
             responses:
                 "200":
-                    description: List of objects found.
+                    description: >
+                        List of objects found. If result properties were
+                        requested, this will be a list of objects,
+                        otherwise it will be a plain list of UUIDs.
                     content:
                         application/json:
-                            schema: { $ref: "#/components/schemas/UuidList" }
+                            schema: 
+                                oneOf:
+                                    -   { $ref: "#/components/schemas/UuidList" }
+                                    -   type: array
+                                        items:
+                                            type: object
+                                            required: [uuid]
+                                            properties:
+                                                uuid: { type: string, format: uuid }
                             
     /app/{app}/{kind}:
         get:
@@ -241,12 +255,59 @@ paths:
                 "405":
                     description: Invalid operation for object registration.
 
+    /load:
+        parameters:
+            -   name: overwrite
+                description: Specifies whether existing entries are overwritten.
+                in: query
+                style: form
+                explode: false
+                schema:
+                    type: string
+                    enum: [true, false, yes, no, on, off, "1", "0"]
+        post:
+            summary: Load a dump into the database.
+            requestBody:
+                description: Dump to load.
+                required: true
+                content:
+                    application/json:
+                        schema: { $ref: "#/components/schemas/Dumpfile" }
+            responses:
+                "204":
+                    description: Dump loaded.
+                "400":
+                    description: Bad dump file format.
+                "404":
+                    description: Required object not found.
+                "409":
+                    description: Conflict with existing entry.
+
+    /save:
+        get:
+            summary: Retrieve a dump of the whole database.
+            responses:
+                "200":
+                    description: Dump file.
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/Dumpfile" }
+
+
 components:
     securitySchemes:
         basic:
             type: http
             description: User/password HTTP Basic auth
             scheme: Basic
+        gssapi:
+            type: http
+            description: GSSAPI/Kerberos HTTP auth
+            scheme: Negotiate
+        bearer:
+            type: http
+            description: Token HTTP auth
+            scheme: Bearer
 
     parameters:
         app:
@@ -289,18 +350,6 @@ components:
                     type: string
                     description: A human-readable name for the application.
 
-        ConfigList:
-            description: A list of config snippets with metadata
-            type: array
-            items:
-                type: object
-                required: [config]
-                properties:
-                    app: { type: string, format: uuid }
-                    schema: { type: string, format: uuid }
-                    device: { type: string, format: uuid }
-                    config: { type: object }
-
         ObjectRegistration:
             description: Object registration information
             type: object
@@ -313,3 +362,50 @@ components:
             description: A list of UUIDs
             type: array
             items: { type: string, format: uuid }
+
+        Dumpfile:
+            description: Dump file for bootstrapping
+            type: object
+            required: [service, version]
+            properties:
+                service:
+                    description: Identifies the service this dump belongs to.
+                    const: "af15f175-78a0-4e05-97c0-2a0bb82b9f3b"
+                version:
+                    description: Dump file format version number.
+                    const: 1
+                classes:
+                    description: List of classes to create.
+                    type: array
+                    items:
+                        type: string
+                        format: uuid
+                objects:
+                    description: Objects to create.
+                    type: object
+                    propertyNames:
+                        description: The Class to create objects in.
+                        type: string
+                        format: uuid
+                    additionalProperties:
+                        description: A list of Objects to create.
+                        type: array
+                        items:
+                            type: string
+                            format: uuid
+                configs:
+                    description: Config entries to create.
+                    type: object
+                    propertyNames:
+                        description: The Application to create config entries under.
+                        type: string
+                        format: uuid
+                    additionalProperties:
+                        description: Config entries to create.
+                        type: object
+                        propertyNames:
+                            description: The Object to create an entry for.
+                            type: string
+                            format: uuid
+                        additionalProperties:
+                            description: The config entry to create.

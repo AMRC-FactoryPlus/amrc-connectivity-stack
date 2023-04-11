@@ -216,9 +216,9 @@ tenant:
         size: 20Gi
     ## List of bucket names to create during tenant provisioning
     buckets:
-      - device-configurations
-      - device-connections
-      - edge-agent-configs
+      - name: "device-configurations"
+      - name: "device-connections"
+      - name: "edge-agent-configs"
     ## List of secret names to use for generating MinIO users during tenant provisioning
     users:
-      - manager
+      - name: "manager"

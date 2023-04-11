@@ -7,19 +7,19 @@
 # ⚠ Do not change these!
 # ====================================================
 
-{{$classDef_wildcard := "00000000-0000-0000-0000-000000000000" | quote}}
-{{$classDef_cellGateway := "00da3c0b-f62b-4761-a689-39ad0c33f864" | quote}}
 {{$classDef_classDefinition := "04a1c90d-2295-4cbe-b33a-74eded62cbf1" | quote}}
-{{$classDef_sparkplugDevice := "18773d6d-a70d-443a-b29a-3f1583195290" | quote}}
-{{$classDef_clientRole := "1c567e3c-5519-4418-8682-6086f22fbc13" | quote}}
-{{$classDef_serviceFunction := "265d481f-87a7-4f93-8fc6-53fa64dc11bb" | quote}}
-{{$classDef_softGateway := "5bee4d24-32e1-44f8-b953-1f86ff4b3e87" | quote}}
-{{$classDef_permission := "8ae784bb-c4b5-4995-9bf6-799b3c7f21ad" | quote}}
-{{$classDef_userAccount := "8b3e8f35-78e5-4f93-bf21-7238bcb2ba9d" | quote}}
-{{$classDef_permissionGroup := "ac0d5288-6136-4ced-a372-325fbbcdd70d" | quote}}
+{{$classDef_wildcard := "00000000-0000-0000-0000-000000000000" | quote}}
 {{$classDef_application := "d319bd87-f42b-4b66-be4f-f82ff48b93f0" | quote}}
+{{$classDef_serviceFunction := "265d481f-87a7-4f93-8fc6-53fa64dc11bb" | quote}}
 {{$classDef_serviceAccount := "e463b4ae-a322-46cc-8976-4ba76838e908" | quote}}
+{{$classDef_permission := "8ae784bb-c4b5-4995-9bf6-799b3c7f21ad" | quote}}
+{{$classDef_permissionGroup := "ac0d5288-6136-4ced-a372-325fbbcdd70d" | quote}}
+{{$classDef_clientRole := "1c567e3c-5519-4418-8682-6086f22fbc13" | quote}}
+{{$classDef_userAccount := "8b3e8f35-78e5-4f93-bf21-7238bcb2ba9d" | quote}}
 {{$classDef_userGroup := "f1fabdd1-de90-4399-b3da-ccf6c2b2c08b" | quote}}
+{{$classDef_cellGateway := "00da3c0b-f62b-4761-a689-39ad0c33f864" | quote}}
+{{$classDef_softGateway := "5bee4d24-32e1-44f8-b953-1f86ff4b3e87" | quote}}
+{{$classDef_sparkplugDevice := "18773d6d-a70d-443a-b29a-3f1583195290" | quote}}
 
 {{$application_objectRegistration := "cb40bed5-49ad-4443-a7f5-08c75009da8f" | quote}}
 {{$application_generalObjectInformation := "64a8bfa9-7772-45c4-9d1a-9e6290690957" | quote}}

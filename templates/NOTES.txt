@@ -1,6 +1,37 @@
+
+*****************************************************************
+*** PLEASE BE PATIENT: ACS may take a few minutes to install ***
+*****************************************************************
+
 Thanks for installing the AMRC Connectivity Stack (ACS), the AMRC's open-source implementation of the Factory+ framework.
 
-Please wait a few minutes for the services to fully deploy. To learn more about the status of the release, try:
+Ensure that you familiarise yourself with the components and concepts of Factory+ (factoryplus.app.amrc.co.uk) before continuing. This chart installs a full end-to-end deployment of Factory+ and there are a lot of moving parts.
 
-  $ helm status {{ .Release.Name }}
-  $ helm get all {{ .Release.Name }}
+⚠️ Next Steps
+-------------
+
+This Chart creates a load balancer on your Kubernetes cluster that exposes all services at the subdomains listed below. If your cluster does not support LoadBalancer ingress types then you may port-forward specific services but you may need to update ConfigMap entries to point to the forwarded ports instead of using the FQDN.
+
+You specified {{.Values.acs.baseUrl}} as your base URL. Please ensure that you have a wildcard DNS entry configured to direct all *.{{.Values.acs.baseUrl}} requests to the load balancer.
+
+{{ if .Values.acs.secure}}
+🔒 Because secure mode is enabled, you need to ensure that your cluster has a wildcard TLS certificate (type: kubernetes.io/tls) called {{.Values.acs.tlsSecretName}} in the "default" namespace on your cluster. It must have a certificate value in the `tls.crt` key and the private key value in the `tls.key` key.
+{{end}}
+
+🚀 Get Started
+-------------
+
+Once the services have been deployed, get the password for the admin user by running:
+
+echo $(sudo kubectl get secret krb5-passwords -o jsonpath="{.data.admin}" -n {{.Values.acs.namespace}} | base64 --decode)
+
+! Once you have the MQTT password for the admin user you can log into the manager. Head over to {{ .Values.acs.secure | ternary "https://" "http://" }}manager.{{.Values.acs.baseUrl}} and login as the `admin` user.
+
+Services
+--------
+Manager: {{ .Values.acs.secure | ternary "https://" "http://" }}manager.{{.Values.acs.baseUrl}}
+MQTT: {{ .Values.acs.secure | ternary "mqtts://" "mqtt://" }}mqtt.{{.Values.acs.baseUrl}}:8883
+
+
+Manage Users
+____________

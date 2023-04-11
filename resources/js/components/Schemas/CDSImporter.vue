@@ -152,21 +152,7 @@ export default {
     },
 
     save () {
-      let vm = this;
-      let valid = !this.metricsToImport.map(e => e.Name).some(function (key) {
-        return !vm.mapping.hasOwnProperty(key);
-      });
-
-      if (valid) {
-        // Actually save
         this.$emit('save', this.mapping);
-      } else {
-        window.showNotification({
-            title: 'Failed',
-            description: 'Some metrics are missing. Please map all metrics from the original CDS before continuing.',
-            type: 'error',
-        });
-      }
     },
 
     buildOptions (schemaIn) {

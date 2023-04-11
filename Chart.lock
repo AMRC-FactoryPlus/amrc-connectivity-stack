@@ -15,10 +15,10 @@ dependencies:
   repository: https://grafana.github.io/helm-charts
   version: 6.52.4
 - name: operator
-  repository: https://operator.min.io
-  version: 4.5.8
+  repository: https://alexgodbehere.github.io/helm-repository
+  version: 5.0.3
 - name: tenant
   repository: https://operator.min.io
-  version: 4.5.8
-digest: sha256:06a8369ec53e4b3f635f480f1dceddadf4e618960ebf880efb66c625afdf0efc
-generated: "2023-04-06T08:38:40.055727+01:00"
+  version: 5.0.3
+digest: sha256:2ecc080dc80b042efc7e079521f3aac7d085a5f0ebd73a12eb4d8922c9488755
+generated: "2023-04-11T20:28:36.010241608Z"

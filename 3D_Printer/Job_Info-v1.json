@@ -1,174 +1,270 @@
 {
-    "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/3D_Printer/Job_Info-v1.json",
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "title": "3D Printer Job Information",
-    "description": "A JSON Schema representation of a Job Information object of a 3D Printer.",
-    "type": "object",
-    "properties": {
-        "Schema_UUID": {
-            "const": "54d89a5b-1c6c-45f8-8900-f9148ce6ffa9"
-        },
-        "Instance_UUID": {
-            "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
-            "type": "string",
-            "format": "uuid"
-        },
-        "Job_ID": {
-            "allOf": [
-                {
-                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
-                },
-                {
-                    "properties": {
-                        "Sparkplug_Type": {
-                            "enum": [
-                                "String"
-                            ]
-                        },
-                        "Documentation": {
-                            "default": "JobID/GUID for the current job (if any)."
-                        }
-                    }
-                }
-            ]
-        },
-        "Job_Name": {
-            "allOf": [
-                {
-                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
-                },
-                {
-                    "properties": {
-                        "Sparkplug_Type": {
-                            "enum": [
-                                "String"
-                            ]
-                        },
-                        "Documentation": {
-                            "default": "Name Associated with the current print job."
-                        }
-                    }
-                }
-            ]
-        },
-        "Submission_Time": {
-            "allOf": [
-                {
-                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
-                },
-                {
-                    "properties": {
-                        "Sparkplug_Type": {
-                            "enum": [
-                                "DateTime"
-                            ]
-                        },
-                        "Documentation": {
-                            "default": "Time the current job was submitted (if any)."
-                        }
-                    }
-                }
-            ]
-        },
-        "Estimated_Time": {
-            "allOf": [
-                {
-                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
-                },
-                {
-                    "properties": {
-                        "Sparkplug_Type": {
-                            "enum": [
-                                "UInt32BE"
-                            ]
-                        },
-                        "Documentation": {
-                            "default": "Estimated Time the current job will take (if any)."
-                        }
-                    }
-                }
-            ]
-        },
-        "Elapsed_Time": {
-            "allOf": [
-                {
-                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
-                },
-                {
-                    "properties": {
-                        "Sparkplug_Type": {
-                            "enum": [
-                                "UInt32BE"
-                            ]
-                        },
-                        "Documentation": {
-                            "default": "Time the current job has been running (if any)."
-                        }
-                    }
-                }
-            ]
-        },
-        "Current_Slice_Height": {
-            "allOf": [
-                {
-                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
-                },
-                {
-                    "properties": {
-                        "Sparkplug_Type": {
-                            "enum": [
-                                "FloatBE"
-                            ]
-                        },
-                        "Documentation": {
-                            "default": "Slice/layer height or resolution of the current print job."
-                        }
-                    }
-                }
-            ]
-        },
-        "Layers": {
-            "allOf": [
-                {
-                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
-                },
-                {
-                    "properties": {
-                        "Sparkplug_Type": {
-                            "enum": [
-                                "UInt16BE"
-                            ]
-                        },
-                        "Documentation": {
-                            "default": "Total layers for the current print job."
-                        }
-                    }
-                }
-            ]
-        },
-        "Current_Layer": {
-            "allOf": [
-                {
-                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
-                },
-                {
-                    "properties": {
-                        "Sparkplug_Type": {
-                            "enum": [
-                                "UInt16BE"
-                            ]
-                        },
-                        "Documentation": {
-                            "default": "Current layer for the current print job."
-                        }
-                    }
-                }
-            ]
-        }
+  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/3D_Printer/Job_Info-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "3D Printer Job Information",
+  "description": "A JSON Schema representation of a Job Information object of a 3D Printer.",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "54d89a5b-1c6c-45f8-8900-f9148ce6ffa9"
     },
-    "required": [
-        "Schema_UUID",
-        "Instance_UUID",
-        "Job_ID"
-    ]
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "Job_ID": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "String"
+              ]
+            },
+            "Documentation": {
+              "default": "JobID/GUID for the current job (if any)."
+            }
+          }
+        }
+      ]
+    },
+    "Job_Name": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "String"
+              ]
+            },
+            "Documentation": {
+              "default": "Name Associated with the current print job."
+            }
+          }
+        }
+      ]
+    },
+    "State": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "String"
+              ]
+            },
+            "Documentation": {
+              "default": "The current state of the job"
+            }
+          }
+        }
+      ]
+    },
+    "Percent_Complete": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "FloatLE",
+                "FloatBE"
+              ]
+            },
+            "Documentation": {
+              "default": "The current percent complete of the job"
+            }
+          }
+        }
+      ]
+    },
+    "Submission_Time": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "DateTime"
+              ]
+            },
+            "Documentation": {
+              "default": "Time the current job was submitted (if any)."
+            }
+          }
+        }
+      ]
+    },
+    "Estimated_Time": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "UInt32BE"
+              ]
+            },
+            "Documentation": {
+              "default": "Estimated Time the current job will take (if any)."
+            }
+          }
+        }
+      ]
+    },
+    "Elapsed_Time": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "UInt32BE"
+              ]
+            },
+            "Documentation": {
+              "default": "Time the current job has been running (if any)."
+            }
+          }
+        }
+      ]
+    },
+    "Current_Slice_Height": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "FloatBE"
+              ]
+            },
+            "Documentation": {
+              "default": "Slice/layer height or resolution of the current print job."
+            }
+          }
+        }
+      ]
+    },
+    "Layers": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "UInt16BE"
+              ]
+            },
+            "Documentation": {
+              "default": "Total layers for the current print job."
+            }
+          }
+        }
+      ]
+    },
+    "Current_Layer": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "UInt16BE"
+              ]
+            },
+            "Documentation": {
+              "default": "Current layer for the current print job."
+            }
+          }
+        }
+      ]
+    },
+    "Result": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "String"
+              ]
+            },
+            "Documentation": {
+              "default": "The result of the build"
+            }
+          }
+        }
+      ]
+    },
+    "Start_Time": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "DateTime"
+              ]
+            },
+            "Documentation": {
+              "default": "The start time of the job"
+            }
+          }
+        }
+      ]
+    },
+    "End_Time": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "DateTime"
+              ]
+            },
+            "Documentation": {
+              "default": "The end time of the job"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID",
+    "Job_ID"
+  ]
 }

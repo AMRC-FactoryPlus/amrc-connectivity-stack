@@ -1,0 +1,46 @@
+{
+    "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/3D_Printer/3D_Printer-v2.json",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "3D Printer Object",
+    "type": "object",
+    "properties": {
+        "Schema_UUID": {
+            "const": "5516f518-82d9-4055-9c31-686944808a33"
+        },
+        "Instance_UUID": {
+            "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+            "type": "string",
+            "format": "uuid"
+        },
+        "Device_Information": {
+            "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Device_Information-v1.json"
+        },
+        "Job_Info": {
+            "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/3D_Printer/Job_Info-v1.json"
+        },
+        "Materials": {
+            "type": "object",
+            "patternProperties": {
+                "^[a-zA-Z0-9_]*$": {
+                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/3D_Printer/Material_Info-v2.json"
+                }
+            }
+        },
+        "Axes": {
+            "type": "object",
+            "patternProperties": {
+                "^[a-zA-Z0-9_]*$": {
+                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/3D_Printer/Axis-v1.json"
+                }
+            }
+        },
+        "Printer_Components": {
+            "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/3D_Printer/Printer_Components-v1.json"
+        }
+    },
+    "required": [
+        "Schema_UUID",
+        "Instance_UUID",
+        "Device_Information"
+    ]
+}

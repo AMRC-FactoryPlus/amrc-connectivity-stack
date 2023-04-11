@@ -1,131 +1,170 @@
 {
-    "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Device_Information-v1.json",
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "type": "object",
-    "properties": {
-        "Schema_UUID": {
-            "const": "2dd093e9-1450-44c5-be8c-c0d78e48219b"
-        },
-        "Manufacturer": {
-            "allOf":[
-                {
-                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
-                }
-                ,
-                {
-                    "type": "object",
-                    "properties": {
-                        "Sparkplug_Type": {
-                            "enum": ["String"]  
-                        },
-                        "Documentation": {
-                            "default": "The name of the manufacturer that produced this device."
-                        }
-                    }
-                }
-            ]
-        },
-        "Model": {
-            "allOf":[
-                {
-                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
-                }
-                ,
-                {
-                    "type": "object",
-                    "properties": {
-                        "Sparkplug_Type": {
-                            "enum": ["String"]  
-                        },
-                        "Documentation": {
-                            "default": "The model name or number of this device."
-                        }
-                    }
-                }
-            ]
-        },
-        "Serial": {
-            "allOf":[
-                {
-                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
-                }
-                ,
-                {
-                    "type": "object",
-                    "properties": {
-                        "Sparkplug_Type": {
-                            "enum": ["String"]  
-                        },
-                        "Documentation": {
-                            "default": "The serial number or unique identifier of the device."
-                        }
-                    }
-                }
-            ]
-        },
-        "Variant": {
-            "allOf":[
-                {
-                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
-                }
-                ,
-                {
-                    "type": "object",
-                    "properties": {
-                        "Sparkplug_Type": {
-                            "enum": ["String"]  
-                        },
-                        "Documentation": {
-                            "default": "The model variant of this device."
-                        }
-                    }
-                }
-            ]
-        },
-        "Software_Version": {
-            "allOf": [
-                {
-                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
-                },
-                {
-                    "type": "object",
-                    "properties": {
-                        "Sparkplug_Type": {
-                            "enum": [
-                                "String"
-                            ]
-                        },
-                        "Documentation": {
-                            "default": "Details of software/firmware running on the device."
-                        }
-                    }
-                }
-            ]
-        },
-        "MAC_Address": {
-            "allOf": [
-                {
-                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
-                },
-                {
-                    "properties": {
-                        "Sparkplug_Type": {
-                            "enum": [
-                                "String"
-                            ]
-                        },
-                        "Documentation": {
-                            "default": "The MAC address of the interface on the device that Factory+ connects to"
-                        }
-                    }
-                }
-            ]
-        }
+  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Device_Information-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "2dd093e9-1450-44c5-be8c-c0d78e48219b"
     },
-    "required": [
-        "Schema_UUID",
-        "Manufacturer",
-        "Model",
-        "Serial"
-    ]
+    "Manufacturer": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "String"
+              ]
+            },
+            "Documentation": {
+              "default": "The name of the manufacturer that produced this device."
+            }
+          }
+        }
+      ]
+    },
+    "Model": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "String"
+              ]
+            },
+            "Documentation": {
+              "default": "The model name or number of this device."
+            }
+          }
+        }
+      ]
+    },
+    "Serial": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "String"
+              ]
+            },
+            "Documentation": {
+              "default": "The serial number or unique identifier of the device."
+            }
+          }
+        }
+      ]
+    },
+    "Variant": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "String"
+              ]
+            },
+            "Documentation": {
+              "default": "The model variant of this device."
+            }
+          }
+        }
+      ]
+    },
+    "Software_Version": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "String"
+              ]
+            },
+            "Documentation": {
+              "default": "Details of software/firmware running on the device."
+            }
+          }
+        }
+      ]
+    },
+    "MAC_Address": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "String"
+              ]
+            },
+            "Documentation": {
+              "default": "The MAC address of the interface on the device that Factory+ connects to"
+            }
+          }
+        }
+      ]
+    },
+    "Friendly_Name": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "String"
+              ]
+            },
+            "Documentation": {
+              "default": "A human-readable friendly name for the device"
+            }
+          }
+        }
+      ]
+    },
+    "Status": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "String"
+              ]
+            },
+            "Documentation": {
+              "default": "The current status of the device"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "required": [
+    "Schema_UUID"
+  ]
 }

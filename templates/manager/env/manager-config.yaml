@@ -9,13 +9,13 @@ data:
   APP_ORGANISATION: {{.Values.acs.organisation | quote | required "values.acs.organisation is required!"}}
   APP_DEBUG: {{.Values.manager.debug | quote | required "values.manager.debug is required!"}}
   VITE_BRANDING_NAME: {{.Values.manager.name | quote | required "values.manager.name is required!"}}
-  MQTT_SERVER_FROM_EDGE: "mqtts://mqtt.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}:8883"
-  MANAGEMENT_APP_FROM_EDGE: "https://manager.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"
+  MQTT_SERVER_FROM_EDGE: "{{ .Values.acs.secure | ternary "mqtts://" "mqtt://" }}mqtt.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}:{{ .Values.acs.secure | ternary "8883" "1883" }}"
+  MANAGEMENT_APP_FROM_EDGE: "{{ .Values.acs.secure | ternary "https://" "http://" }}manager.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"
   MANAGER_SERVICE_PRINCIPAL: "HTTP/manager.{{ .Values.acs.namespace | required "values.acs.namespace is required!" }}.svc.cluster.local"
-  APP_URL: "https://manager.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"
-  ASSET_URL: "https://manager.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"
+  APP_URL: "{{ .Values.acs.secure | ternary "https://" "http://" }}manager.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"
+  ASSET_URL: "{{ .Values.acs.secure | ternary "https://" "http://" }}manager.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"
   KRB_DOMAIN: {{.Values.identity.realm | quote | required "values.identity.realm is required!"}}
-  SERVICE_DOMAIN: {{.Values.acs.baseUrl | quote | required "values.acs.baseUrl is required!"}}
+  SERVICE_DOMAIN: "{{ .Values.acs.namespace | required "values.acs.namespace is required!" }}.svc.cluster.local"
   OCTANE_SERVER: "swoole"
   LOG_CHANNEL: "stdout"
   LOG_LEVEL: {{.Values.manager.logLevel | quote | required "values.manager.logLevel is required!"}}
@@ -31,7 +31,7 @@ data:
   REDIS_HOST: "manager-redis.{{ .Values.acs.namespace | required "values.acs.namespace is required!" }}.svc.cluster.local"
   REDIS_PORT: "6379"
   FILESYSTEM_CLOUD: "minio"
-  MINIO_ENDPOINT: "https://data.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"
+  MINIO_ENDPOINT: "{{ .Values.acs.secure | ternary "https://" "http://" }}data.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"
   MINIO_KEY: {{.Values.manager.minio.key | required "manager.minio.key is required!" | quote}}
   MINIO_REGION: "us-east-1"
   SCOUT_DRIVER: "meilisearch"

@@ -32,7 +32,7 @@ data:
   REDIS_HOST: "manager-redis.{{ .Release.Namespace }}.svc.cluster.local"
   REDIS_PORT: "6379"
   FILESYSTEM_CLOUD: "minio"
-  MINIO_ENDPOINT: "https://data.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"
+  MINIO_ENDPOINT: "http://fplus-minio-core-hl.{{ .Release.Namespace }}.svc.cluster.local:9000"
   MINIO_REGION: "us-east-1"
   SCOUT_DRIVER: "meilisearch"
   MEILISEARCH_HOST: "http://localhost:7700"

@@ -3,7 +3,7 @@ acs:
   organisation: AMRC
   # -- The base URL that services will be served from
   baseUrl: localhost
-  # -- The name of the secret holding the wildcard certificate for the above domain. Only used if secure=true.
+  # -- The name of the secret holding the wildcard certificate for the above domain.
   tlsSecretName: factoryplus-tls
 
 identity:

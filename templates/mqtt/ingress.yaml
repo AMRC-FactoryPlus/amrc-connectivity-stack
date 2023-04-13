@@ -12,10 +12,12 @@ spec:
         - name: mqtt
           port: 1883
           namespace: {{ .Release.Namespace }}
+  {{- if .Values.acs.secure }}
   tls:
     secretName: {{ .Values.acs.tlsSecretName | required "values.acs.tlsSecretName is required!" }}
     domains:
       - main: mqtt.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
+  {{- end -}}
 ---
 apiVersion: traefik.containo.us/v1alpha1
 kind: IngressRoute
@@ -24,7 +26,7 @@ metadata:
   namespace: default
 spec:
   entryPoints:
-    - "websecure"
+    - {{ .Values.acs.secure | ternary "websecure" "web" }}
   routes:
     - match: Host(`mqtt.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}`)
       kind: Rule
@@ -32,7 +34,9 @@ spec:
         - name: mqtt
           port: 9001
           namespace: {{ .Release.Namespace }}
+  {{- if .Values.acs.secure }}
   tls:
     secretName: {{ .Values.acs.tlsSecretName | required "values.acs.tlsSecretName is required!" }}
     domains:
       - main: mqtt.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
+  {{- end -}}

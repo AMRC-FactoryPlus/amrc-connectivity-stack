@@ -14,7 +14,9 @@ This Chart creates a load balancer on your Kubernetes cluster that exposes all s
 
 You specified {{.Values.acs.baseUrl}} as your base URL. Please ensure that you have a wildcard DNS entry configured to direct all *.{{.Values.acs.baseUrl}} requests to the load balancer.
 
-🔒 You need to ensure that your cluster has a wildcard TLS certificate (type: kubernetes.io/tls) called {{.Values.acs.tlsSecretName}} in the "default" namespace on your cluster. It must have a certificate value in the `tls.crt` key and the private key value in the `tls.key` key.
+{{ if .Values.acs.secure}}
+🔒 Because secure mode is enabled, you need to ensure that your cluster has a wildcard TLS certificate (type: kubernetes.io/tls) called {{.Values.acs.tlsSecretName}} in the "default" namespace on your cluster. It must have a certificate value in the `tls.crt` key and the private key value in the `tls.key` key.
+{{end}}
 
 🚀 Get Started
 -------------
@@ -23,12 +25,12 @@ Once the services have been deployed, get the password for the admin user by run
 
 echo $(sudo kubectl get secret krb5-passwords -o jsonpath="{.data.admin}" -n {{.Release.Namespace}} | base64 --decode)
 
-! Once you have the MQTT password for the admin user you can log into the manager. Head over to https://manager.{{.Values.acs.baseUrl}} and login as the `admin` user.
+! Once you have the MQTT password for the admin user you can log into the manager. Head over to {{ .Values.acs.secure | ternary "https://" "http://" }}manager.{{.Values.acs.baseUrl}} and login as the `admin` user.
 
 Services
 --------
-Manager: https://manager.{{.Values.acs.baseUrl}}
-MQTT: "mqtts://mqtt.{{.Values.acs.baseUrl}}:8883
+Manager: {{ .Values.acs.secure | ternary "https://" "http://" }}manager.{{.Values.acs.baseUrl}}
+MQTT: {{ .Values.acs.secure | ternary "mqtts://" "mqtt://" }}mqtt.{{.Values.acs.baseUrl}}:8883
 
 
 Manage Users

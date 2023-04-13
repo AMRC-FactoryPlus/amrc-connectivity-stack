@@ -9,13 +9,13 @@ data:
   APP_ORGANISATION: {{.Values.acs.organisation | quote | required "values.acs.organisation is required!"}}
   APP_DEBUG: {{.Values.manager.debug | quote | required "values.manager.debug is required!"}}
   VITE_BRANDING_NAME: {{.Values.manager.name | quote | required "values.manager.name is required!"}}
-  MQTT_SERVER_FROM_EDGE: "mqtts://mqtt.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}:8883"
+  MQTT_SERVER_FROM_EDGE: "{{ .Values.acs.secure | ternary "mqtts://" "mqtt://" }}mqtt.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}:{{ .Values.acs.secure | ternary "8883" "1883" }}"
   SERVICE_SCHEME: "http"
   SERVICE_DOMAIN: "{{ .Release.Namespace }}.svc.cluster.local"
-  MANAGEMENT_APP_FROM_EDGE: "https://manager.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"
+  MANAGEMENT_APP_FROM_EDGE: "{{ .Values.acs.secure | ternary "https://" "http://" }}manager.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"
   MANAGER_SERVICE_PRINCIPAL: "HTTP/manager.{{ .Release.Namespace }}.svc.cluster.local"
-  APP_URL: "https://manager.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"
-  ASSET_URL: "https://manager.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"
+  APP_URL: "{{ .Values.acs.secure | ternary "https://" "http://" }}manager.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"
+  ASSET_URL: "{{ .Values.acs.secure | ternary "https://" "http://" }}manager.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"
   KRB_DOMAIN: {{.Values.identity.realm | quote | required "values.identity.realm is required!"}}
   OCTANE_SERVER: "swoole"
   LOG_CHANNEL: "stdout"

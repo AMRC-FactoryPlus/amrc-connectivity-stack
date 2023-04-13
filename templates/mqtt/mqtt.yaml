@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: mqtt
-  namespace: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
+  namespace: {{ .Release.Namespace }}
   labels:
     component: mqtt
 spec:
@@ -39,7 +39,7 @@ spec:
                 secretKeyRef:
                   name: krb5-passwords
                   key: sv1mqtt
-          command: [ 'sh', '-c', 'until curl -X PUT -o /dev/null -w "%{http_code}" -u "sv1mqtt:${PASSWORD}" -H "Content-Type: application/json" --data-raw "{ \"url\": \"mqtt://mqtt.{{.Values.acs.namespace}}.svc.cluster.local\" }" http://directory.{{.Values.acs.namespace}}.svc.cluster.local/v1/service/feb27ba3-bd2c-4916-9269-79a61ebc4a47/advertisment | grep -E "2[0-9]{2}" > /dev/null; do sleep 10; done' ]
+          command: [ 'sh', '-c', 'until curl -X PUT -o /dev/null -w "%{http_code}" -u "sv1mqtt:${PASSWORD}" -H "Content-Type: application/json" --data-raw "{ \"url\": \"mqtt://mqtt.{{.Release.Namespace}}.svc.cluster.local\" }" http://directory.{{.Release.Namespace}}.svc.cluster.local/v1/service/feb27ba3-bd2c-4916-9269-79a61ebc4a47/advertisment | grep -E "2[0-9]{2}" > /dev/null; do sleep 10; done' ]
       containers:
         - name: hivemq
           image: "{{ .Values.mqtt.image.registry }}/{{ .Values.mqtt.image.repository }}:{{ .Values.mqtt.image.tag }}"
@@ -48,12 +48,12 @@ spec:
               value: /keytabs/server
             # This needs to name a principal available in the keytab, used for verifying passwords.
             - name: SERVER_PRINCIPAL
-              value: mqtt/mqtt.{{ .Values.acs.namespace | required "values.acs.namespace is required!" }}.svc.cluster.local
+              value: mqtt/mqtt.{{ .Release.Namespace }}.svc.cluster.local
             # These should be discovered, but aren't yet in the Java client.
             - name: AUTHN_URL
-              value: http://auth.{{ .Values.acs.namespace | required "values.acs.namespace is required!" }}.svc.cluster.local
+              value: http://auth.{{ .Release.Namespace }}.svc.cluster.local
             - name: CONFIGDB_URL
-              value: http://configdb.{{ .Values.acs.namespace | required "values.acs.namespace is required!" }}.svc.cluster.local
+              value: http://configdb.{{ .Release.Namespace }}.svc.cluster.local
             # The Java client still only supports Basic auth.
             - name: SERVICE_USERNAME
               value: sv1mqtt
@@ -76,7 +76,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: mqtt-config
-  namespace: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
+  namespace: {{ .Release.Namespace }}
   labels:
     component: mqtt
 data:

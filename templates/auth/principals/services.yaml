@@ -15,10 +15,10 @@ apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey
 metadata:
   name: http.auth
-  namespace: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
+  namespace: {{ .Release.Namespace }}
 spec:
   type: Random
-  principal: HTTP/auth.{{ .Values.acs.namespace | required "values.acs.namespace is required!" }}.svc.cluster.local@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+  principal: HTTP/auth.{{ .Release.Namespace }}.svc.cluster.local@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
   additionalPrincipals:
     - HTTP/auth.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
 ---
@@ -26,10 +26,10 @@ apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey
 metadata:
   name: http.cmdesc
-  namespace: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
+  namespace: {{ .Release.Namespace }}
 spec:
   type: Random
-  principal: HTTP/cmdesc.{{ .Values.acs.namespace | required "values.acs.namespace is required!" }}.svc.cluster.local@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+  principal: HTTP/cmdesc.{{ .Release.Namespace }}.svc.cluster.local@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
   additionalPrincipals:
     - HTTP/cmdesc.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
 ---
@@ -37,10 +37,10 @@ apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey
 metadata:
   name: http.configdb
-  namespace: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
+  namespace: {{ .Release.Namespace }}
 spec:
   type: Random
-  principal: HTTP/configdb.{{ .Values.acs.namespace | required "values.acs.namespace is required!" }}.svc.cluster.local@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+  principal: HTTP/configdb.{{ .Release.Namespace }}.svc.cluster.local@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
   additionalPrincipals:
     - HTTP/configdb.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
 ---
@@ -48,10 +48,10 @@ apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey
 metadata:
   name: http.directory
-  namespace: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
+  namespace: {{ .Release.Namespace }}
 spec:
   type: Random
-  principal: HTTP/directory.{{ .Values.acs.namespace | required "values.acs.namespace is required!" }}.svc.cluster.local@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+  principal: HTTP/directory.{{ .Release.Namespace }}.svc.cluster.local@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
   additionalPrincipals:
     - HTTP/directory.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
 ---
@@ -59,10 +59,10 @@ apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey
 metadata:
   name: mqtt.mqtt
-  namespace: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
+  namespace: {{ .Release.Namespace }}
 spec:
   type: Random
-  principal: mqtt/mqtt.{{ .Values.acs.namespace | required "values.acs.namespace is required!" }}.svc.cluster.local@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+  principal: mqtt/mqtt.{{ .Release.Namespace }}.svc.cluster.local@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
   additionalPrincipals:
     - mqtt/mqtt.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
 ---
@@ -70,10 +70,10 @@ apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey
 metadata:
   name: http.manager
-  namespace: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
+  namespace: {{ .Release.Namespace }}
 spec:
   type: Random
-  principal: HTTP/manager.{{ .Values.acs.namespace | required "values.acs.namespace is required!" }}.svc.cluster.local@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+  principal: HTTP/manager.{{ .Release.Namespace }}.svc.cluster.local@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
   additionalPrincipals:
     - HTTP/manager.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
   secret: manager-keytab/keytab
@@ -82,7 +82,7 @@ apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey
 metadata:
   name: postgres.postgres
-  namespace: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
+  namespace: {{ .Release.Namespace }}
 spec:
   type: Random
-  principal: postgres/postgres.{{ .Values.acs.namespace | required "values.acs.namespace is required!" }}.svc.cluster.local@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+  principal: postgres/postgres.{{ .Release.Namespace }}.svc.cluster.local@{{ .Values.identity.realm | required "values.identity.realm is required!" }}

@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: auth
-  namespace: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
+  namespace: {{ .Release.Namespace }}
   labels:
     component: auth
 spec:
@@ -49,7 +49,7 @@ spec:
                 secretKeyRef:
                   name: krb5-passwords
                   key: admin
-          command: [ 'sh', '-c', 'until curl -X PUT -o /dev/null -w "%{http_code}" -u "admin:${PASSWORD}" -H "Content-Type: application/json" --data-raw "{ \"url\": \"http://auth.{{.Values.acs.namespace}}.svc.cluster.local\" }" http://directory.{{.Values.acs.namespace}}.svc.cluster.local/v1/service/cab2642a-f7d9-42e5-8845-8f35affe1fd4/advertisment/1e1989ab-14e4-42bd-8171-495230acc406 | grep -E "2[0-9]{2}" > /dev/null; do sleep 10; done' ]
+          command: [ 'sh', '-c', 'until curl -X PUT -o /dev/null -w "%{http_code}" -u "admin:${PASSWORD}" -H "Content-Type: application/json" --data-raw "{ \"url\": \"http://auth.{{.Release.Namespace}}.svc.cluster.local\" }" http://directory.{{.Release.Namespace}}.svc.cluster.local/v1/service/cab2642a-f7d9-42e5-8845-8f35affe1fd4/advertisment/1e1989ab-14e4-42bd-8171-495230acc406 | grep -E "2[0-9]{2}" > /dev/null; do sleep 10; done' ]
         - name: db-init
           image: "{{ .Values.auth.image.registry }}/{{ .Values.auth.image.repository }}:{{ .Values.auth.image.tag }}"
           imagePullPolicy: Always
@@ -59,7 +59,7 @@ spec:
             - name: KRB5_CONFIG
               value: /config/krb5-conf/krb5.conf
             - name: PGHOST
-              value: postgres.{{ .Values.acs.namespace | required "values.acs.namespace is required!" }}.svc.cluster.local
+              value: postgres.{{ .Release.Namespace }}.svc.cluster.local
             - name: PGUSER
               value: op1pgadmin
             - name: PGDATABASE
@@ -83,7 +83,7 @@ spec:
             - name: KRB5_CONFIG
               value: /config/krb5-conf/krb5.conf
             - name: PGHOST
-              value: postgres.{{ .Values.acs.namespace | required "values.acs.namespace is required!" }}.svc.cluster.local
+              value: postgres.{{ .Release.Namespace }}.svc.cluster.local
             - name: PGUSER
               value: sv1auth
             - name: PGDATABASE
@@ -112,13 +112,13 @@ spec:
             # These two values are used to construct a principal name we have a key for, to verify
             # passwords for Basic auth. They are not used for anything else.
             - name: HOSTNAME
-              value: auth.{{ .Values.acs.namespace | required "values.acs.namespace is required!" }}.svc.cluster.local
+              value: auth.{{ .Release.Namespace }}.svc.cluster.local
             - name: REALM
               value: {{ .Values.identity.realm | required "values.identity.realm is required!" }}
             - name: PORT
               value: "8080"
             - name: PGHOST
-              value: postgres.{{ .Values.acs.namespace | required "values.acs.namespace is required!" }}.svc.cluster.local
+              value: postgres.{{ .Release.Namespace }}.svc.cluster.local
             - name: PGUSER
               value: sv1auth
             - name: PGDATABASE
@@ -148,7 +148,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: auth
-  namespace: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
+  namespace: {{ .Release.Namespace }}
 spec:
   ports:
     - name: "web"

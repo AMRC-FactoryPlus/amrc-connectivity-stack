@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: manager
-  namespace: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
+  namespace: {{ .Release.Namespace }}
 spec:
   replicas: 1
   selector:
@@ -99,7 +99,7 @@ kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
   name: manager-meilisearch-pvc
-  namespace: {{ .Values.acs.namespace | required "values.namespace is required!" }}
+  namespace: {{ .Release.Namespace }}
   labels:
     factory-plus.service: manager-meilisearch
 spec:
@@ -113,7 +113,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: manager
-  namespace: {{ .Values.acs.namespace | required "values.namespace is required!" }}
+  namespace: {{ .Release.Namespace }}
 spec:
   ports:
     - name: "web"

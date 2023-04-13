@@ -21,7 +21,7 @@ You specified {{.Values.acs.baseUrl}} as your base URL. Please ensure that you h
 
 Once the services have been deployed, get the password for the admin user by running:
 
-echo $(sudo kubectl get secret krb5-passwords -o jsonpath="{.data.admin}" -n {{.Values.acs.namespace}} | base64 --decode)
+echo $(sudo kubectl get secret krb5-passwords -o jsonpath="{.data.admin}" -n {{.Release.Namespace}} | base64 --decode)
 
 ! Once you have the MQTT password for the admin user you can log into the manager. Head over to https://manager.{{.Values.acs.baseUrl}} and login as the `admin` user.
 

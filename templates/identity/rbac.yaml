@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: krb-keys-operator
-  namespace: {{ .Values.acs.namespace | required "values.namespace is required!" }}
+  namespace: {{ .Release.Namespace }}
 ---
 # This role is for the krb-keys operator itself. It grants access to create the actual
 # secrets and sealed secrets, and access to read configmaps to find the kubeseal cert.
@@ -41,4 +41,4 @@ roleRef:
 subjects:
   -   kind: ServiceAccount
       name: krb-keys-operator
-      namespace: {{ .Values.acs.namespace | required "values.namespace is required!" }}
+      namespace: {{ .Release.Namespace }}

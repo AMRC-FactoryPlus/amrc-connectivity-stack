@@ -1,5 +1,5 @@
 # Only run this if the ConfigMaps don't already exist
-{{- if and (not (lookup "v1" "ConfigMap" .Values.acs.namespace "configdb-json-dumps")) (not (lookup "v1" "ConfigMap" .Values.acs.namespace "auth-json-dumps")) }}
+{{- if and (not (lookup "v1" "ConfigMap" .Release.Namespace "configdb-json-dumps")) (not (lookup "v1" "ConfigMap" .Release.Namespace "auth-json-dumps")) }}
 
 # ====================================================
 # Ensure that well-known UUIDs are used where required
@@ -105,7 +105,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: configdb-json-dumps
-  namespace: {{ .Values.acs.namespace | required "values.namespace is required!" }}
+  namespace: {{ .Release.Namespace }}
   labels:
     component: configdb
 data:
@@ -533,7 +533,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: auth-json-dumps
-  namespace: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
+  namespace: {{ .Release.Namespace }}
   annotations:
     "helm.sh/hook": pre-install
     "helm.sh/hook-weight": "20"

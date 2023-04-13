@@ -93,11 +93,6 @@ manager:
     repository: acs-edge
     # -- The tag of the Edge Agent component
     tag: latest
-  minio:
-    # -- The key that the management app uses to connect to MinIO
-    key: management-app
-    # -- The secret that the management app uses to connect to MinIO
-    secret: ""
   meilisearch:
     # -- The key that the manager uses to connect to the Meilisearch search engine
     key: masterKey
@@ -200,11 +195,11 @@ grafana:
 tenant:
   ## Secret with default environment variable configurations to be used by MinIO Tenant.
   ## Not recommended for production deployments! Create the secret manually instead.
-  secrets:
-    name: myminio-env-configuration
-    # MinIO root user and password
-    accessKey: minio
-    secretKey: minio123
+#  secrets:
+#    name: myminio-env-configuration
+#    # MinIO root user and password
+#    accessKey: minio
+#    secretKey: minio123
   tenant:
     name: fplus-minio-core
     pools:
@@ -219,4 +214,4 @@ tenant:
       - name: "edge-agent-configs"
     ## List of secret names to use for generating MinIO users during tenant provisioning
     users:
-      - name: "manager"
+      - name: "manager-minio-secrets"

@@ -33,7 +33,6 @@ data:
   REDIS_PORT: "6379"
   FILESYSTEM_CLOUD: "minio"
   MINIO_ENDPOINT: "https://data.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"
-  MINIO_KEY: {{.Values.manager.minio.key | required "manager.minio.key is required!" | quote}}
   MINIO_REGION: "us-east-1"
   SCOUT_DRIVER: "meilisearch"
   MEILISEARCH_HOST: "http://localhost:7700"

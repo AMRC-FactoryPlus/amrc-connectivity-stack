@@ -67,12 +67,12 @@ spec:
             - name: MINIO_KEY
               valueFrom:
                 secretKeyRef:
-                  name: manager-minio-secrets
+                  name: manager-minio-secret
                   key: CONSOLE_ACCESS_KEY
             - name: MINIO_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: manager-minio-secrets
+                  name: manager-minio-secret
                   key: CONSOLE_SECRET_KEY
             - name: DB_PASSWORD
               valueFrom:

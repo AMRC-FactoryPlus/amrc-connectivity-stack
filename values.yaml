@@ -214,4 +214,4 @@ tenant:
       - name: "edge-agent-configs"
     ## List of secret names to use for generating MinIO users during tenant provisioning
     users:
-      - name: "manager-minio-secrets"
+      - name: "manager-minio-secret"

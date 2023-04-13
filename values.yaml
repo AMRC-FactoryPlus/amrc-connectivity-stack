@@ -1,6 +1,7 @@
 acs:
   # -- The K8s namespace to install the components in
-  namespace: factory-plus
+  namespace: |-
+    factory-plus
   # -- The organisation where ACS is being deployed
   organisation: AMRC
   # -- The base URL that services will be served from
@@ -202,7 +203,7 @@ tenant:
 #    secretKey: minio123
   tenant:
     name: fplus-minio-core
-    namespace: {{ tpl .Values.acs.namespace . }}
+    namespace: "{{ tpl .Values.acs.namespace . }}"
     pools:
       - servers: 1
         name: pool-0

@@ -194,11 +194,13 @@ grafana:
 
 # @ignore
 tenant:
-  secrets:
-    name: myminio-env-configuration
-    # MinIO root user and password
-    accessKey: manager
-    secretKey: {{ randAlphaNum 30 | b64enc | quote }}
+  ## Secret with default environment variable configurations to be used by MinIO Tenant.
+  ## Not recommended for production deployments! Create the secret manually instead.
+#  secrets:
+#    name: myminio-env-configuration
+#    # MinIO root user and password
+#    accessKey: minio
+#    secretKey: minio123
   tenant:
     name: fplus-minio-core
     pools:
@@ -212,4 +214,5 @@ tenant:
       - name: "device-connections"
       - name: "edge-agent-configs"
     ## List of secret names to use for generating MinIO users during tenant provisioning
-    users: [ ]
+    users:
+      - name: "manager-minio-secret"

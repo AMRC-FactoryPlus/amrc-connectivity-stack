@@ -5,7 +5,7 @@ metadata:
   namespace: default
 spec:
   entryPoints:
-    - {{ .Values.acs.secure | ternary "websecure" "web" }}
+    - "websecure"
   routes:
     - match: Host(`configdb.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}`)
       kind: Rule
@@ -13,9 +13,7 @@ spec:
         - name: configdb
           port: 80
           namespace: {{ .Values.acs.namespace | required "values.namespace is required!" }}
-  {{- if .Values.acs.secure }}
   tls:
     secretName: {{ .Values.acs.tlsSecretName | required "values.acs.tlsSecretName is required!" }}
     domains:
       - main: configdb.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
-  {{- end -}}

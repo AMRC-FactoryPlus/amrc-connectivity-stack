@@ -5,7 +5,7 @@ metadata:
   namespace: default
 spec:
   entryPoints:
-    - {{ .Values.acs.secure | ternary "websecure" "web" }}
+    - "websecure"
   routes:
     - match: Host(`data.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}`)
       kind: Rule
@@ -14,12 +14,10 @@ spec:
           port: 9000
           scheme: https
           namespace: {{ .Values.acs.namespace | required "values.namespace is required!" }}
-  {{- if .Values.acs.secure }}
   tls:
     secretName: "{{ .Values.acs.tlsSecretName | required "values.acs.tlsSecretName is required!" }}"
     domains:
       - main: data.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
-  {{- end -}}
 ---
 {{if .Values.minio.exposeConsole}}
 apiVersion: traefik.containo.us/v1alpha1
@@ -29,7 +27,7 @@ metadata:
   namespace: default
 spec:
   entryPoints:
-    - {{ .Values.acs.secure | ternary "websecure" "web" }}
+    - "websecure"
   routes:
     - match: Host(`minio.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}`)
       kind: Rule
@@ -38,10 +36,8 @@ spec:
           port: 9443
           scheme: https
           namespace: {{ .Values.acs.namespace | required "values.namespace is required!" }}
-  {{- if .Values.acs.secure }}
   tls:
     secretName: "{{ .Values.acs.tlsSecretName | required "values.acs.tlsSecretName is required!" }}"
     domains:
       - main: minio.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
   {{- end -}}
-{{- end -}}

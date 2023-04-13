@@ -16,11 +16,13 @@ The AMRC Connectivity Stack (ACS) is a collection of open-source services develo
 
 | Repository | Name | Version |
 |------------|------|---------|
+| https://alexgodbehere.github.io/helm-repository | operator | 5.0.3 |
 | https://bitnami-labs.github.io/sealed-secrets/ | sealed-secrets | 2.8.1 |
 | https://grafana.github.io/helm-charts | grafana | 6.52.4 |
 | https://grafana.github.io/helm-charts | loki | 4.8.0 |
 | https://grafana.github.io/helm-charts | promtail | 6.9.3 |
 | https://helm.traefik.io/traefik | traefik | 10.19.* |
+| https://operator.min.io | tenant | 5.0.3 |
 
 ## Values
 
@@ -29,7 +31,6 @@ The AMRC Connectivity Stack (ACS) is a collection of open-source services develo
 | acs.baseUrl | string | `"localhost"` | The base URL that services will be served from |
 | acs.namespace | string | `"factory-plus"` | The K8s namespace to install the components in |
 | acs.organisation | string | `"AMRC"` | The organisation where ACS is being deployed |
-| acs.secure | bool | `true` | Whether or not services should be served over HTTPS |
 | acs.tlsSecretName | string | `"factoryplus-tls"` | The name of the secret holding the wildcard certificate for the above domain. Only used if secure=true. |
 | auth.image.registry | string | `"ghcr.io/amrc-factoryplus"` | The registry of the Authorisation component |
 | auth.image.repository | string | `"acs-auth"` | The repository of the Authorisation component |
@@ -58,7 +59,7 @@ The AMRC Connectivity Stack (ACS) is a collection of open-source services develo
 | manager.env | string | `"production"` | The environment that the manager is running in |
 | manager.image.registry | string | `"ghcr.io/amrc-factoryplus"` | The registry of the Manager component |
 | manager.image.repository | string | `"acs-manager"` | The repository of the Manager component |
-| manager.image.tag | string | `"latest"` | The tag of the Manager component |
+| manager.image.tag | string | `"v1.0.1"` | The tag of the Manager component |
 | manager.logLevel | string | `"warning"` | The minimum log level that the manager will log messages at |
 | manager.meilisearch.key | string | `"masterKey"` | The key that the manager uses to connect to the Meilisearch search engine |
 | manager.minio.key | string | `"management-app"` | The key that the management app uses to connect to MinIO |

@@ -194,15 +194,14 @@ grafana:
 
 # @ignore
 tenant:
-  ## Secret with default environment variable configurations to be used by MinIO Tenant.
-  ## Not recommended for production deployments! Create the secret manually instead.
-#  secrets:
-#    name: myminio-env-configuration
-#    # MinIO root user and password
-#    accessKey: minio
-#    secretKey: minio123
   tenant:
     name: fplus-minio-core
+    # Disable TLS on the MinIO level because we terminate TLS at Traefik
+    certificate:
+      externalCaCertSecret: { }
+      externalCertSecret: { }
+      requestAutoCert: false
+      certConfig: { }
     pools:
       - servers: 1
         name: pool-0

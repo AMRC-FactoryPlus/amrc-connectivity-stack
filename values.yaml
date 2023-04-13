@@ -136,6 +136,11 @@ traefik:
       exposedPort: 443
       protocol: TCP
     mqtt:
+      port: 1883
+      expose: true
+      exposedPort: 1883
+      protocol: TCP
+    mqttsecure:
       port: 8883
       expose: true
       exposedPort: 8883
@@ -157,7 +162,8 @@ traefik:
       protocol: TCP
   additionalArguments:
     - --metrics.prometheus=true
-    - --entryPoints.mqtt.address=:8883
+    - --entryPoints.mqtt.address=:1883
+    - --entryPoints.mqttsecure.address=:8883
   ingressRoute:
     dashboard:
       enabled: false

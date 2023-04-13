@@ -64,16 +64,11 @@ spec:
           env:
             - name: KRB5_CONFIG
               value: /config/krb5-conf/krb5.conf
-            - name: MINIO_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: manager-minio-secret
-                  key: CONSOLE_ACCESS_KEY
             - name: MINIO_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: manager-minio-secret
-                  key: CONSOLE_SECRET_KEY
+                  name: myminio-env-configuration
+                  key: secretKey
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:

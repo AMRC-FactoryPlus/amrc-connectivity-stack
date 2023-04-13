@@ -29,7 +29,6 @@ The AMRC Connectivity Stack (ACS) is a collection of open-source services develo
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | acs.baseUrl | string | `"localhost"` | The base URL that services will be served from |
-| acs.namespace | string | `"factory-plus"` | The K8s namespace to install the components in |
 | acs.organisation | string | `"AMRC"` | The organisation where ACS is being deployed |
 | acs.tlsSecretName | string | `"factoryplus-tls"` | The name of the secret holding the wildcard certificate for the above domain. Only used if secure=true. |
 | auth.image.registry | string | `"ghcr.io/amrc-factoryplus"` | The registry of the Authorisation component |
@@ -62,8 +61,6 @@ The AMRC Connectivity Stack (ACS) is a collection of open-source services develo
 | manager.image.tag | string | `"v1.0.1"` | The tag of the Manager component |
 | manager.logLevel | string | `"warning"` | The minimum log level that the manager will log messages at |
 | manager.meilisearch.key | string | `"masterKey"` | The key that the manager uses to connect to the Meilisearch search engine |
-| manager.minio.key | string | `"management-app"` | The key that the management app uses to connect to MinIO |
-| manager.minio.secret | string | `""` | The secret that the management app uses to connect to MinIO |
 | manager.name | string | `"Factory+ Manager"` | A string used to customise the branding of the manager |
 | minio.exposeConsole | bool | `false` | Whether or not to expose the MinIO console outside of the cluster |
 | mqtt.image.registry | string | `"ghcr.io/amrc-factoryplus"` | The registry of the MQTT component |

@@ -1,7 +1,4 @@
 acs:
-  # -- The K8s namespace to install the components in
-  namespace: |-
-    factory-plus
   # -- The organisation where ACS is being deployed
   organisation: AMRC
   # -- The base URL that services will be served from

@@ -86,7 +86,7 @@ spec:
               value: admin@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
             # This is the value published via MQTT. It is also used by the editor so it needs to be externally resolvable.
             - name: HTTP_API_URL
-              value: https://directory.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
+              value: "{{ .Values.acs.secure | ternary "https://" "http://" }}directory.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"
             # This is used to check our ACLs so it does not need to be externally resolvable.
             - name: AUTHN_URL
               value: http://auth.{{ .Release.Namespace }}.svc.cluster.local

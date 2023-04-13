@@ -120,7 +120,7 @@ spec:
               value: fplusadmin@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
             # This is the value published via MQTT. It is also used by the editor so it needs to be externally resolvable.
             - name: HTTP_API_URL
-              value: https://configdb.{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+              value: "{{ .Values.acs.secure | ternary "https://" "http://" }}configdb.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"
             # This is used for service discovery so it does not need to be externally resolvable.
             - name: DIRECTORY_URL
               value: http://directory.{{ .Release.Namespace }}.svc.cluster.local

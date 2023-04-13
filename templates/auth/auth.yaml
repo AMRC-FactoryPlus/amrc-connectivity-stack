@@ -130,9 +130,9 @@ spec:
             # These are currently only used for the editor. They need to be resolvable by the
             # user's browser, so in-cluster names will not work.
             - name: HTTP_API_URL
-              value: https://auth.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
+              value: "{{ .Values.acs.secure | ternary "https://" "http://" }}auth.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"
             - name: CONFIGDB_URL
-              value: https://configdb.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
+              value: "{{ .Values.acs.secure | ternary "https://" "http://" }}configdb.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"
             # This principal, if configured, bypasses all ACLs. This is important for
             # bootstrapping but perhaps shouldn't be left in place once we can bootstrap without
             # manual intervention.

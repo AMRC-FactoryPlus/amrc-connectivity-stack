@@ -10,6 +10,7 @@ data:
   APP_DEBUG: {{.Values.manager.debug | quote | required "values.manager.debug is required!"}}
   VITE_BRANDING_NAME: {{.Values.manager.name | quote | required "values.manager.name is required!"}}
   MQTT_SERVER_FROM_EDGE: "{{ .Values.acs.secure | ternary "mqtts://" "mqtt://" }}mqtt.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}:{{ .Values.acs.secure | ternary "8883" "1883" }}"
+  SERVICE_SCHEME: {{ .Values.acs.secure | ternary "https" "http" }}
   MANAGEMENT_APP_FROM_EDGE: "{{ .Values.acs.secure | ternary "https://" "http://" }}manager.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"
   MANAGER_SERVICE_PRINCIPAL: "HTTP/manager.{{ .Values.acs.namespace | required "values.acs.namespace is required!" }}.svc.cluster.local"
   APP_URL: "{{ .Values.acs.secure | ternary "https://" "http://" }}manager.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"

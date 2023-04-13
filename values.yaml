@@ -202,6 +202,7 @@ tenant:
 #    secretKey: minio123
   tenant:
     name: fplus-minio-core
+    namespace: {{ tpl .Values.acs.namespace . }}
     pools:
       - servers: 1
         name: pool-0

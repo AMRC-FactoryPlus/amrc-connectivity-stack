@@ -198,7 +198,7 @@ tenant:
     name: myminio-env-configuration
     # MinIO root user and password
     accessKey: manager
-    secretKey: change_this_password
+    secretKey: {{ randAlphaNum 30 | b64enc | quote }}
   tenant:
     name: fplus-minio-core
     pools:

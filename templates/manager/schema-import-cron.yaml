@@ -11,26 +11,42 @@ spec:
   successfulJobsHistoryLimit: 1
   jobTemplate:
     spec:
-      activeDeadlineSeconds: 240
+      activeDeadlineSeconds: 300
       backoffLimit: 1
       template:
         spec:
           containers:
             - name: cron
               image: "{{ .Values.manager.image.registry }}/{{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}"
-              imagePullPolicy: IfNotPresent
-              command: [ "php", "artisan", "schema:import" ]
               env:
+                - name: KRB5_CONFIG
+                  value: /config/krb5-conf/krb5.conf
+                - name: MINIO_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: manager-minio-secret
+                      key: CONSOLE_ACCESS_KEY
+                - name: MINIO_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: manager-minio-secret
+                      key: CONSOLE_SECRET_KEY
                 - name: DB_PASSWORD
                   valueFrom:
                     secretKeyRef:
                       name: manager-database-secret
                       key: postgres-password
               envFrom:
-                - secretRef:
-                    name: manager-secrets
                 - configMapRef:
                     name: manager-config
+                - secretRef:
+                    name: manager-secrets
+              volumeMounts:
+                - mountPath: /config/keytab
+                  name: manager-keytab
+                - mountPath: /config/krb5-conf
+                  name: krb5-conf
+              command: [ "php", "artisan", "schema:import" ]
               resources:
                 limits:
                   memory: 300Mi

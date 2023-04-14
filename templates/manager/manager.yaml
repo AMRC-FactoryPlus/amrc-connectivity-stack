@@ -86,16 +86,3 @@ spec:
               name: manager-keytab
             - mountPath: /config/krb5-conf
               name: krb5-conf
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: manager
-  namespace: {{ .Release.Namespace }}
-spec:
-  ports:
-    - name: "web"
-      port: 80
-      targetPort: 80
-  selector:
-    factory-plus.service: manager

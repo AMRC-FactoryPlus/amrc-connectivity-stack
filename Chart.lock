@@ -16,9 +16,9 @@ dependencies:
   version: 6.52.4
 - name: operator
   repository: https://alexgodbehere.github.io/helm-repository
-  version: 5.0.3
+  version: 5.0.4
 - name: tenant
   repository: https://operator.min.io
   version: 5.0.3
-digest: sha256:2ecc080dc80b042efc7e079521f3aac7d085a5f0ebd73a12eb4d8922c9488755
-generated: "2023-04-11T20:28:36.010241608Z"
+digest: sha256:11fe62559fec7ba049b8e0b36cdeccbacedbd9b6389a6d3d8fbeb55a6b9408a5
+generated: "2023-04-14T11:35:32.979645+01:00"

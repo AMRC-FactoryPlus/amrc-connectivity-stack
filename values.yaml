@@ -118,6 +118,16 @@ cmdesc:
   # -- Possible values are either 1 to enable all possible debugging, or a comma-separated list of debug tags (the tags printed before the log lines). No logging is specified as an empty string.
   verbosity: 1
 
+warehouse:
+  telegraf:
+    image:
+      # -- The repository of the Telegraf image
+      repository: telegraf
+      # -- The tag of of the Telegraf image
+      tag: latest
+      # @ignore
+      pullPolicy: IfNotPresent
+
 minio:
   # -- Whether or not to expose the MinIO console outside of the cluster
   exposeConsole: false

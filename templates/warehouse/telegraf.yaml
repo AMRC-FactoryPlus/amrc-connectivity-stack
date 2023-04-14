@@ -72,7 +72,7 @@ data:
       [[outputs.influxdb_v2]]
       urls = ["http://acs-influxdb2.{{ .Release.Namespace }}.svc.cluster.local:8086"]
       token = "$TOKEN"
-      organization = "{{ .Values.acs.organisation | quote }}"
+      organization = "{{ .Values.acs.organisation }}"
       bucket = "default"
       [[inputs.mqtt_consumer]]
       servers = ["mqtt.{{ .Release.Namespace }}.svc.cluster.local:1883"]

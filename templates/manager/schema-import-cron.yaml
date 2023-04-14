@@ -53,7 +53,7 @@ spec:
                   name: manager-keytab
                 - mountPath: /config/krb5-conf
                   name: krb5-conf
-              command: [ "php", "artisan", "schema:import" ]
+              command: [ "php", "artisan", "schemas:import" ]
               resources:
                 limits:
                   memory: 300Mi

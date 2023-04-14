@@ -70,9 +70,9 @@ data:
       hostname = ""
       omit_hostname = false
       [[outputs.influxdb_v2]]
-      urls = ["http://acs-influxdb2.{{ .Release.Namespace }}.svc.cluster.local:8086"]
+      urls = ["http://acs-influxdb2.{{ .Release.Namespace }}.svc.cluster.local"]
       token = "$TOKEN"
-      organization = "{{ .Values.acs.organisation }}"
+      organization = "{{ .Values.influxdb2.adminUser.organization }}"
       bucket = "default"
       [[inputs.mqtt_consumer]]
       servers = ["mqtt://mqtt.{{ .Release.Namespace }}.svc.cluster.local:1883"]

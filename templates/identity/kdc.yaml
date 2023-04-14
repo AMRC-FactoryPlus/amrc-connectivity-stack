@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: kdc
-  namespace: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
+  namespace: {{ .Release.Namespace }}
   labels:
     component: kdc
 spec:
@@ -95,7 +95,7 @@ spec:
             - name: KRB5_KDC_PROFILE
               value: /config/kdc-conf/kdc.conf
             - name: NAMESPACE
-              value: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
+              value: {{ .Release.Namespace }}
             - name: KEYTABS_SECRET
               value: "krb5-keytabs"
             - name: PASSWORDS_SECRET
@@ -156,7 +156,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: kdc-conf
-  namespace: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
+  namespace: {{ .Release.Namespace }}
 data:
   kdc.conf: |
     [realms]
@@ -184,7 +184,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: kdc
-  namespace: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
+  namespace: {{ .Release.Namespace }}
 spec:
   type: ClusterIP
   selector:
@@ -202,7 +202,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: kadmin
-  namespace: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
+  namespace: {{ .Release.Namespace }}
 spec:
   type: ClusterIP
   selector:
@@ -221,7 +221,7 @@ kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
   name: kdc-storage
-  namespace: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
+  namespace: {{ .Release.Namespace }}
   labels:
     component: kdc
 spec:

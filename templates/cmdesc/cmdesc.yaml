@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: cmdescd
-  namespace: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
+  namespace: {{ .Release.Namespace }}
   labels:
     component: cmdescd
 spec:
@@ -42,7 +42,7 @@ spec:
             - name: SERVER_KEYTAB
               value: /keytabs/server
             - name: HOSTNAME
-              value: cmdesc.{{ .Values.acs.namespace | required "values.acs.namespace is required!" }}.svc.cluster.local
+              value: cmdesc.{{ .Release.Namespace }}.svc.cluster.local
             - name: REALM
               value: {{ .Values.identity.realm | required "values.identity.realm is required!" }}
             - name: SPARKPLUG_ADDRESS
@@ -54,13 +54,13 @@ spec:
             - name: VERBOSE
               value: {{.Values.cmdesc.verbosity | quote | required "values.cmdesc.verbosity is required!"}}
             - name: HTTP_API_URL
-              value: http://cmdesc.{{ .Values.acs.namespace | required "values.acs.namespace is required!" }}.svc.cluster.local
+              value: http://cmdesc.{{ .Release.Namespace }}.svc.cluster.local
             - name: PORT
               value: "8080"
             - name: CACHE_MAX_AGE
               value: "300"
             - name: DIRECTORY_URL
-              value: http://directory.{{ .Values.acs.namespace | required "values.acs.namespace is required!" }}.svc.cluster.local
+              value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
           volumeMounts:
             - mountPath: /config/krb5-conf
               name: krb5-conf
@@ -71,7 +71,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: cmdesc
-  namespace: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
+  namespace: {{ .Release.Namespace }}
 spec:
   ports:
     - name: "web"

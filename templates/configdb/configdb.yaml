@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: configdb
-  namespace: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
+  namespace: {{ .Release.Namespace }}
   labels:
     component: configdb
 spec:
@@ -40,6 +40,15 @@ spec:
             name: configdb-json-dumps
 
       initContainers:
+        - name: register-with-directory
+          image: appropriate/curl:latest
+          env:
+            - name: PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: krb5-passwords
+                  key: admin
+          command: [ 'sh', '-c', 'until curl -X PUT -o /dev/null -w "%{http_code}" -u "admin:${PASSWORD}" -H "Content-Type: application/json" --data-raw "{ \"url\": \"http://configdb.{{.Release.Namespace}}.svc.cluster.local\" }" http://directory.{{.Release.Namespace}}.svc.cluster.local/v1/service/af15f175-78a0-4e05-97c0-2a0bb82b9f3b/advertisment/36861e8d-9152-40c4-8f08-f51c2d7e3c25 | grep -E "2[0-9]{2}" > /dev/null; do sleep 10; done' ]
         - name: db-init
           image: "{{ .Values.configdb.image.registry }}/{{ .Values.configdb.image.repository }}:{{ .Values.configdb.image.tag }}"
           command: [ "/usr/bin/k5start", "-Uf", "/keytabs/dbadmin", "/usr/local/bin/psql" ]
@@ -48,7 +57,7 @@ spec:
             - name: KRB5_CONFIG
               value: /config/krb5-conf/krb5.conf
             - name: PGHOST
-              value: postgres.{{ .Values.acs.namespace | required "values.acs.namespace is required!" }}.svc.cluster.local
+              value: postgres.{{ .Release.Namespace }}.svc.cluster.local
             - name: PGUSER
               value: op1pgadmin
             - name: PGDATABASE
@@ -71,7 +80,7 @@ spec:
             - name: KRB5_CONFIG
               value: /config/krb5-conf/krb5.conf
             - name: PGHOST
-              value: postgres.{{ .Values.acs.namespace | required "values.acs.namespace is required!" }}.svc.cluster.local
+              value: postgres.{{ .Release.Namespace }}.svc.cluster.local
             - name: PGUSER
               value: sv1configdb
             - name: PGDATABASE
@@ -96,7 +105,7 @@ spec:
               value: /keytabs/server
             # These two are used to verify Basic auth.
             - name: HOSTNAME
-              value: configdb.{{ .Values.acs.namespace | required "values.acs.namespace is required!" }}.svc.cluster.local
+              value: configdb.{{ .Release.Namespace }}.svc.cluster.local
             - name: REALM
               value: {{ .Values.identity.realm | required "values.identity.realm is required!" }}
             - name: DEVICE_UUID
@@ -106,7 +115,7 @@ spec:
             - name: PORT
               value: "8080"
             - name: PGHOST
-              value: postgres.{{ .Values.acs.namespace | required "values.acs.namespace is required!" }}.svc.cluster.local
+              value: postgres.{{ .Release.Namespace }}.svc.cluster.local
             - name: PGUSER
               value: sv1configdb
             - name: PGDATABASE
@@ -120,10 +129,10 @@ spec:
               value: fplusadmin@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
             # This is the value published via MQTT. It is also used by the editor so it needs to be externally resolvable.
             - name: HTTP_API_URL
-              value: https://configdb.{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+              value: "{{ .Values.acs.secure | ternary "https://" "http://" }}configdb.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"
             # This is used for service discovery so it does not need to be externally resolvable.
             - name: DIRECTORY_URL
-              value: http://directory.{{ .Values.acs.namespace | required "values.acs.namespace is required!" }}.svc.cluster.local
+              value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
 
           volumeMounts:
             - mountPath: /config/krb5-conf
@@ -135,7 +144,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: configdb
-  namespace: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
+  namespace: {{ .Release.Namespace }}
 spec:
   ports:
     - name: "web"

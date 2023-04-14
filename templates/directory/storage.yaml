@@ -2,7 +2,7 @@ kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
   name: directory-database-pv-claim
-  namespace: {{ .Values.acs.namespace | required "values.namespace is required!" }}
+  namespace: {{ .Release.Namespace }}
   labels:
     factory-plus.service: directory
 spec:

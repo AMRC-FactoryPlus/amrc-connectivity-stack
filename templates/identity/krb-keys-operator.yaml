@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: krb-keys-operator
-  namespace: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
+  namespace: {{ .Release.Namespace }}
   labels:
     component: krb-keys
 spec:
@@ -41,11 +41,11 @@ spec:
               value: /config/krb5-conf/krb5.conf
             # The k8s namespaces to watch for KerberosKey objects. This should be a comma-separated list.
             - name: WATCH_NAMESPACES
-              value: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
+              value: {{ .Release.Namespace }}
             # The default secrets below are only used for KerberosKeys in this namespace. For other namespaces the
             # secret must be explicitly specified.
             - name: DEFAULT_NAMESPACE
-              value: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
+              value: {{ .Release.Namespace }}
             # These two secrets are managed by the operator. The operator will attempt to create them if they don't
             # exist.
             - name: KEYTABS_SECRET

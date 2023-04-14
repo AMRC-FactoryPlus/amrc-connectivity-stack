@@ -1,5 +1,5 @@
 # Only run this if the ConfigMaps don't already exist
-{{- if and (not (lookup "v1" "ConfigMap" .Values.acs.namespace "configdb-json-dumps")) (not (lookup "v1" "ConfigMap" .Values.acs.namespace "auth-json-dumps")) }}
+{{- if and (not (lookup "v1" "ConfigMap" .Release.Namespace "configdb-json-dumps")) (not (lookup "v1" "ConfigMap" .Release.Namespace "auth-json-dumps")) }}
 
 # ====================================================
 # Ensure that well-known UUIDs are used where required
@@ -7,19 +7,19 @@
 # ⚠ Do not change these!
 # ====================================================
 
-{{$classDef_wildcard := "00000000-0000-0000-0000-000000000000" | quote}}
-{{$classDef_cellGateway := "00da3c0b-f62b-4761-a689-39ad0c33f864" | quote}}
 {{$classDef_classDefinition := "04a1c90d-2295-4cbe-b33a-74eded62cbf1" | quote}}
-{{$classDef_sparkplugDevice := "18773d6d-a70d-443a-b29a-3f1583195290" | quote}}
-{{$classDef_clientRole := "1c567e3c-5519-4418-8682-6086f22fbc13" | quote}}
-{{$classDef_serviceFunction := "265d481f-87a7-4f93-8fc6-53fa64dc11bb" | quote}}
-{{$classDef_softGateway := "5bee4d24-32e1-44f8-b953-1f86ff4b3e87" | quote}}
-{{$classDef_permission := "8ae784bb-c4b5-4995-9bf6-799b3c7f21ad" | quote}}
-{{$classDef_userAccount := "8b3e8f35-78e5-4f93-bf21-7238bcb2ba9d" | quote}}
-{{$classDef_permissionGroup := "ac0d5288-6136-4ced-a372-325fbbcdd70d" | quote}}
+{{$classDef_wildcard := "00000000-0000-0000-0000-000000000000" | quote}}
 {{$classDef_application := "d319bd87-f42b-4b66-be4f-f82ff48b93f0" | quote}}
+{{$classDef_serviceFunction := "265d481f-87a7-4f93-8fc6-53fa64dc11bb" | quote}}
 {{$classDef_serviceAccount := "e463b4ae-a322-46cc-8976-4ba76838e908" | quote}}
+{{$classDef_permission := "8ae784bb-c4b5-4995-9bf6-799b3c7f21ad" | quote}}
+{{$classDef_permissionGroup := "ac0d5288-6136-4ced-a372-325fbbcdd70d" | quote}}
+{{$classDef_clientRole := "1c567e3c-5519-4418-8682-6086f22fbc13" | quote}}
+{{$classDef_userAccount := "8b3e8f35-78e5-4f93-bf21-7238bcb2ba9d" | quote}}
 {{$classDef_userGroup := "f1fabdd1-de90-4399-b3da-ccf6c2b2c08b" | quote}}
+{{$classDef_cellGateway := "00da3c0b-f62b-4761-a689-39ad0c33f864" | quote}}
+{{$classDef_softGateway := "5bee4d24-32e1-44f8-b953-1f86ff4b3e87" | quote}}
+{{$classDef_sparkplugDevice := "18773d6d-a70d-443a-b29a-3f1583195290" | quote}}
 
 {{$application_objectRegistration := "cb40bed5-49ad-4443-a7f5-08c75009da8f" | quote}}
 {{$application_generalObjectInformation := "64a8bfa9-7772-45c4-9d1a-9e6290690957" | quote}}
@@ -73,39 +73,38 @@
 {{$permissionGroup_directory := "58b5da47-d098-44f7-8c1d-6e4bd800e718" | quote}}
 {{$permissionGroup_commands := "9584ee09-a35a-4278-bc13-21a8be1f007c" | quote}}
 
+
+{{$role_administrator := "4c09402f-9923-4c82-a6f2-02bda21aace4" | quote}}
+{{$role_commandEscalation := "dbd0c099-6c59-4bc6-aa92-4ba8a9b543f4" | quote}}
+{{$role_edgeNode := "87e4a5b7-9a89-4796-a216-39666a47b9d2" | quote}}
+{{$role_edgeNodeConsumer := "17a64293-b82d-4db4-af4d-63359bb62934" | quote}}
+{{$role_globalDebugger := "4473fe9c-05b0-42cc-ad8c-8e05f6d0ca86" | quote}}
+{{$role_globalPrimaryApplication := "c0d17bcf-2a90-40e5-b244-07bf631f7417" | quote}}
+{{$role_manager := "29b569d4-ab5d-40d2-b442-d556d531b25e" | quote}}
+{{$role_warehouse := "6958c812-fbe2-4e6c-b997-6f850b89f679" | quote}}
+
+{{$serviceAccount_authorisation := "1e1989ab-14e4-42bd-8171-495230acc406" | quote}}
+{{$serviceAccount_commandEscalation := "23d4e8f9-76c0-49d5-addc-00b6ac05ee58" | quote}}
+{{$serviceAccount_configStore := "36861e8d-9152-40c4-8f08-f51c2d7e3c25" | quote}}
+{{$serviceAccount_dataWarehouse := "388ddbdc-4eb4-4ae8-bbd0-9be32f3c31e8" | quote}}
+{{$serviceAccount_directory := "5cc3b068-938f-4bb2-8ceb-64338a02fbeb" | quote}}
+{{$serviceAccount_manager := "2340e706-1280-420c-84a6-016547b55e95" | quote}}
+{{$serviceAccount_mqtt := "2f42daeb-4521-4522-8e19-85dfb73db88e" | quote}}
+
 # ================================================
 # Generate unique UUIDs for each instance deployed
 # ================================================
 
-{{$role_administrator := uuidv4 | quote}}
-{{$role_gatewayBridge := uuidv4 | quote}}
-{{$role_edgeNodeConsumer := uuidv4 | quote}}
-{{$role_globalDebugger := uuidv4 | quote}}
-{{$role_edgeNode := uuidv4 | quote}}
-{{$role_globalPrimaryApplication := uuidv4 | quote}}
-{{$role_manager := uuidv4 | quote}}
-{{$role_commandEscalation := uuidv4 | quote}}
-{{$role_warehouse := uuidv4 | quote}}
-
 {{$user_admin := uuidv4 | quote}}
 
 {{$userGroup_administrators := uuidv4 | quote}}
-
-{{$serviceAccount_mqtt := uuidv4 | quote}}
-{{$serviceAccount_directory := uuidv4 | quote}}
-{{$serviceAccount_ := uuidv4 | quote}}
-{{$serviceAccount_configStore := uuidv4 | quote}}
-{{$serviceAccount_manager := uuidv4 | quote}}
-{{$serviceAccount_authorisation := uuidv4 | quote}}
-{{$serviceAccount_commandEscalation := uuidv4 | quote}}
-{{$serviceAccount_dataWarehouse := uuidv4 | quote}}
 
 
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: configdb-json-dumps
-  namespace: {{ .Values.acs.namespace | required "values.namespace is required!" }}
+  namespace: {{ .Release.Namespace }}
   labels:
     component: configdb
 data:
@@ -146,7 +145,6 @@ data:
         ],
         {{$classDef_clientRole}}: [
           {{$role_administrator}},
-          {{$role_gatewayBridge}},
           {{$role_edgeNodeConsumer}},
           {{$role_globalDebugger}},
           {{$role_edgeNode}},
@@ -305,9 +303,6 @@ data:
           },
           {{$application_sparkplugAddressInformation}}: {
             "name": "Sparkplug Address Information Application"
-          },
-          {{$role_gatewayBridge}}: {
-            "name": "Role: Gateway Bridge"
           },
           {{$role_edgeNodeConsumer}}: {
             "name": "Role: Edge Node Consumer"
@@ -533,7 +528,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: auth-json-dumps
-  namespace: {{ .Values.acs.namespace | required "values.acs.namespace is required!" }}
+  namespace: {{ .Release.Namespace }}
   annotations:
     "helm.sh/hook": pre-install
     "helm.sh/hook-weight": "20"
@@ -647,13 +642,6 @@ data:
           {{$permission_directory_overrideServiceAdvertisementPermissions}},
           {{$permission_directory_manageServiceAdvertisementForOwner}},
           {{$permission_directory_advertiseService}}
-        ],
-        {{$role_gatewayBridge}}: [
-          {{$permission_mqtt_subscribeToWholeNamespace}},
-          {{$permission_mqtt_publishAllFromGroup}},
-          {{$permission_mqtt_subscribeReadAllStates}},
-          {{$permission_mqtt_updateGroupState}},
-          {{$permission_mqtt_subscribeReadOwnGroup}}
         ],
         {{$role_administrator}}: [
           {{$role_globalDebugger}},

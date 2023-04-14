@@ -12,7 +12,7 @@ spec:
       services:
         - name: directory
           port: 80
-          namespace: {{ .Values.acs.namespace | required "values.namespace is required!" }}
+          namespace: {{ .Release.Namespace }}
   {{- if .Values.acs.secure }}
   tls:
     secretName: {{ .Values.acs.tlsSecretName | required "values.acs.tlsSecretName is required!" }}

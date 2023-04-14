@@ -1,13 +1,11 @@
 acs:
-  # -- The K8s namespace to install the components in
-  namespace: factory-plus
   # -- The organisation where ACS is being deployed
   organisation: AMRC
   # -- The base URL that services will be served from
   baseUrl: localhost
   # -- Whether or not services should be served over HTTPS
   secure: true
-  # -- The name of the secret holding the wildcard certificate for the above domain. Only used if secure=true.
+  # -- The name of the secret holding the wildcard certificate for the above domain.
   tlsSecretName: factoryplus-tls
 
 identity:
@@ -85,7 +83,7 @@ manager:
     # -- The repository of the Manager component
     repository: acs-manager
     # -- The tag of the Manager component
-    tag: v1.0.1
+    tag: latest
     # @ignore
     pullPolicy: IfNotPresent
   edge:
@@ -95,11 +93,6 @@ manager:
     repository: acs-edge
     # -- The tag of the Edge Agent component
     tag: latest
-  minio:
-    # -- The key that the management app uses to connect to MinIO
-    key: management-app
-    # -- The secret that the management app uses to connect to MinIO
-    secret: ""
   meilisearch:
     # -- The key that the manager uses to connect to the Meilisearch search engine
     key: masterKey
@@ -133,8 +126,21 @@ minio:
 traefik:
   ports:
     web:
-      redirectTo: websecure
+      port: 80
+      expose: true
+      exposedPort: 80
+      protocol: TCP
+    websecure:
+      port: 443
+      expose: true
+      exposedPort: 443
+      protocol: TCP
     mqtt:
+      port: 1883
+      expose: true
+      exposedPort: 1883
+      protocol: TCP
+    mqttsecure:
       port: 8883
       expose: true
       exposedPort: 8883
@@ -156,8 +162,8 @@ traefik:
       protocol: TCP
   additionalArguments:
     - --metrics.prometheus=true
-    - --entryPoints.mqtt.address=:8883
-    - --serverstransport.insecureskipverify=true
+    - --entryPoints.mqtt.address=:1883
+    - --entryPoints.mqttsecure.address=:8883
   ingressRoute:
     dashboard:
       enabled: false
@@ -197,3 +203,27 @@ promtail:
 grafana:
   persistence:
     enabled: true
+
+# @ignore
+tenant:
+  tenant:
+    name: fplus-minio-core
+    # Disable TLS on the MinIO level because we terminate TLS at Traefik
+    certificate:
+      externalCaCertSecret: { }
+      externalCertSecret: { }
+      requestAutoCert: false
+      certConfig: { }
+    pools:
+      - servers: 1
+        name: pool-0
+        volumesPerServer: 1
+        size: 20Gi
+    ## List of bucket names to create during tenant provisioning
+    buckets:
+      - name: "device-configurations"
+      - name: "device-connections"
+      - name: "edge-agent-configs"
+    ## List of secret names to use for generating MinIO users during tenant provisioning
+    users:
+      - name: "manager-minio-secret"

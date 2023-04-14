@@ -31,9 +31,10 @@ dependencies:
   - name: grafana
     version: 6.52.4
     repository: https://grafana.github.io/helm-charts
+    # This pulls from my personal repository because the official helm chart doesn't have CRDs in the `crds` directory
   - name: operator
     repository: https://alexgodbehere.github.io/helm-repository
-    version: 5.0.3
+    version: 5.0.4
   - name: tenant
     repository: https://operator.min.io
     version: 5.0.3

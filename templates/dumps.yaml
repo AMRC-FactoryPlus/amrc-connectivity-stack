@@ -73,19 +73,19 @@
 {{$permissionGroup_directory := "58b5da47-d098-44f7-8c1d-6e4bd800e718" | quote}}
 {{$permissionGroup_commands := "9584ee09-a35a-4278-bc13-21a8be1f007c" | quote}}
 
+
+{{$role_administrator := "4c09402f-9923-4c82-a6f2-02bda21aace4" | quote}}
+{{$role_commandEscalation := "dbd0c099-6c59-4bc6-aa92-4ba8a9b543f4" | quote}}
+{{$role_edgeNode := "87e4a5b7-9a89-4796-a216-39666a47b9d2" | quote}}
+{{$role_edgeNodeConsumer := "17a64293-b82d-4db4-af4d-63359bb62934" | quote}}
+{{$role_globalDebugger := "4473fe9c-05b0-42cc-ad8c-8e05f6d0ca86" | quote}}
+{{$role_globalPrimaryApplication := "c0d17bcf-2a90-40e5-b244-07bf631f7417" | quote}}
+{{$role_manager := "29b569d4-ab5d-40d2-b442-d556d531b25e" | quote}}
+{{$role_warehouse := "6958c812-fbe2-4e6c-b997-6f850b89f679" | quote}}
+
 # ================================================
 # Generate unique UUIDs for each instance deployed
 # ================================================
-
-{{$role_administrator := uuidv4 | quote}}
-{{$role_gatewayBridge := uuidv4 | quote}}
-{{$role_edgeNodeConsumer := uuidv4 | quote}}
-{{$role_globalDebugger := uuidv4 | quote}}
-{{$role_edgeNode := uuidv4 | quote}}
-{{$role_globalPrimaryApplication := uuidv4 | quote}}
-{{$role_manager := uuidv4 | quote}}
-{{$role_commandEscalation := uuidv4 | quote}}
-{{$role_warehouse := uuidv4 | quote}}
 
 {{$user_admin := uuidv4 | quote}}
 
@@ -146,7 +146,6 @@ data:
         ],
         {{$classDef_clientRole}}: [
           {{$role_administrator}},
-          {{$role_gatewayBridge}},
           {{$role_edgeNodeConsumer}},
           {{$role_globalDebugger}},
           {{$role_edgeNode}},
@@ -305,9 +304,6 @@ data:
           },
           {{$application_sparkplugAddressInformation}}: {
             "name": "Sparkplug Address Information Application"
-          },
-          {{$role_gatewayBridge}}: {
-            "name": "Role: Gateway Bridge"
           },
           {{$role_edgeNodeConsumer}}: {
             "name": "Role: Edge Node Consumer"
@@ -647,13 +643,6 @@ data:
           {{$permission_directory_overrideServiceAdvertisementPermissions}},
           {{$permission_directory_manageServiceAdvertisementForOwner}},
           {{$permission_directory_advertiseService}}
-        ],
-        {{$role_gatewayBridge}}: [
-          {{$permission_mqtt_subscribeToWholeNamespace}},
-          {{$permission_mqtt_publishAllFromGroup}},
-          {{$permission_mqtt_subscribeReadAllStates}},
-          {{$permission_mqtt_updateGroupState}},
-          {{$permission_mqtt_subscribeReadOwnGroup}}
         ],
         {{$role_administrator}}: [
           {{$role_globalDebugger}},

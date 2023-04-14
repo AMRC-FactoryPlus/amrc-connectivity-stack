@@ -44,6 +44,6 @@ class ImportSchemasCommand extends Command
     {
         (new ImportSchemasFromStorageAction)->execute();
 
-        return 1;
+        return 0;
     }
 }

@@ -75,7 +75,7 @@ data:
       organization = "{{ .Values.acs.organisation }}"
       bucket = "default"
       [[inputs.mqtt_consumer]]
-      servers = ["mqtt.{{ .Release.Namespace }}.svc.cluster.local:1883"]
+      servers = ["mqtt://mqtt.{{ .Release.Namespace }}.svc.cluster.local:1883"]
       username = "$MQTT_USERNAME"
       password = "$MQTT_PASSWORD"
       topics = [

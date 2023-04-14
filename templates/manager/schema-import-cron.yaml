@@ -1,0 +1,64 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: manager-schema-import-cron
+  namespace: {{ .Release.Namespace }}
+spec:
+  concurrencyPolicy: Forbid
+  failedJobsHistoryLimit: 1
+  schedule: "*/5 * * * *"
+  startingDeadlineSeconds: 30
+  successfulJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: 300
+      backoffLimit: 1
+      template:
+        spec:
+          volumes:
+            - name: manager-keytab
+              secret:
+                secretName: manager-keytab
+            - name: krb5-conf
+              configMap:
+                name: krb5-conf
+          containers:
+            - name: cron
+              image: "{{ .Values.manager.image.registry }}/{{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}"
+              env:
+                - name: KRB5_CONFIG
+                  value: /config/krb5-conf/krb5.conf
+                - name: MINIO_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: manager-minio-secret
+                      key: CONSOLE_ACCESS_KEY
+                - name: MINIO_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: manager-minio-secret
+                      key: CONSOLE_SECRET_KEY
+                - name: DB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: manager-database-secret
+                      key: postgres-password
+              envFrom:
+                - configMapRef:
+                    name: manager-config
+                - secretRef:
+                    name: manager-secrets
+              volumeMounts:
+                - mountPath: /config/keytab
+                  name: manager-keytab
+                - mountPath: /config/krb5-conf
+                  name: krb5-conf
+              command: [ "php", "artisan", "schemas:import" ]
+              resources:
+                limits:
+                  memory: 300Mi
+                  cpu: 200m
+                requests:
+                  memory: 200Mi
+                  cpu: 100m
+          restartPolicy: Never

@@ -15,6 +15,13 @@ spec:
       backoffLimit: 1
       template:
         spec:
+          volumes:
+            - name: manager-keytab
+              secret:
+                secretName: manager-keytab
+            - name: krb5-conf
+              configMap:
+                name: krb5-conf
           containers:
             - name: cron
               image: "{{ .Values.manager.image.registry }}/{{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}"

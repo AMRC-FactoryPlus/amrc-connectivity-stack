@@ -83,6 +83,14 @@
 {{$role_manager := "29b569d4-ab5d-40d2-b442-d556d531b25e" | quote}}
 {{$role_warehouse := "6958c812-fbe2-4e6c-b997-6f850b89f679" | quote}}
 
+{{$serviceAccount_authorisation := "1e1989ab-14e4-42bd-8171-495230acc406" | quote}}
+{{$serviceAccount_commandEscalation := "23d4e8f9-76c0-49d5-addc-00b6ac05ee58" | quote}}
+{{$serviceAccount_configStore := "36861e8d-9152-40c4-8f08-f51c2d7e3c25" | quote}}
+{{$serviceAccount_dataWarehouse := "388ddbdc-4eb4-4ae8-bbd0-9be32f3c31e8" | quote}}
+{{$serviceAccount_directory := "5cc3b068-938f-4bb2-8ceb-64338a02fbeb" | quote}}
+{{$serviceAccount_manager := "2340e706-1280-420c-84a6-016547b55e95" | quote}}
+{{$serviceAccount_mqtt := "2f42daeb-4521-4522-8e19-85dfb73db88e" | quote}}
+
 # ================================================
 # Generate unique UUIDs for each instance deployed
 # ================================================
@@ -90,15 +98,6 @@
 {{$user_admin := uuidv4 | quote}}
 
 {{$userGroup_administrators := uuidv4 | quote}}
-
-{{$serviceAccount_mqtt := uuidv4 | quote}}
-{{$serviceAccount_directory := uuidv4 | quote}}
-{{$serviceAccount_ := uuidv4 | quote}}
-{{$serviceAccount_configStore := uuidv4 | quote}}
-{{$serviceAccount_manager := uuidv4 | quote}}
-{{$serviceAccount_authorisation := uuidv4 | quote}}
-{{$serviceAccount_commandEscalation := uuidv4 | quote}}
-{{$serviceAccount_dataWarehouse := uuidv4 | quote}}
 
 
 apiVersion: v1

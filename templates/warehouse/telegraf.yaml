@@ -17,7 +17,7 @@ spec:
         factory-plus.service: telegraf
     spec:
       volumes:
-        - name: telegraf-conf
+        - name: telegraf-config
           configMap:
             name: telegraf-config
         - name: sparkplug-b

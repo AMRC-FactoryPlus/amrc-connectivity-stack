@@ -86,3 +86,14 @@ metadata:
 spec:
   type: Random
   principal: postgres/postgres.{{ .Release.Namespace }}.svc.cluster.local@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+---
+apiVersion: factoryplus.app.amrc.co.uk/v1
+kind: KerberosKey
+metadata:
+  name: http.warehouse
+  namespace: {{ .Release.Namespace }}
+spec:
+  type: Random
+  principal: HTTP/warehouse.{{ .Release.Namespace }}.svc.cluster.local@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+  additionalPrincipals:
+    - HTTP/warehouse.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}@{{ .Values.identity.realm | required "values.identity.realm is required!" }}

@@ -75,5 +75,5 @@ metadata:
   name: sv1warehouse
   namespace: {{ .Release.Namespace }}
 spec:
-  type: Password
+  type: Random
   principal: sv1warehouse@{{ .Values.identity.realm | required "values.identity.realm is required!" }}

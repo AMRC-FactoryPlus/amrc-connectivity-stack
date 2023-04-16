@@ -32,6 +32,7 @@
 {{$service_directory := "af4a1d66-e6f7-43c4-8a67-0fa3be2b1cf9" | quote}}
 {{$service_authorisation := "cab2642a-f7d9-42e5-8845-8f35affe1fd4" | quote}}
 {{$service_mqtt := "feb27ba3-bd2c-4916-9269-79a61ebc4a47" | quote}}
+{{$service_warehouse := "a8e5a73f-2dd1-4cda-8e46-bc6cedb14269" | quote}}
 
 {{$permission_auth_manageKerberosMappings := "327c4cc8-9c46-4e1e-bb6b-257ace37b0f6" | quote}}
 {{$permission_auth_readEffectivePermissions := "35252562-51e5-4dd8-84cd-ba0fafa62669" | quote}}
@@ -142,6 +143,7 @@ data:
           {{$service_directory}},
           {{$service_authorisation}},
           {{$service_mqtt}}
+          {{$service_warehouse}}
         ],
         {{$classDef_clientRole}}: [
           {{$role_administrator}},
@@ -405,6 +407,9 @@ data:
           },
           {{$service_commandEscalation}}: {
             "name": "Command Escalation Service"
+          },
+          {{$service_warehouse}}: {
+            "name": "Data Warehouse Service"
           },
           {{$service_directory}}: {
             "name": "Directory Service"

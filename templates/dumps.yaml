@@ -142,7 +142,7 @@ data:
           {{$service_commandEscalation}},
           {{$service_directory}},
           {{$service_authorisation}},
-          {{$service_mqtt}}
+          {{$service_mqtt}},
           {{$service_warehouse}}
         ],
         {{$classDef_clientRole}}: [

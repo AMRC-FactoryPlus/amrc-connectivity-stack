@@ -14,21 +14,6 @@ spec:
           namespace: {{ .Release.Namespace }}
 ---
 apiVersion: traefik.containo.us/v1alpha1
-kind: IngressRouteUDP
-metadata:
-  name: kdc-ingressroute-udp
-  namespace: default
-spec:
-  entryPoints:
-    - kdc
-  routes:
-    - match: HostSNI(`*`)
-      services:
-        - name: kdc
-          port: kerberos
-          namespace: {{ .Release.Namespace }}
----
-apiVersion: traefik.containo.us/v1alpha1
 kind: IngressRouteTCP
 metadata:
   name: kpasswd-ingressroute

@@ -632,11 +632,6 @@ data:
           "target": {{$classDef_wildcard}}
         },
         {
-          "principal": {{$serviceAccount_dataWarehouse}},
-          "permission": {{$permission_mqtt_issueGlobalCommands}},
-          "target": {{$classDef_wildcard}}
-        },
-        {
           "principal": {{$serviceAccount_mqtt}},
           "permission": {{$permission_directory_advertiseService}},
           "target": {{$service_mqtt}}

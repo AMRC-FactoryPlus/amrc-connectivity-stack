@@ -40,7 +40,7 @@ class OriginMapController extends Controller
         (new ConfigureDeviceAction)->execute(
             device                    : $device->fresh()->load('node.group', 'originMaps'),
             deviceSchema              : $deviceSchema->fresh(),
-            version                   : $deviceSchema->versions()->whereVersion('1')->sole(),
+            version                   : $deviceSchemaVersion,
             deviceConfiguration       : $validated['configuration'],
             deviceConfigurationMetrics: $validated['metrics'],
             active                    : $validated['activate']

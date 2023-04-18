@@ -58,7 +58,7 @@ spec:
             - name: PORT
               value: "8080"
             - name: CACHE_MAX_AGE
-              value: "300"
+              value: "0"
             - name: DIRECTORY_URL
               value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
           volumeMounts:

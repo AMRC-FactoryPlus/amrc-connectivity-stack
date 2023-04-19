@@ -29,4 +29,6 @@ jobs:
           commit_message: Release ${{ github.event.release.tag_name }}
           commit_user_name: GitHub Action
           commit_user_email: actions@github.com
-          branch: main
+          branch: release
+          create_branch: true
+          push_options: '--force'

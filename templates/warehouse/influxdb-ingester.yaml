@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: influxdb-ingester
-  namespace: factory-plus
+  namespace: {{ .Release.Namespace }}
   labels:
     component: influxdb-ingester
 spec:

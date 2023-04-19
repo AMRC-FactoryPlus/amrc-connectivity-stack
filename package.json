@@ -1,12 +1,42 @@
 {
   "name": "influxdb-sparkplug-ingester",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "An ingestion engine to enable InfluxDB to be a fully-featured Sparkplug historian",
+  "author": "AMRC",
+  "license": "MIT",
+  "keywords": [
+    "amrc",
+    "factory-plus",
+    "factoryplus",
+    "acs",
+    "amrc-connectivity-stack",
+    "mqtt",
+    "sparkplug"
+  ],
+  "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "cross-env NODE_ENV=development node dist/bin/ingester.js",
+    "start:dev": "cross-env NODE_ENV=development node -r dotenv/config dist/bin/ingester.js dotenv_config_path=.env.development.local",
+    "start:shell": "k5start -Uf $CLIENT_KEYTAB npm run start:dev",
+    "dev": " npm run build && npm run start:dev",
+    "build": "tsc && tsc-alias",
+    "lint": "eslint --ignore-path .gitignore --ext .ts src/",
+    "lint:fix": "npm run lint -- --fix"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC"
+  "dependencies": {
+    "@amrc-factoryplus/utilities": "^1.0.7",
+    "@influxdata/influxdb-client": "^1.33.2",
+    "@influxdata/influxdb-client-apis": "^1.33.2",
+    "async": "^3.2.4",
+    "long": "^5.2.3",
+    "node-ray": "^1.19.4",
+    "pino": "^8.11.0",
+    "pino-pretty": "^10.0.0"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "dotenv": "^16.0.3",
+    "ts-node": "^10.9.1",
+    "tsc-alias": "^1.7.0"
+  }
 }

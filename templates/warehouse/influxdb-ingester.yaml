@@ -1,20 +1,20 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: influx-ingester
+  name: influxdb-ingester
   namespace: factory-plus
   labels:
-    component: influx-ingester
+    component: influxdb-ingester
 spec:
   replicas: 1
   selector:
     matchLabels:
-      component: influx-ingester
+      component: influxdb-ingester
   template:
     metadata:
       labels:
-        component: influx-ingester
-        factory-plus.service: influx-ingester
+        component: influxdb-ingester
+        factory-plus.service: influxdb-ingester
     spec:
       volumes:
         - name: krb5-conf
@@ -28,7 +28,7 @@ spec:
                 path: client
 
       containers:
-        - name: influx-ingester
+        - name: influxdb-ingester
           image: "{{ .Values.warehouse.ingester.image.registry }}/{{ .Values.warehouse.ingester.image.repository }}:{{ .Values.warehouse.ingester.image.tag }}"
           command: [ "/usr/bin/k5start", "-Uf", "/keytabs/client" ]
           args: [ "npm", "run", "start" ]

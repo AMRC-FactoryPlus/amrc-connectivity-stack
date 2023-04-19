@@ -25,9 +25,17 @@ Get the password for the admin user by running the following command until it re
 
 echo $(sudo kubectl get secret krb5-passwords -o jsonpath="{.data.admin}" -n {{.Release.Namespace}} | base64 --decode)
 
-Once you have the admin password you can log into the services below. To begin, head over to {{ .Values.acs.secure | ternary "https://" "http://" }}manager.{{.Values.acs.baseUrl}} and login as the `admin` user.
+
+Once you have the admin password you can connect to the MQTT broker at {{ .Values.acs.secure | ternary "mqtts://" "mqtt://" }}mqtt.{{.Values.acs.baseUrl}}:{{ .Values.acs.secure | ternary "8883" "1883" }} and subscribe to spBv1.0/#. It's advisable to do this before you start adding devices to the system so that you can see all traffic.
+
+Next, log into the manager at {{ .Values.acs.secure | ternary "https://" "http://" }}manager.{{.Values.acs.baseUrl}} as the `admin` user and create a Group, Node (Soft Gateway) and Device. Configure the device by completing the Information, Connection, and Schema tabs until you see a green VALID tag in the top right corner. Once you've configured the device you should see MQTT traffic begin to flow.
+
+Finally, get the admin password for InfluxDB by running the following command and log into the InfluxDB instance as the admin user at {{ .Values.acs.secure | ternary "https://" "http://" }}influxdb.{{.Values.acs.baseUrl}}
+
+echo $(sudo kubectl get secret acs-influxdb2-auth -o jsonpath="{.data.admin-password}" -n {{.Release.Namespace}} | base64 --decode)
 
 Services
 --------
 Manager: {{ .Values.acs.secure | ternary "https://" "http://" }}manager.{{.Values.acs.baseUrl}}
 MQTT: {{ .Values.acs.secure | ternary "mqtts://" "mqtt://" }}mqtt.{{.Values.acs.baseUrl}}:{{ .Values.acs.secure | ternary "8883" "1883" }}
+InfluxDB: {{ .Values.acs.secure | ternary "https://" "http://" }}influxdb.{{.Values.acs.baseUrl}}

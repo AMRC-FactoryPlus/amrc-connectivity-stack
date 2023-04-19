@@ -1,3 +1,8 @@
+/*
+ * AMRC InfluxDB Sparkplug Ingester
+ * Copyright "2023" AMRC
+ */
+
 import {ServiceClient, SpB, Topic, UUIDs} from "@amrc-factoryplus/utilities";
 import {Reader} from "protobufjs";
 import {logger} from "../bin/ingester.js";

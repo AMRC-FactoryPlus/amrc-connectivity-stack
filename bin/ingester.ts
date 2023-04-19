@@ -1,3 +1,8 @@
+/*
+ * AMRC InfluxDB Sparkplug Ingester
+ * Copyright "2023" AMRC
+ */
+
 import {ServiceClient} from "@amrc-factoryplus/utilities";
 import * as dotenv from 'dotenv'
 import pino from "pino";

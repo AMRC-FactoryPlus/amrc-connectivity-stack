@@ -119,11 +119,13 @@ cmdesc:
   verbosity: 1
 
 warehouse:
-  telegraf:
+  ingester:
     image:
-      # -- The repository of the Telegraf image
-      repository: telegraf
-      # -- The tag of of the Telegraf image
+      # -- The registry of the Commands component
+      registry: ghcr.io/amrc-factoryplus
+      # -- The repository of the Commands component
+      repository: influxdb-sparkplug-ingester
+      # -- The tag of the Commands component
       tag: latest
       # @ignore
       pullPolicy: IfNotPresent

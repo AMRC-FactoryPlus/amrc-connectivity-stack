@@ -40,6 +40,8 @@ spec:
               value: /keytabs/client
             - name: DIRECTORY_URL
               value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
+            - name: INFLUX_URL
+              value: http://acs-influxdb2.{{ .Release.Namespace }}.svc.cluster.local
             - name: INFLUX_ORG
               value: {{.Values.acs.organisation}}
             - name: INFLUX_BUCKET

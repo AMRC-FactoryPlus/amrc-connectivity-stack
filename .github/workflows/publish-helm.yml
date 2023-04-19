@@ -1,4 +1,4 @@
-name: Check out and package Helm chart on release
+name: New Release
 
 on:
   release:
@@ -23,10 +23,9 @@ jobs:
           TAG=${{ github.event.release.tag_name }}
           helm package -u -d build --version=$TAG --app-version=$TAG .
           helm repo index --url https://amrc-factoryplus.github.io/amrc-connectivity-stack/build .
-      - name: Commit changes
-        run: |
-          git config --global user.email "you@example.com"
-          git config --global user.name "Your Name"
-          git add build/*
-          git commit -m "Add new Helm chart package for ${{ github.event.release.tag_name }}"
-          git push
+      - uses: stefanzweifel/git-auto-commit-action@v4
+        id: auto_commit_action
+        with:
+          commit_message: Release ${{ github.event.release.tag_name }}
+          commit_user_name: GitHub Action
+          commit_user_email: actions@github.com

@@ -21,6 +21,7 @@ jobs:
       - name: Package Helm chart
         run: |
           TAG=${{ github.event.release.tag_name }}
+          cd build
           helm package -u -d build --version=$TAG --app-version=$TAG .
           helm repo index --url https://amrc-factoryplus.github.io/amrc-connectivity-stack/build .
       - uses: stefanzweifel/git-auto-commit-action@v4

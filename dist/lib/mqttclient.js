@@ -148,7 +148,6 @@ export default class MQTTClient {
                 }
                 break;
         }
-        return;
     }
     writeMetrics(payload, topic) {
         payload.metrics.forEach((metric) => {

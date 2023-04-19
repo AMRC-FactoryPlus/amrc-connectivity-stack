@@ -20,5 +20,8 @@ dependencies:
 - name: tenant
   repository: https://operator.min.io
   version: 5.0.3
-digest: sha256:11fe62559fec7ba049b8e0b36cdeccbacedbd9b6389a6d3d8fbeb55a6b9408a5
-generated: "2023-04-14T11:35:32.979645+01:00"
+- name: influxdb2
+  repository: https://helm.influxdata.com/
+  version: 2.1.1
+digest: sha256:7bfd8f5c6cae17d59780ad720a75e6afdf2e1ce8e689d192ac506e036c1f8325
+generated: "2023-04-19T13:19:03.928411+01:00"

@@ -1,0 +1,32 @@
+name: Check out and package Helm chart on release
+
+on:
+  release:
+    types: [created]
+    # Only run the action when the release tag matches the pattern v[0-9]+.[0-9]+.[0-9]+
+    branches:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Helm
+        run: |
+          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.release.tag_name }}
+      - name: Package Helm chart
+        run: |
+          TAG=${{ github.event.release.tag_name }}
+          helm package -u -d build --version=$TAG --app-version=$TAG .
+          helm repo index --url https://amrc-factoryplus.github.io/amrc-connectivity-stack/build .
+      - name: Commit changes
+        run: |
+          git config --global user.email "you@example.com"
+          git config --global user.name "Your Name"
+          git add build/*
+          git commit -m "Add new Helm chart package for ${{ github.event.release.tag_name }}"
+          git push

@@ -39,7 +39,7 @@ kubectl cluster-info
 ```
 
 ### Configure Base URL
-This Chart creates a load balancer on your Kubernetes cluster that exposes all services at various subdomain. Please ensure that you have a wildcard DNS entry configured to direct all *.<baseURL> requests to the load balancer.
+This Chart creates a load balancer on your Kubernetes cluster that exposes all services at various subdomain. Please ensure that you have a wildcard DNS entry configured to direct all `*.<baseURL>` requests to your local kube cluster. For example, if you set `baseUrl` to `localhost`, you should have a DNS entry that directs all `*.localhost` requests to your local kube cluster on ports 80 and/or 443 (depending on whether you have enabled `secure` and want to serve ACS over HTTPS).
 
 ### Install ACS
 

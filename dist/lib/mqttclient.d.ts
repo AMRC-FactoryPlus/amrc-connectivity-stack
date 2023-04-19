@@ -1,3 +1,8 @@
+/*
+ * AMRC InfluxDB Sparkplug Ingester
+ * Copyright "2023" AMRC
+ */
+
 import { ServiceClient, Topic } from "@amrc-factoryplus/utilities";
 import { Reader } from "protobufjs";
 interface MQTTClientConstructorParams {
@@ -14,8 +19,8 @@ export default class MQTTClient {
     init(): Promise<this>;
     run(): Promise<void>;
     on_connect(): void;
-    on_close(e: any): void;
-    on_reconnect(e: any): void;
+    on_close(): void;
+    on_reconnect(): void;
     on_error(error: any): void;
     on_message(topicString: string, message: Uint8Array | Reader): Promise<void>;
     private writeMetrics;

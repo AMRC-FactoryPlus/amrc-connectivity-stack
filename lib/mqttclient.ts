@@ -27,8 +27,6 @@ if (!influxOrganisation) {
     throw new Error("INFLUX_ORG environment variable is not set");
 }
 
-console.log(influxURL);
-
 const influxDB = new InfluxDB({
     url: influxURL,
     token: influxToken,
@@ -66,25 +64,25 @@ export default class MQTTClient {
         mqtt.on("message", this.on_message.bind(this));
         mqtt.on("close", this.on_close.bind(this));
         mqtt.on("reconnect", this.on_reconnect.bind(this));
-        logger.info("Subscribing to entire Factory+ namespace");
+        logger.info("👂 Subscribing to entire Factory+ namespace");
         // We subscribe to the whole Sparkplug namespace
         mqtt.subscribe('spBv1.0/#');
     }
 
     on_connect() {
-        logger.info("Connected to Factory+ broker");
+        logger.info("🔌 Connected to Factory+ broker");
     }
 
     on_close() {
-        logger.info(`Disconnected from Factory+ broker`);
+        logger.info(`❌ Disconnected from Factory+ broker`);
     }
 
     on_reconnect() {
-        logger.info(`Reconnecting to Factory+ broker...`);
+        logger.info(`⚠️ Reconnecting to Factory+ broker...`);
     }
 
     on_error(error: any) {
-        logger.error("MQTT error: %o", error);
+        logger.error("🚨 MQTT error: %o", error);
     }
 
     async on_message(topicString: string, message: Uint8Array | Reader) {
@@ -94,12 +92,12 @@ export default class MQTTClient {
         try {
             payload = SpB.decodePayload(message);
         } catch {
-            logger.error(`Bad payload on topic ${topicString}`);
+            logger.error(`🚨 Bad payload on topic ${topicString}`);
             return;
         }
 
         if (!topic) {
-            logger.error(`Bad topic: ${topicString}`);
+            logger.error(`🚨 Bad topic: ${topicString}`);
             return;
         }
 
@@ -111,8 +109,13 @@ export default class MQTTClient {
 
                 let instance = payload.metrics.find((metric) => metric.name === "Instance_UUID").value;
                 let schema = payload.metrics.find((metric) => metric.name === "Schema_UUID").value;
-                logger.info(`Received birth certificate for ${topic.address.group}/${topic.address.node}/${topic.address.device} with Instance_UUID ${instance}`);
 
+                // If we've already seen this birth, update it
+                if (this.aliasResolver?.[topic.address.group]?.[topic.address.node]?.[topic.address.device]) {
+                    logger.info(`🔄 Received updated birth certificate for ${topic.address.group}/${topic.address.node}/${topic.address.device} with Instance_UUID ${instance}`);
+                } else {
+                    logger.info(`👶 Received birth certificate for ${topic.address.group}/${topic.address.node}/${topic.address.device} with Instance_UUID ${instance}`);
+                }
 
                 // Store the birth certificate mapping in the alias resolver. This uses the alias as the key and a simplified object containing the name and type as the value.
                 this.setNestedValue(this.aliasResolver, [topic.address.group, topic.address.node, topic.address.device], payload.metrics.reduce(function (acc, obj) {
@@ -127,11 +130,15 @@ export default class MQTTClient {
                     return acc;
                 }, {}));
 
+                // Clear the debounce
+                delete this.birthDebounce?.[topic.address.group]?.[topic.address.node]?.[topic.address.device];
+
                 // Store the default values in InfluxDB
                 this.writeMetrics(payload, topic);
 
                 break;
             case "DEATH":
+                logger.info(`💀 Received death certificate for ${topic.address.group}/${topic.address.node}/${topic.address.device}. Removing from known devices.`);
                 delete this.birthDebounce?.[topic.address.group]?.[topic.address.node]
                 delete this.aliasResolver?.[topic.address.group]?.[topic.address.node]
                 break;
@@ -150,11 +157,11 @@ export default class MQTTClient {
 
                     // Check that we don't already have an active debounce for this device
                     if (this.birthDebounce?.[topic.address.group]?.[topic.address.node]?.[topic.address.device]) {
-                        logger.info(`Device ${topic.address.group}/${topic.address.node}/${topic.address.device} is unknown but has pending birth certificate request. Ignoring.`);
+                        logger.info(`⏳ Device ${topic.address.group}/${topic.address.node}/${topic.address.device} is unknown but has pending birth certificate request. Ignoring.`);
                         return;
                     }
 
-                    logger.info(`Device ${topic.address.group}/${topic.address.node}/${topic.address.device} is unknown, requesting birth certificate`);
+                    logger.info(`✨ Device ${topic.address.group}/${topic.address.node}/${topic.address.device} is unknown, requesting birth certificate`);
 
                     // Request birth certificate
                     let response = await this.serviceClient.fetch({
@@ -170,7 +177,7 @@ export default class MQTTClient {
                         })
                     })
 
-                    logger.info('Birth certificate request sent for %s. Status: %s', topic.address, response.status);
+                    logger.info('📣 Birth certificate request sent for %s. Status: %s', topic.address, response.status);
 
                     // Create debounce timout for this device
                     this.setNestedValue(this.birthDebounce, [topic.address.group, topic.address.node, topic.address.device], true);
@@ -237,12 +244,6 @@ export default class MQTTClient {
                 break;
 
         }
-
-        // TODO
-        // - Handle overwriting exiting birth certificates
-        // - Handle Deaths
-        // - Store initial value
-        // - Remove debounce when we get a birth certificate
 
         writeApi.close().then(() => {
             logger.info(`Written to InfluxDB: [${birth.type}] ${fullName} = ${value}`);

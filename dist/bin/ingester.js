@@ -1,3 +1,7 @@
+/*
+ * AMRC InfluxDB Sparkplug Ingester
+ * Copyright "2023" AMRC
+ */
 import { ServiceClient } from "@amrc-factoryplus/utilities";
 import * as dotenv from 'dotenv';
 import pino from "pino";
@@ -14,7 +18,6 @@ if (!directoryUrl) {
 export const logger = pino({
     name: 'InfluxDB Sparkplug Ingester'
 }, stream);
-const serviceUUID = 'a8e5a73f-2dd1-4cda-8e46-bc6cedb14269';
 const client = await new ServiceClient({
     directory_url: directoryUrl,
 }).init();

@@ -6,7 +6,7 @@ The AMRC Connectivity Stack (ACS) is a Kubernetes Helm chart that contains a com
 Ensure that you familiarise yourself with the concepts of both Kubernetes and [Factory+](https://factoryplus.app.amrc.co.uk) before continuing. This chart installs a full end-to-end deployment of Factory+ onto a Kubernetes cluster and there are a lot of moving parts.
 
 ## Known Limitations
-- Although Factory+ and ACS fully supports edge-based Cell Gateways, this chart does not support the deployment of edge-based Cell Gateways located on other Kubernetes Clusters, which is recommended in production. This is due to the fact that the chart deploys manifests to Cell Gateways, which requires the nodes to be on the same cluster. We already have a proof-of-concept implementation of how to address this and we aim to update this Helm chart in the near future to support.
+Although Factory+ and ACS fully supports edge-based Cell Gateways, this chart does not support the deployment of edge-based Cell Gateways located on other Kubernetes Clusters, which is recommended in production. This is due to the fact that the chart deploys manifests to Cell Gateways, which requires the nodes to be on the same cluster. We already have a proof-of-concept implementation of how to address this and we aim to update this Helm chart in the near future to support.
 
 ## Get Started
 This chart can be installed onto a local Kubernetes cluster for development or testing by following the instructions below. For production deployments, please refer to the [production deployment guide](#production-deployment).
@@ -18,7 +18,7 @@ Helm is a package manager for Kubernetes that allows you to easily install and m
 Kubectl is a command-line tool for controlling Kubernetes clusters. It must be installed on the machine that you'll be using to deploy ACS _from_. To install Kubectl, follow the instructions [here](https://kubernetes.io/docs/tasks/tools/install-kubectl/).
 
 ### Install Minikube
-Minikube is a tool that allows you to run a local Kubernetes cluster on your machine. It is not required to deploy ACS, but it is recommended for development and testing. To install Minikube, follow the instructions [here](https://minikube.sigs.k8s.io/docs/start/).
+Minikube is a tool that allows you to run a local Kubernetes cluster on your machine. It is not required to deploy ACS, but it is recommended for development and testing. To install Minikube, follow the instructions [here](https://minikube.sigs.k8s.io/docs/start/). If you do not wish to use Minikube, you can deploy ACS to any Kubernetes cluster.
 
 ### Verify Installation
 To verify that Helm and Kubectl have been installed correctly, run the following commands:

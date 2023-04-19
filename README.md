@@ -58,11 +58,25 @@ acs:
   organisation: AMRC # Set this to the name of your organisation. It will be used across the deployment for branding and naming.
   secure: false # Set this to true if you want to serve ACS over HTTPS. This is recommended for production deployments but can be turned for development.
   tlsSecretName: factoryplus-tls # Set this to the name of the secret containing the wildcard certificate for the above domain. This is only required if secure is set to true.
+identity:
+  realm: LOCALHOST # Set the identity realm for the deployment. This is used to namespace the identity server and should be unique to your deployment. It is recommended that you use the domain name in capitals for this value.
 ```
 
-Finally, install ACS by running the following command:
+Before we install, we need to create the `factory-plus` namespace, which is where all ACS services will be deployed to. If a different namespace is chosen by changing the `-n <namespace>` on the helm install command then ensure the namespace exists before installing ACS.
+
+To create the `factory-plus` namespace, run the following command:
 ```bash
-helm install acs amrc-connectivity-stack/amrc-connectivity-stack -f values.yaml
+kubectl create namespace factory-plus
+```
+
+Finally, install ACS by running the following command.
+```bash
+helm install acs amrc-connectivity-stack/amrc-connectivity-stack -f values.yaml --namespace factory-plus
+```
+
+Alternatively, the values can be supplied directly to the helm install command:
+```bash
+helm install acs amrc-connectivity-stack/amrc-connectivity-stack --set acs.baseUrl=localhost --set acs.organisation=AMRC --set acs.secure=false --namespace factory-plus
 ```
 
 If all went to plan you should now have a fully functioning ACS deployment beginning to deploy to your local Kubernetes cluster. Note that it can take a few minutes to have all services operational.

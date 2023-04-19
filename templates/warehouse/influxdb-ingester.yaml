@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: influxdb-ingester
+  namespace: factory-plus
+  labels:
+    component: influxdb-ingester
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: influxdb-ingester
+  template:
+    metadata:
+      labels:
+        component: influxdb-ingester
+        factory-plus.service: influxdb-ingester
+    spec:
+      volumes:
+        - name: krb5-conf
+          configMap:
+            name: krb5-conf
+        - name: krb5-keytabs
+          secret:
+            secretName: krb5-keytabs
+            items:
+              - key: sv1warehouse
+                path: client
+
+      containers:
+        - name: influxdb-ingester
+          image: "{{ .Values.warehouse.ingester.image.registry }}/{{ .Values.warehouse.ingester.image.repository }}:{{ .Values.warehouse.ingester.image.tag }}"
+          command: [ "/usr/bin/k5start", "-Uf", "/keytabs/client" ]
+          args: [ "npm", "run", "start" ]
+          imagePullPolicy: Always
+          env:
+            - name: KRB5_CONFIG
+              value: /config/krb5-conf/krb5.conf
+            - name: CLIENT_KEYTAB
+              value: /keytabs/client
+            - name: DIRECTORY_URL
+              value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
+            - name: INFLUX_URL
+              value: http://acs-influxdb2.{{ .Release.Namespace }}.svc.cluster.local
+            - name: INFLUX_ORG
+              value: {{.Values.acs.organisation}}
+            - name: INFLUX_BUCKET
+              value: 'default'
+            - name: INFLUX_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: acs-influxdb2-auth
+                  key: admin-token
+          volumeMounts:
+            - mountPath: /config/krb5-conf
+              name: krb5-conf
+            - mountPath: /keytabs
+              name: krb5-keytabs

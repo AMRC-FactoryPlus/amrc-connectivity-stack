@@ -3,7 +3,7 @@
 The AMRC Connectivity Stack (ACS) is a Kubernetes Helm chart that contains a comprehensive set of open-source services developed by the AMRC that enables an end-to-end implementation of the Factory+ framework.
 
 ## Prerequisites
-Ensure that you familiarise yourself with the concepts of both Kubernetes and Factory+ (factoryplus.app.amrc.co.uk) before continuing. This chart installs a full end-to-end deployment of Factory+ onto a Kubernetes cluster and there are a lot of moving parts.
+Ensure that you familiarise yourself with the concepts of both Kubernetes and [Factory+](factoryplus.app.amrc.co.uk) before continuing. This chart installs a full end-to-end deployment of Factory+ onto a Kubernetes cluster and there are a lot of moving parts.
 
 ## Known Limitations
 - Although Factory+ and ACS fully supports edge-based Cell Gateways, this chart does not support the deployment of edge-based Cell Gateways located on other Kubernetes Clusters, which is recommended in production. This is due to the fact that the chart deploys manifests to Cell Gateways, which requires the nodes to be on the same cluster. We already have a proof-of-concept implementation of how to address this and we aim to update this Helm chart in the near future to support.

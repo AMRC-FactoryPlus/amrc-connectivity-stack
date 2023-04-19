@@ -1,1 +1,1 @@
-An ingestion engine to enable InfluxDB to be a fully-featured Sparkplug historian.
+A consumption mechanism that allows InfluxDB to function as a comprehensive Sparkplug-based data historian. It was developed for the [AMRC Connectiviy Stack](https://github.com/AMRC-FactoryPlus/amrc-connectivity-stack), the AMRC's open-source implementation of the Factory+ framework.

@@ -19,7 +19,6 @@
 {{$classDef_userGroup := "f1fabdd1-de90-4399-b3da-ccf6c2b2c08b" | quote}}
 {{$classDef_cellGateway := "00da3c0b-f62b-4761-a689-39ad0c33f864" | quote}}
 {{$classDef_softGateway := "5bee4d24-32e1-44f8-b953-1f86ff4b3e87" | quote}}
-{{$classDef_sparkplugDevice := "18773d6d-a70d-443a-b29a-3f1583195290" | quote}}
 
 {{$application_objectRegistration := "cb40bed5-49ad-4443-a7f5-08c75009da8f" | quote}}
 {{$application_generalObjectInformation := "64a8bfa9-7772-45c4-9d1a-9e6290690957" | quote}}
@@ -117,7 +116,6 @@ data:
       "classes": [
         {{$classDef_classDefinition}},
         {{$classDef_application}},
-        {{$classDef_sparkplugDevice}},
         {{$classDef_serviceFunction}},
         {{$classDef_clientRole}},
         {{$classDef_userAccount}},
@@ -218,9 +216,6 @@ data:
           },
           {{$classDef_application}}: {
             "name": "Application"
-          },
-          {{$classDef_sparkplugDevice}}: {
-            "name": "Sparkplug Device"
           },
           {{$classDef_serviceFunction}}: {
             "name": "Service Function"

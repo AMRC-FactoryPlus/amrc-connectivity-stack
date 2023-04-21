@@ -120,7 +120,6 @@ export default {
     },
 
     addNewMetricToArray(val) {
-      console.log('Adding new metric to array of metrics', val);
       this.$emit('addToMetricArray', val);
     },
 

@@ -27,7 +27,7 @@
             <div class="flex items-center justify-center flex-grow">
                 <div class="text-center mt-10 pb-3 flex-grow">
                     <i class="fa-sharp fa-solid fa-cogs fa-2x text-gray-500"></i>
-                    <h3 class="mt-2 text-sm font-medium text-gray-700">What is<span
+                    <h3 class="mt-2 text-sm font-medium text-gray-700">What is <span
                             class="font-bold">{{ device.device_id || 'this device' }}</span>?
                     </h3>
                     <p class="mt-1 text-sm text-gray-400">Get started by assigning this device a schema.</p>

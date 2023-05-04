@@ -108,6 +108,10 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     component: configdb
+  annotations:
+    "helm.sh/hook": pre-install
+    "helm.sh/hook-weight": "20"
+    "helm.sh/resource-policy": keep
 data:
   # Pre-seed required
   bootstrap: |
@@ -535,6 +539,7 @@ metadata:
   annotations:
     "helm.sh/hook": pre-install
     "helm.sh/hook-weight": "20"
+    "helm.sh/resource-policy": keep
   labels:
     component: auth
 data:

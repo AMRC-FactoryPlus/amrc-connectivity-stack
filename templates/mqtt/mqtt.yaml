@@ -50,11 +50,8 @@ spec:
             # This needs to name a principal available in the keytab, used for verifying passwords.
             - name: SERVER_PRINCIPAL
               value: mqtt/mqtt.{{ .Release.Namespace }}.svc.cluster.local
-            # These should be discovered, but aren't yet in the Java client.
-            - name: AUTHN_URL
-              value: http://auth.{{ .Release.Namespace }}.svc.cluster.local
-            - name: CONFIGDB_URL
-              value: http://configdb.{{ .Release.Namespace }}.svc.cluster.local
+            - name: DIRECTORY_URL
+              value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
             # The Java client still only supports Basic auth.
             - name: SERVICE_USERNAME
               value: sv1mqtt

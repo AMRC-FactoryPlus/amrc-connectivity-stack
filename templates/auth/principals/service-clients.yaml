@@ -56,7 +56,7 @@ metadata:
   name: sv1mqtt
   namespace: {{ .Release.Namespace }}
 spec:
-  type: Password
+  type: Random
   principal: sv1mqtt@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
 ---
 apiVersion: factoryplus.app.amrc.co.uk/v1

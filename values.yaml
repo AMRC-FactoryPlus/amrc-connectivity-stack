@@ -130,6 +130,13 @@ warehouse:
       # @ignore
       pullPolicy: IfNotPresent
 
+shell:
+  image:
+    registry: amrc-factoryplus.shef.ac.uk:5000
+    repository: factoryplus-shell
+    tag: 0.0.6
+    pullPolicy: IfNotPresent
+
 minio:
   # -- Whether or not to expose the MinIO console outside of the cluster
   exposeConsole: false

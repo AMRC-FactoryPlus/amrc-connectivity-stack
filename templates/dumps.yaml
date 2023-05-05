@@ -497,11 +497,11 @@ data:
         {{$application_sparkplugAddressInformation}}: {
           {{$serviceAccount_directory}}: {
             "node_id": "Directory",
-            "group_id": "{{ .Values.acs.organisation }}-Service-DIR-Directory"
+            "group_id": "{{ .Values.acs.organisation }}-Service-Core"
           },
           {{$serviceAccount_configStore}}: {
             "node_id": "Config_DB",
-            "group_id": "{{ .Values.acs.organisation }}-Service-Config_DB"
+            "group_id": "{{ .Values.acs.organisation }}-Service-Core"
           },
           {{$serviceAccount_commandEscalation}}: {
             "node_id": "Command_Escalation",

@@ -34,26 +34,6 @@ spec:
         - name: mqtt-conf
           configMap:
             name: mqtt-config
-      initContainers:
-        - name: register-with-directory
-{{ include "amrc-connectivity-stack.image" .Values.shell | indent 10 }}
-          command: ["k5start", "-Uf", "/keytabs/client", "sh", "-c"]
-          args:
-            - |
-              until curl -X PUT -o /dev/null -w "%{http_code}" \
-                --negotiate -u : \
-                -H "Content-Type: application/json" \
-                --data-raw "{ \"url\": \"mqtt://mqtt.{{.Release.Namespace}}.svc.cluster.local\" }" \
-                http://directory.{{.Release.Namespace}}.svc.cluster.local/v1/service/feb27ba3-bd2c-4916-9269-79a61ebc4a47/advertisment \
-                | grep -E "2[0-9]{2}" > /dev/null
-              do sleep 10
-              done
-          volumeMounts:
-            - mountPath: /etc/krb5.conf
-              name: krb5-conf
-              subPath: krb5.conf
-            - mountPath: /keytabs
-              name: krb5-keytabs
       containers:
         - name: k5start
 {{ include "amrc-connectivity-stack.image" .Values.shell | indent 10 }}
@@ -84,6 +64,8 @@ spec:
               value: mqtt/mqtt.{{ .Release.Namespace }}.svc.cluster.local
             - name: DIRECTORY_URL
               value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
+            - name: MQTT_URL
+              value: "{{ .Values.acs.secure | ternary "mqtts://" "mqtt://" }}mqtt.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"
           volumeMounts:
             - mountPath: /etc/krb5.conf
               name: krb5-conf

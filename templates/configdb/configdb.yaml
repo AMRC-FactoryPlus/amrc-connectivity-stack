@@ -112,7 +112,7 @@ spec:
             - name: DEVICE_UUID
               value: 36861e8d-9152-40c4-8f08-f51c2d7e3c25
             - name: SPARKPLUG_ADDRESS
-              value: AMRC-Service-Config_DB/Config_DB
+              value: {{ .Values.acs.organisation }}-Service-Core/Config_DB
             - name: PORT
               value: "8080"
             - name: PGHOST
@@ -127,7 +127,7 @@ spec:
               value: "10"
             # If this is set it names a principal which overrides all ACLs. This should be turned off in production.
             - name: ROOT_PRINCIPAL
-              value: fplusadmin@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+              value: admin@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
             # This is the value published via MQTT. It is also used by the editor so it needs to be externally resolvable.
             - name: HTTP_API_URL
               value: "{{ .Values.acs.secure | ternary "https://" "http://" }}configdb.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"

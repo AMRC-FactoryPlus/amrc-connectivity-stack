@@ -132,9 +132,9 @@ warehouse:
 
 shell:
   image:
-    registry: amrc-factoryplus.shef.ac.uk:5000
-    repository: factoryplus-shell
-    tag: 0.0.6
+    registry: ghcr.io/amrc-factoryplus
+    repository: acs-krb-utils
+    tag: 1.0.0
     pullPolicy: IfNotPresent
 
 minio:

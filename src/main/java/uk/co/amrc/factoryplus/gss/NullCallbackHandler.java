@@ -1,9 +1,9 @@
-/* Factory+ HiveMQ auth plugin.
+/* Factory+ Java client library.
  * Null callback handler class.
  * Copyright 2022 AMRC.
  */
 
-package uk.co.amrc.factoryplus.hivemq_auth_krb;
+package uk.co.amrc.factoryplus.gss;
 
 import javax.security.auth.callback.*;
 

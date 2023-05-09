@@ -13,6 +13,8 @@ import com.hivemq.extension.sdk.api.services.Services;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import uk.co.amrc.factoryplus.*;
+
 public class FPKrbMain implements ExtensionMain {
 
     private static final @NotNull Logger log = LoggerFactory.getLogger(FPKrbMain.class);
@@ -23,7 +25,7 @@ public class FPKrbMain implements ExtensionMain {
         final ExtensionInformation extensionInformation = extensionStartInput.getExtensionInformation();
         log.info("Started " + extensionInformation.getName() + ":" + extensionInformation.getVersion());
 
-        final FPKrbAuthProvider authn = new FPKrbAuthProvider();
+        final FPKrbAuthProvider authn = new FPKrbAuthProvider().start();
         Services.securityRegistry().setEnhancedAuthenticatorProvider(authn);
     }
 

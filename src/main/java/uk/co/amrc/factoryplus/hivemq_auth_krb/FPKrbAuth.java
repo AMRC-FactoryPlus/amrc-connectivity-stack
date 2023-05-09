@@ -15,12 +15,14 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
-import javax.security.auth.Subject;
 import org.ietf.jgss.*;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import io.reactivex.rxjava3.core.*;
 
 import com.hivemq.extension.sdk.api.async.*;
 import com.hivemq.extension.sdk.api.client.parameter.Listener;
@@ -36,6 +38,32 @@ public class FPKrbAuth implements EnhancedAuthenticator {
     private static final @NotNull Logger log = LoggerFactory.getLogger(FPKrbAuth.class);
 
     private FPKrbAuthProvider provider;
+
+    static class AuthResult {
+        public byte[] gssToken;
+        public List<TopicPermission> acl;
+
+        public AuthResult (byte[] tok, List<TopicPermission> acl)
+        {
+            this.gssToken = tok;
+            this.acl = acl;
+        }
+
+        public void applyACL (EnhancedAuthOutput output)
+        {
+            ModifiableDefaultPermissions perms = output.getDefaultPermissions();
+            perms.addAll(acl);
+            perms.setDefaultBehaviour(DefaultAuthorizationBehaviour.DENY);
+        }
+
+        public List<String> showACL ()
+        {
+            return acl.stream()
+                .map(ace -> String.format("%s(%s)", 
+                    ace.getActivity(), ace.getTopicFilter()))
+                .collect(Collectors.toList());
+        }
+    }
 
     public FPKrbAuth (FPKrbAuthProvider prov)
     {
@@ -78,19 +106,26 @@ public class FPKrbAuth implements EnhancedAuthenticator {
         if (in_bb == null) {
             log.error("No GSS step data provided");
             output.failAuthentication();
+            return;
         }
-        else {
-            byte[] in_buf = new byte[in_bb.limit()];
-            in_bb.get(in_buf);
 
-            final Async<EnhancedAuthOutput> asyncOutput = output.async(
-                Duration.ofSeconds(10), TimeoutFallback.FAILURE);
+        byte[] in_buf = new byte[in_bb.limit()];
+        in_bb.get(in_buf);
 
-            Services.extensionExecutorService().submit(() -> {
-                verify_gssapi(in_buf, output, true);
-                asyncOutput.resume();
-            });
-        }
+        final Async<EnhancedAuthOutput> asyncOutput = output.async(
+            Duration.ofSeconds(10), TimeoutFallback.FAILURE);
+
+        verify_gssapi(in_buf)
+            .doAfterTerminate(() -> asyncOutput.resume())
+            .subscribe(
+                rv -> {
+                    rv.applyACL(output);
+                    output.authenticateSuccessfully(rv.gssToken);
+                },
+                e -> {
+                    log.error("GSSAPI auth failed", e);
+                    output.failAuthentication();
+                });
     }
 
     private void auth_none (ConnectPacket conn, EnhancedAuthOutput output)
@@ -117,41 +152,45 @@ public class FPKrbAuth implements EnhancedAuthenticator {
              * against a spoofed KDC. The only striaghtforward way to do
              * this is just to do the whole GSSAPI dance on the client's
              * behalf. */
-            byte[] gss_buf = get_client_gss_proxy(user, passwd_buf);
-            if (gss_buf == null) {
-                log.error("Password authentication failed for {}", user.toString());
+            var buf = get_client_gss_proxy(user, passwd_buf);
+            if (buf.isEmpty()) {
+                log.error("Password authentication failed for {}", 
+                    user.toString());
                 output.failAuthentication();
+                asyncOutput.resume();
+                return;
             }
-            else {
-                verify_gssapi(gss_buf, output, false);
-            }
-            asyncOutput.resume();
+            verify_gssapi(buf.get())
+                .doAfterTerminate(() -> asyncOutput.resume())
+                .subscribe(
+                    rv -> {
+                        rv.applyACL(output);
+                        output.authenticateSuccessfully();
+                    },
+                    e -> output.failAuthentication());
         });
     }
 
-    private byte[] get_client_gss_proxy (String user, char[] passwd_buf)
+    private Optional<byte[]> get_client_gss_proxy (
+        String user, char[] passwd_buf)
     {
-        Subject client = provider.getSubjectWithPassword(user, passwd_buf);
-        if (client == null) {
-            return null;
-        }
-
-        return Subject.doAs(client, (PrivilegedAction<byte[]>)() -> {
-            try {
-                GSSContext ctx = provider.createProxyContext();
-                return ctx.initSecContext(new byte[0], 0, 0);
-            }
-            catch (GSSException e) {
-                log.error("Client GSS exception: {}", e.toString());
-                return null;
-            }
-        });
+        return provider.createProxyContext(user, passwd_buf)
+            .flatMap(ctx -> {
+                try {
+                    return Optional.of(ctx.initSecContext(new byte[0], 0, 0));
+                }
+                catch (GSSException e) {
+                    log.error("GSS error for client proxy", e.toString());
+                    return Optional.<byte[]>empty();
+                }
+            });
     }
 
-    private void verify_gssapi (byte[] in_buf, EnhancedAuthOutput output, boolean send_auth)
+    private Single<AuthResult> verify_gssapi (byte[] in_buf)
     {
-        provider.withKrbSubject("authenticating client", () -> {
-            GSSContext ctx = provider.createServerContext();
+        GSSContext ctx = provider.createServerContext();
+
+        try {
             /* It would be helpful to log the client and server
              * identities if this call fails, so we can see who was
              * trying to connect and what endpoint they were trying to
@@ -162,31 +201,21 @@ public class FPKrbAuth implements EnhancedAuthenticator {
             if (ctx.isEstablished()) {
                 String client_name = ctx.getSrcName().toString();
                 log.info("Authenticated client {}", client_name);
-                setupACLs(output, client_name);
-                if (send_auth) 
-                    output.authenticateSuccessfully(out_buf);
-                else
-                    output.authenticateSuccessfully();
+                return provider.getACLforPrincipal(client_name)
+                    .map(acl -> new AuthResult(out_buf, acl))
+                    .doOnSuccess(rv -> log.info("MQTT ACL [{}]: {}", 
+                        client_name, rv.showACL()));
             }
             else {
                 /* We could handle this case, but I don't think with the
                  * Kerberos mech there is ever any need. */
-                log.error("GSS login took more than one step!");
-                output.failAuthentication();
+                return Single.<AuthResult>error(
+                    new Exception("GSS login took more than one step!"));
             }
-        });
-    }
-
-    private void setupACLs (EnhancedAuthOutput output, String principal)
-    {
-        List<TopicPermission> acl = provider.getACLforPrincipal(principal);
-
-        log.info("MQTT ACL [{}]: {}", principal, acl.stream()
-            .map(ace -> String.format("%s(%s)", ace.getActivity(), ace.getTopicFilter()))
-            .collect(Collectors.toList()));
-
-        ModifiableDefaultPermissions perms = output.getDefaultPermissions();
-        perms.addAll(acl);
-        perms.setDefaultBehaviour(DefaultAuthorizationBehaviour.DENY);
+        }
+        catch (GSSException e) {
+            return Single.<AuthResult>error(
+                new Exception("GSS login failed", e));
+        }
     }
 }

@@ -12,3 +12,8 @@
 
 # IDE
 .idea/
+
+# Build files
+dependency-reduced-pom.xml
+target/
+ver

@@ -35,6 +35,10 @@ spec:
                     properties:
                         spec:
                             type: object
+                            x-kubernetes-validations:
+                                - rule: "self.type == 'Random' || !has(self.additionalPrincipals)"
+                                - rule: "has(self.secret) || !has(self.sealWith)"
+                                - rule: "has(self.secret) || self.type in ['Random', 'Password', 'PresetPassword']"
                             required: [type, principal]
                             properties:
                                 type:
@@ -43,10 +47,9 @@ spec:
                                         will be recorded as a keytab in the keytabs secret. Password generates
                                         a random (machine) password and records it in the passwords secret.
                                         PresetPassword expects a password to have already been recorded in the
-                                        passwords secret; this password will be used as-is. HumanPassword
-                                        generates a password for a human user.
+                                        passwords secret; this password will be used as-is. 
                                     type: string
-                                    enum: [Random, Password, PresetPassword, HumanPassword]
+                                    enum: [Random, Password, PresetPassword, Trust, PresetTrust]
                                 principal:
                                     description: The Kerberos principal name.
                                     type: string
@@ -57,11 +60,6 @@ spec:
                                     type: array
                                     items:
                                         type: string
-                                email:
-                                    description: >
-                                        The human user's email address, for automatic password changes.
-                                    type: string
-                                    format: email
                                 secret:
                                     description: >
                                         The name of the secret and key to store the keytab/password

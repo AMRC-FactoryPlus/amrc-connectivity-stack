@@ -4,6 +4,8 @@
 # Environment
 .env
 
+tmp/
+
 # Secrets
 /keytabs/
 /volumes/

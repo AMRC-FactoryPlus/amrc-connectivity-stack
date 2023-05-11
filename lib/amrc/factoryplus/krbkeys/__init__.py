@@ -2,6 +2,7 @@
 
 # Kopf operator handlers
 
+import  json
 import  kopf
 import  logging
 import  os
@@ -64,10 +65,19 @@ class KrbKeys:
                 case "PresetPassword":
                     secret = self.presets
                 case _ as typ:
-                    raise ValueError(f"Unimplemented type {typ}")
+                    raise ValueError(f"Must specify secret for {spec['type']} {ns}/{name}")
             key = name
 
         return (ns, secret, key)
+
+    def get_sealing_for (self, name, spec):
+        seal_with = spec.get("sealWith");
+        match (spec['type']):
+            case "PresetPassword" | "PresetTrust":
+                if seal_with is not None:
+                    raise RuntimeError(f"Can't seal Preset {name}")
+
+        return seal_with
 
     def update_secret (self, secret, value, seal_with):
         if seal_with is None:
@@ -79,7 +89,7 @@ class KrbKeys:
         kadm = Kadm(name)
         secret = self.get_secret_for(namespace, name, spec)
         princs = self.get_princs_for(name, spec)
-        seal_with = spec.get("sealWith")
+        seal_with = self.get_sealing_for(name, spec)
 
         for p in princs:
             kadm.enable_princ(p)
@@ -92,13 +102,24 @@ class KrbKeys:
                 passwd = secrets.token_urlsafe()
                 kadm.set_password(princs[0], passwd)
                 self.update_secret(secret, passwd.encode(), seal_with)
+            case "Trust":
+                passwd = secrets.token_urlsafe()
+                data = kadm.create_trust_key(princs[0], passwd)
+                jsdata = json.dumps(data)
+                self.update_secret(secret, jsdata.encode(), seal_with)
+
             case "PresetPassword":
-                if seal_with is not None:
-                    raise RuntimeError(f"Can't seal PresetPassword {name}")
                 passwd = self.k8s.read_secret(*secret)
                 if passwd is None:
                     raise RuntimeError(f"No preset password for {name}")
                 kadm.set_password(princs[0], passwd.decode())
+            case "PresetTrust":
+                jsdata = self.k8s.read_secret(*secret)
+                if jsdata is None:
+                    raise RuntimeError(f"No trust data for {name}")
+                data = json.loads(jsdata.decode())
+                kadm.set_trust_key(princs[0], data)
+
             case _ as typ:
                 raise ValueError(f"Unimplemented type {typ}")
 
@@ -129,11 +150,9 @@ class KrbKeys:
             kadm.disable_princ(p)
 
         match (spec['type']):
-            case "Random":
+            case "Random" | "Password" | "Trust":
                 self.remove_secret(secret, sealed)
-            case "Password":
-                self.remove_secret(secret, sealed)
-            case "PresetPassword":
+            case "PresetPassword" | "PresetTrust":
                 pass
             case _ as typ:
                 logging.warning(f"Attempt to remove unimplemeted type {typ}")

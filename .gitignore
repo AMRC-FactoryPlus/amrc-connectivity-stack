@@ -4,7 +4,11 @@
 # Environment
 .env
 
+# Random temp files
 tmp/
+
+# Local build config
+config.sh
 
 # Secrets
 /keytabs/

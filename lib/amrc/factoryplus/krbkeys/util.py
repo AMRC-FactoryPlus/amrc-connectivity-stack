@@ -4,6 +4,7 @@
 
 from    contextlib      import contextmanager
 from    contextvars     import ContextVar
+import  dataclasses
 import  logging
 from    tempfile        import TemporaryDirectory, NamedTemporaryFile
 
@@ -19,6 +20,11 @@ def dslice (dct, *args):
     if dct is None:
         return None
     return tuple(dct.get(x) for x in args)
+
+# I would like to use frozen and slots here, but it appears to break
+# super() in the __init__ methods.
+fields = dataclasses.dataclass()
+hidden = dataclasses.field(init=False, default=None, compare=False, repr=False)
 
 operator = ContextVar("operator")
 log_tag = ContextVar("log_tag", default=None)

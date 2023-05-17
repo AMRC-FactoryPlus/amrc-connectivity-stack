@@ -2,61 +2,13 @@
 # Internal spec class
 # Copyright 2023 AMRC
 
-import  dataclasses
 from    enum            import Enum
 import  logging
 import  typing
 
 from    .           import keyops
-from    .util       import dslice, log, ops
-
-# I would like to use frozen and slots here, but it appears to break
-# super() in the __init__ methods.
-fields = dataclasses.dataclass()
-hidden = dataclasses.field(compare=False, repr=False)
-
-@fields
-class SecretWriter:
-    secret:     typing.Any
-    data:       bytes
-
-    def finish (self):
-        secret, data = self.secret, self.data
-        if secret.seal:
-            ops().kubeseal.create_sealed_secret(secret.seal, *secret.splat, data)
-        else:
-            ops().k8s.update_secret(*secret.splat, data)
-
-@fields
-class SecretRef:
-    spec:       typing.Any = hidden
-    ns:         str
-    name:       str
-    key:        str
-    seal:       str
-
-    @property
-    def splat (self):
-        return self.ns, self.name, self.key
-
-    def maybe_read (self):
-        if self.seal:
-            return None
-        
-        ns, name, key = self.splat
-        return ops().k8s.read_secret(ns, name, key)
-
-    def writer (self, data):
-        return SecretWriter(self, data)
-
-    def remove (self):
-        ns, name, key = self.splat
-        if self.seal:
-            log(f"Remove sealed secret {ns}/{name}")
-            ops().kubeseal.maybe_delete_secret(ns, name)
-        else:
-            log(f"Remove key {key} in secret {ns}/{name}")
-            ops().k8s.remove_secret(ns, name, key)
+from    .secrets    import SecretRef
+from    .util       import dslice, fields, hidden, log, ops
 
 @fields
 class InternalSpec:
@@ -92,8 +44,8 @@ class InternalSpec:
                 self.ns, self.name, spec)
         else:
             sec_name, sec_key = secret.split("/")
-        self.secret = SecretRef(spec=self, ns=self.ns,
-            name=sec_name, key=sec_key, seal=seal)
+        self.secret = SecretRef(ns=self.ns, name=sec_name, 
+            key=sec_key, seal=seal)
 
     @property
     def principal (self):
@@ -149,8 +101,11 @@ class InternalSpec:
             kops.set_key(self, current)
             return None
 
+        # We want to fail, if possible, before we've done a ktadd and
+        # have a newly-minted key which we can't put anywhere.
+        self.secret.verify_writable()
         oldkey = current if self.keep_old else None
         status, data = kops.generate_key(self, oldkey)
-        self.secret.writer(data).finish()
+        self.secret.write(data)
 
         return None

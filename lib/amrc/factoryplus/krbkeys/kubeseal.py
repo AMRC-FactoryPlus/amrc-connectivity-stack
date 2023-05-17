@@ -38,7 +38,7 @@ class Kubeseal:
 
         return tmp
 
-    def create_sealed_secret (self, seal_with, ns, name, key, value):
+    def create_sealed_secret (self, cert, ns, name, key, value):
         logging.info(f"Creating sealed secret {ns}/{name}")
 
         # json wants string values, not bytes.
@@ -56,7 +56,6 @@ class Kubeseal:
         }
 
         plain_js = json.dumps(plain)
-        cert = self.fetch_cert(ns, seal_with)
 
         res = subprocess.run(
             ["kubeseal", "--cert", cert.name],
@@ -64,7 +63,6 @@ class Kubeseal:
             check=True, text=True)
         sealed = json.loads(res.stdout)
 
-        self.maybe_delete_sealed_secret(ns, name)
         api = k8s.client.CustomObjectsApi()
         api.create_namespaced_custom_object(**ss_crd, namespace=ns, body=sealed)
         logging.info(f"Created sealed secret {ns}/{name} sealed with {seal_with}")

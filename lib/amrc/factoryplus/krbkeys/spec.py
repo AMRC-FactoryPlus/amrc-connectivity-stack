@@ -12,11 +12,6 @@ from    .util       import dslice, fields, hidden, log, ops
 
 @fields
 class InternalSpec:
-    # These are typed as Any to avoid a circular import.
-    event: typing.Any = hidden
-    op: typing.Any = hidden
-    ns: str
-    name: str
     principals: list[str]
     secret: SecretRef
     kind: keyops.KeyOps
@@ -24,10 +19,8 @@ class InternalSpec:
     keep_old: bool
 
     def __init__ (self, event, spec, **kw):
-        self.event = event
-        self.op = event.op
-        self.ns = event.ns
-        self.name = event.name
+        ns = event.ns
+        name = event.name
 
         self.principals = {spec["principal"]}
         add_princ = spec.get('additionalPrincipals')
@@ -40,12 +33,10 @@ class InternalSpec:
         secret, seal = dslice(spec, "secret", "sealWith")
         if secret is None:
             log("Default secrets are deprecated", level=logging.WARNING)
-            _, sec_name, sec_key = self.op.get_secret_for(
-                self.ns, self.name, spec)
+            _, sec_name, sec_key = ops().get_secret_for(ns, name, spec)
         else:
             sec_name, sec_key = secret.split("/")
-        self.secret = SecretRef(ns=self.ns, name=sec_name, 
-            key=sec_key, seal=seal)
+        self.secret = SecretRef(ns=ns, name=sec_name, key=sec_key, seal=seal)
 
     @property
     def principal (self):
@@ -85,13 +76,13 @@ class InternalSpec:
         for p in self.principals - npr:
             log(f"Disable principal {p}")
 
-    def reconcile_key (self, status):
+    def reconcile_key (self, force=False):
         mode = self.secret_mode
         kops = self.kind
 
         current = self.secret.maybe_read()
 
-        if kops.verify_key(self, current):
+        if not force and kops.verify_key(self, current):
             log("Current key is still valid")
             return
 

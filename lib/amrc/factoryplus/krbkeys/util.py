@@ -13,6 +13,7 @@ import krb5
 class Identifiers:
     DOMAIN = "factoryplus.app.amrc.co.uk"
     APP = "krbkeys"
+    APPID = f"{APP}.{DOMAIN}"
     CRD_PLURAL = "kerberos-keys"
     CRD_VERSION = "v1"
 

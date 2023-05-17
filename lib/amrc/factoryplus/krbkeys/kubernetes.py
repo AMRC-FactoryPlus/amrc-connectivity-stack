@@ -12,12 +12,11 @@ from    kubernetes.client.exceptions    import ApiException
 
 from .util          import Identifiers, log
 
-APPID = f"{Identifiers.APP}.{Identifiers.DOMAIN}"
 MANAGED_BY = "app.kubernetes.io/managed-by"
 
 def is_mine (obj):
     return obj.metadata.labels is not None \
-        and obj.metadata.labels[MANAGED_BY] == APPID
+        and obj.metadata.labels[MANAGED_BY] == Identifiers.APPID
 
 class K8s:
     def __init__ (self, **kw):
@@ -54,7 +53,7 @@ class K8s:
 
         secret.metadata = meta
         meta.name = name
-        meta.labels = { MANAGED_BY: APPID }
+        meta.labels = { MANAGED_BY: Identifiers.APPID }
         
         log(f"Creating secret {name}")
         core.create_namespaced_secret(namespace=ns, body=secret)

@@ -50,7 +50,7 @@ class KrbKeys:
         lt_tok = log_tag.set(tag)
         op_tok = operator.set(self)
         try:
-            handler = KrbKeyEvent(self, kw)
+            handler = KrbKeyEvent(kw)
             return handler.process()
         finally:
             operator.reset(op_tok)

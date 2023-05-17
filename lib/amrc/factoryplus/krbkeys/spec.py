@@ -149,7 +149,8 @@ class InternalSpec:
             kops.set_key(self, current)
             return None
 
-        status, data = kops.generate_key(self, current)
+        oldkey = current if self.keep_old else None
+        status, data = kops.generate_key(self, oldkey)
         self.secret.writer(data).finish()
 
         return None

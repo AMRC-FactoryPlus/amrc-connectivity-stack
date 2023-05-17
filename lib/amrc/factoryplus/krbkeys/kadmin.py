@@ -46,23 +46,18 @@ class Kadm:
         kpr.set_flags(kadmin.DISALLOW_ALL_TIX)
         kpr.commit()
 
-    def create_keytab (self, princs, oldkt):
-        # Create a temp dir, since ktadd insists on creating the file
-        # itself.
-        with TemporaryDirectory() as ktdir:
-            keytab = f"{ktdir}/keytab"
-            if oldkt:
-                with open(keytab, "wb") as fh:
-                    fh.write(oldkt)
-            for princ in princs:
-                kpr = self.kadm.getprinc(princ)
-                kpr.ktadd(keytab)
-                # Reload because ktadd will update the kvno. kpr.reload
-                # doesn't seem to work (??).
-                kpr = self.kadm.getprinc(princ)
-                log(f"Created {princ} kvno {kpr.kvno}")
-            with open(keytab, "rb") as fh:
-                return fh.read()
+    def create_keytab (self, princs, keytab):
+        kvnos = {}
+        for princ in princs:
+            kpr = self.find_princ(princ)
+            kpr.ktadd(keytab)
+            # Reload because ktadd will update the kvno. kpr.reload
+            # doesn't seem to work (??).
+            kpr = self.kadm.getprinc(princ)
+            log(f"Created {princ} kvno {kpr.kvno}")
+            kvnos[princ] = { "kvno": kpr.kvno }
+
+        return kvnos
 
     def trim_keytab (self, oldkt):
         with NamedTemporaryFile() as ktf:
@@ -88,28 +83,22 @@ class Kadm:
             newkt = ktf.read() if expired else None
             return newkt, more
 
-    def princ_in_keytab (self, princ, data):
+    def princ_in_keytab (self, princ, keytab):
         # We always do find_princ because we always want the princpal to
         # exist.
         kpr = self.find_princ(princ)
+        log(f"Searching for {kpr.principal} kvno {kpr.kvno} in {keytab}")
 
-        if data is None:
+        ctx = krb5.init_context()
+        kt = krb5.kt_resolve(ctx, keytab.encode())
+        pr = krb5.parse_name_flags(ctx, kpr.principal.encode(), 0)
+        try:
+            krb5.kt_get_entry(ctx, kt, pr, kpr.kvno)
+            log("Keytab entry found")
+            return True
+        except:
+            log("Keytab entry not found")
             return False
-
-        # We ought to be able to use MEMORY keytabs for this but how do we get the address from Python?
-        with TemporaryDirectory() as ktdir:
-            keytab = f"{ktdir}/keytab"
-            with open(keytab, "wb") as fh:
-                fh.write(data)
-            
-            ctx = krb5.init_context()
-            kt = krb5.kt_resolve(ctx, f"FILE:{keytab}".encode())
-            pr = krb5.parse_name_flags(ctx, kpr.principal.encode(), 0)
-            try:
-                krb5.kt_get_entry(ctx, kt, pr, kpr.kvno)
-                return True
-            except:
-                return False
 
     def set_password (self, princ, password):
         kpr = self.kadm.getprinc(princ)

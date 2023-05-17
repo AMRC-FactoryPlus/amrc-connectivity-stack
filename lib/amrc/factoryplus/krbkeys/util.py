@@ -31,22 +31,25 @@ def log (msg, level=logging.INFO):
     prefix = "" if tag is None else f"[{tag}] "
     logging.log(level, prefix + msg)
 
-class KtFile:
-    def __init__ (contents):
+class KtData:
+    def __init__ (self, contents):
         self.contents = contents
 
     @contextmanager
-    def open ():
+    def kt_name (self):
+        """Context manager to write the keytab to a file. Yields a
+        string holding the keytab name, i.e. "FILE:foo". Reads the file
+        back into the object when the context finishes."""
         with TemporaryDirectory() as ktdir:
             keytab = f"{ktdir}/keytab"
             if self.contents is not None:
                 with open(keytab, "wb") as fh:
-                    fh.write(contents)
+                    fh.write(self.contents)
 
-            ctx = ops().krb5
-            kt = krb5.kt_resolve(ctx, f"FILE:{keytab}".encode())
-            yield kt
+            yield f"FILE:{keytab}"
 
-            with open(keytab, "rb") as fh:
-                self.contents = fh.read()
-
+            try:
+                with open(keytab, "rb") as fh:
+                    self.contents = fh.read()
+            except FileNotFoundError:
+                self.contents = None

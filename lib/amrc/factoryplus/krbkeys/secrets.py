@@ -29,7 +29,7 @@ class SecretRef:
         if self.seal:
             ks = ops().kubeseal
             self.cert = ks.fetch_cert(self.ns, self.seal)
-            ks.maybe_delete_sealed_secret(self.ns, self.name)
+            ks.maybe_delete_sealed_secret(self.ns, self.name, self.key)
 
     def write (self, data):
         if self.seal:
@@ -40,9 +40,7 @@ class SecretRef:
     def remove (self):
         ns, name, key = self.splat
         if self.seal:
-            log(f"Remove sealed secret {ns}/{name}")
-            ops().kubeseal.maybe_delete_secret(ns, name)
+            ops().kubeseal.maybe_delete_sealed_secret(ns, name, key)
         else:
-            log(f"Remove key {key} in secret {ns}/{name}")
             ops().k8s.remove_secret(ns, name, key)
 

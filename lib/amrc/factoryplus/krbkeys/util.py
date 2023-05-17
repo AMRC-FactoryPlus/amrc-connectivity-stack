@@ -17,6 +17,8 @@ class Identifiers:
     CRD_PLURAL = "kerberos-keys"
     CRD_VERSION = "v1"
 
+    MANAGED_BY = "app.kubernetes.io/managed-by"
+
 def dslice (dct, *args):
     if dct is None:
         return None

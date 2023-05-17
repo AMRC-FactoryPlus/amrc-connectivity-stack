@@ -9,20 +9,20 @@ import  time
 import  krb5
 import  kadmin
 
+from    .util       import log
+
 class Kadm:
-    def __init__ (self, name, kadm=None):
+    def __init__ (self, kadm=None):
         if kadm is None:
             self.kadm = kadmin.init_with_ccache()
         else:
             self.kadm = kadm
 
-        self.log = lambda m: logging.info(f"{name}: {m}")
-
     def find_princ (self, princ):
         kadm = self.kadm
 
         if not kadm.principal_exists(princ):
-            self.log(f"Creating principal {princ}")
+            log(f"Creating principal {princ}")
             kadm.addprinc(princ, None)
 
         return kadm.getprinc(princ)
@@ -31,7 +31,7 @@ class Kadm:
         kpr = self.find_princ(princ)
 
         if kadmin.DISALLOW_ALL_TIX in kpr.attributes:
-            self.log(f"Enabling principal {princ}")
+            log(f"Enabling principal {princ}")
             # Why this needs to be a tuple I don't know. I suspect it's a
             # bug in python-kadmV.
             kpr.unset_flags((kadmin.DISALLOW_ALL_TIX,))
@@ -39,9 +39,9 @@ class Kadm:
 
     def disable_princ (self, princ):
         if not self.kadm.principal_exists(princ):
-            self.log(f"Can't disable non-existent principal {princ}!")
+            log(f"Can't disable non-existent principal {princ}!")
             return
-        self.log(f"Disabling principal {princ}")
+        log(f"Disabling principal {princ}")
         kpr = self.kadm.getprinc(princ)
         kpr.set_flags(kadmin.DISALLOW_ALL_TIX)
         kpr.commit()
@@ -60,7 +60,7 @@ class Kadm:
                 # Reload because ktadd will update the kvno. kpr.reload
                 # doesn't seem to work (??).
                 kpr = self.kadm.getprinc(princ)
-                self.log(f"Created {princ} kvno {kpr.kvno}")
+                log(f"Created {princ} kvno {kpr.kvno}")
             with open(keytab, "rb") as fh:
                 return fh.read()
 
@@ -114,6 +114,8 @@ class Kadm:
     def set_password (self, princ, password):
         kpr = self.kadm.getprinc(princ)
         kpr.change_password(password)
+        kpr = self.kadm.getprinc(princ)
+        return kpr
 
     def create_trust_key (self, princ, password):
         self.set_password(princ, password)
@@ -133,7 +135,7 @@ class Kadm:
         kpr.change_password(data['password'])
         kpr.kvno = kvno
         kpr.commit()
-        self.log(f"Created trust principal {princ} kvno {kvno}")
+        log(f"Created trust principal {princ} kvno {kvno}")
 
         kpr = self.kadm.getprinc(princ)
         keys = kpr.keys

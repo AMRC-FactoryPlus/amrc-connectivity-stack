@@ -25,7 +25,7 @@ class KrbKeysBs:
         self.ktname = ktname
 
         kadm = kadmin.local()
-        self.kadm = Kadm("bootstrap", kadm=kadm)
+        self.kadm = Kadm(kadm=kadm)
 
         k8s.config.load_incluster_config()
         self.k8s = K8s()
@@ -44,7 +44,7 @@ class KrbKeysBs:
 
     def run(self):
         for s in self.secrets:
-            self.k8s.find_secret(name=s, ns=self.namespace)
+            self.k8s.find_secret(name=s, ns=self.namespace, create=True)
 
         self.ensure_keytab()
 

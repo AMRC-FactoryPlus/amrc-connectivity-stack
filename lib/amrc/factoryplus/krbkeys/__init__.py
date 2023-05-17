@@ -2,17 +2,22 @@
 
 # Kopf operator handlers
 
+import  dataclasses
 import  json
-import  kopf
 import  logging
 import  os
 import  secrets
 
+import  kopf
+import  krb5
+
 from .kadmin        import Kadm
 from .kubernetes    import K8s
 from .kubeseal      import Kubeseal
+from .event         import KrbKeyEvent
+from .util          import Identifiers, log, log_tag, operator
 
-crd = ("factoryplus.app.amrc.co.uk", "v1", "kerberos-keys")
+CRD = (Identifiers.DOMAIN, Identifiers.CRD_VERSION, Identifiers.CRD_PLURAL)
 
 class KrbKeys:
     def __init__ (self, default_ns, keytabs, passwords, presets, **kw):
@@ -23,19 +28,32 @@ class KrbKeys:
         self.presets = presets
 
         self.k8s = K8s()
+        self.krb5 = krb5.init_context()
+        self.kadm = Kadm()
         self.kubeseal = Kubeseal()
 
     def register_handlers (self):
-        logging.info("Registering handlers")
-        kopf.on.create(*crd)(self.create_key)
-        kopf.on.update(*crd)(self.update_key)
-        kopf.on.delete(*crd)(self.delete_key)
+        log("Registering handlers")
+        kopf.on.create(*CRD)(self.handle_event)
+        kopf.on.update(*CRD)(self.handle_event)
+        kopf.on.delete(*CRD)(self.handle_event)
         kopf.on.timer(*CRD, interval=10.0,
             annotations={"has-old-keys": "keytab"}
         )(self.trim_keys)
 
     def run (self):
         self.register_handlers()
+
+    def handle_event (self, **kw):
+        tag = f"{kw['namespace']}/{kw['name']}"
+        lt_tok = log_tag.set(tag)
+        op_tok = operator.set(self)
+        try:
+            handler = KrbKeyEvent(self, kw)
+            return handler.process()
+        finally:
+            operator.reset(op_tok)
+            log_tag.reset(lt_tok)
 
     def get_princs_for (self, name, spec):
         princ = spec['principal']

@@ -34,12 +34,13 @@ class KrbKeys:
 
     def register_handlers (self):
         log("Registering handlers")
+        kopf.on.resume(*CRD)(self.handle_event)
         kopf.on.create(*CRD)(self.handle_event)
         kopf.on.update(*CRD)(self.handle_event)
         kopf.on.delete(*CRD)(self.handle_event)
-        kopf.on.timer(*CRD, interval=10.0,
-            annotations={"has-old-keys": "keytab"}
-        )(self.trim_keys)
+        #kopf.on.timer(*CRD, interval=10.0,
+        #    annotations={"has-old-keys": "keytab"}
+        #)(self.trim_keys)
 
     def run (self):
         self.register_handlers()

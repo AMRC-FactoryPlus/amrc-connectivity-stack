@@ -29,10 +29,6 @@ class KrbKeyEvent:
         log("Event: reason %r, old %r, new %r" %
             (self.reason, self.old, self.new))
 
-        if self.old == self.new:
-            log("No change")
-            return
-
         if self.old is not None:
             self.old.remove(self.new)
 

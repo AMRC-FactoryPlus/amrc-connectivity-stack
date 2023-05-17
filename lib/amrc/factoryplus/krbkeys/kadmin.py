@@ -101,7 +101,7 @@ class Kadm:
             return False
 
     def set_password (self, princ, password):
-        kpr = self.kadm.getprinc(princ)
+        kpr = self.find_princ(princ)
         kpr.change_password(password)
         kpr = self.kadm.getprinc(princ)
         return kpr

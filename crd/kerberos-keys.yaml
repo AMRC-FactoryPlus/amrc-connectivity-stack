@@ -36,9 +36,10 @@ spec:
                         spec:
                             type: object
                             x-kubernetes-validations:
-                                - rule: "self.type == 'Random' || !has(self.additionalPrincipals)"
+                                - rule: "self.type in ['Random', 'Disabled'] || !has(self.additionalPrincipals)"
+                                - rule: "self.type in ['Random', 'Disabled'] || !has(self.keepOldKeys)"
                                 - rule: "has(self.secret) || !has(self.sealWith)"
-                                - rule: "has(self.secret) || self.type in ['Random', 'Password', 'PresetPassword']"
+                                - rule: "has(self.secret) || self.type in ['Disabled', 'Random', 'Password', 'PresetPassword']"
                             required: [type, principal]
                             properties:
                                 type:
@@ -49,7 +50,7 @@ spec:
                                         PresetPassword expects a password to have already been recorded in the
                                         passwords secret; this password will be used as-is. 
                                     type: string
-                                    enum: [Random, Password, PresetPassword, Trust, PresetTrust]
+                                    enum: [Disabled, Random, Password, PresetPassword, Trust, PresetTrust]
                                 principal:
                                     description: The Kerberos principal name.
                                     type: string
@@ -60,6 +61,9 @@ spec:
                                     type: array
                                     items:
                                         type: string
+                                keepOldKeys:
+                                    description: Keep old keys available in the keytab.
+                                    type: boolean
                                 secret:
                                     description: >
                                         The name of the secret and key to store the keytab/password
@@ -83,5 +87,8 @@ spec:
                                         object.
                                     type: string
                                     pattern: "^[a-z0-9.-]+/[a-zA-Z0-9._-]+$"
+                        status:
+                            type: object
+                            x-kubernetes-preserve-unknown-fields: true
             subresources:
                 status: {}

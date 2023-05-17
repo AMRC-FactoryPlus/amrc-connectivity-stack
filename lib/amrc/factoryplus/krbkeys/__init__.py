@@ -30,6 +30,9 @@ class KrbKeys:
         kopf.on.create(*crd)(self.create_key)
         kopf.on.update(*crd)(self.update_key)
         kopf.on.delete(*crd)(self.delete_key)
+        kopf.on.timer(*CRD, interval=10.0,
+            annotations={"has-old-keys": "keytab"}
+        )(self.trim_keys)
 
     def run (self):
         self.register_handlers()
@@ -85,8 +88,9 @@ class KrbKeys:
         else:
             self.kubeseal.create_sealed_secret(seal_with, *secret, value)
         
-    def create_key (self, namespace, name, spec, **kw):
-        kadm = Kadm(name)
+    def create_key (self, spec, namespace, name, patch, **kw):
+        log(f"Create key for {namespace}/{name}: {spec!r}")
+        kadm = self.kadm
         secret = self.get_secret_for(namespace, name, spec)
         princs = self.get_princs_for(name, spec)
         seal_with = self.get_sealing_for(name, spec)
@@ -96,8 +100,12 @@ class KrbKeys:
 
         match (spec['type']):
             case "Random":
-                keytab = kadm.create_keytab(princs)
+                oldkt = spec.get("keepOldKeys") and not seal_with \
+                    and self.k8s.read_secret(*secret)
+                keytab = kadm.create_keytab(princs, oldkt)
                 self.update_secret(secret, keytab, seal_with)
+                if oldkt:
+                    patch.metadata.annotations['has-old-keys'] = "keytab"
             case "Password":
                 passwd = secrets.token_urlsafe()
                 kadm.set_password(princs[0], passwd)
@@ -123,15 +131,17 @@ class KrbKeys:
             case _ as typ:
                 raise ValueError(f"Unimplemented type {typ}")
 
-    def update_key (self, namespace, name, old, new, **kw):
-        logging.info(f"Update {name}: old {old!r}, new {new!r}");
-
+    def update_key (self, old, new, **kw):
         # XXX This is not the best thing to do here; it will generate a
         # whole lot of unnecessary kvnos. We should work out what has
         # changed and only update the secrets if necessary. (Though, a
         # 'force new key' field might be good...).
-        self.delete_key(namespace, name, old["spec"])
-        self.create_key(namespace, name, new["spec"])
+        
+        log(f"Key update: {kw['diff']!r}")
+
+        del kw["spec"]
+        self.delete_key(old["spec"], **kw)
+        self.create_key(new["spec"], **kw)
 
     def remove_secret (self, secret, sealed):
         if (sealed):
@@ -140,7 +150,8 @@ class KrbKeys:
         else:
             self.k8s.remove_secret(*secret)
 
-    def delete_key (self, namespace, name, spec, **kw):
+    def delete_key (self, spec, namespace, name, **kw):
+        log(f"Delete key for {namespace}/{name}: {spec!r}")
         secret = self.get_secret_for(namespace, name, spec)
         princs = self.get_princs_for(name, spec)
         sealed = "sealWith" in spec
@@ -151,11 +162,38 @@ class KrbKeys:
 
         match (spec['type']):
             case "Random" | "Password" | "Trust":
-                self.remove_secret(secret, sealed)
+                if "keepOldKeys" not in spec:
+                    self.remove_secret(secret, sealed)
             case "PresetPassword" | "PresetTrust":
                 pass
             case _ as typ:
                 logging.warning(f"Attempt to remove unimplemeted type {typ}")
+
+    def trim_keys (self, spec, namespace, name, patch, **kw):
+        log(f"Trim keys: {spec!r}")
+
+        def clear ():
+            log(f"Clearing has-old-keys")
+            patch.metadata.annotations["has-old-keys"] = None
+
+        if spec["type"] != "Random" or "sealWith" in spec:
+            log(f"Disabling trim for invalid object")
+            clear()
+            return
+
+        secret = self.get_secret_for(namespace, name, spec)
+        oldkt = self.k8s.read_secret(*secret)
+        if oldkt is None:
+            clear()
+            return
+
+        kadm = Kadm(name)
+
+        newkt, more = kadm.trim_keytab(oldkt)
+        if newkt is not None:
+            self.update_secret(secret, newkt, None)
+        if not more:
+            clear()
 
 @kopf.on.startup()
 def run (**kw):

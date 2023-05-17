@@ -3,7 +3,8 @@
 # Kerberos admin class
 
 import  logging
-from    tempfile    import TemporaryDirectory
+from    tempfile    import TemporaryDirectory, NamedTemporaryFile
+import  time
 
 import  krb5
 import  kadmin
@@ -45,11 +46,14 @@ class Kadm:
         kpr.set_flags(kadmin.DISALLOW_ALL_TIX)
         kpr.commit()
 
-    def create_keytab (self, princs):
+    def create_keytab (self, princs, oldkt):
         # Create a temp dir, since ktadd insists on creating the file
         # itself.
         with TemporaryDirectory() as ktdir:
             keytab = f"{ktdir}/keytab"
+            if oldkt:
+                with open(keytab, "wb") as fh:
+                    fh.write(oldkt)
             for princ in princs:
                 kpr = self.kadm.getprinc(princ)
                 kpr.ktadd(keytab)
@@ -59,6 +63,30 @@ class Kadm:
                 self.log(f"Created {princ} kvno {kpr.kvno}")
             with open(keytab, "rb") as fh:
                 return fh.read()
+
+    def trim_keytab (self, oldkt):
+        with NamedTemporaryFile() as ktf:
+            ktf.write(oldkt)
+            ktf.seek(0, 0)
+
+            ctx = krb5.init_context()
+            kth = krb5.kt_resolve(ctx, f"FILE:{ktf.name}".encode())
+
+            entries = list(kth)
+            ckvno   = max((kte.kvno for kte in entries), default=-1)
+            atrisk  = [kte for kte in entries if kte.kvno < ckvno]
+
+            since = time.time() - 1800
+            expired = [kte for kte in atrisk if kte.timestamp < since]
+            more    = len(expired) < len(atrisk)
+
+            for kte in expired:
+                log(f"Removing {kte.principal} kvno {kte.kvno}")
+                krb5.kt_remove_entry(ctx, kth, kte)
+            del kth
+
+            newkt = ktf.read() if expired else None
+            return newkt, more
 
     def princ_in_keytab (self, princ, data):
         # We always do find_princ because we always want the princpal to

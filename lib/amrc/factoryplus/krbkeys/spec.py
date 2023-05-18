@@ -76,23 +76,22 @@ class InternalSpec:
         for p in self.principals:
             kadm.enable_princ(p)
 
-        if not force \
-        and current is not None \
-        and kops.verify_key(self, current):
-            log("Current key is still valid")
-            return
+        if not force and current is not None:
+            valid = kops.verify_key(self, current)
+            if valid:
+                log("Current key is still valid")
+                return valid
 
         if self.preset:
             if current is None:
                 raise ValueError("No secret for preset key")
-            kops.set_key(self, current)
-            return None
+            return kops.set_key(self, current)
 
         # We want to fail, if possible, before we've done a ktadd and
         # have a newly-minted key which we can't put anywhere.
         self.secret.verify_writable()
         oldkey = current if self.keep_old else None
-        status, data = kops.generate_key(self, oldkey)
-        self.secret.write(data)
 
-        return None
+        status = kops.generate_key(self, oldkey)
+        self.secret.write(status.secret)
+        return status

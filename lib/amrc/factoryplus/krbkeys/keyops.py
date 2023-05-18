@@ -6,7 +6,20 @@ import  json
 import  krb5
 import  secrets
 
-from    .util       import KtData, log, ops
+from    .util       import KtData, fields, log, ops
+
+@fields
+class KeyOpStatus:
+    keys:       dict    = None
+    secret:     bytes   = None
+    has_old:    bool    = False
+
+# XXX It would be good to return the current status of the keys in the
+# secret from verify_key. Then we could keep the status part of the K8s
+# object up to date, and potentially verify sealed keys we can't read.
+# But it seems to be very difficult to extract a kvno from a krb5 creds
+# object; I think there is dodgy C casting involved which we can't do
+# from Python.
 
 class KeyOps:
     def verify_key (spec, secret):
@@ -37,15 +50,19 @@ class Keytab (KeyOps):
                     kpr = krb5.parse_name_flags(ctx, princ.encode(), 0)
                     krb5.get_init_creds_keytab(ctx, kpr, gic, kth)
                 except krb5.Krb5Error:
-                    return False
+                    return None
 
-        return True
+        return KeyOpStatus()
 
     def generate_key (spec, current):
         kt = KtData(contents=current)
         with kt.kt_name() as name:
-            kvnos = ops().kadm.create_keytab(spec.principals, name)
-        return kvnos, kt.contents
+            keys = ops().kadm.create_keytab(spec.principals, name)
+
+        return KeyOpStatus(
+            secret=kt.contents, 
+            keys=keys, 
+            has_old=(current is not None))
 
 class Password (KeyOps):
     def verify_key (spec, secret):
@@ -58,24 +75,27 @@ class Password (KeyOps):
             kpr = krb5.parse_name_flags(ctx, princ.encode(), 0)
             krb5.get_init_creds_password(ctx, kpr, gic, secret)
         except krb5.Krb5Error:
-            return False
-        return True
+            return None
+
+        return KeyOpStatus()
 
     def generate_key (spec, current):
         princ = spec.principal
         log(f"Setting new password for {princ}")
 
         passwd = secrets.token_urlsafe()
-        kpr = ops().kadm.set_password(princ, passwd)
-        status = { princ: { "kvno": kpr.kvno } }
+        keys = ops().kadm.set_password(princ, passwd)
 
-        return status, passwd.encode()
+        return KeyOpStatus(
+            secret=passwd.encode(),
+            keys=keys)
 
     def set_key (spec, secret):
         princ = spec.principal
         log(f"Setting preset password for {princ}")
 
-        ops().kadm.set_password(princ, secret.decode())
+        keys = ops().kadm.set_password(princ, secret.decode())
+        return KeyOpStatus(keys=keys)
 
 class Trust (KeyOps):
     def verify_key (spec, secret):
@@ -84,24 +104,34 @@ class Trust (KeyOps):
         log(f"Verifying trust key for {princ}")
 
         passwd = trust.pop("password").encode()
-        have = ops().kadm.fetch_trust_key(princ)
+        have = ops().kadm.key_info(princ)
         
-        return have == trust and Password.verify_key(spec, passwd)
+        if have == trust:
+            return Password.verify_key(spec, passwd)
+        else:
+            return None
 
     def generate_key (spec, current):
         princ = spec.principal
         log(f"Creating new trust key for {princ}")
 
         passwd = secrets.token_urlsafe()
-        trust = ops().kadm.create_trust_key(princ, passwd)
-        return {}, json.dumps(trust).encode()
+        keys = ops().kadm.set_password(princ, passwd)
+        trust = keys | { "password": passwd }
+        
+        return KeyOpStatus(
+            secret=json.dumps(trust).encode(),
+            keys=keys)
 
     def set_key (spec, secret):
         princ = spec.principal
         log(f"Setting trust key for {princ}")
 
         trust = json.loads(secret.decode())
-        ops().kadm.set_trust_key(princ, trust)
+        passwd = trust.pop("password")
+        ops().kadm.set_trust_key(princ, trust, passwd)
+
+        return KeyOpStatus(keys=trust)
 
 TYPE_MAP = {
     "Disabled":         (Disabled, False),

@@ -7,15 +7,12 @@ import  logging
 from .spec          import InternalSpec
 from .util          import Identifiers, dslice, log
 
-FORCE_REKEY = f"{Identifiers.APPID}/force-rekey"
-
 class KrbKeyEvent:
     def __init__ (self, args):
         self.ns, self.name = dslice(args, "namespace", "name")
-        self.annot, self.patch = dslice(args, "annotations", "patch")
+        self.annotations, self.patch = dslice(args, "annotations", "patch")
 
-        old, new, reason = dslice(args, 
-            "old", "new", "reason")
+        old, new, reason = dslice(args, "old", "new", "reason")
 
         self.old = None if old is None \
             else InternalSpec(event=self, spec=old["spec"])
@@ -26,13 +23,13 @@ class KrbKeyEvent:
         if self.old is not None:
             self.old.remove(self.new)
 
-        if self.new is None:
-            return
-
-        if self.new.disabled:
-            log("Key is disabled")
+        if self.new is None or self.new.disabled:
             return
         
-        force = FORCE_REKEY in self.annot
-        self.new.reconcile_key(force=force)
-        self.patch.metadata.annotations[FORCE_REKEY] = None
+        force = Identifiers.FORCE_REKEY in self.annotations
+        status = self.new.reconcile_key(force=force)
+
+        p_meta = self.patch.metadata
+        p_meta.annotations[Identifiers.FORCE_REKEY] = None
+        if status.has_old:
+            p_meta.labels[Identifiers.HAS_OLD_KEYS] = "true"

@@ -100,13 +100,7 @@ class Kadm:
             log("Keytab entry not found")
             return False
 
-    def set_password (self, princ, password):
-        kpr = self.find_princ(princ)
-        kpr.change_password(password)
-        kpr = self.kadm.getprinc(princ)
-        return kpr
-
-    def fetch_trust_key (self, princ):
+    def key_info (self, princ):
         kpr = self.kadm.getprinc(princ)
         if kpr is None:
             return None
@@ -116,18 +110,18 @@ class Kadm:
             'etypes':   [":".join(et) for et in kpr.keys[kpr.kvno]],
         }
 
-    def create_trust_key (self, princ, password):
-        self.set_password(princ, password)
-        trust = self.fetch_trust_key(princ)
-        return trust | { "password": password }
+    def set_password (self, princ, password):
+        kpr = self.find_princ(princ)
+        kpr.change_password(password)
+        return self.key_info(princ)
 
     # For now we cannot set the etype, as kadmV doesn't map the required
     # function. So just check we end up with it right.
-    def set_trust_key (self, princ, data):
-        kvno = data['kvno']
+    def set_trust_key (self, princ, info, passwd):
+        kvno = info['kvno']
 
         kpr = self.find_princ(princ)
-        kpr.change_password(data['password'])
+        kpr.change_password(passwd)
         kpr.kvno = kvno
         kpr.commit()
         log(f"Created trust principal {princ} kvno {kvno}")
@@ -136,7 +130,8 @@ class Kadm:
         keys = kpr.keys
         if len(keys) != 1 or kvno not in keys:
             raise RuntimeError(f"Incorrect kvno for trust {princ}")
-        want_etypes = sorted(data['etypes'])
+
+        want_etypes = sorted(info['etypes'])
         have_etypes = sorted([":".join(et) for et in keys[kvno]])
         if have_etypes != want_etypes:
             raise RuntimeError(f"Incorrect etypes for trust {princ}")

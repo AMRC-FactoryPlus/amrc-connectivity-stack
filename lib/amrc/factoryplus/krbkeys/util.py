@@ -17,6 +17,9 @@ class Identifiers:
     CRD_PLURAL = "kerberos-keys"
     CRD_VERSION = "v1"
 
+    FORCE_REKEY = f"{APPID}/force-rekey"
+    HAS_OLD_KEYS = f"{APPID}/has-old-keys"
+
     MANAGED_BY = "app.kubernetes.io/managed-by"
 
 def dslice (dct, *args):

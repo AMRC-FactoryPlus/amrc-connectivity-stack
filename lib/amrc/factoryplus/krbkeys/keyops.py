@@ -2,6 +2,7 @@
 # Internal spec class
 # Copyright 2023 AMRC
 
+import  json
 import  krb5
 import  secrets
 
@@ -77,7 +78,30 @@ class Password (KeyOps):
         ops().kadm.set_password(princ, secret.decode())
 
 class Trust (KeyOps):
-    pass
+    def verify_key (spec, secret):
+        princ = spec.principal
+        trust = json.loads(secret.decode())
+        log(f"Verifying trust key for {princ}")
+
+        passwd = trust.pop("password").encode()
+        have = ops().kadm.fetch_trust_key(princ)
+        
+        return have == trust and Password.verify_key(spec, passwd)
+
+    def generate_key (spec, current):
+        princ = spec.principal
+        log(f"Creating new trust key for {princ}")
+
+        passwd = secrets.token_urlsafe()
+        trust = ops().kadm.create_trust_key(princ, passwd)
+        return {}, json.dumps(trust).encode()
+
+    def set_key (spec, secret):
+        princ = spec.principal
+        log(f"Setting trust key for {princ}")
+
+        trust = json.loads(secret.decode())
+        ops().kadm.set_trust_key(princ, trust)
 
 TYPE_MAP = {
     "Disabled":         (Disabled, False),

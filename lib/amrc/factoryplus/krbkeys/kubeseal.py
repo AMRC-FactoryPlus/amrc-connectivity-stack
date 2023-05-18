@@ -107,7 +107,6 @@ class Kubeseal:
 
         desc = f"key {key} from sealed secret {ns}/{name}"
         secret = self.find_sealed_secret(ns, name, False)
-        log(f"Found SSecret: {secret!r}")
 
         if secret is None:
             log(f"Cannot remove {desc}: not found")

@@ -82,7 +82,9 @@ class InternalSpec:
 
         current = self.secret.maybe_read()
 
-        if not force and kops.verify_key(self, current):
+        if not force \
+        and current is not None \
+        and kops.verify_key(self, current):
             log("Current key is still valid")
             return
 

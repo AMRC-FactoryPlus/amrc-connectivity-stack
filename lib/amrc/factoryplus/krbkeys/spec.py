@@ -65,12 +65,16 @@ class InternalSpec:
             self.secret.remove()
 
         npr = set() if new is None or new.disabled else new.principals;
+        kadm = ops().kadm
         for p in self.principals - npr:
-            log(f"Disable principal {p}")
+            kadm.disable_princ(p)
 
     def reconcile_key (self, force=False):
         kops = self.kind
         current = self.secret.maybe_read()
+
+        for p in self.principals:
+            kadm.enable_princ(p)
 
         if not force \
         and current is not None \

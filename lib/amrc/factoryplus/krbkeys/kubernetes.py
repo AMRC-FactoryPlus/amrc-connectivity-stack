@@ -34,12 +34,18 @@ class K8s:
                 time.sleep(random.uniform(0.1, 0.6))
                 log("Retrying operation due to 409...")
 
-    def find_secret (self, ns, name, create):
+    def find_secret (self, ns, name, create=False, mine=None):
         cli = k8s.client
         core = cli.CoreV1Api()
 
+        if mine is None:
+            mine = create
+
         try:
-            return core.read_namespaced_secret(namespace=ns, name=name)
+            secret = core.read_namespaced_secret(namespace=ns, name=name)
+            if mine and not is_mine(secret):
+                raise ValueError(f"Can't edit secret {name}, it isn't mine")
+            return secret
         except ApiException as ex:
             if ex.status != 404:
                 raise ex
@@ -70,10 +76,7 @@ class K8s:
         # Encode to Base64 bytes, then decode to Base64 string
         b64 = b64encode(value).decode()
         def work ():
-            secret = self.find_secret(ns, name, True)
-
-            if not is_mine(secret):
-                raise ValueError(f"Can't edit secret {name}, it isn't mine")
+            secret = self.find_secret(ns, name, create=True)
 
             if secret.data is None:
                 secret.data = { key: b64 }
@@ -85,13 +88,11 @@ class K8s:
     def remove_secret (self, ns, name, key):
         core = k8s.client.CoreV1Api()
         def work ():
-            secret = self.find_secret(ns, name, False)
+            secret = self.find_secret(ns, name, create=False, mine=True)
 
             if secret is None or secret.data is None or key not in secret.data:
                 log(f"Can't remove {key} from secret {name}, not found")
                 return
-            if not is_mine(secret):
-                raise ValueError(f"Can't edit secret {name}, it isn't mine")
 
             log(f"Removing key {key} in secret {name}")
             # To delete a key we must set to None, not use del().

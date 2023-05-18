@@ -46,14 +46,6 @@ class InternalSpec:
             return p
 
     @property
-    def secret_mode (self):
-        if self.preset:
-            return "r";
-        if self.keep_old:
-            return "rw";
-        return "w";
-
-    @property
     def disabled (self):
         return self.kind == keyops.Disabled
 
@@ -69,7 +61,7 @@ class InternalSpec:
 
     def remove (self, new):
         nsc = None if new is None else new.secret
-        if "w" in self.secret_mode and self.secret != nsc:
+        if not self.preset and self.secret != nsc:
             self.secret.remove()
 
         npr = set() if new is None or new.disabled else new.principals;
@@ -77,9 +69,7 @@ class InternalSpec:
             log(f"Disable principal {p}")
 
     def reconcile_key (self, force=False):
-        mode = self.secret_mode
         kops = self.kind
-
         current = self.secret.maybe_read()
 
         if not force \

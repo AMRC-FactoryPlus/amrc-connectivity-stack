@@ -20,12 +20,11 @@ from .util          import Identifiers, log, log_tag, operator
 CRD = (Identifiers.DOMAIN, Identifiers.CRD_VERSION, Identifiers.CRD_PLURAL)
 
 class KrbKeys:
-    def __init__ (self, default_ns, keytabs, passwords, presets, **kw):
-        # There must be a better way to do this...
-        self.default_ns = default_ns
-        self.keytabs = keytabs
-        self.passwords = passwords
-        self.presets = presets
+    def __init__ (self, env, **kw):
+        self.default_ns = env["DEFAULT_NAMESPACE"]
+        self.keytabs = env["KEYTABS_SECRET"]
+        self.passwords = env["PASSWORDS_SECRET"]
+        self.presets = env["PRESETS_SECRET"]
 
         self.k8s = K8s()
         self.krb5 = krb5.init_context()
@@ -43,6 +42,7 @@ class KrbKeys:
         #)(self.trim_keys)
 
     def run (self):
+        self.kadm.start()
         self.register_handlers()
 
     def handle_event (self, **kw):
@@ -105,10 +105,5 @@ class KrbKeys:
 
 @kopf.on.startup()
 def run (**kw):
-    krbkeys = KrbKeys(
-        default_ns=os.environ["DEFAULT_NAMESPACE"],
-        keytabs=os.environ["KEYTABS_SECRET"],
-        passwords=os.environ["PASSWORDS_SECRET"],
-        presets=os.environ["PRESETS_SECRET"],
-    )
+    krbkeys = KrbKeys(env=os.environ)
     krbkeys.run()

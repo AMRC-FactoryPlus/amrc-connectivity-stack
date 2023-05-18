@@ -13,10 +13,11 @@ from    .util       import log
 
 class Kadm:
     def __init__ (self, kadm=None):
-        if kadm is None:
+        self.kadm = kadm
+
+    def start (self):
+        if self.kadm is None:
             self.kadm = kadmin.init_with_ccache()
-        else:
-            self.kadm = kadm
 
     def find_princ (self, princ):
         kadm = self.kadm

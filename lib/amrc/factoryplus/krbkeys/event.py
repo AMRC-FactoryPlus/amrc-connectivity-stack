@@ -14,19 +14,29 @@ class KrbKeyEvent:
 
         old, new, reason = dslice(args, "old", "new", "reason")
 
+        self.reason = reason
         self.old = None if old is None \
             else InternalSpec(event=self, spec=old["spec"])
         self.new = None if new is None or reason == "delete" \
             else InternalSpec(event=self, spec=new["spec"])
 
     def process (self):
+        force = Identifiers.FORCE_REKEY in self.annotations
+
+        if not force and self.new == self.old:
+            if self.reason != "resume":
+                log("No change")
+                return
+            if not self.new.can_verify():
+                log("Cannot verify current key")
+                return
+
         if self.old is not None:
             self.old.remove(self.new)
 
         if self.new is None or self.new.disabled:
             return
         
-        force = Identifiers.FORCE_REKEY in self.annotations
         status = self.new.reconcile_key(force=force)
 
         p_meta = self.patch.metadata

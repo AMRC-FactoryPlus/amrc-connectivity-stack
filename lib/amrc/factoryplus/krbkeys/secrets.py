@@ -18,6 +18,9 @@ class SecretRef:
     def splat (self):
         return self.ns, self.name, self.key
 
+    def can_read (self):
+        return not self.seal
+
     def maybe_read (self):
         if self.seal:
             return None

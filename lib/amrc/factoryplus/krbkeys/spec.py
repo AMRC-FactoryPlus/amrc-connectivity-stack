@@ -59,6 +59,9 @@ class InternalSpec:
             if len(self.principals) != 1:
                 raise ValueError("Multiple principals requires a keytab")
 
+    def can_verify (self):
+        return self.secret.can_read()
+
     def remove (self, new):
         nsc = None if new is None else new.secret
         if not self.preset and self.secret != nsc:
@@ -73,6 +76,7 @@ class InternalSpec:
         kops = self.kind
         current = self.secret.maybe_read()
 
+        kadm = ops().kadm
         for p in self.principals:
             kadm.enable_princ(p)
 

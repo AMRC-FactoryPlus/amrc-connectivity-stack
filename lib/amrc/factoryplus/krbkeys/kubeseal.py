@@ -43,12 +43,18 @@ class Kubeseal:
 
         return tmp
 
-    def find_sealed_secret (self, ns, name, create):
+    def find_sealed_secret (self, ns, name, create=False, mine=None):
         api = k8s.client.CustomObjectsApi()
 
+        if mine is None:
+            mine = create
+
         try:
-            return api.get_namespaced_custom_object(
+            secret = api.get_namespaced_custom_object(
                 **SealedSecrets.CRD, namespace=ns, name=name)
+            if mine and not is_mine(secret):
+                raise ValueError(f"Can't edit sealed secret {name}, it isn't mine")
+            return secret
         except ApiException as ex:
             if ex.status != 404:
                 raise ex
@@ -82,7 +88,7 @@ class Kubeseal:
         desc = f"key {key} in sealed secret {ns}/{name}"
 
         api = k8s.client.CustomObjectsApi()
-        secret = self.find_sealed_secret(ns, name, True)
+        secret = self.find_sealed_secret(ns, name, create=True)
         if not is_mine(secret):
             raise ValueError(f"Can't add {desc}: not mine")
 
@@ -106,7 +112,7 @@ class Kubeseal:
         api = k8s.client.CustomObjectsApi()
 
         desc = f"key {key} from sealed secret {ns}/{name}"
-        secret = self.find_sealed_secret(ns, name, False)
+        secret = self.find_sealed_secret(ns, name, create=False, mine=True)
 
         if secret is None:
             log(f"Cannot remove {desc}: not found")

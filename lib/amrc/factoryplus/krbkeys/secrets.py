@@ -32,7 +32,7 @@ class SecretRef:
         if self.seal:
             ks = ops().kubeseal
             self.cert = ks.fetch_cert(self.ns, self.seal)
-            ks.maybe_delete_sealed_secret(*self.splat)
+            ks.find_sealed_secret(self.ns, self.name, create=False, mine=True)
         else:
             ops().k8s.find_secret(self.ns, self.name, create=False, mine=True)
 

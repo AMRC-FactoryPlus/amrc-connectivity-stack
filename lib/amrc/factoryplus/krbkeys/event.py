@@ -9,27 +9,42 @@ from .util          import Identifiers, dslice, log
 
 class KrbKeyEvent:
     def __init__ (self, args):
-        self.ns, self.name = dslice(args, "namespace", "name")
+        self.ns, self.name, self.reason = dslice(args, "namespace", "name", "reason")
         self.annotations, self.patch = dslice(args, "annotations", "patch")
 
-        old, new, reason = dslice(args, "old", "new", "reason")
+    def process (self):
+        raise NotImplementedError()
 
-        self.reason = reason
+class RekeyEvent (KrbKeyEvent):
+    def __init__ (self, args):
+        super().__init__(args)
+
+        old, new = dslice(args, "old", "new")
+
         self.old = None if old is None \
             else InternalSpec(event=self, spec=old["spec"])
-        self.new = None if new is None or reason == "delete" \
+        self.new = None if new is None or self.reason == "delete" \
             else InternalSpec(event=self, spec=new["spec"])
+
+    def rekey_needed (self):
+        if self.new != self.old:
+            return True
+
+        if self.reason != "resume":
+            log("No change")
+            return False
+
+        if not self.new.can_verify():
+            log("Cannot verify current key")
+            return False
+
+        return True
 
     def process (self):
         force = Identifiers.FORCE_REKEY in self.annotations
 
-        if not force and self.new == self.old:
-            if self.reason != "resume":
-                log("No change")
-                return
-            if not self.new.can_verify():
-                log("Cannot verify current key")
-                return
+        if not force and not self.rekey_needed():
+            return
 
         if self.old is not None:
             self.old.remove(self.new)
@@ -43,3 +58,14 @@ class KrbKeyEvent:
         p_meta.annotations[Identifiers.FORCE_REKEY] = None
         if status.has_old:
             p_meta.labels[Identifiers.HAS_OLD_KEYS] = "true"
+
+class TrimKeysEvent (KrbKeyEvent):
+    def __init__ (self, args):
+        super().__init__(args)
+        self.spec = InternalSpec(event=self, spec=args["spec"])
+
+    def process (self):
+        status = self.spec.trim_keys()
+
+        if not status.has_old:
+            self.patch.metadata.labels[Identifiers.HAS_OLD_KEYS] = None

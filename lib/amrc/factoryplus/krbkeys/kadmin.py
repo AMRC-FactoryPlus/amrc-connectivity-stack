@@ -60,30 +60,6 @@ class Kadm:
 
         return kvnos
 
-    def trim_keytab (self, oldkt):
-        with NamedTemporaryFile() as ktf:
-            ktf.write(oldkt)
-            ktf.seek(0, 0)
-
-            ctx = krb5.init_context()
-            kth = krb5.kt_resolve(ctx, f"FILE:{ktf.name}".encode())
-
-            entries = list(kth)
-            ckvno   = max((kte.kvno for kte in entries), default=-1)
-            atrisk  = [kte for kte in entries if kte.kvno < ckvno]
-
-            since = time.time() - 1800
-            expired = [kte for kte in atrisk if kte.timestamp < since]
-            more    = len(expired) < len(atrisk)
-
-            for kte in expired:
-                log(f"Removing {kte.principal} kvno {kte.kvno}")
-                krb5.kt_remove_entry(ctx, kth, kte)
-            del kth
-
-            newkt = ktf.read() if expired else None
-            return newkt, more
-
     def princ_in_keytab (self, princ, keytab):
         # We always do find_princ because we always want the princpal to
         # exist.

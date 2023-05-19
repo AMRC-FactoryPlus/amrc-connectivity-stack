@@ -2,6 +2,7 @@
 
 # Kopf operator handlers
 
+from    contextlib      import contextmanager
 import  dataclasses
 import  json
 import  logging
@@ -14,7 +15,7 @@ import  krb5
 from .kadmin        import Kadm
 from .kubernetes    import K8s
 from .kubeseal      import Kubeseal
-from .event         import KrbKeyEvent
+from .event         import RekeyEvent, TrimKeysEvent
 from .util          import Identifiers, log, log_tag, operator
 
 CRD = (Identifiers.DOMAIN, Identifiers.CRD_VERSION, Identifiers.CRD_PLURAL)
@@ -25,6 +26,7 @@ class KrbKeys:
         self.keytabs = env["KEYTABS_SECRET"]
         self.passwords = env["PASSWORDS_SECRET"]
         self.presets = env["PRESETS_SECRET"]
+        self.expire_old_keys = int(env.get("EXPIRE_OLD_KEYS", 86400))
 
         self.k8s = K8s()
         self.krb5 = krb5.init_context()
@@ -33,28 +35,37 @@ class KrbKeys:
 
     def register_handlers (self):
         log("Registering handlers")
-        kopf.on.resume(*CRD)(self.handle_event)
-        kopf.on.create(*CRD)(self.handle_event)
-        kopf.on.update(*CRD)(self.handle_event)
-        kopf.on.delete(*CRD)(self.handle_event)
-        #kopf.on.timer(*CRD, interval=10.0,
-        #    annotations={"has-old-keys": "keytab"}
-        #)(self.trim_keys)
+        kopf.on.resume(*CRD)(self.maybe_rekey)
+        kopf.on.create(*CRD)(self.maybe_rekey)
+        kopf.on.update(*CRD)(self.maybe_rekey)
+        kopf.on.delete(*CRD)(self.maybe_rekey)
+        kopf.on.timer(*CRD,
+            interval=self.expire_old_keys/2,
+            labels={Identifiers.HAS_OLD_KEYS: "true"}
+        )(self.trim_keys)
 
     def run (self):
         self.kadm.start()
         self.register_handlers()
 
-    def handle_event (self, **kw):
+    @contextmanager
+    def context (self, kw):
         tag = f"{kw['namespace']}/{kw['name']}"
         lt_tok = log_tag.set(tag)
         op_tok = operator.set(self)
-        try:
-            handler = KrbKeyEvent(kw)
+        yield None
+        operator.reset(op_tok)
+        log_tag.reset(lt_tok)
+
+    def maybe_rekey (self, **kw):
+        with self.context(kw):
+            handler = RekeyEvent(kw)
             return handler.process()
-        finally:
-            operator.reset(op_tok)
-            log_tag.reset(lt_tok)
+
+    def trim_keys (self, **kw):
+        with self.context(kw):
+            handler = TrimKeysEvent(kw)
+            return handler.process()
 
     # XXX This needs removing. These default secrets were not a good
     # idea.
@@ -76,32 +87,6 @@ class KrbKeys:
             key = name
 
         return (ns, secret, key)
-
-    def trim_keys (self, spec, namespace, name, patch, **kw):
-        log(f"Trim keys: {spec!r}")
-
-        def clear ():
-            log(f"Clearing has-old-keys")
-            patch.metadata.annotations["has-old-keys"] = None
-
-        if spec["type"] != "Random" or "sealWith" in spec:
-            log(f"Disabling trim for invalid object")
-            clear()
-            return
-
-        secret = self.get_secret_for(namespace, name, spec)
-        oldkt = self.k8s.read_secret(*secret)
-        if oldkt is None:
-            clear()
-            return
-
-        kadm = Kadm(name)
-
-        newkt, more = kadm.trim_keytab(oldkt)
-        if newkt is not None:
-            self.update_secret(secret, newkt, None)
-        if not more:
-            clear()
 
 @kopf.on.startup()
 def run (**kw):

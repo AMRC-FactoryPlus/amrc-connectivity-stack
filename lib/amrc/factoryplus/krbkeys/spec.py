@@ -99,3 +99,18 @@ class InternalSpec:
         status = kops.generate_key(self, oldkey)
         self.secret.write(status.secret)
         return status
+
+    def trim_keys (self):
+        self.secret.verify_writable()
+
+        current = self.secret.maybe_read()
+        if current is None:
+            log(f"Can't trim key, secret is not readable")
+            return keyops.KeyOpStatus(has_old=False)
+            
+        status = self.kind.trim_keys(self, current)
+
+        if status.secret is not None:
+            self.secret.write(status.secret)
+
+        return status

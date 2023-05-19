@@ -2,9 +2,11 @@
 # Internal spec class
 # Copyright 2023 AMRC
 
+from    datetime    import datetime
 import  json
 import  krb5
 import  secrets
+import  time
 
 from    .util       import KtData, fields, log, ops
 
@@ -30,6 +32,9 @@ class KeyOps:
 
     def set_key (spec, secret):
         raise NotImplementedError()
+
+    def trim_keys (spec, secret):
+        return KeyOpStatus(secret=None, has_old=False)
 
 class Disabled (KeyOps):
     pass
@@ -63,6 +68,36 @@ class Keytab (KeyOps):
             secret=kt.contents, 
             keys=keys, 
             has_old=(current is not None))
+
+    def trim_keys (spec, secret):
+        kt = KtData(contents=secret)
+        ctx = ops().krb5
+        since = time.time() - ops().expire_old_keys
+        log(f"Trimming keytab (since {datetime.fromtimestamp(since)})")
+
+        more = False
+        changed = False
+        with kt.kt_name() as keytab:
+            kth = krb5.kt_resolve(ctx, keytab.encode())
+            entries = list(kth)
+
+            principals = set(str(kte.principal) for kte in entries)
+            for princ in principals:
+                mine    = [kte for kte in entries if str(kte.principal) == princ]
+                ckvno   = max((kte.kvno for kte in mine), default=-1)
+                atrisk  = [kte for kte in mine if kte.kvno < ckvno]
+                expired = [kte for kte in atrisk if kte.timestamp < since]
+
+                for kte in expired:
+                    log(f"Removing {kte.principal} kvno {kte.kvno}")
+                    krb5.kt_remove_entry(ctx, kth, kte)
+
+                changed |= bool(expired)
+                more |= len(expired) < len(atrisk)
+
+        return KeyOpStatus(
+            secret=kt.contents if changed else None,
+            has_old=more)
 
 class Password (KeyOps):
     def verify_key (spec, secret):

@@ -10,6 +10,9 @@ from    tempfile        import TemporaryDirectory, NamedTemporaryFile
 
 import krb5
 
+# Don't make a circular import
+from    .       import context
+
 class Identifiers:
     DOMAIN = "factoryplus.app.amrc.co.uk"
     APP = "krbkeys"
@@ -27,21 +30,13 @@ def dslice (dct, *args):
         return None
     return tuple(dct.get(x) for x in args)
 
+def log (*args, **kw):
+    context.log(*args, **kw)
+
 # I would like to use frozen and slots here, but it appears to break
 # super() in the __init__ methods.
 fields = dataclasses.dataclass()
 hidden = dataclasses.field(init=False, default=None, compare=False, repr=False)
-
-operator = ContextVar("operator")
-log_tag = ContextVar("log_tag", default=None)
-
-def ops ():
-    return operator.get()
-
-def log (msg, level=logging.INFO):
-    tag = log_tag.get()
-    prefix = "" if tag is None else f"[{tag}] "
-    logging.log(level, prefix + msg)
 
 class KtData:
     def __init__ (self, contents):

@@ -10,13 +10,10 @@ import  os
 import  secrets
 
 import  kopf
-import  krb5
 
-from .kadmin        import Kadm
-from .kubernetes    import K8s
-from .kubeseal      import Kubeseal
+from .context       import Context
 from .event         import RekeyEvent, TrimKeysEvent
-from .util          import Identifiers, log, log_tag, operator
+from .util          import Identifiers, log
 
 CRD = (Identifiers.DOMAIN, Identifiers.CRD_VERSION, Identifiers.CRD_PLURAL)
 
@@ -27,11 +24,6 @@ class KrbKeys:
         self.passwords = env["PASSWORDS_SECRET"]
         self.presets = env["PRESETS_SECRET"]
         self.expire_old_keys = int(env.get("EXPIRE_OLD_KEYS", 86400))
-
-        self.k8s = K8s()
-        self.krb5 = krb5.init_context()
-        self.kadm = Kadm()
-        self.kubeseal = Kubeseal()
 
     def register_handlers (self):
         log("Registering handlers")
@@ -45,25 +37,15 @@ class KrbKeys:
         )(self.trim_keys)
 
     def run (self):
-        self.kadm.start()
         self.register_handlers()
 
-    @contextmanager
-    def context (self, kw):
-        tag = f"{kw['namespace']}/{kw['name']}"
-        lt_tok = log_tag.set(tag)
-        op_tok = operator.set(self)
-        yield None
-        operator.reset(op_tok)
-        log_tag.reset(lt_tok)
-
     def maybe_rekey (self, **kw):
-        with self.context(kw):
+        with Context(self, kw):
             handler = RekeyEvent(kw)
             return handler.process()
 
     def trim_keys (self, **kw):
-        with self.context(kw):
+        with Context(self, kw):
             handler = TrimKeysEvent(kw)
             return handler.process()
 

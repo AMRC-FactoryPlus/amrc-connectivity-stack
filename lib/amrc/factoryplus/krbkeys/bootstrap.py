@@ -15,7 +15,6 @@ from .kadmin import Kadm
 from .kubernetes import K8s
 from .util import KtData
 
-
 class KrbKeysBs:
     def __init__(self, namespace, keytabs, secrets, principal, ktname):
         self.keytabs = keytabs

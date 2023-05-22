@@ -7,8 +7,9 @@ import  logging
 import  typing
 
 from    .           import keyops
+from    .context    import kk_ctx
 from    .secrets    import SecretRef
-from    .util       import dslice, fields, hidden, log, ops
+from    .util       import dslice, fields, hidden, log
 
 @fields
 class InternalSpec:
@@ -33,7 +34,8 @@ class InternalSpec:
         secret, seal = dslice(spec, "secret", "sealWith")
         if secret is None:
             log("Default secrets are deprecated", level=logging.WARNING)
-            _, sec_name, sec_key = ops().get_secret_for(ns, name, spec)
+            oper = kk_ctx().operator
+            _, sec_name, sec_key = oper.get_secret_for(ns, name, spec)
         else:
             sec_name, sec_key = secret.split("/")
         self.secret = SecretRef(ns=ns, name=sec_name, key=sec_key, seal=seal)
@@ -68,7 +70,7 @@ class InternalSpec:
             self.secret.remove()
 
         npr = set() if new is None or new.disabled else new.principals;
-        kadm = ops().kadm
+        kadm = kk_ctx().kadm
         for p in self.principals - npr:
             kadm.disable_princ(p)
 
@@ -76,7 +78,7 @@ class InternalSpec:
         kops = self.kind
         current = self.secret.maybe_read()
 
-        kadm = ops().kadm
+        kadm = kk_ctx().kadm
         for p in self.principals:
             kadm.enable_princ(p)
 

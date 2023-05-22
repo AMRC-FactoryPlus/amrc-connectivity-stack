@@ -8,7 +8,8 @@ import  krb5
 import  secrets
 import  time
 
-from    .util       import KtData, fields, log, ops
+from    .context    import kk_ctx
+from    .util       import KtData, fields, log
 
 @fields
 class KeyOpStatus:
@@ -42,7 +43,7 @@ class Disabled (KeyOps):
 class Keytab (KeyOps):
     def verify_key (spec, secret):
         kt = KtData(contents=secret)
-        ctx = ops().krb5
+        ctx = kk_ctx().krb5
 
         with kt.kt_name() as ktname:
             kth = krb5.kt_resolve(ctx, ktname.encode())
@@ -62,7 +63,7 @@ class Keytab (KeyOps):
     def generate_key (spec, current):
         kt = KtData(contents=current)
         with kt.kt_name() as name:
-            keys = ops().kadm.create_keytab(spec.principals, name)
+            keys = kk_ctx().kadm.create_keytab(spec.principals, name)
 
         return KeyOpStatus(
             secret=kt.contents, 
@@ -71,8 +72,8 @@ class Keytab (KeyOps):
 
     def trim_keys (spec, secret):
         kt = KtData(contents=secret)
-        ctx = ops().krb5
-        since = time.time() - ops().expire_old_keys
+        ctx = kk_ctx().krb5
+        since = time.time() - kk_ctx().operator.expire_old_keys
         log(f"Trimming keytab (since {datetime.fromtimestamp(since)})")
 
         more = False
@@ -104,7 +105,7 @@ class Password (KeyOps):
         princ = spec.principal
         log(f"Verifying password for {princ}")
 
-        ctx = ops().krb5
+        ctx = kk_ctx().krb5
         gic = krb5.get_init_creds_opt_alloc(ctx)
         try:
             kpr = krb5.parse_name_flags(ctx, princ.encode(), 0)
@@ -119,7 +120,7 @@ class Password (KeyOps):
         log(f"Setting new password for {princ}")
 
         passwd = secrets.token_urlsafe()
-        keys = ops().kadm.set_password(princ, passwd)
+        keys = kk_ctx().kadm.set_password(princ, passwd)
 
         return KeyOpStatus(
             secret=passwd.encode(),
@@ -129,7 +130,7 @@ class Password (KeyOps):
         princ = spec.principal
         log(f"Setting preset password for {princ}")
 
-        keys = ops().kadm.set_password(princ, secret.decode())
+        keys = kk_ctx().kadm.set_password(princ, secret.decode())
         return KeyOpStatus(keys=keys)
 
 class Trust (KeyOps):
@@ -139,7 +140,7 @@ class Trust (KeyOps):
         log(f"Verifying trust key for {princ}")
 
         passwd = trust.pop("password").encode()
-        have = ops().kadm.key_info(princ)
+        have = kk_ctx().kadm.key_info(princ)
         
         if have == trust:
             return Password.verify_key(spec, passwd)
@@ -151,7 +152,7 @@ class Trust (KeyOps):
         log(f"Creating new trust key for {princ}")
 
         passwd = secrets.token_urlsafe()
-        keys = ops().kadm.set_password(princ, passwd)
+        keys = kk_ctx().kadm.set_password(princ, passwd)
         trust = keys | { "password": passwd }
         
         return KeyOpStatus(
@@ -164,7 +165,7 @@ class Trust (KeyOps):
 
         trust = json.loads(secret.decode())
         passwd = trust.pop("password")
-        ops().kadm.set_trust_key(princ, trust, passwd)
+        kk_ctx().kadm.set_trust_key(princ, trust, passwd)
 
         return KeyOpStatus(keys=trust)
 

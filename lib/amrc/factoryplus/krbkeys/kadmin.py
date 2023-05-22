@@ -13,11 +13,7 @@ from    .util       import log
 
 class Kadm:
     def __init__ (self, kadm=None):
-        self.kadm = kadm
-
-    def start (self):
-        if self.kadm is None:
-            self.kadm = kadmin.init_with_ccache()
+        self.kadm = kadmin.init_with_ccache()
 
     def find_princ (self, princ):
         kadm = self.kadm

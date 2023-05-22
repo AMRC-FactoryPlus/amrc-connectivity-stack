@@ -4,7 +4,8 @@
 
 import  typing
 
-from    .util       import fields, hidden, log, ops
+from    .context    import kk_ctx
+from    .util       import fields, hidden, log
 
 @fields
 class SecretRef:
@@ -26,26 +27,26 @@ class SecretRef:
             return None
         
         ns, name, key = self.splat
-        return ops().k8s.read_secret(ns, name, key)
+        return kk_ctx().k8s.read_secret(ns, name, key)
 
     def verify_writable (self):
         if self.seal:
-            ks = ops().kubeseal
+            ks = kk_ctx().kubeseal
             self.cert = ks.fetch_cert(self.ns, self.seal)
             ks.find_sealed_secret(self.ns, self.name, create=False, mine=True)
         else:
-            ops().k8s.find_secret(self.ns, self.name, create=False, mine=True)
+            kk_ctx().k8s.find_secret(self.ns, self.name, create=False, mine=True)
 
     def write (self, data):
         if self.seal:
-            ops().kubeseal.create_sealed_secret(self.cert, *self.splat, data)
+            kk_ctx().kubeseal.create_sealed_secret(self.cert, *self.splat, data)
         else:
-            ops().k8s.update_secret(*self.splat, data)
+            kk_ctx().k8s.update_secret(*self.splat, data)
 
     def remove (self):
         ns, name, key = self.splat
         if self.seal:
-            ops().kubeseal.maybe_delete_sealed_secret(ns, name, key)
+            kk_ctx().kubeseal.maybe_delete_sealed_secret(ns, name, key)
         else:
-            ops().k8s.remove_secret(ns, name, key)
+            kk_ctx().k8s.remove_secret(ns, name, key)
 

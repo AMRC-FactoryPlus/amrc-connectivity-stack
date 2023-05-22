@@ -282,9 +282,10 @@ export class Translator extends EventEmitter {
 
         } catch (e: any) {
             log(e.stack);
+            log(e.message);
             // If the config is giving us errors we'll stop here
             log(`Error starting translator.`);
-            await stop();
+            await this.stop();
         }
 
 

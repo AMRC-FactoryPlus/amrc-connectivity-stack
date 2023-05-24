@@ -8,6 +8,9 @@ RUN npm run clean
 RUN npm run build
 
 FROM node:18-alpine
+RUN apk upgrade --update-cache --available && \
+    apk add openssl && \
+    rm -rf /var/cache/apk/*
 WORKDIR /usr/app
 COPY --from=ts-compiler /usr/app/package*.json ./
 COPY --from=ts-compiler /usr/app/build ./

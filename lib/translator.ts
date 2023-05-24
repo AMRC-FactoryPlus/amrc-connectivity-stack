@@ -210,6 +210,7 @@ export class Translator extends EventEmitter {
                     );
 
                     connection.devices?.forEach((devConf: deviceOptions) => {
+
                         this.devices[devConf.deviceId] = new deviceInfo.type(
                             this.sparkplugNode,
                             this.connections[connection.connType],
@@ -281,8 +282,9 @@ export class Translator extends EventEmitter {
             }
 
         } catch (e: any) {
-            log(e.stack);
-            log(e.message);
+            log(`Error starting translator: ${e.message}`);
+            console.log((e as Error).stack);
+
             // If the config is giving us errors we'll stop here
             log(`Error starting translator.`);
             await this.stop();

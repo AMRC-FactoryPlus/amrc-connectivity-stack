@@ -8,6 +8,8 @@ import {fetchConfig, wait} from './utils/CentralConfig.js';
 import {reHashConf} from "./utils/FormatConfig.js";
 import {log} from "./lib/helpers/log.js";
 import * as dotenv from 'dotenv';
+import sourceMapSupport from 'source-map-support'
+sourceMapSupport.install()
 
 dotenv.config({path: '../.env'});
 

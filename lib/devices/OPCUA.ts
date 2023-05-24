@@ -24,8 +24,6 @@ import {
     WriteValueOptions
 } from "node-opcua";
 
-import * as os from "os";
-
 // Example here: https://github.com/node-opcua/node-opcua/blob/v2.1.3/documentation/sample_client.js
 
 export interface opcUaConnDetails {
@@ -74,10 +72,11 @@ export class OPCUAConnection extends DeviceConnection {
             }
         }
         this.#options = {
-            applicationName: `FactoryPlus OPC UA Client ${os.hostname()}`,
+            applicationName: `acs-edge`,
+            keepSessionAlive: true,
             connectionStrategy: {
                 initialDelay: 1000,
-                maxRetry: 1
+                maxDelay: 20000
             },
             securityMode: getOpcSecurityMode(connDetails.securityMode),
             securityPolicy: getOpcSecurityPolicy(connDetails.securityPolicy),
@@ -86,12 +85,21 @@ export class OPCUAConnection extends DeviceConnection {
         this.#client = OPCUAClient.create(this.#options);
         this.#endpointUrl = connDetails.endpoint;
 
+        this.#client.on("start_reconnection", function () {
+            log("Trying to reconnect to OPC UA server...")
+        });
+        this.#client.on("connecting", function () {
+            log("Trying to connect to OPC UA server...")
+        });
+        this.#client.on("backoff", function (nb, delay) {
+            console.log(`Connection to the OPC UA server failed for the ${nb} time. Retrying in ${delay} ms`);
+        });
+
         this.#session = null;
     }
 
     async open() {
         try {
-            console.log(this.#endpointUrl);
             await this.#client.connect(this.#endpointUrl);
             this.#session = await this.#client.createSession(this.#credentials);
             this.emit('open');
@@ -101,7 +109,6 @@ export class OPCUAConnection extends DeviceConnection {
         }
 
     }
-
 
     readMetrics(metrics: Metrics, payloadFormat?: string) {
         const oldVals: any[] = [];

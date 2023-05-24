@@ -8,7 +8,7 @@
 tmp/
 
 # Local build config
-config.sh
+config.mk
 
 # Secrets
 /keytabs/

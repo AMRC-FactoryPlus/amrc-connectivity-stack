@@ -115,7 +115,8 @@ export class OPCUAConnection extends DeviceConnection {
         let items: ReadValueIdOptions[] = [];
         for (let i = 0; i < metrics.length; i++) {
             const metric = metrics.array[i];
-            if (typeof metric.properties !== "undefined") {
+            // Only add the metrics to the array to monitor if they have an address, otherwise the node-opcua library will throw an error
+            if (typeof metric.properties !== "undefined" && metric.properties.address?.value) {
                 oldVals.push(metric.value);
                 items.push({
                     nodeId: metric.properties.address.value as string,

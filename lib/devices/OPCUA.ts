@@ -57,7 +57,7 @@ export class OPCUAConnection extends DeviceConnection {
             publishingEnabled: true,
             requestedLifetimeCount: 100,
             requestedMaxKeepAliveCount: 10,
-            requestedPublishingInterval: 1000
+            requestedPublishingInterval: 1000,
         }
         // Set credentials if specified
         if (connDetails.useCredentials) {
@@ -192,28 +192,29 @@ export class OPCUAConnection extends DeviceConnection {
                             );
                         })
                         .on("keepalive", function () {
-                            log("OPC UA subscription keepalive");
+                            // log("OPC UA subscription keepalive");
                         })
                         .on("terminated", function () {
                             log("OPC UA subscription terminated");
                         });
                     const itemsToMonitor: ReadValueIdOptions[] = [];
-                    metrics.addresses.forEach(addr => {
-                        itemsToMonitor.push({
-                            nodeId: resolveNodeId(addr),
-                            attributeId: AttributeIds.Value
-                        })
-                    })
 
-                    const monitoringParameters = {
-                        samplingInterval: interval,
-                        discardOldest: true,
-                        queueSize: 10
-                    };
+                    metrics.addresses.forEach(addr => {
+                        if (addr !== 'undefined') {
+                            itemsToMonitor.push({
+                                nodeId: resolveNodeId(addr),
+                                attributeId: AttributeIds.Value
+                            })
+                        }
+                    })
 
                     this.#subscription.monitorItems(
                         itemsToMonitor,
-                        monitoringParameters,
+                        {
+                            samplingInterval: interval,
+                            discardOldest: false,
+                            queueSize: 1000
+                        },
                         TimestampsToReturn.Both
                     );
 
@@ -228,8 +229,6 @@ export class OPCUAConnection extends DeviceConnection {
                                         const nodeId = monitoredItem.itemToMonitor.nodeId.toString();
                                         changedMetrics[nodeId] = monitoredItemNotification.value.value.value;
                                     })
-                                // this.emit('asyncData', changedMetrics);
-                                log(JSON.stringify(changedMetrics));
                                 this.emit('data', changedMetrics, false)
                             })
                         }

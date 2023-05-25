@@ -7,7 +7,7 @@ import { schemaMetric, sparkplugDataType, sparkplugMetric, sparkplugTemplate } f
 import * as secrets from "../lib/k8sSecrets.js";
 // Temporary stop gap function to convert from old GUI conf format to actual Sparkplug format defined in typescript
 // This function also replaces __sensitive-information-placeholders__ in the config file with the real value obtained from the secrets
-export function reHashConf(conf: any) {
+export function reHashConf(conf: any, password: string) {
     conf.deviceConnections?.forEach((devConn: any, i: number) => {
         devConn.devices?.forEach((dev: any, j: number) => {
             dev.pollInt = devConn.pollInt;
@@ -56,11 +56,7 @@ export function reHashConf(conf: any) {
             delete conf.deviceConnections[i].devices[j].tags;
         })
     });
-    let pass = secrets.env({key: 'keytab'});
-    if (pass == null) {
-        throw `No MQTT password in mounted secret file!`;
-    }
-    return JSON.parse(JSON.stringify(conf).replace('__mqtt-password__', pass.toString()));
+    return JSON.parse(JSON.stringify(conf).replace('__mqtt-password__', password));
 }
 
 export function rehashTag(tag: schemaMetric|any): sparkplugMetric {

@@ -3,34 +3,40 @@
  *  Copyright 2023 AMRC
  */
 
+import {ServiceClient} from "@amrc-factoryplus/utilities";
 import {Translator} from "./lib/translator.js";
-import {fetchConfig, wait} from './utils/CentralConfig.js';
+import {validateConfig, wait} from './utils/CentralConfig.js';
 import {reHashConf} from "./utils/FormatConfig.js";
 import {log} from "./lib/helpers/log.js";
 import * as dotenv from 'dotenv';
 import sourceMapSupport from 'source-map-support'
-sourceMapSupport.install()
 
+const EdgeAgentConfig = "aac6f843-cfee-4683-b121-6943bfdf9173"; 
+
+sourceMapSupport.install()
 dotenv.config({path: '../.env'});
 
-//Make sure we have out env variables set before we do anything
-if (!process.env.CONFIG_URL) {
-    throw new Error("CONFIG_URL is not set!");
-}
-if (!process.env.keytab) {
-    throw new Error("Keytab (keytab) is not set!");
-}
-if (!process.env.NODE_ID) {
-    throw new Error("NODE_ID is not set!");
+function requireEnv(key: string) {
+    if (!(key in process.env))
+        throw new Error(`${key} is not set in the environment!`);
+    return process.env[key]!;
 }
 
 run()
 
 async function run() {
-    const config = await getNewConfig(parseInt(process.env.POLL_INT) || 30)
+    const nodeUuid = requireEnv("NODE_ID");
+    const password = requireEnv("SERVICE_PASSWORD");
+    const fplus = await new ServiceClient({
+        directory_url:  requireEnv("DIRECTORY_URL"),
+        username:       requireEnv("SERVICE_USERNAME"),
+        password:       password,
+    }).init();
+
+    const config = await getNewConfig(fplus, nodeUuid, parseInt(process.env.POLL_INT) || 30)
 
     // Once a configuration has been loaded then start up the translator
-    let transApp = new Translator(reHashConf(config));
+    let transApp = new Translator(reHashConf(config, password));
     process.once('SIGTERM', () => {
         log('🔪️SIGTERM RECEIVED');
         transApp.stop(true);
@@ -52,16 +58,17 @@ async function run() {
 /**
  * loops until we have new config
  */
-async function getNewConfig(interval: number) {
+async function getNewConfig(fplus: ServiceClient, nodeUuid: string, interval: number) {
     // Loop to try to fetch the configuration from the manager
-    log('Attempting to fetch config...');
-    let config = await fetchConfig();
-    while (!config) {
-        log('Response from config server was not a config. Trying again in ' + parseInt(process.env.POLL_INT).toString() + ' seconds...');
-        await wait(interval);
+    while (true) {
         log('Attempting to fetch config...');
-        config = await fetchConfig();
+        const config = await fplus.fetch_configdb(EdgeAgentConfig, nodeUuid);
+        if (config && validateConfig(config)) {
+            log('Config fetched.');
+            return config;
+        }
+
+        log(`Response from config server was not a config. Trying again in ${interval} seconds...`);
+        await wait(interval);
     }
-    log('Config fetched.');
-    return config;
 }

@@ -3,14 +3,12 @@
  *  Copyright 2023 AMRC
  */
 
-import * as sparkplug
-    from "sparkplug-client";
-import {
-    log
-} from "./helpers/log.js";
-import {
-    EventEmitter
-} from "events";
+import { EventEmitter } from "events";
+import * as MQTT from "mqtt";
+
+import { Address } from "@amrc-factoryplus/utilities";
+
+import { log } from "./helpers/log.js";
 import {
     metricIndex,
     Metrics,
@@ -19,6 +17,7 @@ import {
     sparkplugMetric,
     sparkplugPayload
 } from "./helpers/typeHandler.js";
+import { BasicSparkplugNode } from "./sparkplug/basic.js";
 
 export class SparkplugNode extends (
     EventEmitter
@@ -46,7 +45,19 @@ export class SparkplugNode extends (
         }
 
         // conf.keepalive = 10;
-        this.#client = sparkplug.newClient(this.#conf); // Instantiate Sparkplug Client
+        this.#client = new BasicSparkplugNode({
+            address:        new Address(conf.groupId, conf.edgeNode),
+            publishDeath    : conf.publishDeath,
+        });
+        const mqtt = MQTT.connect(conf.serverUrl, {
+            clientId:   conf.clientId,
+            username:   conf.username,
+            password:   conf.password,
+            will:       this.#client.will(),
+        });
+        /* Hack: @amrc-fp's MQTT connections have an additional event. */
+        mqtt.on("connect", mqtt.emit.bind(mqtt, "authenticated"));
+        this.#client.connect(mqtt);
 
         // What to do when the client connects
         this.#client.on("connect", () => this.onConnect());

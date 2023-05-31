@@ -9,6 +9,8 @@ interface Settings {
 interface Will {
     topic:          string,
     payload:        Buffer | string,
+    qos:            number,
+    retain:         boolean,
 }
 
 declare class BasicSparkplugNode {

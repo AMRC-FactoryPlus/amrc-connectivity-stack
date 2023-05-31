@@ -3,7 +3,7 @@
  *  Copyright 2023 AMRC
  */
 
-import {ServiceClient} from "@amrc-factoryplus/utilities";
+import {ServiceClient, UUIDs} from "@amrc-factoryplus/utilities";
 import {Translator} from "./lib/translator.js";
 import {validateConfig, wait} from './utils/CentralConfig.js';
 import {reHashConf} from "./utils/FormatConfig.js";
@@ -26,17 +26,22 @@ run()
 
 async function run() {
     const nodeUuid = requireEnv("NODE_ID");
-    const password = requireEnv("SERVICE_PASSWORD");
     const fplus = await new ServiceClient({
         directory_url:  requireEnv("DIRECTORY_URL"),
         username:       requireEnv("SERVICE_USERNAME"),
-        password:       password,
+        password:       requireEnv("SERVICE_PASSWORD"),
     }).init();
+
+    // If we've overwritten the server then update it here. This is not used in production but serves to be useful when testing outside of the cluster
+    if (process.env.MQTT_URL) {
+        console.log(`Overwriting MQTT URL to ${process.env.MQTT_URL}`);
+        fplus.set_service_url(UUIDs.Service.MQTT, process.env.MQTT_URL);
+    }
 
     const config = await getNewConfig(fplus, nodeUuid, parseInt(process.env.POLL_INT) || 30)
 
     // Once a configuration has been loaded then start up the translator
-    let transApp = new Translator(reHashConf(config, password));
+    let transApp = new Translator(fplus, reHashConf(config));
     process.once('SIGTERM', () => {
         log('🔪️SIGTERM RECEIVED');
         transApp.stop(true);

@@ -8,6 +8,7 @@ import {Translator} from "./lib/translator.js";
 import {validateConfig, wait} from './utils/CentralConfig.js';
 import {reHashConf} from "./utils/FormatConfig.js";
 import {log} from "./lib/helpers/log.js";
+import {GIT_VERSION} from "./lib/git-version.js";
 import * as dotenv from 'dotenv';
 import sourceMapSupport from 'source-map-support'
 
@@ -25,6 +26,8 @@ function requireEnv(key: string) {
 run()
 
 async function run() {
+    log(`Starting ACS Edge Agent version ${GIT_VERSION}`);
+
     const nodeUuid = requireEnv("NODE_ID");
     const fplus = await new ServiceClient({
         directory_url:  requireEnv("DIRECTORY_URL"),

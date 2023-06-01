@@ -4,6 +4,9 @@
 # Environment
 .env
 
+# Local config
+config.mk
+
 # Secrets
 /keytabs/
 /volumes/

@@ -25,6 +25,7 @@ import { BasicSparkplugNode } from "./sparkplug/basic.js";
 export class SparkplugNode extends (
     EventEmitter
 ) {
+    #address: Address
     #conf: sparkplugConfig
     #client: any
     #fplus: ServiceClient
@@ -35,25 +36,27 @@ export class SparkplugNode extends (
     #aliasCounter: number
     #metricNameIndex: metricIndex
 
-    constructor(fplus: ServiceClient, conf: sparkplugConfig) {
+    constructor(fplus: ServiceClient, address: Address, conf: sparkplugConfig) {
         super();
-        this.#conf = conf;
         this.#fplus = fplus;
+        this.#address = address;
+        this.#conf = conf;
 
         // conf.keepalive = 10;
         this.#client = new BasicSparkplugNode({
-            address:        new Address(conf.groupId, conf.edgeNode),
+            address,
             publishDeath:   true,
         });
 
-        const clientId = conf.groupId + '-' + conf.edgeNode + '-' + (Math.random() * 1e17).toString(36); // Generate randomized client ID
-        /* The type is wrong in the .d.ts */
-        const hack: any = fplus.mqtt_client({
+         // Generate randomized client ID
+        const clientId = address.group + '-' + address.node + '-' 
+            + (Math.random() * 1e17).toString(36);
+
+        fplus.mqtt_client({
             clientId,
             will:       this.#client.will(),
-        });
-        const mqtt_pr: Promise<MQTT.MqttClient> = hack;
-        mqtt_pr.then(mqtt => this.#client.connect(mqtt));
+        })
+            .then(mqtt => this.#client.connect(mqtt));
 
         // What to do when the client connects
         this.#client.on("connect", () => this.onConnect());
@@ -299,7 +302,7 @@ export class SparkplugNode extends (
         });
         this.#client.publishNodeBirth(payload);
         this.emit('dbirth-all');
-        log(`✨ NBIRTH published for ${this.#conf.clientId}`);
+        log(`✨ NBIRTH published for ${this.#address}`);
     }
 
     /**

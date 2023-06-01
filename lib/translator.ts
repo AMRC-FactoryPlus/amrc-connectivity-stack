@@ -3,7 +3,15 @@
  *  Copyright 2023 AMRC
  */
 
-import type { ServiceClient } from "@amrc-factoryplus/utilities";
+import timers from "timers/promises";
+import { ServiceClient } from "@amrc-factoryplus/utilities";
+import type { Identity } from "@amrc-factoryplus/utilities";
+
+/* XXX These need to be incorporated into the main codebase. The config
+ * rehashing just needs to go: the code which uses the config needs
+ * adapting to accept the correct format. */
+import {validateConfig} from '../utils/CentralConfig.js';
+import {reHashConf} from "../utils/FormatConfig.js";
 
 // Import device connections
 import {
@@ -67,14 +75,16 @@ interface deviceInfo {
     connectionDetails: any
 }
 
+const EdgeAgentConfig = "aac6f843-cfee-4683-b121-6943bfdf9173"; 
+
 export class Translator extends EventEmitter {
     /**
      * Class constructor - Unpacks config file and defines helpful class attributes
      * @param {Object} conf Config file from web UI
      */
     sparkplugNode!: SparkplugNode
-    conf: translatorConf
     fplus: ServiceClient
+    pollInt: number
 
     connections: {
         [index: string]: any
@@ -83,11 +93,11 @@ export class Translator extends EventEmitter {
         [index: string]: any
     }
 
-    constructor(fplus: ServiceClient, conf: translatorConf) {
+    constructor(fplus: ServiceClient, pollInt: number) {
         super();
 
-        this.conf = conf;
         this.fplus = fplus;
+        this.pollInt = pollInt;
         this.connections = {};
         this.devices = {};
     }
@@ -97,13 +107,18 @@ export class Translator extends EventEmitter {
      */
     async start() {
         try {
+            // Fetch our config
+            const ids = await this.fetchIdentities();
+            const conf = await this.fetchConfig(ids.uuid!);
+
             // Create sparkplug node
-            this.sparkplugNode = new SparkplugNode(this.fplus, this.conf.sparkplug);
-            log(`Created Sparkplug node "${this.conf.sparkplug.edgeNode}" in group "${this.conf.sparkplug.groupId}".`);
+            this.sparkplugNode = new SparkplugNode(
+                this.fplus, ids.sparkplug!, conf.sparkplug);
+            log(`Created Sparkplug node "${ids.sparkplug!}".`);
 
             // Create a new device connection for each type listed in config file
             log('Building up connections and devices...');
-            this.conf.deviceConnections?.forEach(c => this.setupConnection(c));
+            conf.deviceConnections?.forEach(c => this.setupConnection(c));
 
             // Setup Sparkplug node handlers
             this.setupSparkplug();
@@ -278,6 +293,51 @@ export class Translator extends EventEmitter {
                 }
             default:
                 return;
+        }
+    }
+
+    /* Fetch our identities (UUID, Sparkplug) from the Auth service. */
+    async fetchIdentities (): Promise<Identity> {
+        const auth = this.fplus.Auth;
+
+        const ids = await this.retry("identities", async () => {
+            const ids = await auth.find_principal();
+            if (!ids || !ids.uuid || !ids.sparkplug) return;
+            return ids;
+        });
+
+        log(`Found my identities: UUID ${ids.uuid}, Sparkplug ${ids.sparkplug}`);
+        return ids;
+    }
+
+    /* Fetch our config from the ConfigDB. */
+    async fetchConfig (uuid: string): Promise<translatorConf> {
+        const cdb = this.fplus.ConfigDB;
+
+        const config = await this.retry("config", async () => {
+            const config = await cdb.get_config(EdgeAgentConfig, uuid);
+            if (!config || !validateConfig(config)) return;
+            return config;
+        });
+
+        return reHashConf(config);
+    }
+
+    async retry<RV> (what: string, fetch: () => Promise<RV | undefined>): 
+        Promise<RV>
+    {
+        const interval = this.pollInt;
+
+        while (true) {
+            log(`Attempting to fetch ${what}...`);
+            const rv = await fetch();
+            if (rv != undefined) {
+                log(`Fetched ${what}.`);
+                return rv;
+            }
+
+            log(`Failed to fetch ${what}. Trying again in ${interval} seconds...`);
+            await timers.setTimeout(interval * 1000);
         }
     }
 }

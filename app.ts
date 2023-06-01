@@ -28,12 +28,21 @@ run()
 async function run() {
     log(`Starting ACS Edge Agent version ${GIT_VERSION}`);
 
-    const nodeUuid = requireEnv("NODE_ID");
+    const pollInt = parseInt(process.env.POLL_INT) || 30;
+
     const fplus = await new ServiceClient({
         directory_url:  requireEnv("DIRECTORY_URL"),
         username:       requireEnv("SERVICE_USERNAME"),
         password:       requireEnv("SERVICE_PASSWORD"),
     }).init();
+
+    /* Fetch our identities (UUID, Sparkplug) from the Auth service. */
+    const ids = await retry("identities", pollInt, async () => {
+        const ids = await fplus.Auth.find_principal();
+        if (!ids || !ids.uuid || !ids.sparkplug) return;
+        return ids;
+    });
+    log(`Found my identities: UUID ${ids.uuid}, Sparkplug ${ids.sparkplug}`);
 
     // If we've overwritten the server then update it here. This is not used in production but serves to be useful when testing outside of the cluster
     if (process.env.MQTT_URL) {
@@ -41,7 +50,11 @@ async function run() {
         fplus.set_service_url(UUIDs.Service.MQTT, process.env.MQTT_URL);
     }
 
-    const config = await getNewConfig(fplus, nodeUuid, parseInt(process.env.POLL_INT) || 30)
+    const config = await retry("config", pollInt, async () => {
+        const config = await fplus.fetch_configdb(EdgeAgentConfig, ids.uuid!);
+        if (!config || !validateConfig(config)) return;
+        return config;
+    });
 
     // Once a configuration has been loaded then start up the translator
     let transApp = new Translator(fplus, reHashConf(config));
@@ -62,21 +75,18 @@ async function run() {
 
 }
 
-
-/**
- * loops until we have new config
- */
-async function getNewConfig(fplus: ServiceClient, nodeUuid: string, interval: number) {
-    // Loop to try to fetch the configuration from the manager
+async function retry<RV> (what: string, interval: number, 
+    fetch: () => Promise<RV | undefined>): Promise<RV>
+{
     while (true) {
-        log('Attempting to fetch config...');
-        const config = await fplus.fetch_configdb(EdgeAgentConfig, nodeUuid);
-        if (config && validateConfig(config)) {
-            log('Config fetched.');
-            return config;
+        log(`Attempting to fetch ${what}...`);
+        const rv = await fetch();
+        if (rv != undefined) {
+            log(`Fetched ${what}.`);
+            return rv;
         }
 
-        log(`Response from config server was not a config. Trying again in ${interval} seconds...`);
+        log(`Failed to fetch ${what}. Trying again in ${interval} seconds...`);
         await wait(interval);
     }
 }

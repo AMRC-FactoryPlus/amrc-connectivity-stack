@@ -20,7 +20,6 @@ import {
     sparkplugMetric,
     sparkplugPayload
 } from "./helpers/typeHandler.js";
-import { BasicSparkplugNode } from "./sparkplug/basic.js";
 
 export class SparkplugNode extends (
     EventEmitter
@@ -28,7 +27,6 @@ export class SparkplugNode extends (
     #address: Address
     #conf: sparkplugConfig
     #client: any
-    #fplus: ServiceClient
     #metrics: Metrics
     isOnline: boolean
     #metricBuffer: { [index: string]: sparkplugMetric[] }
@@ -38,25 +36,20 @@ export class SparkplugNode extends (
 
     constructor(fplus: ServiceClient, address: Address, conf: sparkplugConfig) {
         super();
-        this.#fplus = fplus;
         this.#address = address;
         this.#conf = conf;
-
-        // conf.keepalive = 10;
-        this.#client = new BasicSparkplugNode({
-            address,
-            publishDeath:   true,
-        });
 
          // Generate randomized client ID
         const clientId = address.group + '-' + address.node + '-' 
             + (Math.random() * 1e17).toString(36);
 
-        fplus.mqtt_client({
+        // conf.keepalive = 10;
+        this.#client = fplus.MQTT.basic_sparkplug_node({
+            address,
             clientId,
-            will:       this.#client.will(),
-        })
-            .then(mqtt => this.#client.connect(mqtt));
+            publishDeath:   true,
+        });
+        this.#client.connect();
 
         // What to do when the client connects
         this.#client.on("connect", () => this.onConnect());

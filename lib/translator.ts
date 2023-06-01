@@ -73,9 +73,6 @@ export class Translator extends EventEmitter {
     connections: {
         [index: string]: any
     }
-    supportedChannels: {
-        [index: string]: string
-    }
     devices: {
         [index: string]: any
     }
@@ -87,39 +84,6 @@ export class Translator extends EventEmitter {
         this.fplus = fplus;
         this.connections = {};
         this.devices = {};
-        this.supportedChannels = {
-            DMX: "Gateway DMX",
-            CANOpen: "Gateway CANOpen",
-            DeviceNet: "Gateway DeviceNet",
-            EtherCAT: "Gateway EtherCAT",
-            "Ethernet/IP": "Gateway Ethernet/IP",
-            "ModbusRTU Gateway": "Gateway ModbusRTU",
-            "ModbusTCP Gateway": "Gateway ModbusTCP",
-            "Virtual Device 32 Byte": "Virtual Device 32 Byte",
-            "Virtual Device 32 Byte (Ext.)": "Virtual Device 32 Byte (Ext.)",
-            "Virtual ModbusTCP Slave": "ModbusTCP Slave",
-            "Virtual ModbusTCP Slave (512)": "ModbusTCP Slave (512)",
-            "Virtual ModbusRTU Slave": "ModbusRTU Slave",
-            "Virtual ModbusRTU Slave (512)": "ModbusRTU Slave (512)",
-            "Virtual ModbusTCP Master": "ModbusTCP Master",
-            "Virtual ModbusRTU Master": "ModbusRTU Master",
-            "Virtual ModbusRTU Master 150": "ModbusRTU Master 150",
-            "Virtual ModbusTCP Master 150": "ModbusTCP Master 150",
-            "Virtual RevPi7": "RevPi7",
-            "Virtual RevPiTimer": "RevPiTimer",
-            Powerlink: "Gateway Powerlink",
-            Profibus: "Gateway Profibus",
-            Profinet: "Gateway Profinet IRT",
-            SercosIII: "Gateway SercosIII",
-            Serial: "Gateway Serial",
-            "CANopen Master": "Gateway CANopen Master",
-            Can: "Connect Can",
-            "M-Bus": "Connect M-Bus",
-            DIO: "RevPi DIO",
-            DI: "RevPi DI",
-            DO: "RevPi DO",
-            AIO: "RevPi AIO",
-        };
     }
 
     /**

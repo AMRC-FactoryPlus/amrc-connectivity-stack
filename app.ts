@@ -13,30 +13,13 @@ import sourceMapSupport from 'source-map-support'
 sourceMapSupport.install()
 dotenv.config({path: '../.env'});
 
-function requireEnv(key: string) {
-    if (!(key in process.env))
-        throw new Error(`${key} is not set in the environment!`);
-    return process.env[key]!;
-}
-
 run()
 
 async function run() {
     log(`Starting ACS Edge Agent version ${GIT_VERSION}`);
 
     const pollInt = parseInt(process.env.POLL_INT) || 30;
-
-    const fplus = await new ServiceClient({
-        directory_url:  requireEnv("DIRECTORY_URL"),
-        username:       requireEnv("SERVICE_USERNAME"),
-        password:       requireEnv("SERVICE_PASSWORD"),
-    }).init();
-
-    // If we've overwritten the server then update it here. This is not used in production but serves to be useful when testing outside of the cluster
-    if (process.env.MQTT_URL) {
-        console.log(`Overwriting MQTT URL to ${process.env.MQTT_URL}`);
-        fplus.set_service_url(UUIDs.Service.MQTT, process.env.MQTT_URL);
-    }
+    const fplus = await new ServiceClient({ env: process.env }).init();
 
     // Once a configuration has been loaded then start up the translator
     let transApp = new Translator(fplus, pollInt);

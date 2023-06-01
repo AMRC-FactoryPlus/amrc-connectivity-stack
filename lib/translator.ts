@@ -61,6 +61,12 @@ export interface translatorConf {
     deviceConnections: any[]
 }
 
+interface deviceInfo {
+    type: any,
+    connection: any;
+    connectionDetails: any
+}
+
 export class Translator extends EventEmitter {
     /**
      * Class constructor - Unpacks config file and defines helpful class attributes
@@ -92,164 +98,15 @@ export class Translator extends EventEmitter {
     async start() {
         try {
             // Create sparkplug node
-
             this.sparkplugNode = new SparkplugNode(this.fplus, this.conf.sparkplug);
-
             log(`Created Sparkplug node "${this.conf.sparkplug.edgeNode}" in group "${this.conf.sparkplug.groupId}".`);
 
+            // Create a new device connection for each type listed in config file
             log('Building up connections and devices...');
+            this.conf.deviceConnections?.forEach(c => this.setupConnection(c));
 
-            if (typeof this.sparkplugNode) {
-
-                // Create a new device connection for each type listed in config file
-                this.conf.deviceConnections?.forEach(connection => {
-
-                    type deviceInfo = {
-                        type: any,
-                        connection: any;
-                        connectionDetails: any
-                    };
-
-                    let deviceInfo: deviceInfo = {
-                        connectionDetails: undefined,
-                        connection: undefined,
-                        type: undefined
-                    };
-
-                    // Initialise the connection parameters
-                    switch (connection.connType) {
-                        case "REST":
-                            deviceInfo = {
-                                type: RestDevice,
-                                connection: RestConnection,
-                                connectionDetails: 'RESTConnDetails'
-                            }
-                            break;
-                        case "MTConnect":
-                            deviceInfo = {
-                                type: MTConnectDevice,
-                                connection: MTConnectConnection,
-                                connectionDetails: 'MTConnectConnDetails'
-                            }
-                            break;
-                        case "S7":
-                            deviceInfo = {
-                                type: S7Device,
-                                connection: S7Connection,
-                                connectionDetails: 's7ConnDetails'
-                            }
-                            break;
-                        case "OPC UA":
-                            deviceInfo = {
-                                type: OPCUADevice,
-                                connection: OPCUAConnection,
-                                connectionDetails: 'OPCUAConnDetails'
-                            }
-                            break;
-                        case "MQTT":
-                            deviceInfo = {
-                                type: MQTTDevice,
-                                connection: MQTTConnection,
-                                connectionDetails: 'MQTTConnDetails'
-                            }
-                            break;
-                        case "Websocket":
-                            deviceInfo = {
-                                type: WebsocketDevice,
-                                connection: WebsocketConnection,
-                                connectionDetails: 'WebsocketConnDetails'
-                            }
-                            break;
-                        case "UDP":
-                            deviceInfo = {
-                                type: UDPDevice,
-                                connection: UDPConnection,
-                                connectionDetails: 'UDPConnDetails'
-
-                            }
-                            break;
-                        default:
-                            break;
-                    }
-
-                    // Instantiate device connection
-                    this.connections[connection.connType] = new deviceInfo.connection(
-                        connection.connType,
-                        connection[deviceInfo.connectionDetails]
-                    );
-
-                    connection.devices?.forEach((devConf: deviceOptions) => {
-
-                        this.devices[devConf.deviceId] = new deviceInfo.type(
-                            this.sparkplugNode,
-                            this.connections[connection.connType],
-                            devConf
-                        );
-                    });
-
-                    // What to do when the connection is open
-                    this.connections[connection.connType].on('open', () => {
-                        connection.devices?.forEach((devConf: deviceOptions) => {
-                            this.devices[devConf.deviceId]?._deviceConnected();
-                        })
-                    });
-
-                    // What to do when the device connection has new data from a device
-                    this.connections[connection.connType].on('data', (obj: { [index: string]: any }, parseVals = true) => {
-                        connection.devices?.forEach((devConf: deviceOptions) => {
-                            this.devices[devConf.deviceId]?._handleData(obj, parseVals);
-                        })
-                    })
-
-                    // What to do when device connection dies
-                    this.connections[connection.connType].on('close', () => {
-                        connection.devices?.forEach((devConf: deviceOptions) => {
-                            this.devices[devConf.deviceId]?._deviceDisconnected();
-                        })
-                    });
-
-                    // Open the connection
-                    this.connections[connection.connType].open();
-
-                });
-
-                /**
-                 * What to do when a Sparkplug Birth certificate is requested
-                 * @param deviceId The Device ID which must produce a birth certificate
-                 */
-                this.sparkplugNode.on('dbirth', (deviceId) => {
-                    log('Handling DBIRTH request for ' + deviceId);
-                    Object.values(this.devices).find((e: Device) => e._name === deviceId)?._publishDBirth();
-                });
-
-                /**
-                 * What to do when a Sparkplug Birth certificate is requested
-                 * @param deviceId The Device ID which must produce a birth certificate
-                 */
-                this.sparkplugNode.on('dbirth-all', () => {
-                    log('Publishing DBIRTH request for all devices');
-                    Object.values(this.devices)?.map((dev: Device) => {
-                        dev._publishDBirth();
-                    })
-                });
-
-                /**
-                 * What to do when a Sparkplug Device Command is received
-                 * @param deviceId The Device ID which must produce a birth certificate
-                 * @param payload The Sparkplug payload containing DCMD metrics
-                 */
-                this.sparkplugNode.on('dcmd', (deviceId, payload) => {
-                    log('Handling DCMD request for ' + deviceId);
-                    Object.values(this.devices).find((e: Device) => e._name === deviceId)?._handleDCmd(payload);
-                });
-
-                // Listen to the stop event
-                this.sparkplugNode.on('stop', () => {
-                    log('Handling stop request for all devices');
-                    this.stop();
-                })
-            }
-
+            // Setup Sparkplug node handlers
+            this.setupSparkplug();
         } catch (e: any) {
             log(`Error starting translator: ${e.message}`);
             console.log((e as Error).stack);
@@ -258,8 +115,6 @@ export class Translator extends EventEmitter {
             log(`Error starting translator.`);
             await this.stop();
         }
-
-
     }
 
     /**
@@ -286,5 +141,143 @@ export class Translator extends EventEmitter {
         log('Stop complete.');
 
         this.emit('stopped', kill);
+    }
+
+    setupSparkplug () {
+        const sp = this.sparkplugNode;
+
+        /**
+         * What to do when a Sparkplug Birth certificate is requested
+         * @param deviceId The Device ID which must produce a birth certificate
+         */
+        sp.on('dbirth', (deviceId) => {
+            log('Handling DBIRTH request for ' + deviceId);
+            Object.values(this.devices).find((e: Device) => e._name === deviceId)?._publishDBirth();
+        });
+
+        /**
+         * What to do when a Sparkplug Birth certificate is requested
+         * @param deviceId The Device ID which must produce a birth certificate
+         */
+        sp.on('dbirth-all', () => {
+            log('Publishing DBIRTH request for all devices');
+            Object.values(this.devices)?.map((dev: Device) => {
+                dev._publishDBirth();
+            })
+        });
+
+        /**
+         * What to do when a Sparkplug Device Command is received
+         * @param deviceId The Device ID which must produce a birth certificate
+         * @param payload The Sparkplug payload containing DCMD metrics
+         */
+        sp.on('dcmd', (deviceId, payload) => {
+            log('Handling DCMD request for ' + deviceId);
+            Object.values(this.devices).find((e: Device) => e._name === deviceId)?._handleDCmd(payload);
+        });
+
+        // Listen to the stop event
+        sp.on('stop', () => {
+            log('Handling stop request for all devices');
+            this.stop();
+        })
+    }
+
+    setupConnection (connection: any): void {
+        const cType = connection.connType;
+        const deviceInfo = this.chooseDeviceInfo(cType);
+
+        if (deviceInfo == undefined) {
+            log(`Failed to find DeviceInfo for connection type '${cType}'`);
+            return;
+        }
+
+        // Instantiate device connection
+        const newConn = this.connections[cType] = new deviceInfo.connection(
+            connection.connType,
+            connection[deviceInfo.connectionDetails]
+        );
+
+        connection.devices?.forEach((devConf: deviceOptions) => {
+            this.devices[devConf.deviceId] = new deviceInfo.type(
+                this.sparkplugNode, newConn, devConf);
+        });
+
+        // What to do when the connection is open
+        newConn.on('open', () => {
+            connection.devices?.forEach((devConf: deviceOptions) => {
+                this.devices[devConf.deviceId]?._deviceConnected();
+            })
+        });
+
+        // What to do when the device connection has new data from a device
+        newConn.on('data', (obj: { [index: string]: any }, parseVals = true) => {
+            connection.devices?.forEach((devConf: deviceOptions) => {
+                this.devices[devConf.deviceId]?._handleData(obj, parseVals);
+            })
+        })
+
+        // What to do when device connection dies
+        newConn.on('close', () => {
+            connection.devices?.forEach((devConf: deviceOptions) => {
+                this.devices[devConf.deviceId]?._deviceDisconnected();
+            })
+        });
+
+        // Open the connection
+        newConn.open();
+    }
+
+    /* There is a better way to do this. At minimum this should be in a
+     * factory class, not the main Translator class. */
+    chooseDeviceInfo (connType: string): deviceInfo | undefined {
+        // Initialise the connection parameters
+        switch (connType) {
+            case "REST":
+                return {
+                    type: RestDevice,
+                    connection: RestConnection,
+                    connectionDetails: 'RESTConnDetails'
+                }
+            case "MTConnect":
+                return {
+                    type: MTConnectDevice,
+                    connection: MTConnectConnection,
+                    connectionDetails: 'MTConnectConnDetails'
+                }
+            case "S7":
+                return {
+                    type: S7Device,
+                    connection: S7Connection,
+                    connectionDetails: 's7ConnDetails'
+                }
+            case "OPC UA":
+                return {
+                    type: OPCUADevice,
+                    connection: OPCUAConnection,
+                    connectionDetails: 'OPCUAConnDetails'
+                }
+            case "MQTT":
+                return {
+                    type: MQTTDevice,
+                    connection: MQTTConnection,
+                    connectionDetails: 'MQTTConnDetails'
+                }
+            case "Websocket":
+                return {
+                    type: WebsocketDevice,
+                    connection: WebsocketConnection,
+                    connectionDetails: 'WebsocketConnDetails'
+                }
+            case "UDP":
+                return {
+                    type: UDPDevice,
+                    connection: UDPConnection,
+                    connectionDetails: 'UDPConnDetails'
+
+                }
+            default:
+                return;
+        }
     }
 }

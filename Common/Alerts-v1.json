@@ -1,0 +1,42 @@
+{
+  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Alerts-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Alerts which can be raised by a node.",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "39e0091f-4e68-40f7-b082-1887d6ad2399"
+    },
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    }
+  },
+  "patternProperties": {
+    "^[a-zA-Z0-9_]*$": {
+      "description": "A name for this alert.",
+      "type": "object",
+      "properties": {
+        "Type": {
+          "description": "An alert type registered in the ConfigDB.",
+          "type": "string",
+          "format": "uuid"
+        },
+        "Active": {
+          "description": "Is this alert active (raised)?",
+          "type": "boolean"
+        },
+        "Links": {
+          "$comment": "Additional information about what this alert relates to.",
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Links-v1.json"
+        }
+      },
+      "required": ["Type", "Active"]
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID"
+  ]
+}

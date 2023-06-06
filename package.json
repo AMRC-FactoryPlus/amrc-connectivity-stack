@@ -1,6 +1,6 @@
 {
   "name": "acs-edge",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "The Edge component of the AMRC Connectivity Stack",
   "author": "AMRC",
   "license": "MIT",

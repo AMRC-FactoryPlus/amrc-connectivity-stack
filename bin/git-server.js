@@ -11,11 +11,12 @@ import express from "express";
 
 import { ServiceClient, WebAPI } from "@amrc-factoryplus/utilities";
 
-import { GitServer, Perm } from "../lib/git-server.js";
+import { GitServer } from "../lib/git-server.js";
+import { Flux } from "../lib/uuids.js";
 
 const fplus = await new ServiceClient({
     env:                process.env,
-    permission_group:   Perm.All,
+    permission_group:   Flux.Perm.All,
 }).init();
 
 const git = await new GitServer({
@@ -31,7 +32,9 @@ const api = await new WebAPI({
     keytab:     process.env.SERVER_KEYTAB,
 
     ping: { service: "7adf4db0-2e7b-4a68-ab9d-376f4c5ce14b" },
-    routes: git.routes.bind(git),
+    routes: app => {
+        app.use("/git", git.routes);
+    },
 }).init();
 
 api.run();

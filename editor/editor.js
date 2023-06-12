@@ -59,7 +59,11 @@ async function fetch_json(path) {
 
 async function get_name(obj) {
     const gi = await fetch_json(`app/${AppUuid.General_Info}/object/${obj}`);
-    return gi ? gi.name : html`<i>NO NAME</i>`;
+    return gi
+        ? gi.deleted 
+            ? html`<s>${gi.name}</s>`
+            : gi.name
+        : html`<i>NO NAME</i>`;
 }
 
 async function get_class(obj) {

@@ -14,6 +14,7 @@ const html = htm.bind(h);
 
 const Uuid = {
     General_Info: "64a8bfa9-7772-45c4-9d1a-9e6290690957",
+    Registration: "cb40bed5-49ad-4443-a7f5-08c75009da8f",
 };
 
 let Services;
@@ -83,9 +84,20 @@ async function fetch_json (service, path, method="GET", body=null) {
     return json;
 }
 
-async function get_name (obj) {
+async function _get_name (obj) {
     const gi = await fetch_json("configdb", `v1/app/${Uuid.General_Info}/object/${obj}`);
-    return gi ? gi.name : html`<i>NO NAME</i>`;
+    return gi 
+        ? gi.deleted
+            ? html`<s>${gi.name}</s>`
+            : gi.name
+        : html`<i>NO NAME</i>`;
+}
+
+async function get_name (obj) {
+    const reg = await fetch_json("configdb", `v1/app/${Uuid.Registration}/object/${obj}`);
+    const name = await _get_name(obj);
+    const klass = reg ? await _get_name(reg.class) : html`<i>NO CLASS</i>`;
+    return html`${name} <small>(${klass})</small>`;
 }
 
 function sort_acl (list) {

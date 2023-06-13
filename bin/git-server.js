@@ -23,6 +23,7 @@ const git = await new GitServer({
     fplus:      fplus,
     data:       process.env.DATA_DIR,
     git_exec:   process.env.GIT_EXEC_PATH,
+    http_url:   process.env.HTTP_API_URL,
 }).init();
 
 const api = await new WebAPI({

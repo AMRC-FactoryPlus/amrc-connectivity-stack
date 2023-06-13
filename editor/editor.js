@@ -57,18 +57,27 @@ async function fetch_json(path) {
     return json;
 }
 
-async function get_name(obj) {
+async function get_class(obj) {
+    const reg = await fetch_json(`app/${AppUuid.Registration}/object/${obj}`);
+    return reg ? reg["class"] : null;
+}
+
+async function _get_name (obj) {
     const gi = await fetch_json(`app/${AppUuid.General_Info}/object/${obj}`);
-    return gi
-        ? gi.deleted 
+    return gi 
+        ? gi.deleted
             ? html`<s>${gi.name}</s>`
             : gi.name
         : html`<i>NO NAME</i>`;
 }
 
-async function get_class(obj) {
-    const reg = await fetch_json(`app/${AppUuid.Registration}/object/${obj}`);
-    return reg ? reg["class"] : null;
+async function get_name (obj, with_class) {
+    const name = await _get_name(obj);
+    if (!with_class) return name;
+
+    const kid = await get_class(obj);
+    const kname = kid ? await _get_name(kid) : html`<i>NO CLASS</i>`;
+    return html`${name} <small>(${kname})</small>`;
 }
 
 async function put_string(path, conf, method = "PUT") {
@@ -123,16 +132,16 @@ function build_opener() {
 }
 
 function Opener(props) {
+    const { obj, children, with_class } = props;
     const [open, button] = build_opener();
 
     const title = "obj" in props
-        ? html`
-                <${ObjTitle} obj=${props.obj}/>`
+        ? html`<${ObjTitle} obj=${obj} with_class=${with_class}/>`
         : props.title;
 
     return html`
         <dt>${button} ${title}</dt>
-        <dd>${open ? props.children : ""}</dd>
+        <dd>${open ? children : ""}</dd>
     `;
 }
 
@@ -153,10 +162,10 @@ function Uuid(props) {
 }
 
 function ObjTitle(props) {
-    const obj = props.obj;
+    const { obj, with_class } = props;
     const [name, set_name] = useState("...");
 
-    useEffect(async () => set_name(await get_name(obj)), [obj]);
+    useEffect(async () => set_name(await get_name(obj, with_class)), [obj]);
 
     return html`
         <${Uuid}>${obj}<//> ${name}`;
@@ -327,13 +336,12 @@ function App(props) {
 
     return html`
         <dl>
-            <${Opener} title="New config">
-                <${NewConf} app=${app}/></
-                />
-                ${objs.map(o => html`
-                    <${Opener} key=${o} obj=${o}>
-                        <${Conf} app=${app} obj=${o}/></
-                        />`)}
+            <${Opener} title="New config"><${NewConf} app=${app}/><//>
+            ${objs.map(o => html`
+                <${Opener} key=${o} obj=${o} with_class=${true}>
+                    <${Conf} app=${app} obj=${o}/>
+                <//>
+            `)}
         </dl>
     `;
 }

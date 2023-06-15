@@ -15,12 +15,12 @@ const fplus = await new ServiceClient({
     env:                process.env,
     permission_group:   Edge.Perm.All,
     git_checkouts:      process.env.GIT_CHECKOUTS_DIR,
+    git_email:          process.env.GIT_EMAIL,
 }).init();
 
 const edge = await new EdgeDeploy({
     fplus:      fplus,
     http_url:   process.env.HTTP_API_URL,
-    git_email:  process.env.GIT_EMAIL,
     repo_group: process.env.CLUSTER_REPO_GROUP,
 }).init();
 

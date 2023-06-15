@@ -1,0 +1,28 @@
+{
+    "service": "af15f175-78a0-4e05-97c0-2a0bb82b9f3b",
+    "version": 1,
+    "classes": [
+        "f24d354d-abc1-4e32-98e1-0667b3e40b61"
+    ],
+    "objects": {
+        "d319bd87-f42b-4b66-be4f-f82ff48b93f0": [
+            "bdb13634-0b3d-4e38-a065-9d88c12ee78d"
+        ],
+        "ac0d5288-6136-4ced-a372-325fbbcdd70d": [
+            "9e07fd33-6400-4662-92c4-4dff1f61f990"
+        ],
+        "8ae784bb-c4b5-4995-9bf6-799b3c7f21ad": [
+            "a40acff8-0c61-4251-bef3-d8d53e50cdd0",
+            "07fba27a-0d01-4c07-875b-d25345261d3a"
+        ]
+    },
+    "configs": {
+        "64a8bfa9-7772-45c4-9d1a-9e6290690957": {
+            "f24d354d-abc1-4e32-98e1-0667b3e40b61": { "name": "Edge cluster" },
+            "bdb13634-0b3d-4e38-a065-9d88c12ee78d": { "name": "Edge cluster descriptor" },
+            "9e07fd33-6400-4662-92c4-4dff1f61f990": { "name": "Edge Deployment permissions" },
+            "a40acff8-0c61-4251-bef3-d8d53e50cdd0": { "name": "Edge: Manage clusters" },
+            "07fba27a-0d01-4c07-875b-d25345261d3a": { "name": "Edge: Manage secrets" }
+        }
+    }
+}

@@ -1,0 +1,11 @@
+{
+    "service": "cab2642a-f7d9-42e5-8845-8f35affe1fd4",
+    "version": 1,
+    "groups": {
+        "9e07fd33-6400-4662-92c4-4dff1f61f990": [
+            "a40acff8-0c61-4251-bef3-d8d53e50cdd0",
+            "07fba27a-0d01-4c07-875b-d25345261d3a"
+        ]
+    }
+}
+            

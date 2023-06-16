@@ -4,6 +4,12 @@
 # Environment
 .env
 
+# Random temp files
+tmp/
+
+# Local build config
+config.mk
+
 # Secrets
 /keytabs/
 /volumes/

@@ -7,14 +7,13 @@
 from base64 import b64decode
 import os
 import logging
-from tempfile import TemporaryDirectory
 
 import kubernetes as k8s
 import kadmin_local as kadmin
 
 from .kadmin import Kadm
 from .kubernetes import K8s
-
+from .util import KtData
 
 class KrbKeysBs:
     def __init__(self, namespace, keytabs, secrets, principal, ktname):
@@ -25,26 +24,31 @@ class KrbKeysBs:
         self.ktname = ktname
 
         kadm = kadmin.local()
-        self.kadm = Kadm("bootstrap", kadm=kadm)
+        self.kadm = Kadm(kadm=kadm)
 
         k8s.config.load_incluster_config()
         self.k8s = K8s()
 
     def ensure_keytab(self):
         op = self.principal
-        kt = self.k8s.read_secret(ns=self.namespace, name=self.keytabs, key=self.ktname)
+        data = self.k8s.read_secret(ns=self.namespace,
+            name=self.keytabs, key=self.ktname)
+        kt = KtData(contents=data)
 
-        if self.kadm.princ_in_keytab(op, kt):
-            logging.info(f"Keytab for {op} already exists.")
-            return
+        with kt.kt_name() as ktname:
+            if self.kadm.princ_in_keytab(op, ktname):
+                logging.info(f"Keytab for {op} already exists.")
+                return
 
-        logging.info(f"Creating keytab for {op}")
-        kt = self.kadm.create_keytab([op])
-        self.k8s.update_secret(ns=self.namespace, name=self.keytabs, key=self.ktname, value=kt)
+            logging.info(f"Creating keytab for {op}")
+            self.kadm.create_keytab([op], ktname)
+
+        self.k8s.update_secret(ns=self.namespace, 
+            name=self.keytabs, key=self.ktname, value=kt.contents)
 
     def run(self):
         for s in self.secrets:
-            self.k8s.find_secret(name=s, ns=self.namespace)
+            self.k8s.find_secret(name=s, ns=self.namespace, create=True)
 
         self.ensure_keytab()
 

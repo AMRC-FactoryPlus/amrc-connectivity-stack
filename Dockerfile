@@ -4,6 +4,7 @@ ARG kubeseal_ver=0.19.5
 
 RUN apk add curl python3 py3-pip python3-dev gcc musl-dev krb5 krb5-dev \
     && pip install -t /usr/local/python krb5 python-kadmV kubernetes kopf \
+        requests requests-kerberos \
     && curl -L https://github.com/bitnami-labs/sealed-secrets/releases/download/v${kubeseal_ver}/kubeseal-${kubeseal_ver}-linux-amd64.tar.gz | tar -xzvf - -C /usr/local/bin kubeseal
 
 FROM alpine

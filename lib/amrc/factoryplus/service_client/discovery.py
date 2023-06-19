@@ -21,11 +21,11 @@ class Discovery (ServiceInterface):
 
         self.urls = {}
         for key, srv in presets:
-            if key in kw:
-                self.set_service_url(srv, kw[key])
+            if key in fplus.opts:
+                self.set_service_url(srv, fplus.opts[key])
         
     def set_service_url (self, service, url):
-        log(f"Preset URL for {service}: {url}")
+        log.info(f"Preset URL for {service}: {url}")
         self.urls[service] = url
 
     def service_url (self, service):

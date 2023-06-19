@@ -2,8 +2,8 @@
 # HTTP client
 # Copyright 2023 AMRC
 
-import logging
-import urllib.parse     as urls
+import  logging
+from    urllib.parse    import urljoin
 
 from requests           import HTTPError
 from requests.auth      import HTTPBasicAuth
@@ -29,6 +29,14 @@ class HTTP (ServiceInterface):
         else:
             log.info("Using HTTP Negotiate auth")
             self.basic = None
+
+    def fetch (self, **opts):
+        service = opts.pop("service")
+        base = self.fplus.discovery.service_url(service)
+        url = urljoin(base, opts.pop("url"))
+        host = urljoin(base, "/")
+
+        return self.fetch_with_token(host, url=url, **opts)
 
     def fetch_with_token (self, host, **opts):
         headers = opts.get("headers", {})
@@ -64,7 +72,7 @@ class HTTP (ServiceInterface):
             auth = HTTPKerberosAuth(force_preemptive=True)
 
         res = self._fetch(
-            url=urls.urljoin(host, "/token"),
+            url=urljoin(host, "/token"),
             method="POST",
             auth=auth, force_refresh=True)
 

@@ -24,6 +24,7 @@ class KrbKeys:
         self.passwords = env["PASSWORDS_SECRET"]
         self.presets = env["PRESETS_SECRET"]
         self.expire_old_keys = int(env.get("EXPIRE_OLD_KEYS", 86400))
+        self.kadmin_ccache = env.get("KADMIN_CCNAME", None)
 
     def register_handlers (self):
         log("Registering handlers")

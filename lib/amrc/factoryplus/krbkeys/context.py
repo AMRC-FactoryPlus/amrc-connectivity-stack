@@ -45,7 +45,7 @@ class Context:
 
     @cached_property
     def kadm (self):
-        return Kadm()
+        return Kadm(ccache=self.operator.kadmin_ccache)
 
     @cached_property
     def kubeseal (self):

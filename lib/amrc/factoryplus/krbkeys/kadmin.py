@@ -12,9 +12,9 @@ import  kadmin
 from    .util       import log
 
 class Kadm:
-    def __init__ (self, kadm=None):
+    def __init__ (self, kadm=None, ccache=None):
         if kadm is None:
-            self.kadm = kadmin.init_with_ccache()
+            self.kadm = kadmin.init_with_ccache(None, ccache)
         else:
             self.kadm = kadm
 

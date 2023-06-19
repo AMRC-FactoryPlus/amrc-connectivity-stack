@@ -4,9 +4,10 @@
 
 from    functools       import cached_property
 
-from    .directory      import Directory
-from    .discovery      import Discovery
-from    .http           import HTTP
+from    .directory          import Directory
+from    .discovery          import Discovery
+from    .edge_deployment    import EdgeDeployment
+from    .http               import HTTP
 
 class ServiceClient:
     def __init__ (self, **opts):
@@ -19,6 +20,10 @@ class ServiceClient:
     @cached_property
     def discovery (self):
         return Discovery(self)
+
+    @cached_property
+    def edge_deployment (self):
+        return EdgeDeployment(self)
 
     @cached_property
     def http (self):

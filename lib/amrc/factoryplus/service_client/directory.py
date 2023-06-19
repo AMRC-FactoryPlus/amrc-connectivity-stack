@@ -29,7 +29,7 @@ class Directory (ServiceInterface):
     def register_service_url (self, service, url):
         st = self.fetch(method="POST",
             url=f"v1/service/{service}/advertisment",
-            body={ url: url })
+            json={ url: url })
         if st != 204:
             raise ServiceError(f"Can't register service {service}",
                 service=self.service, status=st)

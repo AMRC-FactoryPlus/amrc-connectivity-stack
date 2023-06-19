@@ -19,17 +19,21 @@ class ServiceInterface:
 
     def fetch (self, url, **opts):
         method = opts.pop("method", "GET")
-        body = opts.pop("body", None)
 
         headers = opts.pop("headers", {})
         headers["Accept"] = "application/json"
-        if body is not None:
+
+        if "json" in opts:
             headers["Content-Type"] = "application/json"
+        elif "content_type" in opts:
+            headers["Content-Type"] = opts.pop("content_type")
+        elif "data" in opts:
+            headers["Content-Type"] = "application/octet-stream"
 
         res = self.fplus.http.fetch(
             service=self.service,
             url=url, method=method, headers=headers,
-            json=body)
+            **opts)
 
         json = None
         if content_type(res) == "application/json":

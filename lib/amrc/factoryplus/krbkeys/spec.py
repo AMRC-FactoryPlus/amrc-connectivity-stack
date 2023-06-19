@@ -31,14 +31,7 @@ class InternalSpec:
         self.kind, self.preset = keyops.TYPE_MAP[spec['type']]
         self.keep_old = bool(spec.get("keepOldKeys"))
 
-        secret, seal = dslice(spec, "secret", "sealWith")
-        if secret is None:
-            log("Default secrets are deprecated", level=logging.WARNING)
-            oper = kk_ctx().operator
-            _, sec_name, sec_key = oper.get_secret_for(ns, name, spec)
-        else:
-            sec_name, sec_key = secret.split("/")
-        self.secret = SecretRef(ns=ns, name=sec_name, key=sec_key, seal=seal)
+        self.secret = SecretRef.from_spec(ns, name, spec)
 
     @property
     def principal (self):

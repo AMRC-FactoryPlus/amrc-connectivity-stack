@@ -21,12 +21,17 @@ class HTTP (ServiceInterface):
         self.cache = "default"
 
         if "username" in fplus.opts:
-            self.auth = HTTPBasicAuth(
+            self.basic = HTTPBasicAuth(
                 fplus.opts["username"], fplus.opts["password"])
         else:
-            # Our services don't return WWW-Auth: Nego yet as it breaks
-            # browser requesets.
-            self.auth = HTTPKerberosAuth(force_preemptive=True)
+            self.basic = None
 
-    def gss_fetch (self, **opts):
-        return self.session.request(**opts, auth=self.auth)
+    def fetch_with_creds (self, **opts):
+        if self.basic is not None:
+            auth = self.basic
+        else:
+            # Our services don't return WWW-Auth: Nego yet as it breaks
+            # browser requests.
+            auth = HTTPKerberosAuth(force_preemptive=True)
+
+        return self.session.request(**opts, auth=auth)

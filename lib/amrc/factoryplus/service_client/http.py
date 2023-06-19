@@ -10,6 +10,7 @@ from requests.auth      import HTTPBasicAuth
 from requests_cache     import CachedSession
 from requests_kerberos  import HTTPKerberosAuth
 
+from .service_error         import ServiceError
 from .service_interface     import ServiceInterface
 
 log = logging.getLogger(__name__)
@@ -33,6 +34,9 @@ class HTTP (ServiceInterface):
     def fetch (self, **opts):
         service = opts.pop("service")
         base = self.fplus.discovery.service_url(service)
+        if base is None:
+            raise ServiceError("Can't find service URL", service=service)
+
         url = urljoin(base, opts.pop("url"))
         host = urljoin(base, "/")
 

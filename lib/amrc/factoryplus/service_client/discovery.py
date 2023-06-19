@@ -13,6 +13,7 @@ presets = [
     ("directory_url",       uuids.Service.Directory),
     ("configdb_url",        uuids.Service.ConfigDB),
     ("authn_url",           uuids.Service.Authentication),
+    ("mqtt_url",            uuids.Service.MQTT),
 ];
 
 class Discovery:
@@ -29,4 +30,13 @@ class Discovery:
         self.urls[service] = url
 
     def service_url (self, service):
-        return self.urls.get(service)
+        url = self.urls.get(service)
+
+        if url is None:
+            from_dir = self.fplus.directory.get_service_urls(service)
+            if len(from_dir) > 0:
+                url = from_dir[0]
+                self.urls[service] = url
+
+        return url
+

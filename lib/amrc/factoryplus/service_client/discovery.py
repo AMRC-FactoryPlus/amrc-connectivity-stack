@@ -15,9 +15,9 @@ presets = [
     ("authn_url",           uuids.Service.Authentication),
 ];
 
-class Discovery (ServiceInterface):
-    def __init__ (self, fplus, **kw):
-        super().__init__(fplus, **kw);
+class Discovery:
+    def __init__ (self, fplus):
+        self.fplus = fplus
 
         self.urls = {}
         for key, srv in presets:

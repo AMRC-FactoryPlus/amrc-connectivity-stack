@@ -16,7 +16,7 @@ log = logging.getLogger(__name__)
 
 class HTTP (ServiceInterface):
     def __init__ (self, fplus, **kw):
-        super().__init__(fplus, **kw);
+        self.fplus = fplus
 
         self.session = CachedSession(backend="memory", cache_control=True)
         self.tokens = {}
@@ -39,7 +39,7 @@ class HTTP (ServiceInterface):
         return self.fetch_with_token(host, url=url, **opts)
 
     def fetch_with_token (self, host, **opts):
-        headers = opts.get("headers", {})
+        headers = opts.pop("headers", {})
 
         tok = None
         def try_req ():

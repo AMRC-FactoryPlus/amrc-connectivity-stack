@@ -22,9 +22,12 @@ endif
 
 all: build push
 
-.PHONY: all build push
+.PHONY: all build push check-committed
 
-build:
+check-committed:
+	[ -z "$$(git status --porcelain)" ] || (git status; exit 1)
+
+build: check-committed
 	docker build -t "${tag}" ${build_args} .
 
 push:

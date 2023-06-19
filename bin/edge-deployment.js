@@ -8,6 +8,7 @@
 
 import { ServiceClient, WebAPI } from "@amrc-factoryplus/utilities";
 
+import { GIT_VERSION } from "../lib/git-version.js";
 import { EdgeDeploy } from "../lib/edge-deploy.js";
 import { Edge } from "../lib/uuids.js";
 
@@ -31,7 +32,15 @@ const api = await new WebAPI({
     hostname:   process.env.HOSTNAME,
     keytab:     process.env.SERVER_KEYTAB,
 
-    ping: { service: Edge.Service.EdgeDeployment },
+    ping: {
+        service:    Edge.Service.EdgeDeployment,
+        version:    "0.0.1",
+        software:   {
+            vendor:         "AMRC",
+            application:    "acs-edge-deployment",
+            revision:       GIT_VERSION,
+        },
+    },
     routes: app => {
         app.use("/v1", edge.routes);
     },

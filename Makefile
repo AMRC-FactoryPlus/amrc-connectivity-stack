@@ -35,7 +35,7 @@ restart:
 	sleep 3
 
 logs:
-	kubectl logs -f deploy/"${deployment}"
+	kubectl logs -f deploy/"${deployment}" -c operator
 
 else
 

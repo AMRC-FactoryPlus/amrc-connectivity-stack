@@ -9,6 +9,8 @@ from    .discovery          import Discovery
 from    .edge_deployment    import EdgeDeployment
 from    .http               import HTTP
 
+from    .service_error      import ServiceError
+
 class ServiceClient:
     def __init__ (self, **opts):
         self.opts = opts

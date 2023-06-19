@@ -17,7 +17,7 @@ class EdgeDeployment (ServiceInterface):
         self.service = uuids.Service.EdgeDeployment
 
     def seal_secret (self, cluster, namespace, name, key, content):
-        st = self.fetch(method="PUT",
+        st, _ = self.fetch(method="PUT",
             url=f"v1/cluster/{cluster}/secret/{namespace}/{name}/{key}",
             data=content)
         if st != 204:

@@ -27,7 +27,7 @@ class Directory (ServiceInterface):
         return [s["url"] for s in specs if s["url"] is not None];
 
     def register_service_url (self, service, url):
-        st = self.fetch(method="POST",
+        st, _ = self.fetch(method="POST",
             url=f"v1/service/{service}/advertisment",
             json={ url: url })
         if st != 204:

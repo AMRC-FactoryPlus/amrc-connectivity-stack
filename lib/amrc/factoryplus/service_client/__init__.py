@@ -4,6 +4,7 @@
 
 from    functools       import cached_property
 
+from    .configdb           import ConfigDB
 from    .directory          import Directory
 from    .discovery          import Discovery
 from    .edge_deployment    import EdgeDeployment
@@ -14,6 +15,10 @@ from    .service_error      import ServiceError
 class ServiceClient:
     def __init__ (self, **opts):
         self.opts = opts
+
+    @cached_property
+    def configdb (self):
+        return ConfigDB(self)
 
     @cached_property
     def directory (self):

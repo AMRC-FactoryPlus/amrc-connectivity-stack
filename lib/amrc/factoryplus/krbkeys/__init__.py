@@ -11,6 +11,8 @@ import  secrets
 
 import  kopf
 
+from    amrc.factoryplus    import ServiceClient
+
 from .context       import Context
 from .event         import RekeyEvent, TrimKeysEvent
 from .util          import Identifiers, log
@@ -25,6 +27,7 @@ class KrbKeys:
         self.presets = env["PRESETS_SECRET"]
         self.expire_old_keys = int(env.get("EXPIRE_OLD_KEYS", 86400))
         self.kadmin_ccache = env.get("KADMIN_CCNAME", None)
+        self.fplus = ServiceClient(env=env)
 
     def register_handlers (self):
         log("Registering handlers")

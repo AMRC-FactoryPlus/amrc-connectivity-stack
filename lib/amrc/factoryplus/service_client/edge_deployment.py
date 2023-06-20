@@ -4,7 +4,6 @@
 
 import logging
 
-from .service_error         import ServiceError
 from .service_interface     import ServiceInterface
 from ..                     import uuids
 
@@ -21,12 +20,10 @@ class EdgeDeployment (ServiceInterface):
             url=f"v1/cluster/{cluster}/secret/{namespace}/{name}/{key}",
             data=content)
         if st != 204:
-            raise ServiceError(f"Can't seal secret {namespace}/{name}/{key}",
-                service=self.service, status=st)
+            self.error(f"Can't seal secret {namespace}/{name}/{key}", st)
 
     def delete_secret (self, cluster, namespace, name, key):
         st, _ = self.fetch(method="DELETE",
             url=f"v1/cluster/{cluster}/secret/{namespace}/{name}/{key}")
         if st != 204:
-            raise ServiceError(f"Can't delete secret {namespace}/{name}/{key}",
-                service=self.service, status=st)
+            self.error(f"Can't delete secret {namespace}/{name}/{key}", st)

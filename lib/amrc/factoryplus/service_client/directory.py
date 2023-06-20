@@ -4,7 +4,6 @@
 
 import logging
 
-from .service_error         import ServiceError
 from .service_interface     import ServiceInterface
 from ..                     import uuids
 
@@ -22,8 +21,7 @@ class Directory (ServiceInterface):
             log.warning(f"Can't find service {service}: {st}")
             return []
         if st != 200:
-            raise ServiceError(f"Can't get service records for {service}",
-                service=self.service, status=st)
+            self.error(f"Can't get service records for {service}", st)
         return [s["url"] for s in specs if s["url"] is not None];
 
     def register_service_url (self, service, url):
@@ -31,6 +29,5 @@ class Directory (ServiceInterface):
             url=f"v1/service/{service}/advertisment",
             json={ url: url })
         if st != 204:
-            raise ServiceError(f"Can't register service {service}",
-                service=self.service, status=st)
+            self.error(f"Can't register service {service}", st)
         log.info("Registered {url} for {service}")

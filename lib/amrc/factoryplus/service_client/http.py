@@ -15,7 +15,7 @@ from .service_interface     import ServiceInterface
 
 log = logging.getLogger(__name__)
 
-class HTTP (ServiceInterface):
+class HTTP:
     def __init__ (self, fplus, **kw):
         self.fplus = fplus
 

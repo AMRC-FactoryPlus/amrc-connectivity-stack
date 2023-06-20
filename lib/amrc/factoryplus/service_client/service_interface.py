@@ -2,7 +2,9 @@
 # Service interface
 # Copyright 2023 AMRC
 
-from email.message import Message
+from email.message  import Message
+
+from .service_error import ServiceError    
 
 # Apparently this is the best way to do this...
 def content_type (res):
@@ -16,6 +18,9 @@ def content_type (res):
 class ServiceInterface:
     def __init__ (self, fplus, **opts):
         self.fplus = fplus
+
+    def error (self, msg, status=None):
+        raise ServiceError(msg, service=self.service, status=status)
 
     def fetch (self, url, **opts):
         method = opts.pop("method", "GET")

@@ -28,18 +28,24 @@ spec:
             items:
               - path: client
                 key: op1krbkeys
+        - name: krb5-ccache
+          emptyDir:
       containers:
         - name: operator
-          image: "{{ .Values.identity.krbKeysOperator.image.registry }}/{{ .Values.identity.krbKeysOperator.image.repository }}:{{ .Values.identity.krbKeysOperator.image.tag }}"
-          command: [
-            "/usr/bin/k5start",
-                   "-Uf", "/keytabs/client",
-            # For some reason k5start wants these separately...
-                   "-S", "kadmin", "-I", "admin" ]
-          args: [ "/bin/sh", "/home/krbkeys/bin/krb-keys.sh" ]
+{{ include "amrc-connectivity-stack.image" .Values.identity.krbKeysOperator | indent 10 }}
+          command: [ "/bin/sh", "/home/krbkeys/bin/krb-keys.sh" ]
+          args: []
           env:
             - name: KRB5_CONFIG
               value: /config/krb5-conf/krb5.conf
+            - name: KRB5CCNAME
+              value: /ccache/krbkeys
+            - name: KADMIN_CCNAME
+              value: /ccache/kadmin
+            - name: DIRECTORY_URL
+              value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
+            - name: VERBOSE
+              value: "1"
             # The k8s namespaces to watch for KerberosKey objects. This should be a comma-separated list.
             - name: WATCH_NAMESPACES
               value: {{ coalesce .Values.identity.krbKeysOperator.namespaces .Release.Namespace }}
@@ -62,6 +68,41 @@ spec:
           volumeMounts:
             - mountPath: /config/krb5-conf
               name: krb5-conf
+            - mountPath: /ccache
+              name: krb5-ccache
+        - name: tgt-creds
+{{ include "amrc-connectivity-stack.image" .Values.identity.krbKeysOperator | indent 10 }}
+          command: ["/usr/bin/k5start", "-Uf", "/keytabs/client", "-K", "5"]
+          args: []
+          env:
+            - name: KRB5_CONFIG
+              value: /config/krb5-conf/krb5.conf
+            - name: KRB5CCNAME
+              value: /ccache/krbkeys
+          volumeMounts:
+            - mountPath: /config/krb5-conf
+              name: krb5-conf
             - mountPath: /keytabs
               name: krb5-keytabs
+            - mountPath: /ccache
+              name: krb5-ccache
+        - name: kadmin-creds
+{{ include "amrc-connectivity-stack.image" .Values.identity.krbKeysOperator | indent 10 }}
+          command: [
+            "/usr/bin/k5start", "-K", "5",
+            "-Uf", "/keytabs/client", 
+            "-S", "kadmin", "-I", "admin" ]
+          args: []
+          env:
+            - name: KRB5_CONFIG
+              value: /config/krb5-conf/krb5.conf
+            - name: KRB5CCNAME
+              value: /ccache/kadmin
+          volumeMounts:
+            - mountPath: /config/krb5-conf
+              name: krb5-conf
+            - mountPath: /keytabs
+              name: krb5-keytabs
+            - mountPath: /ccache
+              name: krb5-ccache
 {{- end -}}

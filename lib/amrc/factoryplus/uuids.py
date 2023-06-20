@@ -12,6 +12,7 @@ App = SimpleNamespace(
     Registration=UUID("cb40bed5-49ad-4443-a7f5-08c75009da8f"),
     Info=UUID("64a8bfa9-7772-45c4-9d1a-9e6290690957"),
     SparkplugAddress=UUID("8e32801b-f35a-4cbf-a5c3-2af64d3debd7"),
+    EdgeCluster=UUID("bdb13634-0b3d-4e38-a065-9d88c12ee78d"),
 )
 
 Class = SimpleNamespace(

@@ -44,5 +44,8 @@ class EdgeDeployment (ServiceInterface):
     def delete_secret (self, **kw):
         url = SecretUrl(**kw)
         st, _ = self.fetch(method="DELETE", **url.params)
-        if st != 204:
-            self.error(f"Can't delete secret {url.path}", st)
+        if st == 404:
+            return False
+        if st == 204:
+            return True
+        self.error(f"Can't delete secret {url.path}", st)

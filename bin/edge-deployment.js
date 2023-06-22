@@ -25,6 +25,7 @@ const edge = await new EdgeDeploy({
     http_url:   process.env.HTTP_API_URL,
     repo_group: process.env.CLUSTER_REPO_GROUP,
     cert_dir:   process.env.KUBESEAL_TEMP,
+    flux_class: process.env.FLUX_ACCOUNT_CLASS,
 }).init();
 
 const api = await new WebAPI({

@@ -12,6 +12,7 @@ import express from "express";
 import { Debug, ServiceClient, WebAPI, UUIDs, pkgVersion } 
     from "@amrc-factoryplus/utilities";
 
+import { GIT_VERSION } from "../lib/git-version.js";
 import { Service, Version } from "../lib/constants.js";
 import APIv1 from "../lib/api-v1/controller.js";
 import MQTTCli from "../lib/mqttcli.js";
@@ -35,6 +36,11 @@ const api = await new WebAPI({
         version:    Version,
         service:    Service.Registry,
         device:     Device_UUID,
+        software: {
+            vendor:         "AMRC",
+            application:    "acs-configdb",
+            revision:       GIT_VERSION,
+        },
     },
     realm:      process.env.REALM,
     hostname:   process.env.HOSTNAME,

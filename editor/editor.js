@@ -31,7 +31,7 @@ async function service_fetch(path, opts) {
         if (Token == null) await get_tok();
         if (Token == null) return;
 
-        opts = {...opts};
+        opts = {...opts, cache: "reload"};
         opts.headers = {...opts.headers};
         opts.headers["Authorization"] = `Bearer ${Token}`;
         return await fetch(url, opts);

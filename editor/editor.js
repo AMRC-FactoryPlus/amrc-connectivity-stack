@@ -80,6 +80,8 @@ async function get_name (obj, with_class) {
     return html`${name} <small>(${kname})</small>`;
 }
 
+function st_ok (st) { return st >= 200 && st < 300; }
+
 async function put_string(path, conf, method = "PUT") {
     const rsp = await service_fetch(`/v1/${path}`, {
         method: method,
@@ -89,7 +91,7 @@ async function put_string(path, conf, method = "PUT") {
         body: conf,
     });
 
-    return rsp.status >= 200 && rsp.status < 300;
+    return rsp.status;
 }
 
 function put_json(path, json, method = "PUT") {
@@ -305,7 +307,7 @@ function NewObj(props) {
 
             const name = new_name.current?.value;
             if (name) {
-                const gi = await put_json(
+                await put_json(
                     `app/${AppUuid.General_Info}/object/${rsp.uuid}`,
                     {name});
             }
@@ -361,10 +363,11 @@ function Conf(props) {
         if (!editbox.current) return;
         const new_conf = editbox.current.value;
 
-        if (await put_string(`app/${app}/object/${obj}`, new_conf)) {
+        const st = await put_string(`app/${app}/object/${obj}`, new_conf);
+        if (st_ok(st)) {
             set_msg(html`Config updated`);
         } else {
-            set_msg(html`Error updating config`);
+            set_msg(html`Error updating config: ${st}`);
         }
         await update_conf();
     };
@@ -392,10 +395,10 @@ function NewConf(props) {
 
     const create = async () => {
         if (!new_obj.current || !new_conf.current) return;
-        const ok = await put_string(
+        const st = await put_string(
             `app/${app}/object/${new_obj.current.value}`,
             new_conf.current.value);
-        set_msg(ok ? "Create succeeded" : "Create failed");
+        set_msg(st_ok(st) ? "Create succeeded" : `Create failed: ${st}`);
     };
 
     return html`

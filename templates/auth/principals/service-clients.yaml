@@ -1,3 +1,4 @@
+{{- if .Values.identity.enabled }}
 ## Service client principals.
   ##
   ## These are the principals that services use when they are acting as a client of another
@@ -13,7 +14,6 @@
   ## krb5-presets secret. This option should only be used for services that can't pull
   ## their password from a k8s secret, like Canary.
   #
----
 apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey
 metadata:
@@ -77,3 +77,4 @@ metadata:
 spec:
   type: Random
   principal: sv1warehouse@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+{{- end -}}

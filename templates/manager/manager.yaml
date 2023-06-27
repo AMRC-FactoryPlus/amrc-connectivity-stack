@@ -1,3 +1,4 @@
+{{ if .Values.manager.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -86,3 +87,4 @@ spec:
               name: manager-keytab
             - mountPath: /config/krb5-conf
               name: krb5-conf
+{{- end -}}

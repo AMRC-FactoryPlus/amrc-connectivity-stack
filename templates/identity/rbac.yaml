@@ -1,3 +1,4 @@
+{{ if .Values.identity.enabled }}
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -42,3 +43,4 @@ subjects:
   -   kind: ServiceAccount
       name: krb-keys-operator
       namespace: {{ .Release.Namespace }}
+{{- end -}}

@@ -1,3 +1,4 @@
+{{ if .Values.identity.enabled }}
 apiVersion: traefik.containo.us/v1alpha1
 kind: IngressRouteTCP
 metadata:
@@ -42,3 +43,4 @@ spec:
         - name: kadmin
           port: kerberos-adm
           namespace: {{ .Release.Namespace }}
+{{- end -}}

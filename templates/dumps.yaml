@@ -100,6 +100,7 @@
 {{$userGroup_administrators := uuidv4 | quote}}
 
 
+{{ if .Values.configdb.enabled }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -523,7 +524,9 @@ data:
         }
       }
     }
+{{- end -}}
 ---
+{{ if .Values.auth.enabled }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -750,3 +753,4 @@ data:
       ]
     }
 {{end}}
+{{- end -}}

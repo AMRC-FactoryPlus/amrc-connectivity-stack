@@ -1,3 +1,4 @@
+{{ if .Values.mqtt.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -101,3 +102,4 @@ data:
             </websocket-listener>
         </listeners>
     </hivemq>
+{{- end -}}

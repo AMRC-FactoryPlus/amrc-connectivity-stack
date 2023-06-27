@@ -1,3 +1,4 @@
+{{ if .Values.warehouse.ingester.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -56,3 +57,4 @@ spec:
               name: krb5-conf
             - mountPath: /keytabs
               name: krb5-keytabs
+{{- end -}}

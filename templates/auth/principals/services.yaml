@@ -1,3 +1,4 @@
+{{- if .Values.identity.enabled }}
 # Service server principals.
   #
   # These are the principals that services use in their capacity as servers: they fulfil
@@ -97,3 +98,4 @@ spec:
   principal: HTTP/warehouse.{{ .Release.Namespace }}.svc.cluster.local@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
   additionalPrincipals:
     - HTTP/warehouse.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+{{- end -}}

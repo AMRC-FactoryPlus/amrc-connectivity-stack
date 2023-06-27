@@ -1,3 +1,4 @@
+{{ if .Values.traefik.enabled }}
 apiVersion: traefik.containo.us/v1alpha1
 kind: TLSStore
 metadata:
@@ -6,3 +7,4 @@ metadata:
 spec:
   defaultCertificate:
     secretName: {{ .Values.acs.tlsSecretName | required "values.acs.tlsSecretName is required!" }}
+{{- end -}}

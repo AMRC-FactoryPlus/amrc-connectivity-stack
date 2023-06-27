@@ -1,3 +1,4 @@
+{{ if .Values.manager.enabled }}
 apiVersion: batch/v1
 kind: CronJob
 metadata:
@@ -39,3 +40,4 @@ spec:
                   memory: 200Mi
                   cpu: 100m
           restartPolicy: Never
+{{- end -}}

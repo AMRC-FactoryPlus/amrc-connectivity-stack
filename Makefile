@@ -11,13 +11,17 @@ tag=${registry}/${repo}:${version}${suffix}
 
 all: build push
 
-.PHONY: all build push
+.PHONY: all build push run
 
 build:
+	[ -z "$$(git status --porcelain)" ] || (git status; exit 1)
 	docker build -t "${tag}" .
 
 push:
 	docker push "${tag}"
+
+run:
+	docker run -ti --rm -v "$$(pwd)":/local "${tag}" /bin/sh
 
 
 ifdef deployment
@@ -31,7 +35,7 @@ restart:
 	sleep 3
 
 logs:
-	kubectl logs -f deploy/"${deployment}"
+	kubectl logs -f deploy/"${deployment}" -c operator
 
 else
 

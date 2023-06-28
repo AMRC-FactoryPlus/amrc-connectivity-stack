@@ -52,8 +52,7 @@ spec:
                   key: admin
           command: [ 'sh', '-c', 'until curl -X PUT -o /dev/null -w "%{http_code}" -u "admin:${PASSWORD}" -H "Content-Type: application/json" --data-raw "{ \"url\": \"http://auth.{{.Release.Namespace}}.svc.cluster.local\" }" http://directory.{{.Release.Namespace}}.svc.cluster.local/v1/service/cab2642a-f7d9-42e5-8845-8f35affe1fd4/advertisment/1e1989ab-14e4-42bd-8171-495230acc406 | grep -E "2[0-9]{2}" > /dev/null; do sleep 10; done' ]
         - name: db-init
-          image: "{{ .Values.auth.image.registry }}/{{ .Values.auth.image.repository }}:{{ .Values.auth.image.tag }}"
-          imagePullPolicy: Always
+{{ include "amrc-connectivity-stack.image" .Values.auth | indent 10 }}
           command: [ "/usr/bin/k5start", "-Uf", "/keytabs/dbadmin", "/usr/local/bin/psql" ]
           args: [ "-w", "-q", "-f", "/home/node/app/sql/migrate.sql" ]
           env:
@@ -76,8 +75,7 @@ spec:
               name: krb5-keytabs-dbinit
 
         - name: load-dumps
-          image: "{{ .Values.auth.image.registry }}/{{ .Values.auth.image.repository }}:{{ .Values.auth.image.tag }}"
-          imagePullPolicy: Always
+{{ include "amrc-connectivity-stack.image" .Values.auth | indent 10 }}
           command: [ "/usr/bin/k5start", "-Uf", "/keytabs/client" ]
           args: [ "npm", "run", "load-dump", "/dumps" ]
           env:
@@ -101,8 +99,7 @@ spec:
 
       containers:
         - name: webapi
-          image: "{{ .Values.auth.image.registry }}/{{ .Values.auth.image.repository }}:{{ .Values.auth.image.tag }}"
-          imagePullPolicy: Always
+{{ include "amrc-connectivity-stack.image" .Values.auth | indent 10 }}
           env:
             - name: KRB5_CONFIG
               value: /config/krb5-conf/krb5.conf

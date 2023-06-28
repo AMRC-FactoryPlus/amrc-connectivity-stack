@@ -32,7 +32,7 @@ spec:
 
       containers:
         - name: mqtt
-          image: "{{ .Values.cmdesc.image.registry }}/{{ .Values.cmdesc.image.repository }}:{{ .Values.cmdesc.image.tag }}"
+{{ include "amrc-connectivity-stack.image" .Values.cmdesc | indent 10 }}
           command: [ "/usr/bin/k5start", "-Uf", "/keytabs/client" ]
           args: [ "npm", "start" ]
           env:

@@ -7,6 +7,7 @@ metadata:
 data:
   APP_NAME: {{.Values.manager.name | quote | required "values.manager.name is required!"}}
   APP_ENV: {{.Values.manager.env | quote | required "values.manager.env is required!"}}
+  APP_NAMESPACE: {{ .Release.Namespace | quote }}
   APP_ORGANISATION: {{.Values.acs.organisation | quote | required "values.acs.organisation is required!"}}
   APP_DEBUG: {{.Values.manager.debug | quote | required "values.manager.debug is required!"}}
   VITE_BRANDING_NAME: {{.Values.manager.name | quote | required "values.manager.name is required!"}}

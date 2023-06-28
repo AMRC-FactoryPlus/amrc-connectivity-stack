@@ -15,6 +15,13 @@ data:
     [domain_realm]
         cluster.local = {{ .Values.identity.realm | required "values.identity.realm is required!" }}
             {{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}} = {{ .Values.identity.realm | required "values.identity.realm is required!" }}
+{{- range .Values.identity.crossRealm }}
+{{- $realm := .realm }}
+        {{ .domain }} = {{ $realm }}
+{{- range .otherDomains }}
+        {{ . }} = {{ $realm }}
+{{- end }}
+{{- end }}
 
     [realms]
             {{ .Values.identity.realm | required "values.identity.realm is required!" }} = {
@@ -22,4 +29,11 @@ data:
             admin_server = kadmin.{{ .Release.Namespace }}.svc.cluster.local
             disable_encrypted_timestamp = true
         }
+{{- range .Values.identity.crossRealm }}
+        {{ .realm }} = {
+            kdc = kdc.{{ .domain }}
+            admin_server = kadmin.{{ .domain }}
+            disable_encrypted_timestamp = true
+        }
+{{- end }}
 {{- end -}}

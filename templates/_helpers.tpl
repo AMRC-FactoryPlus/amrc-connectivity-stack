@@ -36,6 +36,14 @@ Create chart name and version as used by the chart label.
 {{- end }}
 
 {{/*
+Define the image for a container.
+*/}}
+{{- define "amrc-connectivity-stack.image" -}}
+image: {{ .image.registry }}/{{ .image.repository }}:{{ .image.tag }}
+imagePullPolicy: {{ .image.pullPolicy }}
+{{- end }}
+
+{{/*
 Common labels
 */}}
 {{- define "amrc-connectivity-stack.labels" -}}

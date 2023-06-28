@@ -43,7 +43,7 @@ spec:
           command: [ 'sh', '-c', 'until curl -X PUT -o /dev/null -w "%{http_code}" -u "sv1mqtt:${PASSWORD}" -H "Content-Type: application/json" --data-raw "{ \"url\": \"mqtt://mqtt.{{.Release.Namespace}}.svc.cluster.local\" }" http://directory.{{.Release.Namespace}}.svc.cluster.local/v1/service/feb27ba3-bd2c-4916-9269-79a61ebc4a47/advertisment | grep -E "2[0-9]{2}" > /dev/null; do sleep 10; done' ]
       containers:
         - name: hivemq
-          image: "{{ .Values.mqtt.image.registry }}/{{ .Values.mqtt.image.repository }}:{{ .Values.mqtt.image.tag }}"
+{{ include "amrc-connectivity-stack.image" .Values.mqtt | indent 10 }}
           env:
             - name: SERVER_KEYTAB
               value: /keytabs/server

@@ -108,6 +108,10 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     component: configdb
+  annotations:
+    "helm.sh/hook": pre-install
+    "helm.sh/hook-weight": "20"
+    "helm.sh/resource-policy": keep
 data:
   # Pre-seed required
   bootstrap: |
@@ -493,11 +497,11 @@ data:
         {{$application_sparkplugAddressInformation}}: {
           {{$serviceAccount_directory}}: {
             "node_id": "Directory",
-            "group_id": "{{ .Values.acs.organisation }}-Service-DIR-Directory"
+            "group_id": "{{ .Values.acs.organisation }}-Service-Core"
           },
           {{$serviceAccount_configStore}}: {
             "node_id": "Config_DB",
-            "group_id": "{{ .Values.acs.organisation }}-Service-Config_DB"
+            "group_id": "{{ .Values.acs.organisation }}-Service-Core"
           },
           {{$serviceAccount_commandEscalation}}: {
             "node_id": "Command_Escalation",
@@ -535,6 +539,7 @@ metadata:
   annotations:
     "helm.sh/hook": pre-install
     "helm.sh/hook-weight": "20"
+    "helm.sh/resource-policy": keep
   labels:
     component: auth
 data:

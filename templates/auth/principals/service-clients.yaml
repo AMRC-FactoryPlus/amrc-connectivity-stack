@@ -22,7 +22,7 @@ metadata:
 spec:
   type: Random
   principal: sv1auth@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
-{{- end -}}
+{{- end }}
 ---
 {{- if .Values.cmdesc.enabled }}
 apiVersion: factoryplus.app.amrc.co.uk/v1
@@ -33,7 +33,7 @@ metadata:
 spec:
   type: Random
   principal: sv1cmdesc@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
-{{- end -}}
+{{- end }}
 ---
 {{- if .Values.configdb.enabled }}
 apiVersion: factoryplus.app.amrc.co.uk/v1
@@ -44,7 +44,7 @@ metadata:
 spec:
   type: Random
   principal: sv1configdb@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
-{{- end -}}
+{{- end }}
 ---
 {{- if .Values.directory.enabled }}
 apiVersion: factoryplus.app.amrc.co.uk/v1
@@ -55,7 +55,7 @@ metadata:
 spec:
   type: Random
   principal: sv1directory@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
-{{- end -}}
+{{- end }}
 ---
 {{- if .Values.mqtt.enabled }}
 apiVersion: factoryplus.app.amrc.co.uk/v1
@@ -66,7 +66,7 @@ metadata:
 spec:
   type: Password
   principal: sv1mqtt@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
-{{- end -}}
+{{- end }}
 ---
 {{- if .Values.manager.enabled }}
 apiVersion: factoryplus.app.amrc.co.uk/v1
@@ -78,7 +78,7 @@ spec:
   type: Random
   principal: sv1manager@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
   secret: manager-keytab/client-keytab
-{{- end -}}
+{{- end }}
 ---
 {{- if .Values.warehouse.enabled }}
 apiVersion: factoryplus.app.amrc.co.uk/v1
@@ -89,4 +89,4 @@ metadata:
 spec:
   type: Random
   principal: sv1warehouse@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
-{{- end -}}
+{{- end }}

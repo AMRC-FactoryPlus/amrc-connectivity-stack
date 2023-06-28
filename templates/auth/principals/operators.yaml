@@ -23,4 +23,4 @@ metadata:
 spec:
     type: Random
     principal: op1pgadmin@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
-{{- end -}}
+{{- end }}

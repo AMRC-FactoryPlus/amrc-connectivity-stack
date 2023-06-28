@@ -9,6 +9,7 @@ acs:
   tlsSecretName: factoryplus-tls
 
 identity:
+  # -- Whether or not to enable the Identity component
   enabled: true
   # -- The Kerberos realm for this Factory+ deployment.
   realm: LOCALHOST
@@ -34,6 +35,7 @@ identity:
       pullPolicy: IfNotPresent
 
 auth:
+  # -- Whether or not to enable the Authorisation component
   enabled: true
   image:
     # -- The registry of the Authorisation component
@@ -46,6 +48,7 @@ auth:
     pullPolicy: IfNotPresent
 
 directory:
+  # -- Whether or not to enable the Directory component
   enabled: true
   image:
     # -- The registry of the Directory component
@@ -58,6 +61,7 @@ directory:
     pullPolicy: IfNotPresent
 
 configdb:
+  # -- Whether or not to enable the Configuration Store component
   enabled: true
   image:
     # -- The registry of the Configuration Store component
@@ -70,6 +74,7 @@ configdb:
     pullPolicy: IfNotPresent
 
 mqtt:
+  # -- Whether or not to enable the MQTT component
   enabled: true
   image:
     # -- The registry of the MQTT component
@@ -82,6 +87,7 @@ mqtt:
     pullPolicy: IfNotPresent
 
 manager:
+  # -- Whether or not to enable the Manager component
   enabled: true
   image:
     # -- The registry of the Manager component
@@ -112,6 +118,7 @@ manager:
   logLevel: warning
 
 cmdesc:
+  # -- Whether or not to enable the Commands component
   enabled: true
   image:
     # -- The registry of the Commands component
@@ -126,25 +133,28 @@ cmdesc:
   verbosity: 1
 
 warehouse:
+  # -- Whether or not to enable the Warehouse component
   ingester:
     enabled: true
     image:
-      # -- The registry of the Commands component
+      # -- The registry of the Warehouse component
       registry: ghcr.io/amrc-factoryplus
-      # -- The repository of the Commands component
+      # -- The repository of the Warehouse component
       repository: influxdb-sparkplug-ingester
-      # -- The tag of the Commands component
+      # -- The tag of the Warehouse component
       tag: latest
       # @ignore
       pullPolicy: IfNotPresent
 
 minio:
+  # -- Whether or not to enable MinIO
   enabled: true
   # -- Whether or not to expose the MinIO console outside of the cluster
   exposeConsole: false
 
 
 postgres:
+  # -- Whether or not to enable Postgres
   enabled: true
 
 # @ignore

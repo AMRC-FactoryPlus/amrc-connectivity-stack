@@ -3,7 +3,7 @@
 The AMRC Connectivity Stack (ACS) is a Kubernetes Helm chart that contains a comprehensive set of open-source services developed by the AMRC that enables an end-to-end implementation of the Factory+ framework.
 
 ## Prerequisites
-Ensure that you familiarise yourself with the concepts of both Kubernetes and [Factory+](https://factoryplus.app.amrc.co.uk) before continuing. This chart installs a full end-to-end deployment of Factory+ onto a Kubernetes cluster and there are a lot of moving parts.
+Ensure that you have `kubectl` access to an existing Kubernetes cluster and familiarise yourself with the concepts of both Kubernetes and [Factory+](https://factoryplus.app.amrc.co.uk) before continuing. This chart installs a full end-to-end deployment of Factory+ onto the cluster and there are a lot of moving parts.
 
 ## Known Limitations
 Although Factory+ and ACS fully supports edge-based Cell Gateways, this chart does not support the deployment of edge-based Cell Gateways located on other Kubernetes Clusters, which is recommended in production. This is due to the fact that the chart deploys manifests to Cell Gateways, which requires the nodes to be on the same cluster. We already have a proof-of-concept implementation of how to address this and we aim to update this Helm chart in the near future to support.
@@ -17,25 +17,11 @@ Helm is a package manager for Kubernetes that allows you to easily install and m
 ### Install Kubectl
 Kubectl is a command-line tool for controlling Kubernetes clusters. It must be installed on the machine that you'll be using to deploy ACS _from_. To install Kubectl, follow the instructions [here](https://kubernetes.io/docs/tasks/tools/install-kubectl/).
 
-### Install Minikube
-Minikube is a tool that allows you to run a local Kubernetes cluster on your machine. It is not required to deploy ACS, but it is recommended for development and testing. To install Minikube, follow the instructions [here](https://minikube.sigs.k8s.io/docs/start/). If you do not wish to use Minikube, you can deploy ACS to any Kubernetes cluster.
-
 ### Verify Installation
 To verify that Helm and Kubectl have been installed correctly, run the following commands:
 ```bash
 helm version
 kubectl version
-minikube version
-```
-
-Next, create a new MiniKube cluster by running the following command:
-```bash
-minikube start
-```
-
-To verify that you can connect to your MiniKube cluster, run the following command:
-```bash
-kubectl cluster-info
 ```
 
 ### Configure Base URL
@@ -131,49 +117,59 @@ Production deployment does not differ greatly from development deployment, howev
 | https://operator.min.io                         | tenant         | 5.0.3   |
 
 ## Values
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| acs.baseUrl | string | `"localhost"` | The base URL that services will be served from |
+| acs.organisation | string | `"AMRC"` | The organisation where ACS is being deployed |
+| acs.secure | bool | `true` | Whether or not services should be served over HTTPS |
+| acs.tlsSecretName | string | `"factoryplus-tls"` | The name of the secret holding the wildcard certificate for the above domain. |
+| auth.enabled | bool | `true` | Whether or not to enable the Authorisation component |
+| auth.image.registry | string | `"ghcr.io/amrc-factoryplus"` | The registry of the Authorisation component |
+| auth.image.repository | string | `"acs-auth"` | The repository of the Authorisation component |
+| auth.image.tag | string | `"latest"` | The tag of the Authorisation component |
+| cmdesc.enabled | bool | `true` | Whether or not to enable the Commands component |
+| cmdesc.image.registry | string | `"ghcr.io/amrc-factoryplus"` | The registry of the Commands component |
+| cmdesc.image.repository | string | `"acs-cmdesc"` | The repository of the Commands component |
+| cmdesc.image.tag | string | `"latest"` | The tag of the Commands component |
+| cmdesc.verbosity | int | `1` | Possible values are either 1 to enable all possible debugging, or a comma-separated list of debug tags (the tags printed before the log lines). No logging is specified as an empty string. |
+| configdb.enabled | bool | `true` | Whether or not to enable the Configuration Store component |
+| configdb.image.registry | string | `"ghcr.io/amrc-factoryplus"` | The registry of the Configuration Store component |
+| configdb.image.repository | string | `"acs-configdb"` | The repository of the Configuration Store component |
+| configdb.image.tag | string | `"latest"` | The tag of the Configuration Store component |
+| directory.enabled | bool | `true` | Whether or not to enable the Directory component |
+| directory.image.registry | string | `"ghcr.io/amrc-factoryplus"` | The registry of the Directory component |
+| directory.image.repository | string | `"acs-directory"` | The repository of the Directory component |
+| directory.image.tag | string | `"latest"` | The tag of the Directory component |
+| identity.enabled | bool | `true` | Whether or not to enable the Identity component |
+| identity.identity.image.registry | string | `"ghcr.io/amrc-factoryplus"` | The registry of the Identity component |
+| identity.identity.image.repository | string | `"acs-identity"` | The repository of the Identity component |
+| identity.identity.image.tag | string | `"latest"` | The tag of the Identity component |
+| identity.krbKeysOperator.image.registry | string | `"ghcr.io/amrc-factoryplus"` | The registry of the KerberosKey Operator |
+| identity.krbKeysOperator.image.repository | string | `"acs-krb-keys-operator"` | The repository of the KerberosKey Operator |
+| identity.krbKeysOperator.image.tag | string | `"latest"` | The tag of the KerberosKey Operator |
+| identity.realm | string | `"LOCALHOST"` | The Kerberos realm for this Factory+ deployment. |
+| manager.debug | bool | `false` | Whether debug mode is enabled. DO NOT USE THIS IN PRODUCTION. |
+| manager.edge.registry | string | `"ghcr.io/amrc-factoryplus"` | The registry of the Edge Agent component |
+| manager.edge.repository | string | `"acs-edge"` | The repository of the Edge Agent component |
+| manager.edge.tag | string | `"latest"` | The tag of the Edge Agent component |
+| manager.enabled | bool | `true` | Whether or not to enable the Manager component |
+| manager.env | string | `"production"` | The environment that the manager is running in |
+| manager.image.registry | string | `"ghcr.io/amrc-factoryplus"` | The registry of the Manager component |
+| manager.image.repository | string | `"acs-manager"` | The repository of the Manager component |
+| manager.image.tag | string | `"latest"` | The tag of the Manager component |
+| manager.logLevel | string | `"warning"` | The minimum log level that the manager will log messages at |
+| manager.meilisearch.key | string | `"masterKey"` | The key that the manager uses to connect to the Meilisearch search engine |
+| manager.name | string | `"Factory+ Manager"` | A string used to customise the branding of the manager |
+| minio.enabled | bool | `true` | Whether or not to enable MinIO |
+| minio.exposeConsole | bool | `false` | Whether or not to expose the MinIO console outside of the cluster |
+| mqtt.enabled | bool | `true` | Whether or not to enable the MQTT component |
+| mqtt.image.registry | string | `"ghcr.io/amrc-factoryplus"` | The registry of the MQTT component |
+| mqtt.image.repository | string | `"acs-mqtt"` | The repository of the MQTT component |
+| mqtt.image.tag | string | `"latest"` | The tag of the MQTT component |
+| postgres.enabled | bool | `true` | Whether or not to enable Postgres |
+| warehouse.ingester | object | `{"enabled":true,"image":{"registry":"ghcr.io/amrc-factoryplus","repository":"influxdb-sparkplug-ingester","tag":"latest"}}` | Whether or not to enable the Warehouse component |
+| warehouse.ingester.image.registry | string | `"ghcr.io/amrc-factoryplus"` | The registry of the Warehouse component |
+| warehouse.ingester.image.repository | string | `"influxdb-sparkplug-ingester"` | The repository of the Warehouse component |
+| warehouse.ingester.image.tag | string | `"latest"` | The tag of the Warehouse component |
 
-| Key                                       | Type   | Default                         | Description                                                                                                                                                                                 |
-|-------------------------------------------|--------|---------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| acs.baseUrl                               | string | `"localhost"`                   | The base URL that services will be served from                                                                                                                                              |
-| acs.organisation                          | string | `"AMRC"`                        | The organisation where ACS is being deployed                                                                                                                                                |
-| acs.secure                                | bool   | `true`                          | Whether or not services should be served over HTTPS                                                                                                                                         |
-| acs.tlsSecretName                         | string | `"factoryplus-tls"`             | The name of the secret holding the wildcard certificate for the above domain.                                                                                                               |
-| auth.image.registry                       | string | `"ghcr.io/amrc-factoryplus"`    | The registry of the Authorisation component                                                                                                                                                 |
-| auth.image.repository                     | string | `"acs-auth"`                    | The repository of the Authorisation component                                                                                                                                               |
-| auth.image.tag                            | string | `"latest"`                      | The tag of the Authorisation component                                                                                                                                                      |
-| cmdesc.image.registry                     | string | `"ghcr.io/amrc-factoryplus"`    | The registry of the Commands component                                                                                                                                                      |
-| cmdesc.image.repository                   | string | `"acs-cmdesc"`                  | The repository of the Commands component                                                                                                                                                    |
-| cmdesc.image.tag                          | string | `"latest"`                      | The tag of the Commands component                                                                                                                                                           |
-| cmdesc.verbosity                          | int    | `1`                             | Possible values are either 1 to enable all possible debugging, or a comma-separated list of debug tags (the tags printed before the log lines). No logging is specified as an empty string. |
-| configdb.image.registry                   | string | `"ghcr.io/amrc-factoryplus"`    | The registry of the Configuration Store component                                                                                                                                           |
-| configdb.image.repository                 | string | `"acs-configdb"`                | The repository of the Configuration Store component                                                                                                                                         |
-| configdb.image.tag                        | string | `"latest"`                      | The tag of the Configuration Store component                                                                                                                                                |
-| directory.image.registry                  | string | `"ghcr.io/amrc-factoryplus"`    | The registry of the Directory component                                                                                                                                                     |
-| directory.image.repository                | string | `"acs-directory"`               | The repository of the Directory component                                                                                                                                                   |
-| directory.image.tag                       | string | `"latest"`                      | The tag of the Directory component                                                                                                                                                          |
-| identity.identity.image.registry          | string | `"ghcr.io/amrc-factoryplus"`    | The registry of the Identity component                                                                                                                                                      |
-| identity.identity.image.repository        | string | `"acs-identity"`                | The repository of the Identity component                                                                                                                                                    |
-| identity.identity.image.tag               | string | `"latest"`                      | The tag of the Identity component                                                                                                                                                           |
-| identity.krbKeysOperator.image.registry   | string | `"ghcr.io/amrc-factoryplus"`    | The registry of the KerberosKey Operator                                                                                                                                                    |
-| identity.krbKeysOperator.image.repository | string | `"acs-krb-keys-operator"`       | The repository of the KerberosKey Operator                                                                                                                                                  |
-| identity.krbKeysOperator.image.tag        | string | `"latest"`                      | The tag of the KerberosKey Operator                                                                                                                                                         |
-| identity.realm                            | string | `"LOCALHOST"`                   | The Kerberos realm for this Factory+ deployment.                                                                                                                                            |
-| manager.debug                             | bool   | `false`                         | Whether debug mode is enabled. DO NOT USE THIS IN PRODUCTION.                                                                                                                               |
-| manager.edge.registry                     | string | `"ghcr.io/amrc-factoryplus"`    | The registry of the Edge Agent component                                                                                                                                                    |
-| manager.edge.repository                   | string | `"acs-edge"`                    | The repository of the Edge Agent component                                                                                                                                                  |
-| manager.edge.tag                          | string | `"latest"`                      | The tag of the Edge Agent component                                                                                                                                                         |
-| manager.env                               | string | `"production"`                  | The environment that the manager is running in                                                                                                                                              |
-| manager.image.registry                    | string | `"ghcr.io/amrc-factoryplus"`    | The registry of the Manager component                                                                                                                                                       |
-| manager.image.repository                  | string | `"acs-manager"`                 | The repository of the Manager component                                                                                                                                                     |
-| manager.image.tag                         | string | `"latest"`                      | The tag of the Manager component                                                                                                                                                            |
-| manager.logLevel                          | string | `"warning"`                     | The minimum log level that the manager will log messages at                                                                                                                                 |
-| manager.meilisearch.key                   | string | `"masterKey"`                   | The key that the manager uses to connect to the Meilisearch search engine                                                                                                                   |
-| manager.name                              | string | `"Factory+ Manager"`            | A string used to customise the branding of the manager                                                                                                                                      |
-| minio.exposeConsole                       | bool   | `false`                         | Whether or not to expose the MinIO console outside of the cluster                                                                                                                           |
-| mqtt.image.registry                       | string | `"ghcr.io/amrc-factoryplus"`    | The registry of the MQTT component                                                                                                                                                          |
-| mqtt.image.repository                     | string | `"acs-mqtt"`                    | The repository of the MQTT component                                                                                                                                                        |
-| mqtt.image.tag                            | string | `"latest"`                      | The tag of the MQTT component                                                                                                                                                               |
-| warehouse.ingester.image.registry         | string | `"ghcr.io/amrc-factoryplus"`    | The registry of the Commands component                                                                                                                                                      |
-| warehouse.ingester.image.repository       | string | `"influxdb-sparkplug-ingester"` | The repository of the Commands component                                                                                                                                                    |
-| warehouse.ingester.image.tag              | string | `"latest"`                      | The tag of the Commands component                                                                                                                                                           |
 ----------------------------------------------

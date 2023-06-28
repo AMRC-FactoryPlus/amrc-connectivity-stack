@@ -21,7 +21,7 @@ spec:
   principal: HTTP/auth.{{ .Release.Namespace }}.svc.cluster.local@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
   additionalPrincipals:
     - HTTP/auth.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
-{{- end -}}
+{{- end }}
 ---
 {{- if .Values.cmdesc.enabled }}
 apiVersion: factoryplus.app.amrc.co.uk/v1
@@ -34,7 +34,7 @@ spec:
   principal: HTTP/cmdesc.{{ .Release.Namespace }}.svc.cluster.local@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
   additionalPrincipals:
     - HTTP/cmdesc.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
-{{- end -}}
+{{- end }}
 ---
 {{- if .Values.configdb.enabled }}
 apiVersion: factoryplus.app.amrc.co.uk/v1
@@ -47,7 +47,7 @@ spec:
   principal: HTTP/configdb.{{ .Release.Namespace }}.svc.cluster.local@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
   additionalPrincipals:
     - HTTP/configdb.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
-{{- end -}}
+{{- end }}
 ---
 {{- if .Values.directory.enabled }}
 apiVersion: factoryplus.app.amrc.co.uk/v1
@@ -60,7 +60,7 @@ spec:
   principal: HTTP/directory.{{ .Release.Namespace }}.svc.cluster.local@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
   additionalPrincipals:
     - HTTP/directory.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
-{{- end -}}
+{{- end }}
 ---
 {{- if .Values.mqtt.enabled }}
 apiVersion: factoryplus.app.amrc.co.uk/v1
@@ -73,7 +73,7 @@ spec:
   principal: mqtt/mqtt.{{ .Release.Namespace }}.svc.cluster.local@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
   additionalPrincipals:
     - mqtt/mqtt.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
-{{- end -}}
+{{- end }}
 ---
 {{- if .Values.manager.enabled }}
 apiVersion: factoryplus.app.amrc.co.uk/v1
@@ -87,7 +87,7 @@ spec:
   additionalPrincipals:
     - HTTP/manager.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
   secret: manager-keytab/keytab
-{{- end -}}
+{{- end }}
 ---
 {{- if .Values.postgres.enabled }}
 apiVersion: factoryplus.app.amrc.co.uk/v1
@@ -98,7 +98,7 @@ metadata:
 spec:
   type: Random
   principal: postgres/postgres.{{ .Release.Namespace }}.svc.cluster.local@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
-{{- end -}}
+{{- end }}
 ---
 {{- if .Values.warehouse.enabled }}
 apiVersion: factoryplus.app.amrc.co.uk/v1
@@ -111,4 +111,4 @@ spec:
   principal: HTTP/warehouse.{{ .Release.Namespace }}.svc.cluster.local@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
   additionalPrincipals:
     - HTTP/warehouse.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
-{{- end -}}
+{{- end }}

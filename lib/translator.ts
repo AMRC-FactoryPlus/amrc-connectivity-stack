@@ -3,6 +3,8 @@
  *  Copyright 2023 AMRC
  */
 
+import type { ServiceClient } from "@amrc-factoryplus/utilities";
+
 // Import device connections
 import {
     SparkplugNode
@@ -66,6 +68,8 @@ export class Translator extends EventEmitter {
      */
     sparkplugNode!: SparkplugNode
     conf: translatorConf
+    fplus: ServiceClient
+
     connections: {
         [index: string]: any
     }
@@ -76,10 +80,11 @@ export class Translator extends EventEmitter {
         [index: string]: any
     }
 
-    constructor(conf: translatorConf) {
+    constructor(fplus: ServiceClient, conf: translatorConf) {
         super();
 
         this.conf = conf;
+        this.fplus = fplus;
         this.connections = {};
         this.devices = {};
         this.supportedChannels = {
@@ -124,7 +129,7 @@ export class Translator extends EventEmitter {
         try {
             // Create sparkplug node
 
-            this.sparkplugNode = new SparkplugNode(this.conf.sparkplug);
+            this.sparkplugNode = new SparkplugNode(this.fplus, this.conf.sparkplug);
 
             log(`Created Sparkplug node "${this.conf.sparkplug.edgeNode}" in group "${this.conf.sparkplug.groupId}".`);
 

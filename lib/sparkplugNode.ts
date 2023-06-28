@@ -3,14 +3,15 @@
  *  Copyright 2023 AMRC
  */
 
-import * as sparkplug
-    from "sparkplug-client";
+import { EventEmitter } from "events";
+import * as MQTT from "mqtt";
+
 import {
-    log
-} from "./helpers/log.js";
-import {
-    EventEmitter
-} from "events";
+    Address, 
+    ServiceClient, 
+} from "@amrc-factoryplus/utilities";
+
+import { log } from "./helpers/log.js";
 import {
     metricIndex,
     Metrics,
@@ -19,12 +20,14 @@ import {
     sparkplugMetric,
     sparkplugPayload
 } from "./helpers/typeHandler.js";
+import { BasicSparkplugNode } from "./sparkplug/basic.js";
 
 export class SparkplugNode extends (
     EventEmitter
 ) {
     #conf: sparkplugConfig
     #client: any
+    #fplus: ServiceClient
     #metrics: Metrics
     isOnline: boolean
     #metricBuffer: { [index: string]: sparkplugMetric[] }
@@ -32,21 +35,25 @@ export class SparkplugNode extends (
     #aliasCounter: number
     #metricNameIndex: metricIndex
 
-    constructor(conf: sparkplugConfig) {
+    constructor(fplus: ServiceClient, conf: sparkplugConfig) {
         super();
         this.#conf = conf;
-        this.#conf.clientId = conf.groupId + '-' + conf.edgeNode + '-' + (Math.random() * 1e17).toString(36); // Generate randomized client ID
-        this.#conf.publishDeath = true;
-        this.#conf.version = 'spBv1.0';
-
-        // If we've overwritten the server then update it here. This is not used in production but serves to be useful when testing outside of the cluster
-        if (process.env.MQTT_URL) {
-            console.log(`Overwriting MQTT URL to ${process.env.MQTT_URL}`);
-            this.#conf.serverUrl = process.env.MQTT_URL;
-        }
+        this.#fplus = fplus;
 
         // conf.keepalive = 10;
-        this.#client = sparkplug.newClient(this.#conf); // Instantiate Sparkplug Client
+        this.#client = new BasicSparkplugNode({
+            address:        new Address(conf.groupId, conf.edgeNode),
+            publishDeath:   true,
+        });
+
+        const clientId = conf.groupId + '-' + conf.edgeNode + '-' + (Math.random() * 1e17).toString(36); // Generate randomized client ID
+        /* The type is wrong in the .d.ts */
+        const hack: any = fplus.mqtt_client({
+            clientId,
+            will:       this.#client.will(),
+        });
+        const mqtt_pr: Promise<MQTT.MqttClient> = hack;
+        mqtt_pr.then(mqtt => this.#client.connect(mqtt));
 
         // What to do when the client connects
         this.#client.on("connect", () => this.onConnect());

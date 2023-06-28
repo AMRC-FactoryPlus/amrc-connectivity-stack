@@ -1,6 +1,6 @@
 {
   "name": "acs-edge",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "The Edge component of the AMRC Connectivity Stack",
   "author": "AMRC",
   "license": "MIT",
@@ -29,6 +29,7 @@
   },
   "type": "module",
   "dependencies": {
+    "@amrc-factoryplus/utilities": "^1.0.7",
     "@st-one-io/nodes7": "^1.0.1",
     "@types/dotenv": "^8.2.0",
     "@types/node": "^16.10.1",

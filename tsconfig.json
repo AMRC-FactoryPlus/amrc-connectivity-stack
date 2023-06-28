@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES6",
+    "allowJs": true,
     "moduleResolution": "Node",
     "noImplicitAny": true,
     "removeComments": true,

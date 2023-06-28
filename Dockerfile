@@ -1,5 +1,5 @@
 ARG utility_prefix=ghcr.io/amrc-factoryplus/utilities
-ARG utility_ver=v1.0.6
+ARG utility_ver=v1.0.8
 
 FROM ${utility_prefix}-build:${utility_ver} AS build
 

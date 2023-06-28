@@ -1,8 +1,9 @@
 # syntax=docker/dockerfile:1
 
-ARG acs_base=ghcr.io/amrc-factoryplus/utilities
+ARG acs_build=ghcr.io/amrc-factoryplus/utilities-build:v1.0.8
+ARG acs_run=ghcr.io/amrc-factoryplus/utilities-run:v1.0.8
 
-FROM ${acs_base}-build AS build
+FROM ${acs_build} AS build
 ARG acs_npm=NO
 RUN install -d -o node -g node /home/node/app
 WORKDIR /home/node/app
@@ -18,7 +19,7 @@ RUN <<'SHELL'
 SHELL
 COPY . .
 
-FROM ${acs_base}-run AS run
+FROM ${acs_run} AS run
 
 RUN apk add git git-daemon
 

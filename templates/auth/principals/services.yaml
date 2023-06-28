@@ -1,4 +1,3 @@
-{{- if .Values.identity.enabled }}
 # Service server principals.
   #
   # These are the principals that services use in their capacity as servers: they fulfil
@@ -11,7 +10,7 @@
   # /etc/services; HTTP is in caps because Microsoft. A principal name must be added for
   # each FQDN the service can potentially be contacted at.
 
----
+{{- if .Values.auth.enabled }}
 apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey
 metadata:
@@ -22,7 +21,9 @@ spec:
   principal: HTTP/auth.{{ .Release.Namespace }}.svc.cluster.local@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
   additionalPrincipals:
     - HTTP/auth.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+{{- end -}}
 ---
+{{- if .Values.cmdesc.enabled }}
 apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey
 metadata:
@@ -33,7 +34,9 @@ spec:
   principal: HTTP/cmdesc.{{ .Release.Namespace }}.svc.cluster.local@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
   additionalPrincipals:
     - HTTP/cmdesc.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+{{- end -}}
 ---
+{{- if .Values.configdb.enabled }}
 apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey
 metadata:
@@ -44,7 +47,9 @@ spec:
   principal: HTTP/configdb.{{ .Release.Namespace }}.svc.cluster.local@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
   additionalPrincipals:
     - HTTP/configdb.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+{{- end -}}
 ---
+{{- if .Values.directory.enabled }}
 apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey
 metadata:
@@ -55,7 +60,9 @@ spec:
   principal: HTTP/directory.{{ .Release.Namespace }}.svc.cluster.local@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
   additionalPrincipals:
     - HTTP/directory.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+{{- end -}}
 ---
+{{- if .Values.mqtt.enabled }}
 apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey
 metadata:
@@ -66,7 +73,9 @@ spec:
   principal: mqtt/mqtt.{{ .Release.Namespace }}.svc.cluster.local@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
   additionalPrincipals:
     - mqtt/mqtt.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+{{- end -}}
 ---
+{{- if .Values.manager.enabled }}
 apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey
 metadata:
@@ -78,7 +87,9 @@ spec:
   additionalPrincipals:
     - HTTP/manager.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
   secret: manager-keytab/keytab
+{{- end -}}
 ---
+{{- if .Values.postgres.enabled }}
 apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey
 metadata:
@@ -87,7 +98,9 @@ metadata:
 spec:
   type: Random
   principal: postgres/postgres.{{ .Release.Namespace }}.svc.cluster.local@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+{{- end -}}
 ---
+{{- if .Values.warehouse.enabled }}
 apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey
 metadata:

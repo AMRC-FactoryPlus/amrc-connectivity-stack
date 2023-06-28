@@ -1,3 +1,4 @@
+{{ if .Values.manager.enabled }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -43,3 +44,4 @@ data:
   NEW_EDGE_AGENT_REGISTRY: {{.Values.manager.edge.registry | quote | required "values.manager.edge.registry is required!"}}
   NEW_EDGE_AGENT_REPOSITORY: {{.Values.manager.edge.repository | quote | required "values.manager.edge.repository is required!"}}
   NEW_EDGE_AGENT_VERSION: {{.Values.manager.edge.tag | quote | required "values.manager.edge.tag is required!"}}
+{{- end -}}

@@ -1,3 +1,4 @@
+{{ if .Values.postgres.enabled }}
 # This is from https://raw.githubusercontent.com/reactive-tech/kubegres/v1.15/kubegres.yaml.
 # See https://www.kubegres.io/doc/getting-started.html.
 # This is a K8s Operator which manages a Postgres cluster.
@@ -370,3 +371,4 @@ spec:
         runAsNonRoot: true
       serviceAccountName: kubegres-controller-manager
       terminationGracePeriodSeconds: 10
+{{- end -}}

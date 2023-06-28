@@ -1,3 +1,4 @@
+{{- if .Values.auth.enabled }}
 apiVersion: traefik.containo.us/v1alpha1
 kind: IngressRoute
 metadata:
@@ -19,3 +20,4 @@ spec:
     domains:
       - main: auth.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
   {{- end -}}
+{{- end -}}

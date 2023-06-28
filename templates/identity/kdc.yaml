@@ -1,3 +1,4 @@
+{{ if .Values.identity.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -230,3 +231,4 @@ spec:
   resources:
     requests:
       storage: 2Gi
+{{- end -}}

@@ -1,3 +1,4 @@
+{{ if .Values.minio.enabled }}
 apiVersion: traefik.containo.us/v1alpha1
 kind: IngressRoute
 metadata:
@@ -44,4 +45,5 @@ spec:
     domains:
       - main: minio.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
   {{- end -}}
+{{- end -}}
 {{- end -}}

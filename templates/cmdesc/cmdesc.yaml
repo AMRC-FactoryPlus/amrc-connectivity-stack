@@ -1,3 +1,4 @@
+{{- if .Values.cmdesc.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -79,3 +80,4 @@ spec:
       targetPort: 8080
   selector:
     factory-plus.service: cmdescd
+{{- end -}}

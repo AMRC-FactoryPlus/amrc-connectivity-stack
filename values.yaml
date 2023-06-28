@@ -9,6 +9,7 @@ acs:
   tlsSecretName: factoryplus-tls
 
 identity:
+  enabled: true
   # -- The Kerberos realm for this Factory+ deployment.
   realm: LOCALHOST
   identity:
@@ -33,6 +34,7 @@ identity:
       pullPolicy: IfNotPresent
 
 auth:
+  enabled: true
   image:
     # -- The registry of the Authorisation component
     registry: ghcr.io/amrc-factoryplus
@@ -44,6 +46,7 @@ auth:
     pullPolicy: IfNotPresent
 
 directory:
+  enabled: true
   image:
     # -- The registry of the Directory component
     registry: ghcr.io/amrc-factoryplus
@@ -55,6 +58,7 @@ directory:
     pullPolicy: IfNotPresent
 
 configdb:
+  enabled: true
   image:
     # -- The registry of the Configuration Store component
     registry: ghcr.io/amrc-factoryplus
@@ -66,6 +70,7 @@ configdb:
     pullPolicy: IfNotPresent
 
 mqtt:
+  enabled: true
   image:
     # -- The registry of the MQTT component
     registry: ghcr.io/amrc-factoryplus
@@ -77,6 +82,7 @@ mqtt:
     pullPolicy: IfNotPresent
 
 manager:
+  enabled: true
   image:
     # -- The registry of the Manager component
     registry: ghcr.io/amrc-factoryplus
@@ -106,6 +112,7 @@ manager:
   logLevel: warning
 
 cmdesc:
+  enabled: true
   image:
     # -- The registry of the Commands component
     registry: ghcr.io/amrc-factoryplus
@@ -120,6 +127,7 @@ cmdesc:
 
 warehouse:
   ingester:
+    enabled: true
     image:
       # -- The registry of the Commands component
       registry: ghcr.io/amrc-factoryplus
@@ -131,11 +139,17 @@ warehouse:
       pullPolicy: IfNotPresent
 
 minio:
+  enabled: true
   # -- Whether or not to expose the MinIO console outside of the cluster
   exposeConsole: false
 
+
+postgres:
+  enabled: true
+
 # @ignore
 traefik:
+  enabled: true
   ports:
     web:
       port: 80
@@ -181,11 +195,11 @@ traefik:
       enabled: false
   # -- [AZURE] Enable the below section to expose your instance of Factory+/ACS over the internet, replacing the <Value>
   # -- tags with the details of your pre-configured load balancer.
-  #service:
-  #  spec:
-  #    loadBalancerIP: <External IP address here>
-  #  annotations:
-  #    service.beta.kubernetes.io/azure-load-balancer-resource-group: <Load Balancer Resource Group here>
+#  service:
+#    spec:
+#      loadBalancerIP: <External IP address here>
+#    annotations:
+#      service.beta.kubernetes.io/azure-load-balancer-resource-group: <Load Balancer Resource Group here>
   providers:
     kubernetesCRD:
       allowCrossNamespace: true
@@ -195,6 +209,7 @@ traefik:
 
 # @ignore
 loki:
+  enabled: true
   loki:
     auth_enabled: false
     commonConfig:
@@ -213,8 +228,13 @@ promtail:
 
 # @ignore
 grafana:
+  enabled: true
   persistence:
     enabled: true
+
+# @ignore
+sealed-secrets:
+  enabled: true
 
 # @ignore
 tenant:
@@ -242,5 +262,6 @@ tenant:
 
 # @ignore
 influxdb2:
+  enabled: true
   adminUser:
     organization: AMRC

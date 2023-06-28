@@ -1,3 +1,4 @@
+{{ if .Values.influxdb2.enabled }}
 apiVersion: traefik.containo.us/v1alpha1
 kind: IngressRoute
 metadata:
@@ -19,3 +20,4 @@ spec:
     domains:
       - main: influxdb-ingester.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
   {{- end -}}
+{{- end -}}

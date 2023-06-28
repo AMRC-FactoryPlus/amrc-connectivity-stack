@@ -1,3 +1,4 @@
+{{ if .Values.identity.enabled }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -21,3 +22,4 @@ data:
             admin_server = kadmin.{{ .Release.Namespace }}.svc.cluster.local
             disable_encrypted_timestamp = true
         }
+{{- end -}}

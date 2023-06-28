@@ -1,3 +1,4 @@
+{{ if .Values.manager.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -52,3 +53,4 @@ spec:
       targetPort: 6379
   selector:
     factory-plus.service: manager-redis
+{{- end -}}

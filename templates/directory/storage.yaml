@@ -1,3 +1,4 @@
+{{ if .Values.directory.enabled }}
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
@@ -11,3 +12,4 @@ spec:
       storage: 5Gi
   accessModes:
     - ReadWriteOnce
+{{- end -}}

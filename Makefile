@@ -32,7 +32,8 @@ deploy: all restart logs
 
 restart:
 	kubectl rollout restart deploy/"${deployment}"
-	sleep 3
+	kubectl rollout status deploy/"${deployment}"
+	sleep 2
 
 logs:
 	kubectl logs -f deploy/"${deployment}" -c operator

@@ -25,7 +25,7 @@ kubectl version
 ```
 
 ### Configure DNS and TLS
-This Chart creates a load balancer on your Kubernetes cluster that exposes all services at various subdomain. Please ensure that you have a wildcard DNS entry configured to direct all `*.<baseURL>` requests to your Kubernetes cluster.
+This Chart creates a load balancer on your Kubernetes cluster that exposes all services at various subdomains. Please ensure that you have a wildcard DNS entry configured to direct all `*.<baseURL>` requests to your Kubernetes cluster.
 
 If you have enabled `acs.secure` then you must also create a TLS secret on the cluster in the `default` namespace with the same name as the value specified in `acs.tlsSecretName`.
 

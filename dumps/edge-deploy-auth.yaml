@@ -1,0 +1,68 @@
+service: !u FP.Service.Authentication
+version: 1
+# This grants permissions in terms of Service Requirement UUIDs. These
+# need to be populated as groups in the Auth service with the
+# appropriate objects.
+aces:
+  # Advertise service
+  - principal: !u E.Requirement.ServiceAccount
+    permission: 4db4c39a-f18d-4e83-aeb0-5af2c14ddc2b 
+    target: !u E.Service.EdgeDeployment
+
+  # Read ACL
+  - principal: !u E.Requirement.ServiceAccount
+    permission: ba566181-0e8a-405b-b16e-3fb89130fbee
+    target: !u E.Perm.All
+
+  # Manage Kerberos mappings
+  - principal: !u E.Requirement.ServiceAccount
+    permission: 327c4cc8-9c46-4e1e-bb6b-257ace37b0f6
+    target: !u FP.Null
+
+  # Read ConfigDB
+  - principal: !u E.Requirement.ServiceAccount
+    permission: 4a339562-cd57-408d-9d1a-6529a383ea4b
+    target: !u G.App.Config
+  - principal: !u E.Requirement.ServiceAccount
+    permission: 4a339562-cd57-408d-9d1a-6529a383ea4b
+    target: !u E.App.Cluster
+  - principal: !u E.Requirement.ServiceAccount
+    permission: 4a339562-cd57-408d-9d1a-6529a383ea4b
+    target: !u E.App.Template
+
+  # Write ConfigDB
+  - principal: !u E.Requirement.ServiceAccount
+    permission: 6c799ccb-d2ad-4715-a2a7-3c8728d6c0bf
+    target: !u FP.App.Info
+  - principal: !u E.Requirement.ServiceAccount
+    permission: 6c799ccb-d2ad-4715-a2a7-3c8728d6c0bf
+    target: !u E.App.Cluster
+
+  # Manage objects
+  - principal: !u E.Requirement.ServiceAccount
+    permission: f0b7917b-d475-4888-9d5a-2af96b3c26b6
+    target: !u E.Requirement.FluxAccounts
+  - principal: !u E.Requirement.ServiceAccount
+    permission: f0b7917b-d475-4888-9d5a-2af96b3c26b6
+    target: !u E.Class.Cluster
+
+  # Manage ACLs
+  - principal: !u E.Requirement.ServiceAccount
+    permission: 3a41f5ce-fc08-4669-9762-ec9e71061168
+    target: !u G.Perm.Pull
+
+  # Manage group
+  - principal: !u E.Requirement.ServiceAccount
+    permission: be9b6d47-c845-49b2-b9d5-d87b83f11c3b
+    target: !u E.Requirement.FluxRoles
+
+  - principal: !u E.Requirement.ServiceAccount
+    permission: !u G.Perm.Create
+    target: !u E.Requirement.EdgeRepos
+  - principal: !u E.Requirement.ServiceAccount
+    permission: !u G.Perm.Pull
+    target: !u E.Requirement.EdgeRepos
+  - principal: !u E.Requirement.ServiceAccount
+    permission: !u G.Perm.Push
+    target: !u E.Requirement.EdgeRepos
+

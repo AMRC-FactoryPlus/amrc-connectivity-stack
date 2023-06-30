@@ -52,5 +52,5 @@ dependencies:
     condition: influxdb2.enabled
   - name: nginx
     version: 15.1.0
-    repository: oci://registry-1.docker.io/bitnamicharts/nginx
+    repository: https://charts.bitnami.com/bitnami/nginx
     condition: warehouse.enabled

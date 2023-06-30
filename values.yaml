@@ -13,6 +13,8 @@ identity:
   enabled: true
   # -- The Kerberos realm for this Factory+ deployment.
   realm: LOCALHOST
+  # -- Enable support for cross-realm authentication
+  crossRealm: false
   identity:
     image:
       # -- The registry of the Identity component

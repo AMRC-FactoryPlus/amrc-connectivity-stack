@@ -248,17 +248,7 @@ sealed-secrets:
 
 # @ignore
 nginx:
-  serverBlock: |-
-    server {
-        listen 80;
-        listen [::]:80;
-        server_name grafana.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
-
-        location / {
-            proxy_set_header Host $http_host;
-            proxy_pass http://{{ .Release.Name }}-grafana.{{ .Release.Namespace }}.svc.cluster.local;
-        }
-    }
+  existingServerBlockConfigmap: grafana-proxy-server-block
   fullnameOverride: grafana-proxy
   service:
     type: ClusterIP

@@ -146,6 +146,7 @@ Production deployment does not differ greatly from development deployment, howev
 | identity.identity.image.registry | string | `"ghcr.io/amrc-factoryplus"` | The registry of the Identity component |
 | identity.identity.image.repository | string | `"acs-identity"` | The repository of the Identity component |
 | identity.identity.image.tag | string | `"latest"` | The tag of the Identity component |
+| identity.krbKeysOperator.image | object | `{"registry":"ghcr.io/amrc-factoryplus","repository":"acs-krb-keys-operator","tag":"latest"}` | A comma-separated list of namespaces that the KerberosKey Operator should watch for KerberosKey resources in. Defaults to the release namespace if not specified |
 | identity.krbKeysOperator.image.registry | string | `"ghcr.io/amrc-factoryplus"` | The registry of the KerberosKey Operator |
 | identity.krbKeysOperator.image.repository | string | `"acs-krb-keys-operator"` | The repository of the KerberosKey Operator |
 | identity.krbKeysOperator.image.tag | string | `"latest"` | The tag of the KerberosKey Operator |

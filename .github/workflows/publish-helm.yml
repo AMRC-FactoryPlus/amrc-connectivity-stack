@@ -31,6 +31,7 @@ jobs:
   # This job checks out the release branch, adds the new release to the /builds folder, builds the index and commits
   # the changes, which triggers Github to release it as a new pages repo
   release:
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - name: Install Helm

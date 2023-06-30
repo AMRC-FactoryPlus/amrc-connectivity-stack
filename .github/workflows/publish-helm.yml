@@ -1,9 +1,11 @@
 name: New Release
 
 on:
-  push:
-    tags:
-      - v*
+  release:
+    types: [created]
+    # Only run the action when the release tag matches the pattern v[0-9]+.[0-9]+.[0-9]+
+    branches:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
 
 jobs:
   build:

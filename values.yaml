@@ -258,6 +258,13 @@ sealed-secrets:
   enabled: true
 
 # @ignore
+nginx:
+  existingServerBlockConfigmap: grafana-proxy-server-block
+  fullnameOverride: grafana-proxy
+  service:
+    type: ClusterIP
+
+# @ignore
 tenant:
   tenant:
     name: fplus-minio-core

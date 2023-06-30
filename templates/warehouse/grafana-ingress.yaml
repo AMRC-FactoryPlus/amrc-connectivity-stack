@@ -1,0 +1,23 @@
+{{ if .Values.warehouse.enabled }}
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: grafana-ingressroute
+  namespace: default
+spec:
+  entryPoints:
+    - {{ .Values.acs.secure | ternary "websecure" "web" }}
+  routes:
+    - match: Host(`grafana.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}`)
+      kind: Rule
+      services:
+        - name: grafana-proxy
+          port: 80
+          namespace: {{ .Release.Namespace }}
+  {{- if .Values.acs.secure }}
+  tls:
+    secretName: {{ .Values.acs.tlsSecretName | required "values.acs.tlsSecretName is required!" }}
+    domains:
+      - main: grafana.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
+  {{- end -}}
+{{- end -}}

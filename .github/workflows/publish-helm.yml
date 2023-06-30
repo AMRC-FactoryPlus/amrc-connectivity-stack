@@ -1,35 +1,30 @@
 name: New Release
 
 on:
-  release:
-    types: [created]
-    # Only run the action when the release tag matches the pattern v[0-9]+.[0-9]+.[0-9]+
-    branches:
-      - 'v[0-9]+.[0-9]+.[0-9]+'
+  push:
+    tags:
+      - v*
 
 jobs:
-  build:
+  release:
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     steps:
-      - name: Install Helm
-        run: |
-          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v3
         with:
-          ref: ${{ github.event.release.tag_name }}
-      - name: Package Helm chart
+          fetch-depth: 0
+
+      - name: Configure Git
         run: |
-          TAG=${{ github.event.release.tag_name }}
-          helm package -u -d build --version=$TAG --app-version=$TAG .
-          cd build
-          helm repo index --url https://amrc-factoryplus.github.io/amrc-connectivity-stack/build .
-      - uses: stefanzweifel/git-auto-commit-action@v4
-        id: auto_commit_action
-        with:
-          commit_message: Release ${{ github.event.release.tag_name }}
-          commit_user_name: GitHub Action
-          commit_user_email: actions@github.com
-          branch: release
-          create_branch: true
-          push_options: '--force'
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+
+      - name: Install Helm
+        uses: azure/setup-helm@v3
+
+      - name: Run chart-releaser
+        uses: helm/chart-releaser-action@v1.6.0
+        env:
+          CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"

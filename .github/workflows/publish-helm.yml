@@ -25,8 +25,8 @@ jobs:
           helm package -u -d build --version=$TAG --app-version=$TAG .
       - uses: actions/upload-artifact@master
         with:
-          name: new-release-$TAG
-          path: build/amrc-connectivity-stack-$TAG.tgz
+          name: new-release-${{ github.event.release.tag_name }}
+          path: build/amrc-connectivity-stack-${{ github.event.release.tag_name }}.tgz
 
   # This job checks out the release branch, adds the new release to the /builds folder, builds the index and commits
   # the changes, which triggers Github to release it as a new pages repo

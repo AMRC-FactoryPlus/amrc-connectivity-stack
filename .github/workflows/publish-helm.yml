@@ -27,7 +27,14 @@ jobs:
       - name: Install Helm
         uses: azure/setup-helm@v3
 
+      - name: Package Helm chart
+        run: |
+          TAG=${{ github.event.release.tag_name }}
+          helm package -u -d build --version=$TAG --app-version=$TAG .
+
       - name: Run chart-releaser
         uses: helm/chart-releaser-action@v1.5.0
+        with:
+          skip_packaging: true
         env:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"

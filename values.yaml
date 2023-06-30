@@ -18,8 +18,8 @@ identity:
   #  - realm: MYOTHERREALM.COM
   #    domain: myotherrealm.com
   #    otherDomains:
-  #      - myotherrealm.com.org
-  #      - myotherrealm.com.net
+  #      - myotherrealm.org
+  #      - myotherrealm.net
   identity:
     image:
       # -- The registry of the Identity component

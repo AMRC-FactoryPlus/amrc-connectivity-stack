@@ -23,9 +23,9 @@ jobs:
         run: |
           TAG=${{ github.event.release.tag_name }}
           helm package -u -d build --version=$TAG --app-version=$TAG .
-      - uses: actions/upload-artifact@master
+      - uses: actions/upload-artifact@v3
         with:
-          name: new-release-${{ github.event.release.tag_name }}
+          name: new-release
           path: build/amrc-connectivity-stack-${{ github.event.release.tag_name }}.tgz
 
   # This job checks out the release branch, adds the new release to the /builds folder, builds the index and commits
@@ -41,9 +41,9 @@ jobs:
         with:
           ref: release
       - name: add-new-release
-        uses: actions/download-artifact@master
+        uses: actions/download-artifact@v3
         with:
-          name: new-release-${{ github.event.release.tag_name }}
+          name: new-release
           path: build
       - name: Build index
         run: |

@@ -30,7 +30,7 @@ identity:
       # -- The repository of the KerberosKey Operator
       repository: acs-krb-keys-operator
       # -- The tag of the KerberosKey Operator
-      tag: v1.0.2
+      tag: v1.1.0
       # @ignore
       pullPolicy: IfNotPresent
 

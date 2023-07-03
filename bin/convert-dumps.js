@@ -1,5 +1,18 @@
 #!/usr/bin/env node
 
+/* This script converts service dump files from YAML to JSON. The
+ * services only accept JSON format dumps, but JSON is an awkward format
+ * for humans to edit for a variety of reasons.
+ *
+ * Running the script (`npm run convert-dumps`) will convert all `.yaml`
+ * files in `dumps` to JSON and write them out, overwriting any existing
+ * `.json` files present.
+ *
+ * In addition to converting from YAML to JSON, this script will expand
+ * the YAML custom data type tag `!u` to a UUID pulled from the object
+ * UUID_SOURCES defined below.
+ */
+
 import fs from "fs/promises";
 import path from "path";
 import process from "process";

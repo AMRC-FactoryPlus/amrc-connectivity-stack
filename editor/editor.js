@@ -31,7 +31,7 @@ async function service_fetch(path, opts) {
         if (Token == null) await get_tok();
         if (Token == null) return;
 
-        opts = {...opts};
+        opts = {...opts, cache: "reload"};
         opts.headers = {...opts.headers};
         opts.headers["Authorization"] = `Bearer ${Token}`;
         return await fetch(url, opts);
@@ -57,15 +57,30 @@ async function fetch_json(path) {
     return json;
 }
 
-async function get_name(obj) {
-    const gi = await fetch_json(`app/${AppUuid.General_Info}/object/${obj}`);
-    return gi ? gi.name : html`<i>NO NAME</i>`;
-}
-
 async function get_class(obj) {
     const reg = await fetch_json(`app/${AppUuid.Registration}/object/${obj}`);
     return reg ? reg["class"] : null;
 }
+
+async function _get_name (obj) {
+    const gi = await fetch_json(`app/${AppUuid.General_Info}/object/${obj}`);
+    return gi 
+        ? gi.deleted
+            ? html`<s>${gi.name}</s>`
+            : gi.name
+        : html`<i>NO NAME</i>`;
+}
+
+async function get_name (obj, with_class) {
+    const name = await _get_name(obj);
+    if (!with_class) return name;
+
+    const kid = await get_class(obj);
+    const kname = kid ? await _get_name(kid) : html`<i>NO CLASS</i>`;
+    return html`${name} <small>(${kname})</small>`;
+}
+
+function st_ok (st) { return st >= 200 && st < 300; }
 
 async function put_string(path, conf, method = "PUT") {
     const rsp = await service_fetch(`/v1/${path}`, {
@@ -76,7 +91,7 @@ async function put_string(path, conf, method = "PUT") {
         body: conf,
     });
 
-    return rsp.status >= 200 && rsp.status < 300;
+    return rsp.status;
 }
 
 function put_json(path, json, method = "PUT") {
@@ -119,16 +134,16 @@ function build_opener() {
 }
 
 function Opener(props) {
+    const { obj, children, with_class } = props;
     const [open, button] = build_opener();
 
     const title = "obj" in props
-        ? html`
-                <${ObjTitle} obj=${props.obj}/>`
+        ? html`<${ObjTitle} obj=${obj} with_class=${with_class}/>`
         : props.title;
 
     return html`
         <dt>${button} ${title}</dt>
-        <dd>${open ? props.children : ""}</dd>
+        <dd>${open ? children : ""}</dd>
     `;
 }
 
@@ -149,10 +164,10 @@ function Uuid(props) {
 }
 
 function ObjTitle(props) {
-    const obj = props.obj;
+    const { obj, with_class } = props;
     const [name, set_name] = useState("...");
 
-    useEffect(async () => set_name(await get_name(obj)), [obj]);
+    useEffect(async () => set_name(await get_name(obj, with_class)), [obj]);
 
     return html`
         <${Uuid}>${obj}<//> ${name}`;
@@ -292,7 +307,7 @@ function NewObj(props) {
 
             const name = new_name.current?.value;
             if (name) {
-                const gi = await put_json(
+                await put_json(
                     `app/${AppUuid.General_Info}/object/${rsp.uuid}`,
                     {name});
             }
@@ -323,13 +338,12 @@ function App(props) {
 
     return html`
         <dl>
-            <${Opener} title="New config">
-                <${NewConf} app=${app}/></
-                />
-                ${objs.map(o => html`
-                    <${Opener} key=${o} obj=${o}>
-                        <${Conf} app=${app} obj=${o}/></
-                        />`)}
+            <${Opener} title="New config"><${NewConf} app=${app}/><//>
+            ${objs.map(o => html`
+                <${Opener} key=${o} obj=${o} with_class=${true}>
+                    <${Conf} app=${app} obj=${o}/>
+                <//>
+            `)}
         </dl>
     `;
 }
@@ -349,10 +363,11 @@ function Conf(props) {
         if (!editbox.current) return;
         const new_conf = editbox.current.value;
 
-        if (await put_string(`app/${app}/object/${obj}`, new_conf)) {
+        const st = await put_string(`app/${app}/object/${obj}`, new_conf);
+        if (st_ok(st)) {
             set_msg(html`Config updated`);
         } else {
-            set_msg(html`Error updating config`);
+            set_msg(html`Error updating config: ${st}`);
         }
         await update_conf();
     };
@@ -380,10 +395,10 @@ function NewConf(props) {
 
     const create = async () => {
         if (!new_obj.current || !new_conf.current) return;
-        const ok = await put_string(
+        const st = await put_string(
             `app/${app}/object/${new_obj.current.value}`,
             new_conf.current.value);
-        set_msg(ok ? "Create succeeded" : "Create failed");
+        set_msg(st_ok(st) ? "Create succeeded" : `Create failed: ${st}`);
     };
 
     return html`

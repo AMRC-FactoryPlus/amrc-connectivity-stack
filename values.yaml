@@ -32,6 +32,9 @@ identity:
       # @ignore
       pullPolicy: IfNotPresent
   krbKeysOperator:
+    # -- A comma-separated list of namespaces that the KerberosKey Operator should watch for KerberosKey resources in. Defaults to the release namespace if not specified
+    namespaces: ""
+
     image:
       # -- The registry of the KerberosKey Operator
       registry: ghcr.io/amrc-factoryplus

@@ -1,0 +1,39 @@
+{
+  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Links-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Links between objects",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "2fed10c7-de5f-4023-89b7-9aeb10afe60b"
+    },
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    }
+  },
+  "patternProperties": {
+    "^[a-zA-Z0-9_]*$": {
+      "description": "A name for this link.",
+      "type": "object",
+      "properties": {
+        "Target": {
+          "description": "The UUID of the object linked to.",
+          "type": "string",
+          "format": "uuid"
+        },
+        "Relation": {
+          "description": "A UUID identifying the kind of link this is.",
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "required": ["Target", "Relation"]
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID"
+  ]
+}

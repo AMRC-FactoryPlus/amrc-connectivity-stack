@@ -1,0 +1,54 @@
+{
+  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Edge_Agent/Edge_Agent-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Schema for the Edge Agent Node metrics.",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "15360868-2f35-4b52-990b-49329fb246fe"
+    },
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "Config_Revision": {
+      "description": "The revision of our config file we are currently using.",
+      "type": "string",
+      "format": "uuid"
+    },
+    "Alerts": {
+      "description": "Alerts raised by the Edge Agent",
+      "allOf": {
+        { "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Alerts-v1.json" },
+        {
+          "type": "object",
+          "properties": {
+            "Config_File": {
+              "description": "Indicates a problem fetching our config file.",
+              "type": "object",
+              "properties": {
+                "Type": {
+                  "const": "c414c68b-5014-4e46-a0b4-d5f7f8df1d9f"
+                }
+              }
+            }
+          },
+          "required": ["Config_File"],
+          "patternProperties": {
+            "^Connection_[A-Za-z0-9_]+$": {
+              "description": "Indicates a problem with a particular device connection.",
+              "type": "object",
+              "properties": {
+                "Type": {
+                  "const": "633a7da3-ea2a-4e3f-8e84-35691a07465f"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "required": ["Schema_UUID", "Instance_UUID", "Config_File", "Alerts"]
+}

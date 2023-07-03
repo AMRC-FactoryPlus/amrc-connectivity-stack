@@ -1,9 +1,10 @@
 # syntax=docker/dockerfile:1
 # The line above must be the first line in the file!
 
-ARG acs_base=ghcr.io/amrc-factoryplus/utilities
+ARG acs_build=ghcr.io/amrc-factoryplus/utilities-build:v1.0.8
+ARG acs_run=ghcr.io/amrc-factoryplus/utilities-run:v1.0.8
 
-FROM ${acs_base}-build as ts-compiler
+FROM ${acs_build} as ts-compiler
 # This ARG must go here, in the image that uses it, or it isn't
 # available to the shell scripts. Don't ask me why...
 ARG acs_npm=NO
@@ -32,7 +33,7 @@ RUN <<'SHELL'
     npm run build
 SHELL
 
-FROM ${acs_base}-build as util-build
+FROM ${acs_build} as util-build
 USER root
 RUN <<'SHELL'
     # Are these necessary?
@@ -48,7 +49,7 @@ COPY --chown=node --from=ts-compiler /usr/app/build ./
 COPY --chown=node --from=ts-compiler /home/node/.npmrc /home/node
 RUN npm install --save=false --only=production
 
-FROM ${acs_base}-run
+FROM ${acs_run}
 USER root
 RUN <<'SHELL'
     apk upgrade --update-cache --available

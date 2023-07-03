@@ -29,7 +29,7 @@
   },
   "type": "module",
   "dependencies": {
-    "@amrc-factoryplus/utilities": "1.0.8-bmz13",
+    "@amrc-factoryplus/utilities": "^1.0.8",
     "@st-one-io/nodes7": "^1.0.1",
     "@types/dotenv": "^8.2.0",
     "@types/node": "^16.10.1",

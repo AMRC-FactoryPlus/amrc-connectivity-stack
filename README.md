@@ -142,6 +142,7 @@ Production deployment does not differ greatly from development deployment, howev
 | directory.image.registry | string | `"ghcr.io/amrc-factoryplus"` | The registry of the Directory component |
 | directory.image.repository | string | `"acs-directory"` | The repository of the Directory component |
 | directory.image.tag | string | `"latest"` | The tag of the Directory component |
+| identity.crossRealm | array | `[]` | Enable support for cross-realm authentication |
 | identity.enabled | bool | `true` | Whether or not to enable the Identity component |
 | identity.identity.image.registry | string | `"ghcr.io/amrc-factoryplus"` | The registry of the Identity component |
 | identity.identity.image.repository | string | `"acs-identity"` | The repository of the Identity component |

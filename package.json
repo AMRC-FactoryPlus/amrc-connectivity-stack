@@ -6,14 +6,18 @@
   "type": "module",
   "scripts": {
     "start": "node bin/edge-deployment.js",
+    "convert-dumps": "node bin/convert-dumps.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@amrc-factoryplus/utilities": "^1.0.8-bmz26",
+    "@amrc-factoryplus/utilities": "^1.0.8",
     "@kubernetes/client-node": "^0.18.1",
-    "isomorphic-git": "^1.24.0"
+    "concat-stream": "^2.0.0",
+    "isomorphic-git": "^1.24.0",
+    "tmp-promise": "^3.0.3",
+    "yaml": "^2.3.1"
   }
 }

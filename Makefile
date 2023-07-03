@@ -12,8 +12,12 @@ repo?=acs-edge-deployment
 tag=${registry}/${repo}:${version}${suffix}
 build_args=
 
-ifdef acs_base
-build_args+=--build-arg acs_base="${acs_base}"
+ifdef acs_build
+build_args+=--build-arg acs_build="${acs_build}"
+endif
+
+ifdef acs_run
+build_args+=--build-arg acs_run="${acs_run}"
 endif
 
 ifdef acs_npm
@@ -22,9 +26,12 @@ endif
 
 all: build push
 
-.PHONY: all build push
+.PHONY: all build push check-committed
 
-build:
+check-committed:
+	[ -z "$$(git status --porcelain)" ] || (git status; exit 1)
+
+build: check-committed
 	docker build -t "${tag}" ${build_args} .
 
 push:

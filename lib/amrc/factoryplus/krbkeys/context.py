@@ -35,6 +35,10 @@ class Context:
         current_context.reset(self.token)
         return False
 
+    @property
+    def fplus (self):
+        return self.operator.fplus
+
     @cached_property
     def k8s (self):
         return K8s()
@@ -45,7 +49,7 @@ class Context:
 
     @cached_property
     def kadm (self):
-        return Kadm()
+        return Kadm(ccache=self.operator.kadmin_ccache)
 
     @cached_property
     def kubeseal (self):

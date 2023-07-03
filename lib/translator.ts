@@ -3,7 +3,15 @@
  *  Copyright 2023 AMRC
  */
 
-import type { ServiceClient } from "@amrc-factoryplus/utilities";
+import timers from "timers/promises";
+import { ServiceClient } from "@amrc-factoryplus/utilities";
+import type { Identity } from "@amrc-factoryplus/utilities";
+
+/* XXX These need to be incorporated into the main codebase. The config
+ * rehashing just needs to go: the code which uses the config needs
+ * adapting to accept the correct format. */
+import {validateConfig} from '../utils/CentralConfig.js';
+import {reHashConf} from "../utils/FormatConfig.js";
 
 // Import device connections
 import {
@@ -61,65 +69,37 @@ export interface translatorConf {
     deviceConnections: any[]
 }
 
+interface deviceInfo {
+    type: any,
+    connection: any;
+    connectionDetails: any
+}
+
+const EdgeAgentConfig = "aac6f843-cfee-4683-b121-6943bfdf9173"; 
+
 export class Translator extends EventEmitter {
     /**
      * Class constructor - Unpacks config file and defines helpful class attributes
      * @param {Object} conf Config file from web UI
      */
     sparkplugNode!: SparkplugNode
-    conf: translatorConf
     fplus: ServiceClient
+    pollInt: number
 
     connections: {
         [index: string]: any
-    }
-    supportedChannels: {
-        [index: string]: string
     }
     devices: {
         [index: string]: any
     }
 
-    constructor(fplus: ServiceClient, conf: translatorConf) {
+    constructor(fplus: ServiceClient, pollInt: number) {
         super();
 
-        this.conf = conf;
         this.fplus = fplus;
+        this.pollInt = pollInt;
         this.connections = {};
         this.devices = {};
-        this.supportedChannels = {
-            DMX: "Gateway DMX",
-            CANOpen: "Gateway CANOpen",
-            DeviceNet: "Gateway DeviceNet",
-            EtherCAT: "Gateway EtherCAT",
-            "Ethernet/IP": "Gateway Ethernet/IP",
-            "ModbusRTU Gateway": "Gateway ModbusRTU",
-            "ModbusTCP Gateway": "Gateway ModbusTCP",
-            "Virtual Device 32 Byte": "Virtual Device 32 Byte",
-            "Virtual Device 32 Byte (Ext.)": "Virtual Device 32 Byte (Ext.)",
-            "Virtual ModbusTCP Slave": "ModbusTCP Slave",
-            "Virtual ModbusTCP Slave (512)": "ModbusTCP Slave (512)",
-            "Virtual ModbusRTU Slave": "ModbusRTU Slave",
-            "Virtual ModbusRTU Slave (512)": "ModbusRTU Slave (512)",
-            "Virtual ModbusTCP Master": "ModbusTCP Master",
-            "Virtual ModbusRTU Master": "ModbusRTU Master",
-            "Virtual ModbusRTU Master 150": "ModbusRTU Master 150",
-            "Virtual ModbusTCP Master 150": "ModbusTCP Master 150",
-            "Virtual RevPi7": "RevPi7",
-            "Virtual RevPiTimer": "RevPiTimer",
-            Powerlink: "Gateway Powerlink",
-            Profibus: "Gateway Profibus",
-            Profinet: "Gateway Profinet IRT",
-            SercosIII: "Gateway SercosIII",
-            Serial: "Gateway Serial",
-            "CANopen Master": "Gateway CANopen Master",
-            Can: "Connect Can",
-            "M-Bus": "Connect M-Bus",
-            DIO: "RevPi DIO",
-            DI: "RevPi DI",
-            DO: "RevPi DO",
-            AIO: "RevPi AIO",
-        };
     }
 
     /**
@@ -127,165 +107,21 @@ export class Translator extends EventEmitter {
      */
     async start() {
         try {
+            // Fetch our config
+            const ids = await this.fetchIdentities();
+            const conf = await this.fetchConfig(ids.uuid!);
+
             // Create sparkplug node
+            this.sparkplugNode = new SparkplugNode(
+                this.fplus, ids.sparkplug!, conf.sparkplug);
+            log(`Created Sparkplug node "${ids.sparkplug!}".`);
 
-            this.sparkplugNode = new SparkplugNode(this.fplus, this.conf.sparkplug);
-
-            log(`Created Sparkplug node "${this.conf.sparkplug.edgeNode}" in group "${this.conf.sparkplug.groupId}".`);
-
+            // Create a new device connection for each type listed in config file
             log('Building up connections and devices...');
+            conf.deviceConnections?.forEach(c => this.setupConnection(c));
 
-            if (typeof this.sparkplugNode) {
-
-                // Create a new device connection for each type listed in config file
-                this.conf.deviceConnections?.forEach(connection => {
-
-                    type deviceInfo = {
-                        type: any,
-                        connection: any;
-                        connectionDetails: any
-                    };
-
-                    let deviceInfo: deviceInfo = {
-                        connectionDetails: undefined,
-                        connection: undefined,
-                        type: undefined
-                    };
-
-                    // Initialise the connection parameters
-                    switch (connection.connType) {
-                        case "REST":
-                            deviceInfo = {
-                                type: RestDevice,
-                                connection: RestConnection,
-                                connectionDetails: 'RESTConnDetails'
-                            }
-                            break;
-                        case "MTConnect":
-                            deviceInfo = {
-                                type: MTConnectDevice,
-                                connection: MTConnectConnection,
-                                connectionDetails: 'MTConnectConnDetails'
-                            }
-                            break;
-                        case "S7":
-                            deviceInfo = {
-                                type: S7Device,
-                                connection: S7Connection,
-                                connectionDetails: 's7ConnDetails'
-                            }
-                            break;
-                        case "OPC UA":
-                            deviceInfo = {
-                                type: OPCUADevice,
-                                connection: OPCUAConnection,
-                                connectionDetails: 'OPCUAConnDetails'
-                            }
-                            break;
-                        case "MQTT":
-                            deviceInfo = {
-                                type: MQTTDevice,
-                                connection: MQTTConnection,
-                                connectionDetails: 'MQTTConnDetails'
-                            }
-                            break;
-                        case "Websocket":
-                            deviceInfo = {
-                                type: WebsocketDevice,
-                                connection: WebsocketConnection,
-                                connectionDetails: 'WebsocketConnDetails'
-                            }
-                            break;
-                        case "UDP":
-                            deviceInfo = {
-                                type: UDPDevice,
-                                connection: UDPConnection,
-                                connectionDetails: 'UDPConnDetails'
-
-                            }
-                            break;
-                        default:
-                            break;
-                    }
-
-                    // Instantiate device connection
-                    this.connections[connection.connType] = new deviceInfo.connection(
-                        connection.connType,
-                        connection[deviceInfo.connectionDetails]
-                    );
-
-                    connection.devices?.forEach((devConf: deviceOptions) => {
-
-                        this.devices[devConf.deviceId] = new deviceInfo.type(
-                            this.sparkplugNode,
-                            this.connections[connection.connType],
-                            devConf
-                        );
-                    });
-
-                    // What to do when the connection is open
-                    this.connections[connection.connType].on('open', () => {
-                        connection.devices?.forEach((devConf: deviceOptions) => {
-                            this.devices[devConf.deviceId]?._deviceConnected();
-                        })
-                    });
-
-                    // What to do when the device connection has new data from a device
-                    this.connections[connection.connType].on('data', (obj: { [index: string]: any }, parseVals = true) => {
-                        connection.devices?.forEach((devConf: deviceOptions) => {
-                            this.devices[devConf.deviceId]?._handleData(obj, parseVals);
-                        })
-                    })
-
-                    // What to do when device connection dies
-                    this.connections[connection.connType].on('close', () => {
-                        connection.devices?.forEach((devConf: deviceOptions) => {
-                            this.devices[devConf.deviceId]?._deviceDisconnected();
-                        })
-                    });
-
-                    // Open the connection
-                    this.connections[connection.connType].open();
-
-                });
-
-                /**
-                 * What to do when a Sparkplug Birth certificate is requested
-                 * @param deviceId The Device ID which must produce a birth certificate
-                 */
-                this.sparkplugNode.on('dbirth', (deviceId) => {
-                    log('Handling DBIRTH request for ' + deviceId);
-                    Object.values(this.devices).find((e: Device) => e._name === deviceId)?._publishDBirth();
-                });
-
-                /**
-                 * What to do when a Sparkplug Birth certificate is requested
-                 * @param deviceId The Device ID which must produce a birth certificate
-                 */
-                this.sparkplugNode.on('dbirth-all', () => {
-                    log('Publishing DBIRTH request for all devices');
-                    Object.values(this.devices)?.map((dev: Device) => {
-                        dev._publishDBirth();
-                    })
-                });
-
-                /**
-                 * What to do when a Sparkplug Device Command is received
-                 * @param deviceId The Device ID which must produce a birth certificate
-                 * @param payload The Sparkplug payload containing DCMD metrics
-                 */
-                this.sparkplugNode.on('dcmd', (deviceId, payload) => {
-                    log('Handling DCMD request for ' + deviceId);
-                    Object.values(this.devices).find((e: Device) => e._name === deviceId)?._handleDCmd(payload);
-                });
-
-                // Listen to the stop event
-                this.sparkplugNode.on('stop', () => {
-                    log('Handling stop request for all devices');
-                    this.stop();
-                })
-            }
-
+            // Setup Sparkplug node handlers
+            this.setupSparkplug();
         } catch (e: any) {
             log(`Error starting translator: ${e.message}`);
             console.log((e as Error).stack);
@@ -294,8 +130,6 @@ export class Translator extends EventEmitter {
             log(`Error starting translator.`);
             await this.stop();
         }
-
-
     }
 
     /**
@@ -322,5 +156,188 @@ export class Translator extends EventEmitter {
         log('Stop complete.');
 
         this.emit('stopped', kill);
+    }
+
+    setupSparkplug () {
+        const sp = this.sparkplugNode;
+
+        /**
+         * What to do when a Sparkplug Birth certificate is requested
+         * @param deviceId The Device ID which must produce a birth certificate
+         */
+        sp.on('dbirth', (deviceId) => {
+            log('Handling DBIRTH request for ' + deviceId);
+            Object.values(this.devices).find((e: Device) => e._name === deviceId)?._publishDBirth();
+        });
+
+        /**
+         * What to do when a Sparkplug Birth certificate is requested
+         * @param deviceId The Device ID which must produce a birth certificate
+         */
+        sp.on('dbirth-all', () => {
+            log('Publishing DBIRTH request for all devices');
+            Object.values(this.devices)?.map((dev: Device) => {
+                dev._publishDBirth();
+            })
+        });
+
+        /**
+         * What to do when a Sparkplug Device Command is received
+         * @param deviceId The Device ID which must produce a birth certificate
+         * @param payload The Sparkplug payload containing DCMD metrics
+         */
+        sp.on('dcmd', (deviceId, payload) => {
+            log('Handling DCMD request for ' + deviceId);
+            Object.values(this.devices).find((e: Device) => e._name === deviceId)?._handleDCmd(payload);
+        });
+
+        // Listen to the stop event
+        sp.on('stop', () => {
+            log('Handling stop request for all devices');
+            this.stop();
+        })
+    }
+
+    setupConnection (connection: any): void {
+        const cType = connection.connType;
+        const deviceInfo = this.chooseDeviceInfo(cType);
+
+        if (deviceInfo == undefined) {
+            log(`Failed to find DeviceInfo for connection type '${cType}'`);
+            return;
+        }
+
+        // Instantiate device connection
+        const newConn = this.connections[cType] = new deviceInfo.connection(
+            connection.connType,
+            connection[deviceInfo.connectionDetails]
+        );
+
+        connection.devices?.forEach((devConf: deviceOptions) => {
+            this.devices[devConf.deviceId] = new deviceInfo.type(
+                this.sparkplugNode, newConn, devConf);
+        });
+
+        // What to do when the connection is open
+        newConn.on('open', () => {
+            connection.devices?.forEach((devConf: deviceOptions) => {
+                this.devices[devConf.deviceId]?._deviceConnected();
+            })
+        });
+
+        // What to do when the device connection has new data from a device
+        newConn.on('data', (obj: { [index: string]: any }, parseVals = true) => {
+            connection.devices?.forEach((devConf: deviceOptions) => {
+                this.devices[devConf.deviceId]?._handleData(obj, parseVals);
+            })
+        })
+
+        // What to do when device connection dies
+        newConn.on('close', () => {
+            connection.devices?.forEach((devConf: deviceOptions) => {
+                this.devices[devConf.deviceId]?._deviceDisconnected();
+            })
+        });
+
+        // Open the connection
+        newConn.open();
+    }
+
+    /* There is a better way to do this. At minimum this should be in a
+     * factory class, not the main Translator class. */
+    chooseDeviceInfo (connType: string): deviceInfo | undefined {
+        // Initialise the connection parameters
+        switch (connType) {
+            case "REST":
+                return {
+                    type: RestDevice,
+                    connection: RestConnection,
+                    connectionDetails: 'RESTConnDetails'
+                }
+            case "MTConnect":
+                return {
+                    type: MTConnectDevice,
+                    connection: MTConnectConnection,
+                    connectionDetails: 'MTConnectConnDetails'
+                }
+            case "S7":
+                return {
+                    type: S7Device,
+                    connection: S7Connection,
+                    connectionDetails: 's7ConnDetails'
+                }
+            case "OPC UA":
+                return {
+                    type: OPCUADevice,
+                    connection: OPCUAConnection,
+                    connectionDetails: 'OPCUAConnDetails'
+                }
+            case "MQTT":
+                return {
+                    type: MQTTDevice,
+                    connection: MQTTConnection,
+                    connectionDetails: 'MQTTConnDetails'
+                }
+            case "Websocket":
+                return {
+                    type: WebsocketDevice,
+                    connection: WebsocketConnection,
+                    connectionDetails: 'WebsocketConnDetails'
+                }
+            case "UDP":
+                return {
+                    type: UDPDevice,
+                    connection: UDPConnection,
+                    connectionDetails: 'UDPConnDetails'
+
+                }
+            default:
+                return;
+        }
+    }
+
+    /* Fetch our identities (UUID, Sparkplug) from the Auth service. */
+    async fetchIdentities (): Promise<Identity> {
+        const auth = this.fplus.Auth;
+
+        const ids = await this.retry("identities", async () => {
+            const ids = await auth.find_principal();
+            if (!ids || !ids.uuid || !ids.sparkplug) return;
+            return ids;
+        });
+
+        log(`Found my identities: UUID ${ids.uuid}, Sparkplug ${ids.sparkplug}`);
+        return ids;
+    }
+
+    /* Fetch our config from the ConfigDB. */
+    async fetchConfig (uuid: string): Promise<translatorConf> {
+        const cdb = this.fplus.ConfigDB;
+
+        const config = await this.retry("config", async () => {
+            const config = await cdb.get_config(EdgeAgentConfig, uuid);
+            if (!config || !validateConfig(config)) return;
+            return config;
+        });
+
+        return reHashConf(config);
+    }
+
+    async retry<RV> (what: string, fetch: () => Promise<RV | undefined>): 
+        Promise<RV>
+    {
+        const interval = this.pollInt;
+
+        while (true) {
+            log(`Attempting to fetch ${what}...`);
+            const rv = await fetch();
+            if (rv != undefined) {
+                log(`Fetched ${what}.`);
+                return rv;
+            }
+
+            log(`Failed to fetch ${what}. Trying again in ${interval} seconds...`);
+            await timers.setTimeout(interval * 1000);
+        }
     }
 }

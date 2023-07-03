@@ -2,12 +2,13 @@ name: New Release
 
 on:
   release:
-    types: [created]
+    types: [ created ]
     # Only run the action when the release tag matches the pattern v[0-9]+.[0-9]+.[0-9]+
     branches:
       - 'v[0-9]+.[0-9]+.[0-9]+'
 
 jobs:
+  # This job packages up the Helm chart
   build:
     runs-on: ubuntu-latest
     steps:
@@ -22,9 +23,35 @@ jobs:
         run: |
           TAG=${{ github.event.release.tag_name }}
           helm package -u -d build --version=$TAG --app-version=$TAG .
+      - uses: actions/upload-artifact@v3
+        with:
+          name: new-release
+          path: build/amrc-connectivity-stack-${{ github.event.release.tag_name }}.tgz
+
+  # This job checks out the release branch, adds the new release to the /builds folder, builds the index and commits
+  # the changes, which triggers Github to release it as a new pages repo
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Helm
+        run: |
+          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          ref: release
+      - name: add-new-release
+        uses: actions/download-artifact@v3
+        with:
+          name: new-release
+          path: build
+      - name: Build index
+        run: |
           cd build
           helm repo index --url https://amrc-factoryplus.github.io/amrc-connectivity-stack/build .
-      - uses: stefanzweifel/git-auto-commit-action@v4
+      - name: commit
+        uses: stefanzweifel/git-auto-commit-action@v4
         id: auto_commit_action
         with:
           commit_message: Release ${{ github.event.release.tag_name }}

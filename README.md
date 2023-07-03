@@ -148,6 +148,7 @@ Production deployment does not differ greatly from development deployment, howev
 | identity.identity.image.tag               | string | `"latest"` | The tag of the Identity component |
 | identity.krbKeysOperator.namespaces       | string | `""` | A comma-separated list of namespaces that the KerberosKey Operator should watch for KerberosKey resources in. Defaults to the release namespace if not specified |
 | identity.krbKeysOperator.image.registry   | string | `"ghcr.io/amrc-factoryplus"` | The registry of the KerberosKey Operator |
+| identity.crossRealm                       | array  | `[]` | Enable support for cross-realm authentication |
 | identity.krbKeysOperator.image.repository | string | `"acs-krb-keys-operator"` | The repository of the KerberosKey Operator |
 | identity.krbKeysOperator.image.tag        | string | `"latest"` | The tag of the KerberosKey Operator |
 | identity.realm                            | string | `"LOCALHOST"` | The Kerberos realm for this Factory+ deployment. |

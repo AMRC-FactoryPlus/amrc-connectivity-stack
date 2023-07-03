@@ -6,6 +6,9 @@
 # Environment
 .env
 
+# Local build config
+config.mk
+
 # Secrets
 /keytabs/
 /volumes/

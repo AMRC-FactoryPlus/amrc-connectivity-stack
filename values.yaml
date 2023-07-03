@@ -20,7 +20,7 @@ identity:
       # -- The repository of the Identity component
       repository: acs-identity
       # -- The tag of the Identity component
-      tag: latest
+      tag: v1.0.0
       # @ignore
       pullPolicy: IfNotPresent
   krbKeysOperator:
@@ -30,7 +30,7 @@ identity:
       # -- The repository of the KerberosKey Operator
       repository: acs-krb-keys-operator
       # -- The tag of the KerberosKey Operator
-      tag: latest
+      tag: v1.0.2
       # @ignore
       pullPolicy: IfNotPresent
 
@@ -43,7 +43,7 @@ auth:
     # -- The repository of the Authorisation component
     repository: acs-auth
     # -- The tag of the Authorisation component
-    tag: latest
+    tag: v1.0.0
     # @ignore
     pullPolicy: IfNotPresent
 
@@ -56,7 +56,7 @@ directory:
     # -- The repository of the Directory component
     repository: acs-directory
     # -- The tag of the Directory component
-    tag: latest
+    tag: v1.0.1
     # @ignore
     pullPolicy: IfNotPresent
 
@@ -69,7 +69,7 @@ configdb:
     # -- The repository of the Configuration Store component
     repository: acs-configdb
     # -- The tag of the Configuration Store component
-    tag: latest
+    tag: v1.0.0
     # @ignore
     pullPolicy: IfNotPresent
 
@@ -82,7 +82,7 @@ mqtt:
     # -- The repository of the MQTT component
     repository: acs-mqtt
     # -- The tag of the MQTT component
-    tag: latest
+    tag: v1.0.1
     # @ignore
     pullPolicy: IfNotPresent
 
@@ -95,7 +95,7 @@ manager:
     # -- The repository of the Manager component
     repository: acs-manager
     # -- The tag of the Manager component
-    tag: latest
+    tag: v1.0.5
     # @ignore
     pullPolicy: IfNotPresent
   edge:
@@ -104,7 +104,7 @@ manager:
     # -- The repository of the Edge Agent component
     repository: acs-edge
     # -- The tag of the Edge Agent component
-    tag: latest
+    tag: v1.0.5
   meilisearch:
     # -- The key that the manager uses to connect to the Meilisearch search engine
     key: masterKey
@@ -126,7 +126,7 @@ cmdesc:
     # -- The repository of the Commands component
     repository: acs-cmdesc
     # -- The tag of the Commands component
-    tag: latest
+    tag: v1.0.0
     # @ignore
     pullPolicy: IfNotPresent
   # -- Possible values are either 1 to enable all possible debugging, or a comma-separated list of debug tags (the tags printed before the log lines). No logging is specified as an empty string.
@@ -142,7 +142,7 @@ warehouse:
       # -- The repository of the Warehouse component
       repository: influxdb-sparkplug-ingester
       # -- The tag of the Warehouse component
-      tag: latest
+      tag: v1.0.0
       # @ignore
       pullPolicy: IfNotPresent
 

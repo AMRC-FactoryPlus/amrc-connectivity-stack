@@ -14,8 +14,8 @@ identity:
   # -- The Kerberos realm for this Factory+ deployment.
   realm: LOCALHOST
   # -- Enable support for cross-realm authentication
-  crossRealm: {}
-  # crossRealm: {}
+  crossRealm: []
+  # crossRealm:
   #   - realm: MYOTHERREALM.COM
   #     domain: myotherrealm.com
   #     otherDomains:

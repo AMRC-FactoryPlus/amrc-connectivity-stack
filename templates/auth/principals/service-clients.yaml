@@ -80,7 +80,7 @@ spec:
   secret: manager-keytab/client-keytab
 {{- end }}
 ---
-{{- if .Values.warehouse.enabled }}
+{{- if .Values.warehouse.ingester.enabled }}
 apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey
 metadata:

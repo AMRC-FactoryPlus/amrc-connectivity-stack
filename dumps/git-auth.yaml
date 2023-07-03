@@ -1,6 +1,6 @@
 # This file is processed by `npm run convert-dumps` into
 # `git-auth.json`. That file then needs to be loaded into the Auth
-# service.
+# component.
 #
 # The ACLs are expressed in terms of 'service requirement' UUIDs. These
 # need to be created as Auth groups containing the deployment-specific

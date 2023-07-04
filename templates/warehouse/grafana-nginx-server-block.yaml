@@ -10,7 +10,7 @@ data:
     server {
         listen 80;
         listen [::]:80;
-        server_name grafana.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
+        server_name grafana.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}};
 
         location / {
             proxy_set_header Host $http_host;

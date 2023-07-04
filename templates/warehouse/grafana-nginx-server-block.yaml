@@ -6,7 +6,7 @@ metadata:
   labels:
     component: warehouse
 data:
-  server-block: |
+  server-block.conf: |
     server {
         listen 80;
         listen [::]:80;

@@ -528,7 +528,7 @@ data:
         }
       }
     }
-{{- end -}}
+{{end}}
 ---
 {{ if .Values.auth.enabled }}
 apiVersion: v1
@@ -758,4 +758,4 @@ data:
       ]
     }
 {{end}}
-{{- end -}}
+{{end}}

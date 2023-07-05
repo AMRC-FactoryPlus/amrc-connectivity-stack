@@ -253,6 +253,8 @@ grafana:
   persistence:
     enabled: true
   grafana.ini:
+    auth.basic:
+      enabled: false
     auth.proxy:
       enabled: true
       header_name: X-Auth-Principal

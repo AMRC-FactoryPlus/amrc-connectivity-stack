@@ -54,7 +54,7 @@ auth:
     # -- The repository of the Authorisation component
     repository: acs-auth
     # -- The tag of the Authorisation component
-    tag: v1.1.0
+    tag: v1.2.0
     # @ignore
     pullPolicy: IfNotPresent
 

@@ -10,6 +10,8 @@ spec:
   routes:
     - match: Host(`grafana.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}`)
       kind: Rule
+      middlewares:
+        - name: basic-auth
       services:
         - name: acs-grafana
           port: 80

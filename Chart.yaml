@@ -17,7 +17,7 @@ maintainers:
     email: alex.godbehere@amrc.co.uk
 dependencies:
   - name: traefik
-    version: 10.19.*
+    version: 23.1.0
     repository: https://helm.traefik.io/traefik
     condition: traefik.enabled
   - name: sealed-secrets

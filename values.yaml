@@ -177,6 +177,8 @@ traefik:
       expose: true
       exposedPort: 80
       protocol: TCP
+      forwardedHeaders:
+        insecure: true
     websecure:
       port: 443
       expose: true

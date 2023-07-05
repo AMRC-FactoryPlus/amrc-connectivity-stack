@@ -6,13 +6,16 @@
  * Copyright 2022 AMRC
  */
 
-import { WebAPI, pkgVersion } from "@amrc-factoryplus/utilities";
+import { WebAPI, UUIDs } from "@amrc-factoryplus/utilities";
 
 import AuthN from "../lib/authn.js";
 import AuthZ from "../lib/authz.js";
 import Editor from "../lib/editor.js";
 
-const Version = pkgVersion(import.meta);
+import { GIT_VERSION } from "../lib/git-version.js";
+
+/* This is the F+ service spec version */
+const Version = "1.0.0";
 
 const authn = await new AuthN({ }).init();
 const authz = await new AuthZ({
@@ -31,6 +34,12 @@ const editor = await new Editor({
 const api = await new WebAPI({
     ping:       {
         version:    Version,
+        service:    UUIDs.Service.Authentication,
+        software: {
+            vendor:         "AMRC",
+            application:    "acs-auth",
+            revision:       GIT_VERSION,
+        },
     },
     realm:      process.env.REALM,
     hostname:   process.env.HOSTNAME,

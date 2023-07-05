@@ -11,6 +11,7 @@ metadata:
 type: Opaque
 data:
   admin-user: {{ (printf "admin@%s" (.Values.identity.realm | required "values.identity.realm is required!") | b64enc) | quote }}
+  admin-password: {{ (printf "" | b64enc) | quote }}
 
 {{- end }}
 {{- end -}}

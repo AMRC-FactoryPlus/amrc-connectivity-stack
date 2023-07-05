@@ -11,7 +11,7 @@ spec:
     - match: Host(`grafana.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}`)
       kind: Rule
       services:
-        - name: grafana-proxy
+        - name: acs-grafana
           port: 80
           namespace: {{ .Release.Namespace }}
   {{- if .Values.acs.secure }}

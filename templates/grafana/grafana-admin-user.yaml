@@ -10,7 +10,7 @@ metadata:
     "helm.sh/resource-policy": "keep"
 type: Opaque
 data:
-  admin-user: admin@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+  admin-user: {{ (printf "admin@%s" (.Values.identity.realm | required "values.identity.realm is required!") | b64enc) | quote }}
 
 {{- end }}
 {{- end -}}

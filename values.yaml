@@ -252,6 +252,8 @@ grafana:
   enabled: true
   persistence:
     enabled: true
+  admin:
+    existingSecret: grafana-admin-user
   grafana.ini:
     auth.basic:
       enabled: false

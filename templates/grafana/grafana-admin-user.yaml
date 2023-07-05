@@ -1,0 +1,16 @@
+{{ if .Values.grafana.enabled }}
+{{- if not (lookup "v1" "Secret" .Release.Namespace "grafana-admin-user") }}
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: "grafana-admin-user"
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    "helm.sh/resource-policy": "keep"
+type: Opaque
+data:
+  admin-user: admin@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+
+{{- end }}
+{{- end -}}

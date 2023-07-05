@@ -19,7 +19,7 @@
     },
     "Alerts": {
       "description": "Alerts raised by the Edge Agent",
-      "allOf": {
+      "allOf": [
         { "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Alerts-v1.json" },
         {
           "type": "object",
@@ -47,7 +47,7 @@
             }
           }
         }
-      }
+      ]
     }
   },
   "required": ["Schema_UUID", "Instance_UUID", "Config_File", "Alerts"]

@@ -6,6 +6,6 @@ metadata:
   namespace: default
 spec:
   forwardAuth:
-    address: http://auth.{{ .Release.Namespace }}.svc.cluster.local/authz
+    address: {{ .Values.acs.secure | ternary "https" "http" }}://auth.{{.Values.acs.baseUrl}}/authz
     authResponseHeaders:
       - X-Auth-Principal

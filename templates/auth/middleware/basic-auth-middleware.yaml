@@ -7,6 +7,5 @@ metadata:
 spec:
   forwardAuth:
     address: {{ .Values.acs.secure | ternary "https" "http" }}://auth.{{.Values.acs.baseUrl}}/authn/authenticate
-    trustForwardHeader: true
     authResponseHeaders:
       - X-Auth-Principal

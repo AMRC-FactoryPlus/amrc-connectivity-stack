@@ -6,6 +6,6 @@ metadata:
   namespace: default
 spec:
   forwardAuth:
-    address: {{ .Values.acs.secure | ternary "https" "http" }}://auth.{{.Values.acs.baseUrl}}/authz
+    address: {{ .Values.acs.secure | ternary "https" "http" }}://auth.{{.Values.acs.baseUrl}}/authn/authenticate
     authResponseHeaders:
       - X-Auth-Principal

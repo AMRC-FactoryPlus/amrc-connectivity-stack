@@ -252,6 +252,12 @@ grafana:
   enabled: true
   persistence:
     enabled: true
+  grafana.ini:
+    auth.proxy:
+      enabled: true
+      header_name: X-Auth-Principal
+      header_property: username
+      auto_sign_up: true
 
 # @ignore
 sealed-secrets:

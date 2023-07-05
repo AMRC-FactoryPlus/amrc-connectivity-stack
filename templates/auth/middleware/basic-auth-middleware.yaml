@@ -8,4 +8,4 @@ spec:
   forwardAuth:
     address: http://auth.{{ .Release.Namespace }}.svc.cluster.local/authz
     authResponseHeaders:
-      - X-Auth-User
+      - X-Auth-Principal

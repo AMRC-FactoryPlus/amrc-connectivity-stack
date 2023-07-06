@@ -57,8 +57,6 @@ export default class MQTTClient {
         const mqtt = await this.serviceClient.mqtt_client();
         this.mqtt = mqtt;
 
-        this.serviceClient.set_service_url(UUIDs.Service.Command_Escalation, 'http://cmdesc.amrc-f2050-apr2023.shef.ac.uk')
-
         mqtt.on("authenticated", this.on_connect.bind(this));
         mqtt.on("error", this.on_error.bind(this));
         mqtt.on("message", this.on_message.bind(this));

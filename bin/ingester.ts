@@ -4,16 +4,17 @@
  */
 
 import {ServiceClient} from "@amrc-factoryplus/utilities";
-import * as dotenv from 'dotenv'
 import pino from "pino";
 import pretty from 'pino-pretty';
 import MQTTClient from "@lib/mqttclient.js";
+let dotenv: any = null;
+try {dotenv = await import ('dotenv')} catch (e) {}
 
 const stream = pretty({
     colorize: true
 })
 
-dotenv.config()
+dotenv?.config();
 
 
 const directoryUrl = process.env.DIRECTORY_URL;

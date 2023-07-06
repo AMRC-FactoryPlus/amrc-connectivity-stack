@@ -20,6 +20,7 @@
     "start:shell": "k5start -Uf $CLIENT_KEYTAB npm run start:dev",
     "dev": " npm run build && npm run start:dev",
     "build": "tsc && tsc-alias",
+    "clean": "tsc --build --clean",
     "lint": "eslint --ignore-path .gitignore --ext .ts src/",
     "lint:fix": "npm run lint -- --fix"
   },

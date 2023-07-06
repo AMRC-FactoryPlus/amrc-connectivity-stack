@@ -1,23 +1,65 @@
-ARG utility_prefix=ghcr.io/amrc-factoryplus/utilities
-ARG utility_ver=v1.0.7
+# syntax=docker/dockerfile:1
+# The line above must be the first line in the file!
 
-FROM ${utility_prefix}-build:${utility_ver} AS build
+ARG acs_build=ghcr.io/amrc-factoryplus/utilities-build:v1.0.8
+ARG acs_run=ghcr.io/amrc-factoryplus/utilities-run:v1.0.8
 
-# Install the node application on the build container where we can
-# compile the native modules.
-RUN install -d -o node -g node /home/node/app
-WORKDIR /home/node/app
+FROM ${acs_build} as ts-compiler
+# This ARG must go here, in the image that uses it, or it isn't
+# available to the shell scripts. Don't ask me why...
+ARG acs_npm=NO
+USER root
+RUN <<'SHELL'
+    apk add git
+    install -d -o node /home/node /usr/app
+SHELL
 USER node
-COPY package*.json ./
-RUN npm install --save=false
-RUN npm run build
-COPY . .
+WORKDIR /usr/app
+COPY --chown=node . ./
+RUN <<'SHELL'
+    touch /home/node/.npmrc
+    if [ "${acs_npm}" != NO ]
+    then
+        echo "SETTING NPM REGISTRY TO ${acs_npm}" >&2
+        npm config set @amrc-factoryplus:registry "${acs_npm}"
+    fi
+    npm install --save=false
 
-FROM ${utility_prefix}-run:${utility_ver}
+    git describe --tags --dirty \
+        | sed -e's/^/export const GIT_VERSION="/;s/$/";/' \
+        > ./lib/git-version.js
 
-# Copy across from the build container.
-WORKDIR /home/node/app
-COPY --from=build --chown=root:root /home/node/app ./
+    npm run clean
+    echo tsc -v
+    npm run build
+SHELL
 
+FROM ${acs_build} as util-build
+USER root
+RUN <<'SHELL'
+    # Are these necessary?
+    apk upgrade --update-cache --available
+    apk add openssl
+    rm -rf /var/cache/apk/*
+    install -d -o node /home/node /usr/app
+SHELL
 USER node
-CMD npm start
+WORKDIR /usr/app
+COPY --chown=node --from=ts-compiler /usr/app/package*.json ./
+COPY --chown=node --from=ts-compiler /usr/app/dist ./
+COPY --chown=node --from=ts-compiler /home/node/.npmrc /home/node
+RUN npm install --save=false --only=production
+
+FROM ${acs_run}
+USER root
+RUN <<'SHELL'
+    apk upgrade --update-cache --available
+    apk add openssl
+    rm -rf /var/cache/apk/*
+SHELL
+WORKDIR /usr/app
+# This copy leaves the app files owned as root, i.e. read-only to the
+# running application. This is a Good Thing.
+COPY --from=util-build /usr/app ./
+USER node
+CMD [ "node", "--es-module-specifier-resolution=node", "bin/ingester.js" ]

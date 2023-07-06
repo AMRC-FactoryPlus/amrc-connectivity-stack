@@ -6,11 +6,12 @@
 import {ServiceClient, SpB, Topic, UUIDs} from "@amrc-factoryplus/utilities";
 import {Reader} from "protobufjs";
 import {logger} from "../bin/ingester.js";
-import * as dotenv from 'dotenv'
+let dotenv: any = null;
+try {dotenv = await import ('dotenv')} catch (e) {}
 import Long from "long";
 import {InfluxDB, Point} from '@influxdata/influxdb-client'
 
-dotenv.config()
+dotenv?.config()
 
 const influxURL: string = process.env.INFLUX_URL;
 if (!influxURL) {

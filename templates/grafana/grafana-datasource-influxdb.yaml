@@ -40,3 +40,4 @@ data:
         secureJsonData:
           token: ${admin-token}
         version: 1
+        editable: true

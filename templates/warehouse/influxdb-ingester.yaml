@@ -50,7 +50,7 @@ spec:
             - name: INFLUX_TOKEN
               valueFrom:
                 secretKeyRef:
-                  name: acs-influxdb2-auth
+                  name: influxdb-auth
                   key: admin-token
           volumeMounts:
             - mountPath: /config/krb5-conf

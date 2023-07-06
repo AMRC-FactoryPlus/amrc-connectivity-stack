@@ -297,5 +297,5 @@ tenant:
 influxdb2:
   enabled: true
   adminUser:
-    organization: AMRC
+    organization: default
     existingSecret: influxdb-auth

@@ -5,6 +5,7 @@
 
 # Environment
 .env
+dist/
 
 # Secrets
 /keytabs/

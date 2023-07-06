@@ -7,6 +7,8 @@
 .env
 dist/
 
+dist/
+
 # Secrets
 /keytabs/
 /volumes/

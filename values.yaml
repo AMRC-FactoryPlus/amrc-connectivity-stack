@@ -264,11 +264,14 @@ grafana:
       header_name: X-Auth-Principal
       header_property: username
       auto_sign_up: true
+  sidecar:
+    datasources:
+      enabled: true
+      label: grafana_datasource
 
 # @ignore
 sealed-secrets:
   enabled: true
-
 # @ignore
 tenant:
   tenant:

@@ -3,19 +3,22 @@
 apiVersion: v1
 kind: Secret
 metadata:
-  name: prometheus-grafana-datasource
+  name: influx-grafana-datasource
   labels:
-    grafana_datasource: '1'
+    grafana_datasource: "1"
+type: Opaque
 stringData:
-  datasource.yaml: |-
+  influxdatasource.yaml: |-
+    # config file version
     apiVersion: 1
     datasources:
-      - name: InfluxDB
+      - name: influxdb
         type: influxdb
         url: http://acs-influxdb2
         isDefault: true
         jsonData:
           organization: default
-          token: {{ (index $secret.data "admin-token") | b64dec }}
           defaultBucket: bucket
           version: Flux
+        secureJsonData:
+          token: {{ (index $secret.data "admin-token") | b64dec }}

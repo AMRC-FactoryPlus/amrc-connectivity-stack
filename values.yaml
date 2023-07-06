@@ -254,8 +254,7 @@ grafana:
   enabled: true
   persistence:
     enabled: true
-  envFromSecrets:
-    - influxdb-auth
+  envFromSecret: influxdb-auth
   admin:
     existingSecret: grafana-admin-user
   grafana.ini:

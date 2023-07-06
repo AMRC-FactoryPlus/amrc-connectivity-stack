@@ -44,7 +44,7 @@ spec:
             - name: INFLUX_URL
               value: http://acs-influxdb2.{{ .Release.Namespace }}.svc.cluster.local
             - name: INFLUX_ORG
-              value: {{.Values.acs.organisation}}
+              value: default
             - name: INFLUX_BUCKET
               value: 'default'
             - name: INFLUX_TOKEN

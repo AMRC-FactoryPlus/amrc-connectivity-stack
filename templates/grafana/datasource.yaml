@@ -1,10 +1,12 @@
+{{ $secret := ( lookup "v1" "Secret" .Release.Namespace "influxdb-auth" ) }}
+
 apiVersion: v1
-kind: ConfigMap
+kind: Secret
 metadata:
   name: prometheus-grafana-datasource
   labels:
     grafana_datasource: '1'
-data:
+stringData:
   datasource.yaml: |-
     apiVersion: 1
     datasources:
@@ -14,6 +16,6 @@ data:
         isDefault: true
         jsonData:
           organization: default
-          token: {{( lookup "v1" "Secret" .Release.Namespace "influxdb-auth" )}}
+          token: {{ index $secret.data "admin-token" }}
           defaultBucket: bucket
           version: Flux

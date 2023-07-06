@@ -14,7 +14,7 @@ identity:
   # -- The Kerberos realm for this Factory+ deployment.
   realm: LOCALHOST
   # -- Enable support for cross-realm authentication
-  crossRealm: []
+  crossRealm: [ ]
   # crossRealm:
   #   - realm: MYOTHERREALM.COM
   #     domain: myotherrealm.com
@@ -216,11 +216,11 @@ traefik:
       enabled: false
   # -- [AZURE] Enable the below section to expose your instance of Factory+/ACS over the internet, replacing the <Value>
   # -- tags with the details of your pre-configured load balancer.
-#  service:
-#    spec:
-#      loadBalancerIP: <External IP address here>
-#    annotations:
-#      service.beta.kubernetes.io/azure-load-balancer-resource-group: <Load Balancer Resource Group here>
+  #  service:
+  #    spec:
+  #      loadBalancerIP: <External IP address here>
+  #    annotations:
+  #      service.beta.kubernetes.io/azure-load-balancer-resource-group: <Load Balancer Resource Group here>
   providers:
     kubernetesCRD:
       allowCrossNamespace: true
@@ -249,6 +249,8 @@ promtail:
 
 # @ignore
 grafana:
+  image:
+    tag: 10.0.1
   enabled: true
   persistence:
     enabled: true

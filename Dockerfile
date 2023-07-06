@@ -10,7 +10,7 @@ WORKDIR /home/node/app
 USER node
 COPY package*.json ./
 RUN npm install --save=false
-RUN npm build
+RUN npm run build
 COPY . .
 
 FROM ${utility_prefix}-run:${utility_ver}

@@ -34,9 +34,9 @@ data:
         isDefault: true
         jsonData:
           organization: default
-          defaultBucket: bucket
+          defaultBucket: default
           version: Flux
         # <string> json object of data that will be encrypted.
         secureJsonData:
-          token: $admin-token
+          token: ${admin-token}
         version: 1

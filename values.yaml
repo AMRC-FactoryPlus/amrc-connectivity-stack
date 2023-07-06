@@ -267,6 +267,7 @@ grafana:
   sidecar:
     datasources:
       enabled: true
+      envFromSecret: influxdb-auth
       label: grafana_datasource
 
 # @ignore

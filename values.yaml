@@ -254,6 +254,8 @@ grafana:
   enabled: true
   persistence:
     enabled: true
+  envFromSecrets:
+    - influxdb-auth
   admin:
     existingSecret: grafana-admin-user
   grafana.ini:
@@ -267,7 +269,6 @@ grafana:
   sidecar:
     datasources:
       enabled: true
-      envFromSecret: influxdb-auth
       label: grafana_datasource
       initDatasources: true
 

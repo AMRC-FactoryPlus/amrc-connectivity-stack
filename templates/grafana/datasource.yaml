@@ -16,6 +16,6 @@ stringData:
         isDefault: true
         jsonData:
           organization: default
-          token: {{ index $secret.data "admin-token" }}
+          token: {{ (index $secret.data "admin-token") | b64dec }}
           defaultBucket: bucket
           version: Flux

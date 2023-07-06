@@ -296,3 +296,4 @@ influxdb2:
   enabled: true
   adminUser:
     organization: AMRC
+    existingSecret: influxdb-auth

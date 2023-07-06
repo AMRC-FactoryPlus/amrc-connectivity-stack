@@ -1,0 +1,17 @@
+{{ if .Values.influxdb2.enabled }}
+{{- if not (lookup "v1" "Secret" .Release.Namespace "influx-admin-user") }}
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: influxdb-auth
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    "helm.sh/resource-policy": "keep"
+type: Opaque
+data:
+  admin-password: {{ (randAlphaNum 32 | b64enc) | quote }}
+  admin-token: {{ (randAlphaNum 32 | b64enc) | quote }}
+
+{{- end }}
+{{- end -}}

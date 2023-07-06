@@ -1,5 +1,5 @@
 {{ if .Values.influxdb2.enabled }}
-{{- if not (lookup "v1" "Secret" .Release.Namespace "influx-admin-user") }}
+{{- if not (lookup "v1" "Secret" .Release.Namespace "influxdb-auth") }}
 
 apiVersion: v1
 kind: Secret

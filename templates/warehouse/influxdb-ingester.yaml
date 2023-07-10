@@ -32,6 +32,7 @@ spec:
         - name: influxdb-ingester
           image: "{{ .Values.warehouse.ingester.image.registry }}/{{ .Values.warehouse.ingester.image.repository }}:{{ .Values.warehouse.ingester.image.tag }}"
           command: [ "/usr/bin/k5start", "-Uf", "/keytabs/client" ]
+          args: [ "node", "--es-module-specifier-resolution=node", "bin/ingester.js" ]
           imagePullPolicy: Always
           env:
             - name: KRB5_CONFIG

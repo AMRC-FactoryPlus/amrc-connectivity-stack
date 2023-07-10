@@ -54,7 +54,7 @@ data:
         # <bool> mark as default datasource. Max one per org
         isDefault: true
         jsonData:
-          database: default
+          dbName: default
           httpHeaderName1: Authorization
         secureJsonData:
           httpHeaderValue1: Token ${admin-token}

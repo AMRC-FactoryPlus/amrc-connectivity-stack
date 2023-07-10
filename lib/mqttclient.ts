@@ -224,29 +224,29 @@ export default class MQTTClient {
             case "Int16":
             case "Int32":
             case "Int64":
-                writeApi.writePoint(new Point(fullName).intField(fullName, value));
+                writeApi.writePoint(new Point(fullName).intField('value', value));
                 break;
             case "UInt8":
             case "UInt16":
             case "UInt32":
             case "UInt64":
-                writeApi.writePoint(new Point(fullName).uintField(fullName, value));
+                writeApi.writePoint(new Point(fullName).uintField('value', value));
                 break;
             case "Float":
             case "Double":
-                writeApi.writePoint(new Point(fullName).floatField(fullName, value));
+                writeApi.writePoint(new Point(fullName).floatField('value', value));
                 break;
             case "Boolean":
-                writeApi.writePoint(new Point(fullName).booleanField(fullName, value));
+                writeApi.writePoint(new Point(fullName).booleanField('value', value));
                 break;
             default:
-                writeApi.writePoint(new Point(fullName).stringField(fullName, value));
+                writeApi.writePoint(new Point(fullName).stringField('value', value));
                 break;
 
         }
 
         writeApi.close().then(() => {
-            logger.debug(`Written to InfluxDB: [${birth.type}] ${fullName} = ${value}`);
+            logger.debug(`Written to InfluxDB: [${birth.type}] value = ${value}`);
         })
     }
 

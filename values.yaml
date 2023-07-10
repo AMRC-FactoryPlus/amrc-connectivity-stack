@@ -305,12 +305,9 @@ influxdb2:
     organization: default
     existingSecret: influxdb-auth
   initScripts:
-    enabled: false
+    enabled: true
     scripts:
       init.sh: |+
         #!/bin/bash
-        
-        # This is from the default values.yaml file
-        influx apply --force yes -u https://raw.githubusercontent.com/influxdata/community-templates/master/influxdb2_operational_monitoring/influxdb2_operational_monitoring.yml
         echo "Creating mapping for bucket ${DOCKER_INFLUXDB_INIT_BUCKET_ID} in org ${DOCKER_INFLUXDB_INIT_ORG}"
         influx v1 dbrp create --bucket-id ${DOCKER_INFLUXDB_INIT_BUCKET_ID} --db default --rp default --default --org ${DOCKER_INFLUXDB_INIT_ORG}

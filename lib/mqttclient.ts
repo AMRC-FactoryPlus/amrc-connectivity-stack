@@ -217,36 +217,35 @@ export default class MQTTClient {
             device: topic.address.device
         });
 
-        let fullName = `${topic.address.group}/${topic.address.node}/${topic.address.device}/${birth.name}`;
 
         switch (birth.type) {
             case "Int8":
             case "Int16":
             case "Int32":
             case "Int64":
-                writeApi.writePoint(new Point(fullName).intField('value', value));
+                writeApi.writePoint(new Point(birth.name).intField('value', value));
                 break;
             case "UInt8":
             case "UInt16":
             case "UInt32":
             case "UInt64":
-                writeApi.writePoint(new Point(fullName).uintField('value', value));
+                writeApi.writePoint(new Point(birth.name).uintField('value', value));
                 break;
             case "Float":
             case "Double":
-                writeApi.writePoint(new Point(fullName).floatField('value', value));
+                writeApi.writePoint(new Point(birth.name).floatField('value', value));
                 break;
             case "Boolean":
-                writeApi.writePoint(new Point(fullName).booleanField('value', value));
+                writeApi.writePoint(new Point(birth.name).booleanField('value', value));
                 break;
             default:
-                writeApi.writePoint(new Point(fullName).stringField('value', value));
+                writeApi.writePoint(new Point(birth.name).stringField('value', value));
                 break;
 
         }
 
         writeApi.close().then(() => {
-            logger.debug(`Written to InfluxDB: [${birth.type}] value = ${value}`);
+            logger.debug(`Written to InfluxDB: [${birth.type}] ${birth.name} = ${value}`);
         })
     }
 

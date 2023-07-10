@@ -38,6 +38,8 @@ spec:
               value: /config/krb5-conf/krb5.conf
             - name: CLIENT_KEYTAB
               value: /keytabs/client
+            - name: LOG_LEVEL
+              value: info
             - name: DIRECTORY_URL
               value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
             - name: INFLUX_URL

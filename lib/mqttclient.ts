@@ -63,21 +63,22 @@ export default class MQTTClient {
         mqtt.on("message", this.on_message.bind(this));
         mqtt.on("close", this.on_close.bind(this));
         mqtt.on("reconnect", this.on_reconnect.bind(this));
-        logger.info("👂 Subscribing to entire Factory+ namespace");
-        // We subscribe to the whole Sparkplug namespace
-        mqtt.subscribe('spBv1.0/#');
+
+        logger.info("Connecting to Factory+ broker...");
     }
 
     on_connect() {
         logger.info("🔌 Connected to Factory+ broker");
+        logger.info("👂 Subscribing to entire Factory+ namespace");
+        this.mqtt.subscribe('spBv1.0/#');
     }
 
     on_close() {
-        logger.info(`❌ Disconnected from Factory+ broker`);
+        logger.warn(`❌ Disconnected from Factory+ broker`);
     }
 
     on_reconnect() {
-        logger.info(`⚠️ Reconnecting to Factory+ broker...`);
+        logger.warn(`⚠️ Reconnecting to Factory+ broker...`);
     }
 
     on_error(error: any) {
@@ -245,7 +246,7 @@ export default class MQTTClient {
         }
 
         writeApi.close().then(() => {
-            logger.info(`Written to InfluxDB: [${birth.type}] ${fullName} = ${value}`);
+            logger.debug(`Written to InfluxDB: [${birth.type}] ${fullName} = ${value}`);
         })
     }
 

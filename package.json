@@ -15,9 +15,8 @@
   ],
   "type": "module",
   "scripts": {
-    "start": "cross-env NODE_ENV=development node dist/bin/ingester.js",
-    "start:dev": "cross-env NODE_ENV=development node -r dotenv/config dist/bin/ingester.js dotenv_config_path=.env.development.local",
-    "start:shell": "k5start -Uf $CLIENT_KEYTAB npm run start:dev",
+    "start": "node dist/bin/ingester.js",
+    "start:shell": "k5start -Uf $CLIENT_KEYTAB npm run start",
     "dev": " npm run build && npm run start:dev",
     "build": "tsc && tsc-alias",
     "clean": "tsc --build --clean",
@@ -25,7 +24,7 @@
     "lint:fix": "npm run lint -- --fix"
   },
   "dependencies": {
-    "@amrc-factoryplus/utilities": "^1.0.7",
+    "@amrc-factoryplus/utilities": "^1.0.8",
     "@influxdata/influxdb-client": "^1.33.2",
     "@influxdata/influxdb-client-apis": "^1.33.2",
     "async": "^3.2.4",

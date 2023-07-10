@@ -29,12 +29,12 @@ Once you have the admin password you can connect to the MQTT broker at {{ .Value
 
 Next, log into the manager at {{ .Values.acs.secure | ternary "https://" "http://" }}manager.{{.Values.acs.baseUrl}} as the `admin` user and create a Group, Node (Soft Gateway) and Device. Configure the device by completing the Information, Connection, and Schema tabs until you see a green VALID tag in the top right corner. Once you've configured the device you should see MQTT traffic begin to flow.
 
-Finally, get the admin password for InfluxDB by running the following command and log into the InfluxDB instance as the admin user at {{ .Values.acs.secure | ternary "https://" "http://" }}influxdb.{{.Values.acs.baseUrl}}
+Once data is flowing you can start to build dashboards in Grafana. Log into Grafana with the same admin credentials at {{ .Values.acs.secure | ternary "https://" "http://" }}grafana.{{.Values.acs.baseUrl}} and create a new dashboard, where you'll be given the option of two datasources; InfluxDB (Flux) and InfluxDB (InfluxQL). You can read more about the differences between Flux and InfluxQL at the link below, but in short InfluxQL is older but easier to get started with and Flux is more powerful but has a steeper learning curve. Factory+ creates a measurement for each metric configured for a device, so if you have more than one of the same type of device make sure to apply additional WHERE statements to the query to filter to the correct group, node and device.
 
-echo $(sudo kubectl get secret acs-influxdb2-auth -o jsonpath="{.data.admin-password}" -n {{.Release.Namespace}} | base64 --decode)
+https://docs.influxdata.com/influxdb/v2.7/reference/syntax/flux/flux-vs-influxql/
 
 Services
 --------
 Manager: {{ .Values.acs.secure | ternary "https://" "http://" }}manager.{{.Values.acs.baseUrl}}
 MQTT: {{ .Values.acs.secure | ternary "mqtts://" "mqtt://" }}mqtt.{{.Values.acs.baseUrl}}:{{ .Values.acs.secure | ternary "8883" "1883" }}
-InfluxDB: {{ .Values.acs.secure | ternary "https://" "http://" }}influxdb.{{.Values.acs.baseUrl}}
+Grafana: {{ .Values.acs.secure | ternary "https://" "http://" }}grafana.{{.Values.acs.baseUrl}}

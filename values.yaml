@@ -304,3 +304,13 @@ influxdb2:
   adminUser:
     organization: default
     existingSecret: influxdb-auth
+  initScripts:
+    enabled: false
+    scripts:
+      init.sh: |+
+        #!/bin/bash
+        # This is from the default values.yaml file
+        influx apply --force yes -u https://raw.githubusercontent.com/influxdata/community-templates/master/influxdb2_operational_monitoring/influxdb2_operational_monitoring.yml
+        apk add jq
+        # Create a DBRP mapping for the default bucket so we can use it with InfluxQL
+        influx v1 dbrp create --bucket-id $(influx bucket list -n default --json | jq -r '.[0].id') --db default --rp default --default

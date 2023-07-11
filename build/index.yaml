@@ -2,8 +2,64 @@ apiVersion: v1
 entries:
   amrc-connectivity-stack:
   - apiVersion: v2
+    appVersion: 2.0.0
+    created: "2023-07-11T11:03:16.88074144Z"
+    dependencies:
+    - condition: traefik.enabled
+      name: traefik
+      repository: https://helm.traefik.io/traefik
+      version: 23.1.0
+    - condition: sealed-secrets.enabled
+      name: sealed-secrets
+      repository: https://bitnami-labs.github.io/sealed-secrets/
+      version: 2.8.1
+    - condition: loki.enabled
+      name: loki
+      repository: https://grafana.github.io/helm-charts
+      version: 4.8.0
+    - condition: loki.enabled
+      name: promtail
+      repository: https://grafana.github.io/helm-charts
+      version: 6.9.3
+    - condition: grafana.enabled
+      name: grafana
+      repository: https://grafana.github.io/helm-charts
+      version: 6.52.4
+    - condition: minio.enabled
+      name: operator
+      repository: https://alexgodbehere.github.io/helm-repository
+      version: 5.0.4
+    - condition: minio.enabled
+      name: tenant
+      repository: https://operator.min.io
+      version: 5.0.3
+    - condition: influxdb2.enabled
+      name: influxdb2
+      repository: https://helm.influxdata.com/
+      version: 2.1.1
+    description: The AMRC Connectivity Stack (ACS) is a collection of open-source
+      services developed by the AMRC that enables an end-to-end implementation of
+      the Factory+ framework.
+    digest: 56b59d88542627480a7eb25df86f34a9cdab820316a6b2bbed073ed575b2fd4c
+    home: factoryplus.app.amrc.co.uk
+    icon: https://www.sheffield.ac.uk/themes/custom/uos/favicon.svg
+    keywords:
+    - factoryplus
+    - sheffield
+    - mqtt
+    - sparkplug
+    - iiot
+    maintainers:
+    - email: alex.godbehere@amrc.co.uk
+      name: Alex Godbehere
+    name: amrc-connectivity-stack
+    type: application
+    urls:
+    - https://amrc-factoryplus.github.io/amrc-connectivity-stack/build/amrc-connectivity-stack-2.0.0.tgz
+    version: 2.0.0
+  - apiVersion: v2
     appVersion: 2.0.0-rc.3
-    created: "2023-07-11T10:50:46.480326482Z"
+    created: "2023-07-11T11:03:16.848344263Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -59,7 +115,7 @@ entries:
     version: 2.0.0-rc.3
   - apiVersion: v2
     appVersion: v2.0.0-rc.2
-    created: "2023-07-11T10:50:46.588912577Z"
+    created: "2023-07-11T11:03:16.99222635Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -115,7 +171,7 @@ entries:
     version: v2.0.0-rc.2
   - apiVersion: v2
     appVersion: v2.0.0-rc.1
-    created: "2023-07-11T10:50:46.559801724Z"
+    created: "2023-07-11T11:03:16.961341481Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -171,7 +227,7 @@ entries:
     version: v2.0.0-rc.1
   - apiVersion: v2
     appVersion: v1.0.4-dev.4
-    created: "2023-07-11T10:50:46.530787973Z"
+    created: "2023-07-11T11:03:16.931716519Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -227,7 +283,7 @@ entries:
     version: v1.0.4-dev.4
   - apiVersion: v2
     appVersion: v1.0.3
-    created: "2023-07-11T10:50:46.505102927Z"
+    created: "2023-07-11T11:03:16.905321774Z"
     dependencies:
     - name: traefik
       repository: https://helm.traefik.io/traefik
@@ -273,4 +329,4 @@ entries:
     urls:
     - https://amrc-factoryplus.github.io/amrc-connectivity-stack/build/amrc-connectivity-stack-v1.0.3.tgz
     version: v1.0.3
-generated: "2023-07-11T10:50:46.449381727Z"
+generated: "2023-07-11T11:03:16.809292049Z"

@@ -10,11 +10,6 @@ data:
     # config file version
     apiVersion: 1
 
-    # list of datasources that should be deleted from the database
-    deleteDatasources:
-       - name: InfluxDB
-         orgId: 1
-
     # list of datasources to insert/update depending
     # what's available in the database
     datasources:

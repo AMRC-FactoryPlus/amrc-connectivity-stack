@@ -1,0 +1,25 @@
+{{ if .Values.loki.enabled }}
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: loki-ingressroute
+  namespace: default
+spec:
+  entryPoints:
+    - {{ .Values.acs.secure | ternary "websecure" "web" }}
+  routes:
+    - match: Host(`loki.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}`)
+      kind: Rule
+      middlewares:
+        - name: basic-auth
+      services:
+        - name: acs-loki
+          port: 3100
+          namespace: {{ .Release.Namespace }}
+  {{- if .Values.acs.secure }}
+  tls:
+    secretName: {{ .Values.acs.tlsSecretName | required "values.acs.tlsSecretName is required!" }}
+    domains:
+      - main: loki.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
+  {{- end -}}
+{{- end -}}

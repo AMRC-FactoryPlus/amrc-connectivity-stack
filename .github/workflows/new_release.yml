@@ -54,7 +54,7 @@ jobs:
           mv package.json.tmp package.json
 
       - name: Install Dependencies
-        run: npm ci
+        run: npm install --verbose
 
       - name: Publish Package
         run: |

@@ -59,7 +59,7 @@ kubectl create namespace factory-plus
 
 Finally, install ACS by running the following command.
 ```bash
-helm install acs amrc-connectivity-stack/amrc-connectivity-stack -f values.yaml --namespace factory-plus
+helm install acs amrc-connectivity-stack/amrc-connectivity-stack --version ^2.0.0 -f values.yaml --namespace factory-plus
 ```
 
 If all went to plan you should now have a fully functioning ACS deployment beginning to deploy to your local Kubernetes cluster. Note that it can take a few minutes to have all services operational.

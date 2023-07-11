@@ -26,7 +26,7 @@ jobs:
       - uses: actions/upload-artifact@v3
         with:
           name: new-release
-          path: build/amrc-connectivity-stack-${{ github.event.release.tag_name }}.tgz
+          path: build/amrc-connectivity-stack-${{{ github.event.release.tag_name }}#v}.tgz
 
   # This job checks out the release branch, adds the new release to the /builds folder, builds the index and commits
   # the changes, which triggers Github to release it as a new pages repo

@@ -28,6 +28,7 @@ fplus.set_service_discovery(model.find_service_url.bind(model));
 const api = await new APIv1({
     model,
     fplus,
+    internal_hostname:  process.env.HOSTNAME,
 }).init();
 
 const app = await new WebAPI({

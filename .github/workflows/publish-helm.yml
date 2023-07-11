@@ -22,7 +22,7 @@ jobs:
       - name: Package Helm chart
         run: |
           TAG=${{ github.event.release.tag_name }}
-          helm package -u -d build --version=$TAG --app-version=$TAG .
+          helm package -u -d build --version=${TAG#v} --app-version=${TAG#v} .
       - uses: actions/upload-artifact@v3
         with:
           name: new-release

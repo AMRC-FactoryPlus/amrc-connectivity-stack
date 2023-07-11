@@ -575,6 +575,11 @@ data:
           "target": {{$classDef_wildcard}}
         },
         {
+          "principal": {{$serviceAccount_directory}},
+          "permission": {{$permission_ccl_rebirth}},
+          "target": {{$classDef_wildcard}}
+        },
+        {
           "principal": {{$serviceAccount_mqtt}},
           "permission": {{$permission_auth_readACLEntry}},
           "target": {{$permissionGroup_mqtt}}

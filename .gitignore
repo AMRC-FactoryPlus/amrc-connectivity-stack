@@ -3,6 +3,9 @@
 # Vim swap
 *.swp
 
+# Local build
+config.mk
+
 # Environment
 .env
 

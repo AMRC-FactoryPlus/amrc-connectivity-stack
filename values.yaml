@@ -2,7 +2,7 @@ acs:
   # -- The organisation where ACS is being deployed
   organisation: AMRC
   # -- The base URL that services will be served from
-  baseUrl: localhost
+  baseUrl: factoryplus.myorganisation.com
   # -- Whether or not services should be served over HTTPS
   secure: true
   # -- The name of the secret holding the wildcard certificate for the above domain.
@@ -12,7 +12,7 @@ identity:
   # -- Whether or not to enable the Identity component
   enabled: true
   # -- The Kerberos realm for this Factory+ deployment.
-  realm: LOCALHOST
+  realm: FACTORYPLUS.MYORGANISATION.COM
   # -- Enable support for cross-realm authentication
   crossRealm: [ ]
   # crossRealm:

@@ -39,15 +39,15 @@ helm repo add amrc-connectivity-stack https://amrc-factoryplus.github.io/amrc-co
 helm repo update
 ```
 
-Next, create a `values.yaml` file in a sensible location on your local machine. This file will be used to configure the deployment and can contain many options for customisation and configuration (see [values](#values) for more information). At the very least, you should set the following values:
+Next, create a `values.yaml` file in a sensible location on your local machine. This file will be used to configure the deployment and can contain many options for customisation and configuration (see [values](#values) for more information). At the very least you should set the following values but remember to change them to your specific deployment:
 ```yaml
 acs:
-  baseUrl: localhost # Set this to the domain that ACS will be served from. Localhost should suffice for development.
-  organisation: AMRC # Set this to the name of your organisation. It will be used across the deployment for branding and naming.
-  secure: false # Set this to true if you want to serve ACS over HTTPS. This is recommended for production deployments but can be turned for development.
+  baseUrl: factoryplus.myorganisation.com # Set this to the domain that ACS will be served from. This should be the same as the wildcard DNS entry you created earlier.
+  organisation: MYORGANISATION # Set this to the name of your organisation. It will be used across the deployment for branding and naming.
+  secure: false # Set this to true if you want to serve ACS over HTTPS. This is recommended for production deployments but can be turned off for development.
   tlsSecretName: factoryplus-tls # Set this to the name of the secret containing the wildcard certificate for the above domain. This is only required if secure is set to true.
 identity:
-  realm: LOCALHOST # Set the identity realm for the deployment. This is used to namespace the identity server and should be unique to your deployment. It is recommended that you use the domain name in capitals for this value.
+  realm: FACTORYPLUS.MYORGANISATION.COM # Set the identity realm for the deployment. This is used to namespace the identity server and should be unique to your deployment. It is recommended that you use the baseUrl in capitals for this value.
 ```
 
 Before we install, we need to create the `factory-plus` namespace, which is where all ACS services will be deployed to. If a different namespace is chosen by changing the `-n <namespace>` on the helm install command then ensure the namespace exists before installing ACS.
@@ -60,11 +60,6 @@ kubectl create namespace factory-plus
 Finally, install ACS by running the following command.
 ```bash
 helm install acs amrc-connectivity-stack/amrc-connectivity-stack -f values.yaml --namespace factory-plus
-```
-
-Alternatively, the values can be supplied directly to the helm install command:
-```bash
-helm install acs amrc-connectivity-stack/amrc-connectivity-stack --set acs.baseUrl=localhost --set acs.organisation=AMRC --set acs.secure=false --namespace factory-plus
 ```
 
 If all went to plan you should now have a fully functioning ACS deployment beginning to deploy to your local Kubernetes cluster. Note that it can take a few minutes to have all services operational.
@@ -121,7 +116,7 @@ Production deployment does not differ greatly from development deployment, howev
 ## Values
 | Key                                       | Type   | Default | Description |
 |-------------------------------------------|--------|---------|-------------|
-| acs.baseUrl                               | string | `"localhost"` | The base URL that services will be served from |
+| acs.baseUrl                               | string | `"factoryplus.myorganisation.com"` | The base URL that services will be served from |
 | acs.organisation                          | string | `"AMRC"` | The organisation where ACS is being deployed |
 | acs.secure                                | bool   | `true` | Whether or not services should be served over HTTPS |
 | acs.tlsSecretName                         | string | `"factoryplus-tls"` | The name of the secret holding the wildcard certificate for the above domain. |
@@ -151,7 +146,7 @@ Production deployment does not differ greatly from development deployment, howev
 | identity.crossRealm                       | array  | `[]` | Enable support for cross-realm authentication |
 | identity.krbKeysOperator.image.repository | string | `"acs-krb-keys-operator"` | The repository of the KerberosKey Operator |
 | identity.krbKeysOperator.image.tag        | string | `"latest"` | The tag of the KerberosKey Operator |
-| identity.realm                            | string | `"LOCALHOST"` | The Kerberos realm for this Factory+ deployment. |
+| identity.realm                            | string | `"FACTORYPLUS.MYORGANISATION.COM"` | The Kerberos realm for this Factory+ deployment. |
 | manager.debug                             | bool   | `false` | Whether debug mode is enabled. DO NOT USE THIS IN PRODUCTION. |
 | manager.edge.registry                     | string | `"ghcr.io/amrc-factoryplus"` | The registry of the Edge Agent component |
 | manager.edge.repository                   | string | `"acs-edge"` | The repository of the Edge Agent component |

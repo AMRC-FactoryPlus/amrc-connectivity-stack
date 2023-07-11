@@ -126,3 +126,17 @@ spec:
     - HTTP/git.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
   secret: git-keytabs/server
 {{- end }}
+---
+{{- if .Values.edo.enabled }}
+apiVersion: factoryplus.app.amrc.co.uk/v1
+kind: KerberosKey
+metadata:
+  name: http.edge
+  namespace: {{ .Release.Namespace }}
+spec:
+  type: Random
+  principal: HTTP/edge.{{ .Release.Namespace }}.svc.cluster.local@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+  additionalPrincipals:
+    - HTTP/edge.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+  secret: edge-keytabs/server
+{{- end }}

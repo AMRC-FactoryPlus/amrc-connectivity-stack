@@ -172,6 +172,19 @@ git:
   # -- Possible values are either 1 to enable all possible debugging, or a comma-separated list of debug tags (the tags printed before the log lines). No logging is specified as an empty string.
   verbosity: 1
 
+edo:
+  # -- Whether or not to enable the Edge Deployment Operator (EDO) component
+  enabled: true
+  image:
+    # -- The registry of the EDO component
+    registry: ghcr.io/amrc-factoryplus
+    # -- The repository of the EDO component
+    repository: acs-edge
+    # -- The tag of the EDO component
+    tag: v1.0.0
+    # @ignore
+    pullPolicy: IfNotPresent
+
 minio:
   # -- Whether or not to enable MinIO
   enabled: true

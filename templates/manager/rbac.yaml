@@ -1,4 +1,4 @@
-{{ if .Values.manager.enabled }}
+{{- if .Values.manager.enabled }}
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -82,4 +82,12 @@ rules:
   -   apiGroups: [factoryplus.app.amrc.co.uk]
       resources: [kerberos-keys/status]
       verbs: [list, get, watch]
-{{- end -}}
+{{- end}}
+---
+{{- if .Values.edo.enabled }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: edge-deployment-operator
+{{- end }}

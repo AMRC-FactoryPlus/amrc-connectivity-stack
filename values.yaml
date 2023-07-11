@@ -157,6 +157,21 @@ warehouse:
       # @ignore
       pullPolicy: IfNotPresent
 
+git:
+  # -- Whether or not to enable the Git component
+  enabled: true
+  image:
+    # -- The registry of the Git component
+    registry: ghcr.io/amrc-factoryplus
+    # -- The repository of the Git component
+    repository: acs-git
+    # -- The tag of the Git component
+    tag: v1.0.0
+    # @ignore
+    pullPolicy: IfNotPresent
+  # -- Possible values are either 1 to enable all possible debugging, or a comma-separated list of debug tags (the tags printed before the log lines). No logging is specified as an empty string.
+  verbosity: 1
+
 minio:
   # -- Whether or not to enable MinIO
   enabled: true

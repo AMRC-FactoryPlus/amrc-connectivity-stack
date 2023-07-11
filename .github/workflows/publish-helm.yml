@@ -24,11 +24,14 @@ jobs:
           ref: ${{ github.event.release.tag_name }}
       - name: Package Helm chart
         run: |
-          helm package -u -d build --version=${TAG#v} --app-version=${TAG#v} .
+          TAG=${{ github.event.release.tag_name }}
+          VERSION=${TAG#v}
+          helm package -u -d build --version=$VERSION --app-version=$VERSION .
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
       - uses: actions/upload-artifact@v3
         with:
           name: new-release
-          path: build/amrc-connectivity-stack-${TAG#v}.tgz
+          path: build/amrc-connectivity-stack-${{ env.VERSION }}.tgz
 
   # This job checks out the release branch, adds the new release to the /builds folder, builds the index and commits
   # the changes, which triggers Github to release it as a new pages repo

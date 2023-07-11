@@ -1,6 +1,6 @@
 {
   "name": "acs-directory",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "The Directory component of the AMRC Connectivity Stack",
   "author": "AMRC",
   "license": "MIT",

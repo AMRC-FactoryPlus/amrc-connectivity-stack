@@ -14,7 +14,7 @@ identity:
   # -- The Kerberos realm for this Factory+ deployment.
   realm: LOCALHOST
   # -- Enable support for cross-realm authentication
-  crossRealm: []
+  crossRealm: [ ]
   # crossRealm:
   #   - realm: MYOTHERREALM.COM
   #     domain: myotherrealm.com
@@ -54,7 +54,7 @@ auth:
     # -- The repository of the Authorisation component
     repository: acs-auth
     # -- The tag of the Authorisation component
-    tag: v1.0.0
+    tag: v1.2.0
     # @ignore
     pullPolicy: IfNotPresent
 
@@ -153,7 +153,7 @@ warehouse:
       # -- The repository of the Warehouse component
       repository: influxdb-sparkplug-ingester
       # -- The tag of the Warehouse component
-      tag: v1.0.0
+      tag: v1.0.1
       # @ignore
       pullPolicy: IfNotPresent
 
@@ -216,11 +216,11 @@ traefik:
       enabled: false
   # -- [AZURE] Enable the below section to expose your instance of Factory+/ACS over the internet, replacing the <Value>
   # -- tags with the details of your pre-configured load balancer.
-#  service:
-#    spec:
-#      loadBalancerIP: <External IP address here>
-#    annotations:
-#      service.beta.kubernetes.io/azure-load-balancer-resource-group: <Load Balancer Resource Group here>
+  #  service:
+  #    spec:
+  #      loadBalancerIP: <External IP address here>
+  #    annotations:
+  #      service.beta.kubernetes.io/azure-load-balancer-resource-group: <Load Balancer Resource Group here>
   providers:
     kubernetesCRD:
       allowCrossNamespace: true
@@ -249,14 +249,31 @@ promtail:
 
 # @ignore
 grafana:
+  image:
+    tag: 10.0.1
   enabled: true
   persistence:
     enabled: true
+  envFromSecret: influxdb-auth
+  admin:
+    existingSecret: grafana-admin-user
+  grafana.ini:
+    auth.basic:
+      enabled: false
+    auth.proxy:
+      enabled: true
+      header_name: X-Auth-Principal
+      header_property: username
+      auto_sign_up: true
+  sidecar:
+    datasources:
+      enabled: true
+      label: grafana_datasource
+      initDatasources: true
 
 # @ignore
 sealed-secrets:
   enabled: true
-
 # @ignore
 tenant:
   tenant:
@@ -285,4 +302,12 @@ tenant:
 influxdb2:
   enabled: true
   adminUser:
-    organization: AMRC
+    organization: default
+    existingSecret: influxdb-auth
+  initScripts:
+    enabled: true
+    scripts:
+      init.sh: |+
+        #!/bin/bash
+        echo "Creating mapping for bucket ${DOCKER_INFLUXDB_INIT_BUCKET_ID} in org ${DOCKER_INFLUXDB_INIT_ORG}"
+        influx v1 dbrp create --bucket-id ${DOCKER_INFLUXDB_INIT_BUCKET_ID} --db default --rp default --default --org ${DOCKER_INFLUXDB_INIT_ORG}

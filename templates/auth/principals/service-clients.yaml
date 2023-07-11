@@ -90,3 +90,27 @@ spec:
   type: Random
   principal: sv1warehouse@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
 {{- end }}
+---
+{{- if .Values.git.enabled }}
+apiVersion: factoryplus.app.amrc.co.uk/v1
+kind: KerberosKey
+metadata:
+  name: sv1git
+  namespace: {{ .Release.Namespace }}
+spec:
+  type: Random
+  principal: sv1git@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+  secret: git-keytabs/client
+{{- end }}
+---
+{{- if .Values.edo.enabled }}
+apiVersion: factoryplus.app.amrc.co.uk/v1
+kind: KerberosKey
+metadata:
+  name: sv1edge
+  namespace: {{ .Release.Namespace }}
+spec:
+  type: Random
+  principal: sv1edge@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+  secret: edge-keytabs/client
+{{- end }}

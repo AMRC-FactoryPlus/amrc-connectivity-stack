@@ -11,7 +11,7 @@
   "author": "AMRC",
   "license": "MIT",
   "dependencies": {
-    "@amrc-factoryplus/utilities": "1.0.9-bmz1",
+    "@amrc-factoryplus/utilities": "^1.0.9",
     "rxjs": "^7.8.1"
   }
 }

@@ -53,3 +53,4 @@ dependencies:
   - name: switchboard
     version: 0.5.8
     repository: oci://ghcr.io/borchero/charts/switchboard
+    condition: switchboard.enabled

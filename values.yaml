@@ -166,11 +166,11 @@ git:
     # -- The repository of the Git component
     repository: acs-git
     # -- The tag of the Git component
-    tag: v1.0.0
+    tag: v0.0.1
     # @ignore
     pullPolicy: IfNotPresent
   # -- Possible values are either 1 to enable all possible debugging, or a comma-separated list of debug tags (the tags printed before the log lines). No logging is specified as an empty string.
-  verbosity: 1
+  verbosity: "ALL,!service,!token"
 
 edo:
   # -- Whether or not to enable the Edge Deployment Operator (EDO) component
@@ -179,11 +179,12 @@ edo:
     # -- The registry of the EDO component
     registry: ghcr.io/amrc-factoryplus
     # -- The repository of the EDO component
-    repository: acs-edge
+    repository: acs-edge-deployment
     # -- The tag of the EDO component
-    tag: v1.0.0
+    tag: v0.0.1
     # @ignore
     pullPolicy: IfNotPresent
+  verbosity: "ALL,!service,!token"
 
 minio:
   # -- Whether or not to enable MinIO

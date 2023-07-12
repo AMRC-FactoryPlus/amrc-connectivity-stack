@@ -26,21 +26,20 @@ spec:
           secret:
             secretName: edge-keytabs
         - name: data
-          persistentVolumeClaim:
-            claimName: edge-storage
+          emptyDir:
         - name: kubeseal-certs
           emptyDir:
 
       containers:
         - name: edge
-{{ include "amrc-connectivity-stack.image" .Values.edge | indent 10 }}
+{{ include "amrc-connectivity-stack.image" .Values.edo | indent 10 }}
           command: [ "/usr/bin/k5start", "-Uf", "/keytabs/client" ]
           args: ["npm", "run", "start"]
           env:
             - name: PORT
               value: "8080"
             - name: VERBOSE
-              value: {{.Values.edge.verbosity | quote | required "values.edge.verbosity is required!"}}
+              value: {{.Values.edo.verbosity | quote | required "values.edge.verbosity is required!"}}
             - name: KRB5_CONFIG
               value: /config/krb5-conf/krb5.conf
             - name: SERVER_KEYTAB
@@ -81,18 +80,4 @@ spec:
       targetPort: 8080
   selector:
     factory-plus.service: edge
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: edge-storage
-  namespace: {{ .Release.Namespace }}
-  labels:
-    component: edge
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 2Gi
 {{- end -}}

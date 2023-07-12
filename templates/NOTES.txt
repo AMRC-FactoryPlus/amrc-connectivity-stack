@@ -10,13 +10,9 @@ Ensure that you familiarise yourself with the components and concepts of Factory
 📣 Required Steps
 -------------
 
-This Chart creates a load balancer on your Kubernetes cluster that exposes all services at the subdomains listed below. If your cluster does not support LoadBalancer ingress types then you may port-forward specific services but you may need to update ConfigMap entries to point to the forwarded ports instead of using the FQDN.
+This chart includes an instance of Switchboard to automatically configure DNS and TLS for the various services in the stack. Please refer to https://github.com/borchero/switchboard for more information on how to configure this for your specific deployment.
 
-You specified {{.Values.acs.baseUrl}} as your base URL. Please ensure that you have a wildcard DNS entry configured to direct all *.{{.Values.acs.baseUrl}} requests to the load balancer.
-
-{{ if .Values.acs.secure}}
-🔒 Because secure mode is enabled, you need to ensure that your cluster has a wildcard TLS certificate (type: kubernetes.io/tls) called {{.Values.acs.tlsSecretName}} in the "default" namespace on your cluster. It must have a certificate value in the `tls.crt` key and the private key value in the `tls.key` key.
-{{end -}}
+If you would rather configure DNS & TLS manually then you can disable Switchboard by setting `switchboard.enabled` to `false` in your `values.yaml` file and creating a wildcard DNS entry configured to direct all `*.<baseURL>` requests to your Kubernetes cluster. If you have enabled `acs.secure` then you must also create a wildcard TLS secret on the cluster (type: kubernetes.io/tls) in the `default` namespace with the name `factoryplus-tls` containing the certificate value in the `tls.crt` key and the private key value in the `tls.key` key.
 
 🚀 Get Started
 -------------

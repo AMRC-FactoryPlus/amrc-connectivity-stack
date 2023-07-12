@@ -5,8 +5,6 @@ acs:
   baseUrl: factoryplus.myorganisation.com
   # -- Whether or not services should be served over HTTPS
   secure: true
-  # -- The name of the secret holding the wildcard certificate for the above domain.
-  tlsSecretName: factoryplus-tls
 
 identity:
   # -- Whether or not to enable the Identity component
@@ -339,3 +337,9 @@ influxdb2:
         #!/bin/bash
         echo "Creating mapping for bucket ${DOCKER_INFLUXDB_INIT_BUCKET_ID} in org ${DOCKER_INFLUXDB_INIT_ORG}"
         influx v1 dbrp create --bucket-id ${DOCKER_INFLUXDB_INIT_BUCKET_ID} --db default --rp default --default --org ${DOCKER_INFLUXDB_INIT_ORG}
+
+switchboard:
+  cert-manager:
+    install: true
+  external-dns:
+    install: true

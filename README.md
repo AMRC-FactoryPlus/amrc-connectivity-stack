@@ -25,9 +25,9 @@ kubectl version
 ```
 
 ### Configure DNS and TLS
-This Chart creates a load balancer on your Kubernetes cluster that exposes all services at various subdomains. Please ensure that you have a wildcard DNS entry configured to direct all `*.<baseURL>` requests to your Kubernetes cluster.
+This chart includes an instance of Switchboard to automatically configure DNS and TLS for the deployment. Please refer to the [Switchboard documentation](https://github.com/borchero/switchboard) for more information.
 
-If you have enabled `acs.secure` then you must also create a TLS secret on the cluster in the `default` namespace with the same name as the value specified in `acs.tlsSecretName`.
+If you would rather configure DNS & TLS manually then you can disable Switchboard by setting `switchboard.enabled` to `false` in your `values.yaml` file and creating a wildcard DNS entry configured to direct all `*.<baseURL>` requests to your Kubernetes cluster. If you have enabled `acs.secure` then you must also create a wildcard TLS secret on the cluster in the `default` namespace with the same name `factoryplus-tls`.
 
 ### Install ACS
 
@@ -45,7 +45,6 @@ acs:
   baseUrl: factoryplus.myorganisation.com # Set this to the domain that ACS will be served from. This should be the same as the wildcard DNS entry you created earlier.
   organisation: MYORGANISATION # Set this to the name of your organisation. It will be used across the deployment for branding and naming.
   secure: false # Set this to true if you want to serve ACS over HTTPS. This is recommended for production deployments but can be turned off for development.
-  tlsSecretName: factoryplus-tls # Set this to the name of the secret containing the wildcard certificate for the above domain. This is only required if secure is set to true.
 identity:
   realm: FACTORYPLUS.MYORGANISATION.COM # Set the identity realm for the deployment. This is used to namespace the identity server and should be unique to your deployment. It is recommended that you use the baseUrl in capitals for this value.
 ```
@@ -84,15 +83,6 @@ Finally, get the admin password for InfluxDB by running the following command an
 echo $(sudo kubectl get secret acs-influxdb2-auth -o jsonpath="{.data.admin-password}" -n {{.Release.Namespace}} | base64 --decode)
 ```
 
-## Production Deployment
-
-Production deployment does not differ greatly from development deployment, however there are a few things to note:
-
-- Ensure that you have a wildcard DNS entry configured to direct all *.<baseURL> requests to the load balancer.
-- Ensure that you have a wildcard TLS certificate for the domain specified in `baseUrl`
-- Ensure that `secure` is set to `true`
-- Only use `admin` user for disaster recovery
-
 ## Maintainers
 
 | Name           | Email                       |
@@ -119,7 +109,6 @@ Production deployment does not differ greatly from development deployment, howev
 | acs.baseUrl                               | string | `"factoryplus.myorganisation.com"` | The base URL that services will be served from |
 | acs.organisation                          | string | `"AMRC"` | The organisation where ACS is being deployed |
 | acs.secure                                | bool   | `true` | Whether or not services should be served over HTTPS |
-| acs.tlsSecretName                         | string | `"factoryplus-tls"` | The name of the secret holding the wildcard certificate for the above domain. |
 | auth.enabled                              | bool   | `true` | Whether or not to enable the Authorisation component |
 | auth.image.registry                       | string | `"ghcr.io/amrc-factoryplus"` | The registry of the Authorisation component |
 | auth.image.repository                     | string | `"acs-auth"` | The repository of the Authorisation component |

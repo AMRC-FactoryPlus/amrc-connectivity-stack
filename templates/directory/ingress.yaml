@@ -16,7 +16,7 @@ spec:
           namespace: {{ .Release.Namespace }}
   {{- if .Values.acs.secure }}
   tls:
-    secretName: {{ .Values.acs.tlsSecretName | required "values.acs.tlsSecretName is required!" }}
+    secretName: factoryplus-tls
     domains:
       - main: directory.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
   {{- end -}}

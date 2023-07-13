@@ -26,7 +26,7 @@
 {{$service_configStore := "af15f175-78a0-4e05-97c0-2a0bb82b9f3b" | quote}}
 {{$service_edo := "2706aa43-a826-441e-9cec-cd3d4ce623c2" | quote}}
 
-{{$serviceAccount_edgeDeploymentServiceAccount := "26d192cf-73c1-4c14-93cf-1e63743bab08" | quote}}
+{{$serviceRequirement_edgeDeploymentServiceAccount := "26d192cf-73c1-4c14-93cf-1e63743bab08" | quote}}
 
 {{$serviceRequirement_edgeFluxAccount := "4eeb8156-856d-4251-a4a4-4c1b2f3d3e2c" | quote}}
 {{$serviceRequirement_edgeClusterRepositories := "3a58340c-d4ec-453d-99c3-0cf6ab7d8fa9" | quote}}
@@ -75,77 +75,77 @@ data:
       "version": 1,
       "aces": [
         {
-          "principal": {{$serviceAccount_edgeDeploymentServiceAccount}},
+          "principal": {{$serviceRequirement_edgeDeploymentServiceAccount}},
           "permission": {{$permission_directory_advertiseService}},
           "target": {{$service_edo}}
         },
         {
-          "principal": {{$serviceAccount_edgeDeploymentServiceAccount}},
+          "principal": {{$serviceRequirement_edgeDeploymentServiceAccount}},
           "permission": {{$permission_auth_readACLEntry}},
           "target": {{$permissionGroup_edo_all}}
         },
         {
-          "principal": {{$serviceAccount_edgeDeploymentServiceAccount}},
+          "principal": {{$serviceRequirement_edgeDeploymentServiceAccount}},
           "permission": {{$permission_auth_manageKerberosMappings}},
           "target": {{$wildcard}}
         },
         {
-          "principal": {{$serviceAccount_edgeDeploymentServiceAccount}},
+          "principal": {{$serviceRequirement_edgeDeploymentServiceAccount}},
           "permission": {{$permission_configStore_readConfigForApp}},
           "target": {{$application_gitRepoConfiguration}}
         },
         {
-          "principal": {{$serviceAccount_edgeDeploymentServiceAccount}},
+          "principal": {{$serviceRequirement_edgeDeploymentServiceAccount}},
           "permission": {{$permission_configStore_readConfigForApp}},
           "target": {{$application_edgeClusterConfiguration}}
         },
         {
-          "principal": {{$serviceAccount_edgeDeploymentServiceAccount}},
+          "principal": {{$serviceRequirement_edgeDeploymentServiceAccount}},
           "permission": {{$permission_configStore_readConfigForApp}},
           "target": {{$application_edgeClusterTemplate}}
         },
         {
-          "principal": {{$serviceAccount_edgeDeploymentServiceAccount}},
+          "principal": {{$serviceRequirement_edgeDeploymentServiceAccount}},
           "permission": {{$permission_configStore_writeConfigForApp}},
           "target": {{$application_generalObjectInformation}}
         },
         {
-          "principal": {{$serviceAccount_edgeDeploymentServiceAccount}},
+          "principal": {{$serviceRequirement_edgeDeploymentServiceAccount}},
           "permission": {{$permission_configStore_writeConfigForApp}},
           "target": {{$application_edgeClusterConfiguration}}
         },
         {
-          "principal": {{$serviceAccount_edgeDeploymentServiceAccount}},
+          "principal": {{$serviceRequirement_edgeDeploymentServiceAccount}},
           "permission": {{$permission_configStore_manageObjects}},
           "target": {{$serviceRequirement_edgeFluxAccount}}
         },
         {
-          "principal": {{$serviceAccount_edgeDeploymentServiceAccount}},
+          "principal": {{$serviceRequirement_edgeDeploymentServiceAccount}},
           "permission": {{$permission_configStore_manageObjects}},
           "target": {{$classDef_edgeCluster}}
         },
         {
-          "principal": {{$serviceAccount_edgeDeploymentServiceAccount}},
+          "principal": {{$serviceRequirement_edgeDeploymentServiceAccount}},
           "permission": {{$permission_auth_manageACLsPerPermission}},
           "target": {{$permission_git_pullFromRepo}}
         },
         {
-          "principal": {{$serviceAccount_edgeDeploymentServiceAccount}},
+          "principal": {{$serviceRequirement_edgeDeploymentServiceAccount}},
           "permission": {{$permission_auth_manageGroups}},
           "target": {{$serviceRequirement_edgeFluxRoles}}
         },
         {
-          "principal": {{$serviceAccount_edgeDeploymentServiceAccount}},
+          "principal": {{$serviceRequirement_edgeDeploymentServiceAccount}},
           "permission": {{$permission_git_createRepo}},
           "target": {{$serviceRequirement_edgeClusterRepositories}}
         },
         {
-          "principal": {{$serviceAccount_edgeDeploymentServiceAccount}},
+          "principal": {{$serviceRequirement_edgeDeploymentServiceAccount}},
           "permission": {{$permission_git_pullFromRepo}},
           "target": {{$serviceRequirement_edgeClusterRepositories}}
         },
         {
-          "principal": {{$serviceAccount_edgeDeploymentServiceAccount}},
+          "principal": {{$serviceRequirement_edgeDeploymentServiceAccount}},
           "permission": {{$permission_git_pushToRepo}},
           "target": {{$serviceRequirement_edgeClusterRepositories}}
         }
@@ -201,7 +201,7 @@ data:
           {{$permission_edge_manageSecrets}}
         ],
         {{$classDef_serviceRequirement}}: [
-          {{$serviceAccount_edgeDeploymentServiceAccount}},
+          {{$serviceRequirement_edgeDeploymentServiceAccount}},
           {{$serviceRequirement_edgeClusterRepositories}},
           {{$serviceRequirement_edgeFluxAccount}},
           {{$serviceRequirement_edgeFluxRoles}}
@@ -233,7 +233,7 @@ data:
           {{$permission_edge_manageSecrets}}: {
             "name": "Edge: Manage secrets"
           },
-          {{$serviceAccount_edgeDeploymentServiceAccount}}: {
+          {{$serviceRequirement_edgeDeploymentServiceAccount}}: {
             "name": "Edge Deployment service account"
           },
           {{$serviceRequirement_edgeClusterRepositories}}: {

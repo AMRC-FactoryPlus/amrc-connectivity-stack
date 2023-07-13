@@ -138,5 +138,5 @@ spec:
   principal: HTTP/edge.{{ .Release.Namespace }}.svc.cluster.local@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
   additionalPrincipals:
     - HTTP/edge.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
-  secret: edge-keytabs/server
+  secret: edo-keytabs/server
 {{- end }}

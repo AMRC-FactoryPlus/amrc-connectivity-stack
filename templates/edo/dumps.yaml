@@ -64,6 +64,7 @@
 {{$clientRole_edgeFlux := "34ee0e7f-8c9c-4f6d-aad7-4ed700bc77da" | quote}}
 
 {{$gitRepoConfiguration_sharedFluxSystem := "8a3c0860-9e41-48b8-b02f-780a0e582be6" | quote}}
+{{$edgeClusterTemplate_cellGateway := "71648ac2-f2a6-4777-92ac-f7852be68efc" | quote}}
 
 
 
@@ -315,9 +316,12 @@ data:
           {{$clientRole_edgeFlux}}: {
             "name": "Role: Edge Flux"
           },
-            {{$gitRepoConfiguration_sharedFluxSystem}}: {
-                "name": "Git repo shared/flux-system"
-            }
+          {{$gitRepoConfiguration_sharedFluxSystem}}: {
+              "name": "Git repo shared/flux-system"
+          },
+          {{$edgeClusterTemplate_cellGateway}}: {
+              "name": "Cell gateway"
+          }
         },
         {{$application_applicationConfigSchema}}: {
           {{$application_edgeClusterConfiguration}}: {
@@ -460,6 +464,33 @@ data:
             "path": "shared/flux-system"
           }
         },
+        {{$application_edgeClusterTemplate}}: {
+          {{$edgeClusterTemplate_cellGateway}}: {
+            "flux": {
+                "name": "Edge flux: %n",
+                "class": "97756c9a-38e6-4238-b78c-3df6f227a6c9",
+                "groups": [
+                    "34ee0e7f-8c9c-4f6d-aad7-4ed700bc77da"
+                ],
+                "username": "op1flux/%n"
+            },
+            "name": "cell-gateway",
+            "cluster": {
+                "namespace": "fplus-edge"
+            },
+            "repository": {
+                "group": "cluster",
+                "links": {
+                    "8a3c0860-9e41-48b8-b02f-780a0e582be6": {
+                        "branch": "main",
+                        "interval": "3h0m0s"
+                    }
+                },
+                "branch": "main",
+                "interval": "5m0s"
+            }
+        }
+        }
       }
     }
 

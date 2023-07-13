@@ -84,6 +84,16 @@ data:
     {
       "service": {{$service_authorisation}},
       "version": 1,
+      "principals": [
+        {
+          "uuid": {{$serviceAccount_edo}},
+          "kerberos": "sv1edo@{{ .Values.identity.realm }}"
+        },
+        {
+          "uuid": {{$serviceAccount_git}},
+          "kerberos": "sv1git@{{ .Values.identity.realm }}"
+        },
+      ]
       "aces": [
         {
           "principal": {{$serviceRequirement_edgeDeploymentServiceAccount}},

@@ -63,6 +63,8 @@
 
 {{$clientRole_edgeFlux := "34ee0e7f-8c9c-4f6d-aad7-4ed700bc77da" | quote}}
 
+{{$gitRepoConfiguration_sharedFluxSystem := "8a3c0860-9e41-48b8-b02f-780a0e582be6" | quote}}
+
 
 
 # Auth EDO Dumps
@@ -312,7 +314,10 @@ data:
           },
           {{$clientRole_edgeFlux}}: {
             "name": "Role: Edge Flux"
-          }
+          },
+            {{$gitRepoConfiguration_sharedFluxSystem}}: {
+                "name": "Git repo shared/flux-system"
+            }
         },
         {{$application_applicationConfigSchema}}: {
           {{$application_edgeClusterConfiguration}}: {
@@ -443,7 +448,18 @@ data:
               }
             }
           }
-        }
+        },
+        {{$application_gitRepoConfiguration}}: {
+          {{$gitRepoGroup_remoteClusters}}: {
+              "path": "cluster"
+          },
+          {{$gitRepoGroup_sharedRepositories}}: {
+              "path": "shared"
+          },
+          {{$gitRepoConfiguration_sharedFluxSystem}}: {
+            "path": "shared/flux-system"
+          }
+        },
       }
     }
 

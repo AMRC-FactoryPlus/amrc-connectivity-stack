@@ -9,12 +9,15 @@
 {{$wildcard := "00000000-0000-0000-0000-000000000000" | quote}}
 
 {{$classDef_edgeCluster := "f24d354d-abc1-4e32-98e1-0667b3e40b61" | quote}}
+{{$classDef_edgeClusterAccount := "97756c9a-38e6-4238-b78c-3df6f227a6c9" | quote}}
 {{$classDef_edgeClusterTemplate := "f9be0334-0ff7-43d3-9d8a-188d3e4d472b" | quote}}
 {{$classDef_application := "d319bd87-f42b-4b66-be4f-f82ff48b93f0" | quote}}
 {{$classDef_serviceFunction := "265d481f-87a7-4f93-8fc6-53fa64dc11bb" | quote}}
+{{$classDef_clientRole := "1c567e3c-5519-4418-8682-6086f22fbc13" | quote}}
 {{$classDef_permissionGroup := "ac0d5288-6136-4ced-a372-325fbbcdd70d" | quote}}
 {{$classDef_permission := "8ae784bb-c4b5-4995-9bf6-799b3c7f21ad" | quote}}
 {{$classDef_serviceRequirement := "b419cbc2-ab0f-4311-bd9e-f0591f7e88cb" | quote}}
+{{$classDef_gitRepoGroup := "b03d4dfe-7e78-4252-8e62-af594cf316c9" | quote}}
 
 {{$application_gitRepoConfiguration := "38d62a93-b6b4-4f63-bad4-d433e3eaff29" | quote}}
 {{$application_edgeClusterConfiguration := "bdb13634-0b3d-4e38-a065-9d88c12ee78d" | quote}}
@@ -27,11 +30,10 @@
 {{$service_edo := "2706aa43-a826-441e-9cec-cd3d4ce623c2" | quote}}
 
 {{$serviceRequirement_edgeDeploymentServiceAccount := "26d192cf-73c1-4c14-93cf-1e63743bab08" | quote}}
-
-{{$serviceRequirement_edgeFluxAccount := "4eeb8156-856d-4251-a4a4-4c1b2f3d3e2c" | quote}}
+{{$serviceRequirement_gitServiceAccount := "a461ef62-0560-4be2-8d97-1a56916ce4f8" | quote}}
+{{$serviceRequirement_edgeFluxAccounts := "4eeb8156-856d-4251-a4a4-4c1b2f3d3e2c" | quote}}
 {{$serviceRequirement_edgeClusterRepositories := "3a58340c-d4ec-453d-99c3-0cf6ab7d8fa9" | quote}}
 {{$serviceRequirement_edgeFluxRoles := "8cd08563-7c3c-44fd-af4d-15c0fa6dadcb" | quote}}
-{{$serviceRequirement_gitServiceAccount := "a461ef62-0560-4be2-8d97-1a56916ce4f8" | quote}}
 
 {{$permission_directory_advertiseService := "4db4c39a-f18d-4e83-aeb0-5af2c14ddc2b" | quote}}
 
@@ -52,6 +54,15 @@
 {{$permission_edge_manageSecrets := "07fba27a-0d01-4c07-875b-d25345261d3a" | quote}}
 
 {{$permissionGroup_edo_all := "9e07fd33-6400-4662-92c4-4dff1f61f990" | quote}}
+
+{{$serviceAccount_git := "626df296-8156-4c67-8aed-aac70161aa8b" | quote}}
+{{$serviceAccount_edo := "127cde3c-773a-4f61-b0ba-7412a2695253" | quote}}
+
+{{$gitRepoGroup_remoteClusters := "736697bd-3637-4340-8d8a-f4a457d6f483" | quote}}
+{{$gitRepoGroup_sharedRepositories := "9c16e08a-a659-4f02-877f-2949dc4ec7b9" | quote}}
+
+{{$clientRole_edgeFlux := "34ee0e7f-8c9c-4f6d-aad7-4ed700bc77da" | quote}}
+
 
 
 # Auth EDO Dumps
@@ -117,7 +128,7 @@ data:
         {
           "principal": {{$serviceRequirement_edgeDeploymentServiceAccount}},
           "permission": {{$permission_configStore_manageObjects}},
-          "target": {{$serviceRequirement_edgeFluxAccount}}
+          "target": {{$serviceRequirement_edgeFluxAccounts}}
         },
         {
           "principal": {{$serviceRequirement_edgeDeploymentServiceAccount}},
@@ -148,13 +159,34 @@ data:
           "principal": {{$serviceRequirement_edgeDeploymentServiceAccount}},
           "permission": {{$permission_git_pushToRepo}},
           "target": {{$serviceRequirement_edgeClusterRepositories}}
-        }
+        },
+        {
+          "principal": {{$clientRole_edgeFlux}},
+          "permission": {{$permission_git_pullFromRepo}},
+          "target": {{$gitRepoGroup_sharedRepositories}}
+        },
       ],
       "groups": {
           {{$permissionGroup_edo_all}}: [
             {{$permission_edge_manageClusters}},
             {{$permission_edge_manageSecrets}}
-          ]
+          ],
+
+          {{$serviceRequirement_gitServiceAccount}}: [
+            {{$serviceAccount_git}}
+          ],
+          {{$serviceRequirement_edgeDeploymentServiceAccount}}: [
+            {{$serviceAccount_edo}}
+          ],
+          {{$serviceRequirement_edgeClusterRepositories}}: [
+            {{$gitRepoGroup_remoteClusters}}
+          ],
+          {{$serviceRequirement_edgeFluxAccounts}}: [
+            {{$classDef_edgeClusterAccount}}
+          ],
+          {{$serviceRequirement_edgeFluxRoles}}: [
+            {{$clientRole_edgeFlux}}
+          ],
       }
     }
 
@@ -187,6 +219,7 @@ data:
       ],
       "objects": {
         {{$classDef_application}}: [
+          {{$application_gitRepoConfiguration}},
           {{$application_edgeClusterConfiguration}},
           {{$application_edgeClusterTemplate}}
         ],
@@ -203,8 +236,15 @@ data:
         {{$classDef_serviceRequirement}}: [
           {{$serviceRequirement_edgeDeploymentServiceAccount}},
           {{$serviceRequirement_edgeClusterRepositories}},
-          {{$serviceRequirement_edgeFluxAccount}},
+          {{$serviceRequirement_edgeFluxAccounts}},
           {{$serviceRequirement_edgeFluxRoles}}
+        ],
+        {{$classDef_gitRepoGroup}}: [
+          {{$gitRepoGroup_remoteClusters}}
+          {{$gitRepoGroup_sharedRepositories}}
+        ],
+        {{$classDef_clientRole}}: [
+          {{$clientRole_edgeFlux}}
         ]
       },
       "configs": {
@@ -239,11 +279,29 @@ data:
           {{$serviceRequirement_edgeClusterRepositories}}: {
             "name": "Edge cluster repositories"
           },
-          {{$serviceRequirement_edgeFluxAccount}}: {
+          {{$serviceRequirement_edgeFluxAccounts}}: {
             "name": "Edge flux accounts"
           },
           {{$serviceRequirement_edgeFluxRoles}}: {
             "name": "Edge flux roles"
+          },
+          {{$classDef_gitRepoGroup}}: {
+            "name": "Git repository group"
+          },
+          {{$application_gitRepoConfiguration}}: {
+            "name": "Git repository configuration"
+          },
+          {{$gitRepoGroup_sharedRepositories}}: {
+            "name": "Shared repositories"
+          },
+          {{$gitRepoGroup_remoteClusters}}: {
+            "name": "Remote clusters"
+          },
+          {{$classDef_edgeClusterAccount}}: {
+            "name": "Edge cluster account"
+          },
+          {{$clientRole_edgeFlux}}: {
+            "name": "Role: Edge Flux"
           }
         },
         {{$application_applicationConfigSchema}}: {

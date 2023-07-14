@@ -112,5 +112,5 @@ metadata:
 spec:
   type: Random
   principal: sv1edge@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
-  secret: edge-keytabs/client
+  secret: edo-keytabs/client
 {{- end }}

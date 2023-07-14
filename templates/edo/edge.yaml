@@ -2,20 +2,20 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: edge
+  name: edge-deployment-operator
   namespace: {{ .Release.Namespace }}
   labels:
-    component: edge
+    component: edge-deployment-operator
 spec:
   replicas: 1
   selector:
     matchLabels:
-      component: edge
+      component: edge-deployment-operator
   template:
     metadata:
       labels:
-        component: edge
-        factory-plus.service: edge
+        component: edge-deployment-operator
+        factory-plus.service: edge-deployment-operator
     spec:
       serviceAccountName: edge-deployment-operator
       volumes:
@@ -24,14 +24,14 @@ spec:
             name: krb5-conf
         - name: keytabs
           secret:
-            secretName: edge-keytabs
+            secretName: edo-keytabs
         - name: data
           emptyDir:
         - name: kubeseal-certs
           emptyDir:
 
       containers:
-        - name: edge
+        - name: edge-deployment-operator
 {{ include "amrc-connectivity-stack.image" .Values.edo | indent 10 }}
           command: [ "/usr/bin/k5start", "-Uf", "/keytabs/client" ]
           args: ["npm", "run", "start"]
@@ -39,23 +39,23 @@ spec:
             - name: PORT
               value: "8080"
             - name: VERBOSE
-              value: {{.Values.edo.verbosity | quote | required "values.edge.verbosity is required!"}}
+              value: {{.Values.edo.verbosity | quote | required "values.edo.verbosity is required!"}}
             - name: KRB5_CONFIG
               value: /config/krb5-conf/krb5.conf
             - name: SERVER_KEYTAB
               value: /keytabs/server
             - name: HOSTNAME
-              value: edge.{{ .Release.Namespace }}.svc.cluster.local
+              value: edo.{{ .Release.Namespace }}.svc.cluster.local
             - name: REALM
               value: {{ .Values.identity.realm | required "values.identity.realm is required!" }}
             - name: GIT_CHECKOUTS_DIR
               value: /data
             - name: GIT_EMAIL
-              value: sv1edge@{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
+              value: sv1edo@{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
             - name: KUBESEAL_TEMP
               value: /cert
             - name: HTTP_API_URL
-              value: http://edge.{{ .Release.Namespace }}.svc.cluster.local
+              value: http://edo.{{ .Release.Namespace }}.svc.cluster.local
             - name: DIRECTORY_URL
               value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
           volumeMounts:
@@ -71,7 +71,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: edge
+  name: edge-deployment-operator
   namespace: {{ .Release.Namespace }}
 spec:
   ports:
@@ -79,5 +79,5 @@ spec:
       port: 80
       targetPort: 8080
   selector:
-    factory-plus.service: edge
+    factory-plus.service: edge-deployment-operator
 {{- end -}}

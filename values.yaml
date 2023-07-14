@@ -116,6 +116,7 @@ manager:
     repository: acs-edge
     # -- The tag of the Edge Agent component
     tag: v1.0.5
+
   meilisearch:
     # -- The key that the manager uses to connect to the Meilisearch search engine
     key: masterKey
@@ -175,6 +176,7 @@ git:
 edo:
   # -- Whether or not to enable the Edge Deployment Operator (EDO) component
   enabled: true
+  verbosity: "1"
   image:
     # -- The registry of the EDO component
     registry: ghcr.io/amrc-factoryplus

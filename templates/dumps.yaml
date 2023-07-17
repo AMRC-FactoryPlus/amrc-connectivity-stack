@@ -16,12 +16,15 @@
 {{$classDef_userGroup := "f1fabdd1-de90-4399-b3da-ccf6c2b2c08b" | quote}}
 {{$classDef_cellGateway := "00da3c0b-f62b-4761-a689-39ad0c33f864" | quote}}
 {{$classDef_softGateway := "5bee4d24-32e1-44f8-b953-1f86ff4b3e87" | quote}}
+{{$classDef_gitRepoGroup := "b03d4dfe-7e78-4252-8e62-af594cf316c9" | quote}}
 
 {{$application_objectRegistration := "cb40bed5-49ad-4443-a7f5-08c75009da8f" | quote}}
 {{$application_generalObjectInformation := "64a8bfa9-7772-45c4-9d1a-9e6290690957" | quote}}
+{{$application_applicationConfigSchema := "dbd8a535-52ba-4f6e-b4f8-9b71aefe09d3" | quote}}
 {{$application_mqttPermissionTemplate := "1266ddf1-156c-4266-9808-d6949418b185" | quote}}
 {{$application_sparkplugAddressInformation := "8e32801b-f35a-4cbf-a5c3-2af64d3debd7" | quote}}
 {{$application_commandEscalation := "60e99f28-67fe-4344-a6ab-b1edb8b8e810" | quote}}
+{{$application_gitRepoConfiguration := "38d62a93-b6b4-4f63-bad4-d433e3eaff29" | quote}}
 
 {{$service_configStore := "af15f175-78a0-4e05-97c0-2a0bb82b9f3b" | quote}}
 {{$service_commandEscalation := "78ea7071-24ac-4916-8351-aa3e549d8ccd" | quote}}
@@ -29,6 +32,9 @@
 {{$service_authorisation := "cab2642a-f7d9-42e5-8845-8f35affe1fd4" | quote}}
 {{$service_mqtt := "feb27ba3-bd2c-4916-9269-79a61ebc4a47" | quote}}
 {{$service_warehouse := "a8e5a73f-2dd1-4cda-8e46-bc6cedb14269" | quote}}
+{{$service_git := "7adf4db0-2e7b-4a68-ab9d-376f4c5ce14b" | quote}}
+
+{{$serviceRequirement_gitServiceAccount := "a461ef62-0560-4be2-8d97-1a56916ce4f8" | quote}}
 
 {{$permission_auth_manageKerberosMappings := "327c4cc8-9c46-4e1e-bb6b-257ace37b0f6" | quote}}
 {{$permission_auth_readEffectivePermissions := "35252562-51e5-4dd8-84cd-ba0fafa62669" | quote}}
@@ -94,6 +100,7 @@
 {{$serviceAccount_directory := "5cc3b068-938f-4bb2-8ceb-64338a02fbeb" | quote}}
 {{$serviceAccount_manager := "2340e706-1280-420c-84a6-016547b55e95" | quote}}
 {{$serviceAccount_mqtt := "2f42daeb-4521-4522-8e19-85dfb73db88e" | quote}}
+{{$serviceAccount_git := "626df296-8156-4c67-8aed-aac70161aa8b" | quote}}
 {{$user_admin := "d53f476a-29dd-4d79-b614-5b7fe9bc8acf" | quote}}
 
 {{ if .Values.configdb.enabled }}
@@ -520,6 +527,106 @@ data:
         }
       }
     }
+  # This dump is copied in directly from the acs-git repo. It sets up
+  # entries as required by the service implementation. This does not use
+  # the UUID variables as these entries are not maintained here.
+  git: |
+    {
+      "service": "af15f175-78a0-4e05-97c0-2a0bb82b9f3b",
+      "version": 1,
+      "classes": [
+        "d25f2afc-1ab8-4d27-b51b-d02314624e3e",
+        "b03d4dfe-7e78-4252-8e62-af594cf316c9",
+        "ac0d5288-6136-4ced-a372-325fbbcdd70d",
+        "8ae784bb-c4b5-4995-9bf6-799b3c7f21ad",
+        "b419cbc2-ab0f-4311-bd9e-f0591f7e88cb"
+      ],
+      "objects": {
+        "265d481f-87a7-4f93-8fc6-53fa64dc11bb": [
+          "7adf4db0-2e7b-4a68-ab9d-376f4c5ce14b"
+        ],
+        "d319bd87-f42b-4b66-be4f-f82ff48b93f0": [
+          "38d62a93-b6b4-4f63-bad4-d433e3eaff29",
+          "dbd8a535-52ba-4f6e-b4f8-9b71aefe09d3"
+        ],
+        "ac0d5288-6136-4ced-a372-325fbbcdd70d": [
+          "c0c55c78-116e-4526-8ff4-e4595251f76c"
+        ],
+        "8ae784bb-c4b5-4995-9bf6-799b3c7f21ad": [
+          "3668660f-f949-4657-be76-21967144c1a2",
+          "55870092-91b6-4d5e-828f-7637d080bf1c",
+          "12ecb694-b4b9-4d2a-927e-d100019f7ebe",
+          "b2d8d437-5060-4202-bcc2-bd2beda09651"
+        ],
+        "b419cbc2-ab0f-4311-bd9e-f0591f7e88cb": [
+          "a461ef62-0560-4be2-8d97-1a56916ce4f8"
+        ]
+      },
+      "configs": {
+        "64a8bfa9-7772-45c4-9d1a-9e6290690957": {
+          "7adf4db0-2e7b-4a68-ab9d-376f4c5ce14b": {
+            "name": "Git hosting"
+          },
+          "38d62a93-b6b4-4f63-bad4-d433e3eaff29": {
+            "name": "Git repository configuration"
+          },
+          "c0c55c78-116e-4526-8ff4-e4595251f76c": {
+            "name": "Git permissions"
+          },
+          "3668660f-f949-4657-be76-21967144c1a2": {
+            "name": "Git: create repo"
+          },
+          "55870092-91b6-4d5e-828f-7637d080bf1c": {
+            "name": "Git: delete repo"
+          },
+          "12ecb694-b4b9-4d2a-927e-d100019f7ebe": {
+            "name": "Git: pull from repo"
+          },
+          "b2d8d437-5060-4202-bcc2-bd2beda09651": {
+            "name": "Git: push to repo"
+          },
+          "a461ef62-0560-4be2-8d97-1a56916ce4f8": {
+            "name": "Git hosting service account"
+          }
+        },
+        "dbd8a535-52ba-4f6e-b4f8-9b71aefe09d3": {
+          "38d62a93-b6b4-4f63-bad4-d433e3eaff29": {
+            "type": "object",
+            "required": [
+              "path"
+            ],
+            "properties": {
+              "path": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  # This is the ACS-specific configuration of the git service. XXX There
+  # is redundency here to make the dump self-contained. This needs
+  # fixing in the ConfigDB dump-loading code.
+  git-acs: |
+    {
+      "service": {{$service_configStore}},
+      "version": 1,
+      "classes": [
+        {{$classDef_serviceAccount}}
+      ],
+      "objects": {
+        {{$classDef_serviceAccount}}: [
+          {{$serviceAccount_git}}
+        ]
+      },
+      "configs": {
+        {{$application_generalObjectInformation}}: {
+          {{$serviceAccount_git}}: {
+            "name": "Git repository server"
+          }
+        }
+      }
+    }
 {{end}}{{/* configdb.enabled */}}
 ---
 {{ if .Values.auth.enabled }}
@@ -749,5 +856,66 @@ data:
           "kerberos": "sv1warehouse@{{ .Values.identity.realm }}"
         }
       ]
+    }
+  # This is copied directly from the acs-git repo and so doesn't use
+  # UUID variables.
+  git: |
+    {
+      "service": "cab2642a-f7d9-42e5-8845-8f35affe1fd4",
+      "version": 1,
+      "aces": [
+        {
+          "principal": "a461ef62-0560-4be2-8d97-1a56916ce4f8",
+          "permission": "4db4c39a-f18d-4e83-aeb0-5af2c14ddc2b",
+          "target": "7adf4db0-2e7b-4a68-ab9d-376f4c5ce14b"
+        },
+        {
+          "principal": "a461ef62-0560-4be2-8d97-1a56916ce4f8",
+          "permission": "ba566181-0e8a-405b-b16e-3fb89130fbee",
+          "target": "c0c55c78-116e-4526-8ff4-e4595251f76c"
+        },
+        {
+          "principal": "a461ef62-0560-4be2-8d97-1a56916ce4f8",
+          "permission": "f0b7917b-d475-4888-9d5a-2af96b3c26b6",
+          "target": "d25f2afc-1ab8-4d27-b51b-d02314624e3e"
+        },
+        {
+          "principal": "a461ef62-0560-4be2-8d97-1a56916ce4f8",
+          "permission": "4a339562-cd57-408d-9d1a-6529a383ea4b",
+          "target": "38d62a93-b6b4-4f63-bad4-d433e3eaff29"
+        },
+        {
+          "principal": "a461ef62-0560-4be2-8d97-1a56916ce4f8",
+          "permission": "6c799ccb-d2ad-4715-a2a7-3c8728d6c0bf",
+          "target": "38d62a93-b6b4-4f63-bad4-d433e3eaff29"
+        },
+        {
+          "principal": "a461ef62-0560-4be2-8d97-1a56916ce4f8",
+          "permission": "4a339562-cd57-408d-9d1a-6529a383ea4b",
+          "target": "64a8bfa9-7772-45c4-9d1a-9e6290690957"
+        },
+        {
+          "principal": "a461ef62-0560-4be2-8d97-1a56916ce4f8",
+          "permission": "6c799ccb-d2ad-4715-a2a7-3c8728d6c0bf",
+          "target": "64a8bfa9-7772-45c4-9d1a-9e6290690957"
+        }
+      ]
+    }
+  # This is the ACS-specific configuration of the git service.
+  git-acs: |
+    {
+      "service": {{$service_authorisation}},
+      "version": 1,
+      "principals": [
+        {
+          "uuid": {{$serviceAccount_git}},
+          "kerberos": "sv1git@{{ .Values.identity.realm }}"
+        }
+      ],
+      "groups": {
+          {{$serviceRequirement_gitServiceAccount}}: [
+            {{$serviceAccount_git}}
+          ]
+      }
     }
 {{end}}{{/* auth.enabled */}}

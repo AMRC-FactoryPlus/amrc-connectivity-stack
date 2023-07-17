@@ -1,5 +1,4 @@
-# Only run this if the ConfigMaps don't already exist
-
+{{ if false }}
 # ====================================================
 # Ensure that well-known UUIDs are used where required
 # ----------------------------------------------------
@@ -203,8 +202,8 @@ data:
       }
     }
 
-{{end}}
-{{end}}
+{{end}}{{/* auth.enabled and edo.enabled */}}
+{{end}}{{/* lookup ConfigMap */}}
 
 
 # ConfigDB EDO Dumps
@@ -494,5 +493,6 @@ data:
       }
     }
 
-{{end}}
-{{end}}
+{{end}}{{/* configdb.enabled and edo.enabled */}}
+{{end}}{{/* not lookup ConfigMap */}}
+{{end}}{{/* false */}}

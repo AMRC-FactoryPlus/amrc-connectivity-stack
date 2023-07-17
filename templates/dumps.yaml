@@ -1,6 +1,3 @@
-# Only run this if the ConfigMaps don't already exist
-{{- if and (not (lookup "v1" "ConfigMap" .Release.Namespace "configdb-json-dumps")) (not (lookup "v1" "ConfigMap" .Release.Namespace "auth-json-dumps")) }}
-
 # ====================================================
 # Ensure that well-known UUIDs are used where required
 # ----------------------------------------------------
@@ -73,7 +70,6 @@
 {{$permissionGroup_directory := "58b5da47-d098-44f7-8c1d-6e4bd800e718" | quote}}
 {{$permissionGroup_commands := "9584ee09-a35a-4278-bc13-21a8be1f007c" | quote}}
 
-
 {{$role_administrator := "4c09402f-9923-4c82-a6f2-02bda21aace4" | quote}}
 {{$role_commandEscalation := "dbd0c099-6c59-4bc6-aa92-4ba8a9b543f4" | quote}}
 {{$role_edgeNode := "87e4a5b7-9a89-4796-a216-39666a47b9d2" | quote}}
@@ -83,6 +79,14 @@
 {{$role_manager := "29b569d4-ab5d-40d2-b442-d556d531b25e" | quote}}
 {{$role_warehouse := "6958c812-fbe2-4e6c-b997-6f850b89f679" | quote}}
 
+{{$userGroup_administrators := "10fc06b7-02f5-45f1-b419-a486b6bc13ba" | quote}}
+
+# XXX These are currently all fixed UUIDs which will end up identical
+# between installations. This is incorrect: these represent the accounts
+# created in the local realm, and different accounts in different realms
+# should have different UUIDs. There was originally logic here in the
+# Helm chart to generate these unique UUIDs, but this turned out to be
+# difficult to manage across ACS upgrades.
 {{$serviceAccount_authorisation := "1e1989ab-14e4-42bd-8171-495230acc406" | quote}}
 {{$serviceAccount_commandEscalation := "23d4e8f9-76c0-49d5-addc-00b6ac05ee58" | quote}}
 {{$serviceAccount_configStore := "36861e8d-9152-40c4-8f08-f51c2d7e3c25" | quote}}
@@ -90,15 +94,7 @@
 {{$serviceAccount_directory := "5cc3b068-938f-4bb2-8ceb-64338a02fbeb" | quote}}
 {{$serviceAccount_manager := "2340e706-1280-420c-84a6-016547b55e95" | quote}}
 {{$serviceAccount_mqtt := "2f42daeb-4521-4522-8e19-85dfb73db88e" | quote}}
-
-# ================================================
-# Generate unique UUIDs for each instance deployed
-# ================================================
-
-{{$user_admin := uuidv4 | quote}}
-
-{{$userGroup_administrators := uuidv4 | quote}}
-
+{{$user_admin := "d53f476a-29dd-4d79-b614-5b7fe9bc8acf" | quote}}
 
 {{ if .Values.configdb.enabled }}
 apiVersion: v1
@@ -108,10 +104,6 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     component: configdb
-  annotations:
-    "helm.sh/hook": pre-install
-    "helm.sh/hook-weight": "20"
-    "helm.sh/resource-policy": keep
 data:
   # Pre-seed required
   bootstrap: |
@@ -528,7 +520,7 @@ data:
         }
       }
     }
-{{end}}
+{{end}}{{/* configdb.enabled */}}
 ---
 {{ if .Values.auth.enabled }}
 apiVersion: v1
@@ -536,10 +528,6 @@ kind: ConfigMap
 metadata:
   name: auth-json-dumps
   namespace: {{ .Release.Namespace }}
-  annotations:
-    "helm.sh/hook": pre-install
-    "helm.sh/hook-weight": "20"
-    "helm.sh/resource-policy": keep
   labels:
     component: auth
 data:
@@ -762,5 +750,4 @@ data:
         }
       ]
     }
-{{end}}
-{{end}}
+{{end}}{{/* auth.enabled */}}

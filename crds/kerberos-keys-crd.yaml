@@ -28,6 +28,9 @@ spec:
                 -   name: SealWith
                     jsonPath: ".spec.sealWith"
                     type: string
+                -   name: Cluster
+                    jsonPath: ".spec.cluster"
+                    type: string
             schema:
                 openAPIV3Schema:
                     type: object
@@ -35,6 +38,11 @@ spec:
                     properties:
                         spec:
                             type: object
+                            x-kubernetes-validations:
+                                - rule: "self.type in ['Random', 'Disabled'] || !has(self.additionalPrincipals)"
+                                - rule: "self.type in ['Random', 'Disabled'] || !has(self.keepOldKeys)"
+                                - rule: "has(self.secret) || !(has(self.sealWith) || has(self.cluster))"
+                                - rule: "has(self.secret) || self.type in ['Disabled', 'Random', 'Password', 'PresetPassword']"
                             required: [type, principal]
                             properties:
                                 type:
@@ -43,10 +51,9 @@ spec:
                                         will be recorded as a keytab in the keytabs secret. Password generates
                                         a random (machine) password and records it in the passwords secret.
                                         PresetPassword expects a password to have already been recorded in the
-                                        passwords secret; this password will be used as-is. HumanPassword
-                                        generates a password for a human user.
+                                        passwords secret; this password will be used as-is. 
                                     type: string
-                                    enum: [Random, Password, PresetPassword, HumanPassword]
+                                    enum: [Disabled, Random, Password, PresetPassword, Trust, PresetTrust]
                                 principal:
                                     description: The Kerberos principal name.
                                     type: string
@@ -57,11 +64,9 @@ spec:
                                     type: array
                                     items:
                                         type: string
-                                email:
-                                    description: >
-                                        The human user's email address, for automatic password changes.
-                                    type: string
-                                    format: email
+                                keepOldKeys:
+                                    description: Keep old keys available in the keytab.
+                                    type: boolean
                                 secret:
                                     description: >
                                         The name of the secret and key to store the keytab/password
@@ -85,5 +90,25 @@ spec:
                                         object.
                                     type: string
                                     pattern: "^[a-z0-9.-]+/[a-zA-Z0-9._-]+$"
+                                cluster:
+                                    description: >
+                                        The remote cluster to send the secret to. The secret itself
+                                        will be handed over to the Edge Deployment operator for
+                                        transfer to the remote cluster.
+                                    type: object
+                                    required: [uuid]
+                                    properties:
+                                        uuid:
+                                            description: The cluster UUID.
+                                            type: string
+                                            format: uuid
+                                        namespace:
+                                            description: >
+                                                The namespace to seal the secret into. Defaults to
+                                                the cluster default namespace from the ConfigDB.
+                                            type: string
+                        status:
+                            type: object
+                            x-kubernetes-preserve-unknown-fields: true
             subresources:
                 status: {}

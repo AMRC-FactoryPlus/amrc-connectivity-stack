@@ -107,10 +107,10 @@ spec:
 apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey
 metadata:
-  name: sv1edge
+  name: sv1edo
   namespace: {{ .Release.Namespace }}
 spec:
   type: Random
-  principal: sv1edge@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+  principal: sv1edo@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
   secret: edo-keytabs/client
 {{- end }}

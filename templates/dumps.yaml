@@ -1,6 +1,3 @@
-# Only run this if the ConfigMaps don't already exist
-{{- if and (not (lookup "v1" "ConfigMap" .Release.Namespace "configdb-json-dumps")) (not (lookup "v1" "ConfigMap" .Release.Namespace "auth-json-dumps")) }}
-
 # ====================================================
 # Ensure that well-known UUIDs are used where required
 # ----------------------------------------------------
@@ -19,12 +16,20 @@
 {{$classDef_userGroup := "f1fabdd1-de90-4399-b3da-ccf6c2b2c08b" | quote}}
 {{$classDef_cellGateway := "00da3c0b-f62b-4761-a689-39ad0c33f864" | quote}}
 {{$classDef_softGateway := "5bee4d24-32e1-44f8-b953-1f86ff4b3e87" | quote}}
+{{$classDef_serviceRequirement := "b419cbc2-ab0f-4311-bd9e-f0591f7e88cb" | quote}}
+{{$classDef_gitRepoGroup := "b03d4dfe-7e78-4252-8e62-af594cf316c9" | quote}}
+{{$classDef_edgeClusterAccount := "97756c9a-38e6-4238-b78c-3df6f227a6c9" | quote}}
+{{$classDef_edgeClusterTemplate := "f9be0334-0ff7-43d3-9d8a-188d3e4d472b" | quote}}
 
 {{$application_objectRegistration := "cb40bed5-49ad-4443-a7f5-08c75009da8f" | quote}}
 {{$application_generalObjectInformation := "64a8bfa9-7772-45c4-9d1a-9e6290690957" | quote}}
+{{$application_applicationConfigSchema := "dbd8a535-52ba-4f6e-b4f8-9b71aefe09d3" | quote}}
 {{$application_mqttPermissionTemplate := "1266ddf1-156c-4266-9808-d6949418b185" | quote}}
 {{$application_sparkplugAddressInformation := "8e32801b-f35a-4cbf-a5c3-2af64d3debd7" | quote}}
 {{$application_commandEscalation := "60e99f28-67fe-4344-a6ab-b1edb8b8e810" | quote}}
+{{$application_gitRepoConfiguration := "38d62a93-b6b4-4f63-bad4-d433e3eaff29" | quote}}
+{{$application_edgeClusterConfiguration := "bdb13634-0b3d-4e38-a065-9d88c12ee78d" | quote}}
+{{$application_edgeClusterTemplate := "72804a19-636b-4836-b62b-7ad1476f2b86" | quote}}
 
 {{$service_configStore := "af15f175-78a0-4e05-97c0-2a0bb82b9f3b" | quote}}
 {{$service_commandEscalation := "78ea7071-24ac-4916-8351-aa3e549d8ccd" | quote}}
@@ -32,6 +37,13 @@
 {{$service_authorisation := "cab2642a-f7d9-42e5-8845-8f35affe1fd4" | quote}}
 {{$service_mqtt := "feb27ba3-bd2c-4916-9269-79a61ebc4a47" | quote}}
 {{$service_warehouse := "a8e5a73f-2dd1-4cda-8e46-bc6cedb14269" | quote}}
+{{$service_git := "7adf4db0-2e7b-4a68-ab9d-376f4c5ce14b" | quote}}
+
+{{$serviceRequirement_gitServiceAccount := "a461ef62-0560-4be2-8d97-1a56916ce4f8" | quote}}
+{{$serviceRequirement_edgeDeploymentServiceAccount := "26d192cf-73c1-4c14-93cf-1e63743bab08" | quote}}
+{{$serviceRequirement_edgeFluxAccounts := "4eeb8156-856d-4251-a4a4-4c1b2f3d3e2c" | quote}}
+{{$serviceRequirement_edgeClusterRepositories := "3a58340c-d4ec-453d-99c3-0cf6ab7d8fa9" | quote}}
+{{$serviceRequirement_edgeFluxRoles := "8cd08563-7c3c-44fd-af4d-15c0fa6dadcb" | quote}}
 
 {{$permission_auth_manageKerberosMappings := "327c4cc8-9c46-4e1e-bb6b-257ace37b0f6" | quote}}
 {{$permission_auth_readEffectivePermissions := "35252562-51e5-4dd8-84cd-ba0fafa62669" | quote}}
@@ -67,12 +79,20 @@
 {{$permission_ccl_rebirth := "fbb9c25d-386d-4966-a325-f16471d9f7be" | quote}}
 {{$permission_ccl_reloadEdgeAgentConfig := "6335f100-e68e-4e4d-b46d-85b42f85a036" | quote}}
 
+{{$permission_git_createRepo := "3668660f-f949-4657-be76-21967144c1a2" | quote}}
+{{$permission_git_pullFromRepo := "12ecb694-b4b9-4d2a-927e-d100019f7ebe" | quote}}
+{{$permission_git_pushToRepo := "b2d8d437-5060-4202-bcc2-bd2beda09651" | quote}}
+
+{{$permission_edo_manageClusters := "a40acff8-0c61-4251-bef3-d8d53e50cdd0" | quote}}
+{{$permission_edo_manageSecrets := "07fba27a-0d01-4c07-875b-d25345261d3a" | quote}}
+
 {{$permissionGroup_authorisation := "50b727d4-3faa-40dc-b347-01c99a226c58" | quote}}
 {{$permissionGroup_configStore := "c43c7157-a50b-4d2a-ac1a-86ff8e8e88c1" | quote}}
 {{$permissionGroup_mqtt := "a637134a-d06b-41e7-ad86-4bf62fde914a" | quote}}
 {{$permissionGroup_directory := "58b5da47-d098-44f7-8c1d-6e4bd800e718" | quote}}
 {{$permissionGroup_commands := "9584ee09-a35a-4278-bc13-21a8be1f007c" | quote}}
-
+{{$permissionGroup_git := "c0c55c78-116e-4526-8ff4-e4595251f76c" | quote}}
+{{$permissionGroup_edo := "9e07fd33-6400-4662-92c4-4dff1f61f990" | quote}}
 
 {{$role_administrator := "4c09402f-9923-4c82-a6f2-02bda21aace4" | quote}}
 {{$role_commandEscalation := "dbd0c099-6c59-4bc6-aa92-4ba8a9b543f4" | quote}}
@@ -82,7 +102,21 @@
 {{$role_globalPrimaryApplication := "c0d17bcf-2a90-40e5-b244-07bf631f7417" | quote}}
 {{$role_manager := "29b569d4-ab5d-40d2-b442-d556d531b25e" | quote}}
 {{$role_warehouse := "6958c812-fbe2-4e6c-b997-6f850b89f679" | quote}}
+{{$role_edgeFlux := "34ee0e7f-8c9c-4f6d-aad7-4ed700bc77da" | quote}}
 
+{{$userGroup_administrators := "10fc06b7-02f5-45f1-b419-a486b6bc13ba" | quote}}
+
+{{$gitRepoGroup_remoteClusters := "736697bd-3637-4340-8d8a-f4a457d6f483" | quote}}
+{{$gitRepoGroup_sharedRepositories := "9c16e08a-a659-4f02-877f-2949dc4ec7b9" | quote}}
+
+{{$edgeClusterTemplate_cellGateway := "71648ac2-f2a6-4777-92ac-f7852be68efc" | quote}}
+
+# XXX These are currently all fixed UUIDs which will end up identical
+# between installations. This is incorrect: these represent the accounts
+# created in the local realm, and different accounts in different realms
+# should have different UUIDs. There was originally logic here in the
+# Helm chart to generate these unique UUIDs, but this turned out to be
+# difficult to manage across ACS upgrades.
 {{$serviceAccount_authorisation := "1e1989ab-14e4-42bd-8171-495230acc406" | quote}}
 {{$serviceAccount_commandEscalation := "23d4e8f9-76c0-49d5-addc-00b6ac05ee58" | quote}}
 {{$serviceAccount_configStore := "36861e8d-9152-40c4-8f08-f51c2d7e3c25" | quote}}
@@ -90,15 +124,10 @@
 {{$serviceAccount_directory := "5cc3b068-938f-4bb2-8ceb-64338a02fbeb" | quote}}
 {{$serviceAccount_manager := "2340e706-1280-420c-84a6-016547b55e95" | quote}}
 {{$serviceAccount_mqtt := "2f42daeb-4521-4522-8e19-85dfb73db88e" | quote}}
-
-# ================================================
-# Generate unique UUIDs for each instance deployed
-# ================================================
-
-{{$user_admin := uuidv4 | quote}}
-
-{{$userGroup_administrators := uuidv4 | quote}}
-
+{{$serviceAccount_krbkeys := "a04b4195-7db4-4480-b3f3-4d22c08b96ea" | quote}}
+{{$serviceAccount_git := "626df296-8156-4c67-8aed-aac70161aa8b" | quote}}
+{{$serviceAccount_edo := "127cde3c-773a-4f61-b0ba-7412a2695253" | quote}}
+{{$user_admin := "d53f476a-29dd-4d79-b614-5b7fe9bc8acf" | quote}}
 
 {{ if .Values.configdb.enabled }}
 apiVersion: v1
@@ -108,10 +137,6 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     component: configdb
-  annotations:
-    "helm.sh/hook": pre-install
-    "helm.sh/hook-weight": "20"
-    "helm.sh/resource-policy": keep
 data:
   # Pre-seed required
   bootstrap: |
@@ -129,6 +154,7 @@ data:
         {{$classDef_permissionGroup}},
         {{$classDef_wildcard}},
         {{$classDef_serviceAccount}},
+        {{$classDef_serviceRequirement}},
         {{$classDef_cellGateway}},
         {{$classDef_softGateway}}
       ],
@@ -209,7 +235,8 @@ data:
           {{$serviceAccount_manager}},
           {{$serviceAccount_authorisation}},
           {{$serviceAccount_commandEscalation}},
-          {{$serviceAccount_dataWarehouse}}
+          {{$serviceAccount_dataWarehouse}},
+          {{$serviceAccount_krbkeys}}
         ],
         {{$classDef_cellGateway}}: []
 
@@ -225,11 +252,17 @@ data:
           {{$classDef_serviceFunction}}: {
             "name": "Service Function"
           },
+          {{$classDef_serviceRequirement}}: {
+            "name": "Service requirement"
+          },
           {{$application_objectRegistration}}: {
             "name": "Object Registration Application"
           },
           {{$application_generalObjectInformation}}: {
             "name": "General Object Information Application"
+          },
+          {{$application_applicationConfigSchema}}: {
+            "name": "Application config schema"
           },
           {{$service_configStore}}: {
             "name": "Configuration Store"
@@ -435,6 +468,9 @@ data:
           {{$serviceAccount_dataWarehouse}}: {
             "name": "Data Warehouse"
           },
+          {{$serviceAccount_krbkeys}}: {
+            "name": "Kerberos keys operator"
+          },
           {{$role_warehouse}}: {
             "name": "Role: warehouse"
           }
@@ -528,7 +564,409 @@ data:
         }
       }
     }
-{{end}}
+  # This dump is copied in directly from the acs-git repo. It sets up
+  # entries as required by the service implementation. This does not use
+  # the UUID variables as these entries are not maintained here.
+  git: |
+    {
+      "service": "af15f175-78a0-4e05-97c0-2a0bb82b9f3b",
+      "version": 1,
+      "classes": [
+        "d25f2afc-1ab8-4d27-b51b-d02314624e3e",
+        "b03d4dfe-7e78-4252-8e62-af594cf316c9",
+        "ac0d5288-6136-4ced-a372-325fbbcdd70d",
+        "8ae784bb-c4b5-4995-9bf6-799b3c7f21ad",
+        "b419cbc2-ab0f-4311-bd9e-f0591f7e88cb"
+      ],
+      "objects": {
+        "265d481f-87a7-4f93-8fc6-53fa64dc11bb": [
+          "7adf4db0-2e7b-4a68-ab9d-376f4c5ce14b"
+        ],
+        "d319bd87-f42b-4b66-be4f-f82ff48b93f0": [
+          "38d62a93-b6b4-4f63-bad4-d433e3eaff29",
+          "dbd8a535-52ba-4f6e-b4f8-9b71aefe09d3"
+        ],
+        "ac0d5288-6136-4ced-a372-325fbbcdd70d": [
+          "c0c55c78-116e-4526-8ff4-e4595251f76c"
+        ],
+        "8ae784bb-c4b5-4995-9bf6-799b3c7f21ad": [
+          "3668660f-f949-4657-be76-21967144c1a2",
+          "55870092-91b6-4d5e-828f-7637d080bf1c",
+          "12ecb694-b4b9-4d2a-927e-d100019f7ebe",
+          "b2d8d437-5060-4202-bcc2-bd2beda09651"
+        ],
+        "b419cbc2-ab0f-4311-bd9e-f0591f7e88cb": [
+          "a461ef62-0560-4be2-8d97-1a56916ce4f8"
+        ]
+      },
+      "configs": {
+        "64a8bfa9-7772-45c4-9d1a-9e6290690957": {
+          "d25f2afc-1ab8-4d27-b51b-d02314624e3e": {
+            "name": "Git repository"
+          },
+          "b03d4dfe-7e78-4252-8e62-af594cf316c9": {
+            "name": "Git repository group"
+          },
+          "7adf4db0-2e7b-4a68-ab9d-376f4c5ce14b": {
+            "name": "Git hosting"
+          },
+          "38d62a93-b6b4-4f63-bad4-d433e3eaff29": {
+            "name": "Git repository configuration"
+          },
+          "c0c55c78-116e-4526-8ff4-e4595251f76c": {
+            "name": "Git permissions"
+          },
+          "3668660f-f949-4657-be76-21967144c1a2": {
+            "name": "Git: create repo"
+          },
+          "55870092-91b6-4d5e-828f-7637d080bf1c": {
+            "name": "Git: delete repo"
+          },
+          "12ecb694-b4b9-4d2a-927e-d100019f7ebe": {
+            "name": "Git: pull from repo"
+          },
+          "b2d8d437-5060-4202-bcc2-bd2beda09651": {
+            "name": "Git: push to repo"
+          },
+          "a461ef62-0560-4be2-8d97-1a56916ce4f8": {
+            "name": "Git hosting service account"
+          }
+        },
+        "dbd8a535-52ba-4f6e-b4f8-9b71aefe09d3": {
+          "38d62a93-b6b4-4f63-bad4-d433e3eaff29": {
+            "type": "object",
+            "required": [
+              "path"
+            ],
+            "properties": {
+              "path": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  # This is the ACS-specific configuration of the git service. XXX There
+  # is redundency here to make the dump self-contained. This needs
+  # fixing in the ConfigDB dump-loading code.
+  git-acs: |
+    {
+      "service": {{$service_configStore}},
+      "version": 1,
+      "classes": [
+        {{$classDef_serviceAccount}}
+      ],
+      "objects": {
+        {{$classDef_serviceAccount}}: [
+          {{$serviceAccount_git}}
+        ]
+      },
+      "configs": {
+        {{$application_generalObjectInformation}}: {
+          {{$serviceAccount_git}}: {
+            "name": "Git repository server"
+          }
+        }
+      }
+    }
+  # This is copied directory from acs-edge-deployment.
+  edo: |
+    {
+      "service": "af15f175-78a0-4e05-97c0-2a0bb82b9f3b",
+      "version": 1,
+      "classes": [
+        "f24d354d-abc1-4e32-98e1-0667b3e40b61",
+        "f9be0334-0ff7-43d3-9d8a-188d3e4d472b",
+        "265d481f-87a7-4f93-8fc6-53fa64dc11bb",
+        "ac0d5288-6136-4ced-a372-325fbbcdd70d",
+        "8ae784bb-c4b5-4995-9bf6-799b3c7f21ad",
+        "b419cbc2-ab0f-4311-bd9e-f0591f7e88cb"
+      ],
+      "objects": {
+        "d319bd87-f42b-4b66-be4f-f82ff48b93f0": [
+          "bdb13634-0b3d-4e38-a065-9d88c12ee78d",
+          "72804a19-636b-4836-b62b-7ad1476f2b86",
+          "dbd8a535-52ba-4f6e-b4f8-9b71aefe09d3"
+        ],
+        "265d481f-87a7-4f93-8fc6-53fa64dc11bb": [
+          "2706aa43-a826-441e-9cec-cd3d4ce623c2"
+        ],
+        "ac0d5288-6136-4ced-a372-325fbbcdd70d": [
+          "9e07fd33-6400-4662-92c4-4dff1f61f990"
+        ],
+        "8ae784bb-c4b5-4995-9bf6-799b3c7f21ad": [
+          "a40acff8-0c61-4251-bef3-d8d53e50cdd0",
+          "07fba27a-0d01-4c07-875b-d25345261d3a"
+        ],
+        "b419cbc2-ab0f-4311-bd9e-f0591f7e88cb": [
+          "26d192cf-73c1-4c14-93cf-1e63743bab08",
+          "3a58340c-d4ec-453d-99c3-0cf6ab7d8fa9",
+          "4eeb8156-856d-4251-a4a4-4c1b2f3d3e2c",
+          "8cd08563-7c3c-44fd-af4d-15c0fa6dadcb"
+        ]
+      },
+      "configs": {
+        "64a8bfa9-7772-45c4-9d1a-9e6290690957": {
+          "bdb13634-0b3d-4e38-a065-9d88c12ee78d": {
+            "name": "Edge cluster configuration"
+          },
+          "72804a19-636b-4836-b62b-7ad1476f2b86": {
+            "name": "Edge cluster template"
+          },
+          "f24d354d-abc1-4e32-98e1-0667b3e40b61": {
+            "name": "Edge cluster"
+          },
+          "f9be0334-0ff7-43d3-9d8a-188d3e4d472b": {
+            "name": "Edge cluster template"
+          },
+          "2706aa43-a826-441e-9cec-cd3d4ce623c2": {
+            "name": "Edge Deployment Operator"
+          },
+          "9e07fd33-6400-4662-92c4-4dff1f61f990": {
+            "name": "Edge Deployment permissions"
+          },
+          "a40acff8-0c61-4251-bef3-d8d53e50cdd0": {
+            "name": "Edge: Manage clusters"
+          },
+          "07fba27a-0d01-4c07-875b-d25345261d3a": {
+            "name": "Edge: Manage secrets"
+          },
+          "26d192cf-73c1-4c14-93cf-1e63743bab08": {
+            "name": "Edge Deployment service account"
+          },
+          "3a58340c-d4ec-453d-99c3-0cf6ab7d8fa9": {
+            "name": "Edge cluster repositories"
+          },
+          "4eeb8156-856d-4251-a4a4-4c1b2f3d3e2c": {
+            "name": "Edge flux accounts"
+          },
+          "8cd08563-7c3c-44fd-af4d-15c0fa6dadcb": {
+            "name": "Edge flux roles"
+          }
+        },
+        "dbd8a535-52ba-4f6e-b4f8-9b71aefe09d3": {
+          "bdb13634-0b3d-4e38-a065-9d88c12ee78d": {
+            "title": "Edge cluster configuration",
+            "type": "object",
+            "required": [
+              "namespace"
+            ],
+            "properties": {
+              "namespace": {
+                "description": "The k8s namespace to deploy to.",
+                "type": "string"
+              },
+              "flux": {
+                "description": "The URL of the Git repo driving this cluster.",
+                "type": "string"
+              },
+              "kubeseal_cert": {
+                "description": "The PEM-encoded X509 certificate used by the sealed-secrets operator on the edge cluster.\n",
+                "type": "string"
+              }
+            }
+          },
+          "72804a19-636b-4836-b62b-7ad1476f2b86": {
+            "title": "Edge cluster template",
+            "description": "A template to drive the creation of an edge cluster. Some values are subject to template expansion; `%n` is expanded to the name of the cluster as supplied to the Edge Deployment Operator.\n",
+            "type": "object",
+            "required": [
+              "name",
+              "cluster",
+              "flux",
+              "repository"
+            ],
+            "properties": {
+              "name": {
+                "description": "The name used to locate this template.",
+                "type": "string"
+              },
+              "cluster": {
+                "description": "Configuration of the k8s cluster.",
+                "type": "object",
+                "required": [
+                  "namespace"
+                ],
+                "properties": {
+                  "namespace": {
+                    "description": "The namespace to deploy to.",
+                    "type": "string"
+                  }
+                }
+              },
+              "flux": {
+                "description": "Configuration of the Flux service account.",
+                "type": "object",
+                "required": [
+                  "class",
+                  "username"
+                ],
+                "properties": {
+                  "class": {
+                    "description": "ConfigDB class to create the account under.",
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "username": {
+                    "description": "Template for the Kerberos UPN of the service account.",
+                    "type": "string"
+                  },
+                  "name": {
+                    "description": "General Info name for the service account.",
+                    "type": "string"
+                  },
+                  "groups": {
+                    "description": "Auth groups to add the service account to.",
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  }
+                }
+              },
+              "repository": {
+                "description": "Configuration of the cluster git repo.",
+                "required": [
+                  "group",
+                  "branch",
+                  "interval"
+                ],
+                "properties": {
+                  "group": {
+                    "description": "The repo group to create the repo in. The repo itself will be named with the name of the cluster.\n",
+                    "type": "string"
+                  },
+                  "branch": {
+                    "description": "The branch name to use.",
+                    "type": "string"
+                  },
+                  "interval": {
+                    "description": "The sync interval. This is in the interval format accepted by Flux.\n",
+                    "type": "string"
+                  },
+                  "links": {
+                    "description": "Other repos to sync from. Appropriate Flux manifests will be committed to the cluster repo to enable this.\n",
+                    "type": "object",
+                    "propertyNames": {
+                      "description": "The UUID of the repo to sync from.",
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "additionalProperties": {
+                      "type": "object",
+                      "required": [
+                        "branch",
+                        "interval"
+                      ],
+                      "properties": {
+                        "branch": {
+                          "type": "string"
+                        },
+                        "interval": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  # This is the ACS-specific configuration of the EDO service.
+  edo-acs: |
+    {
+      "service": {{$service_configStore}},
+      "version": 1,
+      "classes": [
+        {{$classDef_serviceAccount}},
+        {{$classDef_edgeClusterAccount}},
+        {{$classDef_edgeClusterTemplate}},
+        {{$classDef_gitRepoGroup}},
+        {{$classDef_clientRole}}
+      ],
+      "objects": {
+        {{$classDef_application}}: [
+          {{$application_edgeClusterTemplate}}
+        ],
+        {{$classDef_serviceAccount}}: [
+          {{$serviceAccount_edo}}
+        ],
+        {{$classDef_gitRepoGroup}}: [
+          {{$gitRepoGroup_remoteClusters}},
+          {{$gitRepoGroup_sharedRepositories}}
+        ],
+        {{$classDef_clientRole}}: [
+          {{$role_edgeFlux}}
+        ],
+        {{$classDef_edgeClusterTemplate}}: [
+          {{$edgeClusterTemplate_cellGateway}}
+        ]
+      },
+      "configs": {
+        {{$application_generalObjectInformation}}: {
+          {{$serviceAccount_edo}}: {
+            "name": "Edge Deployment"
+          },
+          {{$gitRepoGroup_sharedRepositories}}: {
+            "name": "Shared repositories"
+          },
+          {{$gitRepoGroup_remoteClusters}}: {
+            "name": "Remote clusters"
+          },
+          {{$classDef_edgeClusterAccount}}: {
+            "name": "Edge cluster account"
+          },
+          {{$role_edgeFlux}}: {
+            "name": "Role: Edge Flux"
+          },
+          {{$edgeClusterTemplate_cellGateway}}: {
+              "name": "Cell gateway"
+          }
+        },
+        {{$application_gitRepoConfiguration}}: {
+          {{$gitRepoGroup_remoteClusters}}: {
+              "path": "cluster"
+          },
+          {{$gitRepoGroup_sharedRepositories}}: {
+              "path": "shared"
+          }
+        },
+        {{$application_edgeClusterTemplate}}: {
+          {{$edgeClusterTemplate_cellGateway}}: {
+            "flux": {
+                "name": "Edge flux: %n",
+                "class": {{$classDef_edgeClusterAccount}},
+                "groups": [
+                    {{$role_edgeFlux}}
+                ],
+                "username": "op1flux/%n"
+            },
+            "name": "cell-gateway",
+            "cluster": {
+                "namespace": "fplus-edge"
+            },
+            "repository": {
+                "group": "cluster",
+                "links": {
+                    "8a3c0860-9e41-48b8-b02f-780a0e582be6": {
+                        "branch": "main",
+                        "interval": "3h0m0s"
+                    }
+                },
+                "branch": "main",
+                "interval": "5m0s"
+            }
+          }
+        }
+      }
+    }
+    
+{{end}}{{/* configdb.enabled */}}
 ---
 {{ if .Values.auth.enabled }}
 apiVersion: v1
@@ -536,10 +974,6 @@ kind: ConfigMap
 metadata:
   name: auth-json-dumps
   namespace: {{ .Release.Namespace }}
-  annotations:
-    "helm.sh/hook": pre-install
-    "helm.sh/hook-weight": "20"
-    "helm.sh/resource-policy": keep
   labels:
     component: auth
 data:
@@ -759,8 +1193,214 @@ data:
         {
           "uuid": {{$serviceAccount_dataWarehouse}},
           "kerberos": "sv1warehouse@{{ .Values.identity.realm }}"
+        },
+        {
+          "uuid": {{$serviceAccount_krbkeys}},
+          "kerberos": "op1krbkeys@{{ .Values.identity.realm }}"
         }
       ]
     }
-{{end}}
-{{end}}
+  # This is copied directly from the acs-git repo and so doesn't use
+  # UUID variables.
+  git: |
+    {
+      "service": "cab2642a-f7d9-42e5-8845-8f35affe1fd4",
+      "version": 1,
+      "aces": [
+        {
+          "principal": "a461ef62-0560-4be2-8d97-1a56916ce4f8",
+          "permission": "4db4c39a-f18d-4e83-aeb0-5af2c14ddc2b",
+          "target": "7adf4db0-2e7b-4a68-ab9d-376f4c5ce14b"
+        },
+        {
+          "principal": "a461ef62-0560-4be2-8d97-1a56916ce4f8",
+          "permission": "ba566181-0e8a-405b-b16e-3fb89130fbee",
+          "target": "c0c55c78-116e-4526-8ff4-e4595251f76c"
+        },
+        {
+          "principal": "a461ef62-0560-4be2-8d97-1a56916ce4f8",
+          "permission": "f0b7917b-d475-4888-9d5a-2af96b3c26b6",
+          "target": "d25f2afc-1ab8-4d27-b51b-d02314624e3e"
+        },
+        {
+          "principal": "a461ef62-0560-4be2-8d97-1a56916ce4f8",
+          "permission": "4a339562-cd57-408d-9d1a-6529a383ea4b",
+          "target": "38d62a93-b6b4-4f63-bad4-d433e3eaff29"
+        },
+        {
+          "principal": "a461ef62-0560-4be2-8d97-1a56916ce4f8",
+          "permission": "6c799ccb-d2ad-4715-a2a7-3c8728d6c0bf",
+          "target": "38d62a93-b6b4-4f63-bad4-d433e3eaff29"
+        },
+        {
+          "principal": "a461ef62-0560-4be2-8d97-1a56916ce4f8",
+          "permission": "4a339562-cd57-408d-9d1a-6529a383ea4b",
+          "target": "64a8bfa9-7772-45c4-9d1a-9e6290690957"
+        },
+        {
+          "principal": "a461ef62-0560-4be2-8d97-1a56916ce4f8",
+          "permission": "6c799ccb-d2ad-4715-a2a7-3c8728d6c0bf",
+          "target": "64a8bfa9-7772-45c4-9d1a-9e6290690957"
+        }
+      ],
+      "groups": {
+        "c0c55c78-116e-4526-8ff4-e4595251f76c": [
+          "3668660f-f949-4657-be76-21967144c1a2",
+          "55870092-91b6-4d5e-828f-7637d080bf1c",
+          "12ecb694-b4b9-4d2a-927e-d100019f7ebe",
+          "b2d8d437-5060-4202-bcc2-bd2beda09651"
+        ]
+      }
+    }
+  # This is the ACS-specific configuration of the git service.
+  git-acs: |
+    {
+      "service": {{$service_authorisation}},
+      "version": 1,
+      "principals": [
+        {
+          "uuid": {{$serviceAccount_git}},
+          "kerberos": "sv1git@{{ .Values.identity.realm }}"
+        }
+      ],
+      "groups": {
+          {{$serviceRequirement_gitServiceAccount}}: [
+            {{$serviceAccount_git}}
+          ],
+          {{$role_administrator}}: [
+            {{$permissionGroup_git}}
+          ]
+      }
+    }
+  # This is copied directly from acs-edge-deployment.
+  edo: |
+    {
+      "service": "cab2642a-f7d9-42e5-8845-8f35affe1fd4",
+      "version": 1,
+      "aces": [
+        {
+          "principal": "26d192cf-73c1-4c14-93cf-1e63743bab08",
+          "permission": "4db4c39a-f18d-4e83-aeb0-5af2c14ddc2b",
+          "target": "2706aa43-a826-441e-9cec-cd3d4ce623c2"
+        },
+        {
+          "principal": "26d192cf-73c1-4c14-93cf-1e63743bab08",
+          "permission": "ba566181-0e8a-405b-b16e-3fb89130fbee",
+          "target": "9e07fd33-6400-4662-92c4-4dff1f61f990"
+        },
+        {
+          "principal": "26d192cf-73c1-4c14-93cf-1e63743bab08",
+          "permission": "327c4cc8-9c46-4e1e-bb6b-257ace37b0f6",
+          "target": "00000000-0000-0000-0000-000000000000"
+        },
+        {
+          "principal": "26d192cf-73c1-4c14-93cf-1e63743bab08",
+          "permission": "4a339562-cd57-408d-9d1a-6529a383ea4b",
+          "target": "38d62a93-b6b4-4f63-bad4-d433e3eaff29"
+        },
+        {
+          "principal": "26d192cf-73c1-4c14-93cf-1e63743bab08",
+          "permission": "4a339562-cd57-408d-9d1a-6529a383ea4b",
+          "target": "bdb13634-0b3d-4e38-a065-9d88c12ee78d"
+        },
+        {
+          "principal": "26d192cf-73c1-4c14-93cf-1e63743bab08",
+          "permission": "4a339562-cd57-408d-9d1a-6529a383ea4b",
+          "target": "72804a19-636b-4836-b62b-7ad1476f2b86"
+        },
+        {
+          "principal": "26d192cf-73c1-4c14-93cf-1e63743bab08",
+          "permission": "6c799ccb-d2ad-4715-a2a7-3c8728d6c0bf",
+          "target": "64a8bfa9-7772-45c4-9d1a-9e6290690957"
+        },
+        {
+          "principal": "26d192cf-73c1-4c14-93cf-1e63743bab08",
+          "permission": "6c799ccb-d2ad-4715-a2a7-3c8728d6c0bf",
+          "target": "bdb13634-0b3d-4e38-a065-9d88c12ee78d"
+        },
+        {
+          "principal": "26d192cf-73c1-4c14-93cf-1e63743bab08",
+          "permission": "f0b7917b-d475-4888-9d5a-2af96b3c26b6",
+          "target": "4eeb8156-856d-4251-a4a4-4c1b2f3d3e2c"
+        },
+        {
+          "principal": "26d192cf-73c1-4c14-93cf-1e63743bab08",
+          "permission": "f0b7917b-d475-4888-9d5a-2af96b3c26b6",
+          "target": "f24d354d-abc1-4e32-98e1-0667b3e40b61"
+        },
+        {
+          "principal": "26d192cf-73c1-4c14-93cf-1e63743bab08",
+          "permission": "3a41f5ce-fc08-4669-9762-ec9e71061168",
+          "target": "12ecb694-b4b9-4d2a-927e-d100019f7ebe"
+        },
+        {
+          "principal": "26d192cf-73c1-4c14-93cf-1e63743bab08",
+          "permission": "be9b6d47-c845-49b2-b9d5-d87b83f11c3b",
+          "target": "8cd08563-7c3c-44fd-af4d-15c0fa6dadcb"
+        },
+        {
+          "principal": "26d192cf-73c1-4c14-93cf-1e63743bab08",
+          "permission": "3668660f-f949-4657-be76-21967144c1a2",
+          "target": "3a58340c-d4ec-453d-99c3-0cf6ab7d8fa9"
+        },
+        {
+          "principal": "26d192cf-73c1-4c14-93cf-1e63743bab08",
+          "permission": "12ecb694-b4b9-4d2a-927e-d100019f7ebe",
+          "target": "3a58340c-d4ec-453d-99c3-0cf6ab7d8fa9"
+        },
+        {
+          "principal": "26d192cf-73c1-4c14-93cf-1e63743bab08",
+          "permission": "b2d8d437-5060-4202-bcc2-bd2beda09651",
+          "target": "3a58340c-d4ec-453d-99c3-0cf6ab7d8fa9"
+        }
+      ],
+      "groups": {
+        "9e07fd33-6400-4662-92c4-4dff1f61f990": [
+          "a40acff8-0c61-4251-bef3-d8d53e50cdd0",
+          "07fba27a-0d01-4c07-875b-d25345261d3a"
+        ]
+      }
+    }
+  # ACS-specific deployment of the EDO service.
+  edo-acs: |
+    {
+      "service": {{$service_authorisation}},
+      "version": 1,
+      "principals": [
+        {
+          "uuid": {{$serviceAccount_edo}},
+          "kerberos": "sv1edo@{{ .Values.identity.realm }}"
+        }
+      ],
+      "aces": [
+        {
+          "principal": {{$role_edgeFlux}},
+          "permission": {{$permission_git_pullFromRepo}},
+          "target": {{$gitRepoGroup_sharedRepositories}}
+        },
+        {
+          "principal": {{$serviceAccount_krbkeys}},
+          "permission": {{$permission_edo_manageSecrets}},
+          "target": {{$classDef_wildcard}}
+        }
+      ],
+      "groups": {
+        {{$serviceRequirement_edgeDeploymentServiceAccount}}: [
+          {{$serviceAccount_edo}}
+        ],
+        {{$serviceRequirement_edgeClusterRepositories}}: [
+          {{$gitRepoGroup_remoteClusters}}
+        ],
+        {{$serviceRequirement_edgeFluxAccounts}}: [
+          {{$classDef_edgeClusterAccount}}
+        ],
+        {{$serviceRequirement_edgeFluxRoles}}: [
+          {{$role_edgeFlux}}
+        ],
+        {{$role_administrator}}: [
+          {{$permissionGroup_edo}}
+        ]
+      }
+    }
+
+{{end}}{{/* auth.enabled */}}

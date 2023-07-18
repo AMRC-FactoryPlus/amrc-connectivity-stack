@@ -2,20 +2,20 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: edge-deployment-operator
+  name: edo
   namespace: {{ .Release.Namespace }}
   labels:
-    component: edge-deployment-operator
+    component: edo
 spec:
   replicas: 1
   selector:
     matchLabels:
-      component: edge-deployment-operator
+      component: edo
   template:
     metadata:
       labels:
-        component: edge-deployment-operator
-        factory-plus.service: edge-deployment-operator
+        component: edo
+        factory-plus.service: edo
     spec:
       serviceAccountName: edge-deployment-operator
       volumes:
@@ -31,7 +31,7 @@ spec:
           emptyDir:
 
       containers:
-        - name: edge-deployment-operator
+        - name: edo
 {{ include "amrc-connectivity-stack.image" .Values.edo | indent 10 }}
           command: [ "/usr/bin/k5start", "-Uf", "/keytabs/client" ]
           args: ["npm", "run", "start"]
@@ -71,7 +71,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: edge-deployment-operator
+  name: edo
   namespace: {{ .Release.Namespace }}
 spec:
   ports:
@@ -79,5 +79,5 @@ spec:
       port: 80
       targetPort: 8080
   selector:
-    factory-plus.service: edge-deployment-operator
+    factory-plus.service: edo
 {{- end -}}

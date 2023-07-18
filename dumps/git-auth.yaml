@@ -54,3 +54,4 @@ groups:
     - !u G.Perm.Delete
     - !u G.Perm.Pull
     - !u G.Perm.Push
+    - !u G.Perm.Manage_Storage

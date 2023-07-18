@@ -27,6 +27,7 @@ objects:
     - !u G.Perm.Delete
     - !u G.Perm.Pull
     - !u G.Perm.Push
+    - !u G.Perm.Manage_Storage
   # Service Requirement
   b419cbc2-ab0f-4311-bd9e-f0591f7e88cb:
     - !u G.Requirement.ServiceAccount
@@ -41,6 +42,7 @@ configs:
     !u G.Perm.Delete: { name: "Git: delete repo" }
     !u G.Perm.Pull: { name: "Git: pull from repo" }
     !u G.Perm.Push: { name: "Git: push to repo" }
+    !u G.Perm.Manage_Storage: { name: "Git: manage repo storage" }
     !u G.Requirement.ServiceAccount: { name: "Git hosting service account" }
   # Config schema
   dbd8a535-52ba-4f6e-b4f8-9b71aefe09d3:

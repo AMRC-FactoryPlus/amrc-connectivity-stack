@@ -19,7 +19,7 @@
     "webapi": "node bin/directory-webapi"
   },
   "dependencies": {
-    "@amrc-factoryplus/utilities": "^1.0.7",
+    "@amrc-factoryplus/utilities": "^1.0.9",
     "async": "^3.2.4",
     "express": "^4.17.1",
     "express-openapi-validator": "^4.13.2"

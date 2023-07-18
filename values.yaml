@@ -67,7 +67,7 @@ directory:
     # -- The repository of the Directory component
     repository: acs-directory
     # -- The tag of the Directory component
-    tag: v1.0.1
+    tag: v1.1.0
     # @ignore
     pullPolicy: IfNotPresent
 
@@ -80,7 +80,7 @@ configdb:
     # -- The repository of the Configuration Store component
     repository: acs-configdb
     # -- The tag of the Configuration Store component
-    tag: v1.0.0
+    tag: v1.7.0
     # @ignore
     pullPolicy: IfNotPresent
 

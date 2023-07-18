@@ -589,6 +589,12 @@ data:
       },
       "configs": {
         "64a8bfa9-7772-45c4-9d1a-9e6290690957": {
+          "d25f2afc-1ab8-4d27-b51b-d02314624e3e": {
+            "name": "Git repository"
+          },
+          "b03d4dfe-7e78-4252-8e62-af594cf316c9": {
+            "name": "Git repository group"
+          },
           "7adf4db0-2e7b-4a68-ab9d-376f4c5ce14b": {
             "name": "Git hosting"
           },

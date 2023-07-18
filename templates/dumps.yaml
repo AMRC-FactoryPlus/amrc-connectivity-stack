@@ -83,6 +83,9 @@
 {{$permission_git_pullFromRepo := "12ecb694-b4b9-4d2a-927e-d100019f7ebe" | quote}}
 {{$permission_git_pushToRepo := "b2d8d437-5060-4202-bcc2-bd2beda09651" | quote}}
 
+{{$permission_edo_manageClusters := "a40acff8-0c61-4251-bef3-d8d53e50cdd0" | quote}}
+{{$permission_edo_manageSecrets := "07fba27a-0d01-4c07-875b-d25345261d3a" | quote}}
+
 {{$permissionGroup_authorisation := "50b727d4-3faa-40dc-b347-01c99a226c58" | quote}}
 {{$permissionGroup_configStore := "c43c7157-a50b-4d2a-ac1a-86ff8e8e88c1" | quote}}
 {{$permissionGroup_mqtt := "a637134a-d06b-41e7-ad86-4bf62fde914a" | quote}}
@@ -121,6 +124,7 @@
 {{$serviceAccount_directory := "5cc3b068-938f-4bb2-8ceb-64338a02fbeb" | quote}}
 {{$serviceAccount_manager := "2340e706-1280-420c-84a6-016547b55e95" | quote}}
 {{$serviceAccount_mqtt := "2f42daeb-4521-4522-8e19-85dfb73db88e" | quote}}
+{{$serviceAccount_krbkeys := "a04b4195-7db4-4480-b3f3-4d22c08b96ea" | quote}}
 {{$serviceAccount_git := "626df296-8156-4c67-8aed-aac70161aa8b" | quote}}
 {{$serviceAccount_edo := "127cde3c-773a-4f61-b0ba-7412a2695253" | quote}}
 {{$user_admin := "d53f476a-29dd-4d79-b614-5b7fe9bc8acf" | quote}}
@@ -231,7 +235,8 @@ data:
           {{$serviceAccount_manager}},
           {{$serviceAccount_authorisation}},
           {{$serviceAccount_commandEscalation}},
-          {{$serviceAccount_dataWarehouse}}
+          {{$serviceAccount_dataWarehouse}},
+          {{$serviceAccount_krbkeys}}
         ],
         {{$classDef_cellGateway}}: []
 
@@ -462,6 +467,9 @@ data:
           },
           {{$serviceAccount_dataWarehouse}}: {
             "name": "Data Warehouse"
+          },
+          {{$serviceAccount_krbkeys}}: {
+            "name": "Kerberos keys operator"
           },
           {{$role_warehouse}}: {
             "name": "Role: warehouse"
@@ -1185,6 +1193,10 @@ data:
         {
           "uuid": {{$serviceAccount_dataWarehouse}},
           "kerberos": "sv1warehouse@{{ .Values.identity.realm }}"
+        },
+        {
+          "uuid": {{$serviceAccount_krbkeys}},
+          "kerberos": "op1krbkeys@{{ .Values.identity.realm }}"
         }
       ]
     }
@@ -1365,6 +1377,11 @@ data:
           "principal": {{$role_edgeFlux}},
           "permission": {{$permission_git_pullFromRepo}},
           "target": {{$gitRepoGroup_sharedRepositories}}
+        },
+        {
+          "principal": {{$serviceAccount_krbkeys}},
+          "permission": {{$permission_edo_manageSecrets}},
+          "target": {{$classDef_wildcard}}
         }
       ],
       "groups": {

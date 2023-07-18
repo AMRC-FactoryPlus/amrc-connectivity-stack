@@ -77,5 +77,11 @@
       "permission": "b2d8d437-5060-4202-bcc2-bd2beda09651",
       "target": "3a58340c-d4ec-453d-99c3-0cf6ab7d8fa9"
     }
-  ]
+  ],
+  "groups": {
+    "9e07fd33-6400-4662-92c4-4dff1f61f990": [
+      "a40acff8-0c61-4251-bef3-d8d53e50cdd0",
+      "07fba27a-0d01-4c07-875b-d25345261d3a"
+    ]
+  }
 }

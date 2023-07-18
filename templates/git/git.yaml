@@ -51,7 +51,7 @@ spec:
             - name: REALM
               value: {{ .Values.identity.realm | required "values.identity.realm is required!" }}
             - name: HTTP_API_URL
-              value: http://git.{{ .Release.Namespace }}.svc.cluster.local
+              value: http://git.{{ .Values.acs.baseUrl }}
             - name: DIRECTORY_URL
               value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
           volumeMounts:

@@ -34,7 +34,7 @@ const api = await new WebAPI({
 
     ping: { service: Git.Service.Git },
     routes: app => {
-        app.use("/git", git.routes);
+        app.use("/", git.routes);
     },
 }).init();
 

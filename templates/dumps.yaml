@@ -150,6 +150,7 @@ data:
         {{$classDef_permissionGroup}},
         {{$classDef_wildcard}},
         {{$classDef_serviceAccount}},
+        {{$classDef_serviceRequirement}},
         {{$classDef_cellGateway}},
         {{$classDef_softGateway}}
       ],
@@ -254,6 +255,9 @@ data:
           },
           {{$application_generalObjectInformation}}: {
             "name": "General Object Information Application"
+          },
+          {{$application_applicationConfigSchema}}: {
+            "name": "Application config schema"
           },
           {{$service_configStore}}: {
             "name": "Configuration Store"

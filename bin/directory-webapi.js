@@ -6,13 +6,15 @@
  * Copyright 2021 AMRC.
  */
 
-import { ServiceClient, WebAPI, UUIDs, pkgVersion } from "@amrc-factoryplus/utilities";
+import { ServiceClient, WebAPI, UUIDs } from "@amrc-factoryplus/utilities";
 
 import Model from "../lib/model.js";
 import APIv1 from "../lib/api_v1.js";
 import { Perm } from "../lib/uuids.js";
+import { GIT_VERSION } from "../lib/git-version.js";
 
-const Version = pkgVersion(import.meta);
+/* This is the version of the service spec we support. */
+const Version = "1.0.0";
 
 const model = await new Model({
     readonly: true,
@@ -28,6 +30,7 @@ fplus.set_service_discovery(model.find_service_url.bind(model));
 const api = await new APIv1({
     model,
     fplus,
+    internal_hostname:  process.env.HOSTNAME,
 }).init();
 
 const app = await new WebAPI({
@@ -35,6 +38,11 @@ const app = await new WebAPI({
         version:    Version,
         service:    UUIDs.Service.Directory,
         device:     process.env.DEVICE_UUID,
+        software: {
+            vendor:         "AMRC",
+            application:    "acs-directory",
+            revision:       GIT_VERSION,
+        },
     },
     keytab:     process.env.SERVER_KEYTAB,
     http_port:  process.env.PORT,

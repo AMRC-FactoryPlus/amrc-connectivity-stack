@@ -898,7 +898,8 @@ data:
       ],
       "objects": {
         {{$classDef_application}}: [
-          {{$application_edgeClusterTemplate}}
+          {{$application_edgeClusterTemplate}},
+          {{$application_gitRepoConfiguration}}
         ],
         {{$classDef_serviceAccount}}: [
           {{$serviceAccount_edo}}

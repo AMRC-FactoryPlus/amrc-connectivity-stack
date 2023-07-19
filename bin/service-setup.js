@@ -20,8 +20,9 @@ const Git_Service = "7adf4db0-2e7b-4a68-ab9d-376f4c5ce14b";
 
 const fplus = await new ServiceClient({env: process.env}).init();
 
+const my_princ = await fplus.Auth.find_principal();
 const git_base = await fplus.Discovery.service_url(Git_Service);
-const author = { name: "ACS bootstrap", email: "admin@acs" };
+const author = { name: "ACS bootstrap", email: my_princ.kerberos };
 
 async function git_auth (url, auth) {
     const bad = auth?.headers?.Authorization

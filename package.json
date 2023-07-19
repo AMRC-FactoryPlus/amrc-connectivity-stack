@@ -12,6 +12,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@amrc-factoryplus/utilities": "^1.0.9"
+    "@amrc-factoryplus/utilities": "^1.0.9",
+    "isomorphic-git": "^1.24.5"
   }
 }

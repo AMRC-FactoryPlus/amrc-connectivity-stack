@@ -84,6 +84,16 @@ configdb:
     # @ignore
     pullPolicy: IfNotPresent
 
+# -- The service-setup component loads ACS-specific configuration into
+# the ACS services when the Helm chart is deployed or upgraded.
+serviceSetup:
+  enabled: true
+  image:
+    registry: ghcr.io/amrc-factoryplus
+    repository: acs-service-setup
+    tag: v0.0.1
+    pullPolicy: IfNotPresent
+
 mqtt:
   # -- Whether or not to enable the MQTT component
   enabled: true

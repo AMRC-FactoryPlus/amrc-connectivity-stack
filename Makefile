@@ -43,7 +43,7 @@ ifdef job_name
 deploy: all run-job logs
 
 run-job:
-	kubectl create job ${job_name} --image="${tag}"
+	kubectl create -f service-setup.yaml
 
 logs:
 	kubectl logs -f job/"${job_name}"

@@ -1,4 +1,5 @@
 *.swp
 node_modules/
 config.mk
+service-setup.yaml
 package-lock.json

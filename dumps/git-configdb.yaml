@@ -7,11 +7,17 @@ version: 1
 classes:
   - !u G.Class.Repo
   - !u G.Class.Group
+  # XXX We should not need to create these here. But currently configdb
+  # dumps must create all classes/apps they use.
+  - ac0d5288-6136-4ced-a372-325fbbcdd70d
+  - 8ae784bb-c4b5-4995-9bf6-799b3c7f21ad
+  - b419cbc2-ab0f-4311-bd9e-f0591f7e88cb
 objects:
   !u FP.Class.Service:
     - !u G.Service.Git
   !u FP.Class.App:
     - !u G.App.Config
+    - dbd8a535-52ba-4f6e-b4f8-9b71aefe09d3
   # Permission group
   ac0d5288-6136-4ced-a372-325fbbcdd70d:
     - !u G.Perm.All
@@ -21,11 +27,14 @@ objects:
     - !u G.Perm.Delete
     - !u G.Perm.Pull
     - !u G.Perm.Push
+    - !u G.Perm.Manage_Storage
   # Service Requirement
   b419cbc2-ab0f-4311-bd9e-f0591f7e88cb:
     - !u G.Requirement.ServiceAccount
 configs:
   !u FP.App.Info:
+    !u G.Class.Repo: { name: "Git repository" }
+    !u G.Class.Group: { name: "Git repository group" }
     !u G.Service.Git: { name: "Git hosting" }
     !u G.App.Config: { name: "Git repository configuration" }
     !u G.Perm.All: { name: "Git permissions" }
@@ -33,6 +42,7 @@ configs:
     !u G.Perm.Delete: { name: "Git: delete repo" }
     !u G.Perm.Pull: { name: "Git: pull from repo" }
     !u G.Perm.Push: { name: "Git: push to repo" }
+    !u G.Perm.Manage_Storage: { name: "Git: manage repo storage" }
     !u G.Requirement.ServiceAccount: { name: "Git hosting service account" }
   # Config schema
   dbd8a535-52ba-4f6e-b4f8-9b71aefe09d3:

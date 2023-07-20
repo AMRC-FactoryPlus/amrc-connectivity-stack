@@ -48,3 +48,10 @@ aces:
   - principal: !u G.Requirement.ServiceAccount
     permission: 6c799ccb-d2ad-4715-a2a7-3c8728d6c0bf
     target: !u FP.App.Info
+groups:
+  !u G.Perm.All:
+    - !u G.Perm.Create
+    - !u G.Perm.Delete
+    - !u G.Perm.Pull
+    - !u G.Perm.Push
+    - !u G.Perm.Manage_Storage

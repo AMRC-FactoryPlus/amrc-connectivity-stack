@@ -177,7 +177,7 @@ git:
     # -- The repository of the Git component
     repository: acs-git
     # -- The tag of the Git component
-    tag: v0.0.1
+    tag: v0.0.2
     # @ignore
     pullPolicy: IfNotPresent
   # -- Possible values are either 1 to enable all possible debugging, or a comma-separated list of debug tags (the tags printed before the log lines). No logging is specified as an empty string.

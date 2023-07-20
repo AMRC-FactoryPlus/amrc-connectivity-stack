@@ -166,7 +166,8 @@ data:
           {{$application_generalObjectInformation}},
           {{$application_mqttPermissionTemplate}},
           {{$application_sparkplugAddressInformation}},
-          {{$application_commandEscalation}}
+          {{$application_commandEscalation}},
+          {{$application_applicationConfigSchema}}
         ],
         {{$classDef_serviceFunction}}: [
           {{$service_configStore}},

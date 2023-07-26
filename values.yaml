@@ -201,6 +201,7 @@ traefik:
     - --metrics.prometheus=true
     - --entryPoints.mqtt.address=:1883
     - --entryPoints.mqttsecure.address=:8883
+    - --serverstransport.insecureskipverify=true
   ingressRoute:
     dashboard:
       enabled: false

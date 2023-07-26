@@ -1,4 +1,4 @@
-# Forward authentication to example.com
+{{- if .Values.traefik.enabled }}
 apiVersion: traefik.io/v1alpha1
 kind: Middleware
 metadata:
@@ -9,3 +9,4 @@ spec:
     address: {{ .Values.acs.secure | ternary "https" "http" }}://auth.{{.Values.acs.baseUrl}}/authn/authenticate
     authResponseHeaders:
       - X-Auth-Principal
+{{- end }}

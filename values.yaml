@@ -172,16 +172,6 @@ postgres:
 traefik:
   enabled: true
   ports:
-    web:
-      port: 80
-      expose: true
-      exposedPort: 80
-      protocol: TCP
-    websecure:
-      port: 443
-      expose: true
-      exposedPort: 443
-      protocol: TCP
     mqtt:
       port: 1883
       expose: true

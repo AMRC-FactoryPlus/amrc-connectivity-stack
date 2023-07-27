@@ -107,8 +107,8 @@ export default class MQTTClient {
                 // Don't handle Node births
                 if (!topic.address.device) return;
 
-                let instance = payload.metrics.find((metric) => metric.name === "Instance_UUID").value;
-                let schema = payload.metrics.find((metric) => metric.name === "Schema_UUID").value;
+                let instance = payload.metrics.find((metric) => metric.name === "Instance_UUID")?.value;
+                let schema = payload.metrics.find((metric) => metric.name === "Schema_UUID")?.value;
 
                 // If we've already seen this birth, update it
                 if (this.aliasResolver?.[topic.address.group]?.[topic.address.node]?.[topic.address.device]) {

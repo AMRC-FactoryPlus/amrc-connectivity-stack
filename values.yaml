@@ -153,7 +153,7 @@ warehouse:
       # -- The repository of the Warehouse component
       repository: influxdb-sparkplug-ingester
       # -- The tag of the Warehouse component
-      tag: v1.0.1
+      tag: v1.0.3
       # @ignore
       pullPolicy: IfNotPresent
 
@@ -199,8 +199,6 @@ traefik:
       protocol: TCP
   additionalArguments:
     - --metrics.prometheus=true
-    - --entryPoints.mqtt.address=:1883
-    - --entryPoints.mqttsecure.address=:8883
     - --serverstransport.insecureskipverify=true
   ingressRoute:
     dashboard:

@@ -6,8 +6,12 @@
 import {ServiceClient, SpB, Topic, UUIDs} from "@amrc-factoryplus/utilities";
 import {Reader} from "protobufjs";
 import {logger} from "../bin/ingester.js";
+
 let dotenv: any = null;
-try {dotenv = await import ('dotenv')} catch (e) {}
+try {
+    dotenv = await import ('dotenv')
+} catch (e) {
+}
 import Long from "long";
 import {InfluxDB, Point} from '@influxdata/influxdb-client'
 
@@ -107,8 +111,14 @@ export default class MQTTClient {
                 // Don't handle Node births
                 if (!topic.address.device) return;
 
-                let instance = payload.metrics.find((metric) => metric.name === "Instance_UUID")?.value;
-                let schema = payload.metrics.find((metric) => metric.name === "Schema_UUID")?.value;
+                let instance = null;
+                let schema = null;
+
+                // Check if this is a Factory+ birth
+                if (payload.uuid === UUIDs.FactoryPlus) {
+                    instance = payload.metrics.find((metric) => metric.name === "Instance_UUID")?.value;
+                    schema = payload.metrics.find((metric) => metric.name === "Schema_UUID")?.value;
+                }
 
                 // If we've already seen this birth, update it
                 if (this.aliasResolver?.[topic.address.group]?.[topic.address.node]?.[topic.address.device]) {

@@ -147,6 +147,7 @@ warehouse:
   # -- Whether or not to enable the Warehouse component
   ingester:
     enabled: true
+    logLevel: info
     image:
       # -- The registry of the Warehouse component
       registry: ghcr.io/amrc-factoryplus

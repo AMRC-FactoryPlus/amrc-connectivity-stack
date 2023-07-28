@@ -147,14 +147,17 @@ warehouse:
   # -- Whether or not to enable the Warehouse component
   ingester:
     enabled: true
+    # -- The minimum log level that the ingester will log messages at (One of 'fatal', 'error', 'warn', 'info', 'debug', 'trace' or 'silent'.)
     logLevel: info
+    # -- The number of messages to batch together before sending to InfluxDB
+    batchSize: 1000
     image:
       # -- The registry of the Warehouse component
       registry: ghcr.io/amrc-factoryplus
       # -- The repository of the Warehouse component
       repository: influxdb-sparkplug-ingester
       # -- The tag of the Warehouse component
-      tag: v1.0.4
+      tag: v1.0.5
       # @ignore
       pullPolicy: IfNotPresent
 

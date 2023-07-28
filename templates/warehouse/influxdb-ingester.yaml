@@ -41,6 +41,8 @@ spec:
               value: /keytabs/client
             - name: LOG_LEVEL
               value: {{ .Values.warehouse.ingester.logLevel | required "values.warehouse.ingester.logLevel" }}
+            - name: BATCH_SIZE
+              value: {{ .Values.warehouse.ingester.batchSize | required "values.warehouse.ingester.batchSize" }}
             - name: DIRECTORY_URL
               value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
             - name: INFLUX_URL

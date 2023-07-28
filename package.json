@@ -15,7 +15,7 @@
   ],
   "type": "module",
   "scripts": {
-    "start": "node dist/bin/ingester.js",
+    "start": "node --trace-warnings dist/bin/ingester.js",
     "start:shell": "k5start -Uf $CLIENT_KEYTAB npm run start",
     "dev": " npm run build && npm run start:dev",
     "build": "tsc && tsc-alias",

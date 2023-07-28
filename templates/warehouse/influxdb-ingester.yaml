@@ -43,6 +43,8 @@ spec:
               value: {{ .Values.warehouse.ingester.logLevel | required "values.warehouse.ingester.logLevel" }}
             - name: BATCH_SIZE
               value: {{ .Values.warehouse.ingester.batchSize | quote | required "values.warehouse.ingester.batchSize" }}
+            - name: FLUSH_INTERVAL
+              value: {{ .Values.warehouse.ingester.flushInterval | quote | required "values.warehouse.ingester.flushInterval" }}
             - name: DIRECTORY_URL
               value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
             - name: INFLUX_URL

@@ -128,9 +128,11 @@ spec:
             # If this is set it names a principal which overrides all ACLs. This should be turned off in production.
             - name: ROOT_PRINCIPAL
               value: admin@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
-            # This is the value published via MQTT. It is also used by the editor so it needs to be externally resolvable.
+            # This is the value published via MQTT. The CDB editor does
+            # not use this so publish an internal URL. This will allow
+            # the Directory to be smart about what to tell clients.
             - name: HTTP_API_URL
-              value: "{{ .Values.acs.secure | ternary "https://" "http://" }}configdb.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"
+              value: http://configdb.{{ .Release.Namespace }}.svc.cluster.local
             # This is used for service discovery so it does not need to be externally resolvable.
             - name: DIRECTORY_URL
               value: http://directory.{{ .Release.Namespace }}.svc.cluster.local

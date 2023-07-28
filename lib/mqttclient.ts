@@ -217,6 +217,9 @@ export default class MQTTClient {
     }
 
     writeToInfluxDB(birth, topic: Topic, value) {
+
+        if (value === null) return;
+
         const writeApi = influxDB.getWriteApi(influxOrganisation, 'default');
 
         writeApi.useDefaultTags({
@@ -228,24 +231,48 @@ export default class MQTTClient {
         });
 
 
+        let numVal = null;
+
         switch (birth.type) {
             case "Int8":
             case "Int16":
             case "Int32":
             case "Int64":
-                writeApi.writePoint(new Point(birth.name).intField('value', value));
+                // Validate
+                numVal = Number(value);
+                if (!Number.isInteger(numVal)) {
+                    logger.warn(`${birth.name} should be a ${birth.type} but received ${numVal}. Not recording.`);
+                    return;
+                }
+                writeApi.writePoint(new Point(birth.name).intField('value', numVal));
                 break;
             case "UInt8":
             case "UInt16":
             case "UInt32":
             case "UInt64":
-                writeApi.writePoint(new Point(birth.name).uintField('value', value));
+                // Validate
+                numVal = Number(value);
+                if (!Number.isInteger(numVal)) {
+                    logger.warn(`${birth.name} should be a ${birth.type} but received ${numVal}. Not recording.`);
+                    return;
+                }
+                writeApi.writePoint(new Point(birth.name).uintField('value', numVal));
                 break;
             case "Float":
             case "Double":
-                writeApi.writePoint(new Point(birth.name).floatField('value', value));
+                // Validate
+                numVal = Number(value);
+                if (isNaN(parseFloat(numVal))) {
+                    logger.warn(`${birth.name} should be a ${birth.type} but received ${numVal}. Not recording.`);
+                    return;
+                }
+                writeApi.writePoint(new Point(birth.name).floatField('value', numVal));
                 break;
             case "Boolean":
+                if (typeof value != "boolean") {
+                    logger.warn(`${birth.name} should be a ${birth.type} but received ${value}. Not recording.`);
+                    return;
+                }
                 writeApi.writePoint(new Point(birth.name).booleanField('value', value));
                 break;
             default:

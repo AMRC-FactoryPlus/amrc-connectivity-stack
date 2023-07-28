@@ -241,7 +241,7 @@ export default class MQTTClient {
                 // Validate
                 numVal = Number(value);
                 if (!Number.isInteger(numVal)) {
-                    logger.warn(`${birth.name} should be a ${birth.type} but received ${numVal}. Not recording.`);
+                    logger.warn(`${topic.address}/${birth.name} should be a ${birth.type} but received ${numVal}. Not recording.`);
                     return;
                 }
                 writeApi.writePoint(new Point(birth.name).intField('value', numVal));
@@ -253,7 +253,7 @@ export default class MQTTClient {
                 // Validate
                 numVal = Number(value);
                 if (!Number.isInteger(numVal)) {
-                    logger.warn(`${birth.name} should be a ${birth.type} but received ${numVal}. Not recording.`);
+                    logger.warn(`${topic.address}/${birth.name} should be a ${birth.type} but received ${numVal}. Not recording.`);
                     return;
                 }
                 writeApi.writePoint(new Point(birth.name).uintField('value', numVal));
@@ -263,14 +263,14 @@ export default class MQTTClient {
                 // Validate
                 numVal = Number(value);
                 if (isNaN(parseFloat(numVal))) {
-                    logger.warn(`${birth.name} should be a ${birth.type} but received ${numVal}. Not recording.`);
+                    logger.warn(`${topic.address}/${birth.name} should be a ${birth.type} but received ${numVal}. Not recording.`);
                     return;
                 }
                 writeApi.writePoint(new Point(birth.name).floatField('value', numVal));
                 break;
             case "Boolean":
                 if (typeof value != "boolean") {
-                    logger.warn(`${birth.name} should be a ${birth.type} but received ${value}. Not recording.`);
+                    logger.warn(`${topic.address}/${birth.name} should be a ${birth.type} but received ${value}. Not recording.`);
                     return;
                 }
                 writeApi.writePoint(new Point(birth.name).booleanField('value', value));
@@ -282,7 +282,7 @@ export default class MQTTClient {
         }
 
         writeApi.close().then(() => {
-            logger.debug(`Written to InfluxDB: [${birth.type}] ${birth.name} = ${value}`);
+            logger.debug(`Written to InfluxDB: [${birth.type}] ${topic.address}/${birth.name} = ${value}`);
         })
     }
 

@@ -137,7 +137,7 @@ cmdesc:
     # -- The repository of the Commands component
     repository: acs-cmdesc
     # -- The tag of the Commands component
-    tag: v1.0.0
+    tag: v1.0.1
     # @ignore
     pullPolicy: IfNotPresent
   # -- Possible values are either 1 to enable all possible debugging, or a comma-separated list of debug tags (the tags printed before the log lines). No logging is specified as an empty string.

@@ -86,6 +86,8 @@ spec:
               value: sv1configdb
             - name: PGDATABASE
               value: configdb
+            - name: VERBOSE
+              value: ALL
           volumeMounts:
             - mountPath: /config/krb5-conf
               name: krb5-conf

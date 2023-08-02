@@ -31,6 +31,12 @@ identity:
       tag: v1.0.0
       # @ignore
       pullPolicy: IfNotPresent
+    # If this is set to true, the kdb-init container will not set up the
+    # KDB but will sit and wait. This can be used to halt startup of the
+    # KDC until a restore from backup can be performed. Be aware that
+    # this will halt startup of the KDC every time the pod starts until
+    # the setting is changed.
+    manualInit: false
   krbKeysOperator:
     # -- A comma-separated list of namespaces that the KerberosKey Operator should watch for KerberosKey resources in. Defaults to the release namespace if not specified
     namespaces: ""

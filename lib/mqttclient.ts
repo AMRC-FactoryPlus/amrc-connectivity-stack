@@ -296,6 +296,11 @@ export default class MQTTClient {
         // Get the path as everything behind the last /
         let path = birth.name.substring(0, birth.name.lastIndexOf("/"));
 
+        // Here we only currently store the InstanceUUID and SchemaUUID
+        // of the top-level birth certificate. It would be nice if we could
+        // also store the InstanceUUID and SchemaUUID of all nested schemas
+        // but unsure how to handle this in InfluxDB.
+
         writeApi.useDefaultTags({
             instance: birth.instance,
             schema: birth.schema,
@@ -319,7 +324,7 @@ export default class MQTTClient {
                     logger.warn(`${topic.address}/${path}/${metricName} should be a ${birth.type} but received ${numVal}. Not recording.`);
                     return;
                 }
-                writeApi.writePoint(new Point(`${metricName}_i`).intField('value', numVal));
+                writeApi.writePoint(new Point(`${metricName}:i`).intField('value', numVal));
                 break;
             case "UInt8":
             case "UInt16":
@@ -331,7 +336,7 @@ export default class MQTTClient {
                     logger.warn(`${topic.address}/${path}/${metricName} should be a ${birth.type} but received ${numVal}. Not recording.`);
                     return;
                 }
-                writeApi.writePoint(new Point(`${metricName}_u`).uintField('value', numVal));
+                writeApi.writePoint(new Point(`${metricName}:u`).uintField('value', numVal));
                 break;
             case "Float":
             case "Double":
@@ -341,17 +346,17 @@ export default class MQTTClient {
                     logger.warn(`${topic.address}/${path}/${metricName} should be a ${birth.type} but received ${numVal}. Not recording.`);
                     return;
                 }
-                writeApi.writePoint(new Point(`${metricName}_d`).floatField('value', numVal));
+                writeApi.writePoint(new Point(`${metricName}:d`).floatField('value', numVal));
                 break;
             case "Boolean":
                 if (typeof value != "boolean") {
                     logger.warn(`${topic.address}/${path}/${metricName} should be a ${birth.type} but received ${value}. Not recording.`);
                     return;
                 }
-                writeApi.writePoint(new Point(`${metricName}_b`).booleanField('value', value));
+                writeApi.writePoint(new Point(`${metricName}:b`).booleanField('value', value));
                 break;
             default:
-                writeApi.writePoint(new Point(`${metricName}_s`).stringField('value', value));
+                writeApi.writePoint(new Point(`${metricName}:s`).stringField('value', value));
                 break;
 
         }

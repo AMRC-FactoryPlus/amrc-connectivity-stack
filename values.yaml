@@ -156,16 +156,16 @@ warehouse:
     # -- The minimum log level that the ingester will log messages at (One of 'fatal', 'error', 'warn', 'info', 'debug', 'trace' or 'silent'.)
     logLevel: info
     # -- The number of messages to batch together before sending to InfluxDB
-    batchSize: 1000
+    batchSize: 5000
     # -- Send all buffered messages after this amount of time has elapsed if the buffer is not full (in milliseconds)
-    flushInterval: 5000
+    flushInterval: 10000
     image:
       # -- The registry of the Warehouse component
       registry: ghcr.io/amrc-factoryplus
       # -- The repository of the Warehouse component
       repository: influxdb-sparkplug-ingester
       # -- The tag of the ingester component
-      tag: v1.0.6
+      tag: v1.0.7
       # @ignore
       pullPolicy: IfNotPresent
 

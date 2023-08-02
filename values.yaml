@@ -273,9 +273,6 @@ grafana:
       initDatasources: true
 
 # @ignore
-sealed-secrets:
-  enabled: true
-# @ignore
 tenant:
   tenant:
     name: fplus-minio-core

@@ -105,7 +105,6 @@ Production deployment does not differ greatly from development deployment, howev
 | Repository                                      | Name           | Version |
 |-------------------------------------------------|----------------|---------|
 | https://alexgodbehere.github.io/helm-repository | operator       | 5.0.4   |
-| https://bitnami-labs.github.io/sealed-secrets/  | sealed-secrets | 2.8.1   |
 | https://grafana.github.io/helm-charts           | grafana        | 6.52.4  |
 | https://grafana.github.io/helm-charts           | loki           | 4.8.0   |
 | https://grafana.github.io/helm-charts           | promtail       | 6.9.3   |

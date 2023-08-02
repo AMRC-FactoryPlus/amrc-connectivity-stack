@@ -3,7 +3,7 @@ entries:
   amrc-connectivity-stack:
   - apiVersion: v2
     appVersion: 2.0.2-rc9
-    created: "2023-07-31T12:10:15.416127464Z"
+    created: "2023-08-02T11:19:02.951685887Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -59,7 +59,7 @@ entries:
     version: 2.0.2-rc9
   - apiVersion: v2
     appVersion: 2.0.2-rc8
-    created: "2023-07-31T12:10:15.382514681Z"
+    created: "2023-08-02T11:19:02.919359832Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -115,7 +115,7 @@ entries:
     version: 2.0.2-rc8
   - apiVersion: v2
     appVersion: 2.0.2-rc7
-    created: "2023-07-31T12:10:15.347861604Z"
+    created: "2023-08-02T11:19:02.888195493Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -171,7 +171,7 @@ entries:
     version: 2.0.2-rc7
   - apiVersion: v2
     appVersion: 2.0.2-rc6
-    created: "2023-07-31T12:10:15.312412232Z"
+    created: "2023-08-02T11:19:02.860234499Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -227,7 +227,7 @@ entries:
     version: 2.0.2-rc6
   - apiVersion: v2
     appVersion: 2.0.2-rc5
-    created: "2023-07-31T12:10:15.276109166Z"
+    created: "2023-08-02T11:19:02.830468579Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -283,7 +283,7 @@ entries:
     version: 2.0.2-rc5
   - apiVersion: v2
     appVersion: 2.0.2-rc4
-    created: "2023-07-31T12:10:15.239319403Z"
+    created: "2023-08-02T11:19:02.80139397Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -339,7 +339,7 @@ entries:
     version: 2.0.2-rc4
   - apiVersion: v2
     appVersion: 2.0.2-rc3
-    created: "2023-07-31T12:10:15.20251794Z"
+    created: "2023-08-02T11:19:02.772656465Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -395,7 +395,7 @@ entries:
     version: 2.0.2-rc3
   - apiVersion: v2
     appVersion: 2.0.2-rc2
-    created: "2023-07-31T12:10:15.170902944Z"
+    created: "2023-08-02T11:19:02.745417781Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -450,8 +450,64 @@ entries:
     - https://amrc-factoryplus.github.io/amrc-connectivity-stack/build/amrc-connectivity-stack-2.0.2-rc2.tgz
     version: 2.0.2-rc2
   - apiVersion: v2
+    appVersion: 2.0.2-rc10
+    created: "2023-08-02T11:19:02.717923894Z"
+    dependencies:
+    - condition: traefik.enabled
+      name: traefik
+      repository: https://helm.traefik.io/traefik
+      version: 23.1.0
+    - condition: sealed-secrets.enabled
+      name: sealed-secrets
+      repository: https://bitnami-labs.github.io/sealed-secrets/
+      version: 2.8.1
+    - condition: loki.enabled
+      name: loki
+      repository: https://grafana.github.io/helm-charts
+      version: 4.8.0
+    - condition: loki.enabled
+      name: promtail
+      repository: https://grafana.github.io/helm-charts
+      version: 6.9.3
+    - condition: grafana.enabled
+      name: grafana
+      repository: https://grafana.github.io/helm-charts
+      version: 6.52.4
+    - condition: minio.enabled
+      name: operator
+      repository: https://alexgodbehere.github.io/helm-repository
+      version: 5.0.4
+    - condition: minio.enabled
+      name: tenant
+      repository: https://operator.min.io
+      version: 5.0.3
+    - condition: influxdb2.enabled
+      name: influxdb2
+      repository: https://helm.influxdata.com/
+      version: 2.1.1
+    description: The AMRC Connectivity Stack (ACS) is a collection of open-source
+      services developed by the AMRC that enables an end-to-end implementation of
+      the Factory+ framework.
+    digest: 7f562d47971f62a09a2104ed1b2fe3943889bfb87e774c0c12919078ae4c5342
+    home: factoryplus.app.amrc.co.uk
+    icon: https://www.sheffield.ac.uk/themes/custom/uos/favicon.svg
+    keywords:
+    - factoryplus
+    - sheffield
+    - mqtt
+    - sparkplug
+    - iiot
+    maintainers:
+    - email: alex.godbehere@amrc.co.uk
+      name: Alex Godbehere
+    name: amrc-connectivity-stack
+    type: application
+    urls:
+    - https://amrc-factoryplus.github.io/amrc-connectivity-stack/build/amrc-connectivity-stack-2.0.2-rc10.tgz
+    version: 2.0.2-rc10
+  - apiVersion: v2
     appVersion: 2.0.2-rc1
-    created: "2023-07-31T12:10:15.139118049Z"
+    created: "2023-08-02T11:19:02.687518165Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -507,7 +563,7 @@ entries:
     version: 2.0.2-rc1
   - apiVersion: v2
     appVersion: 2.0.1
-    created: "2023-07-31T12:10:15.107771451Z"
+    created: "2023-08-02T11:19:02.660123579Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -563,7 +619,7 @@ entries:
     version: 2.0.1
   - apiVersion: v2
     appVersion: 2.0.0
-    created: "2023-07-31T12:10:15.074735964Z"
+    created: "2023-08-02T11:19:02.63033386Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -619,7 +675,7 @@ entries:
     version: 2.0.0
   - apiVersion: v2
     appVersion: 2.0.0-rc.3
-    created: "2023-07-31T12:10:15.039028794Z"
+    created: "2023-08-02T11:19:02.600602841Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -675,7 +731,7 @@ entries:
     version: 2.0.0-rc.3
   - apiVersion: v2
     appVersion: v2.0.0-rc.2
-    created: "2023-07-31T12:10:15.538568375Z"
+    created: "2023-08-02T11:19:03.057460277Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -731,7 +787,7 @@ entries:
     version: v2.0.0-rc.2
   - apiVersion: v2
     appVersion: v2.0.0-rc.1
-    created: "2023-07-31T12:10:15.504025998Z"
+    created: "2023-08-02T11:19:03.030346995Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -787,7 +843,7 @@ entries:
     version: v2.0.0-rc.1
   - apiVersion: v2
     appVersion: v1.0.4-dev.4
-    created: "2023-07-31T12:10:15.471342608Z"
+    created: "2023-08-02T11:19:03.001531189Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -843,7 +899,7 @@ entries:
     version: v1.0.4-dev.4
   - apiVersion: v2
     appVersion: v1.0.3
-    created: "2023-07-31T12:10:15.443434788Z"
+    created: "2023-08-02T11:19:02.976362235Z"
     dependencies:
     - name: traefik
       repository: https://helm.traefik.io/traefik
@@ -889,4 +945,4 @@ entries:
     urls:
     - https://amrc-factoryplus.github.io/amrc-connectivity-stack/build/amrc-connectivity-stack-v1.0.3.tgz
     version: v1.0.3
-generated: "2023-07-31T12:10:14.993574887Z"
+generated: "2023-08-02T11:19:02.557453333Z"

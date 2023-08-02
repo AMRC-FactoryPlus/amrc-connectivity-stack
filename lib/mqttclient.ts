@@ -290,12 +290,24 @@ export default class MQTTClient {
 
         if (value === null) return;
 
+        // Get the value after the last /
+        let metricName = birth.name.split('/').pop();
+
+        // Get the path as everything behind the last /
+        let path = birth.name.substring(0, birth.name.lastIndexOf("/"));
+
+        // Here we only currently store the InstanceUUID and SchemaUUID
+        // of the top-level birth certificate. It would be nice if we could
+        // also store the InstanceUUID and SchemaUUID of all nested schemas
+        // but unsure how to handle this in InfluxDB.
+
         writeApi.useDefaultTags({
             instance: birth.instance,
             schema: birth.schema,
             group: topic.address.group,
             node: topic.address.node,
-            device: topic.address.device
+            device: topic.address.device,
+            path: path,
         });
 
 
@@ -309,10 +321,10 @@ export default class MQTTClient {
                 // Validate
                 numVal = Number(value);
                 if (!Number.isInteger(numVal)) {
-                    logger.warn(`${topic.address}/${birth.name} should be a ${birth.type} but received ${numVal}. Not recording.`);
+                    logger.warn(`${topic.address}/${path}/${metricName} should be a ${birth.type} but received ${numVal}. Not recording.`);
                     return;
                 }
-                writeApi.writePoint(new Point(birth.name).intField('value', numVal));
+                writeApi.writePoint(new Point(`${metricName}:i`).intField('value', numVal));
                 break;
             case "UInt8":
             case "UInt16":
@@ -321,37 +333,37 @@ export default class MQTTClient {
                 // Validate
                 numVal = Number(value);
                 if (!Number.isInteger(numVal)) {
-                    logger.warn(`${topic.address}/${birth.name} should be a ${birth.type} but received ${numVal}. Not recording.`);
+                    logger.warn(`${topic.address}/${path}/${metricName} should be a ${birth.type} but received ${numVal}. Not recording.`);
                     return;
                 }
-                writeApi.writePoint(new Point(birth.name).uintField('value', numVal));
+                writeApi.writePoint(new Point(`${metricName}:u`).uintField('value', numVal));
                 break;
             case "Float":
             case "Double":
                 // Validate
                 numVal = Number(value);
                 if (isNaN(parseFloat(numVal))) {
-                    logger.warn(`${topic.address}/${birth.name} should be a ${birth.type} but received ${numVal}. Not recording.`);
+                    logger.warn(`${topic.address}/${path}/${metricName} should be a ${birth.type} but received ${numVal}. Not recording.`);
                     return;
                 }
-                writeApi.writePoint(new Point(birth.name).floatField('value', numVal));
+                writeApi.writePoint(new Point(`${metricName}:d`).floatField('value', numVal));
                 break;
             case "Boolean":
                 if (typeof value != "boolean") {
-                    logger.warn(`${topic.address}/${birth.name} should be a ${birth.type} but received ${value}. Not recording.`);
+                    logger.warn(`${topic.address}/${path}/${metricName} should be a ${birth.type} but received ${value}. Not recording.`);
                     return;
                 }
-                writeApi.writePoint(new Point(birth.name).booleanField('value', value));
+                writeApi.writePoint(new Point(`${metricName}:b`).booleanField('value', value));
                 break;
             default:
-                writeApi.writePoint(new Point(birth.name).stringField('value', value));
+                writeApi.writePoint(new Point(`${metricName}:s`).stringField('value', value));
                 break;
 
         }
 
         i++;
 
-        logger.debug(`Added to write buffer (${i}/${batchSize}): [${birth.type}] ${topic.address}/${birth.name} = ${value}`);
+        logger.debug(`Added to write buffer (${i}/${batchSize}): [${birth.type}] ${topic.address}/${path}/${metricName} = ${value}`);
 
         if (i >= batchSize) {
             this.flushBuffer(`${batchSize} point BATCH`);

@@ -29,7 +29,6 @@
     "@influxdata/influxdb-client-apis": "^1.33.2",
     "async": "^3.2.4",
     "long": "^5.2.3",
-    "node-ray": "^1.19.4",
     "pino": "^8.11.0",
     "pino-pretty": "^10.0.0"
   },

@@ -165,7 +165,7 @@ warehouse:
       # -- The repository of the Warehouse component
       repository: influxdb-sparkplug-ingester
       # -- The tag of the ingester component
-      tag: v1.0.7
+      tag: v1.1.0
       # @ignore
       pullPolicy: IfNotPresent
 

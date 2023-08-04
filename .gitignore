@@ -24,6 +24,7 @@ Homestead.yaml
 npm-debug.log
 yarn-error.log
 .env
+.env.testing
 /resources/assets/csv/.~lock.airports.csv#
 /.phpunit.result.cache
 /resources/assets/csv/.~lock.aircraft_types.xlsx#

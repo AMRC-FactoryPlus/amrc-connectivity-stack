@@ -5,8 +5,10 @@ RUN apk add --no-cache autoconf krb5-libs krb5-dev oniguruma-dev postgresql-dev 
 RUN docker-php-ext-enable redis
 
 ADD https://pecl.php.net/get/krb5-1.1.4.tgz ./
-RUN tar -xzf ./krb5-1.1.4.tgz && rm krb5-1.1.4.tgz && cd ./krb5-1.1.4 && phpize && ./configure --with-krb5 && make && make install
+RUN tar -xzf ./krb5-1.1.4.tgz && rm krb5-1.1.4.tgz && cd ./krb5-1.1.4 && phpize && ./configure --with-krb5 --with-krb5kadm && make && make install
 RUN echo extension=krb5.so >> /opt/docker/etc/php/php.ini
+
+
 
 # Dockerfile configuration
 ENV WEB_DOCUMENT_ROOT=/app/public

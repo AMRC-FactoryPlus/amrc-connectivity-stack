@@ -17,7 +17,7 @@ class AuthenticateKerberosPrincipalAction
 {
     public function execute(string $username, string $password)
     {
-        if (! extension_loaded('krb5')) {
+        if (!extension_loaded('krb5')) {
             ray('NO KRB');
             exit('KRB5 Extension not installed');
         }
@@ -25,6 +25,7 @@ class AuthenticateKerberosPrincipalAction
         // Get a TGT for the user
         $ccache = new KRB5CCache;
         $flags = ['tkt_lifetime' => 3600];
+
 
         // Check if the login was successful
         try {
@@ -56,7 +57,7 @@ class AuthenticateKerberosPrincipalAction
             $serverContext->registerAcceptorIdentity('/config/keytab/keytab');
             $accepted = $serverContext->acceptSecContext($token);
 
-            if (! $accepted) {
+            if (!$accepted) {
                 throw new ActionFailException('Authentication failed');
             }
         }

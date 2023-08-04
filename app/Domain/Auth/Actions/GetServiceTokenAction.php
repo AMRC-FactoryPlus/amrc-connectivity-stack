@@ -51,8 +51,9 @@ class GetServiceTokenAction
     public function execute(
         string $service,
                $forceRefresh = false
-    ) {
-        if (! extension_loaded(
+    )
+    {
+        if (!extension_loaded(
             'krb5'
         )) {
             exit('KRB5 Extension not installed');
@@ -64,9 +65,7 @@ class GetServiceTokenAction
             'sv1manager@' . config(
                 'manager.domain'
             ),
-            config(
-                'manager.keytab_path'
-            ),
+            config('manager.keytab_path'),
         );
 
         $ccache->save(
@@ -76,9 +75,9 @@ class GetServiceTokenAction
         );
 
         // If the cache doesn't have a krb_token_<$service>_service then get one
-        if (! Cache::has(
-            'krb_token_' . $service . '_service'
-        ) || $forceRefresh) {
+        if (!Cache::has(
+                'krb_token_' . $service . '_service'
+            ) || $forceRefresh) {
             Log::debug(
                 'Refreshing token for service',
                 [
@@ -131,10 +130,10 @@ class GetServiceTokenAction
                 [
                     'service' => $service,
                     'context' => 'HTTP/' . $service . '.' . config(
-                        'manager.service_domain'
-                    ) . '@' . config(
-                        'manager.domain'
-                    ),
+                            'manager.service_domain'
+                        ) . '@' . config(
+                            'manager.domain'
+                        ),
                     'token' => $token,
                 ]
             );
@@ -157,11 +156,11 @@ class GetServiceTokenAction
                     'service' => $service,
                     'token' => $token,
                     'auth_header' => ('Negotiate ' . base64_encode(
-                        $token
-                    )),
+                            $token
+                        )),
                     'endpoint' => config('manager.service_scheme') . '://' . $service . '.' . config(
-                        'manager.service_domain'
-                    ) . '/token',
+                            'manager.service_domain'
+                        ) . '/token',
 
                 ]
             );
@@ -170,8 +169,8 @@ class GetServiceTokenAction
             $response = Http::withHeaders(
                 [
                     'Authorization' => ('Negotiate ' . base64_encode(
-                        $token
-                    )),
+                            $token
+                        )),
                 ]
             )
                 ->post(

@@ -271,6 +271,12 @@ grafana:
       enabled: true
       label: grafana_datasource
       initDatasources: true
+    dashboards:
+      enabled: true
+      provider:
+        folder: 'Factory+'
+        disableDelete: true
+      searchNamespace: ALL
 
 # @ignore
 tenant:

@@ -1,0 +1,234 @@
+{
+    "annotations": {
+        "list": [
+            {
+                "builtIn": 1,
+                "datasource": {
+                    "type": "grafana",
+                    "uid": "-- Grafana --"
+                },
+                "enable": true,
+                "hide": true,
+                "iconColor": "rgba(0, 211, 255, 1)",
+                "name": "Annotations & Alerts",
+                "type": "dashboard"
+            }
+        ]
+    },
+    "description": "Explore all data in Factory+ based on the lowest level schema",
+    "editable": true,
+    "fiscalYearStartMonth": 0,
+    "graphTooltip": 0,
+    "id": 4,
+    "links": [],
+    "liveNow": false,
+    "panels": [
+        {
+            "datasource": {
+                "type": "influxdb",
+                "uid": "influxdb-influxql"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "axisCenteredZero": false,
+                        "axisColorMode": "text",
+                        "axisLabel": "",
+                        "axisPlacement": "auto",
+                        "barAlignment": 0,
+                        "drawStyle": "line",
+                        "fillOpacity": 0,
+                        "gradientMode": "none",
+                        "hideFrom": {
+                            "legend": false,
+                            "tooltip": false,
+                            "viz": false
+                        },
+                        "lineInterpolation": "linear",
+                        "lineWidth": 1,
+                        "pointSize": 5,
+                        "scaleDistribution": {
+                            "type": "linear"
+                        },
+                        "showPoints": "auto",
+                        "spanNulls": false,
+                        "stacking": {
+                            "group": "A",
+                            "mode": "none"
+                        },
+                        "thresholdsStyle": {
+                            "mode": "off"
+                        }
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": 80
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 0
+            },
+            "id": 1,
+            "maxPerRow": 2,
+            "options": {
+                "legend": {
+                    "calcs": [],
+                    "displayMode": "list",
+                    "placement": "bottom",
+                    "showLegend": true
+                },
+                "tooltip": {
+                    "mode": "single",
+                    "sort": "none"
+                }
+            },
+            "repeat": "measurements",
+            "repeatDirection": "h",
+            "targets": [
+                {
+                    "alias": "$tag_device/$tag_path",
+                    "datasource": {
+                        "type": "influxdb",
+                        "uid": "influxdb-influxql"
+                    },
+                    "groupBy": [
+                        {
+                            "params": [
+                                "$__interval"
+                            ],
+                            "type": "time"
+                        },
+                        {
+                            "params": [
+                                "device::tag"
+                            ],
+                            "type": "tag"
+                        },
+                        {
+                            "params": [
+                                "path::tag"
+                            ],
+                            "type": "tag"
+                        },
+                        {
+                            "params": [
+                                "previous"
+                            ],
+                            "type": "fill"
+                        }
+                    ],
+                    "measurement": "/^$measurements$/",
+                    "orderByTime": "ASC",
+                    "policy": "default",
+                    "refId": "A",
+                    "resultFormat": "time_series",
+                    "select": [
+                        [
+                            {
+                                "params": [
+                                    "value"
+                                ],
+                                "type": "field"
+                            },
+                            {
+                                "params": [],
+                                "type": "mean"
+                            }
+                        ]
+                    ],
+                    "tags": []
+                }
+            ],
+            "title": "$measurements",
+            "type": "timeseries"
+        }
+    ],
+    "refresh": "",
+    "schemaVersion": 38,
+    "style": "dark",
+    "tags": [],
+    "templating": {
+        "list": [
+            {
+                "current": {
+                    "selected": false,
+                    "text": "d16b825d-4660-4c41-bebd-c3ac7a90a86c",
+                    "value": "d16b825d-4660-4c41-bebd-c3ac7a90a86c"
+                },
+                "datasource": {
+                    "type": "influxdb",
+                    "uid": "influxdb-influxql"
+                },
+                "definition": "SHOW TAG VALUES WITH KEY = \"bottomLevelSchema\"",
+                "hide": 0,
+                "includeAll": false,
+                "label": "Bottom Level Schema",
+                "multi": false,
+                "name": "bottomLevelSchema",
+                "options": [],
+                "query": "SHOW TAG VALUES WITH KEY = \"bottomLevelSchema\"",
+                "refresh": 1,
+                "regex": "",
+                "skipUrlSync": false,
+                "sort": 6,
+                "type": "query"
+            },
+            {
+                "current": {
+                    "selected": true,
+                    "text": [
+                        "All"
+                    ],
+                    "value": [
+                        "$__all"
+                    ]
+                },
+                "datasource": {
+                    "type": "influxdb",
+                    "uid": "influxdb-influxql"
+                },
+                "definition": "SHOW MEASUREMENTS WHERE \"bottomLevelSchema\" =~ /$bottomLevelSchema/",
+                "hide": 0,
+                "includeAll": true,
+                "label": "Measurements",
+                "multi": true,
+                "name": "measurements",
+                "options": [],
+                "query": "SHOW MEASUREMENTS WHERE \"bottomLevelSchema\" =~ /$bottomLevelSchema/",
+                "refresh": 1,
+                "regex": "",
+                "skipUrlSync": false,
+                "sort": 6,
+                "type": "query"
+            }
+        ]
+    },
+    "time": {
+        "from": "now-6h",
+        "to": "now"
+    },
+    "timepicker": {},
+    "timezone": "",
+    "title": "By Bottom Level Schema",
+    "uid": "f5939bc8-e8f6-46fe-bbc8-236dd311120b",
+    "version": 10,
+    "weekStart": ""
+}

@@ -258,6 +258,35 @@ grafana:
   envFromSecret: influxdb-auth
   admin:
     existingSecret: grafana-admin-user
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+        - name: 'default'
+          orgId: 1
+          folder: ''
+          type: file
+          disableDeletion: false
+          editable: false
+          options:
+            path: /var/lib/grafana/dashboards/default
+  dashboards:
+    default:
+      bottom-level-schema:
+        json: |
+          ${indent(10, file("./templates/grafana/dashboards/bottom-level-schema.json"))}
+      top-level-schema:
+        json: |
+          ${indent(10, file("./templates/grafana/dashboards/top-level-schema.json"))}
+      by-group:
+        json: |
+          ${indent(10, file("./templates/grafana/dashboards/by-group.json"))}
+      by-node:
+        json: |
+          ${indent(10, file("./templates/grafana/dashboards/by-node.json"))}
+      by-device:
+        json: |
+          ${indent(10, file("./templates/grafana/dashboards/by-device.json"))}
   grafana.ini:
     auth.basic:
       enabled: false

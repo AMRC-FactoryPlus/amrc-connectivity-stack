@@ -1,0 +1,243 @@
+{
+    "annotations": {
+        "list": [
+            {
+                "builtIn": 1,
+                "datasource": {
+                    "type": "grafana",
+                    "uid": "-- Grafana --"
+                },
+                "enable": true,
+                "hide": true,
+                "iconColor": "rgba(0, 211, 255, 1)",
+                "name": "Annotations & Alerts",
+                "type": "dashboard"
+            }
+        ]
+    },
+    "description": "Explore all data in Factory+ based on the device",
+    "editable": true,
+    "fiscalYearStartMonth": 0,
+    "graphTooltip": 0,
+    "id": 6,
+    "links": [],
+    "liveNow": false,
+    "panels": [
+        {
+            "datasource": {
+                "type": "influxdb",
+                "uid": "influxdb-influxql"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "axisCenteredZero": false,
+                        "axisColorMode": "text",
+                        "axisLabel": "",
+                        "axisPlacement": "auto",
+                        "barAlignment": 0,
+                        "drawStyle": "line",
+                        "fillOpacity": 25,
+                        "gradientMode": "none",
+                        "hideFrom": {
+                            "legend": false,
+                            "tooltip": false,
+                            "viz": false
+                        },
+                        "lineInterpolation": "linear",
+                        "lineWidth": 1,
+                        "pointSize": 5,
+                        "scaleDistribution": {
+                            "type": "linear"
+                        },
+                        "showPoints": "auto",
+                        "spanNulls": false,
+                        "stacking": {
+                            "group": "A",
+                            "mode": "none"
+                        },
+                        "thresholdsStyle": {
+                            "mode": "off"
+                        }
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": 80
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 9,
+                "w": 8,
+                "x": 0,
+                "y": 0
+            },
+            "id": 1,
+            "maxPerRow": 3,
+            "options": {
+                "legend": {
+                    "calcs": [],
+                    "displayMode": "list",
+                    "placement": "bottom",
+                    "showLegend": true
+                },
+                "tooltip": {
+                    "mode": "multi",
+                    "sort": "none"
+                }
+            },
+            "pluginVersion": "10.0.1",
+            "repeat": "measurements",
+            "repeatDirection": "h",
+            "targets": [
+                {
+                    "alias": "$tag_path ($tag_unit)",
+                    "datasource": {
+                        "type": "influxdb",
+                        "uid": "influxdb-influxql"
+                    },
+                    "groupBy": [
+                        {
+                            "params": [
+                                "$__interval"
+                            ],
+                            "type": "time"
+                        },
+                        {
+                            "params": [
+                                "path::tag"
+                            ],
+                            "type": "tag"
+                        },
+                        {
+                            "params": [
+                                "unit::tag"
+                            ],
+                            "type": "tag"
+                        },
+                        {
+                            "params": [
+                                "previous"
+                            ],
+                            "type": "fill"
+                        }
+                    ],
+                    "hide": false,
+                    "measurement": "/^$measurements$/",
+                    "orderByTime": "ASC",
+                    "policy": "default",
+                    "refId": "A",
+                    "resultFormat": "time_series",
+                    "select": [
+                        [
+                            {
+                                "params": [
+                                    "value"
+                                ],
+                                "type": "field"
+                            },
+                            {
+                                "params": [],
+                                "type": "mean"
+                            }
+                        ]
+                    ],
+                    "tags": [
+                        {
+                            "key": "device::tag",
+                            "operator": "=~",
+                            "value": "/^$device$/"
+                        }
+                    ]
+                }
+            ],
+            "title": "$measurements",
+            "transformations": [],
+            "type": "timeseries"
+        }
+    ],
+    "refresh": "",
+    "schemaVersion": 38,
+    "style": "dark",
+    "tags": [],
+    "templating": {
+        "list": [
+            {
+                "current": {
+                    "selected": false,
+                    "text": "MK1_FactoryPlus_Wall",
+                    "value": "MK1_FactoryPlus_Wall"
+                },
+                "datasource": {
+                    "type": "influxdb",
+                    "uid": "influxdb-influxql"
+                },
+                "definition": "SHOW TAG VALUES WITH KEY = \"device\"",
+                "hide": 0,
+                "includeAll": false,
+                "label": "Device",
+                "multi": false,
+                "name": "device",
+                "options": [],
+                "query": "SHOW TAG VALUES WITH KEY = \"device\"",
+                "refresh": 1,
+                "regex": "",
+                "skipUrlSync": false,
+                "sort": 6,
+                "type": "query"
+            },
+            {
+                "current": {
+                    "selected": true,
+                    "text": [
+                        "All"
+                    ],
+                    "value": [
+                        "$__all"
+                    ]
+                },
+                "datasource": {
+                    "type": "influxdb",
+                    "uid": "influxdb-influxql"
+                },
+                "definition": "SHOW MEASUREMENTS WHERE \"device\" =~ /$device/",
+                "hide": 0,
+                "includeAll": true,
+                "label": "Measurements",
+                "multi": true,
+                "name": "measurements",
+                "options": [],
+                "query": "SHOW MEASUREMENTS WHERE \"device\" =~ /$device/",
+                "refresh": 1,
+                "regex": "",
+                "skipUrlSync": false,
+                "sort": 6,
+                "type": "query"
+            }
+        ]
+    },
+    "time": {
+        "from": "now-24h",
+        "to": "now"
+    },
+    "timepicker": {},
+    "timezone": "",
+    "title": "By Device",
+    "uid": "b05b101d-570b-4075-b445-6507e9d09073",
+    "version": 11,
+    "weekStart": ""
+}

@@ -258,20 +258,6 @@ grafana:
   envFromSecret: influxdb-auth
   admin:
     existingSecret: grafana-admin-user
-  dashboardProviders:
-    dashboardproviders.yaml:
-      apiVersion: 1
-      providers:
-        - name: 'factoryplus'
-          orgId: 1
-          folder: ''
-          type: file
-          disableDeletion: false
-          editable: false
-          options:
-            path: /var/lib/grafana/dashboards/default
-  dashboardsConfigMaps:
-    factoryplus: "default-factoryplus-dashboards"
   grafana.ini:
     auth.basic:
       enabled: false
@@ -285,6 +271,12 @@ grafana:
       enabled: true
       label: grafana_datasource
       initDatasources: true
+    dashboards:
+      enabled: true
+      provider:
+        folder: 'Factory+'
+        disableDelete: true
+      searchNamespace: ALL
 
 # @ignore
 tenant:

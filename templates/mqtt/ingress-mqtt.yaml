@@ -15,7 +15,7 @@ spec:
           namespace: {{ .Release.Namespace }}
   {{- if .Values.acs.secure }}
   tls:
-    secretName: factoryplus-tls
+    secretName: {{ .Values.switchboard.enabled | ternary "factoryplus-mqtt-tls" "factoryplus-tls" }}
     domains:
       - main: mqtt.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
   {{ end }}

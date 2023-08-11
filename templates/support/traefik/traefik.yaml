@@ -1,4 +1,4 @@
-{{ if .Values.traefik.enabled }}
+{{ if and .Values.traefik.enabled (not .Values.switchboard.enabled) }}
 apiVersion: traefik.io/v1alpha1
 kind: TLSStore
 metadata:

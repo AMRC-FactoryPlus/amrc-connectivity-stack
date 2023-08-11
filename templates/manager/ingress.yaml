@@ -16,6 +16,6 @@ spec:
           namespace: {{ .Release.Namespace }}
   {{- if .Values.acs.secure }}
   tls:
-    secretName: factoryplus-tls
+    secretName: {{ .Values.switchboard.enabled | ternary "factoryplus-manager-tls" "factoryplus-tls" }}
   {{- end -}}
 {{- end -}}

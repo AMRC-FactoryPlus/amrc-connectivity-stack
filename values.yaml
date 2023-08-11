@@ -341,6 +341,6 @@ influxdb2:
 switchboard:
   enabled: true
   cert-manager:
-    install: true
+    install: false
   external-dns:
-    install: true
+    install: false

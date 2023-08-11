@@ -7,6 +7,7 @@
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeviceController;
 use App\Http\Controllers\EdgeAgentController;
+use App\Http\Controllers\SchemaEditorController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -36,6 +37,7 @@ Route::group(
     static function () {
         Route::get('/', [DashboardController::class, 'nodes']);
         Route::get('edge-agents', [EdgeAgentController::class, 'index']);
+        Route::get('schema-editor', [SchemaEditorController::class, 'index']);
         Route::get('preferences', [DashboardController::class, 'preferences']);
         Route::get('roles', [DashboardController::class, 'roles']);
         Route::get('users', [DashboardController::class, 'users']);

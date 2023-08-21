@@ -25,9 +25,9 @@ kubectl version
 ```
 
 ### Configure DNS and TLS
-This chart includes an instance of Switchboard to automatically configure DNS and TLS for the deployment. It assumes that you have instances of external-dns and cert-manager installed and configured on your cluster. Please refer to the [Switchboard documentation](https://github.com/borchero/switchboard) for more information.
+This chart includes an instance of Switchboard to automatically configure DNS and TLS for the deployment. It assumes that you have instances of external-dns and cert-manager installed and configured on your cluster. To enable Switchboard make sure to set `switchboard.enabled` to `true` in the `Values.yaml` file and configure the chart as per the the [Switchboard documentation](https://github.com/borchero/switchboard/blob/main/chart/README.md).
 
-If you do not have external-dns and cert-manager installed or would rather configure DNS & TLS manually then you can disable Switchboard by setting `switchboard.enabled` to `false` in your `values.yaml` file and creating a wildcard DNS entry configured to direct all `*.<baseURL>` requests to your Kubernetes cluster. If you have enabled `acs.secure` then you must also create a wildcard TLS secret on the cluster in the `default` namespace with the same name `factoryplus-tls`.
+If you do not have external-dns and cert-manager installed or would rather configure DNS & TLS manually then you can create a wildcard DNS entry configured to direct all `*.<baseURL>` requests to your Kubernetes cluster. If you have enabled `acs.secure` then you must also create a wildcard TLS secret on the cluster in the `default` namespace with the same name `factoryplus-tls`.
 
 ### Install ACS
 

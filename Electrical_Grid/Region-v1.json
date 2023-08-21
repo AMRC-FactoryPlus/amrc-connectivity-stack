@@ -1,0 +1,26 @@
+{
+  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Electrical_Grid/Region-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Electrical Grid Region",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "a15a0500-88ee-4e56-af43-224a874ccf32"
+    },
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "Carbon_Intensity": {
+      "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Electrical_Grid/Carbon_Intensity-v1.json"
+    },
+    "Generation_Mix": {
+      "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Electrical_Grid/Generation_Mix-v1.json"
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID"
+  ]
+}

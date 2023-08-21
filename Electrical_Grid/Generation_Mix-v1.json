@@ -1,0 +1,28 @@
+{
+  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Electrical_Grid/Generation_Mix-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Generation Mix",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "b171ea92-a693-4a62-8448-6df1c7b1ff44"
+    },
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "Fuels": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-zA-Z0-9_]*$": {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Electrical_Grid/Fuel-v1.json"
+        }
+      }
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID"
+  ]
+}

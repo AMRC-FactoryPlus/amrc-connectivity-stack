@@ -1,0 +1,31 @@
+{
+  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Electrical_Grid/Electrical_Grid-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Electrical Grid",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "935b7210-c2f6-402c-90d2-ebe3e5ffffd2"
+    },
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "Device_Information": {
+      "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Device_Information-v1.json"
+    },
+    "Regions": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-zA-Z0-9_]*$": {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Electrical_Grid/Region-v1.json"
+        }
+      }
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID"
+  ]
+}

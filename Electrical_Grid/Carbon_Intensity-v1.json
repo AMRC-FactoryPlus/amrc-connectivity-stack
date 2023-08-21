@@ -1,0 +1,79 @@
+{
+  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Electrical_Grid/Carbon_Intensity-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Carbon Intensity",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "97c856bf-f10c-43b3-86c8-05abd1389315"
+    },
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "Actual": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "FloatLE",
+                "FloatBE"
+              ]
+            },
+            "Documentation": {
+              "default": "Actual carbon intensity"
+            }
+          }
+        }
+      ]
+    },
+    "Forecast": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "FloatLE",
+                "FloatBE"
+              ]
+            },
+            "Documentation": {
+              "default": "Forecast carbon intensity"
+            }
+          }
+        }
+      ]
+    },
+    "Index": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "String"
+              ]
+            },
+            "Documentation": {
+              "default": "Carbon intensity index"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID"
+  ]
+}

@@ -250,6 +250,8 @@ promtail:
 
 # @ignore
 grafana:
+  deploymentStrategy:
+    type: Recreate
   image:
     tag: 10.0.1
   enabled: true

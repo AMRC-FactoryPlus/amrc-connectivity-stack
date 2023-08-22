@@ -1,0 +1,39 @@
+# This manifest runs a Job whenever the Helm chart is installed or
+# upgraded. This Job pulls in an image with configuration to load into
+# the F+ services which is specific to deployment decisions made by ACS.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: service-setup
+  annotations:
+    helm.sh/hook: post-install, post-upgrade
+spec:
+  ttlSecondsAfterFinished: 300
+  template:
+    spec:
+      restartPolicy: OnFailure
+      volumes:
+        - name: git-checkouts
+          emptyDir:
+      containers:
+        - name: service-setup
+{{ include "amrc-connectivity-stack.image" .Values.serviceSetup | indent 10 }}
+          env:
+            - name: DIRECTORY_URL
+              value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
+            - name: SERVICE_USERNAME
+              value: admin
+            - name: SERVICE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: krb5-passwords
+                  key: admin
+            - name: VERBOSE
+              value: ALL
+            - name: GIT_CHECKOUTS
+              value: /data
+          volumeMounts:
+            - mountPath: /data
+              name: git-checkouts
+            

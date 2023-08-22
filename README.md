@@ -17,6 +17,16 @@ Helm is a package manager for Kubernetes that allows you to easily install and m
 ### Install Kubectl
 Kubectl is a command-line tool for controlling Kubernetes clusters. It must be installed on the machine that you'll be using to deploy ACS _from_. To install Kubectl, follow the instructions [here](https://kubernetes.io/docs/tasks/tools/install-kubectl/).
 
+### Install Lens
+
+It's recommended that you utilise a tool like Lens to view the cluster
+status as it bootstraps to ensure that everything is working as
+expected. Lens can be downloaded [here](https://k8slens.dev/) or the
+open-source version [here](https://github.com/MuhammedKalkan/OpenLens).
+
+You will need to configure Lens with a Kubeconfig file to allow it to
+connect to your Kubernetes cluster.
+
 ### Verify Installation
 To verify that Helm and Kubectl have been installed correctly, run the following commands:
 ```bash
@@ -24,14 +34,70 @@ helm version
 kubectl version
 ```
 
+### Configure your ACS installation
+
+In order to configure your ACS installation for your circumstances you
+need to create a config file for Helm. This is conventionally called
+`values.yaml` but can be called anything you like. Create the file in a
+sensible location on your local machine; you will need this file again
+when you upgrade your ACS installation. You may want to check it into
+whatever version control you use locally.
+
+The values file is in [YAML format](https://yaml.org/) and can contain
+many options for customisation and configuration. Values specified in
+your local file override the default values [specified in the Helm
+chart](values.yaml) so you can see that file for reference. At the very
+least you should set the following values but remember to change them to
+your specific deployment:
+
+```yaml
+# This section has configuration for ACS overall.
+acs:
+  # Set this to the domain that ACS will be served from. This should be
+  # the same as the wildcard DNS entry you created earlier.
+  baseUrl: factoryplus.myorganisation.com
+
+  # Set this to the name of your organisation. It will be used across
+  # the deployment for branding and naming. In particular it will be
+  # used as a prefix for your Sparkplug Group names.
+  organisation: MYORGANISATION 
+
+  # Set this to true if you want to serve ACS over HTTPS. This is
+  # recommended for production deployments but can be turned off for
+  # development.
+  secure: false
+
+  # Set this to the name of the secret containing the wildcard
+  # certificate for the above domain. This is only required if secure is
+  # set to true.
+  tlsSecretName: factoryplus-tls
+
+# This section has configuration for the identity component.
+identity:
+  # Set the identity realm for the deployment. This is used to namespace
+  # the identity server and should be unique to your deployment. It is
+  # recommended that you use the baseUrl in capitals for this value. If
+  # you have existing Kerberos realms or Active Directory domains you
+  # need to ensure you don't conflict with them.  
+  realm: FACTORYPLUS.MYORGANISATION.COM
+```
+
+You also need to choose a Kubernetes namespace to install the ACS
+components into. Currently the Helm chart installs into the fixed
+namespaces `default` and `kubegres-system` in addition to the namespace
+you nominate, and creates a number of cluster-wide objects such as
+ClusterRoles.
+
 ### Configure DNS and TLS
 This Chart creates a load balancer on your Kubernetes cluster that exposes all services at various subdomains. Please ensure that you have a wildcard DNS entry configured to direct all `*.<baseURL>` requests to your Kubernetes cluster.
 
 If you have enabled `acs.secure` then you must also create a TLS secret on the cluster in the `default` namespace with the same name as the value specified in `acs.tlsSecretName`.
 
-### Install ACS
+### Install a released version of ACS
 
-Now it's time to install the AMRC Connectivity Stack. It's recommended that you utilise a tool like Lens to view the cluster status as it bootstraps to ensure that everything is working as expected. Lens can be downloaded [here](https://k8slens.dev/).
+Now it's time to install the AMRC Connectivity Stack. Follow these
+instructions to install a released version; to install from a
+development Git checkout use the section below instead.
 
 First, add the AMRC Factory+ Helm repository:
 ```bash
@@ -39,32 +105,83 @@ helm repo add amrc-connectivity-stack https://amrc-factoryplus.github.io/amrc-co
 helm repo update
 ```
 
-Next, create a `values.yaml` file in a sensible location on your local machine. This file will be used to configure the deployment and can contain many options for customisation and configuration (see [values](#values) for more information). At the very least you should set the following values but remember to change them to your specific deployment:
-```yaml
-acs:
-  baseUrl: factoryplus.myorganisation.com # Set this to the domain that ACS will be served from. This should be the same as the wildcard DNS entry you created earlier.
-  organisation: MYORGANISATION # Set this to the name of your organisation. It will be used across the deployment for branding and naming.
-  secure: false # Set this to true if you want to serve ACS over HTTPS. This is recommended for production deployments but can be turned off for development.
-  tlsSecretName: factoryplus-tls # Set this to the name of the secret containing the wildcard certificate for the above domain. This is only required if secure is set to true.
-identity:
-  realm: FACTORYPLUS.MYORGANISATION.COM # Set the identity realm for the deployment. This is used to namespace the identity server and should be unique to your deployment. It is recommended that you use the baseUrl in capitals for this value.
-```
-
-Before we install, we need to create the `factory-plus` namespace, which is where all ACS services will be deployed to. If a different namespace is chosen by changing the `-n <namespace>` on the helm install command then ensure the namespace exists before installing ACS.
-
-To create the `factory-plus` namespace, run the following command:
-```bash
-kubectl create namespace factory-plus
-```
-
 Finally, install ACS by running the following command.
 ```bash
-helm install acs amrc-connectivity-stack/amrc-connectivity-stack -f values.yaml --namespace factory-plus
+helm install acs amrc-connectivity-stack/amrc-connectivity-stack --version $version -f $values -n $namespace --create-namespace
 ```
+
+Replace the `$variables` appropriately:
+
+|Variable|Value|
+|---|---|
+|`$version`     | The version of ACS to install. |
+|`$values`      | The path to your `values.yaml` file created above. |
+|`$namespace`   | The Kubernetes namespace to use. |
+
+The version number should be a specific version like `1.0.2` or a semver
+requirement string like `^2.0.0`.
 
 If all went to plan you should now have a fully functioning ACS deployment beginning to deploy to your local Kubernetes cluster. Note that it can take a few minutes to have all services operational.
 
 Take note of the service URLs printed at the end of the installation. You will need these to connect to the various services.
+
+### Upgrade to a released version of ACS
+
+If you have an existing ACS install and you want to upgrade to a new
+release, first make sure you check the release notes for the release.
+If you are upgrading over a major version increment there may be manual
+steps required. We do not support upgrades that skip major versions; if
+you want to upgrade from N.x.y to N+2.x.y you need to upgrade to the
+latest N+1.x.y first.
+
+You can follow the same procedure to re-deploy with different settings
+in your `values.yaml` file.
+
+Run
+
+```bash
+helm repo update
+```
+
+to pull down any updates to the Helm chart. Then run
+
+```bash
+helm upgrade acs amrc-connectivity-stack/amrc-connectivity-stack -f $values --version $version
+```
+
+specifying the version to upgrade to. You need to use the same `$values`
+file as before, but you don't need to re-specify the namespace.
+
+### Installing a development version
+
+If you are installing a development version of ACS start by cloning this
+repo and switching to the branch/tag you want to install. Create a
+`values.yaml` as above; don't create this inside the repo checkout,
+create it somewhere else. In particular **don't** edit the `values.yaml`
+file in this repo directly unless you are working on ACS itself.
+
+Change directory to the repo checkout. Run
+
+```bash
+helm dependency update
+```
+
+to pull down appropriate versions of the dependent charts. It is
+important to do this whenever you have updated your git checkout as the
+dependecies may have changed. Now run
+
+```bash
+helm install acs . -f $values -n $namespace --create-namespace
+```
+
+The `.` for a chart name instructs Helm to install the chart in the
+current directory rather than pulling a released version.
+
+To upgrade a development install, or to change your `values.yaml`, run
+
+```bash
+helm upgrade acs . -f $values
+```
 
 ### Verifying Installation
 

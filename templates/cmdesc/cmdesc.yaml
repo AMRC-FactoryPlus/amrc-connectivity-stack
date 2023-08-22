@@ -31,7 +31,7 @@ spec:
                 path: server
 
       containers:
-        - name: mqtt
+        - name: cmdesc
 {{ include "amrc-connectivity-stack.image" .Values.cmdesc | indent 10 }}
           command: [ "/usr/bin/k5start", "-Uf", "/keytabs/client" ]
           args: [ "npm", "start" ]

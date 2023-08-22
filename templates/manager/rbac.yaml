@@ -1,10 +1,50 @@
-{{ if .Values.manager.enabled }}
+{{- if .Values.manager.enabled }}
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: factoryplus-manager
   namespace: {{ .Release.Namespace }}
 ---
+
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cluster-secret-manager
+rules:
+  # [BM] I am not entirely happy about giving the operator such broad
+  # access to secrets, but since we need to be able to create arbitrary
+  # secrets there is no choice ATM. It may be worth looking in to e.g.
+  # https://kyverno.io/ to restrict this access.
+  - apiGroups: [""] # "" indicates the core API group
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cluster-deployment-manager
+rules:
+  -   apiGroups: ["apps"]
+      resources: ["deployments"]
+      verbs: [list, get, create, update, delete, patch]
+---
+# This role is for accounts which should be able to create and edit KerberosKey objects
+# (basically the manager account).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: krb-keys-manager
+rules:
+  -   apiGroups: [factoryplus.app.amrc.co.uk]
+      resources: [kerberos-keys]
+      verbs: [list, get, create, update, delete, watch, patch]
+  -   apiGroups: [factoryplus.app.amrc.co.uk]
+      resources: [kerberos-keys/status]
+      verbs: [list, get, watch]
+---
+
+
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
@@ -46,40 +86,4 @@ roleRef:
   kind: ClusterRole
   name: cluster-deployment-manager
   apiGroup: rbac.authorization.k8s.io
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: cluster-secret-manager
-rules:
-  # [BM] I am not entirely happy about giving the operator such broad
-  # access to secrets, but since we need to be able to create arbitrary
-  # secrets there is no choice ATM. It may be worth looking in to e.g.
-  # https://kyverno.io/ to restrict this access.
-  - apiGroups: [""] # "" indicates the core API group
-    resources: ["secrets"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: cluster-deployment-manager
-rules:
-  -   apiGroups: ["apps"]
-      resources: ["deployments"]
-      verbs: [list, get, create, update, delete, patch]
----
-# This role is for accounts which should be able to create and edit KerberosKey objects
-# (basically the manager account).
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: krb-keys-manager
-rules:
-  -   apiGroups: [factoryplus.app.amrc.co.uk]
-      resources: [kerberos-keys]
-      verbs: [list, get, create, update, delete, watch, patch]
-  -   apiGroups: [factoryplus.app.amrc.co.uk]
-      resources: [kerberos-keys/status]
-      verbs: [list, get, watch]
-{{- end -}}
+{{- end}}

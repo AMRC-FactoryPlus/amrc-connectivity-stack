@@ -86,8 +86,18 @@ configdb:
     # -- The repository of the Configuration Store component
     repository: acs-configdb
     # -- The tag of the Configuration Store component
-    tag: v1.0.0
+    tag: v1.7.0
     # @ignore
+    pullPolicy: IfNotPresent
+
+# -- The service-setup component loads ACS-specific configuration into
+# the ACS services when the Helm chart is deployed or upgraded.
+serviceSetup:
+  enabled: true
+  image:
+    registry: ghcr.io/amrc-factoryplus
+    repository: acs-service-setup
+    tag: v0.0.1
     pullPolicy: IfNotPresent
 
 mqtt:
@@ -122,6 +132,7 @@ manager:
     repository: acs-edge
     # -- The tag of the Edge Agent component
     tag: v1.0.5
+
   meilisearch:
     # -- The key that the manager uses to connect to the Meilisearch search engine
     key: masterKey
@@ -168,6 +179,36 @@ warehouse:
       tag: v1.1.0
       # @ignore
       pullPolicy: IfNotPresent
+
+git:
+  # -- Whether or not to enable the Git component
+  enabled: true
+  image:
+    # -- The registry of the Git component
+    registry: ghcr.io/amrc-factoryplus
+    # -- The repository of the Git component
+    repository: acs-git
+    # -- The tag of the Git component
+    tag: v0.0.2
+    # @ignore
+    pullPolicy: IfNotPresent
+  # -- Possible values are either 1 to enable all possible debugging, or a comma-separated list of debug tags (the tags printed before the log lines). No logging is specified as an empty string.
+  verbosity: "ALL,!service,!token"
+
+edo:
+  # -- Whether or not to enable the Edge Deployment Operator (EDO) component
+  enabled: true
+  verbosity: "1"
+  image:
+    # -- The registry of the EDO component
+    registry: ghcr.io/amrc-factoryplus
+    # -- The repository of the EDO component
+    repository: acs-edge-deployment
+    # -- The tag of the EDO component
+    tag: v0.0.1
+    # @ignore
+    pullPolicy: IfNotPresent
+  verbosity: "ALL,!service,!token"
 
 minio:
   # -- Whether or not to enable MinIO

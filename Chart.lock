@@ -1,7 +1,7 @@
 dependencies:
 - name: traefik
   repository: https://helm.traefik.io/traefik
-  version: 10.19.5
+  version: 23.1.0
 - name: loki
   repository: https://grafana.github.io/helm-charts
   version: 4.8.0
@@ -20,8 +20,8 @@ dependencies:
 - name: influxdb2
   repository: https://helm.influxdata.com/
   version: 2.1.1
-- name: nginx
-  repository: oci://registry-1.docker.io/bitnamicharts
-  version: 15.1.0
-digest: sha256:b85dbcb6c61e753d7870c0d80009fc022d030f268d4fdcebf48883a7af380289
-generated: "2023-06-30T15:48:23.94689+01:00"
+- name: charts/switchboard
+  repository: oci://ghcr.io/borchero
+  version: 0.5.8
+digest: sha256:11312b538986616bdaffcc975898662c5138c4520b0b00e1ec5637bc8fa02936
+generated: "2023-08-22T10:56:16.835151+01:00"

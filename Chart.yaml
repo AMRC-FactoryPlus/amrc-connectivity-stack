@@ -46,8 +46,7 @@ dependencies:
     version: 2.1.1
     repository: https://helm.influxdata.com/
     condition: influxdb2.enabled
-  - name: charts/switchboard
-    alias: switchboard
+  - name: switchboard
     version: 0.5.8
-    repository: oci://ghcr.io/borchero
+    repository: oci://ghcr.io/borchero/charts
     condition: switchboard.enabled

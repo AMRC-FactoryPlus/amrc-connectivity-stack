@@ -23,5 +23,5 @@ dependencies:
 - name: charts/switchboard
   repository: oci://ghcr.io/borchero
   version: 0.5.8
-digest: sha256:11312b538986616bdaffcc975898662c5138c4520b0b00e1ec5637bc8fa02936
-generated: "2023-08-22T10:56:16.835151+01:00"
+digest: sha256:02f3e792630e7a16439e7f3dbd82213d142cddc0f6bc68501239576d0c6173a8
+generated: "2023-08-22T11:12:35.868747+01:00"

@@ -121,7 +121,7 @@ manager:
     # -- The repository of the Edge Agent component
     repository: acs-edge
     # -- The tag of the Edge Agent component
-    tag: v1.1.0
+    tag: v1.1.1
   meilisearch:
     # -- The key that the manager uses to connect to the Meilisearch search engine
     key: masterKey

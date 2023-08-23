@@ -135,9 +135,9 @@ class UpdateEdgeAgentConfigurationForNodeAction
                                 'deadBand' => $v['Deadband'] ?? null,
                                 'tooltip' => $v['Tooltip'] ?? null,
                                 'docs' => $v['Documentation'] ?? null,
-                                'recordToDB' => $v['Record_To_Historian'],
+                                'recordToDB' => $v['Record_To_Historian'] ?? false,
                             ], static function ($val) {
-                                return $val;
+                                return $val !== null;
                             }
                         );
                     } elseif ($key === 'Schema_UUID') {

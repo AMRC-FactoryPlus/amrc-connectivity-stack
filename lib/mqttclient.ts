@@ -317,7 +317,7 @@ export default class MQTTClient {
                         type: obj.type,
                         alias: alias,
                         unit: obj.properties?.engUnit?.value,
-                        transient: !(obj.properties?.recordToDB?.value)
+                        transient: obj.isTransient
                     };
                     return acc;
                 }, {}));

@@ -250,13 +250,22 @@ export class SparkplugNode extends (
                     }
 
                     if (metric.timestamp === undefined) metric.timestamp = Date.now();
+
+                    // Strip the recordToDB property from the metric. It's served it's purpose by carrying our
+                    // intentions to inform is_transient. Keeping it in the payload is a waste of space and could
+                    // be confusing.
+                    let isTransient = metric.properties?.recordToDB.value === false ?? false;
+                    if (typeof metric.properties?.recordToDB !== 'undefined') {
+                        delete (metric.properties as any)?.recordToDB;
+                    }
+
                     // Create basic metric object
                     const newMetric: sparkplugMetric = {
                         timestamp: metric.timestamp,
                         value: metric.value,
                         alias: metric.alias,
                         type: metric.type,
-                        isTransient: metric.isTransient
+                        isTransient: isTransient
                     };
                     // If this is a birth certificate, we need to define the name, properties and alias
                     // If a data payload, only alias is used to save space.

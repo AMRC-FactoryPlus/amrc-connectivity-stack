@@ -121,7 +121,7 @@ manager:
     # -- The repository of the Edge Agent component
     repository: acs-edge
     # -- The tag of the Edge Agent component
-    tag: v1.0.5
+    tag: v1.1.0
   meilisearch:
     # -- The key that the manager uses to connect to the Meilisearch search engine
     key: masterKey
@@ -165,7 +165,7 @@ warehouse:
       # -- The repository of the Warehouse component
       repository: influxdb-sparkplug-ingester
       # -- The tag of the ingester component
-      tag: v1.1.0
+      tag: v1.2.0
       # @ignore
       pullPolicy: IfNotPresent
 

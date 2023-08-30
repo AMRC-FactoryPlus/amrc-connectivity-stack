@@ -1,0 +1,142 @@
+{
+  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Geo/GlobalPosition-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Global Position",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "ece1f234-d0cd-478e-8dad-3bf0b1966f81"
+    },
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "Device_Information": {
+      "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Device_Information-v1.json"
+    },
+    "Latitude": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "FloatLE",
+                "FloatBE"
+              ]
+            },
+            "Documentation": {
+              "default": "The latitude of the device"
+            }
+          }
+        }
+      ]
+    },
+    "Longitude": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "FloatLE",
+                "FloatBE"
+              ]
+            },
+            "Documentation": {
+              "default": "The longitude of the device"
+            }
+          }
+        }
+      ]
+    },
+    "Altitude": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "FloatLE",
+                "FloatBE"
+              ]
+            },
+            "Documentation": {
+              "default": "The altitude of the device"
+            }
+          }
+        }
+      ]
+    },
+    "Heading": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "UInt16LE",
+                "UInt16BE"
+              ]
+            },
+            "Documentation": {
+              "default": "The heading of the device (0-360 degrees)"
+            }
+          }
+        }
+      ]
+    },
+    "Speed": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "UInt16LE",
+                "UInt16BE"
+              ]
+            },
+            "Documentation": {
+              "default": "The speed of the device"
+            }
+          }
+        }
+      ]
+    },
+    "Fix_Date_Time": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "String"
+              ]
+            },
+            "Documentation": {
+              "default": "The date and time of the GPS fix in ISO 8601 format"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID"
+  ]
+}

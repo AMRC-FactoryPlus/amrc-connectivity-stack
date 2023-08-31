@@ -1,0 +1,39 @@
+{
+  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/PLC/Status_Flag-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Status Flag",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "4171ff9f-e852-4a15-98c1-b49361e8e506"
+    },
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "Status": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "String"
+              ]
+            },
+            "Documentation": {
+              "default": "The value of the status for this flag"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID"
+  ]
+}

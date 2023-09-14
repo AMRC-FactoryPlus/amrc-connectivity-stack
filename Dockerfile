@@ -1,4 +1,4 @@
-FROM webdevops/php-nginx:8.1-alpine
+FROM webdevops/php-nginx:8.2-alpine
 
 # System dependencies
 RUN apk add --no-cache autoconf krb5-libs krb5-dev oniguruma-dev postgresql-dev libxml2-dev nodejs yarn gcc make g++ zlib-dev

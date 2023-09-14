@@ -180,7 +180,7 @@ return [
         App\Support\Providers\AppServiceProvider::class,
         BroadcastServiceProvider::class,
         App\Support\Providers\EventServiceProvider::class,
-        App\Support\Providers\RouteServiceProvider::class,
+        \App\Support\Providers\RouteServiceProvider::class
 
     ],
 

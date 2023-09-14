@@ -18,7 +18,7 @@
         "laravel/framework": "^9.0",
         "laravel/legacy-factories": "^1.1",
         "laravel/octane": "^1.0.0",
-        "laravel/passport": "^10.0",
+        "laravel/passport": "^11.9",
         "laravel/scout": "^9.2",
         "laravel/tinker": "^2.0",
         "laravelcollective/html": "^6.1",

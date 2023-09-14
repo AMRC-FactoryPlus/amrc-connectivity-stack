@@ -20,9 +20,9 @@ use Laravel\Scout\Searchable;
  */
 class User extends Authenticatable
 {
-    use HasApiTokens;
     use Notifiable;
     use Searchable;
+    use HasApiTokens;
 
     protected $guarded = [];
 

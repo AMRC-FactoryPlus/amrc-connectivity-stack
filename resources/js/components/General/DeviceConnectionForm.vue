@@ -299,6 +299,10 @@ export default {
           username: null,
           password: null,
         },
+        OpenProtocolConnDetails: {
+          host: null,
+          port: '4545',
+        },
         RESTConnDetails: {
           baseURL: '',
           authMethod: 'None',

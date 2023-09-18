@@ -110,6 +110,6 @@
     },
     "required": [
         "Schema_UUID",
-        "Instance_UUID",
+        "Instance_UUID"
     ]
 }

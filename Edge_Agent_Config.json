@@ -53,7 +53,7 @@
                     "format": "password",
                     "minLength": 1
                 },
-                "ayncPubMode": {
+                "asyncPubMode": {
                     "type": "boolean",
                     "title": "Asynchronous publish mode"
                 },
@@ -62,7 +62,7 @@
                     "title": "Publish Cycle Interval",
                     "options": {
                         "dependencies": {
-                            "ayncPubMode": false
+                            "asyncPubMode": false
                         }
                     }
                 },
@@ -104,7 +104,8 @@
                             "REST",
                             "S7",
                             "UDP",
-                            "MTConnect"
+                            "MTConnect",
+                            "Open Protocol"
                         ],
                         "minLength": 1
                     },
@@ -201,6 +202,33 @@
                             }
                         }
                     },
+                    "OpenProtocolConnDetails": {
+                        "type": "object",
+                        "title": "Open Protocol Details",
+                        "options": {
+                            "dependencies": {
+                                "connType": "Open Protocol"
+                            },
+                            "collapsed": false
+                        },
+                        "required": [
+                            "host",
+                            "port"
+                        ],
+                        "properties": {
+                            "host": {
+                                "type": "string",
+                                "title": "Hostname/IP",
+                                "minLength": 1
+                            },
+                            "port": {
+                                "type": "number",
+                                "title": "Port",
+                                "minLength": 1,
+                                "default": 4545
+                            }
+                        }
+                    },
                     "OPCUAConnDetails": {
                         "type": "object",
                         "title": "OPC-UA Server Details",
@@ -220,7 +248,7 @@
                             "endpoint": {
                                 "type": "string",
                                 "title": "Endpoint",
-                                "pattern": "^opc.tcp://.+:\\d+\/?$",
+                                "pattern": "^opc.tcp://.+:\\d+/?$",
                                 "options": {
                                     "inputAttributes": {
                                         "placeholder": "e.g. opc.tcp://myserver:1234"
@@ -568,12 +596,8 @@
                             "DoubleBE",
                             "Boolean",
                             "String",
-                            "DateTime",
-                            "Text",
                             "UUID",
-                            "DataSet",
-                            "Bytes",
-                            "File",
+                            "DateTime",
                             "Template"
                         ]
                     },
@@ -748,8 +772,7 @@
                             "DoubleBE",
                             "Boolean",
                             "String",
-                            "DateTimeBE",
-                            "DateTimeLE",
+                            "DateTime",
                             "Template"
                         ]
                     },

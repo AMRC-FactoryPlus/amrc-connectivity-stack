@@ -30,10 +30,6 @@
     },
     "required": [
         "Schema_UUID",
-        "Instance_UUID",
-        "Smart_Tool_Device_Information",
-        "Device_Information",
-        "Tightening_Result",
-        "Messages"
+        "Instance_UUID"
     ]
 }

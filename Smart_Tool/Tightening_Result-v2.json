@@ -455,23 +455,6 @@
     },
     "required": [
         "Schema_UUID",
-        "Instance_UUID",
-        "Torque_Controller_Name",
-        "VIN_Number",
-        "Job_ID",
-        "Parameter_Set_ID",
-        "Batch_Size",
-        "Batch_Counter",
-        "Tightening_Status",
-        "Torque_Status",
-        "Angle_Status",
-        "Torque_Min_Limit",
-        "Torque_Max_Limit",
-        "Torque_Final_Target",
-        "Torque",
-        "Angle_Min",
-        "Angle_Max",
-        "Final_Angle_Target",
-        "Angle"
+        "Instance_UUID"
     ]
 }

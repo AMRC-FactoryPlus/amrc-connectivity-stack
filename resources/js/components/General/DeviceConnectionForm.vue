@@ -351,6 +351,7 @@ export default {
               'S7',
               'UDP',
               'MTConnect',
+              'Open Protocol'
             ],
           },
           'UDPConnDetails': {
@@ -513,6 +514,41 @@ export default {
                 title: 'Keep Alive Interval (sec)',
                 default: 60,
               },
+            },
+          },
+          'OpenProtocolConnDetails': {
+            type: 'object',
+            title: 'Open Protocol Details',
+            properties: {
+              host: {
+                type: 'string',
+                showIf: () => {
+                  return this.model.connType === 'Open Protocol' || false;
+                },
+                validations: {
+                  requiredIf: requiredIf(() => {
+                    return this.model.connType === 'Open Protocol' || false;
+                  }),
+                  minLength: minLength(3),
+                },
+                description: 'The hostname of the controller to connect to.',
+                title: 'Hostname/IP',
+              },
+              port: {
+                type: 'number',
+                description: 'The port number to connect to the controller on.',
+                title: 'Port',
+                showIf: () => {
+                  return this.model.connType === 'Open Protocol' || false;
+                },
+                validations: {
+                  requiredIf: requiredIf(() => {
+                    return this.model.connType === 'Open Protocol' || false;
+                  }),
+                  numeric,
+                },
+                default: 4545,
+              }
             },
           },
           'OPCUAConnDetails': {

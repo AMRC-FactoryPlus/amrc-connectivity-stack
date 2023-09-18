@@ -112,7 +112,7 @@ manager:
     # -- The repository of the Manager component
     repository: acs-manager
     # -- The tag of the Manager component
-    tag: v1.0.8
+    tag: v1.1.0
     # @ignore
     pullPolicy: IfNotPresent
   edge:
@@ -121,7 +121,7 @@ manager:
     # -- The repository of the Edge Agent component
     repository: acs-edge
     # -- The tag of the Edge Agent component
-    tag: v1.1.1
+    tag: v1.2.0
   meilisearch:
     # -- The key that the manager uses to connect to the Meilisearch search engine
     key: masterKey

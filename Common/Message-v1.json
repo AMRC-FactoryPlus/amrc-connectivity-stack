@@ -111,7 +111,5 @@
     "required": [
         "Schema_UUID",
         "Instance_UUID",
-        "Message_Type",
-        "Message_Content"
     ]
 }

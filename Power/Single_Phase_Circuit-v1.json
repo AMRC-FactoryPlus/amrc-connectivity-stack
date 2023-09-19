@@ -1,6 +1,5 @@
 {
-    "$id": "Single_Phase_Circuit-v1.json",
-    "$id##########": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Power/Single_Phase_Circuit-v1.json",
+    "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Power/Single_Phase_Circuit-v1.json",
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "title": "Single Phase Distribution Line",
     "type": "object",
@@ -20,15 +19,13 @@
             "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Links-v1.json"
         },
         "Characteristics":{
-            "$ref": "Phase-v2.json",
-            "$ref################": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Power/Phase-v2.json"
+            "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Power/Phase-v2.json"
         },
         "Loads": {
             "type": "object",
             "patternProperties": {
                 "^[a-zA-Z0-9_]*$": {
-                    "$ref": "Single_Phase_Circuit-v1.json",
-                    "$ref##############": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Power/Single_Phase_Circuit-v1.json"
+                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Power/Single_Phase_Circuit-v1.json"
                 }
             }
         },

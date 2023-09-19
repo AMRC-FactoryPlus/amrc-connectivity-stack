@@ -1,6 +1,5 @@
 {
-  "$id": "Power_Monitoring-v2.json",
-  "$id#########": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Power_Monitoring-v2.json",
+  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Power_Monitoring-v2.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Power Monitoring",
   "type": "object",
@@ -23,8 +22,7 @@
       "type": "object",
       "patternProperties": {
         "^[a-zA-Z0-9_]*$": {
-          "$ref###########": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Power/Single_Phase_Circuit-v1.json",
-          "$ref": "Single_Phase_Circuit-v1.json"
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Power/Single_Phase_Circuit-v1.json"
         }
       }
     },
@@ -32,8 +30,7 @@
       "type": "object",
       "patternProperties": {
         "^[a-zA-Z0-9_]*$": {
-          "$ref###########": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Power/Three_Phase_Circuit.json",
-          "$ref": "Three_Phase_Circuit-v1.json"
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Power/Three_Phase_Circuit-v1.json"
         }
       }
     },

@@ -1,6 +1,5 @@
 {
-    "$id": "Three_Phase_Circuit-v1.json",
-    "$id###################": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Power/Three_Phase_Circuit-v1.json",
+    "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Power/Three_Phase_Circuit-v1.json",
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "title": "Three Phase Distribution Line",
     "type": "object",
@@ -26,12 +25,10 @@
                     "type": "object",
                     "properties": {
                         "Characteristics": {
-                            "$ref": "Phase-v2.json",
-                            "$ref##############": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Power/Phase-v2.json"
+                            "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Power/Phase-v2.json"
                         },
                         "Loads": {
-                            "$ref": "Single_Phase_Circuit-v1.json",
-                            "$ref############": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Power/Single_Phase_Circuit-v1.json"
+                            "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Power/Single_Phase_Circuit-v1.json"
                         }
                     }
                 }
@@ -41,8 +38,7 @@
             "type": "object",
             "patternProperties": {
                 "^[a-zA-Z0-9_]*$": {
-                    "$ref": "Three_Phase_Circuit-v1.json",
-                    "$ref##############": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Power/Three_Phase_Circuit-v1.json"
+                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Power/Three_Phase_Circuit-v1.json"
                 }
             }
         },

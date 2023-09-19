@@ -1,0 +1,88 @@
+{
+    "$schema": "./Power_Monitoring-v2.json",
+    "Schema_UUID": "b6253da7-8d95-455c-bc42-23693ca95d46",
+    "Instance_UUID": "",
+    "Link": {
+        "Instance_UUID": "",
+        "Schema_UUID": "2fed10c7-de5f-4023-89b7-9aeb10afe60b",
+        "myLink": {
+            "Relation": "very",
+            "Target": "is"
+        }
+    },
+    "Single_Phase_Circuits": {
+        "MyFirstExtensionLead": {
+            "Schema_UUID": "d6de8765-bfbe-4f6b-b5d8-822dbd7f3a49",
+            "Instance_UUID": "",
+            "Characteristics": {
+                "Schema_UUID": "0ff890b0-1ddb-4cb0-96eb-b0e87039df2f",
+                "Instance_UUID": "",
+                "Current_AC": {
+                    "Schema_UUID": "b16275f1-e443-4c41-a482-fcbdfbd20769",
+                    "Sparkplug_Type": "FloatBE",
+                    "Record_To_Historian": true,
+                    "Address": "REST:/status or for recursive calls </robots,$..url>"
+                },
+                "Voltage_AC": 222
+            },
+            "Loads": {
+                "MyFirstSubLoad": {
+                    "Schema_UUID": "d6de8765-bfbe-4f6b-b5d8-822dbd7f3a49",
+                    "Instance_UUID": "",
+                    "Characteristics": {
+                        "Schema_UUID": "0ff890b0-1ddb-4cb0-96eb-b0e87039df2f",
+                        "Instance_UUID": "",
+                        "Voltage_AC": 555
+                    }
+                },
+                "MySecondSubLoad": {
+                    "Schema_UUID": "d6de8765-bfbe-4f6b-b5d8-822dbd7f3a49",
+                    "Instance_UUID": "asdf",
+                    "Characteristics": {
+                        "Schema_UUID": "0ff890b0-1ddb-4cb0-96eb-b0e87039df2f",
+                        "Instance_UUID": "",
+                        "Voltage_AC": 123,
+                    },
+                    "Loads": {
+                        "MyFirstSubSubLoad": {
+                            "Link": {
+                                "MyLink": {
+                                    "Relation": "",
+                                    "Target": ""
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "Three-Phase_Circuits": {
+        "myTopLEvelThreePHase": {
+            "Schema_UUID": "0d3dbae6-3195-4249-9ca1-897221db016f",
+            "Instance_UUID": "",
+            "Voltage_AC_Average": 222.333,
+            "Phases": {
+                "L1": {
+                    "Characteristics": {
+                        "Active_Energy"
+                    },
+                    "Loads": {
+                        "Characteristics": {
+                            "Active_Energy_Returned"
+                        }
+                    }
+                }
+            },
+            "Loads": {
+                "MySub3PhaseLine": {
+                    "Loads": {
+                        "MySubSub3PhaseLine": {
+                            "Voltage_AC_Average": 444.333
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

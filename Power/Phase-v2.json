@@ -1,0 +1,260 @@
+{
+    "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Power/Phase-v2.json",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Phase Characteristics",
+    "type": "object",
+    "properties": {
+      "Schema_UUID": {
+        "const": "0ff890b0-1ddb-4cb0-96eb-b0e87039df2f"
+      },
+      "Instance_UUID": {
+        "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+        "type": "string",
+        "format": "uuid"
+      },
+      "Voltage_AC": {
+        "allOf": [
+          {
+            "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+          },
+          {
+            "properties": {
+              "Sparkplug_Type": {
+                "enum": [
+                  "FloatLE",
+                  "FloatBE"
+                ]
+              },
+              "Documentation": {
+                "default": "True RMS voltage (Vrms)"
+              }
+            }
+          }
+        ]
+      },
+      "Current_AC": {
+        "allOf": [
+          {
+            "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+          },
+          {
+            "properties": {
+              "Sparkplug_Type": {
+                "enum": [
+                  "FloatLE",
+                  "FloatBE"
+                ]
+              },
+              "Documentation": {
+                "default": "True RMS current (Irms)"
+              }
+            }
+          }
+        ]
+      },
+      "Active_Power": {
+        "allOf": [
+          {
+            "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+          },
+          {
+            "properties": {
+              "Sparkplug_Type": {
+                "enum": [
+                  "FloatLE",
+                  "FloatBE"
+                ]
+              },
+              "Documentation": {
+                "default": "Active power (kW)"
+              }
+            }
+          }
+        ]
+      },
+      "Reactive_Power": {
+        "allOf": [
+          {
+            "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+          },
+          {
+            "properties": {
+              "Sparkplug_Type": {
+                "enum": [
+                  "FloatLE",
+                  "FloatBE"
+                ]
+              },
+              "Documentation": {
+                "default": "Reactive power (kVAR)"
+              }
+            }
+          }
+        ]
+      },
+      "Apparent_Power": {
+        "allOf": [
+          {
+            "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+          },
+          {
+            "properties": {
+              "Sparkplug_Type": {
+                "enum": [
+                  "FloatLE",
+                  "FloatBE"
+                ]
+              },
+              "Documentation": {
+                "default": "Apparent power (kVA)"
+              }
+            }
+          }
+        ]
+      },
+      "Power_Factor": {
+        "allOf": [
+          {
+            "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+          },
+          {
+            "properties": {
+              "Sparkplug_Type": {
+                "enum": [
+                  "FloatLE",
+                  "FloatBE"
+                ]
+              },
+              "Documentation": {
+                "default": "Power factor (PF)"
+              }
+            }
+          }
+        ]
+      },
+      "Active_Energy": {
+        "allOf": [
+          {
+            "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+          },
+          {
+            "properties": {
+              "Sparkplug_Type": {
+                "enum": [
+                  "FloatLE",
+                  "FloatBE"
+                ]
+              },
+              "Documentation": {
+                "default": "Active energy (KWh)"
+              }
+            }
+          }
+        ]
+      },
+      "Active_Energy_Returned": {
+        "allOf": [
+          {
+            "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+          },
+          {
+            "properties": {
+              "Sparkplug_Type": {
+                "enum": [
+                  "FloatLE",
+                  "FloatBE"
+                ]
+              },
+              "Documentation": {
+                "default": "Active energy returned (KWh)"
+              }
+            }
+          }
+        ]
+      },
+      "Reactive_Energy": {
+        "allOf": [
+          {
+            "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+          },
+          {
+            "properties": {
+              "Sparkplug_Type": {
+                "enum": [
+                  "FloatLE",
+                  "FloatBE"
+                ]
+              },
+              "Documentation": {
+                "default": "Reactive energy (kVARh)"
+              }
+            }
+          }
+        ]
+      },
+      "Reactive_Energy_Returned": {
+        "allOf": [
+          {
+            "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+          },
+          {
+            "properties": {
+              "Sparkplug_Type": {
+                "enum": [
+                  "FloatLE",
+                  "FloatBE"
+                ]
+              },
+              "Documentation": {
+                "default": "Reactive energy returned (kVARh)"
+              }
+            }
+          }
+        ]
+      },
+      "Apparent_Energy": {
+        "allOf": [
+          {
+            "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+          },
+          {
+            "properties": {
+              "Sparkplug_Type": {
+                "enum": [
+                  "FloatLE",
+                  "FloatBE"
+                ]
+              },
+              "Documentation": {
+                "default": "Apparent energy (kVAh)"
+              }
+            }
+          }
+        ]
+      },
+      "Frequency": {
+        "allOf": [
+          {
+            "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+          },
+          {
+            "properties": {
+              "Sparkplug_Type": {
+                "enum": [
+                  "FloatLE",
+                  "FloatBE"
+                ]
+              },
+              "Documentation": {
+                "default": "Frequency (Hz)"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "required": [
+      "Schema_UUID",
+      "Instance_UUID"
+    ]
+  }

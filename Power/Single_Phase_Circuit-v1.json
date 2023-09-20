@@ -1,0 +1,56 @@
+{
+    "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Power/Single_Phase_Circuit-v1.json",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Single Phase Circuit",
+    "type": "object",
+    "properties": {
+        "Schema_UUID": {
+            "const": "d6de8765-bfbe-4f6b-b5d8-822dbd7f3a49"
+        },
+        "Instance_UUID": {
+            "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+            "type": "string",
+            "format": "uuid"
+        },
+        "Device_Information": {
+            "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Device_Information-v1.json"
+        },
+        "Link":{
+            "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Links-v1.json"
+        },
+        "Characteristics":{
+            "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Power/Phase-v2.json"
+        },
+        "Loads": {
+            "type": "object",
+            "patternProperties": {
+                "^[a-zA-Z0-9_]*$": {
+                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Power/Single_Phase_Circuit-v1.json"
+                }
+            }
+        },
+        "Switch_Closed": {
+            "allOf": [
+                {
+                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+                },
+                {
+                    "properties": {
+                        "Sparkplug_Type": {
+                            "enum": [
+                                "Boolean"
+                            ]
+                        },
+                        "Documentation": {
+                            "default": "Whether or not the relay is open"
+                        }
+                    }
+                }
+            ]
+        }
+    },
+    "required": [
+        "Schema_UUID",
+        "Instance_UUID"
+    ]
+}

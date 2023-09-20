@@ -1,0 +1,311 @@
+{
+    "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Power/Three_Phase_Circuit-v1.json",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Three Phase Circuit",
+    "type": "object",
+    "properties": {
+        "Schema_UUID": {
+            "const": "0d3dbae6-3195-4249-9ca1-897221db016f"
+        },
+        "Instance_UUID": {
+            "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+            "type": "string",
+            "format": "uuid"
+        },
+        "Device_Information": {
+            "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Device_Information-v1.json"
+        },
+        "Link": {
+            "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Links-v1.json"
+        },
+        "Phases": {
+            "type": "object",
+            "properties": {
+                "L1": {
+                    "type": "object",
+                    "properties": {
+                        "Characteristics": {
+                            "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Power/Phase-v2.json"
+                        },
+                        "Loads": {
+                            "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Power/Single_Phase_Circuit-v1.json"
+                        }
+                    }
+                },
+                "L2": {
+                    "type": "object",
+                    "properties": {
+                        "Characteristics": {
+                            "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Power/Phase-v2.json"
+                        },
+                        "Loads": {
+                            "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Power/Single_Phase_Circuit-v1.json"
+                        }
+                    }
+                },
+                "L3": {
+                    "type": "object",
+                    "properties": {
+                        "Characteristics": {
+                            "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Power/Phase-v2.json"
+                        },
+                        "Loads": {
+                            "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Power/Single_Phase_Circuit-v1.json"
+                        }
+                    }
+                }
+            }
+        },
+        "Loads": {
+            "type": "object",
+            "patternProperties": {
+                "^[a-zA-Z0-9_]*$": {
+                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Power/Three_Phase_Circuit-v1.json"
+                }
+            }
+        },
+        "Switch_Closed": {
+            "allOf": [
+                {
+                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+                },
+                {
+                    "properties": {
+                        "Sparkplug_Type": {
+                            "enum": [
+                                "Boolean"
+                            ]
+                        },
+                        "Documentation": {
+                            "default": "Whether or not the relay is open"
+                        }
+                    }
+                }
+            ]
+        },
+        "Voltage_AC_Average": {
+            "allOf": [
+                {
+                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+                },
+                {
+                    "properties": {
+                        "Sparkplug_Type": {
+                            "enum": [
+                                "DoubleLE",
+                                "DoubleBE"
+                            ]
+                        },
+                        "Documentation": {
+                            "default": "Average voltage across the phases"
+                        }
+                    }
+                }
+            ]
+        },
+        "Current_AC_Average": {
+            "allOf": [
+                {
+                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+                },
+                {
+                    "properties": {
+                        "Sparkplug_Type": {
+                            "enum": [
+                                "DoubleLE",
+                                "DoubleBE"
+                            ]
+                        },
+                        "Documentation": {
+                            "default": "Average current across the phases"
+                        }
+                    }
+                }
+            ]
+        },
+        "Active_Power_Total": {
+            "allOf": [
+                {
+                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+                },
+                {
+                    "properties": {
+                        "Sparkplug_Type": {
+                            "enum": [
+                                "DoubleLE",
+                                "DoubleBE"
+                            ]
+                        },
+                        "Documentation": {
+                            "default": "Total Active power (kW)"
+                        }
+                    }
+                }
+            ]
+        },
+        "Reactive_Power_Total": {
+            "allOf": [
+                {
+                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+                },
+                {
+                    "properties": {
+                        "Sparkplug_Type": {
+                            "enum": [
+                                "DoubleLE",
+                                "DoubleBE"
+                            ]
+                        },
+                        "Documentation": {
+                            "default": "Reactive power (kVAR)"
+                        }
+                    }
+                }
+            ]
+        },
+        "Apparent_Power_Total": {
+            "allOf": [
+                {
+                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+                },
+                {
+                    "properties": {
+                        "Sparkplug_Type": {
+                            "enum": [
+                                "DoubleLE",
+                                "DoubleBE"
+                            ]
+                        },
+                        "Documentation": {
+                            "default": "Total Apparent Power (kVA)"
+                        }
+                    }
+                }
+            ]
+        },
+        "Power_Factor_Average": {
+            "allOf": [
+                {
+                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+                },
+                {
+                    "properties": {
+                        "Sparkplug_Type": {
+                            "enum": [
+                                "DoubleLE",
+                                "DoubleBE"
+                            ]
+                        },
+                        "Documentation": {
+                            "default": "Average Power Factor"
+                        }
+                    }
+                }
+            ]
+        },
+        "Frequency_Max": {
+            "allOf": [
+                {
+                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+                },
+                {
+                    "properties": {
+                        "Sparkplug_Type": {
+                            "enum": [
+                                "DoubleLE",
+                                "DoubleBE"
+                            ]
+                        },
+                        "Documentation": {
+                            "default": "Maximum Frequency"
+                        }
+                    }
+                }
+            ]
+        },
+        "Active_Energy_Total": {
+            "allOf": [
+                {
+                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+                },
+                {
+                    "properties": {
+                        "Sparkplug_Type": {
+                            "enum": [
+                                "DoubleLE",
+                                "DoubleBE"
+                            ]
+                        },
+                        "Documentation": {
+                            "default": "Total Active Energy (kWh)"
+                        }
+                    }
+                }
+            ]
+        },
+        "Active_Energy_Returned_Total": {
+            "allOf": [
+                {
+                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+                },
+                {
+                    "properties": {
+                        "Sparkplug_Type": {
+                            "enum": [
+                                "DoubleLE",
+                                "DoubleBE"
+                            ]
+                        },
+                        "Documentation": {
+                            "default": "Total Active Energy Returned (kWh)"
+                        }
+                    }
+                }
+            ]
+        },
+        "Reactive_Energy_Total": {
+            "allOf": [
+                {
+                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+                },
+                {
+                    "properties": {
+                        "Sparkplug_Type": {
+                            "enum": [
+                                "DoubleLE",
+                                "DoubleBE"
+                            ]
+                        },
+                        "Documentation": {
+                            "default": "Total Reactive Energy (kVARh)"
+                        }
+                    }
+                }
+            ]
+        },
+        "Reactive_Energy_Returned_Total": {
+            "allOf": [
+                {
+                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+                },
+                {
+                    "properties": {
+                        "Sparkplug_Type": {
+                            "enum": [
+                                "DoubleLE",
+                                "DoubleBE"
+                            ]
+                        },
+                        "Documentation": {
+                            "default": "Total Reactive Energy Returned (kVARh)"
+                        }
+                    }
+                }
+            ]
+        },
+        "required": [
+            "Schema_UUID",
+            "Instance_UUID"
+        ]
+    }
+}

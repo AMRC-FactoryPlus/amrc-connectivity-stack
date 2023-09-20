@@ -26,7 +26,7 @@
         }
       }
     },
-    "Three-Phase_Circuits": {
+    "Three_Phase_Circuits": {
       "type": "object",
       "patternProperties": {
         "^[a-zA-Z0-9_]*$": {

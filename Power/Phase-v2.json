@@ -1,5 +1,5 @@
 {
-    "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Phase-v2.json",
+    "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Power/Phase-v2.json",
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "title": "Phase Characteristics",
     "type": "object",

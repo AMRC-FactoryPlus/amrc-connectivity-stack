@@ -20,30 +20,8 @@
         },
         "Phases": {
             "type": "object",
-            "properties": {
-                "L1": {
-                    "type": "object",
-                    "properties": {
-                        "Characteristics": {
-                            "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Power/Phase-v2.json"
-                        },
-                        "Loads": {
-                            "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Power/Single_Phase_Circuit-v1.json"
-                        }
-                    }
-                },
-                "L2": {
-                    "type": "object",
-                    "properties": {
-                        "Characteristics": {
-                            "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Power/Phase-v2.json"
-                        },
-                        "Loads": {
-                            "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Power/Single_Phase_Circuit-v1.json"
-                        }
-                    }
-                },
-                "L3": {
+            "patternProperties": {
+                "^L[123]$": {
                     "type": "object",
                     "properties": {
                         "Characteristics": {

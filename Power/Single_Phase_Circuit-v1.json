@@ -1,7 +1,7 @@
 {
     "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Power/Single_Phase_Circuit-v1.json",
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "title": "Single Phase Distribution Line",
+    "title": "Single Phase Circuit",
     "type": "object",
     "properties": {
         "Schema_UUID": {

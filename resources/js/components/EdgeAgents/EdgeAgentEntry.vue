@@ -21,7 +21,7 @@
         <i class="fa-solid fa-circle-notch fa-spin"></i>
       </div>
       <div class="mr-2 inline-flex items-center px-2.5 py-0.5 text-sm font-medium bg-brand/10 text-brand">
-        v{{ item.spec.template.spec.containers[0].image.split(":")[item.spec.template.spec.containers[0].image.split(":").length-1] }}
+        {{ item.spec.template.spec.containers[0].image.split(":")[item.spec.template.spec.containers[0].image.split(":").length-1] }}
       </div>
       <i class="fa-solid fa-arrow-right text-gray-400"></i>
       <TextField class="mb-2" placeholder="New version" v-model="v$.newVersion.$model" :valid="v$">

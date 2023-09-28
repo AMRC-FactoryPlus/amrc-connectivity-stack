@@ -272,7 +272,7 @@
                     }
                 }
             ]
-        },
+        }
     },
     "required": [
         "Schema_UUID",

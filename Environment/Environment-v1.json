@@ -15,29 +15,33 @@
     "Device_Information": {
       "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Device_Information-v1.json"
     },
-	"Temperature": {
+    "Temperature": {
       "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Sensors/Temperature-v1.json"
     },
-	"Humidity": {
+    "Humidity": {
       "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Sensors/Humidity-v1.json"
     },
-	"Pressure": {
+    "Pressure": {
       "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Sensors/Pressure-v1.json"
     },
-	"Sound_Level": {
+    "Sound_Level": {
       "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Sensors/Sound_Level-v1.json"
     },
-	"Carbon_Dioxide": {
+    "Carbon_Dioxide": {
       "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Sensors/Carbon_Dioxide-v1.json"
     },
-	"Light_Intensity": {
+    "Light_Intensity": {
       "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Sensors/Light_Intensity-v1.json"
     },
-	"Sensor": {
-		"Battery":{
-			"$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Sensors/Battery-v1.json"
-		}
+    "Sensor": {
+      "type": "object",
+      "properties": {
+        "Battery": {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Sensors/Battery-v1.json"
+        }
+      }
     }
+  },
   "required": [
     "Schema_UUID",
     "Instance_UUID"

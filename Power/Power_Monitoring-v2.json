@@ -33,10 +33,10 @@
           "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Power/Three_Phase_Circuit-v1.json"
         }
       }
-    },
-    "required": [
-      "Schema_UUID",
-      "Instance_UUID"
-    ]
-  }
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID"
+  ]
 }

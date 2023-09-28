@@ -273,9 +273,9 @@
                 }
             ]
         },
-        "required": [
-            "Schema_UUID",
-            "Instance_UUID"
-        ]
-    }
+    },
+    "required": [
+        "Schema_UUID",
+        "Instance_UUID"
+    ]
 }

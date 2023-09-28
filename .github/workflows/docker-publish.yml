@@ -4,11 +4,9 @@ env:
   REGISTRY: ghcr.io
 
 on:
-  release:
-    types: [ published ]
-    # Trigger only when a release with tag v*.*.* is published
+  push:
     tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v*'
 
 jobs:
   build:

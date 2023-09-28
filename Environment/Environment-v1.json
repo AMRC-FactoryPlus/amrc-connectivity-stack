@@ -1,0 +1,28 @@
+{
+  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Geo/GlobalPosition-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Environment Characteristics",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "8266a8b5-23f4-4fec-8de0-9f2c6dd5c0ed"
+    },
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "Device_Information": {
+      "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Device_Information-v1.json"
+    },
+	"Temperature": {
+      "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Sensors/Temperature-v1.json"
+    },
+	"Humidity": {
+      "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Sensors/Humidity-v1.json"
+    }
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID"
+  ]
+}

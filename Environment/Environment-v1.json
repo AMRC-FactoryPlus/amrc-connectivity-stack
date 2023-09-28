@@ -20,6 +20,18 @@
     },
 	"Humidity": {
       "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Sensors/Humidity-v1.json"
+    },
+	"Pressure": {
+      "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Sensors/Pressure-v1.json"
+    },
+	"Sound_Level": {
+      "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Sensors/Sound_Level-v1.json"
+    },
+	"Carbon_Dioxide": {
+      "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Sensors/Carbon_Dioxide-v1.json"
+    },
+	"Light_Intensity": {
+      "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Sensors/Light_Intensity-v1.json"
     }
   "required": [
     "Schema_UUID",

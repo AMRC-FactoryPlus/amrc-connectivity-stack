@@ -1,7 +1,7 @@
 {
   "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Links-v1.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Links between objects",
+  "title": "DEPRECATED (Use Link-v1 instead)",
   "type": "object",
   "properties": {
     "Schema_UUID": {

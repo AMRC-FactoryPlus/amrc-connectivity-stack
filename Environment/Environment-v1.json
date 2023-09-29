@@ -32,14 +32,6 @@
     },
     "Light_Intensity": {
       "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Sensors/Light_Intensity-v1.json"
-    },
-    "Sensor": {
-      "type": "object",
-      "properties": {
-        "Battery": {
-          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Sensors/Battery-v1.json"
-        }
-      }
     }
   },
   "required": [

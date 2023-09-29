@@ -20,7 +20,7 @@ class GetAvailableFilesForDeviceAction
         $this->validate(...func_get_args());
 
         $response = (new MakeConsumptionFrameworkRequest)->execute(type: 'get', service: 'file-service',
-            url: config('manager.file_service_url') . '/config/' . $device->schema_uuid)['data'];
+            url: config('manager.file_service_url') . '/config/' . $device->latestOriginMap->schema_uuid)['data'];
 
         return action_success($response->json());
     }

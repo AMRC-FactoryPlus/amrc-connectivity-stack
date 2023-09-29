@@ -24,7 +24,7 @@ class DeviceController extends Controller
     {
         // Get the node
         $node = Node::where('id', request()->route('node'))->first();
-        if (! $node) {
+        if (!$node) {
             throw new ActionFailException(
                 'The node does not exist.', 404
             );
@@ -39,7 +39,7 @@ class DeviceController extends Controller
 
         // Get the node
         $node = Node::where('id', $validated['node_id'])->first();
-        if (! $node) {
+        if (!$node) {
             throw new ActionFailException(
                 'The node does not exist.', 404
             );
@@ -52,7 +52,7 @@ class DeviceController extends Controller
     {
         // Get the group
         $group = Group::where('id', request()->route('group'))->first();
-        if (! $group) {
+        if (!$group) {
             throw new ActionFailException(
                 'The group does not exist.', 404
             );
@@ -61,7 +61,7 @@ class DeviceController extends Controller
         // Get the node (if admin they have access to all nodes)
         $query = auth()->user()->administrator ? Node::with('devices') : auth()->user()->accessibleNodes()->with('devices');
         $node = $query->where('nodes.id', request()->route('node'))->first();
-        if (! $node) {
+        if (!$node) {
             throw new ActionFailException(
                 'The node does not exist.', 404
             );
@@ -135,7 +135,7 @@ class DeviceController extends Controller
 
         // Get the device
         $device = Device::with('node')->where('id', $request->route('device'))->first();
-        if (! $device) {
+        if (!$device) {
             throw new ActionFailException(
                 'The device does not exist.', 404
             );

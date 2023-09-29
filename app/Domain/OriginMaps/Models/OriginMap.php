@@ -34,6 +34,6 @@ class OriginMap extends Model
 
     public function schemaVersion()
     {
-        return $this->belongsTo(DeviceSchemaVersion::class, 'device_schema_version_id');
+        return $this->belongsTo(DeviceSchemaVersion::class, 'schema_uuid', 'schema_uuid');
     }
 }

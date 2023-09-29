@@ -115,10 +115,7 @@ class ConfigureDeviceTest extends TestCase
             '/api/devices/' . $device->id . '/origin-map', [
                 'configuration' => file_get_contents(base_path('reference/protective_stop/instance.json')),
                 'activate' => true,
-                'device_schema_id' => $deviceSchema->id,
-                'device_schema_version_id' => $deviceSchema->versions()
-                                                           ->whereVersion('1')
-                                                           ->sole()->id,
+                'device_schema_id' => $deviceSchema->id
             ]
         )
              ->assertSuccessful();
@@ -285,10 +282,7 @@ class ConfigureDeviceTest extends TestCase
             '/api/devices/' . $device->id . '/origin-map', [
                 'configuration' => file_get_contents(base_path('reference/protective_stop/instance.json')),
                 'activate' => true,
-                'device_schema_id' => $deviceSchema->id,
-                'device_schema_version_id' => $deviceSchema->versions()
-                                                           ->whereVersion('1')
-                                                           ->sole()->id,
+                'device_schema_id' => $deviceSchema->id
             ]
         )
              ->assertSuccessful();
@@ -369,10 +363,7 @@ class ConfigureDeviceTest extends TestCase
             '/api/devices/' . $device->id . '/origin-map', [
                 'configuration' => file_get_contents(base_path('reference/protective_stop/instance.json')),
                 'activate' => true,
-                'device_schema_id' => $deviceSchema->id,
-                'device_schema_version_id' => $deviceSchema->versions()
-                                                           ->whereVersion('1')
-                                                           ->sole()->id,
+                'device_schema_id' => $deviceSchema->id
             ]
         )
              ->assertSuccessful();

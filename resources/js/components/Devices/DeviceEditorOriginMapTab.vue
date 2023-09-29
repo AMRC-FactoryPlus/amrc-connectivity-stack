@@ -387,7 +387,6 @@ export default {
     },
 
     maybeDeleteObject (val) {
-      console.log(val)
       window.showNotification({
         title: 'Are you sure?',
         description: `Are you sure you want to delete ${[...val].reverse().map(e => e.key).join('.')}?`,

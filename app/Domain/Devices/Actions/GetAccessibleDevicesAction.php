@@ -29,6 +29,6 @@ class GetAccessibleDevicesAction
             $base = QueryBuilder::for(Device::class)->whereNodeId($node->id);
         }
 
-        return action_success($base->get(['id', 'device_id', 'instance_uuid', 'schema_uuid']));
+        return action_success($base->get(['id', 'device_id', 'instance_uuid']));
     }
 }

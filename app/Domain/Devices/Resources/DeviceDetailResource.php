@@ -39,6 +39,12 @@ class DeviceDetailResource extends JsonResource
                 512,
                 JSON_THROW_ON_ERROR
             ) : null,
+            'metrics' => $this->latestOriginMap ? json_decode(
+                Storage::disk('device-configurations')->get($this->latestOriginMap->metrics),
+                false,
+                512,
+                JSON_THROW_ON_ERROR
+            ) : null,
             'device_connection' => $this->deviceConnection,
         ];
     }

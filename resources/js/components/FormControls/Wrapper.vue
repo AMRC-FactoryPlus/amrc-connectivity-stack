@@ -29,7 +29,7 @@
         </Transition>
       </div>
     </Transition>
-    <div class="hidden lg:inline col-span-1 text-sm text-gray-400 my-auto ml-6">
+    <div class="hidden lg:inline col-span-1 text-sm text-gray-400 my-auto mt-7 ml-6">
       <div class="line-clamp-2 flex">
         <button v-tooltip="'Full description'" @click.stop="showDescriptionPopup" class="fas fa-external-link-alt text-xs mr-1 text-gray-300"></button>
         <slot name="description"></slot>

@@ -113,6 +113,7 @@ class ConfigureDeviceTest extends TestCase
         // Set the device_id
         $this->patchJson(
             '/api/devices/' . $device->id . '/origin-map', [
+                'metrics' => json_encode([], JSON_THROW_ON_ERROR),
                 'configuration' => file_get_contents(base_path('reference/protective_stop/instance.json')),
                 'activate' => true,
                 'device_schema_id' => $deviceSchema->id,
@@ -283,6 +284,7 @@ class ConfigureDeviceTest extends TestCase
         // Set the device_id
         $this->patchJson(
             '/api/devices/' . $device->id . '/origin-map', [
+                'metrics' => json_encode([], JSON_THROW_ON_ERROR),
                 'configuration' => file_get_contents(base_path('reference/protective_stop/instance.json')),
                 'activate' => true,
                 'device_schema_id' => $deviceSchema->id,
@@ -367,6 +369,7 @@ class ConfigureDeviceTest extends TestCase
         // Set the device_id
         $this->patchJson(
             '/api/devices/' . $device->id . '/origin-map', [
+                'metrics' => json_encode([], JSON_THROW_ON_ERROR),
                 'configuration' => file_get_contents(base_path('reference/protective_stop/instance.json')),
                 'activate' => true,
                 'device_schema_id' => $deviceSchema->id,

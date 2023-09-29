@@ -6,7 +6,7 @@
 <template>
   <div class="flex flex-col">
     <Input
-        @keyUpEnter="create"
+        @keyUpEnter="$emit('create')"
         class="!mb-3"
         :showDescription="false"
         :control="{
@@ -14,7 +14,7 @@
               }"
         :valid="v"
         v-model="v.localValue.$model"></Input>
-    <button :disabled="(v && v.$invalid)" @click="create" class="fpl-button-brand h-10 px-10 ml-auto">
+    <button :disabled="(v && v.$invalid)" @click="$emit('create')" class="fpl-button-brand h-10 px-10 ml-auto">
       Create Object
       <i class="fa-sharp fa-solid fa-plus ml-2"></i>
     </button>
@@ -33,19 +33,20 @@ export default {
   name: 'NewObjectOverlayForm',
 
   props: {
+    value: { required: true },
     regex: { required: true },
   },
 
-  methods: {
-    create() {
-      this.$emit('create', this.localValue);
-      this.localValue = null;
-    }
+  watch: {
+    localValue (val) {
+      this.$emit('input', val);
+    },
   },
 
   data () {
     return {
       localValue: this.value,
+      regexValidation: '.+',
     };
   },
 
@@ -54,7 +55,7 @@ export default {
       localValue: {
         required,
         minLength: minLength(1),
-        name: helpers.withMessage(`Invalid name (${this.regex})`, helpers.regex(new RegExp(this.regex))),
+        opcEndpoint: helpers.withMessage('Invalid name.', helpers.regex(new RegExp(this.regex))),
       },
     };
   },

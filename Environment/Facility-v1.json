@@ -1,11 +1,11 @@
 {
-  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Geo/GlobalPosition-v1.json",
+  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Environment/Facility-v1.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Environment Characteristics",
+  "title": "Facility Environment Characteristics",
   "type": "object",
   "properties": {
     "Schema_UUID": {
-      "const": "8266a8b5-23f4-4fec-8de0-9f2c6dd5c0ed"
+      "const": "60e6ddee-9a8d-4c9a-9042-8f1339e7bb11"
     },
     "Instance_UUID": {
       "description": "The unique identifier for this object. (A UUID specified by RFC4122).",

@@ -21,7 +21,7 @@
         leave-class="opacity-100 scale-100"
         leave-active-class="ease-in duration-75"
         leave-to-class="opacity-0 scale-95">
-      <div v-show="show" class="z-20 w-full max-w-7xl bg-white lg:mx-16 xl:mx-32 shadow-xl py-6 px-10 max-h-full overflow-auto">
+      <div v-if="show" class="z-20 w-full max-w-7xl bg-white lg:mx-16 xl:mx-32 shadow-xl py-6 px-10 max-h-full overflow-auto">
         <div class="flex items-center justify-between mb-4">
           <h3>{{ this.title }}</h3>
           <button @mouseup="$emit('close')" class="fpl-button-info">
@@ -41,7 +41,7 @@ export default {
   name: 'overlay',
   props: {
     title: { required: true, type: String },
-    show: { required: true, type: Boolean },
+    show: { required: true, type: Boolean|null },
   },
 };
 </script>

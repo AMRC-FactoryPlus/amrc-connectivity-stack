@@ -53,7 +53,6 @@ class GetEdgeAgentApplicationConfigTest extends TestCase
             deviceSchema: $deviceSchema->fresh(),
             version: $deviceSchema->versions()->whereVersion('1')->sole(),
             deviceConfiguration: file_get_contents(base_path('reference/protective_stop/instance.json')),
-            deviceConfigurationMetrics: '',
             active: false
         );
 

@@ -36,7 +36,6 @@ class ConfigureDeviceAction
         DeviceSchema $deviceSchema,
         DeviceSchemaVersion $version,
         string $deviceConfiguration,
-        string $deviceConfigurationMetrics,
         bool $active
     ) {
         // =========================
@@ -107,12 +106,10 @@ class ConfigureDeviceAction
             );
         }
 
-        // Upload the origin map and metrics
+        // Upload the origin map
         $originMapFilename = uniqid('', true);
         Storage::disk('device-configurations')
                 ->put($originMapFilename . '.json', json_encode($deviceConfig, JSON_THROW_ON_ERROR));
-        Storage::disk('device-configurations')
-                ->put($originMapFilename . '_metrics.json', $deviceConfigurationMetrics);
 
         // Create the origin map for this device
         $originMap = OriginMap::create([
@@ -120,7 +117,6 @@ class ConfigureDeviceAction
             'device_id' => $device->id,
             'device_schema_version_id' => $version->id,
             'file' => $originMapFilename . '.json',
-            'metrics' => $originMapFilename . '_metrics.json',
             'active' => $active,
         ]);
 

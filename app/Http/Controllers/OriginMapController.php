@@ -42,7 +42,6 @@ class OriginMapController extends Controller
             deviceSchema              : $deviceSchema->fresh(),
             version                   : $deviceSchemaVersion,
             deviceConfiguration       : $validated['configuration'],
-            deviceConfigurationMetrics: $validated['metrics'],
             active                    : $validated['activate']
         );
     }

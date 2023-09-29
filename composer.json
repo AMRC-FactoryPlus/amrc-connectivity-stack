@@ -33,7 +33,8 @@
         "spatie/laravel-ray": "^1.29",
         "spatie/test-time": "^1.2",
         "staudenmeir/eloquent-eager-limit": "^1.0",
-        "stevebauman/purify": "^4.0"
+        "stevebauman/purify": "^4.0",
+      "ext-http": "*"
     },
     "require-dev": {
         "ext-dom": "*",

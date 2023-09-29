@@ -15,6 +15,7 @@ use App\Http\Controllers\EdgeAgentConfigurationController;
 use App\Http\Controllers\EdgeAgentController;
 use App\Http\Controllers\GroupController;
 use App\Http\Controllers\NodeController;
+use App\Http\Controllers\NodeUserController;
 use App\Http\Controllers\OriginMapController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\UserMetaController;
@@ -64,6 +65,7 @@ Route::middleware('auth:api')->post('/groups/new', [GroupController::class, 'sto
 Route::middleware('auth:api')->get('/groups/{group}/nodes', [NodeController::class, 'index']);
 Route::middleware('auth:api')->post('/groups/{group}/nodes/new', [NodeController::class, 'store']);
 Route::middleware('auth:api')->get('/groups/{group}/nodes/{node}/connections', [DeviceConnectionController::class, 'index']);
+Route::middleware('auth:api')->post('/groups/{group}/nodes/{node}/users', [NodeUserController::class, 'store']);
 Route::middleware('auth:api')->post('/groups/{group}/nodes/{node}/connections', [DeviceConnectionController::class, 'create']);
 Route::middleware('auth:api')->get('/groups/{group}/nodes/{node}/connections/{connection}', [DeviceConnectionController::class, 'show']);
 Route::middleware('auth:api')->patch('/groups/{group}/nodes/{node}/connections/{connection}', [DeviceConnectionController::class, 'update']);

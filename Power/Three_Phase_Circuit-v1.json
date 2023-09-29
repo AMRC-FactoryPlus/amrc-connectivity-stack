@@ -15,46 +15,6 @@
         "Device_Information": {
             "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Device_Information-v1.json"
         },
-<<<<<<< HEAD
-        "Link": {
-            "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Links-v1.json"
-        },
-        "Phases": {
-            "type": "object",
-            "properties": {
-                "L1": {
-                    "type": "object",
-                    "properties": {
-                        "Characteristics": {
-                            "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Power/Phase-v2.json"
-                        },
-                        "Loads": {
-                            "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Power/Single_Phase_Circuit-v1.json"
-                        }
-                    }
-                },
-                "L2": {
-                    "type": "object",
-                    "properties": {
-                        "Characteristics": {
-                            "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Power/Phase-v2.json"
-                        },
-                        "Loads": {
-                            "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Power/Single_Phase_Circuit-v1.json"
-                        }
-                    }
-                },
-                "L3": {
-                    "type": "object",
-                    "properties": {
-                        "Characteristics": {
-                            "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Power/Phase-v2.json"
-                        },
-                        "Loads": {
-                            "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Power/Single_Phase_Circuit-v1.json"
-                        }
-                    }
-=======
         "Links": {
             "type": "object",
             "patternProperties": {
@@ -68,7 +28,6 @@
             "patternProperties": {
                 "^L[123]$": {
                     "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Power/Single_Phase_Circuit-v1.json"
->>>>>>> master/main
                 }
             }
         },
@@ -318,15 +277,6 @@
                     }
                 }
             ]
-<<<<<<< HEAD
-        },
-        "required": [
-            "Schema_UUID",
-            "Instance_UUID"
-        ]
-    }
-}
-=======
         }
     },
     "required": [
@@ -334,4 +284,3 @@
         "Instance_UUID"
     ]
 }
->>>>>>> master/main

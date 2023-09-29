@@ -173,7 +173,7 @@ export default {
         url: this.device.latest_origin_map.schema_version.schema.url + '-v' +
             this.device.latest_origin_map.schema_version.version + '.json',
         device_schema_id: this.device.latest_origin_map.schema_version.device_schema_id,
-        device_schema_version_id: this.device.latest_origin_map.device_schema_version_id,
+        schema_uuid: this.device.latest_origin_map.schema_uuid,
       }
       this.refParser.dereference(schemaObj.url, (err, parsedSchema) => {
         if (err) {
@@ -588,7 +588,7 @@ export default {
       this.schemaBrowserVisible = false
       this.schema = schema.parsedSchema
       this.selectedSchemaId = schema.schemaObj.device_schema_id
-      this.selectedSchemaVersionId = schema.schemaObj.device_schema_version_id
+      this.selectedSchemaUUID = schema.schemaObj.schema_uuid
       this.loadingExistingConfig = false
     },
 
@@ -604,7 +604,7 @@ export default {
         'configuration': JSON.stringify(this.model),
         'activate': activate,
         'device_schema_id': this.selectedSchemaId,
-        'device_schema_version_id': this.selectedSchemaVersionId,
+        'schema_uuid': this.selectedSchemaUUID,
       }).then(() => {
         this.loading = false
         this.isDirty = false
@@ -642,7 +642,7 @@ export default {
       schemaBrowserVisible: false,
       schema: null,
       selectedSchemaId: null,
-      selectedSchemaVersionId: null,
+      selectedSchemaUUID: null,
       showCDSImport: false,
       controls: [],
 

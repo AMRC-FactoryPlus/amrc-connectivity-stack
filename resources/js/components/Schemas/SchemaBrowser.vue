@@ -100,7 +100,7 @@ export default {
       this.$emit('selected', {
         url: this.selectedDeviceSchema.url + '-v' + deviceSchemaVersion.version + '.json',
         device_schema_id: this.selectedDeviceSchema.id,
-        device_schema_version_id: deviceSchemaVersion.id
+        schema_uuid: deviceSchemaVersion.schema_uuid
       });
     },
   },

@@ -1,0 +1,40 @@
+{
+  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Sensors/Carbon_Dioxide-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Carbon Dioxide",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "aaeaf814-521e-4e08-a8e3-3a5be64ae0c3"
+    },
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "Carbon_Dioxide": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "FloatLE",
+                "FloatBE"
+              ]
+            },
+            "Documentation": {
+              "default": "The Carbon Dioxide measured by the sensor in ppm"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID"
+  ]
+}

@@ -3,10 +3,17 @@ version: 1
 classes:
   - !u E.Class.Cluster
   - !u E.Class.Template
+  # XXX Needed for now
+  - !u FP.Class.Service
+  - ac0d5288-6136-4ced-a372-325fbbcdd70d
+  - 8ae784bb-c4b5-4995-9bf6-799b3c7f21ad
+  - b419cbc2-ab0f-4311-bd9e-f0591f7e88cb
 objects:
   !u FP.Class.App:
     - !u E.App.Cluster
     - !u E.App.Template
+    # XXX Needed for now
+    - dbd8a535-52ba-4f6e-b4f8-9b71aefe09d3
   !u FP.Class.Service:
     - !u E.Service.EdgeDeployment
   # Permission group

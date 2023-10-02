@@ -65,4 +65,7 @@ aces:
   - principal: !u E.Requirement.ServiceAccount
     permission: !u G.Perm.Push
     target: !u E.Requirement.EdgeRepos
-
+groups:
+  !u E.Perm.All:
+    - !u E.Perm.Clusters
+    - !u E.Perm.Secrets

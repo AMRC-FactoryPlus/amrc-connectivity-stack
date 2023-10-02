@@ -31,6 +31,12 @@ identity:
       tag: v1.0.0
       # @ignore
       pullPolicy: IfNotPresent
+    # If this is set to true, the kdb-init container will not set up the
+    # KDB but will sit and wait. This can be used to halt startup of the
+    # KDC until a restore from backup can be performed. Be aware that
+    # this will halt startup of the KDC every time the pod starts until
+    # the setting is changed.
+    manualInit: false
   krbKeysOperator:
     # -- A comma-separated list of namespaces that the KerberosKey Operator should watch for KerberosKey resources in. Defaults to the release namespace if not specified
     namespaces: ""
@@ -67,7 +73,7 @@ directory:
     # -- The repository of the Directory component
     repository: acs-directory
     # -- The tag of the Directory component
-    tag: v1.1.0
+    tag: v1.1.1
     # @ignore
     pullPolicy: IfNotPresent
 
@@ -116,7 +122,7 @@ manager:
     # -- The repository of the Manager component
     repository: acs-manager
     # -- The tag of the Manager component
-    tag: v1.0.5
+    tag: v1.0.6
     # @ignore
     pullPolicy: IfNotPresent
   edge:
@@ -148,7 +154,7 @@ cmdesc:
     # -- The repository of the Commands component
     repository: acs-cmdesc
     # -- The tag of the Commands component
-    tag: v1.0.0
+    tag: v1.0.1
     # @ignore
     pullPolicy: IfNotPresent
   # -- Possible values are either 1 to enable all possible debugging, or a comma-separated list of debug tags (the tags printed before the log lines). No logging is specified as an empty string.
@@ -158,13 +164,19 @@ warehouse:
   # -- Whether or not to enable the Warehouse component
   ingester:
     enabled: true
+    # -- The minimum log level that the ingester will log messages at (One of 'fatal', 'error', 'warn', 'info', 'debug', 'trace' or 'silent'.)
+    logLevel: info
+    # -- The number of messages to batch together before sending to InfluxDB
+    batchSize: 5000
+    # -- Send all buffered messages after this amount of time has elapsed if the buffer is not full (in milliseconds)
+    flushInterval: 10000
     image:
       # -- The registry of the Warehouse component
       registry: ghcr.io/amrc-factoryplus
       # -- The repository of the Warehouse component
       repository: influxdb-sparkplug-ingester
-      # -- The tag of the Warehouse component
-      tag: v1.0.1
+      # -- The tag of the ingester component
+      tag: v1.1.0
       # @ignore
       pullPolicy: IfNotPresent
 
@@ -213,16 +225,6 @@ postgres:
 traefik:
   enabled: true
   ports:
-    web:
-      port: 80
-      expose: true
-      exposedPort: 80
-      protocol: TCP
-    websecure:
-      port: 443
-      expose: true
-      exposedPort: 443
-      protocol: TCP
     mqtt:
       port: 1883
       expose: true
@@ -250,8 +252,7 @@ traefik:
       protocol: TCP
   additionalArguments:
     - --metrics.prometheus=true
-    - --entryPoints.mqtt.address=:1883
-    - --entryPoints.mqttsecure.address=:8883
+    - --serverstransport.insecureskipverify=true
   ingressRoute:
     dashboard:
       enabled: false
@@ -311,10 +312,13 @@ grafana:
       enabled: true
       label: grafana_datasource
       initDatasources: true
+    dashboards:
+      enabled: true
+      provider:
+        folder: 'Factory+'
+        disableDelete: true
+      searchNamespace: ALL
 
-# @ignore
-sealed-secrets:
-  enabled: true
 # @ignore
 tenant:
   tenant:

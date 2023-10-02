@@ -64,7 +64,11 @@ spec:
         - name: kdb-init
           image: "{{ .Values.identity.identity.image.registry }}/{{ .Values.identity.identity.image.repository }}:{{ .Values.identity.identity.image.tag }}"
           command: ["/bin/sh"]
+          {{- if .Values.identity.identity.manualInit }}
+          args: [ "-c", "while test ! -f /tmp/KDB-INIT-COMPLETE; do sleep 5; done" ]
+          {{- else }}
           args: [ "/usr/sbin/init-kdb.sh" ]
+          {{- end }}
           #args: ["-c", "while true; do sleep 10; done"]
           env:
             - name: KRB5_CONFIG

@@ -203,7 +203,7 @@ export default {
        * then it won't have the required schema objects populated so we need to create them.
        **/
 
-      // The nestingPointer array is used to keep track of where we are in the model
+          // The nestingPointer array is used to keep track of where we are in the model
       let nestingPointer = []
       this.searchForSchemaUUID(this.model, nestingPointer)
 
@@ -216,34 +216,43 @@ export default {
 
       let n = nestingPointer.slice(0, -1).flatMap(e => ['properties', e])
 
-      // If we have a Schema_UUID in here then create it first to avoid child before parent issues
-      if (Object.keys(modelLevel).includes('Schema_UUID')) {
-        if (modelLevel.Schema_UUID !== 'b16275f1-e443-4c41-a482-fcbdfbd20769') {
+      // Get the last element of the nestingPointer which will be the name of the object to create
+      let objectName = nestingPointer[nestingPointer.length - 1]
 
-          // Work out what the object looks like for this model in the schema
-          let nestedProperty = n.reduce((object, key) => object[key], this.schema)
+      if (
+          // If we have a Schema_UUID in here then create it first to avoid child before parent issues
+          Object.keys(modelLevel).includes('Schema_UUID')
 
-          // If the nestedProperty has a patternProperties then we need to create the schema objects
-          if (nestedProperty.patternProperties) {
+          // Do not process this if it's a metric schema
+          && modelLevel.Schema_UUID !== 'b16275f1-e443-4c41-a482-fcbdfbd20769'
 
-            // Get the first key within nestedProperty.patternProperties that will be the regex
-            let regexKey = Object.keys(nestedProperty.patternProperties)[0]
+          // Do not process this if it's already been added to the schema object
+          && !_.get(this.schema, n.join('.') + '.properties.' + objectName)) {
 
-            // Get the content of that schema, which will be the object that we need to create
-            let schemaToInstantiate = _.cloneDeep(nestedProperty.patternProperties[regexKey])
+        // Work out what the object looks like for this model in the schema
+        let nestedProperty = n.reduce((object, key) => object[key], this.schema)
 
-            // Get the last element of the nestingPointer which will be the name of the object to create
-            let objectName = nestingPointer[nestingPointer.length - 1]
+        // If the nestedProperty has a patternProperties then we need to create the schema objects
+        if (nestedProperty.patternProperties) {
 
-            // console.log('PatternProperties found. Creating', schemaToInstantiate.title, 'called', objectName ,'at', n.join('.'), schemaToInstantiate)
+          // Get the first key within nestedProperty.patternProperties that will be the regex
+          let regexKey = Object.keys(nestedProperty.patternProperties)[0]
 
-            // Create the object
-            this.set(n.join('.') + '.properties.' + objectName, schemaToInstantiate, this.schema, '.')
+          // Get the content of that schema, which will be the object that we need to create
+          let schemaToInstantiate = _.cloneDeep(nestedProperty.patternProperties[regexKey])
 
-            this.markDirty()
-          }
+          this.removePropertiesWithPatternProperties(schemaToInstantiate.properties)
+
+          // console.log('PatternProperties found. Creating', schemaToInstantiate.title, 'called', objectName, 'at',
+          //     n.join('.'), schemaToInstantiate)
+
+          // Create the object
+          this.set(n.join('.') + '.properties.' + objectName, schemaToInstantiate, this.schema, '.')
+
+          this.markDirty()
 
         }
+
       }
 
       Object.keys(modelLevel).forEach(key => {
@@ -260,6 +269,22 @@ export default {
           nestingPointer.pop()
         }
       })
+    },
+
+    removePropertiesWithPatternProperties (obj) {
+      if (typeof obj !== 'object' || obj === null) {
+        return;
+      }
+
+      if (obj.properties && obj.patternProperties) {
+        delete obj.properties
+      }
+
+      for (const key in obj) {
+        if (key !== 'properties') {
+          this.removePropertiesWithPatternProperties(obj[key])
+        }
+      }
     },
 
     applyMapping (mapping) {

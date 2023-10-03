@@ -1,0 +1,10 @@
+image:
+  registry: ghcr.io/amrc-factoryplus
+  repository: acs-edge
+  version: "1.2.2"
+debug: true
+config_url: http://manager.amrc-fpd-bmz.shef.ac.uk/api/edge-agent-config
+poll_int: 10
+limits:
+  cpu: "100m"
+  memory: "200Mi"

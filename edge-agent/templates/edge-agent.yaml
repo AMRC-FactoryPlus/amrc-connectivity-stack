@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: edge-agent-{{ .Values.uuid }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    factory-plus.app: edge-agent
+    factory-plus.service: edge-agent-{{ .Values.uuid }}
+    factory-plus.nodeUuid: {{ .Values.uuid }}
+    factory-plus.name: {{ .Values.name }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      factory-plus.app: edge-agent
+      factory-plus.nodeUuid: {{ .Values.uuid }}
+  template:
+    metadata:
+      labels:
+        factory-plus.app: edge-agent
+        factory-plus.nodeUuid: {{ .Values.uuid }}
+        factory-plus.name: {{ .Values.name }}
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: {{ .Values.hostname | quote }}
+      containers:
+        - name: edge-agent
+          image: {{ printf "%s/%s:%s" .Values.image.registry .Values.image.repository .Values.image.version | quote }}
+          envFrom:
+            - secretRef:
+                name: edge-agent-secrets-{{ .Values.uuid }}
+          env:
+            - name: CONFIG_URL
+              value: {{ .Values.config_url | quote }}
+            - name: DEBUG
+              value: {{ .Values.debug | quote }}
+            - name: POLL_INT
+              value: {{ .Values.poll_interval | quote }}
+            - name: NODE_ID
+              value: {{ .Values.uuid | quote }}
+          resources:
+            limits:
+              memory: {{ .Values.limits.cpu | quote }}
+            requests:
+              cpu: {{ .Values.limits.cpu | quote }}
+              memory: {{ .Values.limits.memory | quote }}

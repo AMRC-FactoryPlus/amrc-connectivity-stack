@@ -1,0 +1,183 @@
+name: Build
+
+on:
+  push:
+    branches: [ v1-stable ]
+  pull_request:
+
+jobs:
+  check:
+    name: Ensure Latest
+    runs-on: ubuntu-latest
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Check if branch is ahead of v1-stable
+        run: |
+          if ! git merge-base --is-ancestor origin/v1-stable ${{ github.event.pull_request.head.sha }};
+          then echo "This branch is not up to date with v1-stable. Skipping build to save resources.";
+          exit 1; fi
+  build:
+    name: Build
+    needs: check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Log into registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ghcr.io/amrc-factoryplus/acs-manager
+
+      - name: Check backend build
+        id: check-backend-build
+        run: |
+          docker manifest inspect ghcr.io/amrc-factoryplus/acs-manager:backend-build-1.0.0 || echo "needs-build=true" >> $GITHUB_OUTPUT
+
+      - name: Build backend build
+        id: build-backend-build
+        if: steps.check-backend-build.outputs.needs-build == 'true'
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: Dockerfile.backend-build
+          push: true
+          tags: ghcr.io/amrc-factoryplus/acs-manager:backend-build-1.0.0
+
+      - name: Check base
+        id: check-base
+        run: |          
+          docker manifest inspect ghcr.io/amrc-factoryplus/acs-manager:prod-base-php82-1.0.1 || echo "needs-build=true" >> $GITHUB_OUTPUT
+
+      - name: Build base
+        id: build-base
+        if: steps.check-base.outputs.needs-build == 'true'
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: Dockerfile.base
+          push: true
+          tags: ghcr.io/amrc-factoryplus/acs-manager:prod-base-php82-1.0.1
+
+      - name: Build
+        id: build-and-push
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          load: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          outputs: type=docker,dest=/tmp/image.tar
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: ${{ github.event.number }}
+          path: /tmp/image.tar
+  #  test:
+  #    runs-on: ubuntu-latest
+  #    needs: build
+  #    permissions:
+  #      contents: read
+  #      id-token: write
+  #      pull-requests: write
+  #    services:
+  #      redis:
+  #        image: redis
+  #        options: >-
+  #          --health-cmd "redis-cli ping"
+  #          --health-interval 10s
+  #          --health-timeout 5s
+  #          --health-retries 5
+  #    steps:
+  #      - name: Set up Docker Buildx
+  #        uses: docker/setup-buildx-action@v1
+  #      - name: Download artifact
+  #        uses: actions/download-artifact@v2
+  #        with:
+  #          name: image
+  #          path: /tmp
+  #      - name: Load Docker image
+  #        run: |
+  #          docker load --input /tmp/image.tar
+  #          docker image ls -a
+  #      - name: Extract Docker metadata
+  #        id: meta
+  #        uses: docker/metadata-action@v4
+  #        with:
+  #          images: ghcr.io/amrc-factoryplus/acs-manager
+  #      - name: Test
+  #        run: |
+  #          sudo /etc/init.d/mysql start
+  #          mysql -e 'CREATE DATABASE testing;' -uroot -proot
+  #          mysql -e 'SHOW DATABASES;' -uroot -proot
+  #          echo ${{ steps.meta.outputs.tags }}
+  #          docker run --rm --network host -w /app ${{ steps.meta.outputs.tags }} .ci/runTests.sh ${{ secrets.GITHUB_TOKEN }}
+
+  push:
+    name: Push
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      pull-requests: write
+
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Login to GitHub container registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ghcr.io/amrc-factoryplus/acs-manager
+
+      - name: Download artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: ${{ github.event.number }}
+          path: /tmp
+
+      - name: Load and push image
+        run: |
+          docker load --input /tmp/image.tar
+          docker image ls -a
+          docker push ${{ steps.meta.outputs.tags }}
+  auto-approve:
+    name: Approve
+    needs: push
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    if: github.actor == 'AlexGodbehere'
+    steps:
+      - uses: hmarr/auto-approve-action@v3
+

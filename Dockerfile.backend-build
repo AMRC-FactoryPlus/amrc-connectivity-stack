@@ -1,0 +1,20 @@
+FROM composer:2.5.7 as build-backend
+
+# Add required headers to build sockets PHP extension
+RUN apk add --no-cache linux-headers
+
+# Install required PHP extensions
+COPY --from=mlocati/php-extension-installer /usr/bin/install-php-extensions /usr/bin/
+RUN install-php-extensions \
+    bcmath \
+    sockets
+
+# Create and apply permissions for the storage and cache directories
+RUN mkdir -p /app/storage/framework/sessions
+RUN mkdir -p /app/storage/framework/views
+RUN mkdir -p /app/storage/framework/cache
+RUN mkdir -p /app/storage/logs
+RUN mkdir -p /app/storage/app/purify
+RUN mkdir -p /app/storage/app/purify/HTML
+RUN mkdir -p /app/storage/app/purify/JSON
+RUN chmod -R 775 /app/storage

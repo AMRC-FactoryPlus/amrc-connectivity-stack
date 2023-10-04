@@ -1,0 +1,38 @@
+name: Deploy Release
+
+on:
+  release:
+    types: [ published ]
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          tags: |
+            type=semver,pattern={{version}}
+          images: ghcr.io/amrc-factoryplus/acs-manager
+
+      - name: Retag image
+        run: |
+          docker pull ghcr.io/amrc-factoryplus/acs-manager:main
+          docker tag ghcr.io/amrc-factoryplus/acs-manager:main ${{ steps.meta.outputs.tags }}
+          docker push ${{ steps.meta.outputs.tags }}
+          docker tag ${{ steps.meta.outputs.tags }} ghcr.io/amrc-factoryplus/acs-manager:latest
+          docker push ghcr.io/amrc-factoryplus/acs-manager:latest

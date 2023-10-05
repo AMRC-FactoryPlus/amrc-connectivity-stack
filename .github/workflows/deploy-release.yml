@@ -27,6 +27,10 @@ jobs:
         with:
           tags: |
             type=semver,pattern={{version}}
+          flavor: |
+            latest=false
+            prefix=
+            suffix=
           images: ghcr.io/amrc-factoryplus/acs-manager
 
       - name: Retag image

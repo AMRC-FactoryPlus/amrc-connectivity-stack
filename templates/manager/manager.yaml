@@ -32,6 +32,16 @@ spec:
                 secretKeyRef:
                   name: manager-database-secret
                   key: postgres-password
+            - name: MINIO_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: manager-minio-secret
+                  key: CONSOLE_ACCESS_KEY
+            - name: MINIO_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: manager-minio-secret
+                  key: CONSOLE_SECRET_KEY
           envFrom:
             - configMapRef:
                 name: manager-config

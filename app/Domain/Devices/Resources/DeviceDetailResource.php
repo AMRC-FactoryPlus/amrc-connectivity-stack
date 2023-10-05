@@ -25,7 +25,6 @@ class DeviceDetailResource extends JsonResource
             'updated_at' => $this['updated_at'],
             'id' => $this['id'],
             'instance_uuid' => $this['instance_uuid'] ?? null,
-            'schema_uuid' => $this['schema_uuid'] ?? null,
             'node_id' => $this['node_id'],
             'device_id' => $this['device_id'],
             'device_connection_id' => $this['device_connection_id'],

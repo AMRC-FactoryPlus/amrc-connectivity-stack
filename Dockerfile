@@ -43,4 +43,4 @@ COPY --from=build /usr/local/bin/kubeseal /usr/local/bin/kubeseal
 WORKDIR /home/node/app
 COPY --from=build --chown=root:root /home/node/app ./
 USER node
-CMD npm run edge-deploy
+CMD npm run start

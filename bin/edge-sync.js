@@ -17,6 +17,8 @@ const fplus = await new ServiceClient({
     permission_group:   Edge.Perm.All,
 }).init();
 
+fplus.debug.log("version", "Starting Edge Sync agent, version %s", GIT_VERSION);
+
 const recon = await new Reconciler({
     fplus,
     cluster:    process.env.CLUSTER_UUID,

@@ -1,2 +1,3 @@
 config.mk
+lib/git-version.js
 node_modules

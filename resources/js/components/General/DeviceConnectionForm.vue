@@ -303,6 +303,11 @@ export default {
           host: null,
           port: '4545',
         },
+        ASCIITCPConnDetails: {
+          ip: null,
+          inputs: '4',
+          outputs: '4',
+        },
         RESTConnDetails: {
           baseURL: '',
           authMethod: 'None',
@@ -355,7 +360,8 @@ export default {
               'S7',
               'UDP',
               'MTConnect',
-              'Open Protocol'
+              'Open Protocol',
+              'ASCII TCP'
             ],
           },
           'UDPConnDetails': {
@@ -553,6 +559,57 @@ export default {
                 },
                 default: 4545,
               }
+            },
+          },
+          'ASCIITCPConnDetails': {
+            type: 'object',
+            title: 'ASCII TCP Details',
+            properties: {
+              ip: {
+                type: 'string',
+                showIf: () => {
+                  return this.model.connType === 'ASCII TCP' || false;
+                },
+                validations: {
+                  requiredIf: requiredIf(() => {
+                    return this.model.connType === 'ASCII TCP' || false;
+                  }),
+                  minLength: minLength(3),
+                },
+                description: 'The IP of the controller to connect to.',
+                title: 'IP',
+              },
+              inputs: {
+                type: 'number',
+                description: 'The number of inputs to read from the controller.',
+                title: 'Inputs',
+                showIf: () => {
+                  return this.model.connType === 'ASCII TCP' || false;
+                },
+                validations: {
+                  requiredIf: requiredIf(() => {
+                    return this.model.connType === 'ASCII TCP' || false;
+                  }),
+                  numeric,
+                },
+                default: 4,
+              },
+              outputs: {
+                type: 'number',
+                description: 'The number of outputs to read from the controller.',
+                title: 'Outputs',
+                showIf: () => {
+                  return this.model.connType === 'ASCII TCP' || false;
+                },
+                validations: {
+                  requiredIf: requiredIf(() => {
+                    return this.model.connType === 'ASCII TCP' || false;
+                  }),
+                  numeric,
+                },
+                default: 4,
+              }
+
             },
           },
           'OPCUAConnDetails': {

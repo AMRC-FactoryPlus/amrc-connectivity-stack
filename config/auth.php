@@ -8,6 +8,7 @@ use App\Domain\Users\Models\User;
 
 return [
 
+
     /*
     |--------------------------------------------------------------------------
     | Authentication Defaults

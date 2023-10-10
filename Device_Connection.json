@@ -21,7 +21,8 @@
                 "S7",
                 "UDP",
                 "MTConnect",
-                "Open Protocol"
+                "Open Protocol",
+                "ASCII TCP"
             ],
             "minLength": 1
         },
@@ -144,6 +145,40 @@
                     "title": "Port",
                     "minLength": 1,
                     "default": 4545
+                }
+            }
+        },
+        "ASCIITCPConnDetails": {
+            "type": "object",
+            "title": "ASCII TCP Details",
+            "options": {
+                "dependencies": {
+                    "connType": "ASCII TCP"
+                },
+                "collapsed": false
+            },
+            "required": [
+                "ip",
+                "inputs",
+                "outputs"
+            ],
+            "properties": {
+                "ip": {
+                    "type": "string",
+                    "title": "IP",
+                    "minLength": 3
+                },
+                "inputs": {
+                    "type": "number",
+                    "title": "Inputs",
+                    "minLength": 1,
+                    "default": 4
+                },
+                "outputs": {
+                    "type": "number",
+                    "title": "Outputs",
+                    "minLength": 1,
+                    "default": 4
                 }
             }
         },

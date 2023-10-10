@@ -40,6 +40,7 @@ RUN install-php-extensions \
     pdo_mysql \
     pdo_pgsql \
     xml \
+    yaml \
     pcntl \
     # Add more extensions here if needed \
     && find "$(php-config --extension-dir)" -name '*.so' -type f -exec strip --strip-all {} \; \

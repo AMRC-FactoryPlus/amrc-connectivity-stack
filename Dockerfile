@@ -15,7 +15,7 @@ RUN bun install --immutable --immutable-cache --check-cache
 RUN bun run build
 RUN rm -rf node_modules
 
-FROM ghcr.io/amrc-factoryplus/acs-manager:prod-base-php82-1.0.2 as procuction
+FROM ghcr.io/amrc-factoryplus/acs-manager:prod-base-php82-1.0.3 as procuction
 MAINTAINER Alex Godbehere
 
 # Copy the application

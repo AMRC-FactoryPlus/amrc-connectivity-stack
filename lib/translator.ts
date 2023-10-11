@@ -302,7 +302,8 @@ export class Translator extends EventEmitter {
 
         const ids = await this.retry("identities", async () => {
             const ids = await auth.find_principal();
-            if (!ids || !ids.uuid || !ids.sparkplug) return;
+            if (!ids || !ids.uuid || !ids.sparkplug)
+                throw "Auth service not responding correctly";
             return ids;
         });
 
@@ -316,27 +317,30 @@ export class Translator extends EventEmitter {
 
         const config = await this.retry("config", async () => {
             const config = await cdb.get_config(EdgeAgentConfig, uuid);
-            if (!config || !validateConfig(config)) return;
+            if (!config || !validateConfig(config))
+                throw "Config is invalid";
             return config;
         });
 
         return reHashConf(config);
     }
 
-    async retry<RV> (what: string, fetch: () => Promise<RV | undefined>): 
+    async retry<RV> (what: string, fetch: () => Promise<RV>): 
         Promise<RV>
     {
         const interval = this.pollInt;
 
         while (true) {
             log(`Attempting to fetch ${what}...`);
-            const rv = await fetch();
-            if (rv != undefined) {
+            try { 
+                const rv = await fetch();
                 log(`Fetched ${what}.`);
                 return rv;
+            } 
+            catch (e) {
+                log(`Failed to fetch ${what}: ${e}.\n
+Trying again in ${interval} seconds...`);
             }
-
-            log(`Failed to fetch ${what}. Trying again in ${interval} seconds...`);
             await timers.setTimeout(interval * 1000);
         }
     }

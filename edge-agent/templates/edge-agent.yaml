@@ -28,6 +28,7 @@ spec:
       containers:
         - name: edge-agent
           image: {{ printf "%s/%s:%s" .Values.image.registry .Values.image.repository .Values.image.version | quote }}
+          imagePullPolicy: Always
           env:
             - name: DEBUG
               value: {{ .Values.debug | quote }}

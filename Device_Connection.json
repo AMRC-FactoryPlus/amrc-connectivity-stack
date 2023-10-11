@@ -504,7 +504,8 @@
                 "Delimited String",
                 "JSON",
                 "XML",
-                "Buffer"
+                "Buffer",
+                "ASCII HEX"
             ]
         },
         "delimiter": {

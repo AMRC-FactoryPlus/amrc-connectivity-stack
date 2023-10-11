@@ -1,5 +1,8 @@
 apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: edge-agent.{{ .Values.uuid }}
 spec:
   type: Password
   principal: nd1/{{ .Values.cluster }}/{{ .Values.name }}

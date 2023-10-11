@@ -5,5 +5,5 @@ metadata:
   name: edge-agent.{{ .Values.uuid }}
 spec:
   type: Password
-  principal: nd1/{{ .Values.cluster }}/{{ .Values.name }}
+  principal: nd1/{{ .Values.cluster }}/{{ .Values.name }}@{{ .Values.realm }}
   secret: edge-agent-secrets-{{ .Values.uuid }}/keytab

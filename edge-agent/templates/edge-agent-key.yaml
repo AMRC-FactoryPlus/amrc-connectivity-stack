@@ -1,0 +1,6 @@
+apiVersion: factoryplus.app.amrc.co.uk/v1
+kind: KerberosKey
+spec:
+  type: Password
+  principal: nd1/{{ .Values.cluster }}/{{ .Values.name }}
+  secret: edge-agent-secrets-{{ .Values.uuid }}/keytab

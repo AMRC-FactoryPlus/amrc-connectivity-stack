@@ -159,26 +159,39 @@
             },
             "required": [
                 "ip",
-                "inputs",
-                "outputs"
+                "port",
+                "encoding",
+                "delimiter",
+                "keepAlive"
+
             ],
             "properties": {
                 "ip": {
                     "type": "string",
-                    "title": "IP",
                     "minLength": 3
                 },
-                "inputs": {
+                "port": {
                     "type": "number",
-                    "title": "Inputs",
-                    "minLength": 1,
-                    "default": 4
+                    "minLength": 1
                 },
-                "outputs": {
-                    "type": "number",
-                    "title": "Outputs",
-                    "minLength": 1,
-                    "default": 4
+                "encoding": {
+                    "type": "string",
+                    "enum": [
+                        "utf8",
+                        "ascii",
+                        "utf16le",
+                        "ucs2",
+                        "base64",
+                        "latin1",
+                        "binary",
+                        "hex"
+                    ],
+                    "default": "utf8",
+                    "minLength": 1
+                },
+                "delimiter": {
+                    "type": "string",
+                    "minLength": 1
                 }
             }
         },

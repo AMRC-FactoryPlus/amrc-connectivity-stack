@@ -1,6 +1,6 @@
 {
   "name": "acs-auth",
-  "version": "1.0.1",
+  "version": "1.3.0",
   "description": "The Authorisation component of the AMRC Connectivity Stack",
   "type": "module",
   "main": "index.js",

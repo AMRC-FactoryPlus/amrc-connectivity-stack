@@ -305,8 +305,10 @@ export default {
         },
         ASCIITCPConnDetails: {
           ip: null,
-          inputs: '4',
-          outputs: '4',
+          port: null,
+          encoding: 'utf8',
+          delimiter: '\r',
+          keepAlive: 2000,
         },
         RESTConnDetails: {
           baseURL: '',
@@ -576,13 +578,11 @@ export default {
                   }),
                   minLength: minLength(3),
                 },
-                description: 'The IP of the controller to connect to.',
+                description: 'The IP of the host to connect to.',
                 title: 'IP',
               },
-              inputs: {
+              port: {
                 type: 'number',
-                description: 'The number of inputs to read from the controller.',
-                title: 'Inputs',
                 showIf: () => {
                   return this.model.connType === 'ASCII TCP' || false;
                 },
@@ -590,14 +590,13 @@ export default {
                   requiredIf: requiredIf(() => {
                     return this.model.connType === 'ASCII TCP' || false;
                   }),
-                  numeric,
+                  minLength: minLength(1),
                 },
-                default: 4,
+                description: 'The port number to connect to the host on.',
+                title: 'Port',
               },
-              outputs: {
-                type: 'number',
-                description: 'The number of outputs to read from the controller.',
-                title: 'Outputs',
+              encoding: {
+                type: 'string',
                 showIf: () => {
                   return this.model.connType === 'ASCII TCP' || false;
                 },
@@ -605,11 +604,52 @@ export default {
                   requiredIf: requiredIf(() => {
                     return this.model.connType === 'ASCII TCP' || false;
                   }),
-                  numeric,
+                  minLength: minLength(1),
                 },
-                default: 4,
-              }
-
+                description: 'The encoding to use for the connection.',
+                title: 'Encoding',
+                enum: [
+                  'utf8',
+                  'ascii',
+                  'utf16le',
+                  'ucs2',
+                  'base64',
+                  'latin1',
+                  'binary',
+                  'hex',
+                ],
+                default: 'utf8',
+              },
+              delimiter: {
+                type: 'string',
+                showIf: () => {
+                  return this.model.connType === 'ASCII TCP' || false;
+                },
+                validations: {
+                  requiredIf: requiredIf(() => {
+                    return this.model.connType === 'ASCII TCP' || false;
+                  }),
+                  minLength: minLength(1),
+                },
+                description: 'The delimiter to use for the connection.',
+                title: 'Delimiter',
+                default: '\r',
+              },
+              keepAlive: {
+                type: 'number',
+                showIf: () => {
+                  return this.model.connType === 'ASCII TCP' || false;
+                },
+                validations: {
+                  requiredIf: requiredIf(() => {
+                    return this.model.connType === 'ASCII TCP' || false;
+                  }),
+                  minLength: minLength(1),
+                },
+                description: 'The keepalive period for this connection.',
+                title: 'Keep Alive Interval (ms)',
+                default: 2000,
+              },
             },
           },
           'OPCUAConnDetails': {
@@ -960,10 +1000,11 @@ export default {
               'JSON',
               'XML',
               'Buffer',
+              'ASCII HEX'
             ],
-            default: 'Define by Protocol',
+            default: 'Defined by Protocol',
             showIf: () => {
-              return ['REST', 'UDP', 'MQTT'].includes(this.model.connType) || false;
+              return ['REST', 'UDP', 'MQTT', 'ASCII TCP'].includes(this.model.connType) || false;
             },
             validations: {
               required,

@@ -9,6 +9,7 @@ import {DOMParser} from "@xmldom/xmldom";
 import * as jsonpointer from 'jsonpointer';
 import * as Long from "long";
 import {MessageSecurityMode, SecurityPolicy} from "node-opcua";
+import {Address} from "@amrc-factoryplus/utilities";
 import {log} from "./log.js";
 
 export enum serialisationType {
@@ -67,7 +68,10 @@ export interface sparkplugConfig {
     password: string,
     asyncPubMode: boolean,
     compressPayload: boolean,
-    pubInterval: number
+    pubInterval: number,
+    address: Address,
+    uuid: string,
+    configRevision: string,
 }
 
 export interface sparkplugPayload {

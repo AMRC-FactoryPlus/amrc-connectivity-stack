@@ -20,11 +20,11 @@ import {
     sparkplugMetric,
     sparkplugPayload
 } from "./helpers/typeHandler.js";
+import { FactoryPlus, EdgeAgentSchema } from "./uuids.js";
 
 export class SparkplugNode extends (
     EventEmitter
 ) {
-    #address: Address
     #conf: sparkplugConfig
     #client: any
     #metrics: Metrics
@@ -34,12 +34,12 @@ export class SparkplugNode extends (
     #aliasCounter: number
     #metricNameIndex: metricIndex
 
-    constructor(fplus: ServiceClient, address: Address, conf: sparkplugConfig) {
+    constructor(fplus: ServiceClient, conf: sparkplugConfig) {
         super();
-        this.#address = address;
         this.#conf = conf;
 
          // Generate randomized client ID
+        const address = conf.address;
         const clientId = address.group + '-' + address.node + '-' 
             + (Math.random() * 1e17).toString(36);
 
@@ -76,6 +76,21 @@ export class SparkplugNode extends (
         this.#metricNameIndex = {};
         // Default Edge Node metrics
         this.#metrics = new Metrics([
+            {
+                name: "Schema_UUID",
+                type: sparkplugDataType.uuid,
+                value: EdgeAgentSchema,
+            },
+            {
+                name: "Instance_UUID",
+                type: sparkplugDataType.uuid,
+                value: this.#conf.uuid,
+            },
+            {
+                name: "Config_Revision",
+                type: sparkplugDataType.uuid,
+                value: this.#conf.configRevision,
+            },
             {
                 name: "Node Properties/Type",
                 type: sparkplugDataType.string,
@@ -282,10 +297,12 @@ export class SparkplugNode extends (
                 }
             })
         );
-        return {
+        const payload: sparkplugPayload = {
             timestamp: Date.now(),
             metrics: newMetrics,
         };
+        if (birth) payload.uuid = FactoryPlus;
+        return payload;
     }
 
     requestAlias() {
@@ -304,7 +321,7 @@ export class SparkplugNode extends (
         });
         this.#client.publishNodeBirth(payload);
         this.emit('dbirth-all');
-        log(`✨ NBIRTH published for ${this.#address}`);
+        log(`✨ NBIRTH published for ${this.#conf.address}`);
     }
 
     /**
@@ -317,7 +334,6 @@ export class SparkplugNode extends (
         if (this.isOnline) {
             // Prepare metrics for payload and Publish DBIRTH certificate, enabling compression if required.
             const payload = await this.#preparePayload(metrics, true);
-            payload.uuid = '11ad7b32-1d32-4c4a-b0c9-fa049208939a';
             try {
                 this.#client.publishDeviceBirth(deviceId, payload, {
                     compress: this.#metrics.getByName("Node Control/Payload Compression").value,

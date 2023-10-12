@@ -57,6 +57,7 @@ import {
     Device,
     deviceOptions
 } from "./device.js";
+import { EdgeAgentConfig } from "./uuids.js";
 import {EventEmitter} from "events";
 
 /**
@@ -74,8 +75,6 @@ interface deviceInfo {
     connection: any;
     connectionDetails: any
 }
-
-const EdgeAgentConfig = "aac6f843-cfee-4683-b121-6943bfdf9173"; 
 
 export class Translator extends EventEmitter {
     /**
@@ -109,16 +108,21 @@ export class Translator extends EventEmitter {
         try {
             // Fetch our config
             const ids = await this.fetchIdentities();
-            const conf = await this.fetchConfig(ids.uuid!);
+            const [conf, etag] = await this.fetchConfig(ids.uuid!);
+            const spConf = {
+                ...(conf?.sparkplug ?? {}),
+                address: ids.sparkplug!,
+                uuid: ids.uuid!,
+                configRevision: etag,
+            };
 
             // Create sparkplug node
-            this.sparkplugNode = new SparkplugNode(
-                this.fplus, ids.sparkplug!, conf.sparkplug);
+            this.sparkplugNode = new SparkplugNode(this.fplus, spConf);
             log(`Created Sparkplug node "${ids.sparkplug!}".`);
 
             // Create a new device connection for each type listed in config file
             log('Building up connections and devices...');
-            conf.deviceConnections?.forEach(c => this.setupConnection(c));
+            conf?.deviceConnections?.forEach(c => this.setupConnection(c));
 
             // Setup Sparkplug node handlers
             this.setupSparkplug();
@@ -312,17 +316,16 @@ export class Translator extends EventEmitter {
     }
 
     /* Fetch our config from the ConfigDB. */
-    async fetchConfig (uuid: string): Promise<translatorConf> {
+    async fetchConfig (uuid: string): Promise<[translatorConf, string]> {
         const cdb = this.fplus.ConfigDB;
 
-        const config = await this.retry("config", async () => {
-            const config = await cdb.get_config(EdgeAgentConfig, uuid);
-            if (!config || !validateConfig(config))
-                throw "Config is invalid";
-            return config;
-        });
+        const [config, etag] = await this.retry("config",
+            () => cdb.get_config_with_etag(EdgeAgentConfig, uuid));
 
-        return reHashConf(config);
+        if (!config || !validateConfig(config))
+            return;
+        log(`Fetch config with etag [${etag}]`);
+        return [reHashConf(config), etag];
     }
 
     async retry<RV> (what: string, fetch: () => Promise<RV>): 

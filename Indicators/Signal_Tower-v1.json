@@ -2,6 +2,7 @@
   "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Signal_Tower-v1.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Signal Tower",
+  "description": "Industrial signal tower/stack light schema with a user defined set of lights.",
   "type": "object",
   "properties": {
     "Schema_UUID": {

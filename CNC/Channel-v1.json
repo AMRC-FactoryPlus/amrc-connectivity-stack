@@ -407,7 +407,6 @@
           "properties": {
             "Sparkplug_Type": {
               "enum": [
-                "UInt8",
                 "UInt32BE",
                 "UInt32LE"
               ]
@@ -418,7 +417,7 @@
           }
         }
       ]
-    }
+    },
     "Act_Status": {
       "allOf": [
         {

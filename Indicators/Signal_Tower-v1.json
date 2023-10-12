@@ -5,7 +5,7 @@
   "type": "object",
   "properties": {
     "Schema_UUID": {
-      "const": "6c7a36d1-7efb-473f-a2a4-d205871bb641"
+      "const": "d0cd9123-153a-4f4d-9f4a-2307e042d53d"
     },
     "Instance_UUID": {
       "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
@@ -25,7 +25,7 @@
     },
     "Lights": {
       "type": "object",
-      "description": "List of lights on stack light.",
+      "description": "List of lights.",
       "patternProperties": {
         "^[a-zA-Z0-9_]*$": {
           "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Light-v1.json"

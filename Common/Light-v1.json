@@ -5,14 +5,14 @@
   "type": "object",
   "properties": {
     "Schema_UUID": {
-      "const": "60e6ddee-9a8d-4c9a-9042-8f1339e7bb11"
+      "const": "24f1453a-0d0f-4605-aca5-f5e2edeb3a2b"
     },
     "Instance_UUID": {
       "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
       "type": "string",
       "format": "uuid"
     },
-    "Color": {
+    "Colour": {
       "allOf": [
         {
           "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
@@ -25,7 +25,7 @@
               ]
             },
             "Documentation": {
-              "default": "Color of light."
+              "default": "Colour of light."
             }
           }
         }

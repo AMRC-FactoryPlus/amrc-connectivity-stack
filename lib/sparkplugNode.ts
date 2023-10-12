@@ -20,7 +20,7 @@ import {
     sparkplugMetric,
     sparkplugPayload
 } from "./helpers/typeHandler.js";
-import { FactoryPlus, EdgeAgentSchema } from "./uuids.js";
+import { FactoryPlus, EdgeAgentSchema, NullUuid } from "./uuids.js";
 
 export class SparkplugNode extends (
     EventEmitter
@@ -89,7 +89,7 @@ export class SparkplugNode extends (
             {
                 name: "Config_Revision",
                 type: sparkplugDataType.uuid,
-                value: this.#conf.configRevision,
+                value: this.#conf.configRevision ?? NullUuid,
             },
             {
                 name: "Node Properties/Type",
@@ -105,7 +105,7 @@ export class SparkplugNode extends (
                 // Whether metrics changes should be pushed immediately or buffered and published periodically
                 name: "Node Control/Async Publish Mode",
                 type: sparkplugDataType.boolean,
-                value: this.#conf.asyncPubMode,
+                value: this.#conf.asyncPubMode ?? false,
             },
             {
                 // Command to reload the node configuration from the Management App
@@ -117,13 +117,13 @@ export class SparkplugNode extends (
                 // If client is to publish periodically then define how often should this be done
                 name: "Node Control/Publish Interval",
                 type: sparkplugDataType.uInt16,
-                value: this.#conf.pubInterval,
+                value: this.#conf.pubInterval ?? 0,
             },
             {
                 // Whether payload should be compressed or not
                 name: "Node Control/Payload Compression",
                 type: sparkplugDataType.boolean,
-                value: this.#conf.compressPayload,
+                value: this.#conf.compressPayload ?? false,
             },
             {
                 name: "Command_Request_Template",

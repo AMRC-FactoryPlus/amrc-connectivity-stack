@@ -58,20 +58,12 @@ export interface schemaMetric {
 
 
 export interface sparkplugConfig {
-    clientId: string,
-    publishDeath: boolean,
-    version: string,
-    serverUrl: string,
-    groupId: string,
-    edgeNode: string,
-    username: string,
-    password: string,
-    asyncPubMode: boolean,
-    compressPayload: boolean,
-    pubInterval: number,
     address: Address,
     uuid: string,
-    configRevision: string,
+    configRevision?: string,
+    asyncPubMode?: boolean,
+    compressPayload?: boolean,
+    pubInterval?: number,
 }
 
 export interface sparkplugPayload {

@@ -1,20 +1,10 @@
 {
     "title": "Configure Device Translation",
     "type": "object",
-    "required": [
-        "sparkplug"
-    ],
     "properties": {
         "sparkplug": {
             "type": "object",
             "title": "Sparkplug Client",
-            "required": [
-                "groupId",
-                "edgeNode",
-                "username",
-                "password",
-                "serverUrl"
-            ],
             "options": {
                 "collapsed": false
             },

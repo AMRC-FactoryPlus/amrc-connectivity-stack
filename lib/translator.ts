@@ -66,8 +66,8 @@ import {EventEmitter} from "events";
  */
 
 export interface translatorConf {
-    sparkplug: sparkplugConfig,
-    deviceConnections: any[]
+    sparkplug?: sparkplugConfig,
+    deviceConnections?: any[]
 }
 
 interface deviceInfo {
@@ -316,15 +316,20 @@ export class Translator extends EventEmitter {
     }
 
     /* Fetch our config from the ConfigDB. */
-    async fetchConfig (uuid: string): Promise<[translatorConf, string]> {
+    async fetchConfig (uuid: string): 
+        Promise<[translatorConf, string|undefined]>
+    {
         const cdb = this.fplus.ConfigDB;
 
         const [config, etag] = await this.retry("config",
             () => cdb.get_config_with_etag(EdgeAgentConfig, uuid));
 
-        if (!config || !validateConfig(config))
-            return;
-        log(`Fetch config with etag [${etag}]`);
+        log(`Fetched config with etag [${etag}]`);
+        if (!config || !validateConfig(config)) {
+            log("Config is invalid or nonexistent, ignoring");
+            return [{}, etag];
+        }
+
         return [reHashConf(config), etag];
     }
 

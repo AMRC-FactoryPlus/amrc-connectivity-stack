@@ -1,5 +1,5 @@
 {
-  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Signal_Tower-v1.json",
+  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Indicators/Signal_Tower-v1.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Signal Tower",
   "description": "Industrial signal tower/stack light schema with a user defined set of lights.",
@@ -29,7 +29,7 @@
       "description": "List of lights.",
       "patternProperties": {
         "^[a-zA-Z0-9_]*$": {
-          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Light-v1.json"
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Indicators/Light-v1.json"
         }
       }
     },

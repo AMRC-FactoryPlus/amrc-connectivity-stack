@@ -1,0 +1,58 @@
+{
+  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Light-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Facility Environment Characteristics",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "60e6ddee-9a8d-4c9a-9042-8f1339e7bb11"
+    },
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "Color": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "String"
+              ]
+            },
+            "Documentation": {
+              "default": "Color of light."
+            }
+          }
+        }
+      ]
+    },
+    "State": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "Boolean"
+              ]
+            },
+            "Documentation": {
+              "default": "State of light, ON/OFF."
+            }
+          }
+        }
+      ]
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID"
+  ]
+}

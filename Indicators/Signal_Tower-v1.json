@@ -1,7 +1,7 @@
 {
-  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Stack_Light-v1.json",
+  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Signal_Tower-v1.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Stack Light element states",
+  "title": "Signal Tower",
   "type": "object",
   "properties": {
     "Schema_UUID": {
@@ -25,28 +25,31 @@
     },
     "Lights": {
       "type": "object",
-      "description": "List of light colors on stack light.",
+      "description": "List of lights on stack light.",
       "patternProperties": {
         "^[a-zA-Z0-9_]*$": {
-          "allOf": [
-            {
-              "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
-            },
-            {
-              "properties": {
-                "Sparkplug_Type": {
-                  "enum": [
-                    "Boolean"
-                  ]
-                },
-                "Documentation": {
-                  "default": "State of Light"
-                }
-              }
-            }
-          ]
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Light-v1.json"
         }
       }
+    },
+    "Buzzer_State": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "Boolean"
+              ]
+            },
+            "Documentation": {
+              "default": "State of audible buzzer, ON/OFF"
+            }
+          }
+        }
+      ]
     }
   },
   "required": [

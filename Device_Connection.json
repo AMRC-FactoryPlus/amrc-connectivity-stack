@@ -21,7 +21,8 @@
                 "S7",
                 "UDP",
                 "MTConnect",
-                "Open Protocol"
+                "Open Protocol",
+                "ASCII TCP"
             ],
             "minLength": 1
         },
@@ -144,6 +145,53 @@
                     "title": "Port",
                     "minLength": 1,
                     "default": 4545
+                }
+            }
+        },
+        "ASCIITCPConnDetails": {
+            "type": "object",
+            "title": "ASCII TCP Details",
+            "options": {
+                "dependencies": {
+                    "connType": "ASCII TCP"
+                },
+                "collapsed": false
+            },
+            "required": [
+                "ip",
+                "port",
+                "encoding",
+                "delimiter",
+                "keepAlive"
+
+            ],
+            "properties": {
+                "ip": {
+                    "type": "string",
+                    "minLength": 3
+                },
+                "port": {
+                    "type": "number",
+                    "minLength": 1
+                },
+                "encoding": {
+                    "type": "string",
+                    "enum": [
+                        "utf8",
+                        "ascii",
+                        "utf16le",
+                        "ucs2",
+                        "base64",
+                        "latin1",
+                        "binary",
+                        "hex"
+                    ],
+                    "default": "utf8",
+                    "minLength": 1
+                },
+                "delimiter": {
+                    "type": "string",
+                    "minLength": 1
                 }
             }
         },
@@ -456,7 +504,8 @@
                 "Delimited String",
                 "JSON",
                 "XML",
-                "Buffer"
+                "Buffer",
+                "ASCII HEX"
             ]
         },
         "delimiter": {

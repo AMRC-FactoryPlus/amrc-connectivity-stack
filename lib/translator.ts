@@ -51,7 +51,8 @@ import {
     log
 } from "./helpers/log.js";
 import {
-    sparkplugConfig
+    nodeControl,
+    sparkplugConfig,
 } from "./helpers/typeHandler.js";
 import {
     Device,
@@ -66,7 +67,7 @@ import {EventEmitter} from "events";
  */
 
 export interface translatorConf {
-    sparkplug?: sparkplugConfig,
+    sparkplug: Partial<sparkplugConfig>,
     deviceConnections?: any[]
 }
 
@@ -108,12 +109,11 @@ export class Translator extends EventEmitter {
         try {
             // Fetch our config
             const ids = await this.fetchIdentities();
-            const [conf, etag] = await this.fetchConfig(ids.uuid!);
+            const conf = await this.fetchConfig(ids.uuid!);
             const spConf = {
-                ...(conf?.sparkplug ?? {}),
+                ...conf.sparkplug!,
                 address: ids.sparkplug!,
                 uuid: ids.uuid!,
-                configRevision: etag,
             };
 
             // Create sparkplug node
@@ -316,8 +316,7 @@ export class Translator extends EventEmitter {
     }
 
     /* Fetch our config from the ConfigDB. */
-    async fetchConfig (uuid: string): 
-        Promise<[translatorConf, string|undefined]>
+    async fetchConfig (uuid: string): Promise<translatorConf>
     {
         const cdb = this.fplus.ConfigDB;
 
@@ -325,12 +324,27 @@ export class Translator extends EventEmitter {
             () => cdb.get_config_with_etag(EdgeAgentConfig, uuid));
 
         log(`Fetched config with etag [${etag}]`);
-        if (!config || !validateConfig(config)) {
-            log("Config is invalid or nonexistent, ignoring");
-            return [{}, etag];
-        }
 
-        return [reHashConf(config), etag];
+        const valid = config && validateConfig(config);
+        const conns = valid ? reHashConf(config).deviceConnections : [];
+
+        if (!valid)
+            log("Config is invalid or nonexistent, ignoring");
+
+        const rv = {
+            sparkplug: {
+                nodeControl: config?.sparkplug,
+                configRevision: etag,
+                alerts: {
+                    configFetchFailed: !config,
+                    configInvalid: !valid,
+                },
+            },
+            deviceConnections: conns,
+        };
+
+        log(`Mapped config: ${JSON.stringify(config)}\n->\n${JSON.stringify(rv)}`);
+        return rv;
     }
 
     async retry<RV> (what: string, fetch: () => Promise<RV>): 

@@ -18,7 +18,7 @@ import {
     sparkplugConfig,
     sparkplugDataType,
     sparkplugMetric,
-    sparkplugPayload
+    sparkplugPayload,
 } from "./helpers/typeHandler.js";
 import { FactoryPlus, EdgeAgentSchema, NullUuid } from "./uuids.js";
 
@@ -105,7 +105,7 @@ export class SparkplugNode extends (
                 // Whether metrics changes should be pushed immediately or buffered and published periodically
                 name: "Node Control/Async Publish Mode",
                 type: sparkplugDataType.boolean,
-                value: this.#conf.asyncPubMode ?? false,
+                value: this.#conf.nodeControl?.asyncPubMode ?? false,
             },
             {
                 // Command to reload the node configuration from the Management App
@@ -117,13 +117,33 @@ export class SparkplugNode extends (
                 // If client is to publish periodically then define how often should this be done
                 name: "Node Control/Publish Interval",
                 type: sparkplugDataType.uInt16,
-                value: this.#conf.pubInterval ?? 0,
+                value: this.#conf.nodeControl?.pubInterval ?? 0,
             },
             {
                 // Whether payload should be compressed or not
                 name: "Node Control/Payload Compression",
                 type: sparkplugDataType.boolean,
-                value: this.#conf.compressPayload ?? false,
+                value: this.#conf.nodeControl?.compressPayload ?? false,
+            },
+            {
+                name: "Alerts/Config_Fetch_Failed/Type",
+                type: sparkplugDataType.string,
+                value: "633a7da3-ea2a-4e3f-8e84-35691a07465f",
+            },
+            {
+                name: "Alerts/Config_Fetch_Failed/Active",
+                type: sparkplugDataType.boolean,
+                value: this.#conf.alerts?.configFetchFailed ?? false,
+            },
+            {
+                name: "Alerts/Config_Invalid/Type",
+                type: sparkplugDataType.string,
+                value: "075c2d9b-7169-47a8-a27d-28a96f29e0ac",
+            },
+            {
+                name: "Alerts/Config_Invalid/Active",
+                type: sparkplugDataType.boolean,
+                value: this.#conf.alerts?.configInvalid ?? false,
             },
         ]);
         this.isOnline = false; // Whether client is online or not

@@ -57,13 +57,21 @@ export interface schemaMetric {
 }
 
 
+export interface nodeControl {
+    asyncPubMode: boolean,
+    compressPayload: boolean,
+    pubInterval: number,
+}
+
 export interface sparkplugConfig {
     address: Address,
     uuid: string,
+    alerts?: {
+        configFetchFailed: boolean,
+        configInvalid: boolean,
+    },
     configRevision?: string,
-    asyncPubMode?: boolean,
-    compressPayload?: boolean,
-    pubInterval?: number,
+    nodeControl?: nodeControl,
 }
 
 export interface sparkplugPayload {

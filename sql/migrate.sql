@@ -19,6 +19,7 @@
 
 -- Version 6 was the first to use this setup.
 \ir v6.sql
+\ir v7.sql
 
 -- Revoke some unhelpful default permissions.
 revoke all on database :"db" from public;

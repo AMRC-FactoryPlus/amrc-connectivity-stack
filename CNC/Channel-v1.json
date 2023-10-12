@@ -378,6 +378,46 @@
         }
       ]
     },
+    "Act_Program_Cycle_Time": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "DoubleLE",
+                "DoubleBE"
+              ]
+            },
+            "Documentation": {
+              "default": "Runtime of selected NC program ( in seconds )."
+            }
+          }
+        }
+      ]
+    },
+    "Act_Program_Workpiece_Count": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "UInt32BE",
+                "UInt32LE"
+              ]
+            },
+            "Documentation": {
+              "default": "Total number of workpieces machined in current run."
+            }
+          }
+        }
+      ]
+    },
     "Act_Status": {
       "allOf": [
         {
@@ -411,6 +451,26 @@
             },
             "Documentation": {
               "default": "Block mode status (true in case of block mode is active, else false). With block mode active, individual program blocks are processed one by one. Each step has to be triggered by the operator."
+            }
+          }
+        }
+      ]
+    },
+    "Block_Time": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "DoubleLE",
+                "DoubleBE"
+              ]
+            },
+            "Documentation": {
+              "default": "Time from the beginning of the block in seconds."
             }
           }
         }
@@ -557,6 +617,86 @@
             },
             "Documentation": {
               "default": "ID of active tool that has been selected (e.g. calling T1 in the CNC part program). Returns an empty string, if no tool is present."
+            }
+          }
+        }
+      ]
+    },
+    "Tool_Offset": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "DoubleLE",
+                "DoubleBE"
+              ]
+            },
+            "Documentation": {
+              "default": "Active tool length."
+            }
+          }
+        }
+      ]
+    },
+    "Tool_Radius": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "DoubleLE",
+                "DoubleBE"
+              ]
+            },
+            "Documentation": {
+              "default": "Active tool radius."
+            }
+          }
+        }
+      ]
+    },
+    "Cutting_Time": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "DoubleLE",
+                "DoubleBE"
+              ]
+            },
+            "Documentation": {
+              "default": "Tool operating time ( in seconds )."
+            }
+          }
+        }
+      ]
+    },
+    "Operating_Time": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "DoubleLE",
+                "DoubleBE"
+              ]
+            },
+            "Documentation": {
+              "default": "Total runtime of NC programs in Automatic mode ( in seconds )."
             }
           }
         }

@@ -9,9 +9,11 @@
 import { ServiceClient } from "@amrc-factoryplus/utilities";
 
 import { GIT_VERSION } from "../lib/git-version.js";
+import { Edge } from "../lib/uuids.js";
+
+import { Deployments } from "../lib/deployments.js";
 import { Kubeseal } from "../lib/kubeseal.js";
 import { Nodes } from "../lib/nodes.js";
-import { Edge } from "../lib/uuids.js";
 
 const cluster = process.env.CLUSTER_UUID;
 
@@ -32,5 +34,10 @@ const kubeseal = await new Kubeseal({
     controller:     process.env.SEALED_SECRETS_CONTROLLER,
 }).init();
 
+const deploy = await new Deployments({
+    fplus, cluster,
+}).init();
+
 nodes.run();
 kubeseal.run();
+deploy.run();

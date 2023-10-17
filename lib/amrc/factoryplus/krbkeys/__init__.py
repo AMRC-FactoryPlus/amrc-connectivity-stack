@@ -21,10 +21,10 @@ CRD = (Identifiers.DOMAIN, Identifiers.CRD_VERSION, Identifiers.CRD_PLURAL)
 
 class KrbKeys:
     def __init__ (self, env, **kw):
-        self.default_ns = env["DEFAULT_NAMESPACE"]
-        self.keytabs = env["KEYTABS_SECRET"]
-        self.passwords = env["PASSWORDS_SECRET"]
-        self.presets = env["PRESETS_SECRET"]
+        self.default_ns = env.get("DEFAULT_NAMESPACE")
+        self.keytabs = env.get("KEYTABS_SECRET")
+        self.passwords = env.get("PASSWORDS_SECRET")
+        self.presets = env.get("PRESETS_SECRET")
         self.expire_old_keys = int(env.get("EXPIRE_OLD_KEYS", 86400))
         self.kadmin_ccache = env.get("KADMIN_CCNAME", None)
         self.fplus = ServiceClient(env=env)
@@ -59,8 +59,6 @@ class KrbKeys:
         if "secret" in spec:
             secret, key = spec["secret"].split("/")
         else:
-            if ns != self.default_ns:
-                raise ValueError(f"Must specify secret for {ns}/{name}")
             match (spec['type']):
                 case "Random":
                     secret = self.keytabs
@@ -69,7 +67,13 @@ class KrbKeys:
                 case "PresetPassword":
                     secret = self.presets
                 case _ as typ:
-                    raise ValueError(f"Must specify secret for {spec['type']} {ns}/{name}")
+                    secret = None
+
+            if ns != self.default_ns:
+                secret = None
+
+            if secret is None:
+                raise ValueError(f"Must specify secret for {spec['type']} {ns}/{name}")
             key = name
 
         return (ns, secret, key)

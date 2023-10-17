@@ -1,0 +1,5 @@
+image:
+  #registry: ghcr.io/amrc-factoryplus
+  registry: amrc-factoryplus.shef.ac.uk:5000
+  repository: edge-modbus-rest
+  version: "v0.1.0"

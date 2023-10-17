@@ -16,3 +16,6 @@ config.mk
 
 # IDE
 .idea/
+
+# Python
+__pycache__

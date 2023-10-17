@@ -41,7 +41,12 @@ const kubeseal = await new Kubeseal({
 }).init();
 
 const deploy = await new Deployments({
-    fplus, cluster, kubeconfig, namespace,
+    fplus, kubeconfig, namespace,
+    cluster: {
+        uuid:       cluster,
+        name:       process.env.CLUSTER_NAME,
+    },
+    realm:          process.env.REALM,
 }).init();
 
 nodes.run();

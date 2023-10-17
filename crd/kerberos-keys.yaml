@@ -25,11 +25,8 @@ spec:
                 -   name: Secret
                     jsonPath: ".spec.secret"
                     type: string
-                -   name: SealWith
-                    jsonPath: ".spec.sealWith"
-                    type: string
-                -   name: Cluster
-                    jsonPath: ".spec.cluster"
+                -   name: UUID
+                    jsonPath: ".spec.account.uuid"
                     type: string
             schema:
                 openAPIV3Schema:
@@ -43,6 +40,7 @@ spec:
                                 - rule: "self.type in ['Random', 'Disabled'] || !has(self.keepOldKeys)"
                                 - rule: "has(self.secret) || !(has(self.sealWith) || has(self.cluster))"
                                 - rule: "has(self.secret) || self.type in ['Disabled', 'Random', 'Password', 'PresetPassword']"
+                                - rule: "!(has(self.account) && has(self.additionalPrincipals))"
                             required: [type, principal]
                             properties:
                                 type:
@@ -107,6 +105,27 @@ spec:
                                                 The namespace to seal the secret into. Defaults to
                                                 the cluster default namespace from the ConfigDB.
                                             type: string
+                                account:
+                                    description: >
+                                        Create an account in the Factory+ databases.
+                                    type: object
+                                    required: [uuid, class]
+                                    properties:
+                                        uuid:
+                                            description: The account UUID.
+                                            type: string
+                                            format: uuid
+                                        class:
+                                            description: The class UUID to use for the account.
+                                            type: string
+                                            format: uuid
+                                        name:
+                                            description: The GI name to give the account UUID.
+                                            type: string
+                                        groups:
+                                            description: Auth service groups to add the account to.
+                                            type: array
+                                            items: { type: string, format: uuid }
                         status:
                             type: object
                             x-kubernetes-preserve-unknown-fields: true

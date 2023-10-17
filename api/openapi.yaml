@@ -332,7 +332,7 @@ components:
                 online: { type: boolean }
                 last_change: { type: string, format: date-time }
                 schemas: { $ref: "#/components/schemas/uuid-list" }
-                top_schema: { type: string, format: uuid }
+                top_schema: { type: string, format: uuid, nullable: true }
                 
         device-list:
             description: >

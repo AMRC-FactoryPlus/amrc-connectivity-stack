@@ -52,7 +52,7 @@ class RekeyEvent (KrbKeyEvent):
         if self.new is None or self.new.disabled:
             return
         
-        status = self.new.reconcile_key(force=force)
+        status = self.new.reconcile(force=force)
 
         p_meta = self.patch.metadata
         p_meta.annotations[Identifiers.FORCE_REKEY] = None

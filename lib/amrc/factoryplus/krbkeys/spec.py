@@ -5,8 +5,10 @@
 from    enum            import Enum
 import  logging
 import  typing
+from    uuid            import UUID
 
 from    .           import keyops
+from    .account    import FPAccount
 from    .context    import kk_ctx
 from    .secrets    import SecretRef
 from    .util       import dslice, fields, hidden, log
@@ -18,6 +20,7 @@ class InternalSpec:
     kind: keyops.KeyOps
     preset: bool
     keep_old: bool
+    account: FPAccount | None
 
     def __init__ (self, event, spec, **kw):
         ns = event.ns
@@ -32,6 +35,8 @@ class InternalSpec:
         self.keep_old = bool(spec.get("keepOldKeys"))
 
         self.secret = SecretRef.from_spec(ns, name, spec)
+        self.account = None if "account" not in spec \
+            else FPAccount(spec)
 
     @property
     def principal (self):
@@ -58,6 +63,10 @@ class InternalSpec:
         return self.secret.can_read()
 
     def remove (self, new):
+        nacc = None if new is None else new.account
+        if self.account is not None and self.account != nacc:
+            self.account.remove(nacc)
+
         nsc = None if new is None else new.secret
         if not self.preset and self.secret != nsc:
             self.secret.remove()
@@ -67,7 +76,13 @@ class InternalSpec:
         for p in self.principals - npr:
             kadm.disable_princ(p)
 
-    def reconcile_key (self, force=False):
+    def reconcile (self, force=False):
+        if self.account is not None:
+            self.account.reconcile()
+
+        return self.reconcile_key(force)
+
+    def reconcile_key (self, force):
         kops = self.kind
         current = self.secret.maybe_read()
 

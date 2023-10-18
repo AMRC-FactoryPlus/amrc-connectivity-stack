@@ -31,6 +31,9 @@ class FPAccount:
 
     def reconcile (self):
         log(f"Reconcile account {self}")
+        fp = kk_ctx().fplus
+
+        fp.configdb.create_object(self.klass, self.uuid)
 
     def remove (self, new):
         log(f"Maybe remove account: {self} -> {new}")

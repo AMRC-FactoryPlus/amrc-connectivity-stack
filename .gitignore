@@ -1,9 +1,4 @@
 config.mk
 lib/git-version.js
 node_modules
-/.idea/.gitignore
-/.idea/acs-edge-sync.iml
-/.idea/misc.xml
-/.idea/modules.xml
-/.idea/php.xml
-/.idea/vcs.xml
+.idea

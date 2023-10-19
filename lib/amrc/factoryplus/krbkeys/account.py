@@ -5,7 +5,7 @@
 import  typing
 from    uuid        import UUID
 
-from    amrc.factoryplus    import ServiceError
+from    amrc.factoryplus    import ServiceError, uuids
 
 from    .context    import kk_ctx
 from    .util       import fields, log
@@ -37,6 +37,9 @@ class FPAccount:
 
         log(f"Creating account object in class {self.klass}")
         fp.configdb.create_object(self.klass, self.uuid)
+        if self.name is not None:
+            fp.configdb.patch_config(uuids.App.Info, self.uuid,
+                { "name": self.name })
 
         # XXX This is not atomic, but this is unavoidable with the
         # current auth service API.

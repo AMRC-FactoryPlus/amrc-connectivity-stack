@@ -27,9 +27,8 @@ class FPAccount:
         self.klass = acc["class"]
         self.name = acc.get("name", None)
 
-        groups = acc.get("groups", None);
-        self.groups = None if groups is None \
-            else [UUID(g) for g in groups]
+        groups = acc.get("groups", []);
+        self.groups = set(UUID(g) for g in groups)
 
     def reconcile (self):
         log(f"Reconcile account {self}")
@@ -55,17 +54,27 @@ class FPAccount:
                 "kerberos": self.principal,
             })
 
+        for grp in self.groups:
+            log(f"Adding {self.uuid} to {grp}")
+            fp.auth.add_to_group(grp, self.uuid)
+
     def remove (self, new):
         log(f"Maybe remove account: {self} -> {new}")
-        if new is not None and self.uuid == new.uuid:
-            log("UUIDs match, ignoring")
-            return
-
         fp = kk_ctx().fplus
 
-        log(f"Removing account {self.uuid}")
-        try:
-            fp.auth.delete_principal(self.uuid)
-        except ServiceError as err:
-            if err.status != 404:
-                raise
+        if new is None or self.uuid != new.uuid:
+            log(f"Removing principal mapping for {self.uuid}")
+            try:
+                fp.auth.delete_principal(self.uuid)
+            except ServiceError as err:
+                if err.status != 404:
+                    raise
+
+            for grp in self.groups:
+                log(f"Removing {self.uuid} from {grp}")
+                fp.auth.remove_from_group(grp, self.uuid)
+        else:
+            for grp in self.groups - new.groups:
+                log(f"Removing {self.uuid} from {grp}")
+                fp.auth.remove_from_group(grp, self.uuid)
+

@@ -109,14 +109,21 @@ spec:
                   description: >
                     Create an account in the Factory+ databases.
                   type: object
-                  required: [uuid, class]
+                  x-kubernetes-validations:
+                    - rule: "has(self.uuid) || has(self.class)"
+                    - rule: "has(self.class) || !has(self.name)"
                   properties:
                     uuid:
-                      description: The account UUID.
+                      description: >
+                        The account UUID. If omitted the class must be
+                        specified and a new account will be created.
                       type: string
                       format: uuid
                     class:
-                      description: The class UUID to use for the account.
+                      description: >
+                        The class UUID to use for the account. If
+                        omitted the account UUID must already exist in
+                        the ConfigDB.
                       type: string
                       format: uuid
                     name:

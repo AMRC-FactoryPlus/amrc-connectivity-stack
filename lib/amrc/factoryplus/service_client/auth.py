@@ -40,3 +40,19 @@ class Auth (ServiceInterface):
         if st == 204:
             return
         self.error(f"Can't delete principal {uuid}", st)
+
+    def add_to_group (self, group, member):
+        st, _ = self.fetch(
+            method="PUT",
+            url=f"authz/group/{group}/{member}")
+        if st == 204:
+            return
+        self.error(f"Can't add {member} to {group}", st)
+
+    def remove_from_group (self, group, member):
+        st, _ = self.fetch(
+            method="DELETE",
+            url=f"authz/group/{group}/{member}")
+        if st == 204:
+            return
+        self.error(f"Can't remove {member} from {group}", st)

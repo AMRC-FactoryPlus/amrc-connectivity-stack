@@ -33,6 +33,16 @@ class ConfigDB (ServiceInterface):
             return
         self.error(f"Can't set {app} for {obj}", st)
 
+    def patch_config (self, app, obj, patch):
+        st, _ = self.fetch(
+            method="PATCH",
+            url=f"v1/app/{app}/object/{obj}",
+            content_type="application/merge-patch+json",
+            json=patch)
+        if st == 204:
+            return
+        self.error(f"Can't patch {app} for {obj}", st)
+
     def delete_config (self, app, obj):
         st, _ = self.fetch(
             method="DELETE",
@@ -54,4 +64,4 @@ class ConfigDB (ServiceInterface):
         if obj is None:
             self.error(f"Creating new {klass} failed", st)
         else:
-            self.error(f"Creating {obj} failed", st)
+            self.error(f"Creating {obj} of {klass} failed", st)

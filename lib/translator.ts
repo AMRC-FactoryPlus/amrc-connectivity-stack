@@ -51,12 +51,14 @@ import {
     log
 } from "./helpers/log.js";
 import {
-    sparkplugConfig
+    nodeControl,
+    sparkplugConfig,
 } from "./helpers/typeHandler.js";
 import {
     Device,
     deviceOptions
 } from "./device.js";
+import { EdgeAgentConfig } from "./uuids.js";
 import {EventEmitter} from "events";
 
 /**
@@ -65,8 +67,8 @@ import {EventEmitter} from "events";
  */
 
 export interface translatorConf {
-    sparkplug: sparkplugConfig,
-    deviceConnections: any[]
+    sparkplug: Partial<sparkplugConfig>,
+    deviceConnections?: any[]
 }
 
 interface deviceInfo {
@@ -74,8 +76,6 @@ interface deviceInfo {
     connection: any;
     connectionDetails: any
 }
-
-const EdgeAgentConfig = "aac6f843-cfee-4683-b121-6943bfdf9173"; 
 
 export class Translator extends EventEmitter {
     /**
@@ -110,15 +110,19 @@ export class Translator extends EventEmitter {
             // Fetch our config
             const ids = await this.fetchIdentities();
             const conf = await this.fetchConfig(ids.uuid!);
+            const spConf = {
+                ...conf.sparkplug!,
+                address: ids.sparkplug!,
+                uuid: ids.uuid!,
+            };
 
             // Create sparkplug node
-            this.sparkplugNode = new SparkplugNode(
-                this.fplus, ids.sparkplug!, conf.sparkplug);
+            this.sparkplugNode = new SparkplugNode(this.fplus, spConf);
             log(`Created Sparkplug node "${ids.sparkplug!}".`);
 
             // Create a new device connection for each type listed in config file
             log('Building up connections and devices...');
-            conf.deviceConnections?.forEach(c => this.setupConnection(c));
+            conf?.deviceConnections?.forEach(c => this.setupConnection(c));
 
             // Setup Sparkplug node handlers
             this.setupSparkplug();
@@ -302,7 +306,8 @@ export class Translator extends EventEmitter {
 
         const ids = await this.retry("identities", async () => {
             const ids = await auth.find_principal();
-            if (!ids || !ids.uuid || !ids.sparkplug) return;
+            if (!ids || !ids.uuid || !ids.sparkplug)
+                throw "Auth service not responding correctly";
             return ids;
         });
 
@@ -311,32 +316,53 @@ export class Translator extends EventEmitter {
     }
 
     /* Fetch our config from the ConfigDB. */
-    async fetchConfig (uuid: string): Promise<translatorConf> {
+    async fetchConfig (uuid: string): Promise<translatorConf>
+    {
         const cdb = this.fplus.ConfigDB;
 
-        const config = await this.retry("config", async () => {
-            const config = await cdb.get_config(EdgeAgentConfig, uuid);
-            if (!config || !validateConfig(config)) return;
-            return config;
-        });
+        const [config, etag] = await this.retry("config",
+            () => cdb.get_config_with_etag(EdgeAgentConfig, uuid));
 
-        return reHashConf(config);
+        log(`Fetched config with etag [${etag}]`);
+
+        const valid = config && validateConfig(config);
+        const conns = valid ? reHashConf(config).deviceConnections : [];
+
+        if (!valid)
+            log("Config is invalid or nonexistent, ignoring");
+
+        const rv = {
+            sparkplug: {
+                nodeControl: config?.sparkplug,
+                configRevision: etag,
+                alerts: {
+                    configFetchFailed: !config,
+                    configInvalid: !valid,
+                },
+            },
+            deviceConnections: conns,
+        };
+
+        log(`Mapped config: ${JSON.stringify(config)}\n->\n${JSON.stringify(rv)}`);
+        return rv;
     }
 
-    async retry<RV> (what: string, fetch: () => Promise<RV | undefined>): 
+    async retry<RV> (what: string, fetch: () => Promise<RV>): 
         Promise<RV>
     {
         const interval = this.pollInt;
 
         while (true) {
             log(`Attempting to fetch ${what}...`);
-            const rv = await fetch();
-            if (rv != undefined) {
+            try { 
+                const rv = await fetch();
                 log(`Fetched ${what}.`);
                 return rv;
+            } 
+            catch (e) {
+                log(`Failed to fetch ${what}: ${e}.\n
+Trying again in ${interval} seconds...`);
             }
-
-            log(`Failed to fetch ${what}. Trying again in ${interval} seconds...`);
             await timers.setTimeout(interval * 1000);
         }
     }

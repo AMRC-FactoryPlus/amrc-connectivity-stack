@@ -18,13 +18,13 @@ import {
     sparkplugConfig,
     sparkplugDataType,
     sparkplugMetric,
-    sparkplugPayload
+    sparkplugPayload,
 } from "./helpers/typeHandler.js";
+import { FactoryPlus, EdgeAgentSchema, NullUuid } from "./uuids.js";
 
 export class SparkplugNode extends (
     EventEmitter
 ) {
-    #address: Address
     #conf: sparkplugConfig
     #client: any
     #metrics: Metrics
@@ -34,12 +34,12 @@ export class SparkplugNode extends (
     #aliasCounter: number
     #metricNameIndex: metricIndex
 
-    constructor(fplus: ServiceClient, address: Address, conf: sparkplugConfig) {
+    constructor(fplus: ServiceClient, conf: sparkplugConfig) {
         super();
-        this.#address = address;
         this.#conf = conf;
 
          // Generate randomized client ID
+        const address = conf.address;
         const clientId = address.group + '-' + address.node + '-' 
             + (Math.random() * 1e17).toString(36);
 
@@ -77,6 +77,21 @@ export class SparkplugNode extends (
         // Default Edge Node metrics
         this.#metrics = new Metrics([
             {
+                name: "Schema_UUID",
+                type: sparkplugDataType.uuid,
+                value: EdgeAgentSchema,
+            },
+            {
+                name: "Instance_UUID",
+                type: sparkplugDataType.uuid,
+                value: this.#conf.uuid,
+            },
+            {
+                name: "Config_Revision",
+                type: sparkplugDataType.uuid,
+                value: this.#conf.configRevision ?? NullUuid,
+            },
+            {
                 name: "Node Properties/Type",
                 type: sparkplugDataType.string,
                 value: "ACS Edge Agent"
@@ -90,7 +105,7 @@ export class SparkplugNode extends (
                 // Whether metrics changes should be pushed immediately or buffered and published periodically
                 name: "Node Control/Async Publish Mode",
                 type: sparkplugDataType.boolean,
-                value: this.#conf.asyncPubMode,
+                value: this.#conf.nodeControl?.asyncPubMode ?? false,
             },
             {
                 // Command to reload the node configuration from the Management App
@@ -102,121 +117,33 @@ export class SparkplugNode extends (
                 // If client is to publish periodically then define how often should this be done
                 name: "Node Control/Publish Interval",
                 type: sparkplugDataType.uInt16,
-                value: this.#conf.pubInterval,
+                value: this.#conf.nodeControl?.pubInterval ?? 0,
             },
             {
                 // Whether payload should be compressed or not
                 name: "Node Control/Payload Compression",
                 type: sparkplugDataType.boolean,
-                value: this.#conf.compressPayload,
+                value: this.#conf.nodeControl?.compressPayload ?? false,
             },
             {
-                name: "Command_Request_Template",
-                type: sparkplugDataType.template,
-                value: {
-                    isDefinition: true,
-                    metrics: [
-                        {
-                            name: "Senders_Group_ID",
-                            value: "",
-                            type: sparkplugDataType.string,
-                        },
-                        {
-                            name: "Senders_Edge_Node_ID",
-                            value: "",
-                            type: sparkplugDataType.string,
-                        },
-                        {
-                            name: "Senders_Device_ID",
-                            value: "",
-                            type: sparkplugDataType.string,
-                        },
-                        {
-                            name: "Receivers_Group_ID",
-                            value: "",
-                            type: sparkplugDataType.string,
-                        },
-                        {
-                            name: "receiversEdgeNodeId",
-                            value: "",
-                            type: sparkplugDataType.string,
-                        },
-                        {
-                            name: "Receivers_Device_ID",
-                            value: "",
-                            type: sparkplugDataType.string,
-                        },
-                        {
-                            name: "Command_Name",
-                            value: "birth",
-                            type: sparkplugDataType.string,
-                        },
-                        {
-                            name: "Command_Arguments",
-                            value: "",
-                            type: sparkplugDataType.string,
-                        },
-                        {
-                            name: "Command_Timestamp",
-                            value: 0,
-                            type: sparkplugDataType.dateTime,
-                        },
-                    ],
-                },
+                name: "Alerts/Config_Fetch_Failed/Type",
+                type: sparkplugDataType.string,
+                value: "633a7da3-ea2a-4e3f-8e84-35691a07465f",
             },
             {
-                name: "Command_Response_Template",
-                type: sparkplugDataType.template,
-                value: {
-                    isDefinition: true,
-                    metrics: [
-                        {
-                            name: "Senders_Group_ID",
-                            value: "",
-                            type: sparkplugDataType.string,
-                        },
-                        {
-                            name: "Senders_Edge_Node_ID",
-                            value: "",
-                            type: sparkplugDataType.string,
-                        },
-                        {
-                            name: "Senders_Device_ID",
-                            value: "",
-                            type: sparkplugDataType.string,
-                        },
-                        {
-                            name: "Receivers_Group_ID",
-                            value: "",
-                            type: sparkplugDataType.string,
-                        },
-                        {
-                            name: "Receivers_Edge_Node_ID",
-                            value: "",
-                            type: sparkplugDataType.string,
-                        },
-                        {
-                            name: "Receivers_Device_ID",
-                            value: "",
-                            type: sparkplugDataType.string,
-                        },
-                        {
-                            name: "Command_Name",
-                            value: "birth",
-                            type: sparkplugDataType.string,
-                        },
-                        {
-                            name: "Command_Response",
-                            value: "",
-                            type: sparkplugDataType.string,
-                        },
-                        {
-                            name: "Command_Timestamp",
-                            value: 0,
-                            type: sparkplugDataType.dateTime,
-                        },
-                    ],
-                },
+                name: "Alerts/Config_Fetch_Failed/Active",
+                type: sparkplugDataType.boolean,
+                value: this.#conf.alerts?.configFetchFailed ?? false,
+            },
+            {
+                name: "Alerts/Config_Invalid/Type",
+                type: sparkplugDataType.string,
+                value: "075c2d9b-7169-47a8-a27d-28a96f29e0ac",
+            },
+            {
+                name: "Alerts/Config_Invalid/Active",
+                type: sparkplugDataType.boolean,
+                value: this.#conf.alerts?.configInvalid ?? false,
             },
         ]);
         this.isOnline = false; // Whether client is online or not
@@ -282,10 +209,12 @@ export class SparkplugNode extends (
                 }
             })
         );
-        return {
+        const payload: sparkplugPayload = {
             timestamp: Date.now(),
             metrics: newMetrics,
         };
+        if (birth) payload.uuid = FactoryPlus;
+        return payload;
     }
 
     requestAlias() {
@@ -304,7 +233,7 @@ export class SparkplugNode extends (
         });
         this.#client.publishNodeBirth(payload);
         this.emit('dbirth-all');
-        log(`✨ NBIRTH published for ${this.#address}`);
+        log(`✨ NBIRTH published for ${this.#conf.address}`);
     }
 
     /**
@@ -317,7 +246,6 @@ export class SparkplugNode extends (
         if (this.isOnline) {
             // Prepare metrics for payload and Publish DBIRTH certificate, enabling compression if required.
             const payload = await this.#preparePayload(metrics, true);
-            payload.uuid = '11ad7b32-1d32-4c4a-b0c9-fa049208939a';
             try {
                 this.#client.publishDeviceBirth(deviceId, payload, {
                     compress: this.#metrics.getByName("Node Control/Payload Compression").value,

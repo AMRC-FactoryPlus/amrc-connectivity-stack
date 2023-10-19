@@ -402,7 +402,8 @@ function EffPrinc (props) {
     const [eff, set_eff] = useState(null);
 
     useEffect(async () => {
-        const list = await fetch_json("auth", `/authz/effective/${princ}`);
+        const e_princ = encodeURIComponent(princ);
+        const list = await fetch_json("auth", `/authz/effective/${e_princ}`);
         sort_acl(list);
         set_eff(list);
     }, []);

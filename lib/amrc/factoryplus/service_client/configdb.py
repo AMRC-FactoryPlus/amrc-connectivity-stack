@@ -52,10 +52,14 @@ class ConfigDB (ServiceInterface):
         self.error(f"Can't remove {app} for {obj}", st)
 
     def create_object (self, klass, obj=None, excl=False):
+        req = { "class": str(klass) }
+        if obj is not None:
+            req["uuid"] = str(obj)
+
         st, json = self.fetch(
             method="POST",
             url="v1/object",
-            json={ "class": klass, "uuid": obj })
+            json=req)
 
         if st == 200 and excl:
             self.error(f"Exclusive create of {obj} failed", st)

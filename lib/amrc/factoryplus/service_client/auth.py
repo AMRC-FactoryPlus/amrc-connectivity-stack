@@ -24,14 +24,18 @@ class Auth (ServiceInterface):
             self.error(f"Can't fetch principal {uuid}", st)
         return json
 
-    def add_principal (self, identities):
+    def add_principal (self, uuid, kerberos=None):
+        json = { "uuid": str(uuid) }
+        if kerberos is not None:
+            json["kerberos"] = str(kerberos)
+
         st, _ = self.fetch(
             method="POST",
             url=f"authz/principal",
-            json=identities)
+            json=json)
         if st == 204:
             return
-        self.error(f"Can't create principal {identities}", st)
+        self.error(f"Can't create principal {json}", st)
 
     def delete_principal (self, uuid):
         st, _ = self.fetch(

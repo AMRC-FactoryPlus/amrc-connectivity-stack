@@ -23,8 +23,8 @@ class FPAccount:
 
         acc = spec["account"]
 
-        self.uuid = acc.get("uuid", annotation)
-        self.klass = acc.get("class")
+        self.uuid = UUID(acc.get("uuid", annotation))
+        self.klass = UUID(acc.get("class"))
         self.name = acc.get("name")
 
         groups = acc.get("groups", []);
@@ -64,10 +64,7 @@ class FPAccount:
             log(f"Updating auth principal mapping for {self.uuid} to {self.principal}")
             if ids is not None:
                 auth.delete_principal(self.uuid)
-            auth.add_principal({
-                "uuid": self.uuid, 
-                "kerberos": self.principal,
-            })
+            auth.add_principal(self.uuid, kerberos=self.principal)
 
         for grp in self.groups:
             log(f"Adding {self.uuid} to {grp}")

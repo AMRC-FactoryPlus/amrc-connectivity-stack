@@ -22,6 +22,7 @@ class Identifiers:
 
     FORCE_REKEY = f"{APPID}/force-rekey"
     HAS_OLD_KEYS = f"{APPID}/has-old-keys"
+    ACCOUNT_UUID = f"{APPID}/account-uuid"
 
     MANAGED_BY = "app.kubernetes.io/managed-by"
 

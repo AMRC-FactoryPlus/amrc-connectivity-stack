@@ -56,8 +56,10 @@ class RekeyEvent (KrbKeyEvent):
 
         p_meta = self.patch.metadata
         p_meta.annotations[Identifiers.FORCE_REKEY] = None
-        if status.has_old:
+        if status.has_old_keys:
             p_meta.labels[Identifiers.HAS_OLD_KEYS] = "true"
+        if status.account_uuid is not None:
+            p_meta.annotations[Identifiers.ACCOUNT_UUID] = status.account_uuid
 
 class TrimKeysEvent (KrbKeyEvent):
     def __init__ (self, args):

@@ -11,7 +11,12 @@ from    .           import keyops
 from    .account    import FPAccount
 from    .context    import kk_ctx
 from    .secrets    import SecretRef
-from    .util       import dslice, fields, hidden, log
+from    .util       import Identifiers, dslice, fields, hidden, log
+
+@fields
+class ReconcileStatus:
+    has_old_keys: bool = False
+    account_uuid: UUID = None
 
 @fields
 class InternalSpec:
@@ -35,8 +40,12 @@ class InternalSpec:
         self.keep_old = bool(spec.get("keepOldKeys"))
 
         self.secret = SecretRef.from_spec(ns, name, spec)
-        self.account = None if "account" not in spec \
-            else FPAccount(spec)
+
+        if "account" in spec:
+            self.account = FPAccount(spec, 
+                annotation=event.annotations.get(Identifiers.ACCOUNT_UUID))
+        else:
+            self.account = None
 
     @property
     def principal (self):
@@ -77,10 +86,13 @@ class InternalSpec:
             kadm.disable_princ(p)
 
     def reconcile (self, force=False):
-        if self.account is not None:
-            self.account.reconcile()
+        status = ReconcileStatus()
 
-        return self.reconcile_key(force)
+        if self.account is not None:
+            status.account_uuid = self.account.reconcile()
+
+        status.has_old_keys = self.reconcile_key(force)
+        return status
 
     def reconcile_key (self, force):
         kops = self.kind
@@ -108,7 +120,7 @@ class InternalSpec:
 
         status = kops.generate_key(self, oldkey)
         self.secret.write(status.secret)
-        return status
+        return status.has_old
 
     def trim_keys (self):
         self.secret.verify_writable()

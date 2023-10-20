@@ -18,45 +18,60 @@ class FPAccount:
     name: str | None
     groups: list[UUID] | None
 
-    def __init__ (self, spec):
+    def __init__ (self, spec, annotation):
         self.principal = spec["principal"]
 
         acc = spec["account"]
 
-        self.uuid = acc["uuid"]
-        self.klass = acc["class"]
-        self.name = acc.get("name", None)
+        self.uuid = acc.get("uuid", annotation)
+        self.klass = acc.get("class")
+        self.name = acc.get("name")
 
         groups = acc.get("groups", []);
         self.groups = set(UUID(g) for g in groups)
 
     def reconcile (self):
         log(f"Reconcile account {self}")
-        fp = kk_ctx().fplus
+        self.reconcile_configdb()
+        self.reconcile_auth()
+        return self.uuid
 
+    def reconcile_configdb (self):
+        cdb = kk_ctx().fplus.configdb
+
+        # If we don't have a class we aren't managing this object in the
+        # ConfigDB. Someone else (the manager perhaps) is doing that.
+        if self.klass is None:
+            return
+
+        # This will return a new UUID if we don't have one yet.
         log(f"Creating account object in class {self.klass}")
-        fp.configdb.create_object(self.klass, self.uuid)
+        self.uuid = cdb.create_object(self.klass, self.uuid)
+
         if self.name is not None:
-            fp.configdb.patch_config(uuids.App.Info, self.uuid,
+            cdb.patch_config(uuids.App.Info, self.uuid,
                 { "name": self.name })
+
+    def reconcile_auth (self):
+        auth = kk_ctx().fplus.auth
 
         # XXX This is not atomic, but this is unavoidable with the
         # current auth service API.
-        ids = fp.auth.get_principal(self.uuid)
+        ids = auth.get_principal(self.uuid)
         if ids is not None and ids["kerberos"] == self.principal:
             log(f"Principal is already correct in auth service")
         else:
             log(f"Updating auth principal mapping for {self.uuid} to {self.principal}")
             if ids is not None:
-                fp.auth.delete_principal(self.uuid)
-            fp.auth.add_principal({
+                auth.delete_principal(self.uuid)
+            auth.add_principal({
                 "uuid": self.uuid, 
                 "kerberos": self.principal,
             })
 
         for grp in self.groups:
             log(f"Adding {self.uuid} to {grp}")
-            fp.auth.add_to_group(grp, self.uuid)
+            auth.add_to_group(grp, self.uuid)
 
     def remove (self, new):
         log(f"Maybe remove account: {self} -> {new}")

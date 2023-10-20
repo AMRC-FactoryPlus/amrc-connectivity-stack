@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: edge-monitor-{{ .Values.uuid }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    factory-plus.app: edge-monitor
+    factory-plus.nodeUuid: {{ .Values.uuid }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      factory-plus.app: edge-monitor
+      factory-plus.nodeUuid: {{ .Values.uuid }}
+  template:
+    metadata:
+      labels:
+        factory-plus.app: edge-monitor
+        factory-plus.nodeUuid: {{ .Values.uuid }}
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: {{ .Values.hostname | quote }}
+      containers:
+        - name: edge-monitor
+{{ include "edge-agent.image" .Values.image.monitor | indent 10 }
+          env:
+            - name: VERBOSE
+              value: "ALL,!token,!service"
+            - name: DIRECTORY_URL
+              value: http://directory.amrc-fpd-bmz.shef.ac.uk
+            - name: SERVICE_USERNAME
+              value: "op1monitor/{{ .Values.cluster }}/{{ .Values.name }}"
+            - name: SERVICE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: edge-monitor-{{ .Values.uuid }}-keytabs
+                  key: password
+---
+apiVersion: factoryplus.app.amrc.co.uk/v1
+kind: KerberosKey
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: edge-monitor.{{ .Values.uuid }}
+spec:
+  type: Password
+  principal: op1monitor/{{ .Values.cluster }}/{{ .Values.name }}@{{ .Values.realm }}
+  secret: edge-monitor-{{ .Values.uuid }}-keytabs/password
+  account:
+    class: 97756c9a-38e6-4238-b78c-3df6f227a6c9
+    name: "Edge monitor: {{ .Values.cluster }}"
+    groups:
+      - {{ .Values.authGroup.monitor }}

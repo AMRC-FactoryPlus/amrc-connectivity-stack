@@ -10,4 +10,4 @@ spec:
   account:
     uuid: {{ .Values.uuid }}
     groups:
-      - {{ .Values.edgeAgentAuthGroup }}
+      - {{ .Values.authGroup.edgeAgent }}

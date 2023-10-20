@@ -27,8 +27,7 @@ spec:
         kubernetes.io/hostname: {{ .Values.hostname | quote }}
       containers:
         - name: edge-agent
-          image: {{ printf "%s/%s:%s" .Values.image.registry .Values.image.repository .Values.image.version | quote }}
-          imagePullPolicy: Always
+{{ include "edge-agent.image" .Values.image.edgeAgent | indent 10 }
           env:
             - name: DEBUG
               value: {{ .Values.debug | quote }}

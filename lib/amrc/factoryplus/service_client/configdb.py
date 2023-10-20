@@ -51,7 +51,7 @@ class ConfigDB (ServiceInterface):
             return
         self.error(f"Can't remove {app} for {obj}", st)
 
-    def create_object (self, klass, obj, excl=False):
+    def create_object (self, klass, obj=None, excl=False):
         st, json = self.fetch(
             method="POST",
             url="v1/object",

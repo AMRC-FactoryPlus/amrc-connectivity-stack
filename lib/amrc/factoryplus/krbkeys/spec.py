@@ -8,7 +8,6 @@ import  typing
 from    uuid            import UUID
 
 from    .           import keyops
-from    .account    import FPAccount
 from    .context    import kk_ctx
 from    .secrets    import SecretRef
 from    .util       import Identifiers, dslice, fields, hidden, log
@@ -16,7 +15,6 @@ from    .util       import Identifiers, dslice, fields, hidden, log
 @fields
 class ReconcileStatus:
     has_old_keys: bool = False
-    account_uuid: UUID = None
 
 @fields
 class InternalSpec:
@@ -25,7 +23,6 @@ class InternalSpec:
     kind: keyops.KeyOps
     preset: bool
     keep_old: bool
-    account: FPAccount | None
 
     def __init__ (self, event, spec, **kw):
         ns = event.ns
@@ -40,12 +37,6 @@ class InternalSpec:
         self.keep_old = bool(spec.get("keepOldKeys"))
 
         self.secret = SecretRef.from_spec(ns, name, spec)
-
-        if "account" in spec:
-            self.account = FPAccount(spec, 
-                annotation=event.annotations.get(Identifiers.ACCOUNT_UUID))
-        else:
-            self.account = None
 
     @property
     def principal (self):
@@ -72,10 +63,6 @@ class InternalSpec:
         return self.secret.can_read()
 
     def remove (self, new):
-        nacc = None if new is None else new.account
-        if self.account is not None and self.account != nacc:
-            self.account.remove(nacc)
-
         nsc = None if new is None else new.secret
         if not self.preset and self.secret != nsc:
             self.secret.remove()
@@ -87,9 +74,6 @@ class InternalSpec:
 
     def reconcile (self, force=False):
         status = ReconcileStatus()
-
-        if self.account is not None:
-            status.account_uuid = self.account.reconcile()
 
         status.has_old_keys = self.reconcile_key(force)
         return status

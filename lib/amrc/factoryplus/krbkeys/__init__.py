@@ -13,8 +13,8 @@ import  kopf
 
 from    amrc.factoryplus    import ServiceClient
 
+from .              import event
 from .context       import Context
-from .event         import RekeyEvent, TrimKeysEvent
 from .util          import Identifiers, log
 
 CRD = (Identifiers.DOMAIN, Identifiers.CRD_VERSION, Identifiers.CRD_PLURAL)
@@ -37,12 +37,14 @@ class KrbKeys:
 
     def register_handlers (self):
         log("Registering handlers")
-        kopf_crud("rekey", self.process_event(RekeyEvent))
+        kopf_crud("rekey", self.process_event(event.Rekey))
         kopf.on.timer(*CRD,
             id="trim_keys",
             interval=self.expire_old_keys/2,
             labels={Identifiers.HAS_OLD_KEYS: "true"}
-        )(self.process_event(TrimKeysEvent))
+        )(self.process_event(event.TrimKeys))
+        kopf_crud("account_uuid", self.process_event(event.AccUuid))
+        kopf_crud("reconcile_account", self.process_event(event.Account))
 
     def run (self):
         self.register_handlers()

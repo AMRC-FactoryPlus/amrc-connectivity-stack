@@ -20,15 +20,9 @@ class FPAccount:
     name: str | None
     groups: set[UUID]
 
-    def __init__ (self, spec, annotation):
-        self.principal = spec["principal"]
-
-        acc = spec["account"]
-
-        self.uuid = Optional.of(acc.get("uuid")) \
-            .or_else(lambda: annotation) \
-            .map(lambda u: UUID(u)) \
-            .get_or_default(None)
+    def __init__ (self, spec, uuid, principal):
+        self.uuid = uuid
+        self.principal = principal
 
         self.klass = Optional.of(acc.get("class")) \
             .map(lambda u: UUID(u)) \
@@ -39,11 +33,20 @@ class FPAccount:
         groups = acc.get("groups", []);
         self.groups = set(UUID(g) for g in groups)
 
+    @classmethod
+    def fromSpec (cls, spec, uuid):
+        if uuid is None or spec is None:
+            return None
+        acc = spec.get("account")
+        if acc is None:
+            return None
+
+        return cls(acc, uuid, spec["principal"])
+
     def reconcile (self):
         log(f"Reconcile account {self}")
         self.reconcile_configdb()
         self.reconcile_auth()
-        return str(self.uuid)
 
     def reconcile_configdb (self):
         cdb = kk_ctx().fplus.configdb
@@ -52,10 +55,6 @@ class FPAccount:
         # ConfigDB. Someone else (the manager perhaps) is doing that.
         if self.klass is None:
             return
-
-        # This will return a new UUID if we don't have one yet.
-        log(f"Creating account object in class {self.klass}")
-        self.uuid = cdb.create_object(self.klass, self.uuid)
 
         if self.name is not None:
             cdb.patch_config(uuids.App.Info, self.uuid,

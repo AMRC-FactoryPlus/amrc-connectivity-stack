@@ -27,7 +27,7 @@ spec:
         kubernetes.io/hostname: {{ .Values.hostname | quote }}
       containers:
         - name: edge-agent
-{{ include "edge-agent.image" .Values.image.edgeAgent | indent 10 }
+{{ include "edge-agent.image" .Values.image.edgeAgent | indent 10 }}
           env:
             - name: DEBUG
               value: {{ .Values.debug | quote }}

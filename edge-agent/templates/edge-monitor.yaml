@@ -24,7 +24,7 @@ spec:
         kubernetes.io/hostname: {{ .Values.hostname | quote }}
       containers:
         - name: edge-monitor
-{{ include "edge-agent.image" .Values.image.monitor | indent 10 }
+{{ include "edge-agent.image" .Values.image.monitor | indent 10 }}
           env:
             - name: VERBOSE
               value: "ALL,!token,!service"

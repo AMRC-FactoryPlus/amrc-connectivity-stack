@@ -19,6 +19,12 @@ from .util          import Identifiers, log
 
 CRD = (Identifiers.DOMAIN, Identifiers.CRD_VERSION, Identifiers.CRD_PLURAL)
 
+def kopf_crud (id, handler):
+    kopf.on.resume(*CRD, id=id)(handler)
+    kopf.on.create(*CRD, id=id)(handler)
+    kopf.on.update(*CRD, id=id)(handler)
+    kopf.on.delete(*CRD, id=id)(handler)
+
 class KrbKeys:
     def __init__ (self, env, **kw):
         self.default_ns = env.get("DEFAULT_NAMESPACE")
@@ -31,27 +37,22 @@ class KrbKeys:
 
     def register_handlers (self):
         log("Registering handlers")
-        kopf.on.resume(*CRD)(self.maybe_rekey)
-        kopf.on.create(*CRD)(self.maybe_rekey)
-        kopf.on.update(*CRD)(self.maybe_rekey)
-        kopf.on.delete(*CRD)(self.maybe_rekey)
+        kopf_crud("rekey", self.process_event(RekeyEvent))
         kopf.on.timer(*CRD,
+            id="trim_keys",
             interval=self.expire_old_keys/2,
             labels={Identifiers.HAS_OLD_KEYS: "true"}
-        )(self.trim_keys)
+        )(self.process_event(TrimKeysEvent))
 
     def run (self):
         self.register_handlers()
 
-    def maybe_rekey (self, **kw):
-        with Context(self, kw):
-            handler = RekeyEvent(kw)
-            return handler.process()
-
-    def trim_keys (self, **kw):
-        with Context(self, kw):
-            handler = TrimKeysEvent(kw)
-            return handler.process()
+    def process_event (self, event):
+        def handler (**kw):
+            with Context(self, kw):
+                ev = event(kw)
+                return ev.process()
+        return handler
 
     # XXX This needs removing. These default secrets were not a good
     # idea.

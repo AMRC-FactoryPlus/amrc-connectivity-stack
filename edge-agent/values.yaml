@@ -5,6 +5,7 @@ image:
   version: "v2.0.0-bmz"
 debug: true
 poll_int: 10
+edgeAgentAuthGroup: "46e36996-cf74-4b29-80c0-54a0d4c33944"
 limits:
   cpu: "100m"
   memory: "200Mi"

@@ -7,3 +7,7 @@ spec:
   type: Password
   principal: nd1/{{ .Values.cluster }}/{{ .Values.name }}@{{ .Values.realm }}
   secret: edge-agent-secrets-{{ .Values.uuid }}/keytab
+  account:
+    uuid: {{ .Values.uuid }}
+    groups:
+      - {{ .Values.edgeAgentAuthGroup }}

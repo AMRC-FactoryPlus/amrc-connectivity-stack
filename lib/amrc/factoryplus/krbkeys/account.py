@@ -5,6 +5,8 @@
 import  typing
 from    uuid        import UUID
 
+from    optional    import Optional
+
 from    amrc.factoryplus    import ServiceError, uuids
 
 from    .context    import kk_ctx
@@ -16,15 +18,22 @@ class FPAccount:
     uuid: UUID
     klass: UUID
     name: str | None
-    groups: list[UUID] | None
+    groups: set[UUID]
 
     def __init__ (self, spec, annotation):
         self.principal = spec["principal"]
 
         acc = spec["account"]
 
-        self.uuid = UUID(acc.get("uuid", annotation))
-        self.klass = UUID(acc.get("class"))
+        self.uuid = Optional.of(acc.get("uuid")) \
+            .or_else(lambda: annotation) \
+            .map(lambda u: UUID(u)) \
+            .get_or_default(None)
+
+        self.klass = Optional.of(acc.get("class")) \
+            .map(lambda u: UUID(u)) \
+            .get_or_default(None)
+
         self.name = acc.get("name")
 
         groups = acc.get("groups", []);
@@ -34,7 +43,7 @@ class FPAccount:
         log(f"Reconcile account {self}")
         self.reconcile_configdb()
         self.reconcile_auth()
-        return self.uuid
+        return str(self.uuid)
 
     def reconcile_configdb (self):
         cdb = kk_ctx().fplus.configdb

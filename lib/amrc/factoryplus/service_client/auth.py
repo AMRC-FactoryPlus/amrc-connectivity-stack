@@ -60,3 +60,33 @@ class Auth (ServiceInterface):
         if st == 204:
             return
         self.error(f"Can't remove {member} from {group}", st)
+
+    # This API endpoint is awful.
+    
+    def add_ace (self, principal, permission, target):
+        st, _ = self.fetch(
+            method="POST",
+            url=f"authz/ace",
+            json={
+                "action": "add",
+                "principal": str(principal),
+                "permission": str(permission),
+                "target": str(target),
+            })
+        if st == 204:
+            return
+        self.error(f"Can't add ACE {principal},{permission},{target}", st)
+    
+    def delete_ace (self, principal, permission, target):
+        st, _ = self.fetch(
+            method="POST",
+            url=f"authz/ace",
+            json={
+                "action": "delete",
+                "principal": str(principal),
+                "permission": str(permission),
+                "target": str(target),
+            })
+        if st == 204:
+            return
+        self.error(f"Can't add ACE {principal},{permission},{target}", st)

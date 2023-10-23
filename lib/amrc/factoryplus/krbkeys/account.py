@@ -13,6 +13,15 @@ from    .context    import kk_ctx
 from    .util       import fields, log
 
 @fields
+class ACE:
+    permission: UUID
+    target: UUID
+
+    def __init__ (self, spec):
+        self.permission = UUID(spec["permission"])
+        self.target = UUID(spec["target"])
+
+@fields
 class FPAccount:
     principal: str
     uuid: UUID
@@ -32,6 +41,9 @@ class FPAccount:
 
         groups = spec.get("groups", []);
         self.groups = set(UUID(g) for g in groups)
+
+        aces = spec.get("aces", []);
+        self.aces = set(ACE(a) for a in aces)
 
     @classmethod
     def fromSpec (cls, spec, uuid):
@@ -75,8 +87,12 @@ class FPAccount:
             auth.add_principal(self.uuid, kerberos=self.principal)
 
         for grp in self.groups:
-            log(f"Adding {self.uuid} to {grp}")
+            log(f"Adding {self.uuid} to group {grp}")
             auth.add_to_group(grp, self.uuid)
+
+        for ace in self.aces:
+            log(f"Granting {self.uuid} ACE {ace}")
+            auth.add_ace(self.uuid, ace.permission, ace.target)
 
     def remove (self, new):
         if new is None:
@@ -97,3 +113,7 @@ class FPAccount:
         for grp in self.groups - new.groups:
             log(f"Removing {self.uuid} from group {grp}")
             fp.auth.remove_from_group(grp, self.uuid)
+
+        for ace in self.aces - new.aces:
+            log(f"Revoking {self.uuid} ACE {ace}")
+            fp.auth.delete_ace(self.uuid, ace.permission, ace.target)

@@ -10,16 +10,18 @@ from    optional    import Optional
 from    amrc.factoryplus    import ServiceError, uuids
 
 from    .context    import kk_ctx
-from    .util       import fields, log
+from    .util       import fields, immutable, log
 
-@fields
+@immutable
 class ACE:
     permission: UUID
     target: UUID
 
-    def __init__ (self, spec):
-        self.permission = UUID(spec["permission"])
-        self.target = UUID(spec["target"])
+    @classmethod
+    def of (cls, spec):
+        return cls(
+            permission=UUID(spec["permission"]),
+            target=UUID(spec["target"]))
 
 @fields
 class FPAccount:
@@ -43,7 +45,7 @@ class FPAccount:
         self.groups = set(UUID(g) for g in groups)
 
         aces = spec.get("aces", []);
-        self.aces = set(ACE(a) for a in aces)
+        self.aces = set(ACE.of(a) for a in aces)
 
     @classmethod
     def fromSpec (cls, spec, uuid):

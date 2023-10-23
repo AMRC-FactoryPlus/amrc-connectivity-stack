@@ -37,6 +37,7 @@ def log (*args, **kw):
 # I would like to use frozen and slots here, but it appears to break
 # super() in the __init__ methods.
 fields = dataclasses.dataclass()
+immutable = dataclasses.dataclass(frozen=True)
 hidden = dataclasses.field(init=False, default=None, compare=False, repr=False)
 
 class KtData:

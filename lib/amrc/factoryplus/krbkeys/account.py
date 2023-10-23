@@ -58,7 +58,7 @@ class FPAccount:
 
         if self.name is not None:
             cdb.patch_config(uuids.App.Info, self.uuid,
-                { "name": self.name })
+                { "name": self.name, "deleted": None })
 
     def reconcile_auth (self):
         auth = kk_ctx().fplus.auth
@@ -79,22 +79,21 @@ class FPAccount:
             auth.add_to_group(grp, self.uuid)
 
     def remove (self, new):
-        log(f"Maybe remove account: {self} -> {new}")
+        if new is None:
+            new = FPAccount({}, None, None)
+
         fp = kk_ctx().fplus
 
-        if new is None or self.uuid != new.uuid:
+        if self.uuid != new.uuid:
             log(f"Removing principal mapping for {self.uuid}")
-            try:
-                fp.auth.delete_principal(self.uuid)
-            except ServiceError as err:
-                if err.status != 404:
-                    raise
+            ServiceError.catch((404,), lambda:
+                fp.auth.delete_principal(self.uuid))
 
-            for grp in self.groups:
-                log(f"Removing {self.uuid} from {grp}")
-                fp.auth.remove_from_group(grp, self.uuid)
-        else:
-            for grp in self.groups - new.groups:
-                log(f"Removing {self.uuid} from {grp}")
-                fp.auth.remove_from_group(grp, self.uuid)
-
+            if self.klass is not None:
+                ServiceError.catch((404,), lambda:
+                    fp.configdb.patch_config(uuids.App.Info, self.uuid,
+                        { "deleted": True }))
+            
+        for grp in self.groups - new.groups:
+            log(f"Removing {self.uuid} from group {grp}")
+            fp.auth.remove_from_group(grp, self.uuid)

@@ -21,3 +21,12 @@ class ServiceError (Exception):
         msg = super().__str__()
         st = f": {self.status}" if self.status is not None else ""
         return f"{srv}: {msg}{st}"
+
+    @classmethod
+    def catch (cls, codes, action):
+        try:
+            return action()
+        except cls as e:
+            if e.status in codes:
+                return
+            raise

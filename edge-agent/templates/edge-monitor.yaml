@@ -37,6 +37,8 @@ spec:
                 secretKeyRef:
                   name: edge-monitor-{{ .Values.uuid }}-keytabs
                   key: password
+            - name: AGENT_UUID
+              value: {{ .Values.uuid }}
 ---
 apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey

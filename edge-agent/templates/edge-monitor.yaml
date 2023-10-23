@@ -52,3 +52,6 @@ spec:
     name: "Edge monitor: {{ .Values.cluster }}"
     groups:
       - {{ .Values.authGroup.monitor }}
+    aces:
+      - permission: 4cb43b27-287c-4363-b819-944d567d4e48
+        target: {{ .Values.uuid }}

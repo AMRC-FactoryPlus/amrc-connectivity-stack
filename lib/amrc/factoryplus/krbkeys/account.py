@@ -24,13 +24,13 @@ class FPAccount:
         self.uuid = uuid
         self.principal = principal
 
-        self.klass = Optional.of(acc.get("class")) \
+        self.klass = Optional.of(spec.get("class")) \
             .map(lambda u: UUID(u)) \
             .get_or_default(None)
 
-        self.name = acc.get("name")
+        self.name = spec.get("name")
 
-        groups = acc.get("groups", []);
+        groups = spec.get("groups", []);
         self.groups = set(UUID(g) for g in groups)
 
     @classmethod

@@ -131,14 +131,18 @@ class Account (KrbKeyEvent):
         uuid = self.annotations.get(Identifiers.ACCOUNT_UUID)
         if uuid is None and self.reason != "delete":
             raise ValueError(f"Account UUID is not set yet")
+        
+        def mkacc (key):
+            return Optional.of(args.get(key)) \
+                .map(lambda ob: ob.get("spec")) \
+                .map(lambda spec: FPAccount.fromSpec(spec, uuid)) \
+                .get_or_default(None)
 
-        self.old = FPAccount.fromSpec(args["old"], uuid)
-        self.new = FPAccount.fromSpec(args["new"], uuid)
+        self.old = mkacc("old")
+        self.new = mkacc("new")
 
     def process (self):
-        if self.old == self.new:
-            log("No change to account")
-            return
+        log(f"Process account reconciliation {self.old} -> {self.new}")
 
         if self.old is not None:
             self.old.remove(self.new)

@@ -128,8 +128,10 @@ class Account (KrbKeyEvent):
     def __init__ (self, args):
         super().__init__(args)
 
+        deleting = self.reason == "delete"
+
         uuid = self.annotations.get(Identifiers.ACCOUNT_UUID)
-        if uuid is None and self.reason != "delete":
+        if uuid is None and not deleting:
             raise ValueError(f"Account UUID is not set yet")
         
         def mkacc (key):
@@ -138,8 +140,12 @@ class Account (KrbKeyEvent):
                 .map(lambda spec: FPAccount.fromSpec(spec, uuid)) \
                 .get_or_default(None)
 
+        # When we are resuming, old and new will usually be identical,
+        # unless a previous reconciliation has failed. When we are
+        # deleting we are passed the deleted object as both old and new
+        # (unhelpful...).
         self.old = mkacc("old")
-        self.new = mkacc("new")
+        self.new = None if deleting else mkacc("new")
 
     def process (self):
         log(f"Process account reconciliation {self.old} -> {self.new}")

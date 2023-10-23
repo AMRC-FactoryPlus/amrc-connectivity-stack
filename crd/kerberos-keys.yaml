@@ -25,9 +25,12 @@ spec:
         - name: Secret
           jsonPath: ".spec.secret"
           type: string
-        - name: UUID
+        - name: Account UUID
           jsonPath: ".spec.account.uuid"
           type: string
+        - name: Account class
+          type: string
+          jsonPath: ".spec.account.class"
       schema:
         openAPIV3Schema:
           type: object
@@ -133,6 +136,21 @@ spec:
                       description: Auth service groups to add the account to.
                       type: array
                       items: { type: string, format: uuid }
+                    aces:
+                      description: ACEs to add for this account.
+                      type: array
+                      items:
+                        type: object
+                        required: [permission, target]
+                        properties:
+                          permission:
+                            description: The permission to grant.
+                            type: string
+                            format: uuid
+                          target:
+                            description: The target to grant the permission on.
+                            type: string
+                            format: uuid
             status:
               type: object
               x-kubernetes-preserve-unknown-fields: true

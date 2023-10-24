@@ -58,7 +58,7 @@ import {
     Device,
     deviceOptions
 } from "./device.js";
-import { EdgeAgentConfig } from "./uuids.js";
+import * as UUIDs from "./uuids.js";
 import {EventEmitter} from "events";
 
 /**
@@ -321,7 +321,7 @@ export class Translator extends EventEmitter {
         const cdb = this.fplus.ConfigDB;
 
         const [config, etag] = await this.retry("config",
-            () => cdb.get_config_with_etag(EdgeAgentConfig, uuid));
+            () => cdb.get_config_with_etag(UUIDs.App.AgentConfig, uuid));
 
         log(`Fetched config with etag [${etag}]`);
 

@@ -20,7 +20,7 @@ import {
     sparkplugMetric,
     sparkplugPayload,
 } from "./helpers/typeHandler.js";
-import { FactoryPlus, EdgeAgentSchema, NullUuid } from "./uuids.js";
+import * as UUIDs from "./uuids.js";
 
 export class SparkplugNode extends (
     EventEmitter
@@ -79,7 +79,7 @@ export class SparkplugNode extends (
             {
                 name: "Schema_UUID",
                 type: sparkplugDataType.uuid,
-                value: EdgeAgentSchema,
+                value: UUIDs.Schema.EdgeAgent,
             },
             {
                 name: "Instance_UUID",
@@ -89,7 +89,7 @@ export class SparkplugNode extends (
             {
                 name: "Config_Revision",
                 type: sparkplugDataType.uuid,
-                value: this.#conf.configRevision ?? NullUuid,
+                value: this.#conf.configRevision ?? UUIDs.Special.Null,
             },
             {
                 name: "Node Properties/Type",
@@ -126,9 +126,23 @@ export class SparkplugNode extends (
                 value: this.#conf.nodeControl?.compressPayload ?? false,
             },
             {
+                name: "Alerts/Schema_UUID",
+                type: sparkplugDataType.uuid,
+                value: UUIDs.Schema.Alerts,
+            },
+            /* XXX We are publishing our Node UUID again here: these are
+             * the alerts belonging directly to this node. I don't know
+             * if that is sensible; we haven't looked into what
+             * semantics we want from these Instance_UUIDs. */
+            {
+                name: "Alerts/Instance_UUID",
+                type: sparkplugDataType.uuid,
+                value: this.#conf.uuid,
+            },
+            {
                 name: "Alerts/Config_Fetch_Failed/Type",
                 type: sparkplugDataType.string,
-                value: "633a7da3-ea2a-4e3f-8e84-35691a07465f",
+                value: UUIDs.Alerts.ConfigFetchFailed,
             },
             {
                 name: "Alerts/Config_Fetch_Failed/Active",
@@ -138,7 +152,7 @@ export class SparkplugNode extends (
             {
                 name: "Alerts/Config_Invalid/Type",
                 type: sparkplugDataType.string,
-                value: "075c2d9b-7169-47a8-a27d-28a96f29e0ac",
+                value: UUIDs.Alerts.ConfigInvalid,
             },
             {
                 name: "Alerts/Config_Invalid/Active",
@@ -213,7 +227,7 @@ export class SparkplugNode extends (
             timestamp: Date.now(),
             metrics: newMetrics,
         };
-        if (birth) payload.uuid = FactoryPlus;
+        if (birth) payload.uuid = UUIDs.Special.FactoryPlus;
         return payload;
     }
 

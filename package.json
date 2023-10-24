@@ -1,6 +1,6 @@
 {
   "name": "@amrc-factoryplus/sparkplug-app",
-  "version": "0.0.1-alpha.2",
+  "version": "0.0.2",
   "description": "A Javascript library providing Sparkplug Application functionality",
   "main": "lib/index.js",
   "type": "module",

@@ -4,6 +4,7 @@ image:
     registry: amrc-factoryplus.shef.ac.uk:5000
     repository: acs-edge
     tag: "v2.0.0-bmz"
+    pullPolicy: Always
   monitor:
     registry: amrc-factoryplus.shef.ac.uk:5000
     repository: acs-edge-monitor

@@ -73,7 +73,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
   name: edge-monitor-{{ .Values.uuid }}
 rules:
-  - apiGroups: [""]
+  - apiGroups: [apps]
     resources: [deployments]
     verbs: [patch]
     resourceNames: ["edge-agent-{{ .Values.uuid }}"]

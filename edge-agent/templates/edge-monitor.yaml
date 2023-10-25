@@ -22,6 +22,7 @@ spec:
     spec:
       nodeSelector:
         kubernetes.io/hostname: {{ .Values.hostname | quote }}
+      serviceAccountName: edge-monitor-{{ .Values.uuid }}
       containers:
         - name: edge-monitor
 {{ include "edge-agent.image" .Values.image.monitor | indent 10 }}
@@ -39,6 +40,8 @@ spec:
                   key: password
             - name: AGENT_UUID
               value: {{ .Values.uuid }}
+            - name: AGENT_DEPLOYMENT
+              value: edge-agent-{{ .Values.uuid }}
 ---
 apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey
@@ -57,3 +60,34 @@ spec:
     aces:
       - permission: 4cb43b27-287c-4363-b819-944d567d4e48
         target: {{ .Values.uuid }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: edge-monitor-{{ .Values.uuid }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: edge-monitor-{{ .Values.uuid }}
+rules:
+  - apiGroups: [""]
+    resources: [deployments]
+    verbs: [patch]
+    resourceNames: ["edge-agent-{{ .Values.uuid }}"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: edge-monitor-{{ .Values.uuid }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: edge-monitor-{{ .Values.uuid }}
+subjects:
+  - kind: ServiceAccount
+    namespace: {{ .Release.Namespace }}
+    name: edge-monitor-{{ .Values.uuid }}

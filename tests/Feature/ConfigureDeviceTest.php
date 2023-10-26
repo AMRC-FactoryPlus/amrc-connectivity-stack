@@ -47,7 +47,6 @@ class ConfigureDeviceTest extends TestCase
         $payload = [
             'enabled' => true,
             'node_id' => 'Cell_Gateway',
-            'expiry' => Carbon::now(),
             'node_hostname' => 'lenTESTVALUE',
         ];
         $this->postJson('/api/groups/' . $group->id . '/nodes/new', $payload)
@@ -170,7 +169,6 @@ class ConfigureDeviceTest extends TestCase
             'enabled' => true,
             'node_id' => 'Cell_Gateway',
             'node_hostname' => 'lenTESTVALUE',
-            'expiry' => Carbon::now(),
         ];
         $this->postJson('/api/groups/' . $group->id . '/nodes/new', $payload)
              ->assertSuccessful();
@@ -212,7 +210,6 @@ class ConfigureDeviceTest extends TestCase
         $payload = [
             'enabled' => true,
             'node_id' => 'Cell_Gateway',
-            'expiry' => Carbon::now(),
             'node_hostname' => 'lenTESTVALUE',
         ];
         $this->postJson('/api/groups/' . $group->id . '/nodes/new', $payload)

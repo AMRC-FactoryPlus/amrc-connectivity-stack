@@ -145,11 +145,6 @@ export default {
               dataSource: ['settings', 'controls', 'hostname', 'value'],
               data: null,
             },
-            expiry: {
-              dataType: 'collected',
-              dataSource: ['settings', 'controls', 'expiry', 'value'],
-              data: null,
-            },
             principal_role: {
               dataType: 'collected',
               dataSource: ['principalRole', 'controls', 'principalRole', 'value'],
@@ -218,15 +213,6 @@ export default {
           nextStep: 'principalRole',
           previousStep: 'nodeType',
           controls: {
-            expiry: {
-              name: 'Node Expiry',
-              description: 'Define when this node should expire. Leave blank to never expire.',
-              placeholder: '',
-              type: 'time',
-              validations: {},
-              initialValue: '',
-              value: '',
-            },
             node_id: {
               name: 'Node ID',
               description: 'The Node ID must be unique within the group and must comply with the naming convention outlined in the Factory+ specification.',

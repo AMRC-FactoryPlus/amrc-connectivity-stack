@@ -44,7 +44,7 @@ class NodeController extends Controller
 
         return process_action((new CreateNodeAction)->execute(group: $group, nodeId: $validated['node_id'],
             enabled: $validated['enabled'],
-            expiry: $validated['expiry'] ?? null, nodeHostname: $validated['node_hostname'] ?? null));
+            nodeHostname: $validated['node_hostname'] ?? null));
     }
 
     public function destroy()

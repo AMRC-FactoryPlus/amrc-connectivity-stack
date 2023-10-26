@@ -32,7 +32,6 @@ class CreateNodeTest extends TestCase
             'enabled' => true,
             'node_id' => 'Cell_Gateway',
             'node_hostname' => 'lenTESTVALUE',
-            'expiry' => Carbon::now(),
         ];
         $groupId = Group::first()->id;
 
@@ -53,7 +52,6 @@ class CreateNodeTest extends TestCase
             'enabled' => true,
             'node_id' => 'Cell_Gateway',
             'node_hostname' => 'lenTESTVALUE',
-            'expiry' => Carbon::now(),
         ];
         $this->signInAdmin();
         $group = (new CreateGroupAction)->execute('AMRC-TestGroup-1', Cluster::first())['data'];
@@ -77,7 +75,6 @@ class CreateNodeTest extends TestCase
         $payload = [
             'enabled' => true,
             'node_id' => 'Cell_Gateway Test',
-            'expiry' => Carbon::now(),
         ];
 
         $this->signInAdmin();

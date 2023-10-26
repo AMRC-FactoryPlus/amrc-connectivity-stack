@@ -49,7 +49,6 @@ class CreateNodeRequest extends FormRequest
             'enabled' => ['required', 'bool'],
             'node_id' => ['required', 'string', 'min:5', 'regex:/^\w+$/i'],
             'node_hostname' => ['string', 'unique:nodes,k8s_hostname'],
-            'expiry' => ['nullable', 'date'],
         ];
     }
 }

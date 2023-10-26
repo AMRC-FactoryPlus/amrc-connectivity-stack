@@ -11,10 +11,6 @@
                             @valueUpdated="broadcastValueUpdated"
                             @keyUpEnter="$emit('keyUpEnter')">
         </form-control-input>
-        <form-control-date-time-picker :key="control.id" v-else-if="control.type === 'time'" :control="control" :valid="valid"
-                                       :value="value"
-                                       @valueUpdated="broadcastValueUpdated"
-                                       @keyUpEnter="$emit('keyUpEnter')"/>
         <form-control-selection :key="control.id" v-else-if="control.type === 'selection'" :col="true" :control="control" :value="value"
                                 @valueUpdated="broadcastValueUpdated" @navigate="broadcastNavigation"/>
         <FormWrapper :key="control.id" v-else-if="control.type === 'dropdown'" :control="control">
@@ -48,7 +44,6 @@ export default {
         'form-control-dropdown': () => import(/* webpackPrefetch: true */ '../FormControls/Dropdown.vue'),
         'form-control-multi-selection': () => import(/* webpackPrefetch: true */ '../FormControls/MultiSelection.vue'),
         'form-control-checkbox': () => import(/* webpackPrefetch: true */ '../FormControls/Checkbox.vue'),
-        'form-control-date-time-picker': () => import(/* webpackPrefetch: true */ '../FormControls/DateTimePicker.vue'),
     },
 
     computed: {

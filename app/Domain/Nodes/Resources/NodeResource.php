@@ -24,7 +24,7 @@ class NodeResource extends JsonResource
             'node_id' => $this['node_id'],
             'uuid' => $this['uuid'],
             'is_valid' => $this['is_valid'],
-            'expiry_date' => $this['expiry_date'],
+            'expiry_date' => null,
             'group' => $this->whenLoaded('group'),
         ];
 

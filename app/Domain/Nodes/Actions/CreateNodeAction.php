@@ -33,7 +33,6 @@ class CreateNodeAction
         Group $group,
               $nodeId,
               $enabled = true,
-              $expiry = null,
               $nodeHostname = null
     )
     {
@@ -74,7 +73,7 @@ class CreateNodeAction
             'node_id' => $nodeId,
             'k8s_hostname' => $nodeHostname,
             'principal' => (new BuildKerberosPrincipalAction())->execute($group, $nodeHostname, $nodeId)['data'],
-            'expiry_date' => $expiry,
+            'expiry_date' => null,
             'group_id' => $group->id,
             'is_admin' => 0,
             'is_valid' => $enabled,

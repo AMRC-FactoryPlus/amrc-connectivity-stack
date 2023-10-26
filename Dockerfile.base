@@ -46,6 +46,7 @@ RUN install-php-extensions \
     && find "$(php-config --extension-dir)" -name '*.so' -type f -exec strip --strip-all {} \; \
     && rm -rf /usr/src/php/ext
 
+
 ADD https://pecl.php.net/get/krb5-1.1.4.tgz ./
 RUN tar -xzf ./krb5-1.1.4.tgz && rm krb5-1.1.4.tgz && cd ./krb5-1.1.4 && phpize && ./configure --with-krb5 --with-krb5kadm && make && make install
 RUN echo extension=krb5.so >> $PHP_INI_DIR/php.ini

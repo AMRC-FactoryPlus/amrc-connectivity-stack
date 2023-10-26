@@ -23,7 +23,7 @@ spec:
     spec:
       containers:
         - name: queue-default
-          image: "{{ .Values.manager.image.backend.registry }}/{{ .Values.manager.image.backend.repository }}:{{ .Values.manager.image.backend.tag }}"
+          image: "{{ .Values.manager.image.registry }}/{{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}-backend"
           imagePullPolicy: IfNotPresent
           env:
             - name: DB_PASSWORD

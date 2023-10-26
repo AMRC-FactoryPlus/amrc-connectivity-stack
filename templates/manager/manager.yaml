@@ -25,7 +25,7 @@ spec:
             name: krb5-conf
       initContainers:
         - name: migrate-database
-          image: "{{ .Values.manager.image.backend.registry }}/{{ .Values.manager.image.backend.repository }}:{{ .Values.manager.image.backend.tag }}"
+          image: "{{ .Values.manager.image.registry }}/{{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}-backend"
           env:
             - name: DB_PASSWORD
               valueFrom:
@@ -49,7 +49,7 @@ spec:
                 name: manager-secrets
           command: [ 'sh', '-c', 'php artisan migrate --force' ]
         - name: create-admin-user
-          image: "{{ .Values.manager.image.backend.registry }}/{{ .Values.manager.image.backend.repository }}:{{ .Values.manager.image.backend.tag }}"
+          image: "{{ .Values.manager.image.registry }}/{{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}-backend"
           env:
             - name: DB_PASSWORD
               valueFrom:
@@ -68,7 +68,7 @@ spec:
               php artisan tinker --execute="if (User::count() === 0) {User::create(['username' => 'admin@{{.Values.identity.realm}}', 'administrator' => 1]);}"
       containers:
         - name: backend
-          image: "{{ .Values.manager.image.backend.registry }}/{{ .Values.manager.image.backend.repository }}:{{ .Values.manager.image.backend.tag }}"
+          image: "{{ .Values.manager.image.registry }}/{{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}-backend"
           env:
             - name: KRB5_CONFIG
               value: /config/krb5-conf/krb5.conf
@@ -98,5 +98,5 @@ spec:
             - mountPath: /config/krb5-conf
               name: krb5-conf
         - name: frontend
-          image: "{{ .Values.manager.image.frontend.registry }}/{{ .Values.manager.image.frontend.repository }}:{{ .Values.manager.image.frontend.tag }}"
+          image: "{{ .Values.manager.image.registry }}/{{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}-frontend"
 {{- end -}}

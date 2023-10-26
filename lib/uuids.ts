@@ -12,9 +12,10 @@ export const App = {
 };
 export const Schema = {
     EdgeAgent:      "15360868-2f35-4b52-990b-49329fb246fe",
-    Alerts:         "39e0091f-4e68-40f7-b082-1887d6ad2399",
+    Alert:          "8853aa15-2228-4309-b98e-e086cefbc72c",
 };
-export const Alerts = {
-    ConfigFetchFailed:  "633a7da3-ea2a-4e3f-8e84-35691a07465f",
-    ConfigInvalid:      "075c2d9b-7169-47a8-a27d-28a96f29e0ac",
+export const Alert = {
+    ConfigFetchFailed:  "c414c68b-5014-4e46-a0b4-d5f7f8df1d9f",
+    ConfigInvalid:      "99c54cb2-2bb9-45c8-88f9-c1a0f792cfd6",
+    Connection:         "633a7da3-ea2a-4e3f-8e84-35691a07465f",
 };

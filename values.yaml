@@ -107,12 +107,20 @@ manager:
   # -- Whether or not to enable the Manager component
   enabled: true
   image:
-    # -- The registry of the Manager component
-    registry: ghcr.io/amrc-factoryplus
-    # -- The repository of the Manager component
-    repository: acs-manager
-    # -- The tag of the Manager component
-    tag: v1.3.3
+    backend:
+      # -- The registry of the Manager component
+      registry: ghcr.io/amrc-factoryplus
+      # -- The repository of the Manager component
+      repository: acs-manager
+      # -- The tag of the Manager component
+      tag: v1.4.0-rc.7-backend
+    frontend:
+      # -- The registry of the Manager component
+      registry: ghcr.io/amrc-factoryplus
+      # -- The repository of the Manager component
+      repository: acs-manager
+      # -- The tag of the Manager component
+      tag: v1.4.0-rc.7-frontend
     # @ignore
     pullPolicy: IfNotPresent
   edge:

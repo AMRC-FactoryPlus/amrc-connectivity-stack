@@ -71,7 +71,7 @@ jobs:
       - name: Check Backend Base
         id: check-backend-base
         run: |          
-          docker manifest inspect ghcr.io/amrc-factoryplus/acs-manager:prod-base-php82-1.0.5 || echo "needs-build=true" >> $GITHUB_OUTPUT
+          docker manifest inspect ghcr.io/amrc-factoryplus/acs-manager:prod-base-php82-1.0.6 || echo "needs-build=true" >> $GITHUB_OUTPUT
 
       - name: Build Backend Base
         id: build-backend-base
@@ -81,8 +81,8 @@ jobs:
           context: .
           file: ./.docker/Dockerfiles/Dockerfile.backend-base
           push: true
-          tags: ghcr.io/amrc-factoryplus/acs-manager:prod-base-php82-1.0.5
-
+          tags: ghcr.io/amrc-factoryplus/acs-manager:prod-base-php82-1.0.6
+          
       - name: Build Backend
         id: build-backend
         uses: docker/build-push-action@v4

@@ -8,6 +8,7 @@ RUN mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
 
 # Override the logging configuration
 COPY .docker/app/logging.ini "$PHP_INI_DIR/conf.d/zzz-logging.ini"
+COPY .docker/app/disable-access-log.conf "/usr/local/etc/php-fpm.d/zzz-disable-access-log.conf"
 
 # Install required packages
 RUN apk add --no-cache mysql-client mariadb-connector-c-dev \

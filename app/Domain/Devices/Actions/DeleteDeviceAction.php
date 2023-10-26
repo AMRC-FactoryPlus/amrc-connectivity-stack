@@ -10,6 +10,7 @@ use App\Domain\Devices\Models\Device;
 use App\Domain\Nodes\Actions\UpdateEdgeAgentConfigurationForNodeAction;
 use App\Exceptions\ActionFailException;
 use App\Exceptions\ActionForbiddenException;
+use Illuminate\Support\Facades\Log;
 use function func_get_args;
 
 class DeleteDeviceAction
@@ -36,7 +37,11 @@ class DeleteDeviceAction
 
         $device->originMaps()->delete();
         $device->delete();
-        (new UpdateEdgeAgentConfigurationForNodeAction())->execute($device->node);
+        try {
+            (new UpdateEdgeAgentConfigurationForNodeAction())->execute($device->node);
+        } catch (ActionFailException $e) {
+            Log::warning('Failed to update edge agent configuration for node ' . $device->node->node_id . ' after deleting device ' . $device->device_id);
+        }
 
         return action_success();
     }

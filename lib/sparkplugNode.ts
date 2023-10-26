@@ -66,11 +66,12 @@ class AlertBuilder {
     }
 }
 
+const alertbuilder = new AlertBuilder();
+
 export class SparkplugNode extends (
     EventEmitter
 ) {
     #conf: sparkplugConfig
-    #alertbuilder: AlertBuilder
     #client: any
     #metrics: Metrics
     isOnline: boolean
@@ -82,7 +83,6 @@ export class SparkplugNode extends (
     constructor(fplus: ServiceClient, conf: sparkplugConfig) {
         super();
         this.#conf = conf;
-        this.#alertbuilder = new AlertBuilder();
 
          // Generate randomized client ID
         const address = conf.address;
@@ -171,10 +171,10 @@ export class SparkplugNode extends (
                 type: sparkplugDataType.boolean,
                 value: this.#conf.nodeControl?.compressPayload ?? false,
             },
-            ...this.#alertbuilder.build_alert(
+            ...alertbuilder.build_alert(
                 UUIDs.Alert.ConfigFetchFailed, "Config_Unavailable",
                 this.#conf.alerts?.configFetchFailed ?? false),
-            ...this.#alertbuilder.build_alert(
+            ...alertbuilder.build_alert(
                 UUIDs.Alert.ConfigInvalid, "Config_Invalid",
                 this.#conf.alerts?.configInvalid ?? false),
         ]);

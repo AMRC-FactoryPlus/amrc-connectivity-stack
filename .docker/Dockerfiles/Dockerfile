@@ -25,7 +25,7 @@ RUN composer install --prefer-dist --no-dev --optimize-autoloader --no-interacti
 RUN php artisan view:cache && php artisan event:cache && php artisan optimize;
 RUN composer dump-autoload
 
-FROM --platform=linux/amd64 ghcr.io/amrc-factoryplus/acs-manager:prod-base-php82-1.0.4 as production-backend
+FROM --platform=linux/amd64 ghcr.io/amrc-factoryplus/acs-manager:prod-base-php82-1.0.5 as production-backend
 MAINTAINER Alex Godbehere
 USER www-data
 EXPOSE 9000

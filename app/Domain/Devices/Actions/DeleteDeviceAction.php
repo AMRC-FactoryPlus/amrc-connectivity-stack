@@ -37,6 +37,9 @@ class DeleteDeviceAction
 
         $device->originMaps()->delete();
         $device->delete();
+
+        Log::info('Device deleted', ['device' => $device]);
+
         try {
             (new UpdateEdgeAgentConfigurationForNodeAction())->execute($device->node);
         } catch (ActionFailException $e) {

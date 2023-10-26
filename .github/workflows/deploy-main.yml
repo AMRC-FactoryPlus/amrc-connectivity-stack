@@ -20,11 +20,20 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Retag image
+      - name: Retag Backend
         run: |
           TIMESTAMP=$(date +%s)
-          docker pull ghcr.io/amrc-factoryplus/acs-manager:pr-${{ github.event.pull_request.number }}
-          docker tag ghcr.io/amrc-factoryplus/acs-manager:pr-${{ github.event.pull_request.number }} ghcr.io/amrc-factoryplus/acs-manager:main
-          docker push ghcr.io/amrc-factoryplus/acs-manager:main
-          docker tag ghcr.io/amrc-factoryplus/acs-manager:pr-${{ github.event.pull_request.number }} ghcr.io/amrc-factoryplus/acs-manager:main-${{ github.event.pull_request.number }}-$TIMESTAMP
-          docker push ghcr.io/amrc-factoryplus/acs-manager:main-${{ github.event.pull_request.number }}-$TIMESTAMP
+          docker pull ghcr.io/amrc-factoryplus/acs-manager:pr-${{ github.event.pull_request.number }}-backend
+          docker tag ghcr.io/amrc-factoryplus/acs-manager:pr-${{ github.event.pull_request.number }} ghcr.io/amrc-factoryplus/acs-manager:main-backend
+          docker push ghcr.io/amrc-factoryplus/acs-manager:main-backend
+          docker tag ghcr.io/amrc-factoryplus/acs-manager:pr-${{ github.event.pull_request.number }}-backend ghcr.io/amrc-factoryplus/acs-manager:main-${{ github.event.pull_request.number }}-backend-$TIMESTAMP
+          docker push ghcr.io/amrc-factoryplus/acs-manager:main-${{ github.event.pull_request.number }}-backend-$TIMESTAMP
+
+      - name: Retag Frontend
+        run: |
+          TIMESTAMP=$(date +%s)
+          docker pull ghcr.io/amrc-factoryplus/acs-manager:pr-${{ github.event.pull_request.number }}-frontend
+          docker tag ghcr.io/amrc-factoryplus/acs-manager:pr-${{ github.event.pull_request.number }}-frontend ghcr.io/amrc-factoryplus/acs-manager:main-frontend
+          docker push ghcr.io/amrc-factoryplus/acs-manager:main-frontend
+          docker tag ghcr.io/amrc-factoryplus/acs-manager:pr-${{ github.event.pull_request.number }}-frontend ghcr.io/amrc-factoryplus/acs-manager:main-${{ github.event.pull_request.number }}-frontend-$TIMESTAMP
+          docker push ghcr.io/amrc-factoryplus/acs-manager:main-${{ github.event.pull_request.number }}-frontend-$TIMESTAMP

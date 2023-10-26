@@ -1,0 +1,18 @@
+FROM --platform=linux/amd64 oven/bun:latest as build-frontend
+WORKDIR /app
+COPY . /app/
+
+RUN bun install --immutable --immutable-cache --check-cache
+RUN bun run build
+RUN rm -rf node_modules
+
+FROM nginxinc/nginx-unprivileged as procuction-frontend
+MAINTAINER Alex Godbehere
+
+# Copy the nginx config
+COPY .docker/app/nginx.conf /etc/nginx/nginx.conf
+
+# Copy the application
+COPY --from=build-frontend --chown=www:www /app /app
+
+EXPOSE 8080

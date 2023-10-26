@@ -109,6 +109,8 @@ class DeleteNodeAction
         $node->deviceConnections()->delete();
         $node->delete();
 
+        Log::info('Node deleted', ['node' => $node]);
+
         return action_success();
 
 

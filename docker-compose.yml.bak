@@ -1,23 +1,27 @@
 # For more information: https://laravel.com/docs/sail
 version: '3'
 services:
-  backend:
-    image: backend
-    user: www-data
+  acs-manager.test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        WWWGROUP: '${WWWGROUP}'
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    ports:
+      - '${APP_PORT:-80}:80'
+      - '${VITE_PORT:-5173}:${VITE_PORT:-5173}'
+    environment:
+      WWWUSER: '${WWWUSER}'
+      LARAVEL_SAIL: 1
+      XDEBUG_MODE: '${SAIL_XDEBUG_MODE:-off}'
+      XDEBUG_CONFIG: '${SAIL_XDEBUG_CONFIG:-client_host=host.docker.internal}'
     volumes:
+      - '.:/app'
       - './krb5.conf:/etc/krb5.conf'
       - './k3s.yaml:/k3s.yaml'
       - './keytab:/keytab'
-      - '.:/app'
-    networks:
-      - sail
-  frontend:
-    image: frontend
-    volumes:
-      - '.docker/app/nginx.conf.dev:/etc/nginx/nginx.conf'
-      - '.:/app'
-    ports:
-      - '8080:8080'
     networks:
       - sail
   pgsql:

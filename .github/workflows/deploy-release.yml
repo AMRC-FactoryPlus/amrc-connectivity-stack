@@ -33,10 +33,18 @@ jobs:
             suffix=
           images: ghcr.io/amrc-factoryplus/acs-manager
 
-      - name: Retag image
+      - name: Retag Backend
         run: |
-          docker pull ghcr.io/amrc-factoryplus/acs-manager:main
-          docker tag ghcr.io/amrc-factoryplus/acs-manager:main ${{ steps.meta.outputs.tags }}
-          docker push ${{ steps.meta.outputs.tags }}
-          docker tag ${{ steps.meta.outputs.tags }} ghcr.io/amrc-factoryplus/acs-manager:latest
-          docker push ghcr.io/amrc-factoryplus/acs-manager:latest
+          docker pull ghcr.io/amrc-factoryplus/acs-manager:main-backend
+          docker tag ghcr.io/amrc-factoryplus/acs-manager:main-backend ${{ steps.meta.outputs.tags }}-backend
+          docker push ${{ steps.meta.outputs.tags }}-backend
+          docker tag ${{ steps.meta.outputs.tags }}-backend ghcr.io/amrc-factoryplus/acs-manager:latest-backend
+          docker push ghcr.io/amrc-factoryplus/acs-manager:latest-backend
+
+      - name: Retag Frontend
+        run: |
+          docker pull ghcr.io/amrc-factoryplus/acs-manager:main-frontend
+          docker tag ghcr.io/amrc-factoryplus/acs-manager:main-frontend ${{ steps.meta.outputs.tags }}-frontend
+          docker push ${{ steps.meta.outputs.tags }}-frontend
+          docker tag ${{ steps.meta.outputs.tags }}-frontend ghcr.io/amrc-factoryplus/acs-manager:latest-frontend
+          docker push ghcr.io/amrc-factoryplus/acs-manager:latest-frontend

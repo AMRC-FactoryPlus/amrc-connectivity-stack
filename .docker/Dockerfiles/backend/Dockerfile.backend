@@ -1,0 +1,17 @@
+# Use another image to build backend and frontend assets - Base doesn't need composer
+FROM --platform=linux/amd64 ghcr.io/amrc-factoryplus/acs-manager:backend-build-1.0.0 as build-backend
+
+WORKDIR /app
+COPY . /app/
+RUN composer install --prefer-dist --no-dev --optimize-autoloader --no-interaction
+RUN php artisan view:cache && php artisan event:cache && php artisan optimize;
+RUN composer dump-autoload
+
+FROM --platform=linux/amd64 ghcr.io/amrc-factoryplus/acs-manager:prod-base-php82-1.0.4 as procuction-backend
+MAINTAINER Alex Godbehere
+USER www-data
+EXPOSE 9000
+STOPSIGNAL SIGTERM
+
+# Copy the application
+COPY --from=build-backend --chown=www-data:www-data /app /app

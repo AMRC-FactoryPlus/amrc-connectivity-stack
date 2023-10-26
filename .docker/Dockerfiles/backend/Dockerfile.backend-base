@@ -6,17 +6,15 @@ MAINTAINER Alex Godbehere
 # Ensure that we're using the production configuration before we start to install extensions or they'll be installed into the wrong configuration
 RUN mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
 
-# Remove the memory limit
-RUN echo memory_limit = -1 >> "$PHP_INI_DIR/php.ini"
+# Override the logging configuration
+COPY .docker/app/logging.ini "$PHP_INI_DIR/conf.d/zzz-logging.ini"
 
-# Install NGINX and required packages
-RUN apk add --no-cache nginx mysql-client mariadb-connector-c-dev \
+# Install required packages
+RUN apk add --no-cache mysql-client mariadb-connector-c-dev \
     libxml2-dev oniguruma-dev php82-fileinfo php82-session php82-bcmath \
     php82-tokenizer php82-dom php82-xml php82-xmlwriter php82-simplexml \
     php82-sodium php82-pdo git \
-    autoconf krb5-libs krb5-dev postgresql-dev nodejs yarn gcc make g++ \
-    && adduser -D -g 'www' www \
-    && chown -R www:www /var/lib/nginx
+    autoconf krb5-libs krb5-dev postgresql-dev nodejs yarn gcc make g++
 
 ## Prepare Redis
 RUN mkdir -p /usr/src/php/ext/redis \
@@ -53,12 +51,3 @@ RUN echo extension=krb5.so >> $PHP_INI_DIR/php.ini
 
 # Set working directory
 WORKDIR /app
-
-RUN rm -rf /usr/local/etc/php-fpm.d/* && \
-    rm -rf /usr/local/etc/php-fpm.conf && \
-    rm -rf /usr/local/etc/php-fpm.conf.default
-
-COPY .docker/app/nginx.conf /etc/nginx/nginx.conf
-
-COPY .docker/app/php-fpm.conf /usr/local/etc/php-fpm.conf
-COPY .docker/app/www-pool.conf /usr/local/etc/php-fpm.d/www-pool.conf

@@ -10,6 +10,7 @@ use App\Domain\Devices\Models\Device;
 use App\Domain\Groups\Models\Group;
 use App\Exceptions\ActionFailException;
 use App\Exceptions\ActionForbiddenException;
+use Illuminate\Support\Facades\Log;
 use function func_get_args;
 
 class DeleteGroupAction
@@ -40,6 +41,8 @@ class DeleteGroupAction
         $this->validate(...func_get_args());
 
         $group->delete();
+
+        Log::info('Group deleted', ['group' => $group]);
 
         return action_success();
     }

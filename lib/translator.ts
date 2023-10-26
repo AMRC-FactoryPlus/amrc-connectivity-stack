@@ -337,7 +337,7 @@ export class Translator extends EventEmitter {
                 configRevision: etag,
                 alerts: {
                     configFetchFailed: !config,
-                    configInvalid: !valid,
+                    configInvalid: !!config && !valid,
                 },
             },
             deviceConnections: conns,

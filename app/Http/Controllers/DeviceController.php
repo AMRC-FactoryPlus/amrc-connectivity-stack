@@ -7,6 +7,7 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Devices\Actions\CreateDeviceAction;
+use App\Domain\Devices\Actions\DeleteDeviceAction;
 use App\Domain\Devices\Actions\GetAccessibleDevicesAction;
 use App\Domain\Devices\Actions\GetDeviceDetailsAction;
 use App\Domain\Devices\Actions\UpdateDeviceInformationAction;
@@ -16,6 +17,7 @@ use App\Domain\Devices\Resources\DeviceDetailResource;
 use App\Domain\Groups\Models\Group;
 use App\Domain\Nodes\Models\Node;
 use App\Exceptions\ActionFailException;
+use App\Http\Requests\DeleteDeviceRequest;
 use App\Http\Requests\UpdateDeviceInformationRequest;
 
 class DeviceController extends Controller
@@ -142,5 +144,20 @@ class DeviceController extends Controller
         }
 
         (new UpdateDeviceInformationAction)->execute($device, $validated['device_id']);
+    }
+
+    public function destroy(DeleteDeviceRequest $request)
+    {
+        $validated = $request->validated();
+
+        // Get the device
+        $device = Device::with('node')->where('id', $request->route('device'))->first();
+        if (! $device) {
+            throw new ActionFailException(
+                'The device does not exist.', 404
+            );
+        }
+
+        return process_action((new DeleteDeviceAction())->execute($device));
     }
 }

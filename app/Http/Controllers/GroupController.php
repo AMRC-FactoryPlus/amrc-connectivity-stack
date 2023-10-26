@@ -8,7 +8,9 @@ namespace App\Http\Controllers;
 
 use App\Domain\Clusters\Models\Cluster;
 use App\Domain\Groups\Actions\CreateGroupAction;
+use App\Domain\Groups\Actions\DeleteGroupAction;
 use App\Domain\Groups\Actions\GetAccessibleGroupsAction;
+use App\Domain\Groups\Models\Group;
 use App\Exceptions\ActionFailException;
 use App\Http\Requests\CreateGroupRequest;
 
@@ -31,5 +33,17 @@ class GroupController extends Controller
         }
 
         return process_action((new CreateGroupAction)->execute($validated['name'], $cluster));
+    }
+
+    public function destroy()
+    {
+
+        // Get the group
+        $group = Group::whereId(request()->route('group'))->firstOr(function() {
+            throw new ActionFailException('The group does not exist.', 404);
+        });
+
+        (new DeleteGroupAction())->execute($group);
+
     }
 }

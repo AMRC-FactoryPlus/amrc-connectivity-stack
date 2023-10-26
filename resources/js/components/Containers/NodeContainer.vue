@@ -20,8 +20,23 @@
       </template>
       <template v-slot:item="{ item }">
         <div class="flex-1 px-4 py-2 text-sm truncate h-16 flex flex-col justify-center">
-          <a href="#" class="text-gray-500 font-semibold">{{item.name}}</a>
-          <p class="text-gray-400">{{item.nodes_count}} Nodes</p>
+          <div class="flex items-center justify-between gap-2">
+            <div class="flex-1 px-4 py-2 text-sm truncate h-16 flex flex-col justify-center">
+              <a href="#" class="text-gray-500 font-semibold">{{item.name}}</a>
+              <p class="text-gray-400">{{item.nodes_count}} Nodes</p>
+            </div>
+            <div class="flex items-center justify-center gap-0">
+              <button type="button"
+                      class="fpl-button-info w-6 !h-6 hover:!text-red-300"
+                      @click.stop="maybeDeleteGroup(item.id)">
+                <i class="fa-sharp fa-solid fa-trash text-xs"></i>
+              </button>
+            </div>
+          </div>
+          <div class="flex items-center text-gray-400 text-xs">
+            <p v-tooltip="'Node UUID'" v-if="$root.$data.userPreferences.appearance.preferences.show_uuids.value">
+              {{item.uuid}}</p>
+          </div>
         </div>
       </template>
     </ColumnList>
@@ -47,12 +62,19 @@
         <div class="flex-1 px-4 py-2 text-sm truncate h-16 flex flex-col justify-center">
           <div class="flex items-center justify-between gap-2">
             <a href="#" class="text-gray-500 font-semibold hover:text-gray-700 mb-1">{{item.node_id}}</a>
-            <button v-if="$root.$data.user.administrator" type="button"
-                    @mouseup="showNodeUserDialog(item)"
-                    v-tooltip="'Manage User Access'"
-                    class="fpl-button-info w-6 !h-6">
-              <i class="fa-sharp fa-solid fa-users text-xs"></i>
-            </button>
+            <div class="flex items-center justify-center gap-0">
+              <button v-if="$root.$data.user.administrator" type="button"
+                      @mouseup="showNodeUserDialog(item)"
+                      v-tooltip="'Manage User Access'"
+                      class="fpl-button-info w-6 !h-6">
+                <i class="fa-sharp fa-solid fa-users text-xs"></i>
+              </button>
+              <button type="button"
+                      class="fpl-button-info w-6 !h-6 hover:!text-red-300"
+                      @click.stop="maybeDeleteNode(selectedGroup.id, item.id)">
+                <i class="fa-sharp fa-solid fa-trash text-xs"></i>
+              </button>
+            </div>
           </div>
           <div class="flex items-center text-gray-400 text-xs">
             <p v-tooltip="'Node UUID'" v-if="$root.$data.userPreferences.appearance.preferences.show_uuids.value">
@@ -83,12 +105,16 @@
       </template>
       <template v-slot:item="{ item }">
         <div class="flex-1 px-4 py-2 text-sm truncate h-16 flex flex-col justify-center">
-          <a href="#" class="text-gray-500 font-semibold hover:text-gray-700 mb-1">{{
-              item.device_id || 'New Device'
-            }}</a>
-          <div class="flex items-center text-gray-400 text-xs">
-            <p v-tooltip="'Instance UUID'" v-if="$root.$data.userPreferences.appearance.preferences.show_uuids.value">
-              {{item.instance_uuid}}</p>
+          <div class="flex items-center justify-between gap-2">
+            <div>
+              <a href="#" class="text-gray-500 font-semibold hover:text-gray-700 mb-1">{{
+                  item.device_id || 'New Device'
+                }}</a>
+              <div class="flex items-center text-gray-400 text-xs">
+                <p v-tooltip="'Instance UUID'" v-if="$root.$data.userPreferences.appearance.preferences.show_uuids.value">
+                  {{item.instance_uuid}}</p>
+              </div>
+            </div>
           </div>
         </div>
       </template>
@@ -185,6 +211,88 @@ export default {
         this.handleError(error)
       })
     },
+
+    maybeDeleteNode(group, node) {
+      if (this.deletingNode) return;
+
+      window.showNotification({
+        title: 'Are you sure?',
+        description: 'This will delete the node. This action is not reversible.',
+        type: 'error',
+        persistent: true,
+        buttons: [
+          {
+            text: 'Delete Node', type: 'error', loadingOnClick: true, action: () => {
+              this.deleteNode(group, node)
+            },
+          },
+          {text: 'Cancel', isClose: true}
+        ],
+        id: 'eddd8225-2356-498b-9342-811a63c064e1',
+      });
+    },
+
+    deleteNode (group, node) {
+      this.deletingNode = true;
+      axios.delete(`/api/groups/${group}/nodes/${node}`).then(() => {
+        window.showNotification({
+            title: 'Node Deleted',
+            description: 'The node has been deleted.',
+            type: 'success',
+            id: 'eddd8225-2356-498b-9342-811a63c064e1',
+        });
+        this.requestDataReloadFor('nodes')
+        this.deletingNode = false;
+      }).catch(error => {
+        if (error && error.response && error.response.status === 401) {
+          this.goto_url('/login')
+        }
+        this.handleError(error, 'eddd8225-2356-498b-9342-811a63c064e1')
+        this.deletingNode = false;
+      })
+    },
+
+
+    maybeDeleteGroup(group) {
+      if (this.deletingGroup) return;
+
+      window.showNotification({
+        title: 'Are you sure?',
+        description: 'This will delete the group. This action is not reversible.',
+        type: 'error',
+        persistent: true,
+        buttons: [
+          {
+            text: 'Delete Group', type: 'error', loadingOnClick: true, action: () => {
+              this.deleteGroup(group)
+            },
+          },
+          {text: 'Cancel', isClose: true}
+        ],
+        id: '12e62a89-6d3e-4970-8357-fbb2dbbbfafc',
+      });
+    },
+
+    deleteGroup (group) {
+      this.deletingGroup = true;
+      axios.delete(`/api/groups/${group}`).then(() => {
+        window.showNotification({
+          title: 'Group Deleted',
+          description: 'The group has been deleted.',
+          type: 'success',
+          id: '12e62a89-6d3e-4970-8357-fbb2dbbbfafc',
+        });
+        this.requestDataReloadFor('groups')
+        this.deletingGroup = false;
+      }).catch(error => {
+        if (error && error.response && error.response.status === 401) {
+          this.goto_url('/login')
+        }
+        this.handleError(error, '12e62a89-6d3e-4970-8357-fbb2dbbbfafc')
+        this.deletingGroup = false;
+      })
+    },
+
   },
 
   data () {
@@ -203,6 +311,7 @@ export default {
       groupsRouteVar: null,
       groupsForceLoad: true,
       selectedGroup: null,
+      deletingGroup: false,
 
       // nodes
       nodes: null,
@@ -211,6 +320,7 @@ export default {
       nodesQueryBank: null,
       nodesRouteVar: null,
       selectedNode: null,
+      deletingNode: false,
 
       // devices
       devices: null,

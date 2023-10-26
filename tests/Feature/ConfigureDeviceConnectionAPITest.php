@@ -35,7 +35,6 @@ class ConfigureDeviceConnectionAPITest extends TestCase
 
         // Create a Cell Gateway node
         $payload = [
-            'is_gateway' => true,
             'enabled' => true,
             'node_id' => 'Cell_Gateway',
             'node_hostname' => 'lenTESTVALUE',

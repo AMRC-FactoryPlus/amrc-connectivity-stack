@@ -1,6 +1,51 @@
 # For more information: https://laravel.com/docs/sail
 version: '3'
 services:
+  acs-manager.test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        WWWGROUP: '${WWWGROUP}'
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    ports:
+      - '${APP_PORT:-80}:80'
+      - '${VITE_PORT:-5173}:${VITE_PORT:-5173}'
+    environment:
+      WWWUSER: '${WWWUSER}'
+      LARAVEL_SAIL: 1
+      XDEBUG_MODE: '${SAIL_XDEBUG_MODE:-off}'
+      XDEBUG_CONFIG: '${SAIL_XDEBUG_CONFIG:-client_host=host.docker.internal}'
+    volumes:
+      - '.:/app'
+      - './krb5.conf:/etc/krb5.conf'
+      - './k3s.yaml:/k3s.yaml'
+      - './keytab:/keytab'
+    networks:
+      - sail
+  pgsql:
+    image: 'postgres:15'
+    ports:
+      - '5432:5432'
+    environment:
+      POSTGRES_DB: 'factoryplus-manager'
+      POSTGRES_PASSWORD: 'password'
+    volumes:
+      - 'sail-pgsql:/var/lib/postgresql/data'
+    networks:
+      - sail
+    healthcheck:
+      test:
+        - CMD
+        - pg_isready
+        - '-q'
+        - '-d'
+        - '${DB_DATABASE}'
+        - '-U'
+        - '${DB_USERNAME}'
+      retries: 3
+      timeout: 5s
   redis:
     image: 'redis:alpine'
     ports:
@@ -28,9 +73,6 @@ services:
       timeout: 5s
   minio:
     image: 'minio/minio:latest'
-    ports:
-      - '${FORWARD_MINIO_PORT:-9000}:9000'
-      - '${FORWARD_MINIO_CONSOLE_PORT:-8900}:8900'
     environment:
       MINIO_ROOT_USER: 'sail'
       MINIO_ROOT_PASSWORD: 'password'
@@ -69,4 +111,6 @@ volumes:
   sail-meilisearch:
     driver: local
   sail-minio:
+    driver: local
+  sail-pgsql:
     driver: local

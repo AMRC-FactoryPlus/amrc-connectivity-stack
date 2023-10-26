@@ -45,7 +45,6 @@ class ConfigureDeviceTest extends TestCase
 
         // Create a Cell Gateway node
         $payload = [
-            'is_gateway' => true,
             'enabled' => true,
             'node_id' => 'Cell_Gateway',
             'expiry' => Carbon::now(),
@@ -168,7 +167,6 @@ class ConfigureDeviceTest extends TestCase
 
         // Create a Cell Gateway node
         $payload = [
-            'is_gateway' => true,
             'enabled' => true,
             'node_id' => 'Cell_Gateway',
             'node_hostname' => 'lenTESTVALUE',
@@ -212,7 +210,6 @@ class ConfigureDeviceTest extends TestCase
 
         // Create a Cell Gateway node
         $payload = [
-            'is_gateway' => true,
             'enabled' => true,
             'node_id' => 'Cell_Gateway',
             'expiry' => Carbon::now(),

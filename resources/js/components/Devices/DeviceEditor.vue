@@ -9,12 +9,13 @@
       <div class="sm:w-0 sm:flex-1 mb-4">
         <h2 class="font-bold text-brand">Configuration</h2>
         <p v-if="device" class="mt-1 text-sm text-gray-500 overflow-hidden overflow-ellipsis font-bold">
-          <span class="text-gray-400 font-light">for {{ device.node.group.name }} / {{ device.node.node_id }} /</span>
-          {{ device.device_id === null ? 'New Device' : device.device_id }}
+          <span class="text-gray-400 font-light">for {{device.node.group.name}} / {{device.node.node_id}} /</span>
+          {{device.device_id === null ? 'New Device' : device.device_id}}
         </p>
       </div>
       <div class="mt-4 flex items-center justify-between sm:mt-0 sm:ml-6 sm:flex-shrink-0 sm:justify-start">
-        <div v-if="deviceLoading" class="inline-flex items-center px-2.5 py-1  text-sm font-medium bg-gray-100 text-gray-400">
+        <div v-if="deviceLoading"
+             class="inline-flex items-center px-2.5 py-1  text-sm font-medium bg-gray-100 text-gray-400">
           <div class="uppercase tracking-wide mr-1">Validating</div>
           <div class="fa-sharp fa-solid fa-circle-notch fa-spin"></div>
         </div>
@@ -60,6 +61,11 @@
                 <i class="fa-sharp fa-solid fa-file-circle-plus mr-2 fa-fw text-base"></i>
                 <span>Files</span>
               </button>
+              <div class="flex-1"></div>
+              <button @mouseup="maybeDeleteDevice"
+                      class="text-gray-300 hover:text-red-300 border-transparent group inline-flex items-center py-4 px-6 border-b-2 font-medium text-sm">
+                <i class="fa-sharp fa-solid fa-trash mr-2 fa-fw text-base"></i>
+              </button>
             </nav>
           </div>
         </div>
@@ -98,39 +104,68 @@
 export default {
   name: 'DeviceEditor',
   props: {
-    device: {required: true},
-    deviceConnections: {required: true},
-    deviceSchemas: {required: true},
-    deviceSchemaVersions: {required: true},
-    deviceFiles: {required: true},
-    selectedFileDetails: {required: true},
-    availableFileTypes: {required: true},
+    device: { required: true },
+    deviceConnections: { required: true },
+    deviceSchemas: { required: true },
+    deviceSchemaVersions: { required: true },
+    deviceFiles: { required: true },
+    selectedFileDetails: { required: true },
+    availableFileTypes: { required: true },
   },
 
   computed: {
-    deviceInformationValid() {
-      return this.device && this.device.device_id !== null;
+    deviceInformationValid () {
+      return this.device && this.device.device_id !== null
     },
-    deviceConnectionValid() {
-      return !!this?.device?.device_connection_id;
+    deviceConnectionValid () {
+      return !!this?.device?.device_connection_id
     },
-    deviceSchemaValid() {
-      return !!this?.device?.active_origin_map?.active;
+    deviceSchemaValid () {
+      return !!this?.device?.active_origin_map?.active
     },
 
-    configurationValid() {
-      return this.deviceInformationValid && this.deviceConnectionValid && this.deviceSchemaValid;
-    }
+    configurationValid () {
+      return this.deviceInformationValid && this.deviceConnectionValid && this.deviceSchemaValid
+    },
   },
 
-  mounted() {
+  methods: {
+    maybeDeleteDevice() {
+      if (this.deleting) return;
+
+      window.showNotification({
+        title: 'Are you sure?',
+        description: 'This will delete the device and all associated data. This action is not reversible.',
+        type: 'error',
+        persistent: true,
+        buttons: [
+          {
+            text: 'Delete Device', type: 'error', loadingOnClick: true, action: () => {
+              this.deleteDevice()
+            },
+          },
+          {text: 'Cancel', isClose: true}
+        ],
+        id: 'e9e52913-a393-4031-b37c-4704813729e4',
+      });
+    },
+
+    deleteDevice () {
+      this.deleting = true;
+      axios.delete('/api/devices/' + this.device.id).then(() => {
+        this.goto_url('/')
+      })
+    },
+  },
+
+  mounted () {
 
     // Activate the required tab on load if query string present
-    const urlParams = new URLSearchParams(window.location.search);
-    const tab = urlParams.get('tab');
+    const urlParams = new URLSearchParams(window.location.search)
+    const tab = urlParams.get('tab')
     if (tab && this.tabs) {
-      this.selectTab(tab);
-      this.selectedTabContent = this.tabs.filter((e) => e.title === tab)[0] || this.tabs[0];
+      this.selectTab(tab)
+      this.selectedTabContent = this.tabs.filter((e) => e.title === tab)[0] || this.tabs[0]
     }
   },
 
@@ -141,12 +176,13 @@ export default {
     'device-editor-files-tab': () => import(/* webpackPrefetch: true */ './DeviceEditorFilesTab.vue'),
   },
 
-  data() {
+  data () {
     return {
       deviceLoading: false,
       dropdownVisible: false,
       selectedTab: 'Information',
-    };
+      deleting: false,
+    }
   },
-};
+}
 </script>

@@ -24,7 +24,7 @@ export default defineConfig({
           'resources/css/app.css',
           'resources/js/app.js',
         ],
-        valetTls: 'acs-manager.test',
+        detectTls: 'acs-manager.test',
       }),
       vue({
         template: {

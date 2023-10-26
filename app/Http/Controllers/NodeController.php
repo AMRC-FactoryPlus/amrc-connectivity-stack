@@ -6,9 +6,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Devices\Actions\DeleteDeviceAction;
+use App\Domain\Devices\Models\Device;
 use App\Domain\Groups\Models\Group;
 use App\Domain\Nodes\Actions\CreateNodeAction;
+use App\Domain\Nodes\Actions\DeleteNodeAction;
 use App\Domain\Nodes\Actions\GetAccessibleNodesAction;
+use App\Domain\Nodes\Models\Node;
 use App\Domain\Nodes\Resources\NodeResourceCollection;
 use App\Exceptions\ActionFailException;
 use App\Http\Requests\CreateNodeRequest;
@@ -39,7 +43,22 @@ class NodeController extends Controller
         }
 
         return process_action((new CreateNodeAction)->execute(group: $group, nodeId: $validated['node_id'],
-            isGateway: $validated['is_gateway'], enabled: $validated['enabled'],
+            enabled: $validated['enabled'],
             expiry: $validated['expiry'] ?? null, nodeHostname: $validated['node_hostname'] ?? null));
+    }
+
+    public function destroy()
+    {
+
+        // Get the device
+        $node = Node::where('id', request()->route('node'))->first();
+        if (! $node) {
+            throw new ActionFailException(
+                'The node does not exist.', 404
+            );
+        }
+
+        return process_action((new DeleteNodeAction())->execute($node));
+
     }
 }

@@ -43,6 +43,7 @@ yarn-error.log
 /.idea/
 /certs/
 k3s.yaml
+krb5.conf
 /public/build/
 client-keytab
 client-keytab-enc
@@ -51,3 +52,5 @@ client-keytab-enc-amrc
 !/.phpstorm.meta.php
 !/_ide_helper.php
 !/.phpstorm.meta.php
+keytab
+.keytab*

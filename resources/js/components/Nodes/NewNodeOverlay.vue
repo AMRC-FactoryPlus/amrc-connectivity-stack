@@ -117,17 +117,12 @@ export default {
         __request: {
           startAction: () => {
             this.steps.__request.url = '/api/groups/' + this.group.id + '/nodes/new';
-            this.steps.__request.parameters.is_gateway.data = +(['cell', 'soft'].includes(this.steps.nodeType.controls.nodeType.value));
             this.steps.__request.parameters.is_cell_gateway.data = +(this.steps.nodeType.controls.nodeType.value === 'cell');
             this.steps.__request.parameters.supplemental_roles.data = JSON.stringify(this.steps.supplementalRoles.controls.supplementalRoles.value);
           },
           type: 'post',
           url: 'replaced',
           parameters: {
-            is_gateway: {
-              dataType: 'static',
-              data: null,
-            },
             is_cell_gateway: {
               dataType: 'static',
               data: null,

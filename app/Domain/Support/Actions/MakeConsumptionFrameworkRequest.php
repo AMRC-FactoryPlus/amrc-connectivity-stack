@@ -59,7 +59,7 @@ class MakeConsumptionFrameworkRequest
 
     private function validate(string $type, string $service, string $url, $payload = null, $file = null)
     {
-        if (! in_array($type, ['get', 'post', 'put'])) {
+        if (! in_array($type, ['get', 'post', 'put', 'delete'])) {
             throw new ActionErrorException('Incorrect method passed to MakeConsumptionFrameworkRequest');
         }
     }

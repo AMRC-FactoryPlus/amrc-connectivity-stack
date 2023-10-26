@@ -54,12 +54,13 @@ Route::middleware('auth:api')->post('/user/reset-meta', [UserMetaController::cla
 Route::middleware('auth:api')->post('/user/get-meta', [UserMetaController::class, 'getMeta'])->name('meta.get');
 Route::middleware('auth:api')->get('/user/get-all-meta', [UserMetaController::class, 'getAllMeta'])->name('meta.getAll');
 
-// ------ Groups ------ //
+// ------ Roles ------ //
 Route::middleware('auth:api')->get('/roles', [RoleController::class, 'index']);
 
 // ------ Groups ------ //
 Route::middleware('auth:api')->get('/groups', [GroupController::class, 'index']);
 Route::middleware('auth:api')->post('/groups/new', [GroupController::class, 'store']);
+Route::middleware('auth:api')->delete('/groups/{group}', [GroupController::class, 'destroy']);
 
 // ------ Nodes ------ //
 Route::middleware('auth:api')->get('/groups/{group}/nodes', [NodeController::class, 'index']);
@@ -70,12 +71,14 @@ Route::middleware('auth:api')->post('/groups/{group}/nodes/{node}/connections', 
 Route::middleware('auth:api')->get('/groups/{group}/nodes/{node}/connections/{connection}', [DeviceConnectionController::class, 'show']);
 Route::middleware('auth:api')->patch('/groups/{group}/nodes/{node}/connections/{connection}', [DeviceConnectionController::class, 'update']);
 Route::middleware('auth:api')->post('/groups/{group}/nodes/{node}/connections/{connection}/use', [DeviceConnectionController::class, 'use']);
+Route::middleware('auth:api')->delete('/groups/{group}/nodes/{node}', [NodeController::class, 'destroy']);
 
 // ------ Devices ------ //
 Route::middleware('auth:api')->get('/groups/{group}/nodes/{node}/devices', [DeviceController::class, 'index']);
 Route::middleware('auth:api')->post('/groups/{group}/nodes/{node}/devices', [DeviceController::class, 'store']);
 Route::middleware('auth:api')->get('/groups/{group}/nodes/{node}/devices/{device}', [DeviceController::class, 'show']);
 Route::middleware('auth:api')->patch('/devices/{device}', [DeviceController::class, 'update']);
+Route::middleware('auth:api')->delete('/devices/{device}', [DeviceController::class, 'destroy']);
 Route::middleware('auth:api')->patch('/devices/{device}/origin-map', [OriginMapController::class, 'update']);
 Route::middleware('auth:api')->post('/devices/{device}/origin-map/activate', [OriginMapController::class, 'activate']);
 Route::middleware('auth:api')->get('/devices/{device}/files', [DeviceFileController::class, 'index']);

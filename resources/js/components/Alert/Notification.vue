@@ -34,8 +34,8 @@ export default {
       this.showResponseFailed(payload);
     });
 
-    window.events.$on('showResponseError', () => {
-      this.showResponseError();
+    window.events.$on('showResponseError', (e) => {
+      this.showResponseError(e);
     });
 
     window.events.$on('hideNotification', (payload) => {
@@ -66,6 +66,7 @@ export default {
       } else {
         uuid = payload.id;
       }
+
       let content = {
         component: Alert,
         props: {
@@ -195,9 +196,14 @@ export default {
 
     },
 
-    showResponseError () {
+    showResponseError (e) {
 
-      let uuid = uuidv4();
+      let uuid = null;
+      if (!e.id) {
+        uuid = uuidv4();
+      } else {
+        uuid = e.id;
+      }
 
       let content = {
         component: Alert,
@@ -205,7 +211,7 @@ export default {
           id: uuid,
           type: 'error',
           title: 'Something broke',
-          description: 'Something went wrong. If this keeps happening please file a bug report.',
+          description: e ?? 'Something went wrong. If this keeps happening please file a bug report.',
           buttons: [
             { text: 'File Bug Report', type: 'secondary', loadingOnClick: false, action: () => {this.goto_url_tab('https://github.com/AMRC-FactoryPlus/acs-manager/issues/new');} },
           ],

@@ -14,7 +14,8 @@ call migrate_to(9, $migrate$
         device integer not null references device,
         atype integer not null references alert_type,
         metric text not null,
-        active boolean not null
+        active boolean not null,
+        last_change timestamp null
     );
 
     call setup_mqtt_notify('alert');

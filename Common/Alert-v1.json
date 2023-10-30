@@ -13,13 +13,42 @@
       "format": "uuid"
     },
     "Type": {
-      "description": "An alert type registered in the ConfigDB.",
-      "type": "string",
-      "format": "uuid"
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "String"
+              ]
+            },
+            "Documentation": {
+              "default": "An alert type registered in the ConfigDB."
+            }
+          }
+        }
+      ]
     },
     "Active": {
-      "description": "Is this alert active (raised)?",
-      "type": "boolean"
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "Boolean"
+              ]
+            },
+            "Documentation": {
+              "default": "Is this alert active (raised)?"
+            }
+          }
+        }
+      ]
     },
     "Links": {
       "type": "object",

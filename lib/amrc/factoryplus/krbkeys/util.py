@@ -22,6 +22,7 @@ class Identifiers:
 
     FORCE_REKEY = f"{APPID}/force-rekey"
     HAS_OLD_KEYS = f"{APPID}/has-old-keys"
+    ACCOUNT_UUID = f"{APPID}/account-uuid"
 
     MANAGED_BY = "app.kubernetes.io/managed-by"
 
@@ -36,6 +37,7 @@ def log (*args, **kw):
 # I would like to use frozen and slots here, but it appears to break
 # super() in the __init__ methods.
 fields = dataclasses.dataclass()
+immutable = dataclasses.dataclass(frozen=True)
 hidden = dataclasses.field(init=False, default=None, compare=False, repr=False)
 
 class KtData:

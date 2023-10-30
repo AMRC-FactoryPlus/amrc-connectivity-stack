@@ -2,7 +2,8 @@
 # ConfigDB interface
 # Copyright 2023 AMRC
 
-import logging
+import  logging
+from    uuid                import UUID
 
 from .service_interface     import ServiceInterface
 from ..                     import uuids
@@ -32,6 +33,16 @@ class ConfigDB (ServiceInterface):
             return
         self.error(f"Can't set {app} for {obj}", st)
 
+    def patch_config (self, app, obj, patch):
+        st, _ = self.fetch(
+            method="PATCH",
+            url=f"v1/app/{app}/object/{obj}",
+            content_type="application/merge-patch+json",
+            json=patch)
+        if st == 204:
+            return
+        self.error(f"Can't patch {app} for {obj}", st)
+
     def delete_config (self, app, obj):
         st, _ = self.fetch(
             method="DELETE",
@@ -40,25 +51,21 @@ class ConfigDB (ServiceInterface):
             return
         self.error(f"Can't remove {app} for {obj}", st)
 
-    def create_object (klass, obj, excl):
+    def create_object (self, klass, obj=None, excl=False):
+        req = { "class": str(klass) }
+        if obj is not None:
+            req["uuid"] = str(obj)
+
         st, json = self.fetch(
             method="POST",
             url="v1/object",
-            json={ "class": klass, "uuid": obj })
+            json=req)
 
         if st == 200 and excl:
             self.error(f"Exclusive create of {obj} failed", st)
         if st == 201 or st == 200:
-            return json.uuid
+            return UUID(json["uuid"])
         if obj is None:
-            self.error(f"Creating new {klass} failed")
+            self.error(f"Creating new {klass} failed", st)
         else:
-            self.error(f"Creating {obj} failed")
-
-    def delete_object (obj):
-        st, _ = self.fetch(
-            method="DELETE",
-            url=f"v1/object/{obj}")
-        if st == 204:
-            return
-        self.error(f"Deleting {obj} failed")
+            self.error(f"Creating {obj} of {klass} failed", st)

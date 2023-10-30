@@ -5,11 +5,16 @@
 from    enum            import Enum
 import  logging
 import  typing
+from    uuid            import UUID
 
 from    .           import keyops
 from    .context    import kk_ctx
 from    .secrets    import SecretRef
-from    .util       import dslice, fields, hidden, log
+from    .util       import Identifiers, dslice, fields, hidden, log
+
+@fields
+class ReconcileStatus:
+    has_old_keys: bool = False
 
 @fields
 class InternalSpec:
@@ -67,7 +72,13 @@ class InternalSpec:
         for p in self.principals - npr:
             kadm.disable_princ(p)
 
-    def reconcile_key (self, force=False):
+    def reconcile (self, force=False):
+        status = ReconcileStatus()
+
+        status.has_old_keys = self.reconcile_key(force)
+        return status
+
+    def reconcile_key (self, force):
         kops = self.kind
         current = self.secret.maybe_read()
 
@@ -93,7 +104,7 @@ class InternalSpec:
 
         status = kops.generate_key(self, oldkey)
         self.secret.write(status.secret)
-        return status
+        return status.has_old
 
     def trim_keys (self):
         self.secret.verify_writable()

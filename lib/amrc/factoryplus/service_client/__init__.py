@@ -5,6 +5,7 @@
 from    functools       import cached_property
 import  logging
 
+from    .auth               import Auth
 from    .configdb           import ConfigDB
 from    .directory          import Directory
 from    .discovery          import Discovery
@@ -37,6 +38,10 @@ class ServiceClient:
                     opts[opt] = val
 
         self.opts = opts
+
+    @cached_property
+    def auth (self):
+        return Auth(self)
 
     @cached_property
     def configdb (self):

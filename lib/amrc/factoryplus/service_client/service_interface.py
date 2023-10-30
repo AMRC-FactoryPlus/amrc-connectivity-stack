@@ -28,10 +28,10 @@ class ServiceInterface:
         headers = opts.pop("headers", {})
         headers["Accept"] = "application/json"
 
-        if "json" in opts:
-            headers["Content-Type"] = "application/json"
-        elif "content_type" in opts:
+        if "content_type" in opts:
             headers["Content-Type"] = opts.pop("content_type")
+        elif "json" in opts:
+            headers["Content-Type"] = "application/json"
         elif "data" in opts:
             headers["Content-Type"] = "application/octet-stream"
 

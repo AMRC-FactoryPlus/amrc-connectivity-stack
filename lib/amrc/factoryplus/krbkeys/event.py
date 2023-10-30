@@ -4,6 +4,10 @@
 
 import  logging
 
+from    optional    import Optional
+
+from .account       import FPAccount
+from .context       import kk_ctx
 from .spec          import InternalSpec
 from .util          import Identifiers, dslice, log
 
@@ -15,7 +19,7 @@ class KrbKeyEvent:
     def process (self):
         raise NotImplementedError()
 
-class RekeyEvent (KrbKeyEvent):
+class Rekey (KrbKeyEvent):
     def __init__ (self, args):
         super().__init__(args)
 
@@ -52,14 +56,14 @@ class RekeyEvent (KrbKeyEvent):
         if self.new is None or self.new.disabled:
             return
         
-        status = self.new.reconcile_key(force=force)
+        status = self.new.reconcile(force=force)
 
         p_meta = self.patch.metadata
         p_meta.annotations[Identifiers.FORCE_REKEY] = None
-        if status.has_old:
+        if status.has_old_keys:
             p_meta.labels[Identifiers.HAS_OLD_KEYS] = "true"
 
-class TrimKeysEvent (KrbKeyEvent):
+class TrimKeys (KrbKeyEvent):
     def __init__ (self, args):
         super().__init__(args)
         self.spec = InternalSpec(event=self, spec=args["spec"])
@@ -69,3 +73,85 @@ class TrimKeysEvent (KrbKeyEvent):
 
         if not status.has_old:
             self.patch.metadata.labels[Identifiers.HAS_OLD_KEYS] = None
+
+# This class handles UUIDs as strings throughout. This makes the
+# annotation handling easier.
+class AccUuid (KrbKeyEvent):
+    def __init__ (self, args):
+        super().__init__(args)
+
+        self.account = args["spec"].get("account")
+
+    def process (self):
+        if self.reason == "delete":
+            return
+        if self.account is None:
+            log("No account")
+            return
+
+        key = Identifiers.ACCOUNT_UUID
+        p_annot = self.patch.metadata.annotations
+
+        annot = self.annotations.get(key)
+        spec = self.account.get("uuid")
+        klass = self.account.get("class")
+
+        # If you do this it's your problem to sort out the mess.
+        if annot is not None and spec is not None and annot != spec:
+            log(f"Account UUID has changed: {annot} -> {spec}",
+                level=logging.WARNING)
+
+        if klass is None:
+            # We are not managing this object.
+            log(f"Account is unmanaged. Using UUID {spec}.")
+            p_annot[key] = spec
+        elif annot is None:
+            # We are managing this object. We need to make sure that if
+            # the object creation succeeds, the annotation will be
+            # recorded. Otherwise we keep creating ConfigDB objects.
+            log(f"Creating new account in class {klass}")
+            cdb = kk_ctx().fplus.configdb
+            uuid = cdb.create_object(klass, spec)
+            log(f"Created new account {uuid}")
+            p_annot[key] = str(uuid)
+        elif spec is not None and annot != spec:
+            # This should not normally happen. Probably someone has
+            # added an explicit uuid field to an object with a class.
+            # Perhaps I should just forbid explicit uuids if we are
+            # managing the object?
+            log(f"Annotation exists but is overridden to {spec}")
+            p_annot[key] = spec
+        else:
+            log(f"Annotation should be correct: {annot}")
+
+class Account (KrbKeyEvent):
+    def __init__ (self, args):
+        super().__init__(args)
+
+        deleting = self.reason == "delete"
+
+        uuid = self.annotations.get(Identifiers.ACCOUNT_UUID)
+        if uuid is None and not deleting:
+            raise ValueError(f"Account UUID is not set yet")
+        
+        def mkacc (key):
+            return Optional.of(args.get(key)) \
+                .map(lambda ob: ob.get("spec")) \
+                .map(lambda spec: FPAccount.fromSpec(spec, uuid)) \
+                .get_or_default(None)
+
+        # When we are resuming, old and new will usually be identical,
+        # unless a previous reconciliation has failed. When we are
+        # deleting we are passed the deleted object as both old and new
+        # (unhelpful...).
+        self.old = mkacc("old")
+        self.new = None if deleting else mkacc("new")
+
+    def process (self):
+        log(f"Process account reconciliation {self.old} -> {self.new}")
+
+        if self.old is not None:
+            self.old.remove(self.new)
+
+        if self.new is not None:
+            self.new.reconcile()

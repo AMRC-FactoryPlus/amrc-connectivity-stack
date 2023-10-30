@@ -10,6 +10,11 @@ split () {
     done
 }
 
+if [ -z "$WATCH_NAMESPACES" ]
+then
+    WATCH_NAMESPACES="$(cat /run/secrets/kubernetes.io/serviceaccount/namespace)"
+fi
+
 ns_args="$(split "$WATCH_NAMESPACES" , -n)"
 
 kopf run --standalone $ns_args -m amrc.factoryplus.krbkeys

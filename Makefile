@@ -2,10 +2,12 @@
 
 -include config.mk
 
-version?=1.0.3
+version?=1.2.0
 suffix?=
 registry?=ghcr.io/amrc-factoryplus
 repo?=acs-kerberos-keys
+
+kubectl?=kubectl
 
 tag=${registry}/${repo}:${version}${suffix}
 
@@ -31,12 +33,12 @@ ifdef deployment
 deploy: all restart logs
 
 restart:
-	kubectl rollout restart deploy/"${deployment}"
-	kubectl rollout status deploy/"${deployment}"
+	${kubectl} rollout restart deploy/"${deployment}"
+	${kubectl} rollout status deploy/"${deployment}"
 	sleep 2
 
 logs:
-	kubectl logs -f deploy/"${deployment}" -c operator
+	${kubectl} logs -f deploy/"${deployment}" -c operator
 
 else
 

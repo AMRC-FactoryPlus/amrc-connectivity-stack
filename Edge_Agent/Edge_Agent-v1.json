@@ -25,7 +25,9 @@
         "Config_Unavailable": {
           "description": "Indicates a problem fetching our config file.",
           "allOf": [
-            { "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Alert-v1.json" },
+            {
+              "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Alert-v1.json"
+            },
             {
               "type": "object",
               "properties": {
@@ -39,7 +41,9 @@
         "Config_Invalid": {
           "description": "Indicates a problem parsing our config file.",
           "allOf": [
-            { "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Alert-v1.json" },
+            {
+              "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Alert-v1.json"
+            },
             {
               "type": "object",
               "properties": {
@@ -57,7 +61,9 @@
             "^[A-Za-z0-9_]+$": {
               "description": "Indicates a problem with a particular device connection.",
               "allOf": [
-                { "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Alert-v1.json" },
+                {
+                  "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Alert-v1.json"
+                },
                 {
                   "type": "object",
                   "properties": {
@@ -70,7 +76,7 @@
             }
           }
         }
-      ]
+      }
     }
   },
   "required": ["Schema_UUID", "Instance_UUID", "Config_Revision", "Alerts"]

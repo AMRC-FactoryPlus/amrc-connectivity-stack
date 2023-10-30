@@ -16,4 +16,6 @@ call migrate_to(9, $migrate$
         metric text not null,
         active boolean not null
     );
+
+    call setup_mqtt_notify('alert');
 $migrate$);

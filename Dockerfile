@@ -23,13 +23,14 @@ RUN <<'SHELL'
         npm config set @amrc-factoryplus:registry "${acs_npm}"
     fi
 
-    npm install --save=false
+    npm install --save=false --omit=dev
 SHELL
 COPY --chown=node . .
 RUN <<'SHELL'
     git describe --tags --dirty \
         | sed -re's/-[0-9]+-/-/;s/(.*)/export const GIT_VERSION="\1";/' \
         > lib/git-version.js
+    rm -rf .git
 SHELL
 
 FROM ${acs_run} AS run

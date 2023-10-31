@@ -58,3 +58,4 @@ metadata:
   name: edge-agent-{{ .Values.uuid }}
 spec:
   uuid: {{ .Values.uuid }}
+  edgeAgent: true

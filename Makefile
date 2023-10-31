@@ -29,15 +29,18 @@ endif
 
 all: build push
 
-.PHONY: all build push check-committed amend
+.PHONY: all build push check-committed lint amend
 
 check-committed:
 	[ -z "$$(git status --porcelain)" ] || (git status; exit 1)
 
+lint:
+	npx eslint bin lib
+
 amend:
 	git commit -a -C HEAD --amend
 
-build: check-committed
+build: check-committed lint
 	docker build -t "${tag}" ${build_args} .
 
 push:

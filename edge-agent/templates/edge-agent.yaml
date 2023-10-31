@@ -50,3 +50,11 @@ spec:
             requests:
               cpu: {{ .Values.limits.cpu | quote }}
               memory: {{ .Values.limits.memory | quote }}
+---
+apiVersion: factoryplus.app.amrc.co.uk/v1
+kind: SparkplugNode
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: edge-agent-{{ .Values.uuid }}
+spec:
+  uuid: {{ .Values.uuid }}

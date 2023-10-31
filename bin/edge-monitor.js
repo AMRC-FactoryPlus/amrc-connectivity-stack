@@ -14,7 +14,7 @@ const fplus = await new ServiceClient({
 
 const monitor = await new Monitor({
     fplus,
-    node: process.env.AGENT_UUID,
+    namespace: process.env.CLUSTER_NAMESPACE,
 }).init();
 
 monitor.run();

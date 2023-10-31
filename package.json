@@ -13,6 +13,7 @@
   "license": "ISC",
   "dependencies": {
     "@amrc-factoryplus/sparkplug-app": "^0.0.2",
+    "@amrc-factoryplus/rx-util": "0.0.1-bmz2",
     "@amrc-factoryplus/utilities": "^1.1.0",
     "@kubernetes/client-node": "^0.19.0",
     "immutable": "^5.0.0-beta.4",

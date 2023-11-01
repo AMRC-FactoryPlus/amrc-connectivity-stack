@@ -8,4 +8,5 @@ parserOptions:
   ecmaVersion: latest
   sourceType: module
 rules:
+  no-unreachable: warn
   no-unused-vars: warn

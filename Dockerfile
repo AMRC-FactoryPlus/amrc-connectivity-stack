@@ -38,4 +38,4 @@ FROM ${acs_run} AS run
 WORKDIR /home/node/app
 COPY --from=build --chown=root:root /home/node/app ./
 USER node
-CMD npm run start
+CMD node bin/edge-monitor.js

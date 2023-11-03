@@ -98,6 +98,46 @@
                 }
             ]
         },
+        "Current_AC_Neutral": {
+            "allOf": [
+                {
+                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+                },
+                {
+                    "properties": {
+                        "Sparkplug_Type": {
+                            "enum": [
+                                "DoubleLE",
+                                "DoubleBE"
+                            ]
+                        },
+                        "Documentation": {
+                            "default": "Neutral line current"
+                        }
+                    }
+                }
+            ]
+        },
+        "Current_AC_Ground": {
+            "allOf": [
+                {
+                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+                },
+                {
+                    "properties": {
+                        "Sparkplug_Type": {
+                            "enum": [
+                                "DoubleLE",
+                                "DoubleBE"
+                            ]
+                        },
+                        "Documentation": {
+                            "default": "Ground line current"
+                        }
+                    }
+                }
+            ]
+        },
         "Active_Power_Total": {
             "allOf": [
                 {
@@ -273,6 +313,47 @@
                         },
                         "Documentation": {
                             "default": "Total Reactive Energy Returned (kVARh)"
+                        }
+                    }
+                }
+            ]
+        }
+    },
+            "Apparent_Energy_Total": {
+            "allOf": [
+                {
+                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+                },
+                {
+                    "properties": {
+                        "Sparkplug_Type": {
+                            "enum": [
+                                "DoubleLE",
+                                "DoubleBE"
+                            ]
+                        },
+                        "Documentation": {
+                            "default": "Total Apparent Energy (kVAh)"
+                        }
+                    }
+                }
+            ]
+        },
+        "Apparent_Energy_Returned_Total": {
+            "allOf": [
+                {
+                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+                },
+                {
+                    "properties": {
+                        "Sparkplug_Type": {
+                            "enum": [
+                                "DoubleLE",
+                                "DoubleBE"
+                            ]
+                        },
+                        "Documentation": {
+                            "default": "Total Apparent Energy Returned (kVAh)"
                         }
                     }
                 }

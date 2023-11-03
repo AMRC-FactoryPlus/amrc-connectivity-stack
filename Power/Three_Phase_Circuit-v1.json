@@ -319,46 +319,45 @@
             ]
         }
     },
-            "Apparent_Energy_Total": {
-            "allOf": [
-                {
-                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
-                },
-                {
-                    "properties": {
-                        "Sparkplug_Type": {
-                            "enum": [
-                                "DoubleLE",
-                                "DoubleBE"
-                            ]
-                        },
-                        "Documentation": {
-                            "default": "Total Apparent Energy (kVAh)"
-                        }
+    "Apparent_Energy_Total": {
+        "allOf": [
+            {
+                "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+            },
+            {
+                "properties": {
+                    "Sparkplug_Type": {
+                        "enum": [
+                            "DoubleLE",
+                            "DoubleBE"
+                        ]
+                    },
+                    "Documentation": {
+                        "default": "Total Apparent Energy (kVAh)"
                     }
                 }
-            ]
-        },
-        "Apparent_Energy_Returned_Total": {
-            "allOf": [
-                {
-                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
-                },
-                {
-                    "properties": {
-                        "Sparkplug_Type": {
-                            "enum": [
-                                "DoubleLE",
-                                "DoubleBE"
-                            ]
-                        },
-                        "Documentation": {
-                            "default": "Total Apparent Energy Returned (kVAh)"
-                        }
+            }
+        ]
+    },
+    "Apparent_Energy_Returned_Total": {
+        "allOf": [
+            {
+                "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+            },
+            {
+                "properties": {
+                    "Sparkplug_Type": {
+                        "enum": [
+                            "DoubleLE",
+                            "DoubleBE"
+                        ]
+                    },
+                    "Documentation": {
+                        "default": "Total Apparent Energy Returned (kVAh)"
                     }
                 }
-            ]
-        }
+            }
+        ]
     },
     "required": [
         "Schema_UUID",

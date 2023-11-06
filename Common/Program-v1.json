@@ -1,0 +1,94 @@
+{
+  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Program-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Program",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "5f4665b1-2099-47e4-860e-b2a7e298688c"
+    },
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "Start_Time": {
+      "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Time-v1.json"
+    },
+    "End_Time": {
+      "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Time-v1.json"
+    },
+    "Cycle": {
+      "Start_Time": {
+        "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Time-v1.json"
+      },
+      "End_Time": {
+        "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Time-v1.json"
+      }
+    },
+    "File_Name": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "String"
+              ]
+            },
+            "Documentation": {
+              "default": "file_name"
+            }
+          }
+        }
+      ]
+    },
+    "Recipe": {
+      "Name": {
+        "allOf": [
+          {
+            "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+          },
+          {
+            "properties": {
+              "Sparkplug_Type": {
+                "enum": [
+                  "String"
+                ]
+              },
+              "Documentation": {
+                "default": "recipe"
+              }
+            }
+          }
+        ]
+      },
+      "Active_Step": {
+        "allOf": [
+          {
+            "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+          },
+          {
+            "properties": {
+              "Sparkplug_Type": {
+                "enum": [
+                  "uInt16LE",
+                  "uInt16BE"
+                ]
+              },
+              "Documentation": {
+                "default": "Active_Step"
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID"
+  ]
+}

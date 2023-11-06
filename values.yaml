@@ -122,7 +122,7 @@ manager:
     # -- The repository of the Manager component
     repository: acs-manager
     # -- The tag of the Manager component
-    tag: v1.0.6
+    tag: v1.4.0
     # @ignore
     pullPolicy: IfNotPresent
   edge:
@@ -131,8 +131,7 @@ manager:
     # -- The repository of the Edge Agent component
     repository: acs-edge
     # -- The tag of the Edge Agent component
-    tag: v1.0.5
-
+    tag: v1.2.2
   meilisearch:
     # -- The key that the manager uses to connect to the Meilisearch search engine
     key: masterKey
@@ -176,7 +175,7 @@ warehouse:
       # -- The repository of the Warehouse component
       repository: influxdb-sparkplug-ingester
       # -- The tag of the ingester component
-      tag: v1.1.0
+      tag: v1.2.0
       # @ignore
       pullPolicy: IfNotPresent
 
@@ -291,6 +290,8 @@ promtail:
 
 # @ignore
 grafana:
+  deploymentStrategy:
+    type: Recreate
   image:
     tag: 10.0.1
   enabled: true
@@ -356,3 +357,5 @@ influxdb2:
         #!/bin/bash
         echo "Creating mapping for bucket ${DOCKER_INFLUXDB_INIT_BUCKET_ID} in org ${DOCKER_INFLUXDB_INIT_ORG}"
         influx v1 dbrp create --bucket-id ${DOCKER_INFLUXDB_INIT_BUCKET_ID} --db default --rp default --default --org ${DOCKER_INFLUXDB_INIT_ORG}
+switchboard:
+  enabled: false

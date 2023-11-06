@@ -18,7 +18,7 @@ spec:
         spec:
           containers:
             - name: cron
-              image: "{{ .Values.manager.image.registry }}/{{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}"
+              image: "{{ .Values.manager.image.registry }}/{{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}-backend"
               imagePullPolicy: IfNotPresent
               command: [ "php", "artisan", "schedule:run" ]
               env:

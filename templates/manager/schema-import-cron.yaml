@@ -25,7 +25,7 @@ spec:
                 name: krb5-conf
           containers:
             - name: cron
-              image: "{{ .Values.manager.image.registry }}/{{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}"
+              image: "{{ .Values.manager.image.registry }}/{{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}-backend"
               env:
                 - name: KRB5_CONFIG
                   value: /config/krb5-conf/krb5.conf

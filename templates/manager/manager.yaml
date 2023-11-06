@@ -25,13 +25,23 @@ spec:
             name: krb5-conf
       initContainers:
         - name: migrate-database
-          image: "{{ .Values.manager.image.registry }}/{{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}"
+          image: "{{ .Values.manager.image.registry }}/{{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}-backend"
           env:
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: manager-database-secret
                   key: postgres-password
+            - name: MINIO_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: manager-minio-secret
+                  key: CONSOLE_ACCESS_KEY
+            - name: MINIO_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: manager-minio-secret
+                  key: CONSOLE_SECRET_KEY
           envFrom:
             - configMapRef:
                 name: manager-config
@@ -39,7 +49,7 @@ spec:
                 name: manager-secrets
           command: [ 'sh', '-c', 'php artisan migrate --force' ]
         - name: create-admin-user
-          image: "{{ .Values.manager.image.registry }}/{{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}"
+          image: "{{ .Values.manager.image.registry }}/{{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}-backend"
           env:
             - name: DB_PASSWORD
               valueFrom:
@@ -57,8 +67,8 @@ spec:
             - |
               php artisan tinker --execute="if (User::count() === 0) {User::create(['username' => 'admin@{{.Values.identity.realm}}', 'administrator' => 1]);}"
       containers:
-        - name: app
-          image: "{{ .Values.manager.image.registry }}/{{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}"
+        - name: backend
+          image: "{{ .Values.manager.image.registry }}/{{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}-backend"
           env:
             - name: KRB5_CONFIG
               value: /config/krb5-conf/krb5.conf
@@ -87,4 +97,6 @@ spec:
               name: manager-keytab
             - mountPath: /config/krb5-conf
               name: krb5-conf
+        - name: frontend
+          image: "{{ .Values.manager.image.registry }}/{{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}-frontend"
 {{- end -}}

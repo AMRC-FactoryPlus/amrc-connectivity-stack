@@ -150,7 +150,6 @@ export interface sparkplugMetricProperties {
     endianness?: sparkplugMetricProperty,
     deadband?: sparkplugMetricProperty,
     deadbandMode?: sparkplugMetricProperty,
-    recordToDB: sparkplugMetricProperty
 }
 
 export interface sparkplugMetricProperty {

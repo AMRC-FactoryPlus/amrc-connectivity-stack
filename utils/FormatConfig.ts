@@ -20,6 +20,7 @@ export function reHashConf(conf: any) {
                         name: metric.Name,
                         value: metric.value,
                         type: lowerCaseType(metric.type.replace(/[BL]E/g, "")),
+                        isTransient: !metric.recordToDB,
                         properties: {
                             method: { value: metric.method || null, type: sparkplugDataType.string },
                             address: { value: metric.address || null, type: sparkplugDataType.string },
@@ -30,7 +31,6 @@ export function reHashConf(conf: any) {
                             deadband: { value: metric.deadBand || null, type: sparkplugDataType.string },
                             tooltip: { value: metric.tooltip || null, type: sparkplugDataType.string },
                             documentation: { value: metric.docs || null, type: sparkplugDataType.string },
-                            recordToDB: { value: metric.recordToDB || null, type: sparkplugDataType.boolean },
                             endianness: {
                                 value: (metric.type.endsWith("BE") ? 4321 : metric.type.endsWith("LE") ? 1234 : null),
                                 type: sparkplugDataType.uInt16
@@ -68,6 +68,7 @@ export function rehashTag(tag: schemaMetric|any): sparkplugMetric {
         name: tag.Name,
         value: tag.value,
         type: tag.type,
+        isTransient: !tag.recordToDB,
         properties: {
             method: { value: tag.method, type: sparkplugDataType.string },
             address: { value: tag.address, type: sparkplugDataType.string },
@@ -78,7 +79,6 @@ export function rehashTag(tag: schemaMetric|any): sparkplugMetric {
             deadband: { value: tag.deadBand, type: sparkplugDataType.string },
             tooltip: { value: tag.tooltip, type: sparkplugDataType.string },
             documentation: { value: tag.docs, type: sparkplugDataType.string },
-            recordToDB: { value: tag.recordToDB, type: sparkplugDataType.boolean },
             endianness: {
                 value: (tag.type.endsWith("BE") ? 4321 : tag.type.endsWith("LE") ? 1234 : null),
                 type: sparkplugDataType.uInt16

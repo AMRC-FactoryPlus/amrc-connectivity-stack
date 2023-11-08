@@ -12,7 +12,7 @@
             "type": "string",
             "format": "uuid"
         },
-        "Pressure": {
+        "Time": {
             "allOf": [
                 {
                     "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"

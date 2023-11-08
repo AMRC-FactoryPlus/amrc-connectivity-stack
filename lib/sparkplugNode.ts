@@ -5,6 +5,7 @@
 
 import { EventEmitter } from "events";
 import * as MQTT from "mqtt";
+import { v4 as uuidv4 } from "uuid";
 
 import {
     Address, 
@@ -20,7 +21,52 @@ import {
     sparkplugMetric,
     sparkplugPayload,
 } from "./helpers/typeHandler.js";
-import { FactoryPlus, EdgeAgentSchema, NullUuid } from "./uuids.js";
+import * as UUIDs from "./uuids.js";
+
+/* This class tracks the Instance_UUIDs we have assigned to the alerts.
+ * Ideally these would be overridable from a config file or some other
+ * stable storage, but it is essential we can raise alerts before we
+ * have any config. */
+class AlertBuilder {
+    #instances: Map<string, string>
+
+    constructor () {
+        this.#instances = new Map();
+    }
+
+    build_alert (typ: string, name: string, value: boolean) {
+        const prefix = `Alerts/${name}`;
+        
+        if (!this.#instances.has(name))
+            this.#instances.set(name, uuidv4());
+        const instance = this.#instances.get(name)!;
+
+        return [
+            {
+                name: `${prefix}/Schema_UUID`,
+                type: sparkplugDataType.uuid,
+                value: UUIDs.Schema.Alert,
+            },
+            {
+                name: `${prefix}/Instance_UUID`,
+                type: sparkplugDataType.uuid,
+                value: instance,
+            },
+            {
+                name: `${prefix}/Type`,
+                type: sparkplugDataType.uuid,
+                value: typ,
+            },
+            {
+                name: `${prefix}/Active`,
+                type: sparkplugDataType.boolean,
+                value: value,
+            },
+        ];
+    }
+}
+
+const alertbuilder = new AlertBuilder();
 
 export class SparkplugNode extends (
     EventEmitter
@@ -79,7 +125,7 @@ export class SparkplugNode extends (
             {
                 name: "Schema_UUID",
                 type: sparkplugDataType.uuid,
-                value: EdgeAgentSchema,
+                value: UUIDs.Schema.EdgeAgent,
             },
             {
                 name: "Instance_UUID",
@@ -89,7 +135,7 @@ export class SparkplugNode extends (
             {
                 name: "Config_Revision",
                 type: sparkplugDataType.uuid,
-                value: this.#conf.configRevision ?? NullUuid,
+                value: this.#conf.configRevision ?? UUIDs.Special.Null,
             },
             {
                 name: "Node Properties/Type",
@@ -125,26 +171,12 @@ export class SparkplugNode extends (
                 type: sparkplugDataType.boolean,
                 value: this.#conf.nodeControl?.compressPayload ?? false,
             },
-            {
-                name: "Alerts/Config_Fetch_Failed/Type",
-                type: sparkplugDataType.string,
-                value: "633a7da3-ea2a-4e3f-8e84-35691a07465f",
-            },
-            {
-                name: "Alerts/Config_Fetch_Failed/Active",
-                type: sparkplugDataType.boolean,
-                value: this.#conf.alerts?.configFetchFailed ?? false,
-            },
-            {
-                name: "Alerts/Config_Invalid/Type",
-                type: sparkplugDataType.string,
-                value: "075c2d9b-7169-47a8-a27d-28a96f29e0ac",
-            },
-            {
-                name: "Alerts/Config_Invalid/Active",
-                type: sparkplugDataType.boolean,
-                value: this.#conf.alerts?.configInvalid ?? false,
-            },
+            ...alertbuilder.build_alert(
+                UUIDs.Alert.ConfigFetchFailed, "Config_Unavailable",
+                this.#conf.alerts?.configFetchFailed ?? false),
+            ...alertbuilder.build_alert(
+                UUIDs.Alert.ConfigInvalid, "Config_Invalid",
+                this.#conf.alerts?.configInvalid ?? false),
         ]);
         this.isOnline = false; // Whether client is online or not
         this.#metricBuffer = {}; // Buffer to hold metrics when periodic publishing enabled
@@ -213,7 +245,7 @@ export class SparkplugNode extends (
             timestamp: Date.now(),
             metrics: newMetrics,
         };
-        if (birth) payload.uuid = FactoryPlus;
+        if (birth) payload.uuid = UUIDs.Special.FactoryPlus;
         return payload;
     }
 

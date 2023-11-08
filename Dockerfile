@@ -15,7 +15,7 @@ RUN <<'SHELL'
 SHELL
 USER node
 WORKDIR /usr/app
-COPY --chown=node . ./
+COPY --chown=node package.json ./
 RUN <<'SHELL'
     touch /home/node/.npmrc
     if [ "${acs_npm}" != NO ]
@@ -24,7 +24,10 @@ RUN <<'SHELL'
         npm config set @amrc-factoryplus:registry "${acs_npm}"
     fi
     npm install --save=false
+SHELL
 
+COPY --chown=node . ./
+RUN <<'SHELL'
     git describe --tags --dirty \
         | sed -e's/^/export const GIT_VERSION="/;s/$/";/' \
         > ./lib/git-version.js
@@ -44,10 +47,10 @@ RUN <<'SHELL'
 SHELL
 USER node
 WORKDIR /usr/app
-COPY --chown=node --from=ts-compiler /usr/app/package*.json ./
-COPY --chown=node --from=ts-compiler /usr/app/build ./
 COPY --chown=node --from=ts-compiler /home/node/.npmrc /home/node
+COPY --chown=node --from=ts-compiler /usr/app/package*.json ./
 RUN npm install --save=false --only=production
+COPY --chown=node --from=ts-compiler /usr/app/build ./
 
 FROM ${acs_run}
 USER root

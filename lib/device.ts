@@ -173,9 +173,7 @@ export abstract class Device {
                 timestamp: Date.now(),
                 isTransient: true,
                 properties: {
-                    recordToDB: {
-                        type: sparkplugDataType.boolean, value: false
-                    }, method: {
+                    method: {
                         value: "", type: sparkplugDataType.string,
                     }, address: {
                         value: "", type: sparkplugDataType.string,
@@ -200,9 +198,7 @@ export abstract class Device {
                 timestamp: Date.now(),
                 isTransient: true,
                 properties: {
-                    recordToDB: {
-                        type: sparkplugDataType.boolean, value: false
-                    }, method: {
+                    method: {
                         value: "", type: sparkplugDataType.string,
                     }, address: {
                         value: "", type: sparkplugDataType.string,
@@ -221,10 +217,7 @@ export abstract class Device {
                 timestamp: Date.now(),
                 isTransient: true,
                 properties: {
-
-                    recordToDB: {
-                        type: sparkplugDataType.boolean, value: false
-                    }, method: {
+                    method: {
                         value: "", type: sparkplugDataType.string,
                     }, address: {
                         value: "", type: sparkplugDataType.string,

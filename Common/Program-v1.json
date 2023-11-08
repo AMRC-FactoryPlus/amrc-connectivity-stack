@@ -5,7 +5,7 @@
   "type": "object",
   "properties": {
     "Schema_UUID": {
-      "const": "5f4665b1-2099-47e4-860e-b2a7e298688c"
+      "const": "cd718143-7c04-4ae2-a5d1-2ce1b04310a0"
     },
     "Instance_UUID": {
       "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
@@ -46,44 +46,47 @@
       ]
     },
     "Recipe": {
-      "Name": {
-        "allOf": [
-          {
-            "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
-          },
-          {
-            "properties": {
-              "Sparkplug_Type": {
-                "enum": [
-                  "String"
-                ]
-              },
-              "Documentation": {
-                "default": "recipe"
+      "type": "object",
+      "properties": {
+        "Name": {
+          "allOf": [
+            {
+              "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+            },
+            {
+              "properties": {
+                "Sparkplug_Type": {
+                  "enum": [
+                    "String"
+                  ]
+                },
+                "Documentation": {
+                  "default": "Recipe name"
+                }
               }
             }
-          }
-        ]
-      },
-      "Active_Step": {
-        "allOf": [
-          {
-            "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
-          },
-          {
-            "properties": {
-              "Sparkplug_Type": {
-                "enum": [
-                  "uInt16LE",
-                  "uInt16BE"
-                ]
-              },
-              "Documentation": {
-                "default": "Active_Step"
+          ]
+        },
+        "Active_Step": {
+          "allOf": [
+            {
+              "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+            },
+            {
+              "properties": {
+                "Sparkplug_Type": {
+                  "enum": [
+                    "UInt16LE",
+                    "UInt16BE"
+                  ]
+                },
+                "Documentation": {
+                  "default": "Active Step of recipe"
+                }
               }
             }
-          }
-        ]
+          ]
+        }
       }
     }
   },

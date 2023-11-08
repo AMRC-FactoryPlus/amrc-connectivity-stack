@@ -50,8 +50,8 @@
     "Program": {
       "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Program-v1.json"
     },
-    "Cycle": {
-      "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Furnace/Cycle-v1.json"
+    "Process": {
+      "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Furnace/Process-v1.json"
     }
   },
   "required": [

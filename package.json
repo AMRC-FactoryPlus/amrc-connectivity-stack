@@ -1,6 +1,6 @@
 {
   "name": "@amrc-factoryplus/sparkplug-app",
-  "version": "0.0.3-bmz6",
+  "version": "0.0.3-bmz7",
   "description": "A Javascript library providing Sparkplug Application functionality",
   "main": "lib/index.js",
   "type": "module",

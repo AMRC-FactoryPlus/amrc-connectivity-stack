@@ -209,6 +209,13 @@ edo:
     pullPolicy: IfNotPresent
   verbosity: "ALL,!service,!token"
 
+shell:
+  image:
+    registry: ghcr.io/amrc-factoryplus
+    repository: acs-krb-utils
+    tag: v0.0.1
+    pullPolicy: IfNotPresent
+
 minio:
   # -- Whether or not to enable MinIO
   enabled: true

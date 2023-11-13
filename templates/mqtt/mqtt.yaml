@@ -28,23 +28,36 @@ spec:
             items:
               - path: server
                 key: mqtt.mqtt
+              - path: client
+                key: sv1mqtt
+        - name: krb5-ccache
+          emptyDir:
         - name: mqtt-conf
           configMap:
             name: mqtt-config
-      initContainers:
-        - name: register-with-directory
-          image: appropriate/curl:latest
-          env:
-            - name: PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: krb5-passwords
-                  key: sv1mqtt
-          command: [ 'sh', '-c', 'until curl -X PUT -o /dev/null -w "%{http_code}" -u "sv1mqtt:${PASSWORD}" -H "Content-Type: application/json" --data-raw "{ \"url\": \"mqtt://mqtt.{{.Release.Namespace}}.svc.cluster.local\" }" http://directory.{{.Release.Namespace}}.svc.cluster.local/v1/service/feb27ba3-bd2c-4916-9269-79a61ebc4a47/advertisment | grep -E "2[0-9]{2}" > /dev/null; do sleep 10; done' ]
       containers:
+        - name: k5start
+{{ include "amrc-connectivity-stack.image" .Values.shell | indent 10 }}
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              chown 10000:10000 /ccache
+              k5start -Uf /keytabs/client -k /ccache/mqtt -K5 -o10000 -v
+          securityContext:
+            runAsUser: 0
+          volumeMounts:
+            - mountPath: /etc/krb5.conf
+              name: krb5-conf
+              subPath: krb5.conf
+            - mountPath: /keytabs
+              name: krb5-keytabs
+            - mountPath: /ccache
+              name: krb5-ccache
         - name: hivemq
 {{ include "amrc-connectivity-stack.image" .Values.mqtt | indent 10 }}
           env:
+            - name: KRB5CCNAME
+              value: "FILE:/ccache/mqtt"
             - name: SERVER_KEYTAB
               value: /keytabs/server
             # This needs to name a principal available in the keytab, used for verifying passwords.
@@ -52,20 +65,16 @@ spec:
               value: mqtt/mqtt.{{ .Release.Namespace }}.svc.cluster.local
             - name: DIRECTORY_URL
               value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
-            # The Java client still only supports Basic auth.
-            - name: SERVICE_USERNAME
-              value: sv1mqtt
-            - name: SERVICE_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: krb5-passwords
-                  key: sv1mqtt
+            - name: MQTT_URL
+              value: "{{ .Values.acs.secure | ternary "mqtts://" "mqtt://" }}mqtt.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"
           volumeMounts:
             - mountPath: /etc/krb5.conf
               name: krb5-conf
               subPath: krb5.conf
             - mountPath: /keytabs
               name: krb5-keytabs
+            - mountPath: /ccache
+              name: krb5-ccache
             - mountPath: /opt/hivemq/conf/config.xml
               name: mqtt-conf
               subPath: config.xml

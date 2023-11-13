@@ -8,7 +8,7 @@ on:
     types: [ published ]
     # Trigger only when a release with tag v*.*.* is published
     tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+-.*'
+      - 'v[0-9]+.[0-9]+.[0-9]+(-.*)?'
 
 jobs:
   build:

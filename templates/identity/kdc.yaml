@@ -184,6 +184,8 @@ data:
   {{ .Values.identity.realm | required "values.identity.realm is required!" }}.acl: |
     op1krbkeys      x
     admin           x
+    op1krbkeys/*    x     */*1
+    op1krbkeys/*    x     */*1/*
 ---
 apiVersion: v1
 kind: Service

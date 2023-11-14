@@ -8,7 +8,6 @@ spec:
   type: Password
   secret: op1flux-secrets/password
   account:
-    class: {{ .Values.uuid.class.edgeAccount }}
-    name: "Edge flux: {{ .Values.cluster.name }}"
+    uuid: {{ .Values.uuid.account.flux }}
     groups:
       - {{ .Values.uuid.group.flux }}

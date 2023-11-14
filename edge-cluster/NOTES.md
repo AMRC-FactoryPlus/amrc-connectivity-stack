@@ -12,6 +12,14 @@ ConfigMap cluster-config
 GitRepo for edge Helm charts
 HelmRelease for edge cluster helm chart
 
+### Bootstrap requirements
+
+op1krbkeys keytab
+op1flux keytab
+
+op1krbkeys account created and registered correctly
+op1flux account created and registered correctly
+
 ### Edge Cluster Helm chart
 
 Namespace fplus-edge

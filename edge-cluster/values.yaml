@@ -4,6 +4,9 @@ cluster:
   directory:
   domain:
 uuid:
+  account:
+    flux:
+    krbKeys:
   class:
     edgeAccount:
   group:

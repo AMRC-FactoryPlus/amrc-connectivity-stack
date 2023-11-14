@@ -93,8 +93,7 @@ spec:
   type: Random
   secret: krb-keys-keytabs/client
   account:
-    class: {{ .Values.uuid.class.edgeAccount }}
-    name: "Edge krbkeys: {{ .Values.cluster.name }}"
+    uuid: {{ .Values.uuid.account.krbKeys }}
     groups:
       - {{ .Values.uuid.group.krbKeys }}
 ---

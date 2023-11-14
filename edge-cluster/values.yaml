@@ -9,6 +9,7 @@ uuid:
   group:
     edgeMonitor:
     edgeSync:
+    flux:
     krbKeys:
 krb5:
   realm:

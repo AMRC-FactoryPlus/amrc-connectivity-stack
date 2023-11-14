@@ -1,0 +1,14 @@
+apiVersion: factoryplus.app.amrc.co.uk/v1
+kind: KerberosKey
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: op1flux
+spec:
+  principal: op1flux/{{ .Values.cluster.name }}@{{ .Values.krb5.realm }}
+  type: Password
+  secret: op1flux-secrets/password
+  account:
+    class: {{ .Values.uuid.class.edgeAccount }}
+    name: "Edge flux: {{ .Values.cluster.name }}"
+    groups:
+      - {{ .Values.uuid.group.flux }}

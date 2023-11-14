@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: cluster-config
+data:
+  CLUSTER_NAME: {{ .Values.cluster.name }}
+  CLUSTER_UUID: {{ .Values.cluster.uuid }}
+  DIRECTORY_URL: {{ .Values.cluster.directory }}
+  REALM: {{ .Values.krb5.realm }}

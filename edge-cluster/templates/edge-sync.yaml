@@ -1,0 +1,116 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: edge-sync
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: edge-sync
+  template:
+    metadata:
+      labels:
+        component: edge-sync
+    spec:
+      serviceAccountName: edge-sync
+      volumes:
+        - name: krb5-conf
+          configMap:
+            name: krb5-conf
+        - name: keytabs
+          secret:
+            secretName: edge-sync-keytabs
+        - name: kubeseal-certs
+          emptyDir:
+      containers:
+        - name: sync
+{{ list . "edgeSync" | include "edge-cluster.image" | indent 10 }}
+          command: [ "/usr/bin/k5start", "-Uf", "/keytabs/client" ]
+          args: ["node", "bin/edge-sync.js"]
+          env:
+            - name: VERBOSE
+              value: ALL,!service,!token
+            - name: KRB5_CONFIG
+              value: /config/krb5-conf/krb5.conf
+            - name: KUBESEAL_TEMP
+              value: /cert
+          envFrom:
+            - configMapRef:
+                name: cluster-config
+          volumeMounts:
+            - mountPath: /config/krb5-conf
+              name: krb5-conf
+            - mountPath: /keytabs
+              name: keytabs
+            - mountPath: /cert
+              name: kubeseal-certs
+---
+apiVersion: factoryplus.app.amrc.co.uk/v1
+kind: KerberosKey
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: op1sync
+spec:
+  principal: op1sync/{{ .Values.cluster.name }}@{{ .Values.krb5.realm }}
+  type: Random
+  secret: edge-sync-keytabs/client
+  account:
+    class: {{ .Values.uuid.class.edgeAccount }}
+    name: "Edge sync: {{ .Values.cluster.name }}"
+    groups:
+      - {{ .Values.uuid.group.edgeSync }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: edge-sync
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: fplus-nodes-observer
+rules:
+  -   apiGroups: [""]
+      resources: [nodes]
+      verbs: [list, get, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: fplus-nodes-observer
+subjects:
+  - kind: ServiceAccount
+    name: edge-sync
+    namespace: {{ .Release.Namespace }}
+    apiGroup: ""
+roleRef:
+  kind: ClusterRole
+  name: fplus-nodes-observer
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: edge-sync
+rules:
+  - apiGroups: [helm.toolkit.fluxcd.io]
+    resources: [helmreleases]
+    verbs: [list, get, watch, create, update, patch, delete]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: edge-sync
+subjects:
+  - kind: ServiceAccount
+    name: edge-sync
+    namespace: {{ .Release.Namespace }}
+    apiGroup: ""
+roleRef:
+  kind: Role
+  name: edge-sync
+  apiGroup: rbac.authorization.k8s.io

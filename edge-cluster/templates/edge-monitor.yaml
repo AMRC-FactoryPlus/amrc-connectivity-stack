@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: edge-monitor
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: edge-monitor
+  template:
+    metadata:
+      labels:
+        component: edge-monitor
+    spec:
+      serviceAccountName: edge-monitor
+      volumes:
+        - name: krb5-conf
+          configMap:
+            name: krb5-conf
+        - name: keytabs
+          secret:
+            secretName: edge-monitor-keytabs
+      containers:
+        - name: monitor
+{{ list . "edgeMonitor" | include "edge-cluster.image" | indent 10 }}
+          command: [ "/usr/bin/k5start", "-Uf", "/keytabs/client" ]
+          args: ["node", "bin/edge-monitor.js"]
+          env:
+            - name: VERBOSE
+              value: ALL,!service,!token
+            - name: KRB5_CONFIG
+              value: /config/krb5-conf/krb5.conf
+          envFrom:
+            - configMapRef:
+                name: cluster-config
+          volumeMounts:
+            - mountPath: /config/krb5-conf
+              name: krb5-conf
+            - mountPath: /keytabs
+              name: keytabs
+---
+apiVersion: factoryplus.app.amrc.co.uk/v1
+kind: KerberosKey
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: op1monitor
+spec:
+  principal: op1monitor/{{ .Values.cluster.name }}@{{ .Values.krb5.realm }}
+  type: Random
+  secret: edge-monitor-keytabs/client
+  account:
+    class: {{ .Values.uuid.class.edgeAccount }}
+    name: "Edge monitor: {{ .Values.cluster.name }}"
+    groups:
+      - {{ .Values.uuid.group.edgeMonitor }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: edge-monitor
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: edge-monitor
+rules:
+  - apiGroups: [factoryplus.app.amrc.co.uk]
+    resources: [sparkplugnodes]
+    verbs: [list, get, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: edge-monitor
+subjects:
+  - kind: ServiceAccount
+    name: edge-monitor
+    namespace: {{ .Release.Namespace }}
+    apiGroup: ""
+roleRef:
+  kind: Role
+  name: edge-monitor
+  apiGroup: rbac.authorization.k8s.io

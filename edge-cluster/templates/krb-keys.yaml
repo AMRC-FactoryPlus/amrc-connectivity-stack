@@ -1,0 +1,138 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: krb-keys
+  namespace: {{ .Release.Namespace }}
+  labels:
+    component: krb-keys
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: krb-keys
+  template:
+    metadata:
+      labels:
+        component: krb-keys
+    spec:
+      serviceAccountName: krb-keys
+      volumes:
+        - name: krb5-conf
+          configMap:
+            name: krb5-conf
+        - name: krb5-keytabs
+          secret:
+            secretName: krb-keys-keytabs
+        - name: krb5-ccache
+          emptyDir:
+      containers:
+        - name: operator
+{{ list . "krbKeys" | include "edge-cluster.image" | indent 10 }}
+          command: [ "/bin/sh", "/home/krbkeys/bin/krb-keys.sh" ]
+          args: []
+          env:
+            - name: KRB5_CONFIG
+              value: /config/krb5-conf/krb5.conf
+            - name: KRB5CCNAME
+              value: /ccache/krbkeys
+            - name: KADMIN_CCNAME
+              value: /ccache/kadmin
+            - name: VERBOSE
+              value: "1"
+          envFrom:
+            - configMapRef:
+                name: cluster-config
+          volumeMounts:
+            - mountPath: /config/krb5-conf
+              name: krb5-conf
+            - mountPath: /ccache
+              name: krb5-ccache
+        - name: tgt-creds
+{{ list . "krbKeys" | include "edge-cluster.image" | indent 10 }}
+          command: ["/usr/bin/k5start", "-v", "-Uf", "/keytabs/client", "-K", "5"]
+          args: []
+          env:
+            - name: KRB5_CONFIG
+              value: /config/krb5-conf/krb5.conf
+            - name: KRB5CCNAME
+              value: /ccache/krbkeys
+          volumeMounts:
+            - mountPath: /config/krb5-conf
+              name: krb5-conf
+            - mountPath: /keytabs
+              name: krb5-keytabs
+            - mountPath: /ccache
+              name: krb5-ccache
+        - name: kadmin-creds
+{{ list . "krbKeys" | include "edge-cluster.image" | indent 10 }}
+          command: [
+            "/usr/bin/k5start", "-v", "-K", "5",
+            "-Uf", "/keytabs/client", 
+            "-S", "kadmin", "-I", "admin" ]
+          args: []
+          env:
+            - name: KRB5_CONFIG
+              value: /config/krb5-conf/krb5.conf
+            - name: KRB5CCNAME
+              value: /ccache/kadmin
+          volumeMounts:
+            - mountPath: /config/krb5-conf
+              name: krb5-conf
+            - mountPath: /keytabs
+              name: krb5-keytabs
+            - mountPath: /ccache
+              name: krb5-ccache
+---
+apiVersion: factoryplus.app.amrc.co.uk/v1
+kind: KerberosKey
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: op1krbkeys
+spec:
+  principal: op1krbkeys/{{ .Values.cluster.name }}@{{ .Values.krb5.realm }}
+  type: Random
+  secret: krb-keys-keytabs/client
+  account:
+    class: {{ .Values.uuid.class.edgeAccount }}
+    name: "Edge krbkeys: {{ .Values.cluster.name }}"
+    groups:
+      - {{ .Values.uuid.group.krbKeys }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: krb-keys
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: krb-keys
+rules:
+  -   apiGroups: [factoryplus.app.amrc.co.uk]
+      resources: [kerberos-keys]
+      verbs: [list, get, watch, patch]
+  -   apiGroups: [factoryplus.app.amrc.co.uk]
+      resources: [kerberos-keys/status]
+      verbs: [list, get, create, update, delete, watch, patch]
+  -   apiGroups: [""]
+      resources: [secrets]
+      verbs: [get, create, update, delete, patch]
+  -   apiGroups: [""]
+      resources: [events]
+      verbs: [create]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: krb-keys
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: krb-keys
+subjects:
+  -   kind: ServiceAccount
+      name: krb-keys
+      namespace: {{ .Release.Namespace }}

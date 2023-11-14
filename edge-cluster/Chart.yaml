@@ -1,0 +1,4 @@
+apiVersion: v2
+name: edge-cluster
+version: "0.0.1"
+description: "ACS Edge Cluster deployment"

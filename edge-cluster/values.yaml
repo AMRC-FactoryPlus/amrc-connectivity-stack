@@ -1,0 +1,30 @@
+cluster:
+  name:
+  uuid:
+  directory:
+  domain:
+uuid:
+  class:
+    edgeAccount:
+  group:
+    edgeMonitor:
+    edgeSync:
+    krbKeys:
+krb5:
+  realm:
+sealedSecrets:
+  namespace: sealed-secrets
+  controller: sealed-secrets
+image:
+  default:
+    registry: ghcr.io/amrc-factoryplus
+    pullPolicy: IfNotPresent
+  edgeMonitor:
+    repository: acs-edge-monitor
+    tag: v0.0.1
+  edgeSync:
+    repository: acs-edge-sync
+    tag: v0.0.2
+  krbKeys:
+    repository: acs-krb-keys-operator
+    tag: v1.2.0

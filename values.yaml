@@ -109,7 +109,7 @@ mqtt:
     # -- The repository of the MQTT component
     repository: acs-mqtt
     # -- The tag of the MQTT component
-    tag: v1.0.1
+    tag: v1.1.0
     # @ignore
     pullPolicy: IfNotPresent
 

@@ -26,6 +26,50 @@ Install flux
 Currently the op1flux secret is in the flux-system namespace but krbkeys
 can only play in the fplus-edge namespace. This needs resolving.
 
+#### Steps
+
+kubectl create namespace $N
+kubectl create serviceaccount -n $N edge-bootstrap
+kubectl create rolebinding -n $N
+    --clusterrole=cluster-admin --serviceaccount=$N:edge-bootstrap
+kubectl run -ti --image=$KRBKEYS --restart=Never --rm 
+    --overrides='{"spec":{"serviceAccountName":"edge-bootstrap"}}' 
+    -n $N krbkeys-bootstrap -- 
+    python3 -m amrc.factoryplus.krbkeys.cluster
+
+    Python 3.11.6 (main, Oct  4 2023, 06:22:18) [GCC 12.2.1 20220924] on linux
+    Type "help", "copyright", "credits" or "license" for more information.
+    >>> import getpass
+    >>> user = input("ACS admin user: ")
+    >>> passwd = getpass.getpass(prompt="ACS admin password: ")
+    >>> import kadmin
+    >>> kadm_h = kadmin.init_with_password(user, passwd)
+    >>> import kubernetes as k8s
+    >>> from amrc.factoryplus.krbkeys.kadmin import Kadm
+    >>> from amrc.factoryplus.krbkeys.kubernetes import K8s
+    >>> from amrc.factoryplus.krbkeys.util import KtData
+    >>> k8s.config.load_incluster_config()
+    >>> k8o = K8s()
+    >>> kadm = Kadm(kadm=kadm_h)
+    >>> kt = KtData(contents=None)
+    >>> with kt.kt_name() as ktname:
+    ...   kadm.create_keytab(["op1krbkeys/v3-testing"], ktname)
+    ...
+    {'op1krbkeys/v3-testing': {'kvno': 2}}
+    >>> k8o.update_secret(ns="fplus-edge",name="krb-keys-keytabs",key="client",value=kt.conte
+    nts)
+    >>> import secrets
+    >>> fluxpw = secrets.token_urlsafe()
+    >>> kadm.set_password("op1flux/v3-testing", fluxpw)
+    {'kvno': 2, 'etypes': ['aes256-cts-hmac-sha1-96:normal', 'aes128-cts-hmac-sha1-96:normal']}
+    >>> k8o.update_secret(ns="fplus-edge",name="flux-secrets",key="password",value=fluxpw.encode())
+    >>> k8o.update_secret(ns="fplus-edge",name="flux-secrets",key="username",value="op1flux/v3-testing".encode())
+
+kubectl delete -n $N pod/edge-bootstrap
+kubectl delete -n $N configmap/krb5-conf
+kubectl apply -f flux-system.yaml
+kubectl apply -f self-link.yaml
+
 ### Edge Cluster Helm chart
 
 Namespace fplus-edge

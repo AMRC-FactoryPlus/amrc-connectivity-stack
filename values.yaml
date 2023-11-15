@@ -99,7 +99,7 @@ mqtt:
     # -- The repository of the MQTT component
     repository: acs-mqtt
     # -- The tag of the MQTT component
-    tag: v1.0.1
+    tag: v1.1.0
     # @ignore
     pullPolicy: IfNotPresent
 
@@ -168,6 +168,13 @@ warehouse:
       tag: v1.2.0
       # @ignore
       pullPolicy: IfNotPresent
+
+shell:
+  image:
+    registry: ghcr.io/amrc-factoryplus
+    repository: acs-krb-utils
+    tag: v0.0.1
+    pullPolicy: IfNotPresent
 
 minio:
   # -- Whether or not to enable MinIO

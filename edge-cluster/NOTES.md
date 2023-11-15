@@ -15,10 +15,16 @@ HelmRelease for edge cluster helm chart
 ### Bootstrap requirements
 
 op1krbkeys keytab
-op1flux keytab
+op1flux password
+op1flux username
 
 op1krbkeys account created and registered correctly
 op1flux account created and registered correctly
+
+Install flux
+
+Currently the op1flux secret is in the flux-system namespace but krbkeys
+can only play in the fplus-edge namespace. This needs resolving.
 
 ### Edge Cluster Helm chart
 

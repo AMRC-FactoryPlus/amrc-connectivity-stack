@@ -7,7 +7,3 @@ spec:
   principal: op1flux/{{ .Values.cluster.name }}@{{ .Values.krb5.realm }}
   type: Password
   secret: op1flux-secrets/password
-  account:
-    uuid: {{ .Values.uuid.account.flux }}
-    groups:
-      - {{ .Values.uuid.group.flux }}

@@ -92,10 +92,6 @@ spec:
   principal: op1krbkeys/{{ .Values.cluster.name }}@{{ .Values.krb5.realm }}
   type: Random
   secret: krb-keys-keytabs/client
-  account:
-    uuid: {{ .Values.uuid.account.krbKeys }}
-    groups:
-      - {{ .Values.uuid.group.krbKeys }}
 ---
 apiVersion: v1
 kind: ServiceAccount

@@ -2,3 +2,7 @@ apiVersion: v2
 name: edge-cluster
 version: "0.0.1"
 description: "ACS Edge Cluster deployment"
+dependencies:
+  - name: sealed-secrets
+    version: "2.13.3"
+    repository: https://bitnami-labs.github.io/sealed-secrets

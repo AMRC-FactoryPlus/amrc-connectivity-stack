@@ -16,9 +16,9 @@ uuid:
     krbKeys:
 krb5:
   realm:
-sealedSecrets:
+sealed-secrets:
   namespace: sealed-secrets
-  controller: sealed-secrets
+  fullnameOverride: sealed-secrets
 image:
   default:
     registry: ghcr.io/amrc-factoryplus

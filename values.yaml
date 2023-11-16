@@ -112,6 +112,7 @@ mqtt:
     tag: v1.1.0
     # @ignore
     pullPolicy: IfNotPresent
+  verbosity: 0
 
 manager:
   # -- Whether or not to enable the Manager component

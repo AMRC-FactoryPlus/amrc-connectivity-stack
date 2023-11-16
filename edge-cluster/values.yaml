@@ -16,7 +16,7 @@ uuid:
     krbKeys:
 krb5:
   realm:
-sealed-secrets:
+sealedSecrets:
   namespace: sealed-secrets
   fullnameOverride: sealed-secrets
 image:

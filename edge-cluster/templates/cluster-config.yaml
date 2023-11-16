@@ -8,5 +8,5 @@ data:
   CLUSTER_UUID: {{ .Values.cluster.uuid }}
   DIRECTORY_URL: {{ .Values.cluster.directory }}
   REALM: {{ .Values.krb5.realm }}
-  SEALED_SECRETS_NAMESPACE: {{ .Values.sealed-secrets.namespace }}
-  SEALED_SECRETS_CONTROLLER: {{ .Values.sealed-secrets.fullnameOverride }}
+  SEALED_SECRETS_NAMESPACE: {{ .Values.sealedSecrets.namespace }}
+  SEALED_SECRETS_CONTROLLER: {{ .Values.sealedSecrets.fullnameOverride }}

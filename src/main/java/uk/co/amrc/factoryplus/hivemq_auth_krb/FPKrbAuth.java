@@ -161,13 +161,27 @@ public class FPKrbAuth implements EnhancedAuthenticator {
                 return;
             }
             verify_gssapi(buf.get())
-                .doAfterTerminate(() -> asyncOutput.resume())
-                .subscribe(
-                    rv -> {
-                        rv.applyACL(output);
-                        output.authenticateSuccessfully();
-                    },
-                    e -> output.failAuthentication());
+                .map(rv -> Optional.of(rv))
+                .onErrorReturnItem(Optional.<AuthResult>empty())
+                .subscribe(opt -> {
+                    switch (asyncOutput.getStatus()) {
+                        case Async.Status.CANCELED:
+                            log.warn("Timeout authenticating {}",
+                                user.toString());
+                            return;
+                        case Async.Status.DONE:
+                            log.error("Trying to return duplicate result for {}",
+                                user.toString());
+                            return;
+                    }
+                    opt.ifPresentOrElse(
+                        rv -> {
+                            rv.applyACL(output);
+                            output.authenticateSuccessfully();
+                        },
+                        () -> output.failAuthentication());
+                    asyncOutput.resume();
+                });
         });
     }
 

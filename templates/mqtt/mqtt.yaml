@@ -50,6 +50,8 @@ spec:
               value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
             - name: MQTT_URL
               value: "{{ .Values.acs.secure | ternary "mqtts://" "mqtt://" }}mqtt.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"
+            - name: VERBOSE
+              value: {{.Values.mqtt.verbosity | quote | required "values.mqtt.verbosity is required!"}}
           volumeMounts:
             - mountPath: /etc/krb5.conf
               name: krb5-conf

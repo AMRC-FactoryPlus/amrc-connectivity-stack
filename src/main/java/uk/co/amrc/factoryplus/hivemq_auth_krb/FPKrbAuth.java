@@ -31,6 +31,7 @@ import com.hivemq.extension.sdk.api.auth.EnhancedAuthenticator;
 import com.hivemq.extension.sdk.api.auth.parameter.*;
 import com.hivemq.extension.sdk.api.packets.auth.*;
 import com.hivemq.extension.sdk.api.packets.connect.*;
+import com.hivemq.extension.sdk.api.packets.general.*;
 import com.hivemq.extension.sdk.api.services.Services;
 
 public class FPKrbAuth implements EnhancedAuthenticator {
@@ -113,7 +114,8 @@ public class FPKrbAuth implements EnhancedAuthenticator {
         in_bb.get(in_buf);
 
         final Async<EnhancedAuthOutput> asyncOutput = output.async(
-            Duration.ofSeconds(10), TimeoutFallback.FAILURE);
+            Duration.ofSeconds(10), TimeoutFallback.FAILURE,
+            DisconnectedReasonCode.SERVER_BUSY);
 
         verify_gssapi(in_buf)
             .doAfterTerminate(() -> asyncOutput.resume())
@@ -145,7 +147,8 @@ public class FPKrbAuth implements EnhancedAuthenticator {
         passwd_c.get(passwd_buf);
 
         final Async<EnhancedAuthOutput> asyncOutput = output.async(
-            Duration.ofSeconds(10), TimeoutFallback.FAILURE);
+            Duration.ofSeconds(10), TimeoutFallback.FAILURE,
+            DisconnectedReasonCode.SERVER_BUSY);
 
         Services.extensionExecutorService().submit(() -> {
             /* We need to get and verify a service ticket, to protect
@@ -165,11 +168,11 @@ public class FPKrbAuth implements EnhancedAuthenticator {
                 .onErrorReturnItem(Optional.<AuthResult>empty())
                 .subscribe(opt -> {
                     switch (asyncOutput.getStatus()) {
-                        case Async.Status.CANCELED:
+                        case CANCELED:
                             log.warn("Timeout authenticating {}",
                                 user.toString());
                             return;
-                        case Async.Status.DONE:
+                        case DONE:
                             log.error("Trying to return duplicate result for {}",
                                 user.toString());
                             return;

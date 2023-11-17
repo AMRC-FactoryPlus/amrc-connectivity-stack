@@ -85,6 +85,7 @@ public class FPHttpClient {
             .build();
 
         async_client = CachingHttpAsyncClients.custom()
+            .setCacheConfig(cache_config)
             .setIOReactorConfig(ioReactorConfig)
             .build();
     }

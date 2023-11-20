@@ -94,6 +94,14 @@ public class FPGssProvider {
         return buildSubject("client-password", cb, config);
     }
 
+    public Optional<Subject> buildClientSubjectWithKeytab (
+        String keytab, String principal)
+    {
+        Configuration config = new KrbConfiguration(principal, keytab);
+        CallbackHandler cb = new NullCallbackHandler();
+        return buildSubject("client-keytab", cb, config);
+    }
+
     /** Builds server (acceptor) credentials.
      *
      * The <code>FPGssServer</code> returned from this method will
@@ -119,6 +127,21 @@ public class FPGssProvider {
     public Optional<FPGssClient> clientWithCcache ()
     {
         return buildClientSubjectWithCcache()
+            .map(subj -> new FPGssClient(this, subj));
+    }
+
+    /** Builds client (initiator) creds from a keytab.
+     *
+     * This performs a new Kerberos login using the keytab.
+     *
+     * @param principal The principal to use.
+     * @param keytab The keytab file to use.
+     * @return The client credentials.
+     */
+    public Optional<FPGssClient> clientWithKeytab (
+        String principal, String keytab)
+    {
+        return buildClientSubjectWithKeytab(keytab, principal)
             .map(subj -> new FPGssClient(this, subj));
     }
 

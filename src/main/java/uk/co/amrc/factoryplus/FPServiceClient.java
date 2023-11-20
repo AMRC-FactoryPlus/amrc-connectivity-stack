@@ -211,11 +211,17 @@ public class FPServiceClient {
         if (_gss_client == null) {
             var user = getOptionalConf("service_username");
             var passwd = getOptionalConf("service_password");
+            var princ = getOptionalConf("client_principal");
+            var keytab = getOptionalConf("client_keytab");
 
-            var cli = user.isEmpty() || passwd.isEmpty()
-                ? gss().clientWithCcache()
-                : gss().clientWithPassword(user.get(),
-                    passwd.get().toCharArray());
+            var cli = 
+                princ.flatMap(p ->
+                    keytab.flatMap(k -> gss().clientWithKeytab(p, k)))
+                .or(() -> user.flatMap(u ->
+                    passwd.map(p -> p.toCharArray())
+                        .flatMap(p -> gss().clientWithPassword(u, p))))
+                .or(() -> gss().clientWithCcache());
+
             _gss_client = cli
                 .flatMap(c -> c.login())
                 .orElseThrow(() -> new ServiceConfigurationError(

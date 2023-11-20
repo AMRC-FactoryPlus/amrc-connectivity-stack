@@ -51,6 +51,15 @@ class KrbConfiguration extends Configuration {
             opts.put("useTicketCache", "true");
             break;
 
+        case "client-keytab":
+            opts.put("doNotPrompt", "true");
+            opts.put("storeKey", "true");
+            opts.put("isInitiator", "true");
+            opts.put("principal", principal);
+            opts.put("useKeyTab", "true");
+            opts.put("keyTab", keytab);
+            break;
+
         default:
             return null;
         }

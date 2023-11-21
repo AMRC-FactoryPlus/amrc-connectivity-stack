@@ -40,7 +40,7 @@ class KrbConfiguration extends Configuration {
 
         case "client-password":
             opts.put("doNotPrompt", "false");
-            opts.put("storeKey", "true");
+            opts.put("storeKey", "false");
             opts.put("isInitiator", "true");
             break;
 
@@ -53,7 +53,7 @@ class KrbConfiguration extends Configuration {
 
         case "client-keytab":
             opts.put("doNotPrompt", "true");
-            opts.put("storeKey", "true");
+            opts.put("storeKey", "false");
             opts.put("isInitiator", "true");
             opts.put("principal", principal);
             opts.put("useKeyTab", "true");

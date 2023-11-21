@@ -39,17 +39,6 @@ public class FPGssClient extends FPGssPrincipal {
         super(provider, subject);
     }
 
-    public String getPrincipal ()
-    {
-        try {
-            return creds.getName(provider.krb5Mech()).toString();
-        }
-        catch (GSSException e) {
-            throw new ServiceConfigurationError(
-                "Can't read GSS principal name", e);
-        }
-    }
-
     /** Fetches credentials.
      *
      * This performs a Kerberos login, if necessary, and verifies we can

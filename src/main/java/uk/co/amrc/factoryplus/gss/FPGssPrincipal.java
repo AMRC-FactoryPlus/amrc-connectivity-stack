@@ -41,12 +41,6 @@ public abstract class FPGssPrincipal {
         this.subject = subject;
     }
 
-    /** Gets our Kerberos principal name.
-     *
-     * @return Our Kerberos principal name.
-     */
-    public abstract String getPrincipal ();
-
     /** Performs an operation using our Subject.
      *
      * We hold an internal {@link Subject} representing our security

@@ -30,7 +30,7 @@ public class FPGssServer extends FPGssPrincipal {
     private static final Logger log = LoggerFactory.getLogger(FPGssServer.class);
 
     String principal;
-    private GSSCredential creds;
+    //private GSSCredential creds;
 
     /** Internal; construct via {@link FPGssProvider}. */
     public FPGssServer (FPGssProvider provider, String principal, Subject subject)
@@ -49,18 +49,18 @@ public class FPGssServer extends FPGssPrincipal {
      */
     public Optional<FPGssServer> login ()
     {
-        return withSubject("getting creds from keytab", () -> {
-            creds = provider.getGSSManager()
-                .createCredential(GSSCredential.ACCEPT_ONLY);
+        return Optional.of(this);
 
-            log.info("Got GSS creds for server:");
-            for (Oid mech : creds.getMechs()) {
-                log.info("  Oid {}, name {}", 
-                    mech, creds.getName(mech));
-            }
-
-            return this;
-        });
+//        return withSubject("getting creds from keytab", () -> {
+//
+//            log.info("Got GSS creds for server:");
+//            for (Oid mech : creds.getMechs()) {
+//                log.info("  Oid {}, name {}", 
+//                    mech, creds.getName(mech));
+//            }
+//
+//            return this;
+//        });
     }
 
     /** Creates a GSS context.
@@ -69,7 +69,11 @@ public class FPGssServer extends FPGssPrincipal {
      */
     public Optional<GSSContext> createContext ()
     {
-        return withSubject("creating server context",
-                () -> provider.getGSSManager().createContext(creds));
+        return withSubject("creating server context", () -> {
+            GSSManager mgr = provider.getGSSManager();
+            GSSCredential creds = mgr
+                .createCredential(GSSCredential.ACCEPT_ONLY);
+            return mgr.createContext(creds);
+        });
     }
 }

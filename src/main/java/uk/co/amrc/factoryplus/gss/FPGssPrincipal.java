@@ -60,7 +60,7 @@ public abstract class FPGssPrincipal {
             return Optional.of(Subject.doAs(subject, action));
         }
         catch (PrivilegedActionException e) {
-            log.error(msg, e.toString());
+            log.error(msg, e);
             return Optional.<T>empty();
         }
     }

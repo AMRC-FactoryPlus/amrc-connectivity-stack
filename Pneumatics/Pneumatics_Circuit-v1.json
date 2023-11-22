@@ -1,0 +1,138 @@
+{
+  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Pneumatics/Pneumatics_Circuit-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Pneumatics Circuit",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "d2cab215-2a18-45a5-8461-954814c91ecd"
+    },
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "Device_Information": {
+      "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Device_Information-v1.json"
+    },
+    "Links": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-zA-Z0-9_]*$": {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Link-v1.json"
+        }
+      }
+    },
+    "Flow_Rate": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "FloatLE",
+                "FloatBE"
+              ]
+            },
+            "Documentation": {
+              "default": "Flow Rate, typically cubic meters per second (m³/s) or liters per minute (L/min)."
+            }
+          }
+        }
+      ]
+    },
+    "Volume": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "FloatLE",
+                "FloatBE"
+              ]
+            },
+            "Documentation": {
+              "default": "Cumulative amount of gas that has passed through the sensor. It is often expressed in units like cubic meters (m³) or liters (L)"
+            }
+          }
+        }
+      ]
+    },
+    "Pressure": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "FloatLE",
+                "FloatBE"
+              ]
+            },
+            "Documentation": {
+              "default": "Pressure of gas."
+            }
+          }
+        }
+      ]
+    },
+    "Temperature": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "FloatLE",
+                "FloatBE"
+              ]
+            },
+            "Documentation": {
+              "default": "Temperature of gas."
+            }
+          }
+        }
+      ]
+    },
+    "Valve_State": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "Boolean"
+              ]
+            },
+            "Documentation": {
+              "default": "Whether or not the valve is open or closed."
+            }
+          }
+        }
+      ]
+    },
+    "Loads": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-zA-Z0-9_]*$": {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Pneumatics/Pneumatics_Circuit-v1.json"
+        }
+      }
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID"
+  ]
+}

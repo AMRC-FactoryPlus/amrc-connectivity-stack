@@ -94,7 +94,7 @@ public class FPKrbAuthProvider implements EnhancedAuthenticatorProvider
 
     public Attempt<GSSContext> createProxyContext (String user, char[] passwd)
     {
-        String srv = fplus.gssServer().getPrincipal();
+        String srv = fplus.getConf("server_principal");
         return fplus.gss()
             .clientWithPassword(user, passwd)
             .createContext(srv);

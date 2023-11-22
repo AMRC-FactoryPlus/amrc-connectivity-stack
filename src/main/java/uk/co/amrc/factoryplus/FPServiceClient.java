@@ -181,10 +181,9 @@ public class FPServiceClient {
     synchronized public FPGssServer gssServer ()
     {
         if (_gss_server == null) {
-            String princ = getConf("server_principal");
             String keytab = getConf("server_keytab");
 
-            _gss_server = gss().server(princ, keytab);
+            _gss_server = gss().server("*", keytab);
         }
 
         return _gss_server;

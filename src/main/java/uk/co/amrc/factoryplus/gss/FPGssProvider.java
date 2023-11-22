@@ -56,52 +56,6 @@ public class FPGssProvider {
     public Oid krb5Mech () { return _krb5Mech; }
     public Oid krb5PrincipalNT () { return _krb5PrincipalNT; }
 
-    public Optional<Subject> buildSubject (
-        String type, CallbackHandler cb, Configuration config
-    ) {
-        Subject subj = new Subject();
-
-        try {
-            LoginContext ctx = new LoginContext(type, subj, cb, config);
-            ctx.login();
-            return Optional.of(subj);
-        }
-        catch (LoginException e) {
-            log.error("Krb5 init failed: {}", e.toString());
-            return Optional.<Subject>empty();
-        }
-    }
-
-    public Optional<Subject> buildServerSubject (String keytab, String principal)
-    {
-        Configuration config = new KrbConfiguration(principal, keytab);
-        CallbackHandler cb = new NullCallbackHandler();
-        return buildSubject("server", cb, config);
-    }
-
-    public Optional<Subject> buildClientSubjectWithCcache ()
-    {
-        Configuration config = new KrbConfiguration();
-        CallbackHandler cb = new NullCallbackHandler();
-        return buildSubject("client-ccache", cb, config);
-    }
-
-    public Optional<Subject> buildClientSubjectWithPassword (
-        char[] password, String principal
-    ) {
-        Configuration config = new KrbConfiguration();
-        CallbackHandler cb = new PasswordCallbackHandler(principal, password);
-        return buildSubject("client-password", cb, config);
-    }
-
-    public Optional<Subject> buildClientSubjectWithKeytab (
-        String keytab, String principal)
-    {
-        Configuration config = new KrbConfiguration(principal, keytab);
-        CallbackHandler cb = new NullCallbackHandler();
-        return buildSubject("client-keytab", cb, config);
-    }
-
     /** Builds server (acceptor) credentials.
      *
      * The <code>FPGssServer</code> returned from this method will
@@ -112,10 +66,9 @@ public class FPGssProvider {
      * @param keytab The path to a keytab file.
      * @return The server credentials.
      */
-    public Optional<FPGssServer> server (String principal, String keytab)
+    public FPGssServer server (String principal, String keytab)
     {
-        return buildServerSubject(keytab, "*")
-            .map(subj -> new FPGssServer(this, principal, subj));
+        return new FPGssServer(this, principal, keytab);
     }
 
     /** Builds client (initiator) creds from a ccache.
@@ -124,10 +77,9 @@ public class FPGssProvider {
      *
      * @return The client credentials.
      */
-    public Optional<FPGssClient> clientWithCcache ()
+    public FPGssClient clientWithCcache ()
     {
-        return buildClientSubjectWithCcache()
-            .map(subj -> new FPGssClient(this, subj));
+        return new FPGssClientCcache(this);
     }
 
     /** Builds client (initiator) creds from a keytab.
@@ -138,11 +90,9 @@ public class FPGssProvider {
      * @param keytab The keytab file to use.
      * @return The client credentials.
      */
-    public Optional<FPGssClient> clientWithKeytab (
-        String principal, String keytab)
+    public FPGssClient clientWithKeytab (String principal, String keytab)
     {
-        return buildClientSubjectWithKeytab(keytab, principal)
-            .map(subj -> new FPGssClient(this, subj));
+        return new FPGssClientKeytab(this, principal, keytab);
     }
 
     /** Build client creds from username and password.
@@ -153,10 +103,8 @@ public class FPGssProvider {
      * @param password The password.
      * @return The client credentials.
      */
-    public Optional<FPGssClient> clientWithPassword (
-        String username, char[] password)
+    public FPGssClient clientWithPassword (String username, char[] password)
     {
-        return buildClientSubjectWithPassword(password, username)
-            .map(subj -> new FPGssClient(this, subj));
+        return new FPGssClientPassword(this, username, password);
     }
 }

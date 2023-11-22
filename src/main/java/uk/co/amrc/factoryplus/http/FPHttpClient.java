@@ -135,12 +135,12 @@ public class FPHttpClient {
     /** Internal */
     public Single<String> tokenFor (URI service)
     {
-        return Single.fromCallable(() -> {
+        return Single.fromSupplier(() -> {
                 //FPThreadUtil.logId("getting gss context");
                 /* blocking */
                 return fplus.gssClient()
                     .createContextHB("HTTP@" + service.getHost())
-                    .orElseThrow(() -> new Exception("Can't get GSS context"));
+                    .orElseThrow();
             })
             .map(ctx -> new TokenRequest(service, ctx))
                 /* buildRequest is blocking */

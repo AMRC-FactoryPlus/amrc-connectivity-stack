@@ -26,6 +26,11 @@ import org.slf4j.LoggerFactory;
 import org.ietf.jgss.*;
 import org.json.*;
 
+import io.reactivex.rxjava3.functions.Function;
+import io.reactivex.rxjava3.functions.Supplier;
+
+import uk.co.amrc.factoryplus.Attempt;
+
 /** A GSS principal (client or server).
  */
 public abstract class FPGssPrincipal {
@@ -33,35 +38,69 @@ public abstract class FPGssPrincipal {
 
     FPGssProvider provider;
     Subject subject;
+    GSSCredential creds;
 
     /** Internal, construct via {@link FPGssProvider}. */
-    public FPGssPrincipal (FPGssProvider provider, Subject subject)
+    public FPGssPrincipal (FPGssProvider provider)
     {
         this.provider = provider;
-        this.subject = subject;
     }
 
-    /** Performs an operation using our Subject.
-     *
-     * We hold an internal {@link Subject} representing our security
-     * context. This calls 
-     * {@link Subject#doAs(Subject, PrivilegedExceptionAction)}
-     * and returns the result. If the action throws an exception it will
-     * be caught and logged and Optional.empty returned.
-     *
-     * @param msg A description of this action, for logging an error.
-     * @param action The action to perform.
-     * @return The result of the action, if successful.
-     */
-    public <T> Optional<T> withSubject (String msg, 
-        PrivilegedExceptionAction<T> action)
+    protected abstract LoginContext buildLoginContext (Subject subj)
+        throws LoginException;
+    protected abstract int getCredUsage ();
+
+    private Attempt<GSSCredential> getCreds ()
     {
-        try {
-            return Optional.of(Subject.doAs(subject, action));
+        if (creds != null)
+            return Attempt.of(creds);
+
+        return Attempt.ofCallable(() -> {
+                if (subject == null) {
+                    subject = new Subject();
+                    var ctx = this.buildLoginContext(subject);
+                    ctx.login();
+                }
+                return subject;
+            })
+            .flatMap(s -> withSubject(() -> {
+                creds = provider.getGSSManager()
+                    .createCredential(getCredUsage());
+                return creds;
+            }));
+    }
+
+    protected synchronized <T> Attempt<T> withCreds (
+        Function<GSSCredential,T> callback)
+    {
+        /* XXX This is a mess. It could probably be redone with a pair
+         * of cached Observables to avoid all this stateful tangle. */
+
+        if (creds != null) {
+            int lft = Attempt.ofCallable(() -> creds.getRemainingLifetime())
+                .orElse(e -> {
+                    log.warn("Error fetching GSS lifetime", e);
+                    return 0;
+                });
+            if (lft < 5)
+                creds = null;
         }
-        catch (PrivilegedActionException e) {
-            log.error(msg, e);
-            return Optional.<T>empty();
-        }
+
+        return getCreds()
+            .handle(GSSException.class, err -> {
+                log.info("GSS error, retrying login", err);
+                // If we get a GSSException, try logging in again
+                creds = null;
+                subject = null;
+                return getCreds();
+            })
+            .flatMap(cr -> withSubject(() -> callback.apply(cr)));
+    }
+
+    protected <T> Attempt<T> withSubject (Supplier<T> callback)
+    {
+        PrivilegedAction<Attempt<T>> action = () -> Attempt.ofSupplier(callback);
+        return Subject.doAs(subject, action)
+            .mapError(PrivilegedActionException.class, err -> err.getCause());
     }
 }

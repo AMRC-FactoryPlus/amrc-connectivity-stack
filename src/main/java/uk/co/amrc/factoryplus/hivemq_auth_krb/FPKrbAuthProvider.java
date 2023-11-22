@@ -87,21 +87,17 @@ public class FPKrbAuthProvider implements EnhancedAuthenticatorProvider
         return new FPKrbAuth(this);
     }
 
-    public GSSContext createServerContext ()
+    public Attempt<GSSContext> createServerContext ()
     {
-        return fplus.gssServer()
-            .createContext()
-            .orElseThrow(() -> new ServiceConfigurationError(
-                "Cannot create server GSS context"));
+        return fplus.gssServer().createContext();
     }
 
-    public Optional<GSSContext> createProxyContext (String user, char[] passwd)
+    public Attempt<GSSContext> createProxyContext (String user, char[] passwd)
     {
         String srv = fplus.gssServer().getPrincipal();
         return fplus.gss()
             .clientWithPassword(user, passwd)
-            .flatMap(cli -> cli.login())
-            .flatMap(cli -> cli.createContext(srv));
+            .createContext(srv);
     }
 
     public Single<List<TopicPermission>> getACLforPrincipal (String principal)

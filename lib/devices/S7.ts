@@ -87,10 +87,10 @@ export class S7Connection extends DeviceConnection {
      * @param {array} metrics Array of metric objects to read to
      * @returns {array} Old metric values (for RbE checking)
      */
-    readMetrics(metrics: Metrics, payloadFormat?: string,) {
+    async readMetrics(metrics: Metrics, payloadFormat?: string,) {
         const changedMetrics: sparkplugMetric[] = [];
         // Tell S7 to update metric values
-        let newVals = this.#itemGroup.readAllItems();  // name: value
+        let newVals = await this.#itemGroup.readAllItems();  // name: value
         this.emit('data', newVals, false);
     }
 

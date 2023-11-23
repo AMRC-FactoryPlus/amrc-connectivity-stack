@@ -78,7 +78,7 @@ export class S7Connection extends DeviceConnection {
      */
     async open() {
         if (!this.#s7Conn.isConnected) {
-            this.#s7Conn.connect()
+            this.#s7Conn.once("connect", async () => {})
         }
     }
 

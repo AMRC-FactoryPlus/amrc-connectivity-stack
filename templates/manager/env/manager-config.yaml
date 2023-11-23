@@ -9,7 +9,6 @@ data:
   APP_ENV: {{.Values.manager.env | quote | required "values.manager.env is required!"}}
   APP_DEBUG: {{.Values.manager.debug | quote | required "values.manager.debug is required!"}}
   VITE_BRANDING_NAME: {{.Values.manager.name | quote | required "values.manager.name is required!"}}
-  MANAGEMENT_APP_FROM_EDGE: "{{ .Values.acs.secure | ternary "https://" "http://" }}manager.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"
   APP_URL: "{{ .Values.acs.secure | ternary "https://" "http://" }}manager.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"
   ASSET_URL: "{{ .Values.acs.secure | ternary "https://" "http://" }}manager.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"
   KRB_DOMAIN: {{.Values.identity.realm | quote | required "values.identity.realm is required!"}}

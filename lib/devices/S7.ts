@@ -54,8 +54,7 @@ export class S7Connection extends DeviceConnection {
 
         // Pass on errors to parent
         this.#s7Conn.on('error', (e: Error) => {
-            this.emit('error');
-            log("S7 Error: " + e);
+            log("⚠️ S7 Error: " + e);
         })
     }
 

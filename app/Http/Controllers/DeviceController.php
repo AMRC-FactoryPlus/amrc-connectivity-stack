@@ -107,22 +107,7 @@ class DeviceController extends Controller
                 'value' => null,
                 'method' => 'get',
                 'url' => '/api/groups/' . $group->id . '/nodes/' . $node->id . '/connections/',
-            ],
-            'deviceFiles' => [
-                'value' => null,
-                'method' => 'get',
-                'url' => '/api/devices/' . $device->id . '/files',
-            ],
-            'selectedFileDetails' => [
-                'value' => null,
-                'method' => 'get',
-                'url' => '/api/devices/' . $device->id . '/files/{file}',
-            ],
-            'availableFileTypes' => [
-                'value' => null,
-                'method' => 'get',
-                'url' => '/api/devices/' . $device->id . '/available-file-types',
-            ],
+            ]
         ];
 
         // Return the view with the initial data

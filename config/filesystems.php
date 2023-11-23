@@ -67,6 +67,7 @@ return [
             'secret' => env('MINIO_SECRET'),
             'region' => 'us-east-1',
             'bucket' => 'schemas',
+            'throw' => true,
         ],
 
         'device-configurations' => [
@@ -77,6 +78,7 @@ return [
             'secret' => env('MINIO_SECRET'),
             'region' => 'us-east-1',
             'bucket' => 'device-configurations',
+            'throw' => true,
         ],
 
         'device-connections' => [
@@ -87,18 +89,8 @@ return [
             'secret' => env('MINIO_SECRET'),
             'region' => 'us-east-1',
             'bucket' => 'device-connections',
+            'throw' => true,
         ],
-
-        'edge-agent-configs' => [
-            'driver' => 's3',
-            'endpoint' => env('MINIO_ENDPOINT', 'http://127.0.0.1:9000'),
-            'use_path_style_endpoint' => true,
-            'key' => env('MINIO_KEY'),
-            'secret' => env('MINIO_SECRET'),
-            'region' => 'us-east-1',
-            'bucket' => 'edge-agent-configs',
-        ],
-
     ],
 
     /*

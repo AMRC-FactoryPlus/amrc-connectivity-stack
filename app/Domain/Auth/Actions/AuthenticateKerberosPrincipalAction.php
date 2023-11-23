@@ -47,7 +47,7 @@ class AuthenticateKerberosPrincipalAction
             $clientContext = (new GSSAPIContext);
             $token = null;
             $clientContext->acquireCredentials($ccache);
-            $clientContext->initSecContext(config('manager.manager_service_principal') . '@' . config('manager.domain'), null, 0, null, $token);
+            $clientContext->initSecContext(config('manager.manager_service_principal') . '@' . config('manager.realm'), null, 0, null, $token);
 
             //--------|
             // Server |

@@ -25,14 +25,7 @@ class GroupController extends Controller
     {
         $validated = $request->validated();
 
-        // Get the cluster
-        $cluster = Cluster::where('id', $validated['cluster_id'])
-                          ->first();
-        if (! $cluster) {
-            throw new ActionFailException('The cluster does not exist.', 404);
-        }
-
-        return process_action((new CreateGroupAction)->execute($validated['name'], $cluster));
+        return process_action((new CreateGroupAction)->execute($validated['name']));
     }
 
     public function destroy()

@@ -23,6 +23,8 @@ Homestead.json
 Homestead.yaml
 npm-debug.log
 yarn-error.log
+.phpstorm.meta.php
+_ide_helper.php
 .env
 .env.testing
 /resources/assets/csv/.~lock.airports.csv#
@@ -43,6 +45,7 @@ yarn-error.log
 /.idea/
 /certs/
 k3s.yaml
+k3s*
 krb5.conf
 /public/build/
 client-keytab

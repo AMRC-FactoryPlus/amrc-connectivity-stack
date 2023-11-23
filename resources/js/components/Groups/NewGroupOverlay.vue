@@ -4,7 +4,7 @@
   -->
 
 <template>
-  <overlay v-if="clusters" :show="show" @close="$emit('close')" title="New Group">
+  <overlay :show="show" @close="$emit('close')" title="New Group">
     <template #content>
       <wizard :data-steps="steps" data-first-step="name" @complete="completed"></wizard>
     </template>
@@ -22,32 +22,9 @@ export default {
   },
   props: {
     show: {required: true, type: Boolean},
-
-    /**
-     * The list of available clusters where this group can exist
-     */
-    clusters: {
-      required: true,
-    },
   },
 
   watch: {
-    clusters: {
-      handler(val) {
-        this.steps.name.controls.cluster.options = val.map((e) => {
-          return {
-            title: e.name,
-            value: e.id,
-          };
-        })
-      }, deep: true
-    },
-
-    'steps.name.controls.cluster.value': function (newVal, oldVal) {
-      this.steps.name.controls.name.placeholder = 'e.g. F2050-Mazak-2';
-      this.steps.name.controls.name.prefix = this.clusters.find(e => e.id === newVal).name + '-';
-
-    },
   },
 
   methods: {
@@ -70,11 +47,6 @@ export default {
               dataType: 'static',
               data: null
             },
-            cluster_id: {
-              dataType: 'collected',
-              dataSource: ['name', 'controls', 'cluster', 'value'],
-              data: null
-            }
           }
         },
         name: {
@@ -82,17 +54,6 @@ export default {
           },
           tagline: 'Let\'s create a new group. What should it be called?',
           controls: {
-            cluster: {
-              name: 'Cluster',
-              description: 'Choose the cluster where this Group is located.',
-              type: 'dropdown',
-              options: [],
-              validations: {
-                required: helpers.withMessage('Please enter a cluster', required),
-              },
-              initialValue: '',
-              value: ''
-            },
             name: {
               name: 'Group Name',
               description: 'Group names must comply with the naming convention outlined in the Factory+ specification.',
@@ -105,7 +66,7 @@ export default {
                 required: helpers.withMessage('Please enter a Group name', required),
                 minLength: minLength(5),
                 valid: helpers.withMessage('This Group name does not conform to the naming convention',
-                    helpers.regex(/^\w+-\w+(:?-\d+)?$/i)),
+                    helpers.regex(/^\w+-\w+-\w+(:?-\d+)?$/i)),
               },
               initialValue: '',
               value: ''

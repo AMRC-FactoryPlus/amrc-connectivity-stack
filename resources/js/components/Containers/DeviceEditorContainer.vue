@@ -5,8 +5,7 @@
 
 <template>
   <div class="flex flex-col flex-grow overflow-y-auto">
-    <device-editor :device="device" :device-connections="deviceConnections" :device-schemas="deviceSchemas" :device-schema-versions="deviceSchemaVersions"
-                   :device-files="deviceFiles" :selected-file-details="selectedFileDetails" :available-file-types="availableFileTypes"></device-editor>
+    <device-editor :device="device" :device-connections="deviceConnections" :device-schemas="deviceSchemas" :device-schema-versions="deviceSchemaVersions"></device-editor>
   </div>
 </template>
 
@@ -61,30 +60,6 @@ export default {
       deviceSchemaVersionsLoading: null,
       deviceSchemaVersionsLoaded: null,
       deviceSchemaVersionsQueryBank: null,
-
-      // deviceFiles
-      deviceFiles: null,
-      deviceFilesLoading: false,
-      deviceFilesLoaded: false,
-      deviceFilesQueryBank: {},
-      deviceFilesRouteVar: null,
-
-      // selectedFileDetails
-      selectedFileDetails: null,
-      selectedFileDetailsLoading: false,
-      selectedFileDetailsLoaded: false,
-      selectedFileDetailsQueryBank: {},
-      selectedFileDetailsRouteVar: null,
-      
-      // availableFileTypes
-      availableFileTypes: null,
-      availableFileTypesLoading: false,
-      availableFileTypesLoaded: false,
-      availableFileTypesQueryBank: {},
-      availableFileTypesRouteVar: null,
-      
-      
-
     };
   },
 };

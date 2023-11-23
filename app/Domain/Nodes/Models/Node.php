@@ -18,7 +18,6 @@ use Laravel\Scout\Searchable;
 class Node extends Model
 {
     use Searchable;
-    use UUIDs;
 
     protected $table = 'nodes';
     protected $hidden = ['username', 'password_hash'];

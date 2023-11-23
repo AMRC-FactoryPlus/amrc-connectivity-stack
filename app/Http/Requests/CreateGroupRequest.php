@@ -29,7 +29,6 @@ class CreateGroupRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'unique:groups,name'],
-            'cluster_id' => ['required', 'integer', 'exists:clusters,id'],
         ];
     }
 }

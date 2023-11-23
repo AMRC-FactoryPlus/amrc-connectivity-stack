@@ -8,11 +8,10 @@ use App\Http\Controllers\APITestController;
 use App\Http\Controllers\ClusterController;
 use App\Http\Controllers\DeviceConnectionController;
 use App\Http\Controllers\DeviceController;
-use App\Http\Controllers\DeviceFileController;
 use App\Http\Controllers\DeviceSchemaController;
 use App\Http\Controllers\DeviceSchemaVersionController;
-use App\Http\Controllers\EdgeAgentConfigurationController;
 use App\Http\Controllers\EdgeAgentController;
+use App\Http\Controllers\EdgeClusterController;
 use App\Http\Controllers\GroupController;
 use App\Http\Controllers\NodeController;
 use App\Http\Controllers\NodeUserController;
@@ -80,25 +79,15 @@ Route::middleware('auth:api')->get('/groups/{group}/nodes/{node}/devices/{device
 Route::middleware('auth:api')->patch('/devices/{device}', [DeviceController::class, 'update']);
 Route::middleware('auth:api')->delete('/devices/{device}', [DeviceController::class, 'destroy']);
 Route::middleware('auth:api')->patch('/devices/{device}/origin-map', [OriginMapController::class, 'update']);
-Route::middleware('auth:api')->post('/devices/{device}/origin-map/activate', [OriginMapController::class, 'activate']);
-Route::middleware('auth:api')->get('/devices/{device}/files', [DeviceFileController::class, 'index']);
-Route::middleware('auth:api')->get('/devices/{device}/files/{file}', [DeviceFileController::class, 'show']);
-Route::middleware('auth:api')->get('/devices/{device}/files/{file}/download', [DeviceFileController::class, 'download']);
-Route::middleware('auth:api')->post('/devices/{device}/files', [DeviceFileController::class, 'store']);
-Route::middleware('auth:api')->get('/devices/{device}/available-file-types', [DeviceFileController::class, 'available']);
+Route::middleware('auth:api')->post('/devices/{device}/origin-map/activate', [OriginMapController::class, 'activate']);;
 
-// ------ Schemas ------ //
+// ------ Clusters ------ //
 Route::middleware('auth:api')->get('/clusters', [ClusterController::class, 'index']);
+
+// ------ Edge Clusters ------ //
+Route::middleware('auth:api')->get('/edge-clusters', [EdgeClusterController::class, 'index']);
 
 // ------ Schemas ------ //
 Route::middleware('auth:api')->get('/device-schemas', [DeviceSchemaController::class, 'index']);
 //Route::middleware('auth:api')->post('/device-schemas', [DeviceSchemaController::class, 'create']);
 Route::middleware('auth:api')->get('/device-schemas/{schema}/versions', [DeviceSchemaVersionController::class, 'index']);
-
-// ------ Edge Agent Config ------ //
-Route::post('edge-agent-config', [EdgeAgentConfigurationController::class, 'show']);
-
-// ------ Edge Agents ------ //
-Route::middleware('auth:api')->get('/edge-agents', [EdgeAgentController::class, 'index']);
-Route::middleware('auth:api')->post('/edge-agents', [EdgeAgentController::class, 'updateAll']);
-Route::middleware('auth:api')->post('/edge-agents/{namespace}/{name}', [EdgeAgentController::class, 'update']);

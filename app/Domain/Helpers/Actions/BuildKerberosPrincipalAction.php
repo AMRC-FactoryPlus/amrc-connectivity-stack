@@ -18,7 +18,7 @@ class BuildKerberosPrincipalAction
 
     public function execute($group, $hostname, $nodeId)
     {
-        return action_success((new BuildKerberosCRDNameAction())->execute($group, $hostname, $nodeId)['data'] . '@' . config('manager.domain'));
+        return action_success((new BuildKerberosCRDNameAction())->execute($group, $hostname, $nodeId)['data'] . '@' . config('manager.realm'));
     }
 
 }

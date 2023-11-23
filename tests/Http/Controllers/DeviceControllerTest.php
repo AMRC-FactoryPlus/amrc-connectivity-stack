@@ -53,7 +53,7 @@ class DeviceControllerTest extends TestCase
         // Ensure that we don't actually upload any files to the bucket
         Storage::fake('device-configurations');
         Storage::fake('device-connections');
-        Storage::fake('edge-agent-configs');
+
 
         $this->signInAdmin();
 

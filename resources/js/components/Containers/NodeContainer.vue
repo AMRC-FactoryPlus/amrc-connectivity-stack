@@ -40,7 +40,7 @@
         </div>
       </template>
     </ColumnList>
-    <new-group-overlay :show="newGroupDialogVisible" :clusters="clusters"
+    <new-group-overlay :show="newGroupDialogVisible"
                        @close="() => {newGroupDialogVisible = false;}"
                        @completed="newGroupCreated"></new-group-overlay>
 
@@ -84,7 +84,7 @@
       </template>
     </ColumnList>
     <new-node-overlay v-if="selectedGroup" :show="newNodeDialogVisible" @close="newNodeDialogVisible=false"
-                      :roles="roles"
+                      :edge-clusters="edgeClusters"
                       :group="selectedGroup" @complete="newNodeCreated"></new-node-overlay>
     <node-user-overlay v-if="showNodeUserDialogFor" :show="!!showNodeUserDialogFor" :node="showNodeUserDialogFor" :group="selectedGroup"
                        @close="() => {showNodeUserDialogFor = null;}"></node-user-overlay>
@@ -344,6 +344,14 @@ export default {
       clustersQueryBank: {},
       clustersRouteVar: null,
       clustersForceLoad: true,
+
+      // edgeClusters
+      edgeClusters: null,
+      edgeClustersLoading: false,
+      edgeClustersLoaded: false,
+      edgeClustersQueryBank: {},
+      edgeClustersRouteVar: null,
+
     }
   },
 }

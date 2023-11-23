@@ -36,7 +36,6 @@ Route::group(
     ],
     static function () {
         Route::get('/', [DashboardController::class, 'nodes']);
-        Route::get('edge-agents', [EdgeAgentController::class, 'index']);
         Route::get('schema-editor', [SchemaEditorController::class, 'index']);
         Route::get('preferences', [DashboardController::class, 'preferences']);
         Route::get('roles', [DashboardController::class, 'roles']);

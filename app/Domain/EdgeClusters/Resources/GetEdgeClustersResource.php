@@ -4,11 +4,11 @@
  *  Copyright 2023 AMRC
  */
 
-namespace App\Domain\FileService\Resources;
+namespace App\Domain\EdgeClusters\Resources;
 
 use Illuminate\Http\Resources\Json\JsonResource;
 
-class DownloadFileForDeviceResource extends JsonResource
+class GetEdgeClustersResource extends JsonResource
 {
     public function toArray($request)
     {

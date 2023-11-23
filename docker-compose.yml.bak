@@ -94,7 +94,6 @@ services:
       sleep 5;
       /usr/bin/mc alias set factoryplus-manager http://minio:9000 sail password
       && mc mb factoryplus-manager/schemas
-      && mc mb factoryplus-manager/edge-agent-configs
       && mc mb factoryplus-manager/device-connections
       && mc mb factoryplus-manager/device-configurations
       exit 0;

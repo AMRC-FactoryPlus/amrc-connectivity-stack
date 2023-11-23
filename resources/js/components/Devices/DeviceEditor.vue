@@ -54,13 +54,6 @@
                 <i class="fa-sharp fa-solid fa-table-tree mr-2 fa-fw text-base"></i>
                 <span>Schema</span>
               </button>
-              <button @mouseup="selectTab('Files')"
-                      v-if="configurationValid"
-                      :class="[this.selectedTab === 'Files' ? 'text-brand border-brand bg-brand bg-opacity-5' : 'text-gray-500 hover:text-brand hover:border-brand', deviceInformationValid ? '' : '']"
-                      class="border-transparent group inline-flex items-center py-4 px-6 border-b-2 font-medium text-sm">
-                <i class="fa-sharp fa-solid fa-file-circle-plus mr-2 fa-fw text-base"></i>
-                <span>Files</span>
-              </button>
               <div class="flex-1"></div>
               <button @mouseup="maybeDeleteDevice"
                       class="text-gray-300 hover:text-red-300 border-transparent group inline-flex items-center py-4 px-6 border-b-2 font-medium text-sm">
@@ -89,12 +82,6 @@
                                     :device-schemas="deviceSchemas"
                                     :device-schema-versions="deviceSchemaVersions"
       ></device-editor-origin-map-tab>
-      <device-editor-files-tab v-if="selectedTab === 'Files'"
-                               :device="device"
-                               :device-files="deviceFiles"
-                               :selected-file-details="selectedFileDetails"
-                               :available-file-types="availableFileTypes"
-      ></device-editor-files-tab>
     </keep-alive>
   </div>
 </template>
@@ -108,9 +95,6 @@ export default {
     deviceConnections: { required: true },
     deviceSchemas: { required: true },
     deviceSchemaVersions: { required: true },
-    deviceFiles: { required: true },
-    selectedFileDetails: { required: true },
-    availableFileTypes: { required: true },
   },
 
   computed: {
@@ -173,7 +157,6 @@ export default {
     'device-editor-information-tab': () => import(/* webpackPrefetch: true */ './DeviceEditorInformationTab.vue'),
     'device-editor-connections-tab': () => import(/* webpackPrefetch: true */ './DeviceEditorConnectionsTab.vue'),
     'device-editor-origin-map-tab': () => import(/* webpackPrefetch: true */ './DeviceEditorOriginMapTab.vue'),
-    'device-editor-files-tab': () => import(/* webpackPrefetch: true */ './DeviceEditorFilesTab.vue'),
   },
 
   data () {

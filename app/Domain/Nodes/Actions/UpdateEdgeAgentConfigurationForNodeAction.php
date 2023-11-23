@@ -6,14 +6,15 @@
 
 namespace App\Domain\Nodes\Actions;
 
-use App\Domain\Devices\Models\Device;
+use AMRCFactoryPlus\ServiceClient;
+use AMRCFactoryPlus\Exceptions\ServiceClientException;
+use AMRCFactoryPlus\UUIDs\App;
 use App\Domain\Nodes\Models\Node;
-use App\Domain\Support\Actions\MakeConsumptionFrameworkRequest;
-use App\EdgeAgentConfiguration;
 use App\Exceptions\ActionFailException;
 use App\Exceptions\ActionForbiddenException;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use JsonException;
 use Opis\JsonSchema\Errors\ErrorFormatter;
 use Opis\JsonSchema\Errors\ValidationError;
 use Opis\JsonSchema\Validator;
@@ -25,8 +26,13 @@ class UpdateEdgeAgentConfigurationForNodeAction
     /**
      * This action creates a EdgeAgentConfiguration for the supplied node, uploads it to storage and sets the `configuration_file` on
      * the node. The device must have an active connection and an active configuration otherwise this doesn't run.
-     **/
-    public function execute(Node $node)
+     *
+     * @throws ServiceClientException
+     * @throws ActionFailException
+     * @throws JsonException
+     * @throws ActionForbiddenException
+     */
+    public function execute(Node $node): array
     {
         // =========================
         // Validate User Permissions
@@ -51,11 +57,12 @@ class UpdateEdgeAgentConfigurationForNodeAction
         $config = [
             '$schema' => 'https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Edge_Agent_Config.json',
             'sparkplug' => [
-                'serverUrl' => config('manager.mqtt_server_from_edge'),
-                'groupId' => $node->group->name,
-                'edgeNode' => $node->node_id,
-                'username' => $node->principal,
-                'password' => '__mqtt-password__', // This is replaced with the keytab at the edge
+                'DEPRECATED' => 'This is no longer required in V3. It has been kept to prevent too many moving parts from being changed in one go.',
+                'serverUrl' => 'DEPRECATED',
+                'groupId' => 'DEPRECATED',
+                'edgeNode' => 'DEPRECATED',
+                'username' => 'DEPRECATED',
+                'password' => 'DEPRECATED',
                 'asyncPubMode' => true,
             ],
             'deviceConnections' => [],
@@ -121,7 +128,7 @@ class UpdateEdgeAgentConfigurationForNodeAction
 
                     if (is_array($v) && array_key_exists('Sparkplug_Type', $v)) {
                         // If we have an array that contains a metric then extract it and only include properties that are not null to keep the size down
-                        $tags[] = (object) array_filter(
+                        $tags[] = array_filter(
                             [
                                 'Name' => implode('/', $path),
                                 'type' => $v['Sparkplug_Type'],
@@ -178,6 +185,7 @@ class UpdateEdgeAgentConfigurationForNodeAction
         // Get all devices for this node that have an active origin map and an active device config and build the edge agent config
         $config = json_decode(json_encode($config, JSON_THROW_ON_ERROR), false, 512, JSON_THROW_ON_ERROR);
 
+
         if (count($config->deviceConnections) < 1) {
             return action_success();
         }
@@ -222,30 +230,15 @@ class UpdateEdgeAgentConfigurationForNodeAction
             throw new ActionFailException('Failed to validate Edge Agent configuration.');
         }
 
-        // Generate a unique filename for the config
-        $filename = uniqid('', true) . '.json';
-        \Storage::disk('edge-agent-configs')
-                ->put($filename, json_encode($config, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
 
-        EdgeAgentConfiguration::create(
-            [
-                'node_id' => $node->id,
-                'file' => $filename,
-            ]
+        $fplus = resolve(ServiceClient::class);
+        $configDB = $fplus->getConfigDB();
+
+        $configDB->putConfig(
+            App::EdgeAgentConfig,
+            $node->uuid,
+            $config
         );
-
-        if (! in_array(config('app.env'), ['local', 'testing'])) {
-            // Ask the edge agent to reload the config
-            (new MakeConsumptionFrameworkRequest)->execute(
-                type: 'post',
-                service: 'cmdesc',
-                url: config('manager.cmdesc_service_url') . '/v1/address/' . $node->group->name . '/' . $node->node_id,
-                payload: [
-                    'name' => 'Node Control/Reload Edge Agent Config',
-                    'value' => true,
-                ]
-            );
-        }
 
         return action_success();
     }

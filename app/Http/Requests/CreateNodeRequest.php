@@ -46,9 +46,9 @@ class CreateNodeRequest extends FormRequest
     public function rules()
     {
         return [
-            'enabled' => ['required', 'bool'],
-            'node_id' => ['required', 'string', 'min:5', 'regex:/^\w+$/i'],
-            'node_hostname' => ['string', 'unique:nodes,k8s_hostname'],
+            'node_name' => ['required', 'string', 'min:5', 'regex:/^\w+$/i'],
+            'destination_cluster' => ['required', 'string'],
+            'destination_node' => ['required', 'string'],
         ];
     }
 }

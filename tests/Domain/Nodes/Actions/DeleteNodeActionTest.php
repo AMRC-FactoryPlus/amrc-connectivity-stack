@@ -10,20 +10,11 @@ use App\Domain\Clusters\Models\Cluster;
 use App\Domain\Groups\Actions\CreateGroupAction;
 use App\Domain\Nodes\Actions\CreateNodeAction;
 use App\Domain\Nodes\Actions\DeleteNodeAction;
-use App\Domain\Nodes\CRDs\KerberosKey;
 use App\Domain\Nodes\Models\Node;
-use RenokiCo\LaravelK8s\KubernetesCluster;
 use Tests\TestCase;
 
 class DeleteNodeActionTest extends TestCase
 {
-
-    public function test_playground()
-    {
-        $cluster = KubernetesCluster::fromKubeConfigYamlFile(env('LOCAL_KUBECONFIG'), 'default');
-
-        ray($cluster->deployment()->whereNamespace('factory-plus')->getByName('acs-traefik'));
-    }
 
     public function test()
     {

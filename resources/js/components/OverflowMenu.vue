@@ -16,11 +16,14 @@
     </div>
     <div @mouseup="dropdownVisible = false" v-if="dropdownVisible"
          class="fixed inset-0 z-10 bg-primary-jet bg-opacity-80"></div>
-
     <div v-if="dropdownVisible" class="z-50">
       <OverflowMenuContent :is-parent="true" @close="toggleDropdown" @selected="propagateSelected" class="top-6" :options="options" :additionalClasses="additionalClasses"
                            :row="row"></OverflowMenuContent>
     </div>
+  </div>
+  <div v-else class="flex items-center justify-center gap-2 text-sm animate-pulse text-gray-400">
+    <i class="fa-solid fa-circle-notch animate-spin"></i>
+    <div>Loading Options...</div>
   </div>
 </template>
 

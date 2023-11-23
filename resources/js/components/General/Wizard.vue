@@ -125,7 +125,9 @@ export default {
     },
 
     handleButtonClick (event) {
-      this[event]();
+      if (!this.v$.$invalid) {
+        this[event]();
+      }
     },
 
     nextStep () {

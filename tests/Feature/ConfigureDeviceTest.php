@@ -36,7 +36,7 @@ class ConfigureDeviceTest extends TestCase
         // Ensure that we don't actually upload any files to the bucket
         Storage::fake('device-configurations');
         Storage::fake('device-connections');
-        Storage::fake('edge-agent-configs');
+
 
         $this->signInAdmin();
 
@@ -199,7 +199,7 @@ class ConfigureDeviceTest extends TestCase
         // Ensure that we don't actually upload any files to the bucket
         Storage::fake('device-configurations');
         Storage::fake('device-connections');
-        Storage::fake('edge-agent-configs');
+
 
         $this->signInAdmin();
 
@@ -317,6 +317,7 @@ class ConfigureDeviceTest extends TestCase
                    ->load('node')->node->activeEdgeNodeConfiguration
         );
 
+        // ! Needs rewriting to support configDB storage
         $edgeAgentConfig = json_decode(
             \Storage::disk('edge-agent-configs')
                     ->get(
@@ -381,6 +382,7 @@ class ConfigureDeviceTest extends TestCase
         );
         assertNotNull($device->device_connection_id);
 
+        // ! Needs rewriting to support configDB storage
         $edgeAgentConfig = json_decode(
             \Storage::disk('edge-agent-configs')
                     ->get(

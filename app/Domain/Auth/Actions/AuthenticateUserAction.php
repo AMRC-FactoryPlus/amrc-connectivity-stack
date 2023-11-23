@@ -18,13 +18,13 @@ class AuthenticateUserAction
         (new AuthenticateKerberosPrincipalAction)->execute($username, $password);
 
         // Get the local user with this username (null if they don't exist)
-        $user = User::whereUsername($username . '@' . config('manager.domain'))->first();
+        $user = User::whereUsername($username . '@' . config('manager.realm'))->first();
 
         // If the user doesn't exist then create them
         if (! $user) {
             $user = User::create(
                 [
-                    'username' => $username . '@' . config('manager.domain'),
+                    'username' => $username . '@' . config('manager.realm'),
                 ]
             );
         }

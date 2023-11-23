@@ -43,18 +43,19 @@ export class S7Connection extends DeviceConnection {
 
         // Pass on disconnect event to parent
         this.#s7Conn.on('disconnect', () => {
+            log("☠️ Southbound S7 disconnected.");
             this.emit('close');
         });
 
         // Notify when connection is ready
         this.#s7Conn.on('connect', () => {
-            log(`S7 connected to ${this.#s7Conn._connOptsTcp.host}:${this.#s7Conn._connOptsTcp.port}`)
+            log(`🔌 Southbound S7 connected to ${this.#s7Conn._connOptsTcp.host}:${this.#s7Conn._connOptsTcp.port}`)
             this.emit("open");
         });
 
         // Pass on errors to parent
         this.#s7Conn.on('error', (e: Error) => {
-            log("⚠️ S7 Error: " + e);
+            log("⚠️ Southbound S7 Error: " + e);
         })
     }
 

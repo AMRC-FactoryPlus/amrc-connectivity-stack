@@ -85,6 +85,7 @@ public class FPHttpClient {
             .build();
 
         async_client = CachingHttpAsyncClients.custom()
+            .setCacheConfig(cache_config)
             .setIOReactorConfig(ioReactorConfig)
             .build();
     }
@@ -134,12 +135,12 @@ public class FPHttpClient {
     /** Internal */
     public Single<String> tokenFor (URI service)
     {
-        return Single.fromCallable(() -> {
+        return Single.fromSupplier(() -> {
                 //FPThreadUtil.logId("getting gss context");
                 /* blocking */
                 return fplus.gssClient()
                     .createContextHB("HTTP@" + service.getHost())
-                    .orElseThrow(() -> new Exception("Can't get GSS context"));
+                    .orElseThrow();
             })
             .map(ctx -> new TokenRequest(service, ctx))
                 /* buildRequest is blocking */
@@ -156,13 +157,18 @@ public class FPHttpClient {
     private Single<JsonResponse> fetch (SimpleHttpRequest req)
     {
         //FPThreadUtil.logId("fetch called");
-        //final var context = HttpCacheContext.create();
+        final var context = HttpCacheContext.create();
         return Single.<SimpleHttpResponse>create(obs ->
-                async_client.execute(req, //context,
+                async_client.execute(req, context,
                     new FutureCallback<SimpleHttpResponse>() {
                         public void completed (SimpleHttpResponse res) {
                             //FPThreadUtil.logId("fetch success");
-                            //context.getCacheResponseStatus(),
+                            String uri = "???";
+                            try { uri = req.getUri().toString(); }
+                            catch (Exception e) { }
+                            log.info("Cache {} ({}) for {}",
+                                context.getCacheResponseStatus(),
+                                res.getCode(), uri);
                             obs.onSuccess(res);
                         }
 

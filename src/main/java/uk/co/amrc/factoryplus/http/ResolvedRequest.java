@@ -35,9 +35,9 @@ class ResolvedRequest
     {
         URI uri = base.resolve(source.path);
 
-        //log.info("Making request {} {}", source.method, uri);
+        log.debug("Making request {} {}", source.method, uri);
         var end = token.length() > 5 ? 5 : token.length();
-        //log.info("Using bearer auth {}...", token.substring(0, end));
+        log.debug("Using bearer auth {}...", token.substring(0, end));
 
         var req = new SimpleHttpRequest(source.method, uri);
         req.setHeader("Authorization", "Bearer " + token);

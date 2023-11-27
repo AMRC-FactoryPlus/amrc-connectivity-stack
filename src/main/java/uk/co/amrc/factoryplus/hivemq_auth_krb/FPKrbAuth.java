@@ -31,7 +31,10 @@ import com.hivemq.extension.sdk.api.auth.EnhancedAuthenticator;
 import com.hivemq.extension.sdk.api.auth.parameter.*;
 import com.hivemq.extension.sdk.api.packets.auth.*;
 import com.hivemq.extension.sdk.api.packets.connect.*;
+import com.hivemq.extension.sdk.api.packets.general.*;
 import com.hivemq.extension.sdk.api.services.Services;
+
+import uk.co.amrc.factoryplus.Attempt;
 
 public class FPKrbAuth implements EnhancedAuthenticator {
 
@@ -113,7 +116,8 @@ public class FPKrbAuth implements EnhancedAuthenticator {
         in_bb.get(in_buf);
 
         final Async<EnhancedAuthOutput> asyncOutput = output.async(
-            Duration.ofSeconds(10), TimeoutFallback.FAILURE);
+            Duration.ofSeconds(10), TimeoutFallback.FAILURE,
+            DisconnectedReasonCode.SERVER_BUSY);
 
         verify_gssapi(in_buf)
             .doAfterTerminate(() -> asyncOutput.resume())
@@ -145,7 +149,8 @@ public class FPKrbAuth implements EnhancedAuthenticator {
         passwd_c.get(passwd_buf);
 
         final Async<EnhancedAuthOutput> asyncOutput = output.async(
-            Duration.ofSeconds(10), TimeoutFallback.FAILURE);
+            Duration.ofSeconds(10), TimeoutFallback.FAILURE,
+            DisconnectedReasonCode.SERVER_BUSY);
 
         Services.extensionExecutorService().submit(() -> {
             /* We need to get and verify a service ticket, to protect
@@ -153,69 +158,69 @@ public class FPKrbAuth implements EnhancedAuthenticator {
              * this is just to do the whole GSSAPI dance on the client's
              * behalf. */
             var buf = get_client_gss_proxy(user, passwd_buf);
-            if (buf.isEmpty()) {
+            if (buf.isError()) {
                 log.error("Password authentication failed for {}", 
-                    user.toString());
+                    user.toString(), buf.getError());
                 output.failAuthentication();
                 asyncOutput.resume();
                 return;
             }
             verify_gssapi(buf.get())
-                .doAfterTerminate(() -> asyncOutput.resume())
-                .subscribe(
-                    rv -> {
-                        rv.applyACL(output);
-                        output.authenticateSuccessfully();
-                    },
-                    e -> output.failAuthentication());
+                .map(rv -> Optional.of(rv))
+                .onErrorReturnItem(Optional.<AuthResult>empty())
+                .subscribe(opt -> {
+                    switch (asyncOutput.getStatus()) {
+                        case CANCELED:
+                            log.warn("Timeout authenticating {}",
+                                user.toString());
+                            return;
+                        case DONE:
+                            log.error("Trying to return duplicate result for {}",
+                                user.toString());
+                            return;
+                    }
+                    opt.ifPresentOrElse(
+                        rv -> {
+                            rv.applyACL(output);
+                            output.authenticateSuccessfully();
+                        },
+                        () -> output.failAuthentication());
+                    asyncOutput.resume();
+                });
         });
     }
 
-    private Optional<byte[]> get_client_gss_proxy (
+    private Attempt<byte[]> get_client_gss_proxy (
         String user, char[] passwd_buf)
     {
         return provider.createProxyContext(user, passwd_buf)
-            .flatMap(ctx -> {
-                try {
-                    return Optional.of(ctx.initSecContext(new byte[0], 0, 0));
-                }
-                catch (GSSException e) {
-                    log.error("GSS error for client proxy", e.toString());
-                    return Optional.<byte[]>empty();
-                }
-            });
+            .map(ctx -> ctx.initSecContext(new byte[0], 0, 0));
     }
 
     private Single<AuthResult> verify_gssapi (byte[] in_buf)
     {
-        GSSContext ctx = provider.createServerContext();
+        return provider.createServerContext()
+            .toSingle()
+            .flatMap(ctx -> {
+                /* It would be helpful to log the client and server
+                 * identities if this call fails, so we can see who was
+                 * trying to connect and what endpoint they were trying to
+                 * connect to. But get{Src,Targ}Name can't be called until
+                 * the context is established, so we can't. Grrr. */
+                var out_buf = ctx.acceptSecContext(in_buf, 0, in_buf.length);
 
-        try {
-            /* It would be helpful to log the client and server
-             * identities if this call fails, so we can see who was
-             * trying to connect and what endpoint they were trying to
-             * connect to. But get{Src,Targ}Name can't be called until
-             * the context is established, so we can't. Grrr. */
-            byte[] out_buf = ctx.acceptSecContext(in_buf, 0, in_buf.length);
+                /* We could handle this case, but I don't think with the
+                 * Kerberos mech there is ever any need. */
+                if (!ctx.isEstablished())
+                    return Single.<AuthResult>error(
+                        new Exception("GSS login took more than one step!"));
 
-            if (ctx.isEstablished()) {
                 String client_name = ctx.getSrcName().toString();
                 log.info("Authenticated client {}", client_name);
                 return provider.getACLforPrincipal(client_name)
                     .map(acl -> new AuthResult(out_buf, acl))
                     .doOnSuccess(rv -> log.info("MQTT ACL [{}]: {}", 
                         client_name, rv.showACL()));
-            }
-            else {
-                /* We could handle this case, but I don't think with the
-                 * Kerberos mech there is ever any need. */
-                return Single.<AuthResult>error(
-                    new Exception("GSS login took more than one step!"));
-            }
-        }
-        catch (GSSException e) {
-            return Single.<AuthResult>error(
-                new Exception("GSS login failed", e));
-        }
+            });
     }
 }

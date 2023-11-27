@@ -181,13 +181,9 @@ public class FPServiceClient {
     synchronized public FPGssServer gssServer ()
     {
         if (_gss_server == null) {
-            String princ = getConf("server_principal");
             String keytab = getConf("server_keytab");
 
-            _gss_server = gss().server(princ, keytab)
-                .flatMap(s -> s.login())
-                .orElseThrow(() -> new ServiceConfigurationError(
-                    "Cannot get server GSS creds"));
+            _gss_server = gss().server("*", keytab);
         }
 
         return _gss_server;
@@ -211,15 +207,16 @@ public class FPServiceClient {
         if (_gss_client == null) {
             var user = getOptionalConf("service_username");
             var passwd = getOptionalConf("service_password");
+            var princ = getOptionalConf("client_principal");
+            var keytab = getOptionalConf("client_keytab");
 
-            var cli = user.isEmpty() || passwd.isEmpty()
-                ? gss().clientWithCcache()
-                : gss().clientWithPassword(user.get(),
-                    passwd.get().toCharArray());
-            _gss_client = cli
-                .flatMap(c -> c.login())
-                .orElseThrow(() -> new ServiceConfigurationError(
-                    "Cannot get client GSS creds"));
+            _gss_client =
+                princ.flatMap(p ->
+                    keytab.map(k -> gss().clientWithKeytab(p, k)))
+                .or(() -> user.flatMap(u ->
+                    passwd.map(p -> p.toCharArray())
+                        .map(p -> gss().clientWithPassword(u, p))))
+                .orElseGet(() -> gss().clientWithCcache());
         }
         return _gss_client;
     }

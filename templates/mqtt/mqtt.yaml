@@ -30,34 +30,17 @@ spec:
                 key: mqtt.mqtt
               - path: client
                 key: sv1mqtt
-        - name: krb5-ccache
-          emptyDir:
         - name: mqtt-conf
           configMap:
             name: mqtt-config
       containers:
-        - name: k5start
-{{ include "amrc-connectivity-stack.image" .Values.shell | indent 10 }}
-          command: ["/bin/sh", "-c"]
-          args:
-            - |
-              chown 10000:10000 /ccache
-              k5start -Uf /keytabs/client -k /ccache/mqtt -K5 -o10000 -v
-          securityContext:
-            runAsUser: 0
-          volumeMounts:
-            - mountPath: /etc/krb5.conf
-              name: krb5-conf
-              subPath: krb5.conf
-            - mountPath: /keytabs
-              name: krb5-keytabs
-            - mountPath: /ccache
-              name: krb5-ccache
         - name: hivemq
 {{ include "amrc-connectivity-stack.image" .Values.mqtt | indent 10 }}
           env:
-            - name: KRB5CCNAME
-              value: "FILE:/ccache/mqtt"
+            - name: CLIENT_KEYTAB
+              value: /keytabs/client
+            - name: CLIENT_PRINCIPAL
+              value: sv1mqtt@{{ .Values.identity.realm }}
             - name: SERVER_KEYTAB
               value: /keytabs/server
             # This needs to name a principal available in the keytab, used for verifying passwords.
@@ -75,8 +58,6 @@ spec:
               subPath: krb5.conf
             - mountPath: /keytabs
               name: krb5-keytabs
-            - mountPath: /ccache
-              name: krb5-ccache
             - mountPath: /opt/hivemq/conf/config.xml
               name: mqtt-conf
               subPath: config.xml

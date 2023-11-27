@@ -3,7 +3,11 @@
 # Vim swap
 *.swp
 
+# Build
+hivemq-auth-krb-*.zip
+
 # Environment
+config.mk
 .env
 
 # Secrets

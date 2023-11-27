@@ -1,4 +1,3 @@
 [submodule "hivemq-krb"]
 	path = hivemq-krb
 	url = https://github.com/AMRC-FactoryPlus/hivemq-krb
-	branch = main

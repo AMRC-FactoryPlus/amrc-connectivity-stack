@@ -32,7 +32,7 @@ spec:
         - name: git
 {{ include "amrc-connectivity-stack.image" .Values.git | indent 10 }}
           command: [ "/usr/bin/k5start", "-Uf", "/keytabs/client" ]
-          args: [ "npm", "run", "git-server" ]
+          args: ["node", "bin/git-server.js"]
           env:
             - name: PORT
               value: "8080"

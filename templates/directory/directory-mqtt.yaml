@@ -64,7 +64,7 @@ spec:
         - name: mqtt
 {{ include "amrc-connectivity-stack.image" .Values.directory | indent 10 }}
           command: [ "/usr/bin/k5start", "-Uf", "/keytabs/client" ]
-          args: [ "npm", "run", "mqtt" ]
+          args: [ "node", "bin/directory-mqtt" ]
           env:
             - name: KRB5_CONFIG
               value: /config/krb5-conf/krb5.conf

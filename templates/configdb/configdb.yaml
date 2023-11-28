@@ -76,7 +76,7 @@ spec:
         - name: load-dumps
 {{ include "amrc-connectivity-stack.image" .Values.configdb | indent 10 }}
           command: [ "/usr/bin/k5start", "-Uf", "/keytabs/client" ]
-          args: [ "npm", "run", "load-dump", "/dumps" ]
+          args: [ "node", "bin/load-dump.js", "/dumps" ]
           env:
             - name: KRB5_CONFIG
               value: /config/krb5-conf/krb5.conf
@@ -99,6 +99,8 @@ spec:
       containers:
         - name: webapi
 {{ include "amrc-connectivity-stack.image" .Values.configdb | indent 10 }}
+          command: ["/usr/bin/k5start", "-Uf", "/keytabs/client"]
+          args: ["node", "bin/api.js"]
           env:
             - name: KRB5_CONFIG
               value: /config/krb5-conf/krb5.conf

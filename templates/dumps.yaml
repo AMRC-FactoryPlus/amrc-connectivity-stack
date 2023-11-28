@@ -753,6 +753,9 @@ data:
           },
           {{$application_edgeClusterStatus}}: {
             "name": "Edge cluster status"
+          },
+          {{$application_edgeClusterConfiguration}}: {
+            "name": "Edge cluster configuration"
           }
         },
         "dbd8a535-52ba-4f6e-b4f8-9b71aefe09d3": {
@@ -905,7 +908,8 @@ data:
           {{$application_edgeClusterTemplate}},
           {{$application_gitRepoConfiguration}},
           {{$application_edgeClusterStatus}},
-          {{$application_edgeDeployment}}
+          {{$application_edgeDeployment}},
+          {{$application_edgeClusterConfiguration}}
         ],
         {{$classDef_serviceAccount}}: [
           {{$serviceAccount_edo}}
@@ -1068,18 +1072,28 @@ data:
         },
         {
           "principal": {{$serviceAccount_manager}},
+          "permission": {{$permission_configStore_writeConfigForApp}},
+          "target": {{$application_generalObjectInformation}}
+        },
+        {
+          "principal": {{$serviceAccount_manager}},
           "permission": {{$permission_configStore_readConfigForApp}},
           "target": {{$application_edgeClusterStatus}}
         },
         {
           "principal": {{$serviceAccount_manager}},
           "permission": {{$permission_configStore_writeConfigForApp}},
-          "target": {{$application_generalObjectInformation}}
+          "target": {{$application_edgeDeployment}}
+        },
+        {
+          "principal": {{$serviceAccount_manager}},
+          "permission": {{$permission_configStore_readConfigForApp}},
+          "target": {{$application_edgeClusterConfiguration}}
         },
         {
           "principal": {{$serviceAccount_manager}},
           "permission": {{$permission_configStore_writeConfigForApp}},
-          "target": {{$application_edgeDeployment}}
+          "target": {{$application_edgeClusterConfiguration}}
         },
         {
           "principal": {{$serviceAccount_commandEscalation}},

@@ -7,15 +7,8 @@ metadata:
 data:
   APP_NAME: {{.Values.manager.name | quote | required "values.manager.name is required!"}}
   APP_ENV: {{.Values.manager.env | quote | required "values.manager.env is required!"}}
-  APP_NAMESPACE: {{ .Release.Namespace | quote }}
-  APP_ORGANISATION: {{.Values.acs.organisation | quote | required "values.acs.organisation is required!"}}
   APP_DEBUG: {{.Values.manager.debug | quote | required "values.manager.debug is required!"}}
   VITE_BRANDING_NAME: {{.Values.manager.name | quote | required "values.manager.name is required!"}}
-  MQTT_SERVER_FROM_EDGE: "{{ .Values.acs.secure | ternary "mqtts://" "mqtt://" }}mqtt.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}:{{ .Values.acs.secure | ternary "8883" "1883" }}"
-  SERVICE_SCHEME: "http"
-  SERVICE_DOMAIN: "{{ .Release.Namespace }}.svc.cluster.local"
-  MANAGEMENT_APP_FROM_EDGE: "{{ .Values.acs.secure | ternary "https://" "http://" }}manager.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"
-  MANAGER_SERVICE_PRINCIPAL: "HTTP/manager.{{ .Release.Namespace }}.svc.cluster.local"
   APP_URL: "{{ .Values.acs.secure | ternary "https://" "http://" }}manager.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"
   ASSET_URL: "{{ .Values.acs.secure | ternary "https://" "http://" }}manager.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"
   KRB_DOMAIN: {{.Values.identity.realm | quote | required "values.identity.realm is required!"}}
@@ -35,14 +28,14 @@ data:
   REDIS_PORT: "6379"
   FILESYSTEM_CLOUD: "minio"
   MINIO_ENDPOINT: "http://fplus-minio-core-hl.{{ .Release.Namespace }}.svc.cluster.local:9000"
-  MINIO_REGION: "us-east-1"
   SCOUT_DRIVER: "meilisearch"
   MEILISEARCH_HOST: "http://manager-meilisearch.{{ .Release.Namespace }}.svc.cluster.local:7700"
-  FILE_SERVICE_ENDPOINT: "http://files.{{ .Release.Namespace }}.svc.cluster.local"
-  CMDESC_SERVICE_ENDPOINT: "http://cmdesc.{{ .Release.Namespace }}.svc.cluster.local"
-  AUTH_SERVICE_URL: "http://auth.{{ .Release.Namespace }}.svc.cluster.local"
-  CONFIGDB_SERVICE_URL: "http://configdb.{{ .Release.Namespace }}.svc.cluster.local"
-  NEW_EDGE_AGENT_REGISTRY: {{.Values.manager.edge.registry | quote | required "values.manager.edge.registry is required!"}}
-  NEW_EDGE_AGENT_REPOSITORY: {{.Values.manager.edge.repository | quote | required "values.manager.edge.repository is required!"}}
-  NEW_EDGE_AGENT_VERSION: {{.Values.manager.edge.tag | quote | required "values.manager.edge.tag is required!"}}
+
+  APP_ORGANISATION: {{.Values.acs.organisation | quote | required "values.acs.organisation is required!"}}
+  APP_NAMESPACE: {{ .Release.Namespace | quote }}
+  BASE_URL: {{ .Values.acs.baseUrl | quote | required "values.acs.baseUrl is required!"}}
+  REALM: {{.Values.identity.realm | quote | required "values.identity.realm is required!"}}
+  SERVICE_SCHEME: "http"
+  MANAGER_SERVICE_PRINCIPAL: "HTTP/manager.{{ .Release.Namespace }}.svc.cluster.local"
+  MANAGER_CLIENT_PRINCIPAL: "sv1manager"
 {{- end -}}

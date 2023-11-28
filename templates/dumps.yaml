@@ -21,6 +21,7 @@
 {{$classDef_gitRepo := "d25f2afc-1ab8-4d27-b51b-d02314624e3e" | quote}}
 {{$classDef_edgeClusterAccount := "97756c9a-38e6-4238-b78c-3df6f227a6c9" | quote}}
 {{$classDef_edgeClusterTemplate := "f9be0334-0ff7-43d3-9d8a-188d3e4d472b" | quote}}
+{{$classDef_edgeCluster := "f24d354d-abc1-4e32-98e1-0667b3e40b61" | quote}}
 
 {{$application_objectRegistration := "cb40bed5-49ad-4443-a7f5-08c75009da8f" | quote}}
 {{$application_generalObjectInformation := "64a8bfa9-7772-45c4-9d1a-9e6290690957" | quote}}
@@ -1064,6 +1065,11 @@ data:
           "principal": {{$serviceAccount_configStore}},
           "permission": {{$role_edgeNode}},
           "target": {{$serviceAccount_configStore}}
+        },
+        {
+          "principal": {{$serviceAccount_manager}},
+          "permission": {{$permission_configStore_manageObjects}},
+          "target": {{$classDef_edgeCluster}}
         },
         {
           "principal": {{$serviceAccount_manager}},

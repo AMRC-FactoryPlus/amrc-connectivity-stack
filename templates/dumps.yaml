@@ -1071,7 +1071,7 @@ data:
           "permission": {{$permission_configStore_readConfigForApp}},
           "target": {{$application_edgeClusterStatus}}
         },
-    {
+        {
           "principal": {{$serviceAccount_manager}},
           "permission": {{$permission_configStore_writeConfigForApp}},
           "target": {{$application_generalObjectInformation}}

@@ -123,8 +123,7 @@ spec:
               value: auth
             - name: VERBOSE
               value: "1"
-            - name: CACHE_MAX_AGE
-              value: "10"
+{{ include "amrc-connectivity-stack.cache-max-age" (list . "auth") | indent 12 }}
             # These are currently only used for the editor. They need to be resolvable by the
             # user's browser, so in-cluster names will not work.
             - name: HTTP_API_URL

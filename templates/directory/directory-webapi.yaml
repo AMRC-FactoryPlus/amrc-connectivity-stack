@@ -89,8 +89,7 @@ spec:
               value: directory
             - name: VERBOSE
               value: "1"
-            - name: CACHE_MAX_AGE
-              value: "120"
+{{ include "amrc-connectivity-stack.cache-max-age" (list . "directory") | indent 12 }}
             # If this is set it names a principal which overrides all ACLs. This should be turned off in production.
             - name: ROOT_PRINCIPAL
               value: admin@{{ .Values.identity.realm | required "values.identity.realm is required!" }}

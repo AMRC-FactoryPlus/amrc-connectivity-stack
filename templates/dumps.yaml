@@ -747,7 +747,13 @@ data:
           },
           "8cd08563-7c3c-44fd-af4d-15c0fa6dadcb": {
             "name": "Edge flux roles"
-          }
+          },
+          {{$application_edgeDeployment}}: {
+            "name": "Edge deployment"
+          },
+          {{$application_edgeClusterStatus}}: {
+            "name": "Edge cluster status"
+          },
         },
         "dbd8a535-52ba-4f6e-b4f8-9b71aefe09d3": {
           "bdb13634-0b3d-4e38-a065-9d88c12ee78d": {
@@ -898,6 +904,8 @@ data:
         {{$classDef_application}}: [
           {{$application_edgeClusterTemplate}},
           {{$application_gitRepoConfiguration}}
+          {{$application_edgeClusterStatus}}
+          {{$application_edgeDeployment}}
         ],
         {{$classDef_serviceAccount}}: [
           {{$serviceAccount_edo}}

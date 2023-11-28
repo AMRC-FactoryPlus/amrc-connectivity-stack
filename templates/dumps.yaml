@@ -753,7 +753,7 @@ data:
           },
           {{$application_edgeClusterStatus}}: {
             "name": "Edge cluster status"
-          },
+          }
         },
         "dbd8a535-52ba-4f6e-b4f8-9b71aefe09d3": {
           "bdb13634-0b3d-4e38-a065-9d88c12ee78d": {
@@ -903,8 +903,8 @@ data:
       "objects": {
         {{$classDef_application}}: [
           {{$application_edgeClusterTemplate}},
-          {{$application_gitRepoConfiguration}}
-          {{$application_edgeClusterStatus}}
+          {{$application_gitRepoConfiguration}},
+          {{$application_edgeClusterStatus}},
           {{$application_edgeDeployment}}
         ],
         {{$classDef_serviceAccount}}: [

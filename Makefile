@@ -8,8 +8,11 @@ version?=${pkgver}
 suffix?=
 registry?=ghcr.io/amrc-factoryplus
 repo?=acs-service-setup
+docker?=docker
+kubectl?=kubectl
 
 tag=${registry}/${repo}:${version}${suffix}
+
 build_args=
 
 ifdef acs_base
@@ -28,13 +31,13 @@ check-committed:
 	[ -z "$$(git status --porcelain)" ] || (git status; exit 1)
 
 build: check-committed
-	docker build -t "${tag}" ${build_args} .
+	${docker} build -t "${tag}" ${build_args} .
 
 push:
-	docker push "${tag}"
+	${docker} push "${tag}"
 
 run:
-	docker run -ti --rm "${tag}" /bin/sh
+	${docker} run -ti --rm "${tag}" /bin/sh
 
 .PHONY: deploy run-job logs
 

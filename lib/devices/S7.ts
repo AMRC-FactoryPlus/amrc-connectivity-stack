@@ -56,7 +56,6 @@ export class S7Connection extends DeviceConnection {
         // Pass on errors to parent
         this.#s7Conn.on('error', (e: Error) => {
             log(`⚠️ Southbound S7 Error for ${this.#s7Conn._connOptsTcp.host}:${this.#s7Conn._connOptsTcp.port}: ` + e);
-
         })
     }
 

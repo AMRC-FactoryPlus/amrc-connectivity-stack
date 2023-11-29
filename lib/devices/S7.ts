@@ -63,11 +63,10 @@ export class S7Connection extends DeviceConnection {
      * Builds the S7 item group from the defined metric list
      * @param {object} vars object containing metric names and PLC addresses
      */
-    setItemGroup(vars: s7Vars) {
-        if (this.#itemGroup) {
-            this.#itemGroup.destroy();
+    addToItemGroup(vars: s7Vars) {
+        if (!this.#itemGroup) {
+            this.#itemGroup = new S7ItemGroup(this.#s7Conn);
         }
-        this.#itemGroup = new S7ItemGroup(this.#s7Conn);
         this.#itemGroup.setTranslationCB((metric: string) => this.#vars[metric]); //translates a metric name to its address
         this.#vars = vars;
         this.#itemGroup.addItems(Object.keys(this.#vars));
@@ -165,7 +164,7 @@ export class S7Device extends (Device) {
         });
 
         // Set S7 variables as item group (this allows optimization of PLC transactions)
-        this.#devConn.setItemGroup(this.s7Vars);
+        this.#devConn.addToItemGroup(this.s7Vars);
 
     }
 }

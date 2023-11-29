@@ -92,7 +92,7 @@ export class S7Connection extends DeviceConnection {
 
         try {
             let newVals = await this.#itemGroup.readAllItems();  // name: value
-            log(JSON.stringify(newVals));
+            log("S7 Read: " + JSON.stringify(newVals));
             this.emit('data', newVals, false);
         } catch (error) {
             // When a read fails, the connection is closed and the error is emitted

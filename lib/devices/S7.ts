@@ -144,6 +144,9 @@ export class S7Connection extends DeviceConnection {
 // https://github.com/st-one-io/node-red-contrib-s7#variable-addressing
 
 
+/**
+ * S7 Device class
+ */
 export class S7Device extends (Device) {
     s7Vars: {
         [index: string]: string // name: address

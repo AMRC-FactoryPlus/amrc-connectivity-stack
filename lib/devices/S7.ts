@@ -96,8 +96,6 @@ export class S7Connection extends DeviceConnection {
             // When a read fails, the connection is closed and the error is emitted
             // This is a workaround so that the app does not crash
             log(`⚠️ Southbound S7 read error for ${this.#s7Conn._connOptsTcp.host}:${this.#s7Conn._connOptsTcp.port}: ` + error);
-            // Close connection so a new one can get started
-            this.close();
         }
     }
 

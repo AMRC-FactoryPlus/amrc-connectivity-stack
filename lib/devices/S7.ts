@@ -77,9 +77,6 @@ export class S7Connection extends DeviceConnection {
      * Open the connection to the PLC
      */
     async open() {
-        if (!this.#s7Conn.isConnected) {
-            this.#s7Conn.once("connect", async () => {})
-        }
     }
 
     /**
@@ -90,8 +87,18 @@ export class S7Connection extends DeviceConnection {
     async readMetrics(metrics: Metrics, payloadFormat?: string,) {
         const changedMetrics: sparkplugMetric[] = [];
         // Tell S7 to update metric values
-        let newVals = await this.#itemGroup.readAllItems();  // name: value
-        this.emit('data', newVals, false);
+
+        try {
+            let newVals = await this.#itemGroup.readAllItems();  // name: value
+            log(JSON.stringify(newVals));
+            this.emit('data', newVals, false);
+        } catch (error) {
+            // When a read fails, the connection is closed and the error is emitted
+            // This is a workaround so that the app does not crash
+            log(`⚠️ Southbound S7 read error for ${this.#s7Conn._connOptsTcp.host}:${this.#s7Conn._connOptsTcp.port}: ` + error);
+            // Close connection so a new one can get started
+            this.close();
+        }
     }
 
     /**

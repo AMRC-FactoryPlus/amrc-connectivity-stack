@@ -56,6 +56,7 @@ export class S7Connection extends DeviceConnection {
         // Pass on errors to parent
         this.#s7Conn.on('error', (e: Error) => {
             log(`⚠️ Southbound S7 Error for ${this.#s7Conn._connOptsTcp.host}:${this.#s7Conn._connOptsTcp.port}: ` + e);
+
         })
     }
 
@@ -64,11 +65,13 @@ export class S7Connection extends DeviceConnection {
      * @param {object} vars object containing metric names and PLC addresses
      */
     addToItemGroup(vars: s7Vars) {
+        // If item group doesn't exist, create it
         if (!this.#itemGroup) {
             this.#itemGroup = new S7ItemGroup(this.#s7Conn);
         }
         this.#itemGroup.setTranslationCB((metric: string) => this.#vars[metric]); //translates a metric name to its address
         this.#vars = vars;
+        // Add metrics to read for this connection
         this.#itemGroup.addItems(Object.keys(this.#vars));
     }
 

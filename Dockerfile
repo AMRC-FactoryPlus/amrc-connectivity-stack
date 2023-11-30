@@ -8,7 +8,7 @@ ARG acs_npm=NO
 RUN install -d -o node -g node /home/node/app
 WORKDIR /home/node/app
 USER node
-COPY package*.json ./
+COPY --chown=node package*.json ./
 RUN <<'SHELL'
     touch /home/node/.npmrc
     if [ "${acs_npm}" != NO ]
@@ -17,7 +17,13 @@ RUN <<'SHELL'
     fi
     npm install --save=false
 SHELL
-COPY . .
+COPY --chown=node . .
+RUN <<'SHELL'
+    git describe --tags --dirty \
+        | sed -re's/-[0-9]+-/-/;s/(.*)/export const GIT_VERSION="\1";/' \
+        > lib/git-version.js
+    rm -rf .git
+SHELL
 
 FROM ${acs_run} AS run
 

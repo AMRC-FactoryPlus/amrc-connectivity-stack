@@ -11,8 +11,11 @@ import express from "express";
 
 import { ServiceClient, WebAPI } from "@amrc-factoryplus/utilities";
 
+import { GIT_VERSION } from "../lib/git-version.js";
 import { GitServer } from "../lib/git-server.js";
 import { Git } from "../lib/uuids.js";
+
+console.log("Starting acs-git version %s", GIT_VERSION);
 
 const fplus = await new ServiceClient({
     env:                process.env,
@@ -32,7 +35,14 @@ const api = await new WebAPI({
     hostname:   process.env.HOSTNAME,
     keytab:     process.env.SERVER_KEYTAB,
 
-    ping: { service: Git.Service.Git },
+    ping: {
+        service: Git.Service.Git,
+        software: {
+            vendor:         "AMRC",
+            application:    "acs-git",
+            revision:       GIT_VERSION,
+        },
+    },
     routes: app => {
         app.use("/", git.routes);
     },

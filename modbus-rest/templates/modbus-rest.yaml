@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: modbus-rest-{{ .Values.uuid }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    factory-plus.app: modbus-rest
+    factory-plus.nodeUuid: {{ .Values.uuid }}
+    factory-plus.name: {{ .Values.name }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      factory-plus.app: modbus-rest
+      factory-plus.nodeUuid: {{ .Values.uuid }}
+  template:
+    metadata:
+      labels:
+        factory-plus.app: modbus-rest
+        factory-plus.nodeUuid: {{ .Values.uuid }}
+        factory-plus.name: {{ .Values.name }}
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: {{ .Values.hostname | quote }}
+      containers:
+        - name: modbus-rest
+          image: {{ printf "%s/%s:%s" .Values.image.registry .Values.image.repository .Values.image.version | quote }}
+          imagePullPolicy: Always
+          env:

@@ -1,0 +1,4 @@
+image:
+  registry: ghcr.io/amrc-factoryplus
+  repository: edge-modbus-rest
+  version: "v0.1.0"

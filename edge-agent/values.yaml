@@ -1,10 +1,20 @@
 image:
-  #registry: ghcr.io/amrc-factoryplus
-  registry: amrc-factoryplus.shef.ac.uk:5000
-  repository: acs-edge
-  version: "v2.0.0-bmz"
+  edgeAgent:
+    #registry: ghcr.io/amrc-factoryplus
+    registry: amrc-factoryplus.shef.ac.uk:5000
+    repository: acs-edge
+    tag: "v2.0.0-bmz"
+    pullPolicy: Always
+  monitor:
+    registry: amrc-factoryplus.shef.ac.uk:5000
+    repository: acs-edge-monitor
+    tag: "v0.0.1-bmz"
+    pullPolicy: Always
 debug: true
 poll_int: 10
+authGroup:
+  edgeAgent: "46e36996-cf74-4b29-80c0-54a0d4c33944"
+  monitor: "82422c03-9a38-459e-937d-94151dc79664"
 limits:
   cpu: "100m"
   memory: "200Mi"

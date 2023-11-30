@@ -44,18 +44,18 @@ export class S7Connection extends DeviceConnection {
         // Pass on disconnect event to parent
         this.#s7Conn.on('disconnect', () => {
             this.emit('close');
+            log(`☠️ Southbound S7 disconnected from ${this.#s7Conn._connOptsTcp.host}:${this.#s7Conn._connOptsTcp.port}`);
         });
 
         // Notify when connection is ready
         this.#s7Conn.on('connect', () => {
-            log(`S7 connected to ${this.#s7Conn._connOptsTcp.host}:${this.#s7Conn._connOptsTcp.port}`)
+            log(`🔌 Southbound S7 connected to ${this.#s7Conn._connOptsTcp.host}:${this.#s7Conn._connOptsTcp.port}`)
             this.emit("open");
         });
 
         // Pass on errors to parent
         this.#s7Conn.on('error', (e: Error) => {
-            this.emit('error');
-            log("S7 Error: " + e);
+            log(`⚠️ Southbound S7 Error for ${this.#s7Conn._connOptsTcp.host}:${this.#s7Conn._connOptsTcp.port}: ` + e);
         })
     }
 
@@ -77,9 +77,6 @@ export class S7Connection extends DeviceConnection {
      * Open the connection to the PLC
      */
     async open() {
-        if (!this.#s7Conn.isConnected) {
-            this.#s7Conn.connect()
-        }
     }
 
     /**
@@ -90,8 +87,16 @@ export class S7Connection extends DeviceConnection {
     async readMetrics(metrics: Metrics, payloadFormat?: string,) {
         const changedMetrics: sparkplugMetric[] = [];
         // Tell S7 to update metric values
-        let newVals = await this.#itemGroup.readAllItems();  // name: value
-        this.emit('data', newVals, false);
+
+        try {
+            let newVals = await this.#itemGroup.readAllItems();  // name: value
+            log(JSON.stringify(newVals));
+            this.emit('data', newVals, false);
+        } catch (error) {
+            // When a read fails, the connection is closed and the error is emitted
+            // This is a workaround so that the app does not crash
+            log(`⚠️ Southbound S7 read error for ${this.#s7Conn._connOptsTcp.host}:${this.#s7Conn._connOptsTcp.port}: ` + error);
+        }
     }
 
     /**

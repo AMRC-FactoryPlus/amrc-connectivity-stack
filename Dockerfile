@@ -5,7 +5,11 @@ ARG acs_run=ghcr.io/amrc-factoryplus/utilities-run:v1.0.8
 
 FROM ${acs_build} AS build
 ARG acs_npm=NO
-RUN install -d -o node -g node /home/node/app
+USER root
+RUN sh -ex <<'SHELL'
+    apk add git
+    install -d -o node -g node /home/node/app
+SHELL
 WORKDIR /home/node/app
 USER node
 COPY --chown=node package*.json ./

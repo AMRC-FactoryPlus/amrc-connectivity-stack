@@ -8,34 +8,35 @@ This is deployed to an edge cluster as part of the bootstrap process.
 
 GitRepo cluster repo
 Kust cluster repo
-ConfigMap cluster-config
+GitRepo flux-system
+Kust flux-system
 GitRepo for edge Helm charts
 HelmRelease for edge cluster helm chart
 
 ### Bootstrap requirements
 
-op1krbkeys keytab
-op1flux password
-op1flux username
+#### Central
 
 op1krbkeys account created and registered correctly
 op1flux account created and registered correctly
 
-Install flux
+git repo created and populated
 
-Currently the op1flux secret is in the flux-system namespace but krbkeys
-can only play in the fplus-edge namespace. This needs resolving.
+bootstrap script made available
 
-#### Steps
+#### Edge
+
+configure host
+install k3s
 
 kubectl create namespace $N
-kubectl create serviceaccount -n $N edge-bootstrap
-kubectl create rolebinding -n $N
-    --clusterrole=cluster-admin --serviceaccount=$N:edge-bootstrap
-kubectl run -ti --image=$KRBKEYS --restart=Never --rm 
-    --overrides='{"spec":{"serviceAccountName":"edge-bootstrap"}}' 
-    -n $N krbkeys-bootstrap -- 
-    python3 -m amrc.factoryplus.krbkeys.cluster
+kubectl create -f edge-bootstrap.yaml
+kubectl attach -ti -n $N edge-bootstrap
+kubectl delete -f edge-bootstrap.yaml
+kubectl apply -f flux-system.yaml
+kubectl apply -f self-link.yaml
+
+### krbkeys cluster bootstrap
 
     Python 3.11.6 (main, Oct  4 2023, 06:22:18) [GCC 12.2.1 20220924] on linux
     Type "help", "copyright", "credits" or "license" for more information.
@@ -65,15 +66,11 @@ kubectl run -ti --image=$KRBKEYS --restart=Never --rm
     >>> k8o.update_secret(ns="fplus-edge",name="flux-secrets",key="password",value=fluxpw.encode())
     >>> k8o.update_secret(ns="fplus-edge",name="flux-secrets",key="username",value="op1flux/v3-testing".encode())
 
-kubectl delete -n $N pod/edge-bootstrap
-kubectl delete -n $N configmap/krb5-conf
-kubectl apply -f flux-system.yaml
-kubectl apply -f self-link.yaml
-
 ### Edge Cluster Helm chart
 
 Namespace fplus-edge
 
+ConfigMap cluster-config
 ConfigMap krb5-conf
 
 ServiceAccount krb-keys
@@ -99,12 +96,5 @@ Deployment edge-sync
 KrbKey op1monitor
 Deployment edge-monitor
 
-### Unknown
-
-Namespace for sealed-secrets
-
-GitRepo flux-system
-Kust flux-system
-HelmRepo for sealed-secrets
-HelmRelease for sealed-secrets
-
+Namespace sealed-secrets
+sealed-secrets pulled in as a dependency

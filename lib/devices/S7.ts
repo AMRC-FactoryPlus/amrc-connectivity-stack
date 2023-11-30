@@ -87,10 +87,10 @@ export class S7Connection extends DeviceConnection {
      * @param {array} metrics Array of metric objects to read to
      * @returns {array} Old metric values (for RbE checking)
      */
-    readMetrics(metrics: Metrics, payloadFormat?: string,) {
+    async readMetrics(metrics: Metrics, payloadFormat?: string,) {
         const changedMetrics: sparkplugMetric[] = [];
         // Tell S7 to update metric values
-        let newVals = this.#itemGroup.readAllItems();  // name: value
+        let newVals = await this.#itemGroup.readAllItems();  // name: value
         this.emit('data', newVals, false);
     }
 
@@ -98,7 +98,7 @@ export class S7Connection extends DeviceConnection {
      * Writes metric values to the PLC
      * @param {array} metrics Array of metric objects to write to the PLC
      */
-    writeMetrics(metrics: Metrics) {
+    async writeMetrics(metrics: Metrics) {
         // This doesn't seem to work for Ixxx value writes
         // Untested with other writes at present
 
@@ -116,14 +116,14 @@ export class S7Connection extends DeviceConnection {
             // Notify user
             log(`Writing ${values} to ${addrs}`);
             // Write metric values
-            this.#itemGroup.writeItems(addrs, values);
+            await this.#itemGroup.writeItems(addrs, values);
         }
     }
 
     /**
      * Close connection and tidy up
      */
-    close() {
+    async close() {
         // Clear the variable list
         this.#vars = {};
         // Destroy the metric item group, if it exists
@@ -131,7 +131,7 @@ export class S7Connection extends DeviceConnection {
             this.#itemGroup.destroy();
         }
         // Close the PLC connection
-        this.#s7Conn.disconnect();
+        await this.#s7Conn.disconnect();
     }
 }
 

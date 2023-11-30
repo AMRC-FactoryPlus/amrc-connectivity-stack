@@ -9,7 +9,7 @@ RUN install -d -o node -g node /home/node/app
 WORKDIR /home/node/app
 USER node
 COPY --chown=node package*.json ./
-RUN <<'SHELL'
+RUN sh -ex <<'SHELL'
     touch /home/node/.npmrc
     if [ "${acs_npm}" != NO ]
     then
@@ -18,7 +18,7 @@ RUN <<'SHELL'
     npm install --save=false
 SHELL
 COPY --chown=node . .
-RUN <<'SHELL'
+RUN sh -ex <<'SHELL'
     git describe --tags --dirty \
         | sed -re's/-[0-9]+-/-/;s/(.*)/export const GIT_VERSION="\1";/' \
         > lib/git-version.js

@@ -64,12 +64,14 @@ export class S7Connection extends DeviceConnection {
      * @param {object} vars object containing metric names and PLC addresses
      */
     addToItemGroup(vars: s7Vars) {
-        // If item group doesn't exist, create it
+        // If item group doesn't exist, create a fresh setup
         if (!this.#itemGroup) {
             this.#itemGroup = new S7ItemGroup(this.#s7Conn);
+            this.#vars = {}
+            this.#itemGroup.setTranslationCB((metric: string) => this.#vars[metric]); //translates a metric name to its address
         }
-        this.#itemGroup.setTranslationCB((metric: string) => this.#vars[metric]); //translates a metric name to its address
-        this.#vars = vars;
+        // Merge existing vars with new ones
+        this.#vars = {...this.#vars, ...vars}
         // Add metrics to read for this connection
         this.#itemGroup.addItems(Object.keys(this.#vars));
     }

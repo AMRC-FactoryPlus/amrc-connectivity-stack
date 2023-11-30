@@ -28,21 +28,26 @@ spec:
       containers:
         - name: edge-agent
           image: {{ printf "%s/%s:%s" .Values.image.registry .Values.image.repository .Values.image.version | quote }}
-          envFrom:
-            - secretRef:
-                name: edge-agent-secrets-{{ .Values.uuid }}
+          imagePullPolicy: Always
           env:
-            - name: CONFIG_URL
-              value: {{ .Values.config_url | quote }}
             - name: DEBUG
               value: {{ .Values.debug | quote }}
+            - name: VERBOSE
+              value: "ALL,!token,!service"
             - name: POLL_INT
               value: {{ .Values.poll_interval | quote }}
-            - name: NODE_ID
-              value: {{ .Values.uuid | quote }}
+            - name: DIRECTORY_URL
+              value: http://directory.amrc-fpd-bmz.shef.ac.uk
+            - name: SERVICE_USERNAME
+              value: "nd1/{{ .Values.cluster }}/{{ .Values.name }}"
+            - name: SERVICE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: edge-agent-secrets-{{ .Values.uuid }}
+                  key: keytab
           resources:
             limits:
-              memory: {{ .Values.limits.cpu | quote }}
+              memory: {{ .Values.limits.memory | quote }}
             requests:
               cpu: {{ .Values.limits.cpu | quote }}
               memory: {{ .Values.limits.memory | quote }}

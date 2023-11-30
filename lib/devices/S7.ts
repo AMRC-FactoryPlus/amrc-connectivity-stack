@@ -63,13 +63,16 @@ export class S7Connection extends DeviceConnection {
      * Builds the S7 item group from the defined metric list
      * @param {object} vars object containing metric names and PLC addresses
      */
-    setItemGroup(vars: s7Vars) {
-        if (this.#itemGroup) {
-            this.#itemGroup.destroy();
+    addToItemGroup(vars: s7Vars) {
+        // If item group doesn't exist, create a fresh setup
+        if (!this.#itemGroup) {
+            this.#itemGroup = new S7ItemGroup(this.#s7Conn);
+            this.#vars = {}
+            this.#itemGroup.setTranslationCB((metric: string) => this.#vars[metric]); //translates a metric name to its address
         }
-        this.#itemGroup = new S7ItemGroup(this.#s7Conn);
-        this.#itemGroup.setTranslationCB((metric: string) => this.#vars[metric]); //translates a metric name to its address
-        this.#vars = vars;
+        // Merge existing vars with new ones
+        this.#vars = {...this.#vars, ...vars}
+        // Add metrics to read for this connection
         this.#itemGroup.addItems(Object.keys(this.#vars));
     }
 
@@ -90,7 +93,7 @@ export class S7Connection extends DeviceConnection {
 
         try {
             let newVals = await this.#itemGroup.readAllItems();  // name: value
-            log(JSON.stringify(newVals));
+            log("S7 Read: " + JSON.stringify(newVals));
             this.emit('data', newVals, false);
         } catch (error) {
             // When a read fails, the connection is closed and the error is emitted
@@ -145,6 +148,9 @@ export class S7Connection extends DeviceConnection {
 // https://github.com/st-one-io/node-red-contrib-s7#variable-addressing
 
 
+/**
+ * S7 Device class
+ */
 export class S7Device extends (Device) {
     s7Vars: {
         [index: string]: string // name: address
@@ -165,7 +171,7 @@ export class S7Device extends (Device) {
         });
 
         // Set S7 variables as item group (this allows optimization of PLC transactions)
-        this.#devConn.setItemGroup(this.s7Vars);
+        this.#devConn.addToItemGroup(this.s7Vars);
 
     }
 }

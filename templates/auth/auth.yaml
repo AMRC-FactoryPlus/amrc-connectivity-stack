@@ -77,7 +77,7 @@ spec:
         - name: load-dumps
 {{ include "amrc-connectivity-stack.image" .Values.auth | indent 10 }}
           command: [ "/usr/bin/k5start", "-Uf", "/keytabs/client" ]
-          args: [ "npm", "run", "load-dump", "/dumps" ]
+          args: [ "node", "bin/load-dump.js", "/dumps" ]
           env:
             - name: KRB5_CONFIG
               value: /config/krb5-conf/krb5.conf
@@ -100,6 +100,8 @@ spec:
       containers:
         - name: webapi
 {{ include "amrc-connectivity-stack.image" .Values.auth | indent 10 }}
+          command: ["/usr/bin/k5start", "-Uf", "/keytabs/client"]
+          args: ["node", "bin/authn.js"]
           env:
             - name: KRB5_CONFIG
               value: /config/krb5-conf/krb5.conf
@@ -123,8 +125,7 @@ spec:
               value: auth
             - name: VERBOSE
               value: "1"
-            - name: CACHE_MAX_AGE
-              value: "10"
+{{ include "amrc-connectivity-stack.cache-max-age" (list . "auth") | indent 12 }}
             # These are currently only used for the editor. They need to be resolvable by the
             # user's browser, so in-cluster names will not work.
             - name: HTTP_API_URL

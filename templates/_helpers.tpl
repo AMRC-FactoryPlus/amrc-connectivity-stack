@@ -43,6 +43,24 @@ image: {{ .image.registry }}/{{ .image.repository }}:{{ .image.tag }}
 imagePullPolicy: {{ .image.pullPolicy }}
 {{- end }}
 
+{{/* Go templates are just awful grrr */}}
+{{/* Get a service-specific or default value */}}
+{{- define "_acs.with-default" }}
+{{- $top := index . 0 }}
+{{- $srv := index . 1 }}
+{{- $key := index . 2 }}
+{{- coalesce (get (get $top.Values $srv) $key) 
+    (get $top.Values.acs $key) }}
+{{- end }}
+
+{{/*
+Specify cache-control max-age for a service.
+*/}}
+{{- define "amrc-connectivity-stack.cache-max-age" }}
+- name: CACHE_MAX_AGE
+  value: {{ include "_acs.with-default" (append . "cacheMaxAge") | quote }}
+{{- end }}
+
 {{/*
 Common labels
 */}}

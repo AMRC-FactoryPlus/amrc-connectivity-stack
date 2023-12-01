@@ -34,7 +34,7 @@ spec:
         - name: cmdesc
 {{ include "amrc-connectivity-stack.image" .Values.cmdesc | indent 10 }}
           command: [ "/usr/bin/k5start", "-Uf", "/keytabs/client" ]
-          args: [ "npm", "start" ]
+          args: [ "node", "bin/cmdescd.js" ]
           env:
             - name: KRB5_CONFIG
               value: /config/krb5-conf/krb5.conf
@@ -58,8 +58,7 @@ spec:
               value: http://cmdesc.{{ .Release.Namespace }}.svc.cluster.local
             - name: PORT
               value: "8080"
-            - name: CACHE_MAX_AGE
-              value: "0"
+{{ include "amrc-connectivity-stack.cache-max-age" (list . "cmdesc") | indent 12 }}
             - name: DIRECTORY_URL
               value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
           volumeMounts:

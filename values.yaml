@@ -7,6 +7,7 @@ acs:
   secure: true
   # -- The name of the secret holding the wildcard certificate for the above domain.
   tlsSecretName: factoryplus-tls
+  cacheMaxAge: 300
 
 identity:
   # -- Whether or not to enable the Identity component

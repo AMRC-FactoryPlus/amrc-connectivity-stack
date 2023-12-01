@@ -76,7 +76,7 @@ spec:
         - name: load-dumps
 {{ include "amrc-connectivity-stack.image" .Values.configdb | indent 10 }}
           command: [ "/usr/bin/k5start", "-Uf", "/keytabs/client" ]
-          args: [ "npm", "run", "load-dump", "/dumps" ]
+          args: [ "node", "bin/load-dump.js", "/dumps" ]
           env:
             - name: KRB5_CONFIG
               value: /config/krb5-conf/krb5.conf
@@ -97,6 +97,8 @@ spec:
       containers:
         - name: webapi
 {{ include "amrc-connectivity-stack.image" .Values.configdb | indent 10 }}
+          command: ["/usr/bin/k5start", "-Uf", "/keytabs/client"]
+          args: ["node", "bin/api.js"]
           env:
             - name: KRB5_CONFIG
               value: /config/krb5-conf/krb5.conf
@@ -123,8 +125,7 @@ spec:
               value: configdb
             - name: VERBOSE
               value: "1"
-            - name: CACHE_MAX_AGE
-              value: "10"
+{{ include "amrc-connectivity-stack.cache-max-age" (list . "configdb") | indent 12 }}
             # If this is set it names a principal which overrides all ACLs. This should be turned off in production.
             - name: ROOT_PRINCIPAL
               value: admin@{{ .Values.identity.realm | required "values.identity.realm is required!" }}

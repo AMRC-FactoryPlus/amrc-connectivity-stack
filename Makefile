@@ -4,10 +4,11 @@
 
 pkgver!=node -e 'console.log(JSON.parse(fs.readFileSync("package.json")).version)'
 
-version?=${pkgver}
+version?=v${pkgver}
 suffix?=
 registry?=ghcr.io/amrc-factoryplus
 repo?=acs-git
+docker?=docker
 
 tag=${registry}/${repo}:${version}${suffix}
 build_args=
@@ -26,16 +27,19 @@ endif
 
 all: build push
 
-.PHONY: all build push
+.PHONY: all build push check-committed
 
-build:
-	docker build -t "${tag}" ${build_args} .
+check-committed:
+	[ -z "$$(git status --porcelain)" ] || (git status; exit 1)
+
+build: check-committed
+	${docker} build -t "${tag}" ${build_args} .
 
 push:
-	docker push "${tag}"
+	${docker} push "${tag}"
 
 run:
-	docker run -ti --rm "${tag}" /bin/sh
+	${docker} run -ti --rm "${tag}" /bin/sh
 
 .PHONY: deploy restart logs
 

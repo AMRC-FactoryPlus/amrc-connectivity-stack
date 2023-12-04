@@ -5,11 +5,15 @@ ARG acs_run=ghcr.io/amrc-factoryplus/utilities-run:v1.0.8
 
 FROM ${acs_build} AS build
 ARG acs_npm=NO
-RUN install -d -o node -g node /home/node/app
+USER root
+RUN sh -ex <<'SHELL'
+    apk add git
+    install -d -o node -g node /home/node/app
+SHELL
 WORKDIR /home/node/app
 USER node
-COPY package*.json ./
-RUN <<'SHELL'
+COPY --chown=node package*.json ./
+RUN sh -ex <<'SHELL'
     touch /home/node/.npmrc
     if [ "${acs_npm}" != NO ]
     then
@@ -17,7 +21,13 @@ RUN <<'SHELL'
     fi
     npm install --save=false
 SHELL
-COPY . .
+COPY --chown=node . .
+RUN sh -ex <<'SHELL'
+    git describe --tags --dirty \
+        | sed -re's/-[0-9]+-/-/;s/(.*)/export const GIT_VERSION="\1";/' \
+        > lib/git-version.js
+    rm -rf .git
+SHELL
 
 FROM ${acs_run} AS run
 

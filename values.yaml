@@ -98,8 +98,10 @@ serviceSetup:
   image:
     registry: ghcr.io/amrc-factoryplus
     repository: acs-service-setup
-    tag: v0.0.1
+    tag: v0.0.2
     pullPolicy: IfNotPresent
+  helmUrl: https://github.com/AMRC-FactoryPlus/edge-helm-charts.git
+  helmRef: v0.0.1
 
 mqtt:
   # -- Whether or not to enable the MQTT component

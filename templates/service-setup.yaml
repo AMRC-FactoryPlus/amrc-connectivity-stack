@@ -33,6 +33,10 @@ spec:
               value: ALL
             - name: GIT_CHECKOUTS
               value: /data
+            - name: HELM_REPO_URL
+              value: {{ .Values.serviceSetup.helmUrl | quote }}
+            - name: HELM_REPO_REF
+              value: {{ .Values.serviceSetup.helmRef | quote }}
           volumeMounts:
             - mountPath: /data
               name: git-checkouts

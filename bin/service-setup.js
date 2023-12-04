@@ -52,6 +52,7 @@ async function git_auth (url, auth) {
         },
     };
 }
+const remote = { http, onAuth: git_auth, onAuthFailed: git_auth };
 
 async function setup_edo_conf (needs) {
     const Auth = fplus.Auth;
@@ -94,6 +95,56 @@ async function setup_edo_conf (needs) {
     return conf;
 }
 
+async function setup_repo_mirror ({ uuid, source, ref }) {
+    const dir = Path.join(Checkouts, uuid);
+    const local = new URL(`/uuid/${uuid}`, git_base).toString();
+
+    log("Checking out %s", local);
+    await FS.rm(dir, {recursive: true, force: true});
+    await git.clone({
+        fs, dir, ...remote,
+        url:            local,
+        remote:         "local",
+        noCheckout:     true,
+    });
+
+    const ref_or_null = ref => git.resolveRef({fs, dir, ref})
+        .catch(e => { 
+            if (e instanceof git.Errors.NotFoundError)
+                return null;
+            throw e;
+        });
+    const acs = await ref_or_null("refs/remotes/local/acs");
+    const main = await ref_or_null("refs/remotes/local/main");
+    const reset_main = acs == main;
+
+    log("Fetching %s @ %s", source, ref);
+    await git.addRemote({ fs, dir, remote: "source", url: source });
+    const mirror = await git.fetch({
+        fs, dir, ...remote,
+        remote:         "source", 
+        singleBranch:   true,
+        ref,
+    });
+    const sha1 = mirror.fetchHead;
+
+    const set_branch = async ref => {
+        log("Updating branch %s to %s", ref, sha1);
+        await git.branch({fs, dir, ref, object: sha1, force: true});
+        await git.push({
+            fs, dir, ...remote, 
+            remote:     "local",
+            ref,
+            remoteRef:  ref,
+            force:      true,
+        });
+    };
+    await set_branch("acs");
+    if (reset_main) await set_branch("main");
+
+    await FS.rm(dir, { recursive: true, force: true });
+}
+
 const edo_conf = await setup_edo_conf({
     group: {
         cluster:    "Edge cluster repositories",
@@ -104,37 +155,9 @@ const edo_conf = await setup_edo_conf({
     },
 });
 
-//const repos = await FS.readdir(Repos);
-//for (const repo of repos) {
-//    const path = `shared/${repo}`;
-//    console.log(`Updating repo ${path} to ${GIT_VERSION}`);
-//
-//    const dir = Path.join(Checkouts, repo);
-//    const url = new URL(`/git/${path}`, git_base).toString();
-//
-//    const remote = { http, url, onAuth: git_auth, onAuthFailed: git_auth };
-//
-//    await FS.rm(dir, {recursive: true, force: true});
-//    await git.clone({
-//        fs, dir, ...remote,
-//        noCheckout:     true,
-//    });
-//
-//    const branches = await git.listBranches({fs, dir});
-//    if (branches.length == 0) {
-//        /* This is an empty repo. We need to create the branch which the
-//         * remote considers to be 'default'; there doesn't seem to be
-//         * any way to find out what this is called. Assume 'main' as
-//         * that is how acs-git creates repos. */
-//        git.branch({fs, dir, ref: "main", checkout: true});
-//        git.commit({fs, dir, author, message: "Initial commit"});
-//    }
-//
-//    /* We didn't check out the branch, so our WD is empty. */
-//    await FS.cp(Path.join(Repos, repo), dir, {recursive: true});
-//    await git.add({fs, dir, filepath: "."});
-//    await git.commit({fs, dir, author, message: `ACS service setup ${GIT_VERSION}`});
-//
-//    await git.push({fs, dir, ...remote});
-//    await FS.rm(dir, {recursive: true, force: true});
-//}
+await setup_repo_mirror({
+    uuid:       edo_conf.git.repo.helm.uuid,
+    source:     process.env.HELM_REPO_URL,
+    ref:        process.env.HELM_REPO_REF,
+});
+

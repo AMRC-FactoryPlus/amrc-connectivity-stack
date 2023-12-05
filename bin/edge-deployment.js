@@ -19,6 +19,11 @@ const fplus = await new ServiceClient({
     git_email:          process.env.GIT_EMAIL,
 }).init();
 
+const clusters = await new Clusters({
+    fplus,
+    realm:      process.env.REALM,
+}).init();
+
 const edge = await new EdgeDeploy({
     fplus:      fplus,
     realm:      process.env.REALM,
@@ -47,3 +52,4 @@ const api = await new WebAPI({
 }).init();
 
 api.run();
+clusters.run();

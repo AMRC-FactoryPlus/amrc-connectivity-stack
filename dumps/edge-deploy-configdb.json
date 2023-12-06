@@ -11,8 +11,9 @@
   ],
   "objects": {
     "d319bd87-f42b-4b66-be4f-f82ff48b93f0": [
+      "5b47881c-b012-4040-945c-eacafca539b2",
       "bdb13634-0b3d-4e38-a065-9d88c12ee78d",
-      "72804a19-636b-4836-b62b-7ad1476f2b86",
+      "f6c67e6f-e48e-4f69-b4bb-bfbddcc2a517",
       "dbd8a535-52ba-4f6e-b4f8-9b71aefe09d3"
     ],
     "265d481f-87a7-4f93-8fc6-53fa64dc11bb": [
@@ -28,14 +29,21 @@
     "b419cbc2-ab0f-4311-bd9e-f0591f7e88cb": [
       "26d192cf-73c1-4c14-93cf-1e63743bab08",
       "3a58340c-d4ec-453d-99c3-0cf6ab7d8fa9",
+      "979f7fd9-bbc7-4810-a774-6082c7394db6",
       "4eeb8156-856d-4251-a4a4-4c1b2f3d3e2c",
       "8cd08563-7c3c-44fd-af4d-15c0fa6dadcb"
     ]
   },
   "configs": {
     "64a8bfa9-7772-45c4-9d1a-9e6290690957": {
+      "5b47881c-b012-4040-945c-eacafca539b2": {
+        "name": "EDO global config"
+      },
       "bdb13634-0b3d-4e38-a065-9d88c12ee78d": {
         "name": "Edge cluster configuration"
+      },
+      "f6c67e6f-e48e-4f69-b4bb-bfbddcc2a517": {
+        "name": "Edge cluster setup status"
       },
       "72804a19-636b-4836-b62b-7ad1476f2b86": {
         "name": "Edge cluster template"
@@ -64,6 +72,9 @@
       "3a58340c-d4ec-453d-99c3-0cf6ab7d8fa9": {
         "name": "Edge cluster repositories"
       },
+      "979f7fd9-bbc7-4810-a774-6082c7394db6": {
+        "name": "EDO-managed groups"
+      },
       "4eeb8156-856d-4251-a4a4-4c1b2f3d3e2c": {
         "name": "Edge flux accounts"
       },
@@ -72,131 +83,64 @@
       }
     },
     "dbd8a535-52ba-4f6e-b4f8-9b71aefe09d3": {
+      "5b47881c-b012-4040-945c-eacafca539b2": {
+        "title": "Edge Deployment Operator global config",
+        "type": "object",
+        "additionalProperties": false,
+        "$defs": {
+          "uuid-and-path": {
+            "type": "object",
+            "required": [
+              "uuid"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "uuid": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "path": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "properties": {
+          "git": {
+            "type": "object"
+          },
+          "repo": {
+            "description": "Well-known git repository UUIDs",
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/uuid-and-path"
+            }
+          },
+          "group": {
+            "description": "Auth service groups",
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/uuid-and-path"
+            }
+          }
+        }
+      },
       "bdb13634-0b3d-4e38-a065-9d88c12ee78d": {
         "title": "Edge cluster configuration",
         "type": "object",
         "required": [
+          "name",
           "namespace"
         ],
+        "additionalProperties": false,
         "properties": {
+          "name": {
+            "description": "A name for the cluster.",
+            "type": "string"
+          },
           "namespace": {
             "description": "The k8s namespace to deploy to.",
             "type": "string"
-          },
-          "flux": {
-            "description": "The URL of the Git repo driving this cluster.",
-            "type": "string"
-          },
-          "kubeseal_cert": {
-            "description": "The PEM-encoded X509 certificate used by the sealed-secrets operator on the edge cluster.\n",
-            "type": "string"
-          }
-        }
-      },
-      "72804a19-636b-4836-b62b-7ad1476f2b86": {
-        "title": "Edge cluster template",
-        "description": "A template to drive the creation of an edge cluster. Some values are subject to template expansion; `%n` is expanded to the name of the cluster as supplied to the Edge Deployment Operator.\n",
-        "type": "object",
-        "required": [
-          "name",
-          "cluster",
-          "flux",
-          "repository"
-        ],
-        "properties": {
-          "name": {
-            "description": "The name used to locate this template.",
-            "type": "string"
-          },
-          "cluster": {
-            "description": "Configuration of the k8s cluster.",
-            "type": "object",
-            "required": [
-              "namespace"
-            ],
-            "properties": {
-              "namespace": {
-                "description": "The namespace to deploy to.",
-                "type": "string"
-              }
-            }
-          },
-          "flux": {
-            "description": "Configuration of the Flux service account.",
-            "type": "object",
-            "required": [
-              "class",
-              "username"
-            ],
-            "properties": {
-              "class": {
-                "description": "ConfigDB class to create the account under.",
-                "type": "string",
-                "format": "uuid"
-              },
-              "username": {
-                "description": "Template for the Kerberos UPN of the service account.",
-                "type": "string"
-              },
-              "name": {
-                "description": "General Info name for the service account.",
-                "type": "string"
-              },
-              "groups": {
-                "description": "Auth groups to add the service account to.",
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "format": "uuid"
-                }
-              }
-            }
-          },
-          "repository": {
-            "description": "Configuration of the cluster git repo.",
-            "required": [
-              "group",
-              "branch",
-              "interval"
-            ],
-            "properties": {
-              "group": {
-                "description": "The repo group to create the repo in. The repo itself will be named with the name of the cluster.\n",
-                "type": "string"
-              },
-              "branch": {
-                "description": "The branch name to use.",
-                "type": "string"
-              },
-              "interval": {
-                "description": "The sync interval. This is in the interval format accepted by Flux.\n",
-                "type": "string"
-              },
-              "links": {
-                "description": "Other repos to sync from. Appropriate Flux manifests will be committed to the cluster repo to enable this.\n",
-                "type": "object",
-                "propertyNames": {
-                  "description": "The UUID of the repo to sync from.",
-                  "type": "string",
-                  "format": "uuid"
-                },
-                "additionalProperties": {
-                  "type": "object",
-                  "required": [
-                    "branch",
-                    "interval"
-                  ],
-                  "properties": {
-                    "branch": {
-                      "type": "string"
-                    },
-                    "interval": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
           }
         }
       }

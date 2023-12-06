@@ -4,61 +4,68 @@ version: 1
 # need to be populated as groups in the Auth service with the
 # appropriate objects.
 aces:
-  # Advertise service
   - principal: !u E.Requirement.ServiceAccount
-    permission: 4db4c39a-f18d-4e83-aeb0-5af2c14ddc2b 
+    permission: !u FP.Permission.Directory.AdvertiseService 
     target: !u E.Service.EdgeDeployment
 
-  # Read ACL
   - principal: !u E.Requirement.ServiceAccount
-    permission: ba566181-0e8a-405b-b16e-3fb89130fbee
+    permission: !u FP.Permission.Auth.ReadACL
     target: !u E.Perm.All
 
-  # Manage Kerberos mappings
+  # XXX This is nearly root-equivalent.
   - principal: !u E.Requirement.ServiceAccount
-    permission: 327c4cc8-9c46-4e1e-bb6b-257ace37b0f6
+    permission: !u FP.Permission.Auth.ManageKerberos
     target: !u FP.Null
 
-  # Read ConfigDB
   - principal: !u E.Requirement.ServiceAccount
-    permission: 4a339562-cd57-408d-9d1a-6529a383ea4b
-    target: !u G.App.Config
-  - principal: !u E.Requirement.ServiceAccount
-    permission: 4a339562-cd57-408d-9d1a-6529a383ea4b
-    target: !u E.App.Cluster
-  - principal: !u E.Requirement.ServiceAccount
-    permission: 4a339562-cd57-408d-9d1a-6529a383ea4b
-    target: !u E.App.Template
-
-  # Write ConfigDB
-  - principal: !u E.Requirement.ServiceAccount
-    permission: 6c799ccb-d2ad-4715-a2a7-3c8728d6c0bf
-    target: !u FP.App.Info
-  - principal: !u E.Requirement.ServiceAccount
-    permission: 6c799ccb-d2ad-4715-a2a7-3c8728d6c0bf
-    target: !u E.App.Cluster
-
-  # Manage objects
-  - principal: !u E.Requirement.ServiceAccount
-    permission: f0b7917b-d475-4888-9d5a-2af96b3c26b6
-    target: !u E.Requirement.FluxAccounts
-  - principal: !u E.Requirement.ServiceAccount
-    permission: f0b7917b-d475-4888-9d5a-2af96b3c26b6
-    target: !u E.Class.Cluster
-
-  # Manage ACLs
-  - principal: !u E.Requirement.ServiceAccount
-    permission: 3a41f5ce-fc08-4669-9762-ec9e71061168
+    permission: !u FP.Permission.Auth.ManageACL
     target: !u G.Perm.Pull
 
-  # Manage group
+  # XXX This is a very broad grant; it is very nearly root-equivalent.
+  # But currently any grant of ManageGroup will be equivalent to this,
+  # as groups are expanded recursively and we can just add a victim
+  # group to one of our target groups. We have an E.Requirement.Groups,
+  # but it is not set up properly by service-setup, and using it won't
+  # improve security until the Auth groups are fixed.
   - principal: !u E.Requirement.ServiceAccount
-    permission: be9b6d47-c845-49b2-b9d5-d87b83f11c3b
-    target: !u E.Requirement.FluxRoles
+    permission: !u FP.Permission.Auth.ManageGroup
+    target: !u FP.Null
+
+  # Watch ConfigDB
+  # XXX It's not clear what the target needs to be here. Best would be a
+  # permission granting the right to rebirth any device advertising a
+  # given service; that requires cmdesc changes. Next best is probably a
+  # Service Requirement UUID for the ConfigDB, or just make the service
+  # function UUIDs into Auth groups.
+  # For now this is in the ACS-specific dump.
 
   - principal: !u E.Requirement.ServiceAccount
-    permission: !u G.Perm.Create
-    target: !u E.Requirement.EdgeRepos
+    permission: !u FP.Permission.ConfigDB.ReadConfig
+    target: !u FP.App.Info
+  - principal: !u E.Requirement.ServiceAccount
+    permission: !u FP.Permission.ConfigDB.ReadConfig
+    target: !u E.App.Config
+  - principal: !u E.Requirement.ServiceAccount
+    permission: !u FP.Permission.ConfigDB.ReadConfig
+    target: !u E.App.Cluster
+  - principal: !u E.Requirement.ServiceAccount
+    permission: !u FP.Permission.ConfigDB.ReadConfig
+    target: !u E.App.Status
+
+  - principal: !u E.Requirement.ServiceAccount
+    permission: !u FP.Permission.ConfigDB.WriteConfig
+    target: !u FP.App.Info
+  - principal: !u E.Requirement.ServiceAccount
+    permission: !u FP.Permission.ConfigDB.WriteConfig
+    target: !u E.App.Status
+  - principal: !u E.Requirement.ServiceAccount
+    permission: !u FP.Permission.ConfigDB.WriteConfig
+    target: !u G.App.Config
+
+  - principal: !u E.Requirement.ServiceAccount
+    permission: !u FP.Permission.ConfigDB.ManageObjects
+    target: !u E.Class.Account
+
   - principal: !u E.Requirement.ServiceAccount
     permission: !u G.Perm.Pull
     target: !u E.Requirement.EdgeRepos

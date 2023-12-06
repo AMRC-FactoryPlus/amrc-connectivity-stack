@@ -5,33 +5,34 @@ classes:
   - !u E.Class.Template
   # XXX Needed for now
   - !u FP.Class.Service
-  - ac0d5288-6136-4ced-a372-325fbbcdd70d
-  - 8ae784bb-c4b5-4995-9bf6-799b3c7f21ad
-  - b419cbc2-ab0f-4311-bd9e-f0591f7e88cb
+  - !u FP.Class.PermGroup
+  - !u FP.Class.Permission
+  - !u FP.Class.Requirement
 objects:
   !u FP.Class.App:
+    - !u E.App.Config
     - !u E.App.Cluster
-    - !u E.App.Template
+    - !u E.App.Status
     # XXX Needed for now
-    - dbd8a535-52ba-4f6e-b4f8-9b71aefe09d3
+    - !u FP.App.ConfigSchema
   !u FP.Class.Service:
     - !u E.Service.EdgeDeployment
-  # Permission group
-  ac0d5288-6136-4ced-a372-325fbbcdd70d:
+  !u FP.Class.PermGroup:
     - !u E.Perm.All
-  # Permissions
-  8ae784bb-c4b5-4995-9bf6-799b3c7f21ad:
+  !u FP.Class.Permission:
     - !u E.Perm.Clusters
     - !u E.Perm.Secrets
-  # Service requirement
-  b419cbc2-ab0f-4311-bd9e-f0591f7e88cb:
+  !u FP.Class.Requirement:
     - !u E.Requirement.ServiceAccount
     - !u E.Requirement.EdgeRepos
+    - !u E.Requirement.Groups
     - !u E.Requirement.FluxAccounts
     - !u E.Requirement.FluxRoles
 configs:
   !u FP.App.Info:
+    !u E.App.Config: { name: "EDO global config" }
     !u E.App.Cluster: { name: "Edge cluster configuration" }
+    !u E.App.Status: { name: "Edge cluster setup status" }
     !u E.App.Template: { name: "Edge cluster template" }
     !u E.Class.Cluster: { name: "Edge cluster" }
     !u E.Class.Template: { name: "Edge cluster template" }
@@ -41,94 +42,42 @@ configs:
     !u E.Perm.Secrets: { name: "Edge: Manage secrets" }
     !u E.Requirement.ServiceAccount: { name: "Edge Deployment service account" }
     !u E.Requirement.EdgeRepos: { name: "Edge cluster repositories" }
+    !u E.Requirement.Groups: { name: "EDO-managed groups" }
     !u E.Requirement.FluxAccounts: { name: "Edge flux accounts" }
     !u E.Requirement.FluxRoles: { name: "Edge flux roles" }
-  # Config schema
-  dbd8a535-52ba-4f6e-b4f8-9b71aefe09d3:
+  !u FP.App.ConfigSchema:
+    !u E.App.Config:
+      title: Edge Deployment Operator global config
+      type: object
+      additionalProperties: false
+      $defs:
+        uuid-and-path:
+          type: object
+          required: [uuid]
+          additionalProperties: false
+          properties:
+            uuid: { type: string, format: uuid }
+            path: { type: string }
+      properties:
+        # Compatibility with the current service-setup
+        git: { type: object }
+        repo:
+          description: Well-known git repository UUIDs
+          type: object
+          additionalProperties: { $ref: "#/$defs/uuid-and-path" }
+        group:
+          description: Auth service groups
+          type: object
+          additionalProperties: { $ref: "#/$defs/uuid-and-path" }
     !u E.App.Cluster:
       title: Edge cluster configuration
       type: object
-      required: [namespace]
+      required: [name, namespace]
+      additionalProperties: false
       properties:
+        name:
+          description: A name for the cluster.
+          type: string
         namespace:
           description: The k8s namespace to deploy to.
           type: string
-        flux:
-          description: The URL of the Git repo driving this cluster.
-          type: string
-        kubeseal_cert:
-          description: >
-            The PEM-encoded X509 certificate used by the
-            sealed-secrets operator on the edge cluster.
-          type: string
-    !u E.App.Template:
-      title: Edge cluster template
-      description: >
-        A template to drive the creation of an edge cluster. Some values
-        are subject to template expansion; `%n` is expanded to the name
-        of the cluster as supplied to the Edge Deployment Operator.
-      type: object
-      required: [name, cluster, flux, repository]
-      properties:
-        name:
-          description: The name used to locate this template.
-          type: string
-        cluster:
-          description: Configuration of the k8s cluster.
-          type: object
-          required: [namespace]
-          properties:
-            namespace:
-              description: The namespace to deploy to.
-              type: string
-        flux:
-          description: Configuration of the Flux service account.
-          type: object
-          required: [class, username]
-          properties:
-            class:
-              description: ConfigDB class to create the account under.
-              type: string
-              format: uuid
-            username:
-              description: Template for the Kerberos UPN of the service account.
-              type: string
-            name:
-              description: General Info name for the service account.
-              type: string
-            groups:
-              description: Auth groups to add the service account to.
-              type: array
-              items: { type: string, format: uuid }
-        repository:
-          description: Configuration of the cluster git repo.
-          required: [group, branch, interval]
-          properties:
-            group:
-              description: >
-                The repo group to create the repo in. The repo itself will be
-                named with the name of the cluster.
-              type: string
-            branch:
-              description: The branch name to use.
-              type: string
-            interval:
-              description: >
-                The sync interval. This is in the interval format
-                accepted by Flux.
-              type: string
-            links:
-              description: >
-                Other repos to sync from. Appropriate Flux manifests will be
-                committed to the cluster repo to enable this.
-              type: object
-              propertyNames: 
-                description: The UUID of the repo to sync from.
-                type: string
-                format: uuid
-              additionalProperties:
-                type: object
-                required: [branch, interval]
-                properties:
-                  branch: { type: string }
-                  interval: { type: string }

@@ -12,6 +12,8 @@ import { GIT_VERSION } from "../lib/git-version.js";
 import { EdgeDeploy } from "../lib/edge-deploy.js";
 import { Edge } from "../lib/uuids.js";
 
+console.log("Running Edge Deployment Operator revision %s", GIT_VERSION);
+
 const fplus = await new ServiceClient({
     env:                process.env,
     permission_group:   Edge.Perm.All,

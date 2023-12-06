@@ -675,7 +675,9 @@ data:
         }
       }
     }
-  # This is copied directory from acs-edge-deployment.
+  # This is copied directly from acs-edge-deployment.
+  # DO NOT EDIT HERE, make a PR to edit dumps/edge-deploy-configdb.yaml
+  # in that repo and then pull the result back in.
   edo: |
     {
       "service": "af15f175-78a0-4e05-97c0-2a0bb82b9f3b",
@@ -748,15 +750,6 @@ data:
           },
           "8cd08563-7c3c-44fd-af4d-15c0fa6dadcb": {
             "name": "Edge flux roles"
-          },
-          {{$application_edgeDeployment}}: {
-            "name": "Edge deployment"
-          },
-          {{$application_edgeClusterStatus}}: {
-            "name": "Edge cluster status"
-          },
-          {{$application_edgeClusterConfiguration}}: {
-            "name": "Edge cluster configuration"
           }
         },
         "dbd8a535-52ba-4f6e-b4f8-9b71aefe09d3": {
@@ -951,6 +944,15 @@ data:
           },
           {{$edgeClusterTemplate_cellGateway}}: {
               "name": "Cell gateway"
+          },
+          {{$application_edgeDeployment}}: {
+            "name": "Edge deployment"
+          },
+          {{$application_edgeClusterStatus}}: {
+            "name": "Edge cluster status"
+          },
+          {{$application_edgeClusterConfiguration}}: {
+            "name": "Edge cluster configuration"
           }
         },
         {{$application_gitRepoConfiguration}}: {
@@ -1324,6 +1326,8 @@ data:
       }
     }
   # This is copied directly from acs-edge-deployment.
+  # DO NOT EDIT HERE, make a PR to edit dumps/edge-deploy-auth.yaml
+  # in that repo and then pull the result back in.
   edo: |
     {
       "service": "cab2642a-f7d9-42e5-8845-8f35affe1fd4",

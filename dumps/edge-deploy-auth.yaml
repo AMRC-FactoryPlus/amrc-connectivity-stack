@@ -51,6 +51,15 @@ aces:
   - principal: !u E.Requirement.ServiceAccount
     permission: !u FP.Permission.ConfigDB.ReadConfig
     target: !u E.App.Status
+  - principal: !u E.Requirement.ServiceAccount
+    permission: !u FP.Permission.ConfigDB.ReadConfig
+    target: !u E.App.Template
+  - principal: !u E.Requirement.ServiceAccount
+    permission: !u FP.Permission.ConfigDB.ReadConfig
+    target: !u E.App.HelmChart
+  - principal: !u E.Requirement.ServiceAccount
+    permission: !u FP.Permission.ConfigDB.ReadConfig
+    target: !u E.App.HelmRelease
 
   - principal: !u E.Requirement.ServiceAccount
     permission: !u FP.Permission.ConfigDB.WriteConfig

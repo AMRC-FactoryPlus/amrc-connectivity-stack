@@ -370,7 +370,7 @@ function App(props) {
                 <${NewConf} update=${update} app=${app}/><//>
             ${objs.map(o => html`
                 <${Opener} key=${o} obj=${o} with_class=${true}>
-                    <${Conf} app=${app} obj=${o}/>
+                    <${Conf} app=${app} obj=${o} update_parent=${update}/>
                 <//>
             `)}
         </dl>
@@ -378,7 +378,7 @@ function App(props) {
 }
 
 function Conf(props) {
-    const {app, obj} = props;
+    const {app, obj, update_parent} = props;
 
     const [conf, set_conf] = useState("...");
     const [msg, set_msg] = useState("");
@@ -408,6 +408,7 @@ function Conf(props) {
         if (!await delete_path(`app/${app}/object/${obj}`)) {
             set_msg("Error deleting config.");
         }
+        update_parent();
     };
 
     const json = format.stringify(conf, null, 4);

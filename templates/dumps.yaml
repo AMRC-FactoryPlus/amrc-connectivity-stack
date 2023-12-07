@@ -1324,6 +1324,21 @@ data:
         },
         {
           "principal": "26d192cf-73c1-4c14-93cf-1e63743bab08",
+          "permission": "4a339562-cd57-408d-9d1a-6529a383ea4b",
+          "target": "72804a19-636b-4836-b62b-7ad1476f2b86"
+        },
+        {
+          "principal": "26d192cf-73c1-4c14-93cf-1e63743bab08",
+          "permission": "4a339562-cd57-408d-9d1a-6529a383ea4b",
+          "target": "729fe070-5e67-4bc7-94b5-afd75cb42b03"
+        },
+        {
+          "principal": "26d192cf-73c1-4c14-93cf-1e63743bab08",
+          "permission": "4a339562-cd57-408d-9d1a-6529a383ea4b",
+          "target": "88436128-09a3-4c9c-b7f4-b0e495137265"
+        },
+        {
+          "principal": "26d192cf-73c1-4c14-93cf-1e63743bab08",
           "permission": "6c799ccb-d2ad-4715-a2a7-3c8728d6c0bf",
           "target": "64a8bfa9-7772-45c4-9d1a-9e6290690957"
         },

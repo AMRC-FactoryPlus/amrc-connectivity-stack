@@ -7,6 +7,7 @@
 import {h, render} from "https://unpkg.com/preact@latest?module";
 import {useEffect, useRef, useState} from "https://unpkg.com/preact@latest/hooks/dist/hooks.module.js?module";
 import htm from "https://unpkg.com/htm?module";
+import yaml from "https://unpkg.com/yaml/browser/index.js";
 
 const html = htm.bind(h);
 
@@ -363,7 +364,8 @@ function Conf(props) {
         if (!editbox.current) return;
         const new_conf = editbox.current.value;
 
-        const st = await put_string(`app/${app}/object/${obj}`, new_conf);
+        const json = yaml.parse(new_conf);
+        const st = await put_json(`app/${app}/object/${obj}`, json);
         if (st_ok(st)) {
             set_msg(html`Config updated`);
         } else {
@@ -377,7 +379,7 @@ function Conf(props) {
         }
     };
 
-    const json = JSON.stringify(conf, null, 4);
+    const json = yaml.stringify(conf);
     return html`
         <textarea ref=${editbox} cols=80 rows=25 value=${json}/><br/>
         <button onClick=${update}>Update</button>

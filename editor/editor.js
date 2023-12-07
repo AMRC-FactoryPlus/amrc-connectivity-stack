@@ -4,10 +4,12 @@
  * Copyright 2022 AMRC
  */
 
-import {h, render} from "https://unpkg.com/preact@latest?module";
-import {useEffect, useRef, useState} from "https://unpkg.com/preact@latest/hooks/dist/hooks.module.js?module";
-import htm from "https://unpkg.com/htm?module";
-import yaml from "https://unpkg.com/yaml/browser/index.js";
+import { h, render, createContext } from "https://esm.sh/preact";
+import { useContext, useEffect, useRef, useState }
+                                    from "https://esm.sh/preact/hooks";
+import { signal }                   from "https://esm.sh/@preact/signals";
+import htm                          from "https://esm.sh/htm";
+import yaml                         from "https://esm.sh/yaml";
 
 const html = htm.bind(h);
 
@@ -17,6 +19,8 @@ const AppUuid = {
 };
 
 let Token = null;
+
+const Formatter = createContext(signal(yaml));
 
 async function service_fetch(path, opts) {
     const get_tok = async () => {
@@ -175,11 +179,13 @@ function ObjTitle(props) {
 }
 
 function Editor(props) {
+    const UseYAML = createContext(true);
 
     return html`
         <h1>ACS | Config Store</h1>
         <p>The display does not always update when you change things.
             You might need to reopen sections or refresh the page.</p>
+       <${SetUseYAML}/> 
         <dl>
             <${Opener} title="Applications">
                 <${Apps}/>
@@ -195,6 +201,26 @@ function Editor(props) {
             />
         </dl>
     `
+}
+
+function SetUseYAML (props) {
+    const format = useContext(Formatter);
+
+    const option = (frm, label) => html`
+        <label>
+            <input type="radio" 
+                checked=${format.value == frm} 
+                onClick=${() => format.value = frm}/>
+            ${label}
+        </label>
+    `;
+
+    return html`
+        <span>
+            ${option(yaml, "YAML")}
+            ${option(JSON, "JSON")}
+        </span>
+    `;
 }
 
 function Apps(props) {
@@ -351,8 +377,11 @@ function App(props) {
 
 function Conf(props) {
     const {app, obj} = props;
+
     const [conf, set_conf] = useState("...");
     const [msg, set_msg] = useState("");
+
+    const format = useContext(Formatter).value;
 
     const update_conf = async () =>
         set_conf(await fetch_json(`app/${app}/object/${obj}`));
@@ -364,7 +393,7 @@ function Conf(props) {
         if (!editbox.current) return;
         const new_conf = editbox.current.value;
 
-        const json = yaml.parse(new_conf);
+        const json = format.parse(new_conf);
         const st = await put_json(`app/${app}/object/${obj}`, json);
         if (st_ok(st)) {
             set_msg(html`Config updated`);
@@ -379,7 +408,7 @@ function Conf(props) {
         }
     };
 
-    const json = yaml.stringify(conf);
+    const json = format.stringify(conf, null, 4);
     return html`
         <textarea ref=${editbox} cols=80 rows=25 value=${json}/><br/>
         <button onClick=${update}>Update</button>
@@ -392,14 +421,17 @@ function NewConf(props) {
     const app = props.app;
     const [msg, set_msg] = useState("");
 
+    const format = useContext(Formatter).value;
+
     const new_obj = useRef();
     const new_conf = useRef();
 
     const create = async () => {
         if (!new_obj.current || !new_conf.current) return;
-        const st = await put_string(
+        const json = format.parse(new_conf.current.value);
+        const st = await put_json(
             `app/${app}/object/${new_obj.current.value}`,
-            new_conf.current.value);
+            json);
         set_msg(st_ok(st) ? "Create succeeded" : `Create failed: ${st}`);
     };
 

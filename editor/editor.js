@@ -361,11 +361,13 @@ function App(props) {
     const {app} = props;
     const [objs, set_objs] = useState([]);
 
-    useEffect(async () => set_objs(await fetch_json(`app/${app}/object`)), []);
+    const update = async () => set_objs(await fetch_json(`app/${app}/object`));
+    useEffect(update, []);
 
     return html`
         <dl>
-            <${Opener} title="New config"><${NewConf} app=${app}/><//>
+            <${Opener} title="New config">
+                <${NewConf} update=${update} app=${app}/><//>
             ${objs.map(o => html`
                 <${Opener} key=${o} obj=${o} with_class=${true}>
                     <${Conf} app=${app} obj=${o}/>
@@ -418,7 +420,7 @@ function Conf(props) {
 }
 
 function NewConf(props) {
-    const app = props.app;
+    const { app, update } = props;
     const [msg, set_msg] = useState("");
 
     const format = useContext(Formatter).value;
@@ -432,7 +434,15 @@ function NewConf(props) {
         const st = await put_json(
             `app/${app}/object/${new_obj.current.value}`,
             json);
-        set_msg(st_ok(st) ? "Create succeeded" : `Create failed: ${st}`);
+        if (st_ok(st)) {
+            await update();
+            set_msg("Create succeeded");
+            new_obj.current.value = "";
+            new_conf.current.value = "";
+        }
+        else {
+            set_msg(`Create failed: ${st}`);
+        }
     };
 
     return html`

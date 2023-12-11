@@ -13,6 +13,8 @@ cluster = os.environ["CLUSTER_NAME"]
 realm = os.environ["REALM"]
 namespace = os.environ["NAMESPACE"]
 
+input("Press Return to continue...")
+
 print(f"Enrolling cluster {cluster} in {realm}")
 user = input("ACS admin user: ")
 passwd = getpass.getpass(prompt="Password: ")

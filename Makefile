@@ -52,7 +52,7 @@ restart:
 	sleep 2
 
 logs:
-	kubectl logs -f deploy/"${deployment}"
+	kubectl logs ${logs_opts} -f deploy/"${deployment}"
 
 else
 

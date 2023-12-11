@@ -60,6 +60,9 @@ aces:
   - principal: !u E.Requirement.ServiceAccount
     permission: !u FP.Permission.ConfigDB.ReadConfig
     target: !u E.App.HelmRelease
+  - principal: !u E.Requirement.ServiceAccount
+    permission: !u FP.Permission.ConfigDB.ReadConfig
+    target: !u E.App.Bootstrap
 
   - principal: !u E.Requirement.ServiceAccount
     permission: !u FP.Permission.ConfigDB.WriteConfig

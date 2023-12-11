@@ -54,6 +54,8 @@ spec:
               value: sv1edo@{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
             - name: KUBESEAL_TEMP
               value: /cert
+            - name: KRBKEYS_IMAGE
+              value: {{ include "amrc-connectivity-stack.image-name" .Values.identity.krbKeysOperator | quote }}
             - name: HTTP_API_URL
               value: http://edo.{{ .Release.Namespace }}.svc.cluster.local
             - name: DIRECTORY_URL

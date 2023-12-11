@@ -1,4 +1,5 @@
 import getpass
+import os
 import secrets
 
 import kadmin
@@ -8,9 +9,9 @@ from .kadmin import Kadm
 from .kubernetes import K8s
 from .util import KtData
 
-cluster = process.environ["CLUSTER_NAME"]
-realm = process.environ["REALM"]
-namespace = process.environ["NAMESPACE"]
+cluster = os.environ["CLUSTER_NAME"]
+realm = os.environ["REALM"]
+namespace = os.environ["NAMESPACE"]
 
 print(f"Enrolling cluster {cluster} in {realm}")
 user = input("ACS admin user: ")

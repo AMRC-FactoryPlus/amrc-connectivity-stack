@@ -51,7 +51,7 @@ function get_token (service, renew) {
     return promise;
 }
 
-async function fetch_json (service, path, method="GET", body=null) {
+async function fetch_json (service, path, method="GET", body=null, cache=false) {
     if (!(service in Services)) return;
     const url = new URL(path, Services[service]);
 
@@ -60,6 +60,7 @@ async function fetch_json (service, path, method="GET", body=null) {
         const opts = {
             method, 
             headers: { "Authorization": `Bearer ${token}` },
+            cache: cache ? "default" : "no-cache",
         };
         if (body != null) {
             opts.body = JSON.stringify(body);
@@ -85,7 +86,9 @@ async function fetch_json (service, path, method="GET", body=null) {
 }
 
 async function _get_name (obj) {
-    const gi = await fetch_json("configdb", `v1/app/${Uuid.General_Info}/object/${obj}`);
+    const gi = await fetch_json("configdb", 
+        `v1/app/${Uuid.General_Info}/object/${obj}`,
+        "GET", null, true);
     return gi 
         ? gi.deleted
             ? html`<s>${gi.name}</s>`
@@ -94,7 +97,9 @@ async function _get_name (obj) {
 }
 
 async function get_name (obj) {
-    const reg = await fetch_json("configdb", `v1/app/${Uuid.Registration}/object/${obj}`);
+    const reg = await fetch_json("configdb", 
+        `v1/app/${Uuid.Registration}/object/${obj}`,
+        "GET", null, true);
     const name = await _get_name(obj);
     const klass = reg ? await _get_name(reg.class) : html`<i>NO CLASS</i>`;
     return html`${name} <small>(${klass})</small>`;

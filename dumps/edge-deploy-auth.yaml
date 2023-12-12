@@ -44,7 +44,7 @@ aces:
     target: !u FP.App.Info
   - principal: !u E.Requirement.ServiceAccount
     permission: !u FP.Permission.ConfigDB.ReadConfig
-    target: !u E.App.Config
+    target: !u FP.App.ServiceConfig
   - principal: !u E.Requirement.ServiceAccount
     permission: !u FP.Permission.ConfigDB.ReadConfig
     target: !u E.App.Cluster
@@ -53,7 +53,7 @@ aces:
     target: !u E.App.Status
   - principal: !u E.Requirement.ServiceAccount
     permission: !u FP.Permission.ConfigDB.ReadConfig
-    target: !u E.App.Template
+    target: !u E.App.Flux
   - principal: !u E.Requirement.ServiceAccount
     permission: !u FP.Permission.ConfigDB.ReadConfig
     target: !u E.App.HelmChart

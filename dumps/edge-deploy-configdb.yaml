@@ -10,9 +10,11 @@ classes:
   - !u FP.Class.Requirement
 objects:
   !u FP.Class.App:
-    - !u E.App.Config
     - !u E.App.Cluster
     - !u E.App.Status
+    - !u E.App.Flux
+    - !u E.App.HelmChart
+    - !u E.App.HelmRelease
     # XXX Needed for now
     - !u FP.App.ConfigSchema
   !u FP.Class.Service:
@@ -30,12 +32,13 @@ objects:
     - !u E.Requirement.FluxRoles
 configs:
   !u FP.App.Info:
-    !u E.App.Config: { name: "EDO global config" }
-    !u E.App.Cluster: { name: "Edge cluster configuration" }
-    !u E.App.Status: { name: "Edge cluster setup status" }
-    !u E.App.Template: { name: "Edge cluster template" }
     !u E.Class.Cluster: { name: "Edge cluster" }
     !u E.Class.Template: { name: "Edge cluster template" }
+    !u E.App.Cluster: { name: "Edge cluster configuration" }
+    !u E.App.Status: { name: "Edge cluster setup status" }
+    !u E.App.Flux: { name: "Edge cluster Flux template" }
+    !u E.App.HelmChart: { name: "Helm chart template" }
+    !u E.App.HelmRelease: { name: "HelmRelease template" }
     !u E.Service.EdgeDeployment: { name: "Edge Deployment Operator" }
     !u E.Perm.All: { name: "Edge Deployment permissions" }
     !u E.Perm.Clusters: { name: "Edge: Manage clusters" }
@@ -46,29 +49,6 @@ configs:
     !u E.Requirement.FluxAccounts: { name: "Edge flux accounts" }
     !u E.Requirement.FluxRoles: { name: "Edge flux roles" }
   !u FP.App.ConfigSchema:
-    !u E.App.Config:
-      title: Edge Deployment Operator global config
-      type: object
-      additionalProperties: false
-      $defs:
-        uuid-and-path:
-          type: object
-          required: [uuid]
-          additionalProperties: false
-          properties:
-            uuid: { type: string, format: uuid }
-            path: { type: string }
-      properties:
-        # Compatibility with the current service-setup
-        git: { type: object }
-        repo:
-          description: Well-known git repository UUIDs
-          type: object
-          additionalProperties: { $ref: "#/$defs/uuid-and-path" }
-        group:
-          description: Auth service groups
-          type: object
-          additionalProperties: { $ref: "#/$defs/uuid-and-path" }
     !u E.App.Cluster:
       title: Edge cluster configuration
       type: object
@@ -81,3 +61,63 @@ configs:
         namespace:
           description: The k8s namespace to deploy to.
           type: string
+    !u E.App.Status:
+      title: EDO private status
+      type: object
+      additionalProperties: true
+      # No additional constraints, this is our private data
+    !u E.App.Flux:
+      title: Edge cluster Flux template
+      description: >
+        A template for creating an edge cluster Flux repo. Values that
+        are strings will have {{handlebar}} templates expanded.
+      type: object
+      required: ["self-link.yaml"]
+      additionalProperties:
+        description: >
+          A file to include in the flux repo. The key gives the name of
+          the file and the value is an array of manifest templates.
+        type: array
+        items:
+          description: A Kubernetes manifest template.
+          oneOf:
+            - type: object
+              required: [apiVersion, kind]
+            - type: string
+              pattern: ^\{\{.*\}\}$
+    !u E.App.HelmChart:
+      title: Helm chart template
+      type: object
+      required: [chart, values]
+      additionalProperties: false
+      properties:
+        chart:
+          description: Path to the Helm chart within the source repo.
+          type: string
+        source:
+          description: Source to pull the Helm chart from.
+          type: string
+        values:
+          description: >
+            Helm values to apply. {{Templates}} will be expanded.
+          type: object
+    !u E.App.HelmRelease:
+      title: Flux HelmRelease manifest template
+      type: object
+      required: [template, resources]
+      additionalProperties: false
+      properties:
+        template:
+          description: Resource template with {{templates}}
+          type: object
+          required: [apiVersion, kind]
+        resources:
+          description: Resource types which represent Helm charts
+          type: array
+          items:
+            type: object
+            required: [apiVersion, kind]
+            additionalProperties: false
+            properties:
+              apiVersion: { type: string }
+              kind: { type: string }

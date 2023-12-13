@@ -107,8 +107,19 @@ serviceSetup:
     repository: acs-service-setup
     tag: v0.0.2
     pullPolicy: IfNotPresent
-  helmUrl: https://github.com/AMRC-FactoryPlus/edge-helm-charts.git
-  helmRef: v0.0.1
+  config:
+    class:
+      repoGroup: b03d4dfe-7e78-4252-8e62-af594cf316c9
+      userGroup: f1fabdd1-de90-4399-b3da-ccf6c2b2c08b
+      edgeAccount: 97756c9a-38e6-4238-b78c-3df6f227a6c9
+    repoMirror:
+      helm:
+        name: Edge Helm charts
+        url: https://github.com/AMRC-FactoryPlus/edge-helm-charts.git
+        ref: v0.0.1
+    helmChart:
+      cluster: null
+    
 
 mqtt:
   # -- Whether or not to enable the MQTT component

@@ -184,6 +184,9 @@ data:
   {{ .Values.identity.realm | required "values.identity.realm is required!" }}.acl: |
     op1krbkeys      x
     admin           x
+    {{- range .Values.identity.kadminUsers }}
+    {{ .principal }} {{ .permission }} {{ .restrictions }}
+    {{- end }}
 ---
 apiVersion: v1
 kind: Service

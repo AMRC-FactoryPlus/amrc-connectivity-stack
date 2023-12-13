@@ -14,6 +14,11 @@ identity:
   enabled: true
   # -- The Kerberos realm for this Factory+ deployment.
   realm: FACTORYPLUS.MYORGANISATION.COM
+  # -- Kerberos UPNs to grant kadmin access. This needs to be list of
+  # objects with 'principal', 'permission' and (optionally)
+  # 'restrictions' properties; see the kadmin documentation for their
+  # meaning.
+  kadminUsers: []
   # -- Enable support for cross-realm authentication
   crossRealm: [ ]
   # crossRealm:

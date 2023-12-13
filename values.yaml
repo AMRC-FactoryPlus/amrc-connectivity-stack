@@ -107,19 +107,28 @@ serviceSetup:
     repository: acs-service-setup
     tag: v0.0.2
     pullPolicy: IfNotPresent
+  # This section overrides the classes etc. installed into the ConfigDB
   config:
+    # ConfigDB class UUIDs
     class:
+      # Git repository groups
       repoGroup: b03d4dfe-7e78-4252-8e62-af594cf316c9
-      userGroup: f1fabdd1-de90-4399-b3da-ccf6c2b2c08b
+      # Edge service accounts
       edgeAccount: 97756c9a-38e6-4238-b78c-3df6f227a6c9
+      # User groups for edge service accounts
+      edgeGroup: f1fabdd1-de90-4399-b3da-ccf6c2b2c08b
+    # Git repos to mirror in the on-prem git server
     repoMirror:
       helm:
         name: Edge Helm charts
         url: https://github.com/AMRC-FactoryPlus/edge-helm-charts.git
+        # The 'acs' branch will be updated to this tag/branch 
         ref: v0.0.1
+    # Helm charts to deploy to the edge; these default to the charts
+    # created automatically but can be overridden to customise
     helmChart:
-      cluster: null
-    
+      # Chart to deploy an edge cluster
+      #cluster: null
 
 mqtt:
   # -- Whether or not to enable the MQTT component

@@ -59,7 +59,7 @@ spec:
             - name: HTTP_API_URL
               value: http://edo.{{ .Release.Namespace }}.svc.cluster.local
             - name: EXTERNAL_URL
-              value: "{{ .Values.acs.secure | ternary "https://" "http://" }}edo.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"
+              value: {{ include "amrc-connectivity-stack.external-url" (list . "edo") | quote }}
             - name: DIRECTORY_URL
               value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
           volumeMounts:

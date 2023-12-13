@@ -66,6 +66,17 @@ Specify cache-control max-age for a service.
 {{- end }}
 
 {{/*
+Fetch an external service URL
+*/}}
+{{- define "amrc-connectivity-stack.external-url" }}
+{{- $top := index . 0 }}
+{{- $srv := index . 1 }}
+{{- $top.Values.acs.secure | ternary "https://" "http://" }}
+{{- $srv }}.
+{{- $top.Values.acs.baseUrl | required "values.acs.baseUrl is required" }}
+{{- end }}
+
+{{/*
 Common labels
 */}}
 {{- define "amrc-connectivity-stack.labels" -}}

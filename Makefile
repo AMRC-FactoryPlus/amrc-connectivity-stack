@@ -30,7 +30,10 @@ all: build push
 check-committed:
 	[ -z "$$(git status --porcelain)" ] || (git status; exit 1)
 
-build: check-committed
+lint:
+	npx eslint bin lib
+
+build: check-committed lint
 	${docker} build -t "${tag}" ${build_args} .
 
 push:

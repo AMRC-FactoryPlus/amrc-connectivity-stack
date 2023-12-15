@@ -7,8 +7,8 @@
 namespace App\Domain\EdgeClusters\Actions;
 
 use AMRCFactoryPlus\ServiceClient;
-use App\Exceptions\ActionForbiddenException;
 use AMRCFactoryPlus\UUIDs\App;
+use App\Exceptions\ActionForbiddenException;
 
 use function func_get_args;
 
@@ -38,7 +38,7 @@ class GetEdgeClustersAction
 
         $fplus = resolve(ServiceClient::class);
         $configDB = $fplus->getConfigDB();
-        $edgeClusters = $configDB->getConfig(App::EdgeClusterStatus);
+        $edgeClusters = $configDB->getConfig(App::EdgeClusterConfiguration);
 
         $clusters = [];
 
@@ -47,11 +47,11 @@ class GetEdgeClustersAction
             // Then hit the general object information endpoint for each cluster to get its name
             $clusterName = $configDB->getConfig(App::Info, $cluster)['name'];
             // Then hit the edge cluster status endpoint for each cluster to get its status and nodes
-            $clusterResponse = $configDB->getConfig(App::EdgeClusterStatus, $cluster);
+            $clusterStatus = $configDB->getConfig(App::EdgeClusterStatus, $cluster);
 
             $clusters[$clusterName] = [
                 'uuid' => $cluster,
-                'nodes' => $clusterResponse['hosts'],
+                'status' => $clusterStatus,
             ];
         }
 

@@ -45,11 +45,17 @@
       <div class="hidden w-32 bg-gray-100 overflow-y-auto md:block flex flex-col">
         <div class="w-full flex flex-col items-center flex-1 h-full">
           <div class="flex flex-col flex-1 p-2 w-full space-y-1">
-            <a href="/"
+            <a href="/nodes"
                :class="pageActive('nodes') ? 'bg-brand bg-opacity-10 text-brand' : 'hover:bg-brand hover:bg-opacity-10 hover:text-brand'"
                class="text-brand group w-full p-3 flex flex-col items-center text-xs font-medium">
               <i class="fa-sharp fa-solid fa-sitemap fa-2x" :class="pageActive('nodes') ? 'opacity-100' : 'opacity-60 group-hover:opacity-100'"></i>
               <span class="mt-2">Nodes</span>
+            </a>
+            <a href="/edge-clusters"
+               :class="pageActive('edge-clusters') ? 'bg-brand bg-opacity-10 text-brand' : 'hover:bg-brand hover:bg-opacity-10 hover:text-brand'"
+               class="text-brand group w-full p-3 flex flex-col text-center items-center text-xs font-medium">
+              <i class="fa-sharp fa-solid fa-circle-nodes fa-2x" :class="pageActive('nodes') ? 'opacity-100' : 'opacity-60 group-hover:opacity-100'"></i>
+              <span class="mt-2">Edge Clusters</span>
             </a>
             <a v-if="$root.$data.user.administrator" href="/schema-editor"
                :class="pageActive('schema-editor') ? 'bg-brand bg-opacity-10 text-brand' : 'hover:bg-brand hover:bg-opacity-10 hover:text-brand'"

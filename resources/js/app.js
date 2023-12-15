@@ -43,6 +43,7 @@ Vue.component('dashboard', () => import(/* webpackPrefetch: true */ './component
 Vue.component('node-container', () => import(/* webpackPrefetch: true */ './components/Containers/NodeContainer.vue'));
 Vue.component('device-editor-container', () => import(/* webpackPrefetch: true */ './components/Containers/DeviceEditorContainer.vue'));
 Vue.component('schema-editor-container', () => import(/* webpackPrefetch: true */ './components/Containers/SchemaEditorContainer.vue'));
+Vue.component('edge-cluster-container', () => import(/* webpackPrefetch: true */ './components/Containers/EdgeClusterContainer.vue'));
 
 // Components
 Vue.component('Loader', () => import(/* webpackPrefetch: true */ './components/General/Loader.vue'));

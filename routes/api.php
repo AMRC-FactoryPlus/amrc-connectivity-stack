@@ -86,6 +86,8 @@ Route::middleware('auth:api')->get('/clusters', [ClusterController::class, 'inde
 
 // ------ Edge Clusters ------ //
 Route::middleware('auth:api')->get('/edge-clusters', [EdgeClusterController::class, 'index']);
+Route::middleware('auth:api')->get('/edge-clusters/{cluster}/bootstrap-command', [EdgeClusterController::class, 'bootstrapCommand']);
+Route::middleware('auth:api')->post('/edge-clusters', [EdgeClusterController::class, 'create']);
 
 // ------ Schemas ------ //
 Route::middleware('auth:api')->get('/device-schemas', [DeviceSchemaController::class, 'index']);

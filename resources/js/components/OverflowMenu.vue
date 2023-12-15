@@ -23,7 +23,7 @@
   </div>
   <div v-else class="flex items-center justify-center gap-2 text-sm animate-pulse text-gray-400">
     <i class="fa-solid fa-circle-notch animate-spin"></i>
-    <div>Loading Options...</div>
+    <div>Loading Options (or no options)...</div>
   </div>
 </template>
 

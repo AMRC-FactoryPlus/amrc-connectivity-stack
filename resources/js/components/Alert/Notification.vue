@@ -211,7 +211,7 @@ export default {
           id: uuid,
           type: 'error',
           title: 'Something broke',
-          description: e ?? 'Something went wrong. If this keeps happening please file a bug report.',
+          description: e.description ?? 'Something went wrong. If this keeps happening please file a bug report.',
           buttons: [
             { text: 'File Bug Report', type: 'secondary', loadingOnClick: false, action: () => {this.goto_url_tab('https://github.com/AMRC-FactoryPlus/acs-manager/issues/new');} },
           ],

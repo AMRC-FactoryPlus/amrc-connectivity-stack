@@ -7,6 +7,7 @@
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeviceController;
 use App\Http\Controllers\EdgeAgentController;
+use App\Http\Controllers\EdgeClusterController;
 use App\Http\Controllers\SchemaEditorController;
 use Illuminate\Support\Facades\Route;
 
@@ -35,8 +36,11 @@ Route::group(
         ],
     ],
     static function () {
-        Route::get('/', [DashboardController::class, 'nodes']);
+        // Redirect / to /nodes
+        Route::redirect('/', '/nodes');
+        Route::get('/nodes', [DashboardController::class, 'nodes']);
         Route::get('schema-editor', [SchemaEditorController::class, 'index']);
+        Route::get('edge-clusters', [EdgeClusterController::class, 'index']);
         Route::get('preferences', [DashboardController::class, 'preferences']);
         Route::get('roles', [DashboardController::class, 'roles']);
         Route::get('users', [DashboardController::class, 'users']);

@@ -1,0 +1,8 @@
+service: !u UUIDs.Service.ConfigDB
+version: 1
+objects:
+  !u UUIDs.Class.App:
+    - !u UUIDs.App.ServiceConfig
+configs:
+  !u UUIDs.App.Info:
+    !u UUIDs.App.ServiceConfig:   { name: "Service setup" }

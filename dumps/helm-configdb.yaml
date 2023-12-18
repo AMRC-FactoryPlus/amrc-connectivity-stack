@@ -1,0 +1,79 @@
+service: !u UUIDs.Service.ConfigDB
+version: 1
+classes:
+  - !u Clusters.Class.HelmChart
+objects:
+  !u UUIDs.Class.App:
+    - !u Clusters.App.HelmRelease
+    - !u Clusters.App.HelmTemplate
+    # XXX Needed for now
+    - !u UUIDs.App.ConfigSchema
+applications:
+  !u UUIDs.App.Info:
+    !u Clusters.Class.HelmChart:    { name: "Helm chart" }
+    !u Clusters.App.HelmRelease:    { name: "HelmRelease template" }
+    !u Clusters.App.HelmTemplate:   { name: "Helm chart template" }
+  !u UUIDs.App.ConfigSchema:
+    !u Clusters.App.HelmTemplate:
+      title: Helm chart template
+      type: object
+      required: [chart, values]
+      additionalProperties: false
+      properties:
+        chart:
+          description: Path to the Helm chart within the source repo.
+          type: string
+        source:
+          description: Source to pull the Helm chart from.
+          type: string
+        values:
+          description: >
+            Helm values to apply. {{Templates}} will be expanded.
+          type: object
+    !u Clusters.App.HelmRelease:
+      title: Flux HelmRelease manifest template
+      type: object
+      required: [template, resources]
+      additionalProperties: false
+      properties:
+        template:
+          description: Resource template with {{templates}}
+          type: object
+          required: [apiVersion, kind]
+        resources:
+          description: Resource types which represent Helm charts
+          type: array
+          items:
+            type: object
+            required: [apiVersion, kind]
+            additionalProperties: false
+            properties:
+              apiVersion: { type: string }
+              kind: { type: string }
+  # XXX These single-object configs don't give the user any opportunity
+  # to override the configuration. But where is an override specified?
+  !u Clusters.App.HelmRelease:
+    !u Clusters.App.HelmRelease:
+      resources:
+        - apiVersion: helm.toolkit.fluxcd.io/v2beta1
+          kind: HelmRelease
+      template:
+        apiVersion: helm.toolkit.fluxcd.io/v2beta1
+        kind: HelmRelease
+        metadata:
+          name: "{{chart}}-{{uuid}}"
+        spec:
+          chart:
+            spec:
+              chart: "{{chart}}"
+              reconcileStrategy: Revision
+              sourceRef:
+                kind: GitRepository
+                name: helm-charts
+          install:
+            disableWait: true
+          interval: 2m0s
+          maxHistory: 1
+          upgrade:
+            disableWait: true
+          values: "{{values}}"

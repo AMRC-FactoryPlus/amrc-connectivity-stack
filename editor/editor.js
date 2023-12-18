@@ -21,8 +21,6 @@ const AppUuid = {
 
 let Token = null;
 
-const Formatter = createContext(signal(yaml));
-
 async function service_fetch(path, opts) {
     const get_tok = async () => {
         const res = await fetch("/token", {method: "POST"});
@@ -180,8 +178,6 @@ function ObjTitle(props) {
 }
 
 function Editor(props) {
-    const UseYAML = createContext(true);
-
     return html`
         <h1>ACS | Config Store</h1>
         <p>The display does not always update when you change things.
@@ -204,6 +200,22 @@ function Editor(props) {
     `
 }
 
+const Formats = {
+    json: {
+        read:   JSON.parse,
+        write:  d => JSON.stringify(d, null, 4),
+    },
+    yaml: {
+        read:   yaml.parse,
+        write:  d => yaml.stringify(d, null, {
+            sortMapEntries:     true,
+            blockQuote:         "literal",
+            indent:             2,
+        }),
+    },
+};
+const Formatter = createContext(signal(Formats.yaml));
+
 function SetUseYAML (props) {
     const format = useContext(Formatter);
 
@@ -218,8 +230,8 @@ function SetUseYAML (props) {
 
     return html`
         <span>
-            ${option(yaml, "YAML")}
-            ${option(JSON, "JSON")}
+            ${option(Formats.yaml, "YAML")}
+            ${option(Formats.json, "JSON")}
         </span>
     `;
 }
@@ -396,7 +408,7 @@ function Conf(props) {
         if (!editbox.current) return;
         const new_conf = editbox.current.value;
 
-        const json = format.parse(new_conf);
+        const json = format.read(new_conf);
         const st = await put_json(`app/${app}/object/${obj}`, json);
         if (st_ok(st)) {
             set_msg(html`Config updated`);
@@ -412,7 +424,7 @@ function Conf(props) {
         update_parent();
     };
 
-    const json = format.stringify(conf, null, 4);
+    const json = format.write(conf);
     return html`
         <textarea ref=${editbox} cols=80 rows=25 value=${json}/><br/>
         <button onClick=${update}>Update</button>
@@ -432,7 +444,7 @@ function NewConf(props) {
 
     const create = async () => {
         if (!new_obj.current || !new_conf.current) return;
-        const json = format.parse(new_conf.current.value);
+        const json = format.read(new_conf.current.value);
         const st = await put_json(
             `app/${app}/object/${new_obj.current.value}`,
             json);

@@ -3,7 +3,6 @@
   "version": 1,
   "classes": [
     "f24d354d-abc1-4e32-98e1-0667b3e40b61",
-    "f9be0334-0ff7-43d3-9d8a-188d3e4d472b",
     "265d481f-87a7-4f93-8fc6-53fa64dc11bb",
     "ac0d5288-6136-4ced-a372-325fbbcdd70d",
     "8ae784bb-c4b5-4995-9bf6-799b3c7f21ad",
@@ -13,7 +12,6 @@
     "d319bd87-f42b-4b66-be4f-f82ff48b93f0": [
       "bdb13634-0b3d-4e38-a065-9d88c12ee78d",
       "f6c67e6f-e48e-4f69-b4bb-bfbddcc2a517",
-      "72804a19-636b-4836-b62b-7ad1476f2b86",
       "729fe070-5e67-4bc7-94b5-afd75cb42b03",
       "88436128-09a3-4c9c-b7f4-b0e495137265",
       "dbd8a535-52ba-4f6e-b4f8-9b71aefe09d3"
@@ -41,17 +39,11 @@
       "f24d354d-abc1-4e32-98e1-0667b3e40b61": {
         "name": "Edge cluster"
       },
-      "f9be0334-0ff7-43d3-9d8a-188d3e4d472b": {
-        "name": "Edge cluster template"
-      },
       "bdb13634-0b3d-4e38-a065-9d88c12ee78d": {
         "name": "Edge cluster configuration"
       },
       "f6c67e6f-e48e-4f69-b4bb-bfbddcc2a517": {
         "name": "Edge cluster setup status"
-      },
-      "72804a19-636b-4836-b62b-7ad1476f2b86": {
-        "name": "Edge cluster Flux template"
       },
       "729fe070-5e67-4bc7-94b5-afd75cb42b03": {
         "name": "Helm chart template"
@@ -111,96 +103,6 @@
         "title": "EDO private status",
         "type": "object",
         "additionalProperties": true
-      },
-      "72804a19-636b-4836-b62b-7ad1476f2b86": {
-        "title": "Edge cluster Flux template",
-        "description": "A template for creating an edge cluster Flux repo. Values that are strings will have {{handlebar}} templates expanded.\n",
-        "type": "object",
-        "required": [
-          "self-link.yaml"
-        ],
-        "additionalProperties": {
-          "description": "A file to include in the flux repo. The key gives the name of the file and the value is an array of manifest templates.\n",
-          "type": "array",
-          "items": {
-            "description": "A Kubernetes manifest template.",
-            "oneOf": [
-              {
-                "type": "object",
-                "required": [
-                  "apiVersion",
-                  "kind"
-                ]
-              },
-              {
-                "type": "string",
-                "pattern": "^\\{\\{.*\\}\\}$"
-              }
-            ]
-          }
-        }
-      },
-      "729fe070-5e67-4bc7-94b5-afd75cb42b03": {
-        "title": "Helm chart template",
-        "type": "object",
-        "required": [
-          "chart",
-          "values"
-        ],
-        "additionalProperties": false,
-        "properties": {
-          "chart": {
-            "description": "Path to the Helm chart within the source repo.",
-            "type": "string"
-          },
-          "source": {
-            "description": "Source to pull the Helm chart from.",
-            "type": "string"
-          },
-          "values": {
-            "description": "Helm values to apply. {{Templates}} will be expanded.\n",
-            "type": "object"
-          }
-        }
-      },
-      "88436128-09a3-4c9c-b7f4-b0e495137265": {
-        "title": "Flux HelmRelease manifest template",
-        "type": "object",
-        "required": [
-          "template",
-          "resources"
-        ],
-        "additionalProperties": false,
-        "properties": {
-          "template": {
-            "description": "Resource template with {{templates}}",
-            "type": "object",
-            "required": [
-              "apiVersion",
-              "kind"
-            ]
-          },
-          "resources": {
-            "description": "Resource types which represent Helm charts",
-            "type": "array",
-            "items": {
-              "type": "object",
-              "required": [
-                "apiVersion",
-                "kind"
-              ],
-              "additionalProperties": false,
-              "properties": {
-                "apiVersion": {
-                  "type": "string"
-                },
-                "kind": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        }
       }
     }
   }

@@ -686,7 +686,6 @@ data:
       "version": 1,
       "classes": [
         "f24d354d-abc1-4e32-98e1-0667b3e40b61",
-        "f9be0334-0ff7-43d3-9d8a-188d3e4d472b",
         "265d481f-87a7-4f93-8fc6-53fa64dc11bb",
         "ac0d5288-6136-4ced-a372-325fbbcdd70d",
         "8ae784bb-c4b5-4995-9bf6-799b3c7f21ad",
@@ -694,10 +693,10 @@ data:
       ],
       "objects": {
         "d319bd87-f42b-4b66-be4f-f82ff48b93f0": [
-          "5b47881c-b012-4040-945c-eacafca539b2",
-          "72804a19-636b-4836-b62b-7ad1476f2b86",
           "bdb13634-0b3d-4e38-a065-9d88c12ee78d",
           "f6c67e6f-e48e-4f69-b4bb-bfbddcc2a517",
+          "729fe070-5e67-4bc7-94b5-afd75cb42b03",
+          "88436128-09a3-4c9c-b7f4-b0e495137265",
           "dbd8a535-52ba-4f6e-b4f8-9b71aefe09d3"
         ],
         "265d481f-87a7-4f93-8fc6-53fa64dc11bb": [
@@ -720,8 +719,8 @@ data:
       },
       "configs": {
         "64a8bfa9-7772-45c4-9d1a-9e6290690957": {
-          "5b47881c-b012-4040-945c-eacafca539b2": {
-            "name": "EDO global config"
+          "f24d354d-abc1-4e32-98e1-0667b3e40b61": {
+            "name": "Edge cluster"
           },
           "bdb13634-0b3d-4e38-a065-9d88c12ee78d": {
             "name": "Edge cluster configuration"
@@ -729,14 +728,11 @@ data:
           "f6c67e6f-e48e-4f69-b4bb-bfbddcc2a517": {
             "name": "Edge cluster setup status"
           },
-          "72804a19-636b-4836-b62b-7ad1476f2b86": {
-            "name": "Edge cluster template"
+          "729fe070-5e67-4bc7-94b5-afd75cb42b03": {
+            "name": "Helm chart template"
           },
-          "f24d354d-abc1-4e32-98e1-0667b3e40b61": {
-            "name": "Edge cluster"
-          },
-          "f9be0334-0ff7-43d3-9d8a-188d3e4d472b": {
-            "name": "Edge cluster template"
+          "88436128-09a3-4c9c-b7f4-b0e495137265": {
+            "name": "HelmRelease template"
           },
           "2706aa43-a826-441e-9cec-cd3d4ce623c2": {
             "name": "Edge Deployment Operator"
@@ -767,48 +763,6 @@ data:
           }
         },
         "dbd8a535-52ba-4f6e-b4f8-9b71aefe09d3": {
-          "5b47881c-b012-4040-945c-eacafca539b2": {
-            "title": "Edge Deployment Operator global config",
-            "type": "object",
-            "additionalProperties": false,
-            "$defs": {
-              "uuid-and-path": {
-                "type": "object",
-                "required": [
-                  "uuid"
-                ],
-                "additionalProperties": false,
-                "properties": {
-                  "uuid": {
-                    "type": "string",
-                    "format": "uuid"
-                  },
-                  "path": {
-                    "type": "string"
-                  }
-                }
-              }
-            },
-            "properties": {
-              "git": {
-                "type": "object"
-              },
-              "repo": {
-                "description": "Well-known git repository UUIDs",
-                "type": "object",
-                "additionalProperties": {
-                  "$ref": "#/$defs/uuid-and-path"
-                }
-              },
-              "group": {
-                "description": "Auth service groups",
-                "type": "object",
-                "additionalProperties": {
-                  "$ref": "#/$defs/uuid-and-path"
-                }
-              }
-            }
-          },
           "bdb13634-0b3d-4e38-a065-9d88c12ee78d": {
             "title": "Edge cluster configuration",
             "type": "object",
@@ -827,6 +781,11 @@ data:
                 "type": "string"
               }
             }
+          },
+          "f6c67e6f-e48e-4f69-b4bb-bfbddcc2a517": {
+            "title": "EDO private status",
+            "type": "object",
+            "additionalProperties": true
           }
         }
       }
@@ -1349,6 +1308,11 @@ data:
           "principal": "26d192cf-73c1-4c14-93cf-1e63743bab08",
           "permission": "4a339562-cd57-408d-9d1a-6529a383ea4b",
           "target": "88436128-09a3-4c9c-b7f4-b0e495137265"
+        },
+        {
+          "principal": "26d192cf-73c1-4c14-93cf-1e63743bab08",
+          "permission": "4a339562-cd57-408d-9d1a-6529a383ea4b",
+          "target": "a807d8fc-63ff-48bb-85c7-82b93beb606e"
         },
         {
           "principal": "26d192cf-73c1-4c14-93cf-1e63743bab08",

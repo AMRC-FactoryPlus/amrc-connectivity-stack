@@ -4,12 +4,13 @@
  * Copyright 2022 AMRC
  */
 
-import { h, render, createContext } from "https://esm.sh/preact";
+import { h, render, createContext } 
+                    from "https://esm.sh/preact@10.19.2";
 import { useContext, useEffect, useRef, useState }
-                                    from "https://esm.sh/preact/hooks";
-import { signal }                   from "https://esm.sh/@preact/signals";
-import htm                          from "https://esm.sh/htm";
-import yaml                         from "https://esm.sh/yaml";
+                    from "https://esm.sh/preact@10.19.2/hooks";
+import { signal }   from "https://esm.sh/@preact/signals@1.2.2";
+import htm          from "https://esm.sh/htm@3.1.1";
+import yaml         from "https://esm.sh/yaml@2.3.4";
 
 const html = htm.bind(h);
 

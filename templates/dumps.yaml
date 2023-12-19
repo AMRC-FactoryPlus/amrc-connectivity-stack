@@ -110,6 +110,7 @@
 {{$role_edgeFlux := "34ee0e7f-8c9c-4f6d-aad7-4ed700bc77da" | quote}}
 
 {{$userGroup_administrators := "10fc06b7-02f5-45f1-b419-a486b6bc13ba" | quote}}
+{{$userGroup_sparkplugNode := "1d3121a0-aade-4376-8fa3-57ba1460ba76" | quote}}
 
 {{$gitRepoGroup_remoteClusters := "736697bd-3637-4340-8d8a-f4a457d6f483" | quote}}
 {{$gitRepoGroup_sharedRepositories := "9c16e08a-a659-4f02-877f-2949dc4ec7b9" | quote}}
@@ -931,11 +932,6 @@ data:
         },
         {
           "principal": {{$serviceAccount_directory}},
-          "permission": {{$role_edgeNode}},
-          "target": {{$serviceAccount_directory}}
-        },
-        {
-          "principal": {{$serviceAccount_directory}},
           "permission": {{$permission_auth_readACLEntry}},
           "target": {{$permissionGroup_directory}}
         },
@@ -968,11 +964,6 @@ data:
           "principal": {{$serviceAccount_configStore}},
           "permission": {{$permission_auth_readACLEntry}},
           "target": {{$permissionGroup_configStore}}
-        },
-        {
-          "principal": {{$serviceAccount_configStore}},
-          "permission": {{$role_edgeNode}},
-          "target": {{$serviceAccount_configStore}}
         },
         {
           "principal": {{$serviceAccount_manager}},
@@ -1033,11 +1024,6 @@ data:
           "principal": {{$serviceAccount_commandEscalation}},
           "permission": {{$permission_configStore_readConfigForApp}},
           "target": {{$application_sparkplugAddressInformation}}
-        },
-        {
-          "principal": {{$serviceAccount_commandEscalation}},
-          "permission": {{$role_edgeNode}},
-          "target": {{$serviceAccount_commandEscalation}}
         },
         {
           "principal": {{$serviceAccount_commandEscalation}},
@@ -1127,6 +1113,11 @@ data:
         ],
         {{$userGroup_administrators}}: [
           {{$user_admin}}
+        ],
+        {{$userGroup_sparkplugNode}}: [
+          {{$serviceAccount_directory}},
+          {{$serviceAccount_configStore}},
+          {{$serviceAccount_commandEscalation}}
         ]
       },
       "principals": [

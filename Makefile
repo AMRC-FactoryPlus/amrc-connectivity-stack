@@ -35,6 +35,7 @@ pull:
 
 lint:
 	npx eslint bin lib
+	node bin/check-yaml.js
 
 build: check-committed pull lint
 	${docker} build -t "${tag}" ${build_args} .

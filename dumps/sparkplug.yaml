@@ -1,0 +1,26 @@
+# ACS-specific deployment decisions
+service: !u UUIDs.Service.ConfigDB
+version: 1
+classes:
+  # Not created here
+  - !u ACS.Class.UserGroup
+objects:
+  !u ACS.Class.UserGroup:
+    - !u ACS.Group.SparkplugNode
+configs:
+  !u UUIDs.App.Info:
+    !u ACS.Group.SparkplugNode:   { name: "Sparkplug Node" }
+---
+service: !u UUIDs.Service.Authentication
+version: 1
+principals:
+aces:
+  - principal: !u ACS.Group.SparkplugNode
+    permission: !u ACS.Perm.MQTT.ParticipateAsNode
+    target: !u UUIDs.Special.Self
+  - principal: !u ACS.Group.SparkplugNode
+    permission: !u ACS.Perm.MQTT.RepresentDevices
+    target: !u UUIDs.Special.Self
+  - principal: !u ACS.Group.SparkplugNode
+    permission: !u ACS.Perm.MQTT.ReadAllStates
+    target: !u UUIDs.Special.Null

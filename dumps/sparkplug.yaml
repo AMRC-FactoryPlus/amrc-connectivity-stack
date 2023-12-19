@@ -2,13 +2,22 @@
 service: !u UUIDs.Service.ConfigDB
 version: 1
 classes:
+  - !u UUIDs.Class.EdgeAgent
   # Not created here
+  - !u ACS.Class.ClientRole
   - !u ACS.Class.UserGroup
 objects:
+  !u UUIDs.Class.App:
+    - !u EdgeAgent.App.Config
+  !u ACS.Class.ClientRole:
+    - !u EdgeAgent.Role.Monitor
   !u ACS.Class.UserGroup:
     - !u ACS.Group.SparkplugNode
 configs:
   !u UUIDs.App.Info:
+    !u UUIDs.Class.EdgeAgent:     { name: "Edge Agent" }
+    !u EdgeAgent.App.Config:      { name: "Edge Agent config" }
+    !u EdgeAgent.Role.Monitor:    { name: "Edge Monitor for Agent" }
     !u ACS.Group.SparkplugNode:   { name: "Sparkplug Node" }
 ---
 service: !u UUIDs.Service.Authentication
@@ -24,3 +33,8 @@ aces:
   - principal: !u ACS.Group.SparkplugNode
     permission: !u ACS.Perm.MQTT.ReadAllStates
     target: !u UUIDs.Special.Null
+groups:
+  !u EdgeAgent.Role.Monitor:
+    - !u ACS.Perm.MQTT.ReadNode
+    - !u EdgeAgent.Perm.ReloadConfig
+    - !u UUIDs.Permission.CmdEsc.Rebirth

@@ -1053,7 +1053,8 @@ data:
           {{$permissionGroup_configStore}}
         ],
         {{$role_edgeNodeConsumer}}: [
-          {{$permission_mqtt_subscribeReadNode}}
+          {{$permission_mqtt_subscribeReadNode}},
+          {{$permission_ccl_rebirth}}
         ],
         {{$role_warehouse}}: [
           {{$permission_mqtt_subscribeReadWholeNamespace}},
@@ -1366,7 +1367,7 @@ data:
           "target": {{$classDef_wildcard}}
         },
         {
-          "principal": {{$serviceAccount_edo}},
+          "principal": {{$serviceRequirement_edgeDeploymentServiceAccount}},
           "permission": {{$role_edgeNodeConsumer}},
           "target": {{$serviceAccount_configStore}}
         }

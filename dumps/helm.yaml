@@ -8,7 +8,7 @@ objects:
     - !u Clusters.App.HelmTemplate
     # XXX Needed for now
     - !u UUIDs.App.ConfigSchema
-applications:
+configs:
   !u UUIDs.App.Info:
     !u Clusters.Class.HelmChart:    { name: "Helm chart" }
     !u Clusters.App.HelmRelease:    { name: "HelmRelease template" }

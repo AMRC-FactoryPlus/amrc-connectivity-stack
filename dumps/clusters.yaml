@@ -5,7 +5,7 @@ objects:
   !u UUIDs.Class.App:
     - !u Clusters.App.Bootstrap
     - !u Clusters.App.Flux
-applications:
+configs:
   !u UUIDs.App.Info:
     !u Clusters.App.Bootstrap:      { name: "Boostrap script" }
     !u Clusters.App.Flux:           { name: "Flux template" }

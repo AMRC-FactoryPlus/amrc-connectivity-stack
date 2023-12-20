@@ -1,6 +1,6 @@
 {
   "name": "@amrc-factoryplus/sparkplug-app",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "A Javascript library providing Sparkplug Application functionality",
   "main": "lib/index.js",
   "type": "module",
@@ -11,7 +11,8 @@
   "author": "AMRC",
   "license": "MIT",
   "dependencies": {
-    "@amrc-factoryplus/utilities": "^1.0.9",
+    "@amrc-factoryplus/rx-util": "^0.0.1",
+    "@amrc-factoryplus/utilities": "^1.2.2",
     "rxjs": "^7.8.1"
   }
 }

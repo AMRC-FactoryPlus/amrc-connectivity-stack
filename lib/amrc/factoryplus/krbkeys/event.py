@@ -131,9 +131,6 @@ class Account (KrbKeyEvent):
         deleting = self.reason == "delete"
 
         uuid = self.annotations.get(Identifiers.ACCOUNT_UUID)
-        if uuid is None and not deleting:
-            raise ValueError(f"Account UUID is not set yet")
-        
         def mkacc (key):
             return Optional.of(args.get(key)) \
                 .map(lambda ob: ob.get("spec")) \
@@ -146,6 +143,9 @@ class Account (KrbKeyEvent):
         # (unhelpful...).
         self.old = mkacc("old")
         self.new = None if deleting else mkacc("new")
+
+        if uuid is None and self.new is not None:
+            raise ValueError(f"Account UUID is not set yet")
 
     def process (self):
         log(f"Process account reconciliation {self.old} -> {self.new}")

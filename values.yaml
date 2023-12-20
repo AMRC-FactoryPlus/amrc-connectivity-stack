@@ -14,6 +14,11 @@ identity:
   enabled: true
   # -- The Kerberos realm for this Factory+ deployment.
   realm: FACTORYPLUS.MYORGANISATION.COM
+  # -- Kerberos UPNs to grant kadmin access. This needs to be list of
+  # objects with 'principal', 'permission' and (optionally)
+  # 'restrictions' properties; see the kadmin documentation for their
+  # meaning.
+  kadminUsers: []
   # -- Enable support for cross-realm authentication
   crossRealm: [ ]
   # crossRealm:
@@ -98,8 +103,10 @@ serviceSetup:
   image:
     registry: ghcr.io/amrc-factoryplus
     repository: acs-service-setup
-    tag: v0.0.1
+    tag: v0.0.2
     pullPolicy: IfNotPresent
+  helmUrl: https://github.com/AMRC-FactoryPlus/edge-helm-charts.git
+  helmRef: v0.0.1
 
 mqtt:
   # -- Whether or not to enable the MQTT component

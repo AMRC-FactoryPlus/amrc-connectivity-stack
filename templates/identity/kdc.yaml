@@ -186,6 +186,9 @@ data:
     admin           x
     op1krbkeys/*    x     */*1
     op1krbkeys/*    x     */*1/*
+    {{- range .Values.identity.kadminUsers }}
+    {{ .principal }} {{ .permission }} {{ .restrictions }}
+    {{- end }}
 ---
 apiVersion: v1
 kind: Service

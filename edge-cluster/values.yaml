@@ -1,0 +1,37 @@
+cluster:
+  # The name of this cluster, used to form principal names
+  #name:
+  # The UUID of this cluster
+  #uuid:
+  # The URL of the central Directory service
+  #directory:
+  # The domain used by the central services
+  #domain:
+uuid:
+  class:
+    # ConfigDB class to use for account objects
+    #edgeAccount:
+  # Auth groups to use for service accounts
+  group:
+    #edgeMonitor:
+    #edgeSync:
+krb5:
+  # Kerberos realm used by central cluster
+  #realm:
+sealedSecrets:
+  namespace: sealed-secrets
+  fullnameOverride: sealed-secrets
+image:
+  # Values under default: will be used if not overridden per-image
+  default:
+    registry: ghcr.io/amrc-factoryplus
+    pullPolicy: IfNotPresent
+  edgeMonitor:
+    repository: acs-edge-monitor
+    tag: v0.0.1
+  edgeSync:
+    repository: acs-edge-sync
+    tag: v0.0.2
+  krbKeys:
+    repository: acs-krb-keys-operator
+    tag: v1.2.0

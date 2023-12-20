@@ -4,9 +4,13 @@
  * Copyright 2022 AMRC
  */
 
-import {h, render} from "https://unpkg.com/preact@latest?module";
-import {useEffect, useRef, useState} from "https://unpkg.com/preact@latest/hooks/dist/hooks.module.js?module";
-import htm from "https://unpkg.com/htm?module";
+import { h, render, createContext } 
+                    from "https://esm.sh/preact@10.19.2";
+import { useContext, useEffect, useRef, useState }
+                    from "https://esm.sh/preact@10.19.2/hooks";
+import { signal }   from "https://esm.sh/@preact/signals@1.2.2";
+import htm          from "https://esm.sh/htm@3.1.1";
+import yaml         from "https://esm.sh/yaml@2.3.4";
 
 const html = htm.bind(h);
 
@@ -174,11 +178,11 @@ function ObjTitle(props) {
 }
 
 function Editor(props) {
-
     return html`
         <h1>ACS | Config Store</h1>
         <p>The display does not always update when you change things.
             You might need to reopen sections or refresh the page.</p>
+       <${SetUseYAML}/> 
         <dl>
             <${Opener} title="Applications">
                 <${Apps}/>
@@ -194,6 +198,42 @@ function Editor(props) {
             />
         </dl>
     `
+}
+
+const Formats = {
+    json: {
+        read:   JSON.parse,
+        write:  d => JSON.stringify(d, null, 4),
+    },
+    yaml: {
+        read:   yaml.parse,
+        write:  d => yaml.stringify(d, null, {
+            sortMapEntries:     true,
+            blockQuote:         "literal",
+            indent:             2,
+        }),
+    },
+};
+const Formatter = createContext(signal(Formats.yaml));
+
+function SetUseYAML (props) {
+    const format = useContext(Formatter);
+
+    const option = (frm, label) => html`
+        <label>
+            <input type="radio" 
+                checked=${format.value == frm} 
+                onClick=${() => format.value = frm}/>
+            ${label}
+        </label>
+    `;
+
+    return html`
+        <span>
+            ${option(Formats.yaml, "YAML")}
+            ${option(Formats.json, "JSON")}
+        </span>
+    `;
 }
 
 function Apps(props) {
@@ -334,14 +374,16 @@ function App(props) {
     const {app} = props;
     const [objs, set_objs] = useState([]);
 
-    useEffect(async () => set_objs(await fetch_json(`app/${app}/object`)), []);
+    const update = async () => set_objs(await fetch_json(`app/${app}/object`));
+    useEffect(update, []);
 
     return html`
         <dl>
-            <${Opener} title="New config"><${NewConf} app=${app}/><//>
+            <${Opener} title="New config">
+                <${NewConf} update=${update} app=${app}/><//>
             ${objs.map(o => html`
                 <${Opener} key=${o} obj=${o} with_class=${true}>
-                    <${Conf} app=${app} obj=${o}/>
+                    <${Conf} app=${app} obj=${o} update_parent=${update}/>
                 <//>
             `)}
         </dl>
@@ -349,9 +391,12 @@ function App(props) {
 }
 
 function Conf(props) {
-    const {app, obj} = props;
+    const {app, obj, update_parent} = props;
+
     const [conf, set_conf] = useState("...");
     const [msg, set_msg] = useState("");
+
+    const format = useContext(Formatter).value;
 
     const update_conf = async () =>
         set_conf(await fetch_json(`app/${app}/object/${obj}`));
@@ -363,7 +408,8 @@ function Conf(props) {
         if (!editbox.current) return;
         const new_conf = editbox.current.value;
 
-        const st = await put_string(`app/${app}/object/${obj}`, new_conf);
+        const json = format.read(new_conf);
+        const st = await put_json(`app/${app}/object/${obj}`, json);
         if (st_ok(st)) {
             set_msg(html`Config updated`);
         } else {
@@ -375,9 +421,10 @@ function Conf(props) {
         if (!await delete_path(`app/${app}/object/${obj}`)) {
             set_msg("Error deleting config.");
         }
+        update_parent();
     };
 
-    const json = JSON.stringify(conf, null, 4);
+    const json = format.write(conf);
     return html`
         <textarea ref=${editbox} cols=80 rows=25 value=${json}/><br/>
         <button onClick=${update}>Update</button>
@@ -387,18 +434,29 @@ function Conf(props) {
 }
 
 function NewConf(props) {
-    const app = props.app;
+    const { app, update } = props;
     const [msg, set_msg] = useState("");
+
+    const format = useContext(Formatter).value;
 
     const new_obj = useRef();
     const new_conf = useRef();
 
     const create = async () => {
         if (!new_obj.current || !new_conf.current) return;
-        const st = await put_string(
+        const json = format.read(new_conf.current.value);
+        const st = await put_json(
             `app/${app}/object/${new_obj.current.value}`,
-            new_conf.current.value);
-        set_msg(st_ok(st) ? "Create succeeded" : `Create failed: ${st}`);
+            json);
+        if (st_ok(st)) {
+            await update();
+            set_msg("Create succeeded");
+            new_obj.current.value = "";
+            new_conf.current.value = "";
+        }
+        else {
+            set_msg(`Create failed: ${st}`);
+        }
     };
 
     return html`

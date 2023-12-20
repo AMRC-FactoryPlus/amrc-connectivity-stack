@@ -4,7 +4,7 @@
 
 pkgver!=node -e 'console.log(JSON.parse(fs.readFileSync("package.json")).version)'
 
-version?=${pkgver}
+version?=v${pkgver}
 suffix?=
 registry?=ghcr.io/amrc-factoryplus
 repo?=acs-edge-deployment
@@ -52,7 +52,7 @@ restart:
 	sleep 2
 
 logs:
-	kubectl logs -f deploy/"${deployment}"
+	kubectl logs ${logs_opts} -f deploy/"${deployment}"
 
 else
 

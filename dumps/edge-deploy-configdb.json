@@ -12,7 +12,10 @@
   "objects": {
     "d319bd87-f42b-4b66-be4f-f82ff48b93f0": [
       "bdb13634-0b3d-4e38-a065-9d88c12ee78d",
+      "f6c67e6f-e48e-4f69-b4bb-bfbddcc2a517",
       "72804a19-636b-4836-b62b-7ad1476f2b86",
+      "729fe070-5e67-4bc7-94b5-afd75cb42b03",
+      "88436128-09a3-4c9c-b7f4-b0e495137265",
       "dbd8a535-52ba-4f6e-b4f8-9b71aefe09d3"
     ],
     "265d481f-87a7-4f93-8fc6-53fa64dc11bb": [
@@ -28,23 +31,33 @@
     "b419cbc2-ab0f-4311-bd9e-f0591f7e88cb": [
       "26d192cf-73c1-4c14-93cf-1e63743bab08",
       "3a58340c-d4ec-453d-99c3-0cf6ab7d8fa9",
+      "979f7fd9-bbc7-4810-a774-6082c7394db6",
       "4eeb8156-856d-4251-a4a4-4c1b2f3d3e2c",
       "8cd08563-7c3c-44fd-af4d-15c0fa6dadcb"
     ]
   },
   "configs": {
     "64a8bfa9-7772-45c4-9d1a-9e6290690957": {
-      "bdb13634-0b3d-4e38-a065-9d88c12ee78d": {
-        "name": "Edge cluster configuration"
-      },
-      "72804a19-636b-4836-b62b-7ad1476f2b86": {
-        "name": "Edge cluster template"
-      },
       "f24d354d-abc1-4e32-98e1-0667b3e40b61": {
         "name": "Edge cluster"
       },
       "f9be0334-0ff7-43d3-9d8a-188d3e4d472b": {
         "name": "Edge cluster template"
+      },
+      "bdb13634-0b3d-4e38-a065-9d88c12ee78d": {
+        "name": "Edge cluster configuration"
+      },
+      "f6c67e6f-e48e-4f69-b4bb-bfbddcc2a517": {
+        "name": "Edge cluster setup status"
+      },
+      "72804a19-636b-4836-b62b-7ad1476f2b86": {
+        "name": "Edge cluster Flux template"
+      },
+      "729fe070-5e67-4bc7-94b5-afd75cb42b03": {
+        "name": "Helm chart template"
+      },
+      "88436128-09a3-4c9c-b7f4-b0e495137265": {
+        "name": "HelmRelease template"
       },
       "2706aa43-a826-441e-9cec-cd3d4ce623c2": {
         "name": "Edge Deployment Operator"
@@ -64,6 +77,9 @@
       "3a58340c-d4ec-453d-99c3-0cf6ab7d8fa9": {
         "name": "Edge cluster repositories"
       },
+      "979f7fd9-bbc7-4810-a774-6082c7394db6": {
+        "name": "EDO-managed groups"
+      },
       "4eeb8156-856d-4251-a4a4-4c1b2f3d3e2c": {
         "name": "Edge flux accounts"
       },
@@ -76,124 +92,110 @@
         "title": "Edge cluster configuration",
         "type": "object",
         "required": [
+          "name",
           "namespace"
         ],
+        "additionalProperties": false,
         "properties": {
+          "name": {
+            "description": "A name for the cluster.",
+            "type": "string"
+          },
           "namespace": {
             "description": "The k8s namespace to deploy to.",
-            "type": "string"
-          },
-          "flux": {
-            "description": "The URL of the Git repo driving this cluster.",
-            "type": "string"
-          },
-          "kubeseal_cert": {
-            "description": "The PEM-encoded X509 certificate used by the sealed-secrets operator on the edge cluster.\n",
             "type": "string"
           }
         }
       },
+      "f6c67e6f-e48e-4f69-b4bb-bfbddcc2a517": {
+        "title": "EDO private status",
+        "type": "object",
+        "additionalProperties": true
+      },
       "72804a19-636b-4836-b62b-7ad1476f2b86": {
-        "title": "Edge cluster template",
-        "description": "A template to drive the creation of an edge cluster. Some values are subject to template expansion; `%n` is expanded to the name of the cluster as supplied to the Edge Deployment Operator.\n",
+        "title": "Edge cluster Flux template",
+        "description": "A template for creating an edge cluster Flux repo. Values that are strings will have {{handlebar}} templates expanded.\n",
         "type": "object",
         "required": [
-          "name",
-          "cluster",
-          "flux",
-          "repository"
+          "self-link.yaml"
         ],
+        "additionalProperties": {
+          "description": "A file to include in the flux repo. The key gives the name of the file and the value is an array of manifest templates.\n",
+          "type": "array",
+          "items": {
+            "description": "A Kubernetes manifest template.",
+            "oneOf": [
+              {
+                "type": "object",
+                "required": [
+                  "apiVersion",
+                  "kind"
+                ]
+              },
+              {
+                "type": "string",
+                "pattern": "^\\{\\{.*\\}\\}$"
+              }
+            ]
+          }
+        }
+      },
+      "729fe070-5e67-4bc7-94b5-afd75cb42b03": {
+        "title": "Helm chart template",
+        "type": "object",
+        "required": [
+          "chart",
+          "values"
+        ],
+        "additionalProperties": false,
         "properties": {
-          "name": {
-            "description": "The name used to locate this template.",
+          "chart": {
+            "description": "Path to the Helm chart within the source repo.",
             "type": "string"
           },
-          "cluster": {
-            "description": "Configuration of the k8s cluster.",
+          "source": {
+            "description": "Source to pull the Helm chart from.",
+            "type": "string"
+          },
+          "values": {
+            "description": "Helm values to apply. {{Templates}} will be expanded.\n",
+            "type": "object"
+          }
+        }
+      },
+      "88436128-09a3-4c9c-b7f4-b0e495137265": {
+        "title": "Flux HelmRelease manifest template",
+        "type": "object",
+        "required": [
+          "template",
+          "resources"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "template": {
+            "description": "Resource template with {{templates}}",
             "type": "object",
             "required": [
-              "namespace"
-            ],
-            "properties": {
-              "namespace": {
-                "description": "The namespace to deploy to.",
-                "type": "string"
-              }
-            }
+              "apiVersion",
+              "kind"
+            ]
           },
-          "flux": {
-            "description": "Configuration of the Flux service account.",
-            "type": "object",
-            "required": [
-              "class",
-              "username"
-            ],
-            "properties": {
-              "class": {
-                "description": "ConfigDB class to create the account under.",
-                "type": "string",
-                "format": "uuid"
-              },
-              "username": {
-                "description": "Template for the Kerberos UPN of the service account.",
-                "type": "string"
-              },
-              "name": {
-                "description": "General Info name for the service account.",
-                "type": "string"
-              },
-              "groups": {
-                "description": "Auth groups to add the service account to.",
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "format": "uuid"
-                }
-              }
-            }
-          },
-          "repository": {
-            "description": "Configuration of the cluster git repo.",
-            "required": [
-              "group",
-              "branch",
-              "interval"
-            ],
-            "properties": {
-              "group": {
-                "description": "The repo group to create the repo in. The repo itself will be named with the name of the cluster.\n",
-                "type": "string"
-              },
-              "branch": {
-                "description": "The branch name to use.",
-                "type": "string"
-              },
-              "interval": {
-                "description": "The sync interval. This is in the interval format accepted by Flux.\n",
-                "type": "string"
-              },
-              "links": {
-                "description": "Other repos to sync from. Appropriate Flux manifests will be committed to the cluster repo to enable this.\n",
-                "type": "object",
-                "propertyNames": {
-                  "description": "The UUID of the repo to sync from.",
-                  "type": "string",
-                  "format": "uuid"
+          "resources": {
+            "description": "Resource types which represent Helm charts",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "apiVersion",
+                "kind"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "apiVersion": {
+                  "type": "string"
                 },
-                "additionalProperties": {
-                  "type": "object",
-                  "required": [
-                    "branch",
-                    "interval"
-                  ],
-                  "properties": {
-                    "branch": {
-                      "type": "string"
-                    },
-                    "interval": {
-                      "type": "string"
-                    }
-                  }
+                "kind": {
+                  "type": "string"
                 }
               }
             }

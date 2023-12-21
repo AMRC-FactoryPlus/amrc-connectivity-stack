@@ -1,10 +1,13 @@
 image:
   # Parameters for the Edge Agent image to pull
   edgeAgent:
-    registry: ghcr.io/amrc-factoryplus
+    #registry: ghcr.io/amrc-factoryplus
     repository: acs-edge
-    tag: "v2.0.0"
-    pullPolicy: IfNotPresent
+    #tag: "v2.0.0"
+    #pullPolicy: IfNotPresent
+    registry: amrc-factoryplus.shef.ac.uk:5000
+    tag: "v2.0.0-bmz"
+    pullPolicy: Always
 debug: true
 poll_int: 10
 authGroup:

@@ -1027,6 +1027,11 @@ data:
           "target": {{$application_edgeAgentConfig}}
         },
         {
+          "principal": {{$serviceAccount_manager}},
+          "permission": {{$permission_configStore_writeConfigForApp}},
+          "target": {{$application_sparkplugAddressInformation}}
+        },
+        {
           "principal": {{$serviceAccount_commandEscalation}},
           "permission": {{$role_commandEscalation}},
           "target": {{$classDef_wildcard}}

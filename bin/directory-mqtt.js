@@ -23,11 +23,6 @@ fplus.set_service_discovery(model.find_service_url.bind(model));
 const app = await new MQTTCli({
     fplus,
     model,
-    mqtt_broker: process.env.MQTT_BROKER,
-
-    device_uuid: process.env.DEVICE_UUID,
-    sparkplug_address: process.env.SPARKPLUG_ADDRESS,
-
     url: process.env.HTTP_API_URL,
     silent: !!process.env.MQTT_MONITOR_ONLY,
 }).init();

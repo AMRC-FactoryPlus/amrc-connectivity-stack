@@ -33,6 +33,9 @@ aces:
   - principal: !u ACS.Group.SparkplugNode
     permission: !u ACS.Perm.MQTT.ReadAllStates
     target: !u UUIDs.Special.Null
+  - principal: !u ACS.Group.SparkplugNode
+    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
+    target: !u UUIDs.App.SparkplugAddress
 groups:
   !u Edge.Role.Monitor:
     - !u ACS.Perm.MQTT.ReadNode

@@ -23,6 +23,7 @@
 {{$classDef_edgeCluster := "f24d354d-abc1-4e32-98e1-0667b3e40b61" | quote}}
 
 {{$special_wildcard := "00000000-0000-0000-0000-000000000000" | quote}}
+{{$special_self := "5855a1cc-46d8-4b16-84f8-ab3916ecb230" | quote}}
 
 {{$application_objectRegistration := "cb40bed5-49ad-4443-a7f5-08c75009da8f" | quote}}
 {{$application_generalObjectInformation := "64a8bfa9-7772-45c4-9d1a-9e6290690957" | quote}}
@@ -73,7 +74,7 @@
 {{$permission_mqtt_publishAllFromGroup := "64c019f8-6754-4270-8917-6659a5628b86" | quote}}
 {{$permission_mqtt_subscribeReadAllStates := "8790cf3d-b793-423c-b373-8cfcf9f63529" | quote}}
 {{$permission_mqtt_updateGroupState := "9a32f195-a8cc-4562-a87a-d4653279474f" | quote}}
-{{$permission_mqtt_particpateAsNode := "a1314953-8226-44f4-8a3e-e87b09310579" | quote}}
+{{$permission_mqtt_participateAsNode := "a1314953-8226-44f4-8a3e-e87b09310579" | quote}}
 {{$permission_mqtt_updateOwnState := "bdc96a3e-d6fb-48ed-b790-0aa95cf826f0" | quote}}
 {{$permission_mqtt_issueGroupCommands := "cff45682-f2f0-4c72-91f3-7dda20d43509" | quote}}
 {{$permission_mqtt_subscribeReadOwnGroup := "d617e37c-3908-41b1-8820-d3f8d41a4280" | quote}}
@@ -214,7 +215,7 @@ data:
           {{$permission_mqtt_subscribeReadWholeNamespace}},
           {{$permission_mqtt_subscribeReadAllStates}},
           {{$permission_mqtt_updateGroupState}},
-          {{$permission_mqtt_particpateAsNode}},
+          {{$permission_mqtt_participateAsNode}},
           {{$permission_mqtt_updateOwnState}},
           {{$permission_mqtt_issueGroupCommands}},
           {{$permission_mqtt_subscribeReadOwnGroup}},
@@ -371,7 +372,7 @@ data:
           {{$permission_mqtt_updateGroupState}}: {
             "name": "MQTT: Update group STATE"
           },
-          {{$permission_mqtt_particpateAsNode}}: {
+          {{$permission_mqtt_participateAsNode}}: {
             "name": "MQTT: Participate as Node"
           },
           {{$permission_mqtt_updateOwnState}}: {
@@ -484,7 +485,7 @@ data:
           {{$permission_mqtt_updateGroupState}}: {
             "STATE/%g": "w"
           },
-          {{$permission_mqtt_particpateAsNode}}: {
+          {{$permission_mqtt_participateAsNode}}: {
             "spBv1.0/%g/NDATA/%n": "w",
             "spBv1.0/%g/NBIRTH/%n": "w",
             "spBv1.0/%g/NCMD/%n/#": "rs",
@@ -908,6 +909,26 @@ data:
           "target": {{$special_wildcard}}
         },
         {
+          "principal": {{$userGroup_sparkplugNode}},
+          "permission": {{$permission_mqtt_participateAsNode}},
+          "target": {{$special_self}}
+        },
+        {
+          "principal": {{$userGroup_sparkplugNode}},
+          "permission": {{$permission_mqtt_representDevices}},
+          "target": {{$special_self}}
+        },
+        {
+          "principal": {{$userGroup_sparkplugNode}},
+          "permission": {{$permission_mqtt_subscribeReadAllStates}},
+          "target": {{$special_wildcard}}
+        },
+        {
+          "principal": {{$userGroup_sparkplugNode}},
+          "permission": {{$permission_configStore_readConfigForApp}},
+          "target": {{$application_sparkplugAddressInformation}}
+        },
+        {
           "principal": {{$serviceAccount_directory}},
           "permission": {{$permission_mqtt_subscribeReadWholeNamespace}},
           "target": {{$special_wildcard}}
@@ -1063,7 +1084,7 @@ data:
         ],
         {{$role_edgeNode}}: [
           {{$permission_mqtt_subscribeReadAllStates}},
-          {{$permission_mqtt_particpateAsNode}},
+          {{$permission_mqtt_participateAsNode}},
           {{$permission_mqtt_representDevices}}
         ],
         {{$permissionGroup_commands}}: [
@@ -1100,7 +1121,7 @@ data:
           {{$permission_mqtt_subscribeReadWholeNamespace}},
           {{$permission_mqtt_subscribeReadAllStates}},
           {{$permission_mqtt_updateGroupState}},
-          {{$permission_mqtt_particpateAsNode}},
+          {{$permission_mqtt_participateAsNode}},
           {{$permission_mqtt_updateOwnState}},
           {{$permission_mqtt_issueGroupCommands}},
           {{$permission_mqtt_subscribeReadOwnGroup}},

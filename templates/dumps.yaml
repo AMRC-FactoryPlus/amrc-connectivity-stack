@@ -1076,6 +1076,14 @@ data:
           {{$permission_mqtt_subscribeReadAllStates}},
           {{$permission_mqtt_updateOwnState}}
         ],
+        # This is not the complete set of Directory permissions,
+        # they are created by service-setup. But these are required for
+        # bootstrap before we can even discover services.
+        {{$permissionGroup_directory}}: [
+          {{$permission_directory_overrideServiceAdvertisementPermissions}},
+          {{$permission_directory_advertiseService}},
+          {{$permission_directory_manageServiceAdvertisementForOwner}}
+        ],
         {{$permissionGroup_authorisation}}: [
           {{$permission_auth_readACLEntry}},
           {{$permission_auth_readEffectivePermissions}},

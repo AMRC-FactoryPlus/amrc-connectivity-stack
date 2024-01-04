@@ -234,6 +234,14 @@ minio:
 postgres:
   # -- Whether or not to enable Postgres
   enabled: true
+  # Postgres image to use. DO NOT change major version on an
+  # existing installation without being prepared to handle database
+  # dump/restore manually.
+  image:
+    registry: docker.io/library
+    repository: postgres
+    tag: 16.1
+    # Kubegres doesn't support setting pullPolicy
 
 # @ignore
 traefik:

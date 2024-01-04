@@ -5,7 +5,6 @@
 # ====================================================
 
 {{$classDef_classDefinition := "04a1c90d-2295-4cbe-b33a-74eded62cbf1" | quote}}
-{{$classDef_wildcard := "00000000-0000-0000-0000-000000000000" | quote}}
 {{$classDef_application := "d319bd87-f42b-4b66-be4f-f82ff48b93f0" | quote}}
 {{$classDef_serviceFunction := "265d481f-87a7-4f93-8fc6-53fa64dc11bb" | quote}}
 {{$classDef_serviceAccount := "e463b4ae-a322-46cc-8976-4ba76838e908" | quote}}
@@ -22,6 +21,8 @@
 {{$classDef_edgeClusterAccount := "97756c9a-38e6-4238-b78c-3df6f227a6c9" | quote}}
 {{$classDef_edgeClusterTemplate := "f9be0334-0ff7-43d3-9d8a-188d3e4d472b" | quote}}
 {{$classDef_edgeCluster := "f24d354d-abc1-4e32-98e1-0667b3e40b61" | quote}}
+
+{{$special_wildcard := "00000000-0000-0000-0000-000000000000" | quote}}
 
 {{$application_objectRegistration := "cb40bed5-49ad-4443-a7f5-08c75009da8f" | quote}}
 {{$application_generalObjectInformation := "64a8bfa9-7772-45c4-9d1a-9e6290690957" | quote}}
@@ -110,9 +111,6 @@
 {{$role_warehouse := "6958c812-fbe2-4e6c-b997-6f850b89f679" | quote}}
 {{$role_edgeFlux := "34ee0e7f-8c9c-4f6d-aad7-4ed700bc77da" | quote}}
 
-{{$userGroup_administrators := "10fc06b7-02f5-45f1-b419-a486b6bc13ba" | quote}}
-{{$userGroup_sparkplugNode := "1d3121a0-aade-4376-8fa3-57ba1460ba76" | quote}}
-
 {{$gitRepoGroup_remoteClusters := "736697bd-3637-4340-8d8a-f4a457d6f483" | quote}}
 {{$gitRepoGroup_sharedRepositories := "9c16e08a-a659-4f02-877f-2949dc4ec7b9" | quote}}
 {{$gitRepo_sharedFluxSystem := "8a3c0860-9e41-48b8-b02f-780a0e582be6" | quote}}
@@ -135,6 +133,8 @@
 {{$serviceAccount_krbkeys := "a04b4195-7db4-4480-b3f3-4d22c08b96ea" | quote}}
 {{$serviceAccount_git := "626df296-8156-4c67-8aed-aac70161aa8b" | quote}}
 {{$serviceAccount_edo := "127cde3c-773a-4f61-b0ba-7412a2695253" | quote}}
+{{$userGroup_administrators := "10fc06b7-02f5-45f1-b419-a486b6bc13ba" | quote}}
+{{$userGroup_sparkplugNode := "1d3121a0-aade-4376-8fa3-57ba1460ba76" | quote}}
 {{$user_admin := "d53f476a-29dd-4d79-b614-5b7fe9bc8acf" | quote}}
 
 {{ if .Values.configdb.enabled }}
@@ -160,7 +160,6 @@ data:
         {{$classDef_userGroup}},
         {{$classDef_permission}},
         {{$classDef_permissionGroup}},
-        {{$classDef_wildcard}},
         {{$classDef_serviceAccount}},
         {{$classDef_serviceRequirement}},
         {{$classDef_cellGateway}},
@@ -178,7 +177,6 @@ data:
         {{$classDef_serviceFunction}}: [
           {{$service_configStore}},
           {{$service_commandEscalation}},
-          {{$service_directory}},
           {{$service_authorisation}},
           {{$service_mqtt}},
           {{$service_warehouse}}
@@ -221,9 +219,6 @@ data:
           {{$permission_mqtt_issueGroupCommands}},
           {{$permission_mqtt_subscribeReadOwnGroup}},
           {{$permission_mqtt_representDevices}},
-          {{$permission_directory_overrideServiceAdvertisementPermissions}},
-          {{$permission_directory_advertiseService}},
-          {{$permission_directory_manageServiceAdvertisementForOwner}},
           {{$permission_auth_readKerberosMapping}},
           {{$permission_mqtt_readAllBirthMessages}},
           {{$permission_ccl_rebirth}},
@@ -233,7 +228,6 @@ data:
           {{$permissionGroup_authorisation}},
           {{$permissionGroup_configStore}},
           {{$permissionGroup_mqtt}},
-          {{$permissionGroup_directory}},
           {{$permissionGroup_commands}}
         ],
         {{$classDef_serviceAccount}}: [
@@ -317,9 +311,6 @@ data:
           {{$permissionGroup_authorisation}}: {
             "name": "Auth permissions"
           },
-          {{$classDef_wildcard}}: {
-            "name": "Wildcard UUID"
-          },
           {{$permission_configStore_readConfigForApp}}: {
             "name": "ConfigDB: Read config for app"
           },
@@ -398,18 +389,6 @@ data:
           {{$classDef_serviceAccount}}: {
             "name": "Service Account"
           },
-          {{$permissionGroup_directory}}: {
-            "name": "Directory permissions"
-          },
-          {{$permission_directory_overrideServiceAdvertisementPermissions}}: {
-            "name": "Directory: Override service advertisement permissions"
-          },
-          {{$permission_directory_advertiseService}}: {
-            "name": "Directory: Advertise service"
-          },
-          {{$permission_directory_manageServiceAdvertisementForOwner}}: {
-            "name": "Directory: Manage service advertisement for owner"
-          },
           {{$permission_auth_readKerberosMapping}}: {
             "name": "Auth: Read Kerberos mapping"
           },
@@ -448,9 +427,6 @@ data:
           },
           {{$service_warehouse}}: {
             "name": "Data Warehouse Service"
-          },
-          {{$service_directory}}: {
-            "name": "Directory Service"
           },
           {{$service_authorisation}}: {
             "name": "Authentication Service"
@@ -924,12 +900,17 @@ data:
         {
           "principal": {{$userGroup_administrators}},
           "permission": {{$role_administrator}},
-          "target": {{$classDef_wildcard}}
+          "target": {{$special_wildcard}}
+        },
+        {
+          "principal": {{$userGroup_administrators}},
+          "permission": {{$permissionGroup_directory}},
+          "target": {{$special_wildcard}}
         },
         {
           "principal": {{$serviceAccount_directory}},
           "permission": {{$permission_mqtt_subscribeReadWholeNamespace}},
-          "target": {{$classDef_wildcard}}
+          "target": {{$special_wildcard}}
         },
         {
           "principal": {{$serviceAccount_directory}},
@@ -939,12 +920,12 @@ data:
         {
           "principal": {{$serviceAccount_directory}},
           "permission": {{$permission_auth_readKerberosMapping}},
-          "target": {{$classDef_wildcard}}
+          "target": {{$special_wildcard}}
         },
         {
           "principal": {{$serviceAccount_directory}},
           "permission": {{$permission_ccl_rebirth}},
-          "target": {{$classDef_wildcard}}
+          "target": {{$special_wildcard}}
         },
         {
           "principal": {{$serviceAccount_mqtt}},
@@ -1034,7 +1015,7 @@ data:
         {
           "principal": {{$serviceAccount_commandEscalation}},
           "permission": {{$role_commandEscalation}},
-          "target": {{$classDef_wildcard}}
+          "target": {{$special_wildcard}}
         },
         {
           "principal": {{$serviceAccount_commandEscalation}},
@@ -1054,7 +1035,7 @@ data:
         {
           "principal": {{$serviceAccount_dataWarehouse}},
           "permission": {{$role_warehouse}},
-          "target": {{$classDef_wildcard}}
+          "target": {{$special_wildcard}}
         },
         {
           "principal": {{$serviceAccount_mqtt}},
@@ -1063,11 +1044,6 @@ data:
         }
       ],
       "groups": {
-        {{$permissionGroup_directory}}: [
-          {{$permission_directory_overrideServiceAdvertisementPermissions}},
-          {{$permission_directory_manageServiceAdvertisementForOwner}},
-          {{$permission_directory_advertiseService}}
-        ],
         {{$role_administrator}}: [
           {{$role_globalDebugger}},
           {{$permissionGroup_authorisation}},
@@ -1385,7 +1361,7 @@ data:
         {
           "principal": {{$serviceAccount_krbkeys}},
           "permission": {{$permission_edo_manageSecrets}},
-          "target": {{$classDef_wildcard}}
+          "target": {{$special_wildcard}}
         },
         {
           "principal": {{$serviceRequirement_edgeDeploymentServiceAccount}},

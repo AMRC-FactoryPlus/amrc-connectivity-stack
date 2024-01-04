@@ -7,7 +7,7 @@ metadata:
 
 spec:
   replicas: 1
-  image: postgres:14.3
+  image: {{ include "amrc-connectivity-stack.image-name" .Values.postgres }}
 
   database:
     size: 10Gi

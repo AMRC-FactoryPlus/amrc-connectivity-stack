@@ -17,7 +17,6 @@ spec:
         component: clusters
         factory-plus.service: clusters
     spec:
-      serviceAccountName: clusters-operator
       volumes:
         - name: krb5-conf
           configMap:

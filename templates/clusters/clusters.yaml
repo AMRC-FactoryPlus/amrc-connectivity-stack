@@ -1,65 +1,65 @@
-{{- if .Values.edo.enabled }}
+{{- if .Values.clusters.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: edo
+  name: clusters
   namespace: {{ .Release.Namespace }}
   labels:
-    component: edo
+    component: clusters
 spec:
   replicas: 1
   selector:
     matchLabels:
-      component: edo
+      component: clusters
   template:
     metadata:
       labels:
-        component: edo
-        factory-plus.service: edo
+        component: clusters
+        factory-plus.service: clusters
     spec:
-      serviceAccountName: edge-deployment-operator
+      serviceAccountName: clusters-operator
       volumes:
         - name: krb5-conf
           configMap:
             name: krb5-conf
         - name: keytabs
           secret:
-            secretName: edo-keytabs
+            secretName: clusters-keytabs
         - name: data
           emptyDir:
         - name: kubeseal-certs
           emptyDir:
 
       containers:
-        - name: edo
-{{ include "amrc-connectivity-stack.image" .Values.edo | indent 10 }}
+        - name: clusters
+{{ include "amrc-connectivity-stack.image" .Values.clusters | indent 10 }}
           command: [ "/usr/bin/k5start", "-Uf", "/keytabs/client" ]
           args: ["node", "bin/edge-deployment.js"]
           env:
             - name: PORT
               value: "8080"
             - name: VERBOSE
-              value: {{.Values.edo.verbosity | quote | required "values.edo.verbosity is required!"}}
+              value: {{.Values.clusters.verbosity | quote | required "values.clusters.verbosity is required!"}}
             - name: KRB5_CONFIG
               value: /config/krb5-conf/krb5.conf
             - name: SERVER_KEYTAB
               value: /keytabs/server
             - name: HOSTNAME
-              value: edo.{{ .Release.Namespace }}.svc.cluster.local
+              value: clusters.{{ .Release.Namespace }}.svc.cluster.local
             - name: REALM
               value: {{ .Values.identity.realm | required "values.identity.realm is required!" }}
             - name: GIT_CHECKOUTS_DIR
               value: /data
             - name: GIT_EMAIL
-              value: sv1edo@{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
+              value: sv1clusters@{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
             - name: KUBESEAL_TEMP
               value: /cert
             - name: KRBKEYS_IMAGE
               value: {{ include "amrc-connectivity-stack.image-name" .Values.identity.krbKeysOperator | quote }}
             - name: HTTP_API_URL
-              value: http://edo.{{ .Release.Namespace }}.svc.cluster.local
+              value: http://clusters.{{ .Release.Namespace }}.svc.cluster.local
             - name: EXTERNAL_URL
-              value: {{ include "amrc-connectivity-stack.external-url" (list . "edo") | quote }}
+              value: {{ include "amrc-connectivity-stack.external-url" (list . "clusters") | quote }}
             - name: DIRECTORY_URL
               value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
           volumeMounts:
@@ -75,7 +75,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: edo
+  name: clusters
   namespace: {{ .Release.Namespace }}
 spec:
   ports:
@@ -83,5 +83,5 @@ spec:
       port: 80
       targetPort: 8080
   selector:
-    factory-plus.service: edo
+    factory-plus.service: clusters
 {{- end -}}

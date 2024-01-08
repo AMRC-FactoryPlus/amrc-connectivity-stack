@@ -229,7 +229,7 @@ git:
   # -- Possible values are either 1 to enable all possible debugging, or a comma-separated list of debug tags (the tags printed before the log lines). No logging is specified as an empty string.
   verbosity: "ALL,!service,!token"
 
-edo:
+clusters:
   # -- Whether or not to enable the Edge Deployment Operator (EDO) component
   enabled: true
   verbosity: "1"

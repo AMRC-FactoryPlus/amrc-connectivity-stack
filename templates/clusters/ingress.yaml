@@ -1,23 +1,23 @@
-{{ if .Values.edo.enabled }}
+{{ if .Values.clusters.enabled }}
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
-  name: edo-ingressroute
+  name: clusters-ingressroute
   namespace: default
 spec:
   entryPoints:
     - {{ .Values.acs.secure | ternary "websecure" "web" }}
   routes:
-    - match: Host(`edo.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}`)
+    - match: Host(`clusters.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}`)
       kind: Rule
       services:
-        - name: edo
+        - name: clusters
           port: 80
           namespace: {{ .Release.Namespace }}
   {{- if .Values.acs.secure }}
   tls:
     secretName: {{ .Values.acs.tlsSecretName | required "values.acs.tlsSecretName is required!" }}
     domains:
-      - main: edo.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
+      - main: clusters.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
   {{- end -}}
 {{- end -}}

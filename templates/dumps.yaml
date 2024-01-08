@@ -92,8 +92,8 @@
 {{$permission_git_pullFromRepo := "12ecb694-b4b9-4d2a-927e-d100019f7ebe" | quote}}
 {{$permission_git_pushToRepo := "b2d8d437-5060-4202-bcc2-bd2beda09651" | quote}}
 
-{{$permission_edo_manageClusters := "a40acff8-0c61-4251-bef3-d8d53e50cdd0" | quote}}
-{{$permission_edo_manageSecrets := "07fba27a-0d01-4c07-875b-d25345261d3a" | quote}}
+{{$permission_clusters_manageClusters := "a40acff8-0c61-4251-bef3-d8d53e50cdd0" | quote}}
+{{$permission_clusters_manageSecrets := "07fba27a-0d01-4c07-875b-d25345261d3a" | quote}}
 
 {{$permissionGroup_authorisation := "50b727d4-3faa-40dc-b347-01c99a226c58" | quote}}
 {{$permissionGroup_configStore := "c43c7157-a50b-4d2a-ac1a-86ff8e8e88c1" | quote}}
@@ -101,7 +101,7 @@
 {{$permissionGroup_directory := "58b5da47-d098-44f7-8c1d-6e4bd800e718" | quote}}
 {{$permissionGroup_commands := "9584ee09-a35a-4278-bc13-21a8be1f007c" | quote}}
 {{$permissionGroup_git := "c0c55c78-116e-4526-8ff4-e4595251f76c" | quote}}
-{{$permissionGroup_edo := "9e07fd33-6400-4662-92c4-4dff1f61f990" | quote}}
+{{$permissionGroup_clusters := "9e07fd33-6400-4662-92c4-4dff1f61f990" | quote}}
 
 {{$role_administrator := "4c09402f-9923-4c82-a6f2-02bda21aace4" | quote}}
 {{$role_commandEscalation := "dbd0c099-6c59-4bc6-aa92-4ba8a9b543f4" | quote}}
@@ -133,7 +133,7 @@
 {{$serviceAccount_mqtt := "2f42daeb-4521-4522-8e19-85dfb73db88e" | quote}}
 {{$serviceAccount_krbkeys := "a04b4195-7db4-4480-b3f3-4d22c08b96ea" | quote}}
 {{$serviceAccount_git := "626df296-8156-4c67-8aed-aac70161aa8b" | quote}}
-{{$serviceAccount_edo := "127cde3c-773a-4f61-b0ba-7412a2695253" | quote}}
+{{$serviceAccount_clusters := "127cde3c-773a-4f61-b0ba-7412a2695253" | quote}}
 {{$userGroup_administrators := "10fc06b7-02f5-45f1-b419-a486b6bc13ba" | quote}}
 {{$userGroup_sparkplugNode := "1d3121a0-aade-4376-8fa3-57ba1460ba76" | quote}}
 {{$user_admin := "d53f476a-29dd-4d79-b614-5b7fe9bc8acf" | quote}}
@@ -659,7 +659,7 @@ data:
   # This is copied directly from acs-edge-deployment.
   # DO NOT EDIT HERE, make a PR to edit dumps/edge-deploy-configdb.yaml
   # in that repo and then pull the result back in.
-  edo: |
+  clusters: |
     {
       "service": "af15f175-78a0-4e05-97c0-2a0bb82b9f3b",
       "version": 1,
@@ -714,25 +714,25 @@ data:
             "name": "HelmRelease template"
           },
           "2706aa43-a826-441e-9cec-cd3d4ce623c2": {
-            "name": "Edge Deployment Operator"
+            "name": "Clusters Operator"
           },
           "9e07fd33-6400-4662-92c4-4dff1f61f990": {
-            "name": "Edge Deployment permissions"
+            "name": "Clusters permissions"
           },
           "a40acff8-0c61-4251-bef3-d8d53e50cdd0": {
-            "name": "Edge: Manage clusters"
+            "name": "Clusters: Manage clusters"
           },
           "07fba27a-0d01-4c07-875b-d25345261d3a": {
-            "name": "Edge: Manage secrets"
+            "name": "Clusters: Manage secrets"
           },
           "26d192cf-73c1-4c14-93cf-1e63743bab08": {
-            "name": "Edge Deployment service account"
+            "name": "Clusters service account"
           },
           "3a58340c-d4ec-453d-99c3-0cf6ab7d8fa9": {
             "name": "Edge cluster repositories"
           },
           "979f7fd9-bbc7-4810-a774-6082c7394db6": {
-            "name": "EDO-managed groups"
+            "name": "Clusters-managed groups"
           },
           "4eeb8156-856d-4251-a4a4-4c1b2f3d3e2c": {
             "name": "Edge flux accounts"
@@ -762,7 +762,7 @@ data:
             }
           },
           "f6c67e6f-e48e-4f69-b4bb-bfbddcc2a517": {
-            "title": "EDO private status",
+            "title": "Clusters private status",
             "type": "object",
             "additionalProperties": true
           }
@@ -770,7 +770,7 @@ data:
       }
     }
   # This is the ACS-specific configuration of the EDO service.
-  edo-acs: |
+  clusters-acs: |
     {
       "service": {{$service_configStore}},
       "version": 1,
@@ -791,7 +791,7 @@ data:
           {{$application_edgeClusterConfiguration}}
         ],
         {{$classDef_serviceAccount}}: [
-          {{$serviceAccount_edo}}
+          {{$serviceAccount_clusters}}
         ],
         {{$classDef_gitRepoGroup}}: [
           {{$gitRepoGroup_remoteClusters}},
@@ -809,8 +809,8 @@ data:
       },
       "configs": {
         {{$application_generalObjectInformation}}: {
-          {{$serviceAccount_edo}}: {
-            "name": "Edge Deployment"
+          {{$serviceAccount_clusters}}: {
+            "name": "Clusters"
           },
           {{$gitRepoGroup_sharedRepositories}}: {
             "name": "Shared repositories"
@@ -834,7 +834,7 @@ data:
             "name": "Edge deployment"
           },
           {{$application_edgeClusterStatus}}: {
-            "name": "Edge cluster status"
+            "name": "Clusters private status"
           },
           {{$application_edgeClusterConfiguration}}: {
             "name": "Edge cluster configuration"
@@ -1259,7 +1259,7 @@ data:
   # This is copied directly from acs-edge-deployment.
   # DO NOT EDIT HERE, make a PR to edit dumps/edge-deploy-auth.yaml
   # in that repo and then pull the result back in.
-  edo: |
+  clusters: |
     {
       "service": "cab2642a-f7d9-42e5-8845-8f35affe1fd4",
       "version": 1,
@@ -1368,14 +1368,14 @@ data:
       }
     }
   # ACS-specific deployment of the EDO service.
-  edo-acs: |
+  clusters-acs: |
     {
       "service": {{$service_authorisation}},
       "version": 1,
       "principals": [
         {
-          "uuid": {{$serviceAccount_edo}},
-          "kerberos": "sv1edo@{{ .Values.identity.realm }}"
+          "uuid": {{$serviceAccount_clusters}},
+          "kerberos": "sv1clusters@{{ .Values.identity.realm }}"
         }
       ],
       "aces": [
@@ -1386,7 +1386,7 @@ data:
         },
         {
           "principal": {{$serviceAccount_krbkeys}},
-          "permission": {{$permission_edo_manageSecrets}},
+          "permission": {{$permission_clusters_manageSecrets}},
           "target": {{$special_wildcard}}
         },
         {
@@ -1397,7 +1397,7 @@ data:
       ],
       "groups": {
         {{$serviceRequirement_edgeDeploymentServiceAccount}}: [
-          {{$serviceAccount_edo}}
+          {{$serviceAccount_clusters}}
         ],
         {{$serviceRequirement_edgeClusterRepositories}}: [
           {{$gitRepoGroup_remoteClusters}}
@@ -1409,7 +1409,7 @@ data:
           {{$role_edgeFlux}}
         ],
         {{$role_administrator}}: [
-          {{$permissionGroup_edo}}
+          {{$permissionGroup_clusters}}
         ]
       }
     }

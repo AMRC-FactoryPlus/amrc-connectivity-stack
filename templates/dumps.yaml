@@ -1034,6 +1034,11 @@ data:
           "target": {{$application_sparkplugAddressInformation}}
         },
         {
+          "principal": {{$serviceAccount_manager}},
+          "permission": {{$permission_clusters_manageClusters}},
+          "target": {{$special_wildcard}}
+        },
+        {
           "principal": {{$serviceAccount_commandEscalation}},
           "permission": {{$role_commandEscalation}},
           "target": {{$special_wildcard}}

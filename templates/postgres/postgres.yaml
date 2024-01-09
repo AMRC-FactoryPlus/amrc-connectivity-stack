@@ -6,6 +6,10 @@ metadata:
   namespace: {{ .Release.Namespace }}
 
 spec:
+  {{- with .Values.acs.imagePullSecrets }}
+  imagePullSecrets:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   replicas: 1
   image: {{ include "amrc-connectivity-stack.image-name" .Values.postgres }}
 

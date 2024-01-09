@@ -8,6 +8,16 @@ acs:
   # -- The name of the secret holding the wildcard certificate for the above domain.
   tlsSecretName: factoryplus-tls
   cacheMaxAge: 300
+  # -- Image pull secrets for Docker images
+  imagePullSecrets: []
+
+  # Curl service used by auth and configdb
+  curl:
+    # @ignore
+    image:
+      registry: docker.io
+      repository: appropriate/curl
+      tag: latest
 
 identity:
   # -- Whether or not to enable the Identity component
@@ -133,6 +143,17 @@ manager:
   meilisearch:
     # -- The key that the manager uses to connect to the Meilisearch search engine
     key: masterKey
+    # @ignore
+    image:
+      registry: docker.io
+      repository: getmeili/meilisearch
+      tag: v0.30.0
+  # @ignore
+  redis:
+    image:
+      registry: docker.io
+      repository: redis
+      tag: alpine
   # -- A string used to customise the branding of the manager
   name: Factory+ Manager
   # -- The environment that the manager is running in
@@ -141,6 +162,19 @@ manager:
   debug: false
   # -- The minimum log level that the manager will log messages at
   logLevel: warning
+
+# @ignore
+kubegres:
+  kubeProxy:
+    image:
+      registry: gcr.io
+      repository: kubebuilder/kube-rbac-proxy:v0.13.0
+      tag: v0.13.0
+  kubegres:
+    image:
+      registry: docker.io
+      repository: reactivetechio/kubegres:1.16
+      tag: 1.16
 
 cmdesc:
   # -- Whether or not to enable the Commands component

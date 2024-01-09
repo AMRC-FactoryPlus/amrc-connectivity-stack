@@ -17,9 +17,13 @@ spec:
         component: manager-redis
         factory-plus.service: manager-redis
     spec:
+      {{- with .Values.acs.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: redis
-          image: redis:alpine
+          image: "{{ .Values.manager.redis.image.registry }}/{{ .Values.manager.redis.image.repository }}:{{ .Values.manager.redis.image.tag }}"
           volumeMounts:
             - mountPath: "/data"
               name: manager-redis-storage

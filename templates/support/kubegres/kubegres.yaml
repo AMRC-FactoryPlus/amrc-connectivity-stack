@@ -311,13 +311,17 @@ spec:
       labels:
         control-plane: controller-manager
     spec:
+      {{- with .Values.acs.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - args:
             - --secure-listen-address=0.0.0.0:8443
             - --upstream=http://127.0.0.1:8080/
             - --logtostderr=true
             - --v=0
-          image: gcr.io/kubebuilder/kube-rbac-proxy:v0.13.0
+          image: "{{ .Values.kubegres.kubeProxy.image.registry }}/{{ .Values.kubegres.kubeProxy.image.repository }}:{{ .Values.kubegres.kubeProxy.image.tag }}"
           name: kube-rbac-proxy
           ports:
             - containerPort: 8443
@@ -341,7 +345,7 @@ spec:
             - --leader-elect
           command:
             - /manager
-          image: reactivetechio/kubegres:1.16
+          image: "{{ .Values.kubegres.kubegres.image.registry }}/{{ .Values.kubegres.kubegres.image.repository }}:{{ .Values.kubegres.kubegres.image.tag }}"
           livenessProbe:
             httpGet:
               path: /healthz

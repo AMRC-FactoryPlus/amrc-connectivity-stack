@@ -6,8 +6,12 @@ metadata:
   namespace: {{ .Release.Namespace }}
 
 spec:
+  {{- with .Values.acs.imagePullSecrets }}
+  imagePullSecrets:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   replicas: 1
-  image: postgres:14.3
+  image: "{{ .Values.postgres.image.registry }}/{{ .Values.postgres.image.repository }}:{{ .Values.postgres.image.tag }}"
 
   database:
     size: 1Gi

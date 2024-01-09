@@ -13,7 +13,7 @@ grant select on version to :"role";
 
 grant select, insert on
     address, device, missing_uuid,
-    principal, schema, service
+    schema, service
 to :"role";
 -- This is because we SELECT FOR UPDATE.
 grant update on address to :"role";
@@ -23,7 +23,7 @@ grant select, insert, update, delete on
 to :"role";
 grant usage on sequence
     address_id_seq, alert_id_seq, alert_type_id_seq,
-    device_id_seq, principal_id_seq,
+    device_id_seq,
     schema_id_seq, schema_used_id_seq, service_id_seq,
     service_provider_id_seq, session_id_seq
 to :"role";

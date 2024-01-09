@@ -323,7 +323,7 @@ components:
                 online at the moment. lastChange indicates the last time a BIRTH or DEATH was seen.
                 schemas is a list of all schemas used by the most recent birth certificate.
             type: object
-            required: [uuid, group_id, node_id, online, last_change]
+            required: [uuid, group_id, node_id, online, last_change, schemas, top_schema]
             properties:
                 uuid: { type: string, format: uuid }
                 group_id: { $ref: "#/components/schemas/sparkplug-name" }

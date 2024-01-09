@@ -25,6 +25,7 @@ BEGIN;
 \ir v7.sql
 \ir v8.sql
 \ir v9.sql
+\ir v10.sql
 
 \ir permissions.sql
 

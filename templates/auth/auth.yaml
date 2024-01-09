@@ -17,6 +17,10 @@ spec:
         component: auth
         factory-plus.service: auth
     spec:
+      {{- with .Values.acs.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       volumes:
         - name: krb5-conf
           configMap:
@@ -43,7 +47,7 @@ spec:
 
       initContainers:
         - name: register-with-directory
-          image: appropriate/curl:latest
+{{ include "amrc-connectivity-stack.image" .Values.acs.curl | indent 10 }}
           env:
             - name: PASSWORD
               valueFrom:

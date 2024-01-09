@@ -36,7 +36,7 @@ spec:
             - name: POLL_INT
               value: {{ .Values.poll_interval | quote }}
             - name: DIRECTORY_URL
-              value: http://directory.amrc-fpd-bmz.shef.ac.uk
+              value: "{{ .Values.directory_url }}"
             - name: SERVICE_USERNAME
               value: "nd1/{{ .Values.cluster }}/{{ .Values.name }}"
             - name: SERVICE_PASSWORD

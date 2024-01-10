@@ -46,7 +46,7 @@ spec:
 
       initContainers:
         - name: register-with-directory
-{{ include "amrc-connectivity-stack.image" .Values.acs.curl | indent 10 }}
+{{ include "amrc-connectivity-stack.image" .Values.curl | indent 10 }}
           env:
             - name: PASSWORD
               valueFrom:

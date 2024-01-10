@@ -39,6 +39,7 @@
 {{$application_helmChartTemplate := "729fe070-5e67-4bc7-94b5-afd75cb42b03" | quote}}
 {{$application_serviceSetup := "5b47881c-b012-4040-945c-eacafca539b2" | quote}}
 {{$application_edgeAgentConfig := "aac6f843-cfee-4683-b121-6943bfdf9173" | quote }}
+{{$application_serviceConfig := "5b47881c-b012-4040-945c-eacafca539b2" | quote}}
 
 {{$service_configStore := "af15f175-78a0-4e05-97c0-2a0bb82b9f3b" | quote}}
 {{$service_commandEscalation := "78ea7071-24ac-4916-8351-aa3e549d8ccd" | quote}}
@@ -47,6 +48,7 @@
 {{$service_mqtt := "feb27ba3-bd2c-4916-9269-79a61ebc4a47" | quote}}
 {{$service_warehouse := "a8e5a73f-2dd1-4cda-8e46-bc6cedb14269" | quote}}
 {{$service_git := "7adf4db0-2e7b-4a68-ab9d-376f4c5ce14b" | quote}}
+{{$service_manager := "619eecab-742d-4824-8b97-bcae472e5c04" | quote}}
 
 {{$serviceRequirement_gitServiceAccount := "a461ef62-0560-4be2-8d97-1a56916ce4f8" | quote}}
 {{$serviceRequirement_edgeDeploymentServiceAccount := "26d192cf-73c1-4c14-93cf-1e63743bab08" | quote}}
@@ -180,7 +182,8 @@ data:
           {{$service_commandEscalation}},
           {{$service_authorisation}},
           {{$service_mqtt}},
-          {{$service_warehouse}}
+          {{$service_warehouse}},
+          {{$service_manager}}
         ],
         {{$classDef_clientRole}}: [
           {{$role_administrator}},
@@ -434,6 +437,9 @@ data:
           },
           {{$service_mqtt}}: {
             "name": "MQTT Broker"
+          },
+          {{$service_manager}}: {
+            "name": "Factory+ Manager"
           },
           {{$serviceAccount_authorisation}}: {
             "name": "Auth Service"
@@ -972,6 +978,11 @@ data:
           "principal": {{$serviceAccount_manager}},
           "permission": {{$permission_configStore_manageObjects}},
           "target": {{$classDef_edgeCluster}}
+        },
+        {
+          "principal": {{$serviceAccount_manager}},
+          "permission": {{$permission_configStore_readConfigForApp}},
+          "target": {{$application_serviceConfig}}
         },
         {
           "principal": {{$serviceAccount_manager}},

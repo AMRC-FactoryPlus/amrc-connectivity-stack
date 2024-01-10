@@ -1,7 +1,13 @@
-{{ if .Values.postgres.enabled }}
 # This is from https://raw.githubusercontent.com/reactive-tech/kubegres/v1.15/kubegres.yaml.
 # See https://www.kubegres.io/doc/getting-started.html.
+#
 # This is a K8s Operator which manages a Postgres cluster.
+#
+# The Kubegres manifest has been patched to allow the images to be
+# customised. When an update is imported the equivalent changes will
+# need to be made to the new version.
+
+{{ if .Values.postgres.enabled }}
 
 apiVersion: v1
 kind: Namespace
@@ -311,13 +317,17 @@ spec:
       labels:
         control-plane: controller-manager
     spec:
+      {{- with .Values.acs.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - args:
             - --secure-listen-address=0.0.0.0:8443
             - --upstream=http://127.0.0.1:8080/
             - --logtostderr=true
             - --v=0
-          image: gcr.io/kubebuilder/kube-rbac-proxy:v0.13.0
+{{ include "amrc-connectivity-stack.image" .Values.kubegres.kubeProxy | indent 10 }}
           name: kube-rbac-proxy
           ports:
             - containerPort: 8443
@@ -341,7 +351,7 @@ spec:
             - --leader-elect
           command:
             - /manager
-          image: reactivetechio/kubegres:1.16
+{{ include "amrc-connectivity-stack.image" .Values.kubegres.kubegres | indent 10 }}
           livenessProbe:
             httpGet:
               path: /healthz

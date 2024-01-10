@@ -8,6 +8,8 @@ acs:
   # -- The name of the secret holding the wildcard certificate for the above domain.
   tlsSecretName: factoryplus-tls
   cacheMaxAge: 300
+  # -- Image pull secrets for container images
+  imagePullSecrets: []
 
 identity:
   # -- Whether or not to enable the Identity component
@@ -143,6 +145,17 @@ manager:
   meilisearch:
     # -- The key that the manager uses to connect to the Meilisearch search engine
     key: masterKey
+    image:
+      registry: docker.io
+      repository: getmeili/meilisearch
+      tag: v0.30.0
+      pullPolicy: IfNotPresent
+  redis:
+    image:
+      registry: docker.io
+      repository: redis
+      tag: alpine
+      pullPolicy: IfNotPresent
   # -- A string used to customise the branding of the manager
   name: Factory+ Manager
   # -- The environment that the manager is running in
@@ -224,6 +237,14 @@ shell:
     tag: v0.0.1
     pullPolicy: IfNotPresent
 
+# XXX This should probably be included in acs-krb-utils
+curl: 
+  image:
+    registry: docker.io
+    repository: appropriate/curl
+    tag: latest
+    pullPolicy: IfNotPresent
+
 minio:
   # -- Whether or not to enable MinIO
   enabled: true
@@ -234,6 +255,28 @@ minio:
 postgres:
   # -- Whether or not to enable Postgres
   enabled: true
+  # Postgres image to use. DO NOT change major version on an
+  # existing installation without being prepared to handle database
+  # dump/restore manually.
+  image:
+    registry: docker.io/library
+    repository: postgres
+    tag: 16.1
+    # Kubegres doesn't support setting pullPolicy
+
+kubegres:
+  kubeProxy:
+    image:
+      registry: gcr.io
+      repository: kubebuilder/kube-rbac-proxy
+      tag: v0.13.0
+      pullPolicy: IfNotPresent
+  kubegres:
+    image:
+      registry: docker.io
+      repository: reactivetechio/kubegres
+      tag: 1.16
+      pullPolicy: IfNotPresent
 
 # @ignore
 traefik:

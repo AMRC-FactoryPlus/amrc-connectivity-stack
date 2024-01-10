@@ -15,13 +15,17 @@ spec:
         component: manager-meilisearch
         factory-plus.service: manager-meilisearch
     spec:
+      {{- with .Values.acs.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       volumes:
         - name: manager-meilisearch-storage
           persistentVolumeClaim:
             claimName: manager-meilisearch-pvc
       containers:
         - name: meilisearch
-          image: getmeili/meilisearch:v0.30.0
+{{ include "amrc-connectivity-stack.image" .Values.manager.meilisearch | indent 10 }}
           volumeMounts:
             - mountPath: "/data.ms"
               name: manager-meilisearch-storage

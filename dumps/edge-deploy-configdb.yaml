@@ -57,6 +57,10 @@ configs:
         namespace:
           description: The k8s namespace to deploy to.
           type: string
+        chart:
+          description: The Helm chart to deploy.
+          type: string
+          format: uuid
     !u E.App.Status:
       title: EDO private status
       type: object

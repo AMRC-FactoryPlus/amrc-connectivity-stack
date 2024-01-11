@@ -81,7 +81,7 @@ directory:
     # -- The repository of the Directory component
     repository: acs-directory
     # -- The tag of the Directory component
-    tag: v1.1.1
+    tag: v1.1.2
     # @ignore
     pullPolicy: IfNotPresent
 

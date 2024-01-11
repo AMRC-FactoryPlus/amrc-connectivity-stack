@@ -16,6 +16,10 @@ spec:
       labels:
         component: krb-keys
     spec:
+      {{- with .Values.acs.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       serviceAccountName: krb-keys-operator
       automountServiceAccountToken: true
       volumes:

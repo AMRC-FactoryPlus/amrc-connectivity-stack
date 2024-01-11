@@ -92,6 +92,60 @@ paths:
                         application/json:
                             schema: { $ref: "#/components/schemas/address-info" }
 
+    /alert:
+        get:
+            summary: >
+                List all known alerts. These endpoints are ALPHA; they
+                are subject to incompatible change in the future.
+            responses:
+                "200":
+                    description: Information about available alerts.
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/alert-list" }
+    /alert/active:
+        get:
+            summary: List all currently active alerts.
+            responses:
+                "200":
+                    description: Information about active alerts.
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/alert-list" }
+    /alert/type/{type}:
+        parameters:
+            - { $ref: "#/components/parameters/alert-type" }
+        get:
+            summary: List all alerts of the given type.
+            responses:
+                "200":
+                    description: Active alerts.
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/alert-list" }
+    /alert/type/{type}/active:
+        parameters:
+            - { $ref: "#/components/parameters/alert-type" }
+        get:
+            summary: List all active alerts of the given type.
+            responses:
+                "200":
+                    description: Active alerts of the given type.
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/alert-list" }
+    /alert/{alert}:
+        parameters:
+            - { $ref: "#/components/parameters/alert" }
+        get:
+            summary: Return the status of a particular alert.
+            responses:
+                "200":
+                    description: Status of the given alert.
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/alert" }
+
     /device:
         get:
             summary: List all known devices.
@@ -254,6 +308,20 @@ paths:
                     
 components:
     parameters:
+        alert:
+            description: The UUID of an individual alert.
+            name: alert
+            in: path
+            required: true
+            schema: { type: string, format: uuid }
+
+        alert-type:
+            description: The UUID of an alert type.
+            name: type
+            in: path
+            required: true
+            schema: { type: string, format: uuid }
+
         device:
             description: The UUID of the device we are querying.
             name: device
@@ -315,6 +383,50 @@ components:
                         The names of the known children of this branch of the tree. If this is a
                         Group, the children will be Nodes. If this is a Node, the children will be
                         Devices.
+
+        alert:
+            description: Information about a particular alert.
+            type: object
+            required: [uuid, device, type, metric, active, last_change]
+            properties:
+                uuid:
+                    description: The UUID of this individual alert.
+                    type: string
+                    format: uuid
+                device:
+                    description: >
+                        The UUID of the device which published this alert.
+                    type: string
+                    format: uuid
+                type:
+                    description: >
+                        A UUID identifying the category of alert this
+                        represents. These UUIDs should be registered in
+                        the ConfigDB with at least a human-readable name
+                        in the General Info app.
+                    type: string
+                    format: uuid
+                metric:
+                    description: >
+                        The path to the metric sub-tree within the
+                        device's metrics which represents this alert.
+                        Metrics here should conform to the Alert schema.
+                        Do not attach any significance to the metric
+                        names used; alerts must be identified by their
+                        type and their Links.
+                    type: string
+                active:
+                    description: Is this alert currently active?
+                    type: boolean
+                last_change:
+                    description: The time this alert last changed status.
+                    type: string
+                    format: date-time
+
+        alert-list:
+            description: A list of alerts.
+            type: array
+            items: { $ref: "#/components/schemas/alert" }
 
         device:
             description: >

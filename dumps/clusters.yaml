@@ -1,0 +1,230 @@
+service: !u UUIDs.Service.ConfigDB
+version: 1
+classes:
+objects:
+  !u UUIDs.Class.App:
+    - !u Clusters.App.Bootstrap
+    - !u Clusters.App.Flux
+configs:
+  !u UUIDs.App.Info:
+    !u Clusters.App.Bootstrap:      { name: "Boostrap script" }
+    !u Clusters.App.Flux:           { name: "Flux template" }
+  !u UUIDs.App.ConfigSchema:
+    !u Clusters.App.Bootstrap:
+      title: Edge cluster bootstrap script template
+      description: >
+        A template for a shell script to bootstrap and edge cluster.
+        Values that are strings will have {{handlebar}} templates
+        expanded. Additional files `self-link.yaml` and
+        `flux-system.yaml` will be added with manifests extracted from
+        the cluster generation process.
+      type: object
+      required: [files, wrapper]
+      additionalProperties: false
+      properties:
+        files:
+          description: >
+            A list of files to pack into the self-extracting part of the
+            script. These will be unpacked by the wrapper.
+          type: object
+          additionalProperties: { type: string }
+        wrapper:
+          description: >
+            A wrapper script to unpack the files and perform the
+            bootstrap. The `{{files}}` template will be expanded to a
+            set of commands to unpack the packed files.
+          type: string
+    !u Clusters.App.Flux:
+      title: Edge cluster Flux template
+      description: >
+        A template for creating an edge cluster Flux repo. Values that
+        are strings will have {{handlebar}} templates expanded.
+      type: object
+      required: ["self-link.yaml"]
+      additionalProperties:
+        description: >
+          A file to include in the flux repo. The key gives the name of
+          the file and the value is an array of manifest templates.
+        type: array
+        items:
+          description: A Kubernetes manifest template.
+          oneOf:
+            - type: object
+              required: [apiVersion, kind]
+            - type: string
+              pattern: ^\{\{.*\}\}$
+  # XXX These single-object configs don't give the user any opportunity
+  # to override the configuration. But where is an override specified?
+  !u Clusters.App.Bootstrap:
+    !u Clusters.App.Bootstrap:
+      files:
+        bootstrap.sh: |
+          #!/bin/sh
+          
+          N="{{namespace}}"
+
+          wait_ready () {
+              local obj="$1"
+              while ! kubectl wait -n $N "$obj" --for condition=Ready
+              do
+                  sleep 2
+              done
+          }
+
+
+          kubectl create namespace $N
+          kubectl create -f edge-bootstrap.yaml
+
+          wait_ready pod/edge-bootstrap
+          kubectl attach -ti -n $N -c bootstrap edge-bootstrap </dev/tty
+
+          kubectl delete -f edge-bootstrap.yaml
+          kubectl apply -f flux-system.yaml
+          kubectl apply -f self-link.yaml
+          wait_ready kustomization/self-link
+        edge-bootstrap.yaml: |
+          ---
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            namespace: {{namespace}}
+            name: krb5-conf
+          data:
+            krb5.conf: |
+              [libdefaults]
+                  default_realm = {{realm}}
+                  dns_canonicalize_hostname = false
+                  udp_preference_limit = 1
+                  spake_preauth_groups = edwards25519
+
+              [domain_realm]
+                  {{domain}} = {{realm}}
+
+              [realms]
+                  {{realm}} = {
+                      kdc = kdc.{{domain}}
+                      admin_server = kadmin.{{domain}}
+                      disable_encrypted_timestamp = true
+                  }
+          ---
+          apiVersion: v1
+          kind: ServiceAccount
+          metadata:
+            namespace: {{namespace}}
+            name: edge-bootstrap
+          ---
+          apiVersion: rbac.authorization.k8s.io/v1
+          kind: RoleBinding
+          metadata:
+            namespace: {{namespace}}
+            name: acs-edge-bootstrap
+          roleRef:
+            apiGroup: rbac.authorization.k8s.io
+            kind: ClusterRole
+            name: cluster-admin
+          subjects:
+            - kind: ServiceAccount
+              namespace: {{namespace}}
+              name: edge-bootstrap
+          ---
+          apiVersion: v1
+          kind: Pod
+          metadata:
+            namespace: {{namespace}}
+            name: edge-bootstrap
+          spec:
+            serviceAccountName: edge-bootstrap
+            restartPolicy: Never
+            volumes:
+              - name: krb5-conf
+                configMap:
+                  name: krb5-conf
+            containers:
+              - name: bootstrap
+                image: {{krbkeys}}
+                imagePullPolicy: Always
+                command:
+                  - "/usr/bin/python3"
+                  - "-m"
+                  - "amrc.factoryplus.krbkeys.cluster"
+                stdin: true
+                tty: true
+                env:
+                  - name: CLUSTER_NAME
+                    value: {{name}}
+                  - name: REALM
+                    value: {{realm}}
+                  - name: NAMESPACE
+                    value: {{namespace}}
+                volumeMounts:
+                  - mountPath: /etc/krb5.conf
+                    name: krb5-conf
+                    subPath: krb5.conf
+      wrapper: |
+        #!/bin/sh
+        
+        set -ex
+
+        wd=$(mktemp -d)
+        cd "$wd"
+
+        {{files}}
+
+        . ./bootstrap.sh
+        cd /
+        rm -rf "$wd"
+  !u Clusters.App.Flux:
+    !u Clusters.App.Flux:
+      edge-cluster.yaml:
+        - "{{ helm }}"
+      flux-system.yaml:
+        - apiVersion: kustomize.toolkit.fluxcd.io/v1
+          kind: Kustomization
+          metadata:
+            name: flux-system
+            namespace: "{{ namespace }}"
+          spec:
+            interval: 3h0m0s
+            path: ./flux-system
+            prune: true
+            sourceRef:
+              kind: GitRepository
+              name: helm-charts
+      helm-charts.yaml:
+        - apiVersion: source.toolkit.fluxcd.io/v1
+          kind: GitRepository
+          metadata:
+            name: helm-charts
+            namespace: "{{ namespace }}"
+          spec:
+            interval: 3m
+            ref:
+              branch: main
+            secretRef:
+              name: flux-secrets
+            url: "{{ url.helm }}"
+      self-link.yaml:
+        - apiVersion: source.toolkit.fluxcd.io/v1
+          kind: GitRepository
+          metadata:
+            name: self-link
+            namespace: "{{ namespace }}"
+          spec:
+            interval: 3m
+            ref:
+              branch: main
+            secretRef:
+              name: flux-secrets
+            url: "{{ url.self }}"
+        - apiVersion: kustomize.toolkit.fluxcd.io/v1
+          kind: Kustomization
+          metadata:
+            name: self-link
+            namespace: "{{ namespace }}"
+          spec:
+            interval: 3m
+            path: ./
+            prune: true
+            sourceRef:
+              kind: GitRepository
+              name: self-link

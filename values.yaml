@@ -55,7 +55,7 @@ identity:
       # -- The repository of the KerberosKey Operator
       repository: acs-krb-keys-operator
       # -- The tag of the KerberosKey Operator
-      tag: v1.1.0
+      tag: v1.2.0
       # @ignore
       pullPolicy: IfNotPresent
 
@@ -68,7 +68,7 @@ auth:
     # -- The repository of the Authorisation component
     repository: acs-auth
     # -- The tag of the Authorisation component
-    tag: v1.2.0
+    tag: v1.3.0
     # @ignore
     pullPolicy: IfNotPresent
 
@@ -94,7 +94,7 @@ configdb:
     # -- The repository of the Configuration Store component
     repository: acs-configdb
     # -- The tag of the Configuration Store component
-    tag: v1.7.0
+    tag: v1.8.1
     # @ignore
     pullPolicy: IfNotPresent
 
@@ -223,23 +223,22 @@ git:
     # -- The repository of the Git component
     repository: acs-git
     # -- The tag of the Git component
-    tag: v0.0.2
+    tag: v0.0.3
     # @ignore
     pullPolicy: IfNotPresent
   # -- Possible values are either 1 to enable all possible debugging, or a comma-separated list of debug tags (the tags printed before the log lines). No logging is specified as an empty string.
   verbosity: "ALL,!service,!token"
 
 clusters:
-  # -- Whether or not to enable the Edge Deployment Operator (EDO) component
+  # -- Whether or not to enable the Cluster Manager component
   enabled: true
-  verbosity: "1"
   image:
-    # -- The registry of the EDO component
+    # -- The registry of the Clusters component
     registry: ghcr.io/amrc-factoryplus
-    # -- The repository of the EDO component
-    repository: acs-edge-deployment
-    # -- The tag of the EDO component
-    tag: v0.0.1
+    # -- The repository of the Clusters component
+    repository: acs-clusters
+    # -- The tag of the Clusters component
+    tag: v0.0.2
     # @ignore
     pullPolicy: IfNotPresent
   verbosity: "ALL,!service,!token"

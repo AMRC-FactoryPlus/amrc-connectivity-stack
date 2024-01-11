@@ -64,6 +64,11 @@
     },
     {
       "principal": "26d192cf-73c1-4c14-93cf-1e63743bab08",
+      "permission": "4a339562-cd57-408d-9d1a-6529a383ea4b",
+      "target": "a807d8fc-63ff-48bb-85c7-82b93beb606e"
+    },
+    {
+      "principal": "26d192cf-73c1-4c14-93cf-1e63743bab08",
       "permission": "6c799ccb-d2ad-4715-a2a7-3c8728d6c0bf",
       "target": "64a8bfa9-7772-45c4-9d1a-9e6290690957"
     },

@@ -7,7 +7,7 @@ pkgver!=node -e 'console.log(JSON.parse(fs.readFileSync("package.json")).version
 version?=v${pkgver}
 suffix?=
 registry?=ghcr.io/amrc-factoryplus
-repo?=acs-edge-deployment
+repo?=acs-clusters
 
 tag=${registry}/${repo}:${version}${suffix}
 build_args=

@@ -1,5 +1,5 @@
 {
-  "name": "acs-edge-deployment",
+  "name": "acs-clusters",
   "version": "0.0.2",
   "description": "",
   "main": "index.js",

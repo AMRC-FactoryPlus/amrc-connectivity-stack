@@ -52,25 +52,25 @@
         "name": "HelmRelease template"
       },
       "2706aa43-a826-441e-9cec-cd3d4ce623c2": {
-        "name": "Edge Deployment Operator"
+        "name": "Cluster Manager"
       },
       "9e07fd33-6400-4662-92c4-4dff1f61f990": {
-        "name": "Edge Deployment permissions"
+        "name": "Clusters permissions"
       },
       "a40acff8-0c61-4251-bef3-d8d53e50cdd0": {
-        "name": "Edge: Manage clusters"
+        "name": "Clusters: Manage clusters"
       },
       "07fba27a-0d01-4c07-875b-d25345261d3a": {
-        "name": "Edge: Manage secrets"
+        "name": "Clusters: Manage secrets"
       },
       "26d192cf-73c1-4c14-93cf-1e63743bab08": {
-        "name": "Edge Deployment service account"
+        "name": "Clusters service account"
       },
       "3a58340c-d4ec-453d-99c3-0cf6ab7d8fa9": {
         "name": "Edge cluster repositories"
       },
       "979f7fd9-bbc7-4810-a774-6082c7394db6": {
-        "name": "EDO-managed groups"
+        "name": "Clusters-managed groups"
       },
       "4eeb8156-856d-4251-a4a4-4c1b2f3d3e2c": {
         "name": "Edge flux accounts"
@@ -105,7 +105,7 @@
         }
       },
       "f6c67e6f-e48e-4f69-b4bb-bfbddcc2a517": {
-        "title": "EDO private status",
+        "title": "Clusters private status",
         "type": "object",
         "additionalProperties": true
       }

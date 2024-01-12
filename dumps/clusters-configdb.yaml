@@ -35,13 +35,13 @@ configs:
     !u E.App.Status: { name: "Edge cluster setup status" }
     !u E.App.HelmChart: { name: "Helm chart template" }
     !u E.App.HelmRelease: { name: "HelmRelease template" }
-    !u E.Service.EdgeDeployment: { name: "Edge Deployment Operator" }
-    !u E.Perm.All: { name: "Edge Deployment permissions" }
-    !u E.Perm.Clusters: { name: "Edge: Manage clusters" }
-    !u E.Perm.Secrets: { name: "Edge: Manage secrets" }
-    !u E.Requirement.ServiceAccount: { name: "Edge Deployment service account" }
+    !u E.Service.EdgeDeployment: { name: "Cluster Manager" }
+    !u E.Perm.All: { name: "Clusters permissions" }
+    !u E.Perm.Clusters: { name: "Clusters: Manage clusters" }
+    !u E.Perm.Secrets: { name: "Clusters: Manage secrets" }
+    !u E.Requirement.ServiceAccount: { name: "Clusters service account" }
     !u E.Requirement.EdgeRepos: { name: "Edge cluster repositories" }
-    !u E.Requirement.Groups: { name: "EDO-managed groups" }
+    !u E.Requirement.Groups: { name: "Clusters-managed groups" }
     !u E.Requirement.FluxAccounts: { name: "Edge flux accounts" }
     !u E.Requirement.FluxRoles: { name: "Edge flux roles" }
   !u FP.App.ConfigSchema:
@@ -62,7 +62,7 @@ configs:
           type: string
           format: uuid
     !u E.App.Status:
-      title: EDO private status
+      title: Clusters private status
       type: object
       additionalProperties: true
       # No additional constraints, this is our private data

@@ -662,7 +662,7 @@ data:
         }
       }
     }
-  # This is copied directly from acs-edge-deployment.
+  # This is copied directly from acs-clusters.
   # DO NOT EDIT HERE, make a PR to edit dumps/edge-deploy-configdb.yaml
   # in that repo and then pull the result back in.
   clusters: |
@@ -720,7 +720,7 @@ data:
             "name": "HelmRelease template"
           },
           "2706aa43-a826-441e-9cec-cd3d4ce623c2": {
-            "name": "Clusters Operator"
+            "name": "Cluster Manager"
           },
           "9e07fd33-6400-4662-92c4-4dff1f61f990": {
             "name": "Clusters permissions"
@@ -764,6 +764,11 @@ data:
               "namespace": {
                 "description": "The k8s namespace to deploy to.",
                 "type": "string"
+              },
+              "chart": {
+                "description": "The Helm chart to deploy.",
+                "type": "string",
+                "format": "uuid"
               }
             }
           },

@@ -27,14 +27,49 @@ export default {
     'wizard': () => import(/* webpackPrefetch: true */ '../General/Wizard.vue'),
     'overlay': () => import(/* webpackPrefetch: true */ '../General/Overlay.vue'),
   },
+
   props: {
     show: {
       required: true,
       type: Boolean,
     },
+    helmChartTemplates: {
+      required: true,
+    },
+    defaultHelmChartTemplates: {
+      required: true,
+    },
+  },
+
+  watch: {
+    helmChartTemplates: {
+      immediate: true,
+      handler: function (val) {
+        if (val) {
+          this.buildHelmChartTemplateOptions();
+        }
+      },
+    },
   },
 
   methods: {
+
+    buildHelmChartTemplateOptions() {
+      this.steps.clusterConfiguration.controls.chart.options = Object.keys(this.helmChartTemplates).map((helmChartTemplate) => {
+        return {
+          title: this.helmChartTemplates[helmChartTemplate].name,
+          value: helmChartTemplate,
+          action: () => {
+            this.steps.__request.parameters.chart.data = helmChartTemplate
+            this.steps.clusterConfiguration.controls.chart.value = this.helmChartTemplates[helmChartTemplate].name
+          },
+        }
+      })
+      this.steps.__request.parameters.chart.data = this.defaultHelmChartTemplates.helm.cluster
+      this.steps.clusterConfiguration.controls.chart.value = this.helmChartTemplates[this.defaultHelmChartTemplates.helm.cluster].name
+      this.$forceUpdate();
+
+    },
 
     completed (response) {
       this.$emit('complete', response)
@@ -59,6 +94,10 @@ export default {
               dataSource: ['clusterConfiguration', 'controls', 'name', 'value'],
               data: null,
             },
+            chart: {
+              dataType: 'static',
+              data: null,
+            },
           },
         },
         clusterConfiguration: {
@@ -77,6 +116,18 @@ export default {
               initialValue: '',
               value: '',
             },
+            chart: {
+              name: 'Helm Chart',
+              description: 'Choose a helm chart to use to deploy the edge cluster.',
+              type: 'dropdown',
+              options: [],
+              validations: {
+                required: helpers.withMessage('Please choose a chart', required),
+              },
+              disabled: false,
+              initialValue: '',
+              value: '',
+            }
           },
           buttons: [
             {

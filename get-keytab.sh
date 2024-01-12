@@ -4,4 +4,4 @@
 #
 
 # bin/bash
-kubectl --kubeconfig ./k3s.yaml get -n fpd-ago secret manager-keytab -o jsonpath="{.data.client-keytab}" | base64 -d >"./keytab"
+kubectl --kubeconfig ./k3s.yaml get -n fpd-bmz secret manager-keytab -o jsonpath="{.data.client-keytab}" | base64 -d >"./keytab"

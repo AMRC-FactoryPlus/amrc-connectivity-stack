@@ -21,6 +21,12 @@ class EdgeClusterController extends Controller
 
         $initialData = [
             'edgeClusters' => ['value' => null, 'method' => 'get', 'url' => '/api/edge-clusters',],
+            'helmChartTemplates' => ['value' => null, 'method' => 'get', 'url' => '/api/helm-chart-templates',],
+            'defaultHelmChartTemplates' => [
+                'value' => null,
+                'method' => 'get',
+                'url' => '/api/default-helm-chart-templates',
+            ],
         ];
 
         // Return the view with the initial data
@@ -31,7 +37,9 @@ class EdgeClusterController extends Controller
     {
         $validated = $request->validated();
 
-        return process_action((new CreateEdgeClusterAction())->execute(name: $validated['name']));
+        return process_action(
+            (new CreateEdgeClusterAction())->execute(name: $validated['name'], chart: $validated['chart'])
+        );
     }
 
     public function bootstrapCommand()

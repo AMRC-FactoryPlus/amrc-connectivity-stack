@@ -33,7 +33,8 @@ class CreateNodeAction
         Group $group,
         $nodeName,
         $destinationCluster,
-        $destinationNode
+        $destinationNode,
+        $chart,
     ) {
         // =========================
         // Validate User Permissions
@@ -74,7 +75,7 @@ class CreateNodeAction
         // Create an entry in the Edge Agent Deployment app to trigger the deployment of the edge agent
         $configDB->putConfig(App::EdgeAgentDeployment, $uuid, [
             "name" => $nodeName,
-            "charts" => ["edge-agent"],
+            "charts" => [$chart],
             "cluster" => $destinationCluster,
             "hostname" => $destinationNode,
         ]);

@@ -44,6 +44,12 @@ export default {
     edgeClusters: {
       required: true,
     },
+    helmChartTemplates: {
+      required: true,
+    },
+    defaultHelmChartTemplates: {
+      required: true,
+    },
   },
 
   watch: {
@@ -56,6 +62,15 @@ export default {
       },
     },
 
+    helmChartTemplates: {
+      immediate: true,
+      handler: function (val) {
+        if (val) {
+          this.buildHelmChartTemplateOptions();
+        }
+      },
+    },
+
     edgeClusters: {
       immediate: true,
       handler: function (val) {
@@ -64,7 +79,7 @@ export default {
             return {
               title: edgeCluster,
               value: edgeCluster,
-              options: Object.keys(val[edgeCluster].nodes).map(e => {
+              options: val[edgeCluster].nodes && Object.keys(val[edgeCluster].nodes)?.map(e => {
                 return {
                   title: val[edgeCluster].nodes[e].hostname,
                   value: val[edgeCluster].nodes[e].hostname,
@@ -85,6 +100,23 @@ export default {
   },
 
   methods: {
+
+    buildHelmChartTemplateOptions() {
+      this.steps.nodeSelection.controls.chart.options = Object.keys(this.helmChartTemplates).map((helmChartTemplate) => {
+        return {
+          title: this.helmChartTemplates[helmChartTemplate].name,
+          value: helmChartTemplate,
+          action: () => {
+            this.steps.__request.parameters.chart.data = helmChartTemplate
+            this.steps.nodeSelection.controls.chart.value = this.helmChartTemplates[helmChartTemplate].name
+          },
+        }
+      })
+      this.steps.__request.parameters.chart.data = this.defaultHelmChartTemplates.helm.agent
+      this.steps.nodeSelection.controls.chart.value = this.helmChartTemplates[this.defaultHelmChartTemplates.helm.agent].name
+      this.$forceUpdate();
+
+    },
 
     completed (response) {
       this.$emit('complete', response)
@@ -120,6 +152,10 @@ export default {
               dataType: 'static',
               data: null,
             },
+            chart: {
+              dataType: 'static',
+              data: null,
+            },
           },
         },
         nodeSelection: {
@@ -152,6 +188,18 @@ export default {
               initialValue: '',
               value: '',
             },
+            chart: {
+              name: 'Helm Chart',
+              description: 'Choose a helm chart to deploy to the edge cluster.',
+              type: 'dropdown',
+              options: [],
+              validations: {
+                required: helpers.withMessage('Please choose a chart', required),
+              },
+              disabled: false,
+              initialValue: '',
+              value: '',
+            }
           },
           buttons: [
             {

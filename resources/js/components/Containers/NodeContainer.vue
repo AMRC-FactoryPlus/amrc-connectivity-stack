@@ -85,7 +85,10 @@
     </ColumnList>
     <new-node-overlay v-if="selectedGroup" :show="newNodeDialogVisible" @close="newNodeDialogVisible=false"
                       :edge-clusters="edgeClusters"
-                      :group="selectedGroup" @complete="newNodeCreated"></new-node-overlay>
+                      :group="selectedGroup" @complete="newNodeCreated"
+                      :helm-chart-templates="helmChartTemplates"
+                      :default-helm-chart-templates="defaultHelmChartTemplates"
+    ></new-node-overlay>
     <node-user-overlay v-if="showNodeUserDialogFor" :show="!!showNodeUserDialogFor" :node="showNodeUserDialogFor" :group="selectedGroup"
                        @close="() => {showNodeUserDialogFor = null;}"></node-user-overlay>
 
@@ -351,6 +354,22 @@ export default {
       edgeClustersLoaded: false,
       edgeClustersQueryBank: {},
       edgeClustersRouteVar: null,
+
+      // helmChartTemplates
+      helmChartTemplates: null,
+      helmChartTemplatesLoading: false,
+      helmChartTemplatesLoaded: false,
+      helmChartTemplatesQueryBank: {},
+      helmChartTemplatesRouteVar: null,
+      helmChartTemplatesForceLoad: true,
+
+      // defaultHelmChartTemplates
+      defaultHelmChartTemplates: null,
+      defaultHelmChartTemplatesLoading: false,
+      defaultHelmChartTemplatesLoaded: false,
+      defaultHelmChartTemplatesQueryBank: {},
+      defaultHelmChartTemplatesRouteVar: null,
+      defaultHelmChartTemplatesForceLoad: true,
 
     }
   },

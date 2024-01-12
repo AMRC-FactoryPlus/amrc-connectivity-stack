@@ -13,6 +13,7 @@ use App\Http\Controllers\DeviceSchemaVersionController;
 use App\Http\Controllers\EdgeAgentController;
 use App\Http\Controllers\EdgeClusterController;
 use App\Http\Controllers\GroupController;
+use App\Http\Controllers\HelmChartController;
 use App\Http\Controllers\NodeController;
 use App\Http\Controllers\NodeUserController;
 use App\Http\Controllers\OriginMapController;
@@ -88,6 +89,10 @@ Route::middleware('auth:api')->get('/clusters', [ClusterController::class, 'inde
 Route::middleware('auth:api')->get('/edge-clusters', [EdgeClusterController::class, 'index']);
 Route::middleware('auth:api')->get('/edge-clusters/{cluster}/bootstrap-command', [EdgeClusterController::class, 'bootstrapCommand']);
 Route::middleware('auth:api')->post('/edge-clusters', [EdgeClusterController::class, 'create']);
+
+// ------ Helm Charts ------ //
+Route::middleware('auth:api')->get('/helm-chart-templates', [HelmChartController::class, 'index']);
+Route::middleware('auth:api')->get('/default-helm-chart-templates', [HelmChartController::class, 'defaults']);
 
 // ------ Schemas ------ //
 Route::middleware('auth:api')->get('/device-schemas', [DeviceSchemaController::class, 'index']);

@@ -17,6 +17,12 @@ class DashboardController extends Controller
             'devices' => ['value' => null, 'method' => 'get', 'url' => '/api/groups/{group}/nodes/{node}/devices',],
             'roles' => ['value' => null, 'method' => 'get', 'url' => '/api/roles',],
             'edgeClusters' => ['value' => null, 'method' => 'get', 'url' => '/api/edge-clusters',],
+            'helmChartTemplates' => ['value' => null, 'method' => 'get', 'url' => '/api/helm-chart-templates',],
+            'defaultHelmChartTemplates' => [
+                'value' => null,
+                'method' => 'get',
+                'url' => '/api/default-helm-chart-templates',
+            ],
         ];
 
         // Return the view with the initial data

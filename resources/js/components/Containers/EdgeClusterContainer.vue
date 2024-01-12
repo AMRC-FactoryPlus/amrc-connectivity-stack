@@ -43,7 +43,8 @@
       </template>
     </ColumnList>
     <new-edge-cluster-overlay :show="newClusterDialogVisible" @close="newClusterDialogVisible=false"
-                              @complete="newClusterCreated"></new-edge-cluster-overlay>
+                              @complete="newClusterCreated" :helm-chart-templates="helmChartTemplates"
+                              :default-helm-chart-templates="defaultHelmChartTemplates"></new-edge-cluster-overlay>
   </div>
 </template>
 
@@ -72,31 +73,31 @@ export default {
     copyBootstrapCommand (item) {
       axios.get(`/api/edge-clusters/${item.name}/bootstrap-command`).then((response) => {
         if (response.data.data) {
-          this.copyToClipboard(response.data.data);
+          this.copyToClipboard(response.data.data)
           window.showNotification({
             title: 'Copied to clipboard',
             description: 'The bootstrap command has been copied to your clipboard. Paste this onto the node you wish to bootstrap.',
             type: 'success',
-          });
+          })
         } else {
           window.showNotification({
-              title: 'Not ready',
-              description: 'The bootstrap script is not ready yet. Please wait a few moments and try again.',
-              type: 'error',
-          });
+            title: 'Not ready',
+            description: 'The bootstrap script is not ready yet. Please wait a few moments and try again.',
+            type: 'error',
+          })
         }
       })
     },
 
-    async copyToClipboard(text) {
+    async copyToClipboard (text) {
       try {
-        await navigator.clipboard.writeText(text);
+        await navigator.clipboard.writeText(text)
       } catch (err) {
         window.showNotification({
           title: 'Failed to copy to clipboard.',
           description: err,
           type: 'error',
-        });
+        })
       }
     },
 
@@ -117,6 +118,22 @@ export default {
       edgeClustersQueryBank: {},
       edgeClustersRouteVar: null,
       edgeClustersForceLoad: true,
+
+      // helmChartTemplates
+      helmChartTemplates: null,
+      helmChartTemplatesLoading: false,
+      helmChartTemplatesLoaded: false,
+      helmChartTemplatesQueryBank: {},
+      helmChartTemplatesRouteVar: null,
+      helmChartTemplatesForceLoad: true,
+
+      // defaultHelmChartTemplates
+      defaultHelmChartTemplates: null,
+      defaultHelmChartTemplatesLoading: false,
+      defaultHelmChartTemplatesLoaded: false,
+      defaultHelmChartTemplatesQueryBank: {},
+      defaultHelmChartTemplatesRouteVar: null,
+      defaultHelmChartTemplatesForceLoad: true,
 
     }
   },

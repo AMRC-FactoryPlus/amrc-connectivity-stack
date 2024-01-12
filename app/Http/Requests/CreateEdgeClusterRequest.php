@@ -33,6 +33,11 @@ class CreateEdgeClusterRequest extends FormRequest
                 'string',
                 'max:100',
             ],
+            'chart' => [
+                'required',
+                'uuid',
+                'string',
+            ],
         ];
     }
 }

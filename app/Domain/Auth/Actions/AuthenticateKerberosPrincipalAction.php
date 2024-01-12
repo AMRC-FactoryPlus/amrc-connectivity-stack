@@ -31,6 +31,7 @@ class AuthenticateKerberosPrincipalAction
         try {
             $ccache->initPassword($username, $password, $flags);
         } catch (Exception $e) {
+            ray($e->getMessage());
             Log::info('Authentication failed for ' . $username, [
                 'message' => $e->getMessage(),
             ]);

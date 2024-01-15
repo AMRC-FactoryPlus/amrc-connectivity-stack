@@ -77,7 +77,7 @@ export default {
         if (val) {
           const control = this.steps.nodeSelection.controls.destination_node;
           const params = this.steps.__request.parameters;
-          control.options = Object.entries(val).map(([edgeCluster, config]) => {
+          control.options = Object.entries(val).filter(([edgeCluster, config]) => config.status).map(([edgeCluster, config]) => {
             return {
               title: edgeCluster,
               value: edgeCluster,

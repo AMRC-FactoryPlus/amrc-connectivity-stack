@@ -59,6 +59,7 @@ export default {
     'FormWrapper': () => import(/* webpackPrefetch: true */ '../FormControls/FormWrapper.vue'),
     'form-control-input': () => import(/* webpackPrefetch: true */ '../FormControls/Input.vue'),
     'form-control-selection': () => import(/* webpackPrefetch: true */ '../FormControls/Selection.vue'),
+    'form-control-multi-selection': () => import(/* webpackPrefetch: true */ '../FormControls/MultiSelection.vue'),
     'form-control-dropdown': () => import(/* webpackPrefetch: true */ '../FormControls/Dropdown.vue'),
     'form-control-checkbox': () => import(/* webpackPrefetch: true */ '../FormControls/Checkbox.vue'),
     'OverflowMenu': () => import(/* webpackPrefetch: true */ '../OverflowMenu.vue'),

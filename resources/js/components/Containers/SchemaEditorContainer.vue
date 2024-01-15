@@ -163,6 +163,7 @@ export default {
           this.subSchemaBrowserType = 'sub-schema'
           this.subSchemaParent = e.parent
           this.subSchemaIndex = e.index
+          break;
         case 'sub-schema-array':
           this.subSchemaBrowserVisible = true
           this.subSchemaBrowserType = 'sub-schema-array'

@@ -270,7 +270,7 @@ export default {
         {
           title: 'Sub-Schema Array',
           icon: 'fa-cubes',
-          value: 'sub-schema',
+          value: 'sub-schema-array',
           action: () => {
             this.$emit('new', { type: 'sub-schema-array', parent: this.uuid, index: this.sortedKeys.length })
           },

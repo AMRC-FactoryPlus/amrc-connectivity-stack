@@ -54,6 +54,12 @@ class DeleteNodeAction
         $configDB = $fplus->getConfigDB();
 
         $configDB->deleteConfig(App::EdgeAgentDeployment, $node->uuid);
+        $configDB->deleteConfig(App::SparkplugAddress, $node->uuid);
+
+        /* XXX This should be a library method to mark an object deleted */
+        $info = $configDB->getConfig(App::Info, $node->uuid);
+        $info["deleted"] = true;
+        $configDB->putConfig(App::Info, $node->uuid, $info);
 
         $node->delete();
 

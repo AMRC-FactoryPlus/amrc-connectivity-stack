@@ -75,18 +75,20 @@ export default {
       immediate: true,
       handler: function (val) {
         if (val) {
-          this.steps.nodeSelection.controls.destination_node.options = Object.keys(val).map((edgeCluster) => {
+          const control = this.steps.nodeSelection.controls.destination_node;
+          const params = this.steps.__request.parameters;
+          control.options = Object.entries(val).map(([edgeCluster, config]) => {
             return {
               title: edgeCluster,
               value: edgeCluster,
-              options: val[edgeCluster].nodes && Object.keys(val[edgeCluster].nodes)?.map(e => {
+              options: config.status.hosts.map(host => {
                 return {
-                  title: val[edgeCluster].nodes[e].hostname,
-                  value: val[edgeCluster].nodes[e].hostname,
+                  title: `${host.hostname} (${host.arch})`,
+                  value: host.hostname,
                   action: () => {
-                    this.steps.__request.parameters.destination_cluster.data = val[edgeCluster].uuid
-                    this.steps.__request.parameters.destination_node.data = val[edgeCluster].nodes[e].hostname
-                    this.steps.nodeSelection.controls.destination_node.value = val[edgeCluster].nodes[e].hostname
+                    params.destination_cluster.data = config.uuid;
+                    params.destination_node.data = host.hostname;
+                    control.value = host.hostname;
                   },
                 }
               })

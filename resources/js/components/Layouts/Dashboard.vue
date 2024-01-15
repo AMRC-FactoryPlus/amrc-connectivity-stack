@@ -61,7 +61,7 @@
                :class="pageActive('schema-editor') ? 'bg-brand bg-opacity-10 text-brand' : 'hover:bg-brand hover:bg-opacity-10 hover:text-brand'"
                class="text-brand group w-full p-3 flex flex-col items-center text-xs font-medium">
               <i class="fa-sharp fa-solid fa-code fa-2x" :class="pageActive('schema-editor') ? 'opacity-100' : 'opacity-60 group-hover:opacity-100'"></i>
-              <span class="mt-2 text-center">Schema Viewer</span>
+              <span class="mt-2 text-center">Schema Editor</span>
             </a>
             <div class="flex-1"></div>
             <a href="/preferences"

@@ -10,8 +10,8 @@
       <div class="flex flex-col w-full">
         <div class="text-sm text-gray-400 mb-1 w-full">{{selectedMetric.path.join(' / ')}}</div>
         <div class="font-bold text-lg text-gray-600">{{selectedMetric.path.slice(-1)[0]}}</div>
-                        <input class="font-light text-sm text-gray-400 w-full focus:outline-none focus:bg-gray-50 focus:p-1 mr-3 group"
-                               v-model="localModel.Documentation"></input>
+        <input class="font-light text-sm text-gray-400 w-full focus:outline-none focus:bg-gray-50 focus:p-1 mr-3 group"
+               v-model="localModel.Documentation"></input>
       </div>
       <Checkbox v-model="localModel.Record_To_Historian"
                 :valid="{}"
@@ -27,8 +27,8 @@
         </template>
         <template #content>
           <Input :showDescription="false" :control="{
-                name: 'Value',
-              }" :valid="{}" v-model="localModel.Value"></Input>
+          name: 'Value',
+        }" :valid="{}" v-model="localModel.Value"></Input>
         </template>
       </Wrapper>
       <Wrapper>
@@ -41,9 +41,9 @@
               v-model="localModel.Sparkplug_Type"
               :valid="{}"
               :control="{
-                    name: schema.properties.Sparkplug_Type.title,
-                    options: availableTypes
-                  }"></Dropdown>
+              name: schema.properties.Sparkplug_Type.title,
+              options: availableTypes
+            }"></Dropdown>
         </template>
       </Wrapper>
       <Wrapper>
@@ -55,9 +55,9 @@
               v-model="localModel.Method"
               :valid="{}"
               :control="{
-                    name: schema.properties.Method.title,
-                    options: methods
-                  }"></Dropdown>
+              name: schema.properties.Method.title,
+              options: methods
+            }"></Dropdown>
         </template>
       </Wrapper>
       <Wrapper>
@@ -66,8 +66,8 @@
         </template>
         <template #content>
           <Input :showDescription="false" :control="{
-                name: schema.properties.Address.title,
-              }" :valid="{}" v-model="localModel.Address"></Input>
+          name: schema.properties.Address.title,
+        }" :valid="{}" v-model="localModel.Address"></Input>
         </template>
       </Wrapper>
       <Wrapper>
@@ -76,8 +76,8 @@
         </template>
         <template #content>
           <Input :showDescription="false" :control="{
-                name: schema.properties.Path.title,
-              }" :valid="{}" v-model="localModel.Path"></Input>
+          name: schema.properties.Path.title,
+        }" :valid="{}" v-model="localModel.Path"></Input>
         </template>
       </Wrapper>
       <Wrapper>
@@ -86,8 +86,8 @@
         </template>
         <template #content>
           <Input :showDescription="false" :control="{
-                name: 'Engineering Unit',
-              }" :valid="{}" v-model="localModel.Eng_Unit"></Input>
+          name: 'Engineering Unit',
+        }" :valid="{}" v-model="localModel.Eng_Unit"></Input>
         </template>
       </Wrapper>
       <Wrapper>
@@ -96,8 +96,8 @@
         </template>
         <template #content>
           <Input :showDescription="false" :control="{
-                name: 'Eng Low',
-              }" :valid="{}" v-model="localModel.Eng_Low"></Input>
+          name: 'Eng Low',
+        }" :valid="{}" v-model="localModel.Eng_Low"></Input>
         </template>
       </Wrapper>
       <Wrapper>
@@ -106,8 +106,8 @@
         </template>
         <template #content>
           <Input :showDescription="false" :control="{
-                name: 'Eng High',
-              }" :valid="{}" v-model="localModel.Eng_High"></Input>
+          name: 'Eng High',
+        }" :valid="{}" v-model="localModel.Eng_High"></Input>
         </template>
       </Wrapper>
       <Wrapper>
@@ -116,8 +116,8 @@
         </template>
         <template #content>
           <Input :showDescription="false" :control="{
-                name: 'Deadband',
-              }" :valid="{}" v-model="localModel.Deadband"></Input>
+          name: 'Deadband',
+        }" :valid="{}" v-model="localModel.Deadband"></Input>
         </template>
       </Wrapper>
     </div>
@@ -191,6 +191,49 @@ export default {
 
   },
   methods: {
+    populateForm () {
+
+      // Get the existing properties defined for this metric from the master model
+      let existing = this.get(this.selectedMetric.namePath.join('/'), this.model, '/')
+
+      // Loop through the properties and set the values to the existing values or the default
+      Object.keys(this.selectedMetric.metric.properties).forEach(e => {
+
+        // If we already have one in the master model then use that
+        if (existing && e in existing) {
+
+          // If the property that we're dealing with is the Sparkplug_Type then we need to ensure that it's a valid type, otherwise set the default
+          if (e === 'Sparkplug_Type') {
+            if (this.isValidType(existing[e], this.selectedMetric.metric.properties[e].enum)) {
+              this.$set(this.localModel, e, existing[e])
+            } else {
+              if ('default' in this.selectedMetric.metric.properties[e]) {
+                // If we have a default value then set it
+                this.$set(this.localModel, e, this.selectedMetric.metric.properties[e].default)
+              } else if ('enum' in this.selectedMetric.metric.properties[e]) {
+                // If we have an enum then set the first value
+                this.$set(this.localModel, e, this.selectedMetric.metric.properties[e].enum[0])
+              }
+            }
+          } else {
+            this.$set(this.localModel, e, existing[e])
+          }
+        }
+
+        // Otherwise set it to the default
+        else if ('default' in this.selectedMetric.metric.properties[e]) {
+          // If we have a default value then set it
+          this.$set(this.localModel, e, this.selectedMetric.metric.properties[e].default)
+        } else if ('enum' in this.selectedMetric.metric.properties[e]) {
+          // If we have an enum then set the first value
+          this.$set(this.localModel, e, this.selectedMetric.metric.properties[e].enum[0])
+        } else {
+          // Otherwise set it to null
+          this.$set(this.localModel, e, null)
+        }
+      })
+    },
+
     isValidType (val, options) {
       return options.some(e => e.value === val)
     },

@@ -15,6 +15,12 @@
         :loading="deviceSchemasLoading"
         :items="deviceSchemas"
         :show-divider="false">
+      <template #admin-actions>
+        <button v-if="showNew" @click="newSchema" class="fpl-button-brand h-10">
+          <span>New</span>
+          <i class="fa-sharp fa-solid ml-2 fa-plus"></i>
+        </button>
+      </template>
       <template
           v-slot:item="{ item }">
         <div class="flex-1 px-4 py-2 text-sm truncate h-10 flex flex-col justify-center">
@@ -77,6 +83,7 @@ export default {
   props: {
     deviceSchemas: {},
     deviceSchemaVersions: {},
+    showNew: { required: false, type: Boolean, default: false}
   },
 
   components: {
@@ -92,6 +99,10 @@ export default {
     selectDeviceSchema(deviceSchema) {
       this.selectedDeviceSchema = deviceSchema;
       this.requestDataReloadFor('deviceSchemaVersions', null, {schema: this.selectedDeviceSchema.id});
+    },
+
+    newSchema() {
+      this.$emit('new-schema', {});
     },
 
     selectDeviceSchemaVersion(deviceSchemaVersion) {

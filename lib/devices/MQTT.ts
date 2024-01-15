@@ -34,7 +34,7 @@ export class MQTTConnection extends DeviceConnection {
         connectTimeout?: number
         reconnectPeriod?: number
     }
-    #client: mqtt.Client
+    #client: mqtt.MqttClient
 
     constructor(type: string, connDetails: mqttConnDetails) {
         super(type);

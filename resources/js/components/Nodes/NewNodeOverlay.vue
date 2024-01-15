@@ -102,18 +102,16 @@ export default {
   methods: {
 
     buildHelmChartTemplateOptions() {
-      this.steps.nodeSelection.controls.chart.options = Object.keys(this.helmChartTemplates).map((helmChartTemplate) => {
+      this.steps.nodeSelection.controls.charts.options = Object.keys(this.helmChartTemplates).map((helmChartTemplate) => {
         return {
           title: this.helmChartTemplates[helmChartTemplate].name,
           value: helmChartTemplate,
           action: () => {
-            this.steps.__request.parameters.chart.data = helmChartTemplate
-            this.steps.nodeSelection.controls.chart.value = this.helmChartTemplates[helmChartTemplate].name
+            this.steps.__request.parameters.charts.data = helmChartTemplate
+            this.steps.nodeSelection.controls.charts.value = this.helmChartTemplates[helmChartTemplate].name
           },
         }
       })
-      this.steps.__request.parameters.chart.data = this.defaultHelmChartTemplates.helm.agent
-      this.steps.nodeSelection.controls.chart.value = this.helmChartTemplates[this.defaultHelmChartTemplates.helm.agent].name
       this.$forceUpdate();
 
     },
@@ -152,8 +150,9 @@ export default {
               dataType: 'static',
               data: null,
             },
-            chart: {
-              dataType: 'static',
+            charts: {
+              dataType: 'collected',
+              dataSource: ['nodeSelection', 'controls', 'charts', 'value'],
               data: null,
             },
           },
@@ -163,7 +162,7 @@ export default {
           controls: {
             node_name: {
               name: 'Node Name',
-              description: 'Node names must use underscores for spaces.',
+              description: 'Node names must use underscores for spaces',
               prefix: '',
               placeholder: 'e.g. Assembly_Cell',
               type: 'input',
@@ -178,7 +177,7 @@ export default {
             },
             destination_node: {
               name: 'Destination Node',
-              description: 'Choose a remote cluster and edge device on which to deploy the new Sparkplug node.',
+              description: 'Choose a remote cluster and edge device on which to deploy the new Sparkplug node',
               type: 'dropdown',
               options: [],
               validations: {
@@ -188,17 +187,17 @@ export default {
               initialValue: '',
               value: '',
             },
-            chart: {
-              name: 'Helm Chart',
-              description: 'Choose a helm chart to deploy to the edge cluster.',
-              type: 'dropdown',
+            charts: {
+              name: 'Helm Charts',
+              description: 'Choose the Helm charts to deploy to the edge cluster',
+              type: 'multiSelection',
               options: [],
               validations: {
                 required: helpers.withMessage('Please choose a chart', required),
               },
               disabled: false,
-              initialValue: '',
-              value: '',
+              initialValue: [],
+              value: [],
             }
           },
           buttons: [

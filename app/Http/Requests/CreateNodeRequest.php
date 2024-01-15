@@ -49,7 +49,7 @@ class CreateNodeRequest extends FormRequest
     {
         return [
             'node_name' => ['required', 'string', 'min:5', 'regex:/^\w+$/i'],
-            'chart' => ['required', 'uuid', 'string',],
+            'charts' => ['required', 'string'],
             'destination_cluster' => ['required', 'string'],
             'destination_node' => ['required', 'string'],
         ];

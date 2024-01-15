@@ -4,7 +4,7 @@
   -->
 
 <template>
-  <div class="flex flex-col">
+  <div class="flex flex-wrap gap-3">
     <div v-if="control.options?.length === 0">
       <div class=" bg-gray-100 animate-pulse flex relative items-center justify-start w-full h-16"></div>
     </div>
@@ -34,11 +34,11 @@ export default {
 
   methods: {
     updateCheckState (option) {
-      if (this.localValue.includes(option.id)) {
-        this.localValue.splice(this.localValue.indexOf(option.id), 1);
+      if (this.localValue.includes(option.value)) {
+        this.localValue.splice(this.localValue.indexOf(option.value), 1);
         return;
       }
-      this.localValue.push(option.id);
+      this.localValue.push(option.value);
     },
   },
 

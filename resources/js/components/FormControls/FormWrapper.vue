@@ -9,7 +9,7 @@
             {{ control.description }}
         </div>
         <div class="flex flex-col" :class="[showDescription ? 'col-span-2' : 'col-span-3']">
-            <div class="flex items-center mb-1">
+            <div class="flex items-center mb-2">
                 <h4 v-if="control.name">{{ control.name }}</h4>
                 <button v-if="control.infoLink" @mouseup="goto_url_tab(control.infoLink)"
                         v-tooltip="control.infoTooltip" class="fa-sharp fa-solid fa-info-circle fa-fw fpl-button-info text-xs"></button>

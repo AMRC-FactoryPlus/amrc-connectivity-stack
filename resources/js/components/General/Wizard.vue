@@ -304,9 +304,9 @@ export default {
             return JSON.stringify(paramContent);
           case 'arrayOfStrings' :
             suppliedData.forEach((element) => {
-              paramContent.push(element[value.translator.field]);
+              paramContent.push(element);
             });
-            return JSON.stringify(paramContent);
+            return paramContent;
           case 'invert' :
             return !suppliedData;
           case 'multiply' :

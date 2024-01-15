@@ -51,7 +51,7 @@ class NodeController extends Controller
                 nodeName: $validated['node_name'],
                 destinationCluster: $validated['destination_cluster'],
                 destinationNode: $validated['destination_node'],
-                chart: $validated['chart'],
+                charts: $validated['charts'],
             )
         );
     }

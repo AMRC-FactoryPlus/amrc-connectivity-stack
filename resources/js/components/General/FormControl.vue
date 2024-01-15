@@ -23,16 +23,19 @@
                 class="inline-flex justify-center w-80 border pl-4 py-2 bg-white font-medium text-gray-700 fpl-input text-left"
                 id="menu-button" aria-expanded="true" aria-haspopup="true">
           <div class="flex-grow truncate">
-            {{ value ? value : 'Select...' }}
+            {{value ? value : 'Select...'}}
           </div>
           <i class="fa-solid fa-chevron-down text-gray-400"></i>
         </button>
       </OverflowMenu>
 
     </FormWrapper>
-    <form-control-multi-selection :key="control.id" v-else-if="control.type === 'multiSelection'" :control="control"
-                                  :value="value"
-                                  @valueUpdated="broadcastValueUpdated"/>
+    <FormWrapper :key="control.id" v-else-if="control.type === 'multiSelection'" :control="control">
+      <form-control-multi-selection
+          :control="control"
+          :value="value"
+          @valueUpdated="broadcastValueUpdated"/>
+    </FormWrapper>
     <form-control-checkbox :key="control.id" v-else-if="control.type === 'checkbox'" :control="control" :valid="valid"
                            :value="value"
                            @valueUpdated="broadcastValueUpdated"/>

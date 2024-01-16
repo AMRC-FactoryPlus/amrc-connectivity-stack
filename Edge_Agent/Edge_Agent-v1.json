@@ -23,56 +23,17 @@
       "required": ["Config_Unavailable", "Config_Invalid"],
       "properties": {
         "Config_Unavailable": {
-          "description": "Indicates a problem fetching our config file.",
-          "allOf": [
-            {
-              "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Alert-v1.json"
-            },
-            {
-              "type": "object",
-              "properties": {
-                "Type": {
-                  "const": "c414c68b-5014-4e46-a0b4-d5f7f8df1d9f"
-                }
-              }
-            }
-          ]
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Alert-v1.json"
         },
         "Config_Invalid": {
-          "description": "Indicates a problem parsing our config file.",
-          "allOf": [
-            {
-              "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Alert-v1.json"
-            },
-            {
-              "type": "object",
-              "properties": {
-                "Type": {
-                  "const": "99c54cb2-2bb9-45c8-88f9-c1a0f792cfd6"
-                }
-              }
-            }
-          ]
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Alert-v1.json"
         },
         "Connection": {
           "description": "Problems with southbound connections.",
           "type": "object",
           "patternProperties": {
             "^[A-Za-z0-9_]+$": {
-              "description": "Indicates a problem with a particular device connection.",
-              "allOf": [
-                {
-                  "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Alert-v1.json"
-                },
-                {
-                  "type": "object",
-                  "properties": {
-                    "Type": {
-                      "const": "633a7da3-ea2a-4e3f-8e84-35691a07465f"
-                    }
-                  }
-                }
-              ]
+              "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Alert-v1.json"
             }
           }
         }

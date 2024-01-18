@@ -122,6 +122,8 @@ mqtt:
     tag: v1.1.1
     # @ignore
     pullPolicy: IfNotPresent
+  # -- Possible values are either 1 to enable all possible debugging, or a comma-separated list of debug tags (the tags printed before the log lines). No logging is specified as an empty string.
+  verbosity: 0
 
 manager:
   # -- Whether or not to enable the Manager component
@@ -132,7 +134,7 @@ manager:
     # -- The repository of the Manager component
     repository: acs-manager
     # -- The tag of the Manager component
-    tag: v1.4.0
+    tag: v1.4.1
     # @ignore
     pullPolicy: IfNotPresent
   edge:

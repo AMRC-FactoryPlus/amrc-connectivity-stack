@@ -17,11 +17,6 @@ RUN apk add --no-cache mysql-client mariadb-connector-c-dev \
     php82-sodium php82-pdo git \
     autoconf krb5-libs krb5-dev postgresql-dev nodejs yarn gcc make g++
 
-## Prepare Redis
-RUN mkdir -p /usr/src/php/ext/redis \
-    && curl -L https://github.com/phpredis/phpredis/archive/5.3.7.tar.gz | tar xvz -C /usr/src/php/ext/redis --strip 1 \
-    && echo 'redis' >> /usr/src/php-available-exts
-
 ## Install PHP extensions
 COPY --from=mlocati/php-extension-installer /usr/bin/install-php-extensions /usr/bin/
 RUN install-php-extensions \
@@ -30,7 +25,6 @@ RUN install-php-extensions \
     opcache \
     fileinfo \
     bcmath \
-    redis \
     session \
     dom \
     mysqli \

@@ -7,3 +7,4 @@ dependencies:
     version: "2.13.3"
     repository: https://bitnami-labs.github.io/sealed-secrets
     alias: sealedSecrets
+    condition: sealedSecrets.enabled

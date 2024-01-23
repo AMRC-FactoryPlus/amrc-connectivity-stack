@@ -19,6 +19,7 @@ krb5:
   # Kerberos realm used by central cluster
   #realm:
 sealedSecrets:
+  enabled: true
   namespace: sealed-secrets
   fullnameOverride: sealed-secrets
 image:

@@ -37,7 +37,6 @@ class GetAccessibleGroupsAction
             ->when(! auth()->user()->administrator, function ($query) {
                 $query->whereIn('id', auth()->user()->accessibleNodes->pluck('group.id'));
             })
-            ->with('cluster')
             // Return the count of the nodes with the result (excluding any bridges)
             ->withCount([
                 'nodes' => function (Builder $query) {

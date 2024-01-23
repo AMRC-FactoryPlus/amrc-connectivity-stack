@@ -25,11 +25,6 @@ class Group extends Model
         return $this->only(['id', 'name']);
     }
 
-    public function cluster()
-    {
-        return $this->belongsTo(Cluster::class);
-    }
-
     public function nodes()
     {
         return $this->hasMany(Node::class);

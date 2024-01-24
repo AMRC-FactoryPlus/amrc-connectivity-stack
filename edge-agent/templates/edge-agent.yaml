@@ -24,7 +24,9 @@ spec:
         factory-plus.name: {{ .Values.name }}
     spec:
       nodeSelector:
+{{ if .Values.hostname }}
         kubernetes.io/hostname: {{ .Values.hostname | quote }}
+{{ end }}
       containers:
         - name: edge-agent
 {{ include "edge-agent.image" .Values.image.edgeAgent | indent 10 }}

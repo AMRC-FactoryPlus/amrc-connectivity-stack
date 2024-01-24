@@ -14,3 +14,5 @@ authGroup:
 limits:
   cpu: "100m"
   memory: "200Mi"
+# This deploys to a specific host
+#hostname: foo

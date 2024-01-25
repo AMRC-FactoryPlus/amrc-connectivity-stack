@@ -73,7 +73,6 @@ public class FPKrbAuthProvider implements EnhancedAuthenticatorProvider
                     log.info("Retrying registration in 5 seconds.");
                 })
                 .delay(5, TimeUnit.SECONDS))
-            .timeout(10, TimeUnit.MINUTES)
             .subscribe(() -> log.info("Registered service successfully"),
                 e -> log.error("Failed to register service: {}", 
                     e.toString()));

@@ -122,7 +122,7 @@ manager:
     # -- The repository of the Manager component
     repository: acs-manager
     # -- The tag of the Manager component
-    tag: v1.4.0
+    tag: v1.4.1
     # @ignore
     pullPolicy: IfNotPresent
   edge:
@@ -375,5 +375,7 @@ influxdb2:
         #!/bin/bash
         echo "Creating mapping for bucket ${DOCKER_INFLUXDB_INIT_BUCKET_ID} in org ${DOCKER_INFLUXDB_INIT_ORG}"
         influx v1 dbrp create --bucket-id ${DOCKER_INFLUXDB_INIT_BUCKET_ID} --db default --rp default --default --org ${DOCKER_INFLUXDB_INIT_ORG}
+  pdb:
+    create: false
 switchboard:
   enabled: false

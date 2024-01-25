@@ -66,7 +66,7 @@ public class FPConfigDB {
             .fetch()
             .map(res -> res.ifOk()
                 .flatMap(r -> r.getBodyObject())
-                .orElseThrow(() ->
-                    new Exception("ConfigDB entry not an object")));
+                .orElseThrow(() -> new FPServiceException(SERVICE,
+                    res.getCode(), "Can't fetch ConfigDB entry")));
     }
 }

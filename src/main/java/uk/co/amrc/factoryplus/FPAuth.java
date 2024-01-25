@@ -67,10 +67,8 @@ public class FPAuth {
             .fetch()
             .map(res -> res.ifOk()
                 .flatMap(r -> r.getBodyArray())
-                .orElseGet(() -> {
-                    log.error("Can't fetch ACL: {}", res.getCode());
-                    return new JSONArray();
-                }))
+                .orElseThrow(() -> new FPServiceException(SERVICE, 
+                    res.getCode(), "Can't fetch ACL")))
             .doOnSuccess(acl -> log.info("F+ ACL [{}]: {}", princ, acl))
             .map(acl -> acl.toList().stream()
                 .filter(o -> o instanceof Map)

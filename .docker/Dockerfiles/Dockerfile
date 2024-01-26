@@ -17,7 +17,7 @@ COPY --from=build-frontend --chown=www:www /app /app
 
 EXPOSE 8080
 
-FROM --platform=linux/amd64 ghcr.io/amrc-factoryplus/acs-manager:backend-build-1.0.0 as build-backend
+FROM --platform=linux/amd64 ghcr.io/amrc-factoryplus/acs-manager:backend-build-1.1.0 as build-backend
 
 WORKDIR /app
 COPY --from=build-frontend --chown=www-data:www-data /app /app

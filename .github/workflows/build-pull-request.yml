@@ -57,7 +57,7 @@ jobs:
       - name: Check Backend Builder
         id: check-backend-builder
         run: |
-          docker manifest inspect ghcr.io/amrc-factoryplus/acs-manager:backend-build-1.0.0 || echo "needs-build=true" >> $GITHUB_OUTPUT
+          docker manifest inspect ghcr.io/amrc-factoryplus/acs-manager:backend-build-1.1.0 || echo "needs-build=true" >> $GITHUB_OUTPUT
 
       - name: Build Backend Builder
         id: build-backend-builder
@@ -67,7 +67,7 @@ jobs:
           context: .
           file: ./.docker/Dockerfiles/Dockerfile.backend-build
           push: true
-          tags: ghcr.io/amrc-factoryplus/acs-manager:backend-build-1.0.0
+          tags: ghcr.io/amrc-factoryplus/acs-manager:backend-build-1.1.0
 
       - name: Check Backend Base
         id: check-backend-base

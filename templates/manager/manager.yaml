@@ -4,6 +4,8 @@ kind: Deployment
 metadata:
   name: manager
   namespace: {{ .Release.Namespace }}
+  labels:
+    component: manager
 spec:
   replicas: 1
   selector:
@@ -23,6 +25,9 @@ spec:
         - name: krb5-conf
           configMap:
             name: krb5-conf
+        - name: manager-ccache-storage
+          persistentVolumeClaim:
+            claimName: manager-ccache-storage
       initContainers:
         - name: migrate-database
           image: "{{ .Values.manager.image.registry }}/{{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}-backend"
@@ -100,7 +105,23 @@ spec:
               name: manager-keytab
             - mountPath: /config/krb5-conf
               name: krb5-conf
+            - mountPath: /app/storage/ccache
+              name: manager-ccache-storage
         - name: frontend
           image: "{{ .Values.manager.image.registry }}/{{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}-frontend"
           imagePullPolicy: {{ .Values.manager.image.pullPolicy }}
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: manager-ccache-storage
+  namespace: {{ .Release.Namespace }}
+  labels:
+    component: manager
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Mi
 {{- end -}}

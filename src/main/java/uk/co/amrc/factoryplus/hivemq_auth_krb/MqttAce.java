@@ -19,6 +19,8 @@ import io.reactivex.rxjava3.core.*;
 import com.hivemq.extension.sdk.api.auth.parameter.*;
 import com.hivemq.extension.sdk.api.services.builder.Builders;
 
+import uk.co.amrc.factoryplus.*;
+
 class MqttAce {
     private static final Logger log = LoggerFactory.getLogger(MqttAce.class);
 
@@ -84,9 +86,11 @@ class MqttAce {
             .map(target -> 
                 interp.replaceAll(match -> expandTemplate(match, target)))
             .map(tp -> new MqttAce(tp, activity))
-            //.doOnError(e -> log.error("Topic interpolation failed: {}",
-            //    e.toString()))
-            .onErrorComplete();
+            .onErrorResumeNext(err -> {
+                if (FPServiceException.check(err, FPUuid.Service.ConfigDB, 404))
+                    return Maybe.<MqttAce>empty();
+                return Maybe.<MqttAce>error(err);
+            });
     }
 
     public TopicPermission toTopicPermission ()

@@ -48,6 +48,7 @@
         @else
             <notification></notification>
         @endif
+        <reauthenticate></reauthenticate>
     </main>
     @yield('page')
 </div>

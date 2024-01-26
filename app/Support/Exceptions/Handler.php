@@ -7,6 +7,7 @@
 namespace App\Support\Exceptions;
 
 use App\Exceptions\ActionFailException;
+use App\Exceptions\ReauthenticationRequiredException;
 use App\Support\Traits\HandleActionExceptions;
 use Exception;
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
@@ -24,6 +25,7 @@ class Handler extends ExceptionHandler
     protected $dontReport
         = [
             ActionFailException::class,
+            ReauthenticationRequiredException::class,
         ];
     /**
      * A list of the inputs that are never flashed for validation exceptions.

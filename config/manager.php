@@ -14,4 +14,5 @@ return [
     'manager_client_principal' => env('MANAGER_CLIENT_PRINCIPAL', 'sv1manager'),
     'tgt_lifetime' => 3600,
     'keytab_path' => env('KEYTAB_PATH', '/config/keytab/client-keytab'),
+    'tkt_life' => env('TKT_LIFE', 21600),
 ];

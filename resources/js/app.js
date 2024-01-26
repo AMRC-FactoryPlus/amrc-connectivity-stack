@@ -35,6 +35,7 @@ Vue.component('notification', () => import(/* webpackPrefetch: true */ './compon
 
 // Auth
 Vue.component('login-page', () => import(/* webpackPrefetch: true */ './components/Auth/LoginPage.vue'));
+Vue.component('reauthenticate', () => import(/* webpackPrefetch: true */ './components/Auth/Reauthenticate.vue'));
 
 // Layouts
 Vue.component('dashboard', () => import(/* webpackPrefetch: true */ './components/Layouts/Dashboard.vue'));
@@ -102,9 +103,9 @@ Vue.mixin({
   },
 
   methods: {
-
+    
     handleError(error, notificationId = null) {
-      console.error(error);
+      
       if (error && error.response && error.response.status === 401) {
         this.goto_url('/login');
       }
@@ -281,30 +282,51 @@ Vue.mixin({
           url = url.replace(re, value);
         }
       }
-
-      axios[method](url + queryString).then(response => {
-        self[property] = response.data.data;
-        self[property + 'Loaded'] = true;
-        this[property + 'Loading'] = false;
-        window.events.$emit('dataLoaded-' + property);
-        if (initial) {
-          window.events.$emit('initialDataLoaded-' + property);
-        }
-        actionOnComplete();
-      }).catch(error => {
-        if (error && error.response && error.response.status === 401) {
-          this.goto_url('/login');
-        }
-        window.events.$emit('dataLoaded-' + property);
-        if (initial) {
-          window.events.$emit('initialDataLoaded-' + property);
-        }
-        self[property + 'Loaded'] = false;
-        self[property + 'Loading'] = false;
-
-        this.handleError(error);
+      
+      this.makeRequest(method, url, queryString, property, this, initial, actionOnComplete);
+      
+    },
+    
+    makeRequest(method, url, queryString, property, self, initial, actionOnComplete) {
+      return new Promise((resolve, reject) => {
+        const attemptRequest = () => {
+          axios[method](url + queryString).then(response => {
+            self[property] = response.data.data;
+            self[property + 'Loaded'] = true;
+            this[property + 'Loading'] = false;
+            window.events.$emit('dataLoaded-' + property);
+            if (initial) {
+              window.events.$emit('initialDataLoaded-' + property);
+            }
+            actionOnComplete();
+            resolve(response);
+          }).catch(error => {
+            if (error?.response?.data?.data?.reauthenticate) {
+              // Show the reauthenticate modal
+              window.events.$emit('show-reauthenticate-modal', () => {
+                attemptRequest(); // Retry the request after reauthentication
+              });
+            } else {
+              if (error && error.response && error.response.status === 401) {
+                this.goto_url('/login');
+              }
+              window.events.$emit('dataLoaded-' + property);
+              if (initial) {
+                window.events.$emit('initialDataLoaded-' + property);
+              }
+              self[property + 'Loaded'] = false;
+              self[property + 'Loading'] = false;
+              
+              this.handleError(error);
+              reject(error);
+            }
+          });
+        };
+        
+        attemptRequest();
       });
     },
+    
     buildQueryStringFromBank (bank) {
       let queryStringBuilder = '?';
 

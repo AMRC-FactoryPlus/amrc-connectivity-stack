@@ -17,6 +17,7 @@ use App\Http\Controllers\HelmChartController;
 use App\Http\Controllers\NodeController;
 use App\Http\Controllers\NodeUserController;
 use App\Http\Controllers\OriginMapController;
+use App\Http\Controllers\ReauthenticateController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\UserMetaController;
 use App\Http\Controllers\UserPreferenceController;
@@ -35,6 +36,9 @@ if (env('APP_ENV', 'local') !== 'production') {
     Route::post('testing/exception_error', [APITestController::class, 'error']);
     Route::post('testing/exception_other', [APITestController::class, 'other']);
 }
+
+// ------ Auth ------ //
+Route::post('/reauthenticate', [ReauthenticateController::class, 'reauthenticate']);
 
 // ------ Proxy ------ //
 Route::middleware('auth:api')->post('/github-proxy', [\App\Http\Controllers\GithubProxyController::class, 'get']);

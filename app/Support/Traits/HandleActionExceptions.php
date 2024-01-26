@@ -9,6 +9,7 @@ namespace App\Support\Traits;
 use App\Exceptions\ActionErrorException;
 use App\Exceptions\ActionFailException;
 use App\Exceptions\ActionForbiddenException;
+use App\Exceptions\ReauthenticationRequiredException;
 use Exception;
 use Illuminate\Support\Arr;
 use Illuminate\Validation\ValidationException;
@@ -48,6 +49,18 @@ trait HandleActionExceptions
     protected function prepareJsonResponse($request, Throwable $e)
     {
         $message = $e->getMessage();
+
+        // If the exception is a ReauthenticationRequiredException then send a special response that the UI can use
+        // to show an inline login dialog
+        if ($e instanceof ReauthenticationRequiredException) {
+            return jsend_error(
+                $message,
+                $e->getStatusCode(),
+                [
+                    'reauthenticate' => true,
+                ]
+            );
+        }
 
         $data = config('app.debug') ? [
             'exception' => get_class($e),

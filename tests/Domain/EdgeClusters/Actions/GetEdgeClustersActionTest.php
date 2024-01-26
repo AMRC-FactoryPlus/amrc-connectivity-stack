@@ -16,10 +16,6 @@ class GetEdgeClustersActionTest extends TestCase
 
         $this->signInAdmin();
 
-        $response = (new GetEdgeClustersAction())->execute()['data'];
-
-        ray($response);
-
-
+        (new GetEdgeClustersAction())->execute()['data'];
     }
 }

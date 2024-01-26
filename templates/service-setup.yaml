@@ -30,13 +30,21 @@ spec:
                   name: krb5-passwords
                   key: admin
             - name: VERBOSE
-              value: ALL
+              value: ALL,!token,!service
             - name: GIT_CHECKOUTS
               value: /data
-            - name: HELM_REPO_URL
-              value: {{ .Values.serviceSetup.helmUrl | quote }}
-            - name: HELM_REPO_REF
-              value: {{ .Values.serviceSetup.helmRef | quote }}
+            - name: SS_CONFIG
+              value: {{ .Values.serviceSetup.config | toRawJson | quote }}
+            - name: ACS_CONFIG
+              value: {{
+                dict
+                  "organisation"    .Values.acs.organisation
+                  "domain"          .Values.acs.baseUrl
+                  "realm"           .Values.identity.realm
+                  "directory"
+                    (include "amrc-connectivity-stack.external-url" 
+                      (list . "directory"))
+                | toRawJson | quote }}
           volumeMounts:
             - mountPath: /data
               name: git-checkouts

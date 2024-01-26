@@ -5,7 +5,6 @@
 # ====================================================
 
 {{$classDef_classDefinition := "04a1c90d-2295-4cbe-b33a-74eded62cbf1" | quote}}
-{{$classDef_wildcard := "00000000-0000-0000-0000-000000000000" | quote}}
 {{$classDef_application := "d319bd87-f42b-4b66-be4f-f82ff48b93f0" | quote}}
 {{$classDef_serviceFunction := "265d481f-87a7-4f93-8fc6-53fa64dc11bb" | quote}}
 {{$classDef_serviceAccount := "e463b4ae-a322-46cc-8976-4ba76838e908" | quote}}
@@ -23,6 +22,9 @@
 {{$classDef_edgeClusterTemplate := "f9be0334-0ff7-43d3-9d8a-188d3e4d472b" | quote}}
 {{$classDef_edgeCluster := "f24d354d-abc1-4e32-98e1-0667b3e40b61" | quote}}
 
+{{$special_wildcard := "00000000-0000-0000-0000-000000000000" | quote}}
+{{$special_self := "5855a1cc-46d8-4b16-84f8-ab3916ecb230" | quote}}
+
 {{$application_objectRegistration := "cb40bed5-49ad-4443-a7f5-08c75009da8f" | quote}}
 {{$application_generalObjectInformation := "64a8bfa9-7772-45c4-9d1a-9e6290690957" | quote}}
 {{$application_applicationConfigSchema := "dbd8a535-52ba-4f6e-b4f8-9b71aefe09d3" | quote}}
@@ -36,6 +38,8 @@
 {{$application_edgeDeployment := "f2b9417a-ef7f-421f-b387-bb8183a48cdb" | quote}}
 {{$application_helmChartTemplate := "729fe070-5e67-4bc7-94b5-afd75cb42b03" | quote}}
 {{$application_serviceSetup := "5b47881c-b012-4040-945c-eacafca539b2" | quote}}
+{{$application_edgeAgentConfig := "aac6f843-cfee-4683-b121-6943bfdf9173" | quote }}
+{{$application_serviceConfig := "5b47881c-b012-4040-945c-eacafca539b2" | quote}}
 
 {{$service_configStore := "af15f175-78a0-4e05-97c0-2a0bb82b9f3b" | quote}}
 {{$service_commandEscalation := "78ea7071-24ac-4916-8351-aa3e549d8ccd" | quote}}
@@ -44,6 +48,7 @@
 {{$service_mqtt := "feb27ba3-bd2c-4916-9269-79a61ebc4a47" | quote}}
 {{$service_warehouse := "a8e5a73f-2dd1-4cda-8e46-bc6cedb14269" | quote}}
 {{$service_git := "7adf4db0-2e7b-4a68-ab9d-376f4c5ce14b" | quote}}
+{{$service_manager := "619eecab-742d-4824-8b97-bcae472e5c04" | quote}}
 
 {{$serviceRequirement_gitServiceAccount := "a461ef62-0560-4be2-8d97-1a56916ce4f8" | quote}}
 {{$serviceRequirement_edgeDeploymentServiceAccount := "26d192cf-73c1-4c14-93cf-1e63743bab08" | quote}}
@@ -71,7 +76,7 @@
 {{$permission_mqtt_publishAllFromGroup := "64c019f8-6754-4270-8917-6659a5628b86" | quote}}
 {{$permission_mqtt_subscribeReadAllStates := "8790cf3d-b793-423c-b373-8cfcf9f63529" | quote}}
 {{$permission_mqtt_updateGroupState := "9a32f195-a8cc-4562-a87a-d4653279474f" | quote}}
-{{$permission_mqtt_particpateAsNode := "a1314953-8226-44f4-8a3e-e87b09310579" | quote}}
+{{$permission_mqtt_participateAsNode := "a1314953-8226-44f4-8a3e-e87b09310579" | quote}}
 {{$permission_mqtt_updateOwnState := "bdc96a3e-d6fb-48ed-b790-0aa95cf826f0" | quote}}
 {{$permission_mqtt_issueGroupCommands := "cff45682-f2f0-4c72-91f3-7dda20d43509" | quote}}
 {{$permission_mqtt_subscribeReadOwnGroup := "d617e37c-3908-41b1-8820-d3f8d41a4280" | quote}}
@@ -89,8 +94,8 @@
 {{$permission_git_pullFromRepo := "12ecb694-b4b9-4d2a-927e-d100019f7ebe" | quote}}
 {{$permission_git_pushToRepo := "b2d8d437-5060-4202-bcc2-bd2beda09651" | quote}}
 
-{{$permission_edo_manageClusters := "a40acff8-0c61-4251-bef3-d8d53e50cdd0" | quote}}
-{{$permission_edo_manageSecrets := "07fba27a-0d01-4c07-875b-d25345261d3a" | quote}}
+{{$permission_clusters_manageClusters := "a40acff8-0c61-4251-bef3-d8d53e50cdd0" | quote}}
+{{$permission_clusters_manageSecrets := "07fba27a-0d01-4c07-875b-d25345261d3a" | quote}}
 
 {{$permissionGroup_authorisation := "50b727d4-3faa-40dc-b347-01c99a226c58" | quote}}
 {{$permissionGroup_configStore := "c43c7157-a50b-4d2a-ac1a-86ff8e8e88c1" | quote}}
@@ -98,7 +103,7 @@
 {{$permissionGroup_directory := "58b5da47-d098-44f7-8c1d-6e4bd800e718" | quote}}
 {{$permissionGroup_commands := "9584ee09-a35a-4278-bc13-21a8be1f007c" | quote}}
 {{$permissionGroup_git := "c0c55c78-116e-4526-8ff4-e4595251f76c" | quote}}
-{{$permissionGroup_edo := "9e07fd33-6400-4662-92c4-4dff1f61f990" | quote}}
+{{$permissionGroup_clusters := "9e07fd33-6400-4662-92c4-4dff1f61f990" | quote}}
 
 {{$role_administrator := "4c09402f-9923-4c82-a6f2-02bda21aace4" | quote}}
 {{$role_commandEscalation := "dbd0c099-6c59-4bc6-aa92-4ba8a9b543f4" | quote}}
@@ -108,8 +113,6 @@
 {{$role_globalPrimaryApplication := "c0d17bcf-2a90-40e5-b244-07bf631f7417" | quote}}
 {{$role_warehouse := "6958c812-fbe2-4e6c-b997-6f850b89f679" | quote}}
 {{$role_edgeFlux := "34ee0e7f-8c9c-4f6d-aad7-4ed700bc77da" | quote}}
-
-{{$userGroup_administrators := "10fc06b7-02f5-45f1-b419-a486b6bc13ba" | quote}}
 
 {{$gitRepoGroup_remoteClusters := "736697bd-3637-4340-8d8a-f4a457d6f483" | quote}}
 {{$gitRepoGroup_sharedRepositories := "9c16e08a-a659-4f02-877f-2949dc4ec7b9" | quote}}
@@ -132,7 +135,9 @@
 {{$serviceAccount_mqtt := "2f42daeb-4521-4522-8e19-85dfb73db88e" | quote}}
 {{$serviceAccount_krbkeys := "a04b4195-7db4-4480-b3f3-4d22c08b96ea" | quote}}
 {{$serviceAccount_git := "626df296-8156-4c67-8aed-aac70161aa8b" | quote}}
-{{$serviceAccount_edo := "127cde3c-773a-4f61-b0ba-7412a2695253" | quote}}
+{{$serviceAccount_clusters := "127cde3c-773a-4f61-b0ba-7412a2695253" | quote}}
+{{$userGroup_administrators := "10fc06b7-02f5-45f1-b419-a486b6bc13ba" | quote}}
+{{$userGroup_sparkplugNode := "1d3121a0-aade-4376-8fa3-57ba1460ba76" | quote}}
 {{$user_admin := "d53f476a-29dd-4d79-b614-5b7fe9bc8acf" | quote}}
 
 {{ if .Values.configdb.enabled }}
@@ -158,7 +163,6 @@ data:
         {{$classDef_userGroup}},
         {{$classDef_permission}},
         {{$classDef_permissionGroup}},
-        {{$classDef_wildcard}},
         {{$classDef_serviceAccount}},
         {{$classDef_serviceRequirement}},
         {{$classDef_cellGateway}},
@@ -176,10 +180,10 @@ data:
         {{$classDef_serviceFunction}}: [
           {{$service_configStore}},
           {{$service_commandEscalation}},
-          {{$service_directory}},
           {{$service_authorisation}},
           {{$service_mqtt}},
-          {{$service_warehouse}}
+          {{$service_warehouse}},
+          {{$service_manager}}
         ],
         {{$classDef_clientRole}}: [
           {{$role_administrator}},
@@ -214,14 +218,11 @@ data:
           {{$permission_mqtt_subscribeReadWholeNamespace}},
           {{$permission_mqtt_subscribeReadAllStates}},
           {{$permission_mqtt_updateGroupState}},
-          {{$permission_mqtt_particpateAsNode}},
+          {{$permission_mqtt_participateAsNode}},
           {{$permission_mqtt_updateOwnState}},
           {{$permission_mqtt_issueGroupCommands}},
           {{$permission_mqtt_subscribeReadOwnGroup}},
           {{$permission_mqtt_representDevices}},
-          {{$permission_directory_overrideServiceAdvertisementPermissions}},
-          {{$permission_directory_advertiseService}},
-          {{$permission_directory_manageServiceAdvertisementForOwner}},
           {{$permission_auth_readKerberosMapping}},
           {{$permission_mqtt_readAllBirthMessages}},
           {{$permission_ccl_rebirth}},
@@ -231,7 +232,6 @@ data:
           {{$permissionGroup_authorisation}},
           {{$permissionGroup_configStore}},
           {{$permissionGroup_mqtt}},
-          {{$permissionGroup_directory}},
           {{$permissionGroup_commands}}
         ],
         {{$classDef_serviceAccount}}: [
@@ -315,9 +315,6 @@ data:
           {{$permissionGroup_authorisation}}: {
             "name": "Auth permissions"
           },
-          {{$classDef_wildcard}}: {
-            "name": "Wildcard UUID"
-          },
           {{$permission_configStore_readConfigForApp}}: {
             "name": "ConfigDB: Read config for app"
           },
@@ -378,7 +375,7 @@ data:
           {{$permission_mqtt_updateGroupState}}: {
             "name": "MQTT: Update group STATE"
           },
-          {{$permission_mqtt_particpateAsNode}}: {
+          {{$permission_mqtt_participateAsNode}}: {
             "name": "MQTT: Participate as Node"
           },
           {{$permission_mqtt_updateOwnState}}: {
@@ -395,18 +392,6 @@ data:
           },
           {{$classDef_serviceAccount}}: {
             "name": "Service Account"
-          },
-          {{$permissionGroup_directory}}: {
-            "name": "Directory permissions"
-          },
-          {{$permission_directory_overrideServiceAdvertisementPermissions}}: {
-            "name": "Directory: Override service advertisement permissions"
-          },
-          {{$permission_directory_advertiseService}}: {
-            "name": "Directory: Advertise service"
-          },
-          {{$permission_directory_manageServiceAdvertisementForOwner}}: {
-            "name": "Directory: Manage service advertisement for owner"
           },
           {{$permission_auth_readKerberosMapping}}: {
             "name": "Auth: Read Kerberos mapping"
@@ -447,14 +432,14 @@ data:
           {{$service_warehouse}}: {
             "name": "Data Warehouse Service"
           },
-          {{$service_directory}}: {
-            "name": "Directory Service"
-          },
           {{$service_authorisation}}: {
             "name": "Authentication Service"
           },
           {{$service_mqtt}}: {
             "name": "MQTT Broker"
+          },
+          {{$service_manager}}: {
+            "name": "Factory+ Manager"
           },
           {{$serviceAccount_authorisation}}: {
             "name": "Auth Service"
@@ -506,7 +491,7 @@ data:
           {{$permission_mqtt_updateGroupState}}: {
             "STATE/%g": "w"
           },
-          {{$permission_mqtt_particpateAsNode}}: {
+          {{$permission_mqtt_participateAsNode}}: {
             "spBv1.0/%g/NDATA/%n": "w",
             "spBv1.0/%g/NBIRTH/%n": "w",
             "spBv1.0/%g/NCMD/%n/#": "rs",
@@ -677,16 +662,15 @@ data:
         }
       }
     }
-  # This is copied directly from acs-edge-deployment.
+  # This is copied directly from acs-clusters.
   # DO NOT EDIT HERE, make a PR to edit dumps/edge-deploy-configdb.yaml
   # in that repo and then pull the result back in.
-  edo: |
+  clusters: |
     {
       "service": "af15f175-78a0-4e05-97c0-2a0bb82b9f3b",
       "version": 1,
       "classes": [
         "f24d354d-abc1-4e32-98e1-0667b3e40b61",
-        "f9be0334-0ff7-43d3-9d8a-188d3e4d472b",
         "265d481f-87a7-4f93-8fc6-53fa64dc11bb",
         "ac0d5288-6136-4ced-a372-325fbbcdd70d",
         "8ae784bb-c4b5-4995-9bf6-799b3c7f21ad",
@@ -694,10 +678,10 @@ data:
       ],
       "objects": {
         "d319bd87-f42b-4b66-be4f-f82ff48b93f0": [
-          "5b47881c-b012-4040-945c-eacafca539b2",
-          "72804a19-636b-4836-b62b-7ad1476f2b86",
           "bdb13634-0b3d-4e38-a065-9d88c12ee78d",
           "f6c67e6f-e48e-4f69-b4bb-bfbddcc2a517",
+          "729fe070-5e67-4bc7-94b5-afd75cb42b03",
+          "88436128-09a3-4c9c-b7f4-b0e495137265",
           "dbd8a535-52ba-4f6e-b4f8-9b71aefe09d3"
         ],
         "265d481f-87a7-4f93-8fc6-53fa64dc11bb": [
@@ -720,8 +704,8 @@ data:
       },
       "configs": {
         "64a8bfa9-7772-45c4-9d1a-9e6290690957": {
-          "5b47881c-b012-4040-945c-eacafca539b2": {
-            "name": "EDO global config"
+          "f24d354d-abc1-4e32-98e1-0667b3e40b61": {
+            "name": "Edge cluster"
           },
           "bdb13634-0b3d-4e38-a065-9d88c12ee78d": {
             "name": "Edge cluster configuration"
@@ -729,35 +713,32 @@ data:
           "f6c67e6f-e48e-4f69-b4bb-bfbddcc2a517": {
             "name": "Edge cluster setup status"
           },
-          "72804a19-636b-4836-b62b-7ad1476f2b86": {
-            "name": "Edge cluster template"
+          "729fe070-5e67-4bc7-94b5-afd75cb42b03": {
+            "name": "Helm chart template"
           },
-          "f24d354d-abc1-4e32-98e1-0667b3e40b61": {
-            "name": "Edge cluster"
-          },
-          "f9be0334-0ff7-43d3-9d8a-188d3e4d472b": {
-            "name": "Edge cluster template"
+          "88436128-09a3-4c9c-b7f4-b0e495137265": {
+            "name": "HelmRelease template"
           },
           "2706aa43-a826-441e-9cec-cd3d4ce623c2": {
-            "name": "Edge Deployment Operator"
+            "name": "Cluster Manager"
           },
           "9e07fd33-6400-4662-92c4-4dff1f61f990": {
-            "name": "Edge Deployment permissions"
+            "name": "Clusters permissions"
           },
           "a40acff8-0c61-4251-bef3-d8d53e50cdd0": {
-            "name": "Edge: Manage clusters"
+            "name": "Clusters: Manage clusters"
           },
           "07fba27a-0d01-4c07-875b-d25345261d3a": {
-            "name": "Edge: Manage secrets"
+            "name": "Clusters: Manage secrets"
           },
           "26d192cf-73c1-4c14-93cf-1e63743bab08": {
-            "name": "Edge Deployment service account"
+            "name": "Clusters service account"
           },
           "3a58340c-d4ec-453d-99c3-0cf6ab7d8fa9": {
             "name": "Edge cluster repositories"
           },
           "979f7fd9-bbc7-4810-a774-6082c7394db6": {
-            "name": "EDO-managed groups"
+            "name": "Clusters-managed groups"
           },
           "4eeb8156-856d-4251-a4a4-4c1b2f3d3e2c": {
             "name": "Edge flux accounts"
@@ -767,48 +748,6 @@ data:
           }
         },
         "dbd8a535-52ba-4f6e-b4f8-9b71aefe09d3": {
-          "5b47881c-b012-4040-945c-eacafca539b2": {
-            "title": "Edge Deployment Operator global config",
-            "type": "object",
-            "additionalProperties": false,
-            "$defs": {
-              "uuid-and-path": {
-                "type": "object",
-                "required": [
-                  "uuid"
-                ],
-                "additionalProperties": false,
-                "properties": {
-                  "uuid": {
-                    "type": "string",
-                    "format": "uuid"
-                  },
-                  "path": {
-                    "type": "string"
-                  }
-                }
-              }
-            },
-            "properties": {
-              "git": {
-                "type": "object"
-              },
-              "repo": {
-                "description": "Well-known git repository UUIDs",
-                "type": "object",
-                "additionalProperties": {
-                  "$ref": "#/$defs/uuid-and-path"
-                }
-              },
-              "group": {
-                "description": "Auth service groups",
-                "type": "object",
-                "additionalProperties": {
-                  "$ref": "#/$defs/uuid-and-path"
-                }
-              }
-            }
-          },
           "bdb13634-0b3d-4e38-a065-9d88c12ee78d": {
             "title": "Edge cluster configuration",
             "type": "object",
@@ -825,14 +764,24 @@ data:
               "namespace": {
                 "description": "The k8s namespace to deploy to.",
                 "type": "string"
+              },
+              "chart": {
+                "description": "The Helm chart to deploy.",
+                "type": "string",
+                "format": "uuid"
               }
             }
+          },
+          "f6c67e6f-e48e-4f69-b4bb-bfbddcc2a517": {
+            "title": "Clusters private status",
+            "type": "object",
+            "additionalProperties": true
           }
         }
       }
     }
   # This is the ACS-specific configuration of the EDO service.
-  edo-acs: |
+  clusters-acs: |
     {
       "service": {{$service_configStore}},
       "version": 1,
@@ -853,7 +802,7 @@ data:
           {{$application_edgeClusterConfiguration}}
         ],
         {{$classDef_serviceAccount}}: [
-          {{$serviceAccount_edo}}
+          {{$serviceAccount_clusters}}
         ],
         {{$classDef_gitRepoGroup}}: [
           {{$gitRepoGroup_remoteClusters}},
@@ -871,8 +820,8 @@ data:
       },
       "configs": {
         {{$application_generalObjectInformation}}: {
-          {{$serviceAccount_edo}}: {
-            "name": "Edge Deployment"
+          {{$serviceAccount_clusters}}: {
+            "name": "Clusters"
           },
           {{$gitRepoGroup_sharedRepositories}}: {
             "name": "Shared repositories"
@@ -896,7 +845,7 @@ data:
             "name": "Edge deployment"
           },
           {{$application_edgeClusterStatus}}: {
-            "name": "Edge cluster status"
+            "name": "Clusters private status"
           },
           {{$application_edgeClusterConfiguration}}: {
             "name": "Edge cluster configuration"
@@ -963,17 +912,37 @@ data:
         {
           "principal": {{$userGroup_administrators}},
           "permission": {{$role_administrator}},
-          "target": {{$classDef_wildcard}}
+          "target": {{$special_wildcard}}
+        },
+        {
+          "principal": {{$userGroup_administrators}},
+          "permission": {{$permissionGroup_directory}},
+          "target": {{$special_wildcard}}
+        },
+        {
+          "principal": {{$userGroup_sparkplugNode}},
+          "permission": {{$permission_mqtt_participateAsNode}},
+          "target": {{$special_self}}
+        },
+        {
+          "principal": {{$userGroup_sparkplugNode}},
+          "permission": {{$permission_mqtt_representDevices}},
+          "target": {{$special_self}}
+        },
+        {
+          "principal": {{$userGroup_sparkplugNode}},
+          "permission": {{$permission_mqtt_subscribeReadAllStates}},
+          "target": {{$special_wildcard}}
+        },
+        {
+          "principal": {{$userGroup_sparkplugNode}},
+          "permission": {{$permission_configStore_readConfigForApp}},
+          "target": {{$application_sparkplugAddressInformation}}
         },
         {
           "principal": {{$serviceAccount_directory}},
           "permission": {{$permission_mqtt_subscribeReadWholeNamespace}},
-          "target": {{$classDef_wildcard}}
-        },
-        {
-          "principal": {{$serviceAccount_directory}},
-          "permission": {{$role_edgeNode}},
-          "target": {{$serviceAccount_directory}}
+          "target": {{$special_wildcard}}
         },
         {
           "principal": {{$serviceAccount_directory}},
@@ -983,12 +952,12 @@ data:
         {
           "principal": {{$serviceAccount_directory}},
           "permission": {{$permission_auth_readKerberosMapping}},
-          "target": {{$classDef_wildcard}}
+          "target": {{$special_wildcard}}
         },
         {
           "principal": {{$serviceAccount_directory}},
           "permission": {{$permission_ccl_rebirth}},
-          "target": {{$classDef_wildcard}}
+          "target": {{$special_wildcard}}
         },
         {
           "principal": {{$serviceAccount_mqtt}},
@@ -1011,14 +980,19 @@ data:
           "target": {{$permissionGroup_configStore}}
         },
         {
-          "principal": {{$serviceAccount_configStore}},
-          "permission": {{$role_edgeNode}},
-          "target": {{$serviceAccount_configStore}}
+          "principal": {{$serviceAccount_manager}},
+          "permission": {{$permission_configStore_manageObjects}},
+          "target": {{$classDef_edgeCluster}}
+        },
+        {
+          "principal": {{$serviceAccount_manager}},
+          "permission": {{$permission_configStore_readConfigForApp}},
+          "target": {{$application_serviceConfig}}
         },
         {
           "principal": {{$serviceAccount_manager}},
           "permission": {{$permission_configStore_manageObjects}},
-          "target": {{$classDef_edgeCluster}}
+          "target": {{$classDef_cellGateway}}
         },
         {
           "principal": {{$serviceAccount_manager}},
@@ -1061,9 +1035,29 @@ data:
           "target": {{$application_serviceSetup}}
         },
         {
+          "principal": {{$serviceAccount_manager}},
+          "permission": {{$permission_configStore_readConfigForApp}},
+          "target": {{$application_edgeAgentConfig}}
+        },
+        {
+          "principal": {{$serviceAccount_manager}},
+          "permission": {{$permission_configStore_writeConfigForApp}},
+          "target": {{$application_edgeAgentConfig}}
+        },
+        {
+          "principal": {{$serviceAccount_manager}},
+          "permission": {{$permission_configStore_writeConfigForApp}},
+          "target": {{$application_sparkplugAddressInformation}}
+        },
+        {
+          "principal": {{$serviceAccount_manager}},
+          "permission": {{$permission_clusters_manageClusters}},
+          "target": {{$special_wildcard}}
+        },
+        {
           "principal": {{$serviceAccount_commandEscalation}},
           "permission": {{$role_commandEscalation}},
-          "target": {{$classDef_wildcard}}
+          "target": {{$special_wildcard}}
         },
         {
           "principal": {{$serviceAccount_commandEscalation}},
@@ -1077,18 +1071,13 @@ data:
         },
         {
           "principal": {{$serviceAccount_commandEscalation}},
-          "permission": {{$role_edgeNode}},
-          "target": {{$serviceAccount_commandEscalation}}
-        },
-        {
-          "principal": {{$serviceAccount_commandEscalation}},
           "permission": {{$permission_auth_readACLEntry}},
           "target": {{$permissionGroup_commands}}
         },
         {
           "principal": {{$serviceAccount_dataWarehouse}},
           "permission": {{$role_warehouse}},
-          "target": {{$classDef_wildcard}}
+          "target": {{$special_wildcard}}
         },
         {
           "principal": {{$serviceAccount_mqtt}},
@@ -1097,18 +1086,14 @@ data:
         }
       ],
       "groups": {
-        {{$permissionGroup_directory}}: [
-          {{$permission_directory_overrideServiceAdvertisementPermissions}},
-          {{$permission_directory_manageServiceAdvertisementForOwner}},
-          {{$permission_directory_advertiseService}}
-        ],
         {{$role_administrator}}: [
           {{$role_globalDebugger}},
           {{$permissionGroup_authorisation}},
           {{$permissionGroup_configStore}}
         ],
         {{$role_edgeNodeConsumer}}: [
-          {{$permission_mqtt_subscribeReadNode}}
+          {{$permission_mqtt_subscribeReadNode}},
+          {{$permission_ccl_rebirth}}
         ],
         {{$role_warehouse}}: [
           {{$permission_mqtt_subscribeReadWholeNamespace}},
@@ -1120,7 +1105,7 @@ data:
         ],
         {{$role_edgeNode}}: [
           {{$permission_mqtt_subscribeReadAllStates}},
-          {{$permission_mqtt_particpateAsNode}},
+          {{$permission_mqtt_participateAsNode}},
           {{$permission_mqtt_representDevices}}
         ],
         {{$permissionGroup_commands}}: [
@@ -1132,6 +1117,11 @@ data:
           {{$permission_mqtt_subscribeReadWholeNamespace}},
           {{$permission_mqtt_subscribeReadAllStates}},
           {{$permission_mqtt_updateOwnState}}
+        ],
+        {{$permissionGroup_directory}}: [
+          {{$permission_directory_overrideServiceAdvertisementPermissions}},
+          {{$permission_directory_advertiseService}},
+          {{$permission_directory_manageServiceAdvertisementForOwner}}
         ],
         {{$permissionGroup_authorisation}}: [
           {{$permission_auth_readACLEntry}},
@@ -1152,7 +1142,7 @@ data:
           {{$permission_mqtt_subscribeReadWholeNamespace}},
           {{$permission_mqtt_subscribeReadAllStates}},
           {{$permission_mqtt_updateGroupState}},
-          {{$permission_mqtt_particpateAsNode}},
+          {{$permission_mqtt_participateAsNode}},
           {{$permission_mqtt_updateOwnState}},
           {{$permission_mqtt_issueGroupCommands}},
           {{$permission_mqtt_subscribeReadOwnGroup}},
@@ -1168,6 +1158,11 @@ data:
         ],
         {{$userGroup_administrators}}: [
           {{$user_admin}}
+        ],
+        {{$userGroup_sparkplugNode}}: [
+          {{$serviceAccount_directory}},
+          {{$serviceAccount_configStore}},
+          {{$serviceAccount_commandEscalation}}
         ]
       },
       "principals": [
@@ -1285,7 +1280,7 @@ data:
   # This is copied directly from acs-edge-deployment.
   # DO NOT EDIT HERE, make a PR to edit dumps/edge-deploy-auth.yaml
   # in that repo and then pull the result back in.
-  edo: |
+  clusters: |
     {
       "service": "cab2642a-f7d9-42e5-8845-8f35affe1fd4",
       "version": 1,
@@ -1352,6 +1347,11 @@ data:
         },
         {
           "principal": "26d192cf-73c1-4c14-93cf-1e63743bab08",
+          "permission": "4a339562-cd57-408d-9d1a-6529a383ea4b",
+          "target": "a807d8fc-63ff-48bb-85c7-82b93beb606e"
+        },
+        {
+          "principal": "26d192cf-73c1-4c14-93cf-1e63743bab08",
           "permission": "6c799ccb-d2ad-4715-a2a7-3c8728d6c0bf",
           "target": "64a8bfa9-7772-45c4-9d1a-9e6290690957"
         },
@@ -1389,14 +1389,14 @@ data:
       }
     }
   # ACS-specific deployment of the EDO service.
-  edo-acs: |
+  clusters-acs: |
     {
       "service": {{$service_authorisation}},
       "version": 1,
       "principals": [
         {
-          "uuid": {{$serviceAccount_edo}},
-          "kerberos": "sv1edo@{{ .Values.identity.realm }}"
+          "uuid": {{$serviceAccount_clusters}},
+          "kerberos": "sv1clusters@{{ .Values.identity.realm }}"
         }
       ],
       "aces": [
@@ -1407,18 +1407,18 @@ data:
         },
         {
           "principal": {{$serviceAccount_krbkeys}},
-          "permission": {{$permission_edo_manageSecrets}},
-          "target": {{$classDef_wildcard}}
+          "permission": {{$permission_clusters_manageSecrets}},
+          "target": {{$special_wildcard}}
         },
         {
-          "principal": {{$serviceAccount_edo}},
+          "principal": {{$serviceRequirement_edgeDeploymentServiceAccount}},
           "permission": {{$role_edgeNodeConsumer}},
           "target": {{$serviceAccount_configStore}}
         }
       ],
       "groups": {
         {{$serviceRequirement_edgeDeploymentServiceAccount}}: [
-          {{$serviceAccount_edo}}
+          {{$serviceAccount_clusters}}
         ],
         {{$serviceRequirement_edgeClusterRepositories}}: [
           {{$gitRepoGroup_remoteClusters}}
@@ -1430,7 +1430,7 @@ data:
           {{$role_edgeFlux}}
         ],
         {{$role_administrator}}: [
-          {{$permissionGroup_edo}}
+          {{$permissionGroup_clusters}}
         ]
       }
     }

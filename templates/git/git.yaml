@@ -28,6 +28,24 @@ spec:
           persistentVolumeClaim:
             claimName: git-storage
 
+      initContainers:
+        # Do as little work as possible as root... We need to chown the storage
+        # as the default permissions will not be correct.
+        - name: chown-storage
+{{ include "amrc-connectivity-stack.image" .Values.shell | indent 10 }}
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              echo "Setting repo dir permissions"
+              chown 1000:1000 /data
+              chmod 700 /data
+              ls -ld /data
+          securityContext:
+            runAsUser: 0
+          volumeMounts:
+            - mountPath: /data
+              name: data
+
       containers:
         - name: git
 {{ include "amrc-connectivity-stack.image" .Values.git | indent 10 }}

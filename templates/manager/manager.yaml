@@ -4,6 +4,8 @@ kind: Deployment
 metadata:
   name: manager
   namespace: {{ .Release.Namespace }}
+  labels:
+    component: manager
 spec:
   replicas: 1
   selector:
@@ -23,7 +25,26 @@ spec:
         - name: krb5-conf
           configMap:
             name: krb5-conf
+        - name: manager-ccache-storage
+          persistentVolumeClaim:
+            claimName: manager-ccache-storage
       initContainers:
+        # Do as little work as possible as root... We need to chown the storage
+        # as the default permissions will not be correct.
+        - name: chown-storage
+          image: "{{ .Values.manager.image.registry }}/{{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}-backend"
+          command: [ "/bin/sh", "-c" ]
+          args:
+            - |
+              echo "Setting ccache volume permissions"
+              chown www-data:www-data /app/storage/ccache
+              chmod 700 /app/storage/ccache
+              ls -ld /app/storage/ccache
+          securityContext:
+            runAsUser: 0
+          volumeMounts:
+            - mountPath: /app/storage/ccache
+              name: manager-ccache-storage
         - name: migrate-database
           image: "{{ .Values.manager.image.registry }}/{{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}-backend"
           imagePullPolicy: {{ .Values.manager.image.pullPolicy }}
@@ -100,7 +121,23 @@ spec:
               name: manager-keytab
             - mountPath: /config/krb5-conf
               name: krb5-conf
+            - mountPath: /app/storage/ccache
+              name: manager-ccache-storage
         - name: frontend
           image: "{{ .Values.manager.image.registry }}/{{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}-frontend"
           imagePullPolicy: {{ .Values.manager.image.pullPolicy }}
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: manager-ccache-storage
+  namespace: {{ .Release.Namespace }}
+  labels:
+    component: manager
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Mi
 {{- end -}}

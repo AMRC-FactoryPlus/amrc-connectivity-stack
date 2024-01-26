@@ -17,4 +17,5 @@ RUN mkdir -p /app/storage/logs
 RUN mkdir -p /app/storage/app/purify
 RUN mkdir -p /app/storage/app/purify/HTML
 RUN mkdir -p /app/storage/app/purify/JSON
+RUN mkdir -p /app/storage/ccache
 RUN chmod -R 775 /app/storage

@@ -28,7 +28,7 @@ class AppServiceProvider extends ServiceProvider
             try {
                 // If the user is logged in then get their ccache
                 // and use that for all future requests
-                $ccache->open("FILE:/app/storage/" . auth()->user()->username . '.ccache');
+                $ccache->open("FILE:/app/storage/ccache/" . auth()->user()->username . '.ccache');
 
                 $ccache->isValid();
             } catch (\Exception $e) {

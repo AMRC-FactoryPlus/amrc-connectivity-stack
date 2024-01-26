@@ -85,7 +85,7 @@ class AuthenticateUserAction
         // At this point we have a valid ccache for the user. Store
         // the cache to disk using the user's full principal as the
         // filename, replacing the @ with a - to avoid issues with
-        $ccache->save("FILE:/app/storage/" . $user->username . '.ccache');
+        $ccache->save("FILE:/app/storage/ccache/" . $user->username . '.ccache');
 
         // Log the user in
         return action_success($user);

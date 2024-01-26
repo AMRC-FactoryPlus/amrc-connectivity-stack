@@ -19,36 +19,26 @@
     },
     "Alerts": {
       "description": "Alerts raised by the Edge Agent",
-      "allOf": [
-        { "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Alerts-v1.json" },
-        {
+      "type": "object",
+      "required": ["Config_Unavailable", "Config_Invalid"],
+      "properties": {
+        "Config_Unavailable": {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Alert-v1.json"
+        },
+        "Config_Invalid": {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Alert-v1.json"
+        },
+        "Connection": {
+          "description": "Problems with southbound connections.",
           "type": "object",
-          "properties": {
-            "Config_File": {
-              "description": "Indicates a problem fetching our config file.",
-              "type": "object",
-              "properties": {
-                "Type": {
-                  "const": "c414c68b-5014-4e46-a0b4-d5f7f8df1d9f"
-                }
-              }
-            }
-          },
-          "required": ["Config_File"],
           "patternProperties": {
-            "^Connection_[A-Za-z0-9_]+$": {
-              "description": "Indicates a problem with a particular device connection.",
-              "type": "object",
-              "properties": {
-                "Type": {
-                  "const": "633a7da3-ea2a-4e3f-8e84-35691a07465f"
-                }
-              }
+            "^[A-Za-z0-9_]+$": {
+              "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Alert-v1.json"
             }
           }
         }
-      ]
+      }
     }
   },
-  "required": ["Schema_UUID", "Instance_UUID", "Config_File", "Alerts"]
+  "required": ["Schema_UUID", "Instance_UUID", "Config_Revision", "Alerts"]
 }

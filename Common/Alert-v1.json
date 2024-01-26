@@ -1,0 +1,68 @@
+{
+  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Alert-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Alert which can be raised by a node.",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "8853aa15-2228-4309-b98e-e086cefbc72c"
+    },
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "Type": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "String"
+              ]
+            },
+            "Documentation": {
+              "default": "An alert type registered in the ConfigDB."
+            }
+          }
+        }
+      ]
+    },
+    "Active": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "Boolean"
+              ]
+            },
+            "Documentation": {
+              "default": "Is this alert active (raised)?"
+            }
+          }
+        }
+      ]
+    },
+    "Links": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-zA-Z0-9_]*$": {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Link-v1.json"
+        }
+      }
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID",
+    "Type",
+    "Active"
+  ]
+}

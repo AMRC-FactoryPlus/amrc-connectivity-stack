@@ -18,6 +18,10 @@ spec:
         component: mqtt
         factory-plus.service: mqtt
     spec:
+      {{- with .Values.acs.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       volumes:
         - name: krb5-conf
           configMap:

@@ -16,6 +16,10 @@ spec:
       backoffLimit: 1
       template:
         spec:
+          {{- with .Values.acs.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           volumes:
             - name: manager-keytab
               secret:

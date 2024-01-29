@@ -44,14 +44,13 @@ class NodeController extends Controller
             );
         }
 
-
         return process_action(
             (new CreateNodeAction)->execute(
                 group: $group,
                 nodeName: $validated['node_name'],
                 destinationCluster: $validated['destination_cluster'],
-                destinationNode: $validated['destination_node'],
                 charts: $validated['charts'],
+                destinationNode: $validated['destination_node'],
             )
         );
     }

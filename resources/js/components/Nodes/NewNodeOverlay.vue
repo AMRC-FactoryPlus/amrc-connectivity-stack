@@ -78,7 +78,7 @@ export default {
           const control = this.steps.nodeSelection.controls.destination_node;
           const params = this.steps.__request.parameters;
           control.options = Object.entries(val).filter(([edgeCluster, config]) => config.status).map(([edgeCluster, config]) => {
-            return {
+            let payload = {
               title: edgeCluster,
               value: edgeCluster,
               options: config.status.hosts.map(host => {
@@ -88,12 +88,26 @@ export default {
                   action: () => {
                     params.destination_cluster.data = config.uuid;
                     params.destination_node.data = host.hostname;
-                    control.value = host.hostname;
+                    control.value = `${edgeCluster} / ${host.hostname}`;
                   },
                 }
               })
             }
+
+            // Add a `Floating Node` option to the very beginning of the list
+            payload.options.unshift({
+              title: 'Floating',
+              value: 'floating',
+              action: () => {
+                params.destination_cluster.data = config.uuid;
+                params.destination_node.data = '';
+                control.value = `${edgeCluster} / Floating`;
+              },
+            })
+
+            return payload;
           })
+
           this.$forceUpdate();
         }
       },

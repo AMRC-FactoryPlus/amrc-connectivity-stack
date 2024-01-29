@@ -33,8 +33,8 @@ class CreateNodeAction
         Group $group,
         $nodeName,
         $destinationCluster,
-        $destinationNode,
         $charts,
+        $destinationNode,
     ) {
 
         // =========================
@@ -52,6 +52,12 @@ class CreateNodeAction
         // ===================
         // Perform the Action
         // ===================
+
+        $isFloating = $destinationNode === null;
+
+        if ($isFloating) {
+            $destinationNode = 'Floating';
+        }
 
         $fplus = resolve(ServiceClient::class);
         $configDB = $fplus->getConfigDB();
@@ -84,12 +90,17 @@ class CreateNodeAction
         $charts = explode(',', $charts);
 
         // Create an entry in the Edge Agent Deployment app to trigger the deployment of the edge agent
-        $configDB->putConfig(App::EdgeAgentDeployment, $uuid, [
+        $payload = [
             "name" => sprintf("%s.%s", $group->name, $nodeName),
             "charts" => $charts,
             "cluster" => $destinationCluster,
-            "hostname" => $destinationNode,
-        ]);
+        ];
+
+        if (!$isFloating) {
+            $payload['hostname'] = $destinationNode;
+        }
+
+        $configDB->putConfig(App::EdgeAgentDeployment, $uuid, $payload);
 
         return action_success([
             'node' => [

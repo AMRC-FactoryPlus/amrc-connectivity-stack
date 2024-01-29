@@ -13,7 +13,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class OriginMap extends Model
 {
-    use HasFactory;
 
     protected $guarded = [];
 

@@ -10,8 +10,6 @@ use App\DeviceConnection;
 use App\Domain\Devices\Models\Device;
 use App\Domain\Groups\Models\Group;
 use App\Domain\Users\Models\User;
-use App\EdgeAgentConfiguration;
-use App\Support\Traits\UUIDs;
 use Illuminate\Database\Eloquent\Model;
 use Laravel\Scout\Searchable;
 
@@ -47,15 +45,5 @@ class Node extends Model
     public function deviceConnections()
     {
         return $this->hasMany(DeviceConnection::class);
-    }
-
-    public function activeEdgeNodeConfiguration()
-    {
-        return $this->hasOne(EdgeAgentConfiguration::class)->latestOfMany();
-    }
-
-    public function edgeNodeConfigurations()
-    {
-        return $this->hasMany(EdgeAgentConfiguration::class);
     }
 }

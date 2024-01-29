@@ -33,7 +33,7 @@ class UpdateDeviceInformationAction
             'device_id' => $deviceId,
         ]);
 
-        // Create a EdgeAgentConfiguration for all active devices in this node and attach it to the Node
+        // Create a for all active devices in this node and attach it to the Node
         (new UpdateEdgeAgentConfigurationForNodeAction)->execute($device->node->fresh());
 
         return action_success();

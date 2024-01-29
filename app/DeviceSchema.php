@@ -12,7 +12,6 @@ use Laravel\Scout\Searchable;
 
 class DeviceSchema extends Model
 {
-    use HasFactory;
     use Searchable;
 
     protected $guarded = [];

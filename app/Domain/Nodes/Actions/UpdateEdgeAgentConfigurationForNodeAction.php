@@ -24,8 +24,9 @@ use RecursiveIteratorIterator;
 class UpdateEdgeAgentConfigurationForNodeAction
 {
     /**
-     * This action creates a EdgeAgentConfiguration for the supplied node, uploads it to storage and sets the `configuration_file` on
-     * the node. The device must have an active connection and an active configuration otherwise this doesn't run.
+     * This action creates a configuration for the supplied node, uploads it to storage and sets the
+     * `configuration_file` on the node. The device must have an active connection and an active configuration
+     * otherwise this doesn't run.
      *
      * @throws ServiceClientException
      * @throws ActionFailException

@@ -15,7 +15,6 @@ use Laravel\Scout\Searchable;
 
 class Device extends Model
 {
-    use HasFactory;
     use Searchable;
 
     protected $guarded = [];

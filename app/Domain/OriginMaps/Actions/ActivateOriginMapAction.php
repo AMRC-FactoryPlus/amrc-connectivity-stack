@@ -13,7 +13,7 @@ use App\Exceptions\ActionForbiddenException;
 class ActivateOriginMapAction
 {
     /**
-     * This action sets the `active` flag of this origin map for the device and clears all others. It then constructs a EdgeAgentConfiguration
+     * This action sets the `active` flag of this origin map for the device and clears all others.
      * for all devices for this node and attaches it to the Node. Finally, it sends an NCMD to the node to reload its config.
      **/
     public function execute(OriginMap $originMap)
@@ -38,7 +38,6 @@ class ActivateOriginMapAction
             'active' => 1,
         ]);
 
-        // Create a EdgeAgentConfiguration for all active devices in this node and attach it to the Node
         (new UpdateEdgeAgentConfigurationForNodeAction)->execute($originMap->device->node->fresh());
 
         return action_success();

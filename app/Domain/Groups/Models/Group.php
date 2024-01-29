@@ -6,7 +6,6 @@
 
 namespace App\Domain\Groups\Models;
 
-use App\Domain\Clusters\Models\Cluster;
 use App\Domain\Nodes\Models\Node;
 use Illuminate\Database\Eloquent\Model;
 use Laravel\Scout\Searchable;

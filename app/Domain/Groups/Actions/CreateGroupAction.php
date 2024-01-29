@@ -7,9 +7,7 @@
 
 namespace App\Domain\Groups\Actions;
 
-    use App\Domain\Clusters\Models\Cluster;
     use App\Domain\Groups\Models\Group;
-    use App\Exceptions\ActionFailException;
     use App\Exceptions\ActionForbiddenException;
 
     class CreateGroupAction

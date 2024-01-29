@@ -5,7 +5,6 @@
  */
 
 use App\Http\Controllers\APITestController;
-use App\Http\Controllers\ClusterController;
 use App\Http\Controllers\DeviceConnectionController;
 use App\Http\Controllers\DeviceController;
 use App\Http\Controllers\DeviceSchemaController;
@@ -85,9 +84,6 @@ Route::middleware('auth:api')->patch('/devices/{device}', [DeviceController::cla
 Route::middleware('auth:api')->delete('/devices/{device}', [DeviceController::class, 'destroy']);
 Route::middleware('auth:api')->patch('/devices/{device}/origin-map', [OriginMapController::class, 'update']);
 Route::middleware('auth:api')->post('/devices/{device}/origin-map/activate', [OriginMapController::class, 'activate']);;
-
-// ------ Clusters ------ //
-Route::middleware('auth:api')->get('/clusters', [ClusterController::class, 'index']);
 
 // ------ Edge Clusters ------ //
 Route::middleware('auth:api')->get('/edge-clusters', [EdgeClusterController::class, 'index']);

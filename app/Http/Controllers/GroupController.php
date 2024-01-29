@@ -6,7 +6,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Domain\Clusters\Models\Cluster;
 use App\Domain\Groups\Actions\CreateGroupAction;
 use App\Domain\Groups\Actions\DeleteGroupAction;
 use App\Domain\Groups\Actions\GetAccessibleGroupsAction;

@@ -64,9 +64,7 @@ export default {
               type: 'input',
               validations: {
                 required: helpers.withMessage('Please enter a Group name', required),
-                minLength: minLength(5),
-                valid: helpers.withMessage('This Group name does not conform to the naming convention',
-                    helpers.regex(/^\w+-\w+-\w+(:?-\d+)?$/i)),
+                minLength: minLength(1),
               },
               initialValue: '',
               value: ''

@@ -32,12 +32,6 @@ namespace App\Domain\Groups\Actions;
                 throw new ActionForbiddenException('Only administrators can create new groups.');
             }
 
-            $reg = '/^\w+-\w+-\w+(:?-\d+)?$/i';
-
-            if (! preg_match($reg, $name)) {
-                throw new ActionFailException('The name format is invalid.');
-            }
-
             // ===================
             // Perform the Action
             // ===================

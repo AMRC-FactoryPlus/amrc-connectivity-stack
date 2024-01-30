@@ -94,8 +94,8 @@
 {{$permission_git_pullFromRepo := "12ecb694-b4b9-4d2a-927e-d100019f7ebe" | quote}}
 {{$permission_git_pushToRepo := "b2d8d437-5060-4202-bcc2-bd2beda09651" | quote}}
 
-{{$permission_clusters_manageClusters := "a40acff8-0c61-4251-bef3-d8d53e50cdd0" | quote}}
-{{$permission_clusters_manageSecrets := "07fba27a-0d01-4c07-875b-d25345261d3a" | quote}}
+{{$permission_clusterManager_manageClusters := "a40acff8-0c61-4251-bef3-d8d53e50cdd0" | quote}}
+{{$permission_clusterManager_manageSecrets := "07fba27a-0d01-4c07-875b-d25345261d3a" | quote}}
 
 {{$permissionGroup_authorisation := "50b727d4-3faa-40dc-b347-01c99a226c58" | quote}}
 {{$permissionGroup_configStore := "c43c7157-a50b-4d2a-ac1a-86ff8e8e88c1" | quote}}
@@ -103,7 +103,7 @@
 {{$permissionGroup_directory := "58b5da47-d098-44f7-8c1d-6e4bd800e718" | quote}}
 {{$permissionGroup_commands := "9584ee09-a35a-4278-bc13-21a8be1f007c" | quote}}
 {{$permissionGroup_git := "c0c55c78-116e-4526-8ff4-e4595251f76c" | quote}}
-{{$permissionGroup_clusters := "9e07fd33-6400-4662-92c4-4dff1f61f990" | quote}}
+{{$permissionGroup_clusterManager := "9e07fd33-6400-4662-92c4-4dff1f61f990" | quote}}
 
 {{$role_administrator := "4c09402f-9923-4c82-a6f2-02bda21aace4" | quote}}
 {{$role_commandEscalation := "dbd0c099-6c59-4bc6-aa92-4ba8a9b543f4" | quote}}
@@ -135,7 +135,7 @@
 {{$serviceAccount_mqtt := "2f42daeb-4521-4522-8e19-85dfb73db88e" | quote}}
 {{$serviceAccount_krbkeys := "a04b4195-7db4-4480-b3f3-4d22c08b96ea" | quote}}
 {{$serviceAccount_git := "626df296-8156-4c67-8aed-aac70161aa8b" | quote}}
-{{$serviceAccount_clusters := "127cde3c-773a-4f61-b0ba-7412a2695253" | quote}}
+{{$serviceAccount_clusterManager := "127cde3c-773a-4f61-b0ba-7412a2695253" | quote}}
 {{$userGroup_administrators := "10fc06b7-02f5-45f1-b419-a486b6bc13ba" | quote}}
 {{$userGroup_sparkplugNode := "1d3121a0-aade-4376-8fa3-57ba1460ba76" | quote}}
 {{$user_admin := "d53f476a-29dd-4d79-b614-5b7fe9bc8acf" | quote}}
@@ -662,7 +662,7 @@ data:
         }
       }
     }
-  # This is copied directly from acs-clusters.
+  # This is copied directly from acs-cluster-manager.
   # DO NOT EDIT HERE, make a PR to edit dumps/edge-deploy-configdb.yaml
   # in that repo and then pull the result back in.
   clusters: |
@@ -802,7 +802,7 @@ data:
           {{$application_edgeClusterConfiguration}}
         ],
         {{$classDef_serviceAccount}}: [
-          {{$serviceAccount_clusters}}
+          {{$serviceAccount_clusterManager}}
         ],
         {{$classDef_gitRepoGroup}}: [
           {{$gitRepoGroup_remoteClusters}},
@@ -820,8 +820,8 @@ data:
       },
       "configs": {
         {{$application_generalObjectInformation}}: {
-          {{$serviceAccount_clusters}}: {
-            "name": "Clusters"
+          {{$serviceAccount_clusterManager}}: {
+            "name": "Cluster Manager"
           },
           {{$gitRepoGroup_sharedRepositories}}: {
             "name": "Shared repositories"
@@ -1051,7 +1051,7 @@ data:
         },
         {
           "principal": {{$serviceAccount_manager}},
-          "permission": {{$permission_clusters_manageClusters}},
+          "permission": {{$permission_clusterManager_manageClusters}},
           "target": {{$special_wildcard}}
         },
         {
@@ -1277,8 +1277,8 @@ data:
           ]
       }
     }
-  # This is copied directly from acs-edge-deployment.
-  # DO NOT EDIT HERE, make a PR to edit dumps/edge-deploy-auth.yaml
+  # This is copied directly from acs-cluster-manager
+  # DO NOT EDIT HERE, make a PR to edit dumps/clusters-auth.yaml
   # in that repo and then pull the result back in.
   clusters: |
     {
@@ -1395,8 +1395,8 @@ data:
       "version": 1,
       "principals": [
         {
-          "uuid": {{$serviceAccount_clusters}},
-          "kerberos": "sv1clusters@{{ .Values.identity.realm }}"
+          "uuid": {{$serviceAccount_clusterManager}},
+          "kerberos": "sv1clustermanager@{{ .Values.identity.realm }}"
         }
       ],
       "aces": [
@@ -1407,7 +1407,7 @@ data:
         },
         {
           "principal": {{$serviceAccount_krbkeys}},
-          "permission": {{$permission_clusters_manageSecrets}},
+          "permission": {{$permission_clusterManager_manageSecrets}},
           "target": {{$special_wildcard}}
         },
         {
@@ -1418,7 +1418,7 @@ data:
       ],
       "groups": {
         {{$serviceRequirement_edgeDeploymentServiceAccount}}: [
-          {{$serviceAccount_clusters}}
+          {{$serviceAccount_clusterManager}}
         ],
         {{$serviceRequirement_edgeClusterRepositories}}: [
           {{$gitRepoGroup_remoteClusters}}
@@ -1430,7 +1430,7 @@ data:
           {{$role_edgeFlux}}
         ],
         {{$role_administrator}}: [
-          {{$permissionGroup_clusters}}
+          {{$permissionGroup_clusterManager}}
         ]
       }
     }

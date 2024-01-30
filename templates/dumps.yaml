@@ -19,7 +19,6 @@
 {{$classDef_gitRepoGroup := "b03d4dfe-7e78-4252-8e62-af594cf316c9" | quote}}
 {{$classDef_gitRepo := "d25f2afc-1ab8-4d27-b51b-d02314624e3e" | quote}}
 {{$classDef_edgeClusterAccount := "97756c9a-38e6-4238-b78c-3df6f227a6c9" | quote}}
-{{$classDef_edgeClusterTemplate := "f9be0334-0ff7-43d3-9d8a-188d3e4d472b" | quote}}
 {{$classDef_edgeCluster := "f24d354d-abc1-4e32-98e1-0667b3e40b61" | quote}}
 
 {{$special_wildcard := "00000000-0000-0000-0000-000000000000" | quote}}
@@ -33,7 +32,6 @@
 {{$application_commandEscalation := "60e99f28-67fe-4344-a6ab-b1edb8b8e810" | quote}}
 {{$application_gitRepoConfiguration := "38d62a93-b6b4-4f63-bad4-d433e3eaff29" | quote}}
 {{$application_edgeClusterConfiguration := "bdb13634-0b3d-4e38-a065-9d88c12ee78d" | quote}}
-{{$application_edgeClusterTemplate := "72804a19-636b-4836-b62b-7ad1476f2b86" | quote}}
 {{$application_edgeClusterStatus := "747a62c9-1b66-4a2e-8dd9-0b70a91b6b75" | quote}}
 {{$application_edgeDeployment := "f2b9417a-ef7f-421f-b387-bb8183a48cdb" | quote}}
 {{$application_helmChartTemplate := "729fe070-5e67-4bc7-94b5-afd75cb42b03" | quote}}
@@ -117,8 +115,6 @@
 {{$gitRepoGroup_remoteClusters := "736697bd-3637-4340-8d8a-f4a457d6f483" | quote}}
 {{$gitRepoGroup_sharedRepositories := "9c16e08a-a659-4f02-877f-2949dc4ec7b9" | quote}}
 {{$gitRepo_sharedFluxSystem := "8a3c0860-9e41-48b8-b02f-780a0e582be6" | quote}}
-
-{{$edgeClusterTemplate_cellGateway := "71648ac2-f2a6-4777-92ac-f7852be68efc" | quote}}
 
 # XXX These are currently all fixed UUIDs which will end up identical
 # between installations. This is incorrect: these represent the accounts
@@ -788,14 +784,12 @@ data:
       "classes": [
         {{$classDef_serviceAccount}},
         {{$classDef_edgeClusterAccount}},
-        {{$classDef_edgeClusterTemplate}},
         {{$classDef_gitRepoGroup}},
         {{$classDef_gitRepo}},
         {{$classDef_clientRole}}
       ],
       "objects": {
         {{$classDef_application}}: [
-          {{$application_edgeClusterTemplate}},
           {{$application_gitRepoConfiguration}},
           {{$application_edgeClusterStatus}},
           {{$application_edgeDeployment}},
@@ -813,9 +807,6 @@ data:
         ],
         {{$classDef_clientRole}}: [
           {{$role_edgeFlux}}
-        ],
-        {{$classDef_edgeClusterTemplate}}: [
-          {{$edgeClusterTemplate_cellGateway}}
         ]
       },
       "configs": {
@@ -838,9 +829,6 @@ data:
           {{$role_edgeFlux}}: {
             "name": "Role: Edge Flux"
           },
-          {{$edgeClusterTemplate_cellGateway}}: {
-              "name": "Cell gateway"
-          },
           {{$application_edgeDeployment}}: {
             "name": "Edge deployment"
           },
@@ -860,33 +848,6 @@ data:
           },
           {{$gitRepo_sharedFluxSystem}}: {
             "path": "shared/flux-system"
-          }
-        },
-        {{$application_edgeClusterTemplate}}: {
-          {{$edgeClusterTemplate_cellGateway}}: {
-            "flux": {
-                "name": "Edge flux: %n",
-                "class": {{$classDef_edgeClusterAccount}},
-                "groups": [
-                    {{$role_edgeFlux}}
-                ],
-                "username": "op1flux/%n"
-            },
-            "name": "cell-gateway",
-            "cluster": {
-                "namespace": "fplus-edge"
-            },
-            "repository": {
-                "group": "cluster",
-                "links": {
-                    {{$gitRepo_sharedFluxSystem}}: {
-                        "branch": "main",
-                        "interval": "3h0m0s"
-                    }
-                },
-                "branch": "main",
-                "interval": "5m0s"
-            }
           }
         }
       }

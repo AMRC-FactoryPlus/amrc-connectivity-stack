@@ -81,7 +81,7 @@ directory:
     # -- The repository of the Directory component
     repository: acs-directory
     # -- The tag of the Directory component
-    tag: v1.1.2
+    tag: v1.1.3-dev.1
     # @ignore
     pullPolicy: IfNotPresent
 
@@ -94,7 +94,7 @@ configdb:
     # -- The repository of the Configuration Store component
     repository: acs-configdb
     # -- The tag of the Configuration Store component
-    tag: v1.8.1
+    tag: v1.8.2-dev.1
     # @ignore
     pullPolicy: IfNotPresent
 
@@ -146,7 +146,7 @@ manager:
     # -- The repository of the Manager component
     repository: acs-manager
     # -- The tag of the Manager component
-    tag: v2.0.0-dev.9
+    tag: v2.0.0-dev.15
     # @ignore
     pullPolicy: IfNotPresent
   edge:
@@ -188,7 +188,7 @@ cmdesc:
     # -- The repository of the Commands component
     repository: acs-cmdesc
     # -- The tag of the Commands component
-    tag: v1.0.1
+    tag: v1.0.2-dev.2
     # @ignore
     pullPolicy: IfNotPresent
   # -- Possible values are either 1 to enable all possible debugging, or a comma-separated list of debug tags (the tags printed before the log lines). No logging is specified as an empty string.
@@ -236,9 +236,9 @@ clusters:
     # -- The registry of the Clusters component
     registry: ghcr.io/amrc-factoryplus
     # -- The repository of the Clusters component
-    repository: acs-clusters
+    repository: acs-cluster-manager
     # -- The tag of the Clusters component
-    tag: v0.0.2
+    tag: v0.0.3-dev.1
     # @ignore
     pullPolicy: IfNotPresent
   verbosity: "ALL,!service,!token"

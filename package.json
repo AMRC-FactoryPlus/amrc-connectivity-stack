@@ -1,5 +1,5 @@
 {
-  "name": "acs-clusters",
+  "name": "acs-cluster-manager",
   "version": "0.0.4",
   "description": "",
   "main": "index.js",

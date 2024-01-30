@@ -229,7 +229,7 @@ git:
   # -- Possible values are either 1 to enable all possible debugging, or a comma-separated list of debug tags (the tags printed before the log lines). No logging is specified as an empty string.
   verbosity: "ALL,!service,!token"
 
-clusters:
+clusterManager:
   # -- Whether or not to enable the Cluster Manager component
   enabled: true
   image:

@@ -1,13 +1,13 @@
-{{- if .Values.clusters.enabled }}
+{{- if .Values.clusterManager.enabled }}
 apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey
 metadata:
-  name: sv1clusters
+  name: sv1clustermanager
   namespace: {{ .Release.Namespace }}
 spec:
   type: Random
-  principal: sv1clusters@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
-  secret: clusters-keytabs/client
+  principal: sv1clustermanager@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+  secret: cluster-manager-keytabs/client
 ---
 apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey
@@ -19,5 +19,5 @@ spec:
   principal: HTTP/clusters.{{ .Release.Namespace }}.svc.cluster.local@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
   additionalPrincipals:
     - HTTP/clusters.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
-  secret: clusters-keytabs/server
+  secret: cluster-manager-keytabs/server
 {{- end }}

@@ -1,21 +1,21 @@
-{{- if .Values.clusters.enabled }}
+{{- if .Values.clusterManager.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: clusters
+  name: cluster-manager
   namespace: {{ .Release.Namespace }}
   labels:
-    component: clusters
+    component: cluster-manager
 spec:
   replicas: 1
   selector:
     matchLabels:
-      component: clusters
+      component: cluster-manager
   template:
     metadata:
       labels:
-        component: clusters
-        factory-plus.service: clusters
+        component: cluster-manager
+        factory-plus.service: cluster-manager
     spec:
       volumes:
         - name: krb5-conf
@@ -23,22 +23,22 @@ spec:
             name: krb5-conf
         - name: keytabs
           secret:
-            secretName: clusters-keytabs
+            secretName: cluster-manager-keytabs
         - name: data
           emptyDir:
         - name: kubeseal-certs
           emptyDir:
 
       containers:
-        - name: clusters
-{{ include "amrc-connectivity-stack.image" .Values.clusters | indent 10 }}
+        - name: cluster-manager
+{{ include "amrc-connectivity-stack.image" .Values.clusterManager | indent 10 }}
           command: [ "/usr/bin/k5start", "-Uf", "/keytabs/client" ]
           args: ["node", "bin/edge-deployment.js"]
           env:
             - name: PORT
               value: "8080"
             - name: VERBOSE
-              value: {{.Values.clusters.verbosity | quote | required "values.clusters.verbosity is required!"}}
+              value: {{.Values.clusterManager.verbosity | quote | required "values.clusterManager.verbosity is required!"}}
             - name: KRB5_CONFIG
               value: /config/krb5-conf/krb5.conf
             - name: SERVER_KEYTAB
@@ -52,7 +52,7 @@ spec:
             - name: GIT_CHECKOUTS_DIR
               value: /data
             - name: GIT_EMAIL
-              value: sv1clusters@{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
+              value: sv1clustermanager@{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
             - name: KUBESEAL_TEMP
               value: /cert
             - name: KRBKEYS_IMAGE
@@ -76,7 +76,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: clusters
+  name: cluster-manager
   namespace: {{ .Release.Namespace }}
 spec:
   ports:
@@ -84,5 +84,5 @@ spec:
       port: 80
       targetPort: 8080
   selector:
-    factory-plus.service: clusters
+    factory-plus.service: cluster-manager
 {{- end -}}

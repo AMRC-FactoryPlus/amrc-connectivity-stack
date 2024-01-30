@@ -1,6 +1,6 @@
 {
   "name": "acs-directory",
-  "version": "1.1.2",
+  "version": "1.1.3",
   "description": "The Directory component of the AMRC Connectivity Stack",
   "author": "AMRC",
   "license": "MIT",
@@ -19,7 +19,7 @@
     "webapi": "node bin/directory-webapi"
   },
   "dependencies": {
-    "@amrc-factoryplus/utilities": "^1.0.9",
+    "@amrc-factoryplus/utilities": "^1.3.1",
     "async": "^3.2.4",
     "express": "^4.17.1",
     "express-openapi-validator": "^4.13.2"

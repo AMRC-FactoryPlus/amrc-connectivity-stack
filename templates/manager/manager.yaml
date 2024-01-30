@@ -26,6 +26,7 @@ spec:
       initContainers:
         - name: migrate-database
           image: "{{ .Values.manager.image.registry }}/{{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}-backend"
+          imagePullPolicy: {{ .Values.manager.image.pullPolicy }}
           env:
             - name: DB_PASSWORD
               valueFrom:
@@ -50,6 +51,7 @@ spec:
           command: [ 'sh', '-c', 'php artisan migrate --force' ]
         - name: create-admin-user
           image: "{{ .Values.manager.image.registry }}/{{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}-backend"
+          imagePullPolicy: {{ .Values.manager.image.pullPolicy }}
           env:
             - name: DB_PASSWORD
               valueFrom:
@@ -69,6 +71,7 @@ spec:
       containers:
         - name: backend
           image: "{{ .Values.manager.image.registry }}/{{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}-backend"
+          imagePullPolicy: {{ .Values.manager.image.pullPolicy }}
           env:
             - name: KRB5_CONFIG
               value: /config/krb5-conf/krb5.conf
@@ -99,4 +102,5 @@ spec:
               name: krb5-conf
         - name: frontend
           image: "{{ .Values.manager.image.registry }}/{{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}-frontend"
+          imagePullPolicy: {{ .Values.manager.image.pullPolicy }}
 {{- end -}}

@@ -22,7 +22,10 @@ spec:
       labels:
         component: kdc
     spec:
-
+      {{- with .Values.acs.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       # We must run the whole pod as the krbkeys ServiceAccount even though
       # only the krbkeys initContainer needs access. There is no significant
       # security issue here as this SA just gives rights to manage the

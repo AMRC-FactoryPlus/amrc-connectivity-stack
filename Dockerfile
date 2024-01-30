@@ -1,5 +1,5 @@
 ARG utility_prefix=ghcr.io/amrc-factoryplus/utilities
-ARG utility_ver=v1.0.6
+ARG utility_ver=v1.3.1
 
 FROM ${utility_prefix}-build:${utility_ver} AS build
 
@@ -19,4 +19,4 @@ WORKDIR /home/node/app
 COPY --from=build --chown=root:root /home/node/app ./
 
 USER node
-CMD npm start
+CMD node bin/cmdescd.js

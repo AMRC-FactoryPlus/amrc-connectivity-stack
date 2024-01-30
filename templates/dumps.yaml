@@ -845,7 +845,7 @@ data:
             "name": "Edge deployment"
           },
           {{$application_edgeClusterStatus}}: {
-            "name": "Clusters private status"
+            "name": "Edge cluster status"
           },
           {{$application_edgeClusterConfiguration}}: {
             "name": "Edge cluster configuration"

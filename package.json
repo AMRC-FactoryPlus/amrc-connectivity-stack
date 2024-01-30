@@ -1,6 +1,6 @@
 {
   "name": "acs-configdb",
-  "version": "1.8.1",
+  "version": "1.8.2",
   "description": "The Config Store component of the AMRC Connectivity Stack",
   "author": "AMRC",
   "license": "MIT",
@@ -19,7 +19,7 @@
   },
   "type": "module",
   "dependencies": {
-    "@amrc-factoryplus/utilities": "^1.0.8",
+    "@amrc-factoryplus/utilities": "^1.3.1",
     "ajv": "^8.10.0",
     "ajv-formats": "^2.1.1",
     "content-type": "^1.0.5",

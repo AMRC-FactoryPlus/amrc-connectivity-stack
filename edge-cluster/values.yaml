@@ -19,6 +19,7 @@ krb5:
   # Kerberos realm used by central cluster
   #realm:
 sealedSecrets:
+  enabled: true
   namespace: sealed-secrets
   fullnameOverride: sealed-secrets
 image:
@@ -28,7 +29,7 @@ image:
     pullPolicy: IfNotPresent
   edgeMonitor:
     repository: acs-edge-monitor
-    tag: v0.0.1
+    tag: v0.0.2
   edgeSync:
     repository: acs-edge-sync
     tag: v0.0.2

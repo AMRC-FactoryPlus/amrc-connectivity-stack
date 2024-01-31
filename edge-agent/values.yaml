@@ -10,7 +10,9 @@ poll_int: 10
 authGroup:
   # This must be supplied on deployment. It specifies the Auth group to
   # place the Edge Agent user account in.
-  #edgeAgent:
+  #edgeAgent: 00000000-0000-0000-0000-000000000000
 limits:
   cpu: "100m"
   memory: "200Mi"
+# This deploys to a specific host
+#hostname: foo

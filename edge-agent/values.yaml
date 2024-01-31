@@ -16,3 +16,10 @@ limits:
   memory: "200Mi"
 # This deploys to a specific host
 #hostname: foo
+tolerations:
+  # Tolerations to apply to pods deploys to a specific host
+  specific:
+    - key: factoryplus.app.amrc.ac.uk/fieldbus
+      operator: exists
+  # Tolerations to apply to floating pods
+  floating: []

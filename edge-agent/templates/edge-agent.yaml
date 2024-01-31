@@ -23,9 +23,12 @@ spec:
         factory-plus.nodeUuid: {{ .Values.uuid }}
         factory-plus.name: {{ .Values.name }}
     spec:
-      nodeSelector:
 {{ if .Values.hostname }}
+      nodeSelector:
         kubernetes.io/hostname: {{ .Values.hostname | quote }}
+      tolerations: {{ .Values.tolerations.specific | nindent 8 }}
+{{ else }}
+      tolerations: {{ .Values.tolerations.floating | nindent 8 }}
 {{ end }}
       containers:
         - name: edge-agent

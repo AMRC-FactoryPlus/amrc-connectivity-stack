@@ -19,7 +19,7 @@ limits:
 tolerations:
   # Tolerations to apply to pods deploys to a specific host
   specific:
-    - key: factoryplus.app.amrc.ac.uk/fieldbus
+    - key: factoryplus.app.amrc.co.uk/fieldbus
       operator: Exists
   # Tolerations to apply to floating pods
   floating: []

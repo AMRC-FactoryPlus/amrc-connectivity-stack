@@ -6,9 +6,6 @@ env:
 on:
   release:
     types: [ published ]
-    # Trigger only when a release with tag v*.*.* is published
-    tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'
 
 jobs:
   update-version:
@@ -75,9 +72,10 @@ jobs:
       # https://github.com/docker/build-push-action
       - name: Build and push Docker image
         id: build-and-push
-        uses: docker/build-push-action@ac9327eae2b366085ac7f6a2d02df8aa8ead720a
+        uses: docker/build-push-action@v5
         with:
           context: .
+          platforms: linux/amd64,linux/arm64
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

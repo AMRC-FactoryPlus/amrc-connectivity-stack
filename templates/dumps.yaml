@@ -19,7 +19,6 @@
 {{$classDef_gitRepoGroup := "b03d4dfe-7e78-4252-8e62-af594cf316c9" | quote}}
 {{$classDef_gitRepo := "d25f2afc-1ab8-4d27-b51b-d02314624e3e" | quote}}
 {{$classDef_edgeClusterAccount := "97756c9a-38e6-4238-b78c-3df6f227a6c9" | quote}}
-{{$classDef_edgeClusterTemplate := "f9be0334-0ff7-43d3-9d8a-188d3e4d472b" | quote}}
 {{$classDef_edgeCluster := "f24d354d-abc1-4e32-98e1-0667b3e40b61" | quote}}
 
 {{$special_wildcard := "00000000-0000-0000-0000-000000000000" | quote}}
@@ -33,7 +32,6 @@
 {{$application_commandEscalation := "60e99f28-67fe-4344-a6ab-b1edb8b8e810" | quote}}
 {{$application_gitRepoConfiguration := "38d62a93-b6b4-4f63-bad4-d433e3eaff29" | quote}}
 {{$application_edgeClusterConfiguration := "bdb13634-0b3d-4e38-a065-9d88c12ee78d" | quote}}
-{{$application_edgeClusterTemplate := "72804a19-636b-4836-b62b-7ad1476f2b86" | quote}}
 {{$application_edgeClusterStatus := "747a62c9-1b66-4a2e-8dd9-0b70a91b6b75" | quote}}
 {{$application_edgeDeployment := "f2b9417a-ef7f-421f-b387-bb8183a48cdb" | quote}}
 {{$application_helmChartTemplate := "729fe070-5e67-4bc7-94b5-afd75cb42b03" | quote}}
@@ -94,8 +92,8 @@
 {{$permission_git_pullFromRepo := "12ecb694-b4b9-4d2a-927e-d100019f7ebe" | quote}}
 {{$permission_git_pushToRepo := "b2d8d437-5060-4202-bcc2-bd2beda09651" | quote}}
 
-{{$permission_clusters_manageClusters := "a40acff8-0c61-4251-bef3-d8d53e50cdd0" | quote}}
-{{$permission_clusters_manageSecrets := "07fba27a-0d01-4c07-875b-d25345261d3a" | quote}}
+{{$permission_clusterManager_manageClusters := "a40acff8-0c61-4251-bef3-d8d53e50cdd0" | quote}}
+{{$permission_clusterManager_manageSecrets := "07fba27a-0d01-4c07-875b-d25345261d3a" | quote}}
 
 {{$permissionGroup_authorisation := "50b727d4-3faa-40dc-b347-01c99a226c58" | quote}}
 {{$permissionGroup_configStore := "c43c7157-a50b-4d2a-ac1a-86ff8e8e88c1" | quote}}
@@ -103,7 +101,7 @@
 {{$permissionGroup_directory := "58b5da47-d098-44f7-8c1d-6e4bd800e718" | quote}}
 {{$permissionGroup_commands := "9584ee09-a35a-4278-bc13-21a8be1f007c" | quote}}
 {{$permissionGroup_git := "c0c55c78-116e-4526-8ff4-e4595251f76c" | quote}}
-{{$permissionGroup_clusters := "9e07fd33-6400-4662-92c4-4dff1f61f990" | quote}}
+{{$permissionGroup_clusterManager := "9e07fd33-6400-4662-92c4-4dff1f61f990" | quote}}
 
 {{$role_administrator := "4c09402f-9923-4c82-a6f2-02bda21aace4" | quote}}
 {{$role_commandEscalation := "dbd0c099-6c59-4bc6-aa92-4ba8a9b543f4" | quote}}
@@ -117,8 +115,6 @@
 {{$gitRepoGroup_remoteClusters := "736697bd-3637-4340-8d8a-f4a457d6f483" | quote}}
 {{$gitRepoGroup_sharedRepositories := "9c16e08a-a659-4f02-877f-2949dc4ec7b9" | quote}}
 {{$gitRepo_sharedFluxSystem := "8a3c0860-9e41-48b8-b02f-780a0e582be6" | quote}}
-
-{{$edgeClusterTemplate_cellGateway := "71648ac2-f2a6-4777-92ac-f7852be68efc" | quote}}
 
 # XXX These are currently all fixed UUIDs which will end up identical
 # between installations. This is incorrect: these represent the accounts
@@ -135,7 +131,7 @@
 {{$serviceAccount_mqtt := "2f42daeb-4521-4522-8e19-85dfb73db88e" | quote}}
 {{$serviceAccount_krbkeys := "a04b4195-7db4-4480-b3f3-4d22c08b96ea" | quote}}
 {{$serviceAccount_git := "626df296-8156-4c67-8aed-aac70161aa8b" | quote}}
-{{$serviceAccount_clusters := "127cde3c-773a-4f61-b0ba-7412a2695253" | quote}}
+{{$serviceAccount_clusterManager := "127cde3c-773a-4f61-b0ba-7412a2695253" | quote}}
 {{$userGroup_administrators := "10fc06b7-02f5-45f1-b419-a486b6bc13ba" | quote}}
 {{$userGroup_sparkplugNode := "1d3121a0-aade-4376-8fa3-57ba1460ba76" | quote}}
 {{$user_admin := "d53f476a-29dd-4d79-b614-5b7fe9bc8acf" | quote}}
@@ -662,7 +658,7 @@ data:
         }
       }
     }
-  # This is copied directly from acs-clusters.
+  # This is copied directly from acs-cluster-manager.
   # DO NOT EDIT HERE, make a PR to edit dumps/edge-deploy-configdb.yaml
   # in that repo and then pull the result back in.
   clusters: |
@@ -788,21 +784,19 @@ data:
       "classes": [
         {{$classDef_serviceAccount}},
         {{$classDef_edgeClusterAccount}},
-        {{$classDef_edgeClusterTemplate}},
         {{$classDef_gitRepoGroup}},
         {{$classDef_gitRepo}},
         {{$classDef_clientRole}}
       ],
       "objects": {
         {{$classDef_application}}: [
-          {{$application_edgeClusterTemplate}},
           {{$application_gitRepoConfiguration}},
           {{$application_edgeClusterStatus}},
           {{$application_edgeDeployment}},
           {{$application_edgeClusterConfiguration}}
         ],
         {{$classDef_serviceAccount}}: [
-          {{$serviceAccount_clusters}}
+          {{$serviceAccount_clusterManager}}
         ],
         {{$classDef_gitRepoGroup}}: [
           {{$gitRepoGroup_remoteClusters}},
@@ -813,15 +807,12 @@ data:
         ],
         {{$classDef_clientRole}}: [
           {{$role_edgeFlux}}
-        ],
-        {{$classDef_edgeClusterTemplate}}: [
-          {{$edgeClusterTemplate_cellGateway}}
         ]
       },
       "configs": {
         {{$application_generalObjectInformation}}: {
-          {{$serviceAccount_clusters}}: {
-            "name": "Clusters"
+          {{$serviceAccount_clusterManager}}: {
+            "name": "Cluster Manager"
           },
           {{$gitRepoGroup_sharedRepositories}}: {
             "name": "Shared repositories"
@@ -837,9 +828,6 @@ data:
           },
           {{$role_edgeFlux}}: {
             "name": "Role: Edge Flux"
-          },
-          {{$edgeClusterTemplate_cellGateway}}: {
-              "name": "Cell gateway"
           },
           {{$application_edgeDeployment}}: {
             "name": "Edge deployment"
@@ -860,33 +848,6 @@ data:
           },
           {{$gitRepo_sharedFluxSystem}}: {
             "path": "shared/flux-system"
-          }
-        },
-        {{$application_edgeClusterTemplate}}: {
-          {{$edgeClusterTemplate_cellGateway}}: {
-            "flux": {
-                "name": "Edge flux: %n",
-                "class": {{$classDef_edgeClusterAccount}},
-                "groups": [
-                    {{$role_edgeFlux}}
-                ],
-                "username": "op1flux/%n"
-            },
-            "name": "cell-gateway",
-            "cluster": {
-                "namespace": "fplus-edge"
-            },
-            "repository": {
-                "group": "cluster",
-                "links": {
-                    {{$gitRepo_sharedFluxSystem}}: {
-                        "branch": "main",
-                        "interval": "3h0m0s"
-                    }
-                },
-                "branch": "main",
-                "interval": "5m0s"
-            }
           }
         }
       }
@@ -1051,7 +1012,7 @@ data:
         },
         {
           "principal": {{$serviceAccount_manager}},
-          "permission": {{$permission_clusters_manageClusters}},
+          "permission": {{$permission_clusterManager_manageClusters}},
           "target": {{$special_wildcard}}
         },
         {
@@ -1277,8 +1238,8 @@ data:
           ]
       }
     }
-  # This is copied directly from acs-edge-deployment.
-  # DO NOT EDIT HERE, make a PR to edit dumps/edge-deploy-auth.yaml
+  # This is copied directly from acs-cluster-manager
+  # DO NOT EDIT HERE, make a PR to edit dumps/clusters-auth.yaml
   # in that repo and then pull the result back in.
   clusters: |
     {
@@ -1395,8 +1356,8 @@ data:
       "version": 1,
       "principals": [
         {
-          "uuid": {{$serviceAccount_clusters}},
-          "kerberos": "sv1clusters@{{ .Values.identity.realm }}"
+          "uuid": {{$serviceAccount_clusterManager}},
+          "kerberos": "sv1clustermanager@{{ .Values.identity.realm }}"
         }
       ],
       "aces": [
@@ -1407,7 +1368,7 @@ data:
         },
         {
           "principal": {{$serviceAccount_krbkeys}},
-          "permission": {{$permission_clusters_manageSecrets}},
+          "permission": {{$permission_clusterManager_manageSecrets}},
           "target": {{$special_wildcard}}
         },
         {
@@ -1418,7 +1379,7 @@ data:
       ],
       "groups": {
         {{$serviceRequirement_edgeDeploymentServiceAccount}}: [
-          {{$serviceAccount_clusters}}
+          {{$serviceAccount_clusterManager}}
         ],
         {{$serviceRequirement_edgeClusterRepositories}}: [
           {{$gitRepoGroup_remoteClusters}}
@@ -1430,7 +1391,7 @@ data:
           {{$role_edgeFlux}}
         ],
         {{$role_administrator}}: [
-          {{$permissionGroup_clusters}}
+          {{$permissionGroup_clusterManager}}
         ]
       }
     }

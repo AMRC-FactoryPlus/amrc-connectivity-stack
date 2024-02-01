@@ -4,3 +4,12 @@ image:
     repository: node-red
 # If this is non-null it will be deployed as the initial flow file
 flow: null
+# This deploys to a specific host
+#hostname: foo
+tolerations:
+  # Tolerations to apply to pods deployed to a specific host
+  specific:
+    - key: factoryplus.app.amrc.co.uk/fieldbus
+      operator: Exists
+  # Tolerations to apply to floating pods
+  floating: []

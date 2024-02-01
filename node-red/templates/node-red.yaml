@@ -61,7 +61,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
   name: node-red-{{ .Values.uuid }}
 data:
-  flow.json: {{ .Values.flow | nindent 4 }}
+  flow.json: {{ .Values.flow | toRawJson | nindent 4 }}
 {{ end }}
 ---
 apiVersion: v1

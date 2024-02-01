@@ -38,6 +38,8 @@ spec:
           configMap:
             name: node-red-{{ .Values.uuid }}
         {{- end }}
+      securityContext:
+        runAsUser: 1000
       initContainers:
       {{- if .Values.flow }}
         - name: copy-flow

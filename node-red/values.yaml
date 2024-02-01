@@ -2,8 +2,12 @@ image:
   nodered:
     registry: docker.io/nodered
     repository: node-red
+    tag: "3.1"
+    pullPolicy: IfNotPresent
 # If this is non-null it will be deployed as the initial flow file
 flow: null
+# This is required
+# uuid: 12345
 # This deploys to a specific host
 #hostname: foo
 tolerations:

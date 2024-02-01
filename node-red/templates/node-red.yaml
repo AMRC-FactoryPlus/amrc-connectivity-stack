@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: node-red-{{ .Values.uuid }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    factory-plus.app: node-red
+    factory-plus.nodeUuid: {{ .Values.uuid }}
+    factory-plus.name: {{ .Values.name }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      factory-plus.app: node-red
+      factory-plus.nodeUuid: {{ .Values.uuid }}
+  template:
+    metadata:
+      labels:
+        factory-plus.app: node-red
+        factory-plus.service: node-red-{{ .Values.uuid }}
+        factory-plus.nodeUuid: {{ .Values.uuid }}
+        factory-plus.name: {{ .Values.name }}
+    spec:
+{{ if .Values.hostname }}
+      nodeSelector:
+        kubernetes.io/hostname: {{ .Values.hostname | quote }}
+      tolerations: {{ .Values.tolerations.specific | toYaml | nindent 8 }}
+{{ else }}
+      tolerations: {{ .Values.tolerations.floating | toYaml | nindent 8 }}
+{{ end }}
+      volumes:
+        - name: data
+          emptyDir:
+      initContainers:
+      {{- if .Values.flow }}
+        - name: copy-flow
+          image: alpine
+          command: ["/bin/sh", "-c", "cp /conf/flow.json /data/flow.json"]
+          volumeMounts:
+            - mountPath: /conf
+              name: config
+            - mountPath: /data
+              name: data
+      containers:
+        - name: node-red
+          {{- with .Values.image.nodered }}
+          image: "{{ .registry }}/{{ .repository }}:{{ .tag }}"
+          imagePullPolicy: {{ .pullPolicy }}
+          {{- end }}
+          volumeMounts:
+            - mountPath: /data
+              name: data
+{{ if .Values.flow }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: node-red-{{ .Values.uuid }}
+data:
+  flow.json: {{ .Values.flow | nindent 4 }}
+{{ end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: node-red-{{ .Values.uuid }}
+spec:
+  selector:
+    factory-plus.service: node-red-{{ .Values.uuid }}
+  ports:
+    - name: node-red
+      port: 1880
+    - name: mqtt
+      port: 1883

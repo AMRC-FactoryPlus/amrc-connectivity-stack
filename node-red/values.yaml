@@ -1,0 +1,6 @@
+image:
+  nodered:
+    registry: docker.io/nodered
+    repository: node-red
+# If this is non-null it will be deployed as the initial flow file
+flow: null

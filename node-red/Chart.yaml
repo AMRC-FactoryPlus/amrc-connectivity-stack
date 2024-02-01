@@ -1,0 +1,4 @@
+apiVersion: v2
+name: node-red
+version: "0.0.1"
+description: "ACS Node-RED deployment"

@@ -27,8 +27,8 @@ RUN <<SHELL
 
     ./configure --prefix=/usr/local --with-gssapi --without-icu
     make -j6
-    make -C src/bin install \
-    make -C src/include install \
+    make -C src/bin install
+    make -C src/include install
     make -C src/interfaces install
 
     # Install a second time into /dist so the run image can pick out the

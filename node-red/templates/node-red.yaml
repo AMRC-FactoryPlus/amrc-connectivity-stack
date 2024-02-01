@@ -44,7 +44,7 @@ spec:
       {{- if .Values.flow }}
         - name: copy-flow
           image: alpine
-          command: ["/bin/sh", "-c", "cp /conf/flow.json /data/flow.json"]
+          command: ["/bin/sh", "-c", "cp /conf/flows.json /data/"]
           volumeMounts:
             - mountPath: /conf
               name: config
@@ -68,7 +68,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
   name: node-red-{{ .Values.uuid }}
 data:
-  flow.json: {{ .Values.flow | toRawJson | quote }}
+  flows.json: {{ .Values.flow | toRawJson | quote }}
 {{ end }}
 ---
 apiVersion: v1

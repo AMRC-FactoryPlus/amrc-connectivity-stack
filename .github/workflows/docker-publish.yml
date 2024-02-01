@@ -60,7 +60,10 @@ jobs:
           platforms: linux/amd64,linux/arm64
           file: ./Dockerfile.js-build
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: ${{ env.REGISTRY }}/acs-base-js-build:${{ steps.meta.outputs.version }}
+          build-args: |
+            base=${{ env.REGISTRY }}/acs-base
+            version=${{ steps.meta.outputs.version }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -88,7 +91,10 @@ jobs:
           platforms: linux/amd64,linux/arm64
           file: ./Dockerfile.js-run
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: ${{ env.REGISTRY }}/acs-base-js-run:${{ steps.meta.outputs.version }}
+          build-args: |
+            base=${{ env.REGISTRY }}/acs-base
+            version=${{ steps.meta.outputs.version }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -116,7 +122,10 @@ jobs:
           platforms: linux/amd64,linux/arm64
           file: ./Dockerfile.pg-build
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: ${{ env.REGISTRY }}/acs-base-pg-build:${{ steps.meta.outputs.version }}
+          build-args: |
+            base=${{ env.REGISTRY }}/acs-base
+            version=${{ steps.meta.outputs.version }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -144,7 +153,10 @@ jobs:
           platforms: linux/amd64,linux/arm64
           file: ./Dockerfile.pg-run
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: ${{ env.REGISTRY }}/acs-base-pg-run:${{ steps.meta.outputs.version }}
+          build-args: |
+            base=${{ env.REGISTRY }}/acs-base
+            version=${{ steps.meta.outputs.version }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

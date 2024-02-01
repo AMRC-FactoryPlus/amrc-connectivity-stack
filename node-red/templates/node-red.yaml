@@ -60,6 +60,13 @@ spec:
           volumeMounts:
             - mountPath: /data
               name: data
+        {{- if .Values.mqttBroker }}
+        - name: mqtt-broker
+          {{- with .Values.image.mqttBroker }}
+          image: "{{ .registry}}/{{.repository }}:{{ .tag }}"
+          imagePullPolicy: {{ .pullPolicy }}
+          {{- end }}
+        {{- end }}
 {{ if .Values.flow }}
 ---
 apiVersion: v1

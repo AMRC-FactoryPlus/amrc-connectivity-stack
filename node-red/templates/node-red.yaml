@@ -33,11 +33,9 @@ spec:
       volumes:
         - name: data
           emptyDir:
-        {{- if .Values.flow }}
         - name: config
           configMap:
             name: node-red-{{ .Values.uuid }}
-        {{- end }}
       securityContext:
         runAsUser: 1000
       initContainers:
@@ -66,8 +64,10 @@ spec:
           image: "{{ .registry}}/{{.repository }}:{{ .tag }}"
           imagePullPolicy: {{ .pullPolicy }}
           {{- end }}
+          volumeMounts:
+            - mountPath: /mosquitto/config
+              name: config
         {{- end }}
-{{ if .Values.flow }}
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -75,8 +75,14 @@ metadata:
   namespace: {{ .Release.Namespace }}
   name: node-red-{{ .Values.uuid }}
 data:
+  {{- if .Values.flow }}
   flows.json: {{ .Values.flow | toRawJson | quote }}
-{{ end }}
+  {{- end }}
+  {{- if .Values.mqttBroker }}
+  mosquitto.conf: |
+    listener 1883
+    allow_anonymous true
+  {{- end }}
 ---
 apiVersion: v1
 kind: Service

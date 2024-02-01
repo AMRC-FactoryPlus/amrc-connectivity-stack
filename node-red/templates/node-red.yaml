@@ -43,6 +43,7 @@ spec:
               name: config
             - mountPath: /data
               name: data
+      {{- end }}
       containers:
         - name: node-red
           {{- with .Values.image.nodered }}

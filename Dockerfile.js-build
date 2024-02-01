@@ -1,0 +1,12 @@
+# ACS base image for building all JS services.
+# This includes the krb5 libraries and the build tools needed to build
+# gssapi.js.
+
+FROM node:lts-alpine
+
+# Install system packages we need to build.
+RUN apk add gcc g++ cmake make python3 \
+    krb5-dev libedit-dev
+
+USER node
+WORKDIR /home/node

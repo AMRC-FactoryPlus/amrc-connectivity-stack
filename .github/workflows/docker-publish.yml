@@ -10,7 +10,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    needs: publish
     permissions:
       contents: read
       packages: write

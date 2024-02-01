@@ -33,6 +33,11 @@ spec:
       volumes:
         - name: data
           emptyDir:
+        {{- if .Values.flow }}
+        - name: config
+          configMap:
+            name: node-red-{{ .Values.uuid }}
+        {{- end }}
       initContainers:
       {{- if .Values.flow }}
         - name: copy-flow

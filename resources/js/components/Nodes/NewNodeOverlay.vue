@@ -82,8 +82,9 @@ export default {
               title: edgeCluster,
               value: edgeCluster,
               options: config.status.hosts.map(host => {
+                const special = host.specialised ? ` [${host.specialised}]` : "";
                 return {
-                  title: `${host.hostname} (${host.arch})`,
+                  title: `${host.hostname}${special}`,
                   value: host.hostname,
                   action: () => {
                     params.destination_cluster.data = config.uuid;

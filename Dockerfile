@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
-ARG acs_build=ghcr.io/amrc-factoryplus/utilities-build:v1.3.1
-ARG acs_run=ghcr.io/amrc-factoryplus/utilities-run:v1.3.1
+ARG acs_build=ghcr.io/amrc-factoryplus/acs-base-js-build:v0.0.1
+ARG acs_run=ghcr.io/amrc-factoryplus/acs-base-js-run:v0.0.1
 
 FROM ${acs_build} AS build
 ARG acs_npm=NO

@@ -53,6 +53,9 @@ aces:
     target: !u E.App.Status
   - principal: !u E.Requirement.ServiceAccount
     permission: !u FP.Permission.ConfigDB.ReadConfig
+    target: !u E.App.EdgeStatus
+  - principal: !u E.Requirement.ServiceAccount
+    permission: !u FP.Permission.ConfigDB.ReadConfig
     target: !u E.App.Flux
   - principal: !u E.Requirement.ServiceAccount
     permission: !u FP.Permission.ConfigDB.ReadConfig

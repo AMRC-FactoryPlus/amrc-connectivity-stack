@@ -92,6 +92,7 @@ metadata:
 spec:
   selector:
     factory-plus.service: node-red-{{ .Values.uuid }}
+  internalTrafficPolicy: Local
   ports:
     - name: node-red
       port: 1880

@@ -3,7 +3,7 @@ image:
   edgeAgent:
     registry: ghcr.io/amrc-factoryplus
     repository: acs-edge
-    tag: "v2.0.0"
+    tag: "v2.0.1-dev.2"
     pullPolicy: IfNotPresent
 debug: true
 poll_int: 10

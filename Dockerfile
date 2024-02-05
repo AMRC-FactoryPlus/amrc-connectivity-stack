@@ -1,8 +1,8 @@
 # syntax=docker/dockerfile:1
 # The line above must be the first line in the file!
 
-ARG acs_build=ghcr.io/amrc-factoryplus/utilities-build:v1.0.8
-ARG acs_run=ghcr.io/amrc-factoryplus/utilities-run:v1.0.8
+ARG acs_build=ghcr.io/amrc-factoryplus/acs-base-js-build:v0.0.1
+ARG acs_run=ghcr.io/amrc-factoryplus/acs-base-js-run:v0.0.1
 
 FROM ${acs_build} as ts-compiler
 # This ARG must go here, in the image that uses it, or it isn't

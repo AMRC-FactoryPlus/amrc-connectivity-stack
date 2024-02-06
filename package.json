@@ -1,6 +1,6 @@
 {
   "name": "acs-cluster-manager",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "",
   "main": "index.js",
   "type": "module",
@@ -18,7 +18,7 @@
     "@kubernetes/client-node": "^0.18.1",
     "concat-stream": "^2.0.0",
     "immutable": "^5.0.0-beta.4",
-    "isomorphic-git": "^1.24.0",
+    "isomorphic-git": "^1.25.3",
     "json-merge-patch": "^1.0.2",
     "json-templates": "^5.0.0",
     "tmp-promise": "^3.0.3",

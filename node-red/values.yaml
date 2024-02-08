@@ -20,7 +20,7 @@ mqttBroker: false
 tolerations:
   # Tolerations to apply to pods deployed to a specific host
   specific:
-    - key: factoryplus.app.amrc.co.uk/fieldbus
+    - key: factoryplus.app.amrc.co.uk/specialised
       operator: Exists
   # Tolerations to apply to floating pods
   floating: []

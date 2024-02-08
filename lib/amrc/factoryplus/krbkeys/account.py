@@ -23,6 +23,19 @@ class ACE:
             permission=UUID(spec["permission"]),
             target=UUID(spec["target"]))
 
+@immutable
+class SparkplugAddress:
+    group: Optional
+    node: str
+
+    @classmethod
+    def of (cls, spec):
+        if spec is None:
+            return None
+        return cls(
+            group=Optional.of(spec.get("group")),
+            node=spec["node"])
+
 @fields
 class FPAccount:
     principal: str
@@ -30,6 +43,7 @@ class FPAccount:
     klass: UUID
     name: str | None
     groups: set[UUID]
+    sparkplug: SparkplugAddress
 
     def __init__ (self, spec, uuid, principal):
         self.uuid = uuid
@@ -46,6 +60,8 @@ class FPAccount:
 
         aces = spec.get("aces", []);
         self.aces = set(ACE.of(a) for a in aces)
+
+        self.sparkplug = SparkplugAddress.of(spec.get("sparkplug", None))
 
     @classmethod
     def fromSpec (cls, spec, uuid):
@@ -73,6 +89,17 @@ class FPAccount:
         if self.name is not None:
             cdb.patch_config(uuids.App.Info, self.uuid,
                 { "name": self.name, "deleted": None })
+
+        if self.sparkplug is not None:
+            group = self.sparkplug.group \
+                .or_else(lambda: kk_ctx().operator.cluster_group \
+                    # Grr, Python's Optional doesn't have .or
+                    .get_or_default(None)) \
+                .get_or_raise(ValueError(f"No cluster group for {self.uuid}"))
+            addr = { "group_id": group, "node_id": self.sparkplug.node }
+
+            log(f"Giving {self.uuid} address {addr}")
+            cdb.put_config(uuids.App.SparkplugAddress, self.uuid, addr);
 
     def reconcile_auth (self):
         auth = kk_ctx().fplus.auth
@@ -119,3 +146,8 @@ class FPAccount:
         for ace in self.aces - new.aces:
             log(f"Revoking {self.uuid} ACE {ace}")
             fp.auth.delete_ace(self.uuid, ace.permission, ace.target)
+
+        if self.sparkplug != new.sparkplug:
+            log(f"Removing {self.uuid} address {self.sparkplug}")
+            ServiceError.catch((404,), lambda:
+                fp.configdb.delete_config(uuids.App.SparkplugAddress, self.uuid))

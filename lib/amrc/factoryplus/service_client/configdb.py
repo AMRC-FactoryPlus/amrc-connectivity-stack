@@ -30,7 +30,9 @@ class ConfigDB (ServiceInterface):
             url=f"v1/app/{app}/object/{obj}",
             json=json)
         if st == 204:
-            return
+            return False
+        if st == 201:
+            return True
         self.error(f"Can't set {app} for {obj}", st)
 
     def patch_config (self, app, obj, patch):

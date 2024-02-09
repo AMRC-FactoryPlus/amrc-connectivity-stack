@@ -63,7 +63,7 @@ spec:
         - name: edge-agent-sensitive-information
           secret:
             optional: true
-            secretName: edge-agent-sensitive-information
+            secretName: edge-agent-sensitive-information-{{ .Values.uuid }}
 ---
 apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: SparkplugNode

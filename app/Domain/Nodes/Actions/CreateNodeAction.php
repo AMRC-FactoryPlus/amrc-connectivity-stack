@@ -80,18 +80,12 @@ class CreateNodeAction
                 $group->name, $nodeName, $destinationNode),
         ]);
 
-        // Register the Sparkplug address the EA should use
-        $configDB->putConfig(App::SparkplugAddress, $uuid, [
-            "group_id" => $group->name,
-            "node_id" => $nodeName,
-        ]);
-
         // Split the $charts string (comma-delimited) into an array of UUIDs
         $charts = explode(',', $charts);
 
         // Create an entry in the Edge Agent Deployment app to trigger the deployment of the edge agent
         $payload = [
-            "name" => sprintf("%s.%s", $group->name, $nodeName),
+            "name" => $nodeName,
             "charts" => $charts,
             "cluster" => $destinationCluster,
         ];

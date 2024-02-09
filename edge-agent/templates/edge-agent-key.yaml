@@ -11,3 +11,5 @@ spec:
     uuid: {{ .Values.uuid }}
     groups:
       - {{ .Values.authGroup.edgeAgent }}
+    sparkplug:
+      node: {{ .Values.name }}

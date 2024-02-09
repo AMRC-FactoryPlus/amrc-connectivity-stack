@@ -264,44 +264,65 @@ export class Translator extends EventEmitter {
     async fetchConfig(uuid: string): Promise<translatorConf> {
         const cdb = this.fplus.ConfigDB;
 
-        let [config, etag] = await this.retry("config", () => cdb.get_config_with_etag(UUIDs.App.AgentConfig, uuid));
+        /* XXX This is a mess. We want an Error monad, I think, or
+         * recast everything with try/catch/custom exceptions */
+
+        let [config, etag] = await this.retry("config", () => 
+            cdb.get_config_with_etag(UUIDs.App.AgentConfig, uuid));
 
         log(`Fetched config with etag [${etag}]`);
 
-        let valid = config && validateConfig(config);
+        let valid = true;
+        if (config) {
+            // Replace all occurrences of __FPSI_<v4UUID> with the actual
+            // secret of the same name from /etc/secrets
 
-        // Replace all occurrences of __FPSI_<v4UUID> with the actual secret of the same name from /etc/secrets
+            // First, convert it to a string
+            const configString = JSON.stringify(config);
 
-        // First, convert it to a string
-        const configString = JSON.stringify(config);
+            // Then, replace all occurrences of __FPSI_<v4UUID> with the
+            // actual secret of the same name from /etc/secrets
+            const secretReplacedConfig = configString.replace(
+                /__FPSI__[a-f0-9-]{36}/g,
+                (match) => {
+                    try {
+                        // Attempt to get the secret contents from the file in /etc/secrets with the same name
+                        const secretPath = `/etc/secrets/${match}`;
+                        return fs.readFileSync(secretPath, 'utf8');
+                    } catch (err: any) {
+                        // Handle error (e.g., file not found) gracefully
+                        console.error(`Error reading secret from ${match}: ${err.message}`);
+                        valid = false;
+                        return "SECRET_NOT_FOUND";
+                    }
+                });
 
-        // Then, replace all occurrences of __FPSI_<v4UUID> with the actual secret of the same name from /etc/secrets
-        const secretReplacedConfig = configString.replace(/__FPSI__[a-f0-9-]{36}/g, (match) => {
-            try {
-                // Attempt to get the secret contents from the file in /etc/secrets with the same name
-                const secretPath = `/etc/secrets/${match}`;
-                return fs.readFileSync(secretPath, 'utf8');
-            } catch (err: any) {
-                // Handle error (e.g., file not found) gracefully
-                console.error(`Error reading secret from ${match}: ${err.message}`);
-                valid = false;
-                return "SECRET_NOT_FOUND";
+            // Then, convert it back to an object and validate
+            if (valid) {
+                try {
+                    config = JSON.parse(secretReplacedConfig);
+                    valid = validateConfig(config);
+                }
+                catch {
+                    valid = false;
+                }
             }
-        });
+        }
 
-        // Then, convert it back to an object
-        config = JSON.parse(secretReplacedConfig);
-
-        const conns = valid ? reHashConf(config).deviceConnections : [];
+        const conns = config && valid ? reHashConf(config).deviceConnections : [];
 
         if (!valid) log("Config is invalid or nonexistent, ignoring");
 
         const rv = {
             sparkplug: {
-                nodeControl: config?.sparkplug, configRevision: etag, alerts: {
-                    configFetchFailed: !config, configInvalid: !!config && !valid,
+                nodeControl:    config?.sparkplug,
+                configRevision: etag, 
+                alerts: {
+                    configFetchFailed:  !config, 
+                    configInvalid:      !valid,
                 },
-            }, deviceConnections: conns,
+            },
+            deviceConnections: conns,
         };
 
         log(`Mapped config: ${JSON.stringify(config)}\n->\n${JSON.stringify(rv)}`);

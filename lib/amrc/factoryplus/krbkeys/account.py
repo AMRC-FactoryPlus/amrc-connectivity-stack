@@ -83,13 +83,11 @@ class FPAccount:
 
         # If we don't have a class we aren't managing this object in the
         # ConfigDB. Someone else (the manager perhaps) is doing that.
-        if self.klass is None:
-            return
-
-        if self.name is not None:
+        if self.klass is not None and self.name is not None:
             cdb.patch_config(uuids.App.Info, self.uuid,
                 { "name": self.name, "deleted": None })
 
+        # We are always managing the Sparkplug address if it's requested
         if self.sparkplug is not None:
             group = self.sparkplug.group \
                 .or_else(lambda: kk_ctx().operator.cluster_group \

@@ -24,6 +24,7 @@
               <Input :password="true" v-else-if="(['password'].includes(element.object.type)) && !('enum' in element.object)"
                      :showDescription="false"
                      :control="{}"
+                     :device="device.id"
                      :valid="get(element.keyPath.filter(e => e !== 'properties').join('.'), v.model)"
                      :value="get(element.keyPath.filter(e => e !== 'properties').join('.'), model)"
                      @input="updateInput(element, $event)"></Input>

@@ -58,3 +58,5 @@ client-keytab-enc-amrc
 keytab
 .keytab*
 *ccache*
+/.phpstorm.meta.php
+/_ide_helper.php

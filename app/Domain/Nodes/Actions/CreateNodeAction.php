@@ -67,7 +67,7 @@ class CreateNodeAction
 
         $node = Node::create([
             'node_id' => $nodeName,
-            'k8s_hostname' => $destinationCluster . '/' . $destinationNode,
+            'cluster' => $destinationCluster,
             'principal' => $nodeName . '/' . $destinationCluster . '/' . $destinationNode,
             'group_id' => $group->id,
             'is_admin' => 0,

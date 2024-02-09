@@ -18,6 +18,7 @@ use App\Http\Controllers\NodeUserController;
 use App\Http\Controllers\OriginMapController;
 use App\Http\Controllers\ReauthenticateController;
 use App\Http\Controllers\RoleController;
+use App\Http\Controllers\SensitiveInformationController;
 use App\Http\Controllers\UserMetaController;
 use App\Http\Controllers\UserPreferenceController;
 use Illuminate\Support\Facades\Route;
@@ -96,5 +97,8 @@ Route::middleware('auth:api')->get('/default-helm-chart-templates', [HelmChartCo
 
 // ------ Schemas ------ //
 Route::middleware('auth:api')->get('/device-schemas', [DeviceSchemaController::class, 'index']);
-//Route::middleware('auth:api')->post('/device-schemas', [DeviceSchemaController::class, 'create']);
 Route::middleware('auth:api')->get('/device-schemas/{schema}/versions', [DeviceSchemaVersionController::class, 'index']);
+
+// ------ Sensitive Information ------ //
+Route::middleware('auth:api')->post('/sensitive-information', [SensitiveInformationController::class, 'create']);
+

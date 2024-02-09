@@ -27,3 +27,4 @@ coverage
 build/
 *.js
 *.js.*
+/lib/git-version.ts

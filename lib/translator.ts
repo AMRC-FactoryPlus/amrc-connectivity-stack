@@ -4,8 +4,8 @@
  */
 
 import timers from "timers/promises";
-import { ServiceClient } from "@amrc-factoryplus/utilities";
-import type { Identity } from "@amrc-factoryplus/utilities";
+import type {Identity} from "@amrc-factoryplus/utilities";
+import {ServiceClient} from "@amrc-factoryplus/utilities";
 
 /* XXX These need to be incorporated into the main codebase. The config
  * rehashing just needs to go: the code which uses the config needs
@@ -14,52 +14,22 @@ import {validateConfig} from '../utils/CentralConfig.js';
 import {reHashConf} from "../utils/FormatConfig.js";
 
 // Import device connections
-import {
-    SparkplugNode
-} from "./sparkplugNode.js";
+import {SparkplugNode} from "./sparkplugNode.js";
 
 // Import devices
-import {
-    RestConnection,
-    RestDevice
-} from "./devices/REST.js";
-import {
-    S7Connection,
-    S7Device
-} from "./devices/S7.js";
-import {
-    OPCUAConnection,
-    OPCUADevice
-} from "./devices/OPCUA.js";
-import {
-    MQTTConnection,
-    MQTTDevice
-} from "./devices/MQTT.js";
-import {
-    UDPConnection,
-    UDPDevice
-} from "./devices/UDP.js";
-import {
-    WebsocketConnection,
-    WebsocketDevice
-} from "./devices/websocket.js";
-import {
-    MTConnectConnection,
-    MTConnectDevice
-} from "./devices/MTConnect.js";
-import {
-    log
-} from "./helpers/log.js";
-import {
-    nodeControl,
-    sparkplugConfig,
-} from "./helpers/typeHandler.js";
-import {
-    Device,
-    deviceOptions
-} from "./device.js";
+import {RestConnection, RestDevice} from "./devices/REST.js";
+import {S7Connection, S7Device} from "./devices/S7.js";
+import {OPCUAConnection, OPCUADevice} from "./devices/OPCUA.js";
+import {MQTTConnection, MQTTDevice} from "./devices/MQTT.js";
+import {UDPConnection, UDPDevice} from "./devices/UDP.js";
+import {WebsocketConnection, WebsocketDevice} from "./devices/websocket.js";
+import {MTConnectConnection, MTConnectDevice} from "./devices/MTConnect.js";
+import {log} from "./helpers/log.js";
+import {sparkplugConfig,} from "./helpers/typeHandler.js";
+import {Device, deviceOptions} from "./device.js";
 import * as UUIDs from "./uuids.js";
 import {EventEmitter} from "events";
+import fs from "node:fs";
 
 /**
  * Translator class basically turns config file into instantiated classes
@@ -111,9 +81,7 @@ export class Translator extends EventEmitter {
             const ids = await this.fetchIdentities();
             const conf = await this.fetchConfig(ids.uuid!);
             const spConf = {
-                ...conf.sparkplug!,
-                address: ids.sparkplug!,
-                uuid: ids.uuid!,
+                ...conf.sparkplug!, address: ids.sparkplug!, uuid: ids.uuid!,
             };
 
             // Create sparkplug node
@@ -141,19 +109,15 @@ export class Translator extends EventEmitter {
      */
     async stop(kill: Boolean = false) {
         log('Waiting for devices to stop...');
-        await Promise.all(
-            Object.values(this.devices)?.map((dev: Device) => {
-                log(`Stopping device ${dev._name}`);
-                dev.stop();
-            })
-        );
+        await Promise.all(Object.values(this.devices)?.map((dev: Device) => {
+            log(`Stopping device ${dev._name}`);
+            dev.stop();
+        }));
         log('Waiting for connections to close...');
-        await Promise.all(
-            Object.values(this.connections)?.map((connection) => {
-                log(`Closing connection ${connection._type}`);
-                connection.close();
-            })
-        );
+        await Promise.all(Object.values(this.connections)?.map((connection) => {
+            log(`Closing connection ${connection._type}`);
+            connection.close();
+        }));
         log('Waiting for sparkplug node to stop...');
         await this.sparkplugNode?.stop();
 
@@ -162,7 +126,7 @@ export class Translator extends EventEmitter {
         this.emit('stopped', kill);
     }
 
-    setupSparkplug () {
+    setupSparkplug() {
         const sp = this.sparkplugNode;
 
         /**
@@ -202,7 +166,7 @@ export class Translator extends EventEmitter {
         })
     }
 
-    setupConnection (connection: any): void {
+    setupConnection(connection: any): void {
         const cType = connection.connType;
         const deviceInfo = this.chooseDeviceInfo(cType);
 
@@ -212,14 +176,10 @@ export class Translator extends EventEmitter {
         }
 
         // Instantiate device connection
-        const newConn = this.connections[cType] = new deviceInfo.connection(
-            connection.connType,
-            connection[deviceInfo.connectionDetails]
-        );
+        const newConn = this.connections[cType] = new deviceInfo.connection(connection.connType, connection[deviceInfo.connectionDetails]);
 
         connection.devices?.forEach((devConf: deviceOptions) => {
-            this.devices[devConf.deviceId] = new deviceInfo.type(
-                this.sparkplugNode, newConn, devConf);
+            this.devices[devConf.deviceId] = new deviceInfo.type(this.sparkplugNode, newConn, devConf);
         });
 
         // What to do when the connection is open
@@ -249,50 +209,36 @@ export class Translator extends EventEmitter {
 
     /* There is a better way to do this. At minimum this should be in a
      * factory class, not the main Translator class. */
-    chooseDeviceInfo (connType: string): deviceInfo | undefined {
+    chooseDeviceInfo(connType: string): deviceInfo | undefined {
         // Initialise the connection parameters
         switch (connType) {
             case "REST":
                 return {
-                    type: RestDevice,
-                    connection: RestConnection,
-                    connectionDetails: 'RESTConnDetails'
+                    type: RestDevice, connection: RestConnection, connectionDetails: 'RESTConnDetails'
                 }
             case "MTConnect":
                 return {
-                    type: MTConnectDevice,
-                    connection: MTConnectConnection,
-                    connectionDetails: 'MTConnectConnDetails'
+                    type: MTConnectDevice, connection: MTConnectConnection, connectionDetails: 'MTConnectConnDetails'
                 }
             case "S7":
                 return {
-                    type: S7Device,
-                    connection: S7Connection,
-                    connectionDetails: 's7ConnDetails'
+                    type: S7Device, connection: S7Connection, connectionDetails: 's7ConnDetails'
                 }
             case "OPC UA":
                 return {
-                    type: OPCUADevice,
-                    connection: OPCUAConnection,
-                    connectionDetails: 'OPCUAConnDetails'
+                    type: OPCUADevice, connection: OPCUAConnection, connectionDetails: 'OPCUAConnDetails'
                 }
             case "MQTT":
                 return {
-                    type: MQTTDevice,
-                    connection: MQTTConnection,
-                    connectionDetails: 'MQTTConnDetails'
+                    type: MQTTDevice, connection: MQTTConnection, connectionDetails: 'MQTTConnDetails'
                 }
             case "Websocket":
                 return {
-                    type: WebsocketDevice,
-                    connection: WebsocketConnection,
-                    connectionDetails: 'WebsocketConnDetails'
+                    type: WebsocketDevice, connection: WebsocketConnection, connectionDetails: 'WebsocketConnDetails'
                 }
             case "UDP":
                 return {
-                    type: UDPDevice,
-                    connection: UDPConnection,
-                    connectionDetails: 'UDPConnDetails'
+                    type: UDPDevice, connection: UDPConnection, connectionDetails: 'UDPConnDetails'
 
                 }
             default:
@@ -301,13 +247,12 @@ export class Translator extends EventEmitter {
     }
 
     /* Fetch our identities (UUID, Sparkplug) from the Auth service. */
-    async fetchIdentities (): Promise<Identity> {
+    async fetchIdentities(): Promise<Identity> {
         const auth = this.fplus.Auth;
 
         const ids = await this.retry("identities", async () => {
             const ids = await auth.find_principal();
-            if (!ids || !ids.uuid || !ids.sparkplug)
-                throw "Auth service not responding correctly";
+            if (!ids || !ids.uuid || !ids.sparkplug) throw "Auth service not responding correctly";
             return ids;
         });
 
@@ -316,50 +261,63 @@ export class Translator extends EventEmitter {
     }
 
     /* Fetch our config from the ConfigDB. */
-    async fetchConfig (uuid: string): Promise<translatorConf>
-    {
+    async fetchConfig(uuid: string): Promise<translatorConf> {
         const cdb = this.fplus.ConfigDB;
 
-        const [config, etag] = await this.retry("config",
-            () => cdb.get_config_with_etag(UUIDs.App.AgentConfig, uuid));
+        let [config, etag] = await this.retry("config", () => cdb.get_config_with_etag(UUIDs.App.AgentConfig, uuid));
 
         log(`Fetched config with etag [${etag}]`);
 
-        const valid = config && validateConfig(config);
+        let valid = config && validateConfig(config);
+
+        // Replace all occurrences of __FPSI_<v4UUID> with the actual secret of the same name from /etc/secrets
+
+        // First, convert it to a string
+        const configString = JSON.stringify(config);
+
+        // Then, replace all occurrences of __FPSI_<v4UUID> with the actual secret of the same name from /etc/secrets
+        const secretReplacedConfig = configString.replace(/__FPSI__[a-f0-9-]{36}/g, (match) => {
+            try {
+                // Attempt to get the secret contents from the file in /etc/secrets with the same name
+                const secretPath = `/etc/secrets/${match}`;
+                return fs.readFileSync(secretPath, 'utf8');
+            } catch (err: any) {
+                // Handle error (e.g., file not found) gracefully
+                console.error(`Error reading secret from ${match}: ${err.message}`);
+                valid = false;
+                return "SECRET_NOT_FOUND";
+            }
+        });
+
+        // Then, convert it back to an object
+        config = JSON.parse(secretReplacedConfig);
+
         const conns = valid ? reHashConf(config).deviceConnections : [];
 
-        if (!valid)
-            log("Config is invalid or nonexistent, ignoring");
+        if (!valid) log("Config is invalid or nonexistent, ignoring");
 
         const rv = {
             sparkplug: {
-                nodeControl: config?.sparkplug,
-                configRevision: etag,
-                alerts: {
-                    configFetchFailed: !config,
-                    configInvalid: !!config && !valid,
+                nodeControl: config?.sparkplug, configRevision: etag, alerts: {
+                    configFetchFailed: !config, configInvalid: !!config && !valid,
                 },
-            },
-            deviceConnections: conns,
+            }, deviceConnections: conns,
         };
 
         log(`Mapped config: ${JSON.stringify(config)}\n->\n${JSON.stringify(rv)}`);
         return rv;
     }
 
-    async retry<RV> (what: string, fetch: () => Promise<RV>): 
-        Promise<RV>
-    {
+    async retry<RV>(what: string, fetch: () => Promise<RV>): Promise<RV> {
         const interval = this.pollInt;
 
         while (true) {
             log(`Attempting to fetch ${what}...`);
-            try { 
+            try {
                 const rv = await fetch();
                 log(`Fetched ${what}.`);
                 return rv;
-            } 
-            catch (e) {
+            } catch (e) {
                 log(`Failed to fetch ${what}: ${e}.\n
 Trying again in ${interval} seconds...`);
             }

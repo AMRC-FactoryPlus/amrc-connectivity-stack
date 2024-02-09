@@ -23,9 +23,12 @@ spec:
         factory-plus.nodeUuid: {{ .Values.uuid }}
         factory-plus.name: {{ .Values.name }}
     spec:
-      nodeSelector:
 {{ if .Values.hostname }}
+      nodeSelector:
         kubernetes.io/hostname: {{ .Values.hostname | quote }}
+      tolerations: {{ .Values.tolerations.specific | toYaml | nindent 8 }}
+{{ else }}
+      tolerations: {{ .Values.tolerations.floating | toYaml | nindent 8 }}
 {{ end }}
       containers:
         - name: edge-agent
@@ -52,6 +55,15 @@ spec:
             requests:
               cpu: {{ .Values.limits.cpu | quote }}
               memory: {{ .Values.limits.memory | quote }}
+          volumeMounts:
+            - name: edge-agent-sensitive-information
+              mountPath: "/etc/secrets"
+              readOnly: true
+      volumes:
+        - name: edge-agent-sensitive-information
+          secret:
+            optional: true
+            secretName: edge-agent-sensitive-information-{{ .Values.uuid }}
 ---
 apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: SparkplugNode

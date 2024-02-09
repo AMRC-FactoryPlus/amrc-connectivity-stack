@@ -43,6 +43,10 @@ spec:
                   description: Is this an Edge Agent?
                   type: boolean
                   default: false
+                interval:
+                  description: Liveness check interval
+                  type: string
+                  format: duration
             status:
               type: object
       subresources:

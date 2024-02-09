@@ -8,16 +8,16 @@
     "packages": [
         {
             "name": "amrc-factoryplus/service-client",
-            "version": "v1.5.2",
+            "version": "v1.5.3",
             "source": {
                 "type": "git",
                 "url": "https://github.com/AMRC-FactoryPlus/php-service-client.git",
-                "reference": "bcd532aad5a6090680c9de7046988b87118fef0d"
+                "reference": "e4ab611d3b4a87d9e50ca23eab8d66c34fff1343"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/AMRC-FactoryPlus/php-service-client/zipball/bcd532aad5a6090680c9de7046988b87118fef0d",
-                "reference": "bcd532aad5a6090680c9de7046988b87118fef0d",
+                "url": "https://api.github.com/repos/AMRC-FactoryPlus/php-service-client/zipball/e4ab611d3b4a87d9e50ca23eab8d66c34fff1343",
+                "reference": "e4ab611d3b4a87d9e50ca23eab8d66c34fff1343",
                 "shasum": ""
             },
             "require": {
@@ -45,9 +45,9 @@
             "description": "This is a PHP package for writing clients for Factory+",
             "support": {
                 "issues": "https://github.com/AMRC-FactoryPlus/php-service-client/issues",
-                "source": "https://github.com/AMRC-FactoryPlus/php-service-client/tree/v1.5.2"
+                "source": "https://github.com/AMRC-FactoryPlus/php-service-client/tree/v1.5.3"
             },
-            "time": "2024-02-06T14:48:29+00:00"
+            "time": "2024-02-09T09:27:27+00:00"
         },
         {
             "name": "aws/aws-crt-php",
@@ -105,16 +105,16 @@
         },
         {
             "name": "aws/aws-sdk-php",
-            "version": "3.298.3",
+            "version": "3.298.6",
             "source": {
                 "type": "git",
                 "url": "https://github.com/aws/aws-sdk-php.git",
-                "reference": "70fde185df4a8dd99983a308b823991fb5b39060"
+                "reference": "0afccba68a96c0cbc10f6fc5b08c5a0e09774220"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/aws/aws-sdk-php/zipball/70fde185df4a8dd99983a308b823991fb5b39060",
-                "reference": "70fde185df4a8dd99983a308b823991fb5b39060",
+                "url": "https://api.github.com/repos/aws/aws-sdk-php/zipball/0afccba68a96c0cbc10f6fc5b08c5a0e09774220",
+                "reference": "0afccba68a96c0cbc10f6fc5b08c5a0e09774220",
                 "shasum": ""
             },
             "require": {
@@ -194,9 +194,9 @@
             "support": {
                 "forum": "https://forums.aws.amazon.com/forum.jspa?forumID=80",
                 "issues": "https://github.com/aws/aws-sdk-php/issues",
-                "source": "https://github.com/aws/aws-sdk-php/tree/3.298.3"
+                "source": "https://github.com/aws/aws-sdk-php/tree/3.298.6"
             },
-            "time": "2024-02-05T19:05:28+00:00"
+            "time": "2024-02-08T19:03:23+00:00"
         },
         {
             "name": "bacon/bacon-qr-code",
@@ -11473,16 +11473,16 @@
         },
         {
             "name": "fidry/cpu-core-counter",
-            "version": "1.0.0",
+            "version": "1.1.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/theofidry/cpu-core-counter.git",
-                "reference": "85193c0b0cb5c47894b5eaec906e946f054e7077"
+                "reference": "f92996c4d5c1a696a6a970e20f7c4216200fcc42"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/theofidry/cpu-core-counter/zipball/85193c0b0cb5c47894b5eaec906e946f054e7077",
-                "reference": "85193c0b0cb5c47894b5eaec906e946f054e7077",
+                "url": "https://api.github.com/repos/theofidry/cpu-core-counter/zipball/f92996c4d5c1a696a6a970e20f7c4216200fcc42",
+                "reference": "f92996c4d5c1a696a6a970e20f7c4216200fcc42",
                 "shasum": ""
             },
             "require": {
@@ -11522,7 +11522,7 @@
             ],
             "support": {
                 "issues": "https://github.com/theofidry/cpu-core-counter/issues",
-                "source": "https://github.com/theofidry/cpu-core-counter/tree/1.0.0"
+                "source": "https://github.com/theofidry/cpu-core-counter/tree/1.1.0"
             },
             "funding": [
                 {
@@ -11530,7 +11530,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2023-09-17T21:38:23+00:00"
+            "time": "2024-02-07T09:43:46+00:00"
         },
         {
             "name": "filp/whoops",

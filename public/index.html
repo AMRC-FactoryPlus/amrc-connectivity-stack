@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+
+<html>
+    <head>
+        <title>Factory+ visualisation</title>
+        <link rel="shortcut icon" href="fplus.png">
+        <script src="webpack-modules.js"></script>
+        <script type="module" src="index.js"></script>
+    </head>
+    <body style="overflow: hidden; margin: 0px; padding: 0px;">
+        <div id="form">
+            <h2>MQTT credentials</h2>
+            <p>These will need to have global debugger rights to see much of interest.</p>
+            <label>Broker <input id="broker" type="text" size="50"></label><br>
+            <label>Username <input id="username" type="text" size="50"></label><br>
+            <label>Password <input id="password" type="password" size="50"></label><br>
+            <label><input id="save" type="checkbox"> Save credentials to browser</label><br>
+            <button id="login">Log in</button>
+        </div>
+        <canvas id="canvas"></canvas>
+    </body>
+</html>
+

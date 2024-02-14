@@ -1,0 +1,32 @@
+{
+  "name": "factoryplus-vis",
+  "version": "0.0.3",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "bin": {
+    "factoryplus-vis": "bin/vis-proxy.js"
+  },
+  "directories": {
+    "lib": "lib"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node bin/server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.18.1",
+    "mqtt": "^4.3.7",
+    "process": "^0.11.10",
+    "sparkplug-payload": "^1.0.1",
+    "url": "^0.11.0",
+    "webpack": "^5.73.0",
+    "ws": "^8.7.0"
+  },
+  "devDependencies": {
+    "webpack-cli": "^4.10.0"
+  }
+}

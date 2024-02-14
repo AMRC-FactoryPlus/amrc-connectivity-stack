@@ -1,0 +1,270 @@
+/*
+ * Factory+ visualisation.
+ * Vis display class.
+ * Copyright 2022 AMRC.
+ */
+
+import Packet from "./packet.js";
+import Style from "./style.js";
+
+const TURN = 2*Math.PI;
+const HALF = Math.PI;
+const QUARTER = Math.PI/2;
+
+export default class Vis {
+    constructor (graph, canvas) {
+        this.graph = graph;
+
+        this.canvas = canvas;
+
+        this.render = this.render.bind(this);
+        this.circle = this.circle.bind(this);
+
+        const obs = new ResizeObserver(() => this.resize());
+        obs.observe(this.canvas);
+        this.resize();
+    }
+
+    circle (x, y, r, fill_style, stroke) {
+        const ctx = this.ctx;
+			if (fill_style) ctx.fillStyle = Style[fill_style];
+			ctx.beginPath();
+			ctx.arc(x, y, r, 0, TURN, true);
+			stroke ? ctx.stroke() : ctx.fill();
+    }
+
+    count_leaves (graph, depth) {
+        graph.depth = depth;
+        const nodes = graph.children;
+
+        if (graph.path)
+            this.paths.set(graph.path, graph);
+
+        if (!nodes) {
+            this.leaves.push(graph);
+            graph.leaves = 1;
+            graph.maxdepth = 0;
+        }
+        else {
+            nodes.forEach(c => {
+                this.count_leaves(c, depth + 1);
+                c.parent = graph;
+            });
+            if (nodes.every(n => !n.children) && nodes.length > 5) {
+				graph.leaves = 1;
+				graph.maxdepth = 0;
+				graph.too_many = nodes.length;
+			}
+            else {
+                graph.leaves = nodes
+                    .map(c => c.leaves)
+                    .reduce((a, b) => a + b, 0);
+                graph.maxdepth = 1 + nodes
+                    .map(c => c.maxdepth)
+                    .reduce((a,b) => a > b ? a : b, 0);
+            }
+        }
+    }
+
+    pick_centres (graph, angle, radius, segment, ring) {
+        const myangle = angle + segment * graph.leaves / 2;
+        const centre = graph.centre = [
+            radius * Math.cos(myangle) * this.xscale, 
+            radius * Math.sin(myangle)];
+        const txtangle = myangle + 1;
+        graph.radius = this.root_node/(graph.depth + 3);
+
+        const name_w = this.ctx.measureText(graph.name).width;
+        graph.label = [
+            name_w/2,
+            0,
+            //graph.depth == 0 ? 0 :
+            //    (txtangle > TURN/4 && txtangle < 3*TURN/4)
+            //        ? txtangle - TURN/2 : txtangle,
+        ];
+        
+        const nodes = graph.children;
+		if (graph.too_many) {
+			const o_cen = [
+            (radius + ring) * Math.cos(myangle) * this.xscale, 
+            (radius + ring) * Math.sin(myangle)];
+			graph.overflow = {
+				parent: graph,
+				centre: o_cen,
+			};
+		}
+        if (graph.too_many || !nodes) return;
+
+        for (const child of nodes) {
+            this.pick_centres(child, angle, radius + ring, segment, ring);
+            angle += segment * child.leaves;
+        }
+    }
+
+    render_nodes (graph) {
+        const ctx = this.ctx;
+
+        if (graph.children && !graph.too_many) {
+            for (const n of graph.children) {
+                if (!n.centre) {
+                    console.log("No centre for %o", n);
+                    continue;
+                }
+				ctx.strokeStyle = Style.circles
+                ctx.beginPath();
+                ctx.moveTo(...graph.centre);
+                ctx.lineTo(...n.centre);
+                ctx.stroke();
+                this.render_nodes(n);
+            }
+        }
+		if (graph.too_many) {
+			ctx.save()
+			ctx.beginPath();
+			ctx.moveTo(...graph.centre);
+			ctx.lineTo(...graph.overflow.centre);
+			ctx.strokeStyle = Style.circles;
+			ctx.stroke();
+			const pos = graph.overflow.centre;
+			ctx.fillStyle = Style.background;
+			this.circle(pos[0], pos[1], 0.35*this.root_node, null, true);
+			ctx.restore();
+		}
+
+        const pos = graph.centre;
+        //ctx.save()
+        //ctx.fillStyle = graph.too_many ? Style.toomany : Style.circles;
+        this.circle(pos[0], pos[1], graph.radius, "circles");
+        //ctx.restore();
+    }
+
+    render_text (graph) {
+        const ctx = this.ctx;
+
+        if (graph.label) {
+            const [offset, angle] = graph.label;
+            const print = (fill, size, centre, offset, text) => { 
+                ctx.save();
+                ctx.font = `${size}px ${Style.font}`;
+                ctx.fillStyle = fill;
+                ctx.translate(centre[0], centre[1]);
+                ctx.rotate(angle);
+                ctx.translate(...offset);
+                ctx.fillText(text, 0, 0);
+                ctx.restore();
+            };
+
+            print(Style.text, this.text_height, graph.centre, [-offset, -graph.radius - 2], graph.name);
+			
+            if (graph.too_many) {
+				const print_too_many = (fill, size, centre, position, text) => { 
+					ctx.save();
+					ctx.font = `${size}px ${Style.font}`;
+					let text_size = ctx.measureText(text)
+					let text_xPos = graph.overflow.centre[0] - (text_size.width / 2)
+					let text_yPos = graph.overflow.centre[1] + (text_size.actualBoundingBoxAscent / 2)
+					ctx.fillStyle = fill;
+					//ctx.translate(centre[0], centre[1]);
+					ctx.rotate(angle);
+					ctx.translate(text_xPos, text_yPos);
+					ctx.fillText(text, 0, 0);
+					ctx.restore();
+				}
+                print_too_many(Style.circles, (0.6*this.root_node), graph.overflow.centre, [this.text_xPos, this.text_yPos], graph.too_many);
+            }
+        }
+
+        if (graph.children && !graph.too_many) {
+            for (const n of graph.children)
+                this.render_text(n);
+        }
+    }
+    
+    run () {
+        this.reset_graph();
+        this.active = new Set();
+
+        this.stopping = null;
+        window.requestAnimationFrame(this.render);
+
+        return this;
+    }
+
+    stop () {
+        return new Promise((resolve, reject) =>
+            this.stopping = resolve);
+    }
+
+    resize () {
+        this.ctx = canvas.getContext("2d");
+
+        const margin = 10;
+        this.width = this.canvas.width;
+        this.height = this.canvas.height;
+        this.radius = Math.min(this.width, this.height) / 2 - margin;
+        this.xscale = (this.width - 2*margin) / (this.height - 2*margin);
+        this.root_node = this.radius / 9;
+        this.packet_size = this.radius / 90;
+        this.line_width = this.radius / 600;
+		this.text_height = this.height / 68;
+        this.reset_graph();
+    }
+
+    reset_graph () {
+        this.leaves = [];
+        this.paths = new Map();
+        this.count_leaves(this.graph, 0);
+
+        const segment = TURN / this.graph.leaves;
+        const ring = this.radius * 0.8 / this.graph.maxdepth;
+        this.pick_centres(this.graph, 0, 0, segment, ring);
+    }
+
+    make_active (path, style) {
+        let node = this.paths.get(path);
+        if (node) {
+            if (node.parent.too_many) {
+                node = node.parent.overflow;
+            }
+            this.active.add(new Packet(this, node, style));
+        }
+    }
+
+    render (time) {
+        if (this.stopping) {
+            this.stopping();
+            return;
+        }
+
+        const ctx = this.ctx;
+        ctx.reset();
+        ctx.save();
+        ctx.fillStyle = Style.background;;
+        ctx.fillRect(0, 0, this.width, this.height);
+
+        ctx.fillStyle = Style.circles;
+        ctx.strokeStyle = Style.lines;
+        ctx.lineWidth = this.line_width;
+        ctx.translate(this.width/2, this.height/2);
+
+        this.render_nodes(this.graph, true);
+        this.render_text(this.graph);
+
+        for (const [_, p] of this.active.entries()) {
+            if (!p.render(time, this.circle))
+                this.active.delete(p);
+        }
+
+        /*
+        ctx.save();
+        ctx.font = Style.font;
+        ctx.fillStyle = Style.text;
+        ctx.fillText(`${this.canvas.width}x${this.canvas.height}`, 0, 0);
+        ctx.restore();
+        */
+
+        ctx.restore();
+
+        window.requestAnimationFrame(this.render);
+    }
+};

@@ -1,0 +1,50 @@
+{
+  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Proximity-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "d4e32f15-3276-4e9f-b9ef-d9e1a1e4c535"
+    },
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "Active": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Documentation": {
+              "default": "Whether the proximity sensor is active"
+            },
+            "Sparkplug_Type": {
+              "enum": [
+                "Boolean"
+              ]
+            },
+            "Eng_Unit": {
+              "default": ""
+            },
+            "Eng_Low": {
+              "default": ""
+            },
+            "Eng_High": {
+              "default": ""
+            }
+          }
+        }
+      ]
+    },
+    "Device_Information": {
+      "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Device_Information-v1.json"
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID"
+  ]
+}

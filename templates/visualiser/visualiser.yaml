@@ -1,0 +1,40 @@
+{{- if .Values.visualiser.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: visualiser
+  namespace: {{ .Release.Namespace }}
+  labels:
+    component: visualiser
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: visualiser
+  template:
+    metadata:
+      labels:
+        component: visualiser
+        factory-plus.service: visualiser
+    spec:
+      {{- with .Values.acs.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: webapi
+{{ include "amrc-connectivity-stack.image" .Values.visualiser | indent 10 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: visualiser
+  namespace: {{ .Release.Namespace }}
+spec:
+  ports:
+    - name: "web"
+      port: 80
+      targetPort: 80
+  selector:
+    factory-plus.service: visualiser
+{{- end -}}

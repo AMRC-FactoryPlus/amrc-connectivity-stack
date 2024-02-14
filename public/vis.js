@@ -27,10 +27,11 @@ export default class Vis {
 
     circle (x, y, r, fill_style, stroke) {
         const ctx = this.ctx;
-			if (fill_style) ctx.fillStyle = Style[fill_style];
-			ctx.beginPath();
-			ctx.arc(x, y, r, 0, TURN, true);
-			stroke ? ctx.stroke() : ctx.fill();
+      if (fill_style) ctx.fillStyle = Style[fill_style];
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, TURN, true);
+      ctx.fill()
+      if (stroke) ctx.stroke();
     }
 
     count_leaves (graph, depth) {
@@ -51,10 +52,10 @@ export default class Vis {
                 c.parent = graph;
             });
             if (nodes.every(n => !n.children) && nodes.length > 5) {
-				graph.leaves = 1;
-				graph.maxdepth = 0;
-				graph.too_many = nodes.length;
-			}
+                graph.leaves = 1;
+                graph.maxdepth = 0;
+                graph.too_many = nodes.length;
+            }
             else {
                 graph.leaves = nodes
                     .map(c => c.leaves)
@@ -110,7 +111,7 @@ export default class Vis {
                     console.log("No centre for %o", n);
                     continue;
                 }
-				ctx.strokeStyle = Style.circles
+                ctx.strokeStyle = Style.circles
                 ctx.beginPath();
                 ctx.moveTo(...graph.centre);
                 ctx.lineTo(...n.centre);
@@ -118,23 +119,25 @@ export default class Vis {
                 this.render_nodes(n);
             }
         }
-		if (graph.too_many) {
-			ctx.save()
-			ctx.beginPath();
-			ctx.moveTo(...graph.centre);
-			ctx.lineTo(...graph.overflow.centre);
-			ctx.strokeStyle = Style.circles;
-			ctx.stroke();
-			const pos = graph.overflow.centre;
-			ctx.fillStyle = Style.background;
-			this.circle(pos[0], pos[1], 0.35*this.root_node, null, true);
-			ctx.restore();
-		}
+      if (graph.too_many) {
+        ctx.save()
+        ctx.beginPath();
+        ctx.moveTo(...graph.centre);
+        ctx.lineTo(...graph.overflow.centre);
+        ctx.strokeStyle = Style.circles;
+        ctx.fillStyle = Style.background;
+        ctx.stroke();
+        ctx.lineWidth = 3 * this.line_width;
+        const pos = graph.overflow.centre;
+        this.circle(pos[0], pos[1], 0.35*this.root_node, null, true);
+        ctx.restore();
+      }
 
         const pos = graph.centre;
         //ctx.save()
         //ctx.fillStyle = graph.too_many ? Style.toomany : Style.circles;
-        this.circle(pos[0], pos[1], graph.radius, "circles");
+        const style = graph.online ? "circles" : "offline";
+        this.circle(pos[0], pos[1], graph.radius, style);
         //ctx.restore();
     }
 
@@ -157,19 +160,19 @@ export default class Vis {
             print(Style.text, this.text_height, graph.centre, [-offset, -graph.radius - 2], graph.name);
 			
             if (graph.too_many) {
-				const print_too_many = (fill, size, centre, position, text) => { 
-					ctx.save();
-					ctx.font = `${size}px ${Style.font}`;
-					let text_size = ctx.measureText(text)
-					let text_xPos = graph.overflow.centre[0] - (text_size.width / 2)
-					let text_yPos = graph.overflow.centre[1] + (text_size.actualBoundingBoxAscent / 2)
-					ctx.fillStyle = fill;
-					//ctx.translate(centre[0], centre[1]);
-					ctx.rotate(angle);
-					ctx.translate(text_xPos, text_yPos);
-					ctx.fillText(text, 0, 0);
-					ctx.restore();
-				}
+                const print_too_many = (fill, size, centre, position, text) => {
+                    ctx.save();
+                    ctx.font = `${size}px ${Style.font}`;
+                    let text_size = ctx.measureText(text)
+                    let text_xPos = graph.overflow.centre[0] - (text_size.width / 2)
+                    let text_yPos = graph.overflow.centre[1] + (text_size.actualBoundingBoxAscent / 2)
+                    ctx.fillStyle = fill;
+                    //ctx.translate(centre[0], centre[1]);
+                    ctx.rotate(angle);
+                    ctx.translate(text_xPos, text_yPos);
+                    ctx.fillText(text, 0, 0);
+                    ctx.restore();
+                }
                 print_too_many(Style.circles, (0.6*this.root_node), graph.overflow.centre, [this.text_xPos, this.text_yPos], graph.too_many);
             }
         }

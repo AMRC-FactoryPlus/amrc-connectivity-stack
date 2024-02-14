@@ -7,6 +7,7 @@
 const Style = {
     background:     "rgb(24,27,31)",
     circles:        "rgb(0, 159, 227)",
+    offline:        "rgb(200, 200, 200)",
     lines:        "rgb(0, 159, 227)",
     //packet:          "rgb(0, 72, 153)",
     //packet:         "rgb(0, 116, 122)",
@@ -21,7 +22,7 @@ const Style = {
     //CMD:            "rgb(0, 116, 122)",
     // dark mode
     DATA:           "rgb(227,155,220)",
-    BIRTH:          "rgb(242,75,91)",
+    BIRTH:          "rgb(39,166,36)",
     DEATH:          "rgb(242,75,91)",
     CMD:            "rgb(250,218,43)",
     text:           "rgb(220, 220, 220)",

@@ -137,6 +137,18 @@ mqtt:
   # -- Possible values are either 1 to enable all possible debugging, or a comma-separated list of debug tags (the tags printed before the log lines). No logging is specified as an empty string.
   verbosity: 0
 
+visualiser:
+  enabled: true
+  image:
+    # -- The registry of the MQTT component
+    registry: ghcr.io/amrc-factoryplus
+    # -- The repository of the MQTT component
+    repository: acs-visualiser
+    # -- The tag of the MQTT component
+    tag: v1.0.2
+    # @ignore
+    pullPolicy: IfNotPresent
+
 manager:
   # -- Whether or not to enable the Manager component
   enabled: true

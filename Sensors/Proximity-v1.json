@@ -25,15 +25,6 @@
               "enum": [
                 "Boolean"
               ]
-            },
-            "Eng_Unit": {
-              "default": ""
-            },
-            "Eng_Low": {
-              "default": ""
-            },
-            "Eng_High": {
-              "default": ""
             }
           }
         }

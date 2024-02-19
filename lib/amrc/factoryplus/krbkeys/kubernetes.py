@@ -94,9 +94,20 @@ class K8s:
                 log(f"Can't remove {key} from secret {name}, not found")
                 return
 
-            log(f"Removing key {key} in secret {name}")
-            # To delete a key we must set to None, not use del().
-            secret.data[key] = None
-            core.patch_namespaced_secret(namespace=ns, name=name, body=secret)
+            # We know the key is there, so 1 key must be this one
+            if len(secret.data) == 1:
+                log(f"Removing secret {name}")
+                core.delete_namespaced_secret(namespace=ns, name=name, body={
+                    "preconditions": {
+                        "uid":              secret.metadata.uid,
+                        "resource_version": secret.metadata.resource_version,
+                    },
+                })
+            else:
+                log(f"Removing key {key} in secret {name}")
+                # To delete a key we must set to None, not use del().
+                secret.data[key] = None
+                core.patch_namespaced_secret(namespace=ns, name=name, body=secret)
+
         self.retry(work)
 

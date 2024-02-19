@@ -10,8 +10,9 @@ import  os
 import  secrets
 
 import  kopf
+from    optional            import Optional
 
-from    amrc.factoryplus    import ServiceClient
+from    amrc.factoryplus    import ServiceClient, uuids
 
 from .              import event
 from .context       import Context
@@ -33,7 +34,13 @@ class KrbKeys:
         self.presets = env.get("PRESETS_SECRET")
         self.expire_old_keys = int(env.get("EXPIRE_OLD_KEYS", 86400))
         self.kadmin_ccache = env.get("KADMIN_CCNAME", None)
+
         self.fplus = ServiceClient(env=env)
+
+        self.cluster_group = Optional.of(env.get("CLUSTER_UUID")) \
+            .map(lambda cluster: self.fplus.configdb.get_config(
+                uuids.App.SparkplugAddress, cluster)) \
+            .map(lambda addr: addr["group_id"])
 
     def register_handlers (self):
         log("Registering handlers")

@@ -13,9 +13,10 @@ export default class MQTTClient extends EventEmitter {
         this.username = opts.username;
         this.password = opts.password;
 
-        this.known = new Set();
+        this.known = new Map();
         this.graph = {
             name: opts.name,
+            online: true,
         };
     }
 
@@ -44,7 +45,7 @@ export default class MQTTClient extends EventEmitter {
     on_message (topic, message) {
         const match = topic.match(
             // Please, please, can I have m!!x back... ?
-            /^spBv1\.0\/([\w-]+)\/[ND]([A-Z]+)\/([\w -]+)(?:\/([\w -]+))?$/);
+            /^spBv1\.0\/([\w.-]+)\/[ND]([A-Z]+)\/([\w. -]+)(?:\/([\w. -]+))?$/);
         if (!match) {
             console.log(`Bad MQTT topic ${topic}`);
             return;
@@ -56,14 +57,22 @@ export default class MQTTClient extends EventEmitter {
         if (device != undefined) parts.push(device);
         const path = parts.join("/");
 
-        this.add_to_graph(parts, path);
+        const graph = this.add_to_graph(parts, path);
+        if (kind == "BIRTH" || kind == "DATA") {
+            for (let g = graph; g; g = g.parent)
+                g.online = true;
+        }
+        if (kind == "DEATH") {
+            graph.online = false;
+            graph.children?.forEach(c => c.online = false);
+        }
 
         this.emit("packet", path, kind);
     }
 
     add_to_graph (parts, path) {
-        if (this.known.has(path)) return;
-        this.known.add(path);
+        if (this.known.has(path))
+            return this.known.get(path);
 
         let node = this.graph;
 
@@ -71,14 +80,16 @@ export default class MQTTClient extends EventEmitter {
             const children = node.children ??= [];
             let next = children.find(c => c.name == p);
             if (!next) {
-                next = { name: p };
+                next = { parent: node, name: p, online: false };
                 children.push(next);
             }
             node = next;
         }
         node.path = path;
+        this.known.set(path, node);
 
         this.emit("graph");
+        return node;
     }
 }
 

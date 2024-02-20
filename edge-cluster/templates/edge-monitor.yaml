@@ -70,6 +70,9 @@ rules:
   - apiGroups: [factoryplus.app.amrc.co.uk]
     resources: [sparkplugnodes]
     verbs: [list, get, watch]
+  - apiGroups: [bitnami.com]
+    resources: [sealedsecrets]
+    verbs: [list, get, watch]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

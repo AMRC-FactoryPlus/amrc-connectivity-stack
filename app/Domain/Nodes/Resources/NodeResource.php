@@ -25,7 +25,6 @@ class NodeResource extends JsonResource
             'uuid' => $this['uuid'],
             'is_valid' => $this['is_valid'],
             'expiry_date' => null,
-            'group' => $this->whenLoaded('group'),
         ];
 
         if (auth()->user()->administrator) {

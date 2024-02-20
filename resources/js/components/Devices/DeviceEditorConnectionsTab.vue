@@ -100,7 +100,7 @@ export default {
     use (connection) {
       if (this.useChangeInProgress) {return;}
       this.useChangeInProgress = true;
-      axios.post(`/api/groups/${this.device.node.group.id}/nodes/${this.device.node}/connections/${connection.id}/use`, {
+      axios.post(`/api/clusters/${this.device.node.cluster}/nodes/${this.device.node}/connections/${connection.id}/use`, {
         device: this.device.id
       }).then(e => {
         this.useChangeInProgress = false;
@@ -116,7 +116,7 @@ export default {
     },
 
     createNewConnection () {
-      axios.post(`/api/groups/${this.device.node.group.id}/nodes/${this.device.node.id}/connections`).then(e => {
+      axios.post(`/api/clusters/${this.device.node.cluster}/nodes/${this.device.node.id}/connections`).then(e => {
         this.requestDataReloadFor('deviceConnections', null, null, () => {
           this.selectConnection(e.data.data);
         });

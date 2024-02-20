@@ -12,9 +12,8 @@ class DashboardController extends Controller
     public function nodes()
     {
         $initialData = [
-            'groups' => ['value' => null, 'method' => 'get', 'url' => '/api/groups',],
-            'nodes' => ['value' => null, 'method' => 'get', 'url' => '/api/groups/{group}/nodes',],
-            'devices' => ['value' => null, 'method' => 'get', 'url' => '/api/groups/{group}/nodes/{node}/devices',],
+            'nodes' => ['value' => null, 'method' => 'get', 'url' => '/api/clusters/{cluster}/nodes',],
+            'devices' => ['value' => null, 'method' => 'get', 'url' => '/api/clusters/{cluster}/nodes/{node}/devices',],
             'roles' => ['value' => null, 'method' => 'get', 'url' => '/api/roles',],
             'edgeClusters' => ['value' => null, 'method' => 'get', 'url' => '/api/edge-clusters',],
             'helmChartTemplates' => ['value' => null, 'method' => 'get', 'url' => '/api/helm-chart-templates',],

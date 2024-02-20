@@ -9,7 +9,7 @@
       <div class="sm:w-0 sm:flex-1 mb-4">
         <h2 class="font-bold text-brand">Configuration</h2>
         <p v-if="device" class="mt-1 text-sm text-gray-500 overflow-hidden overflow-ellipsis font-bold">
-          <span class="text-gray-400 font-light">for {{device.node.group.name}} / {{device.node.node_id}} /</span>
+          <span class="text-gray-400 font-light">for {{device.node.node_id}} /</span>
           {{device.device_id === null ? 'New Device' : device.device_id}}
         </p>
       </div>

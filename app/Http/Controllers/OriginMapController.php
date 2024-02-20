@@ -38,7 +38,7 @@ class OriginMapController extends Controller
 
         // Configure the device with a draft pre-written device configuration
         (new ConfigureDeviceAction)->execute(
-            device                    : $device->fresh()->load('node.group', 'originMaps'),
+            device                    : $device->fresh()->load('originMaps'),
             deviceSchema              : $deviceSchema->fresh(),
             version                   : $deviceSchemaVersion,
             deviceConfiguration       : $validated['configuration'],

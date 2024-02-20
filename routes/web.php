@@ -40,10 +40,9 @@ Route::group(
         Route::redirect('/', '/nodes');
         Route::get('/nodes', [DashboardController::class, 'nodes']);
         Route::get('schema-editor', [SchemaEditorController::class, 'index']);
-        Route::get('edge-clusters', [EdgeClusterController::class, 'index']);
         Route::get('preferences', [DashboardController::class, 'preferences']);
         Route::get('roles', [DashboardController::class, 'roles']);
         Route::get('users', [DashboardController::class, 'users']);
-        Route::get('groups/{group}/nodes/{node}/devices/{device}', [DeviceController::class, 'show']);
+        Route::get('clusters/{cluster}/nodes/{node}/devices/{device}', [DeviceController::class, 'show']);
     }
 );

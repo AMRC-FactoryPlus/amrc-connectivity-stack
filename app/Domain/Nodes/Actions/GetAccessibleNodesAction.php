@@ -12,9 +12,9 @@ use App\Domain\Nodes\Models\Node;
 class GetAccessibleNodesAction
 {
     /**
-     * This action gets all nodes that the user is authorised to view for the given group
+     * This action gets all nodes that the user is authorised to view for the given cluster
      **/
-    public function execute(Group $group)
+    public function execute($clusterUUID)
     {
         $searchTerm = request()->query('search');
 
@@ -33,8 +33,8 @@ class GetAccessibleNodesAction
 
         return action_success(
             $query
-                // Only return nodes for the selected group
-                ->whereGroupId($group->id)
+                // Only return nodes for the selected cluster
+                ->whereCluster($clusterUUID)
                 // Don't return nodes without a node_id (MQTT bridges)
                 ->whereNotNull('nodes.node_id')
                 // If we have a search term then apply then filter only the models that were returned from the search

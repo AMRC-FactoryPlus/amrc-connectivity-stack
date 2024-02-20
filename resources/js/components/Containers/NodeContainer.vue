@@ -5,48 +5,54 @@
 
 <template>
   <div class="grid grid-cols-3 flex-grow bg-gray-100 overflow-auto">
-    <!--Groups-->
-    <ColumnList class="px-4" @selected="selectGroup" :selected-item="selectedGroup ? selectedGroup.id : null"
-                property="groups"
-                :loading="groupsLoading" :items="groups"
-                name="Groups">
+    <!--Clusters-->
+    <ColumnList @selected="selectCluster" class="px-4"
+                property="edgeClusters" :loading="edgeClustersLoading"
+                :items="edgeClusters"
+                name="Edge Clusters">
       <template #admin-actions>
         <button type="button"
-                @mouseup="showNewGroupDialog"
+                @mouseup="showNewClusterDialog"
                 class="fpl-button-brand">
-          <div class="mr-2">New Group</div>
+          <div class="mr-2">New Cluster</div>
           <i class="fa-sharp fa-solid fa-plus text-xs"></i>
         </button>
       </template>
-      <template v-slot:item="{ item }">
+      <template v-slot:item="{ item, index }">
         <div class="flex-1 px-4 py-2 text-sm truncate h-16 flex flex-col justify-center">
           <div class="flex items-center justify-between gap-2">
-            <div class="flex-1 px-4 py-2 text-sm truncate h-16 flex flex-col justify-center">
-              <a href="#" class="text-gray-500 font-semibold">{{item.name}}</a>
-              <p class="text-gray-400">{{item.nodes_count}} Nodes</p>
-            </div>
+            <a href="#" class="text-gray-500 font-semibold hover:text-gray-700 mb-1">{{index}}</a>
             <div class="flex items-center justify-center gap-0">
-              <button type="button"
-                      class="fpl-button-info w-6 !h-6 hover:!text-red-300"
-                      @click.stop="maybeDeleteGroup(item.id)">
-                <i class="fa-sharp fa-solid fa-trash text-xs"></i>
-              </button>
             </div>
           </div>
-          <div class="flex items-center text-gray-400 text-xs">
-            <p v-tooltip="'Node UUID'" v-if="$root.$data.userPreferences.appearance.preferences.show_uuids.value">
-              {{item.uuid}}</p>
+          <div v-if="item.status" class="flex items-center gap-1.5">
+            <div class="flex items-center text-gray-400 text-xs">{{item.status?.hosts?.length}} Nodes</div>
+            <div class="flex items-center bg-gray-300 text-xs rounded-full size-1"/>
+            <div v-if="$root.$data.userPreferences.appearance.preferences.show_uuids.value" class="flex items-center text-gray-400 text-xs">{{item.uuid}}</div>
+          </div>
+          <div v-else class="flex items-center text-gray-400 animate-pulse text-xs tracking-wider font-normal gap-1">
+            <div class="flex items-center justify-center">
+              <i class="fa-solid fa-circle-notch fa-spin"></i>
+            </div>
+            <div>Awaiting bootstrap...</div>
           </div>
         </div>
+        <button type="button"
+                @mouseup="() => {copyBootstrapCommand(item)}"
+                class="fpl-button-secondary mr-3"
+                v-tooltip="'Copy bootstrap command to clipboard'"
+        >
+          <i class="fa-sharp fa-solid fa-file-code"></i>
+        </button>
       </template>
     </ColumnList>
-    <new-group-overlay :show="newGroupDialogVisible"
-                       @close="() => {newGroupDialogVisible = false;}"
-                       @completed="newGroupCreated"></new-group-overlay>
+    <new-edge-cluster-overlay :show="newClusterDialogVisible" @close="newClusterDialogVisible=false"
+                              @complete="newClusterCreated" :helm-chart-templates="helmChartTemplates"
+                              :default-helm-chart-templates="defaultHelmChartTemplates"></new-edge-cluster-overlay>
 
     <!--Nodes-->
     <ColumnList class="px-4" @selected="selectNode" :selected-item="selectedNode ? selectedNode.id : null"
-                v-if="selectedGroup"
+                v-if="selectedCluster"
                 property="nodes" :loading="nodesLoading"
                 :items="nodes"
                 name="Nodes">
@@ -71,7 +77,7 @@
               </button>
               <button type="button"
                       class="fpl-button-info w-6 !h-6 hover:!text-red-300"
-                      @click.stop="maybeDeleteNode(selectedGroup.id, item.id)">
+                      @click.stop="maybeDeleteNode(selectedCluster.uuid, item.id)">
                 <i class="fa-sharp fa-solid fa-trash text-xs"></i>
               </button>
             </div>
@@ -83,13 +89,13 @@
         </div>
       </template>
     </ColumnList>
-    <new-node-overlay v-if="selectedGroup" :show="newNodeDialogVisible" @close="newNodeDialogVisible=false"
+    <new-node-overlay v-if="selectedCluster" :show="newNodeDialogVisible" @close="newNodeDialogVisible=false"
                       :edge-clusters="edgeClusters"
-                      :group="selectedGroup" @complete="newNodeCreated"
+                      :cluster="selectedCluster" @complete="newNodeCreated"
                       :helm-chart-templates="helmChartTemplates"
                       :default-helm-chart-templates="defaultHelmChartTemplates"
     ></new-node-overlay>
-    <node-user-overlay v-if="showNodeUserDialogFor" :show="!!showNodeUserDialogFor" :node="showNodeUserDialogFor" :group="selectedGroup"
+    <node-user-overlay v-if="showNodeUserDialogFor" :show="!!showNodeUserDialogFor" :node="showNodeUserDialogFor" :cluster="selectedCluster"
                        @close="() => {showNodeUserDialogFor = null;}"></node-user-overlay>
 
     <!--Devices-->
@@ -132,9 +138,9 @@ export default {
 
   components: {
     'ColumnList': () => import(/* webpackPrefetch: true */ '../General/ColumnList.vue'),
-    'new-group-overlay': () => import(/* webpackPrefetch: true */ '../Groups/NewGroupOverlay.vue'),
     'new-node-overlay': () => import(/* webpackPrefetch: true */ '../Nodes/NewNodeOverlay.vue'),
     'node-user-overlay': () => import(/* webpackPrefetch: true */ '../Nodes/NodeUserOverlay.vue'),
+    'new-edge-cluster-overlay': () => import(/* webpackPrefetch: true */ '../EdgeClusters/NewEdgeClusterOverlay.vue'),
   },
 
   props: {
@@ -142,7 +148,7 @@ export default {
   },
 
   watch: {
-    selectedGroup () {
+    selectedCluster () {
       this.selectedNode = null
       this.selectedDevice = null
     },
@@ -158,9 +164,6 @@ export default {
   },
 
   methods: {
-    showNewGroupDialog () {
-      this.newGroupDialogVisible = true
-    },
 
     showNewNodeDialog () {
       this.newNodeDialogVisible = true
@@ -170,12 +173,12 @@ export default {
       this.showNodeUserDialogFor = item;
     },
 
-    newGroupCreated (response) {
-      this.newGroupDialogVisible = false
-      this.requestDataReloadFor('groups', {}, {}, () => {
-        this.selectGroup(this.groups.find(e => e.id === response.data.data.id))
-      })
-    },
+    // newGroupCreated (response) {
+    //   this.newGroupDialogVisible = false
+    //   this.requestDataReloadFor('groups', {}, {}, () => {
+    //     this.selectCluster(this.groups.find(e => e.id === response.data.data.id))
+    //   })
+    // },
 
     newNodeCreated (response) {
       this.newNodeDialogVisible = false
@@ -186,24 +189,25 @@ export default {
       this.newDeviceDialogVisible = true
     },
 
-    selectGroup (group) {
-      this.selectedGroup = group
-      this.nodesRouteVar = { group: this.selectedGroup.id }
+    selectCluster (cluster) {
+
+      this.selectedCluster = cluster
+      this.nodesRouteVar = { cluster: this.selectedCluster.uuid }
       this.requestDataReloadFor('nodes')
     },
 
     selectNode (node) {
       this.selectedNode = node
-      this.devicesRouteVar = { group: this.selectedGroup.id, node: this.selectedNode.id }
+      this.devicesRouteVar = { cluster: this.selectedCluster.uuid, node: this.selectedNode.id }
       this.requestDataReloadFor('devices')
     },
 
     selectDevice (device) {
-      this.goto_url('/groups/' + this.selectedGroup.id + '/nodes/' + this.selectedNode.id + '/devices/' + device.id)
+      this.goto_url('/clusters/' + this.selectedCluster.uuid + '/nodes/' + this.selectedNode.id + '/devices/' + device.id)
     },
 
     createNewDevice () {
-      axios.post(`/api/groups/${this.selectedGroup.id}/nodes/${this.selectedNode.id}/devices`, {
+      axios.post(`/api/clusters/${this.selectedCluster.uuid}/nodes/${this.selectedNode.id}/devices`, {
         'node_id': this.selectedNode.id,
       }).then(e => {
         this.selectDevice(e.data.data)
@@ -215,7 +219,7 @@ export default {
       })
     },
 
-    maybeDeleteNode(group, node) {
+    maybeDeleteNode(cluster, node) {
       if (this.deletingNode) return;
 
       window.showNotification({
@@ -226,7 +230,7 @@ export default {
         buttons: [
           {
             text: 'Delete Node', type: 'error', loadingOnClick: true, action: () => {
-              this.deleteNode(group, node)
+              this.deleteNode(cluster, node)
             },
           },
           {text: 'Cancel', isClose: true}
@@ -235,9 +239,9 @@ export default {
       });
     },
 
-    deleteNode (group, node) {
+    deleteNode (cluster, node) {
       this.deletingNode = true;
-      axios.delete(`/api/groups/${group}/nodes/${node}`).then(() => {
+      axios.delete(`/api/clusters/${cluster}/nodes/${node}`).then(() => {
         window.showNotification({
             title: 'Node Deleted',
             description: 'The node has been deleted.',
@@ -255,66 +259,83 @@ export default {
       })
     },
 
-
-    maybeDeleteGroup(group) {
-      if (this.deletingGroup) return;
-
-      window.showNotification({
-        title: 'Are you sure?',
-        description: 'This will delete the group. This action is not reversible.',
-        type: 'error',
-        persistent: true,
-        buttons: [
-          {
-            text: 'Delete Group', type: 'error', loadingOnClick: true, action: () => {
-              this.deleteGroup(group)
-            },
-          },
-          {text: 'Cancel', isClose: true}
-        ],
-        id: '12e62a89-6d3e-4970-8357-fbb2dbbbfafc',
-      });
+    showNewClusterDialog () {
+      this.newClusterDialogVisible = true
     },
 
-    deleteGroup (group) {
-      this.deletingGroup = true;
-      axios.delete(`/api/groups/${group}`).then(() => {
-        window.showNotification({
-          title: 'Group Deleted',
-          description: 'The group has been deleted.',
-          type: 'success',
-          id: '12e62a89-6d3e-4970-8357-fbb2dbbbfafc',
-        });
-        this.requestDataReloadFor('groups')
-        this.deletingGroup = false;
-      }).catch(error => {
-        if (error && error.response && error.response.status === 401) {
-          this.goto_url('/login')
+    copyBootstrapCommand (item) {
+      axios.get(`/api/edge-clusters/${item.uuid}/bootstrap-command`).then((response) => {
+        if (response.data.data) {
+          this.copyToClipboard(response.data.data)
+          window.showNotification({
+            title: 'Copied to clipboard',
+            description: 'The bootstrap command has been copied to your clipboard. Paste this onto the node you wish to bootstrap.',
+            type: 'success',
+          })
+        } else {
+          window.showNotification({
+            title: 'Not ready',
+            description: 'The bootstrap script is not ready yet. Please wait a few moments and try again.',
+            type: 'error',
+          })
         }
-        this.handleError(error, '12e62a89-6d3e-4970-8357-fbb2dbbbfafc')
-        this.deletingGroup = false;
       })
     },
+
+    newClusterCreated (response) {
+      this.newClusterDialogVisible = false
+    },
+
+
+    // maybeDeleteGroup(group) {
+    //   if (this.deletingGroup) return;
+    //
+    //   window.showNotification({
+    //     title: 'Are you sure?',
+    //     description: 'This will delete the group. This action is not reversible.',
+    //     type: 'error',
+    //     persistent: true,
+    //     buttons: [
+    //       {
+    //         text: 'Delete Group', type: 'error', loadingOnClick: true, action: () => {
+    //           this.deleteGroup(group)
+    //         },
+    //       },
+    //       {text: 'Cancel', isClose: true}
+    //     ],
+    //     id: '12e62a89-6d3e-4970-8357-fbb2dbbbfafc',
+    //   });
+    // },
+
+    // deleteGroup (group) {
+    //   this.deletingGroup = true;
+    //   axios.delete(`/api/groups/${group}`).then(() => {
+    //     window.showNotification({
+    //       title: 'Group Deleted',
+    //       description: 'The group has been deleted.',
+    //       type: 'success',
+    //       id: '12e62a89-6d3e-4970-8357-fbb2dbbbfafc',
+    //     });
+    //     this.requestDataReloadFor('groups')
+    //     this.deletingGroup = false;
+    //   }).catch(error => {
+    //     if (error && error.response && error.response.status === 401) {
+    //       this.goto_url('/login')
+    //     }
+    //     this.handleError(error, '12e62a89-6d3e-4970-8357-fbb2dbbbfafc')
+    //     this.deletingGroup = false;
+    //   })
+    // },
 
   },
 
   data () {
     return {
       isContainer: true,
-      newGroupDialogVisible: false,
+      newClusterDialogVisible: false,
       newNodeDialogVisible: false,
       newDeviceDialogVisible: false,
       showNodeUserDialogFor: null,
-
-      // groups
-      groups: null,
-      groupsLoading: false,
-      groupsLoaded: false,
-      groupsQueryBank: null,
-      groupsRouteVar: null,
-      groupsForceLoad: true,
-      selectedGroup: null,
-      deletingGroup: false,
 
       // nodes
       nodes: null,
@@ -354,6 +375,8 @@ export default {
       edgeClustersLoaded: false,
       edgeClustersQueryBank: {},
       edgeClustersRouteVar: null,
+      edgeClustersForceLoad: true,
+      selectedCluster: null,
 
       // helmChartTemplates
       helmChartTemplates: null,

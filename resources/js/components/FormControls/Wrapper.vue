@@ -29,11 +29,9 @@
         </Transition>
       </div>
     </Transition>
-    <div class="hidden lg:inline col-span-1 text-sm text-gray-400 my-auto ml-6">
-      <div class="line-clamp-2 flex">
+    <div class="hidden lg:inline col-span-1 text-sm text-gray-400 my-auto ml-6 !line-clamp-2">
         <button v-tooltip="'Full description'" @click.stop="showDescriptionPopup" class="fas fa-external-link-alt text-xs mr-1 text-gray-300"></button>
         <slot name="description"></slot>
-      </div>
     </div>
     <div class="lg:col-span-2 col-span-3 flex flex-col">
       <div class="flex w-full relative">

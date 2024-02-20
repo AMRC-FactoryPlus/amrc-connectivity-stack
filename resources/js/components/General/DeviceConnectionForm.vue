@@ -108,7 +108,7 @@ export default {
     if (this.deviceConnection.file) {
       // Get the existing model
       this.deviceConnectionLoading = true;
-      axios.get(`/api/groups/${this.device.node.group.id}/nodes/${this.device.node}/connections/${this.device?.device_connection_id}`).then((r) => {
+      axios.get(`/api/clusters/${this.device.node.cluster}/nodes/${this.device.node}/connections/${this.device?.device_connection_id}`).then((r) => {
         this.model = {...this.model, ...r.data.data};
         this.deviceConnectionLoading = false;
       }).catch(error => {
@@ -248,7 +248,7 @@ export default {
         }
       });
 
-      axios.patch(`/api/groups/${this.device.node.group.id}/nodes/${this.device.node}/connections/${this.deviceConnection.id}`, {
+      axios.patch(`/api/clusters/${this.device.node.cluster}/nodes/${this.device.node}/connections/${this.deviceConnection.id}`, {
         'configuration': JSON.stringify(this.finalModel),
         'device': this.device.id
       }).then(() => {
@@ -286,7 +286,7 @@ export default {
           protocol: 'mqtts',
           port: 8883,
           useSSL: true,
-          clientId: this.device.node.group.name + '-' + this.device.node.node_id + '-' + this.device.device_id + '-' + this.generateGuid(),
+          clientId: this.device.node.uuid + '-' + this.device.node.node_id + '-' + this.device.device_id + '-' + this.generateGuid(),
           username: '',
           password: '',
           cleanSession: true,

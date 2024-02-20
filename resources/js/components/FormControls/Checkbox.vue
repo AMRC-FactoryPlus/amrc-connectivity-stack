@@ -5,7 +5,7 @@
 
 <template>
   <div @mouseup="toggle"
-       class="cursor-pointer flex justify-between items-center w-full select-none text-gray-500 focus:ring-gray-400 p-4 gap-3"
+       class="cursor-pointer flex items-center w-full select-none text-gray-500 focus:ring-gray-400 p-4 gap-3"
        :class="[
              localValue ? 'bg-gray-100' : 'hover:bg-gray-100']">
     <div

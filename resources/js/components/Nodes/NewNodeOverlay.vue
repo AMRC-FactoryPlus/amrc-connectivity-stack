@@ -33,7 +33,7 @@ export default {
     'overlay': () => import(/* webpackPrefetch: true */ '../General/Overlay.vue'),
   },
   props: {
-    group: {
+    cluster: {
       required: true,
       type: Object,
     },
@@ -77,11 +77,11 @@ export default {
         if (val) {
           const control = this.steps.nodeSelection.controls.destination_node;
           const params = this.steps.__request.parameters;
-          control.options = Object.entries(val).filter(([edgeCluster, config]) => config.status).map(([edgeCluster, config]) => {
+          control.options = Object.entries(val).map(([edgeCluster, config]) => {
             let payload = {
               title: edgeCluster,
               value: edgeCluster,
-              options: config.status.hosts.map(host => {
+              options: config.status?.hosts.map(host => {
                 const special = host.specialised ? ` [${host.specialised}]` : "";
                 return {
                   title: `${host.hostname}${special}`,
@@ -93,6 +93,11 @@ export default {
                   },
                 }
               })
+            }
+
+            // If options is undefined at this point create it as an empty array
+            if (!payload.options) {
+              payload.options = [];
             }
 
             // Add a `Floating Node` option to the very beginning of the list
@@ -149,7 +154,7 @@ export default {
       steps: {
         __request: {
           startAction: () => {
-            this.steps.__request.url = '/api/groups/' + this.group.id + '/nodes/new'
+            this.steps.__request.url = '/api/clusters/' + this.cluster.uuid + '/nodes/new'
           },
           type: 'post',
           url: 'replaced',

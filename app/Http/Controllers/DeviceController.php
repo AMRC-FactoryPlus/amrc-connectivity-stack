@@ -14,7 +14,6 @@ use App\Domain\Devices\Actions\UpdateDeviceInformationAction;
 use App\Domain\Devices\Models\Device;
 use App\Domain\Devices\Requests\CreateDeviceRequest;
 use App\Domain\Devices\Resources\DeviceDetailResource;
-use App\Domain\Groups\Models\Group;
 use App\Domain\Nodes\Models\Node;
 use App\Exceptions\ActionFailException;
 use App\Http\Requests\DeleteDeviceRequest;
@@ -52,13 +51,6 @@ class DeviceController extends Controller
 
     public function show()
     {
-        // Get the group
-        $group = Group::where('id', request()->route('group'))->first();
-        if (!$group) {
-            throw new ActionFailException(
-                'The group does not exist.', 404
-            );
-        }
 
         // Get the node (if admin they have access to all nodes)
         $query = auth()->user()->administrator ? Node::with('devices') : auth()->user()->accessibleNodes()->with('devices');
@@ -71,7 +63,7 @@ class DeviceController extends Controller
 
         // Get the device
         $device = $node->devices()->where('id', request()->route('device'))->with(
-            'node.group',
+            'node',
             'latestOriginMap.schemaVersion.schema',
             'activeOriginMap.schemaVersion.schema',
             'originMaps',
@@ -91,7 +83,7 @@ class DeviceController extends Controller
             'device' => [
                 'value' => null,
                 'method' => 'get',
-                'url' => '/api/groups/' . $group->id . '/nodes/' . $node->id . '/devices/' . $device->id,
+                'url' => '/api/clusters/' . $node->cluster . '/nodes/' . $node->id . '/devices/' . $device->id,
             ],
             'deviceSchemas' => [
                 'value' => null,
@@ -106,7 +98,7 @@ class DeviceController extends Controller
             'deviceConnections' => [
                 'value' => null,
                 'method' => 'get',
-                'url' => '/api/groups/' . $group->id . '/nodes/' . $node->id . '/connections/',
+                'url' => '/api/clusters/' . $node->cluster . '/nodes/' . $node->id . '/connections/',
             ]
         ];
 

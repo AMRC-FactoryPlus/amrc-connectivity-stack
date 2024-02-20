@@ -6,9 +6,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Domain\Devices\Actions\DeleteDeviceAction;
-use App\Domain\Devices\Models\Device;
-use App\Domain\Groups\Models\Group;
 use App\Domain\Nodes\Actions\CreateNodeAction;
 use App\Domain\Nodes\Actions\DeleteNodeAction;
 use App\Domain\Nodes\Actions\GetAccessibleNodesAction;
@@ -21,32 +18,15 @@ class NodeController extends Controller
 {
     public function index()
     {
-        // Get the group
-        $group = Group::where('id', request()->route('group'))->first();
-        if (!$group) {
-            throw new ActionFailException(
-                'The group does not exist.', 404
-            );
-        }
-
-        return process_action((new GetAccessibleNodesAction)->execute($group), NodeResourceCollection::class);
+        return process_action((new GetAccessibleNodesAction)->execute(request()->route('cluster')), NodeResourceCollection::class);
     }
 
     public function store(CreateNodeRequest $request)
     {
         $validated = $request->validated();
 
-        // Get the group
-        $group = Group::where('id', $request->route('group'))->first();
-        if (!$group) {
-            throw new ActionFailException(
-                'The group does not exist.', 404
-            );
-        }
-
         return process_action(
             (new CreateNodeAction)->execute(
-                group: $group,
                 nodeName: $validated['node_name'],
                 destinationCluster: $validated['destination_cluster'],
                 charts: $validated['charts'],

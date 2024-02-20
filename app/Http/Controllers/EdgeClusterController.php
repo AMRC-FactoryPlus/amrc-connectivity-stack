@@ -15,22 +15,7 @@ class EdgeClusterController extends Controller
 {
     public function index()
     {
-        if (\request()->wantsJson()) {
-            return process_action((new GetEdgeClustersAction())->execute());
-        }
-
-        $initialData = [
-            'edgeClusters' => ['value' => null, 'method' => 'get', 'url' => '/api/edge-clusters',],
-            'helmChartTemplates' => ['value' => null, 'method' => 'get', 'url' => '/api/helm-chart-templates',],
-            'defaultHelmChartTemplates' => [
-                'value' => null,
-                'method' => 'get',
-                'url' => '/api/default-helm-chart-templates',
-            ],
-        ];
-
-        // Return the view with the initial data
-        return view('edge-clusters', ['initialData' => $initialData,]);
+        return process_action((new GetEdgeClustersAction())->execute());
     }
 
     public function create(CreateEdgeClusterRequest $request)

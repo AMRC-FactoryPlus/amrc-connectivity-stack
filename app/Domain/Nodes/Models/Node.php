@@ -8,7 +8,6 @@ namespace App\Domain\Nodes\Models;
 
 use App\DeviceConnection;
 use App\Domain\Devices\Models\Device;
-use App\Domain\Groups\Models\Group;
 use App\Domain\Users\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Laravel\Scout\Searchable;
@@ -30,11 +29,6 @@ class Node extends Model
     public function accessibleBy()
     {
         return $this->belongsToMany(User::class);
-    }
-
-    public function group()
-    {
-        return $this->belongsTo(Group::class);
     }
 
     public function devices()

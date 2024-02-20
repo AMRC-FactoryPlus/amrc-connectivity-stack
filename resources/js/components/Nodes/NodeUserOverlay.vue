@@ -73,7 +73,7 @@ export default {
     /**
     * The group that the node sits in
     */
-    group: {
+    cluster: {
       required: true,
       type: Object
     },
@@ -82,7 +82,7 @@ export default {
   methods: {
     grantAccess() {
 
-      axios.post(`/api/groups/${this.group.id}/nodes/${this.node.id}/users`, {
+      axios.post(`/api/cluster/${this.cluster.uuid}/nodes/${this.node.id}/users`, {
         user: this.username,
       }).then(e => {
         window.showNotification({

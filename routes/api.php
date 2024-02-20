@@ -61,26 +61,21 @@ Route::middleware('auth:api')->get('/user/get-all-meta', [UserMetaController::cl
 // ------ Roles ------ //
 Route::middleware('auth:api')->get('/roles', [RoleController::class, 'index']);
 
-// ------ Groups ------ //
-Route::middleware('auth:api')->get('/groups', [GroupController::class, 'index']);
-Route::middleware('auth:api')->post('/groups/new', [GroupController::class, 'store']);
-Route::middleware('auth:api')->delete('/groups/{group}', [GroupController::class, 'destroy']);
-
 // ------ Nodes ------ //
-Route::middleware('auth:api')->get('/groups/{group}/nodes', [NodeController::class, 'index']);
-Route::middleware('auth:api')->post('/groups/{group}/nodes/new', [NodeController::class, 'store']);
-Route::middleware('auth:api')->get('/groups/{group}/nodes/{node}/connections', [DeviceConnectionController::class, 'index']);
-Route::middleware('auth:api')->post('/groups/{group}/nodes/{node}/users', [NodeUserController::class, 'store']);
-Route::middleware('auth:api')->post('/groups/{group}/nodes/{node}/connections', [DeviceConnectionController::class, 'create']);
-Route::middleware('auth:api')->get('/groups/{group}/nodes/{node}/connections/{connection}', [DeviceConnectionController::class, 'show']);
-Route::middleware('auth:api')->patch('/groups/{group}/nodes/{node}/connections/{connection}', [DeviceConnectionController::class, 'update']);
-Route::middleware('auth:api')->post('/groups/{group}/nodes/{node}/connections/{connection}/use', [DeviceConnectionController::class, 'use']);
-Route::middleware('auth:api')->delete('/groups/{group}/nodes/{node}', [NodeController::class, 'destroy']);
+Route::middleware('auth:api')->get('/clusters/{cluster}/nodes', [NodeController::class, 'index']);
+Route::middleware('auth:api')->post('/clusters/{cluster}/nodes/new', [NodeController::class, 'store']);
+Route::middleware('auth:api')->get('/clusters/{cluster}/nodes/{node}/connections', [DeviceConnectionController::class, 'index']);
+Route::middleware('auth:api')->post('/clusters/{cluster}/nodes/{node}/users', [NodeUserController::class, 'store']);
+Route::middleware('auth:api')->post('/clusters/{cluster}/nodes/{node}/connections', [DeviceConnectionController::class, 'create']);
+Route::middleware('auth:api')->get('/clusters/{cluster}/nodes/{node}/connections/{connection}', [DeviceConnectionController::class, 'show']);
+Route::middleware('auth:api')->patch('/clusters/{cluster}/nodes/{node}/connections/{connection}', [DeviceConnectionController::class, 'update']);
+Route::middleware('auth:api')->post('/clusters/{cluster}/nodes/{node}/connections/{connection}/use', [DeviceConnectionController::class, 'use']);
+Route::middleware('auth:api')->delete('/clusters/{cluster}/nodes/{node}', [NodeController::class, 'destroy']);
 
 // ------ Devices ------ //
-Route::middleware('auth:api')->get('/groups/{group}/nodes/{node}/devices', [DeviceController::class, 'index']);
-Route::middleware('auth:api')->post('/groups/{group}/nodes/{node}/devices', [DeviceController::class, 'store']);
-Route::middleware('auth:api')->get('/groups/{group}/nodes/{node}/devices/{device}', [DeviceController::class, 'show']);
+Route::middleware('auth:api')->get('/clusters/{cluster}/nodes/{node}/devices', [DeviceController::class, 'index']);
+Route::middleware('auth:api')->post('/clusters/{cluster}/nodes/{node}/devices', [DeviceController::class, 'store']);
+Route::middleware('auth:api')->get('/clusters/{cluster}/nodes/{node}/devices/{device}', [DeviceController::class, 'show']);
 Route::middleware('auth:api')->patch('/devices/{device}', [DeviceController::class, 'update']);
 Route::middleware('auth:api')->delete('/devices/{device}', [DeviceController::class, 'destroy']);
 Route::middleware('auth:api')->patch('/devices/{device}/origin-map', [OriginMapController::class, 'update']);

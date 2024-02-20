@@ -33,7 +33,7 @@ data:
   APP_NAMESPACE: {{ .Release.Namespace | quote }}
   BASE_URL: {{ .Values.acs.baseUrl | quote | required "values.acs.baseUrl is required!"}}
   REALM: {{.Values.identity.realm | quote | required "values.identity.realm is required!"}}
-  SERVICE_SCHEME: "http"
+  SERVICE_SCHEME: "{{ .Values.acs.secure | ternary "https" "http" }}"
   MANAGER_SERVICE_PRINCIPAL: "HTTP/manager.{{ .Release.Namespace }}.svc.cluster.local"
   MANAGER_CLIENT_PRINCIPAL: "sv1manager"
 {{- end -}}

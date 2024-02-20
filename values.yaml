@@ -105,7 +105,7 @@ serviceSetup:
   image:
     registry: ghcr.io/amrc-factoryplus
     repository: acs-service-setup
-    tag: v3.0.0-dev.1
+    tag: v3.0.0-dev.2
     pullPolicy: IfNotPresent
   # This section overrides the classes etc. installed into the ConfigDB
   config:
@@ -115,7 +115,7 @@ serviceSetup:
         name: Edge Helm charts
         url: https://github.com/AMRC-FactoryPlus/edge-helm-charts.git
         # The 'acs' branch will be updated to this tag/branch 
-        ref: v3.0.0-dev.1
+        ref: v3.0.0-dev.2
     # Helm charts to deploy to the edge; these default to the charts
     # created automatically but can be overridden to customise
     helmChart:

@@ -25,7 +25,10 @@
             <div class="flex items-center justify-center gap-0">
             </div>
           </div>
-          <div v-if="item.status" class="flex items-center text-gray-400 text-xs">{{item.status?.hosts?.length}} Nodes
+          <div v-if="item.status" class="flex items-center gap-1.5">
+            <div class="flex items-center text-gray-400 text-xs">{{item.status?.hosts?.length}} Nodes</div>
+            <div class="flex items-center bg-gray-300 text-xs rounded-full size-1"/>
+            <div v-if="$root.$data.userPreferences.appearance.preferences.show_uuids.value" class="flex items-center text-gray-400 text-xs">{{item.uuid}}</div>
           </div>
           <div v-else class="flex items-center text-gray-400 animate-pulse text-xs tracking-wider font-normal gap-1">
             <div class="flex items-center justify-center">

@@ -19,7 +19,7 @@
           <i v-if="isToggled(key)"
              class="fa-sharp fa-solid fa-chevron-down fa-fw text-xs text-gray-400 group-hover:text-gray-900"></i>
           <i v-else class="fa-sharp fa-solid fa-chevron-up fa-fw text-xs"></i>
-          <div>
+          <div class="flex flex-col justify-center items-start ml-1">
             <div class="font-bold">{{key}}</div>
             <div v-tooltip="'Schema_UUID'"
                  v-if="!isToggled(key) && $root.$data.userPreferences.appearance.preferences.show_uuids.value"

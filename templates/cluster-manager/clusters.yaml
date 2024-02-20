@@ -49,6 +49,8 @@ spec:
               value: {{ .Values.identity.realm | required "values.identity.realm is required!" }}
             - name: EXTERNAL_DOMAIN
               value: {{ .Values.acs.baseUrl | required "values.acs.baseUrl is required" }}
+            - name: ORGANISATION_PREFIX
+              value: {{ .Values.acs.organisation | quote }}
             - name: GIT_CHECKOUTS_DIR
               value: /data
             - name: GIT_EMAIL

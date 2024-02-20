@@ -158,7 +158,7 @@ manager:
     # -- The repository of the Manager component
     repository: acs-manager
     # -- The tag of the Manager component
-    tag: v2.0.0-dev.15
+    tag: v2.0.0-dev.19
     # @ignore
     pullPolicy: IfNotPresent
   edge:

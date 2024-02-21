@@ -151,6 +151,20 @@ spec:
                             description: The target to grant the permission on.
                             type: string
                             format: uuid
+                    sparkplug:
+                      description: Sparkplug Address entry to create
+                      type: object
+                      required: [node]
+                      properties:
+                        group:
+                          description: >
+                            Sparkplug Group ID. Optional for edge
+                            cluster krbkeys, where it defaults to the
+                            Group ID of the edge cluster.
+                          type: string
+                        node:
+                          description: Sparkplug Node ID
+                          type: string
             status:
               type: object
               x-kubernetes-preserve-unknown-fields: true

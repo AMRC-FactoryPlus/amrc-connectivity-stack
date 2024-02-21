@@ -32,7 +32,7 @@ image:
     tag: v0.0.2
   edgeSync:
     repository: acs-edge-sync
-    tag: v0.0.2
+    tag: v0.0.3-dev.1
   krbKeys:
     repository: acs-krb-keys-operator
-    tag: v1.2.0
+    tag: v1.3.0

@@ -286,6 +286,18 @@ export default {
       this.newClusterDialogVisible = false
     },
 
+    async copyToClipboard (text) {
+      try {
+        await navigator.clipboard.writeText(text)
+      } catch (err) {
+        console.warn(`Failed to copy to clipboard: ${text}`);
+        window.showNotification({
+          title: 'Failed to copy to clipboard.',
+          description: err,
+          type: 'error',
+        })
+      }
+    },
 
     // maybeDeleteGroup(group) {
     //   if (this.deletingGroup) return;

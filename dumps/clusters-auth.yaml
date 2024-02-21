@@ -66,6 +66,9 @@ aces:
   - principal: !u E.Requirement.ServiceAccount
     permission: !u FP.Permission.ConfigDB.ReadConfig
     target: !u E.App.Bootstrap
+  - principal: !u E.Requirement.ServiceAccount
+    permission: !u FP.Permission.ConfigDB.ReadConfig
+    target: !u FP.App.SparkplugAddress
 
   - principal: !u E.Requirement.ServiceAccount
     permission: !u FP.Permission.ConfigDB.WriteConfig
@@ -76,6 +79,9 @@ aces:
   - principal: !u E.Requirement.ServiceAccount
     permission: !u FP.Permission.ConfigDB.WriteConfig
     target: !u G.App.Config
+  - principal: !u E.Requirement.ServiceAccount
+    permission: !u FP.Permission.ConfigDB.WriteConfig
+    target: !u FP.App.SparkplugAddress
 
   - principal: !u E.Requirement.ServiceAccount
     permission: !u FP.Permission.ConfigDB.ManageObjects

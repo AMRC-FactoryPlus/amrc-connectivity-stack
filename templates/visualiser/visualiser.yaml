@@ -23,6 +23,9 @@ spec:
       {{- end }}
       containers:
         - name: webapi
+          env:
+            - name: PORT
+              value: "8080"
 {{ include "amrc-connectivity-stack.image" .Values.visualiser | indent 10 }}
 ---
 apiVersion: v1
@@ -34,7 +37,7 @@ spec:
   ports:
     - name: "web"
       port: 80
-      targetPort: 80
+      targetPort: 8080
   selector:
     factory-plus.service: visualiser
 {{- end -}}

@@ -266,7 +266,8 @@ export default {
     copyBootstrapCommand (item) {
       axios.get(`/api/edge-clusters/${item.uuid}/bootstrap-command`).then((response) => {
         if (response.data.data) {
-          this.copyToClipboard(response.data.data)
+
+          this.copyToClipboard(`curl ${response.data.data} | sh -`)
           window.showNotification({
             title: 'Copied to clipboard',
             description: 'The bootstrap command has been copied to your clipboard. Paste this onto the node you wish to bootstrap.',
@@ -286,11 +287,11 @@ export default {
       this.newClusterDialogVisible = false
     },
 
-    async copyToClipboard (text) {
+    async copyToClipboard (command) {
       try {
-        await navigator.clipboard.writeText(text)
+        await navigator.clipboard.writeText(command)
       } catch (err) {
-        console.warn(`Failed to copy to clipboard: ${text}`);
+        console.warn(`Failed to copy to clipboard: ${command}`);
         window.showNotification({
           title: 'Failed to copy to clipboard.',
           description: err,

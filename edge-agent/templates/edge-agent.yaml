@@ -73,3 +73,5 @@ metadata:
 spec:
   uuid: {{ .Values.uuid }}
   edgeAgent: true
+  secrets:
+    - edge-agent-sensitive-information-{{ .Values.uuid }}

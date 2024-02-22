@@ -29,6 +29,7 @@ spec:
               x-kubernetes-validations:
                 - rule: "has(self.uuid) != has(self.address)"
                 - rule: "has(self.uuid) || !self.edgeAgent"
+                - rule: "self.edgeAgent || !has(self.secrets)"
               properties:
                 uuid:
                   description: Sparkplug Node UUID
@@ -43,6 +44,15 @@ spec:
                   description: Is this an Edge Agent?
                   type: boolean
                   default: false
+                interval:
+                  description: Liveness check interval
+                  type: string
+                  format: duration
+                secrets:
+                  description: Names of SealedSecrets we use.
+                  type: array
+                  items:
+                    type: string
             status:
               type: object
       subresources:

@@ -27,11 +27,11 @@ export default class Vis {
 
     circle (x, y, r, fill_style, stroke) {
         const ctx = this.ctx;
-      if (fill_style) ctx.fillStyle = Style[fill_style];
-      ctx.beginPath();
-      ctx.arc(x, y, r, 0, TURN, true);
-      ctx.fill()
-      if (stroke) ctx.stroke();
+        if (fill_style) ctx.fillStyle = Style[fill_style];
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, TURN, true);
+        ctx.fill()
+        if (stroke) ctx.stroke();
     }
 
     count_leaves (graph, depth) {
@@ -105,21 +105,41 @@ export default class Vis {
     render_nodes (graph) {
         const ctx = this.ctx;
 
-        if (graph.children && !graph.too_many) {
-            for (const n of graph.children) {
-                if (!n.centre) {
-                    console.log("No centre for %o", n);
-                    continue;
-                }
-                ctx.strokeStyle = Style.circles
-                ctx.beginPath();
-                ctx.moveTo(...graph.centre);
-                ctx.lineTo(...n.centre);
-                ctx.stroke();
-                this.render_nodes(n);
-            }
+        if (graph.children) {
+            if (graph.too_many)
+                this.render_too_many(graph);
+            else
+              this.render_children(graph);
         }
-      if (graph.too_many) {
+
+        const pos = graph.centre;
+        //ctx.save()
+        //ctx.fillStyle = graph.too_many ? Style.toomany : Style.circles;
+        const style = graph.online ? "circles" : "offline";
+        this.circle(pos[0], pos[1], graph.radius, style);
+        //ctx.restore();
+    }
+
+    render_children (graph) {
+        const ctx = this.ctx;
+
+        for (const n of graph.children) {
+            if (!n.centre) {
+                console.log("No centre for %o", n);
+                continue;
+            }
+            ctx.strokeStyle = Style.circles
+            ctx.beginPath();
+            ctx.moveTo(...graph.centre);
+            ctx.lineTo(...n.centre);
+            ctx.stroke();
+            this.render_nodes(n);
+        }
+    }
+
+    render_too_many (graph) {
+        const ctx = this.ctx;
+
         ctx.save()
         ctx.beginPath();
         ctx.moveTo(...graph.centre);
@@ -128,17 +148,20 @@ export default class Vis {
         ctx.fillStyle = Style.background;
         ctx.stroke();
         ctx.lineWidth = 3 * this.line_width;
-        const pos = graph.overflow.centre;
-        this.circle(pos[0], pos[1], 0.35*this.root_node, null, true);
-        ctx.restore();
-      }
 
-        const pos = graph.centre;
-        //ctx.save()
-        //ctx.fillStyle = graph.too_many ? Style.toomany : Style.circles;
-        const style = graph.online ? "circles" : "offline";
-        this.circle(pos[0], pos[1], graph.radius, style);
-        //ctx.restore();
+        const [x, y] = graph.overflow.centre;
+        const r = 0.35*this.root_node;
+        this.circle(x, y, r, null, false);
+
+        const th = TURN / graph.too_many;
+        for (let i = 0; i < graph.too_many; i++) {
+            ctx.strokeStyle = graph.children[i].online ? Style.circles : Style.offline;
+            ctx.beginPath();
+            ctx.arc(x, y, r, th*i, th*(i + 1), true);
+            ctx.stroke();
+        }
+
+        ctx.restore();
     }
 
     render_text (graph) {
@@ -152,28 +175,25 @@ export default class Vis {
                 ctx.fillStyle = fill;
                 ctx.translate(centre[0], centre[1]);
                 ctx.rotate(angle);
-                ctx.translate(...offset);
+                if (offset) {
+                    ctx.translate(...offset);
+                }
+                else {
+                    const tsz = ctx.measureText(text);
+                    ctx.translate(-(tsz.width / 2), (tsz.actualBoundingBoxAscent / 2));
+                }
                 ctx.fillText(text, 0, 0);
                 ctx.restore();
             };
 
-            print(Style.text, this.text_height, graph.centre, [-offset, -graph.radius - 2], graph.name);
+            print(Style.text, this.text_height, 
+                graph.centre, [-offset, -graph.radius - 2],
+                graph.name);
 			
             if (graph.too_many) {
-                const print_too_many = (fill, size, centre, position, text) => {
-                    ctx.save();
-                    ctx.font = `${size}px ${Style.font}`;
-                    let text_size = ctx.measureText(text)
-                    let text_xPos = graph.overflow.centre[0] - (text_size.width / 2)
-                    let text_yPos = graph.overflow.centre[1] + (text_size.actualBoundingBoxAscent / 2)
-                    ctx.fillStyle = fill;
-                    //ctx.translate(centre[0], centre[1]);
-                    ctx.rotate(angle);
-                    ctx.translate(text_xPos, text_yPos);
-                    ctx.fillText(text, 0, 0);
-                    ctx.restore();
-                }
-                print_too_many(Style.circles, (0.6*this.root_node), graph.overflow.centre, [this.text_xPos, this.text_yPos], graph.too_many);
+                print(Style.text, (0.4*this.root_node),
+                    graph.overflow.centre, null,
+                    graph.too_many);
             }
         }
 

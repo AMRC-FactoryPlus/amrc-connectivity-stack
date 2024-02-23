@@ -152,28 +152,25 @@ export default class Vis {
                 ctx.fillStyle = fill;
                 ctx.translate(centre[0], centre[1]);
                 ctx.rotate(angle);
-                ctx.translate(...offset);
+                if (offset) {
+                    ctx.translate(...offset);
+                }
+                else {
+                    const tsz = ctx.measureText(text);
+                    ctx.translate(-(tsz.width / 2), (tsz.actualBoundingBoxAscent / 2));
+                }
                 ctx.fillText(text, 0, 0);
                 ctx.restore();
             };
 
-            print(Style.text, this.text_height, graph.centre, [-offset, -graph.radius - 2], graph.name);
+            print(Style.text, this.text_height, 
+                graph.centre, [-offset, -graph.radius - 2],
+                graph.name);
 			
             if (graph.too_many) {
-                const print_too_many = (fill, size, centre, position, text) => {
-                    ctx.save();
-                    ctx.font = `${size}px ${Style.font}`;
-                    let text_size = ctx.measureText(text)
-                    let text_xPos = graph.overflow.centre[0] - (text_size.width / 2)
-                    let text_yPos = graph.overflow.centre[1] + (text_size.actualBoundingBoxAscent / 2)
-                    ctx.fillStyle = fill;
-                    //ctx.translate(centre[0], centre[1]);
-                    ctx.rotate(angle);
-                    ctx.translate(text_xPos, text_yPos);
-                    ctx.fillText(text, 0, 0);
-                    ctx.restore();
-                }
-                print_too_many(Style.circles, (0.6*this.root_node), graph.overflow.centre, [this.text_xPos, this.text_yPos], graph.too_many);
+                print(Style.text, (0.4*this.root_node),
+                    graph.overflow.centre, null,
+                    graph.too_many);
             }
         }
 

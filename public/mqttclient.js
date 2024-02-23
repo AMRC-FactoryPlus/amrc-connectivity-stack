@@ -66,6 +66,8 @@ export default class MQTTClient extends EventEmitter {
             graph.online = false;
             graph.children?.forEach(c => c.online = false);
         }
+        if (kind == "BIRTH")
+            this.check_for_schema(message, graph);
 
         this.emit("packet", path, kind);
     }
@@ -90,6 +92,20 @@ export default class MQTTClient extends EventEmitter {
 
         this.emit("graph");
         return node;
+    }
+
+    check_for_schema (message, node) {
+        const payload = SpB.decodePayload(message);
+        if (payload.uuid != FactoryPlus)
+            return;
+
+        const schema = payload.metrics
+            .find(m => m.name == "Schema_UUID")
+            ?.value;
+
+        console.log("Found schema %s for %s", schema, node.name);
+        node.schema = schema;
+        this.icons.request_icon(schema);
     }
 }
 

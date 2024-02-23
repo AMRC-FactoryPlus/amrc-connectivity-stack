@@ -21,7 +21,7 @@
     "express": "^4.18.1",
     "mqtt": "^4.3.7",
     "process": "^0.11.10",
-    "sparkplug-payload": "^1.0.1",
+    "sparkplug-payload": "^1.0.3",
     "url": "^0.11.0",
     "webpack": "^5.73.0",
     "ws": "^8.7.0"

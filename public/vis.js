@@ -27,11 +27,11 @@ export default class Vis {
 
     circle (x, y, r, fill_style, stroke) {
         const ctx = this.ctx;
-      if (fill_style) ctx.fillStyle = Style[fill_style];
-      ctx.beginPath();
-      ctx.arc(x, y, r, 0, TURN, true);
-      ctx.fill()
-      if (stroke) ctx.stroke();
+        if (fill_style) ctx.fillStyle = Style[fill_style];
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, TURN, true);
+        ctx.fill()
+        if (stroke) ctx.stroke();
     }
 
     count_leaves (graph, depth) {
@@ -105,21 +105,41 @@ export default class Vis {
     render_nodes (graph) {
         const ctx = this.ctx;
 
-        if (graph.children && !graph.too_many) {
-            for (const n of graph.children) {
-                if (!n.centre) {
-                    console.log("No centre for %o", n);
-                    continue;
-                }
-                ctx.strokeStyle = Style.circles
-                ctx.beginPath();
-                ctx.moveTo(...graph.centre);
-                ctx.lineTo(...n.centre);
-                ctx.stroke();
-                this.render_nodes(n);
-            }
+        if (graph.children) {
+            if (graph.too_many)
+                this.render_too_many(graph);
+            else
+              this.render_children(graph);
         }
-      if (graph.too_many) {
+
+        const pos = graph.centre;
+        //ctx.save()
+        //ctx.fillStyle = graph.too_many ? Style.toomany : Style.circles;
+        const style = graph.online ? "circles" : "offline";
+        this.circle(pos[0], pos[1], graph.radius, style);
+        //ctx.restore();
+    }
+
+    render_children (graph) {
+        const ctx = this.ctx;
+
+        for (const n of graph.children) {
+            if (!n.centre) {
+                console.log("No centre for %o", n);
+                continue;
+            }
+            ctx.strokeStyle = Style.circles
+            ctx.beginPath();
+            ctx.moveTo(...graph.centre);
+            ctx.lineTo(...n.centre);
+            ctx.stroke();
+            this.render_nodes(n);
+        }
+    }
+
+    render_too_many (graph) {
+        const ctx = this.ctx;
+
         ctx.save()
         ctx.beginPath();
         ctx.moveTo(...graph.centre);
@@ -128,17 +148,20 @@ export default class Vis {
         ctx.fillStyle = Style.background;
         ctx.stroke();
         ctx.lineWidth = 3 * this.line_width;
-        const pos = graph.overflow.centre;
-        this.circle(pos[0], pos[1], 0.35*this.root_node, null, true);
-        ctx.restore();
-      }
 
-        const pos = graph.centre;
-        //ctx.save()
-        //ctx.fillStyle = graph.too_many ? Style.toomany : Style.circles;
-        const style = graph.online ? "circles" : "offline";
-        this.circle(pos[0], pos[1], graph.radius, style);
-        //ctx.restore();
+        const [x, y] = graph.overflow.centre;
+        const r = 0.35*this.root_node;
+        this.circle(x, y, r, null, false);
+
+        const th = TURN / graph.too_many;
+        for (let i = 0; i < graph.too_many; i++) {
+            ctx.strokeStyle = graph.children[i].online ? Style.circles : Style.offline;
+            ctx.beginPath();
+            ctx.arc(x, y, r, th*i, th*(i + 1), true);
+            ctx.stroke();
+        }
+
+        ctx.restore();
     }
 
     render_text (graph) {

@@ -12,10 +12,10 @@ const HALF = Math.PI;
 const QUARTER = Math.PI/2;
 
 export default class Vis {
-    constructor (graph, canvas) {
+    constructor (graph, canvas, icons) {
         this.graph = graph;
-
         this.canvas = canvas;
+        this.icons = icons;
 
         this.render = this.render.bind(this);
         this.circle = this.circle.bind(this);
@@ -189,6 +189,19 @@ export default class Vis {
             print(Style.text, this.text_height, 
                 graph.centre, [-offset, -graph.radius - 2],
                 graph.name);
+
+            if (graph.schema) {
+                const icon = this.icons.fetch_icon(graph.schema);
+                if (icon) {
+                    ctx.save();
+                    ctx.translate(graph.centre[0], graph.centre[1]);
+                    if (offset) ctx.translate(-offset, -graph.radius - 2);
+                    const h = this.text_height;
+                    const w = h*icon.aspect;
+                    ctx.drawImage(icon.icon, -(w*2), -h, w, h);
+                    ctx.restore();
+                }
+            }
 			
             if (graph.too_many) {
                 print(Style.text, (0.4*this.root_node),

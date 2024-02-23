@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="40.07mm"
+   height="64.573959mm"
+   viewBox="0 0 29.819902 48.055631"
+   version="1.1"
+   id="svg5"
+   inkscape:version="1.2.2 (732a01da63, 2022-12-09)"
+   sodipodi:docname="94d38fe2-33d8-4902-b984-bb8c49556084.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview7"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="mm"
+     showgrid="false"
+     inkscape:zoom="2.9825758"
+     inkscape:cx="98.069596"
+     inkscape:cy="114.66599"
+     inkscape:window-width="1920"
+     inkscape:window-height="1017"
+     inkscape:window-x="1912"
+     inkscape:window-y="-8"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="layer1" />
+  <defs
+     id="defs2" />
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1"
+     transform="translate(-30.306547,-30.785245)">
+    <path
+       id="path7789"
+       style="fill:#f104ff;stroke-width:0.67424"
+       d="m 30.108495,31.051345 0.198052,-0.2661 14.249777,5.071339 0.262042,11.885148 z m 30.017955,-0.2661 v 0.662205 l -15.502077,16.492335 -0.06805,-12.0832 z m -20.389391,8.709305 10.273379,1.650433 -4.816773,16.174242 -0.104222,-0.06602 z m -16.961469,30.500002 44.897184,2e-6 -0.132038,8.846324 H 22.70957 Z"
+       sodipodi:nodetypes="cccccccccccccccccccc" />
+    <ellipse
+       style="fill:#f104ff;fill-opacity:1;stroke-width:0.865355"
+       id="path7822"
+       cx="45.216499"
+       cy="-64.322044"
+       rx="7.7240291"
+       ry="4.8192644"
+       transform="scale(1,-1)" />
+  </g>
+</svg>

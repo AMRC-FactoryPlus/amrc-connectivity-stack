@@ -6,6 +6,7 @@
 
 import MQTTClient from "./mqttclient.js";
 import Vis from "./vis.js";
+import Icons from "./icons.js";
 
 class FPlusVis {
     start_vis (opts) {
@@ -25,10 +26,11 @@ class FPlusVis {
 
         const mqtt = this.mqtt = new MQTTClient({
             name: "Factory+",
+            icons: this.icons,
             ...opts,
         }).run();
 
-        const vis = this.vis = new Vis(mqtt.graph, canvas).run();
+        const vis = this.vis = new Vis(mqtt.graph, canvas, this.icons).run();
 
         mqtt.on("packet", vis.make_active.bind(vis));
         mqtt.on("graph", vis.reset_graph.bind(vis));
@@ -114,6 +116,7 @@ class FPlusVis {
     }
 
     async main () {
+        this.icons = new Icons();
         this.canvas = document.getElementById("canvas");
         this.form = document.getElementById("form");
         this.canvas.style.display = "none";

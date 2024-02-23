@@ -4,7 +4,9 @@
  * Copyright 2022 AMRC.
  */
 
-import { EventEmitter, MQTT } from "./webpack.js";
+import { EventEmitter, MQTT, SpB } from "./webpack.js";
+
+const FactoryPlus = "11ad7b32-1d32-4c4a-b0c9-fa049208939a";
 
 export default class MQTTClient extends EventEmitter {
     constructor (opts) {
@@ -12,6 +14,7 @@ export default class MQTTClient extends EventEmitter {
         this.broker = opts.broker;
         this.username = opts.username;
         this.password = opts.password;
+        this.icons = opts.icons;
 
         this.known = new Map();
         this.graph = {

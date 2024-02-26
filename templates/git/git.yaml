@@ -48,6 +48,25 @@ spec:
             - mountPath: /data
               name: data
 
+        - name: init-data
+{{ include "amrc-connectivity-stack.image" .Values.shell | indent 10 }}
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              echo "Setting up data directory"
+              if ! [ -d /data/repo ]
+              then
+                mkdir /data/repo
+                mv /data/*-*-*-*-* /data/repo/
+              fi
+              rm -f /data/changed
+              mkfifo /data/changed
+          securityContext:
+            runAsUser: 1000
+          volumeMounts:
+            - mountPath: /data
+              name: data
+
       containers:
         - name: git
 {{ include "amrc-connectivity-stack.image" .Values.git | indent 10 }}
@@ -59,7 +78,9 @@ spec:
             - name: VERBOSE
               value: {{.Values.git.verbosity | quote | required "values.git.verbosity is required!"}}
             - name: DATA_DIR
-              value: /data
+              value: /data/repo
+            - name: DATA_CHANGED_FIFO
+              value: /data/changed
             - name: GIT_EXEC_PATH
               value: /usr/libexec/git-core
             - name: KRB5_CONFIG

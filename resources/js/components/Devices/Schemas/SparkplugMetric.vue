@@ -97,7 +97,7 @@
         <template #content>
           <Input :showDescription="false" :control="{
           name: 'Eng Low',
-        }" :valid="{}" v-model="localModel.Eng_Low"></Input>
+        }" :valid="{}" :value="localModel.Eng_Low" @input="(val) => {localModel.Eng_Low = Number(val)}"></Input>
         </template>
       </Wrapper>
       <Wrapper>
@@ -107,7 +107,7 @@
         <template #content>
           <Input :showDescription="false" :control="{
           name: 'Eng High',
-        }" :valid="{}" v-model="localModel.Eng_High"></Input>
+        }" :valid="{}" :value="localModel.Eng_High" @input="(val) => {localModel.Eng_High = Number(val)}"></Input>
         </template>
       </Wrapper>
       <Wrapper>
@@ -180,7 +180,7 @@ export default {
       this.schema = data.data
       this.schemaLoading = false
       this.localModel = this.selectedMetric.model
-      this.$emit('loaded');
+      this.$emit('loaded')
     }).catch(error => {
       this.posting = false
       if (error && error.response && error.response.status === 401) {

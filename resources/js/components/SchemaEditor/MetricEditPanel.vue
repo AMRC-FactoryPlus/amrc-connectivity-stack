@@ -67,7 +67,7 @@
           <Input :showDescription="false"
                  :control="{name: 'Low',}"
                  :valid="{}"
-                 v-model="localMetric.Eng_Low.default"
+                 :value="localMetric.Eng_Low.default" @input="(val) => {localMetric.Eng_Low.default = Number(val)}"
           ></Input>
         </div>
       </template>
@@ -79,7 +79,7 @@
           <Input :showDescription="false"
                  :control="{name: 'High',}"
                  :valid="{}"
-                 v-model="localMetric.Eng_High.default"
+                 :value="localMetric.Eng_High.default" @input="(val) => {localMetric.Eng_High.default = Number(val)}"
           ></Input>
         </div>
       </template>

@@ -94,9 +94,30 @@
                             "REST",
                             "S7",
                             "UDP",
-                            "MTConnect"
+                            "MTConnect",
+                            "EtherNet/IP"
                         ],
                         "minLength": 1
+                    },
+                    "EtherNetIPConnDetails": {
+                        "type": "object",
+                        "title": "EtherNet/IP Connection Details",
+                        "options": {
+                            "dependencies": {
+                                "connType": "EtherNet/IP"
+                            },
+                            "collapsed": false
+                        },
+                        "required": [
+                            "host"
+                        ],
+                        "properties": {
+                            "host": {
+                                "type": "string",
+                                "title": "Hostname/IP",
+                                "minLength": 1
+                            }
+                        }
                     },
                     "UDPConnDetails": {
                         "type": "object",

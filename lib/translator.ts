@@ -24,6 +24,7 @@ import {MQTTConnection, MQTTDevice} from "./devices/MQTT.js";
 import {UDPConnection, UDPDevice} from "./devices/UDP.js";
 import {WebsocketConnection, WebsocketDevice} from "./devices/websocket.js";
 import {MTConnectConnection, MTConnectDevice} from "./devices/MTConnect.js";
+import {EtherNetIPConnection, EtherNetIPDevice} from "./devices/EtherNetIP";
 import {log} from "./helpers/log.js";
 import {sparkplugConfig,} from "./helpers/typeHandler.js";
 import {Device, deviceOptions} from "./device.js";
@@ -220,6 +221,10 @@ export class Translator extends EventEmitter {
                 return {
                     type: MTConnectDevice, connection: MTConnectConnection, connectionDetails: 'MTConnectConnDetails'
                 }
+            case "EtherNet/IP":
+                return {
+                    type: EtherNetIPDevice, connection: EtherNetIPConnection, connectionDetails: 'EtherNetIPConnDetails'
+                }
             case "S7":
                 return {
                     type: S7Device, connection: S7Connection, connectionDetails: 's7ConnDetails'
@@ -267,8 +272,7 @@ export class Translator extends EventEmitter {
         /* XXX This is a mess. We want an Error monad, I think, or
          * recast everything with try/catch/custom exceptions */
 
-        let [config, etag] = await this.retry("config", () => 
-            cdb.get_config_with_etag(UUIDs.App.AgentConfig, uuid));
+        let [config, etag] = await this.retry("config", () => cdb.get_config_with_etag(UUIDs.App.AgentConfig, uuid));
 
         log(`Fetched config with etag [${etag}]`);
 
@@ -282,28 +286,25 @@ export class Translator extends EventEmitter {
 
             // Then, replace all occurrences of __FPSI_<v4UUID> with the
             // actual secret of the same name from /etc/secrets
-            const secretReplacedConfig = configString.replace(
-                /__FPSI__[a-f0-9-]{36}/g,
-                (match) => {
-                    try {
-                        // Attempt to get the secret contents from the file in /etc/secrets with the same name
-                        const secretPath = `/etc/secrets/${match}`;
-                        return fs.readFileSync(secretPath, 'utf8');
-                    } catch (err: any) {
-                        // Handle error (e.g., file not found) gracefully
-                        console.error(`Error reading secret from ${match}: ${err.message}`);
-                        valid = false;
-                        return "SECRET_NOT_FOUND";
-                    }
-                });
+            const secretReplacedConfig = configString.replace(/__FPSI__[a-f0-9-]{36}/g, (match) => {
+                try {
+                    // Attempt to get the secret contents from the file in /etc/secrets with the same name
+                    const secretPath = `/etc/secrets/${match}`;
+                    return fs.readFileSync(secretPath, 'utf8');
+                } catch (err: any) {
+                    // Handle error (e.g., file not found) gracefully
+                    console.error(`Error reading secret from ${match}: ${err.message}`);
+                    valid = false;
+                    return "SECRET_NOT_FOUND";
+                }
+            });
 
             // Then, convert it back to an object and validate
             if (valid) {
                 try {
                     config = JSON.parse(secretReplacedConfig);
                     valid = validateConfig(config);
-                }
-                catch {
+                } catch {
                     valid = false;
                 }
             }
@@ -315,14 +316,10 @@ export class Translator extends EventEmitter {
 
         const rv = {
             sparkplug: {
-                nodeControl:    config?.sparkplug,
-                configRevision: etag, 
-                alerts: {
-                    configFetchFailed:  !config, 
-                    configInvalid:      !valid,
+                nodeControl: config?.sparkplug, configRevision: etag, alerts: {
+                    configFetchFailed: !config, configInvalid: !valid,
                 },
-            },
-            deviceConnections: conns,
+            }, deviceConnections: conns,
         };
 
         log(`Mapped config: ${JSON.stringify(config)}\n->\n${JSON.stringify(rv)}`);

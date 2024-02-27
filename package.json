@@ -44,6 +44,7 @@
     "jsonpath-plus": "^5.0.7",
     "jsonpointer": "^5.0.1",
     "node-opcua": "^2.103.0",
+    "st-ethernet-ip": "^2.7.1",
     "ts-node-dev": "^1.1.8",
     "uuid": "^9.0.0",
     "ws": "^8.2.3",

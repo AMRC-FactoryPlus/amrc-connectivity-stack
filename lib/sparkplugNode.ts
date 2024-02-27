@@ -199,8 +199,9 @@ export class SparkplugNode extends (
                 // See https://docs.inductiveautomation.com/display/DOC80/Understanding+Metrics#
                 if (typeof metric.name !== "undefined") {
                     metric.name = metric.name.replace(/[^\w_\s\'\-\:\(\)\/]+/g, "");
-                    if (metric.type.toLowerCase() == sparkplugDataType.string && (typeof metric.value).toLowerCase() !== sparkplugDataType.string) {
-                        metric.value = metric.value ? metric.value.toString() : "";
+
+                    if (metric.type === sparkplugDataType.string) {
+                        metric.value = metric.value?.toString() ?? "";
                     }
 
                     if (metric.value === "") {

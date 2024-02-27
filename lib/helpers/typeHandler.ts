@@ -13,11 +13,36 @@ import {Address} from "@amrc-factoryplus/utilities";
 import {log} from "./log.js";
 
 export enum serialisationType {
-    ignored = "Defined by Protocol", delimited = "Delimited String", JSON = "JSON", XML = "XML", fixedBuffer = "Buffer", serialisedBuffer = "Buffer"
+    ignored = "Defined by Protocol",
+    delimited = "Delimited String",
+    JSON = "JSON",
+    XML = "XML",
+    fixedBuffer = "Buffer",
+    serialisedBuffer = "Buffer"
 }
 
 export enum sparkplugDataType {
-    boolean = "boolean", int8 = "int8", int16 = "int16", int32 = "int32", int64 = "int64", uInt8 = "uInt8", uInt16 = "uInt16", uInt32 = "uInt32", uInt64 = "uInt64", float = "float", double = "double", dateTime = "dateTime", string = "string", text = "text", uuid = "uuid", dataSet = "dataSet", bytes = "bytes", file = "file", template = "template", propertySet = "propertySet", propertySetList = "propertySetList",
+    boolean = "Boolean",
+    int8 = "Int8",
+    int16 = "Int16",
+    int32 = "Int32",
+    int64 = "Int64",
+    uInt8 = "UInt8",
+    uInt16 = "UInt16",
+    uInt32 = "UInt32",
+    uInt64 = "UInt64",
+    float = "Float",
+    double = "Double",
+    dateTime = "DateTime",
+    string = "String",
+    text = "Text",
+    uuid = "UUID",
+    dataSet = "DataSet",
+    bytes = "Bytes",
+    file = "File",
+    template = "Template",
+    propertySet = "PropertySet",
+    propertySetList = "PropertySetList",
 }
 
 export enum restAuthMethod {
@@ -32,11 +57,31 @@ export interface restConnDetails {
 }
 
 export enum OPCUADataType {
-    boolean = "Boolean", int8 = "SByte", int16 = "Int16", int32 = "Int32", int64 = "Int64", uInt8 = "Byte", uInt16 = "UInt16", uInt32 = "UInt32", uInt64 = "UInt64", float = "Float", double = "Double", dateTime = "DateTime", string = "String", text = "String", uuid = "Guid", dataSet = "dataSet", bytes = "bytes", file = "file", template = "template", propertySet = "propertySet", propertySetList = "propertySetList",
+    Boolean = "Boolean",
+    Int8 = "SByte",
+    Int16 = "Int16",
+    Int32 = "Int32",
+    Int64 = "Int64",
+    UInt8 = "Byte",
+    UInt16 = "UInt16",
+    UInt32 = "UInt32",
+    UInt64 = "UInt64",
+    Float = "Float",
+    Double = "Double",
+    DateTime = "DateTime",
+    String = "String",
+    Text = "String",
+    UUID = "Guid",
+    DataSet = "dataSet",
+    Bytes = "bytes",
+    File = "file",
+    Template = "template",
+    PropertySet = "propertySet",
+    PropertySetList = "propertySetList",
 }
 
 export enum byteOrder {
-    littleEndian = 1234, bigEndian = 4321, PDPEndian = 3412,
+    littleEndian = 1234, bigEndian = 4321
 }
 
 export interface schemaMetric {
@@ -67,8 +112,7 @@ export interface sparkplugConfig {
     address: Address,
     uuid: string,
     alerts?: {
-        configFetchFailed: boolean,
-        configInvalid: boolean,
+        configFetchFailed: boolean, configInvalid: boolean,
     },
     configRevision?: string,
     nodeControl?: nodeControl,
@@ -83,15 +127,15 @@ export interface sparkplugPayload {
 }
 
 export type sparkplugValue =
-        number
-        | string
-        | boolean
-        | Buffer
-        | sparkplugDataSet
-        | sparkplugTemplate
-        | Long
-        | bigint
-        | null;
+    number
+    | string
+    | boolean
+    | Buffer
+    | sparkplugDataSet
+    | sparkplugTemplate
+    | Long
+    | bigint
+    | null;
 
 export interface sparkplugMetric {
     name?: string,
@@ -206,8 +250,7 @@ export class Metrics {
             const metric = this.#array[i];
             this.#nameIndex[metric.name || ""] = i;
             // this.#aliasIndex[metric.alias as number] = i;
-            if (metric.properties != null && metric.properties.address != null && metric.properties.path != null && (metric.properties.method.value as string).search(
-                    /^GET/g) > -1) {
+            if (metric.properties != null && metric.properties.address != null && metric.properties.path != null && (metric.properties.method.value as string).search(/^GET/g) > -1) {
                 const addr = metric.properties.address.value as string;
                 if (!this.#addrIndex[addr]) {
                     this.#addrIndex[addr] = [];
@@ -317,7 +360,7 @@ export function parseValueFromPayload(msg: any, metric: sparkplugMetric, payload
         case serialisationType.delimited:
             // Handle no delimiter
             payload = (delimiter != '') ? msg.toString()
-            .split(delimiter) : msg.toString();
+                .split(delimiter) : msg.toString();
 
             // Handle no path parsing
             let newVal = (path != '') ? payload[path] : payload;
@@ -375,11 +418,7 @@ export function parseValueFromPayload(msg: any, metric: sparkplugMetric, payload
             }
             break;
         case serialisationType.fixedBuffer:
-            return parseValFromBuffer(metric.type,
-                                      (typeof metric.properties !== "undefined" && typeof metric.properties.endianness !== "undefined" ? metric.properties.endianness.value as number : 0),
-                                      parseInt(path),
-                                      msg as Buffer,
-            );
+            return parseValFromBuffer(metric.type, (typeof metric.properties !== "undefined" && typeof metric.properties.endianness !== "undefined" ? metric.properties.endianness.value as number : 0), parseInt(path), msg as Buffer,);
         case serialisationType.serialisedBuffer:
             break;
         default:
@@ -412,8 +451,8 @@ export function parseTimeStampFromPayload(msg: any, metric: sparkplugMetric, pay
             }
 
             const timestamp = JSONPath({
-                                           path: '$.timestamp', json: payload
-                                       });
+                path: '$.timestamp', json: payload
+            });
             return timestamp[0];
         default:
             return undefined;
@@ -444,7 +483,15 @@ function parseTypeFromString(type: string, val: any) {
 }
 
 function stringToBoolean(string: string) {
-    switch(string.toLowerCase()) {case "false": case "no": case "0": case "": return false; default: return true;}
+    switch (string.toLowerCase()) {
+        case "false":
+        case "no":
+        case "0":
+        case "":
+            return false;
+        default:
+            return true;
+    }
 }
 
 /**
@@ -502,20 +549,20 @@ export function writeValuesToPayload(metrics: sparkplugMetric[], payloadFormat: 
 // Variable length types (String, Buffer etc) are not considered... yet.
 export function typeLens(type: string): number {
     switch (type) {
-        case 'boolean':
-        case 'uInt':
-        case 'int':
+        case sparkplugDataType.boolean:
+        case sparkplugDataType.int8:
+        case sparkplugDataType.uInt8:
             return 1
-        case 'uInt16':
-        case 'int16':
+        case sparkplugDataType.uInt16:
+        case sparkplugDataType.int16:
             return 2
-        case 'uInt32':
-        case 'int32':
-        case 'float':
+        case sparkplugDataType.uInt32:
+        case sparkplugDataType.int32:
+        case sparkplugDataType.float:
             return 4
-        case 'double':
+        case sparkplugDataType.double:
             return 8
-        case 'dateTime':
+        case sparkplugDataType.dateTime:
             return 12
         default:
             return -1
@@ -533,99 +580,69 @@ export function typeLens(type: string): number {
  */
 export function parseValFromBuffer(type: sparkplugDataType, endianness: byteOrder, byteAddr: number, buf: Buffer, bit?: number): any {
     // Reads in a variable of the specified metric.type type from buffer buf starting at position byteAddr
-    // Datetime is not implemented properly as it uses Rikki's workaround for Siemens PLCs
-    let fullType = type.toString();
-    if (["boolean", "int8", "uInt8"].indexOf(fullType) == -1) {
-        fullType += getEndianString(endianness || null);
-    }
-    switch (fullType) {
-        case 'boolean':
+    switch (type) {
+        case sparkplugDataType.boolean:
             if (bit) {
                 return (!!(buf[byteAddr] & (1 << bit)));
             } else {
                 return -1;
             }
-        case 'int8':
+        case sparkplugDataType.int8:
             return buf.readInt8(byteAddr);
-        case 'int16BE':
-            return buf.readInt16BE(byteAddr);
-        case 'int16LE':
-            return buf.readInt16LE(byteAddr);
-        case 'int32BE':
-            return buf.readInt32BE(byteAddr);
-        case 'int32LE':
-            return buf.readInt32LE(byteAddr);
-        case 'int64BE':
-            return buf.readBigInt64BE(byteAddr);
-        case 'int64LE':
-            return buf.readBigInt64LE(byteAddr);
-        case 'int64PDP':
-            return buf.subarray(byteAddr, byteAddr + 8)
-            .swap16()
-            .readBigInt64BE();
-        case 'int32PDP':
-            return buf.subarray(byteAddr, byteAddr + 4)
-            .swap16()
-            .readInt32BE();
-        case 'uInt8':
-            return buf.readUInt8(byteAddr);
-        case 'uInt16BE':
-            return buf.readUInt16BE(byteAddr);
-        case 'uInt16LE':
-            return buf.readUInt16LE(byteAddr);
-        case 'uInt32BE':
-            return buf.readUInt32BE(byteAddr);
-        case 'uInt32LE':
-            return buf.readUInt32LE(byteAddr);
-        case 'uInt32PDP':
-            return buf.subarray(byteAddr, byteAddr + 4)
-            .swap16()
-            .readUInt32BE();
-        case 'dateTimeBE':
-        case 'uInt64BE':
-            return Number(buf.readBigUInt64BE(byteAddr));
-        case 'dateTimeLE':
-        case 'uInt64LE':
-            return Number(buf.readBigUInt64LE(byteAddr));
-        case 'dateTimePDP':
-        case 'uint64PDP':
-            return buf.subarray(byteAddr, byteAddr + 8)
-            .swap16()
-            .readBigUInt64BE();
-        case 'floatBE':
-            return buf.readFloatBE(byteAddr);
-        case 'floatLE':
-            return buf.readFloatLE(byteAddr);
-        case 'floatPDP':
-            return (buf.subarray(byteAddr, byteAddr + 4)
-            .swap16()).readFloatBE();
-        case 'doubleBE':
-            return buf.readDoubleBE(byteAddr);
-        case 'doubleLE':
-            return buf.readDoubleLE(byteAddr);
-        case 'doublePDP':
-            return buf.subarray(byteAddr, byteAddr + 8)
-            .swap16()
-            .readDoubleBE();
-        case 'uuid':
-            return buf.toString();
-        case 'String':
-            return buf.toString()
-        default:
-            // return null;
-    }
-}
 
-function getEndianString(endianness: byteOrder): string {
-    switch (endianness) {
-        case (byteOrder.bigEndian):
-            return "BE";
-        case (byteOrder.littleEndian):
-            return "LE";
-        case (byteOrder.PDPEndian):
-            return "PDP";
+        case sparkplugDataType.int16:
+            if (endianness === byteOrder.bigEndian)
+                return buf.readInt16BE(byteAddr);
+            else
+                return buf.readInt16LE(byteAddr);
+
+        case sparkplugDataType.int32:
+            if (endianness === byteOrder.bigEndian)
+                return buf.readInt32BE(byteAddr);
+            else
+                return buf.readInt32LE(byteAddr);
+
+        case sparkplugDataType.int64:
+            if (endianness === byteOrder.bigEndian)
+                return buf.readBigInt64BE(byteAddr);
+            else
+                return buf.readBigInt64LE(byteAddr);
+
+        case sparkplugDataType.uInt8:
+            return buf.readUInt8(byteAddr);
+
+        case sparkplugDataType.uInt16:
+            if (endianness === byteOrder.bigEndian)
+                return buf.readUInt16BE(byteAddr);
+            else
+                return buf.readUInt16LE(byteAddr);
+        case sparkplugDataType.uInt32:
+            if (endianness === byteOrder.bigEndian)
+                return buf.readUInt32BE(byteAddr);
+            else
+                return buf.readUInt32LE(byteAddr);
+
+        case sparkplugDataType.uInt64:
+            if (endianness === byteOrder.bigEndian)
+                return buf.readBigUInt64BE(byteAddr);
+            else
+                return buf.readBigUInt64LE(byteAddr);
+
+        case sparkplugDataType.float:
+            if (endianness === byteOrder.bigEndian)
+                return buf.readFloatBE(byteAddr);
+            else
+                return buf.readFloatLE(byteAddr);
+
+        case sparkplugDataType.double:
+            if (endianness === byteOrder.bigEndian)
+                return buf.readDoubleBE(byteAddr);
+            else
+                return buf.readDoubleLE(byteAddr);
+
         default:
-            return "";
+            log(`Type ${type} not supported for buffer parsing`);
+            return undefined;
     }
 }
 
@@ -634,78 +651,79 @@ export function writeValToBuffer(metric: sparkplugMetric): Buffer {
     // Datetime, string, and buffer are not implemented...yet
     let buf = Buffer.allocUnsafe(8);
     let len = 0;
-    const endianness = (typeof metric.properties !== "undefined" && typeof metric.properties.endianness !== "undefined" ? metric.properties.endianness.value as byteOrder : byteOrder.bigEndian);
-    let fullType = (metric.type as string) + getEndianString(endianness);
+    const endianness = metric.properties?.endianness?.value as byteOrder ?? byteOrder.bigEndian
 
     try {
-        switch (fullType) {
-            case 'boolean':
-                // This must be handled outside of this function
-                // as the whole byte must first be read, then the
-                // bit of interest set, then the new byte written
+        switch (metric.type) {
+            case sparkplugDataType.boolean:
                 break;
-            case 'int8':
+            case sparkplugDataType.int8:
                 len = buf.writeInt8(metric.value as number);
-                break
-            case 'int16BE':
-                len = buf.writeInt16BE(metric.value as number);
-                break
-            case 'int16LE':
-                len = buf.writeInt16LE(metric.value as number);
-                break
-            case 'int32PDP':
-            case 'int32BE':
-                len = buf.writeInt32BE(metric.value as number);
-                break
-            case 'int32LE':
-                len = buf.writeInt32LE(metric.value as number);
-                break
-            case 'int64BE':
-            case 'int64PDP':
-                len = buf.writeBigInt64BE(metric.value as bigint);
-                break
-            case 'uInt8':
+                break;
+
+            case sparkplugDataType.int16:
+                if (endianness === byteOrder.bigEndian)
+                    len = buf.writeInt16BE(metric.value as number);
+                else
+                    len = buf.writeInt16LE(metric.value as number);
+                break;
+
+            case sparkplugDataType.int32:
+                if (endianness === byteOrder.bigEndian)
+                    len = buf.writeInt32BE(metric.value as number);
+                else
+                    len = buf.writeInt32LE(metric.value as number);
+                break;
+
+            case sparkplugDataType.int64:
+                if (endianness === byteOrder.bigEndian)
+                    len = buf.writeBigInt64BE(metric.value as bigint);
+                else
+                    len = buf.writeBigInt64LE(metric.value as bigint);
+                break;
+
+            case sparkplugDataType.uInt8:
                 len = buf.writeUInt8(metric.value as number);
-                break
-            case 'uInt16BE':
-                len = buf.writeUInt16BE(metric.value as number);
-                break
-            case 'uInt16LE':
-                len = buf.writeUInt16LE(metric.value as number);
-                break
-            case 'uInt32BE':
-            case 'uInt32PDP':
-                len = buf.writeUInt32BE(metric.value as number);
-                break
-            case 'uInt32LE':
-                len = buf.writeUInt32LE(metric.value as number);
-                break
-            case 'uInt64BE':
-            case 'uInt64PDP':
-                len = buf.writeBigUInt64BE(metric.value as bigint);
-                break
-            case 'floatBE':
-            case 'floatPDP':
-                len = buf.writeFloatBE(metric.value as number);
-                break
-            case 'floatLE':
-                len = buf.writeFloatLE(metric.value as number);
-                break
-            case 'doubleBE':
-            case 'doublePDP':
-                len = buf.writeDoubleBE(metric.value as number);
-                break
-            case 'doubleLE':
-                len = buf.writeDoubleLE(metric.value as number);
-                break
-            case 'dateTime':
-                break
+                break;
+
+            case sparkplugDataType.uInt16:
+                if (endianness === byteOrder.bigEndian)
+                    len = buf.writeUInt16BE(metric.value as number);
+                else
+                    len = buf.writeUInt16LE(metric.value as number);
+                break;
+            case sparkplugDataType.uInt32:
+                if (endianness === byteOrder.bigEndian)
+                    len = buf.writeUInt32BE(metric.value as number);
+                else
+                    len = buf.writeUInt32LE(metric.value as number);
+                break;
+
+            case sparkplugDataType.uInt64:
+                if (endianness === byteOrder.bigEndian)
+                    len = buf.writeBigUInt64BE(metric.value as bigint);
+                else
+                    len = buf.writeBigUInt64LE(metric.value as bigint);
+                break;
+
+            case sparkplugDataType.float:
+                if (endianness === byteOrder.bigEndian)
+                    len = buf.writeFloatBE(metric.value as number);
+                else
+                    len = buf.writeFloatLE(metric.value as number);
+                break;
+
+            case sparkplugDataType.double:
+                if (endianness === byteOrder.bigEndian)
+                    len = buf.writeDoubleBE(metric.value as number);
+                else
+                    len = buf.writeDoubleLE(metric.value as number);
+                break;
+
             default:
-                break
+                throw new Error(`Type ${metric.type} not supported for buffer parsing`);
         }
-        if (fullType.endsWith('PDP')) {
-            buf.swap16();
-        }
+
         return buf.slice(0, len);
     } catch (err) {
         console.log(err);

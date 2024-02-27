@@ -11,6 +11,9 @@
       "type": "string",
       "format": "uuid"
     },
+    "Device_Information": {
+      "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Device_Information-v1.json"
+    },
     "Measurement_Count": {
       "allOf": [
         {
@@ -36,7 +39,7 @@
               "default": ""
             },
             "Eng_Low": {
-              "default": "0"
+              "default": ""
             },
             "Eng_High": {
               "default": ""

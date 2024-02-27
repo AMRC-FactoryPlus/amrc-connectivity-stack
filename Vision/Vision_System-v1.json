@@ -34,15 +34,6 @@
                 "UInt64LE",
                 "UInt64BE"
               ]
-            },
-            "Eng_Unit": {
-              "default": ""
-            },
-            "Eng_Low": {
-              "default": ""
-            },
-            "Eng_High": {
-              "default": ""
             }
           }
         }

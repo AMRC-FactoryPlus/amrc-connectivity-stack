@@ -24,7 +24,7 @@ import {MQTTConnection, MQTTDevice} from "./devices/MQTT.js";
 import {UDPConnection, UDPDevice} from "./devices/UDP.js";
 import {WebsocketConnection, WebsocketDevice} from "./devices/websocket.js";
 import {MTConnectConnection, MTConnectDevice} from "./devices/MTConnect.js";
-import {EtherNetIPConnection, EtherNetIPDevice} from "./devices/EtherNetIP";
+import {EtherNetIPConnection, EtherNetIPDevice} from "./devices/EtherNetIP.js";
 import {log} from "./helpers/log.js";
 import {sparkplugConfig,} from "./helpers/typeHandler.js";
 import {Device, deviceOptions} from "./device.js";

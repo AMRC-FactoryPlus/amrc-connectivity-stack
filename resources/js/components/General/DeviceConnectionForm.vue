@@ -7,21 +7,26 @@
   <div class="flex flex-col">
     <Loader v-if="deviceConnectionLoading"></Loader>
     <div v-else class="flex flex-col">
-      <div class="p-2 mb-2  flex flex-col" v-for="element in controls" v-if="'showIf' in element.object ? element.object.showIf() : true">
+      <div class="p-2 mb-2  flex flex-col" v-for="element in controls"
+           v-if="'showIf' in element.object ? element.object.showIf() : true">
         <Wrapper>
           <template #description>
-            {{ element.object.description }}
+            {{element.object.description}}
           </template>
           <template #content>
             <div class="flex flex-col flex-grow">
               <h4 v-if="element.object.type !== 'boolean'" class="h-7">
-                {{ (element.namePath.length > 0 ? (element.namePath.join(' > ') + ' > ') : '') + element.object.title }}</h4>
-              <Input v-if="(['string', 'number'].includes(element.object.type)) && !('enum' in element.object)" :showDescription="false"
+                {{
+                  (element.namePath.length > 0 ? (element.namePath.join(' > ') + ' > ') : '') + element.object.title
+                }}</h4>
+              <Input v-if="(['string', 'number'].includes(element.object.type)) && !('enum' in element.object)"
+                     :showDescription="false"
                      :control="{}"
                      :valid="get(element.keyPath.filter(e => e !== 'properties').join('.'), v.model)"
                      :value="get(element.keyPath.filter(e => e !== 'properties').join('.'), model)"
                      @input="updateInput(element, $event)"></Input>
-              <Input :password="true" v-else-if="(['password'].includes(element.object.type)) && !('enum' in element.object)"
+              <Input :password="true"
+                     v-else-if="(['password'].includes(element.object.type)) && !('enum' in element.object)"
                      :showDescription="false"
                      :control="{}"
                      :device="device.id"
@@ -45,7 +50,9 @@
                         name: element.object.title,
                         description: element.object.description
             }"/>
-              <div class="px-2 py-1 bg-red-100  text-red-400 mr-auto" v-else>CONTROL NOT SUPPORTED: {{ element.object.type }}</div>
+              <div class="px-2 py-1 bg-red-100  text-red-400 mr-auto" v-else>CONTROL NOT SUPPORTED:
+                {{element.object.type}}
+              </div>
             </div>
           </template>
         </Wrapper>
@@ -78,12 +85,12 @@
 </template>
 
 <script>
-import useVuelidate from '@vuelidate/core';
-import {required, minLength, maxLength, numeric, requiredIf, helpers} from '@vuelidate/validators';
+import useVuelidate from '@vuelidate/core'
+import { helpers, maxLength, minLength, numeric, required, requiredIf } from '@vuelidate/validators'
 
 export default {
-  setup() {
-    return {v: useVuelidate()};
+  setup () {
+    return { v: useVuelidate() }
   },
   name: 'DeviceConnectionForm',
 
@@ -104,113 +111,116 @@ export default {
     },
   },
 
-  created() {
+  created () {
     if (this.deviceConnection.file) {
       // Get the existing model
-      this.deviceConnectionLoading = true;
-      axios.get(`/api/clusters/${this.device.node.cluster}/nodes/${this.device.node}/connections/${this.device?.device_connection_id}`).then((r) => {
-        this.model = {...this.model, ...r.data.data};
-        this.deviceConnectionLoading = false;
-      }).catch(error => {
-        this.deviceConnectionLoading = false;
-        if (error && error.response && error.response.status === 401) {
-          this.goto_url('/login');
-        }
-        this.handleError(error);
-      });
+      this.deviceConnectionLoading = true
+      axios.get(
+              `/api/clusters/${this.device.node.cluster}/nodes/${this.device.node}/connections/${this.device?.device_connection_id}`).
+          then((r) => {
+            this.model = { ...this.model, ...r.data.data }
+            this.deviceConnectionLoading = false
+          }).
+          catch(error => {
+            this.deviceConnectionLoading = false
+            if (error && error.response && error.response.status === 401) {
+              this.goto_url('/login')
+            }
+            this.handleError(error)
+          })
     }
     // Get every element that has a 'type' key and NO properties field - that's our control
-    this.deepProcessKeys(this.schema);
+    this.deepProcessKeys(this.schema)
   },
 
   methods: {
-    processCast(value, type) {
+    processCast (value, type) {
       switch (type) {
         case 'string':
         case 'password':
-          return String(value);
+          return String(value)
         case 'number':
-          return Number(value);
+          return Number(value)
         case 'boolean':
-          return Boolean(value);
+          return Boolean(value)
         default:
-          return value;
+          return value
       }
     },
 
-    updateInput(element, val) {
+    updateInput (element, val) {
       // Set the underlying value
-      this.set(element.keyPath.filter(e => e !== 'properties').join('.'), val, this.model);
+      this.set(element.keyPath.filter(e => e !== 'properties').join('.'), val, this.model)
     },
 
-    get(path, obj) {
-      let schema = obj;  // a moving reference to internal objects within obj
-      const pList = path.split('.');
-      const len = pList.length;
+    get (path, obj) {
+      let schema = obj  // a moving reference to internal objects within obj
+      const pList = path.split('.')
+      const len = pList.length
       for (let i = 0; i < len - 1; i++) {
-        const elem = pList[i];
-        if (!schema[elem]) schema[elem] = {};
-        schema = schema[elem];
+        const elem = pList[i]
+        if (!schema[elem]) schema[elem] = {}
+        schema = schema[elem]
       }
 
-      return schema[pList[len - 1]];
+      return schema[pList[len - 1]]
     },
-    set(path, value, obj) {
-      let schema = obj;  // a moving reference to internal objects within obj
-      const pList = path.split('.');
-      const len = pList.length;
+    set (path, value, obj) {
+      let schema = obj  // a moving reference to internal objects within obj
+      const pList = path.split('.')
+      const len = pList.length
 
       for (let i = 0; i < len - 1; i++) {
-        const elem = pList[i];
-        if (!schema[elem]) schema[elem] = {};
-        schema = schema[elem];
+        const elem = pList[i]
+        if (!schema[elem]) schema[elem] = {}
+        schema = schema[elem]
       }
-      this.$set(schema, pList[len - 1], value);
+      this.$set(schema, pList[len - 1], value)
     },
-    unset(path, obj) {
-      let schema = obj;  // a moving reference to internal objects within obj
-      const pList = path.split('.');
-      const len = pList.length;
+    unset (path, obj) {
+      let schema = obj  // a moving reference to internal objects within obj
+      const pList = path.split('.')
+      const len = pList.length
 
       for (let i = 0; i < len - 1; i++) {
-        const elem = pList[i];
-        if (!schema[elem]) schema[elem] = {};
-        schema = schema[elem];
+        const elem = pList[i]
+        if (!schema[elem]) schema[elem] = {}
+        schema = schema[elem]
       }
-      delete schema[pList[len - 1]];
+      delete schema[pList[len - 1]]
     },
 
-    deepProcessKeys(obj, keyPath = [], namePath = []) {
+    deepProcessKeys (obj, keyPath = [], namePath = []) {
       if (obj && typeof obj === 'object') {
-        let allKeys = Object.keys(obj);
-        let isParent = false;
-        let hasType = false;
-        let hasTitle = false;
-        let validations = {};
+        let allKeys = Object.keys(obj)
+        let isParent = false
+        let hasType = false
+        let hasTitle = false
+        let validations = {}
         for (let i = 0; i < allKeys.length; i++) {
-          let k = allKeys[i];
-          let value = obj[k];
+          let k = allKeys[i]
+          let value = obj[k]
           if (k === 'properties') {
-            isParent = true;
+            isParent = true
           }
           if (k === 'type') {
-            hasType = true;
+            hasType = true
           }
           if (k === 'title') {
-            hasTitle = true;
+            hasTitle = true
           }
           if (k === 'validations') {
-            validations = value;
+            validations = value
           }
           if (typeof value === 'object') {
-            keyPath.push(k);
+            keyPath.push(k)
             if (obj.title) {
-              namePath.push(obj.title);
+              namePath.push(obj.title)
             }
-            this.deepProcessKeys(value, keyPath, namePath);
-            keyPath.pop();
+            this.deepProcessKeys(value, keyPath, namePath)
+            keyPath.pop()
             if (obj.title) {
-              namePath.pop();
+              namePath.pop()
             }
 
           }
@@ -218,60 +228,65 @@ export default {
 
         // We've been through all of the keys in this object and we have the signature of a control then add it to the array
         if (!isParent && hasType && hasTitle) {
-          this.controls.push({object: obj, keyPath: Array.from(keyPath), namePath: Array.from(namePath), validations: validations});
+          this.controls.push(
+              { object: obj, keyPath: Array.from(keyPath), namePath: Array.from(namePath), validations: validations })
         }
       }
-      return obj;
+      return obj
     },
 
-    generateGuid() {
-      let result, i, j;
-      result = '';
+    generateGuid () {
+      let result, i, j
+      result = ''
       for (j = 0; j < 32; j++) {
         if (j === 8 || j === 12 || j === 16 || j === 20)
-          result = result + '-';
-        i = Math.floor(Math.random()*16).toString(16).toUpperCase();
-        result = result + i;
+          result = result + '-'
+        i = Math.floor(Math.random() * 16).toString(16).toUpperCase()
+        result = result + i
       }
-      return result;
+      return result
     },
 
-    save(activate) {
+    save (activate) {
       if (this.loading) {
-        return;
+        return
       }
-      this.loading = true;
+      this.loading = true
       this.controls.forEach(c => {
         if (!('showIf' in c.object) || ('showIf' in c.object && c.object.showIf() === true)) {
           // Unset the value from the model array
-          this.set(c.keyPath.filter(e => e !== 'properties').join('.'), this.processCast(this.get(c.keyPath.filter(e => e !== 'properties').join('.'), this.model), c.object.type), this.finalModel);
+          this.set(c.keyPath.filter(e => e !== 'properties').join('.'),
+              this.processCast(this.get(c.keyPath.filter(e => e !== 'properties').join('.'), this.model),
+                  c.object.type), this.finalModel)
         }
-      });
+      })
 
-      axios.patch(`/api/clusters/${this.device.node.cluster}/nodes/${this.device.node}/connections/${this.deviceConnection.id}`, {
-        'configuration': JSON.stringify(this.finalModel),
-        'device': this.device.id
-      }).then(() => {
-        this.loading = false;
-        this.$emit('close');
-        this.requestDataReloadFor('deviceConnections');
-        this.requestDataReloadFor('device');
+      axios.patch(
+          `/api/clusters/${this.device.node.cluster}/nodes/${this.device.node}/connections/${this.deviceConnection.id}`,
+          {
+            'configuration': JSON.stringify(this.finalModel),
+            'device': this.device.id,
+          }).then(() => {
+        this.loading = false
+        this.$emit('close')
+        this.requestDataReloadFor('deviceConnections')
+        this.requestDataReloadFor('device')
         window.showNotification({
-            title: 'Saved',
-            description: 'The device connection details have been saved.',
-            type: 'success',
-        });
+          title: 'Saved',
+          description: 'The device connection details have been saved.',
+          type: 'success',
+        })
       }).catch(error => {
-        this.loading = false;
+        this.loading = false
         if (error && error.response && error.response.status === 401) {
-          this.goto_url('/login');
+          this.goto_url('/login')
         }
-        this.handleError(error);
-      });
+        this.handleError(error)
+      })
     },
   },
 
-  data() {
+  data () {
     return {
       loading: false,
       deviceConnectionLoading: false,
@@ -281,12 +296,16 @@ export default {
         UDPConnDetails: {
           port: 50205,
         },
+        EtherNetIPConnDetails: {
+          host: '',
+        },
         MQTTConnDetails: {
           host: '',
           protocol: 'mqtts',
           port: 8883,
           useSSL: true,
-          clientId: this.device.node.uuid + '-' + this.device.node.node_id + '-' + this.device.device_id + '-' + this.generateGuid(),
+          clientId: this.device.node.uuid + '-' + this.device.node.node_id + '-' + this.device.device_id + '-' +
+              this.generateGuid(),
           username: '',
           password: '',
           cleanSession: true,
@@ -364,8 +383,29 @@ export default {
               'UDP',
               'MTConnect',
               'Open Protocol',
-              'ASCII TCP'
+              'ASCII TCP',
+              'EtherNet/IP',
             ],
+          },
+          'EtherNetIPConnDetails': {
+            type: 'object',
+            title: 'EtherNet/IP Connection Details',
+            description: 'The connection details to the EtherNet/IP device.',
+            properties: {
+              host: {
+                type: 'string',
+                showIf: () => {
+                  return this.model.connType === 'EtherNet/IP' || false
+                },
+                validations: {
+                  requiredIf: requiredIf(() => {
+                    return this.model.connType === 'EtherNet/IP' || false
+                  }),
+                },
+                description: 'The hostname of the EtherNet/IP device to connect to.',
+                title: 'Hostname/IP',
+              },
+            },
           },
           'UDPConnDetails': {
             type: 'object',
@@ -377,11 +417,11 @@ export default {
                 title: 'Port',
                 type: 'number',
                 showIf: () => {
-                  return this.model.connType === 'UDP' || false;
+                  return this.model.connType === 'UDP' || false
                 },
                 validations: {
                   requiredIf: requiredIf(() => {
-                    return this.model.connType === 'UDP' || false;
+                    return this.model.connType === 'UDP' || false
                   }),
                   numeric,
                 },
@@ -398,11 +438,11 @@ export default {
               host: {
                 type: 'string',
                 showIf: () => {
-                  return this.model.connType === 'MQTT' || false;
+                  return this.model.connType === 'MQTT' || false
                 },
                 validations: {
                   requiredIf: requiredIf(() => {
-                    return this.model.connType === 'MQTT' || false;
+                    return this.model.connType === 'MQTT' || false
                   }),
                   minLength: minLength(3),
                 },
@@ -412,11 +452,11 @@ export default {
               protocol: {
                 type: 'string',
                 showIf: () => {
-                  return this.model.connType === 'MQTT' || false;
+                  return this.model.connType === 'MQTT' || false
                 },
                 validations: {
                   requiredIf: requiredIf(() => {
-                    return this.model.connType === 'MQTT' || false;
+                    return this.model.connType === 'MQTT' || false
                   }),
                   minLength: minLength(3),
                 },
@@ -437,11 +477,11 @@ export default {
                 description: 'The port number to connect to the MQTT server on.',
                 title: 'Port',
                 showIf: () => {
-                  return this.model.connType === 'MQTT' || false;
+                  return this.model.connType === 'MQTT' || false
                 },
                 validations: {
                   requiredIf: requiredIf(() => {
-                    return this.model.connType === 'MQTT' || false;
+                    return this.model.connType === 'MQTT' || false
                   }),
                   numeric,
                 },
@@ -453,22 +493,22 @@ export default {
                 title: 'Use SSL?',
                 format: 'checkbox',
                 showIf: () => {
-                  return this.model.connType === 'MQTT' || false;
+                  return this.model.connType === 'MQTT' || false
                 },
                 validations: {
                   requiredIf: requiredIf(() => {
-                    return this.model.connType === 'MQTT' || false;
+                    return this.model.connType === 'MQTT' || false
                   }),
                 },
               },
               clientId: {
                 type: 'string',
                 showIf: () => {
-                  return this.model.connType === 'MQTT' || false;
+                  return this.model.connType === 'MQTT' || false
                 },
                 validations: {
                   requiredIf: requiredIf(() => {
-                    return this.model.connType === 'MQTT' || false;
+                    return this.model.connType === 'MQTT' || false
                   }),
                   minLength: minLength(10),
                 },
@@ -478,7 +518,7 @@ export default {
               username: {
                 type: 'string',
                 showIf: () => {
-                  return this.model.connType === 'MQTT' || false;
+                  return this.model.connType === 'MQTT' || false
                 },
                 validations: {
                   minLength: minLength(3),
@@ -489,7 +529,7 @@ export default {
               password: {
                 type: 'password',
                 showIf: () => {
-                  return this.model.connType === 'MQTT' || false;
+                  return this.model.connType === 'MQTT' || false
                 },
                 validations: {
                   minLength: minLength(3),
@@ -500,11 +540,11 @@ export default {
               },
               cleanSession: {
                 showIf: () => {
-                  return this.model.connType === 'MQTT' || false;
+                  return this.model.connType === 'MQTT' || false
                 },
                 validations: {
                   requiredIf: requiredIf(() => {
-                    return this.model.connType === 'MQTT' || false;
+                    return this.model.connType === 'MQTT' || false
                   }),
                 },
                 type: 'boolean',
@@ -515,11 +555,11 @@ export default {
               },
               keepAlive: {
                 showIf: () => {
-                  return this.model.connType === 'MQTT' || false;
+                  return this.model.connType === 'MQTT' || false
                 },
                 validations: {
                   requiredIf: requiredIf(() => {
-                    return this.model.connType === 'MQTT' || false;
+                    return this.model.connType === 'MQTT' || false
                   }),
                 },
                 type: 'number',
@@ -536,11 +576,11 @@ export default {
               host: {
                 type: 'string',
                 showIf: () => {
-                  return this.model.connType === 'Open Protocol' || false;
+                  return this.model.connType === 'Open Protocol' || false
                 },
                 validations: {
                   requiredIf: requiredIf(() => {
-                    return this.model.connType === 'Open Protocol' || false;
+                    return this.model.connType === 'Open Protocol' || false
                   }),
                   minLength: minLength(3),
                 },
@@ -552,16 +592,16 @@ export default {
                 description: 'The port number to connect to the controller on.',
                 title: 'Port',
                 showIf: () => {
-                  return this.model.connType === 'Open Protocol' || false;
+                  return this.model.connType === 'Open Protocol' || false
                 },
                 validations: {
                   requiredIf: requiredIf(() => {
-                    return this.model.connType === 'Open Protocol' || false;
+                    return this.model.connType === 'Open Protocol' || false
                   }),
                   numeric,
                 },
                 default: 4545,
-              }
+              },
             },
           },
           'ASCIITCPConnDetails': {
@@ -571,11 +611,11 @@ export default {
               ip: {
                 type: 'string',
                 showIf: () => {
-                  return this.model.connType === 'ASCII TCP' || false;
+                  return this.model.connType === 'ASCII TCP' || false
                 },
                 validations: {
                   requiredIf: requiredIf(() => {
-                    return this.model.connType === 'ASCII TCP' || false;
+                    return this.model.connType === 'ASCII TCP' || false
                   }),
                   minLength: minLength(3),
                 },
@@ -585,11 +625,11 @@ export default {
               port: {
                 type: 'number',
                 showIf: () => {
-                  return this.model.connType === 'ASCII TCP' || false;
+                  return this.model.connType === 'ASCII TCP' || false
                 },
                 validations: {
                   requiredIf: requiredIf(() => {
-                    return this.model.connType === 'ASCII TCP' || false;
+                    return this.model.connType === 'ASCII TCP' || false
                   }),
                   minLength: minLength(1),
                 },
@@ -599,11 +639,11 @@ export default {
               encoding: {
                 type: 'string',
                 showIf: () => {
-                  return this.model.connType === 'ASCII TCP' || false;
+                  return this.model.connType === 'ASCII TCP' || false
                 },
                 validations: {
                   requiredIf: requiredIf(() => {
-                    return this.model.connType === 'ASCII TCP' || false;
+                    return this.model.connType === 'ASCII TCP' || false
                   }),
                   minLength: minLength(1),
                 },
@@ -624,11 +664,11 @@ export default {
               delimiter: {
                 type: 'string',
                 showIf: () => {
-                  return this.model.connType === 'ASCII TCP' || false;
+                  return this.model.connType === 'ASCII TCP' || false
                 },
                 validations: {
                   requiredIf: requiredIf(() => {
-                    return this.model.connType === 'ASCII TCP' || false;
+                    return this.model.connType === 'ASCII TCP' || false
                   }),
                   minLength: minLength(1),
                 },
@@ -639,11 +679,11 @@ export default {
               keepAlive: {
                 type: 'number',
                 showIf: () => {
-                  return this.model.connType === 'ASCII TCP' || false;
+                  return this.model.connType === 'ASCII TCP' || false
                 },
                 validations: {
                   requiredIf: requiredIf(() => {
-                    return this.model.connType === 'ASCII TCP' || false;
+                    return this.model.connType === 'ASCII TCP' || false
                   }),
                   minLength: minLength(1),
                 },
@@ -660,14 +700,16 @@ export default {
               endpoint: {
                 type: 'string',
                 showIf: () => {
-                  return this.model.connType === 'OPC UA' || false;
+                  return this.model.connType === 'OPC UA' || false
                 },
                 validations: {
                   requiredIf: requiredIf(() => {
-                    return this.model.connType === 'OPC UA' || false;
+                    return this.model.connType === 'OPC UA' || false
                   }),
                   minLength: minLength(1),
-                  opcEndpoint: helpers.withMessage('This does not look like a valid OPC endpoint (opc.tcp://[HOST]:[PORT])', helpers.regex(/^opc\.tcp:\/\/.+:\d+\/?$/)),
+                  opcEndpoint: helpers.withMessage(
+                      'This does not look like a valid OPC endpoint (opc.tcp://[HOST]:[PORT])',
+                      helpers.regex(/^opc\.tcp:\/\/.+:\d+\/?$/)),
 
                 },
                 description: 'The endpoint of the OPC UA server.',
@@ -676,11 +718,11 @@ export default {
               securityPolicy: {
                 type: 'string',
                 showIf: () => {
-                  return this.model.connType === 'OPC UA' || false;
+                  return this.model.connType === 'OPC UA' || false
                 },
                 validations: {
                   requiredIf: requiredIf(() => {
-                    return this.model.connType === 'OPC UA' || false;
+                    return this.model.connType === 'OPC UA' || false
                   }),
                   minLength: minLength(1),
                 },
@@ -705,11 +747,11 @@ export default {
               securityMode: {
                 type: 'string',
                 showIf: () => {
-                  return this.model.connType === 'OPC UA' || false;
+                  return this.model.connType === 'OPC UA' || false
                 },
                 validations: {
                   requiredIf: requiredIf(() => {
-                    return this.model.connType === 'OPC UA' || false;
+                    return this.model.connType === 'OPC UA' || false
                   }),
                   minLength: minLength(1),
                 },
@@ -724,11 +766,11 @@ export default {
               },
               useCredentials: {
                 showIf: () => {
-                  return this.model.connType === 'OPC UA' || false;
+                  return this.model.connType === 'OPC UA' || false
                 },
                 validations: {
                   requiredIf: requiredIf(() => {
-                    return this.model.connType === 'OPC UA' || false;
+                    return this.model.connType === 'OPC UA' || false
                   }),
                 },
                 description: 'Should the OPC UA connection use credentials?',
@@ -739,11 +781,13 @@ export default {
               },
               username: {
                 showIf: () => {
-                  return (this.model.connType === 'OPC UA' && this.model.OPCUAConnDetails.useCredentials === true) || false;
+                  return (this.model.connType === 'OPC UA' && this.model.OPCUAConnDetails.useCredentials === true) ||
+                      false
                 },
                 validations: {
                   requiredIf: requiredIf(() => {
-                    return (this.model.connType === 'OPC UA' && this.model.OPCUAConnDetails.useCredentials === true) || false;
+                    return (this.model.connType === 'OPC UA' && this.model.OPCUAConnDetails.useCredentials === true) ||
+                        false
                   }),
                   minLength: minLength(3),
                 },
@@ -754,11 +798,13 @@ export default {
               password: {
                 type: 'password',
                 showIf: () => {
-                  return (this.model.connType === 'OPC UA' && this.model.OPCUAConnDetails.useCredentials === true) || false;
+                  return (this.model.connType === 'OPC UA' && this.model.OPCUAConnDetails.useCredentials === true) ||
+                      false
                 },
                 validations: {
                   requiredIf: requiredIf(() => {
-                    return (this.model.connType === 'OPC UA' && this.model.OPCUAConnDetails.useCredentials === true) || false;
+                    return (this.model.connType === 'OPC UA' && this.model.OPCUAConnDetails.useCredentials === true) ||
+                        false
                   }),
                   minLength: minLength(3),
                 },
@@ -777,11 +823,11 @@ export default {
                 description: 'The base URL for the REST connection.',
                 title: 'Base URL',
                 showIf: () => {
-                  return this.model.connType === 'REST' || false;
+                  return this.model.connType === 'REST' || false
                 },
                 validations: {
                   requiredIf: requiredIf(() => {
-                    return this.model.connType === 'REST' || false;
+                    return this.model.connType === 'REST' || false
                   }),
                   minLength: minLength(1),
                 },
@@ -796,11 +842,11 @@ export default {
                 ],
                 default: 'None',
                 showIf: () => {
-                  return this.model.connType === 'REST' || false;
+                  return this.model.connType === 'REST' || false
                 },
                 validations: {
                   requiredIf: requiredIf(() => {
-                    return this.model.connType === 'REST' || false;
+                    return this.model.connType === 'REST' || false
                   }),
                   minLength: minLength(1),
                 },
@@ -810,11 +856,12 @@ export default {
                 description: 'The username for the REST authentication.',
                 title: 'Username',
                 showIf: () => {
-                  return (this.model.connType === 'REST' && this.model.RESTConnDetails.authMethod === 'Basic') || false;
+                  return (this.model.connType === 'REST' && this.model.RESTConnDetails.authMethod === 'Basic') || false
                 },
                 validations: {
                   requiredIf: requiredIf(() => {
-                    return (this.model.connType === 'REST' && this.model.RESTConnDetails.authMethod === 'Basic') || false;
+                    return (this.model.connType === 'REST' && this.model.RESTConnDetails.authMethod === 'Basic') ||
+                        false
                   }),
                   minLength: minLength(1),
                 },
@@ -824,11 +871,12 @@ export default {
                 description: 'The password for the REST authentication.',
                 title: 'Password',
                 showIf: () => {
-                  return (this.model.connType === 'REST' && this.model.RESTConnDetails.authMethod === 'Basic') || false;
+                  return (this.model.connType === 'REST' && this.model.RESTConnDetails.authMethod === 'Basic') || false
                 },
                 validations: {
                   requiredIf: requiredIf(() => {
-                    return (this.model.connType === 'REST' && this.model.RESTConnDetails.authMethod === 'Basic') || false;
+                    return (this.model.connType === 'REST' && this.model.RESTConnDetails.authMethod === 'Basic') ||
+                        false
                   }),
                   minLength: minLength(1),
                 },
@@ -844,11 +892,11 @@ export default {
                 description: 'The base MTConnect URL.',
                 title: 'Base URL',
                 showIf: () => {
-                  return this.model.connType === 'MTConnect' || false;
+                  return this.model.connType === 'MTConnect' || false
                 },
                 validations: {
                   requiredIf: requiredIf(() => {
-                    return this.model.connType === 'MTConnect' || false;
+                    return this.model.connType === 'MTConnect' || false
                   }),
                   minLength: minLength(1),
                 },
@@ -863,11 +911,11 @@ export default {
                 ],
                 default: 'None',
                 showIf: () => {
-                  return this.model.connType === 'MTConnect' || false;
+                  return this.model.connType === 'MTConnect' || false
                 },
                 validations: {
                   requiredIf: requiredIf(() => {
-                    return this.model.connType === 'MTConnect' || false;
+                    return this.model.connType === 'MTConnect' || false
                   }),
                   minLength: minLength(3),
                 },
@@ -877,11 +925,13 @@ export default {
                 description: 'The username for the MTConnect authentication.',
                 title: 'Username',
                 showIf: () => {
-                  return (this.model.connType === 'REST' && this.model.MTConnectConnDetails.authMethod === 'Basic') || false;
+                  return (this.model.connType === 'REST' && this.model.MTConnectConnDetails.authMethod === 'Basic') ||
+                      false
                 },
                 validations: {
                   requiredIf: requiredIf(() => {
-                    return (this.model.connType === 'REST' && this.model.MTConnectConnDetails.authMethod === 'Basic') || false;
+                    return (this.model.connType === 'REST' && this.model.MTConnectConnDetails.authMethod === 'Basic') ||
+                        false
                   }),
                   minLength: minLength(1),
                 },
@@ -891,11 +941,13 @@ export default {
                 description: 'The password for the MTConnect authentication.',
                 title: 'Password',
                 showIf: () => {
-                  return (this.model.connType === 'REST' && this.model.MTConnectConnDetails.authMethod === 'Basic') || false;
+                  return (this.model.connType === 'REST' && this.model.MTConnectConnDetails.authMethod === 'Basic') ||
+                      false
                 },
                 validations: {
                   requiredIf: requiredIf(() => {
-                    return (this.model.connType === 'REST' && this.model.MTConnectConnDetails.authMethod === 'Basic') || false;
+                    return (this.model.connType === 'REST' && this.model.MTConnectConnDetails.authMethod === 'Basic') ||
+                        false
                   }),
                   minLength: minLength(1),
                 },
@@ -911,11 +963,11 @@ export default {
                 description: 'The hostname or IP address of the PLC.',
                 title: 'Hostname/IP Address',
                 showIf: () => {
-                  return this.model.connType === 'S7' || false;
+                  return this.model.connType === 'S7' || false
                 },
                 validations: {
                   requiredIf: requiredIf(() => {
-                    return this.model.connType === 'S7' || false;
+                    return this.model.connType === 'S7' || false
                   }),
                   minLength: minLength(1),
                 },
@@ -926,11 +978,11 @@ export default {
                 title: 'Port',
                 default: 102,
                 showIf: () => {
-                  return this.model.connType === 'S7' || false;
+                  return this.model.connType === 'S7' || false
                 },
                 validations: {
                   requiredIf: requiredIf(() => {
-                    return this.model.connType === 'S7' || false;
+                    return this.model.connType === 'S7' || false
                   }),
                   minLength: minLength(1),
                 },
@@ -940,11 +992,11 @@ export default {
                 description: 'The rack number of the PLC.',
                 title: 'Rack',
                 showIf: () => {
-                  return this.model.connType === 'S7' || false;
+                  return this.model.connType === 'S7' || false
                 },
                 validations: {
                   requiredIf: requiredIf(() => {
-                    return this.model.connType === 'S7' || false;
+                    return this.model.connType === 'S7' || false
                   }),
                   minLength: minLength(1),
                 },
@@ -954,11 +1006,11 @@ export default {
                 description: 'The slot number of the PLC.',
                 title: 'Slot',
                 showIf: () => {
-                  return this.model.connType === 'S7' || false;
+                  return this.model.connType === 'S7' || false
                 },
                 validations: {
                   requiredIf: requiredIf(() => {
-                    return this.model.connType === 'S7' || false;
+                    return this.model.connType === 'S7' || false
                   }),
                   minLength: minLength(1),
                 },
@@ -969,11 +1021,11 @@ export default {
                 title: 'Timeout',
                 default: 5000,
                 showIf: () => {
-                  return this.model.connType === 'S7' || false;
+                  return this.model.connType === 'S7' || false
                 },
                 validations: {
                   requiredIf: requiredIf(() => {
-                    return this.model.connType === 'S7' || false;
+                    return this.model.connType === 'S7' || false
                   }),
                   minLength: minLength(1),
                 },
@@ -1001,11 +1053,11 @@ export default {
               'JSON',
               'XML',
               'Buffer',
-              'ASCII HEX'
+              'ASCII HEX',
             ],
             default: 'Defined by Protocol',
             showIf: () => {
-              return ['REST', 'UDP', 'MQTT', 'ASCII TCP'].includes(this.model.connType) || false;
+              return ['REST', 'UDP', 'MQTT', 'ASCII TCP'].includes(this.model.connType) || false
             },
             validations: {
               required,
@@ -1017,11 +1069,12 @@ export default {
             title: 'Delimiter',
             type: 'string',
             showIf: () => {
-              return this.model.payloadFormat === 'Delimited String' || false;
+              return this.model.payloadFormat === 'Delimited String' || false
             },
             validations: {
               requiredIf: requiredIf(() => {
-                return (['REST', 'UDP', 'MQTT'].includes(this.model.connType) && this.model.payloadFormat === 'Delimited String') || false;
+                return (['REST', 'UDP', 'MQTT'].includes(this.model.connType) && this.model.payloadFormat ===
+                    'Delimited String') || false
               }),
               minLength: minLength(1),
               maxLength: maxLength(1),
@@ -1029,22 +1082,22 @@ export default {
           },
         },
       },
-    };
+    }
   },
-  validations() {
+  validations () {
     let returnObj = {
       model: {},
-    };
+    }
 
     // Build up validation array for current step by going through the controls array and creating a validation entry for its model path
     for (const [key, control] of Object.entries(this.controls)) {
       // Only validate if the control is visible
       if (!('showIf' in control.object) || ('showIf' in control.object && control.object.showIf() === true)) {
-        this.set(control.keyPath.filter(e => e !== 'properties').join('.'), control.validations, returnObj.model);
+        this.set(control.keyPath.filter(e => e !== 'properties').join('.'), control.validations, returnObj.model)
       }
     }
-    return returnObj;
+    return returnObj
   },
-};
+}
 </script>
 

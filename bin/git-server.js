@@ -14,6 +14,7 @@ import { ServiceClient, WebAPI } from "@amrc-factoryplus/utilities";
 import { GIT_VERSION }      from "../lib/git-version.js";
 import { GitServer }        from "../lib/git-server.js";
 import { AutoPull }         from "../lib/auto-pull.js";
+import { RepoStatus }       from "../lib/status.js";
 import { Git }              from "../lib/uuids.js";
 
 console.log("Starting acs-git version %s", GIT_VERSION);
@@ -50,9 +51,15 @@ const api = await new WebAPI({
     },
 }).init();
 
-const pulls = await new AutoPull({
+const status = await new RepoStatus({
     fplus, data,
 }).init();
 
+const pulls = await new AutoPull({
+    fplus, data, status,
+}).init();
+
 api.run();
+status.run();
 pulls.run();
+

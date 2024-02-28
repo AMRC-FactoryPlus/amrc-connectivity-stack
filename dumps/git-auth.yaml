@@ -5,49 +5,25 @@
 # The ACLs are expressed in terms of 'service requirement' UUIDs. These
 # need to be created as Auth groups containing the deployment-specific
 # UUIDs which fulfil the requirements.
+#
+# The Git service also requires:
+# - Permission to publish as a Sparkplug Node
+# - Permission to consume the ConfigDB MQTT interface
 
 service: !u FP.Service.Authentication
 version: 1
 aces:
-  # Advertise service
   - principal: !u G.Requirement.ServiceAccount
-    permission: 4db4c39a-f18d-4e83-aeb0-5af2c14ddc2b
+    permission: !u FP.Permission.Directory.AdvertiseService
     target: !u G.Service.Git
 
-  # Read our ACLs
   - principal: !u G.Requirement.ServiceAccount
-    permission: ba566181-0e8a-405b-b16e-3fb89130fbee
+    permission: !u FP.Permission.Auth.ReadACL
     target: !u G.Perm.All
 
-  # Manage git repos
   - principal: !u G.Requirement.ServiceAccount
-    permission: f0b7917b-d475-4888-9d5a-2af96b3c26b6
-    target: !u G.Class.Repo
-
-  # This would be 'delete git repos', but I am avoiding allowing this.
-  # The repo server marks them deleted in GI but doesn't delete the
-  # object. This preserves the UUID and the metadata.
-  #- principal: !u G.Requirement.ServiceAccount
-  #  permission: 6957174b-7b08-45ca-ac5c-c03ab6928a6e
-  #  target: !u G.Class.Repo
-
-  # Edit git repo configs
-  - principal: !u G.Requirement.ServiceAccount
-    permission: 4a339562-cd57-408d-9d1a-6529a383ea4b
+    permission: !u FP.Permission.ConfigDB.ReadConfig
     target: !u G.App.Config
-
-  - principal: !u G.Requirement.ServiceAccount
-    permission: 6c799ccb-d2ad-4715-a2a7-3c8728d6c0bf
-    target: !u G.App.Config
-
-  # Edit GI configs. This should be more restricted.
-  - principal: !u G.Requirement.ServiceAccount
-    permission: 4a339562-cd57-408d-9d1a-6529a383ea4b
-    target: !u FP.App.Info
-
-  - principal: !u G.Requirement.ServiceAccount
-    permission: 6c799ccb-d2ad-4715-a2a7-3c8728d6c0bf
-    target: !u FP.App.Info
 groups:
   !u G.Perm.All:
     - !u G.Perm.Create

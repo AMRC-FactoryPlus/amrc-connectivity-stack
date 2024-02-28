@@ -27,6 +27,8 @@ RUN sh -ex <<'SHELL'
         | sed -re's/-[0-9]+-/-/;s/(.*)/export const GIT_VERSION="\1";/' \
         > lib/git-version.js
     rm -rf .git
+    chmod a+x hooks/*
+    git config --global core.hooksPath /home/node/app/hooks
 SHELL
 
 FROM ${acs_run} AS run
@@ -34,8 +36,9 @@ FROM ${acs_run} AS run
 RUN apk add git git-daemon
 
 # Copy across from the build container.
-WORKDIR /home/node/app
-COPY --from=build --chown=root:root /home/node/app ./
+WORKDIR /home/node
+COPY --from=build --chown=root:root /home/node/app ./app/
+COPY --from=build --chown=root:root /home/node/.gitconfig ./
 
 USER node
 CMD npm run git-server

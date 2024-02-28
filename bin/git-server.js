@@ -6,9 +6,6 @@
  * Copyright 2022 AMRC
  */
 
-import http from "http";
-import express from "express";
-
 import { ServiceClient, WebAPI } from "@amrc-factoryplus/utilities";
 
 import { GIT_VERSION }      from "../lib/git-version.js";

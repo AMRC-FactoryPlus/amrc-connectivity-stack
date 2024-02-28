@@ -54,6 +54,7 @@ const api = await new WebAPI({
 
 const status = await new RepoStatus({
     fplus, data,
+    pushes:         process.env.DATA_CHANGED_FIFO,
 }).init();
 
 const pulls = await new AutoPull({

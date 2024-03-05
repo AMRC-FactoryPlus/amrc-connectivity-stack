@@ -114,8 +114,13 @@ serviceSetup:
       helm:
         name: Edge Helm charts
         url: https://github.com/AMRC-FactoryPlus/edge-helm-charts.git
-        # The 'acs' branch will be updated to this tag/branch 
+        # The 'acs' branch will be updated to this tag/branch, and then
+        # merged into main if main has not otherwise moved
         ref: v3.0.0-dev.8
+        # Interval to perform updates. 'never' will only update on git
+        # server startup and is suitable for tag refs which won't
+        # change.
+        interval: never
     # Helm charts to deploy to the edge; these default to the charts
     # created automatically but can be overridden to customise
     helmChart:

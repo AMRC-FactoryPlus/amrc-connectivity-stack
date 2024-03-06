@@ -40,7 +40,6 @@ spec:
         - name: modbus-rest
           image: {{ printf "%s/%s:%s" .Values.image.registry .Values.image.repository .Values.image.version | quote }}
           pullPolicy: {{ .Values.image.pullPolicy }}
-          command: ["node", "bin/modbus-rest.js"]
 ---
 apiVersion: v1
 kind: Service

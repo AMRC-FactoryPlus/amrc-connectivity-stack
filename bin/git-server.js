@@ -11,11 +11,14 @@ import express from "express";
 
 import { ServiceClient, WebAPI } from "@amrc-factoryplus/utilities";
 
-import { GIT_VERSION } from "../lib/git-version.js";
-import { GitServer } from "../lib/git-server.js";
-import { Git } from "../lib/uuids.js";
+import { GIT_VERSION }      from "../lib/git-version.js";
+import { GitServer }        from "../lib/git-server.js";
+import { AutoPull }         from "../lib/auto-pull.js";
+import { Git }              from "../lib/uuids.js";
 
 console.log("Starting acs-git version %s", GIT_VERSION);
+
+const data = process.env.DATA_DIR;
 
 const fplus = await new ServiceClient({
     env:                process.env,
@@ -23,8 +26,7 @@ const fplus = await new ServiceClient({
 }).init();
 
 const git = await new GitServer({
-    fplus:      fplus,
-    data:       process.env.DATA_DIR,
+    fplus, data,
     git_exec:   process.env.GIT_EXEC_PATH,
     http_url:   process.env.HTTP_API_URL,
 }).init();
@@ -48,4 +50,9 @@ const api = await new WebAPI({
     },
 }).init();
 
+const pulls = await new AutoPull({
+    fplus, data,
+}).init();
+
 api.run();
+pulls.run();

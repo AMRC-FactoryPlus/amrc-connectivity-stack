@@ -19,7 +19,7 @@ RUN sh -ex <<'SHELL'
     then
         npm config set @amrc-factoryplus:registry "${acs_npm}"
     fi
-    npm install --save=false
+    npm install --save=false --omit=dev
 SHELL
 COPY --chown=node . .
 RUN sh -ex <<'SHELL'

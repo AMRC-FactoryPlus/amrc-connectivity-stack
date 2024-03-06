@@ -22,10 +22,43 @@ spec:
         factory-plus.nodeUuid: {{ .Values.uuid }}
         factory-plus.name: {{ .Values.name }}
     spec:
+
+{{- if .Values.hostname }}
       nodeSelector:
         kubernetes.io/hostname: {{ .Values.hostname | quote }}
+      tolerations: {{ .Values.tolerations.specific | toYaml | nindent 8 }}
+{{- else }}
+      tolerations: {{ .Values.tolerations.floating | toYaml | nindent 8 }}
+{{- end }}
+
+      securityContext:
+          runAsNonRoot: true
+          # User Bun in container is 1000
+          runAsUser: 1000
+
       containers:
         - name: modbus-rest
           image: {{ printf "%s/%s:%s" .Values.image.registry .Values.image.repository .Values.image.version | quote }}
-          imagePullPolicy: Always
-          env:
+          pullPolicy: {{ .Values.image.pullPolicy }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: factory-plus
+  name: modbus-rest-9a1dbaa7-ebec-48b1-987e-b847d902f8a2
+spec:
+  selector:
+    factory-plus.app: modbus-rest
+    factory-plus.nodeUuid: 9a1dbaa7-ebec-48b1-987e-b847d902f8a2
+
+  ports:
+    - name: http
+      port: 80
+      targetPort: 20900
+{{- if .Values.hostname }}
+  # This only routes to the Service from the Node the modbus-rest Pod is
+  # running on. This is not really security but it's better than
+  # nothing. Properly we need a system for authenticating connections to
+  # these southbound adapters.
+  internalTrafficPolicy: Local
+{{- end }}

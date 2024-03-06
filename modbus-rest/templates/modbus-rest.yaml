@@ -44,12 +44,12 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  namespace: factory-plus
-  name: modbus-rest-9a1dbaa7-ebec-48b1-987e-b847d902f8a2
+  namespace: {{ .Release.Namespace }}
+  name: modbus-rest-{{ .Values.uuid }}
 spec:
   selector:
     factory-plus.app: modbus-rest
-    factory-plus.nodeUuid: 9a1dbaa7-ebec-48b1-987e-b847d902f8a2
+    factory-plus.nodeUuid: {{ .Values.uuid }}
 
   ports:
     - name: http

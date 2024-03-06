@@ -1,6 +1,6 @@
 {
   "name": "@amrc-factoryplus/rx-util",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "",
   "main": "lib/index.js",
   "type": "module",
@@ -11,7 +11,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "immutable": "^5.0.0-beta.4",
+    "immutable": "^5.0.0-beta.5",
     "rxjs": "^7.8.1"
   }
 }

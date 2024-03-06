@@ -34,8 +34,16 @@ FROM ${acs_run} AS run
 RUN apk add git git-daemon
 
 # Copy across from the build container.
-WORKDIR /home/node/app
-COPY --from=build --chown=root:root /home/node/app ./
+WORKDIR /home/node
+COPY --from=build /home/node/app ./app/
+RUN sh -ex <<'SHELL'
+    export HOME=/home/node
+    git config --global core.hooksPath /home/node/app/hooks
+    chown -R 0:0 .
+    chmod -R a=rX .
+    chmod a+x app/hooks/post-update
+SHELL
 
 USER node
-CMD npm run git-server
+WORKDIR /home/node/app
+CMD node bin/git-server.js

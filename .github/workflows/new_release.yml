@@ -1,0 +1,42 @@
+name: New Release
+
+env:
+  REGISTRY: ghcr.io
+
+on:
+  release:
+    types: [ published ]
+    # Trigger only when a release with tag v*.*.* is published
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16.x'
+
+      - name: Update version in package.json
+        run: |
+          CURRENT_TAG=${GITHUB_REF#refs/tags/}
+          echo "Current tag: $CURRENT_TAG"
+          VERSION="${CURRENT_TAG#v}"
+          echo "Updating version to: $VERSION"
+          jq ".version = \"$VERSION\"" package.json > package.json.tmp
+          mv package.json.tmp package.json
+
+      - name: Install Dependencies
+        run: npm install --verbose
+
+      - name: Publish Package
+        run: |
+          echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
+          npm publish --access=public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

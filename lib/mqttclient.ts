@@ -1,6 +1,6 @@
 /*
  * AMRC InfluxDB Sparkplug Ingester
- * Copyright "2023" AMRC
+ * Copyright "2024" AMRC
  */
 
 import {ServiceClient, SpB, Topic, UUIDs} from "@amrc-factoryplus/utilities";
@@ -53,9 +53,7 @@ const keepAliveAgent = new Agent({
 })
 
 const influxDB = new InfluxDB({
-    url: influxURL,
-    token: influxToken,
-    transportOptions: {
+    url: influxURL, token: influxToken, transportOptions: {
         agent: keepAliveAgent,
     }
 })
@@ -70,8 +68,7 @@ const writeApi = influxDB.getWriteApi(influxOrganisation, process.env.INFLUX_BUC
     /* maximum time in millis to keep points in an unflushed batch, 0 means don't periodically flush */
     flushInterval: 0, // Never allow the package to flush: we'll flush manually
     /* maximum size of the retry buffer - it contains items that could not be sent for the first time */
-    maxBufferLines: 30_000,
-    /* the count of internally-scheduled retries upon write failure, the delays between write attempts follow an exponential backoff strategy if there is no Retry-After HTTP header */
+    maxBufferLines: 30_000, /* the count of internally-scheduled retries upon write failure, the delays between write attempts follow an exponential backoff strategy if there is no Retry-After HTTP header */
     maxRetries: 0, // do not retry writes
     // ... there are more write options that can be customized, see
     // https://influxdata.github.io/influxdb-client-js/influxdb-client.writeoptions.html and
@@ -179,7 +176,7 @@ export default class MQTTClient {
             case "BIRTH":
 
                 // Don't handle Node births
-                if (!topic.address.device) return;
+                if (!topic.address.isDevice()) return;
 
                 let topLevelSchema = null;
                 let schemaUUIDMapping = {};
@@ -330,14 +327,23 @@ export default class MQTTClient {
 
                 break;
             case "DEATH":
-                logger.info(`💀 Received death certificate for ${topic.address.group}/${topic.address.node}/${topic.address.device}. Removing from known devices.`);
-                delete this.birthDebounce?.[topic.address.group]?.[topic.address.node]
-                delete this.aliasResolver?.[topic.address.group]?.[topic.address.node]
-                break;
+
+                // If the death certificate is for a device then remove it from the known devices, otherwise remove the entire node
+                if (topic.address.isDevice()) {
+                    logger.info(`💀 Received death certificate for ${topic.address.group}/${topic.address.node}/${topic.address.device}. Removing from known devices.`);
+                    delete this.birthDebounce?.[topic.address.group]?.[topic.address.node]?.[topic.address.device]
+                    delete this.aliasResolver?.[topic.address.group]?.[topic.address.node]?.[topic.address.device]
+                    break;
+                } else {
+                    logger.info(`💀💀💀 Received death certificate for entire node ${topic.address.group}/${topic.address.node}. Removing from known nodes.`);
+                    delete this.birthDebounce?.[topic.address.group]?.[topic.address.node]
+                    delete this.aliasResolver?.[topic.address.group]?.[topic.address.node]
+                    break;
+                }
             case "DATA":
 
                 // Don't handle Node data
-                if (!topic.address.device) return;
+                if (!topic.address.isDevice()) return;
 
                 // Check if we have a birth certificate for the device
                 if (this.aliasResolver?.[topic.address.group]?.[topic.address.node]?.[topic.address.device]) {
@@ -355,27 +361,26 @@ export default class MQTTClient {
 
                     logger.info(`✨ Device ${topic.address.group}/${topic.address.node}/${topic.address.device} is unknown, requesting birth certificate`);
 
-                    // Request birth certificate
-                    let response = await this.serviceClient.fetch({
-                        service: UUIDs.Service.Command_Escalation,
-                        url: `/v1/address/${topic.address.group}/${topic.address.node}`,
-                        method: "POST",
-                        headers: {
-                            "content-type": "application/json"
-                        },
-                        body: JSON.stringify({
-                            "name": "Node Control/Rebirth",
-                            "value": "true"
-                        })
-                    })
-
-                    logger.info('📣 Birth certificate request sent for %s. Status: %s', topic.address, response.status);
-
                     // Create debounce timout for this device
                     this.setNestedValue(this.birthDebounce, [topic.address.group, topic.address.node, topic.address.device], true);
                     setTimeout(() => {
                         delete this.birthDebounce?.[topic.address.group]?.[topic.address.node]?.[topic.address.device];
                     }, Math.floor(Math.random() * (10000 - 5000 + 1) + 5000));
+
+                    // Request birth certificate
+                    let response = await this.serviceClient.fetch({
+                        service: UUIDs.Service.Command_Escalation,
+                        url: `/v1/address/${topic.address.group}/${topic.address.node}/${topic.address.device}`,
+                        method: "POST",
+                        headers: {
+                            "content-type": "application/json"
+                        },
+                        body: JSON.stringify({
+                            "name": "Device Control/Rebirth", "value": "true"
+                        })
+                    })
+
+                    logger.info('📣 Birth certificate request sent for %s. Status: %s', topic.address, response.status);
 
                 }
                 break;

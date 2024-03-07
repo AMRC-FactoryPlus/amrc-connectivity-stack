@@ -418,7 +418,20 @@ export function parseValueFromPayload(msg: any, metric: sparkplugMetric, payload
             }
             break;
         case serialisationType.fixedBuffer:
-            return parseValFromBuffer(metric.type, (typeof metric.properties !== "undefined" && typeof metric.properties.endianness !== "undefined" ? metric.properties.endianness.value as number : 0), parseInt(path), msg as Buffer, parseInt(path));
+            // Split the path into path.bit if bit. This may not always match but the bit is required if the data is a boolean
+            let _path = path;
+            let bit: number | undefined;
+            if (path.includes(':')) {
+                const splitPath = path.split(':');
+                _path = splitPath[0];
+                bit = parseInt(splitPath[1]);
+            }
+            return parseValFromBuffer(
+                metric.type,
+                (typeof metric.properties !== "undefined" && typeof metric.properties.endianness !== "undefined" ? metric.properties.endianness.value as number : 0),
+                parseInt(_path),
+                msg as Buffer,
+                bit);
         case serialisationType.serialisedBuffer:
             break;
         default:

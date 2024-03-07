@@ -111,11 +111,21 @@ serviceSetup:
   config:
     # Git repos to mirror in the on-prem git server
     repoMirror:
+      # This repo is expected to hold the edge Helm charts
       helm:
         name: Edge Helm charts
-        url: https://github.com/AMRC-FactoryPlus/edge-helm-charts.git
-        # The 'acs' branch will be updated to this tag/branch 
-        ref: v3.0.0-dev.8
+        # Branches to pull from external repos
+        pull:
+          acs:
+            url: https://github.com/AMRC-FactoryPlus/edge-helm-charts.git
+            # Pull this branch/tag
+            ref: v3.0.0-dev.8
+            # Merge to a local branch, if not otherwise moved
+            merge: main
+            # Interval to perform updates. 'never' will only update on git
+            # server startup and is suitable for tag refs which won't
+            # change.
+            interval: never
     # Helm charts to deploy to the edge; these default to the charts
     # created automatically but can be overridden to customise
     helmChart:
@@ -145,7 +155,7 @@ visualiser:
     # -- The repository of the MQTT component
     repository: acs-visualiser
     # -- The tag of the MQTT component
-    tag: v1.0.3
+    tag: v1.0.4
     # @ignore
     pullPolicy: IfNotPresent
 
@@ -175,12 +185,6 @@ manager:
       registry: docker.io
       repository: getmeili/meilisearch
       tag: v0.30.0
-      pullPolicy: IfNotPresent
-  redis:
-    image:
-      registry: docker.io
-      repository: redis
-      tag: alpine
       pullPolicy: IfNotPresent
   # -- A string used to customise the branding of the manager
   name: Factory+ Manager
@@ -235,7 +239,7 @@ git:
     # -- The repository of the Git component
     repository: acs-git
     # -- The tag of the Git component
-    tag: v0.0.3
+    tag: v0.0.4-dev.1
     # @ignore
     pullPolicy: IfNotPresent
   # -- Possible values are either 1 to enable all possible debugging, or a comma-separated list of debug tags (the tags printed before the log lines). No logging is specified as an empty string.

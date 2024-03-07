@@ -179,7 +179,7 @@ export default class MQTTClient {
             case "BIRTH":
 
                 // Don't handle Node births
-                if (!topic.address.device) return;
+                if (!topic.address.isDevice()) return;
 
                 let topLevelSchema = null;
                 let schemaUUIDMapping = {};
@@ -330,14 +330,23 @@ export default class MQTTClient {
 
                 break;
             case "DEATH":
+
+                // If the death certificate is for a device then remove it from the known devices, otherwise remove the entire node
+                if (topic.address.isDevice()) {
                 logger.info(`💀 Received death certificate for ${topic.address.group}/${topic.address.node}/${topic.address.device}. Removing from known devices.`);
+                    delete this.birthDebounce?.[topic.address.group]?.[topic.address.node]?.[topic.address.device]
+                    delete this.aliasResolver?.[topic.address.group]?.[topic.address.node]?.[topic.address.device]
+                    break;
+                } else {
+                    logger.info(`💀💀💀 Received death certificate for entire node ${topic.address.group}/${topic.address.node}. Removing from known nodes.`);
                 delete this.birthDebounce?.[topic.address.group]?.[topic.address.node]
                 delete this.aliasResolver?.[topic.address.group]?.[topic.address.node]
                 break;
+                }
             case "DATA":
 
                 // Don't handle Node data
-                if (!topic.address.device) return;
+                if (!topic.address.isDevice()) return;
 
                 // Check if we have a birth certificate for the device
                 if (this.aliasResolver?.[topic.address.group]?.[topic.address.node]?.[topic.address.device]) {
@@ -358,14 +367,13 @@ export default class MQTTClient {
                     // Request birth certificate
                     let response = await this.serviceClient.fetch({
                         service: UUIDs.Service.Command_Escalation,
-                        url: `/v1/address/${topic.address.group}/${topic.address.node}`,
+                        url: `/v1/address/${topic.address.group}/${topic.address.node}/${topic.address.device}`,
                         method: "POST",
                         headers: {
                             "content-type": "application/json"
                         },
                         body: JSON.stringify({
-                            "name": "Node Control/Rebirth",
-                            "value": "true"
+                            "name": "Device Control/Rebirth", "value": "true"
                         })
                     })
 

@@ -660,7 +660,7 @@ data:
           {{$serviceAccount_git}}: {
             "node_id": "Git",
             "group_id": "{{ .Values.acs.organisation }}-Service-Core"
-          },
+          }
         }
       }
     }

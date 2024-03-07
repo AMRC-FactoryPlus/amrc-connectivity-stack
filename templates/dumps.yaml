@@ -661,6 +661,7 @@ data:
             "node_id": "Git",
             "group_id": "{{ .Values.acs.organisation }}-Service-Core"
           },
+        }
       }
     }
   # This is copied directly from acs-cluster-manager.

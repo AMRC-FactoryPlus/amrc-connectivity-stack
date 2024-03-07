@@ -155,7 +155,7 @@ visualiser:
     # -- The repository of the MQTT component
     repository: acs-visualiser
     # -- The tag of the MQTT component
-    tag: v1.0.3
+    tag: v1.0.4
     # @ignore
     pullPolicy: IfNotPresent
 

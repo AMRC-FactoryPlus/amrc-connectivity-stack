@@ -186,12 +186,6 @@ manager:
       repository: getmeili/meilisearch
       tag: v0.30.0
       pullPolicy: IfNotPresent
-  redis:
-    image:
-      registry: docker.io
-      repository: redis
-      tag: alpine
-      pullPolicy: IfNotPresent
   # -- A string used to customise the branding of the manager
   name: Factory+ Manager
   # -- The environment that the manager is running in

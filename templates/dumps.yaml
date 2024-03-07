@@ -655,7 +655,12 @@ data:
           {{$serviceAccount_git}}: {
             "name": "Git repository server"
           }
-        }
+        },
+        {{$application_sparkplugAddressInformation}}: {
+          {{$serviceAccount_git}}: {
+            "node_id": "Git",
+            "group_id": "{{ .Values.acs.organisation }}-Service-Core"
+          },
       }
     }
   # This is copied directly from acs-cluster-manager.

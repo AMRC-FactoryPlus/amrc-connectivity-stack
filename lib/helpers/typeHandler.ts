@@ -418,7 +418,7 @@ export function parseValueFromPayload(msg: any, metric: sparkplugMetric, payload
             }
             break;
         case serialisationType.fixedBuffer:
-            return parseValFromBuffer(metric.type, (typeof metric.properties !== "undefined" && typeof metric.properties.endianness !== "undefined" ? metric.properties.endianness.value as number : 0), parseInt(path), msg as Buffer,);
+            return parseValFromBuffer(metric.type, (typeof metric.properties !== "undefined" && typeof metric.properties.endianness !== "undefined" ? metric.properties.endianness.value as number : 0), parseInt(path), msg as Buffer, parseInt(path));
         case serialisationType.serialisedBuffer:
             break;
         default:
@@ -579,7 +579,7 @@ export function typeLens(type: string): number {
  * @returns Value parsed from buffer
  */
 export function parseValFromBuffer(type: sparkplugDataType, endianness: byteOrder, byteAddr: number, buf: Buffer, bit?: number): any {
-    // Reads in a variable of the specified metric.type type from buffer buf starting at position byteAddr
+
     switch (type) {
         case sparkplugDataType.boolean:
             if (bit) {
@@ -591,54 +591,30 @@ export function parseValFromBuffer(type: sparkplugDataType, endianness: byteOrde
             return buf.readInt8(byteAddr);
 
         case sparkplugDataType.int16:
-            if (endianness === byteOrder.bigEndian)
-                return buf.readInt16BE(byteAddr);
-            else
-                return buf.readInt16LE(byteAddr);
+            if (endianness === byteOrder.bigEndian) return buf.readInt16BE(byteAddr); else return buf.readInt16LE(byteAddr);
 
         case sparkplugDataType.int32:
-            if (endianness === byteOrder.bigEndian)
-                return buf.readInt32BE(byteAddr);
-            else
-                return buf.readInt32LE(byteAddr);
+            if (endianness === byteOrder.bigEndian) return buf.readInt32BE(byteAddr); else return buf.readInt32LE(byteAddr);
 
         case sparkplugDataType.int64:
-            if (endianness === byteOrder.bigEndian)
-                return buf.readBigInt64BE(byteAddr);
-            else
-                return buf.readBigInt64LE(byteAddr);
+            if (endianness === byteOrder.bigEndian) return buf.readBigInt64BE(byteAddr); else return buf.readBigInt64LE(byteAddr);
 
         case sparkplugDataType.uInt8:
             return buf.readUInt8(byteAddr);
 
         case sparkplugDataType.uInt16:
-            if (endianness === byteOrder.bigEndian)
-                return buf.readUInt16BE(byteAddr);
-            else
-                return buf.readUInt16LE(byteAddr);
+            if (endianness === byteOrder.bigEndian) return buf.readUInt16BE(byteAddr); else return buf.readUInt16LE(byteAddr);
         case sparkplugDataType.uInt32:
-            if (endianness === byteOrder.bigEndian)
-                return buf.readUInt32BE(byteAddr);
-            else
-                return buf.readUInt32LE(byteAddr);
+            if (endianness === byteOrder.bigEndian) return buf.readUInt32BE(byteAddr); else return buf.readUInt32LE(byteAddr);
 
         case sparkplugDataType.uInt64:
-            if (endianness === byteOrder.bigEndian)
-                return buf.readBigUInt64BE(byteAddr);
-            else
-                return buf.readBigUInt64LE(byteAddr);
+            if (endianness === byteOrder.bigEndian) return buf.readBigUInt64BE(byteAddr); else return buf.readBigUInt64LE(byteAddr);
 
         case sparkplugDataType.float:
-            if (endianness === byteOrder.bigEndian)
-                return buf.readFloatBE(byteAddr);
-            else
-                return buf.readFloatLE(byteAddr);
+            if (endianness === byteOrder.bigEndian) return buf.readFloatBE(byteAddr); else return buf.readFloatLE(byteAddr);
 
         case sparkplugDataType.double:
-            if (endianness === byteOrder.bigEndian)
-                return buf.readDoubleBE(byteAddr);
-            else
-                return buf.readDoubleLE(byteAddr);
+            if (endianness === byteOrder.bigEndian) return buf.readDoubleBE(byteAddr); else return buf.readDoubleLE(byteAddr);
 
         default:
             log(`Type ${type} not supported for buffer parsing`);
@@ -662,24 +638,15 @@ export function writeValToBuffer(metric: sparkplugMetric): Buffer {
                 break;
 
             case sparkplugDataType.int16:
-                if (endianness === byteOrder.bigEndian)
-                    len = buf.writeInt16BE(metric.value as number);
-                else
-                    len = buf.writeInt16LE(metric.value as number);
+                if (endianness === byteOrder.bigEndian) len = buf.writeInt16BE(metric.value as number); else len = buf.writeInt16LE(metric.value as number);
                 break;
 
             case sparkplugDataType.int32:
-                if (endianness === byteOrder.bigEndian)
-                    len = buf.writeInt32BE(metric.value as number);
-                else
-                    len = buf.writeInt32LE(metric.value as number);
+                if (endianness === byteOrder.bigEndian) len = buf.writeInt32BE(metric.value as number); else len = buf.writeInt32LE(metric.value as number);
                 break;
 
             case sparkplugDataType.int64:
-                if (endianness === byteOrder.bigEndian)
-                    len = buf.writeBigInt64BE(metric.value as bigint);
-                else
-                    len = buf.writeBigInt64LE(metric.value as bigint);
+                if (endianness === byteOrder.bigEndian) len = buf.writeBigInt64BE(metric.value as bigint); else len = buf.writeBigInt64LE(metric.value as bigint);
                 break;
 
             case sparkplugDataType.uInt8:
@@ -687,37 +654,22 @@ export function writeValToBuffer(metric: sparkplugMetric): Buffer {
                 break;
 
             case sparkplugDataType.uInt16:
-                if (endianness === byteOrder.bigEndian)
-                    len = buf.writeUInt16BE(metric.value as number);
-                else
-                    len = buf.writeUInt16LE(metric.value as number);
+                if (endianness === byteOrder.bigEndian) len = buf.writeUInt16BE(metric.value as number); else len = buf.writeUInt16LE(metric.value as number);
                 break;
             case sparkplugDataType.uInt32:
-                if (endianness === byteOrder.bigEndian)
-                    len = buf.writeUInt32BE(metric.value as number);
-                else
-                    len = buf.writeUInt32LE(metric.value as number);
+                if (endianness === byteOrder.bigEndian) len = buf.writeUInt32BE(metric.value as number); else len = buf.writeUInt32LE(metric.value as number);
                 break;
 
             case sparkplugDataType.uInt64:
-                if (endianness === byteOrder.bigEndian)
-                    len = buf.writeBigUInt64BE(metric.value as bigint);
-                else
-                    len = buf.writeBigUInt64LE(metric.value as bigint);
+                if (endianness === byteOrder.bigEndian) len = buf.writeBigUInt64BE(metric.value as bigint); else len = buf.writeBigUInt64LE(metric.value as bigint);
                 break;
 
             case sparkplugDataType.float:
-                if (endianness === byteOrder.bigEndian)
-                    len = buf.writeFloatBE(metric.value as number);
-                else
-                    len = buf.writeFloatLE(metric.value as number);
+                if (endianness === byteOrder.bigEndian) len = buf.writeFloatBE(metric.value as number); else len = buf.writeFloatLE(metric.value as number);
                 break;
 
             case sparkplugDataType.double:
-                if (endianness === byteOrder.bigEndian)
-                    len = buf.writeDoubleBE(metric.value as number);
-                else
-                    len = buf.writeDoubleLE(metric.value as number);
+                if (endianness === byteOrder.bigEndian) len = buf.writeDoubleBE(metric.value as number); else len = buf.writeDoubleLE(metric.value as number);
                 break;
 
             default:

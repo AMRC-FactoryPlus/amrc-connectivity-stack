@@ -12,9 +12,19 @@ module.exports = {
 
     /* Polyfills for node builtins */
     resolve: {
+        alias: {
+            got: false,
+            ["got-fetch"]: false,
+            ["gssapi.js"]: false,
+            rxjs: false,
+            ["timers/promises"]: "timers-promises",
+            ["@amrc-factoryplus/sparkplug-app"]: false,
+        },
         fallback: {
             buffer: require.resolve("buffer/"),
             url: require.resolve("url/"),
+            util: require.resolve("util/"),
+
         },
     },
     plugins: [

@@ -595,7 +595,7 @@ export function parseValFromBuffer(type: sparkplugDataType, endianness: byteOrde
 
     switch (type) {
         case sparkplugDataType.boolean:
-            if (bit) {
+            if (bit != null) {
                 return (!!(buf[byteAddr] & (1 << bit)));
             } else {
                 return -1;

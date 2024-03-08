@@ -284,18 +284,25 @@ export abstract class Device {
                     if (!parseVals || (parseVals && ((typeof metric.properties.path !== "undefined" && metric.properties.path.value) || Object.keys(
                         obj).length == 1))) {
                         // Get new value either directly or by parsing
-                        const newVal = parseVals ? parseValueFromPayload(obj[addr],
+                        let newVal = parseVals ? parseValueFromPayload(obj[addr],
                             metric,
                             this._payloadFormat,
                             this._delimiter
                         ) : obj[addr];
+
+                        // Test if the value is a bigint and convert it to a Long. This is a hack to ensure that the
+                        // Tahu library works - it only accepts Longs, not bigints.
+                        if (typeof newVal === "bigint") {
+                            newVal = Long.fromString(newVal.toString());
+                        }
+
                         // If it has a sensible value...
                         // + Use the deadband here
+
                         if (
                             (newVal || newVal == 0)
-                            && (((typeof metric.value !== "object")
                             && (metric.value !== newVal)
-                            ) || !util.isDeepStrictEqual(metric.value, newVal))) {
+                        ) {
                             // If timestamp is provided in data package
                             const timestamp = parseTimeStampFromPayload(obj[addr],
                                 metric,
@@ -579,6 +586,7 @@ export abstract class Device {
                     if (typeof metric.name !== "undefined") {
                         // Requests to change tag values
                         let oldMetric = this._metrics.getByName(metric.name);
+
                         // If metric value arrives as long, turn it into a JS double
                         if (Long.isLong(metric.value)) {
                             metric.value = (metric.value as Long).toNumber();

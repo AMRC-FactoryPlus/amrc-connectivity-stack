@@ -1,0 +1,55 @@
+{
+  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Oven/Element-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "acff6c68-a7f3-49bd-89a4-e7c22a954abe"
+    },
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "Utilisation": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Documentation": {
+              "default": "The usage of the heating element vs it's maximum capacity"
+            },
+            "Sparkplug_Type": {
+              "enum": [
+                "UInt8",
+                "UInt16LE",
+                "UInt16BE",
+                "UInt32LE",
+                "UInt32BE",
+                "UInt64LE",
+                "UInt64BE",
+                "FloatLE",
+                "FloatBE",
+                "DoubleLE",
+                "DoubleBE",
+                "Int64BE",
+                "Int64LE",
+                "Int32BE",
+                "Int32LE",
+                "Int16BE",
+                "Int16LE",
+                "Int8"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID"
+  ]
+}

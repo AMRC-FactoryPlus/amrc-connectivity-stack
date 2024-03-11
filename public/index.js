@@ -33,13 +33,13 @@ class FPlusVis {
             browser:        true,
         }).init();
         window.AMRC_FactoryPlus_Vis_Client = fplus;
+        const icons = await new Icons({ fplus }).init();
 
         const mqtt = this.mqtt = new MQTTClient({
-            fplus,
+            fplus, icons,
             name: "Factory+",
-            icons: this.icons,
         });
-        const vis = this.vis = new Vis(mqtt.graph, canvas, this.icons).run();
+        const vis = this.vis = new Vis(mqtt.graph, canvas, icons).run();
 
         mqtt.on("packet", vis.make_active.bind(vis));
         mqtt.on("graph", vis.reset_graph.bind(vis));
@@ -130,7 +130,6 @@ class FPlusVis {
     }
 
     async main () {
-        this.icons = new Icons();
         this.canvas = document.getElementById("canvas");
         this.form = document.getElementById("form");
         this.canvas.style.display = "none";

@@ -124,10 +124,15 @@ export default class Vis {
             ctx.strokeStyle = graph.online ? Style.circles : Style.offline;
             ctx.lineWidth = 4;
             ctx.fillStyle = Style.background;
-            this.circle(pos[0], pos[1], r, null, true);
-            const h = r;
-            const w = h*icon.aspect;
-            ctx.drawImage(icon.icon, pos[0]-w/2, pos[1]-h/2, w, h);
+            ctx.translate(pos[0], pos[1]);
+            this.circle(0, 0, r, null, true);
+
+            ctx.fillStyle = Style.text;
+            const scale = r * icon.scale;
+            ctx.scale(scale, scale);
+            ctx.translate(...icon.offset);
+            ctx.fill(icon.path);
+            
             ctx.restore();
         }
         else {

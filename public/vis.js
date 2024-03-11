@@ -113,18 +113,24 @@ export default class Vis {
         }
 
         const pos = graph.centre;
+        const icon = this.icons.fetch_icon(graph.schema);
         //ctx.save()
         //ctx.fillStyle = graph.too_many ? Style.toomany : Style.circles;
-        if (graph.schema) {
+        if (icon) {
             const r = 0.3*this.root_node;
+            graph.text_roff = r;
             ctx.save();
             ctx.strokeStyle = graph.online ? Style.circles : Style.offline;
             ctx.lineWidth = 4;
             ctx.fillStyle = Style.background;
             this.circle(pos[0], pos[1], r, null, true);
+            const h = r;
+            const w = h*icon.aspect;
+            ctx.drawImage(icon.icon, pos[0]-w/2, pos[1]-h/2, w, h);
             ctx.restore();
         }
         else {
+            graph.text_roff = graph.radius;
             const style = graph.online ? "circles" : "offline";
             this.circle(pos[0], pos[1], graph.radius, style);
         }
@@ -197,26 +203,10 @@ export default class Vis {
                 ctx.restore();
             };
 
-            const radius = graph.schema ? 0.3*this.root_node : graph.radius;
+            const radius = graph.text_roff;
             print(Style.text, this.text_height, 
                 graph.centre, [-offset, -radius - 2],
                 graph.name);
-
-            if (graph.schema) {
-                const icon = this.icons.fetch_icon(graph.schema);
-                if (icon) {
-                    console.log("Drawing icon for %s: %o", graph.name, graph.centre);
-                    ctx.save();
-                    ctx.translate(graph.centre[0], graph.centre[1]);
-                    //ctx.translate(-offset, -graph.radius - 2);
-                    //ctx.rotate(-0.5);
-                    //const h = this.text_height;
-                    const h = 0.3 * this.root_node;
-                    const w = h*icon.aspect;
-                    ctx.drawImage(icon.icon, -w/2, -h/2, w, h);
-                    ctx.restore();
-                }
-            }
 			
             if (graph.too_many) {
                 print(Style.text, (0.4*this.root_node),

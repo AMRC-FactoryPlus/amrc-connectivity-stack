@@ -69,9 +69,10 @@ export default class Vis {
 
     pick_centres (graph, angle, radius, segment, ring) {
         const myangle = angle + segment * graph.leaves / 2;
+        const jitter = (Math.random() - 0.5) * 0.6 * ring;
         const centre = graph.centre = [
-            radius * Math.cos(myangle) * this.xscale, 
-            radius * Math.sin(myangle)];
+            (radius + jitter) * Math.cos(myangle) * this.xscale, 
+            (radius + jitter) * Math.sin(myangle)];
         const txtangle = myangle + 1;
         graph.radius = this.root_node/(graph.depth + 3);
 

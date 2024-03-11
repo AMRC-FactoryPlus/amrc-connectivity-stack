@@ -115,8 +115,19 @@ export default class Vis {
         const pos = graph.centre;
         //ctx.save()
         //ctx.fillStyle = graph.too_many ? Style.toomany : Style.circles;
-        const style = graph.online ? "circles" : "offline";
-        this.circle(pos[0], pos[1], graph.radius, style);
+        if (graph.schema) {
+            const r = 0.3*this.root_node;
+            ctx.save();
+            ctx.strokeStyle = graph.online ? Style.circles : Style.offline;
+            ctx.lineWidth = 4;
+            ctx.fillStyle = Style.background;
+            this.circle(pos[0], pos[1], r, null, true);
+            ctx.restore();
+        }
+        else {
+            const style = graph.online ? "circles" : "offline";
+            this.circle(pos[0], pos[1], graph.radius, style);
+        }
         //ctx.restore();
     }
 
@@ -174,7 +185,7 @@ export default class Vis {
                 ctx.font = `${size}px ${Style.font}`;
                 ctx.fillStyle = fill;
                 ctx.translate(centre[0], centre[1]);
-                ctx.rotate(angle);
+                //ctx.rotate(-0.5);
                 if (offset) {
                     ctx.translate(...offset);
                 }
@@ -186,19 +197,23 @@ export default class Vis {
                 ctx.restore();
             };
 
+            const radius = graph.schema ? 0.3*this.root_node : graph.radius;
             print(Style.text, this.text_height, 
-                graph.centre, [-offset, -graph.radius - 2],
+                graph.centre, [-offset, -radius - 2],
                 graph.name);
 
             if (graph.schema) {
                 const icon = this.icons.fetch_icon(graph.schema);
                 if (icon) {
+                    console.log("Drawing icon for %s: %o", graph.name, graph.centre);
                     ctx.save();
                     ctx.translate(graph.centre[0], graph.centre[1]);
-                    if (offset) ctx.translate(-offset, -graph.radius - 2);
-                    const h = this.text_height;
+                    //ctx.translate(-offset, -graph.radius - 2);
+                    //ctx.rotate(-0.5);
+                    //const h = this.text_height;
+                    const h = 0.3 * this.root_node;
                     const w = h*icon.aspect;
-                    ctx.drawImage(icon.icon, -(w*2), -h, w, h);
+                    ctx.drawImage(icon.icon, -w/2, -h/2, w, h);
                     ctx.restore();
                 }
             }

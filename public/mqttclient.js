@@ -11,9 +11,7 @@ const FactoryPlus = "11ad7b32-1d32-4c4a-b0c9-fa049208939a";
 export default class MQTTClient extends EventEmitter {
     constructor (opts) {
         super();
-        this.broker = opts.broker;
-        this.username = opts.username;
-        this.password = opts.password;
+        this.fplus = opts.fplus;
         this.icons = opts.icons;
 
         this.known = new Map();
@@ -23,19 +21,14 @@ export default class MQTTClient extends EventEmitter {
         };
     }
 
-    run () {
-        const mqtt = this.mqtt = MQTT.connect(this.broker, {
-            username: this.username,
-            password: this.password,
-        });
+    async run () {
+        const mqtt = this.mqtt = await this.fplus.MQTT.mqtt_client();
 
         mqtt.on("connect", () => console.log("MQTT connected"));
         mqtt.on("error", e => console.log(`MQTT error: ${e}`));
         mqtt.on("message", this.on_message.bind(this));
 
         mqtt.subscribe("spBv1.0/#");
-
-        return this;
     }
 
     stop () {

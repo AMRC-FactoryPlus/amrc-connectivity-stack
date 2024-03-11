@@ -7,9 +7,10 @@
 import MQTTClient from "./mqttclient.js";
 import Vis from "./vis.js";
 import Icons from "./icons.js";
+import { FactoryPlus } from "./webpack.js";
 
 class FPlusVis {
-    start_vis (opts) {
+    async start_vis (opts) {
         const canvas = this.canvas;
         canvas.style.display = "";
         const resize = () => {
@@ -24,16 +25,26 @@ class FPlusVis {
         window.addEventListener("resize", resize);
         resize();
 
+        const fplus = await new FactoryPlus.ServiceClient({
+            directory_url:  opts.directory,
+            username:       opts.username,
+            password:       opts.password,
+            verbose:        "ALL",
+            browser:        true,
+        }).init();
+        window.AMRC_FactoryPlus_Vis_Client = fplus;
+
         const mqtt = this.mqtt = new MQTTClient({
+            fplus,
             name: "Factory+",
             icons: this.icons,
-            ...opts,
-        }).run();
-
+        });
         const vis = this.vis = new Vis(mqtt.graph, canvas, this.icons).run();
 
         mqtt.on("packet", vis.make_active.bind(vis));
         mqtt.on("graph", vis.reset_graph.bind(vis));
+
+        mqtt.run();
     }
 
     async stop_vis () {
@@ -45,7 +56,7 @@ class FPlusVis {
     save_creds (creds) {
         console.log("Saving to localStorage");
         try {
-            localStorage.setItem("broker", creds.broker);
+            localStorage.setItem("directory", creds.directory);
             localStorage.setItem("username", creds.username);
             localStorage.setItem("password", creds.password);
         }
@@ -55,12 +66,12 @@ class FPlusVis {
     }
 
     load_creds () {
-        const [broker, username, password] =
-            ["broker", "username", "password"]
+        const [directory, username, password] =
+            ["directory", "username", "password"]
                 .map(n => localStorage.getItem(n));
 
-        if (broker && username && password) {
-            return { broker, username, password };
+        if (directory && username && password) {
+            return { directory, username, password };
         }
         else {
             this.clear_creds();
@@ -73,17 +84,20 @@ class FPlusVis {
     }
 
     login () {
-        const [broker, user, passwd, save, login] =
-            ["broker", "username", "password", "save", "login"]
+        const [directory, user, passwd, save, login] =
+            ["directory", "username", "password", "save", "login"]
                 .map(n => document.getElementById(n));
 
-        if (broker.value == "")
-            broker.value = "wss://mqtt.BASE_URL";
+        if (directory.value == "") {
+            const here = new URL(document.baseURI);
+            here.host = here.host.replace(/^[^.]*/, "directory");
+            directory.value = here.toString();
+        }
 
         return new Promise((resolve, reject) => {
             login.addEventListener("click", () => {
                 const creds = {
-                    broker: broker.value,
+                    directory: directory.value,
                     username: user.value,
                     password: passwd.value,
                 };

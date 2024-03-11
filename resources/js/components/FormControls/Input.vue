@@ -27,7 +27,7 @@
                class="fpl-input flex-grow text-gray-700"
                :class="(valid.$invalid) ? 'ring-2 ring-offset-2 ring-opacity-30 ring-red-500' :''">
         <input v-else v-on:keyup.enter="$emit('keyUpEnter')" :disabled="control.disabled"
-               type="text"
+               :type="type"
                v-model="localValue"
                :placeholder="control.placeholder"
                class="fpl-input flex-grow text-gray-700"
@@ -66,6 +66,10 @@ export default {
     control: {},
     valid: {},
     value: {},
+    type: {
+      type: String,
+      default: 'text',
+    },
     showDescription: {
       type: Boolean,
       default: true,
@@ -84,10 +88,21 @@ export default {
   },
 
   watch: {
-    value (val) {
+    value (val, oldVal) {
+      if (val === oldVal) {
+        return
+      }
       this.localValue = val
     },
+
     localValue (val) {
+
+      if (val.length === 0) {
+        val = null
+      } else if (this.type === 'number') {
+        val = Number(val)
+      }
+
       this.$emit('valueUpdated', val)
       this.$emit('input', val)
     },
@@ -128,7 +143,7 @@ export default {
 
       if (this.localValue === null || this.localValue.length === 0) {
         this.localValue = null
-        return;
+        return
       }
 
       if (!this.device) {

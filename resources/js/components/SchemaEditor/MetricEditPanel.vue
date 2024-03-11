@@ -55,7 +55,18 @@
           <Input :showDescription="false"
                  :control="{name: 'Engineering Unit',}"
                  :valid="{}"
-                 v-model="localMetric.Eng_Unit.default"
+                 :value="localMetric.Eng_Unit?.default" @input="(val) => {
+                   if (val === null) {
+                     if (localMetric.Eng_Unit) {
+                       delete localMetric.Eng_Unit
+                     }
+                     return;
+                   }
+                   if (!localMetric.Eng_Unit) {
+                      localMetric.Eng_Unit = {};
+                   }
+                   localMetric.Eng_Unit.default = val;
+                 }"
           ></Input>
         </div>
       </template>
@@ -66,8 +77,20 @@
         <div class="p-4 w-full">
           <Input :showDescription="false"
                  :control="{name: 'Low',}"
+                 type="number"
                  :valid="{}"
-                 :value="localMetric.Eng_Low.default" @input="(val) => {localMetric.Eng_Low.default = Number(val)}"
+                 :value="localMetric.Eng_Low?.default" @input="(val) => {
+                   if (val === null) {
+                     if (localMetric.Eng_Low) {
+                       delete localMetric.Eng_Low
+                     }
+                     return;
+                   }
+                   if (!localMetric.Eng_Low) {
+                      localMetric.Eng_Low = {};
+                   }
+                   localMetric.Eng_Low.default = val;
+                 }"
           ></Input>
         </div>
       </template>
@@ -79,7 +102,19 @@
           <Input :showDescription="false"
                  :control="{name: 'High',}"
                  :valid="{}"
-                 :value="localMetric.Eng_High.default" @input="(val) => {localMetric.Eng_High.default = Number(val)}"
+                 type="number"
+                 :value="localMetric.Eng_High?.default" @input="(val) => {
+                   if (val === null) {
+                     if (localMetric.Eng_High) {
+                       delete localMetric.Eng_High
+                     }
+                     return;
+                   }
+                   if (!localMetric.Eng_High) {
+                      localMetric.Eng_High = {};
+                   }
+                   localMetric.Eng_High.default = val;
+                 }"
           ></Input>
         </div>
       </template>
@@ -197,15 +232,6 @@ export default {
           Sparkplug_Type: {
             default: ['String'],
           },
-          Eng_Unit: {
-            default: '',
-          },
-          Eng_Low: {
-            default: '',
-          },
-          Eng_High: {
-            default: '',
-          },
         },
         ..._.cloneDeep(this.selectedMetric.property.allOf[1].properties),
       }
@@ -219,6 +245,7 @@ export default {
       localMetric: null,
       metricSchema: null,
       types: null,
+      console: console,
     }
   },
 }

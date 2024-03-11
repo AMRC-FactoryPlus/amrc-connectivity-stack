@@ -7,6 +7,7 @@ module.exports = {
         library: "AMRC_FactoryPlus_Vis",
         path: path.resolve("public"),
         filename: "webpack-modules.js",
+        chunkFilename: "webpack/[id].[name].js",
     },
     mode: "development",
 

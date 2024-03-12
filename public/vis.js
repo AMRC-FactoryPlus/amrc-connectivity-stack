@@ -260,7 +260,7 @@ export default class Vis {
         this.root_node = this.radius / 9;
         this.packet_size = this.radius / 90;
         this.line_width = this.radius / 600;
-		this.text_height = this.height / 68;
+        this.text_height = this.height / 90;
         this.reset_graph();
     }
 

@@ -29,9 +29,12 @@ export default class MQTTClient extends EventEmitter {
         mqtt.on("message", this.on_message.bind(this));
 
         mqtt.subscribe("spBv1.0/#");
+
+        this.expiry_timer = setInterval(() => this.on_expiry(), 3000);
     }
 
     stop () {
+        clearInterval(this.expiry_timer);
         return new Promise((resolve, reject) => {
             this.mqtt.on("end", resolve);
             this.mqtt.end();
@@ -62,8 +65,16 @@ export default class MQTTClient extends EventEmitter {
             graph.online = false;
             graph.children?.forEach(c => c.online = false);
         }
-        if (kind == "BIRTH")
+        if (kind == "BIRTH") {
             this.check_for_schema(message, graph);
+        }
+        if (kind == "CMD" && !graph.seen_data) {
+            graph.expires = Date.now() + 20*1000;
+        }
+        else {
+            graph.seen_data = true;
+            delete graph.expires;
+        }
 
         this.emit("packet", path, kind);
     }
@@ -99,9 +110,32 @@ export default class MQTTClient extends EventEmitter {
             .find(m => m.name == "Schema_UUID")
             ?.value;
 
-        console.log("Found schema %s for %s", schema, node.name);
+        //console.log("Found schema %s for %s", schema, node.name);
         node.schema = schema;
         this.icons.request_icon(schema);
     }
-}
+
+    on_expiry () {
+        const now = Date.now();
+        const changed = [false];
+        this.check_expiry(now, this.graph, changed);
+        if (changed[0])
+            this.emit("graph");
+    }
+
+    check_expiry (now, node, changed) {
+        if (!node.children) return;
+        node.children = node.children.filter(kid => {
+            this.check_expiry(now, kid, changed);
+            const ok = !kid.expires || kid.expires > now;
+            if (!ok) {
+                changed[0] = true;
+                this.known.delete(kid.path);
+            }
+            return ok;
+        });
+        if (!node.children.length && !node.seen_data)
+            node.expires = now;
+    }
+}   
 

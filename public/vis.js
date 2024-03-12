@@ -10,6 +10,12 @@ import Style from "./style.js";
 const TURN = 2*Math.PI;
 const HALF = Math.PI;
 const QUARTER = Math.PI/2;
+const FADEOUT = 15000;
+
+function fade (expires, now) {
+    const rv = 0.2 + Math.min(0.8, Math.max(0, (expires - now)/FADEOUT));
+    return rv;
+}
 
 export default class Vis {
     constructor (graph, canvas, icons) {
@@ -103,24 +109,25 @@ export default class Vis {
         }
     }
 
-    render_nodes (graph) {
+    render_nodes (graph, now) {
         const ctx = this.ctx;
 
         if (graph.children) {
             if (graph.too_many)
                 this.render_too_many(graph);
             else
-              this.render_children(graph);
+              this.render_children(graph, now);
         }
 
         const pos = graph.centre;
         const icon = this.icons.fetch_icon(graph.schema);
-        //ctx.save()
-        //ctx.fillStyle = graph.too_many ? Style.toomany : Style.circles;
+
+        ctx.save()
+        if (graph.expires)
+            ctx.globalAlpha = fade(graph.expires, now);
         if (icon) {
             const r = 0.3*this.root_node;
             graph.text_roff = r;
-            ctx.save();
             ctx.strokeStyle = graph.online ? Style.circles : Style.offline;
             ctx.lineWidth = 4;
             ctx.fillStyle = Style.background;
@@ -132,18 +139,16 @@ export default class Vis {
             ctx.scale(scale, scale);
             ctx.translate(...icon.offset);
             ctx.fill(icon.path);
-            
-            ctx.restore();
         }
         else {
             graph.text_roff = graph.radius;
             const style = graph.online ? "circles" : "offline";
             this.circle(pos[0], pos[1], graph.radius, style);
         }
-        //ctx.restore();
+        ctx.restore();
     }
 
-    render_children (graph) {
+    render_children (graph, now) {
         const ctx = this.ctx;
 
         for (const n of graph.children) {
@@ -156,7 +161,7 @@ export default class Vis {
             ctx.moveTo(...graph.centre);
             ctx.lineTo(...n.centre);
             ctx.stroke();
-            this.render_nodes(n);
+            this.render_nodes(n, now);
         }
     }
 
@@ -187,7 +192,7 @@ export default class Vis {
         ctx.restore();
     }
 
-    render_text (graph) {
+    render_text (graph, now) {
         const ctx = this.ctx;
 
         if (graph.label) {
@@ -196,6 +201,8 @@ export default class Vis {
                 ctx.save();
                 ctx.font = `${size}px ${Style.font}`;
                 ctx.fillStyle = fill;
+                if (graph.expires)
+                    ctx.globalAlpha = fade(graph.expires, now);
                 ctx.translate(centre[0], centre[1]);
                 //ctx.rotate(-0.5);
                 if (offset) {
@@ -223,7 +230,7 @@ export default class Vis {
 
         if (graph.children && !graph.too_many) {
             for (const n of graph.children)
-                this.render_text(n);
+                this.render_text(n, now);
         }
     }
     
@@ -284,6 +291,8 @@ export default class Vis {
         }
 
         const ctx = this.ctx;
+        const now = Date.now();
+
         ctx.reset();
         ctx.save();
         ctx.fillStyle = Style.background;;
@@ -294,8 +303,8 @@ export default class Vis {
         ctx.lineWidth = this.line_width;
         ctx.translate(this.width/2, this.height/2);
 
-        this.render_nodes(this.graph, true);
-        this.render_text(this.graph);
+        this.render_nodes(this.graph, now);
+        this.render_text(this.graph, now);
 
         for (const [_, p] of this.active.entries()) {
             if (!p.render(time, this.circle))

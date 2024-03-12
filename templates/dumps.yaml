@@ -20,6 +20,7 @@
 {{$classDef_gitRepo := "d25f2afc-1ab8-4d27-b51b-d02314624e3e" | quote}}
 {{$classDef_edgeClusterAccount := "97756c9a-38e6-4238-b78c-3df6f227a6c9" | quote}}
 {{$classDef_edgeCluster := "f24d354d-abc1-4e32-98e1-0667b3e40b61" | quote}}
+{{$classDef_metricSchema := "83ee28d4-023e-4c2c-ab86-12c24e86372c" | quote}}
 
 {{$special_wildcard := "00000000-0000-0000-0000-000000000000" | quote}}
 {{$special_self := "5855a1cc-46d8-4b16-84f8-ab3916ecb230" | quote}}
@@ -38,6 +39,7 @@
 {{$application_serviceSetup := "5b47881c-b012-4040-945c-eacafca539b2" | quote}}
 {{$application_edgeAgentConfig := "aac6f843-cfee-4683-b121-6943bfdf9173" | quote }}
 {{$application_serviceConfig := "5b47881c-b012-4040-945c-eacafca539b2" | quote}}
+{{$application_schemaIcon := "65c0ccba-151d-48d3-97b4-d0026a811900" | quote}}
 
 {{$service_configStore := "af15f175-78a0-4e05-97c0-2a0bb82b9f3b" | quote}}
 {{$service_commandEscalation := "78ea7071-24ac-4916-8351-aa3e549d8ccd" | quote}}
@@ -115,6 +117,9 @@
 {{$gitRepoGroup_remoteClusters := "736697bd-3637-4340-8d8a-f4a457d6f483" | quote}}
 {{$gitRepoGroup_sharedRepositories := "9c16e08a-a659-4f02-877f-2949dc4ec7b9" | quote}}
 {{$gitRepo_sharedFluxSystem := "8a3c0860-9e41-48b8-b02f-780a0e582be6" | quote}}
+
+{{$schema_serviceV1 := "05688a03-730e-4cda-9932-172e2c62e45c" | quote}}
+{{$schema_powerMonitoringV2 := "d6de8765-bfbe-4f6b-b5d8-822dbd7f3a49" | quote}}
 
 # XXX These are currently all fixed UUIDs which will end up identical
 # between installations. This is incorrect: these represent the accounts
@@ -854,6 +859,42 @@ data:
           },
           {{$gitRepo_sharedFluxSystem}}: {
             "path": "shared/flux-system"
+          }
+        }
+      }
+    }
+  # Deployment of schema metadata
+  schemas: |
+    {
+      "service": {{$service_configStore}},
+      "version": 1,
+      "classes": [
+        {{$classDef_metricSchema}}
+      ],
+      "objects": {
+        {{$classDef_application}}: [
+          {{$application_schemaIcon}}
+        ],
+        {{$classDef_metricSchema}}: [
+          {{$schema_serviceV1}},
+          {{$schema_powerMonitoringV2}}
+        ]
+      },
+      "configs": {
+        {{$application_generalObjectInformation}}: {
+          {{$classDef_metricSchema}}: { "name": "Metric schema" },
+          {{$application_schemaIcon}}: { "name": "Schema icon" },
+          {{$schema_serviceV1}}: { "name": "Service v1" },
+          {{$schema_powerMonitoringV2}}: { "name": "Power Monitoring v2" }
+        },
+        {{$application_schemaIcon}}: {
+          {{$schema_serviceV1}}: {
+            "bbox": { "top": 0, "left": 0, "width": 512, "height": 512 },
+            "path": "M64 32C28.7 32 0 60.7 0 96v64c0 35.3 28.7 64 64 64H448c35.3 0 64-28.7 64-64V96c0-35.3-28.7-64-64-64H64zm280 72a24 24 0 1 1 0 48 24 24 0 1 1 0-48zm48 24a24 24 0 1 1 48 0 24 24 0 1 1 -48 0zM64 288c-35.3 0-64 28.7-64 64v64c0 35.3 28.7 64 64 64H448c35.3 0 64-28.7 64-64V352c0-35.3-28.7-64-64-64H64zm280 72a24 24 0 1 1 0 48 24 24 0 1 1 0-48zm56 24a24 24 0 1 1 48 0 24 24 0 1 1 -48 0z"
+          },
+          {{$schema_powerMonitoringV2}}: {
+            "bbox": { "top": 0, "left": 0, "width": 384, "height": 512 },
+            "path": "M96 0C78.3 0 64 14.3 64 32v96h64V32c0-17.7-14.3-32-32-32zM288 0c-17.7 0-32 14.3-32 32v96h64V32c0-17.7-14.3-32-32-32zM32 160c-17.7 0-32 14.3-32 32s14.3 32 32 32v32c0 77.4 55 142 128 156.8V480c0 17.7 14.3 32 32 32s32-14.3 32-32V412.8C297 398 352 333.4 352 256V224c17.7 0 32-14.3 32-32s-14.3-32-32-32H32z"
           }
         }
       }

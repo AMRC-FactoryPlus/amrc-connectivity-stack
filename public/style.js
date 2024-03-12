@@ -28,7 +28,7 @@ const Style = {
     text:           "rgb(220, 220, 220)",
     too_many:       "rgb(227,155,220)",
 	too_many_text: 	"rgb(0, 0, 0)",
-    font:           "monospace",
+    font:           "Calibri, sans-serif",
 };
 
 export default Style;

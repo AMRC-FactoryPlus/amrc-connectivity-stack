@@ -4,4 +4,7 @@
  * Copyright 2022 AMRC.
  */
 
-export const { EventEmitter, MQTT, SpB } = AMRC_FactoryPlus_Vis;
+const webpack = await AMRC_FactoryPlus_Vis;
+
+export const { EventEmitter, FactoryPlus } = webpack;
+export const { Address, Topic, MQTT, SpB } = FactoryPlus;

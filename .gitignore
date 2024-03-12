@@ -6,6 +6,10 @@
 # Environment
 .env
 
+# Webpack
+public/webpack-modules.js
+public/webpack/
+
 # Secrets
 /keytabs/
 /volumes/

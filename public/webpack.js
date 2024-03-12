@@ -7,4 +7,4 @@
 const webpack = await AMRC_FactoryPlus_Vis;
 
 export const { EventEmitter, FactoryPlus } = webpack;
-export const { MQTT, SpB } = FactoryPlus;
+export const { Address, Topic, MQTT, SpB } = FactoryPlus;

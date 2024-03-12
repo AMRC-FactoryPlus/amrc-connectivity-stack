@@ -4,7 +4,7 @@
  * Copyright 2022 AMRC.
  */
 
-import { EventEmitter, MQTT, SpB } from "./webpack.js";
+import { Address, Topic, EventEmitter, MQTT, SpB } from "./webpack.js";
 
 const FactoryPlus = "11ad7b32-1d32-4c4a-b0c9-fa049208939a";
 
@@ -41,16 +41,15 @@ export default class MQTTClient extends EventEmitter {
         });
     }
 
-    on_message (topic, message) {
-        const match = topic.match(
-            // Please, please, can I have m!!x back... ?
-            /^spBv1\.0\/([\w.-]+)\/[ND]([A-Z]+)\/([\w. -]+)(?:\/([\w. -]+))?$/);
-        if (!match) {
+    on_message (topicstr, message) {
+        const topic = Topic.parse(topicstr);
+        if (!topic) {
             console.log(`Bad MQTT topic ${topic}`);
             return;
         }
 
-        const [, group, kind, node, device] = match;
+        const { address, type: kind } = topic;
+        const { group, node, device } = address;
 
         const parts = [...group.split("-"), node];
         if (device != undefined) parts.push(device);
@@ -67,6 +66,9 @@ export default class MQTTClient extends EventEmitter {
         }
         if (kind == "BIRTH") {
             this.check_for_schema(message, graph);
+        }
+        if (kind == "DATA") {
+            this.check_directory(address, graph);
         }
         if (kind == "CMD" && !graph.seen_data) {
             graph.expires = Date.now() + 20*1000;
@@ -102,6 +104,8 @@ export default class MQTTClient extends EventEmitter {
     }
 
     check_for_schema (message, node) {
+        node.seen_birth = true;
+
         const payload = SpB.decodePayload(message);
         if (payload.uuid != FactoryPlus)
             return;
@@ -113,6 +117,24 @@ export default class MQTTClient extends EventEmitter {
         //console.log("Found schema %s for %s", schema, node.name);
         node.schema = schema;
         this.icons.request_icon(schema);
+    }
+
+    async check_directory (address, node) {
+        if (node.seen_birth || node.checked_directory)
+            return;
+        node.checked_directory = true;
+
+        const dir = this.fplus.Directory;
+
+        const [st, rv] = await dir.fetch(`v1/address/${address}`);
+        if (st != 200) return;
+        const info = await dir.get_device_info(rv.uuid);
+        
+        if (!info.top_schema) return;
+        if (node.seen_birth) return;
+        
+        node.schema = info.top_schema;
+        this.icons.request_icon(node.schema);
     }
 
     on_expiry () {

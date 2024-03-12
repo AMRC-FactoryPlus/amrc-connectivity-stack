@@ -11,5 +11,14 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "content-type": "^1.0.5",
+    "mqtt": "^5.3.6",
+    "optional-js": "^2.3.0",
+    "semver": "^7.6.0",
+    "sparkplug-payload": "^1.0.3"
+  },
+  "optionalDependencies": {
+    "got-fetch": "^5.1.8",
+    "gssapi.js": "^2.0.1"
   }
 }

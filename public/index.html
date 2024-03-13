@@ -28,18 +28,26 @@
         <label class="flex flex-col gap-1">
           <div class="text-gray-600 font-medium text-xs">Directory</div>
           <input class="fpl-input" id="directory" type="text" size="50"></label>
-        <label  class="flex flex-col gap-1">
+        <label class="flex flex-col gap-1">
           <div class="text-gray-600 font-medium text-xs">Username</div>
           <input class="fpl-input" id="username" type="text" size="50"></label>
-        <label  class="flex flex-col gap-1">
+        <label class="flex flex-col gap-1">
           <div class="text-gray-600 font-medium text-xs">Password</div>
           <input class="fpl-input" id="password" type="password" size="50">
         </label>
-        <label  class="text-gray-500 font-medium">
-          <input class="mb-6" id="save" type="checkbox">
-          Save credentials to browser</label>
 
-        <button class="disabled:opacity-30 disabled:cursor-not-allowed w-full justify-center h-10 inline-flex items-center px-4 py-2 bg-gray-800 border border-transparent text-xs text-white uppercase tracking-widest hover:bg-gray-700 active:bg-gray-900 focus:outline-none focus:border-gray-900 focus:shadow-outline-gray transition ease-in-out duration-150 mb-4" id="login">Log in</button>
+        <div class="text-xs text-gray-400">These credentials will need to have global debugger rights to see much
+          of interest.
+        </div>
+
+        <label class="text-gray-500 font-medium flex items-center">
+          <input class="text-xs" id="save" type="checkbox">
+          <div class="ml-1 text-xs text-gray-500">Save credentials to browser</div>
+        </label>
+
+        <button class="disabled:opacity-30 disabled:cursor-not-allowed w-full justify-center h-10 inline-flex items-center px-4 py-2 bg-gray-800 border border-transparent text-xs text-white uppercase tracking-widest hover:bg-gray-700 active:bg-gray-900 focus:outline-none focus:border-gray-900 focus:shadow-outline-gray transition ease-in-out duration-150 mb-4"
+            id="login">Log in
+        </button>
       </div>
     </div>
   </div>

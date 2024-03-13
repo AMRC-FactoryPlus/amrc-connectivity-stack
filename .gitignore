@@ -16,3 +16,4 @@ public/webpack/
 
 # IDE
 .idea/
+/public/output.css

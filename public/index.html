@@ -1,23 +1,58 @@
 <!DOCTYPE html>
 
 <html>
-    <head>
-        <title>Factory+ visualisation</title>
-        <link rel="shortcut icon" href="fplus.png">
-        <script src="webpack-modules.js"></script>
-        <script type="module" src="index.js"></script>
-    </head>
-    <body style="overflow: hidden; margin: 0px; padding: 0px;">
-        <div id="form">
-            <h2>Factory+ credentials</h2>
-            <p>These will need to have global debugger rights to see much of interest.</p>
-            <label>Directory <input id="directory" type="text" size="50"></label><br>
-            <label>Username <input id="username" type="text" size="50"></label><br>
-            <label>Password <input id="password" type="password" size="50"></label><br>
-            <label><input id="save" type="checkbox"> Save credentials to browser</label><br>
-            <button id="login">Log in</button>
+<head>
+  <title>ACS Visualiser</title>
+  <link rel="shortcut icon" href="fplus.png">
+  <script src="webpack-modules.js"></script>
+  <script type="module" src="index.js"></script>
+  <link rel="stylesheet" type="text/css" href="output.css">
+</head>
+<body style="overflow: hidden; margin: 0px; padding: 0px;">
+<div id="form" class="min-h-screen flex flex-col sm:justify-center items-center pt-6 sm:pt-0 bg-gray-100"
+    style="background-image: url('assets/login-background.png')">
+  <div class="w-full sm:max-w-md mt-6 shadow-md overflow-hidden bg-[#FAFAFA]">
+    <div class="bg-[#434953] p-10 flex items-center justify-center gap-3">
+      <img class="h-12" src="assets/uos-logo.png" alt="">
+      <img class="h-12" src="assets/amrc-logo.png" alt="">
+    </div>
+    <div class="px-6 py-4">
+      <div class="text-gray-600 text-2xl mt-4 font-bold">
+        Factory+
+      </div>
+      <div class="text-gray-400 text-lg mb-3">
+        ACS Visualiser
+      </div>
+
+      <div class="flex flex-col gap-5">
+        <label class="flex flex-col gap-1">
+          <div class="text-gray-600 font-medium text-xs">Directory</div>
+          <input class="fpl-input" id="directory" type="text" size="50"></label>
+        <label class="flex flex-col gap-1">
+          <div class="text-gray-600 font-medium text-xs">Username</div>
+          <input class="fpl-input" id="username" type="text" size="50"></label>
+        <label class="flex flex-col gap-1">
+          <div class="text-gray-600 font-medium text-xs">Password</div>
+          <input class="fpl-input" id="password" type="password" size="50">
+        </label>
+
+        <div class="text-xs text-gray-400">These credentials will need to have global debugger rights to see much
+          of interest.
         </div>
-        <canvas id="canvas"></canvas>
-    </body>
+
+        <label class="text-gray-500 font-medium flex items-center">
+          <input class="text-xs" id="save" type="checkbox">
+          <div class="ml-1 text-xs text-gray-500">Save credentials to browser</div>
+        </label>
+
+        <button class="disabled:opacity-30 disabled:cursor-not-allowed w-full justify-center h-10 inline-flex items-center px-4 py-2 bg-gray-800 border border-transparent text-xs text-white uppercase tracking-widest hover:bg-gray-700 active:bg-gray-900 focus:outline-none focus:border-gray-900 focus:shadow-outline-gray transition ease-in-out duration-150 mb-4"
+            id="login">Log in
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<canvas id="canvas"></canvas>
+</body>
 </html>
 

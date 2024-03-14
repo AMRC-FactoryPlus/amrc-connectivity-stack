@@ -38,6 +38,7 @@ export default class MQTTClient extends EventEmitter {
 
     stop () {
         clearInterval(this.expiry_timer);
+        if (!this.mqtt) return;
         return new Promise((resolve, reject) => {
             this.mqtt.on("end", resolve);
             this.mqtt.end();

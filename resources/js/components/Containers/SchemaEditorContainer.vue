@@ -28,6 +28,10 @@
           <span>Open</span>
           <i class="fa-sharp fa-solid ml-2 fa-folder"></i>
         </button>
+        <button @click="importSchemaFromClipboard" class="fpl-button-secondary h-10 ml-auto">
+          <span>Import from Clipboard</span>
+          <i class="fa-sharp fa-solid ml-2 fa-clipboard"></i>
+        </button>
       </div>
       <input class="font-bold text-brand text-lg bg-gray-100 p-2" v-model="name">
       <List @new="create" @rowSelected="handleRowSelection" @rowDeleted="handleRowDeletion" :guides="false" :properties="schema.properties"
@@ -241,6 +245,21 @@ export default {
 
     open () {
       this.schemaBrowserVisible = true
+    },
+
+    importSchemaFromClipboard() {
+      navigator.clipboard.readText().then(text => {
+        try {
+          let schema = JSON.parse(text)
+          this.selectSchema({ rawSchema: schema })
+        } catch (e) {
+          window.showNotification({
+            title: 'Invalid JSON',
+            description: 'The JSON in the clipboard is not valid.',
+            type: 'error',
+          })
+        }
+      })
     },
 
     selectSchema (schema) {

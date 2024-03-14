@@ -12,11 +12,14 @@ export default class MQTTClient extends EventEmitter {
     constructor (opts) {
         super();
         this.fplus = opts.fplus;
-        this.icons = opts.icons;
+        this.graph = opts.graph;
 
         this.known = new Map();
-        this.graph = {
-            name: opts.name,
+    }
+
+    static graph (name) {
+        return {
+            name,
             online: true,
         };
     }
@@ -35,6 +38,7 @@ export default class MQTTClient extends EventEmitter {
 
     stop () {
         clearInterval(this.expiry_timer);
+        if (!this.mqtt) return;
         return new Promise((resolve, reject) => {
             this.mqtt.on("end", resolve);
             this.mqtt.end();
@@ -116,7 +120,7 @@ export default class MQTTClient extends EventEmitter {
 
         //console.log("Found schema %s for %s", schema, node.name);
         node.schema = schema;
-        this.icons.request_icon(schema);
+        this.emit("schema", schema);
     }
 
     async check_directory (address, node) {
@@ -134,7 +138,7 @@ export default class MQTTClient extends EventEmitter {
         if (node.seen_birth) return;
         
         node.schema = info.top_schema;
-        this.icons.request_icon(node.schema);
+        this.emit("schema", node.schema);
     }
 
     on_expiry () {

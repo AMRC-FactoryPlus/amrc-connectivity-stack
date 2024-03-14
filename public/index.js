@@ -25,31 +25,45 @@ class FPlusVis {
         window.addEventListener("resize", resize);
         resize();
 
-        const fplus = await new FactoryPlus.ServiceClient({
-            directory_url:  opts.directory,
-            username:       opts.username,
-            password:       opts.password,
-            verbose:        "ALL",
-            browser:        true,
-        }).init();
-        window.AMRC_FactoryPlus_Vis_Client = fplus;
+        const graph = MQTTClient.graph("Factory+");
+        const clients = await this.build_clients(opts, graph);
+        this.clients = clients;
+        window.AMRC_FactoryPlus_Vis_Clients = clients;
+
+        const fplus = clients[0].fplus;
         const icons = await new Icons({ fplus }).init();
+        const vis = this.vis = new Vis(graph, canvas, icons);
 
-        const mqtt = this.mqtt = new MQTTClient({
-            fplus, icons,
-            name: "Factory+",
-        });
-        const vis = this.vis = new Vis(mqtt.graph, canvas, icons).run();
+        vis.run();
+        for (const { mqtt } of clients) {
+            mqtt.on("packet", vis.make_active.bind(vis));
+            mqtt.on("graph", vis.reset_graph.bind(vis));
+            mqtt.on("schema", u => icons.request_icon(u));
+            mqtt.run();
+        }
+    }
 
-        mqtt.on("packet", vis.make_active.bind(vis));
-        mqtt.on("graph", vis.reset_graph.bind(vis));
+    async build_clients (opts, graph) {
+        const directories = opts.directory.split(/\s+/);
+        const { username, password } = opts;
 
-        mqtt.run();
+        return Promise.all(directories.map(async directory_url => { 
+            const fplus = await new FactoryPlus.ServiceClient({
+                directory_url, username, password,
+                verbose:        "ALL",
+                browser:        true,
+            }).init();
+            const mqtt = new MQTTClient({ fplus, graph });
+
+            return { fplus, mqtt };
+        }));
     }
 
     async stop_vis () {
         await this.vis.stop();
-        await this.mqtt.stop();
+        for (const { mqtt } of this.clients) {
+            await mqtt.stop();
+        }
         this.canvas.style.display = "none";
     }
 

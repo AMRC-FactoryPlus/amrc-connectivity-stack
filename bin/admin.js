@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { Admin }    from "../lib/admin.js";
+import { Admin }        from "../lib/admin.js";
 
 console.log("ACS Admin interface");
 

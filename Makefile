@@ -59,7 +59,7 @@ restart:
 	sleep 2
 
 logs:
-	${kubectl} logs -f deploy/"${deployment}"
+	${kubectl} logs -f deploy/"${deployment}" -c frontend
 
 else
 

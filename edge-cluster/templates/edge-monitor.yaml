@@ -56,6 +56,8 @@ spec:
     name: "Edge monitor: {{ .Values.cluster.name }}"
     groups:
       - {{ .Values.uuid.group.edgeMonitor }}
+    sparkplug:
+      node: Monitor
 ---
 apiVersion: v1
 kind: ServiceAccount

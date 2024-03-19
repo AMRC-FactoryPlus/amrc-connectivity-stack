@@ -7,6 +7,8 @@ metadata:
     component: krb-keys
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       component: krb-keys

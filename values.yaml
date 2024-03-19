@@ -105,7 +105,7 @@ serviceSetup:
   image:
     registry: ghcr.io/amrc-factoryplus
     repository: acs-service-setup
-    tag: v3.0.0-dev.11
+    tag: v3.0.0-dev.13
     pullPolicy: IfNotPresent
   # This section overrides the classes etc. installed into the ConfigDB
   config:
@@ -119,7 +119,7 @@ serviceSetup:
           acs:
             url: https://github.com/AMRC-FactoryPlus/edge-helm-charts.git
             # Pull this branch/tag
-            ref: v3.0.0-dev.11
+            ref: v3.0.0-dev.13
             # Merge to a local branch, if not otherwise moved
             merge: main
             # Interval to perform updates. 'never' will only update on git

@@ -311,6 +311,8 @@ kubegres:
 traefik:
   enabled: true
   ports:
+    web:
+      expose: false
     mqtt:
       port: 1883
       expose: true

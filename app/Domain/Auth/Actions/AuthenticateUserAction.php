@@ -70,14 +70,17 @@ class AuthenticateUserAction
             }
         }
 
+        // Use the username from the ccache to ensure we include the correct realm
+        $username = $ccache->getPrincipal();
+
         // Get the local user with this username (null if they don't exist)
-        $user = User::whereUsername($username . '@' . config('manager.realm'))->first();
+        $user = User::whereUsername($username)->first();
 
         // If the user doesn't exist then create them
         if (!$user) {
             $user = User::create(
                 [
-                    'username' => $username . '@' . config('manager.realm'),
+                    'username' => $username,
                 ]
             );
         }

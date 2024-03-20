@@ -59,11 +59,15 @@ spec:
             - name: edge-agent-sensitive-information
               mountPath: "/etc/secrets"
               readOnly: true
+            - mountPath: /home/node/.config
+              name: local-config
       volumes:
         - name: edge-agent-sensitive-information
           secret:
             optional: true
             secretName: edge-agent-sensitive-information-{{ .Values.uuid }}
+        - name: local-config
+          emptyDir:
 ---
 apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: SparkplugNode

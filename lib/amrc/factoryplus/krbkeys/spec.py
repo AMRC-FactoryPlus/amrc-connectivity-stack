@@ -13,10 +13,6 @@ from    .secrets    import SecretRef
 from    .util       import Identifiers, dslice, fields, hidden, log
 
 @fields
-class ReconcileStatus:
-    has_old_keys: bool = False
-
-@fields
 class InternalSpec:
     principals: list[str]
     secret: SecretRef
@@ -73,12 +69,6 @@ class InternalSpec:
             kadm.disable_princ(p)
 
     def reconcile (self, force=False):
-        status = ReconcileStatus()
-
-        status.has_old_keys = self.reconcile_key(force)
-        return status
-
-    def reconcile_key (self, force):
         kops = self.kind
         current = self.secret.maybe_read()
 
@@ -104,7 +94,7 @@ class InternalSpec:
 
         status = kops.generate_key(self, oldkey)
         self.secret.write(status.secret)
-        return status.has_old
+        return status
 
     def trim_keys (self):
         self.secret.verify_writable()

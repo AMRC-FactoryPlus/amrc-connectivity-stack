@@ -2,7 +2,7 @@
 
 -include config.mk
 
-version?=v1.3.0
+version?=v1.3.1
 suffix?=
 registry?=ghcr.io/amrc-factoryplus
 repo?=acs-kerberos-keys

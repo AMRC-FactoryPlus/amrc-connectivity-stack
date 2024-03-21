@@ -60,7 +60,7 @@ class Rekey (KrbKeyEvent):
 
         p_meta = self.patch.metadata
         p_meta.annotations[Identifiers.FORCE_REKEY] = None
-        if status.has_old_keys:
+        if status.has_old:
             p_meta.labels[Identifiers.HAS_OLD_KEYS] = "true"
 
 class TrimKeys (KrbKeyEvent):

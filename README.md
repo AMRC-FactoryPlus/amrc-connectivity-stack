@@ -108,6 +108,13 @@ V3.0.0 leverages the power of kubernetes secrets to store sensitive configuratio
 
 ![Edge Clusters - Secrets.jpg](docs%2Fassets%2FEdge%20Clusters%20-%20Secrets.jpg)
 
+## More detailed documentation
+
+These pages document parts of the system in more detail.
+
+* [Edge clusters](./docs/edge-clusters.md)
+* [Edge cluster bootstrap process](./docs/edge-cluster-bootstrap.md)
+
 ## Maintainers
 
 | Name           | Email                       |

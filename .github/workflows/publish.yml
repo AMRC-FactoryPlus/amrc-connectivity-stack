@@ -21,8 +21,6 @@ jobs:
       matrix:
         type: [ "js-build", "js-run" ]
     steps:
-      - name: Set Service Name
-        run: echo "TYPE=${{ matrix.type }}" >> $GITHUB_ENV
       - name: Checkout
         uses: actions/checkout@v3
       - uses: ./.github/actions/prepare
@@ -36,9 +34,9 @@ jobs:
         with:
           context: .
           platforms: linux/amd64,linux/arm64
-          file: ./acs-base-images/Dockerfile.${{ env.TYPE }}
+          file: ./acs-base-images/Dockerfile.${{ matrix.type }}
           push: true
-          tags: ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}-${{ env.TYPE }}:${{ steps.prepare.outputs.version }}
+          tags: ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}-${{ matrix.type }}:${{ steps.prepare.outputs.version }}
           build-args: |
             base=ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}
             version=${{ steps.prepare.outputs.version }}
@@ -49,7 +47,7 @@ jobs:
         id: cleanup
         with:
           version: ${{ steps.prepare.outputs.version }}
-          service-name: ${{ steps.prepare.outputs.service-name }}-${{ env.TYPE }}
+          service-name: ${{ steps.prepare.outputs.service-name }}-${{ matrix.type }}
           digest: ${{ steps.build-and-push.outputs.digest }}
   build-base-pg-build:
     runs-on: ubuntu-latest
@@ -73,7 +71,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           file: ./acs-base-images/Dockerfile.pg-build
           push: true
           tags: ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}-pg-build:${{ steps.prepare.outputs.version }}
@@ -111,7 +109,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           file: ./acs-base-images/Dockerfile.pg-run
           push: true
           tags: ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}-pg-run:${{ steps.prepare.outputs.version }}
@@ -127,27 +125,26 @@ jobs:
           version: ${{ steps.prepare.outputs.version }}
           service-name: ${{ steps.prepare.outputs.service-name }}-pg-run
           digest: ${{ steps.build-and-push.outputs.digest }}
-
-  build:
+  build-x86:
     needs: [ build-base-js, build-base-pg-build, build-base-pg-run ]
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        service: [ 'acs-auth', 'acs-directory', 'acs-cluster-manager', 'acs-cmdesc', 'acs-configdb', 'acs-edge-monitor' ]
+        service: [ 'acs-auth', 'acs-directory', 'acs-cluster-manager', 'acs-cmdesc', 'acs-configdb',
+                   'acs-edge-monitor', 'acs-edge-sync', 'acs-git', 'acs-identity', 'acs-krb-keys-operator',
+                   'acs-krb-utils', 'acs-service-setup', 'acs-visualiser' ]
     permissions:
       contents: read
       packages: write
       id-token: write
       pull-requests: write
     steps:
-      - name: Set Service Name
-        run: echo "SERVICE_NAME=${{ matrix.service }}" >> $GITHUB_ENV
       - name: Checkout
         uses: actions/checkout@v3
       - uses: ./.github/actions/prepare
         id: prepare
         with:
-          service-name: ${{ env.SERVICE_NAME }}
+          service-name: ${{ matrix.service }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build
@@ -167,3 +164,113 @@ jobs:
           version: ${{ steps.prepare.outputs.version }}
           service-name: ${{ steps.prepare.outputs.service-name }}
           digest: ${{ steps.build-and-push.outputs.digest }}
+  build-x86-arm:
+    needs: [ build-base-js, build-base-pg-build, build-base-pg-run ]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [ 'acs-edge' ]
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - uses: ./.github/actions/prepare
+        id: prepare
+        with:
+          service-name: ${{ matrix.service }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build
+        uses: docker/build-push-action@v5
+        id: build-and-push
+        with:
+          context: ./${{ steps.prepare.outputs.service-name }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}:${{ steps.prepare.outputs.version }}
+          labels: ${{  steps.prepare.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - uses: ./.github/actions/cleanup
+        id: cleanup
+        with:
+          version: ${{ steps.prepare.outputs.version }}
+          service-name: ${{ steps.prepare.outputs.service-name }}
+          digest: ${{ steps.build-and-push.outputs.digest }}
+  build-manager:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Skip
+        run: |
+          echo "Skipping"
+  build-mqtt:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Skip
+        run: |
+          echo "Skipping"
+  build-helm-chart:
+    needs: [ 'build-x86', 'build-x86-arm', 'build-manager', 'build-mqtt' ]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Helm
+        run: |
+          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.release.tag_name }}
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Package Helm chart
+        run: |
+          TAG=${{ github.event.release.tag_name }}
+          VERSION=${TAG#v}
+          helm package -u -d deploy/build --version=$VERSION --app-version=$VERSION .
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+      - uses: actions/upload-artifact@v3
+        with:
+          name: new-release
+          path: build/amrc-connectivity-stack-${{ env.VERSION }}.tgz
+
+  # This job checks out the release branch, adds the new release to the /builds folder, builds the index and commits
+  # the changes, which triggers Github to release it as a new pages repo
+  release-helm-chart:
+    needs: build-helm-chart
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Helm
+        run: |
+          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          ref: release
+      - name: add-new-release
+        uses: actions/download-artifact@v3
+        with:
+          name: new-release
+          path: deploy/build
+      - name: Build index
+        run: |
+          cd deploy/build
+          helm repo index --url https://amrc-factoryplus.github.io/amrc-connectivity-stack/build .
+      - name: commit
+        uses: stefanzweifel/git-auto-commit-action@v4
+        id: auto_commit_action
+        with:
+          commit_message: Release ${{ github.event.release.tag_name }}
+          commit_user_name: GitHub Action
+          commit_user_email: actions@github.com
+          branch: release
+          create_branch: true
+          push_options: '--force'

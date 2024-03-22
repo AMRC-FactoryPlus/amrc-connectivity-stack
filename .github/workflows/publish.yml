@@ -26,6 +26,7 @@ jobs:
         id: prepare
         with:
           service-name: ${{ env.SERVICE_NAME }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
 #      - uses: actions/checkout@v3
 #

@@ -1,0 +1,4 @@
+package-lock.json
+service-setup.yaml
+node_modules
+**/*.swp

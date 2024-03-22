@@ -1,0 +1,24 @@
+service: !u UUIDs.Service.ConfigDB
+version: 1
+classes:
+  - !u UUIDs.Class.PermGroup
+objects:
+  !u UUIDs.Class.PermGroup:
+    # XXX Properly this is not a permission group, but a group of
+    # groups. Since we don't have quoting for group membership grant
+    # here will be much too large; the grant of ManageGroup to the edge
+    # krbkeys is root-equivalent.
+    - !u ACS.Group.EdgeGroups
+    - !u ACS.Group.EdgePermissions
+configs:
+  !u UUIDs.App.Info:
+    !u ACS.Group.EdgeGroups:        { name: "Edge-managed groups" }
+    !u ACS.Group.EdgePermissions:   { name: "Edge-managed permissions" }
+#---
+#service: !u UUIDs.Service.Authentication
+#version: 1
+#groups:
+#     These are all granted dynamically
+#  !u ACS.Group.EdgeGroups
+#     We currently don't need any explicit ACEs granted at the edge
+#  !u ACS.Group.EdgePermissions:

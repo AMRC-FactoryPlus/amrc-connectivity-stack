@@ -1,0 +1,43 @@
+# ACS-specific deployment decisions
+service: !u UUIDs.Service.ConfigDB
+version: 1
+classes:
+  - !u UUIDs.Class.EdgeAgent
+  # Not created here
+  - !u ACS.Class.ClientRole
+  - !u ACS.Class.UserGroup
+objects:
+  !u UUIDs.Class.App:
+    - !u Edge.App.AgentConfig
+  !u ACS.Class.ClientRole:
+    - !u Edge.Role.Monitor
+  !u ACS.Class.UserGroup:
+    - !u ACS.Group.SparkplugNode
+configs:
+  !u UUIDs.App.Info:
+    !u UUIDs.Class.EdgeAgent:     { name: "Edge Agent" }
+    !u Edge.App.AgentConfig:      { name: "Edge Agent config" }
+    !u Edge.Role.Monitor:         { name: "Edge Monitor for Agent" }
+    !u ACS.Group.SparkplugNode:   { name: "Sparkplug Node" }
+---
+service: !u UUIDs.Service.Authentication
+version: 1
+principals:
+aces:
+  - principal: !u ACS.Group.SparkplugNode
+    permission: !u ACS.Perm.MQTT.ParticipateAsNode
+    target: !u UUIDs.Special.Self
+  - principal: !u ACS.Group.SparkplugNode
+    permission: !u ACS.Perm.MQTT.RepresentDevices
+    target: !u UUIDs.Special.Self
+  - principal: !u ACS.Group.SparkplugNode
+    permission: !u ACS.Perm.MQTT.ReadAllStates
+    target: !u UUIDs.Special.Null
+  - principal: !u ACS.Group.SparkplugNode
+    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
+    target: !u UUIDs.App.SparkplugAddress
+groups:
+  !u Edge.Role.Monitor:
+    - !u ACS.Perm.MQTT.ReadNode
+    - !u Edge.Perm.ReloadConfig
+    - !u UUIDs.Permission.CmdEsc.Rebirth

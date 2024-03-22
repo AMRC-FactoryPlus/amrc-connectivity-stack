@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ES6",
+    "allowJs": true,
+    "moduleResolution": "Node",
+    "noImplicitAny": true,
+    "removeComments": true,
+    "preserveConstEnums": true,
+    "sourceMap": false,
+    "esModuleInterop": true,
+    "outDir": "./build",
+    "types": ["node"],
+    //"types": ["node", "jest"],
+    "strict": true
+  },
+  "exclude": [
+    "**/__mocks__/*", 
+    "../../node_modules", 
+    "build", 
+    "tests"
+  ]
+}

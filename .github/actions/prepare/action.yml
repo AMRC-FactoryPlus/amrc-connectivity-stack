@@ -8,8 +8,10 @@ inputs:
     description: 'The secrets.GITHUB_TOKEN to use for Docker login. Must be passed as input because composite actions cannot access secrets.'
     required: true
 outputs:
-  meta:
-    value: ${{ steps.meta.outputs }}
+  version:
+    value: ${{ steps.meta.outputs.version }}
+  labels:
+    value: ${{ steps.meta.outputs.labels }}
 runs:
   using: "composite"
   steps:

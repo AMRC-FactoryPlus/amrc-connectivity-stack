@@ -61,15 +61,15 @@ jobs:
         with:
           context: ./${{ env.SERVICE_NAME }}
           push: true
-          tags: ghcr.io/amrc-factoryplus/${{ env.SERVICE_NAME }}:${{ steps.prepare.outputs.meta.version }}
-          labels: ${{  steps.prepare.outputs.meta.labels }}
+          tags: ghcr.io/amrc-factoryplus/${{ env.SERVICE_NAME }}:${{ steps.prepare.outputs.version }}
+          labels: ${{  steps.prepare.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - uses: ./.github/actions/cleanup
         id: cleanup
         with:
-          meta: ${{ steps.prepare.outputs.meta }}
+          version: ${{ steps.prepare.outputs.version }}
           service-name: ${{ env.SERVICE_NAME }}
           digest: ${{ steps.build-and-push.outputs.digest }}
 

@@ -232,8 +232,8 @@ jobs:
         if: steps.check-backend-builder.outputs.needs-build == 'true'
         uses: docker/build-push-action@v4
         with:
-          context: acs-manager
-          file: ./.docker/Dockerfiles/Dockerfile.backend-build
+          context: ./acs-manager
+          file: ./acs-manager/.docker/Dockerfiles/Dockerfile.backend-build
           push: true
           tags: ghcr.io/amrc-factoryplus/acs-manager:backend-build-1.1.0
 
@@ -247,8 +247,8 @@ jobs:
         if: steps.check-backend-base.outputs.needs-build == 'true'
         uses: docker/build-push-action@v4
         with:
-          context: acs-manager
-          file: ./.docker/Dockerfiles/Dockerfile.backend-base
+          context: ./acs-manager
+          file: ./acs-manager/.docker/Dockerfiles/Dockerfile.backend-base
           push: true
           tags: ghcr.io/amrc-factoryplus/acs-manager:prod-base-php82-1.0.6
 
@@ -256,8 +256,8 @@ jobs:
         id: build-backend
         uses: docker/build-push-action@v4
         with:
-          context: acs-manager
-          file: ./.docker/Dockerfiles/Dockerfile
+          context: ./acs-manager
+          file: ./acs-manager/.docker/Dockerfiles/Dockerfile
           load: true
           tags: ${{ steps.prepare.outputs.version }}-backend
           labels: ${{  steps.prepare.outputs.labels }}
@@ -273,9 +273,9 @@ jobs:
         id: build-and-push-frontend
         uses: docker/build-push-action@v4
         with:
-          context: acs-manager
+          context: ./acs-manager
           push: true
-          file: ./.docker/Dockerfiles/Dockerfile
+          file: ./acs-manager/.docker/Dockerfiles/Dockerfile
           target: production-frontend
           tags: ${{ steps.prepare.outputs.version }}-frontend
           labels: ${{ steps.prepare.outputs.labels }}

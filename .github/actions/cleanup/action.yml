@@ -14,6 +14,7 @@ runs:
   using: "composite"
   steps:
     - name: Sign the published Docker image
+      shell: sh
       env:
         COSIGN_EXPERIMENTAL: "true"
       # This step uses the identity token to provision an ephemeral certificate

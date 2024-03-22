@@ -5,7 +5,7 @@ inputs:
     description: 'The name of the service (e.g. acs-auth)'
     required: true
   token:
-    description: '${{ secrets.GITHUB_TOKEN }}'
+    description: 'The secrets.GITHUB_TOKEN to use for Docker login. Must be passed as input because composite actions cannot access secrets.'
     required: true
 outputs:
   meta:
@@ -24,13 +24,3 @@ runs:
       id: meta
       with:
         images: ghcr.io/amrc-factoryplus/${{ inputs.service-name }}
-    - name: Build and push Docker image
-      id: build-and-push
-      uses: docker/build-push-action@ac9327eae2b366085ac7f6a2d02df8aa8ead720a
-      with:
-        context: ./acs-auth
-        push: true
-        tags: ${{ env.IMAGE_BASE }}:${{ steps.meta.outputs.version }}
-        labels: ${{ steps.meta.outputs.labels }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max

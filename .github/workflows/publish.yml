@@ -183,7 +183,12 @@ jobs:
         with:
           service-name: ${{ matrix.service }}
           token: ${{ secrets.GITHUB_TOKEN }}
-
+      - name: Set Git info
+        run: |
+          git describe --tags --dirty
+          git describe --tags --dirty \
+              | sed -e's/^/export const GIT_VERSION="/;s/$/";/' \
+              > ./${{ steps.prepare.outputs.service-name }}/lib/git-version.js "
       - name: Build
         uses: docker/build-push-action@v5
         id: build-and-push
@@ -244,33 +249,33 @@ jobs:
 
   # This job checks out the release branch, adds the new release to the /builds folder, builds the index and commits
   # the changes, which triggers Github to release it as a new pages repo
-  release-helm-chart:
-    needs: build-helm-chart
-    runs-on: ubuntu-latest
-    steps:
-      - name: Install Helm
-        run: |
-          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-      - name: Checkout code
-        uses: actions/checkout@v3
-        with:
-          ref: release
-      - name: add-new-release
-        uses: actions/download-artifact@v3
-        with:
-          name: new-release
-          path: deploy/build
-      - name: Build index
-        run: |
-          cd deploy/build
-          helm repo index --url https://amrc-factoryplus.github.io/amrc-connectivity-stack/build .
-      - name: commit
-        uses: stefanzweifel/git-auto-commit-action@v4
-        id: auto_commit_action
-        with:
-          commit_message: Release ${{ github.event.release.tag_name }}
-          commit_user_name: GitHub Action
-          commit_user_email: actions@github.com
-          branch: release
-          create_branch: true
-          push_options: '--force'
+#  release-helm-chart:
+#    needs: build-helm-chart
+#    runs-on: ubuntu-latest
+#    steps:
+#      - name: Install Helm
+#        run: |
+#          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+#      - name: Checkout code
+#        uses: actions/checkout@v3
+#        with:
+#          ref: release
+#      - name: add-new-release
+#        uses: actions/download-artifact@v3
+#        with:
+#          name: new-release
+#          path: deploy/build
+#      - name: Build index
+#        run: |
+#          cd deploy/build
+#          helm repo index --url https://amrc-factoryplus.github.io/amrc-connectivity-stack/build .
+#      - name: commit
+#        uses: stefanzweifel/git-auto-commit-action@v4
+#        id: auto_commit_action
+#        with:
+#          commit_message: Release ${{ github.event.release.tag_name }}
+#          commit_user_name: GitHub Action
+#          commit_user_email: actions@github.com
+#          branch: release
+#          create_branch: true
+#          push_options: '--force'

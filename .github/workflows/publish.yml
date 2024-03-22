@@ -1,8 +1,5 @@
 name: Build & Publish Docker Image
 
-env:
-  SERVICE_NAME: acs-auth
-
 # ! Change this back to released
 #on:
 #  release:
@@ -14,13 +11,17 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [ "acs-auth", "acs-directory" ]
     permissions:
       contents: read
       packages: write
       id-token: write
       pull-requests: write
-
     steps:
+      - name: Set Service Name
+        run: echo "SERVICE_NAME=${{ matrix.service }}" >> $GITHUB_ENV
       - name: Checkout
         uses: actions/checkout@v3
       - uses: ./.github/actions/prepare
@@ -33,9 +34,9 @@ jobs:
         uses: docker/build-push-action@v5
         id: build-and-push
         with:
-          context: ./${{ env.SERVICE_NAME }}
+          context: ./${{ steps.prepare.outputs.service-name }}
           push: true
-          tags: ghcr.io/amrc-factoryplus/${{ env.SERVICE_NAME }}:${{ steps.prepare.outputs.version }}
+          tags: ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}:${{ steps.prepare.outputs.version }}
           labels: ${{  steps.prepare.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -44,17 +45,5 @@ jobs:
         id: cleanup
         with:
           version: ${{ steps.prepare.outputs.version }}
-          service-name: ${{ env.SERVICE_NAME }}
+          service-name: ${{ steps.prepare.outputs.service-name }}
           digest: ${{ steps.build-and-push.outputs.digest }}
-
-#      # Sign the resulting Docker image digest except on PRs.
-#      # This will only write to the public Rekor transparency log when the Docker
-#      # repository is public to avoid leaking data.  If you would like to publish
-#      # transparency data even for private images, pass --force to cosign below.
-#      # https://github.com/sigstore/cosign
-#      - name: Sign the published Docker image
-#        env:
-#          COSIGN_EXPERIMENTAL: "true"
-#        # This step uses the identity token to provision an ephemeral certificate
-#        # against the sigstore community Fulcio instance.
-#        run: echo "${{ env.IMAGE_BASE }}:${{ steps.meta.outputs.version }}" | xargs -I {} cosign sign --yes {}@${{ steps.build-and-push.outputs.digest }}

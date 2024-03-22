@@ -8,6 +8,8 @@ inputs:
     description: 'The secrets.GITHUB_TOKEN to use for Docker login. Must be passed as input because composite actions cannot access secrets.'
     required: true
 outputs:
+  service-name:
+    value: ${{ inputs.service-name }}
   version:
     value: ${{ steps.meta.outputs.version }}
   labels:

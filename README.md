@@ -1,12 +1,30 @@
 # AMRC Connectivity Stack
 
-The AMRC Connectivity Stack (ACS) is a Kubernetes Helm chart that contains a comprehensive set of open-source services developed by the AMRC that enables an end-to-end implementation of the Factory+ framework.
+The AMRC Connectivity Stack (ACS) is a Kubernetes Helm chart that contains a comprehensive set of open-source services developed by the AMRC that enables an end-to-end implementation of the [Factory+](https://factoryplus.app.amrc.co.uk) framework.
 
 ## Prerequisites
-Ensure that you have `kubectl` access to an existing Kubernetes cluster and familiarise yourself with the concepts of both Kubernetes and [Factory+](https://factoryplus.app.amrc.co.uk) before continuing. This chart installs a full end-to-end deployment of Factory+ onto the cluster and there are a lot of moving parts.
+Ensure that you have `kubectl` access to an existing Kubernetes cluster and familiarise yourself with the concepts of both Kubernetes and [Factory+](https://factoryplus.app.amrc.co.uk) before continuing. This chart installs a full end-to-end deployment of Factory+ onto a central cluster and there are a lot of moving parts.
 
-## Known Limitations
-Although Factory+ and ACS fully supports edge-based Cell Gateways, this chart does not support the deployment of edge-based Cell Gateways located on other Kubernetes Clusters, which is recommended in production. This is due to the fact that the chart deploys manifests to Cell Gateways, which requires the nodes to be on the same cluster. We already have a proof-of-concept implementation of how to address this and we aim to update this Helm chart in the near future to support.
+## What's Changed in V3?
+
+### Edge Clusters
+V3.0.0 of the AMRC Connectivity Stack introduces a number of new components to enable effective management of edge clusters. Prior to this version, the chart was designed to be installed onto a single central cluster that consisted of all central nodes _and_ all edge nodes. This was not ideal for a number of reasons, including the fact that it was impossible to utilise cloud-based clusters with on-premise edge nodes, in most cases.
+
+Through changes to the Manager in V3, is is now possible to create "Edge Clusters" directly from the Manager UI. This action will provide you with a bootstrap script to run on a fresh Kubernetes cluster at the edge. The bootstrap script handles the installation and configuration of all necessary components to connect the edge cluster to the central cluster.
+
+![Edge Clusters - Bootstrap.jpg](docs%2Fassets%2FEdge%20Clusters%20-%20Bootstrap.jpg)
+
+Once the edge cluster is connected to the central cluster, it will appear in the Manager UI and can have workloads assigned to it. The process for assigning workloads to edge clusters relies on components deployed to the edge during the bootstrap process, which ultimately watch the Config Store for changes to their state.
+
+![Edge Clusters - Deployment.jpg](docs%2Fassets%2FEdge%20Clusters%20-%20Deployment.jpg)
+
+### Visualiser
+The Visualiser (`visualiser.<baseURL>`) is a new component included in ACS V3.0.0 that provides a visual representation of Factory+ traffic and MQTT packets. This application is accessible from the Manager UI and provides a real-time overview of the MQTT traffic flowing through the system. It can be useful for debugging and understanding the flow of data through the system but also serves as a great communication tool for demonstrating the capabilities of Factory+.
+
+### Sensitive Information Management
+V3.0.0 leverages the power of kubernetes secrets to store sensitive configuration information such as passwords and keys for connecting to equipment. Whereas before sensitive information was stored in the device configuration files for your devices, it is now stored in kubernetes secrets and accessed by the devices at runtime. This is a more secure way of managing sensitive information ensures that only the edge cluster destined to represent the device has access to the information.
+
+![Edge Clusters - Secrets.jpg](docs%2Fassets%2FEdge%20Clusters%20-%20Secrets.jpg)
 
 ## Get Started
 This chart can be installed onto a local Kubernetes cluster for development or testing by following the instructions below. For production deployments, please refer to the [production deployment guide](#production-deployment).
@@ -24,10 +42,17 @@ helm version
 kubectl version
 ```
 
-### Configure DNS and TLS
-This chart includes an instance of Switchboard to automatically configure DNS and TLS for the deployment. It assumes that you have instances of external-dns and cert-manager installed and configured on your cluster. To enable Switchboard make sure to set `switchboard.enabled` to `true` in the `Values.yaml` file and configure the chart as per the the [Switchboard documentation](https://github.com/borchero/switchboard/blob/main/chart/README.md).
+### Configure DNS
 
-If you do not have external-dns and cert-manager installed or would rather configure DNS & TLS manually then you can create a wildcard DNS entry configured to direct all `*.<baseURL>` requests to your Kubernetes cluster. If you have enabled `acs.secure` then you must also create a wildcard TLS secret on the cluster in the `default` namespace with the same name `factoryplus-tls`.
+This Chart creates a load balancer on your Kubernetes cluster that exposes all services at various subdomains. Please ensure that you have a wildcard DNS entry configured to direct all `*.<baseURL>` requests to your Kubernetes cluster.
+
+### Configure TLS
+
+#### Production Deployment
+If `acs.secure` is set to `true` in your deployment (enabled by default) then you must also create a wildcard TLS secret on the cluster in the`default` namespace with the same name as the value specified in `acs.tlsSecretName` _before_ installing ACS. The TLS certificate must be valid for all domains covered by the wildcard DNS entry.
+
+#### Development (Insecure) Deployment
+If you have disabled `acs.secure` then you can skip this step but ensure that you update the `traefik.ports.web.enbaled` and `traefik.ports.mqtt.enabled` values to `true` in your `values.yaml` file. You may also optionally want to disable the `traefik.ports.websecure.enabled` and `traefik.ports.mqttsecure.enabled` values.
 
 ### Install ACS
 
@@ -58,7 +83,8 @@ kubectl create namespace factory-plus
 
 Finally, install ACS by running the following command.
 ```bash
-helm install acs amrc-connectivity-stack/amrc-connectivity-stack --version ^2.0.0 -f values.yaml --namespace factory-plus
+helm install acs amrc-connectivity-stack/amrc-connectivity-stack --version ^3.0.0 -f values.yaml --namespace 
+factory-plus
 ```
 
 If all went to plan you should now have a fully functioning ACS deployment beginning to deploy to your local Kubernetes cluster. Note that it can take a few minutes to have all services operational.
@@ -89,18 +115,6 @@ echo $(sudo kubectl get secret acs-influxdb2-auth -o jsonpath="{.data.admin-pass
 |----------------|-----------------------------|
 | Alex Godbehere | <alex.godbehere@amrc.co.uk> |
 | Ben Morrow     | <b.morrow@amrc.co.uk>       |
-
-## Requirements
-
-| Repository                                      | Name           | Version |
-|-------------------------------------------------|----------------|---------|
-| https://alexgodbehere.github.io/helm-repository | operator       | 5.0.4   |
-| https://grafana.github.io/helm-charts           | grafana        | 6.52.4  |
-| https://grafana.github.io/helm-charts           | loki           | 4.8.0   |
-| https://grafana.github.io/helm-charts           | promtail       | 6.9.3   |
-| https://helm.influxdata.com/                    | influxdb2      | 2.1.1   |
-| https://helm.traefik.io/traefik                 | traefik        | 10.19.* |
-| https://operator.min.io                         | tenant         | 5.0.3   |
 
 ## Values
 See the `values.yaml` file for possible values. We do not list all values here as they are subject to change and the `values.yaml` file is the source of truth.

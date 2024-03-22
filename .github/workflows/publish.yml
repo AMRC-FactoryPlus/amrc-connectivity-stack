@@ -9,7 +9,8 @@ env:
 #    types: [ published ]
 on:
   pull_request:
-    types: [ opened, synchronize, reopened ]
+    branches:
+      - 'v3.0.0-prep'
 
 jobs:
   build:

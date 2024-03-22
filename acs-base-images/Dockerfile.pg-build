@@ -1,0 +1,44 @@
+# syntax=docker/dockerfile:1
+# 
+# ACS base image for building JS services using Pg
+# This includes, in addition to js-build, Pg libraries with GSSAPI
+# support.
+
+ARG base=ghcr.io/amrc-factoryplus/acs-base
+ARG version=latest
+
+FROM ${base}-js-build:${version}
+
+# This must be here to show up in RUN
+ARG pg_version=16.1
+
+# We need to be root again
+USER root
+
+# Install postgres from source as the alpine package doesn't include
+# GSSAPI support.
+RUN <<SHELL
+    apk add bison flex zlib-dev linux-headers
+
+    wget -O /tmp/postgresql.tar.bz2 "https://ftp.postgresql.org/pub/source/v${pg_version}/postgresql-${pg_version}.tar.bz2"
+    mkdir -p /usr/src/postgresql
+    cd /usr/src/postgresql
+    tar -xf /tmp/postgresql.tar.bz2 --strip-components 1
+
+    ./configure --prefix=/usr/local --with-gssapi --without-icu
+    make -j6
+    make -C src/bin install
+    make -C src/include install
+    make -C src/interfaces install
+
+    # Install a second time into /dist so the run image can pick out the
+    # files it needs.
+    mkdir -p /dist
+    make -C src/bin install DESTDIR=/dist
+    make -C src/include install DESTDIR=/dist
+    make -C src/interfaces install DESTDIR=/dist
+SHELL
+
+# Switch back to the JS build environment
+USER node
+WORKDIR /home/node

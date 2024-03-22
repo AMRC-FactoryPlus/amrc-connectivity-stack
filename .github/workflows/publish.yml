@@ -3,9 +3,13 @@ name: Build & Publish Docker Image
 env:
   REGISTRY: ghcr.io
 
+# ! Change this back to released
+#on:
+#  release:
+#    types: [ published ]
 on:
-  release:
-    types: [ published ]
+  pull-request:
+    types: [ opened, synchronize, reopened ]
 
 jobs:
   build:
@@ -53,9 +57,9 @@ jobs:
         id: build-and-push
         uses: docker/build-push-action@ac9327eae2b366085ac7f6a2d02df8aa8ead720a
         with:
-          context: .
+          context: ./acs-auth
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: acs-auth:${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

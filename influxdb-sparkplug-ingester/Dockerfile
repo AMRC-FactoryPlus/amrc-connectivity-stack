@@ -26,7 +26,7 @@ RUN <<'SHELL'
     fi
     npm install --save=false
 
-    echo "$revision" > ./lib/git-version.js
+    echo "export const GIT_VERSION=\"$revision\";" > ./lib/git-version.js
 
     npm run clean
     echo tsc -v

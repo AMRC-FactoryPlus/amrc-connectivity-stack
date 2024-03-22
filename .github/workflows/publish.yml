@@ -9,124 +9,124 @@ on:
     types: [ opened, synchronize, reopened ]
 
 jobs:
-  build-base-js:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-      # This is used to complete the identity challenge
-      # with sigstore/fulcio when running outside of PRs.
-      id-token: write
-    strategy:
-      matrix:
-        type: [ "js-build", "js-run" ]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-      - uses: ./.github/actions/prepare
-        id: prepare
-        with:
-          service-name: acs-base
-          token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build
-        id: build-and-push
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          platforms: linux/amd64,linux/arm64
-          file: ./acs-base-images/Dockerfile.${{ matrix.type }}
-          push: true
-          tags: ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}-${{ matrix.type }}:${{ steps.prepare.outputs.version }}
-          build-args: |
-            base=ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}
-            version=${{ steps.prepare.outputs.version }}
-          labels: ${{ steps.prepare.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-      - uses: ./.github/actions/cleanup
-        id: cleanup
-        with:
-          version: ${{ steps.prepare.outputs.version }}
-          service-name: ${{ steps.prepare.outputs.service-name }}-${{ matrix.type }}
-          digest: ${{ steps.build-and-push.outputs.digest }}
-  build-base-pg-build:
-    runs-on: ubuntu-latest
-    needs: build-base-js
-    permissions:
-      contents: read
-      packages: write
-      # This is used to complete the identity challenge
-      # with sigstore/fulcio when running outside of PRs.
-      id-token: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-      - uses: ./.github/actions/prepare
-        id: prepare
-        with:
-          service-name: acs-base
-          token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build
-        id: build-and-push
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          platforms: linux/amd64
-          file: ./acs-base-images/Dockerfile.pg-build
-          push: true
-          tags: ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}-pg-build:${{ steps.prepare.outputs.version }}
-          build-args: |
-            base=ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}
-            version=${{ steps.prepare.outputs.version }}
-          labels: ${{ steps.prepare.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-      - uses: ./.github/actions/cleanup
-        id: cleanup
-        with:
-          version: ${{ steps.prepare.outputs.version }}
-          service-name: ${{ steps.prepare.outputs.service-name }}-pg-build
-          digest: ${{ steps.build-and-push.outputs.digest }}
-  build-base-pg-run:
-    runs-on: ubuntu-latest
-    needs: build-base-pg-build
-    permissions:
-      contents: read
-      packages: write
-      # This is used to complete the identity challenge
-      # with sigstore/fulcio when running outside of PRs.
-      id-token: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-      - uses: ./.github/actions/prepare
-        id: prepare
-        with:
-          service-name: acs-base
-          token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build
-        id: build-and-push
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          platforms: linux/amd64
-          file: ./acs-base-images/Dockerfile.pg-run
-          push: true
-          tags: ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}-pg-run:${{ steps.prepare.outputs.version }}
-          build-args: |
-            base=ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}
-            version=${{ steps.prepare.outputs.version }}
-          labels: ${{ steps.prepare.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-      - uses: ./.github/actions/cleanup
-        id: cleanup
-        with:
-          version: ${{ steps.prepare.outputs.version }}
-          service-name: ${{ steps.prepare.outputs.service-name }}-pg-run
-          digest: ${{ steps.build-and-push.outputs.digest }}
+#  build-base-js:
+#    runs-on: ubuntu-latest
+#    permissions:
+#      contents: read
+#      packages: write
+#      # This is used to complete the identity challenge
+#      # with sigstore/fulcio when running outside of PRs.
+#      id-token: write
+#    strategy:
+#      matrix:
+#        type: [ "js-build", "js-run" ]
+#    steps:
+#      - name: Checkout
+#        uses: actions/checkout@v3
+#      - uses: ./.github/actions/prepare
+#        id: prepare
+#        with:
+#          service-name: acs-base
+#          token: ${{ secrets.GITHUB_TOKEN }}
+#      - name: Build
+#        id: build-and-push
+#        uses: docker/build-push-action@v5
+#        with:
+#          context: .
+#          platforms: linux/amd64,linux/arm64
+#          file: ./acs-base-images/Dockerfile.${{ matrix.type }}
+#          push: true
+#          tags: ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}-${{ matrix.type }}:${{ steps.prepare.outputs.version }}
+#          build-args: |
+#            base=ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}
+#            version=${{ steps.prepare.outputs.version }}
+#          labels: ${{ steps.prepare.outputs.labels }}
+#          cache-from: type=gha
+#          cache-to: type=gha,mode=max
+#      - uses: ./.github/actions/cleanup
+#        id: cleanup
+#        with:
+#          version: ${{ steps.prepare.outputs.version }}
+#          service-name: ${{ steps.prepare.outputs.service-name }}-${{ matrix.type }}
+#          digest: ${{ steps.build-and-push.outputs.digest }}
+#  build-base-pg-build:
+#    runs-on: ubuntu-latest
+#    needs: build-base-js
+#    permissions:
+#      contents: read
+#      packages: write
+#      # This is used to complete the identity challenge
+#      # with sigstore/fulcio when running outside of PRs.
+#      id-token: write
+#    steps:
+#      - name: Checkout
+#        uses: actions/checkout@v3
+#      - uses: ./.github/actions/prepare
+#        id: prepare
+#        with:
+#          service-name: acs-base
+#          token: ${{ secrets.GITHUB_TOKEN }}
+#      - name: Build
+#        id: build-and-push
+#        uses: docker/build-push-action@v5
+#        with:
+#          context: .
+#          platforms: linux/amd64
+#          file: ./acs-base-images/Dockerfile.pg-build
+#          push: true
+#          tags: ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}-pg-build:${{ steps.prepare.outputs.version }}
+#          build-args: |
+#            base=ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}
+#            version=${{ steps.prepare.outputs.version }}
+#          labels: ${{ steps.prepare.outputs.labels }}
+#          cache-from: type=gha
+#          cache-to: type=gha,mode=max
+#      - uses: ./.github/actions/cleanup
+#        id: cleanup
+#        with:
+#          version: ${{ steps.prepare.outputs.version }}
+#          service-name: ${{ steps.prepare.outputs.service-name }}-pg-build
+#          digest: ${{ steps.build-and-push.outputs.digest }}
+#  build-base-pg-run:
+#    runs-on: ubuntu-latest
+#    needs: build-base-pg-build
+#    permissions:
+#      contents: read
+#      packages: write
+#      # This is used to complete the identity challenge
+#      # with sigstore/fulcio when running outside of PRs.
+#      id-token: write
+#    steps:
+#      - name: Checkout
+#        uses: actions/checkout@v3
+#      - uses: ./.github/actions/prepare
+#        id: prepare
+#        with:
+#          service-name: acs-base
+#          token: ${{ secrets.GITHUB_TOKEN }}
+#      - name: Build
+#        id: build-and-push
+#        uses: docker/build-push-action@v5
+#        with:
+#          context: .
+#          platforms: linux/amd64
+#          file: ./acs-base-images/Dockerfile.pg-run
+#          push: true
+#          tags: ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}-pg-run:${{ steps.prepare.outputs.version }}
+#          build-args: |
+#            base=ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}
+#            version=${{ steps.prepare.outputs.version }}
+#          labels: ${{ steps.prepare.outputs.labels }}
+#          cache-from: type=gha
+#          cache-to: type=gha,mode=max
+#      - uses: ./.github/actions/cleanup
+#        id: cleanup
+#        with:
+#          version: ${{ steps.prepare.outputs.version }}
+#          service-name: ${{ steps.prepare.outputs.service-name }}-pg-run
+#          digest: ${{ steps.build-and-push.outputs.digest }}
   build-x86:
-    needs: [ build-base-js, build-base-pg-build, build-base-pg-run ]
+#    needs: [ build-base-js, build-base-pg-build, build-base-pg-run ]
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -166,7 +166,7 @@ jobs:
           service-name: ${{ steps.prepare.outputs.service-name }}
           digest: ${{ steps.build-and-push.outputs.digest }}
   build-x86-arm:
-    needs: [ build-base-js, build-base-pg-build, build-base-pg-run ]
+#    needs: [ build-base-js, build-base-pg-build, build-base-pg-run ]
     runs-on: ubuntu-latest
     strategy:
       matrix:

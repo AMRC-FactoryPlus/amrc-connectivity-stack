@@ -19,7 +19,7 @@ COPY package*.json ./
 RUN npm install --save=false
 COPY --chown=node . .
 RUN <<'SHELL'
-    echo "$revision" > ./lib/git-version.js
+    echo "export const GIT_VERSION=\"$revision\";" > ./lib/git-version.js
 SHELL
 
 FROM ${utility_prefix}-run:${utility_ver}

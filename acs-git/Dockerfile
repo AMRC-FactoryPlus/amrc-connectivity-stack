@@ -24,7 +24,7 @@ RUN sh -ex <<'SHELL'
 SHELL
 COPY --chown=node . .
 RUN sh -ex <<'SHELL'
-    echo "$revision" > ./lib/git-version.js
+    echo "export const GIT_VERSION=\"$revision\";" > ./lib/git-version.js
 SHELL
 
 FROM ${acs_run} AS run

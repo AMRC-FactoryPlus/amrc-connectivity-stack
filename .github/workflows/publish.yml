@@ -3,10 +3,6 @@ name: Build & Publish Docker Image
 env:
   REGISTRY: ghcr.io
 
-# ! Change this back to released
-#on:
-#  release:
-#    types: [ published ]
 on:
   pull_request:
     branches:

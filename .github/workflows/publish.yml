@@ -36,7 +36,7 @@ jobs:
         with:
           context: .
           platforms: linux/amd64,linux/arm64
-          file: ./Dockerfile.${{ env.TYPE }}
+          file: ./acs-base-images/Dockerfile.${{ env.TYPE }}
           push: true
           tags: ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}-${{ env.TYPE }}:${{ steps.prepare.outputs.version }}
           build-args: |
@@ -52,6 +52,7 @@ jobs:
           service-name: ${{ steps.prepare.outputs.service-name }}-${{ env.TYPE }}
           digest: ${{ steps.build-and-push.outputs.digest }}
   build:
+    needs: build-base
     runs-on: ubuntu-latest
     strategy:
       matrix:

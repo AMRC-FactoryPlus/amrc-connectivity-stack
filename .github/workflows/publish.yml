@@ -157,8 +157,8 @@ jobs:
           labels: ${{  steps.prepare.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-        build-args: |
-          revision=${{ steps.prepare.outputs.version }} (${{ github.sha }})
+          build-args: |
+            revision=${{ steps.prepare.outputs.version }} (${{ github.sha }})
       - uses: ./.github/actions/cleanup
         id: cleanup
         with:

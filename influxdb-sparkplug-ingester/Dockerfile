@@ -8,9 +8,10 @@ FROM ${acs_build} as ts-compiler
 # This ARG must go here, in the image that uses it, or it isn't
 # available to the shell scripts. Don't ask me why...
 ARG acs_npm=NO
+ARG revision=unknown
+
 USER root
 RUN <<'SHELL'
-    apk add git
     install -d -o node /home/node /usr/app
 SHELL
 USER node
@@ -25,9 +26,7 @@ RUN <<'SHELL'
     fi
     npm install --save=false
 
-    git describe --tags --dirty \
-        | sed -e's/^/export const GIT_VERSION="/;s/$/";/' \
-        > ./lib/git-version.js
+    echo "$revision" > ./lib/git-version.js
 
     npm run clean
     echo tsc -v

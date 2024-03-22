@@ -5,12 +5,13 @@ ARG utility_ver=v1.0.8
 
 FROM ${utility_prefix}-build:${utility_ver} AS build
 
+ARG revision=unknown
+
 # Install the node application on the build container where we can
 # compile the native modules.
 USER root
 RUN <<'SHELL'
     install -d -o node -g node /home/node/app
-    apk add git
 SHELL
 WORKDIR /home/node/app
 USER node
@@ -18,9 +19,7 @@ COPY package*.json ./
 RUN npm install --save=false
 COPY --chown=node . .
 RUN <<'SHELL'
-    git describe --tags --dirty \
-        | sed -re's/-[0-9]+-/-/;s/(.*)/export const GIT_VERSION="\1";/' \
-        > lib/git-version.js
+    echo "$revision" > ./lib/git-version.js
 SHELL
 
 FROM ${utility_prefix}-run:${utility_ver}

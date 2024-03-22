@@ -157,7 +157,8 @@ jobs:
           labels: ${{  steps.prepare.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
+        build-args: |
+          revision=${{ steps.prepare.outputs.version }} (${{ github.sha }})
       - uses: ./.github/actions/cleanup
         id: cleanup
         with:
@@ -183,12 +184,6 @@ jobs:
         with:
           service-name: ${{ matrix.service }}
           token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Set Git info
-        run: |
-          git describe --tags --dirty
-          git describe --tags --dirty \
-              | sed -e's/^/export const GIT_VERSION="/;s/$/";/' \
-              > ./${{ steps.prepare.outputs.service-name }}/lib/git-version.js "
       - name: Build
         uses: docker/build-push-action@v5
         id: build-and-push
@@ -196,6 +191,8 @@ jobs:
           context: ./${{ steps.prepare.outputs.service-name }}
           platforms: linux/amd64,linux/arm64
           push: true
+          build-args: |
+            revision=${{ steps.prepare.outputs.version }} (${{ github.sha }})
           tags: ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}:${{ steps.prepare.outputs.version }}
           labels: ${{  steps.prepare.outputs.labels }}
           cache-from: type=gha

@@ -8,6 +8,7 @@ ARG acs_npm=NO
 ARG kubeseal_version=0.21.0
 ARG TARGETOS
 ARG TARGETARCH
+ARG revision=unknown
 
 USER root
 RUN <<'SHELL'
@@ -16,7 +17,6 @@ RUN <<'SHELL'
     tar="kubeseal-${kubeseal_version}-${TARGETOS}-${TARGETARCH}.tar.gz"
     wget "https://github.com/bitnami-labs/sealed-secrets/releases/download/v${kubeseal_version}/${tar}"
     tar -xvf "${tar}" -C /usr/local/bin kubeseal
-    apk add git
 SHELL
 WORKDIR /home/node/app
 USER node
@@ -32,9 +32,7 @@ RUN <<'SHELL'
 SHELL
 COPY --chown=node . .
 RUN <<'SHELL'
-    git describe --tags --dirty \
-        | sed -re's/-[0-9]+-/-/;s/(.*)/export const GIT_VERSION="\1";/' \
-        > lib/git-version.js
+    echo "$revision" > ./lib/git-version.js
 SHELL
 
 FROM ${acs_run} AS run

@@ -5,9 +5,10 @@ ARG acs_run=ghcr.io/amrc-factoryplus/utilities-run:v1.0.8
 
 FROM ${acs_build} AS build
 ARG acs_npm=NO
+ARG revision=unknown
+
 USER root
 RUN sh -ex <<'SHELL'
-    apk add git
     install -d -o node -g node /home/node/app
 SHELL
 WORKDIR /home/node/app
@@ -23,10 +24,7 @@ RUN sh -ex <<'SHELL'
 SHELL
 COPY --chown=node . .
 RUN sh -ex <<'SHELL'
-    git describe --tags --dirty \
-        | sed -re's/-[0-9]+-/-/;s/(.*)/export const GIT_VERSION="\1";/' \
-        > lib/git-version.js
-    rm -rf .git
+    echo "$revision" > ./lib/git-version.js
 SHELL
 
 FROM ${acs_run} AS run

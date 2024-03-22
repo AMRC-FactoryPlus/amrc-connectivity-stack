@@ -65,7 +65,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - uses: ./.github/actions/cleanup
-        id: prepare
+        id: cleanup
         with:
           meta: ${{ steps.prepare.outputs.meta }}
           service-name: ${{ env.SERVICE_NAME }}

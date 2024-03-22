@@ -1,0 +1,48 @@
+FROM php:8.2-fpm-alpine as procuction
+MAINTAINER Alex Godbehere
+
+# Install/enable required PHP extensions
+
+# Ensure that we're using the production configuration before we start to install extensions or they'll be installed into the wrong configuration
+RUN mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
+
+# Override the logging configuration
+COPY .docker/app/logging.ini "$PHP_INI_DIR/conf.d/zzz-logging.ini"
+COPY .docker/app/disable-access-log.conf "/usr/local/etc/php-fpm.d/zzz-disable-access-log.conf"
+
+# Install required packages
+RUN apk add --no-cache mysql-client mariadb-connector-c-dev \
+    libxml2-dev oniguruma-dev php82-fileinfo php82-session php82-bcmath \
+    php82-tokenizer php82-dom php82-xml php82-xmlwriter php82-simplexml \
+    php82-sodium php82-pdo git \
+    autoconf krb5-libs krb5-dev postgresql-dev nodejs yarn gcc make g++
+
+## Install PHP extensions
+COPY --from=mlocati/php-extension-installer /usr/bin/install-php-extensions /usr/bin/
+RUN install-php-extensions \
+    excimer \
+    gd \
+    opcache \
+    fileinfo \
+    bcmath \
+    session \
+    dom \
+    mysqli \
+    mbstring \
+    pdo \
+    pdo_mysql \
+    pdo_pgsql \
+    xml \
+    yaml \
+    pcntl \
+    # Add more extensions here if needed \
+    && find "$(php-config --extension-dir)" -name '*.so' -type f -exec strip --strip-all {} \; \
+    && rm -rf /usr/src/php/ext
+
+
+ADD https://pecl.php.net/get/krb5-1.1.4.tgz ./
+RUN tar -xzf ./krb5-1.1.4.tgz && rm krb5-1.1.4.tgz && cd ./krb5-1.1.4 && phpize && ./configure --with-krb5 --with-krb5kadm && make && make install
+RUN echo extension=krb5.so >> $PHP_INI_DIR/php.ini
+
+# Set working directory
+WORKDIR /app

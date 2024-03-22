@@ -1,0 +1,239 @@
+/*
+ *  Factory+ / AMRC Connectivity Stack (ACS) Manager component
+ *  Copyright 2023 AMRC
+ */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+h1 {
+  @apply text-brand tracking-wider text-xl
+}
+
+h2 {
+  @apply text-brand
+}
+
+h3 {
+  @apply text-lg text-gray-500
+}
+
+h4 {
+  @apply block font-medium text-sm text-gray-700
+}
+
+.fpl-button {
+  @apply px-2 py-1 inline-flex items-center flex items-center justify-center border border-transparent text-sm font-medium opacity-90 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-opacity-30 disabled:cursor-not-allowed disabled:opacity-30 transition duration-100 ease-out;
+}
+
+.fpl-button-brand {
+  @apply px-2 py-1 inline-flex h-10 items-center flex items-center justify-center border border-transparent text-sm font-medium opacity-90 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-opacity-30 disabled:cursor-not-allowed disabled:opacity-30 transition duration-100 ease-out bg-brand focus:ring-brand text-white focus:ring-brand
+}
+
+.fpl-button-error {
+  @apply px-2 py-1 inline-flex items-center flex items-center justify-center border border-transparent text-sm font-medium opacity-90 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-opacity-30 disabled:cursor-not-allowed disabled:opacity-30 transition duration-100 ease-out bg-red-400 focus:ring-red-400 text-white focus:ring-red-400
+}
+
+.fpl-button-success {
+  @apply px-2 py-1 inline-flex items-center flex items-center justify-center border border-transparent text-sm font-medium opacity-90 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-opacity-30 disabled:cursor-not-allowed disabled:opacity-30 transition duration-100 ease-out bg-green-400 focus:ring-green-400 text-white focus:ring-green-400
+}
+
+.fpl-button-primary {
+  @apply px-2 py-1 inline-flex items-center flex items-center justify-center border border-transparent text-sm font-medium opacity-90 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-opacity-30 disabled:cursor-not-allowed disabled:opacity-30 transition duration-100 ease-out bg-gray-700 text-white focus:ring-gray-700
+}
+
+.fpl-button-secondary {
+  @apply px-2 py-1 inline-flex items-center flex items-center justify-center hover:bg-gray-200 border border-transparent text-sm font-medium opacity-90 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-opacity-30 disabled:cursor-not-allowed disabled:opacity-30 transition duration-75 ease-out text-gray-500 focus:ring-gray-400
+}
+
+.fpl-button-back {
+  @apply px-2 py-1 inline-flex items-center flex items-center justify-center border border-transparent text-sm font-medium opacity-90 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-opacity-30 disabled:cursor-not-allowed disabled:opacity-30 transition duration-100 ease-out bg-white text-gray-500 focus:ring-gray-500
+}
+
+.fpl-button-info {
+  @apply text-gray-300 py-1 px-1 hover:text-gray-400
+}
+
+.fpl-input {
+  @apply inline-flex items-center py-2 px-2 flex items-center justify-center border border-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-opacity-30;
+}
+
+.notification {
+  left: 50%;
+  transform: translateX(-50%)
+}
+
+/* Notification Style Overrides*/
+
+
+.Vue-Toastification__toast {
+  @apply font-sans p-4 pb-5 rounded-none shadow-xl  !important;
+}
+
+.Vue-Toastification__toast--default {
+  @apply bg-white text-gray-500 !important;
+}
+
+.Vue-Toastification__progress-bar {
+  @apply bg-brand !important;
+}
+
+.Vue-Toastification__toast--info {
+  @apply bg-white text-gray-500  !important;
+}
+
+.Vue-Toastification__toast--success {
+  @apply bg-white text-green-500  !important;
+}
+
+.Vue-Toastification__toast--error {
+  @apply bg-white text-red-500  !important;
+}
+
+.Vue-Toastification__toast--warning {
+  @apply bg-white text-orange-500  !important;
+}
+
+@keyframes fadeFplOutLeft {
+  0% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(-50px);
+    opacity: 0;
+  }
+}
+
+@keyframes fadeFplInLeft {
+  0% {
+    transform: translateX(-50px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.fade-fpl-enter-active {
+  animation-name: fadeFplInLeft;
+  animation-duration: 100ms !important;
+}
+
+.fade-fpl-leave-active {
+  animation-name: fadeFplOutLeft;
+  animation-duration: 100ms !important;
+}
+
+.fade-fpl-move {
+  transition-timing-function: linear;
+  transition-property: opacity;
+  transition-duration: 100ms !important;
+}
+
+.tooltip {
+  display: block !important;
+  z-index: 10000;
+}
+
+.tooltip .tooltip-inner {
+  @apply bg-white text-gray-700 text-sm shadow-lg px-3 py-1.5 text-xs
+}
+
+.tooltip .tooltip-arrow {
+  width: 0;
+  height: 0;
+  opacity: 0;
+  border-style: solid;
+  position: absolute;
+  margin: 5px;
+  border-color: black;
+  z-index: 1;
+}
+
+.tooltip[x-placement^="top"] {
+  margin-bottom: 5px;
+}
+
+.tooltip[x-placement^="top"] .tooltip-arrow {
+  border-width: 5px 5px 0 5px;
+  border-left-color: transparent !important;
+  border-right-color: transparent !important;
+  border-bottom-color: transparent !important;
+  bottom: -5px;
+  left: calc(50% - 5px);
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.tooltip[x-placement^="bottom"] {
+  margin-top: 5px;
+}
+
+.tooltip[x-placement^="bottom"] .tooltip-arrow {
+  border-width: 0 5px 5px 5px;
+  border-left-color: transparent !important;
+  border-right-color: transparent !important;
+  border-top-color: transparent !important;
+  top: -5px;
+  left: calc(50% - 5px);
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.tooltip[x-placement^="right"] {
+  margin-left: 5px;
+}
+
+.tooltip[x-placement^="right"] .tooltip-arrow {
+  border-width: 5px 5px 5px 0;
+  border-left-color: transparent !important;
+  border-top-color: transparent !important;
+  border-bottom-color: transparent !important;
+  left: -5px;
+  top: calc(50% - 5px);
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.tooltip[x-placement^="left"] {
+  margin-right: 5px;
+}
+
+.tooltip[x-placement^="left"] .tooltip-arrow {
+  border-width: 5px 0 5px 5px;
+  border-top-color: transparent !important;
+  border-right-color: transparent !important;
+  border-bottom-color: transparent !important;
+  right: -5px;
+  top: calc(50% - 5px);
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.tooltip.popover .popover-inner {
+  background: #f9f9f9;
+  color: black;
+  padding: 24px;
+  border-radius: 5px;
+  box-shadow: 0 5px 30px rgba(0, 0, 0, 0.1);
+}
+
+.tooltip.popover .popover-arrow {
+  border-color: #f9f9f9;
+}
+
+.tooltip[aria-hidden='true'] {
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity .15s, visibility .15s;
+}
+
+.tooltip[aria-hidden='false'] {
+  visibility: visible;
+  opacity: 1;
+  transition: opacity .15s;
+}

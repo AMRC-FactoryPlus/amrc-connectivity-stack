@@ -9,6 +9,48 @@ on:
     types: [ opened, synchronize, reopened ]
 
 jobs:
+  build-base:
+    runs-on: ubuntu-latest
+    permissions:
+      strategy:
+        matrix:
+          type: [ "js-build", "js-run", "pg-build", "pg-run" ]
+      contents: read
+      packages: write
+      # This is used to complete the identity challenge
+      # with sigstore/fulcio when running outside of PRs.
+      id-token: write
+    steps:
+      - name: Set Service Name
+        run: echo "TYPE=${{ matrix.type }}" >> $GITHUB_ENV
+      - name: Checkout
+        uses: actions/checkout@v3
+      - uses: ./.github/actions/prepare
+        id: prepare
+        with:
+          service-name: acs-base
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build JS Build Base
+        id: build-and-push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          file: ./Dockerfile.${{ env.TYPE }}
+          push: true
+          tags: ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}-${{ env.TYPE }}:${{ steps.prepare.outputs.version }}
+          build-args: |
+            base=ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}
+            version=${{ steps.prepare.outputs.version }}
+          labels: ${{ steps.prepare.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - uses: ./.github/actions/cleanup
+        id: cleanup
+        with:
+          version: ${{ steps.prepare.outputs.version }}
+          service-name: ${{ steps.prepare.outputs.service-name }}-${{ env.TYPE }}
+          digest: ${{ steps.build-and-push.outputs.digest }}
   build:
     runs-on: ubuntu-latest
     strategy:

@@ -1,0 +1,21 @@
+name: 'Cleanup ACS Build'
+description: 'Cleanup after AMRC Connectivity Stack build steps'
+inputs:
+  service-name:
+    description: 'The name of the service (e.g. acs-auth)'
+    required: true
+  meta:
+    description: 'The meta information of the built container'
+    required: true
+  digest:
+    description: 'The digest output from the build-and-push step'
+    required: true
+runs:
+  using: "composite"
+  steps:
+    - name: Sign the published Docker image
+      env:
+        COSIGN_EXPERIMENTAL: "true"
+      # This step uses the identity token to provision an ephemeral certificate
+      # against the sigstore community Fulcio instance.
+      run: echo "ghcr.io/amrc-factoryplus/${{ inputs.service-name }}:${{ inputs.meta.outputs.version }}" | xargs -I {} cosign sign --yes {}@${{ inputs.digest }}

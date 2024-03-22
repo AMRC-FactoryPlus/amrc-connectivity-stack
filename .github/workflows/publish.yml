@@ -125,99 +125,99 @@ jobs:
 #          version: ${{ steps.prepare.outputs.version }}
 #          service-name: ${{ steps.prepare.outputs.service-name }}-pg-run
 #          digest: ${{ steps.build-and-push.outputs.digest }}
-  build-x86:
-#    needs: [ build-base-js, build-base-pg-build, build-base-pg-run ]
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        service: [ 'acs-auth', 'acs-directory', 'acs-cluster-manager', 'acs-cmdesc', 'acs-configdb',
-                   'acs-edge-monitor', 'acs-edge-sync', 'acs-git', 'acs-identity', 'acs-krb-keys-operator',
-                   'acs-krb-utils', 'acs-service-setup', 'acs-visualiser' ]
-    permissions:
-      contents: read
-      packages: write
-      id-token: write
-      pull-requests: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-      - uses: ./.github/actions/prepare
-        id: prepare
-        with:
-          service-name: ${{ matrix.service }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build
-        uses: docker/build-push-action@v5
-        id: build-and-push
-        with:
-          context: ./${{ steps.prepare.outputs.service-name }}
-          push: true
-          tags: ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}:${{ steps.prepare.outputs.version }}
-          labels: ${{  steps.prepare.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          build-args: |
-            revision=${{ steps.prepare.outputs.version }} (${{ github.sha }})
-      - uses: ./.github/actions/cleanup
-        id: cleanup
-        with:
-          version: ${{ steps.prepare.outputs.version }}
-          service-name: ${{ steps.prepare.outputs.service-name }}
-          digest: ${{ steps.build-and-push.outputs.digest }}
-  build-x86-arm:
-#    needs: [ build-base-js, build-base-pg-build, build-base-pg-run ]
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        service: [ 'acs-edge' ]
-    permissions:
-      contents: read
-      packages: write
-      id-token: write
-      pull-requests: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-      - uses: ./.github/actions/prepare
-        id: prepare
-        with:
-          service-name: ${{ matrix.service }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build
-        uses: docker/build-push-action@v5
-        id: build-and-push
-        with:
-          context: ./${{ steps.prepare.outputs.service-name }}
-          platforms: linux/amd64,linux/arm64
-          push: true
-          build-args: |
-            revision=${{ steps.prepare.outputs.version }} (${{ github.sha }})
-          tags: ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}:${{ steps.prepare.outputs.version }}
-          labels: ${{  steps.prepare.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - uses: ./.github/actions/cleanup
-        id: cleanup
-        with:
-          version: ${{ steps.prepare.outputs.version }}
-          service-name: ${{ steps.prepare.outputs.service-name }}
-          digest: ${{ steps.build-and-push.outputs.digest }}
-  build-manager:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Skip
-        run: |
-          echo "Skipping"
-  build-mqtt:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Skip
-        run: |
-          echo "Skipping"
+#  build-x86:
+##    needs: [ build-base-js, build-base-pg-build, build-base-pg-run ]
+#    runs-on: ubuntu-latest
+#    strategy:
+#      matrix:
+#        service: [ 'acs-auth', 'acs-directory', 'acs-cluster-manager', 'acs-cmdesc', 'acs-configdb',
+#                   'acs-edge-monitor', 'acs-edge-sync', 'acs-git', 'acs-identity', 'acs-krb-keys-operator',
+#                   'acs-krb-utils', 'acs-service-setup', 'acs-visualiser' ]
+#    permissions:
+#      contents: read
+#      packages: write
+#      id-token: write
+#      pull-requests: write
+#    steps:
+#      - name: Checkout
+#        uses: actions/checkout@v3
+#      - uses: ./.github/actions/prepare
+#        id: prepare
+#        with:
+#          service-name: ${{ matrix.service }}
+#          token: ${{ secrets.GITHUB_TOKEN }}
+#
+#      - name: Build
+#        uses: docker/build-push-action@v5
+#        id: build-and-push
+#        with:
+#          context: ./${{ steps.prepare.outputs.service-name }}
+#          push: true
+#          tags: ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}:${{ steps.prepare.outputs.version }}
+#          labels: ${{  steps.prepare.outputs.labels }}
+#          cache-from: type=gha
+#          cache-to: type=gha,mode=max
+#          build-args: |
+#            revision=${{ steps.prepare.outputs.version }} (${{ github.sha }})
+#      - uses: ./.github/actions/cleanup
+#        id: cleanup
+#        with:
+#          version: ${{ steps.prepare.outputs.version }}
+#          service-name: ${{ steps.prepare.outputs.service-name }}
+#          digest: ${{ steps.build-and-push.outputs.digest }}
+#  build-x86-arm:
+##    needs: [ build-base-js, build-base-pg-build, build-base-pg-run ]
+#    runs-on: ubuntu-latest
+#    strategy:
+#      matrix:
+#        service: [ 'acs-edge' ]
+#    permissions:
+#      contents: read
+#      packages: write
+#      id-token: write
+#      pull-requests: write
+#    steps:
+#      - name: Checkout
+#        uses: actions/checkout@v3
+#      - uses: ./.github/actions/prepare
+#        id: prepare
+#        with:
+#          service-name: ${{ matrix.service }}
+#          token: ${{ secrets.GITHUB_TOKEN }}
+#      - name: Build
+#        uses: docker/build-push-action@v5
+#        id: build-and-push
+#        with:
+#          context: ./${{ steps.prepare.outputs.service-name }}
+#          platforms: linux/amd64,linux/arm64
+#          push: true
+#          build-args: |
+#            revision=${{ steps.prepare.outputs.version }} (${{ github.sha }})
+#          tags: ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}:${{ steps.prepare.outputs.version }}
+#          labels: ${{  steps.prepare.outputs.labels }}
+#          cache-from: type=gha
+#          cache-to: type=gha,mode=max
+#
+#      - uses: ./.github/actions/cleanup
+#        id: cleanup
+#        with:
+#          version: ${{ steps.prepare.outputs.version }}
+#          service-name: ${{ steps.prepare.outputs.service-name }}
+#          digest: ${{ steps.build-and-push.outputs.digest }}
+#  build-manager:
+#    runs-on: ubuntu-latest
+#    steps:
+#      - name: Skip
+#        run: |
+#          echo "Skipping"
+#  build-mqtt:
+#    runs-on: ubuntu-latest
+#    steps:
+#      - name: Skip
+#        run: |
+#          echo "Skipping"
   build-helm-chart:
-    needs: [ 'build-x86', 'build-x86-arm', 'build-manager', 'build-mqtt' ]
+#    needs: [ 'build-x86', 'build-x86-arm', 'build-manager', 'build-mqtt' ]
     runs-on: ubuntu-latest
     steps:
       - name: Install Helm
@@ -237,7 +237,7 @@ jobs:
         run: |
           TAG=${{ github.event.release.tag_name }}
           VERSION=${TAG#v}
-          helm package -u -d deploy/build --version=$VERSION --app-version=$VERSION .
+          helm package -u -d deploy/build --version=$VERSION --app-version=$VERSION deploy
           echo "VERSION=$VERSION" >> $GITHUB_ENV
       - uses: actions/upload-artifact@v3
         with:

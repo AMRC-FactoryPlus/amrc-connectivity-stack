@@ -4,6 +4,8 @@ This document assumes familiarity which the [overall
 architecture](./edge-clusters.md), including the data structures used by
 the ConfigDB.
 
+![Diagram of edge deployment](./assets/Edge%20Clusters%20-%20Deployment.jpg)
+
 ## Edge Helm Charts
 
 When an Edge Agent is deployed in the Manager, you need to specify what
@@ -15,13 +17,13 @@ this removes the need to keep pushing more drivers into the Edge Agent
 codebase itself.
 
 Services that can be deployed to the edge must be packaged in the form
-of a Helm chart. These Helm charts live in another Git repo on the
-central cluster, from where the Flux installations on the edge clusters
-can pull them. A default installation of ACS will pull the on-prem Helm
-charts repo from the `edge-helm-charts` repo on the AMRC-FactoryPlus
-Github, but this can be changed in the ACS `values.yaml`. Currently all
-deployable Helm charts must be present in the `main` branch of the
-single Helm charts repo.
+of a [Helm](https://helm.sh) chart. These Helm charts live in another
+Git repo on the central cluster, from where the Flux installations on
+the edge clusters can pull them. A default installation of ACS will pull
+the on-prem Helm charts repo from the `edge-helm-charts` repo on the
+AMRC-FactoryPlus Github, but this can be changed in the ACS
+`values.yaml`. Currently all deployable Helm charts must be present in
+the `main` branch of the single Helm charts repo.
 
 In order to allow for deploying the same chart in different
 configurations, the ConfigDB contains a set of 'Helm chart template'
@@ -49,7 +51,8 @@ cluster, subject to 'specialised host' taints applied in Kubernetes.
 These deployment entries are picked up by the Edge Sync operator on the
 edge cluster. This operator picks out the entries applicable to its own
 cluster and uses the 'Helm chart template' entries to construct a set of
-Flux HelmRelease Kubernetes objects. 
+Flux HelmRelease Kubernetes objects. Flux on the edge then pulls the
+Helm charts from the internal Git repo and performs the deployment.
 
 ## Edge Agent configuration
 
@@ -58,6 +61,8 @@ information also goes into the ConfigDB. The Edge Agent pulls its
 configuration from the ConfigDB at startup, and the Edge Monitor tracks
 the current state of the ConfigDB and instructs the Edge Agent to reload
 its config if it is out of date.
+
+![Diagram of secret sealing process](./assets/Edge%20Clusters%20-%20Secrets.jpg)
 
 Secret information (credentials for communicating with devices) is
 handled differently from the rest of the configuration. The
@@ -194,8 +199,9 @@ KerberosKeys which create an account in the Factory+ services have an
       Sparkplug Group associated with the Cluster UUID.
 
 The operator will attach a
-`krbkeys.factoryplus.app.amrc.co.uk/account-uuid` to the KerberosKey
-resource once it has decided what the account UUID should be.
+`krbkeys.factoryplus.app.amrc.co.uk/account-uuid` annotation to the
+KerberosKey resource once it has decided what the account UUID should
+be.
 
 ### SparkplugNode Kubernetes resouce
 

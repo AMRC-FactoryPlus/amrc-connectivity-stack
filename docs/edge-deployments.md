@@ -4,7 +4,7 @@ This document assumes familiarity which the [overall
 architecture](./edge-clusters.md), including the data structures used by
 the ConfigDB.
 
-![Diagram of edge deployment](./assets/Edge%20Clusters%20-%20Deployment.jpg)
+![Diagram of edge deployment](assets/edge-clusters/deployment.jpeg)
 
 ## Edge Helm Charts
 
@@ -62,7 +62,7 @@ configuration from the ConfigDB at startup, and the Edge Monitor tracks
 the current state of the ConfigDB and instructs the Edge Agent to reload
 its config if it is out of date.
 
-![Diagram of secret sealing process](./assets/Edge%20Clusters%20-%20Secrets.jpg)
+![Diagram of secret sealing process](assets/edge-clusters/secrets.jpeg)
 
 Secret information (credentials for communicating with devices) is
 handled differently from the rest of the configuration. The

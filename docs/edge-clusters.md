@@ -1,23 +1,18 @@
-# ACS Edge Cluster
+# Edge Clusters: Overall architecture
 
 As of ACS version 3 we require the machines running Edge Agents and
 actually collecting data (the edge) to be part of one or more Kubernetes
-separate from the cluster running the central services. This is partly
-to make the architecture more flexible, allowing for example a central
-cluster which is cloud hosted or hosted on a managed Kubernetes cluster
-and the edge to use k3s or microk8s or some other Kubernetes
+clusters separate from the cluster running the central services. This is
+partly to make the architecture more flexible, allowing for example a
+central cluster which is cloud hosted or hosted on a managed Kubernetes
+cluster and the edge to use k3s or microk8s or some other Kubernetes
 distribution tailored to edge devices. It is also, we believe, the
 correct thing to do from a security perspective: physical compromise of
 a machine joined to a Kubernetes cluster compromises the entire cluster,
 and keeping edge devices to their own cluster limits the possible
 damage.
 
-## Architecture
-
-ACS requires a central cluster running the central services and one or
-more edge clusters running the Edge Agents.
-
-### Central cluster
+## Central cluster
 
 The central Kubernetes cluster runs a number of essential services:
 
@@ -36,7 +31,7 @@ cluster also provides
 * The Cluster Manager service, which is responsible for setting up edge
   clusters in the central services.
 
-### Edge clusters
+## Edge clusters
 
 Edge devices on the shop floor must then be joined into a number of edge
 clusters. Choosing how to assign edge devices to clusters is a local
@@ -66,7 +61,67 @@ create credentials for the Kerberos Keys Operator. After that the edge
 cluster is (supposed to be) self-maintaining, with everything that
 happens on the edge driven by configuration from the centre.
 
-### Network requirements
+## Soft gateways
+
+Since the beginning of the Factory+ project we have found it necessary
+to have a number of Edge Agents running not on physical machines on the
+shopfloor but on VMs provided by our IT team. These are needed when we
+are not interfacing directly with the device producing the data but with
+some other existing system, including situations where we are pulling
+data from entirely outside our organisation into Factory+. While this is
+not ideal from the point of view of the Factory+ principle of pushing
+data collection to the edge, sometimes pragmatism needs to win out over
+principle.
+
+These Edge Agents are referred to as 'soft gateways', for historical
+reasons. Under the previous version of ACS, where all machines were part
+of a single cluster, the Soft Gateways ran directly on the central
+cluster as Kubernetes Deployments. As of version 3 this is no longer
+possible, and no Edge Agents can run on the central cluster. There are
+instead two possibilities:
+
+* For situations where having the Edge Agent present in a particular
+  geographical location is desirable, perhaps because it is known that
+  the other system it is communicating with is also in that location, an
+  Edge Agent can be deployed 'floating' to an ordinary edge cluster on
+  the shop floor. This will result in the Edge Agent being run on one of
+  the machines that form that cluster, chosen by the Kubernetes control
+  plane. If a machine goes offline the floating Edge Agents that were
+  running on it will be restarted on a different machine.
+
+* For situations where it is desirable to run the Edge Agent on central
+  infrastructure, perhaps because it is reading data from outside the
+  organisation, a dedicated 'soft gateways' cluster will need to be
+  created alongside the central cluster. Edge Agents can then be
+  deployed (almost certainly 'floating') to this cluster.
+
+## Specialised hosts
+
+Some machines on the shopfloor will not be suitable for running
+general-purpose workloads such as the cluster operators and floating
+Edge Agents. This may be because of their hardware (for example, we use
+Raspberry Pis internally which have limited CPU and memory) or because
+of their operational situation (for example, because they are frequently
+switched off without warning).
+
+Kubernetes can be instructed not to deploy workloads to particular nodes
+using
+[taints](https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/).
+Hosts in an ACS edge cluster which should not accept general-purpose
+workloads should be tainted using the key
+`factoryplus.app.amrc.co.uk/specialised` and (usually) the effect
+`NoExecute`. Edge deployments which are targetted to a specific hostname
+will tolerate this taint, but floating deployments and cluster operators
+will not. Taints with a different key should be used for other purposes,
+e.g. because a host has been temporarily taken out of service.
+
+The value of the `specialised` taint is chosen by the administrator to
+indicate why the taint was applied. The value is ignored by the Helm
+charts. When deploying a new Edge Agent in the Manager, hosts with this
+taint will have the value of the taint displayed after the hostname in
+square brackets.
+
+## Network requirements
 
 All communication between central and edge clusters happens over
 Factory+ channels; there is no need for any Kubernetes API access in
@@ -92,10 +147,17 @@ autonomous and self-maintaining, we cannot at this point recommend
 isolating a cluster entirely. In particular, administrator access to the
 Kubernetes API on the edge is likely to be useful if things go wrong.
 
-## Deployment process
+## Communication and control
 
-This description assumes a familiarity with the data structures used by
-the Factory+ Config Store (ACS ConfigDB). In brief:
+Communication and control between the clusters occurs over two channels:
+the ACS ConfigDB and the internal Git repositories, both hosted on the
+central cluster.
+
+The ConfigDB is a data store originally developed to associate static,
+application-specific configuration with Sparkplug devices, for the sake
+of data consumers which need more information about a device than is
+present in its Sparkplug output. It has since developed into a more
+general-purpose database with the following structure:
 
 * An Object in the ConfigDB represents anything that can be identified
   by a UUID.
@@ -109,60 +171,18 @@ the Factory+ Config Store (ACS ConfigDB). In brief:
 * All entries for a given Application should have the same structure,
   which can be described by a JSON Schema associated with the
   Application.
+* Each revision of each config entry is given an HTTP ETag in the form
+  of a UUID.
 * The ConfigDB has an MQTT interface where it publishes information
   about changes to config entries.
 
-### Edge Helm Charts
+A Git repository is created in the internal Git server for each cluster.
+This drives the installation of Flux on the edge cluster, which deploys
+manifests to the edge to match the current contents of the repo. The
+server also provides other repos, most importantly a repo containing
+Helm charts which can be deployed to the edge.
 
-When an Edge Agent is deployed in the Manager, you need to specify what
-you would like to deploy. This will normally be an ACS Edge Agent, but
-can also include other services to be deployed to the edge alongside the
-Edge Agent. For example, we have developed a simple service which reads
-Modbus/TCP and supplies a REST interface the Edge Agent can consume;
-this removes the need to keep pushing more drivers into the Edge Agent
-codebase itself.
-
-Services that can be deployed to the edge must be packaged in the form
-of a Helm chart. These Helm charts live in another Git repo on the
-central cluster, from where the Flux installations on the edge clusters
-can pull them. A default installation of ACS will pull the on-prem Helm
-charts repo from the `edge-helm-charts` repo on the AMRC-FactoryPlus
-Github, but this can be changed in the ACS `values.yaml`. Currently all
-deployable Helm charts must be present in the `main` branch of the
-single Helm charts repo.
-
-In order to allow for deploying the same chart in different
-configurations, the ConfigDB contains a set of 'Helm chart template'
-entries which are the items which can actually be deployed. These
-reference a particular chart in the charts repo and give a template for
-the `values.yaml` to use on deployment. This template will be filled in
-with a few fixed pieces of information about the deployment such as the
-UUID and the hostname of the machine to deploy to.
-
-### Edge deployment
-
-Creating a Deployment in the Manager simply creates an entry in the
-ConfigDB detailing what is to be deployed and where. These entries live
-under the 'Edge deployment' Application and use the UUID of the Edge
-Agent as their Object. The entry specifies the Helm charts to deploy,
-the cluster to deploy to, and a name for the deployment; if this is an
-Edge Agent then the name will become the Sparkplug Node-ID.
-
-The deployment entry also specifies which host on the cluster to deploy
-to, for deployments that target a specific host. It is possible to omit
-the hostname by selecting a 'Floating' deployment in the Manager; this
-will deploy such that the container might end up running anywhere in the
-cluster, subject to 'specialised host' taints applied in Kubernetes.
-
-These deployment entries are picked up by the Edge Sync operator on the
-edge cluster. This operator picks out the entries applicable to its own
-cluster and uses the 'Helm chart template' entries to construct a set of
-Flux HelmRelease Kubernetes objects. 
-
-## Edge Agent configuration
-
-When the Edge Agent configuration is updated in the Manager, this
-information also goes into the ConfigDB. The Edge Agent pulls its
-configuration from the ConfigDB at startup, and the Edge Monitor tracks
-the current state of the ConfigDB and instructs the Edge Agent to reload
-its config if it is out of date.
+The internal Git server has the facility to create an internal repo
+which mirrors the contents of an external repo. This is used when the
+edge Helm charts are to be pulled from public Github but the edge
+clusters do not have access to the Internet.

@@ -112,7 +112,8 @@ V3.0.0 leverages the power of kubernetes secrets to store sensitive configuratio
 
 These pages document parts of the system in more detail.
 
-* [Edge clusters](./docs/edge-clusters.md)
+* [Edge clusters: Overall architecture](./docs/edge-clusters.md)
+* [Edge clusters: Deploying to the edge](./docs/edge-deployments.md)
 * [Edge cluster bootstrap process](./docs/edge-cluster-bootstrap.md)
 
 ## Maintainers

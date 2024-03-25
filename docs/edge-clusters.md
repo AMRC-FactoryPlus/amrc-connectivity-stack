@@ -61,6 +61,30 @@ create credentials for the Kerberos Keys Operator. After that the edge
 cluster is (supposed to be) self-maintaining, with everything that
 happens on the edge driven by configuration from the centre.
 
+## Sparkplug Groups
+
+Sparkplug addresses have a fairly limited structure: there are three
+levels, Group, Node and Device, and an Edge Agent publishing metrics is
+required by protocol to sit at the Node level. This leaves Group as a
+single-level classification of Nodes.
+
+As a result of this, we have found it useful at the AMRC to institute a
+convention for Group names that they should consist of hierarchical
+parts separated by hyphens. So, for example, those Nodes in our Mark I
+building at Factory 2050 might be in the Group `AMRC-F2050-Mk1`. The
+Visualiser component released as part of ACS version 3 assumes such a
+naming convention for Groups.
+
+The edge cluster support in version 3 formalises this convention in the
+following respects:
+
+* Each edge cluster has an associated Sparkplug Group.
+* All Edge Nodes deployed to a particular cluster have Sparkplug
+  addresses under that group.
+* The group name the form `ORG-Cluster-Name`, where `ORG` is the value of
+  `acs.organisation` supplied in the ACS `values.yaml` and
+  `Cluster-Name` is the name assigned to the cluster.
+
 ## Soft gateways
 
 Since the beginning of the Factory+ project we have found it necessary

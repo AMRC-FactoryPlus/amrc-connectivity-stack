@@ -89,7 +89,7 @@ jobs:
           platforms: linux/amd64
           file: ./acs-base-images/Dockerfile.pg-build
           push: true
-          tags: ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}-pg-build:${{ steps.prepare.outputs.version }}
+          tags: ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}-pg-build:${{ env.BASE_JS_VERSION }}
           build-args: |
             version=${{ env.BASE_JS_VERSION }}
           labels: ${{ steps.prepare.outputs.labels }}
@@ -153,7 +153,7 @@ jobs:
       matrix:
 #        service: [ 'acs-cluster-manager', 'acs-cmdesc', 'acs-edge-monitor', 'acs-edge-sync', 'acs-git',
 #                   'acs-identity', 'acs-krb-keys-operator', 'acs-krb-utils', 'acs-service-setup', 'acs-visualiser' ]
-        service: [ 'acs-cluster-manager']
+        service: [ 'acs-cluster-manager', 'acs-cmdesc']
     permissions:
       contents: read
       packages: write

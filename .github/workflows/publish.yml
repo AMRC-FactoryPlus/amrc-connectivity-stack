@@ -189,7 +189,7 @@ jobs:
           version: ${{ steps.prepare.outputs.version }}
           service-name: ${{ steps.prepare.outputs.service-name }}
           digest: ${{ steps.build-and-push.outputs.digest }}
-  build-x86-js-arm:
+  build-arm-js:
     needs: [ build-base-js ]
     runs-on: ubuntu-latest
     strategy:
@@ -432,7 +432,7 @@ jobs:
 
   build-helm-chart:
     if: github.event_name == 'release'
-    needs: [ 'build-x86-js', 'build-x86-js-arm', 'build-x86-pg', 'push-manager', 'build-mqtt' ]
+    needs: [ 'build-x86-js', 'build-arm-js', 'build-x86-pg', 'push-manager', 'build-mqtt' ]
     runs-on: ubuntu-latest
     steps:
       - name: Install Helm

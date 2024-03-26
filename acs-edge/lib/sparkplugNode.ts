@@ -5,7 +5,7 @@
 
 import { EventEmitter } from "events";
 import * as MQTT from "mqtt";
-import { v4 as uuidv4 } from "uuid";
+import { v5 as uuidv5 } from "uuid";
 
 import {
     Address, 
@@ -23,35 +23,39 @@ import {
 } from "./helpers/typeHandler.js";
 import * as UUIDs from "./uuids.js";
 
-/* This class tracks the Instance_UUIDs we have assigned to the alerts.
- * Ideally these would be overridable from a config file or some other
- * stable storage, but it is essential we can raise alerts before we
- * have any config. */
-class AlertBuilder {
-    #instances: Map<string, string>
+class InstanceBuilder {
+    #uuid: string
 
-    constructor () {
-        this.#instances = new Map();
+    constructor (uuid: string) {
+        this.#uuid = uuid;
+    }
+
+    fp_v5_uuid (...args: string[]) {
+        return uuidv5(args.join(":"), UUIDs.Special.FactoryPlus);
+    }
+
+    mk_instance (schema: string, prefix: string) {
+        const instance = this.fp_v5_uuid(UUIDs.Special.V5Metric, 
+            this.#uuid, prefix);
+        return [
+            { 
+                name: `${prefix}/Schema_UUID`,
+                type: sparkplugDataType.uuid,
+                value: schema,
+            },
+            {   
+                name: `${prefix}/Instance_UUID`,
+                type: sparkplugDataType.uuid,
+                value: instance,
+            },
+        ];
     }
 
     build_alert (typ: string, name: string, value: boolean) {
         const prefix = `Alerts/${name}`;
         
-        if (!this.#instances.has(name))
-            this.#instances.set(name, uuidv4());
-        const instance = this.#instances.get(name)!;
-
         return [
-            {
-                name: `${prefix}/Schema_UUID`,
-                type: sparkplugDataType.uuid,
-                value: UUIDs.Schema.Alert,
-            },
-            {
-                name: `${prefix}/Instance_UUID`,
-                type: sparkplugDataType.uuid,
-                value: instance,
-            },
+            ...this.mk_instance(UUIDs.Schema.Alert, prefix),
             {
                 name: `${prefix}/Type`,
                 type: sparkplugDataType.uuid,
@@ -65,8 +69,6 @@ class AlertBuilder {
         ];
     }
 }
-
-const alertbuilder = new AlertBuilder();
 
 export class SparkplugNode extends (
     EventEmitter
@@ -121,6 +123,7 @@ export class SparkplugNode extends (
         this.#client.on("close", () => this.onClose());
         this.#metricNameIndex = {};
         // Default Edge Node metrics
+        const builder = new InstanceBuilder(this.#conf.uuid);
         this.#metrics = new Metrics([
             {
                 name: "Schema_UUID",
@@ -171,10 +174,10 @@ export class SparkplugNode extends (
                 type: sparkplugDataType.boolean,
                 value: this.#conf.nodeControl?.compressPayload ?? false,
             },
-            ...alertbuilder.build_alert(
+            ...builder.build_alert(
                 UUIDs.Alert.ConfigFetchFailed, "Config_Unavailable",
                 this.#conf.alerts?.configFetchFailed ?? false),
-            ...alertbuilder.build_alert(
+            ...builder.build_alert(
                 UUIDs.Alert.ConfigInvalid, "Config_Invalid",
                 this.#conf.alerts?.configInvalid ?? false),
         ]);

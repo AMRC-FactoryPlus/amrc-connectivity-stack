@@ -31,7 +31,7 @@ This Chart creates a load balancer on your Kubernetes cluster that exposes all s
 If `acs.secure` is set to `true` in your deployment (enabled by default) then you must also create a wildcard TLS secret on the cluster in the`default` namespace with the same name as the value specified in `acs.tlsSecretName` _before_ installing ACS. The TLS certificate must be valid for all domains covered by the wildcard DNS entry.
 
 #### Development (Insecure) Deployment
-If you have disabled `acs.secure` then you can skip this step but ensure that you update the `traefik.ports.web.enbaled` and `traefik.ports.mqtt.enabled` values to `true` in your `values.yaml` file. You may also optionally want to disable the `traefik.ports.websecure.enabled` and `traefik.ports.mqttsecure.enabled` values.
+If you have disabled `acs.secure` then you can skip this step but ensure that you update the `traefik.ports.web.expose` and `traefik.ports.mqtt.expose` values to `true` in your `values.yaml` file. You may also optionally want to disable the `traefik.ports.websecure.enabled` and `traefik.ports.mqttsecure.enabled` values.
 
 ### Install ACS
 

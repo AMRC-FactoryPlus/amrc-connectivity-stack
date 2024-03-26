@@ -476,7 +476,7 @@ jobs:
       - name: Build index
         run: |
           cd deploy/build
-          helm repo index --url https://amrc-factoryplus.github.io/amrc-connectivity-stack/build .
+          helm repo index --url https://amrc-factoryplus.github.io/amrc-connectivity-stack/deploy/build .
       - name: commit
         uses: stefanzweifel/git-auto-commit-action@v4
         id: auto_commit_action

@@ -450,9 +450,9 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Package Helm chart
         run: |
-          TAG=${{ github.event.release.tag_name }}
-          VERSION=${TAG#v}
-          helm package -u -d deploy/build --version=$VERSION --app-version=$VERSION deploy
+          TAG="${{ github.event.release.tag_name }}"
+          VERSION="${TAG#v}"
+          helm package -u -d deploy/build --version="$VERSION" --app-version="$VERSION" deploy
           echo "VERSION=$VERSION" >> $GITHUB_ENV
       - uses: actions/upload-artifact@v3
         with:

@@ -152,10 +152,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-#        service: [ 'acs-cluster-manager', 'acs-cmdesc', 'acs-edge-monitor', 'acs-edge-sync', 'acs-git',
-#                   'acs-identity', 'acs-krb-keys-operator', 'acs-krb-utils', 'acs-service-setup', 'acs-visualiser' ]
         service: [ 'acs-cluster-manager', 'acs-cmdesc', 'acs-edge-monitor', 'acs-edge-sync', 'acs-git',
-                   'acs-identity', 'acs-krb-keys-operator', 'acs-krb-utils', 'acs-service-setup']
+                   'acs-identity', 'acs-krb-keys-operator', 'acs-krb-utils', 'acs-service-setup', 'acs-visualiser']
     permissions:
       contents: read
       packages: write

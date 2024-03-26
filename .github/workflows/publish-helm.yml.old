@@ -1,0 +1,15 @@
+name: New Release
+
+on:
+  release:
+    types: [ created ]
+    # Only run the action when the release tag matches the pattern v[0-9]+.[0-9]+.[0-9]+
+    branches:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+env:
+  TAG: ${{ github.event.release.tag_name }}
+
+jobs:
+  # This job packages up the Helm chart
+  

@@ -1,0 +1,19 @@
+/node_modules/
+
+# Vim swap
+*.swp
+
+# Environment
+.env
+
+# Secrets
+/keytabs/
+/volumes/
+
+# IDE
+.idea/
+
+# Build files
+dependency-reduced-pom.xml
+target/
+ver

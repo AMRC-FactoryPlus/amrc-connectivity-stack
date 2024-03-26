@@ -1,0 +1,6 @@
+#!/bin/sh
+
+uuid="$(basename "$(realpath "$GIT_DIR")")"
+echo "$uuid" >"$DATA_CHANGED_FIFO"
+
+exit 0

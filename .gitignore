@@ -1,8 +1,1 @@
-/**/*.plain.yaml
-/**/*.plain.json
-*.cert
-*.pem
-*.key
-*.swp
-/.idea
-/charts/*
+.idea/

@@ -1,0 +1,17 @@
+/node_modules/
+
+# Vim swap
+*.swp
+
+# Local build config
+config.mk
+
+# Environment
+.env
+
+# Secrets
+/keytabs/
+/volumes/
+
+# IDE
+.idea/

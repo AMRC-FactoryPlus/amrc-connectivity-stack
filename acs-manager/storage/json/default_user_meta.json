@@ -1,0 +1,16 @@
+{
+  "new_user": {
+    "name": "new_user",
+    "title": "New User",
+    "description": "Used to show introduction dialogs.",
+    "type": "bool",
+    "value": true
+  },
+  "sidebar": {
+    "name": "sidebar",
+    "title": "Sidebar Status",
+    "description": "Used to persist the user's sidebar state",
+    "type": "string",
+    "value": "visible"
+  }
+}

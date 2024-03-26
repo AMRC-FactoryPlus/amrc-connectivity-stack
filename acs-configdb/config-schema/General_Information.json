@@ -1,0 +1,36 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "urn:uuid:64a8bfa9-7772-45c4-9d1a-9e6290690957",
+    "title": "Device general information",
+    "description": "Human-readble information for display in UIs and such.",
+    "type": "object",
+    "required": ["name"],
+    "additionalProperties": false,
+    "properties": {
+        "name": {
+            "description": "A human-readable name for this object.",
+            "type": "string"
+        },
+        "location": {
+            "description": "A brief human-readable description of the object's physical location.",
+            "type": "string"
+        },
+        "photo": {
+            "description": "A photo of the object to display in selection screens and so on.",
+            "type": "string",
+            "format": "byte"
+        },
+        "contact": {
+            "description": "Contact information for the people responsible for this object.",
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": ["name"],
+                "properties": {
+                    "name": { "type": "string" },
+                    "email": { "type": "string", "format": "email" }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,122 @@
+{
+  "service": "cab2642a-f7d9-42e5-8845-8f35affe1fd4",
+  "version": 1,
+  "aces": [
+    {
+      "principal": "26d192cf-73c1-4c14-93cf-1e63743bab08",
+      "permission": "4db4c39a-f18d-4e83-aeb0-5af2c14ddc2b",
+      "target": "2706aa43-a826-441e-9cec-cd3d4ce623c2"
+    },
+    {
+      "principal": "26d192cf-73c1-4c14-93cf-1e63743bab08",
+      "permission": "ba566181-0e8a-405b-b16e-3fb89130fbee",
+      "target": "9e07fd33-6400-4662-92c4-4dff1f61f990"
+    },
+    {
+      "principal": "26d192cf-73c1-4c14-93cf-1e63743bab08",
+      "permission": "327c4cc8-9c46-4e1e-bb6b-257ace37b0f6",
+      "target": "00000000-0000-0000-0000-000000000000"
+    },
+    {
+      "principal": "26d192cf-73c1-4c14-93cf-1e63743bab08",
+      "permission": "3a41f5ce-fc08-4669-9762-ec9e71061168",
+      "target": "12ecb694-b4b9-4d2a-927e-d100019f7ebe"
+    },
+    {
+      "principal": "26d192cf-73c1-4c14-93cf-1e63743bab08",
+      "permission": "be9b6d47-c845-49b2-b9d5-d87b83f11c3b",
+      "target": "00000000-0000-0000-0000-000000000000"
+    },
+    {
+      "principal": "26d192cf-73c1-4c14-93cf-1e63743bab08",
+      "permission": "4a339562-cd57-408d-9d1a-6529a383ea4b",
+      "target": "64a8bfa9-7772-45c4-9d1a-9e6290690957"
+    },
+    {
+      "principal": "26d192cf-73c1-4c14-93cf-1e63743bab08",
+      "permission": "4a339562-cd57-408d-9d1a-6529a383ea4b",
+      "target": "5b47881c-b012-4040-945c-eacafca539b2"
+    },
+    {
+      "principal": "26d192cf-73c1-4c14-93cf-1e63743bab08",
+      "permission": "4a339562-cd57-408d-9d1a-6529a383ea4b",
+      "target": "bdb13634-0b3d-4e38-a065-9d88c12ee78d"
+    },
+    {
+      "principal": "26d192cf-73c1-4c14-93cf-1e63743bab08",
+      "permission": "4a339562-cd57-408d-9d1a-6529a383ea4b",
+      "target": "f6c67e6f-e48e-4f69-b4bb-bfbddcc2a517"
+    },
+    {
+      "principal": "26d192cf-73c1-4c14-93cf-1e63743bab08",
+      "permission": "4a339562-cd57-408d-9d1a-6529a383ea4b",
+      "target": "747a62c9-1b66-4a2e-8dd9-0b70a91b6b75"
+    },
+    {
+      "principal": "26d192cf-73c1-4c14-93cf-1e63743bab08",
+      "permission": "4a339562-cd57-408d-9d1a-6529a383ea4b",
+      "target": "72804a19-636b-4836-b62b-7ad1476f2b86"
+    },
+    {
+      "principal": "26d192cf-73c1-4c14-93cf-1e63743bab08",
+      "permission": "4a339562-cd57-408d-9d1a-6529a383ea4b",
+      "target": "729fe070-5e67-4bc7-94b5-afd75cb42b03"
+    },
+    {
+      "principal": "26d192cf-73c1-4c14-93cf-1e63743bab08",
+      "permission": "4a339562-cd57-408d-9d1a-6529a383ea4b",
+      "target": "88436128-09a3-4c9c-b7f4-b0e495137265"
+    },
+    {
+      "principal": "26d192cf-73c1-4c14-93cf-1e63743bab08",
+      "permission": "4a339562-cd57-408d-9d1a-6529a383ea4b",
+      "target": "a807d8fc-63ff-48bb-85c7-82b93beb606e"
+    },
+    {
+      "principal": "26d192cf-73c1-4c14-93cf-1e63743bab08",
+      "permission": "4a339562-cd57-408d-9d1a-6529a383ea4b",
+      "target": "8e32801b-f35a-4cbf-a5c3-2af64d3debd7"
+    },
+    {
+      "principal": "26d192cf-73c1-4c14-93cf-1e63743bab08",
+      "permission": "6c799ccb-d2ad-4715-a2a7-3c8728d6c0bf",
+      "target": "64a8bfa9-7772-45c4-9d1a-9e6290690957"
+    },
+    {
+      "principal": "26d192cf-73c1-4c14-93cf-1e63743bab08",
+      "permission": "6c799ccb-d2ad-4715-a2a7-3c8728d6c0bf",
+      "target": "f6c67e6f-e48e-4f69-b4bb-bfbddcc2a517"
+    },
+    {
+      "principal": "26d192cf-73c1-4c14-93cf-1e63743bab08",
+      "permission": "6c799ccb-d2ad-4715-a2a7-3c8728d6c0bf",
+      "target": "38d62a93-b6b4-4f63-bad4-d433e3eaff29"
+    },
+    {
+      "principal": "26d192cf-73c1-4c14-93cf-1e63743bab08",
+      "permission": "6c799ccb-d2ad-4715-a2a7-3c8728d6c0bf",
+      "target": "8e32801b-f35a-4cbf-a5c3-2af64d3debd7"
+    },
+    {
+      "principal": "26d192cf-73c1-4c14-93cf-1e63743bab08",
+      "permission": "f0b7917b-d475-4888-9d5a-2af96b3c26b6",
+      "target": "97756c9a-38e6-4238-b78c-3df6f227a6c9"
+    },
+    {
+      "principal": "26d192cf-73c1-4c14-93cf-1e63743bab08",
+      "permission": "12ecb694-b4b9-4d2a-927e-d100019f7ebe",
+      "target": "3a58340c-d4ec-453d-99c3-0cf6ab7d8fa9"
+    },
+    {
+      "principal": "26d192cf-73c1-4c14-93cf-1e63743bab08",
+      "permission": "b2d8d437-5060-4202-bcc2-bd2beda09651",
+      "target": "3a58340c-d4ec-453d-99c3-0cf6ab7d8fa9"
+    }
+  ],
+  "groups": {
+    "9e07fd33-6400-4662-92c4-4dff1f61f990": [
+      "a40acff8-0c61-4251-bef3-d8d53e50cdd0",
+      "07fba27a-0d01-4c07-875b-d25345261d3a"
+    ]
+  }
+}

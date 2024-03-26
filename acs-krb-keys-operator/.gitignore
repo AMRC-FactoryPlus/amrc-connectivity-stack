@@ -1,0 +1,21 @@
+# Vim swap
+*.swp
+
+# Environment
+.env
+
+# Random temp files
+tmp/
+
+# Local build config
+config.mk
+
+# Secrets
+/keytabs/
+/volumes/
+
+# IDE
+.idea/
+
+# Python
+__pycache__

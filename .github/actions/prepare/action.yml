@@ -1,0 +1,34 @@
+name: 'Prepare ACS Build'
+description: 'Prepare AMRC Connectivity Stack build steps'
+inputs:
+  service-name:
+    description: 'The name of the service (e.g. acs-auth)'
+    required: true
+  token:
+    description: 'The secrets.GITHUB_TOKEN to use for Docker login. Must be passed as input because composite actions cannot access secrets.'
+    required: true
+outputs:
+  service-name:
+    value: ${{ inputs.service-name }}
+  version:
+    value: ${{ steps.meta.outputs.version }}
+  labels:
+    value: ${{ steps.meta.outputs.labels }}
+runs:
+  using: "composite"
+  steps:
+    - name: Install Cosign
+      uses: sigstore/cosign-installer@v3.3.0
+    - name: Setup build
+      uses: docker/setup-buildx-action@v3
+    - name: Login to registry
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ inputs.token }}
+    - name: Extract metadata
+      uses: docker/metadata-action@v5
+      id: meta
+      with:
+        images: ghcr.io/amrc-factoryplus/${{ inputs.service-name }}

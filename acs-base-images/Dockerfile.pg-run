@@ -1,0 +1,24 @@
+# syntax=docker/dockerfile:1
+# 
+# ACS base image for running JS services using Pg.
+# This includes, in addition to js-run, Pg libraries with GSSAPI
+# support.
+
+ARG version
+
+FROM ghcr.io/amrc-factoryplus/acs-base-pg-build:${version} AS build
+
+FROM ghcr.io/amrc-factoryplus/acs-base-js-run:${version}
+
+# Install system packages we need for runtime.
+RUN <<'SHELL'
+    apk add libedit krb5-libs kstart
+    # Create the runtime directories root-owned, for security.
+    install -d -o root -g root -m 755 /home/node
+    install -d -o root -g root -m 755 /home/node/app
+    # NPM has started making a fuss about this
+    install -d -o node -g node -m 700 /home/node/.npm
+SHELL
+
+# Copy across from the build container
+COPY --from=build /dist /

@@ -290,10 +290,7 @@ jobs:
       - name: Check Backend Builder
         id: check-backend-builder
         run: |
-          docker manifest inspect ghcr.io/amrc-factoryplus/acs-manager:backend-build-${{ env.BUILD_PHP_VERSION}} || 
-          echo 
-          "needs-build=true" >> 
-          $GITHUB_OUTPUT
+          docker manifest inspect ghcr.io/amrc-factoryplus/acs-manager:backend-build-${{ env.BUILD_PHP_VERSION}} || echo "needs-build=true" >> $GITHUB_OUTPUT
 
       - name: Build Backend Builder
         id: build-backend-builder

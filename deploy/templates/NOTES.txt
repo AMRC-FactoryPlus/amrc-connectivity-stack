@@ -22,4 +22,3 @@ MQTT: {{ .Values.acs.secure | ternary "mqtts://" "mqtt://" }}mqtt.{{.Values.acs.
 Grafana: {{ .Values.acs.secure | ternary "https://" "http://" }}grafana.{{.Values.acs.baseUrl}}
 Auth: {{ .Values.acs.secure | ternary "https://" "http://" }}auth.{{.Values.acs.baseUrl}}/editor
 Config Store: {{ .Values.acs.secure | ternary "https://" "http://" }}configdb.{{.Values.acs.baseUrl}}
-```

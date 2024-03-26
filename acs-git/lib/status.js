@@ -55,7 +55,10 @@ export class RepoStatus {
 
         return rx.defer(() => cdb.watcher()).pipe(
             rx.mergeMap(w => w.application(Git.App.Config)),
-            rx.startWith(null),
+            /* Fetch regardless every 10 minutes */
+            rx.mergeWith(rx.timer(0, 10*60*1000).pipe(
+                /* Jitter fetches */
+                rx.delayWhen(() => rx.timer(Math.random() * 5000)))),
             rx.switchMap(fetch),
             rxx.shareLatest(),
         );

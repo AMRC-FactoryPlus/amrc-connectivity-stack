@@ -10,6 +10,11 @@ acs:
   cacheMaxAge: 300
   # -- Image pull secrets for container images
   imagePullSecrets: []
+  # -- An optional tag that will force images to use this version
+  # regardless of the version in the Helm chart. Each component can
+  # override this value by setting the `tag` property in its own
+  # section.
+  defaultTag: ""
 
 identity:
   # -- Whether or not to enable the Identity component

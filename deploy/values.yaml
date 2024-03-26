@@ -359,25 +359,6 @@ traefik:
       level: DEBUG
 
 # @ignore
-loki:
-  enabled: true
-  loki:
-    auth_enabled: false
-    commonConfig:
-      replication_factor: 1
-    storage:
-      type: filesystem
-  singleBinary:
-    replicas: 1
-    persistence:
-      size: 10Gi
-
-# @ignore
-promtail:
-  loki:
-    serviceName: loki
-
-# @ignore
 grafana:
   deploymentStrategy:
     type: Recreate
@@ -448,5 +429,3 @@ influxdb2:
         influx v1 dbrp create --bucket-id ${DOCKER_INFLUXDB_INIT_BUCKET_ID} --db default --rp default --default --org ${DOCKER_INFLUXDB_INIT_ORG}
   pdb:
     create: false
-switchboard:
-  enabled: false

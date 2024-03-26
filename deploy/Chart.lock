@@ -2,12 +2,6 @@ dependencies:
 - name: traefik
   repository: https://helm.traefik.io/traefik
   version: 23.1.0
-- name: loki
-  repository: https://grafana.github.io/helm-charts
-  version: 4.8.0
-- name: promtail
-  repository: https://grafana.github.io/helm-charts
-  version: 6.9.3
 - name: grafana
   repository: https://grafana.github.io/helm-charts
   version: 6.52.4

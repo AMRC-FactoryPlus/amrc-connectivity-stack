@@ -359,25 +359,6 @@ traefik:
       level: DEBUG
 
 # @ignore
-loki:
-  enabled: true
-  loki:
-    auth_enabled: false
-    commonConfig:
-      replication_factor: 1
-    storage:
-      type: filesystem
-  singleBinary:
-    replicas: 1
-    persistence:
-      size: 10Gi
-
-# @ignore
-promtail:
-  loki:
-    serviceName: loki
-
-# @ignore
 grafana:
   deploymentStrategy:
     type: Recreate

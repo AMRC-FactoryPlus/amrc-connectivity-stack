@@ -38,8 +38,8 @@ jobs:
           service-name: acs-base
           token: ${{ secrets.GITHUB_TOKEN }}
       - name: Build
-        if: steps.check.outputs.needs-build == 'true'
         id: build-and-push
+        if: steps.check.outputs.needs-build == 'true'
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -51,8 +51,8 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - uses: ./.github/actions/cleanup
-        if: steps.check.outputs.needs-build == 'true'
         id: cleanup
+        if: steps.check.outputs.needs-build == 'true'
         with:
           version: ${{ steps.prepare.outputs.version }}
           service-name: ${{ steps.prepare.outputs.service-name }}-${{ matrix.type }}
@@ -75,14 +75,14 @@ jobs:
         if: steps.check.outputs.needs-build == 'true'
         uses: actions/checkout@v3
       - uses: ./.github/actions/prepare
-        if: steps.check.outputs.needs-build == 'true'
         id: prepare
+        if: steps.check.outputs.needs-build == 'true'
         with:
           service-name: acs-base
           token: ${{ secrets.GITHUB_TOKEN }}
       - name: Build
-        if: steps.check.outputs.needs-build == 'true'
         id: build-and-push
+        if: steps.check.outputs.needs-build == 'true'
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -97,6 +97,7 @@ jobs:
           cache-to: type=gha,mode=max
       - uses: ./.github/actions/cleanup
         id: cleanup
+        if: steps.check.outputs.needs-build == 'true'
         with:
           version: ${{ steps.prepare.outputs.version }}
           service-name: ${{ steps.prepare.outputs.service-name }}-pg-build

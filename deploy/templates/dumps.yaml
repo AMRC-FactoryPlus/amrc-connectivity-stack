@@ -1017,7 +1017,7 @@ data:
         },
         {
           "principal": {{$serviceAccount_krbkeys}},
-          "permission": {{$permission_auth_readKerberosMappings}},
+          "permission": {{$permission_auth_readKerberosMapping}},
           "target": {{$special_wildcard}}
         },
         {

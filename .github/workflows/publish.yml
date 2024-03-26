@@ -1,4 +1,4 @@
-name: Build & Publish Docker Image
+name: Build & Release ACS
 
 env:
   BASE_JS_VERSION: v3.0.0
@@ -151,7 +151,8 @@ jobs:
     strategy:
       matrix:
         service: [ 'acs-cluster-manager', 'acs-cmdesc', 'acs-edge-monitor', 'acs-edge-sync', 'acs-git',
-                   'acs-identity', 'acs-krb-keys-operator', 'acs-krb-utils', 'acs-service-setup', 'acs-visualiser']
+                   'acs-identity', 'acs-krb-keys-operator', 'acs-krb-utils', 'acs-service-setup', 'acs-visualiser',
+                   'influxdb-sparkplug-ingester']
     permissions:
       contents: read
       packages: write

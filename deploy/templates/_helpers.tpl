@@ -39,7 +39,8 @@ Create chart name and version as used by the chart label.
 Define the image for a container.
 */}}
 {{- define "amrc-connectivity-stack.image-name" -}}
-{{- .image.registry }}/{{ .image.repository }}:{{ .image.tag }}
+{{- $defaultTag := coalesce .image.tag $.Values.acs.defaultTag $.Release.Version }}
+{{- .image.registry }}/{{ .image.repository }}:{{ $defaultTag }}
 {{- end }}
 
 {{- define "amrc-connectivity-stack.image" -}}

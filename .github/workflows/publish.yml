@@ -133,7 +133,7 @@ jobs:
           platforms: linux/amd64
           file: ./acs-base-images/Dockerfile.pg-run
           push: true
-          tags: ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}-pg-run:${{ steps.prepare.outputs.version }}
+          tags: ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}-pg-run:${{ env.BASE_JS_VERSION }}
           build-args: |
             version=${{ env.BASE_JS_VERSION }}
           labels: ${{ steps.prepare.outputs.labels }}

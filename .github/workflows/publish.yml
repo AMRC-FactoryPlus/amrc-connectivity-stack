@@ -154,7 +154,7 @@ jobs:
       matrix:
 #        service: [ 'acs-cluster-manager', 'acs-cmdesc', 'acs-edge-monitor', 'acs-edge-sync', 'acs-git',
 #                   'acs-identity', 'acs-krb-keys-operator', 'acs-krb-utils', 'acs-service-setup', 'acs-visualiser' ]
-        service: [ 'acs-cluster-manager', 'acs-cmdesc', 'acs-edge-monitor', 'acs-edge-sync']
+        service: [ 'acs-cluster-manager', 'acs-cmdesc', 'acs-edge-monitor', 'acs-edge-sync', 'acs-git']
     permissions:
       contents: read
       packages: write

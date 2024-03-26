@@ -1,9 +1,9 @@
 # syntax=docker/dockerfile:1
 
-ARG acs_build=ghcr.io/amrc-factoryplus/utilities-build:v1.0.8
-ARG acs_run=ghcr.io/amrc-factoryplus/utilities-run:v1.0.8
+ARG base_version
+ARG base_prefix=ghcr.io/amrc-factoryplus/acs-base
 
-FROM ${acs_build} AS build
+FROM ${base_prefix}-js-build:${base_version} AS build
 ARG acs_npm=NO
 ARG revision=unknown
 
@@ -27,7 +27,7 @@ RUN sh -ex <<'SHELL'
     echo "export const GIT_VERSION=\"$revision\";" > ./lib/git-version.js
 SHELL
 
-FROM ${acs_run} AS run
+FROM ${base_prefix}-js-run:${base_version} AS run
 
 RUN apk add git git-daemon
 

@@ -4,10 +4,9 @@
 # This includes, in addition to js-build, Pg libraries with GSSAPI
 # support.
 
-ARG base=ghcr.io/amrc-factoryplus/acs-base
-ARG version=latest
+ARG version
 
-FROM ${base}-js-build:${version}
+FROM ghcr.io/amrc-factoryplus/acs-base-js-build:${version}
 
 # This must be here to show up in RUN
 ARG pg_version=16.1

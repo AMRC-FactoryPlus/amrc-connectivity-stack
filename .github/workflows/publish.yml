@@ -472,11 +472,11 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: new-release
-          path: deploy/build
+          path: build
       - name: Build index
         run: |
           cd build
-          helm repo index --url https://amrc-factoryplus.github.io/amrc-connectivity-stack/deploy/build .
+          helm repo index --url https://amrc-factoryplus.github.io/amrc-connectivity-stack/build .
       - name: commit
         uses: stefanzweifel/git-auto-commit-action@v4
         id: auto_commit_action

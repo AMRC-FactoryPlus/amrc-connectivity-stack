@@ -453,7 +453,7 @@ jobs:
       - uses: actions/upload-artifact@v3
         with:
           name: new-release
-          path: build/amrc-connectivity-stack-${{ env.VERSION }}.tgz
+          path: deploy/build/amrc-connectivity-stack-${{ env.VERSION }}.tgz
   # This job checks out the release branch, adds the new release to the /builds folder, builds the index and commits
   # the changes, which triggers Github to release it as a new pages repo
   release-helm-chart:

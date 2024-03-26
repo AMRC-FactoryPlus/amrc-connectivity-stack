@@ -115,7 +115,7 @@ restarting the Edge Sync operator will force a full reconcile.
 
 The 'Helm chart template' Application has UUID
 `729fe070-5e67-4bc7-94b5-afd75cb42b03`. Entries of this type are created
-by the initial installation or by an administrator and are used by the
+by the `acs-service-setup` or by an administrator and are used by the
 Edge Sync and Cluster Manager operators to deploy Helm charts to the
 edge. These entries are the options provided by the Manager when
 creating a cluster or an Edge Agent.
@@ -134,6 +134,15 @@ deployment entry referencing the templates. Templates available are
 `{{name}}` and `{{hostname}}` from the content of the entry. Hostname is
 only available for deployments, and may be empty for a floating
 deployment.
+
+### HelmRelease template ConfigDB Application
+
+The 'HelmRelease template' Application has UUID
+`88436128-09a3-4c9c-b7f4-b0e495137265`, and should have only a single
+entry with the same UUID. This entry is created by `acs-service-setup`
+and should not be modified. It is used by the Edge Sync operator and by
+the Cluster Manager when a Flux HelmRelease resource needs to be
+created.
 
 ### Edge Agent config ConfigDB Application
 

@@ -115,6 +115,7 @@ These pages document parts of the system in more detail.
 * [Edge clusters: Overall architecture](./docs/edge-clusters.md)
 * [Edge clusters: Deploying to the edge](./docs/edge-deployments.md)
 * [Edge clusters: Bootstrap process](./docs/edge-bootstrap.md)
+* [Internal Git server](./docs/git-server.md)
 
 ## Maintainers
 

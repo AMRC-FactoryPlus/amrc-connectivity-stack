@@ -48,7 +48,7 @@ Branches named by `merge` are handled as follows: if the `merge` branch
 sits at the same commit as the pulled branch before a pull operation, it
 will be updated to the pulled commit after the pull. Otherwise it will
 be left alone. This allows for automatic pulls unless and until the
-local adminstrator decides to make their own commits, from which point
+local administrator decides to make their own commits, from which point
 merges from the pulled branch will need to be made manually. A `merge`
 branch can be hard-reset to the pulled branch to reactivate automatic
 merging.
@@ -75,7 +75,7 @@ access are authenticated against the Auth service.
 
 ### `/git/:path`
 
-This is the Git repo URL for a repo accessed via a human-firendly path.
+This is the Git repo URL for a repo accessed via a human-friendly path.
 If more than one repo is configured with the same path, none will be
 accessible by path until the problem is fixed.
 
@@ -130,8 +130,8 @@ The metric structure of the Node birth certificate is as follows:
 
 * `Schema_UUID`: `ee115c26-2ad6-4846-a771-da0cf6401399` Git Server v1.
 * `Instance_UUID`: The UUID of the Git server Node.
-* `Repositories`: A folder of metrics with a subfolder named for the
-  UUID of each configured repo. Each subfolder contains:
+* `Repositories`: A folder of metrics with a sub-folder named for the
+  UUID of each configured repo. Each sub-folder contains:
     * `Schema_UUID`: `1bc8b1c1-e5e6-4777-814b-67bc58aaad62` Git Repo v1.
     * `Instance_UUID`: The UUID of the repo (the same as the folder
       name).

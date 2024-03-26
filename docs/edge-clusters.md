@@ -5,7 +5,7 @@ actually collecting data (the edge) to be part of one or more Kubernetes
 clusters separate from the cluster running the central services. This is
 partly to make the architecture more flexible, allowing for example a
 central cluster which is cloud hosted or hosted on a managed Kubernetes
-cluster and the edge to use k3s or microk8s or some other Kubernetes
+cluster and the edge to use `k3s` or `microk8s` or some other Kubernetes
 distribution tailored to edge devices. It is also, we believe, the
 correct thing to do from a security perspective: physical compromise of
 a machine joined to a Kubernetes cluster compromises the entire cluster,
@@ -24,7 +24,7 @@ The central Kubernetes cluster runs a number of essential services:
 There are also others, such as the Directory for locating devices and
 services and the Historian for recording data, but these are not
 relevant here. Additionally, to support edge clusters, the central
-cluster also provides
+cluster also provides:
 
 * A Git server providing Git repositories integrated with the ACS Auth
   system.
@@ -39,11 +39,10 @@ administration decision; having a single edge cluster is a reasonable
 choice. For example, at the AMRC we have decided to separate our edge
 clusters by building.
 
-Each edge cluster runs these services to allow control from the centre:
+Each edge cluster runs the following services to allow control from the central cluster:
 
-* [Flux](https://fluxcd.io), which is an industry-standard tool for
-  maintaining the state of a Kubernetes cluster based on a Git
-  repository.
+* [Flux](https://fluxcd.io), an industry-standard tool for maintaining the state of
+* a Kubernetes cluster based on a Git repository.
 * The Kerberos Keys Operator, which is an ACS component allowing
   accounts for edge devices to be securely created in the central KDC.
 * The Edge Sync Operator, which reports to the centre on the current
@@ -59,7 +58,7 @@ script (provided by the Cluster Manager) is run against the edge
 cluster, which requests an administrator's credentials and uses them to
 create credentials for the Kerberos Keys Operator. After that the edge
 cluster is (supposed to be) self-maintaining, with everything that
-happens on the edge driven by configuration from the centre.
+happens on the edge driven by configuration from the central cluster.
 
 ## Sparkplug Groups
 
@@ -70,8 +69,8 @@ single-level classification of Nodes.
 
 As a result of this, we have found it useful at the AMRC to institute a
 convention for Group names that they should consist of hierarchical
-parts separated by hyphens. So, for example, those Nodes in our Mark I
-building at Factory 2050 might be in the Group `AMRC-F2050-Mk1`. The
+parts separated by hyphens. So, for example, those Nodes in our MKI
+building at Factory 2050 might be in the Group `AMRC-F2050-MK1`. The
 Visualiser component released as part of ACS version 3 assumes such a
 naming convention for Groups.
 
@@ -89,7 +88,7 @@ following respects:
 
 Since the beginning of the Factory+ project we have found it necessary
 to have a number of Edge Agents running not on physical machines on the
-shopfloor but on VMs provided by our IT team. These are needed when we
+shop floor but on VMs provided by our IT team. These are needed when we
 are not interfacing directly with the device producing the data but with
 some other existing system, including situations where we are pulling
 data from entirely outside our organisation into Factory+. While this is
@@ -121,12 +120,12 @@ instead two possibilities:
 
 ## Specialised hosts
 
-Some machines on the shopfloor will not be suitable for running
+Some machines on the shop floor will not be suitable for running
 general-purpose workloads such as the cluster operators and floating
-Edge Agents. This may be because of their hardware (for example, we use
-Raspberry Pis internally which have limited CPU and memory) or because
-of their operational situation (for example, because they are frequently
-switched off without warning).
+Edge Agents. This may be because of their hardware (for example,
+Raspberry Pis which have limited CPU and memory) or because of their
+operational situation (for example, because they are frequently switched
+off without warning).
 
 Kubernetes can be instructed not to deploy workloads to particular nodes
 using
@@ -134,7 +133,7 @@ using
 Hosts in an ACS edge cluster which should not accept general-purpose
 workloads should be tainted using the key
 `factoryplus.app.amrc.co.uk/specialised` and (usually) the effect
-`NoExecute`. Edge deployments which are targetted to a specific hostname
+`NoExecute`. Edge deployments which are targeted to a specific hostname
 will tolerate this taint, but floating deployments and cluster operators
 will not. Taints with a different key should be used for other purposes,
 e.g. because a host has been temporarily taken out of service.
@@ -166,22 +165,23 @@ cluster:
 In practice this means ports 8883, 443, 88 and 749 for a 'secure' ACS
 installation, and 1883, 80, 88 and 749 for an 'insecure' installation.
 
-While the design of ACS version 3 is that edge clusters should be
-autonomous and self-maintaining, we cannot at this point recommend
-isolating a cluster entirely. In particular, administrator access to the
-Kubernetes API on the edge is likely to be useful if things go wrong.
+While the design of ACS V3 is that edge clusters should be autonomous
+and self-maintaining, we cannot at this point recommend isolating a
+cluster entirely. In particular, administrator access to the Kubernetes
+API on the edge is likely to be useful for management and debugging.
 
 ## Communication and control
 
 Communication and control between the clusters occurs over two channels:
-the ACS ConfigDB and the internal Git repositories, both hosted on the
-central cluster.
+the ACS ConfigDB (Config Store) and the internal Git repositories, both
+hosted on the central cluster.
 
-The ConfigDB is a data store originally developed to associate static,
-application-specific configuration with Sparkplug devices, for the sake
-of data consumers which need more information about a device than is
-present in its Sparkplug output. It has since developed into a more
-general-purpose database with the following structure:
+The ACS ConfigDB is a data store that conforms to the Factory+ Config
+Store specification. It is designed to associate static, application-specific
+configuration with Sparkplug devices, for the sake of data consumers
+which need more information about a device than is present in its Sparkplug
+output. In ACS, it is used as a general-purpose database with the following
+structure:
 
 * An Object in the ConfigDB represents anything that can be identified
   by a UUID.

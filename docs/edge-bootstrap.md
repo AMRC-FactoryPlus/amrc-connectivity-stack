@@ -4,7 +4,7 @@ This document describes the process of setting up a new edge cluster. It
 assumes familiarity with [the overall architecture](./edge-clusters.md)
 including the data structures used by the ConfigDB. In addition, the
 Helm chart templates used are described in full in [the deployment
-document](./edge-deployment.md).
+document](./edge-deployments.md).
 
 ![Diagram of edge cluster bootstrap process](assets/edge-clusters/bootstrap.jpeg)
 
@@ -28,7 +28,7 @@ are **in scope** for the bootstrap process:
 The following steps are **out of scope** and must be performed outside
 of the ACS framework:
 
-* Installing approriate Linux and Kubernetes distributions on the
+* Installing appropriate Linux and Kubernetes distributions on the
   machines.
 * Configuring network and firewall settings.
 * Joining the edge machines into a cluster, and adding and removing
@@ -97,7 +97,7 @@ The first few commands run a single Pod which pulls the Kerberos Keys
 operator container and runs a bootstrap script. This will prompt for
 admin credentials; these credentials must have rights to edit principals
 in the KDC. The container uses these credentials to create principals
-for krbkeys itself and for Flux; these link up with the accounts already
+for `krbkeys` itself and for Flux; these link up with the accounts already
 created for these principals by the cluster manager. The final step of
 creating the principal is performed on the edge as this means the
 passwords for the new accounts can be recorded directly to Secrets in
@@ -108,8 +108,8 @@ and creates the Flux resources which link to the cluster's git repo.
 Flux uses the credentials just created to check out the repo and from
 that point the state of the cluster is driven by Flux. The repo already
 contains manifests instructing Flux to install the 'Edge cluster' Helm
-chart, which will deploy the edge operators (krbkeys, sync, monitor) and
-the Sealed Secrets Helm chart as a sub-chart.
+chart, which will deploy the edge operators (`krbkeys`, `sync`, `monitor`) and
+the `Sealed Secrets` Helm chart as a sub-chart.
 
 ## Status reports from the edge
 
@@ -125,7 +125,7 @@ to. The sealed secrets operator also periodically renews the keypair to
 be used; the edge sync operator periodically uploads the current public
 key to the ConfigDB.
 
-The Edge Monitor reports over MQTT. Initially it will simply NBIRTH
+The Edge Monitor reports over MQTT. Initially it will simply `NBIRTH`
 itself, announcing that the cluster is operational. Once [deployments
 have been made](./edge-deployments.md) this will trigger additional
 actions from the Monitor.

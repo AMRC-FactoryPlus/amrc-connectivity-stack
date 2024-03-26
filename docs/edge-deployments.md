@@ -1,6 +1,6 @@
 # Edge clusters: Deploying to the edge
 
-This document assumes familiarity which the [overall
+This document assumes familiarity with the [overall edge cluster
 architecture](./edge-clusters.md), including the data structures used by
 the ConfigDB.
 
@@ -156,7 +156,7 @@ Edge Agent is using at the moment.
 The internal structure of these entries is currently not documented and
 should be considered a private implementation matter between the Manager
 and the Edge Agent. The format is compatible with that used by the ACS
-v2 Edge Agent and retrived directly from the Manager, with the exception
+v2 Edge Agent and retried directly from the Manager, with the exception
 of the `sparkplug` section which is now mostly ignored.
 
 The Edge Monitor operator on an edge cluster watches for changes to
@@ -173,7 +173,7 @@ this type are used both centrally and at the edge to instruct the
 Kerberos Keys operator to create an account in the KDC and to associate
 it with an account in the Factory+ services.
 
-The krbkeys operators running on the edge are only given permission to
+The `krbkeys` operators running on the edge are only given permission to
 create or modify Kerberos principals whose second component is the name
 of the cluster. (Components of a Kerberos principal name are sections of
 the username part, before the `@`, separated by `/`.) This restricts the
@@ -181,7 +181,7 @@ extent of the damage in the event of a security compromise of an edge
 cluster.
 
 KerberosKeys objects at the edge are deployed by the Helm charts. The
-'Edge cluster' chart deploys four: krbkeys itself, Flux, the Edge Sync
+'Edge cluster' chart deploys four: `krbkeys` itself, Flux, the Edge Sync
 operator, and the Edge Monitor. The Edge Agent chart deploys an
 additional KerberosKey for each Edge Agent. 
 
@@ -212,7 +212,7 @@ The operator will attach a
 KerberosKey resource once it has decided what the account UUID should
 be.
 
-### SparkplugNode Kubernetes resouce
+### SparkplugNode Kubernetes resource
 
 This is a Kubernetes Custom Resource with ApiVersion
 `factoryplus.app.amrc.co.uk/v1` and Kind `SparkplugNode`. Resources of
@@ -238,5 +238,5 @@ have the following properties:
 The Edge Monitor will create a child Device for each SparkplugNode
 resource, named after the UUID of the Node it is monitoring. This Device
 will publish an Alert if the Monitor cannot get a response from the Node
-after repeated attempts. The Device will publish DDEATH if the
+after repeated attempts. The Device will publish `DDEATH` if the
 SparkplugNode resource is removed.

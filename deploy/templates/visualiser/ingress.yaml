@@ -16,7 +16,7 @@ spec:
           namespace: {{ .Release.Namespace }}
   {{- if .Values.acs.secure }}
   tls:
-    secretName: {{ .Values.switchboard.enabled | ternary "factoryplus-visualiser-tls" "factoryplus-tls" }}
+    secretName: factoryplus-tls
     domains:
       - main: visualiser.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
   {{- end -}}

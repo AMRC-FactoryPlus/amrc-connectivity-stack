@@ -35,8 +35,6 @@ identity:
       registry: ghcr.io/amrc-factoryplus
       # -- The repository of the Identity component
       repository: acs-identity
-      # -- The tag of the Identity component
-      tag: v1.0.0
       # @ignore
       pullPolicy: IfNotPresent
     # If this is set to true, the kdb-init container will not set up the
@@ -54,8 +52,6 @@ identity:
       registry: ghcr.io/amrc-factoryplus
       # -- The repository of the KerberosKey Operator
       repository: acs-krb-keys-operator
-      # -- The tag of the KerberosKey Operator
-      tag: v1.3.1
       # @ignore
       pullPolicy: IfNotPresent
 
@@ -67,8 +63,6 @@ auth:
     registry: ghcr.io/amrc-factoryplus
     # -- The repository of the Authorisation component
     repository: acs-auth
-    # -- The tag of the Authorisation component
-    tag: v1.3.0
     # @ignore
     pullPolicy: IfNotPresent
 
@@ -80,8 +74,6 @@ directory:
     registry: ghcr.io/amrc-factoryplus
     # -- The repository of the Directory component
     repository: acs-directory
-    # -- The tag of the Directory component
-    tag: v1.1.3
     # @ignore
     pullPolicy: IfNotPresent
 
@@ -93,8 +85,6 @@ configdb:
     registry: ghcr.io/amrc-factoryplus
     # -- The repository of the Configuration Store component
     repository: acs-configdb
-    # -- The tag of the Configuration Store component
-    tag: v1.8.2
     # @ignore
     pullPolicy: IfNotPresent
 
@@ -105,7 +95,6 @@ serviceSetup:
   image:
     registry: ghcr.io/amrc-factoryplus
     repository: acs-service-setup
-    tag: v3.0.0-dev.13
     pullPolicy: IfNotPresent
   # This section overrides the classes etc. installed into the ConfigDB
   config:
@@ -140,8 +129,6 @@ mqtt:
     registry: ghcr.io/amrc-factoryplus
     # -- The repository of the MQTT component
     repository: acs-mqtt
-    # -- The tag of the MQTT component
-    tag: v1.1.1
     # @ignore
     pullPolicy: IfNotPresent
   # -- Possible values are either 1 to enable all possible debugging, or a comma-separated list of debug tags (the tags printed before the log lines). No logging is specified as an empty string.
@@ -154,8 +141,6 @@ visualiser:
     registry: ghcr.io/amrc-factoryplus
     # -- The repository of the MQTT component
     repository: acs-visualiser
-    # -- The tag of the MQTT component
-    tag: v1.1.1
     # @ignore
     pullPolicy: IfNotPresent
 
@@ -167,8 +152,6 @@ manager:
     registry: ghcr.io/amrc-factoryplus
     # -- The repository of the Manager component
     repository: acs-manager
-    # -- The tag of the Manager component
-    tag: v2.0.0-dev.25
     # @ignore
     pullPolicy: IfNotPresent
   edge:
@@ -176,8 +159,6 @@ manager:
     registry: ghcr.io/amrc-factoryplus
     # -- The repository of the Edge Agent component
     repository: acs-edge
-    # -- The tag of the Edge Agent component
-    tag: v1.2.2
   meilisearch:
     # -- The key that the manager uses to connect to the Meilisearch search engine
     key: masterKey
@@ -203,8 +184,6 @@ cmdesc:
     registry: ghcr.io/amrc-factoryplus
     # -- The repository of the Commands component
     repository: acs-cmdesc
-    # -- The tag of the Commands component
-    tag: v1.0.2
     # @ignore
     pullPolicy: IfNotPresent
   # -- Possible values are either 1 to enable all possible debugging, or a comma-separated list of debug tags (the tags printed before the log lines). No logging is specified as an empty string.
@@ -225,8 +204,6 @@ warehouse:
       registry: ghcr.io/amrc-factoryplus
       # -- The repository of the Warehouse component
       repository: influxdb-sparkplug-ingester
-      # -- The tag of the ingester component
-      tag: v1.2.1
       # @ignore
       pullPolicy: IfNotPresent
 
@@ -238,8 +215,6 @@ git:
     registry: ghcr.io/amrc-factoryplus
     # -- The repository of the Git component
     repository: acs-git
-    # -- The tag of the Git component
-    tag: v0.0.4-dev.1
     # @ignore
     pullPolicy: IfNotPresent
   # -- Possible values are either 1 to enable all possible debugging, or a comma-separated list of debug tags (the tags printed before the log lines). No logging is specified as an empty string.
@@ -253,8 +228,6 @@ clusterManager:
     registry: ghcr.io/amrc-factoryplus
     # -- The repository of the Clusters component
     repository: acs-cluster-manager
-    # -- The tag of the Clusters component
-    tag: v0.0.4
     # @ignore
     pullPolicy: IfNotPresent
   verbosity: "ALL,!service,!token"

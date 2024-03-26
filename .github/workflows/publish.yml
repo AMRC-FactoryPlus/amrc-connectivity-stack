@@ -5,13 +5,9 @@ env:
   BASE_PHP_VERSION: v3.0.0
   BUILD_PHP_VERSION: v3.0.0
 
-# ! Change this back to released
-#on:
-#  release:
-#    types: [ published ]
 on:
-  pull_request:
-    types: [ opened, synchronize, reopened ]
+  release:
+    types: [ published ]
 
 jobs:
   build-base-js:

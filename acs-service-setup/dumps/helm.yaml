@@ -71,9 +71,9 @@ configs:
                 kind: GitRepository
                 name: helm-charts
           install:
-            disableWait: true
+            crds: CreateReplace
+          upgrade:
+            crds: CreateReplace
           interval: 2m0s
           maxHistory: 1
-          upgrade:
-            disableWait: true
           values: "{{values}}"

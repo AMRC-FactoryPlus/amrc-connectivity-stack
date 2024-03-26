@@ -16,7 +16,6 @@
 {{$classDef_cellGateway := "00da3c0b-f62b-4761-a689-39ad0c33f864" | quote}}
 {{$classDef_softGateway := "5bee4d24-32e1-44f8-b953-1f86ff4b3e87" | quote}}
 {{$classDef_serviceRequirement := "b419cbc2-ab0f-4311-bd9e-f0591f7e88cb" | quote}}
-{{$classDef_gitRepoGroup := "b03d4dfe-7e78-4252-8e62-af594cf316c9" | quote}}
 {{$classDef_gitRepo := "d25f2afc-1ab8-4d27-b51b-d02314624e3e" | quote}}
 {{$classDef_edgeClusterAccount := "97756c9a-38e6-4238-b78c-3df6f227a6c9" | quote}}
 {{$classDef_edgeCluster := "f24d354d-abc1-4e32-98e1-0667b3e40b61" | quote}}
@@ -52,9 +51,7 @@
 
 {{$serviceRequirement_gitServiceAccount := "a461ef62-0560-4be2-8d97-1a56916ce4f8" | quote}}
 {{$serviceRequirement_edgeDeploymentServiceAccount := "26d192cf-73c1-4c14-93cf-1e63743bab08" | quote}}
-{{$serviceRequirement_edgeFluxAccounts := "4eeb8156-856d-4251-a4a4-4c1b2f3d3e2c" | quote}}
 {{$serviceRequirement_edgeClusterRepositories := "3a58340c-d4ec-453d-99c3-0cf6ab7d8fa9" | quote}}
-{{$serviceRequirement_edgeFluxRoles := "8cd08563-7c3c-44fd-af4d-15c0fa6dadcb" | quote}}
 
 {{$permission_auth_manageKerberosMappings := "327c4cc8-9c46-4e1e-bb6b-257ace37b0f6" | quote}}
 {{$permission_auth_readEffectivePermissions := "35252562-51e5-4dd8-84cd-ba0fafa62669" | quote}}
@@ -112,11 +109,6 @@
 {{$role_globalDebugger := "4473fe9c-05b0-42cc-ad8c-8e05f6d0ca86" | quote}}
 {{$role_globalPrimaryApplication := "c0d17bcf-2a90-40e5-b244-07bf631f7417" | quote}}
 {{$role_warehouse := "6958c812-fbe2-4e6c-b997-6f850b89f679" | quote}}
-{{$role_edgeFlux := "34ee0e7f-8c9c-4f6d-aad7-4ed700bc77da" | quote}}
-
-{{$gitRepoGroup_remoteClusters := "736697bd-3637-4340-8d8a-f4a457d6f483" | quote}}
-{{$gitRepoGroup_sharedRepositories := "9c16e08a-a659-4f02-877f-2949dc4ec7b9" | quote}}
-{{$gitRepo_sharedFluxSystem := "8a3c0860-9e41-48b8-b02f-780a0e582be6" | quote}}
 
 {{$schema_serviceV1 := "05688a03-730e-4cda-9932-172e2c62e45c" | quote}}
 {{$schema_threePhaseCircuitV1 := "0d3dbae6-3195-4249-9ca1-897221db016f" | quote}}
@@ -798,30 +790,16 @@ data:
       "version": 1,
       "classes": [
         {{$classDef_serviceAccount}},
-        {{$classDef_edgeClusterAccount}},
-        {{$classDef_gitRepoGroup}},
-        {{$classDef_gitRepo}},
-        {{$classDef_clientRole}}
+        {{$classDef_edgeClusterAccount}}
       ],
       "objects": {
         {{$classDef_application}}: [
-          {{$application_gitRepoConfiguration}},
           {{$application_edgeClusterStatus}},
           {{$application_edgeDeployment}},
           {{$application_edgeClusterConfiguration}}
         ],
         {{$classDef_serviceAccount}}: [
           {{$serviceAccount_clusterManager}}
-        ],
-        {{$classDef_gitRepoGroup}}: [
-          {{$gitRepoGroup_remoteClusters}},
-          {{$gitRepoGroup_sharedRepositories}}
-        ],
-        {{$classDef_gitRepo}}: [
-          {{$gitRepo_sharedFluxSystem}}
-        ],
-        {{$classDef_clientRole}}: [
-          {{$role_edgeFlux}}
         ]
       },
       "configs": {
@@ -829,20 +807,8 @@ data:
           {{$serviceAccount_clusterManager}}: {
             "name": "Cluster Manager"
           },
-          {{$gitRepoGroup_sharedRepositories}}: {
-            "name": "Shared repositories"
-          },
-          {{$gitRepoGroup_remoteClusters}}: {
-            "name": "Remote clusters"
-          },
-          {{$gitRepo_sharedFluxSystem}}: {
-            "name": "Shared git repo: flux system"
-          },
           {{$classDef_edgeClusterAccount}}: {
             "name": "Edge cluster account"
-          },
-          {{$role_edgeFlux}}: {
-            "name": "Role: Edge Flux"
           },
           {{$application_edgeDeployment}}: {
             "name": "Edge deployment"
@@ -852,17 +818,6 @@ data:
           },
           {{$application_edgeClusterConfiguration}}: {
             "name": "Edge cluster configuration"
-          }
-        },
-        {{$application_gitRepoConfiguration}}: {
-          {{$gitRepoGroup_remoteClusters}}: {
-              "path": "cluster"
-          },
-          {{$gitRepoGroup_sharedRepositories}}: {
-              "path": "shared"
-          },
-          {{$gitRepo_sharedFluxSystem}}: {
-            "path": "shared/flux-system"
           }
         }
       }
@@ -1487,11 +1442,6 @@ data:
       ],
       "aces": [
         {
-          "principal": {{$role_edgeFlux}},
-          "permission": {{$permission_git_pullFromRepo}},
-          "target": {{$gitRepoGroup_sharedRepositories}}
-        },
-        {
           "principal": {{$serviceAccount_krbkeys}},
           "permission": {{$permission_clusterManager_manageSecrets}},
           "target": {{$special_wildcard}}
@@ -1508,12 +1458,6 @@ data:
         ],
         {{$serviceRequirement_edgeClusterRepositories}}: [
           {{$gitRepoGroup_remoteClusters}}
-        ],
-        {{$serviceRequirement_edgeFluxAccounts}}: [
-          {{$classDef_edgeClusterAccount}}
-        ],
-        {{$serviceRequirement_edgeFluxRoles}}: [
-          {{$role_edgeFlux}}
         ],
         {{$role_administrator}}: [
           {{$permissionGroup_clusterManager}}

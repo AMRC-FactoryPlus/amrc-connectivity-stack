@@ -16,7 +16,7 @@ spec:
           namespace: {{ .Release.Namespace }}
   {{- if .Values.acs.secure }}
   tls:
-    secretName: {{ default .Values.manager.tlsSecretName .Values.acs.tlsSecretName }}
+    secretName: {{ coalesce .Values.manager.tlsSecretName .Values.acs.tlsSecretName }}
     domains:
       - main: manager.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
   {{- end -}}

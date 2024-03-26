@@ -18,7 +18,7 @@ spec:
           namespace: {{ .Release.Namespace }}
   {{- if .Values.acs.secure }}
   tls:
-    secretName: {{ default .Values.grafana.tlsSecretName .Values.acs.tlsSecretName }}
+    secretName: {{ coalesce .Values.grafana.tlsSecretName .Values.acs.tlsSecretName }}
     domains:
       - main: grafana.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
   {{- end -}}

@@ -16,7 +16,7 @@ spec:
           namespace: {{ .Release.Namespace }}
   {{- if .Values.acs.secure }}
   tls:
-    secretName: {{ default .Values.influxdb2.tlsSecretName .Values.acs.tlsSecretName }}
+    secretName: {{ coalesce .Values.influxdb2.tlsSecretName .Values.acs.tlsSecretName }}
     domains:
       - main: influxdb-ingester.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
   {{- end -}}

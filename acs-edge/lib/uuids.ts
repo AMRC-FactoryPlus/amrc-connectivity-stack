@@ -6,6 +6,7 @@
 export const Special = {
     FactoryPlus:    "11ad7b32-1d32-4c4a-b0c9-fa049208939a",
     Null:           "00000000-0000-0000-0000-000000000000",
+    V5Metric:       "8a4dc2f4-2f9f-45fc-b2e9-ed7b9cda6145",
 };
 export const App = {
     AgentConfig:    "aac6f843-cfee-4683-b121-6943bfdf9173",

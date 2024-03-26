@@ -5,27 +5,6 @@ The AMRC Connectivity Stack (ACS) is a Kubernetes Helm chart that contains a com
 ## Prerequisites
 Ensure that you have `kubectl` access to an existing Kubernetes cluster and familiarise yourself with the concepts of both Kubernetes and [Factory+](https://factoryplus.app.amrc.co.uk) before continuing. This chart installs a full end-to-end deployment of Factory+ onto a central cluster and there are a lot of moving parts.
 
-## What's Changed in V3?
-
-### Edge Clusters
-V3.0.0 of the AMRC Connectivity Stack introduces a number of new components to enable effective management of edge clusters. Prior to this version, the chart was designed to be installed onto a single central cluster that consisted of all central nodes _and_ all edge nodes. This was not ideal for a number of reasons, including the fact that it was impossible to utilise cloud-based clusters with on-premise edge nodes, in most cases.
-
-Through changes to the Manager in V3, is is now possible to create "Edge Clusters" directly from the Manager UI. This action will provide you with a bootstrap script to run on a fresh Kubernetes cluster at the edge. The bootstrap script handles the installation and configuration of all necessary components to connect the edge cluster to the central cluster.
-
-![Edge Clusters - Bootstrap.jpg](docs%2Fassets%2FEdge%20Clusters%20-%20Bootstrap.jpg)
-
-Once the edge cluster is connected to the central cluster, it will appear in the Manager UI and can have workloads assigned to it. The process for assigning workloads to edge clusters relies on components deployed to the edge during the bootstrap process, which ultimately watch the Config Store for changes to their state.
-
-![Edge Clusters - Deployment.jpg](docs%2Fassets%2FEdge%20Clusters%20-%20Deployment.jpg)
-
-### Visualiser
-The Visualiser (`visualiser.<baseURL>`) is a new component included in ACS V3.0.0 that provides a visual representation of Factory+ traffic and MQTT packets. This application is accessible from the Manager UI and provides a real-time overview of the MQTT traffic flowing through the system. It can be useful for debugging and understanding the flow of data through the system but also serves as a great communication tool for demonstrating the capabilities of Factory+.
-
-### Sensitive Information Management
-V3.0.0 leverages the power of kubernetes secrets to store sensitive configuration information such as passwords and keys for connecting to equipment. Whereas before sensitive information was stored in the device configuration files for your devices, it is now stored in kubernetes secrets and accessed by the devices at runtime. This is a more secure way of managing sensitive information ensures that only the edge cluster destined to represent the device has access to the information.
-
-![Edge Clusters - Secrets.jpg](docs%2Fassets%2FEdge%20Clusters%20-%20Secrets.jpg)
-
 ## Get Started
 This chart can be installed onto a local Kubernetes cluster for development or testing by following the instructions below. For production deployments, please refer to the [production deployment guide](#production-deployment).
 
@@ -83,8 +62,7 @@ kubectl create namespace factory-plus
 
 Finally, install ACS by running the following command.
 ```bash
-helm install acs amrc-connectivity-stack/amrc-connectivity-stack --version ^3.0.0 -f values.yaml --namespace 
-factory-plus
+helm install acs amrc-connectivity-stack/amrc-connectivity-stack --version ^3.0.0 -f values.yaml --namespace factory-plus
 ```
 
 If all went to plan you should now have a fully functioning ACS deployment beginning to deploy to your local Kubernetes cluster. Note that it can take a few minutes to have all services operational.
@@ -108,6 +86,27 @@ Finally, get the admin password for InfluxDB by running the following command an
 ```bash
 echo $(sudo kubectl get secret acs-influxdb2-auth -o jsonpath="{.data.admin-password}" -n {{.Release.Namespace}} | base64 --decode)
 ```
+
+## What's Changed in V3?
+
+### Edge Clusters
+V3.0.0 of the AMRC Connectivity Stack introduces a number of new components to enable effective management of edge clusters. Prior to this version, the chart was designed to be installed onto a single central cluster that consisted of all central nodes _and_ all edge nodes. This was not ideal for a number of reasons, including the fact that it was impossible to utilise cloud-based clusters with on-premise edge nodes, in most cases.
+
+Through changes to the Manager in V3, is is now possible to create "Edge Clusters" directly from the Manager UI. This action will provide you with a bootstrap script to run on a fresh Kubernetes cluster at the edge. The bootstrap script handles the installation and configuration of all necessary components to connect the edge cluster to the central cluster.
+
+![Edge Clusters - Bootstrap.jpg](docs%2Fassets%2FEdge%20Clusters%20-%20Bootstrap.jpg)
+
+Once the edge cluster is connected to the central cluster, it will appear in the Manager UI and can have workloads assigned to it. The process for assigning workloads to edge clusters relies on components deployed to the edge during the bootstrap process, which ultimately watch the Config Store for changes to their state.
+
+![Edge Clusters - Deployment.jpg](docs%2Fassets%2FEdge%20Clusters%20-%20Deployment.jpg)
+
+### Visualiser
+The Visualiser (`visualiser.<baseURL>`) is a new component included in ACS V3.0.0 that provides a visual representation of Factory+ traffic and MQTT packets. This application is accessible from the Manager UI and provides a real-time overview of the MQTT traffic flowing through the system. It can be useful for debugging and understanding the flow of data through the system but also serves as a great communication tool for demonstrating the capabilities of Factory+.
+
+### Sensitive Information Management
+V3.0.0 leverages the power of kubernetes secrets to store sensitive configuration information such as passwords and keys for connecting to equipment. Whereas before sensitive information was stored in the device configuration files for your devices, it is now stored in kubernetes secrets and accessed by the devices at runtime. This is a more secure way of managing sensitive information ensures that only the edge cluster destined to represent the device has access to the information.
+
+![Edge Clusters - Secrets.jpg](docs%2Fassets%2FEdge%20Clusters%20-%20Secrets.jpg)
 
 ## Maintainers
 

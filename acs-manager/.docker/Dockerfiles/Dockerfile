@@ -1,3 +1,8 @@
+
+ARG base_version
+ARG build_version
+ARG base_prefix=ghcr.io/amrc-factoryplus/acs-manager
+
 FROM --platform=linux/amd64 oven/bun:latest as build-frontend
 WORKDIR /app
 COPY . /app/
@@ -17,7 +22,7 @@ COPY --from=build-frontend --chown=www:www /app /app
 
 EXPOSE 8080
 
-FROM --platform=linux/amd64 ghcr.io/amrc-factoryplus/acs-manager:backend-build-1.1.0 as build-backend
+FROM --platform=linux/amd64 ${base_prefix}:backend-build-${build_version} as build-backend
 
 WORKDIR /app
 COPY --from=build-frontend --chown=www-data:www-data /app /app
@@ -25,7 +30,7 @@ RUN composer install --prefer-dist --no-dev --optimize-autoloader --no-interacti
 RUN php artisan view:cache && php artisan event:cache && php artisan optimize;
 RUN composer dump-autoload
 
-FROM --platform=linux/amd64 ghcr.io/amrc-factoryplus/acs-manager:prod-base-php82-1.0.6 as production-backend
+FROM --platform=linux/amd64 ${base_prefix}:prod-base-php82-${base_version} as production-backend
 
 MAINTAINER Alex Godbehere
 USER www-data

@@ -29,7 +29,7 @@ spec:
                 name: krb5-conf
           containers:
             - name: cron
-              image: "{{ include "amrc-connectivity-stack.image-name" .Values.configdb }}-backend"
+              image: "{{ include "amrc-connectivity-stack.image-name" (list . .Values.configdb) }}-backend"
               env:
                 - name: KRB5_CONFIG
                   value: /config/krb5-conf/krb5.conf

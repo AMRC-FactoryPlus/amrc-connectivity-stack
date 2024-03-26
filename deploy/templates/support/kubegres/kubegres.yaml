@@ -327,7 +327,7 @@ spec:
             - --upstream=http://127.0.0.1:8080/
             - --logtostderr=true
             - --v=0
-{{ include "amrc-connectivity-stack.image" .Values.kubegres.kubeProxy | indent 10 }}
+{{ include "amrc-connectivity-stack.image" ( list . .Values.kubegres.kubeProxy) | indent 10 }}
           name: kube-rbac-proxy
           ports:
             - containerPort: 8443
@@ -351,7 +351,7 @@ spec:
             - --leader-elect
           command:
             - /manager
-{{ include "amrc-connectivity-stack.image" .Values.kubegres.kubegres | indent 10 }}
+{{ include "amrc-connectivity-stack.image" (list . .Values.kubegres.kubegres) | indent 10 }}
           livenessProbe:
             httpGet:
               path: /healthz

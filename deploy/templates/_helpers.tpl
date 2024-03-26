@@ -39,13 +39,17 @@ Create chart name and version as used by the chart label.
 Define the image for a container.
 */}}
 {{- define "amrc-connectivity-stack.image-name" -}}
-{{- $defaultTag := coalesce .image.tag $.Values.acs.defaultTag $.Release.Version }}
-{{- .image.registry }}/{{ .image.repository }}:{{ $defaultTag }}
+{{- $top := index . 0 }}
+{{- $context := index . 1 }}
+{{- $defaultTag := coalesce $context.image.tag $top.Values.acs.defaultTag $top.Release.Version }}
+{{- $context.image.registry }}/{{ $context.image.repository }}:{{ $defaultTag }}
 {{- end }}
 
 {{- define "amrc-connectivity-stack.image" -}}
-image: {{ include "amrc-connectivity-stack.image-name" . }}
-imagePullPolicy: {{ .image.pullPolicy }}
+{{- $top := index . 0 }}
+{{- $context := index . 1 }}
+image: {{ include "amrc-connectivity-stack.image-name" (list $top $context) }}
+imagePullPolicy: {{ $context.image.pullPolicy }}
 {{- end }}
 
 {{/* Go templates are just awful grrr */}}

@@ -34,7 +34,7 @@ spec:
         # Do as little work as possible as root... We need to chown the storage
         # as the default permissions will not be correct.
         - name: chown-storage
-{{ include "amrc-connectivity-stack.image" .Values.shell | indent 10 }}
+{{ include "amrc-connectivity-stack.image" (list . .Values.shell) | indent 10 }}
           command: ["/bin/sh", "-c"]
           args:
             - |
@@ -49,7 +49,7 @@ spec:
               name: data
 
         - name: init-data
-{{ include "amrc-connectivity-stack.image" .Values.shell | indent 10 }}
+{{ include "amrc-connectivity-stack.image" (list . .Values.shell) | indent 10 }}
           command: ["/bin/sh", "-c"]
           args:
             - |
@@ -69,7 +69,7 @@ spec:
 
       containers:
         - name: git
-{{ include "amrc-connectivity-stack.image" .Values.git | indent 10 }}
+{{ include "amrc-connectivity-stack.image" (list . .Values.git) | indent 10 }}
           command: [ "/usr/bin/k5start", "-Uf", "/keytabs/client" ]
           args: ["node", "bin/git-server.js"]
           env:

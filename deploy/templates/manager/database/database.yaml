@@ -7,7 +7,7 @@ metadata:
 
 spec:
   replicas: 1
-  image: {{ include "amrc-connectivity-stack.image-name" .Values.postgres }}
+  image: {{ include "amrc-connectivity-stack.image-name" (list . .Values.postgres ) }}
   {{- with .Values.acs.imagePullSecrets }}
   imagePullSecrets:
     {{- toYaml . | nindent 4 }}

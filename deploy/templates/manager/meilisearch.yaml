@@ -25,7 +25,7 @@ spec:
             claimName: manager-meilisearch-pvc
       containers:
         - name: meilisearch
-{{ include "amrc-connectivity-stack.image" .Values.manager.meilisearch | indent 10 }}
+{{ include "amrc-connectivity-stack.image" (list . .Values.manager.meilisearch) | indent 10 }}
           volumeMounts:
             - mountPath: "/data.ms"
               name: manager-meilisearch-storage

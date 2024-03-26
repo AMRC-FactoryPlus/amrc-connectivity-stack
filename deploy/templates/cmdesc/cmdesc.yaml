@@ -36,7 +36,7 @@ spec:
 
       containers:
         - name: cmdesc
-{{ include "amrc-connectivity-stack.image" .Values.cmdesc | indent 10 }}
+{{ include "amrc-connectivity-stack.image" (list . .Values.cmdesc) | indent 10 }}
           command: [ "/usr/bin/k5start", "-Uf", "/keytabs/client" ]
           args: [ "node", "bin/cmdescd.js" ]
           env:

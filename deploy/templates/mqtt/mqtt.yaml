@@ -39,7 +39,7 @@ spec:
             name: mqtt-config
       containers:
         - name: hivemq
-{{ include "amrc-connectivity-stack.image" .Values.mqtt | indent 10 }}
+{{ include "amrc-connectivity-stack.image" (list . .Values.mqtt) | indent 10 }}
           env:
             - name: CLIENT_KEYTAB
               value: /keytabs/client

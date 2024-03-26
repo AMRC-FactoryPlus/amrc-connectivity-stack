@@ -16,7 +16,7 @@ acs:
   # regardless of the version in the Helm chart. Each component can
   # further override this value by setting the `tag` property in its
   # own section.
-  defaultTag: ""
+  defaultTag: v3.0.0-rc.1
 
 identity:
   # -- Whether or not to enable the Identity component

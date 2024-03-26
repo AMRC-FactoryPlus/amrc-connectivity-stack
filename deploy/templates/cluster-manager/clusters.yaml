@@ -31,7 +31,7 @@ spec:
 
       containers:
         - name: cluster-manager
-{{ include "amrc-connectivity-stack.image" .Values.clusterManager | indent 10 }}
+{{ include "amrc-connectivity-stack.image" (list . .Values.clusterManager) | indent 10 }}
           command: [ "/usr/bin/k5start", "-Uf", "/keytabs/client" ]
           args: ["node", "bin/edge-deployment.js"]
           env:
@@ -58,7 +58,7 @@ spec:
             - name: KUBESEAL_TEMP
               value: /cert
             - name: KRBKEYS_IMAGE
-              value: {{ include "amrc-connectivity-stack.image-name" .Values.identity.krbKeysOperator | quote }}
+              value: {{ include "amrc-connectivity-stack.image-name" (list . .Values.identity.krbKeysOperator) | quote }}
             - name: HTTP_API_URL
               value: http://clusters.{{ .Release.Namespace }}.svc.cluster.local
             - name: EXTERNAL_URL

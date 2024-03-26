@@ -27,7 +27,7 @@ spec:
       {{- end }}
       containers:
         - name: queue-default
-          image: "{{ include "amrc-connectivity-stack.image-name" .Values.configdb }}-backend"
+          image: "{{ include "amrc-connectivity-stack.image-name" (list . .Values.configdb ) }}-backend"
           imagePullPolicy: IfNotPresent
           env:
             - name: DB_PASSWORD

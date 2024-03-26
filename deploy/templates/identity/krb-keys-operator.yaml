@@ -36,7 +36,7 @@ spec:
           emptyDir:
       containers:
         - name: operator
-{{ include "amrc-connectivity-stack.image" .Values.identity.krbKeysOperator | indent 10 }}
+{{ include "amrc-connectivity-stack.image" (list . .Values.identity.krbKeysOperator) | indent 10 }}
           command: [ "/bin/sh", "/home/krbkeys/bin/krb-keys.sh" ]
           args: []
           env:
@@ -75,7 +75,7 @@ spec:
             - mountPath: /ccache
               name: krb5-ccache
         - name: tgt-creds
-{{ include "amrc-connectivity-stack.image" .Values.identity.krbKeysOperator | indent 10 }}
+{{ include "amrc-connectivity-stack.image" (list . .Values.identity.krbKeysOperator) | indent 10 }}
           command: ["/usr/bin/k5start", "-Uf", "/keytabs/client", "-K", "5"]
           args: []
           env:
@@ -91,7 +91,7 @@ spec:
             - mountPath: /ccache
               name: krb5-ccache
         - name: kadmin-creds
-{{ include "amrc-connectivity-stack.image" .Values.identity.krbKeysOperator | indent 10 }}
+{{ include "amrc-connectivity-stack.image" (list . .Values.identity.krbKeysOperator) | indent 10 }}
           command: [
             "/usr/bin/k5start", "-K", "5",
             "-Uf", "/keytabs/client", 

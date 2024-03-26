@@ -42,7 +42,7 @@ spec:
 
       initContainers:
         - name: db-init
-{{ include "amrc-connectivity-stack.image" .Values.directory | indent 10 }}
+{{ include "amrc-connectivity-stack.image" (list . .Values.directory) | indent 10 }}
           command: [ "/usr/bin/k5start", "-Uf", "/keytabs/dbadmin", "/usr/local/bin/psql" ]
           args: [ "-w", "-q", "-f", "/home/node/app/sql/migrate.sql" ]
           env:
@@ -66,7 +66,7 @@ spec:
 
       containers:
         - name: mqtt
-{{ include "amrc-connectivity-stack.image" .Values.directory | indent 10 }}
+{{ include "amrc-connectivity-stack.image" (list . .Values.directory) | indent 10 }}
           command: [ "/usr/bin/k5start", "-Uf", "/keytabs/client" ]
           args: [ "node", "bin/directory-mqtt" ]
           env:

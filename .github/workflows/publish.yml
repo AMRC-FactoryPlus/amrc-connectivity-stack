@@ -406,14 +406,13 @@ jobs:
           cd hivemq-krb
           ver="$(mvn -q help:evaluate -Dexpression=project.version -DforceStdout)"
           echo "krb_zipfile=hivemq-auth-krb-${ver}-distribution.zip" >>"$GITHUB_ENV"
-
       - name: Build with Maven
         run: |
           cd hivemq-krb
           mvn -B package
           cp "target/${krb_zipfile}" ..
-            - name: Build and push Docker image
-      - id: build-and-push
+      - name: Build and push Docker image
+        id: build-and-push
         uses: docker/build-push-action@v5
         with:
           context: .

@@ -1016,6 +1016,51 @@ data:
           "target": {{$permissionGroup_configStore}}
         },
         {
+          "principal": {{$serviceAccount_krbkeys}},
+          "permission": {{$permission_auth_readKerberosMappings}},
+          "target": {{$special_wildcard}}
+        },
+        {
+          "principal": {{$serviceAccount_krbkeys}},
+          "permission": {{$permission_auth_manageKerberosMappings}},
+          "target": {{$special_wildcard}}
+        },
+        {
+          "principal": {{$serviceAccount_krbkeys}},
+          "permission": {{$permission_auth_manageACLsPerPermission}},
+          "target": {{$special_wildcard}}
+        },
+        {
+          "principal": {{$serviceAccount_krbkeys}},
+          "permission": {{$permission_auth_manageGroups}},
+          "target": {{$special_wildcard}}
+        },
+        {
+          "principal": {{$serviceAccount_krbkeys}},
+          "permission": {{$permission_configStore_readConfigForApp}},
+          "target": {{$application_generalObjectInformation}}
+        },
+        {
+          "principal": {{$serviceAccount_krbkeys}},
+          "permission": {{$permission_configStore_readConfigForApp}},
+          "target": {{$application_sparkplugAddressInformation}}
+        },
+        {
+          "principal": {{$serviceAccount_krbkeys}},
+          "permission": {{$permission_configStore_writeConfigForApp}},
+          "target": {{$application_generalObjectInformation}}
+        },
+        {
+          "principal": {{$serviceAccount_krbkeys}},
+          "permission": {{$permission_configStore_writeConfigForApp}},
+          "target": {{$application_sparkplugAddressInformation}}
+        },
+        {
+          "principal": {{$serviceAccount_krbkeys}},
+          "permission": {{$permission_configStore_manageObjects}},
+          "target": {{$special_wildcard}}
+        },
+        {
           "principal": {{$serviceAccount_manager}},
           "permission": {{$permission_configStore_manageObjects}},
           "target": {{$classDef_edgeCluster}}

@@ -421,7 +421,7 @@ jobs:
           mvn -B package
           cp "target/${krb_zipfile}" ..
             - name: Build and push Docker image
-        id: build-and-push
+      - id: build-and-push
         uses: docker/build-push-action@v5
         with:
           context: .

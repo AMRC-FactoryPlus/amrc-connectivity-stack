@@ -410,17 +410,17 @@ jobs:
         run: |
           cd hivemq-krb
           mvn -B package
-          cp "target/${krb_zipfile}" ..
+          cp "target/${krb_zipfile}" "../${{ steps.prepare.outputs.service-name }}"
       - name: Build and push Docker image
         id: build-and-push
         uses: docker/build-push-action@v5
         with:
-          context: .
-          push: ${{ github.event_name != 'pull_request' }}
+          context: ./${{ steps.prepare.outputs.service-name }}
+          push: true
+          tags: ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}:${{ steps.prepare.outputs.version }}
+          labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             krb_zipfile=${{ env.krb_zipfile }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - uses: ./.github/actions/cleanup

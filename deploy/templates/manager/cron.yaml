@@ -22,7 +22,7 @@ spec:
           {{- end }}
           containers:
             - name: cron
-              image: "{{ .Values.manager.image.registry }}/{{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}-backend"
+              image: "{{ include "amrc-connectivity-stack.image-name" .Values.manager }}-backend"
               imagePullPolicy: IfNotPresent
               command: [ "php", "artisan", "schedule:run" ]
               env:

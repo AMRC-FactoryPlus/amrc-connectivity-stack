@@ -48,7 +48,7 @@ spec:
         # Do as little work as possible as root... We need to chown the storage
         # as the default permissions will not be correct.
         - name: chown-storage
-          image: "{{ .Values.identity.identity.image.registry }}/{{ .Values.identity.identity.image.repository }}:{{ .Values.identity.identity.image.tag }}"
+{{ include "amrc-connectivity-stack.image" .Values.identity.identity | indent 10 }}
           command: ["/bin/sh", "-c"]
           args:
             - |
@@ -65,7 +65,7 @@ spec:
 
         # Initialise the Kerberos database on first boot.
         - name: kdb-init
-          image: "{{ .Values.identity.identity.image.registry }}/{{ .Values.identity.identity.image.repository }}:{{ .Values.identity.identity.image.tag }}"
+{{ include "amrc-connectivity-stack.image" .Values.identity.identity | indent 10 }}
           command: ["/bin/sh"]
           {{- if .Values.identity.identity.manualInit }}
           args: [ "-c", "while test ! -f /tmp/KDB-INIT-COMPLETE; do sleep 5; done" ]
@@ -90,7 +90,7 @@ spec:
         # principal to authenticate with...). It creates the Kerberos principal
         # needed and stashes its key in a K8s secret for use by the operator.
         - name: krbkeys
-          image: "{{ .Values.identity.krbKeysOperator.image.registry }}/{{ .Values.identity.krbKeysOperator.image.repository }}:{{ .Values.identity.krbKeysOperator.image.tag }}"
+          image: "{{ include "amrc-connectivity-stack.image-name" .Values.identity.krbKeysOperator }}"
           command: ["/usr/bin/python3", "-m", "amrc.factoryplus.krbkeys.bootstrap"]
           # We need to run as the 'kdc' user from the kdc
           # image. This user isn't the same UID as the default
@@ -125,7 +125,7 @@ spec:
       containers:
         # The KDC issues tickets to clients.
         - name: kdc
-          image: "{{ .Values.identity.identity.image.registry }}/{{ .Values.identity.identity.image.repository }}:{{ .Values.identity.identity.image.tag }}"
+{{ include "amrc-connectivity-stack.image" .Values.identity.identity | indent 10 }}
           command: ["/usr/sbin/krb5kdc"]
           args: [ "-n" ]
           env:
@@ -144,7 +144,7 @@ spec:
         # Kadmind performs Kerberos database administration, including password
         # changes for users.
         - name: kadmind
-          image: "{{ .Values.identity.identity.image.registry }}/{{ .Values.identity.identity.image.repository }}:{{ .Values.identity.identity.image.tag }}"
+{{ include "amrc-connectivity-stack.image" .Values.identity.identity | indent 10 }}
           command: ["/usr/sbin/kadmind"]
           args: [ "-nofork" ]
           env:

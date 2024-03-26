@@ -34,7 +34,7 @@ spec:
 
       containers:
         - name: influxdb-ingester
-          image: "{{ .Values.warehouse.ingester.image.registry }}/{{ .Values.warehouse.ingester.image.repository }}:{{ .Values.warehouse.ingester.image.tag }}"
+          image: "{{ include "amrc-connectivity-stack.image-name" .Values.warehouse.ingester }}"
           command: [ "/usr/bin/k5start", "-Uf", "/keytabs/client" ]
           args: [ "node", "--es-module-specifier-resolution=node", "bin/ingester.js" ]
           imagePullPolicy: Always

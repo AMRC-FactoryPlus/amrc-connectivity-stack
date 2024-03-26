@@ -1,11 +1,11 @@
 # syntax=docker/dockerfile:1
 
-ARG utility_prefix=ghcr.io/amrc-factoryplus/utilities
-ARG utility_ver=v1.0.8
-
-FROM ${utility_prefix}-build:${utility_ver} AS build
-
+ARG base_version
+ARG base_prefix=ghcr.io/amrc-factoryplus/acs-base
 ARG revision=unknown
+
+FROM ${base_prefix}-pg-build:${base_version} AS build
+
 
 # Install the node application on the build container where we can
 # compile the native modules.
@@ -22,7 +22,7 @@ RUN <<'SHELL'
     echo "export const GIT_VERSION=\"$revision\";" > ./lib/git-version.js
 SHELL
 
-FROM ${utility_prefix}-run:${utility_ver}
+FROM ${base_prefix}-pg-run:${base_version} AS run
 
 # Copy across from the build container.
 WORKDIR /home/node/app

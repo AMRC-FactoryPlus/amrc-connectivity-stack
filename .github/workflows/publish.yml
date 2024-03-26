@@ -227,45 +227,46 @@ jobs:
           version: ${{ steps.prepare.outputs.version }}
           service-name: ${{ steps.prepare.outputs.service-name }}
           digest: ${{ steps.build-and-push.outputs.digest }}
-#  build-x86-pg:
-#    needs: [ build-base-pg-run ]
-#    runs-on: ubuntu-latest
-#    strategy:
-#      matrix:
-#        service: [ 'acs-auth', 'acs-directory', 'acs-configdb' ]
-#    permissions:
-#      contents: read
-#      packages: write
-#      id-token: write
-#      pull-requests: write
-#    steps:
-#      - name: Checkout
-#        uses: actions/checkout@v3
-#      - uses: ./.github/actions/prepare
-#        id: prepare
-#        with:
-#          service-name: ${{ matrix.service }}
-#          token: ${{ secrets.GITHUB_TOKEN }}
-#
-#      - name: Build
-#        uses: docker/build-push-action@v5
-#        id: build-and-push
-#        with:
-#          context: ./${{ steps.prepare.outputs.service-name }}
-#          push: true
-#          tags: ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}:${{ steps.prepare.outputs.version }}
-#          labels: ${{  steps.prepare.outputs.labels }}
-#          cache-from: type=gha
-#          cache-to: type=gha,mode=max
-#          build-args: |
-#            revision=${{ steps.prepare.outputs.version }} (${{ github.sha }})
-#            base_version=${{ env.BASE_JS_VERSION }}
-#      - uses: ./.github/actions/cleanup
-#        id: cleanup
-#        with:
-#          version: ${{ steps.prepare.outputs.version }}
-#          service-name: ${{ steps.prepare.outputs.service-name }}
-#          digest: ${{ steps.build-and-push.outputs.digest }}
+  build-x86-pg:
+    needs: [ build-base-pg-run ]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [ 'acs-auth', 'acs-directory', 'acs-configdb' ]
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - uses: ./.github/actions/prepare
+        id: prepare
+        with:
+          service-name: ${{ matrix.service }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build
+        uses: docker/build-push-action@v5
+        id: build-and-push
+        with:
+          context: ./${{ steps.prepare.outputs.service-name }}
+          push: true
+          tags: ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}:${{ steps.prepare.outputs.version }}
+          labels: ${{  steps.prepare.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            revision=${{ steps.prepare.outputs.version }} (${{ github.sha }})
+            base_version=${{ env.BASE_JS_VERSION }}
+      - uses: ./.github/actions/cleanup
+        id: cleanup
+        with:
+          version: ${{ steps.prepare.outputs.version }}
+          service-name: ${{ steps.prepare.outputs.service-name }}
+          digest: ${{ steps.build-and-push.outputs.digest }}
+
 #  build-manager:
 #    name: Build Manager
 #    runs-on: ubuntu-latest

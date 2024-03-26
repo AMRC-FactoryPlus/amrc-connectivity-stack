@@ -14,13 +14,6 @@ The server has the ability to automatically mirror external repos into
 an internal repo. This is useful when the central cluster can contact
 the Internet but the edge clusters cannot.
 
-## Git server HTTP API
-
-The Git server is normally deployed at `https://git.DOMAIN` where
-`DOMAIN` is the ACS external base domain. In any case the base URL for
-the server should normally be discovered via the Directory using the
-Service UUID `7adf4db0-2e7b-4a68-ab9d-376f4c5ce14b`.
-
 ## Git repository configuration ConfigDB Application
 
 The 'Git repository configuration' Application has UUID
@@ -66,6 +59,81 @@ remote commit. Changing the `url` or `ref` to pull from will trigger a
 pull immediately, which will update to the newly requested commit
 regardless of its relationship to the previous position of the branch.
 
+## Git server HTTP API
+
+The Git server is normally deployed at `https://git.DOMAIN` where
+`DOMAIN` is the ACS external base domain. In any case the base URL for
+the server should normally be discovered via the Directory using the
+Service UUID `7adf4db0-2e7b-4a68-ab9d-376f4c5ce14b`.
+
+Endpoints available under the base URL are:
+
+### `/uuid/:uuid`
+
+This is the Git repo URL for a repo with the given UUID. Pull and push
+access are authenticated against the Auth service.
+
+### `/git/:path`
+
+This is the Git repo URL for a repo accessed via a human-firendly path.
+If more than one repo is configured with the same path, none will be
+accessible by path until the problem is fixed.
+
+### `GET /v1/storage`
+
+This returns a JSON array listing the UUIDs of all the repositories
+which currently have storage allocated. Repos which have been created in
+the ConfigDB but not allocated space on disk yet will not appear in the
+list. Repos which have been deleted from the ConfigDB but which still
+appear in this list will preserve their former contents and history if
+they are recreated.
+
+### `DELETE /v1/storage/:uuid`
+
+Deletes the storage associated with a repo, permanently. If the repo
+still exists in the ConfigDB, or if it is subsequently created, it will
+revert to an empty repo.
+
 ## Git repository permissions
 
+The Git server uses the following permissions in the Auth service.
 
+### Pull from repo
+
+    12ecb694-b4b9-4d2a-927e-d100019f7ebe
+
+This grants permission to pull from a repo. It should be granted on the
+repo UUID as target, or on an Auth group including the repo UUID.
+
+### Push to repo
+
+    b2d8d437-5060-4202-bcc2-bd2beda09651
+
+This grants permission to push to a repo. It should be granted on the
+repo UUID as target, or on an Auth group including the repo UUID.
+
+### Manage repo storage
+
+    7fd8a8c1-6050-4950-97bd-a35bb83ff750
+
+This grants permission to list and delete repo storage. It should be
+granted on the Null UUID; storage permissions for individual repos are
+not supported.
+
+## Git server MQTT interface
+
+The Git server publishes as a Sparkplug Node, normally under the
+`ORG-Service-Core/Git` address. The server publishes information about
+the current state of all the repositories.
+
+The metric structure of the Node birth certificate is as follows:
+
+* `Schema_UUID`: `ee115c26-2ad6-4846-a771-da0cf6401399` Git Server v1.
+* `Instance_UUID`: The UUID of the Git server Node.
+* `Repositories`: A folder of metrics with a subfolder named for the
+  UUID of each configured repo. Each subfolder contains:
+    * `Schema_UUID`: `1bc8b1c1-e5e6-4777-814b-67bc58aaad62` Git Repo v1.
+    * `Instance_UUID`: The UUID of the repo (the same as the folder
+      name).
+    * `Branches`: A folder of metrics with a metric for each branch in
+      the repo. The metric value is the full SHA-1 of the branch.

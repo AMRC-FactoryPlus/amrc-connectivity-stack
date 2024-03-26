@@ -380,8 +380,11 @@ export function parseValueFromPayload(msg: any, metric: sparkplugMetric, payload
             }
 
             if (path) {
-                let newVal = JSONPath({path: path, json: payload});
-                if (payload === 0) {
+                /* Work around a bug in the JSONPath library */
+                let newVal = path === "$" && payload === false
+                    ? [ false ] 
+                    : JSONPath({path: path, json: payload});
+                if (payload === 0 || !Array.isArray(newVal)) {
                     return 0;
                 } else {
                     if (newVal[0]?.type === "Buffer") {
@@ -466,7 +469,7 @@ export function parseTimeStampFromPayload(msg: any, metric: sparkplugMetric, pay
             const timestamp = JSONPath({
                 path: '$.timestamp', json: payload
             });
-            return timestamp[0];
+            return Array.isArray(timestamp) ? timestamp[0] : undefined;
         default:
             return undefined;
     }

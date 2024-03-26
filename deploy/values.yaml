@@ -12,8 +12,8 @@ acs:
   imagePullSecrets: []
   # -- An optional tag that will force images to use this version
   # regardless of the version in the Helm chart. Each component can
-  # override this value by setting the `tag` property in its own
-  # section.
+  # further override this value by setting the `tag` property in its
+  # own section.
   defaultTag: ""
 
 identity:

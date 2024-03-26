@@ -1,9 +1,9 @@
 # syntax=docker/dockerfile:1
 
-ARG acs_build=ghcr.io/amrc-factoryplus/acs-base-js-build:v0.0.1
-ARG acs_run=ghcr.io/amrc-factoryplus/acs-base-js-run:v0.0.1
+ARG base_version
+ARG base_prefix=ghcr.io/amrc-factoryplus/acs-base
 
-FROM ${acs_build} AS build
+FROM ${base_prefix}-js-build:${base_version} AS build
 ARG acs_npm=NO
 ARG TARGETOS
 ARG TARGETARCH
@@ -30,7 +30,7 @@ RUN <<'SHELL'
     echo "export const GIT_VERSION=\"$revision\";" > ./lib/git-version.js
 SHELL
 
-FROM ${acs_run} AS run
+FROM ${base_prefix}-js-run:${base_version} AS run
 # Copy across from the build container.
 WORKDIR /home/node/app
 COPY --from=build --chown=root:root /home/node/app ./

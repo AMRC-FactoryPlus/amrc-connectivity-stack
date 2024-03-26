@@ -1,6 +1,7 @@
 ARG base_version
+ARG base_prefix=ghcr.io/amrc-factoryplus/acs-base
 
-FROM ghcr.io/amrc-factoryplus/acs-base-js-build:${base_version} AS build
+FROM ${base_prefix}-js-build:${base_version} AS build
 
 # Install the node application on the build container where we can
 # compile the native modules.
@@ -11,7 +12,7 @@ COPY package*.json ./
 RUN npm install --save=false
 COPY . .
 
-FROM ghcr.io/amrc-factoryplus/acs-base-js-run:${base_version}
+FROM ${base_prefix}-js-run:${base_version}
 
 # Copy across from the build container.
 WORKDIR /home/node/app

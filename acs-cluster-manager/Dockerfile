@@ -1,8 +1,9 @@
 # syntax=docker/dockerfile:1
 
 ARG base_version
+ARG base_prefix=ghcr.io/amrc-factoryplus/acs-base
 
-FROM ghcr.io/amrc-factoryplus/acs-base-js-build:${base_version} AS build
+FROM ${base_prefix}-js-build:${base_version} AS build
 ARG acs_npm=NO
 ARG kubeseal_version=0.21.0
 ARG TARGETOS
@@ -34,7 +35,7 @@ RUN <<'SHELL'
     echo "export const GIT_VERSION=\"$revision\";" > ./lib/git-version.js
 SHELL
 
-FROM ghcr.io/amrc-factoryplus/acs-base-js-run:${base_version} AS run
+FROM ${base_prefix}-js-run:${base_version} AS run
 # Copy across from the build container.
 COPY --from=build /usr/local/bin/kubeseal /usr/local/bin/kubeseal
 WORKDIR /home/node/app

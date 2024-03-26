@@ -30,7 +30,7 @@ RUN composer install --prefer-dist --no-dev --optimize-autoloader --no-interacti
 RUN php artisan view:cache && php artisan event:cache && php artisan optimize;
 RUN composer dump-autoload
 
-FROM --platform=linux/amd64 ${base_prefix}:prod-base-php82-${base_version} as production-backend
+FROM --platform=linux/amd64 ${base_prefix}:prod-base-${base_version} as production-backend
 
 MAINTAINER Alex Godbehere
 USER www-data

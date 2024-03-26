@@ -385,14 +385,62 @@ jobs:
           docker load --input /tmp/image.tar
           docker image ls -a
           docker push ghcr.io/amrc-factoryplus/acs-manager:${{ steps.prepare.outputs.version }}-backend
-  # ! Skip MQTT for now
+
   build-mqtt:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      pull-requests: write
     steps:
-      - name: Skip
+      - name: Checkout
+        uses: actions/checkout@v3
+      - uses: ./.github/actions/prepare
+        id: prepare
+        with:
+          service-name: acs-mqtt
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up JDK 19
+        uses: actions/setup-java@v3
+        with:
+          java-version: '19'
+          distribution: 'temurin'
+          server-id: github # Value of the distributionManagement/repository/id field of the pom.xml
+          settings-path: ${{ github.workspace }} # location for the settings.xml file
+
+      - name: Extract POM version
         run: |
-          echo "Skipping"
+          cd hivemq-krb
+          ver="$(mvn -q help:evaluate -Dexpression=project.version -DforceStdout)"
+          echo "krb_zipfile=hivemq-auth-krb-${ver}-distribution.zip" >>"$GITHUB_ENV"
+
+      - name: Build with Maven
+        run: |
+          cd hivemq-krb
+          mvn -B package
+          cp "target/${krb_zipfile}" ..
+            - name: Build and push Docker image
+        id: build-and-push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: ${{ github.event_name != 'pull_request' }}
+          build-args: |
+            krb_zipfile=${{ env.krb_zipfile }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - uses: ./.github/actions/cleanup
+        id: cleanup
+        with:
+          version: ${{ steps.prepare.outputs.version }}
+          service-name: ${{ steps.prepare.outputs.service-name }}
+          digest: ${{ steps.build-and-push.outputs.digest }}
+
   build-helm-chart:
+    if: github.event_name == 'release'
     needs: [ 'build-x86-js', 'build-x86-js-arm', 'build-x86-pg', 'push-manager', 'build-mqtt' ]
     runs-on: ubuntu-latest
     steps:
@@ -419,36 +467,36 @@ jobs:
         with:
           name: new-release
           path: build/amrc-connectivity-stack-${{ env.VERSION }}.tgz
-
   # This job checks out the release branch, adds the new release to the /builds folder, builds the index and commits
   # the changes, which triggers Github to release it as a new pages repo
-#  release-helm-chart:
-#    needs: build-helm-chart
-#    runs-on: ubuntu-latest
-#    steps:
-#      - name: Install Helm
-#        run: |
-#          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-#      - name: Checkout code
-#        uses: actions/checkout@v3
-#        with:
-#          ref: release
-#      - name: add-new-release
-#        uses: actions/download-artifact@v3
-#        with:
-#          name: new-release
-#          path: deploy/build
-#      - name: Build index
-#        run: |
-#          cd deploy/build
-#          helm repo index --url https://amrc-factoryplus.github.io/amrc-connectivity-stack/build .
-#      - name: commit
-#        uses: stefanzweifel/git-auto-commit-action@v4
-#        id: auto_commit_action
-#        with:
-#          commit_message: Release ${{ github.event.release.tag_name }}
-#          commit_user_name: GitHub Action
-#          commit_user_email: actions@github.com
-#          branch: release
-#          create_branch: true
-#          push_options: '--force'
+  release-helm-chart:
+    if: github.event_name == 'release'
+    needs: build-helm-chart
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Helm
+        run: |
+          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          ref: release
+      - name: add-new-release
+        uses: actions/download-artifact@v3
+        with:
+          name: new-release
+          path: deploy/build
+      - name: Build index
+        run: |
+          cd deploy/build
+          helm repo index --url https://amrc-factoryplus.github.io/amrc-connectivity-stack/build .
+      - name: commit
+        uses: stefanzweifel/git-auto-commit-action@v4
+        id: auto_commit_action
+        with:
+          commit_message: Release ${{ github.event.release.tag_name }}
+          commit_user_name: GitHub Action
+          commit_user_email: actions@github.com
+          branch: release
+          create_branch: true
+          push_options: '--force'

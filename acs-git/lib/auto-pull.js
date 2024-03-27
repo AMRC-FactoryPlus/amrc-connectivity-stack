@@ -87,7 +87,7 @@ export class AutoPull {
                 : Promise.reject(e))
         const before = await get_ref(spec.branch);
 
-        fs.promises.stat(gitdir)
+        await fs.promises.stat(gitdir)
             .catch(() => git.init({
                 fs, gitdir,
                 bare:           true,

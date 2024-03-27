@@ -94,11 +94,11 @@ V3.0.0 of the AMRC Connectivity Stack introduces a number of new components to e
 
 Through changes to the Manager in V3, is is now possible to create "Edge Clusters" directly from the Manager UI. This action will provide you with a bootstrap script to run on a fresh Kubernetes cluster at the edge. The bootstrap script handles the installation and configuration of all necessary components to connect the edge cluster to the central cluster.
 
-![Edge Clusters - Bootstrap.jpg](docs%2Fassets%2FEdge%20Clusters%20-%20Bootstrap.jpg)
+![Diagram of edge cluster bootstrap](docs/assets/edge-clusters/bootstrap.jpeg)
 
 Once the edge cluster is connected to the central cluster, it will appear in the Manager UI and can have workloads assigned to it. The process for assigning workloads to edge clusters relies on components deployed to the edge during the bootstrap process, which ultimately watch the Config Store for changes to their state.
 
-![Edge Clusters - Deployment.jpg](docs%2Fassets%2FEdge%20Clusters%20-%20Deployment.jpg)
+![Diagram of edge deployment](docs/assets/edge-clusters/deployment.jpeg)
 
 ### Visualiser
 The Visualiser (`visualiser.<baseURL>`) is a new component included in ACS V3.0.0 that provides a visual representation of Factory+ traffic and MQTT packets. This application is accessible from the Manager UI and provides a real-time overview of the MQTT traffic flowing through the system. It can be useful for debugging and understanding the flow of data through the system but also serves as a great communication tool for demonstrating the capabilities of Factory+.
@@ -106,7 +106,16 @@ The Visualiser (`visualiser.<baseURL>`) is a new component included in ACS V3.0.
 ### Sensitive Information Management
 V3.0.0 leverages the power of kubernetes secrets to store sensitive configuration information such as passwords and keys for connecting to equipment. Whereas before sensitive information was stored in the device configuration files for your devices, it is now stored in kubernetes secrets and accessed by the devices at runtime. This is a more secure way of managing sensitive information ensures that only the edge cluster destined to represent the device has access to the information.
 
-![Edge Clusters - Secrets.jpg](docs%2Fassets%2FEdge%20Clusters%20-%20Secrets.jpg)
+![Diagram of sealing secrets to the edge](docs/assets/edge-clusters/secrets.jpeg)
+
+## More detailed documentation
+
+These pages document parts of the system in more detail.
+
+* [Edge clusters: Overall architecture](./docs/edge-clusters.md)
+* [Edge clusters: Deploying to the edge](./docs/edge-deployments.md)
+* [Edge clusters: Bootstrap process](./docs/edge-bootstrap.md)
+* [Internal Git server](./docs/git-server.md)
 
 ## Maintainers
 

@@ -3,7 +3,8 @@
 ARG base_version
 ARG base_prefix=ghcr.io/amrc-factoryplus/acs-base
 
-FROM ${base_prefix}-js-build:${base_version} AS build
+#FROM ${base_prefix}-js-build:${base_version} AS build
+FROM ghcr.io/amrc-factoryplus/utilities-build:v1.0.8 AS build
 ARG acs_npm=NO
 ARG revision=unknown
 
@@ -27,7 +28,8 @@ RUN sh -ex <<'SHELL'
     echo "export const GIT_VERSION=\"$revision\";" > ./lib/git-version.js
 SHELL
 
-FROM ${base_prefix}-js-run:${base_version} AS run
+#FROM ${base_prefix}-js-run:${base_version} AS run
+FROM ghcr.io/amrc-factoryplus/utilities-run:v1.0.8 AS run
 
 RUN apk add git git-daemon
 

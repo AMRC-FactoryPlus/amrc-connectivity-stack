@@ -1456,9 +1456,6 @@ data:
         {{$serviceRequirement_edgeDeploymentServiceAccount}}: [
           {{$serviceAccount_clusterManager}}
         ],
-        {{$serviceRequirement_edgeClusterRepositories}}: [
-          {{$gitRepoGroup_remoteClusters}}
-        ],
         {{$role_administrator}}: [
           {{$permissionGroup_clusterManager}}
         ]

@@ -87,6 +87,12 @@ export class AutoPull {
                 : Promise.reject(e))
         const before = await get_ref(spec.branch);
 
+        fs.promises.stat(gitdir)
+            .catch(() => git.init({
+                fs, gitdir,
+                bare:           true,
+                defaultBranch:  "main",
+            }))
         /* There should be noone else trying to create remotes on this
          * repo. However, this update() is not atomic, and if we are
          * killed partway through the remote will not be removed. So,

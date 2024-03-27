@@ -48,7 +48,9 @@ Define the image for a container.
 {{- define "amrc-connectivity-stack.image" -}}
 {{- $top := index . 0 }}
 {{- $context := index . 1 }}
-image: {{ include "amrc-connectivity-stack.image-name" (list $top $context) }}
+image: {{ list $top $context 
+    | include "amrc-connectivity-stack.image-name"
+    | quote }}
 imagePullPolicy: {{ $context.image.pullPolicy }}
 {{- end }}
 

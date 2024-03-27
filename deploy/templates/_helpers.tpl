@@ -41,7 +41,8 @@ Define the image for a container.
 {{- define "amrc-connectivity-stack.image-name" -}}
 {{- $top := index . 0 }}
 {{- $context := index . 1 }}
-{{- $defaultTag := coalesce $context.image.tag $top.Values.acs.defaultTag $top.Release.Version }}
+{{- $defaultTag := coalesce 
+    $context.image.tag $top.Values.acs.defaultTag $top.Chart.Version }}
 {{- $context.image.registry }}/{{ $context.image.repository }}:{{ $defaultTag }}
 {{- end }}
 

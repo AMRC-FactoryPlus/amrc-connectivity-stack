@@ -42,7 +42,9 @@ Define the image for a container.
 {{- $top := index . 0 }}
 {{- $context := index . 1 }}
 {{- $defaultTag := coalesce 
-    $context.image.tag $top.Values.acs.defaultTag $top.Chart.Version }}
+        $context.image.tag 
+        $top.Values.acs.defaultTag 
+        (printf "v%s" $top.Chart.Version) }}
 {{- $context.image.registry }}/{{ $context.image.repository }}:{{ $defaultTag }}
 {{- end }}
 

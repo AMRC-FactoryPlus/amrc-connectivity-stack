@@ -443,6 +443,17 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Update Chart.yaml version
+        run: |
+          yq eval '.version = "${{ github.event.release.tag_name }}"' -i ./deploy/Chart.yaml
+
+      - name: Commit and push if version changed
+        run: |
+          git config --global user.name 'GitHub Action'
+          git config --global user.email 'action@github.com'
+          git add ./deploy/Chart.yaml
+          git commit -m "Update Chart.yaml version" || exit 0 # Exit 0 if no changes
+          git push
       - name: Package Helm chart
         run: |
           TAG="${{ github.event.release.tag_name }}"

@@ -29,10 +29,10 @@ image:
     pullPolicy: IfNotPresent
   edgeMonitor:
     repository: acs-edge-monitor
-    tag: v0.0.3-dev.1
+    tag: v3.0.0-rc.11
   edgeSync:
     repository: acs-edge-sync
-    tag: v0.0.3-dev.1
+    tag: v3.0.0-rc.11
   krbKeys:
     repository: acs-krb-keys-operator
-    tag: v1.3.0
+    tag: v3.0.0-rc.11

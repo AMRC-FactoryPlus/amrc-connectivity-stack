@@ -2,23 +2,19 @@
 
 -include config.mk
 
-pkgver!=node -e 'console.log(JSON.parse(fs.readFileSync("package.json")).version)'
+release!=git describe --tags --abbrev=0
 
-version?=v${pkgver}
+version?=${release}
 suffix?=
+base_version?=${release}
 registry?=ghcr.io/amrc-factoryplus
 repo?=acs-cluster-manager
+docker?=docker
 
 tag=${registry}/${repo}:${version}${suffix}
 build_args=
 
-ifdef acs_build
-build_args+=--build-arg acs_build="${acs_build}"
-endif
-
-ifdef acs_run
-build_args+=--build-arg acs_run="${acs_run}"
-endif
+build_args+=--build-arg base_version="${base_version}"
 
 ifdef acs_npm
 build_args+=--build-arg acs_npm="${acs_npm}"

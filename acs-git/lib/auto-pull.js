@@ -8,8 +8,8 @@ import fs           from "fs";
 
 import duration     from "parse-duration";
 import imm          from "immutable";
-import git          from "isomorphic-git";
-import http         from "isomorphic-git/http/node/index.js";
+import git          from "@amrc-factoryplus/git-client";
+import http         from "@amrc-factoryplus/git-client/http/node/index.js";
 import rx           from "rxjs";
 
 import * as rxx     from "@amrc-factoryplus/rx-util";

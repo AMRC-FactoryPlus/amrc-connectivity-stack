@@ -27,12 +27,13 @@ image:
   default:
     registry: ghcr.io/amrc-factoryplus
     pullPolicy: IfNotPresent
+    tag: v3.0.0-rc.11
   edgeMonitor:
     repository: acs-edge-monitor
-    tag: v0.0.3-dev.1
+    #tag: ''
   edgeSync:
     repository: acs-edge-sync
-    tag: v0.0.3-dev.1
+    #tag: ''
   krbKeys:
     repository: acs-krb-keys-operator
-    tag: v1.3.0
+    #tag: ''

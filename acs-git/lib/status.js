@@ -9,7 +9,7 @@ import fs           from "fs";
 import util         from "util";
 
 import imm          from "immutable";
-import git          from "isomorphic-git";
+import git          from "@amrc-factoryplus/git-client";
 import rx           from "rxjs";
 
 import * as rxx     from "@amrc-factoryplus/rx-util";

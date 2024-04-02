@@ -3,7 +3,7 @@
 The AMRC Connectivity Stack (ACS) is a comprehensive collection of open-source services developed by the AMRC that represents a complete end-to-end implementation of the [Factory+](https://factoryplus.app.amrc.co.uk) framework. It is distributed as a Kubernetes Helm chart an can be deployed onto any Kubernetes cluster.
 
 ## Quick Links
-- [Installation and getting started](./docs/installation.md)
+- [Installation and getting started](docs/installation.md)
 - [See what's new in ACS V3](docs/whats-changed-in-v3.md)
 - [Factory+ framework reference](https://factoryplus.app.amrc.co.uk)
 

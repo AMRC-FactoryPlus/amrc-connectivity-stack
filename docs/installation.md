@@ -40,7 +40,7 @@ helm repo add amrc-connectivity-stack https://amrc-factoryplus.github.io/amrc-co
 helm repo update
 ```
 
-Next, create a `values.yaml` file in a sensible location on your local machine. This file will be used to configure the deployment and can contain many options for customisation and configuration (see [values](#values) for more information). At the very least you should set the following values but remember to change them to match your specific deployment. Please note that this will install a production-ready deployment of ACS with TLS enabled by default. To deploy an insecure development deployment, see the [Development (Insecure) Deployment](#development-insecure-deployment) section above.
+Next, create a `values.yaml` file in a sensible location on your local machine. This file will be used to configure the deployment and can contain many options for customisation and configuration (see [values](#values) for more information). At the very least you should set the following values but remember to change them to match your specific deployment. Please note that this will install a production-ready deployment of ACS with TLS enabled by default. To deploy an insecure development deployment, see the [Development (insecure) deployment](#development-insecure-deployment) section above.
 
 ```yaml
 acs:

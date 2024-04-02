@@ -102,7 +102,7 @@ path: |
   24 24 0 1 1 0-48zm56 24a24 24 0 1 1 48 0 24 24 0 1 1 -48 0z
 ```
 
-(This is given in YAML as supported by the ACS v3 ConfigDB. For ACS v2
+(This is given in YAML as supported by the ACS V3 ConfigDB. For ACS v2
 the equivalent JSON will be required.) The `bbox` information comes from
 the `viewBox` attribute on the `<svg>` element, and the `path` comes
 from the `d` attribute of the `<path>`.

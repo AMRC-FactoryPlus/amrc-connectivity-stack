@@ -73,7 +73,7 @@ Take note of the service URLs printed at the end of the installation. You will n
 
 > ACS should be configured once the `service-setup` job has completed successfully. This job is responsible for setting up the initial configuration of the services and can take a few minutes to complete.
 
-### Verifying Installation
+### Get the admin password
 
 Get the password for the admin user by running the following command. Note that it may not return the password until the deployment has finished bootstrapping.
 
@@ -83,7 +83,7 @@ echo $(sudo kubectl get secret krb5-passwords -o jsonpath="{.data.admin}" -n {{.
 
 Once you have the admin password you can connect to the MQTT broker at the URL supplied to you and subscribe to spBv1.0/#. It's advisable to do this before you start adding devices to the system so that you can see all traffic. The bundled [Visualiser](#visualiser) is a great tool to view MQTT traffic (plus it's ACS-aware!), or something like MQTTExplorer may be more useful if you're interested in viewing raw packet contents. MQTTExplorer can be downloaded [here](https://mqtt-explorer.com), however building the tool from [this](https://github.com/thomasnordquist/MQTT-Explorer/pull/712) pull request may be more useful when working with ACS and Sparkplug messages.
 
-### Configuring your first edge cluster
+### Configure your first edge cluster
 
 Next, log into the manager at the URL supplied to you as the `admin` user and create an `Edge Cluster`. This will provide you with a bootstrap script to run on a fresh Kubernetes cluster at the edge. The bootstrap script handles the installation and configuration of all necessary components to connect the edge cluster to the central cluster (see the [Edge Clusters](#edge-clusters) section for more information on this process).
 
@@ -93,9 +93,9 @@ Once the edge cluster is connected to the central cluster, it will appear in the
 
 ACS is much more than just a dashboarding pipeline, but building a simple dashboard is a good way to verify that the architecture is working as expected. Log into Grafana (`grafana.<baseURL>`) with your admin credentials and and create a new dashboard. All ACS data is accessed from the InfluxDB datasource, which will already be configured for you. There are also a number of pre-built dashboards available in the Grafana UI that you can use instantly to start visualising your data.
 
-## What's Changed in V3?
+## What's changed in v3.0.0?
 
-### Edge Clusters
+### Edge clusters
 
 `v3.0.0` of the AMRC Connectivity Stack introduces a number of new components to enable effective management of edge clusters. Prior to this version, the chart was designed to be installed onto a single central cluster that consisted of all central nodes _and_ all edge nodes. This was not ideal for a number of reasons, including the fact that it was impossible to utilise cloud-based clusters with on-premise edge nodes, in most cases.
 
@@ -111,7 +111,7 @@ Once the edge cluster is connected to the central cluster, it will appear in the
 
 The Visualiser (`visualiser.<baseURL>`) is a new component included in ACS V3.0.0 that provides a visual representation of Factory+ traffic and MQTT packets. This application is accessible from the Manager UI and provides a real-time overview of the MQTT traffic flowing through the system. It can be useful for debugging and understanding the flow of data through the system but also serves as a great communication tool for demonstrating the capabilities of Factory+.
 
-### Sensitive Information Management
+### Sensitive information management
 
 V3.0.0 leverages the power of kubernetes secrets to store sensitive configuration information such as passwords and keys for connecting to equipment. Whereas before sensitive information was stored in the device configuration files for your devices, it is now stored in kubernetes secrets and accessed by the devices at runtime. This is a more secure way of managing sensitive information ensures that only the edge cluster destined to represent the device has access to the information.
 

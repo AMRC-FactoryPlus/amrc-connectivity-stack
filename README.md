@@ -135,4 +135,4 @@ These pages document parts of the system in more detail.
 
 ## Values
 
-See the `values.yaml` file for possible values. We do not list all values here as they are subject to change and the `values.yaml` file is the source of truth.
+See the `deploy/values.yaml` file for possible values. We do not list all values here as they are subject to change and the `values.yaml` file is the source of truth.

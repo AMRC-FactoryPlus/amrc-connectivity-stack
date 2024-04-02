@@ -42,7 +42,6 @@ identity:
       registry: ghcr.io/amrc-factoryplus
       # -- The repository of the Identity component
       repository: acs-identity
-      # @ignore
       pullPolicy: IfNotPresent
     # If this is set to true, the kdb-init container will not set up the
     # KDB but will sit and wait. This can be used to halt startup of the
@@ -59,7 +58,6 @@ identity:
       registry: ghcr.io/amrc-factoryplus
       # -- The repository of the KerberosKey Operator
       repository: acs-krb-keys-operator
-      # @ignore
       pullPolicy: IfNotPresent
 
 auth:
@@ -70,7 +68,6 @@ auth:
     registry: ghcr.io/amrc-factoryplus
     # -- The repository of the Authorisation component
     repository: acs-auth
-    # @ignore
     pullPolicy: IfNotPresent
 
 directory:
@@ -81,7 +78,6 @@ directory:
     registry: ghcr.io/amrc-factoryplus
     # -- The repository of the Directory component
     repository: acs-directory
-    # @ignore
     pullPolicy: IfNotPresent
 
 configdb:
@@ -92,7 +88,6 @@ configdb:
     registry: ghcr.io/amrc-factoryplus
     # -- The repository of the Configuration Store component
     repository: acs-configdb
-    # @ignore
     pullPolicy: IfNotPresent
 
 # -- The service-setup component loads ACS-specific configuration into
@@ -136,7 +131,6 @@ mqtt:
     registry: ghcr.io/amrc-factoryplus
     # -- The repository of the MQTT component
     repository: acs-mqtt
-    # @ignore
     pullPolicy: IfNotPresent
   # -- Possible values are either 1 to enable all possible debugging, or a comma-separated list of debug tags (the tags printed before the log lines). No logging is specified as an empty string.
   verbosity: 0
@@ -148,7 +142,6 @@ visualiser:
     registry: ghcr.io/amrc-factoryplus
     # -- The repository of the MQTT component
     repository: acs-visualiser
-    # @ignore
     pullPolicy: IfNotPresent
 
 manager:
@@ -159,7 +152,6 @@ manager:
     registry: ghcr.io/amrc-factoryplus
     # -- The repository of the Manager component
     repository: acs-manager
-    # @ignore
     pullPolicy: IfNotPresent
   edge:
     # -- The registry of the Edge Agent component
@@ -191,7 +183,6 @@ cmdesc:
     registry: ghcr.io/amrc-factoryplus
     # -- The repository of the Commands component
     repository: acs-cmdesc
-    # @ignore
     pullPolicy: IfNotPresent
   # -- Possible values are either 1 to enable all possible debugging, or a comma-separated list of debug tags (the tags printed before the log lines). No logging is specified as an empty string.
   verbosity: 1
@@ -211,7 +202,6 @@ warehouse:
       registry: ghcr.io/amrc-factoryplus
       # -- The repository of the Warehouse component
       repository: influxdb-sparkplug-ingester
-      # @ignore
       pullPolicy: IfNotPresent
 
 git:
@@ -222,7 +212,6 @@ git:
     registry: ghcr.io/amrc-factoryplus
     # -- The repository of the Git component
     repository: acs-git
-    # @ignore
     pullPolicy: IfNotPresent
   # -- Possible values are either 1 to enable all possible debugging, or a comma-separated list of debug tags (the tags printed before the log lines). No logging is specified as an empty string.
   verbosity: "ALL,!service,!token"
@@ -235,7 +224,6 @@ clusterManager:
     registry: ghcr.io/amrc-factoryplus
     # -- The repository of the Clusters component
     repository: acs-cluster-manager
-    # @ignore
     pullPolicy: IfNotPresent
   verbosity: "ALL,!service,!token"
 
@@ -287,7 +275,6 @@ kubegres:
       tag: 1.16
       pullPolicy: IfNotPresent
 
-# @ignore
 traefik:
   enabled: true
   ports:
@@ -338,7 +325,6 @@ traefik:
     general:
       level: DEBUG
 
-# @ignore
 grafana:
   deploymentStrategy:
     type: Recreate
@@ -370,7 +356,6 @@ grafana:
         disableDelete: true
       searchNamespace: ALL
 
-# @ignore
 tenant:
   tenant:
     name: fplus-minio-core
@@ -394,7 +379,6 @@ tenant:
     users:
       - name: "manager-minio-secret"
 
-# @ignore
 influxdb2:
   enabled: true
   adminUser:

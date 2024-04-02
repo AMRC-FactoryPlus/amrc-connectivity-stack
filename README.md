@@ -6,7 +6,9 @@ The AMRC Connectivity Stack (ACS) is a Kubernetes Helm chart that contains a com
 Ensure that you have `kubectl` access to an existing Kubernetes cluster and familiarise yourself with the concepts of both Kubernetes and [Factory+](https://factoryplus.app.amrc.co.uk) before continuing. This chart installs a full end-to-end deployment of Factory+ onto a central cluster and there are a lot of moving parts.
 
 ## Get Started
-This chart can be installed onto a local Kubernetes cluster for development or testing by following the instructions below. For production deployments, please refer to the [production deployment guide](#production-deployment).
+This chart can be installed onto a local Kubernetes cluster for development or testing by following the instructions 
+below. For production deployments, please ensure that the deployment is secured as per the [TLS / Production 
+Deployment](#production-deployment) section of this guide.
 
 ### Install Helm
 Helm is a package manager for Kubernetes that allows you to easily install and manage applications on Kubernetes. It must be installed on the machine that you'll be using to deploy ACS _from_. To install Helm, follow the instructions [here](https://helm.sh/docs/intro/install/).

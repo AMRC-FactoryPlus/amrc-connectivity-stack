@@ -9,8 +9,7 @@ package-lock.json
 config.mk
 
 # Webpack
-public/webpack-modules.js
-public/webpack/
+public/js
 
 # Secrets
 /keytabs/

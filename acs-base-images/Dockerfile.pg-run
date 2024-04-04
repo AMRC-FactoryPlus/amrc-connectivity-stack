@@ -5,10 +5,11 @@
 # support.
 
 ARG version
+ARG base=ghcr.io/amrc-factoryplus/acs-base
 
-FROM ghcr.io/amrc-factoryplus/acs-base-pg-build:${version} AS build
+FROM ${base}-pg-build:${version} AS build
 
-FROM ghcr.io/amrc-factoryplus/acs-base-js-run:${version}
+FROM ${base}-js-run:${version}
 
 # Install system packages we need for runtime.
 RUN <<'SHELL'

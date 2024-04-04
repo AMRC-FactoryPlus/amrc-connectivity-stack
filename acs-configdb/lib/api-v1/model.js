@@ -10,7 +10,7 @@ import Ajv from "ajv/dist/2020.js";
 import ajv_formats from "ajv-formats";
 import merge_patch from "json-merge-patch";
 
-import {Debug, DB} from "@amrc-factoryplus/utilities";
+import { DB } from "@amrc-factoryplus/utilities";
 
 import {App, Class, Null_UUID, Service} from "../constants.js";
 import { Specials } from "./special.js";
@@ -37,16 +37,14 @@ async function _q_set(query, sql, params) {
     return dbr.rows;
 }
 
-const debug = new Debug();
-
 export default class Model extends EventEmitter {
     constructor(opts) {
         super();
+        this.log = opts.log;
+
         this.db = new DB({
             version: DB_Version,
-            verbose: opts.verbose,
         });
-
 
         this.ajv = new Ajv({
             /* We need to use our own schema cache, so we can update it
@@ -580,23 +578,23 @@ export default class Model extends EventEmitter {
 
     async dump_validate(dump) {
         if (typeof (dump) != "object") {
-            debug.log("dump", "Dump not an object");
+            this.log("dump", "Dump not an object");
             return false;
         }
         if (dump.service != Service.Registry) {
-            debug.log("dump", "Dump not for ConfigDB");
+            this.log("dump", "Dump not for ConfigDB");
             return false;
         }
         if (dump.version != 1) {
-            debug.log("dump", "Dump should be version 1");
+            this.log("dump", "Dump should be version 1");
             return false;
         }
         if (Class.Class in (dump.objects ?? {})) {
-            debug.log("dump", "Dump cannot create classes via objects key.");
+            this.log("dump", "Dump cannot create classes via objects key.");
             return false;
         }
         if (App.Registration in (dump.configs ?? {})) {
-            debug.log("dump", "Dump cannot create objects via configs key.");
+            this.log("dump", "Dump cannot create objects via configs key.");
             return false;
         }
         return true;
@@ -616,7 +614,7 @@ export default class Model extends EventEmitter {
         for (const klass of dump.classes ?? []) {
             const st = await this.object_create(klass, Class.Class);
             if (st > 299) {
-                debug.log("dump", "Dump failed [%s] on class %s", st, klass);
+                this.log("dump", "Dump failed [%s] on class %s", st, klass);
                 return st;
             }
         }
@@ -627,7 +625,7 @@ export default class Model extends EventEmitter {
                     st = await this.object_set_class(obj, klass);
                 }
                 if (st > 299) {
-                    debug.log("dump", "Dump failed [%s] on object %s (%s)",
+                    this.log("dump", "Dump failed [%s] on object %s (%s)",
                         st, obj, klass);
                     return st;
                 }
@@ -639,7 +637,7 @@ export default class Model extends EventEmitter {
                     {app, object, exclusive: !overwrite},
                     conf);
                 if (st > 299 && st != 409) {
-                    debug.log("dump", "Dump failed [%s] on config %s/%s", 
+                    this.log("dump", "Dump failed [%s] on config %s/%s", 
                         st, app, object);
                     return st;
                 }

@@ -9,8 +9,8 @@
 import url from "url";
 import express from "express";
 
-import { Debug, ServiceClient, WebAPI, UUIDs, pkgVersion } 
-    from "@amrc-factoryplus/utilities";
+import { Debug, ServiceClient, UUIDs }  from "@amrc-factoryplus/service-client";
+import { WebAPI }                       from "@amrc-factoryplus/utilities";
 
 import { GIT_VERSION } from "../lib/git-version.js";
 import { Service, Version } from "../lib/constants.js";
@@ -19,16 +19,10 @@ import MQTTCli from "../lib/mqttcli.js";
 
 const Device_UUID = process.env.DEVICE_UUID;
 
-const debug = new Debug();
-
-const fplus = await new ServiceClient({
-    directory_url: process.env.DIRECTORY_URL,
-    root_principal: process.env.ROOT_PRINCIPAL,
-}).init();
+const fplus = await new ServiceClient({ env: process.env }).init();
 
 const api_v1 = await new APIv1({
     fplus_client:   fplus,
-    verbose:        !!process.env.VERBOSE,
 }).init();
 
 const api = await new WebAPI({
@@ -42,6 +36,7 @@ const api = await new WebAPI({
             revision:       GIT_VERSION,
         },
     },
+    verbose:    process.env.VERBOSE,
     realm:      process.env.REALM,
     hostname:   process.env.HOSTNAME,
     keytab:     process.env.SERVER_KEYTAB,
@@ -54,7 +49,7 @@ const api = await new WebAPI({
 
         /* Serve the editor */
         const editor = url.fileURLToPath(new URL("../editor", import.meta.url));
-        debug.log("editor", `Serving editor out of ${editor}.`);
+        fplus.debug.log("editor", `Serving editor out of ${editor}.`);
         app.use("/editor", express.static(editor));
 
         app.use("/v1", api_v1.routes);
@@ -62,7 +57,7 @@ const api = await new WebAPI({
 }).init();
 
 if (process.env.MQTT_DISABLE) {
-    debug.log("mqtt", "Disabling MQTT connection.");
+    fplus.debug.log("mqtt", "Disabling MQTT connection.");
 }
 else {
     const mqtt = await new MQTTCli({

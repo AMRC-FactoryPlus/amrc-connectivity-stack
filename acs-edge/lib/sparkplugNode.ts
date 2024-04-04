@@ -92,7 +92,7 @@ export class SparkplugNode extends (
             + (Math.random() * 1e17).toString(36);
 
         // conf.keepalive = 10;
-        this.#client = fplus.MQTT.basic_sparkplug_node({
+        this.#client = await fplus.MQTT.basic_sparkplug_node({
             address,
             clientId,
             publishDeath:   true,

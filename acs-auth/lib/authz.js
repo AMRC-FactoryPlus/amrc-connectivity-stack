@@ -14,7 +14,6 @@ import {Perm} from "./uuids.js";
 const UUID_rx = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const KRB_rx = /^[a-zA-Z0-9_./-]+@[A-Z0-9-.]+$/;
 
-const debug = new Debug();
 const booleans = {
     undefined: false,
     "true": true, "false": false,
@@ -26,20 +25,21 @@ const booleans = {
 function valid_uuid(uuid) {
     if (UUID_rx.test(uuid))
         return true;
-    debug.log("debug", `Ignoring invalid UUID [${uuid}]`);
+    //debug.log("debug", `Ignoring invalid UUID [${uuid}]`);
     return false;
 }
 
 function valid_krb(krb) {
     if (KRB_rx.test(krb))
         return true;
-    debug.log("debug", `Ignoring invalid principal [${krb}]`);
+    //debug.log("debug", `Ignoring invalid principal [${krb}]`);
     return false;
 }
 
 export default class AuthZ {
     constructor(opts) {
-        this.model = new Model(opts);
+        this.debug  = new Debug(opts);
+        this.model  = new Model(opts);
         this.routes = express.Router();
     }
 
@@ -268,7 +268,7 @@ export default class AuthZ {
         const dump = req.body;
 
         if (!this.model.dump_validate(dump)) {
-            debug.log("dump", "Dump failed initial validation");
+            this.debug.log("dump", "Dump failed initial validation");
             return res.status(400).end();
         }
 
@@ -282,7 +282,7 @@ export default class AuthZ {
                 const ok = await this.model.check_acl(
                     req.auth, perm, UUIDs.Null, false);
                 if (!ok) {
-                    debug.log("dump", "Refusing dump: %s needs permission to set %s",
+                    this.debug.log("dump", "Refusing dump: %s needs permission to set %s",
                         req.auth, key);
                     return res.status(403).end();
                 }

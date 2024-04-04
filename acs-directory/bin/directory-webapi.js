@@ -6,7 +6,8 @@
  * Copyright 2021 AMRC.
  */
 
-import { ServiceClient, WebAPI, UUIDs } from "@amrc-factoryplus/utilities";
+import { ServiceClient, UUIDs } from "@amrc-factoryplus/service-client";
+import { WebAPI }               from "@amrc-factoryplus/utilities";
 
 import Model from "../lib/model.js";
 import APIv1 from "../lib/api_v1.js";
@@ -22,7 +23,7 @@ const model = await new Model({
 }).init();
 
 const fplus = new ServiceClient({
-    root_principal:     process.env.ROOT_PRINCIPAL,
+    env:    process.env,
     permission_group:   Perm.All,
 });
 fplus.set_service_discovery(model.find_service_url.bind(model));
@@ -44,6 +45,7 @@ const app = await new WebAPI({
             revision:       GIT_VERSION,
         },
     },
+    verbose:    process.env.VERBOSE,
     keytab:     process.env.SERVER_KEYTAB,
     http_port:  process.env.PORT,
     max_age:    process.env.CACHE_MAX_AGE,

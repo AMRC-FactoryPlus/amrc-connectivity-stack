@@ -6,7 +6,7 @@
  * Copyright 2021 AMRC.
  */
 
-import { ServiceClient } from "@amrc-factoryplus/utilities";
+import { ServiceClient } from "@amrc-factoryplus/service-client";
 
 import MQTTCli from "../lib/mqttcli.js";
 import Model from "../lib/model.js";
@@ -17,7 +17,7 @@ const model = await new Model({
     verbose: true,
 }).init();
 
-const fplus = new ServiceClient({});
+const fplus = new ServiceClient({ env: process.env });
 fplus.set_service_discovery(model.find_service_url.bind(model));
 
 const app = await new MQTTCli({

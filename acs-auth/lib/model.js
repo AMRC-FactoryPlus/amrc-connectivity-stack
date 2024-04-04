@@ -9,16 +9,15 @@ import {DB, Debug, UUIDs} from "@amrc-factoryplus/utilities";
 import Queries from "./queries.js";
 import {Perm} from "./uuids.js";
 
-const debug = new Debug();
-
 export default class Model extends Queries {
     constructor(opts) {
         const db = new DB({
             version: Queries.DBVersion,
-            verbose: opts.verbose,
         });
 
         super(db.query.bind(db))
+
+        this.debug = new Debug(opts);
 
         this.db = db;
         this.acl_cache_age = opts.acl_cache * 1000;
@@ -47,7 +46,7 @@ export default class Model extends Queries {
         const now = Date.now();
         const cached = cache.get(key);
         if (cached) {
-            debug.log("acl", `Cached result ${cached.expiry} (${cached.expiry - now})`);
+            this.debug.log("acl", `Cached result ${cached.expiry} (${cached.expiry - now})`);
             if (cached.expiry > now)
                 return cached.result;
             cache.delete(key);

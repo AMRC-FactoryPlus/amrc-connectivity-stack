@@ -4,21 +4,21 @@
  * Copyright 2022 AMRC
  */
 
-import { ServiceClient, WebAPI, pkgVersion } from "@amrc-factoryplus/utilities";
+import { ServiceClient }    from "@amrc-factoryplus/service-client";
+import { WebAPI }           from "@amrc-factoryplus/utilities";
 
+import { GIT_VERSION } from "../lib/git-version.js";
 import ApiV1 from "../lib/api_v1.js";
 import CmdEscD from "../lib/cmdescd.js";
 import MqttCli from "../lib/mqttcli.js";
 
 const Service_Cmdesc = "78ea7071-24ac-4916-8351-aa3e549d8ccd";
+/* This is the service spec version, not the implementation version */
+const Version = "1.0.2";
 
-const Version = pkgVersion(import.meta);
 const Device_UUID = process.env.DEVICE_UUID;
 
-const fplus = await new ServiceClient({
-    root_principal:     process.env.ROOT_PRINCIPAL,
-    directory_url:      process.env.DIRECTORY_URL,
-}).init();
+const fplus = await new ServiceClient({ env: process.env }).init();
 
 const cmdesc = await new CmdEscD({
     fplus,
@@ -41,7 +41,13 @@ const web = await new WebAPI({
         version:    Version,
         service:    Service_Cmdesc,
         device:     Device_UUID,
+        software: {
+            vendor:         "AMRC",
+            application:    "acs-cmdesc",
+            revision:       GIT_VERSION,
+        },
     },
+    verbose:    process.env.VERBOSE,
     realm:      process.env.REALM,
     hostname:   process.env.HOSTNAME,
     keytab:     process.env.SERVER_KEYTAB,

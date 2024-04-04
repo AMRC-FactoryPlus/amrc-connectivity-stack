@@ -1,42 +1,35 @@
-# On Windows try https://frippery.org/busybox/
+top=..
+include ${top}/mk/acs.init.mk
 
--include config.mk
-
-version?=v0.0.1
-suffix?=
+# We aren't using acs.docker.mk, so these all need to be here too
+version?=${git.tag}
 registry?=ghcr.io/amrc-factoryplus
-base?=acs-base
-docker?=docker
+repo?=acs-base
+suffix?=
 
-images=	js-build js-run pg-build pg-run
+images=		js-build js-run pg-build pg-run
+tag.base=	${registry}/${repo}
+tag.version=	${version}${suffix}
 
-tag_start=${registry}/${base}-
-tag_end=:${version}${suffix}
-build_args=	--build-arg base=${registry}/${base} \
-		--build-arg version=${version}${suffix}
+build_args+=	--build-arg base=${tag.base}
+build_args+= 	--build-arg version=${tag.version}
 
-ifdef acs_npm
-build_args+=--build-arg acs_npm="${acs_npm}"
-endif
+include ${mk}/acs.git.mk
+
+.PHONY: build push
 
 all: build push
 
-.PHONY: all build push check-committed amend
-
-check-committed:
-	[ -z "$$(git status --porcelain)" ] || (git status; exit 1)
-
-amend:
-	git commit -a -C HEAD --amend
-
-build: check-committed
+# Yuck. This is where I miss BSD make...
+build: git.prepare
 	for i in ${images}; do \
-	    ${docker} build -t ${tag_start}$${i}${tag_end} \
-	        -f Dockerfile.$${i} ${build_args} .; \
+	    t="${tag.base}-$$i:${tag.version}"; \
+	    docker build -t $$t -f Dockerfile.$$i ${build_args} .; \
 	done
 
 push:
 	for i in ${images}; do \
-	    ${docker} push ${tag_start}$${i}${tag_end}; \
+	    t="${tag.base}-$$i:${tag.version}"; \
+	    docker push $$t; \
 	done
 

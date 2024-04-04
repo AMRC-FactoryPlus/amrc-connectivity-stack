@@ -6,7 +6,7 @@
 import content_type from "content-type";
 import express from "express";
 
-import {Debug, UUIDs} from "@amrc-factoryplus/utilities";
+import { UUIDs } from "@amrc-factoryplus/service-client";
 
 import * as etags from "../etags.js";
 
@@ -21,8 +21,6 @@ const Perm = {
     Delete_Obj: "6957174b-7b08-45ca-ac5c-c03ab6928a6e",
     Manage_App: "95c7cbcb-ce60-49ed-aa81-2fe3eec4559d",
 };
-
-const debug = new Debug();
 
 function compat(dest) {
     const pieces = dest.split("/");
@@ -56,8 +54,13 @@ function json_value(str) {
 export default class API {
     constructor(opts) {
         this.fplus = opts.fplus_client;
-        this.model = new Model(opts);
+
+        this.log = this.fplus.debug.log.bind(this.fplus.debug);
+
         this.routes = express.Router();
+        this.model = new Model({
+            log:    this.log,
+        });
     }
 
     async init() {
@@ -407,7 +410,7 @@ export default class API {
                 const ok = await this._check_acl(
                     req.auth, perm, UUIDs.Null, false);
                 if (!ok) {
-                    debug.log("dump", "Refusing dump (%s)", key);
+                    this.log("dump", "Refusing dump (%s)", key);
                     return res.status(403).end();
                 }
             }

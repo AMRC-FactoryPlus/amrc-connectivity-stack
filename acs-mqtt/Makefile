@@ -1,30 +1,27 @@
--include config.mk
+top=..
+include ${top}/mk/acs.init.mk
 
-registry?=	ghcr.io/amrc-factoryplus
-repository?=	acs-mqtt
-version?= 	v1.1.1
-suffix?=
+repo?=acs-mqtt
+k8s.deployment?=mqtt
 
-image=	${registry}/${repository}:${version}${suffix}
 env= 	JAVA_HOME='${JAVA_HOME}' M2_HOME='${M2_HOME}' M2='${M2_HOME}/bin'
-mvn=	'${M2_HOME}'/bin/mvn
+mvn?=	'${M2_HOME}'/bin/mvn
 
-pluginver!=	cd hivemq-krb && \
+src=	../hivemq-krb
+
+pluginver!=	cd ${src} && \
 	${env} ${mvn} -q help:evaluate -Dexpression=project.version -DforceStdout
+
 zip=hivemq-auth-krb-${pluginver}-distribution.zip
 
+build_args+=	krb_zipfile=${zip}
 
-.PHONY: all build-plugin build-image update
+include ${mk}/acs.docker.mk
 
-all:	build-plugin build-image
+.PHONY: build-plugin
 
-update:
-	git submodule update --remote
+build: build-plugin
 
-build-plugin:
-	cd hivemq-krb && ${env} ${mvn} -B package
-	cp hivemq-krb/target/${zip} .
-
-build-image:
-	docker build -t ${image} --build-arg krb_zipfile=${zip} .
-	docker push ${image}
+build-plugin: git.prepare
+	cd ${src} && ${env} ${mvn} -B package
+	cp ${src}/target/${zip} .

@@ -21,7 +21,7 @@ const authn = await new AuthN({ }).init();
 const authz = await new AuthZ({
     acl_cache:          process.env.ACL_CACHE ?? 5,
     root_principal:     process.env.ROOT_PRINCIPAL,
-    verbose:            !!process.env.VERBOSE,
+    verbose:            process.env.VERBOSE,
 }).init();
 
 const editor = await new Editor({
@@ -41,6 +41,7 @@ const api = await new WebAPI({
             revision:       GIT_VERSION,
         },
     },
+    verbose:    process.env.VERBOSE,
     realm:      process.env.REALM,
     hostname:   process.env.HOSTNAME,
     keytab:     process.env.SERVER_KEYTAB,

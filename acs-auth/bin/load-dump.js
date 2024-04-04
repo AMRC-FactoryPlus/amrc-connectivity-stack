@@ -39,7 +39,7 @@ const dumps = process.argv.slice(2)
     .map(f => [f, loadJSONobj(f)])
     .filter(([f, d]) => d.service == UUIDs.Service.Authentication);
 
-const model = await new Model({ verbose: !!process.env.VERBOSE }).init();
+const model = await new Model({ verbose: process.env.VERBOSE }).init();
 
 for (const [file, dump] of dumps) {
     console.log(`Loading dump ${file}...`);

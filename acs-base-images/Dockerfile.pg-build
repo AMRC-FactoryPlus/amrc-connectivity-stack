@@ -5,8 +5,9 @@
 # support.
 
 ARG version
+ARG base=ghcr.io/amrc-factoryplus/acs-base
 
-FROM ghcr.io/amrc-factoryplus/acs-base-js-build:${version}
+FROM ${base}-js-build:${version}
 
 # This must be here to show up in RUN
 ARG pg_version=16.1

@@ -61,7 +61,7 @@ export class SparkplugNode {
     connect_sparkplug () {
         const { ids, fplus } = this;
 
-        const cli = fplus.MQTT.basic_sparkplug_node({
+        const cli = await fplus.MQTT.basic_sparkplug_node({
             address:        ids.sparkplug,
             clientId:       ids.uuid,
             publishDeath:   true,

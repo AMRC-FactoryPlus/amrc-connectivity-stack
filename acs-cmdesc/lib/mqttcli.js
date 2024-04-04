@@ -4,14 +4,12 @@
  * Copyright 2022 AMRC
  */
 
-import {Address, Debug, MetricBuilder, SpB, Topic, UUIDs} from "@amrc-factoryplus/utilities";
+import {Address, MetricBuilder, SpB, Topic, UUIDs} from "@amrc-factoryplus/utilities";
 
 const Valid = {
     Name: /^[A-Za-z0-9_-]+$/,
     Tag: /^[A-Za-z0-9_ \/]+$/,
 };
-
-const debug = new Debug({default: "cmdesc"});
 
 /* Currently we are a Sparkplug Node; this is only so we can advertise
  * ourself to the Directory over MQTT. Should we instead push a service
@@ -25,6 +23,8 @@ export default class MqttCli {
         this.device_uuid = opts.device_uuid;
         this.http_url = opts.http_url;
         this.service = opts.service;
+
+        this.log = this.fplus.debug.log.bind(this.fplus.debug);
 
         this.seq = 0;
     }
@@ -64,7 +64,7 @@ export default class MqttCli {
     }
 
     on_connect() {
-        debug.log("mqtt", "Connected to MQTT.");
+        this.log("mqtt", "Connected to MQTT.");
         this.mqtt.subscribe(this.address.topic("CMD"));
         this.mqtt.subscribe("spBv1.0/+/NDATA/+");
         this.mqtt.subscribe("spBv1.0/+/DDATA/+/+");
@@ -78,7 +78,7 @@ export default class MqttCli {
     on_message(topicstr, message) {
         const topic = Topic.parse(topicstr);
         if (topic === null) {
-            debug.log("mqtt", `Ignoring bad topic ${topicstr}`);
+            this.log("mqtt", `Ignoring bad topic ${topicstr}`);
             return;
         }
         const addr = topic.address;
@@ -87,7 +87,7 @@ export default class MqttCli {
         try {
             payload = SpB.decodePayload(message);
         } catch {
-            debug.log("mqtt", `Bad payload on topic ${topic}`);
+            this.log("mqtt", `Bad payload on topic ${topic}`);
             return;
         }
 
@@ -105,7 +105,7 @@ export default class MqttCli {
                 this.on_command(addr, payload);
                 break;
             default:
-                debug.log("mqtt", `Unknown Sparkplug message type ${topic.type}!`);
+                this.log("mqtt", `Unknown Sparkplug message type ${topic.type}!`);
         }
     }
 
@@ -121,7 +121,7 @@ export default class MqttCli {
                     this.rebirth();
                     break;
                 default:
-                    debug.log("mqtt", `Received unknown CMD: ${m.name}`);
+                    this.log("mqtt", `Received unknown CMD: ${m.name}`);
                 /* Ignore for now */
             }
         }
@@ -173,16 +173,16 @@ export default class MqttCli {
         const value = cmdesc.Tag_Value;
 
         if (!Valid.Name.test(group))
-            return debug.log("cmdesc", `Bad group '${group}'`);
+            return this.log("cmdesc", `Bad group '${group}'`);
 
         if (!Valid.Name.test(node))
-            return debug.log("cmdesc", `Bad node '${node}'`);
+            return this.log("cmdesc", `Bad node '${node}'`);
 
         if (!(device == "" || Valid.Name.test(device)))
-            return debug.log("cmdesc", `Bad device '${device}'`);
+            return this.log("cmdesc", `Bad device '${device}'`);
 
         if (!Valid.Tag.test(tag))
-            return debug.log("cmdesc", `Bad tag '${tag}'`);
+            return this.log("cmdesc", `Bad tag '${tag}'`);
 
         const address = new Address(group, node, device);
 
@@ -211,7 +211,7 @@ export default class MqttCli {
         const topic = addr.topic(kind);
         const payload = this.encode_metrics(metrics, kind);
 
-        debug.log("mqtt", `Publishing to ${topic}`);
+        this.log("mqtt", `Publishing to ${topic}`);
         this.mqtt.publish(topic, payload);
     }
 

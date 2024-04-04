@@ -39,8 +39,6 @@ function ts_date (ts) {
     return new Date(val);
 }
 
-const debug = new Debug();
-
 function for_each_metric(tree, action) {
     for (const [name, metric] of Object.entries(tree)) {
         if (metric instanceof MetricBranch) {
@@ -61,6 +59,9 @@ export default class MQTTCli {
 
         this.url = opts.url;
         this.silent = opts.silent;
+
+        /* .bound always binds a level */
+        this.log = this.fplus.debug.log.bind(this.fplus.debug);
 
         this.seq = 0;
 
@@ -110,7 +111,7 @@ export default class MQTTCli {
 
     async run() {
         if (this.silent)
-            debug.log("mqtt", "Running in monitor-only mode.");
+            this.log("mqtt", "Running in monitor-only mode.");
 
         const mqtt = await this.fplus.mqtt_client({
             verbose: true,
@@ -147,14 +148,14 @@ export default class MQTTCli {
     }
 
     async mqtt_debug(packet) {
-        console.log(`MQTT packet: ${packet.cmd}`);
+        this.log("mqtt", `MQTT packet: ${packet.cmd}`);
         if (packet.cmd != "connack")
             return;
         console.dir(packet);
     }
 
     async on_connect() {
-        debug.log("mqtt", "Connected to MQTT broker.");
+        this.log("mqtt", "Connected to MQTT broker.");
 
         await this.rebirth();
     }
@@ -184,18 +185,18 @@ export default class MQTTCli {
             {name: "Last_Changed/Service", type: "UUID", value: ""},
         ]);
 
-        debug.log("mqtt", `Publishing birth certificate`);
+        this.log("mqtt", `Publishing birth certificate`);
         this.publish("BIRTH", metrics, true);
     }
 
     on_error(error) {
-        debug.log("mqtt", "MQTT error: %o", error);
+        this.log("mqtt", "MQTT error: %o", error);
     }
 
     on_message(topicstr, message) {
         let topic = Topic.parse(topicstr);
         if (topic === null) {
-            debug.log("mqtt", `Ignoring bad topic ${topicstr}`);
+            this.log("mqtt", `Ignoring bad topic ${topicstr}`);
             return;
         }
 
@@ -203,7 +204,7 @@ export default class MQTTCli {
         try {
             payload = SpB.decodePayload(message);
         } catch {
-            debug.log("mqtt", `Bad payload on topic ${topicstr}`);
+            this.log("mqtt", `Bad payload on topic ${topicstr}`);
             return;
         }
 
@@ -233,20 +234,20 @@ export default class MQTTCli {
                 await this.on_command(addr, payload);
                 break;
             default:
-                debug.log("mqtt", `Unknown Sparkplug message type ${topic.type}!`);
+                this.log("mqtt", `Unknown Sparkplug message type ${topic.type}!`);
         }
     }
 
     on_queue_error(error, qitem) {
-        debug.log("mqtt", "Error handling %s: %o", qitem.topic, error);
+        this.log("mqtt", "Error handling %s: %o", qitem.topic, error);
     }
 
     on_notify(msg) {
-        debug.log("change", `NOTIFY: [${msg.channel}] [${msg.payload}]`);
+        this.log("change", `NOTIFY: [${msg.channel}] [${msg.payload}]`);
         const [table, idx] = msg.payload.split(":");
         const id = Number.parseInt(idx);
         if (Number.isNaN(id)) {
-            debug.log("change", `Bad table row id [${idx}]`);
+            this.log("change", `Bad table row id [${idx}]`);
             return;
         }
 
@@ -261,7 +262,7 @@ export default class MQTTCli {
                 this.on_service_notify(id);
                 break;
             default:
-                debug.log("change", `Notify for unknown table ${table}`);
+                this.log("change", `Notify for unknown table ${table}`);
         }
     }
 
@@ -353,7 +354,7 @@ export default class MQTTCli {
             });
         });
 
-        debug.log("alerts", "Found alerts: %o", alerts);
+        this.log("alerts", "Found alerts: %o", alerts);
         return alerts;
     }
 
@@ -386,7 +387,7 @@ export default class MQTTCli {
     }
 
     publish_changed(changes) {
-        debug.log("change", "Publish changed: %o", changes);
+        this.log("change", "Publish changed: %o", changes);
         this.publish("DATA", changes.map(
             ([name, value, type]) => ({
                 name: `Last_Changed/${name}`,
@@ -396,14 +397,14 @@ export default class MQTTCli {
     }
 
     async on_birth(address, payload) {
-        debug.log("device", `Registering BIRTH for ${address}`);
+        this.log("device", `Registering BIRTH for ${address}`);
         this.online.add(address);
 
         let tree;
         if (payload.uuid === UUIDs.FactoryPlus) {
             tree = new MetricTree(payload);
         } else {
-            debug.log("device", "Ignoring all metrics in non-F+ BIRTH");
+            this.log("device", "Ignoring all metrics in non-F+ BIRTH");
             tree = {};
         }
 
@@ -420,19 +421,19 @@ export default class MQTTCli {
             alerts,
         });
 
-        debug.log("device", `Finished BIRTH for ${address}`);
+        this.log("device", `Finished BIRTH for ${address}`);
     }
 
     async on_death(address, payload) {
         const time =  ts_date(payload.timestamp ?? 0);
 
-        debug.log("device", `Registering DEATH for ${address}`);
+        this.log("device", `Registering DEATH for ${address}`);
 
         this.alerts.delete(address);
         this.online.delete(address);
         await this.model.death({address, time});
 
-        debug.log("device", `Finished DEATH for ${address}`);
+        this.log("device", `Finished DEATH for ${address}`);
     }
 
     async on_command(addr, payload) {
@@ -447,7 +448,7 @@ export default class MQTTCli {
                     await this.rebirth();
                     break;
                 default:
-                    debug.log("mqtt", `Received unknown CMD: ${m.name}`);
+                    this.log("mqtt", `Received unknown CMD: ${m.name}`);
                 /* Ignore for now */
             }
         }
@@ -467,7 +468,7 @@ export default class MQTTCli {
         /* XXX always rebirth the whole edge node? */
         const node = addr.parent_node();
 
-        debug.log("rebirth", `Sending (escalated) rebirth request to ${node}`);
+        this.log("rebirth", `Sending (escalated) rebirth request to ${node}`);
         const metrics = MetricBuilder.data.command_escalation(
             //addr, 
             //(addr.isDevice() ? "Device Control/Rebirth" : "Node Control/Rebirth"),
@@ -483,7 +484,7 @@ export default class MQTTCli {
     async do_we_rebirth(addr) {
         const {pending, sent} = this.rebirths;
 
-        //debug.log("rebirth", `Checking whether we should rebirth ${addr}`);
+        //this.log("rebirth", `Checking whether we should rebirth ${addr}`);
 
         /* If we've rebirthed this device in the last 5 minutes, don't
          * do it again. */

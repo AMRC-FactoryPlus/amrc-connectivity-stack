@@ -1,70 +1,13 @@
-# On Windows try https://frippery.org/busybox/
+top=..
+include ${top}/mk/acs.init.mk
 
--include config.mk
-
-pkgver!=node -e 'console.log(JSON.parse(fs.readFileSync("package.json")).version)'
-
-version?=v${pkgver}
-suffix?=
-registry?=ghcr.io/amrc-factoryplus
 repo?=acs-service-setup
-docker?=docker
-kubectl?=kubectl
 
-tag=${registry}/${repo}:${version}${suffix}
+eslint=	bin lib
 
-build_args=
+include ${mk}/acs.js.mk
 
-ifdef acs_base
-build_args+=--build-arg acs_base="${acs_base}"
-endif
+lint: check-yaml
 
-ifdef acs_npm
-build_args+=--build-arg acs_npm="${acs_npm}"
-endif
-
-all: build push
-
-.PHONY: all build push check-committed pull
-
-check-committed:
-	[ -z "$$(git status --porcelain)" ] || (git status; exit 1)
-
-pull:
-	git pull --ff-only
-
-lint:
-	npx eslint bin lib
+check-yaml:
 	node bin/check-yaml.js
-
-ifdef pull
-build: check-committed pull lint
-else
-build: check-committed lint
-endif
-	${docker} build -t "${tag}" ${build_args} .
-
-push:
-	${docker} push "${tag}"
-
-run:
-	${docker} run -ti --rm "${tag}" /bin/sh
-
-.PHONY: deploy run-job logs
-
-ifdef job_name
-
-deploy: all run-job logs
-
-run-job:
-	kubectl create -f service-setup.yaml
-
-logs:
-	kubectl logs -f job/"${job_name}"
-
-else
-
-deploy run-job logs:
-	: Set $${job_name} for automatic k8s deployment
-
-endif

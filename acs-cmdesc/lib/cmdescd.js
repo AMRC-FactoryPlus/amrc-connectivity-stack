@@ -9,12 +9,11 @@ import {Address, Debug, UUIDs,} from "@amrc-factoryplus/utilities";
 const CCL_Perms = "9584ee09-a35a-4278-bc13-21a8be1f007c";
 const CCL_Template = "60e99f28-67fe-4344-a6ab-b1edb8b8e810";
 
-const debug = new Debug();
-
 export default class CmdEscD {
     constructor(opts) {
         this.fplus = opts.fplus;
         this.root = this.fplus.Auth.root_principal;
+        this.log = this.fplus.debug.log.bind(this.fplus.debug);
     }
 
     async init() {
@@ -27,7 +26,7 @@ export default class CmdEscD {
 
     async find_principal_for_address(from) {
         if (from.isDevice()) {
-            debug.log("cmdesc", "Cannot authorise request from a Device");
+            this.log("cmdesc", "Cannot authorise request from a Device");
             return;
         }
 
@@ -40,23 +39,23 @@ export default class CmdEscD {
             },
         });
         if (!res.ok) {
-            debug.log("cmdesc", `Failed to look up address ${from}: ${res.status}`);
+            this.log("cmdesc", `Failed to look up address ${from}: ${res.status}`);
             return;
         }
         const json = await res.json();
 
         switch (json.length) {
             case 0:
-                debug.log("cmdesc", `No UUID found for address ${from}`);
+                this.log("cmdesc", `No UUID found for address ${from}`);
                 return;
             case 1:
                 break;
             default:
-                debug.log("cmdesc", `More than one UUID found for address ${from}`);
+                this.log("cmdesc", `More than one UUID found for address ${from}`);
                 return;
         }
 
-        debug.log("cmdesc", `Request from ${from} = ${json[0]}`);
+        this.log("cmdesc", `Request from ${from} = ${json[0]}`);
         return json[0];
     }
 
@@ -71,7 +70,7 @@ export default class CmdEscD {
             },
         });
         if (!res.ok) {
-            debug.log("acl", `Can't get ACL for ${princ}: ${res.status}`);
+            this.log("acl", `Can't get ACL for ${princ}: ${res.status}`);
             return [];
         }
 
@@ -132,7 +131,7 @@ export default class CmdEscD {
      */
     async execute_command(from, to, cmd) {
         const log = stat => {
-            debug.log("cmdesc", `${stat}: ${from} -> ${to}[${cmd.name} = ${cmd.value}]`);
+            this.log("cmdesc", `${stat}: ${from} -> ${to}[${cmd.name} = ${cmd.value}]`);
             return stat;
         };
 
@@ -145,11 +144,11 @@ export default class CmdEscD {
             from == this.root;
 
         if (is_root) {
-            debug.log("acl", `Granting root rights to ${from}`);
+            this.log("acl", `Granting root rights to ${from}`);
         }
         else {
             const acl = await this.expand_acl(from);
-            debug.log("acl", "ACL for %s: %o", from, acl);
+            this.log("acl", "ACL for %s: %o", from, acl);
 
             const type_ok = cmd.type == undefined
                 ? t => true

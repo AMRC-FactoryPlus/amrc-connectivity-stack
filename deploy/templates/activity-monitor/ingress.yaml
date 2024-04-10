@@ -1,0 +1,23 @@
+{{- if .Values.activityMonitor.enabled }}
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: activity-monitor-ingressroute
+  namespace: default
+spec:
+  entryPoints:
+    - {{ .Values.acs.secure | ternary "websecure" "web" }}
+  routes:
+    - match: Host(`activity.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}`)
+      kind: Rule
+      services:
+        - name: activity-monitor
+          port: 80
+          namespace: {{ .Release.Namespace }}
+  {{- if .Values.acs.secure }}
+  tls:
+    secretName: {{ coalesce .Values.activityMonitor.tlsSecretName .Values.acs.tlsSecretName }}
+    domains:
+      - main: activity-monitor.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
+  {{- end -}}
+{{- end -}}

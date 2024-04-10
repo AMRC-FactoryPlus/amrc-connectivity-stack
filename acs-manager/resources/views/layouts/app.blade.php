@@ -2,16 +2,10 @@
 <html lang="{{ app()->getLocale() }}" class="{{ Auth::user() && Auth::user()->preference('appearance.colours.dark_mode') ? 'theme-dark' : 'theme-light' }}">
 <head>
 
-    <title>Factory+ Manager | @yield('title', '')</title>
+    <title>ACS | Manager</title>
 
-    @if (config('manager.multi_cluster'))
-        <link rel="apple-touch-icon" sizes="180x180" href="{{ Vite::asset('resources/assets/img/apple-touch-icon.png') }}">
-        <link rel="icon" type="image/png" sizes="32x32" href="{{ Vite::asset('resources/assets/img/favicon-32x32.png') }}">
-        <link rel="icon" type="image/png" sizes="16x16" href="{{ Vite::asset('resources/assets/img/favicon-16x16.png') }}">
-    @else
-        <link rel="apple-touch-icon" sizes="180x180" href="https://www.sheffield.ac.uk/themes/custom/uos/favicon.svg">
-        <link rel="icon" type="image/svg" sizes="32x32" href="https://www.sheffield.ac.uk/themes/custom/uos/favicon.svg">
-    @endif
+    <link rel="icon" sizes="32x32" href="{{ Vite::asset('resources/assets/img/favicon.svg') }}">
+    <link rel="icon" sizes="16x16" href="{{ Vite::asset('resources/assets/img/favicon.svg') }}">
 
     <script src="https://kit.fontawesome.com/fb885729aa.js" crossorigin="anonymous"></script>
 

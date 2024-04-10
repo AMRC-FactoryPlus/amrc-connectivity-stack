@@ -10,5 +10,9 @@ RUN rm -rf node_modules
 # production stage
 FROM nginx:stable-alpine as production-stage
 COPY --from=build-stage /app/dist /usr/share/nginx/html
-EXPOSE 80
+
+# Echo listen 8080 to a new file /etc/nginx/templates/default.conf.template
+RUN echo "listen 8080;" > /etc/nginx/templates/default.conf.template
+
+EXPOSE 8080
 CMD ["nginx", "-g", "daemon off;"]

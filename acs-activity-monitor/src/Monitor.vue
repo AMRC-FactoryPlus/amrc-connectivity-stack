@@ -2,8 +2,8 @@
   <div class="flex flex-col bg-[rgb(24,27,31)] min-h-screen">
     <div class="text-2xl m-1 mb-0 p-4 flex items-center justify-between">
       <div class="flex flex-col">
-        <h1 class="text-white"><span class="font-bold mr-1">AMRC</span>Factory+</h1>
-        <h1 class="text-base text-gray-200">Live Device Activity</h1>
+        <h1 class="text-white"><span class="font-bold mr-1">Live Device Activity</span></h1>
+        <h1 class="text-base text-gray-200">AMRC Connectivity Stack</h1>
       </div>
       <div class="flex items-center gap-2">
         <input v-if="connected === false" v-model="directories" type="text"

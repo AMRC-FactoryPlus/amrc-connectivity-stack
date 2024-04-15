@@ -386,6 +386,23 @@ export default class MQTTCli {
         this.model.update_alerts(updates);
     }
 
+    find_links(metrics, timestamp) {
+        const links = [];
+
+        for_each_metric(metrics, (branch, leaf, metric) => {
+            if (leaf != "Schema_UUID" || metric.value != Schema.Link)
+                return;
+            links.push({
+                uuid:       branch.Instance_UUID.value,
+                relation:   branch.Relation.value,
+                target:     branch.Target.value,
+            });
+        });
+
+        this.log("links", "Found links: %o", links);
+        return links;
+    }
+
     publish_changed(changes) {
         this.log("change", "Publish changed: %o", changes);
         this.publish("DATA", changes.map(
@@ -416,9 +433,10 @@ export default class MQTTCli {
             address,
             uuid: tree.Instance_UUID?.value,
             top_schema: tree.Schema_UUID?.value,
-            schemas: this.find_schemas(tree),
-            service: this.find_service(tree),
+            schemas:    this.find_schemas(tree),
+            service:    this.find_service(tree),
             alerts,
+            links:      this.find_links(tree),
         });
 
         this.log("device", `Finished BIRTH for ${address}`);

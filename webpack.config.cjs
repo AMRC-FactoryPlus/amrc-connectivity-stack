@@ -6,7 +6,12 @@ module.exports = {
     entry: {
         webpack:    "./webpack.js",
         preact:     "./preact.js",
-        configdb:   { import: "./configdb.js", },
+        configdb:   { 
+            import:     "./configdb.js",
+        },
+        alerts:     {
+            import:     "./alerts.js",
+        },
     },
     output: {
         library: ["AMRC_FactoryPlus", "[name]"],
@@ -18,13 +23,16 @@ module.exports = {
 
     /* Polyfills for node builtins */
     resolve: {
+        conditionNames: ["node", "browser", "import", "default"],
+        mainFields: ["main", "module"],
         alias: {
             got: false,
             ["got-fetch"]: false,
             ["gssapi.js"]: false,
-            rxjs: false,
             ["timers/promises"]: "timers-promises",
-            ["@amrc-factoryplus/sparkplug-app"]: false,
+            ["@amrc-factoryplus/utilities"]: "@amrc-factoryplus/service-client",
+            //rxjs: path.resolve(__dirname, "src/compat/rxjs.js"),
+            //immutable: path.resolve(__dirname, "src/compat/immutable.js"),
         },
         fallback: {
             buffer: require.resolve("buffer/"),

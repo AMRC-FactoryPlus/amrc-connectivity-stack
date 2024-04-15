@@ -8,9 +8,9 @@
   </head>
 
   <body>
-    {{#if page.script ~}}
-        <script src="/js/{{page.script}}.js"></script>
-    {{~/if}}
+    {{#each page.script ~}}
+        <script src="/js/{{this}}.js"></script>
+    {{~/each}}
 
     <h1>{{page.title}} @ {{acs.domain}}</h1>
 

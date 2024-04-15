@@ -416,15 +416,6 @@ export default class Queries {
               and id != $1
         `, [sess, opts.addrid]);
 
-        /* Clear old alerts and links. They will be recreated according
-         * to our new BIRTH. */
-        await this.query(`
-            update alert set stale = true where device = $1
-        `, [opts.devid]);
-        await this.query(`
-            update link set stale = true where device = $1
-        `, [opts.devid]);
-
         return sess;
     }
 
@@ -499,26 +490,34 @@ export default class Queries {
             opts.active, opts.stamp]);
     }
 
-    update_alert_info (id, opts) {
-        return this.query(`
+    async update_alert_info (id, opts) {
+        await this.query(`
             update alert
             set device = $2, atype = $3, metric = $4, active = $5,
                 last_change = case when active != $5
-                    then $6::timestamp else last_change end,
-                stale = false
+                    then $6::timestamp else last_change end
             where id = $1 and
                 (device != $2 or atype != $3 or metric != $4 or active != $5)
         `, [id, opts.dev_id, opts.type_id, opts.metric,
             opts.active, opts.stamp]);
+
     }
 
     update_alert_active (uuid, active, stamp) {
         return this.query(`
             update alert
-            set active = $2, last_change = $3, stale = false
+            set active = $2, last_change = $3
             where uuid = $1
                 and active != $2
         `, [uuid, active, stamp]);
+    }
+
+    record_stale_alerts (devid, valid) {
+        return this.query(`
+            update alert
+            set stale = true
+            where device = $1 and uuid <> all ($2::uuid[])
+        `, [devid, valid]);
     }
 
     async alert_list (opts) {
@@ -567,8 +566,16 @@ export default class Queries {
             insert into link (uuid, device, relation, target)
             values ($1, $2, $3, $4)
             on conflict (uuid) do update
-                set device = $2, relation = $3, target = $4, stale = false
+                set device = $2, relation = $3, target = $4
         `, [opts.uuid, devid, relid, opts.target]);
+    }
+
+    record_stale_links (devid, valid) {
+        return this.query(`
+            update link
+            set stale = true
+            where device = $1 and uuid <> all ($2::uuid[])
+        `, [devid, valid]);
     }
 
     async link_list () {

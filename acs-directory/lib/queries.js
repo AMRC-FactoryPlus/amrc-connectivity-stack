@@ -416,6 +416,15 @@ export default class Queries {
               and id != $1
         `, [sess, opts.addrid]);
 
+        /* Clear old alerts and links. They will be recreated according
+         * to our new BIRTH. */
+        await this.query(`
+            delete from alert where device = $1
+        `, [opts.devid]);
+        await this.query(`
+            delete from link where device = $1
+        `, [opts.devid]);
+
         return sess;
     }
 

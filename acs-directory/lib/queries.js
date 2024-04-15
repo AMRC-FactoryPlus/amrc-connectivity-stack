@@ -28,7 +28,7 @@ function sym_diff(one, two) {
  * the database directly, and sometimes we need to query using a query
  * function for a transaction. The model inherits from this class. */
 export default class Queries {
-    static DBVersion = 11;
+    static DBVersion = 12;
 
     constructor(query) {
         this.query = query;
@@ -419,10 +419,10 @@ export default class Queries {
         /* Clear old alerts and links. They will be recreated according
          * to our new BIRTH. */
         await this.query(`
-            delete from alert where device = $1
+            update alert set stale = true where device = $1
         `, [opts.devid]);
         await this.query(`
-            delete from link where device = $1
+            update link set stale = true where device = $1
         `, [opts.devid]);
 
         return sess;
@@ -504,7 +504,8 @@ export default class Queries {
             update alert
             set device = $2, atype = $3, metric = $4, active = $5,
                 last_change = case when active != $5
-                    then $6::timestamp else last_change end
+                    then $6::timestamp else last_change end,
+                stale = false
             where id = $1 and
                 (device != $2 or atype != $3 or metric != $4 or active != $5)
         `, [id, opts.dev_id, opts.type_id, opts.metric,
@@ -514,7 +515,7 @@ export default class Queries {
     update_alert_active (uuid, active, stamp) {
         return this.query(`
             update alert
-            set active = $2, last_change = $3
+            set active = $2, last_change = $3, stale = false
             where uuid = $1
                 and active != $2
         `, [uuid, active, stamp]);
@@ -528,6 +529,7 @@ export default class Queries {
                 join alert_type t   on a.atype = t.id
                 join device d       on a.device = d.id
             where ($1::uuid is null or t.uuid = $1)
+                and not a.stale
                 and (a.active or not $2)
                 and ($3::uuid[] is null or t.uuid = any ($3))
                 and ($4::uuid[] is null or d.uuid = any ($4))
@@ -543,7 +545,7 @@ export default class Queries {
             from alert a
                 join alert_type t   on a.atype = t.id
                 join device d       on a.device = d.id
-            where a.uuid = $1
+            where a.uuid = $1 and not a.stale
         `, [uuid]);
         return dbr.rows[0];
     }
@@ -565,7 +567,7 @@ export default class Queries {
             insert into link (uuid, device, relation, target)
             values ($1, $2, $3, $4)
             on conflict (uuid) do update
-                set device = $2, relation = $3, target = $4
+                set device = $2, relation = $3, target = $4, stale = false
         `, [opts.uuid, devid, relid, opts.target]);
     }
 
@@ -573,6 +575,7 @@ export default class Queries {
         const dbr = await this.query(`
             select l.uuid
             from link l
+            where not l.stale
         `);
         return dbr.rows;
     }
@@ -581,7 +584,7 @@ export default class Queries {
         const dbr = await this.query(`
             select l.uuid
             from link l join device d on d.id = l.device
-            where d.uuid = $1
+            where d.uuid = $1 and not l.stale
         `, [dev]);
         return dbr.rows;
     }
@@ -591,7 +594,7 @@ export default class Queries {
             select l.uuid
             from link l
                 join relation r on l.relation = r.id
-            where r.uuid = $1
+            where r.uuid = $1 and not l.stale
         `, [rel]);
         return dbr.rows;
     }
@@ -600,7 +603,7 @@ export default class Queries {
         const dbr = await this.query(`
             select l.uuid
             from link l
-            where l.target = $1
+            where l.target = $1 and not l.stale
         `, [targ]);
         return dbr.rows;
     }
@@ -611,7 +614,7 @@ export default class Queries {
             from link l
                 join device d       on l.device = d.id
                 join link_rel r     on l.relation = r.id
-            where l.uuid = $1
+            where l.uuid = $1 and not l.stale
         `, [uuid]);
         return dbr.rows[0];
     }

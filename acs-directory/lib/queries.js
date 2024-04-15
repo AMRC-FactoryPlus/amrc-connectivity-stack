@@ -28,7 +28,7 @@ function sym_diff(one, two) {
  * the database directly, and sometimes we need to query using a query
  * function for a transaction. The model inherits from this class. */
 export default class Queries {
-    static DBVersion = 10;
+    static DBVersion = 11;
 
     constructor(query) {
         this.query = query;
@@ -545,6 +545,74 @@ export default class Queries {
             from alert a
                 join alert_type t   on a.atype = t.id
             where a.id = $1
+        `, [id]);
+        return dbr.rows[0];
+    }
+
+    /* Links */
+    async record_link (devid, opts) {
+        const relid = await this.find_or_create("link_rel", opts.relation);
+        await this.query(`
+            insert into link (uuid, device, relation, target)
+            values ($1, $2, $3, $4)
+            on conflict (uuid) do update
+                set device = $2, relation = $3, target = $4
+        `, [opts.uuid, devid, relid, opts.target]);
+    }
+
+    async link_list () {
+        const dbr = await this.query(`
+            select l.uuid
+            from link l
+        `);
+        return dbr.rows;
+    }
+
+    async link_list_by_device (dev) {
+        const dbr = await this.query(`
+            select l.uuid
+            from link l join device d on d.id = l.device
+            where d.uuid = $1
+        `, [dev]);
+        return dbr.rows;
+    }
+
+    async link_list_by_relation (rel) {
+        const dbr = await this.query(`
+            select l.uuid
+            from link l
+                join relation r on l.relation = r.id
+            where r.uuid = $1
+        `, [rel]);
+        return dbr.rows;
+    }
+
+    async link_list_by_target (targ) {
+        const dbr = await this.query(`
+            select l.uuid
+            from link l
+            where l.target = $1
+        `, [targ]);
+        return dbr.rows;
+    }
+
+    async link_by_uuid (uuid) {
+        const dbr = await this.query(`
+            select l.uuid, d.uuid "device", r.uuid "relation", target
+            from link l
+                join device d       on l.device = d.id
+                join link_rel r     on l.relation = r.id
+            where l.uuid = $1
+        `, [uuid]);
+        return dbr.rows[0];
+    }
+
+    async link_by_id (id) {
+        const dbr = await this.query(`
+            select l.uuid, r.uuid "relation"
+            from link l
+                join link_rel r     on l.relation = r.id
+            where l.id = $1
         `, [id]);
         return dbr.rows[0];
     }

@@ -6,6 +6,7 @@
 
 export const Schema = {
     Alert:                  "8853aa15-2228-4309-b98e-e086cefbc72c",
+    Link:                   "b3c4b273-9528-45de-8842-9f77c9ef272a",
 };
 
 export const Perm = {

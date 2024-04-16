@@ -538,7 +538,6 @@ export default class Queries {
                     or $7)
         `, [id, opts.dev_id, opts.type_id, opts.metric,
             opts.active, opts.stamp, links_changed]);
-
     }
 
     update_alert_active (uuid, active, stamp) {
@@ -561,7 +560,10 @@ export default class Queries {
     async alert_list (opts) {
         const dbr = await this.query(`
             select a.uuid, d.uuid "device", t.uuid "type", a.metric, 
-                a.active, a.last_change
+                a.active, a.last_change, 
+                (select coalesce(array_agg(l.uuid), '{}'::uuid[])
+                    from alert_link al join link l on l.id = al.link
+                    where al.alert = a.id) links
             from alert a
                 join alert_type t   on a.atype = t.id
                 join device d       on a.device = d.id
@@ -578,7 +580,10 @@ export default class Queries {
     async alert_by_uuid (uuid) {
         const dbr = await this.query(`
             select a.uuid, d.uuid "device", t.uuid "type", a.metric,
-                a.active, a.last_change
+                a.active, a.last_change,
+                (select coalesce(array_agg(l.uuid), '{}'::uuid[])
+                    from alert_link al join link l on l.id = al.link
+                    where al.alert = a.id) links
             from alert a
                 join alert_type t   on a.atype = t.id
                 join device d       on a.device = d.id

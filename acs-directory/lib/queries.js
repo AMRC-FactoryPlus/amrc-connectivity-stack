@@ -584,41 +584,49 @@ export default class Queries {
         `, [devid, valid]);
     }
 
-    async link_list () {
-        const dbr = await this.query(`
+    link_list () {
+        return this.query(`
             select l.uuid
             from link l
             where not l.stale
-        `);
-        return dbr.rows;
+        `)
+            .then(dbr => dbr.rows.map(r => r.uuid));
     }
 
-    async link_list_by_device (dev) {
-        const dbr = await this.query(`
+    link_list_by_device (dev) {
+        return this.query(`
             select l.uuid
             from link l join device d on d.id = l.device
             where d.uuid = $1 and not l.stale
-        `, [dev]);
-        return dbr.rows;
+        `, [dev])
+            .then(dbr => dbr.rows.map(r => r.uuid));
     }
 
-    async link_list_by_relation (rel) {
-        const dbr = await this.query(`
+    link_list_by_source (src) {
+        return this.query(`
             select l.uuid
             from link l
-                join relation r on l.relation = r.id
-            where r.uuid = $1 and not l.stale
-        `, [rel]);
-        return dbr.rows;
+            where l.source = $1 and not l.stale
+        `, [src])
+            .then(dbr => dbr.rows.map(r => r.uuid));
     }
 
-    async link_list_by_target (targ) {
-        const dbr = await this.query(`
+    link_list_by_relation (rel) {
+        return this.query(`
+            select l.uuid
+            from link l join link_rel r on l.relation = r.id
+            where r.uuid = $1 and not l.stale
+        `, [rel])
+            .then(dbr => dbr.rows.map(r => r.uuid));
+    }
+
+    link_list_by_target (targ) {
+        return this.query(`
             select l.uuid
             from link l
             where l.target = $1 and not l.stale
-        `, [targ]);
-        return dbr.rows;
+        `, [targ])
+            .then(dbr => dbr.rows.map(r => r.uuid));
     }
 
     async link_by_uuid (uuid) {

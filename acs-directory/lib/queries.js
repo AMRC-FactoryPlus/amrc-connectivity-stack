@@ -516,7 +516,7 @@ export default class Queries {
         return this.query(`
             update alert
             set stale = true
-            where device = $1 and uuid <> all ($2::uuid[])
+            where device = $1 and uuid <> all ($2::uuid[]) and not stale
         `, [devid, valid]);
     }
 
@@ -567,6 +567,7 @@ export default class Queries {
             values ($1, $2, $3, $4)
             on conflict (uuid) do update
                 set device = $2, relation = $3, target = $4
+                where device <> $2 or relation <> $3 or target <> $4
         `, [opts.uuid, devid, relid, opts.target]);
     }
 
@@ -574,7 +575,7 @@ export default class Queries {
         return this.query(`
             update link
             set stale = true
-            where device = $1 and uuid <> all ($2::uuid[])
+            where device = $1 and uuid <> all ($2::uuid[]) and not stale
         `, [devid, valid]);
     }
 

@@ -479,27 +479,65 @@ export default class Queries {
         }
     }
 
-    create_alert (opts) {
-        return this.query(`
+    async insert_alert_links (id, opts) {
+        await this.query(`
+            insert into alert_link (alert, link)
+            select $1, l.id
+            from unnest($2::uuid[]) as a(uuid)
+                join link l on l.uuid = a.uuid
+            on conflict (alert, link) do nothing
+        `, [id, opts.links]);
+    }
+
+    async create_alert (opts) {
+        const id = await this.query(`
             insert into alert (
                 uuid, device, atype, metric, active, 
                 last_change)
             values($1, $2, $3, $4, $5, $6)
             returning id
         `, [opts.uuid, opts.dev_id, opts.type_id, opts.metric, 
-            opts.active, opts.stamp]);
+            opts.active, opts.stamp])
+            .then(dbr => dbr.rows[0].id);
+        
+        await this.insert_alert_links(id, opts);
+        return id;
     }
 
     async update_alert_info (id, opts) {
+        /* This is a really crude set-equality function. The core JS Set
+         * doesn't seem to have an equality method. */
+        const u_set = l => l.toSorted().join(":");
+        const cur_links = await this.query(`
+            select l.uuid
+            from alert_link al
+                join link l on l.id = al.link
+            where al.alert = $1
+        `, [id])
+            .then(dbr => dbr.rows.map(r => r.uuid));
+        const links_changed = u_set(cur_links) != u_set(opts.links);
+
+        if (links_changed) {
+            await this.insert_alert_links(id, opts);
+            await this.query(`
+                delete from alert_link al
+                using link l
+                where al.alert = $1
+                    and l.id = al.link
+                    and l.uuid <> all ($2)
+            `, [id, opts.links]);
+        }
+        
         await this.query(`
             update alert
             set device = $2, atype = $3, metric = $4, active = $5,
                 last_change = case when active != $5
                     then $6::timestamp else last_change end
             where id = $1 and
-                (device != $2 or atype != $3 or metric != $4 or active != $5)
+                (device != $2 or atype != $3 or metric != $4 or active != $5
+                    or $7)
         `, [id, opts.dev_id, opts.type_id, opts.metric,
-            opts.active, opts.stamp]);
+            opts.active, opts.stamp, links_changed]);
 
     }
 
@@ -567,7 +605,7 @@ export default class Queries {
             values ($1, $2, $3, $4)
             on conflict (uuid) do update
                 set device = $2, relation = $3, target = $4
-                where device <> $2 or relation <> $3 or target <> $4
+                where link <> excluded 
         `, [opts.uuid, devid, relid, opts.target]);
     }
 

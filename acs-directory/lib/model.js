@@ -78,14 +78,16 @@ export default class Model extends Queries {
 
             for (const schema of opts.schemas)
                 await q.record_schema(sess, schema);
-            for (const alrt of opts.alerts)
-                await q.record_alert(devid, alrt);
-            await q.record_stale_alerts(devid,
-                Object.values(opts.alerts).map(a => a.uuid));
+            /* Record links before alerts, we need the records for the
+             * alert-link link table */
             for (const lnk of opts.links)
                 await q.record_link(devid, lnk);
             await q.record_stale_links(devid,
                 Object.values(opts.links).map(l => l.uuid));
+            for (const alrt of opts.alerts)
+                await q.record_alert(devid, alrt);
+            await q.record_stale_alerts(devid,
+                Object.values(opts.alerts).map(a => a.uuid));
 
             if (opts.service) {
                 await q.record_service({

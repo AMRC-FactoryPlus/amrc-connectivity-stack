@@ -352,6 +352,9 @@ export default class MQTTCli {
         for_each_metric(metrics, (branch, leaf, metric) => {
             if (leaf != "Schema_UUID" || metric.value != Schema.Alert)
                 return;
+            const links = Object.values(branch.Links ?? {})
+                .filter(l => l.Schema_UUID.value == Schema.Link)
+                .map(l => l.Instance_UUID.value);
             alerts.push({
                 uuid:   branch.Instance_UUID.value,
                 type:   branch.Type.value,
@@ -359,6 +362,7 @@ export default class MQTTCli {
                 active: branch.Active.value,
                 alias:  branch.Active.alias,
                 stamp:  ts_date(metric.timestamp ?? timestamp),
+                links,
             });
         });
 

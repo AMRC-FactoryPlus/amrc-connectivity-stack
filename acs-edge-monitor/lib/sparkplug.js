@@ -92,7 +92,7 @@ export class SparkplugNode {
                 ...mk_instance(device, Schema.Alert, name),
                 { name: `${name}/Type`, type: "UUID", value: type },
                 { name: `${name}/Active`, type: "Boolean", value: value },
-                ...mk_link(`${name}/Links/Node`, type, uuid),
+                ...mk_link(`${name}/Links/Node`, Link.DeviceMonitor, uuid),
             ];
         };
 

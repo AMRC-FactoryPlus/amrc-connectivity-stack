@@ -382,29 +382,37 @@ export default class MQTTCli {
     }
 
     record_alert_metrics(address, alerts) {
+        /* We must stringify the address otherwise the Map uses object
+         * identity, and Addresses are not interned */
         const metrics = map_get_or_create(
-            this.alerts, address, 
+            this.alerts, address.toString(), 
             () => ({ name: new Map(), alias: new Map() }));
 
         for (const alrt of alerts.values()) {
             metrics.name.set(alrt.metric, alrt.uuid);
             if (alrt.alias != undefined) {
-                metrics.alias.set(alrt.alias, alrt.uuid);
+                /* We must stringify the alias as it is a Long */
+                metrics.alias.set(alrt.alias.toString(), alrt.uuid);
             }
         }
+        this.log("alerts", "Recorded aliases for %s: %o", address, metrics);
     }
 
     handle_alert_updates(address, payload) {
-        const alerts = this.alerts.get(address);
+        /* Stringification as above */
+        const alerts = this.alerts.get(address.toString());
+        this.log("alerts", "Found aliases for %s: %o", address, alerts);
         if (!alerts) return;
 
         const updates = payload.metrics.flatMap(m => {
             const uuid = "alias" in m 
-                ? alerts.alias.get(m.alias) : alerts.name.get(m.name);
+                ? alerts.alias.get(m.alias.toString()) 
+                : alerts.name.get(m.name);
             if (!uuid) return [];
             const stamp = ts_date(m.timestamp ?? payload.timestamp);
             return [[uuid, m.value, stamp]];
         });
+        this.log("alerts", "Updates: %o", updates);
 
         this.model.update_alerts(updates);
     }

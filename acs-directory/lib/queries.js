@@ -28,7 +28,7 @@ function sym_diff(one, two) {
  * the database directly, and sometimes we need to query using a query
  * function for a transaction. The model inherits from this class. */
 export default class Queries {
-    static DBVersion = 12;
+    static DBVersion = 11;
 
     constructor(query) {
         this.query = query;
@@ -479,65 +479,27 @@ export default class Queries {
         }
     }
 
-    async insert_alert_links (id, opts) {
-        await this.query(`
-            insert into alert_link (alert, link)
-            select $1, l.id
-            from unnest($2::uuid[]) as a(uuid)
-                join link l on l.uuid = a.uuid
-            on conflict (alert, link) do nothing
-        `, [id, opts.links]);
-    }
-
     async create_alert (opts) {
-        const id = await this.query(`
+         await this.query(`
             insert into alert (
                 uuid, device, atype, metric, active, 
                 last_change)
             values($1, $2, $3, $4, $5, $6)
             returning id
         `, [opts.uuid, opts.dev_id, opts.type_id, opts.metric, 
-            opts.active, opts.stamp])
-            .then(dbr => dbr.rows[0].id);
-        
-        await this.insert_alert_links(id, opts);
-        return id;
+            opts.active, opts.stamp]);
     }
 
     async update_alert_info (id, opts) {
-        /* This is a really crude set-equality function. The core JS Set
-         * doesn't seem to have an equality method. */
-        const u_set = l => l.toSorted().join(":");
-        const cur_links = await this.query(`
-            select l.uuid
-            from alert_link al
-                join link l on l.id = al.link
-            where al.alert = $1
-        `, [id])
-            .then(dbr => dbr.rows.map(r => r.uuid));
-        const links_changed = u_set(cur_links) != u_set(opts.links);
-
-        if (links_changed) {
-            await this.insert_alert_links(id, opts);
-            await this.query(`
-                delete from alert_link al
-                using link l
-                where al.alert = $1
-                    and l.id = al.link
-                    and l.uuid <> all ($2)
-            `, [id, opts.links]);
-        }
-        
         await this.query(`
             update alert
             set device = $2, atype = $3, metric = $4, active = $5,
                 last_change = case when active != $5
                     then $6::timestamp else last_change end
             where id = $1 and
-                (device != $2 or atype != $3 or metric != $4 or active != $5
-                    or $7)
+                (device != $2 or atype != $3 or metric != $4 or active != $5)
         `, [id, opts.dev_id, opts.type_id, opts.metric,
-            opts.active, opts.stamp, links_changed]);
+            opts.active, opts.stamp]);
     }
 
     update_alert_active (uuid, active, stamp) {
@@ -562,8 +524,8 @@ export default class Queries {
             select a.uuid, d.uuid "device", t.uuid "type", a.metric, 
                 a.active, a.last_change, 
                 (select coalesce(array_agg(l.uuid), '{}'::uuid[])
-                    from alert_link al join link l on l.id = al.link
-                    where al.alert = a.id) links
+                    from link l
+                    where l.source = a.uuid) links
             from alert a
                 join alert_type t   on a.atype = t.id
                 join device d       on a.device = d.id
@@ -582,8 +544,8 @@ export default class Queries {
             select a.uuid, d.uuid "device", t.uuid "type", a.metric,
                 a.active, a.last_change,
                 (select coalesce(array_agg(l.uuid), '{}'::uuid[])
-                    from alert_link al join link l on l.id = al.link
-                    where al.alert = a.id) links
+                    from link l
+                    where l.source = a.uuid) links
             from alert a
                 join alert_type t   on a.atype = t.id
                 join device d       on a.device = d.id
@@ -606,12 +568,12 @@ export default class Queries {
     async record_link (devid, opts) {
         const relid = await this.find_or_create("link_rel", opts.relation);
         await this.query(`
-            insert into link (uuid, device, relation, target)
-            values ($1, $2, $3, $4)
+            insert into link (uuid, device, source, relation, target)
+            values ($1, $2, $3, $4, $5)
             on conflict (uuid) do update
-                set device = $2, relation = $3, target = $4
+                set device = $2, source = $3, relation = $4, target = $5
                 where link <> excluded 
-        `, [opts.uuid, devid, relid, opts.target]);
+        `, [opts.uuid, devid, opts.source, relid, opts.target]);
     }
 
     record_stale_links (devid, valid) {
@@ -661,7 +623,8 @@ export default class Queries {
 
     async link_by_uuid (uuid) {
         const dbr = await this.query(`
-            select l.uuid, d.uuid "device", r.uuid "relation", target
+            select l.uuid, d.uuid "device", 
+                l.source, r.uuid "relation", l.target
             from link l
                 join device d       on l.device = d.id
                 join link_rel r     on l.relation = r.id

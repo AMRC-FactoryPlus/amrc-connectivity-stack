@@ -52,6 +52,20 @@ function for_each_metric(tree, action) {
     }
 }
 
+function for_each_instance (tree, action, parent) {
+    const schema = tree.Schema_UUID?.value;
+    const uuid = tree.Instance_UUID?.value;
+    if (schema && uuid) {
+        action(schema, uuid, tree, parent);
+        parent = uuid;
+    }
+    for (const metric of Object.values(tree)) {
+        if (!(metric instanceof MetricBranch))
+            continue;
+        for_each_instance(metric, action, parent);
+    }
+}
+
 export default class MQTTCli {
     constructor(opts) {
         this.fplus = opts.fplus;
@@ -349,20 +363,17 @@ export default class MQTTCli {
     find_alerts(metrics, timestamp) {
         const alerts = [];
 
-        for_each_metric(metrics, (branch, leaf, metric) => {
-            if (leaf != "Schema_UUID" || metric.value != Schema.Alert)
-                return;
-            const links = Object.values(branch.Links ?? {})
-                .filter(l => l.Schema_UUID.value == Schema.Link)
-                .map(l => l.Instance_UUID.value);
+        for_each_instance(metrics, (schema, uuid, branch) => {
+            if (schema != Schema.Alert) return;
+
+            const active = branch.Active;
             alerts.push({
-                uuid:   branch.Instance_UUID.value,
+                uuid,
                 type:   branch.Type.value,
-                metric: branch.Active.name,
-                active: branch.Active.value,
-                alias:  branch.Active.alias,
-                stamp:  ts_date(metric.timestamp ?? timestamp),
-                links,
+                metric: active.name,
+                active: active.value,
+                alias:  active.alias,
+                stamp:  ts_date(active.timestamp ?? timestamp),
             });
         });
 
@@ -401,13 +412,13 @@ export default class MQTTCli {
     find_links(metrics, timestamp) {
         const links = [];
 
-        for_each_metric(metrics, (branch, leaf, metric) => {
-            if (leaf != "Schema_UUID" || metric.value != Schema.Link)
-                return;
+        for_each_instance(metrics, (schema, uuid, tree, parent) => {
+            if (schema != Schema.Link) return;
             links.push({
-                uuid:       branch.Instance_UUID.value,
-                relation:   branch.Relation.value,
-                target:     branch.Target.value,
+                uuid,
+                source:     parent,
+                relation:   tree.Relation.value,
+                target:     tree.Target.value,
             });
         });
 

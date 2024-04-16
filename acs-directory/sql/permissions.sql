@@ -18,7 +18,7 @@ to :"role";
 -- This is because we SELECT FOR UPDATE.
 grant update on address to :"role";
 grant select, insert, update, delete on
-    alert, alert_type, link, link_rel, alert_link,
+    alert, alert_type, link, link_rel,
     session, schema_used, service_provider
 to :"role";
 grant usage on sequence

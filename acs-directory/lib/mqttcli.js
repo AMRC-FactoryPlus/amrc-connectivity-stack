@@ -255,6 +255,9 @@ export default class MQTTCli {
             case "alert":
                 this.on_alert_notify(id);
                 break;
+            case "link":
+                this.on_link_notify(id);
+                break;
             case "session":
                 this.on_session_notify(id);
                 break;
@@ -270,6 +273,11 @@ export default class MQTTCli {
         const alrt = await this.model.alert_by_id(id);
 
         this.publish_changed([["Alert_Type", alrt.type]]);
+    }
+
+    async on_link_notify (id) {
+        const lnk = await this.model.link_by_id(id);
+        this.publish_changed([["Link_Relation", lnk.relation]]);
     }
 
     async on_session_notify(id) {

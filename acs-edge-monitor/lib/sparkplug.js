@@ -59,7 +59,8 @@ class SparkplugDevice {
 
     check_name (typ) {
         if (!this.name) {
-            this.log("Unable to publish %s, I have no name", typ);
+            this.log("Unable to publish %s for %s, I have no name", 
+                typ, this.uuid);
             return false;
         }
         return true;

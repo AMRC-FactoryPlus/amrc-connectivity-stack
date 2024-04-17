@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>{{page.title}} @ {{acs.domain}}</title>
+    {{#if page.style ~}}
+        <link rel=stylesheet href="/css/{{page.style}}.css">
+    {{~/if}}
+  </head>
+
+  <body>
+    {{#if page.script ~}}
+        <script src="/js/{{page.script}}.js"></script>
+    {{~/if}}
+
+    <h1>{{page.title}} @ {{acs.domain}}</h1>
+
+    {{{body}}}
+
+  </body>
+</html>
+{{! vi:set ft=html: }}

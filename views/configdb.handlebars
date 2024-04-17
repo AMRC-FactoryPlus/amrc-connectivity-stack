@@ -1,0 +1,9 @@
+<div id="editor">
+    <p>Loading...
+</div>
+<script type="text/javascript">
+    console.log("Running app");
+    const editor = document.getElementById("editor");
+    AMRC_FactoryPlus.configdb.then(cdb =>
+        cdb.run(editor, "{{acs.directory}}"));
+</script>

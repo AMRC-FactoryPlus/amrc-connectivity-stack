@@ -2,11 +2,16 @@ const path = require("path");
 const webpack = require("webpack");
 
 module.exports = {
-    entry: "./src/webpack.js",
+    context: path.resolve(__dirname, "src/js"),
+    entry: {
+        webpack:    "./webpack.js",
+        preact:     "./preact.js",
+        configdb:   { import: "./configdb.js", },
+    },
     output: {
-        library: "AMRC_FactoryPlus_Vis",
-        path: path.resolve("public"),
-        filename: "webpack-modules.js",
+        library: ["AMRC_FactoryPlus", "[name]"],
+        path: path.resolve("public/js"),
+        filename: "[name].js",
         chunkFilename: "webpack/[id].[name].js",
     },
     mode: "development",
@@ -25,13 +30,13 @@ module.exports = {
             buffer: require.resolve("buffer/"),
             url: require.resolve("url/"),
             util: require.resolve("util/"),
-
+            process: require.resolve("process/browser.js"),
         },
     },
     plugins: [
         new webpack.ProvidePlugin({
             Buffer: ["buffer", "Buffer"],
-            process: "process/browser",
+            process: "process/browser.js",
         }),
     ],
 };

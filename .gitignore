@@ -1,4 +1,5 @@
 /node_modules/
+package-lock.json
 
 # Vim swap
 *.swp
@@ -8,8 +9,7 @@
 config.mk
 
 # Webpack
-public/webpack-modules.js
-public/webpack/
+public/js
 
 # Secrets
 /keytabs/

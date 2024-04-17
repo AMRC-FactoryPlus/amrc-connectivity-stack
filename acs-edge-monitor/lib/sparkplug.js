@@ -24,6 +24,105 @@ function mk_instance (device, schema, prefix) {
     ];
 }
 
+class SparkplugDevice {
+    constructor (opts) {
+        this.fplus      = opts.fplus;
+        this.node       = opts.node;
+        this.uuid       = opts.uuid;
+        this.monitor    = opts.monitor;
+
+        this.log        = this.fplus.debug.bound("spdev");
+        this.sub        = new rx.Subscription();
+        this.name       = null;
+    }
+
+    start () {
+        const { monitor, sub } = this;
+
+        sub.add(monitor.device.address
+            .pipe(rx.distinctUntilChanged())
+            .subscribe(async a => {
+                if (this.name)
+                    await this.death();
+                this.name = a.node;
+                await this.birth();
+            }));
+        sub.add(monitor.offline
+            .pipe(rx.distinctUntilChanged())
+            .subscribe(b => this.publish_offline(b)));
+    }
+
+    stop () {
+        this.sub.unsubscribe();
+        this.death();
+    }
+
+    check_name (typ) {
+        if (!this.name) {
+            this.log("Unable to publish %s, I have no name", typ);
+            return false;
+        }
+        return true;
+    }
+
+    async birth () {
+        if (!this.check_name("BIRTH")) return;
+
+        const { monitor, uuid } = this;
+
+        const device = fp_v5_uuid(Special.V5Monitor, uuid);
+        const offline = await rx.firstValueFrom(monitor.offline);
+
+        const mk_link = (name, relation, target) => [
+            ...mk_instance(device, Schema.Link, name),
+            { name: `${name}/Target`, type: "UUID", value: target },
+            { name: `${name}/Relation`, type: "UUID", value: relation },
+        ];
+        const mk_alert = (name, type, value) => {
+            return [
+                ...mk_instance(device, Schema.Alert, name),
+                { name: `${name}/Type`, type: "UUID", value: type },
+                { name: `${name}/Active`, type: "Boolean", value: value },
+                ...mk_link(`${name}/Links/Node`, Link.DeviceMonitor, uuid),
+            ];
+        };
+
+        const metrics = [
+            { name: "Schema_UUID", type: "UUID",
+                value: Schema.EdgeMonitorDevice },
+            { name: "Instance_UUID", type: "UUID", value: device },
+            ...mk_link("Links/Node", Link.DeviceMonitor, uuid),
+            ...mk_alert("Alerts/Offline", Alert.Offline, offline),
+        ];
+
+        this.node.publishDeviceBirth(this.name, {
+            metrics,
+            timestamp:  Date.now(),
+            uuid:       UUIDs.Special.FactoryPlus,
+        });
+    }
+
+    async publish_offline (offline) {
+        if (!this.check_name("DATA")) return;
+
+        const timestamp = Date.now();
+
+        this.node.publishDeviceData(this.name, {
+            metrics: [
+                { name: "Alerts/Offline/Active", type: "Boolean", 
+                    value: offline },
+            ],
+            timestamp,
+        });
+    }
+
+    death () {
+        if (!this.check_name("DEATH")) return;
+
+        this.node.publishDeviceDeath(this.name, { timestamp: Date.now() });
+    }
+}
+
 export class SparkplugNode {
     constructor (opts) {
         this.fplus  = opts.fplus;
@@ -71,46 +170,11 @@ export class SparkplugNode {
             uuid:       UUIDs.Special.FactoryPlus,
         });
 
-        for (const uuid of this.devices.keys()) {
-            this.rebirth_device(uuid);
+        for (const dev of this.devices.values()) {
+            dev.birth();
         }
     }
 
-    async rebirth_device (uuid) {
-        const device = fp_v5_uuid(Special.V5Monitor, uuid);
-        const monitor = this.devices.get(uuid);
-
-        const addr = await monitor.address();
-        const offline = await rx.firstValueFrom(monitor.offline);
-
-        const mk_link = (name, relation, target) => [
-            ...mk_instance(device, Schema.Link, name),
-            { name: `${name}/Target`, type: "UUID", value: target },
-            { name: `${name}/Relation`, type: "UUID", value: relation },
-        ];
-        const mk_alert = (name, type, value) => {
-            return [
-                ...mk_instance(device, Schema.Alert, name),
-                { name: `${name}/Type`, type: "UUID", value: type },
-                { name: `${name}/Active`, type: "Boolean", value: value },
-                ...mk_link(`${name}/Links/Node`, Link.DeviceMonitor, uuid),
-            ];
-        };
-
-        const metrics = [
-            { name: "Schema_UUID", type: "UUID",
-                value: Schema.EdgeMonitorDevice },
-            { name: "Instance_UUID", type: "UUID", value: device },
-            ...mk_link("Links/Node", Link.DeviceMonitor, uuid),
-            ...mk_alert("Alerts/Offline", Alert.Offline, offline),
-        ];
-
-        this.node.publishDeviceBirth(addr.node, {
-            metrics,
-            timestamp:  Date.now(),
-            uuid:       UUIDs.Special.FactoryPlus,
-        });
-    }
 
     publish (name, type, value) {
         const timestamp = Date.now();
@@ -119,40 +183,24 @@ export class SparkplugNode {
         });
     }
 
-    async publish_device_alert (monitor, offline) {
-        const timestamp = Date.now();
-        const addr = await monitor.address();
-
-        this.node.publishDeviceData(addr.node, {
-            metrics: [
-                { name: "Alerts/Offline/Active", type: "Boolean", 
-                    value: offline },
-            ],
-            timestamp,
-        });
-    }
-
     add_device (monitor) {
         const uuid = monitor.node;
         this.log("Adding Device %s", uuid);
-        this.devices.set(uuid, monitor);
+        const device = new SparkplugDevice({
+            fplus:      this.fplus,
+            node:       this.node,
+            uuid:       uuid,
+            monitor:    monitor,
+        });
+        this.devices.set(uuid, device);
+        device.start();
 
-        const subs = new rx.Subscription();
-        this.dev_subs.set(uuid, subs);
-
-        subs.add(monitor.device.address
-            .subscribe(() => this.rebirth_device(uuid)));
-        subs.add(monitor.offline
-            .pipe(rx.distinctUntilChanged())
-            .subscribe(b => this.publish_device_alert(monitor, b)));
     }
 
     remove_device (monitor) {
         const uuid = monitor.node;
         this.log("Removing Device %s", uuid);
-        this.dev_subs.get(uuid)?.unsubscribe();
-        this.dev_subs.delete(uuid);
-        this.node.publishDeviceDeath(uuid, { timestamp: Date.now() });
+        this.devices.get(uuid)?.stop();
         this.devices.delete(uuid);
     }
         

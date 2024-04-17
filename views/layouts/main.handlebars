@@ -2,9 +2,9 @@
 <html>
   <head>
     <title>{{page.title}} @ {{acs.domain}}</title>
-    {{#if page.style ~}}
-        <link rel=stylesheet href="/css/{{page.style}}.css">
-    {{~/if}}
+    {{#each page.style ~}}
+        <link rel=stylesheet href="/css/{{this}}.css">
+    {{~/each}}
   </head>
 
   <body>

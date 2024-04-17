@@ -35,15 +35,17 @@ function Alert (props) {
 
     console.log("ALERT: %o", alrt);
     const links = alrt.links.map(l => html`
-        <tr><th>${l.relation}:</th><td>${l.target}</td></tr>
+        <tr><th>${l.relation}:</><td>${l.target}</></>
     `);
     return html`
-        <h2>${alrt.type}</h2>
-        <table>
-            <tr><th>Raised by:</th><td>${alrt.device}</td></tr>
-            <tr><th>Since:</th><td>${date_format.format(alrt.since)}</td></tr>
-            ${links}
-        </table>
+        <section class="alert">
+            <h2>${alrt.type}</>
+            <table>
+                <tr><th>Raised by:</th><td>${alrt.device}</></>
+                <tr><th>Since:</><td>${date_format.format(alrt.since)}</></>
+                ${links}
+            </>
+        </>
     `;
 }
 
@@ -134,7 +136,7 @@ async function fetch_alerts (fplus) {
         if (inf?.deleted) continue;
 
         const links = [];
-        for (const uuid of alrt.links) {
+        for (const uuid of alrt.links ?? []) {
             const l = await link(uuid);
             if (!l) continue;
             links.push({

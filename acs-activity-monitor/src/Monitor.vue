@@ -259,9 +259,9 @@ export default {
 
   data () {
     return {
-      directories: 'https://directory.amrc-factoryplus-dev.shef.ac.uk',
-      username: '***REMOVED***',
-      password: '***REMOVED***',
+      directories: 'https://directory.*',
+      username: '',
+      password: '',
 
       mqtt: null,
 

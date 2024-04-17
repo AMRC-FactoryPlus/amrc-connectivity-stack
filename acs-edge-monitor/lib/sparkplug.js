@@ -32,7 +32,7 @@ export class SparkplugNode {
         this.log = opts.fplus.debug.bound("spnode");
 
         this.devices = new Map();
-        this.alert_subs = new Map();
+        this.dev_subs = new Map();
     }
 
     async init () {
@@ -80,6 +80,7 @@ export class SparkplugNode {
         const device = fp_v5_uuid(Special.V5Monitor, uuid);
         const monitor = this.devices.get(uuid);
 
+        const addr = await monitor.address();
         const offline = await rx.firstValueFrom(monitor.offline);
 
         const mk_link = (name, relation, target) => [
@@ -104,7 +105,7 @@ export class SparkplugNode {
             ...mk_alert("Alerts/Offline", Alert.Offline, offline),
         ];
 
-        this.node.publishDeviceBirth(uuid, {
+        this.node.publishDeviceBirth(addr.node, {
             metrics,
             timestamp:  Date.now(),
             uuid:       UUIDs.Special.FactoryPlus,
@@ -118,9 +119,11 @@ export class SparkplugNode {
         });
     }
 
-    publish_device_alert (device, offline) {
+    async publish_device_alert (monitor, offline) {
         const timestamp = Date.now();
-        this.node.publishDeviceData(device, {
+        const addr = await monitor.address();
+
+        this.node.publishDeviceData(addr.node, {
             metrics: [
                 { name: "Alerts/Offline/Active", type: "Boolean", 
                     value: offline },
@@ -133,18 +136,22 @@ export class SparkplugNode {
         const uuid = monitor.node;
         this.log("Adding Device %s", uuid);
         this.devices.set(uuid, monitor);
-        this.rebirth_device(uuid);
 
-        this.alert_subs.set(uuid,
-            monitor.offline.pipe(rx.distinctUntilChanged())
-                .subscribe(b => this.publish_device_alert(uuid, b)));
+        const subs = new rx.Subscription();
+        this.dev_subs.set(uuid, subs);
+
+        subs.add(monitor.device.address
+            .subscribe(() => this.rebirth_device(uuid)));
+        subs.add(monitor.offline
+            .pipe(rx.distinctUntilChanged())
+            .subscribe(b => this.publish_device_alert(monitor, b)));
     }
 
     remove_device (monitor) {
         const uuid = monitor.node;
         this.log("Removing Device %s", uuid);
-        this.alert_subs.get(uuid)?.unsubscribe();
-        this.alert_subs.delete(uuid);
+        this.dev_subs.get(uuid)?.unsubscribe();
+        this.dev_subs.delete(uuid);
         this.node.publishDeviceDeath(uuid, { timestamp: Date.now() });
         this.devices.delete(uuid);
     }

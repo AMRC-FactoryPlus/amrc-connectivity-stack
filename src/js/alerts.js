@@ -34,10 +34,16 @@ function Alert (props) {
     const { alrt } = props;
 
     console.log("ALERT: %o", alrt);
+    const links = alrt.links.map(l => html`
+        <tr><th>${l.relation}:</th><td>${l.target}</td></tr>
+    `);
     return html`
         <h2>${alrt.type}</h2>
-        <p>Raised by: ${alrt.device}</p>
-        <p>Since: ${date_format.format(alrt.since)}</p>
+        <table>
+            <tr><th>Raised by:</th><td>${alrt.device}</td></tr>
+            <tr><th>Since:</th><td>${date_format.format(alrt.since)}</td></tr>
+            ${links}
+        </table>
     `;
 }
 
@@ -112,6 +118,8 @@ async function fetch_alerts (fplus) {
     const addr = o => fplus.Directory
         .get_device_address(o)
         .then(a => a.toString());
+    const link = u => fplus.Directory.fetch(`v1/link/${u}`)
+        .then(([st, rv]) => st == 200 ? rv : null);
     const unknown = u => `Unknown (${u})`;
     const first = async (v, ...fs) => {
         for (const f of fs) {
@@ -125,10 +133,21 @@ async function fetch_alerts (fplus) {
         const inf = await info(alrt.device);
         if (inf?.deleted) continue;
 
+        const links = [];
+        for (const uuid of alrt.links) {
+            const l = await link(uuid);
+            if (!l) continue;
+            links.push({
+                relation:   await first(l.relation, name, unknown),
+                target:     await first(l.target, name, addr, unknown),
+            });
+        }
+            
         rv.push({
             device:     await first(alrt.device, name, addr, unknown),
             type:       await first(alrt.type, name, unknown),
             since:      new Date(alrt.last_change),
+            links,
         });
     }
     return rv;

@@ -77,7 +77,10 @@ export class Monitor {
         return rxx.k8s_watch({
             k8s,
             kubeconfig:     this.kubeconfig,
-            errors:         e => this.log("SP node watch error: %s", e),
+            errors:         e => {
+                if (!(e instanceof rxx.StoppedError))
+                    this.log("SP node watch error: %s", e);
+            },
             apiVersion:     "factoryplus.app.amrc.co.uk/v1",
             kind:           "SparkplugNode",
             namespace:      this.namespace,

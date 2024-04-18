@@ -27,8 +27,8 @@ spec:
             - name: SERVICE_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: krb5-passwords
-                  key: admin
+                  name: admin-password
+                  key: password
             - name: VERBOSE
               value: ALL,!token,!service
             - name: GIT_CHECKOUTS

@@ -15,6 +15,7 @@ export async function fixups (ss) {
 
     await fixup_null(cdb);
     await fixup_sparkplug_nodes(auth);
+    await fixup_admin_account(cdb, auth);
 }
 
 /* Null was originally registered as a Class, which was wrong.
@@ -46,4 +47,14 @@ async function fixup_sparkplug_nodes (auth) {
         await auth.add_to_group(ACS.Group.SparkplugNode, node);
         await auth.delete_ace(node, Fixup.Role.EdgeNode, node);
     }
+}
+
+async function fixup_admin_account (cdb, auth) {
+    const admin = Fixup.User.Administrator;
+
+    await auth.delete_principal(admin);
+    await auth.remove_from_group(ACS.Group.Administrators, admin)
+        .catch(() => null);
+    await cdb.mark_object_deleted(admin)
+        .catch(() => null);
 }

@@ -1,0 +1,33 @@
+service: !u UUIDs.Service.ConfigDB
+version: 1
+classes:
+  - !u Edge.Class.Alert
+  - !u Edge.Class.LinkRelation
+objects:
+  !u Edge.Class.Alert:
+    - !u Edge.Alert.Agent.Connection
+    - !u Edge.Alert.Agent.ConfigInvalid
+    - !u Edge.Alert.Agent.ConfigFetch
+    - !u Edge.Alert.Monitor.Offline
+    - !u Edge.Alert.Monitor.Reload
+  !u Edge.Class.LinkRelation:
+    - !u Edge.Link.Monitor.Node
+configs:
+  !u UUIDs.App.Info:
+    !u Edge.Class.Alert:
+      name: "Alert type"
+    !u Edge.Class.LinkRelation:
+      name: "Link relation"
+    !u Edge.Alert.Agent.Connection:
+      name: "Edge Agent: Connection problem"
+    !u Edge.Alert.Agent.ConfigInvalid:
+      name: "Edge Agent: Config invalid"
+    !u Edge.Alert.Agent.ConfigFetch:
+      name: "Edge Agent: Config unavailable"
+    !u Edge.Alert.Monitor.Offline:
+      name: "Monitor: Node offline"
+    !u Edge.Alert.Monitor.Reload:
+      name: "Monitor: Node will not reload config"
+
+    !u Edge.Link.Monitor.Node:
+      name: "Monitored Node"

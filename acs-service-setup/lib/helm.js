@@ -45,34 +45,31 @@ class HelmConfig extends ServiceConfig {
 
 async function setup_perms (auth, group) {
     const { ReadConfig, WriteConfig } = UUIDs.Permission.ConfigDB;
-    const { Rebirth } = UUIDs.Permission.CmdEsc;
     const { ReloadConfig } = Edge.Perm;
-    const { EdgeNodeConsumer, GlobalDebugger } = ACS.Role;
+    const { EdgeNodeConsumer } = ACS.Role;
+
+    /* XXX Until we can resolve the issues with dynamic MQTT ACLs,
+     * just grant the Monitors the very big hammer of full
+     * read/rebirth/reload rights. If we settled on SpGroup ==
+     * Cluster we could reduce this to per-Group rights; this would
+     * involve either a per-monitor explicit ACE or a new reflexive
+     * UUID for group access. */
 
     const members = [
         [ACS.Group.SparkplugNode,       group.agent.uuid],
         [ACS.Group.SparkplugNode,       group.monitor.uuid],
+        [ACS.Group.GlobalDebuggers,     group.monitor.uuid],
     ];
     const aces = [
         [group.agent.uuid,      ReadConfig,     Edge.App.AgentConfig],
-        [group.agent.uuid,      ReadConfig,     UUIDs.App.SparkplugAddress],
         [group.sync.uuid,       ReadConfig,     Clusters.App.HelmRelease],
         [group.sync.uuid,       ReadConfig,     Clusters.App.HelmTemplate],
         [group.sync.uuid,       ReadConfig,     Edge.App.Deployment],
         [group.sync.uuid,       ReadConfig,     Edge.App.ClusterStatus],
         [group.sync.uuid,       WriteConfig,    Edge.App.ClusterStatus],
         [group.sync.uuid,       EdgeNodeConsumer, ACS.Device.ConfigDB],
-        [group.monitor.uuid,    ReadConfig,     UUIDs.App.SparkplugAddress],
         [group.monitor.uuid,    ReadConfig,     Edge.App.AgentConfig],
         [group.monitor.uuid,    EdgeNodeConsumer, ACS.Device.ConfigDB],
-        /* XXX Until we can resolve the issues with dynamic MQTT ACLs,
-         * just grant the Monitors the very big hammer of full
-         * read/rebirth/reload rights. If we settled on SpGroup ==
-         * Cluster we could reduce this to per-Group rights; this would
-         * involve either a per-monitor explicit ACE or a new reflexive
-         * UUID for group access. */
-        [group.monitor.uuid,    GlobalDebugger, UUIDs.Special.Null],
-        [group.monitor.uuid,    Rebirth,        UUIDs.Special.Null],
         [group.monitor.uuid,    ReloadConfig,   UUIDs.Special.Null],
     ];
 

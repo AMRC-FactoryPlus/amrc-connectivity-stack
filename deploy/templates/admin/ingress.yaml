@@ -1,0 +1,56 @@
+{{ if .Values.admin.enabled }}
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: admin-ingressroute
+  namespace: default
+spec:
+  entryPoints:
+    - {{ .Values.acs.secure | ternary "websecure" "web" }}
+  routes:
+    - match: Host(`admin.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}`)
+      kind: Rule
+      services:
+        - name: admin
+          port: 80
+          namespace: {{ .Release.Namespace }}
+  {{- if .Values.acs.secure }}
+  tls:
+    secretName: {{ .Values.acs.tlsSecretName | required "values.acs.tlsSecretName is required!" }}
+    domains:
+      - main: admin.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
+  {{- end }}
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: admin-landing
+  namespace: default
+spec:
+  addPrefix:
+    prefix: /landing
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: admin-landing-ingressroute
+  namespace: default
+spec:
+  entryPoints:
+    - {{ .Values.acs.secure | ternary "websecure" "web" }}
+  routes:
+    - match: Host(`{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}`)
+      kind: Rule
+      services:
+        - name: admin
+          port: 80
+          namespace: {{ .Release.Namespace }}
+      middlewares:
+        - name: admin-landing
+  {{- if .Values.acs.secure }}
+  tls:
+    secretName: {{ .Values.acs.tlsSecretName | required "values.acs.tlsSecretName is required!" }}
+    domains:
+      - main: {{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
+  {{- end -}}
+{{- end -}}

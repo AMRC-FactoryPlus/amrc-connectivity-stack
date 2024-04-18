@@ -102,3 +102,15 @@ spec:
   principal: sv1git@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
   secret: git-keytabs/client
 {{- end }}
+---
+{{- if .Values.admin.enabled }}
+apiVersion: factoryplus.app.amrc.co.uk/v1
+kind: KerberosKey
+metadata:
+  name: sv1admin
+  namespace: {{ .Release.Namespace }}
+spec:
+  type: Random
+  principal: sv1admin@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+  secret: admin-keytabs/client
+{{- end }}

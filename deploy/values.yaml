@@ -68,6 +68,14 @@ identity:
       repository: acs-krb-keys-operator
       pullPolicy: IfNotPresent
 
+admin:
+  enabled: true
+  image:
+    registry: ghcr.io/amrc-factoryplus
+    repository: acs-admin
+    pullPolicy: IfNotPresent
+  verbosity: "ALL,!service,!token"
+
 auth:
   # -- Whether or not to enable the Authorisation component
   enabled: true

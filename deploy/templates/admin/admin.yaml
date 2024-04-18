@@ -1,0 +1,70 @@
+{{- if .Values.admin.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: admin
+  namespace: {{ .Release.Namespace }}
+  labels:
+    component: admin
+spec:
+  strategy:
+    type: RollingUpdate
+  replicas: 1
+  selector:
+    matchLabels:
+      component: admin
+  template:
+    metadata:
+      labels:
+        component: admin
+        factory-plus.service: admin
+    spec:
+      volumes:
+        - name: krb5-conf
+          configMap:
+            name: krb5-conf
+        - name: keytabs
+          secret:
+            secretName: admin-keytabs
+
+      containers:
+        - name: admin
+{{ include "amrc-connectivity-stack.image" (list . .Values.admin) | indent 10 }}
+          command: [ "/usr/bin/k5start", "-Uf", "/keytabs/client" ]
+          args: ["node", "bin/admin.js"]
+          env:
+            - name: PORT
+              value: "8080"
+            - name: VERBOSE
+              value: {{.Values.admin.verbosity | quote | required "values.admin.verbosity is required!"}}
+            - name: KRB5_CONFIG
+              value: /config/krb5-conf/krb5.conf
+            - name: SERVER_KEYTAB
+              value: /keytabs/server
+            - name: HOSTNAME
+              value: admin.{{ .Release.Namespace }}.svc.cluster.local
+            - name: REALM
+              value: {{ .Values.identity.realm | required "values.identity.realm is required!" }}
+            - name: DIRECTORY_URL
+              value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
+            - name: EXTERNAL_DOMAIN
+              value: {{ .Values.acs.baseUrl | quote }}
+          volumeMounts:
+            - mountPath: /config/krb5-conf
+              name: krb5-conf
+            - mountPath: /keytabs
+              name: keytabs
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: admin
+  namespace: {{ .Release.Namespace }}
+spec:
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+  selector:
+    factory-plus.service: admin
+{{- end -}}

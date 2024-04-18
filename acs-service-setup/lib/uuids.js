@@ -100,6 +100,9 @@ export const Fixup = {
     Role: {
         EdgeNode:           "87e4a5b7-9a89-4796-a216-39666a47b9d2",
     },
+    User: {
+        Administrator:      "d53f476a-29dd-4d79-b614-5b7fe9bc8acf",
+    },
 };
 
 export const Git = {

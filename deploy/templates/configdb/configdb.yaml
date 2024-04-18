@@ -51,8 +51,8 @@ spec:
             - name: PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: krb5-passwords
-                  key: admin
+                  name: admin-password
+                  key: password
           command: [ 'sh', '-c', 'until curl -X PUT -o /dev/null -w "%{http_code}" -u "admin:${PASSWORD}" -H "Content-Type: application/json" --data-raw "{ \"url\": \"http://configdb.{{.Release.Namespace}}.svc.cluster.local\" }" http://directory.{{.Release.Namespace}}.svc.cluster.local/v1/service/af15f175-78a0-4e05-97c0-2a0bb82b9f3b/advertisment/36861e8d-9152-40c4-8f08-f51c2d7e3c25 | grep -E "2[0-9]{2}" > /dev/null; do sleep 10; done' ]
         - name: db-init
 {{ include "amrc-connectivity-stack.image" (list . .Values.configdb) | indent 10 }}

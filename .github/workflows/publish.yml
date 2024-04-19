@@ -20,7 +20,9 @@ jobs:
       id-token: write
     strategy:
       matrix:
-        type: [ "js-build", "js-run" ]
+        type: 
+          - js-build
+          - js-run
     steps:
       - name: Check if build required
         id: check
@@ -150,9 +152,20 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        service: [ 'acs-admin', 'acs-cluster-manager', 'acs-cmdesc', 'acs-monitor', 'acs-edge-sync', 'acs-git',
-                   'acs-identity', 'acs-krb-keys-operator', 'acs-krb-utils', 'acs-service-setup', 'acs-visualiser',
-                   'influxdb-sparkplug-ingester', 'acs-activity-monitor']
+        service: 
+          - acs-activity-monitor
+          - acs-admin
+          - acs-cluster-manager
+          - acs-cmdesc
+          - acs-edge-sync
+          - acs-git
+          - acs-identity
+          - acs-krb-keys-operator
+          - acs-krb-utils
+          - acs-monitor
+          - acs-service-setup
+          - acs-visualiser
+          - influxdb-sparkplug-ingester
     permissions:
       contents: read
       packages: write
@@ -191,7 +204,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        service: [ 'acs-edge' ]
+        service:
+          - acs-edge
     permissions:
       contents: read
       packages: write
@@ -231,7 +245,10 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        service: [ 'acs-auth', 'acs-directory', 'acs-configdb' ]
+        service: 
+          - acs-auth
+          - acs-configdb
+          - acs-directory
     permissions:
       contents: read
       packages: write

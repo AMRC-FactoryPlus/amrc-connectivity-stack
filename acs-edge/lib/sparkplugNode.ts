@@ -73,6 +73,7 @@ class InstanceBuilder {
 export class SparkplugNode extends (
     EventEmitter
 ) {
+    #fplus: ServiceClient
     #conf: sparkplugConfig
     #client: any
     #metrics: Metrics
@@ -84,15 +85,20 @@ export class SparkplugNode extends (
 
     constructor(fplus: ServiceClient, conf: sparkplugConfig) {
         super();
+        this.#fplus = fplus;
         this.#conf = conf;
 
+        this.isOnline = false; // Whether client is online or not
+    }
+
+    async init () {
          // Generate randomized client ID
         const address = conf.address;
         const clientId = address.group + '-' + address.node + '-' 
             + (Math.random() * 1e17).toString(36);
 
         // conf.keepalive = 10;
-        this.#client = await fplus.MQTT.basic_sparkplug_node({
+        this.#client = await this.#fplus.MQTT.basic_sparkplug_node({
             address,
             clientId,
             publishDeath:   true,
@@ -181,11 +187,12 @@ export class SparkplugNode extends (
                 UUIDs.Alert.ConfigInvalid, "Config_Invalid",
                 this.#conf.alerts?.configInvalid ?? false),
         ]);
-        this.isOnline = false; // Whether client is online or not
         this.#metricBuffer = {}; // Buffer to hold metrics when periodic publishing enabled
         this.#pubIntHandle = setTimeout(() => {
         }, 1); // Handle for publish interval
         this.#aliasCounter = 0; // Counter to keep track of metrics aliases for this Edge Node
+
+        return this;
     }
 
     /**

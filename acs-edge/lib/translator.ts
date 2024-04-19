@@ -86,7 +86,7 @@ export class Translator extends EventEmitter {
             };
 
             // Create sparkplug node
-            this.sparkplugNode = new SparkplugNode(this.fplus, spConf);
+            this.sparkplugNode = await new SparkplugNode(this.fplus, spConf).init();
             log(`Created Sparkplug node "${ids.sparkplug!}".`);
 
             // Create a new device connection for each type listed in config file

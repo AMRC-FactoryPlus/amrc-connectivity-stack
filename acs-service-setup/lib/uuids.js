@@ -111,6 +111,7 @@ export const Edge = {
     },
     Link: {
         Monitor: {
+            Cluster:        "422d47e0-8761-43da-abd4-4f2adaef0d4a",
             Node:           "ec916189-f4f9-4fc7-af7e-724cc216e9e9",
         },
     },

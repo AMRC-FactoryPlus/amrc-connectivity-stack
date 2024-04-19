@@ -11,6 +11,7 @@ objects:
     - !u Edge.Alert.Monitor.Offline
     - !u Edge.Alert.Monitor.Reload
   !u Edge.Class.LinkRelation:
+    - !u Edge.Link.Monitor.Cluster
     - !u Edge.Link.Monitor.Node
 configs:
   !u UUIDs.App.Info:
@@ -18,6 +19,7 @@ configs:
       name: "Alert type"
     !u Edge.Class.LinkRelation:
       name: "Link relation"
+
     !u Edge.Alert.Agent.Connection:
       name: "Edge Agent: Connection problem"
     !u Edge.Alert.Agent.ConfigInvalid:
@@ -29,5 +31,7 @@ configs:
     !u Edge.Alert.Monitor.Reload:
       name: "Monitor: Node will not reload config"
 
+    !u Edge.Link.Monitor.Cluster:
+      name: "Monitored cluster"
     !u Edge.Link.Monitor.Node:
       name: "Monitored Node"

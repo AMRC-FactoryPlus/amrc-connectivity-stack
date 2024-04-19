@@ -8,12 +8,9 @@ RUN bun run build
 RUN rm -rf node_modules
 
 # production stage
-FROM nginx:stable-alpine as production-stage
-COPY --from=build-stage /app/dist /usr/share/nginx/html
-
-# Echo listen 8080 to a new file /etc/nginx/templates/default.conf.template
-RUN mkdir -p /etc/nginx/templates
-RUN echo "listen 8080;" > /etc/nginx/templates/default.conf.template
-
+FROM node:alpine as production-stage
+WORKDIR /app
+COPY --from=build-stage /app/dist /app
+RUN npm install -g serve
 EXPOSE 8080
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["serve", "-s", ".", "-l", "8080"]

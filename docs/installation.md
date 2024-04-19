@@ -57,6 +57,8 @@ Next, create a `values.yaml` file in a sensible location on your local machine. 
 acs:
   baseUrl: factoryplus.myorganisation.com # Set this to the domain that ACS will be served from. This should be the same as the wildcard DNS entry you created earlier.
   organisation: MYORGANISATION # Set this to the name of your organisation. It will be used across the deployment for branding and naming.
+  letsEncrypt:
+    email: factoryplus@myorganisation.co.uk
 identity:
   realm: FACTORYPLUS.MYORGANISATION.COM # Set the identity realm for the deployment. This is used to namespace the identity server and should be unique to your deployment. It is recommended that you use the baseUrl in capitals for this value.
 ```

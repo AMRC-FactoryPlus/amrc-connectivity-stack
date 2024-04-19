@@ -26,6 +26,7 @@ https://github.com/AMRC-FactoryPlus/amrc-connectivity-stack/blob/main/README.md
 ╚══════════════╝
 
 Visualiser: {{ .Values.acs.secure | ternary "https://" "http://" }}visualiser.{{.Values.acs.baseUrl}}
+Activity Monitor: {{ .Values.acs.secure | ternary "https://" "http://" }}activity.{{.Values.acs.baseUrl}}
 Manager: {{ .Values.acs.secure | ternary "https://" "http://" }}manager.{{.Values.acs.baseUrl}}
 MQTT: {{ .Values.acs.secure | ternary "mqtts://" "mqtt://" }}mqtt.{{.Values.acs.baseUrl}}:{{ .Values.acs.secure | ternary "8883" "1883" }}
 Grafana: {{ .Values.acs.secure | ternary "https://" "http://" }}grafana.{{.Values.acs.baseUrl}}

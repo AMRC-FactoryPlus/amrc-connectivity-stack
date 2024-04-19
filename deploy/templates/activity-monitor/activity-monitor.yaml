@@ -1,0 +1,43 @@
+{{- if .Values.activityMonitor.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: activity-monitor
+  namespace: {{ .Release.Namespace }}
+  labels:
+    component: activity-monitor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: activity-monitor
+  template:
+    metadata:
+      labels:
+        component: activity-monitor
+        factory-plus.service: activity-monitor
+    spec:
+      {{- with .Values.acs.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: web
+          env:
+            - name: PORT
+              value: "8080"
+{{ include "amrc-connectivity-stack.image" (list . .Values.activityMonitor) | indent 10 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: activity-monitor
+  namespace: {{ .Release.Namespace }}
+spec:
+  ports:
+    - name: "web"
+      port: 80
+      targetPort: 8080
+  selector:
+    factory-plus.service: activity-monitor
+{{- end -}}

@@ -10,7 +10,7 @@ import k8s          from "@kubernetes/client-node";
 
 import * as rxx     from "@amrc-factoryplus/rx-util";
 
-import { NodeMonitor, NodeSpec }    from "./node.js";
+import { NodeMonitor, NodeSpec }    from "./monitor.js";
 
 const SecretStatus = imm.Record({
     uuid:           null,

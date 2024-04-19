@@ -420,4 +420,4 @@ influxdb2:
     create: false
 
 cert-manager:
-  installCRDs: true
+  fullnameOverride: "cert-manager"

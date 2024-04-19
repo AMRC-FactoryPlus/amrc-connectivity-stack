@@ -37,7 +37,7 @@ export class SparkplugNode {
         this.online.subscribe(b => this.log("MQTT %sline", b ? "on" : "off"));
 
         await this.find_ids();
-        this.connect_sparkplug();
+        await this.connect_sparkplug();
 
         /* This subscribes to the ConfigDB and must come after the
          * Sparkplug initialisation */
@@ -58,7 +58,7 @@ export class SparkplugNode {
             ));
     }
 
-    connect_sparkplug () {
+    async connect_sparkplug () {
         const { ids, fplus } = this;
 
         const cli = await fplus.MQTT.basic_sparkplug_node({

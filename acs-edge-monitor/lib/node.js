@@ -51,6 +51,10 @@ export class NodeMonitor {
         return this;
     }
 
+    address () {
+        return rx.firstValueFrom(this.device.address);
+    }
+
     checks () {
         const reporter = this.operator.sparkplug;
 

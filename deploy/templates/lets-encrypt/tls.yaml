@@ -5,7 +5,7 @@ metadata:
   name: letsencrypt
 spec:
   acme:
-    server: {{ ternary .Values.acs.letsEncrypt.staging "https://acme-staging-v02.api.letsencrypt.org/directory" "https://acme-v02.api.letsencrypt.org/directory" }}
+    server: {{ ternary "https://acme-staging-v02.api.letsencrypt.org/directory" "https://acme-v02.api.letsencrypt.org/directory" .Values.acs.letsEncrypt.staging }}
     email: {{.Values.acs.letsEncrypt.email}}
     privateKeySecretRef:
       name: letsencrypt

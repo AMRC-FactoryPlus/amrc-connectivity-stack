@@ -1,6 +1,6 @@
 /*
  * ACS Edge Monitor service
- * Main entry point
+ * Edge monitor entry point
  * Copyright 2023 AMRC
  */
 

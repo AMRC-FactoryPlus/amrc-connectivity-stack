@@ -1,0 +1,9 @@
+<div id="alerts">
+    <p>Loading...
+</div>
+<script type="text/javascript">
+    console.log("Running app");
+    const alerts = document.getElementById("alerts");
+    AMRC_FactoryPlus.alerts.then(app =>
+        app.run(alerts, "{{acs.directory}}"));
+</script>

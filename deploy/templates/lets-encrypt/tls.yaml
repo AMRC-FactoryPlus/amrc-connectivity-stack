@@ -1,0 +1,42 @@
+{{ if .Values.acs.letsEncrypt.enabled -}}
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: {{.Values.acs.letsEncrypt.email}}
+    privateKeySecretRef:
+      name: letsencrypt
+    solvers:
+      - http01:
+          ingress:
+            class: traefik
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ .Values.acs.tlsSecretName }}
+  namespace: default
+spec:
+  secretName: {{ .Values.acs.tlsSecretName }}
+  privateKey:
+    rotationPolicy: Always
+  dnsNames:
+    - {{ .Values.acs.baseUrl}}
+    - visualiser.{{ .Values.acs.baseUrl}}
+    - auth.{{ .Values.acs.baseUrl}}
+    - clusters.{{ .Values.acs.baseUrl}}
+    - cmdesc.{{ .Values.acs.baseUrl}}
+    - configdb.{{ .Values.acs.baseUrl}}
+    - data.{{ .Values.acs.baseUrl}}
+    - directory.{{ .Values.acs.baseUrl}}
+    - git.{{ .Values.acs.baseUrl}}
+    - grafana.{{ .Values.acs.baseUrl}}
+    - manager.{{ .Values.acs.baseUrl}}
+    - mqtt.{{ .Values.acs.baseUrl}}
+  issuerRef:
+    name: letsencrypt
+    kind: ClusterIssuer
+{{- end }}

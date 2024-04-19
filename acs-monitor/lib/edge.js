@@ -1,5 +1,4 @@
-/*
- * ACS Edge Monitor
+/* ACS Edge Monitor
  * Monitor class
  * Copyright 2023 AMRC
  */

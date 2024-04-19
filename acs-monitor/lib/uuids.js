@@ -5,7 +5,8 @@
  */
 
 export const App = {
-    AgentConfig: "aac6f843-cfee-4683-b121-6943bfdf9173",
+    AgentConfig:        "aac6f843-cfee-4683-b121-6943bfdf9173",
+    ClusterStatus:      "747a62c9-1b66-4a2e-8dd9-0b70a91b6b75",
 };
 
 export const Schema = {

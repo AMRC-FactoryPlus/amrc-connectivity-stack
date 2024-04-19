@@ -146,10 +146,19 @@ mqtt:
 visualiser:
   enabled: true
   image:
-    # -- The registry of the MQTT component
+    # -- The registry of the visualiser component
     registry: ghcr.io/amrc-factoryplus
-    # -- The repository of the MQTT component
+    # -- The repository of the visualiser component
     repository: acs-visualiser
+    pullPolicy: IfNotPresent
+
+activityMonitor:
+  enabled: true
+  image:
+    # -- The registry of the activity monitor component
+    registry: ghcr.io/amrc-factoryplus
+    # -- The repository of the activity monitor component
+    repository: acs-activity-monitor
     pullPolicy: IfNotPresent
 
 manager:

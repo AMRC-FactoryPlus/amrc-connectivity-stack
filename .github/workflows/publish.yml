@@ -152,7 +152,7 @@ jobs:
       matrix:
         service: [ 'acs-cluster-manager', 'acs-cmdesc', 'acs-edge-monitor', 'acs-edge-sync', 'acs-git',
                    'acs-identity', 'acs-krb-keys-operator', 'acs-krb-utils', 'acs-service-setup', 'acs-visualiser',
-                   'influxdb-sparkplug-ingester']
+                   'influxdb-sparkplug-ingester', 'acs-activity-monitor']
     permissions:
       contents: read
       packages: write

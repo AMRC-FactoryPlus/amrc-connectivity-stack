@@ -89,12 +89,16 @@ export class SparkplugNode extends (
         this.#conf = conf;
 
         /* XXX This is about to be overwritten by .init(). But TS
-         * insists we initialise here. */
+         * insists we initialise here. Making it nullable just causes
+         * mess everywhere. */
         this.#metrics = new Metrics([]);
         this.#metricNameIndex = {};
         this.#metricBuffer = {}; // Buffer to hold metrics when periodic publishing enabled
         this.#aliasCounter = 0; // Counter to keep track of metrics aliases for this Edge Node
-        this.#pubIntHandle = 0;
+        /* XXX This is awful. But it's the only way to get the right
+         * type, and again we really don't want this nullable. */
+        this.#pubIntHandle = setTimeout(() => {
+        }, 1); // Handle for publish interval
 
         this.isOnline = false; // Whether client is online or not
     }
@@ -194,8 +198,6 @@ export class SparkplugNode extends (
                 UUIDs.Alert.ConfigInvalid, "Config_Invalid",
                 this.#conf.alerts?.configInvalid ?? false),
         ]);
-        this.#pubIntHandle = setTimeout(() => {
-        }, 1); // Handle for publish interval
 
         return this;
     }

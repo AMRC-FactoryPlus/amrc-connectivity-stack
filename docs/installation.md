@@ -21,11 +21,16 @@ This Chart creates a load balancer on your Kubernetes cluster that exposes all s
 
 ### Configure TLS
 
-#### Production deployment
+If `acs.letsEncrypt.enabled` is true (default) then ACS will utilise `cert-manager` and Let's Encrypt to automatically issue and renew TLS certificates for your ACS installation. Please note that the cluster will need internet access for this to work. If you intend on utilising Let's Encrypt to handle certificates for you then you need to ensure that the cert-manager CRDs are installed onto your cluster.
 
-If `acs.letsEncrypt.enabled` is true (default) then ACS will utilise `cert-manager` and Let's Encrypt to automatically issue and renew TLS certificates for your ACS installation. Please note that the cluster will need internet access for this to work.
+```bash
+kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.14.4/cert-manager.crds.yaml
+```
 
 > Please ensure that you set a valid email address in `acs.letsEncrypt.email` before installing.
+
+#### Bringing your own certificate
+If you'd prefer to use your own certificate, create a wildcard TLS secret in your namespace with the name of `acs.tlsSecretName` (`factoryplus-tls` by default) and set the `acs.letsEncrypt.enabled` value to `false`.
 
 #### Development (insecure) deployment
 

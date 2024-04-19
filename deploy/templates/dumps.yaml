@@ -102,11 +102,9 @@
 {{$permissionGroup_git := "c0c55c78-116e-4526-8ff4-e4595251f76c" | quote}}
 {{$permissionGroup_clusterManager := "9e07fd33-6400-4662-92c4-4dff1f61f990" | quote}}
 
-{{$role_administrator := "4c09402f-9923-4c82-a6f2-02bda21aace4" | quote}}
 {{$role_commandEscalation := "dbd0c099-6c59-4bc6-aa92-4ba8a9b543f4" | quote}}
 {{$role_edgeNode := "87e4a5b7-9a89-4796-a216-39666a47b9d2" | quote}}
 {{$role_edgeNodeConsumer := "17a64293-b82d-4db4-af4d-63359bb62934" | quote}}
-{{$role_globalDebugger := "4473fe9c-05b0-42cc-ad8c-8e05f6d0ca86" | quote}}
 {{$role_globalPrimaryApplication := "c0d17bcf-2a90-40e5-b244-07bf631f7417" | quote}}
 {{$role_warehouse := "6958c812-fbe2-4e6c-b997-6f850b89f679" | quote}}
 
@@ -133,9 +131,7 @@
 {{$serviceAccount_krbkeys := "a04b4195-7db4-4480-b3f3-4d22c08b96ea" | quote}}
 {{$serviceAccount_git := "626df296-8156-4c67-8aed-aac70161aa8b" | quote}}
 {{$serviceAccount_clusterManager := "127cde3c-773a-4f61-b0ba-7412a2695253" | quote}}
-{{$userGroup_administrators := "10fc06b7-02f5-45f1-b419-a486b6bc13ba" | quote}}
 {{$userGroup_sparkplugNode := "1d3121a0-aade-4376-8fa3-57ba1460ba76" | quote}}
-{{$user_admin := "d53f476a-29dd-4d79-b614-5b7fe9bc8acf" | quote}}
 
 {{ if .Values.configdb.enabled }}
 apiVersion: v1
@@ -183,19 +179,11 @@ data:
           {{$service_manager}}
         ],
         {{$classDef_clientRole}}: [
-          {{$role_administrator}},
           {{$role_edgeNodeConsumer}},
-          {{$role_globalDebugger}},
           {{$role_edgeNode}},
           {{$role_globalPrimaryApplication}},
           {{$role_commandEscalation}},
           {{$role_warehouse}}
-        ],
-        {{$classDef_userAccount}}: [
-          {{$user_admin}}
-        ],
-        {{$classDef_userGroup}}: [
-          {{$userGroup_administrators}}
         ],
         {{$classDef_permission}}: [
           {{$permission_auth_manageKerberosMappings}},
@@ -273,21 +261,6 @@ data:
           {{$classDef_clientRole}}: {
             "name": "Client Role"
           },
-          {{$classDef_userAccount}}: {
-            "name": "User Account"
-          },
-          {{$classDef_userGroup}}: {
-            "name": "User Group"
-          },
-          {{$role_administrator}}: {
-            "name": "Role: Administrator"
-          },
-          {{$user_admin}}: {
-            "name": "Global Administrator Account"
-          },
-          {{$userGroup_administrators}}: {
-            "name": "Administrators"
-          },
           {{$classDef_permission}}: {
             "name": "Permission"
           },
@@ -341,9 +314,6 @@ data:
           },
           {{$role_edgeNodeConsumer}}: {
             "name": "Role: Edge Node Consumer"
-          },
-          {{$role_globalDebugger}}: {
-            "name": "Role: Global Debugger"
           },
           {{$role_edgeNode}}: {
             "name": "Role: Edge Node"
@@ -901,16 +871,6 @@ data:
       "version": 1,
       "aces": [
         {
-          "principal": {{$userGroup_administrators}},
-          "permission": {{$role_administrator}},
-          "target": {{$special_wildcard}}
-        },
-        {
-          "principal": {{$userGroup_administrators}},
-          "permission": {{$permissionGroup_directory}},
-          "target": {{$special_wildcard}}
-        },
-        {
           "principal": {{$userGroup_sparkplugNode}},
           "permission": {{$permission_mqtt_participateAsNode}},
           "target": {{$special_self}}
@@ -1122,11 +1082,6 @@ data:
         }
       ],
       "groups": {
-        {{$role_administrator}}: [
-          {{$role_globalDebugger}},
-          {{$permissionGroup_authorisation}},
-          {{$permissionGroup_configStore}}
-        ],
         {{$role_edgeNodeConsumer}}: [
           {{$permission_mqtt_subscribeReadNode}},
           {{$permission_ccl_rebirth}}
@@ -1167,9 +1122,6 @@ data:
           {{$permission_auth_manageKerberosMappings}},
           {{$permission_auth_readKerberosMapping}}
         ],
-        {{$role_globalDebugger}}: [
-          {{$permission_mqtt_subscribeReadWholeNamespace}}
-        ],
         {{$permissionGroup_mqtt}}: [
           {{$permission_mqtt_subscribeReadNode}},
           {{$permission_mqtt_subscribeToWholeNamespace}},
@@ -1192,9 +1144,6 @@ data:
           {{$permission_configStore_manageObjects}},
           {{$permission_configStore_deleteObjects}}
         ],
-        {{$userGroup_administrators}}: [
-          {{$user_admin}}
-        ],
         {{$userGroup_sparkplugNode}}: [
           {{$serviceAccount_directory}},
           {{$serviceAccount_configStore}},
@@ -1202,10 +1151,6 @@ data:
         ]
       },
       "principals": [
-        {
-          "uuid": {{$user_admin}},
-          "kerberos": "admin@{{ .Values.identity.realm }}"
-        },
         {
           "uuid": {{$serviceAccount_directory}},
           "kerberos": "sv1directory@{{ .Values.identity.realm }}"
@@ -1290,9 +1235,6 @@ data:
           ],
           {{$userGroup_sparkplugNode}}: [
             {{$serviceAccount_git}}
-          ],
-          {{$role_administrator}}: [
-            {{$permissionGroup_git}}
           ]
       },
       "aces": [
@@ -1455,9 +1397,6 @@ data:
       "groups": {
         {{$serviceRequirement_edgeDeploymentServiceAccount}}: [
           {{$serviceAccount_clusterManager}}
-        ],
-        {{$role_administrator}}: [
-          {{$permissionGroup_clusterManager}}
         ]
       }
     }

@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>{{page.title}} @ {{acs.domain}}</title>
+    {{#each page.style ~}}
+        <link rel=stylesheet href="/css/{{this}}.css">
+    {{~/each}}
+  </head>
+
+  <body>
+    {{#each page.script ~}}
+        <script src="/js/{{this}}.js"></script>
+    {{~/each}}
+
+    <h1>{{page.title}} @ {{acs.domain}}</h1>
+
+    {{{body}}}
+
+  </body>
+</html>
+{{! vi:set ft=html: }}

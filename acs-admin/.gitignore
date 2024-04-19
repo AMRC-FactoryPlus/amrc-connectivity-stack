@@ -1,0 +1,23 @@
+/node_modules/
+package-lock.json
+
+# Vim swap
+*.swp
+
+# Environment
+.env
+config.mk
+
+# Webpack
+public/js
+
+# Secrets
+/keytabs/
+/volumes/
+
+# Random tempdir
+/tmp/
+
+# IDE
+.idea/
+/public/output.css

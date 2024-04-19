@@ -3,7 +3,7 @@ apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
   name: admin-ingressroute
-  namespace: default
+  namespace: {{ .Release.Namespace }}
 spec:
   entryPoints:
     - {{ .Values.acs.secure | ternary "websecure" "web" }}
@@ -25,7 +25,7 @@ apiVersion: traefik.io/v1alpha1
 kind: Middleware
 metadata:
   name: admin-landing
-  namespace: default
+  namespace: {{ .Release.Namespace }}
 spec:
   addPrefix:
     prefix: /landing
@@ -34,7 +34,7 @@ apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
   name: admin-landing-ingressroute
-  namespace: default
+  namespace: {{ .Release.Namespace }}
 spec:
   entryPoints:
     - {{ .Values.acs.secure | ternary "websecure" "web" }}

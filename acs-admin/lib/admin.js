@@ -89,7 +89,7 @@ export class Admin {
         return res.format({
             html: async () => {
                 const url = Object.fromEntries(
-                    ["admin", "manager", "visualiser"]
+                    ["activity", "admin", "manager", "visualiser"]
                     .map(h => [h, `${acs.http}://${h}.${acs.domain}`]));
                 url.mqtt = await this.external(req, UUIDs.Service.MQTT);
                 res.render("landing", {

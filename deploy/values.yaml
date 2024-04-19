@@ -5,6 +5,11 @@ acs:
   baseUrl: factoryplus.myorganisation.com
   # -- Whether or not services should be served over HTTPS
   secure: true
+  # -- Whether or not to use Let's Encrypt to automatically generate
+  # certificates for the services
+  letsEncrypt:
+    enabled: true
+    email: ''
   # -- The name of the secret holding the wildcard certificate for the
   # above domain. It will be used for every service unless that service
   # specifies its own tlsSecretName.
@@ -278,8 +283,6 @@ kubegres:
 traefik:
   enabled: true
   ports:
-    web:
-      expose: false
     mqtt:
       port: 1883
       expose: false
@@ -393,3 +396,6 @@ influxdb2:
         influx v1 dbrp create --bucket-id ${DOCKER_INFLUXDB_INIT_BUCKET_ID} --db default --rp default --default --org ${DOCKER_INFLUXDB_INIT_ORG}
   pdb:
     create: false
+
+cert-manager:
+  installCRDs: true

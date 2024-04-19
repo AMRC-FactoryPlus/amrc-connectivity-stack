@@ -17,17 +17,23 @@ Kubectl is a command-line tool for controlling Kubernetes clusters. It must be i
 
 ### Configure DNS
 
-This Chart creates a load balancer on your Kubernetes cluster that exposes all services at various subdomains. Please ensure that you have a wildcard DNS entry configured to direct all `*.<baseURL>` requests to your Kubernetes cluster.
+This Chart creates a load balancer on your Kubernetes cluster that exposes all services at various subdomains. Please ensure that you have both a wildcard DNS `A Record` configured to direct all `*.<baseURL>` requests and a root `A Record` to direct all `<baseURL>` requests to your load balancer IP.
 
 ### Configure TLS
 
 #### Production deployment
 
-If `acs.secure` is set to `true` in your deployment (enabled by default) then you must also create a wildcard TLS secret on the cluster in the`default` namespace with the same name as the value specified in `acs.tlsSecretName` _before_ installing ACS. The TLS certificate must be valid for all domains covered by the wildcard DNS entry.
+If `acs.letsEncrypt.enabled` is true (default) then ACS will utilise `cert-manager` and Let's Encrypt to automatically issue and renew TLS certificates for your ACS installation. Please note that the cluster will need internet access for this to work.
+
+> Please ensure that you set a valid email address in `acs.letsEncrypt.email` before installing.
 
 #### Development (insecure) deployment
 
-To deploy a development/testing instance without TLS set `acs.secure` to `false` and ensure that you update the `traefik.ports.web.expose` and `traefik.ports.mqtt.expose` values to `true` in your `values.yaml` file.
+To deploy a development/testing instance without TLS set:
+
+- `acs.secure` to `false`
+- `acs.letsEncrypt.enabled` to `false`
+- `traefik.ports.mqtt.expose` to `true`
 
 ## Install ACS
 

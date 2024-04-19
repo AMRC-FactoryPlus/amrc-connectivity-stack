@@ -88,12 +88,20 @@ export class SparkplugNode extends (
         this.#fplus = fplus;
         this.#conf = conf;
 
+        /* XXX This is about to be overwritten by .init(). But TS
+         * insists we initialise here. */
+        this.#metrics = new Metrics([]);
+        this.#metricNameIndex = {};
+        this.#metricBuffer = {}; // Buffer to hold metrics when periodic publishing enabled
+        this.#aliasCounter = 0; // Counter to keep track of metrics aliases for this Edge Node
+        this.#pubIntHandle = 0;
+
         this.isOnline = false; // Whether client is online or not
     }
 
     async init () {
          // Generate randomized client ID
-        const address = conf.address;
+        const address = this.#conf.address;
         const clientId = address.group + '-' + address.node + '-' 
             + (Math.random() * 1e17).toString(36);
 
@@ -127,7 +135,6 @@ export class SparkplugNode extends (
         this.#client.on("error", (err: Error) => this.onError(err));
         // What to do when the client connection is closed
         this.#client.on("close", () => this.onClose());
-        this.#metricNameIndex = {};
         // Default Edge Node metrics
         const builder = new InstanceBuilder(this.#conf.uuid);
         this.#metrics = new Metrics([
@@ -187,10 +194,8 @@ export class SparkplugNode extends (
                 UUIDs.Alert.ConfigInvalid, "Config_Invalid",
                 this.#conf.alerts?.configInvalid ?? false),
         ]);
-        this.#metricBuffer = {}; // Buffer to hold metrics when periodic publishing enabled
         this.#pubIntHandle = setTimeout(() => {
         }, 1); // Handle for publish interval
-        this.#aliasCounter = 0; // Counter to keep track of metrics aliases for this Edge Node
 
         return this;
     }

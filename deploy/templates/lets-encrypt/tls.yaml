@@ -1,6 +1,6 @@
 {{ if .Values.acs.letsEncrypt.enabled -}}
 apiVersion: cert-manager.io/v1
-kind: ClusterIssuer
+kind: Issuer
 metadata:
   name: letsencrypt
 spec:
@@ -38,5 +38,5 @@ spec:
     - mqtt.{{ .Values.acs.baseUrl}}
   issuerRef:
     name: letsencrypt
-    kind: ClusterIssuer
+    kind: Issuer
 {{- end }}

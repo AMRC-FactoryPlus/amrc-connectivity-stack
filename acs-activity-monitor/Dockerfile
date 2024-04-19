@@ -3,7 +3,6 @@ FROM oven/bun:latest as build-stage
 WORKDIR /app
 COPY package*.json ./
 RUN bun install --immutable --immutable-cache --check-cache
-RUN sed -i~ -e'/GSS = await/{N;s/\n//}' /app/node_modules/@amrc-factoryplus/service-client/lib/deps.js
 COPY . /app/
 RUN bun run build
 RUN rm -rf node_modules

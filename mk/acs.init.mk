@@ -15,7 +15,9 @@ mk=${top}/mk
 all:
 
 build: lint
+	@: build
 
 lint:
+	@: lint
 
 endif

@@ -26,14 +26,25 @@ subdirs+=deploy
 #subdirs+=hivemq-krb
 subdirs+=influxdb-sparkplug-ingester
 
-# This is where I really miss a better make...
-.PHONY: all build lint
+.PHONY: recurse sd.build sd.lint
 
-all:
-	+for d in ${subdirs}; do echo [$$d]; ${MAKE} -C $$d all; done
+recurse:
+	+for d in ${subdirs}; do \
+		echo [$$d]; \
+		${MAKE} -C $$d ${sd.targ}; \
+	done
 
-build:
-	+for d in ${subdirs}; do echo [$$d]; ${MAKE} -C $$d build; done
+all: sd.all
 
-lint:
-	+for d in ${subdirs}; do echo [$$d]; ${MAKE} -C $$d lint; done
+sd.all:
+	+${MAKE} sd.targ=all recurse
+
+build: sd.build
+
+sd.build:
+	+${MAKE} sd.targ=build recurse
+
+lint: sd.lint
+
+sd.lint:
+	+${MAKE} sd.targ=lint recurse

@@ -16,12 +16,14 @@ build_args+= 	--build-arg version=${tag.version}
 
 include ${mk}/acs.git.mk
 
-.PHONY: build push
+.PHONY: img.build push
 
 all: build push
 
 # Yuck. This is where I miss BSD make...
-build: git.prepare
+build: git.prepare img.build
+
+img.build:
 	for i in ${images}; do \
 	    t="${tag.base}-$$i:${tag.version}"; \
 	    docker build -t $$t -f Dockerfile.$$i ${build_args} .; \

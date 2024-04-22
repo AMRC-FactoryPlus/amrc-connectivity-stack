@@ -17,11 +17,13 @@ build_args+=	--build-arg revision="${git.tag} (${git.sha})"
 # has changed, or even to retag an existing image from the same
 # source...
 
-.PHONY: build push run
+.PHONY: dkr.build push run
 
 all: build push
 
-build: git.prepare
+build: git.prepare dkr.build
+
+dkr.build:
 	docker build -t "${tag}" ${build_args} .
 
 push:

@@ -113,4 +113,12 @@ spec:
   type: Random
   principal: sv1monitor@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
   secret: monitor-keytabs/client
+  account:
+    class: e463b4ae-a322-46cc-8976-4ba76838e908
+    name: Central Monitor
+    groups:
+      - 1bc3dbca-68fe-48d2-9590-3a528c111827
+    sparkplug:
+      group: {{ .Values.acs.organisation }}-Service-Core
+      node: Monitor
 {{- end }}

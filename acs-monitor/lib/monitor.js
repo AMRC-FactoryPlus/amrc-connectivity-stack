@@ -8,7 +8,7 @@ import imm          from "immutable";
 import duration     from "parse-duration";
 import rx           from "rxjs";
 
-import { UUIDs }            from "@amrc-factoryplus/utilities";
+import { UUIDs }            from "@amrc-factoryplus/service-client";
 import * as rxx             from "@amrc-factoryplus/rx-util";
 
 import { App }              from "./uuids.js";
@@ -82,8 +82,8 @@ export class NodeMonitor {
             rx.mergeAll(),
             /* Inform the Sparkplug Node */
             rx.tap({
-                subscribe:  () => reporter.add_device(this),
-                finalize:   () => reporter.remove_device(this),
+                subscribe:  () => reporter?.add_device(this),
+                finalize:   () => reporter?.remove_device(this),
             }),
         );
     }
@@ -99,6 +99,10 @@ export class NodeMonitor {
                 app.watch_address(addr.child_device("+")))),
             rx.tap({ error: e => this.log("Can't watch: %s", e) }),
             rx.retry({ delay: 10000 }),
+            rx.tap({
+                subscribe:  () => this.log("ALL_P sub %s", this.node),
+                finalize:   () => this.log("ALL_P final %s", this.node),
+            }),
             rx.share(),
         );
     }
@@ -114,14 +118,18 @@ export class NodeMonitor {
 
         return this.all_pkts.pipe(
             rx.timeout({ first, each }),
+            rx.tap({finalize: () => this.log("LIVE ALL_P FINAL %s", this.node)}),
             rx.retry({ 
                 delay: () => 
                     rx.timer(Math.random() * jitter).pipe(
                         rx.mergeMap(() => this.device.rebirth()))
             }),
-            rx.tap({ subscribe: () => 
-                this.log("Liveness checks on %s with interval %s",
-                    this.node, each) }));
+            rx.tap({ 
+                subscribe:  () => this.log(
+                    "Liveness checks on %s with interval %s",
+                    this.node, each),
+                finalize:   () => this.log("LIVE FINAL %s", this.node),
+            }));
     }
 
     _init_offline () {
@@ -139,6 +147,10 @@ export class NodeMonitor {
                 rx.of(false),
                 /* but it goes active again after this delay */
                 rx.of(true).pipe(rx.delay(delay)))),
+            rx.tap({
+                subscribe:  () => this.log("OFF SUB %s", this.node),
+                finalize:   () => this.log("OFF FINAL %s", this.node),
+            }),
             /* Always make a value available */
             rxx.shareLatest());
     }

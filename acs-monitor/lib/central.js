@@ -6,8 +6,7 @@
 
 import imm          from "immutable";
 import rx           from "rxjs";
-
-import { Address, UUIDs }   from "@amrc-factoryplus/utilities";
+import { Address, UUIDs }   from "@amrc-factoryplus/service-client";
 import * as rxx             from "@amrc-factoryplus/rx-util";
 
 import { App }                      from "./uuids.js";
@@ -31,7 +30,7 @@ export class CentralMonitor {
     }
 
     run () {
-        this.clusters.subscribe(cs => this.log("CLUSTERS: %o", cs.toJS()));
+        this.clusters.subscribe();
     }
 
     async _init_clusters () {
@@ -48,13 +47,16 @@ export class CentralMonitor {
             rx.mergeAll(),
             rx.mergeMap(cl => cdb.get_config(SpAdd, cl)),
             rx.mergeMap(address => 
-                cdb.search(SpAdd, { 
-                    group_id:   address.group_id,
-                    node_id:    "Monitor", 
-                    device_id:  undefined
-                }, {}).then(uuid => NodeSpec.of({
+                cdb.resolve({
+                    app:    SpAdd, 
+                    query:  { 
+                        group_id:   address.group_id,
+                        node_id:    "Monitor", 
+                        device_id:  undefined
+                    },
+                }).then(uuid => NodeSpec.of({
                     uuid,
-                    address:    new Address(address.group_id, "Monitor"),
+                    address:    `${address.group_id}/Monitor`,
                     edgeAgent:  false,
                 }))),
             rx.toArray(),
@@ -62,7 +64,10 @@ export class CentralMonitor {
         );
 
         return rxp(
-            rx.merge(cdbw.application(ClSt), rx.interval(5*6*1000)),
+            rx.merge(
+                cdbw.application(ClSt),
+                rx.timer(0, 5*6*1000),
+            ),
             rx.switchMap(configs),
             rx.distinctUntilChanged(imm.is),
             rxx.mapStartStops(spec => {
@@ -76,6 +81,7 @@ export class CentralMonitor {
                     rx.finalize(() => this.log("STOP: %s", spec.uuid)),
                 );
             }),
+            rx.mergeAll(),
         );
     }
 }

@@ -3,7 +3,7 @@
 ifndef .acs.git.mk
 .acs.git.mk=1
 
-git.tag!=git describe --tags --abbrev=0
+git.tag!=git describe --tags --abbrev=0 2>/dev/null
 git.sha!=git rev-parse --verify HEAD
 
 .PHONY: git.prepare git.check-committed git.pull amend

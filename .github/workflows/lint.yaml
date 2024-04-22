@@ -19,4 +19,4 @@ jobs:
           version: '3.6.3' # Specify the Helm version you want to use
 
       - name: Run lint
-        run: make lint
+        run: make --no-print-directory lint

@@ -114,3 +114,15 @@ spec:
   principal: sv1admin@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
   secret: admin-keytabs/client
 {{- end }}
+---
+{{- if .Values.monitor.enabled }}
+apiVersion: factoryplus.app.amrc.co.uk/v1
+kind: KerberosKey
+metadata:
+  name: sv1monitor
+  namespace: {{ .Release.Namespace }}
+spec:
+  type: Random
+  principal: sv1monitor@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+  secret: monitor-keytabs/client
+{{- end }}

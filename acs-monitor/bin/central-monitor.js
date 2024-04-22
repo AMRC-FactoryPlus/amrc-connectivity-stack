@@ -4,7 +4,7 @@
  * Copyright 2024 AMRC
  */
 
-import { ServiceClient } from "@amrc-factoryplus/utilities";
+import { ServiceClient } from "@amrc-factoryplus/service-client";
 
 import { GIT_VERSION } from "../lib/git-version.js";
 import { CentralMonitor } from "../lib/central.js";

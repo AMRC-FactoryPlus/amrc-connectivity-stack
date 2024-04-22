@@ -7,7 +7,7 @@
 import rx               from "rxjs";
 import * as uuid        from "uuid";
 
-import { UUIDs }        from "@amrc-factoryplus/utilities";
+import { UUIDs }        from "@amrc-factoryplus/service-client";
 
 import { Alert, Schema, Link, Special }
                         from "./uuids.js";

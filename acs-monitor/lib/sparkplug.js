@@ -138,8 +138,9 @@ class SparkplugDevice {
     death () {
         if (!this.check_name("DEATH")) return;
 
+        const name = this.name;
         this.name = null;
-        this.splug.publishDeviceDeath(this.name, { timestamp: Date.now() });
+        this.splug.publishDeviceDeath(name, { timestamp: Date.now() });
     }
 }
 

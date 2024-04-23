@@ -42,10 +42,8 @@ class SparkplugDevice {
         sub.add(monitor.device.address
             .pipe(rx.distinctUntilChanged())
             .subscribe(async a => {
-                if (this.name)
-                    await this.death();
-                this.name = a.node;
-                await this.birth();
+                await this.death();
+                await this.birth(a.node);
             }));
         sub.add(monitor.offline
             .pipe(rx.distinctUntilChanged())
@@ -57,8 +55,23 @@ class SparkplugDevice {
         this.death();
     }
 
-    check_name (typ) {
-        if (!this.name) {
+    async dcmd (payload) {
+        for (const m of payload.metrics) {
+            switch (m.name) {
+            case "Device Control/Rebirth":
+                if (!m.value) break;
+                await this.publish(m.name, "Boolean", true);
+                this.birth();
+                break;
+            default:
+                this.log("Unknown DCMD %s for %s", m.name, this.name);
+            }
+        }
+    }
+
+    check_name (typ, name) {
+        name ??= this.name;
+        if (!name) {
             this.log("Unable to publish %s for %s, I have no name", 
                 typ, this.uuid);
             return false;
@@ -66,8 +79,9 @@ class SparkplugDevice {
         return true;
     }
 
-    async birth () {
-        if (!this.check_name("BIRTH")) return;
+    async birth (name) {
+        name ??= this.name;
+        if (!this.check_name("BIRTH", name)) return;
 
         const { monitor, uuid } = this;
 
@@ -89,6 +103,7 @@ class SparkplugDevice {
         };
 
         const metrics = [
+            { name: "Device Control/Rebirth", type: "Boolean", value: false },
             { name: "Schema_UUID", type: "UUID",
                 value: Schema.EdgeMonitorDevice },
             { name: "Instance_UUID", type: "UUID", value: device },
@@ -96,30 +111,33 @@ class SparkplugDevice {
             ...mk_alert("Alerts/Offline", Alert.Offline, offline),
         ];
 
-        this.node.publishDeviceBirth(this.name, {
+        this.node.publishDeviceBirth(name, {
             metrics,
             timestamp:  Date.now(),
             uuid:       UUIDs.Special.FactoryPlus,
         });
+        this.name = name;
     }
 
-    async publish_offline (offline) {
+    async publish (name, type, value) {
         if (!this.check_name("DATA")) return;
 
         const timestamp = Date.now();
 
         this.node.publishDeviceData(this.name, {
-            metrics: [
-                { name: "Alerts/Offline/Active", type: "Boolean", 
-                    value: offline },
-            ],
+            metrics:    [ { name, type, value } ],
             timestamp,
         });
+    }
+
+    publish_offline (offline) {
+        return this.publish("Alerts/Offline/Active", "Boolean", offline);
     }
 
     death () {
         if (!this.check_name("DEATH")) return;
 
+        this.name = null;
         this.node.publishDeviceDeath(this.name, { timestamp: Date.now() });
     }
 }
@@ -142,6 +160,8 @@ export class SparkplugNode {
         const node = this.node = await this.fplus.MQTT.basic_sparkplug_node({
             address:        ids.sparkplug,
             publishDeath:   true,
+            /* XXX workaround for js-service-client bug */
+            debug:          this.fplus.debug,
         });
 
         node.on("birth", this.rebirth.bind(this));
@@ -157,6 +177,7 @@ export class SparkplugNode {
 
     async rebirth () {
         const metrics = [
+            { name: "Node Control/Rebirth", type: "Boolean", value: false },
             { name: "Schema_UUID", type: "UUID", value: Schema.EdgeMonitor },
             { name: "Instance_UUID", type: "UUID", value: this.uuid },
             ...mk_instance(this.uuid, Schema.Link, "Links/Cluster"),
@@ -231,9 +252,12 @@ export class SparkplugNode {
     }
 
     _dcmd (device, payload) {
-        for (const m of payload.metrics) {
-            this.log("Unknown DCMD: %s: %s", device, m.name);
-        }
+        const dev = [...this.devices.values()]
+            .find(d => d.name == device);
+        if (dev)
+            dev.dcmd(payload);
+        else
+            this.log("DCMD for unknown device %s", device);
     }
 }
 

@@ -16,7 +16,8 @@ import { rx_rx }                    from "./util.js";
 
 export class CentralMonitor {
     constructor (opts) {
-        this.fplus  = opts.fplus;
+        this.fplus      = opts.fplus;
+        this.sparkplug  = opts.sparkplug;
 
         this.log = opts.fplus.debug.bound("central");
     }

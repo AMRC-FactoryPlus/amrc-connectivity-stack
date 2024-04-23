@@ -26,6 +26,9 @@ version: 1
 #  !u ACS.Group.EdgeGroups
 #     We currently don't need any explicit ACEs granted at the edge
 #  !u ACS.Group.EdgePermissions:
+groups:
+  !u ACS.Group.SparkplugNode:
+    - !u ACS.Group.CentralMonitor
 aces:
   - principal: !u ACS.Group.CentralMonitor
     permission: !u ACS.Role.EdgeNodeConsumer

@@ -61,12 +61,7 @@ export class CentralMonitor {
         );
 
         return rx_rx(
-            rx.merge(
-                rx_rx(cdbw.application(ClSt),
-                    rx.tap(() => this.log("Cluster status update"))),
-                rx_rx(rx.timer(0, 5*6*1000),
-                    rx.tap(() => this.log("Cluster status backstop"))),
-            ),
+            rx.merge(cdbw.application(ClSt), rx.timer(0, 5*60*1000)),
             rx.switchMap(configs),
             rx.tap(cs => this.log("New cluster configs: %o", cs.toJS())),
             rx.distinctUntilChanged(imm.is),

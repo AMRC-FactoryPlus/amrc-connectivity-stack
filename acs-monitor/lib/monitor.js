@@ -47,6 +47,8 @@ export class NodeMonitor {
     }
 
     async init () {
+        this.log("Using %s for %s", this.constructor.name, this.node);
+
         /* This will watch a SP publisher and resolve aliases */
         this.app = await this.fplus.MQTT.sparkplug_app();
 
@@ -94,16 +96,11 @@ export class NodeMonitor {
     _init_all_pkts () {
         const { device, app } = this;
         return device.address.pipe(
-            rx.tap(addr => this.log("Watching all packets from %s", addr)),
             rx.switchMap(addr => rx.merge(
                 app.watch_address(addr),
                 app.watch_address(addr.child_device("+")))),
             rx.tap({ error: e => this.log("Can't watch: %s", e) }),
             rx.retry({ delay: 10000 }),
-            rx.tap({
-                subscribe:  () => this.log("ALL_P sub %s", this.node),
-                finalize:   () => this.log("ALL_P final %s", this.node),
-            }),
             rx.share(),
         );
     }
@@ -119,7 +116,7 @@ export class NodeMonitor {
         return rx_rx(
             this.all_pkts,
             rx.startWith(null),
-            rx.switchMap(is_first => rx_rx(
+            rx.switchMap(() => rx_rx(
                 rx.of(null),
                 rx.repeat({ 
                     delay: () => rx.timer(each + Math.random()*jitter),
@@ -153,10 +150,6 @@ export class NodeMonitor {
                 rx.of(false),
                 /* but it goes active again after this delay */
                 rx.of(true).pipe(rx.delay(delay)))),
-            rx.tap({
-                subscribe:  () => this.log("OFF SUB %s", this.node),
-                finalize:   () => this.log("OFF FINAL %s", this.node),
-            }),
             /* Always make a value available */
             rxx.shareLatest());
     }
@@ -174,12 +167,12 @@ export class AgentMonitor extends NodeMonitor {
 
         /* Watch for changes to our config file */
         const config_changed = this._init_config_changed();
-        config_changed.subscribe(v =>
-            this.log("CONFIG CHANGED [%s]: %o", this.node, v));
+        config_changed.subscribe(() =>
+            this.log("Config changed for %s", this.node));
         /* Watch for Secret changes we care about */
         const secret_changed = this._init_secret_changed();
-        secret_changed.subscribe(v => 
-            this.log("SECRET CHANGED [%s]: %o", this.node, v.toJS()));
+        secret_changed.subscribe(() => 
+            this.log("Secret changed for %s", this.node));
 
         /* Check for updates to the config and send reload CMDs */
         this._checks.push(this._init_config_updates(

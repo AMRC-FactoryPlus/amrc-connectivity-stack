@@ -6,8 +6,9 @@
 
 import imm          from "immutable";
 import rx           from "rxjs";
-import { Address, UUIDs }   from "@amrc-factoryplus/service-client";
-import * as rxx             from "@amrc-factoryplus/rx-util";
+
+import { UUIDs }    from "@amrc-factoryplus/service-client";
+import * as rxx     from "@amrc-factoryplus/rx-util";
 
 import { App }                      from "./uuids.js";
 import { NodeMonitor, NodeSpec }    from "./monitor.js";
@@ -30,16 +31,19 @@ export class CentralMonitor {
         this.clusters.subscribe();
     }
 
-    async _init_clusters () {
+    /* This is a bit round-the-houses: for each cluster, we look up its
+     * Sparkplug Group. Then we construct the Monitor address and
+     * reverse-lookup the Monitor UUID. We require the UUID of the edge
+     * monitor Node; our Sparkplug schema depends on it. One way to
+     * avoid the redundant lookups would be to use the Links API to find
+     * the edge monitor rather than a well-known address; this would
+     * give us a Node UUID directly. */
+    fetch_configs () {
         const ClSt  = App.ClusterStatus;
         const SpAdd = UUIDs.App.SparkplugAddress;
         const cdb = this.fplus.ConfigDB;
-        const cdbw = await cdb.watcher();
 
-        /* This is a bit round-the-houses: for each cluster, we look up
-         * its Sparkplug Group. Then we construct the Monitor address
-         * and reverse-lookup the Monitor UUID. */
-        const configs = () => rx_rx(
+        return rx_rx(
             cdb.list_configs(ClSt),
             rx.mergeAll(),
             rx.mergeMap(cl => cdb.get_config(SpAdd, cl)),
@@ -59,21 +63,25 @@ export class CentralMonitor {
             rx.toArray(),
             rx.map(l => imm.Set(l)),
         );
+    }
+
+    async _init_clusters () {
+        const ClSt  = App.ClusterStatus;
+        const cdbw  = await this.fplus.ConfigDB.watcher();
 
         return rx_rx(
             rx.merge(cdbw.application(ClSt), rx.timer(0, 5*60*1000)),
-            rx.switchMap(configs),
-            rx.tap(cs => this.log("New cluster configs: %o", cs.toJS())),
+            rx.switchMap(() => this.fetch_configs()),
             rx.distinctUntilChanged(imm.is),
             rxx.mapStartStops(spec => {
                 const monitor = NodeMonitor.of(this, spec);
-                this.log("Using monitor %s for %s", monitor, spec.uuid);
 
                 /* Run the monitor checks until we get a stop */
                 return rx_rx(
                     monitor.init(),
                     rx.mergeMap(m => m.checks()),
-                    rx.finalize(() => this.log("STOP: %s", spec.uuid)),
+                    rx.finalize(() => this.log(
+                        "Stopped monitor for %s", spec.uuid)),
                 );
             }),
             rx.mergeAll(),

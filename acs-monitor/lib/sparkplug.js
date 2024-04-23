@@ -27,9 +27,10 @@ function mk_instance (device, schema, prefix) {
 class SparkplugDevice {
     constructor (opts) {
         this.fplus      = opts.fplus;
-        this.node       = opts.node;
+        this.splug      = opts.splug;
         this.uuid       = opts.uuid;
         this.monitor    = opts.monitor;
+        this.find_name  = opts.find_name;
 
         this.log        = this.fplus.debug.bound("spdev");
         this.sub        = new rx.Subscription();
@@ -43,7 +44,7 @@ class SparkplugDevice {
             .pipe(rx.distinctUntilChanged())
             .subscribe(async a => {
                 await this.death();
-                await this.birth(a.node);
+                await this.birth(this.find_name(a));
             }));
         sub.add(monitor.offline
             .pipe(rx.distinctUntilChanged())
@@ -111,7 +112,7 @@ class SparkplugDevice {
             ...mk_alert("Alerts/Offline", Alert.Offline, offline),
         ];
 
-        this.node.publishDeviceBirth(name, {
+        this.splug.publishDeviceBirth(name, {
             metrics,
             timestamp:  Date.now(),
             uuid:       UUIDs.Special.FactoryPlus,
@@ -124,7 +125,7 @@ class SparkplugDevice {
 
         const timestamp = Date.now();
 
-        this.node.publishDeviceData(this.name, {
+        this.splug.publishDeviceData(this.name, {
             metrics:    [ { name, type, value } ],
             timestamp,
         });
@@ -138,7 +139,7 @@ class SparkplugDevice {
         if (!this.check_name("DEATH")) return;
 
         this.name = null;
-        this.node.publishDeviceDeath(this.name, { timestamp: Date.now() });
+        this.splug.publishDeviceDeath(this.name, { timestamp: Date.now() });
     }
 }
 
@@ -157,22 +158,22 @@ export class SparkplugNode {
         const ids = await this._find_ids();
         this.uuid = ids.uuid;
 
-        const node = this.node = await this.fplus.MQTT.basic_sparkplug_node({
+        const splug = this.splug = await this.fplus.MQTT.basic_sparkplug_node({
             address:        ids.sparkplug,
             publishDeath:   true,
             /* XXX workaround for js-service-client bug */
             debug:          this.fplus.debug,
         });
 
-        node.on("birth", this.rebirth.bind(this));
-        node.on("ncmd", this._ncmd.bind(this));
-        node.on("dcmd", this._dcmd.bind(this));
+        splug.on("birth", this.rebirth.bind(this));
+        splug.on("ncmd", this._ncmd.bind(this));
+        splug.on("dcmd", this._dcmd.bind(this));
 
         return this;
     }
 
     async run () {
-        this.node.connect();
+        this.splug.connect();
     }
 
     async rebirth () {
@@ -180,13 +181,18 @@ export class SparkplugNode {
             { name: "Node Control/Rebirth", type: "Boolean", value: false },
             { name: "Schema_UUID", type: "UUID", value: Schema.EdgeMonitor },
             { name: "Instance_UUID", type: "UUID", value: this.uuid },
-            ...mk_instance(this.uuid, Schema.Link, "Links/Cluster"),
-            { name: "Links/Cluster/Target", type: "UUID", value: this.cluster },
-            { name: "Links/Cluster/Relation", type: "UUID", 
-                value: Link.ClusterMonitor },
         ];
+
+        if (this.cluster)
+            metrics.push(
+                ...mk_instance(this.uuid, Schema.Link, "Links/Cluster"),
+                { name: "Links/Cluster/Target", type: "UUID",
+                    value: this.cluster },
+                { name: "Links/Cluster/Relation", type: "UUID", 
+                    value: Link.ClusterMonitor },
+            );
     
-        this.node.publishNodeBirth({
+        this.splug.publishNodeBirth({
             metrics,
             timestamp:  Date.now(),
             uuid:       UUIDs.Special.FactoryPlus,
@@ -200,7 +206,7 @@ export class SparkplugNode {
 
     publish (name, type, value) {
         const timestamp = Date.now();
-        this.node.publishNodeData({
+        this.splug.publishNodeData({
             metrics: [ { name, type, value, timestamp } ],
         });
     }
@@ -210,9 +216,10 @@ export class SparkplugNode {
         this.log("Adding Device %s", uuid);
         const device = new SparkplugDevice({
             fplus:      this.fplus,
-            node:       this.node,
+            splug:      this.splug,
             uuid:       uuid,
             monitor:    monitor,
+            find_name:  this.cluster ? a => a.node : a => a.group,
         });
         this.devices.set(uuid, device);
         device.start();

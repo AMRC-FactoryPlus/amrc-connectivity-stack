@@ -108,7 +108,6 @@ export class EdgeMonitor {
         /* When we get a "start", start a new sequence monitoring that
          * node. Merge the results into our output. */
         return starts.pipe(
-            rx.tap(u => this.log("START: %s", u)),
             rx.flatMap(spec => {
                 /* Watch for a stop signal for this node UUID */
                 const stopper = stops.pipe(
@@ -116,13 +115,13 @@ export class EdgeMonitor {
                 );
 
                 const monitor = NodeMonitor.of(this, spec);
-                this.log("Using monitor %s for %s", monitor, spec.uuid);
 
                 /* Run the monitor checks until we get a stop */
                 return rx.from(monitor.init()).pipe(
                     rx.mergeMap(m => m.checks()),
                     rx.takeUntil(stopper),
-                    rx.finalize(() => this.log("STOP: %s", spec.uuid)),
+                    rx.finalize(() => this.log(
+                        "Stopped monitor for %s", spec.uuid)),
                 );
             }),
         );
@@ -139,7 +138,6 @@ export class EdgeMonitor {
             key:            obj => obj.metadata.name,
             value:          obj => SecretStatus.of(obj),
         }).pipe(
-            rx.tap({ subscribe: () => this.log("SS subscribe") }),
             rxx.shareLatest(),
         );
     }

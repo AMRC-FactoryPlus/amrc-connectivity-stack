@@ -10,9 +10,9 @@ import rx           from "rxjs";
 import { UUIDs }    from "@amrc-factoryplus/service-client";
 import * as rxx     from "@amrc-factoryplus/rx-util";
 
-import { App }                      from "./uuids.js";
-import { NodeMonitor, NodeSpec }    from "./monitor.js";
-import { rx_rx }                    from "./util.js";
+import { App }          from "./uuids.js";
+import { NodeSpec }     from "./nodespec.js";
+import { rx_rx }        from "./util.js";
 
 export class CentralMonitor {
     constructor (opts) {
@@ -84,7 +84,7 @@ export class CentralMonitor {
             rx.switchMap(() => this.fetch_configs()),
             rx.distinctUntilChanged(imm.is),
             rxx.mapStartStops(spec => {
-                const monitor = NodeMonitor.of(this, spec);
+                const monitor = spec.monitor(this);
 
                 /* Run the monitor checks until we get a stop */
                 return rx_rx(

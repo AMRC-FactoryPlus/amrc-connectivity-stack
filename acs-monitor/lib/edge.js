@@ -9,7 +9,7 @@ import k8s          from "@kubernetes/client-node";
 
 import * as rxx     from "@amrc-factoryplus/rx-util";
 
-import { NodeMonitor, NodeSpec }    from "./monitor.js";
+import { NodeSpec } from "./nodespec.js";
 
 const SecretStatus = imm.Record({
     uuid:           null,
@@ -114,7 +114,7 @@ export class EdgeMonitor {
                     rx.filter(stop => stop.uuid == spec.uuid),
                 );
 
-                const monitor = NodeMonitor.of(this, spec);
+                const monitor = spec.monitor(this);
 
                 /* Run the monitor checks until we get a stop */
                 return rx.from(monitor.init()).pipe(

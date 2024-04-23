@@ -7,7 +7,6 @@ FROM ${base_prefix}-js-build:${base_version} AS build
 ARG acs_npm=NO
 ARG TARGETOS
 ARG TARGETARCH
-ARG revision=unknown
 
 USER root
 RUN <<'SHELL'
@@ -26,13 +25,15 @@ RUN <<'SHELL'
     npm install --save=false --omit=dev
 SHELL
 COPY --chown=node . .
-RUN <<'SHELL'
-    echo "export const GIT_VERSION=\"$revision\";" > ./lib/git-version.js
-SHELL
 
 FROM ${base_prefix}-js-run:${base_version} AS run
+ARG revision=unknown
 # Copy across from the build container.
 WORKDIR /home/node/app
 COPY --from=build --chown=root:root /home/node/app ./
+# Do this last to not smash the build cache
+RUN <<'SHELL'
+    echo "export const GIT_VERSION=\"$revision\";" > ./lib/git-version.js
+SHELL
 USER node
 CMD node bin/edge-monitor.js

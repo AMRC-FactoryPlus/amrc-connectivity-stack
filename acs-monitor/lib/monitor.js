@@ -4,14 +4,15 @@
  * Copyright 2023 AMRC
  */
 
-import imm          from "immutable";
+import * as imm     from "immutable";
 import duration     from "parse-duration";
-import rx           from "rxjs";
+import * as rx      from "rxjs";
 
 import { UUIDs }            from "@amrc-factoryplus/service-client";
 import * as rxx             from "@amrc-factoryplus/rx-util";
 
 import { App }              from "./uuids.js";
+import { rx_rx }            from "./util.js";
 
 export const NodeSpec = imm.Record({
     uuid:       null, 
@@ -112,24 +113,29 @@ export class NodeMonitor {
          * rebirth. Delay the rebirth by up to half the interval again
          * to avoid rebirth storms. */
 
-        const first = 5000;
         const each = this.interval;
-        const jitter = each / 2;
+        const jitter = each / 4;
 
-        return this.all_pkts.pipe(
-            rx.timeout({ first, each }),
-            rx.tap({finalize: () => this.log("LIVE ALL_P FINAL %s", this.node)}),
-            rx.retry({ 
-                delay: () => 
-                    rx.timer(Math.random() * jitter).pipe(
-                        rx.mergeMap(() => this.device.rebirth()))
-            }),
+        return rx_rx(
+            this.all_pkts,
+            rx.startWith(null),
+            rx.switchMap(is_first => rx_rx(
+                rx.of(null),
+                rx.repeat({ 
+                    delay: () => rx.timer(each + Math.random()*jitter),
+                }),
+                rx.skip(1),
+                rx.tap(() => this.log("No packets for %s", this.node)),
+                rx.exhaustMap(() => this.device.rebirth()),
+            )),
             rx.tap({ 
                 subscribe:  () => this.log(
                     "Liveness checks on %s with interval %s",
                     this.node, each),
-                finalize:   () => this.log("LIVE FINAL %s", this.node),
-            }));
+                finalize:   () => this.log(
+                    "Stop liveness checks on %s", this.node),
+            }),
+        );
     }
 
     _init_offline () {

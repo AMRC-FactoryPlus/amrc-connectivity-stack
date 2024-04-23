@@ -70,19 +70,9 @@ class SparkplugDevice {
         }
     }
 
-    check_name (typ, name) {
-        name ??= this.name;
-        if (!name) {
-            this.log("Unable to publish %s for %s, I have no name", 
-                typ, this.uuid);
-            return false;
-        }
-        return true;
-    }
-
     async birth (name) {
         name ??= this.name;
-        if (!this.check_name("BIRTH", name)) return;
+        if (!name) return;
 
         const { monitor, uuid } = this;
 
@@ -121,7 +111,7 @@ class SparkplugDevice {
     }
 
     async publish (name, type, value) {
-        if (!this.check_name("DATA")) return;
+        if (!this.name) return;
 
         const timestamp = Date.now();
 
@@ -136,7 +126,7 @@ class SparkplugDevice {
     }
 
     death () {
-        if (!this.check_name("DEATH")) return;
+        if (!this.name) return;
 
         const name = this.name;
         this.name = null;

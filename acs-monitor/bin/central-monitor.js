@@ -20,7 +20,6 @@ fplus.Fetch.cache = "reload";
 
 const sparkplug = await new SparkplugNode({
     fplus,
-    cluster:    process.env.CLUSTER_UUID,
 }).init();
 
 const monitor = await new CentralMonitor({

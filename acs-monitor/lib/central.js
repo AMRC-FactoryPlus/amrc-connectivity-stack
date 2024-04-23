@@ -47,20 +47,29 @@ export class CentralMonitor {
         return rx_rx(
             cdb.list_configs(ClSt),
             rx.mergeAll(),
-            rx.mergeMap(cl => cdb.get_config(SpAdd, cl)),
-            rx.mergeMap(address => 
-                cdb.resolve({
+            rx.mergeMap(async cluster => {
+                const addr = await cdb.get_config(SpAdd, cluster);
+                if (!addr || addr.node_id) {
+                    this.log("Can't find cluster Group for %s", cluster);
+                    return null;
+                }
+                const monitor = await cdb.resolve({
                     app:    SpAdd, 
                     query:  { 
-                        group_id:   address.group_id,
+                        group_id:   addr.group_id,
                         node_id:    "Monitor", 
                         device_id:  undefined
                     },
-                }).then(uuid => NodeSpec.of({
-                    uuid,
-                    address:    `${address.group_id}/Monitor`,
-                    edgeAgent:  false,
-                }))),
+                });
+                if (!monitor)
+                    this.log("Can't find Monitor for cluster %s", cluster);
+                return monitor;
+            }),
+            rx.filter(uuid => !!uuid),
+            rx.map(uuid => NodeSpec.of({
+                uuid,
+                edgeAgent:  false,
+            })),
             rx.toArray(),
             rx.map(l => imm.Set(l)),
         );

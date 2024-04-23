@@ -15,6 +15,8 @@ console.log("Starting ACS central monitor, revision %s", GIT_VERSION);
 const fplus = await new ServiceClient({
     env: process.env,
 }).init();
+/* XXX This is global. I need a better interface to the cache. */
+fplus.Fetch.cache = "reload";
 
 //const sparkplug = await new SparkplugNode({
 //    fplus,

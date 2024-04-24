@@ -47,7 +47,7 @@ spec:
               value: {{ .Values.identity.realm | required "values.identity.realm is required!" }}
             - name: DIRECTORY_URL
               value: {{ include "amrc-connectivity-stack.external-url" (list . "directory") }}
-            - name: EXTERNAL_DOMAIN
+            - name: BASE_URL
               value: {{ .Values.acs.baseUrl | quote }}
           volumeMounts:
             - mountPath: /config/krb5-conf

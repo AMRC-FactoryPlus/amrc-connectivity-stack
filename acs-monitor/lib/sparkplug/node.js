@@ -42,7 +42,7 @@ export class SparkplugNode {
     }
 
     async run () {
-        this.splug.connect();
+        await this.splug.connect();
     }
 
     async rebirth () {

@@ -30,8 +30,6 @@ export class SparkplugNode {
         const splug = this.splug = await this.fplus.MQTT.basic_sparkplug_node({
             address:        ids.sparkplug,
             publishDeath:   true,
-            /* XXX workaround for js-service-client bug */
-            debug:          this.fplus.debug,
         });
 
         splug.on("birth", this.rebirth.bind(this));

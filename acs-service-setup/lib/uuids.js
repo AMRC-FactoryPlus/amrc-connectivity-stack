@@ -18,6 +18,7 @@ export const ACS = {
         SparkplugNode:      "1d3121a0-aade-4376-8fa3-57ba1460ba76",
         EdgeGroups:         "9ba0de4b-056f-4b5e-b966-2d5d85d07767",
         EdgePermissions:    "7594cd71-e5b9-4467-88c0-b11a66d47fec",
+        CentralMonitor:     "1bc3dbca-68fe-48d2-9590-3a528c111827",
     },
     Perm: {
         MQTT: {

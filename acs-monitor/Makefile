@@ -1,8 +1,8 @@
 top=..
 include ${top}/mk/acs.init.mk
 
-repo?=acs-edge-monitor
-k8s.deployment?=edge-monitor
+repo?=acs-monitor
+k8s.deployment?=monitor
 
 eslint=	bin lib
 

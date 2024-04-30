@@ -17,6 +17,12 @@ const sidebarNavItems: Item[] = [
         href: '/',
         icon: 'home',
         auth: false
+    },
+    {
+        title: 'Live Activity',
+        href: '/activity',
+        icon: 'pallet',
+        auth: true
     }
 ]
 

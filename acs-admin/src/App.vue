@@ -1,6 +1,7 @@
 <template>
-  <div class="grid h-screen overflow-auto w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">
-    <div class="hidden border-r bg-muted/40 md:block">
+  <div class="grid h-screen overflow-auto w-full"
+      :class="!l.fullscreen ? 'md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]' : 'grid-cols-1'">
+    <div v-if="!l.fullscreen" class="hidden border-r bg-muted/40 md:block">
       <div class="flex h-full max-h-screen flex-col">
         <div class="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6">
           <a href="/" class="flex items-center gap-2 font-semibold">
@@ -32,12 +33,16 @@
       </div>
     </div>
     <div class="flex flex-col overflow-auto">
-      <header class="flex justify-between items-center border-b px-4 lg:h-[60px] flex-shrink-0 lg:px-6">
+      <header v-if="!l.fullscreen"
+          class="flex justify-between items-center border-b px-4 lg:h-[60px] flex-shrink-0 lg:px-6">
         <div class="flex items-center justify-center gap-2">
           <i :class="`fa-solid fa-${$route.meta.icon}`"></i>
           <h3 class="text-lg font-bold tracking-tight">{{$route.meta.name}}</h3>
         </div>
-        <Button variant="link" size="icon" @click="s.logout">Logout</Button>
+        <div class="flex items-center justify-center gap-3">
+          <Button variant="ghost" size="icon" @click="l.toggleFullscreen"><i class="fa-solid fa-expand"></i></Button>
+          <Button variant="link" size="icon" @click="s.logout">Logout</Button>
+        </div>
       </header>
       <main class="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6">
         <RouterView/>
@@ -55,13 +60,21 @@ import { Input } from '@/components/ui/input'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import Nav from '@/components/Nav.vue'
 import { useServiceClientStore } from '@/store/serviceClientStore.js'
+import { useLayoutStore } from '@/store/layoutStore.js'
+import { useMagicKeys } from '@vueuse/core'
 
 export default {
   name: 'App',
 
   setup () {
+    const {
+            escape,
+          } = useMagicKeys()
+
     return {
       s: useServiceClientStore(),
+      l: useLayoutStore(),
+      escape,
     }
   },
 
@@ -89,6 +102,14 @@ export default {
   computed: {
     baseUrl () {
       return import.meta.env.VITE_EXTERNAL_DOMAIN
+    },
+  },
+
+  watch: {
+    escape (pressed) {
+      if (pressed) {
+        this.l.toggleFullscreen()
+      }
     },
   },
 

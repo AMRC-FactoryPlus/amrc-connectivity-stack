@@ -67,9 +67,7 @@ export default {
   name: 'App',
 
   setup () {
-    const {
-            escape,
-          } = useMagicKeys()
+    const { escape } = useMagicKeys()
 
     return {
       s: useServiceClientStore(),

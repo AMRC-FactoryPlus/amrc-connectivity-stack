@@ -61,7 +61,7 @@ import { useClipboard } from '@vueuse/core'
 
 export default {
 
-  name: 'Welcome',
+  name: 'Home',
 
   setup () {
     return {

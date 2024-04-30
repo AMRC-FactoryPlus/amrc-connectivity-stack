@@ -21,7 +21,7 @@ const sidebarNavItems: Item[] = [
     {
         title: 'Live Activity',
         href: '/activity',
-        icon: 'pallet',
+        icon: 'table-cells',
         auth: true
     }
 ]

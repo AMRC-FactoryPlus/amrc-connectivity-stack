@@ -6,18 +6,24 @@ import { createRouter, createWebHashHistory } from 'vue-router'
 
 import App from './App.vue'
 
-import Welcome from '@pages/Welcome.vue'
+import Home from '@pages/Home.vue'
 import Activity from '@pages/Activity.vue'
-
 
 const routes = [
   {
     path: '/',
-    component: Welcome,
-  },
-  {
+    component: Home,
+    meta: {
+      name: 'Home',
+      icon: 'house'
+    },
+  }, {
     path: '/activity',
     component: Activity,
+    meta: {
+      name: 'Live Device Activity',
+      icon: 'table-cells'
+    },
   },
 ]
 

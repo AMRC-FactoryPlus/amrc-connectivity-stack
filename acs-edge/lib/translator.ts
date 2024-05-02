@@ -83,8 +83,11 @@ export class Translator extends EventEmitter {
             const ids = await this.fetchIdentities();
             const conf = await this.fetchConfig(ids.uuid!);
 
-            // Create a new device connection for each type listed in config file
-            const available = this.setupConnections(conf);
+            log('Finding available metrics...');
+            const conns = conf.deviceConnections ?? [];
+            const available = conns
+                .flatMap(c => c.devices)
+                .flatMap(d => prefixMetrics(d.metrics, d.deviceId));
 
             // Setup Sparkplug node
             const spConf = {
@@ -94,6 +97,10 @@ export class Translator extends EventEmitter {
                 available,
             };
             this.sparkplugNode = await this.setupSparkplug(spConf);
+
+            log('Building up connections and devices...');
+            /* This uses this.sparkplugNode */
+            conns.forEach(c => this.setupConnection(c));
         } catch (e: any) {
             log(`Error starting translator: ${e.message}`);
             console.error((e as Error).stack);
@@ -169,19 +176,6 @@ export class Translator extends EventEmitter {
         return sp;
     }
 
-    setupConnections (conf: translatorConf): sparkplugMetric[] {
-        log('Building up connections and devices...');
-
-        const conns = conf.deviceConnections;
-        if (!conns)
-            return [];
-
-        conns.forEach(c => this.setupConnection(c));
-        return conns
-            .flatMap(c => c.devices)
-            .flatMap(d => prefixMetrics(d.metrics, d.deviceId));
-    }
-
     setupConnection(connection: any): void {
         const cType = connection.connType;
         const deviceInfo = this.chooseDeviceInfo(cType);
@@ -219,7 +213,6 @@ export class Translator extends EventEmitter {
             })
         });
 
-        // Open the connection
         newConn.open();
     }
 

@@ -169,7 +169,8 @@ export default class CmdEscD {
         }
 
         this.mqtt.publish({
-            topic:      to.topic("CMD"),
+            address:    to,
+            type:       "CMD",
             metrics:    [cmd],
             from:       from instanceof Address 
                 ? `sparkplug:${from}`

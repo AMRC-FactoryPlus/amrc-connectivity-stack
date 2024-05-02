@@ -156,7 +156,10 @@ export default class MqttCli {
         //    Object.values(Changed).map(v =>
         //        ({ name: `Last_Changed/${v}`, type: "UUID", value: "" })));
 
-        this.publish(this.address, "BIRTH", metrics);
+        this.publish({
+            topic:      this.address.topic("BIRTH"),
+            metrics,
+        });
     }
 
     decode_request(metric) {
@@ -189,10 +192,13 @@ export default class MqttCli {
         return [address, {name: tag, value}];
     }
 
-    encode_metrics(metrics, kind) {
+    encode_metrics (opts) {
+        const { topic, metrics, from } = opts;
+
+        const kind = topic.type;
         const payload = {
             timestamp: Date.now(),
-            metrics: metrics,
+            metrics,
         };
 
         /* CMDs don't increment the seq, because by spec they are only
@@ -201,15 +207,17 @@ export default class MqttCli {
             payload.seq = this.seq;
             this.seq = (this.seq < 255) ? (this.seq + 1) : 0;
         }
-        if (kind == "BIRTH")
+        if (kind == "BIRTH" || kind == "CMD")
             payload.uuid = UUIDs.FactoryPlus;
+        if (kind == "CMD")
+            payload.body = `uuid:${from ?? this.device_uuid}`;
 
         return SpB.encodePayload(payload);
     }
 
-    async publish(addr, kind, metrics) {
-        const topic = addr.topic(kind);
-        const payload = this.encode_metrics(metrics, kind);
+    async publish (opts) {
+        const { topic } = opts;
+        const payload = this.encode_metrics(opts);
 
         this.log("mqtt", `Publishing to ${topic}`);
         this.mqtt.publish(topic, payload);
@@ -224,7 +232,10 @@ export default class MqttCli {
 
         const resp = MetricBuilder.cmd.command_escalation_response(
             to, cmd.name, stat);
-        this.publish(from, "CMD", resp);
+        this.publish({
+            topic:      from.topic("CMD"),
+            metrics:    resp,
+        });
     }
 }
 

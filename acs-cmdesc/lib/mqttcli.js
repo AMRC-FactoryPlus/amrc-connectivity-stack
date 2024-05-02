@@ -209,8 +209,10 @@ export default class MqttCli {
         }
         if (type == "BIRTH" || type == "CMD")
             payload.uuid = UUIDs.FactoryPlus;
-        if (type == "CMD")
-            payload.body = from ?? `uuid:${this.device_uuid}`;
+        if (type == "CMD") {
+            const sender = from ?? `uuid:${this.device_uuid}`;
+            payload.body = Buffer.from(sender.toString());
+        }
 
         return SpB.encodePayload(payload);
     }

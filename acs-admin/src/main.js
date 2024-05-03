@@ -8,6 +8,7 @@ import App from './App.vue'
 
 import Home from '@pages/Home.vue'
 import Activity from '@pages/Activity.vue'
+import Alerts from '@pages/Alerts/Alerts.vue'
 
 const routes = [
   {
@@ -23,6 +24,14 @@ const routes = [
     meta: {
       name: 'Live Device Activity',
       icon: 'table-cells'
+    },
+  },
+  {
+    path: '/alerts',
+    component: Alerts,
+    meta: {
+      name: 'Alerts',
+      icon: 'bell'
     },
   },
 ]

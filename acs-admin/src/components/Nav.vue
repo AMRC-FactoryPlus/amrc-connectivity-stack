@@ -23,6 +23,12 @@ const sidebarNavItems: Item[] = [
         href: '/activity',
         icon: 'table-cells',
         auth: true
+    },
+    {
+        title: 'Alerts',
+        href: '/alerts',
+        icon: 'bell',
+        auth: true
     }
 ]
 

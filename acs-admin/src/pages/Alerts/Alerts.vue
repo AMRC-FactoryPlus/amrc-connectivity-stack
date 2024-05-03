@@ -1,12 +1,12 @@
 <template>
-    <DataTable :data="a.alerts" :columns="columns" />
+  <DataTable :data="a.alerts" :columns="columns"/>
 </template>
 
 <script>
 import { useServiceClientStore } from '@/store/serviceClientStore.js'
 import { useAlertsStore } from '@/store/useAlertsStore.js'
 
-import { columns } from "./columns"
+import { columns } from './columns'
 import DataTable from '@/pages/Alerts/DataTable.vue'
 
 export default {
@@ -19,7 +19,7 @@ export default {
     return {
       s: useServiceClientStore(),
       a: useAlertsStore(),
-      columns
+      columns,
     }
   },
 
@@ -28,7 +28,7 @@ export default {
   },
 
   beforeUnmount () {
-    this.alertWatcher()
+    if (this.alertWatcher) this.alertWatcher()
   },
 }
 </script>

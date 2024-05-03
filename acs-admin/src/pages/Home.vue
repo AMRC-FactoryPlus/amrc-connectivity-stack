@@ -39,9 +39,11 @@
             </CardDescription>
           </CardHeader>
           <CardFooter>
-            <Button as-child>
-              <a :href="`${s.scheme}://activity.${s.baseUrl}`">View</a>
-            </Button>
+            <RouterLink to="/activity">
+              <Button as-child>
+                <a :href="`${s.scheme}://activity.${s.baseUrl}`">View</a>
+              </Button>
+            </RouterLink>
           </CardFooter>
         </Card>
       </div>

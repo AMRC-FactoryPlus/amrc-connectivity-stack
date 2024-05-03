@@ -7,8 +7,13 @@ export const useLayoutStore = defineStore('layout', {
     }
   },
   actions: {
-    toggleFullscreen() {
-      this.fullscreen = !this.fullscreen
-    }
-  }
+    toggleFullscreen (state = null) {
+      if (state !== null) {
+        this.fullscreen = state
+      }
+      else {
+        this.fullscreen = !this.fullscreen
+      }
+    },
+  },
 })

@@ -111,16 +111,19 @@ export default {
     },
   },
 
-  mounted () {
+  async mounted () {
     // Check if opts exists in local storage
     if (localStorage.getItem('opts')) {
       // If it does then create the service client
       this.s.login(JSON.parse(localStorage.getItem('opts')))
     }
 
-    // If it does then create the service client
 
-    // It doesn't then do nothing and we'll show the login page
+    this.$router.isReady().then(() => {
+      if (this.$route.query.fullscreen) {
+        this.l.toggleFullscreen(this.$route.query.fullscreen === 'true')
+      }
+    })
   },
 }
 </script>

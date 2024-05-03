@@ -17,6 +17,7 @@ import DataTablePagination from './DataTablePagination.vue'
 import DataTableToolbar from './DataTableToolbar.vue'
 import {valueUpdater} from '@/lib/utils'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow,} from '@/components/ui/table'
+import { useLayoutStore } from '@/store/layoutStore.js'
 
 interface DataTableProps {
     columns: ColumnDef<Alert, any>[]
@@ -29,6 +30,8 @@ const sorting = ref<SortingState>([{ id: 'since', desc: true }])
 const columnFilters = ref<ColumnFiltersState>([])
 const columnVisibility = ref<VisibilityState>({})
 const rowSelection = ref({})
+
+const l =  useLayoutStore();
 
 const table = useVueTable({
     get data() {
@@ -67,7 +70,7 @@ const table = useVueTable({
 
 <template>
   <div class="space-y-4">
-    <DataTableToolbar :table="table"/>
+    <DataTableToolbar v-if="!l.fullscreen" :table="table"/>
     <div class="rounded-md border">
       <Table>
         <TableHeader>
@@ -104,6 +107,6 @@ const table = useVueTable({
       </Table>
     </div>
 
-    <DataTablePagination :table="table"/>
+    <DataTablePagination v-if="!l.fullscreen" :table="table"/>
   </div>
 </template>

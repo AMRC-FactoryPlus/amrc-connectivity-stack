@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { UUIDs } from '@amrc-factoryplus/service-client'
-import { concat, interval, merge, mergeAll, timer, tap, switchMap, throttleTime } from 'rxjs'
+import * as rx from 'rxjs'
 
 export const useAlertsStore = defineStore('alerts', {
   state: () => ({
@@ -8,7 +8,6 @@ export const useAlertsStore = defineStore('alerts', {
   }),
   actions: {
     async fetchAlerts (fplus) {
-      console.log('fetching alerts...')
       const res = await fplus.Directory.fetch({
         url: 'v1/alert/active',
         cache: 'reload',
@@ -49,44 +48,21 @@ export const useAlertsStore = defineStore('alerts', {
           device: await first(alrt.device, name, addr, unknown),
           type: await first(alrt.type, name, unknown),
           since: new Date(alrt.last_change),
-          links: links,
+          links,
         })
       }
       return rv
     },
 
     watchAlerts (fplus) {
-      if (fplus === null) return
-
-      console.log('====== Running watchAlerts ======')
-
-      concat(interval(1000), interval(2000)).subscribe(e => {
-        console.log('Interval')
-        console.log(e)
-      })
-
-      console.log('AFTER')
-
-      return;
+      if (fplus == null) return
 
       const from_dir = rx.defer(async () => {
-        console.log('====== Running from_dir ======')
         const spa = await fplus.MQTT.sparkplug_app()
         const inf = await fplus.Directory.get_service_info(UUIDs.Service.Directory)
         const dev = await spa.device({ device: inf.device })
-        console.log('spa', spa)
-        console.log('inf', inf)
-        console.log('dev', dev)
         return dev.metric('Last_Changed/Alert_Type')
-      }).pipe(mergeAll())
-
-      // Working
-      merge(from_dir).subscribe()
-
-      // Not working
-      merge(timer(0, 5 * 60 * 1000), from_dir).subscribe()
-
-
+      }).pipe(rx.mergeAll())
 
       /* This does not currently work correctly, as if we refresh because
        * of a CDB notification the CDB fetches all get stale cached
@@ -99,24 +75,12 @@ export const useAlertsStore = defineStore('alerts', {
       //    return cdbw.application(UUIDs.App.Info);
       //}).pipe(rx.mergeAll());
 
-      const sub = merge(timer(0, 5 * 60 * 1000).pipe(tap(() => console.log('timer'))), from_dir).
-        pipe(throttleTime(1000, undefined, {
+      const sub = rx.merge(rx.timer(0, 5 * 60 * 1000), from_dir /*from_cdb*/).
+        pipe(rx.throttleTime(1000, undefined, {
           leading: true,
           trailing: true,
-        }), tap({
-          next: e => console.log(e),
-          error: err => console.error(err),
-          subscribe: s => console.log('subscribed', s),
-          finalize: () => console.log('finalized'),
-          unsubscribe: s => console.log('unsubscribed', s),
-          complete: () => console.log('completed'),
-        }), switchMap(() => this.fetchAlerts(fplus))).
-        subscribe({
-          next: res => res && (this.alerts = res),
-          error: err => console.error(err),
-        })
-
-      console.log('sub', sub)
+        }), rx.switchMap(() => this.fetchAlerts(fplus))).
+        subscribe(res => res && (this.alerts = res))
 
       return () => sub.unsubscribe()
     },

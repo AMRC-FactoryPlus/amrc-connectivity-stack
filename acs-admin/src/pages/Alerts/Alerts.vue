@@ -1,21 +1,19 @@
 <template>
-  <DataTable :columns="columns" :data="a.alerts" />
+    <DataTable :data="a.alerts" :columns="columns" />
 </template>
 
 <script>
 import { useServiceClientStore } from '@/store/serviceClientStore.js'
 import { useAlertsStore } from '@/store/useAlertsStore.js'
-import DataTable from '@/components/ui/data-table/DataTable.vue'
 
 import { columns } from "./columns"
+import DataTable from '@/pages/Alerts/DataTable.vue'
 
 export default {
 
   name: 'Alerts',
 
-  components: {
-    DataTable
-  },
+  components: { DataTable },
 
   setup () {
     return {

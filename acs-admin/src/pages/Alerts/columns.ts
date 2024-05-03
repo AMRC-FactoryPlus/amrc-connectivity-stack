@@ -1,14 +1,14 @@
+import type {ColumnDef} from '@tanstack/vue-table'
 import {h} from 'vue'
-import {ColumnDef} from "@tanstack/vue-table";
+
+import DataTableColumnHeader from './DataTableColumnHeader.vue'
+import DataTableRowActions from './DataTableRowActions.vue'
 import {Badge} from '@/components/ui/badge'
-import dayjs from 'dayjs'
-import relativeTime from 'dayjs/plugin/relativeTime';
-import DropdownAction from './TableDropdown.vue'
-import {Button} from "@/components/ui/button";
-import {ArrowUpDown} from "lucide-vue-next";
+import TooltipCell from './Cells/TooltipCell.vue'
+import dayjs from "dayjs";
+import relativeTime from "dayjs/plugin/relativeTime";
 
-
-interface Alert {
+export interface Alert {
     uuid: string
     device: string
     type: string
@@ -18,64 +18,58 @@ interface Alert {
     }>;
 }
 
+dayjs.extend(relativeTime);
+
 export const columns: ColumnDef<Alert>[] = [{
     accessorKey: 'type',
-    header: ({column}) => {
-        return h(Button,
-            {
-                variant: 'ghost',
-                size: 'noPadding',
-                onClick: () => column.toggleSorting(column.getIsSorted() === 'asc'),
-            },
-            () => [h('div',
-                {class: 'flex gap-1 items-center justify center'},
-                ['Alert', h(ArrowUpDown, {class: 'ml-2 h-4 w-4'})])])
-    },
-    cell: ({row}) => {
-
-        return h(Badge, {variant: 'outline'}, () => row.getValue('type'))
+    header: ({column}) => h(DataTableColumnHeader, {
+        column,
+        title: 'Alert'
+    }),
+    cell: ({row}) => h(Badge, {}, () => row.getValue('type')),
+    filterFn: (row, id, value) => {
+        return value.includes(row.getValue(id))
     },
 }, {
     accessorKey: 'device',
-    header: ({column}) => {
-        return h(Button,
-            {
-                variant: 'ghost',
-                size: 'noPadding',
-                onClick: () => column.toggleSorting(column.getIsSorted() === 'asc'),
-            },
-            () => [h('div',
-                {class: 'flex gap-1 items-center justify center'},
-                ['Device', h(ArrowUpDown, {class: 'ml-2 h-4 w-4'})])])
-    },
-    cell: ({row}) => {
+    header: ({column}) => h(DataTableColumnHeader, {
+        column,
+        title: 'Device'
+    }),
 
-        return h('div', {class: 'text-right font-medium'}, row.getValue('device'))
+    cell: ({row}) => {
+        return h('span', {class: 'max-w-[500px] truncate font-medium'}, row.getValue('device'))
+    },
+    filterFn: (row, id, value) => {
+        return value.includes(row.getValue(id))
     },
 }, {
     accessorKey: 'since',
-    header: ({column}) => {
-        return h(Button,
-            {
-                variant: 'ghost',
-                size: 'noPadding',
-                onClick: () => column.toggleSorting(column.getIsSorted() === 'asc'),
-            },
-            () => [h('div',
-                {class: 'flex gap-1 items-center justify center'},
-                ['Triggered', h(ArrowUpDown, {class: 'ml-2 h-4 w-4'})])])
-    },
-    cell: ({row}) => {
+    header: ({column}) => h(DataTableColumnHeader, {
+        column,
+        title: 'Triggered'
+    }),
 
-        dayjs.extend(relativeTime);
-        return h('div', {class: 'text-right font-medium'}, dayjs(row.getValue('since')).fromNow())
+    cell: ({row}) => {
+        return h(TooltipCell, {
+            content: dayjs(row.getValue('since')).fromNow(),
+            tooltip: dayjs(row.getValue('since')).format('YYYY-MM-DD HH:mm:ss')
+        });
+    },
+}, {
+    accessorKey: 'links',
+    header: ({column}) => h(DataTableColumnHeader, {
+        column,
+        title: 'Links'
+    }),
+
+    cell: ({row}) => {
+        // return h('span', { class: 'max-w-[500px] truncate font-medium' }, row.original.links.map(link => `${link.relation}: ${link.target}`).join(', '))
+        return h('div', {class: 'max-w-[500px]'}, row.original.links.map(link => {
+            return h(Badge, {variant: 'outline'}, `${link.relation}: ${link.target}`);
+        }));
     },
 }, {
     id: 'actions',
-    enableHiding: false,
-    cell: ({row}) => {
-        return h('div', {class: 'relative'}, h(DropdownAction, {
-            uuid: row.original.uuid,
-        }))
-    },
+    cell: ({row}) => h(DataTableRowActions, {row}),
 },]

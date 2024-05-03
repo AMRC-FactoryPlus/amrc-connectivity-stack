@@ -23,13 +23,20 @@
     "numeral": "^2.0.6",
     "pinia": "^2.1.7",
     "process": "^0.11.10",
-    "radix-vue": "^1.7.1",
+    "radix-vue": "^1.7.3",
     "rxjs": "^7.8.1",
     "tailwind-merge": "^2.3.0",
     "tailwindcss-animate": "^1.0.7",
     "util": "^0.12.5",
     "vue": "^3.4.21",
-    "vue-router": "4"
+    "vue-router": "4",
+    "@types/node": "^20.12.7",
+    "@vitejs/plugin-vue": "^5.0.4",
+    "autoprefixer": "^10.4.19",
+    "postcss": "^8.4.38",
+    "tailwindcss": "^3.4.3",
+    "vite": "^5.2.8",
+    "vite-plugin-vue-devtools": "^7.0.25"
   },
   "devDependencies": {
     "@types/node": "^20.12.7",

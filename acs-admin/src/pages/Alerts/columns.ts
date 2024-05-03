@@ -24,6 +24,7 @@ export const columns: ColumnDef<Alert>[] = [{
         return h(Button,
             {
                 variant: 'ghost',
+                size: 'noPadding',
                 onClick: () => column.toggleSorting(column.getIsSorted() === 'asc'),
             },
             () => [h('div',
@@ -40,6 +41,7 @@ export const columns: ColumnDef<Alert>[] = [{
         return h(Button,
             {
                 variant: 'ghost',
+                size: 'noPadding',
                 onClick: () => column.toggleSorting(column.getIsSorted() === 'asc'),
             },
             () => [h('div',
@@ -56,6 +58,7 @@ export const columns: ColumnDef<Alert>[] = [{
         return h(Button,
             {
                 variant: 'ghost',
+                size: 'noPadding',
                 onClick: () => column.toggleSorting(column.getIsSorted() === 'asc'),
             },
             () => [h('div',

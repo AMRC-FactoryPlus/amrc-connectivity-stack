@@ -1,5 +1,5 @@
 <template>
-  <div class="flex flex-col">
+  <div class="flex flex-col flex-1">
     <div v-if="s.loaded && connected" id="app"
         class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 w-full gap-1 p-1 line">
       <div class="rounded-lg" :key="topic.path" :ref="topic.path" v-for="topic in topics">
@@ -33,11 +33,9 @@
         </Card>
       </div>
     </div>
-    <div class="flex items-center justify-center h-full" v-else>
-      <div v-if="connected === false"
-          class="bg-red-700 px-4 py-2 uppercase font-bold tracking-wider text-sm text-white mr-2">
-        Not Connected
-      </div>
+    <div class="flex flex-col gap-2 items-center justify-center flex-1 animate-pulse" v-else>
+      <div class="text-2xl font-semibold leading-none tracking-tight">Loading...</div>
+      <div class="text-sm text-slate-500 dark:text-slate-400">The activity monitor is loading</div>
     </div>
   </div>
 </template>

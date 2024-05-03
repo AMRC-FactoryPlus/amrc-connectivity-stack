@@ -36,8 +36,6 @@ export default defineConfig({
       '@pages': fileURLToPath(new URL('./src/pages', import.meta.url)),
       '@store': fileURLToPath(new URL('./src/store', import.meta.url)),
       '@amrc-factoryplus/utilities': '@amrc-factoryplus/service-client',
-      rxjs: fileURLToPath(new URL('./src/compat/rxjs.js', import.meta.url)),
-      immutable: fileURLToPath(new URL('./src/compat/immutable.js', import.meta.url)),
       got: path.resolve(__dirname, './emptyModule.js'),
       ["got-fetch"]: path.resolve(__dirname, './emptyModule.js'),
       ["gssapi.js"]: path.resolve(__dirname, './emptyModule.js'),

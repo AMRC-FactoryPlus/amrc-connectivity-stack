@@ -15,6 +15,9 @@ export default defineConfig({
   },
   build: {
     target: 'esnext',
+    rollupOptions: {
+      treeshake: 'safest'
+    }
   },
   optimizeDeps: {
     include: ['buffer'],
@@ -35,7 +38,6 @@ export default defineConfig({
       '@components': fileURLToPath(new URL('./src/components', import.meta.url)),
       '@pages': fileURLToPath(new URL('./src/pages', import.meta.url)),
       '@store': fileURLToPath(new URL('./src/store', import.meta.url)),
-      '@amrc-factoryplus/utilities': '@amrc-factoryplus/service-client',
       got: path.resolve(__dirname, './emptyModule.js'),
       ["got-fetch"]: path.resolve(__dirname, './emptyModule.js'),
       ["gssapi.js"]: path.resolve(__dirname, './emptyModule.js'),

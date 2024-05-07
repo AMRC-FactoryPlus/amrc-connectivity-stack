@@ -1,10 +1,10 @@
 import type {ColumnDef} from '@tanstack/vue-table'
 import {h} from 'vue'
 
-import DataTableColumnHeader from './DataTableColumnHeader.vue'
-import DataTableRowActions from './DataTableRowActions.vue'
+import DataTableColumnHeader from '@/components/ui/data-table/DataTableColumnHeader.vue'
+import DataTableRowActions from '@/components/ui/data-table/DataTableRowActions.vue'
 import {Badge} from '@/components/ui/badge'
-import TooltipCell from './Cells/TooltipCell.vue'
+import TooltipCell from '@/components/ui/data-table/cells/TooltipCell.vue'
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 

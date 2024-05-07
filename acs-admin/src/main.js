@@ -9,6 +9,7 @@ import App from './App.vue'
 import Home from '@pages/Home.vue'
 import Activity from '@pages/Activity.vue'
 import Alerts from '@pages/Alerts/Alerts.vue'
+import AccessControl from '@pages/AccessControl/AccessControl.vue'
 
 const routes = [
   {
@@ -32,6 +33,14 @@ const routes = [
     meta: {
       name: 'Alerts',
       icon: 'bell'
+    },
+  },
+  {
+    path: '/access-control',
+    component: AccessControl,
+    meta: {
+      name: 'Access Control',
+      icon: 'user-shield'
     },
   },
 ]

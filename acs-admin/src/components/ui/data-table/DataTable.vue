@@ -12,19 +12,19 @@ import {
 } from '@tanstack/vue-table'
 
 import {ref} from 'vue'
-import type {Alert} from './columns'
 import DataTablePagination from './DataTablePagination.vue'
 import DataTableToolbar from './DataTableToolbar.vue'
 import {valueUpdater} from '@/lib/utils'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow,} from '@/components/ui/table'
 import { useLayoutStore } from '@/store/layoutStore.js'
 
-interface DataTableProps {
-    columns: ColumnDef<Alert, any>[]
-    data: Alert[]
+interface DataTableProps<T> {
+    columns: ColumnDef<T, any>[]
+    data: T[],
+    filters: { name: string; property: string }[]
 }
 
-const props = defineProps<DataTableProps>()
+const props = defineProps<DataTableProps<any>>()
 
 const sorting = ref<SortingState>([{ id: 'since', desc: true }])
 const columnFilters = ref<ColumnFiltersState>([])
@@ -70,7 +70,7 @@ const table = useVueTable({
 
 <template>
   <div class="space-y-4">
-    <DataTableToolbar v-if="!l.fullscreen" :table="table"/>
+    <DataTableToolbar v-if="!l.fullscreen" :filters="filters" :table="table"/>
     <div class="rounded-md border">
       <Table>
         <TableHeader>
@@ -97,7 +97,7 @@ const table = useVueTable({
 
           <TableRow v-else>
             <TableCell
-                :colspan="columns.length"
+                :colspan="table.getVisibleLeafColumns().length"
                 class="h-24 text-center"
             >
               There are no active alerts

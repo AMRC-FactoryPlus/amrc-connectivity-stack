@@ -29,6 +29,12 @@ const sidebarNavItems: Item[] = [
         href: '/alerts',
         icon: 'bell',
         auth: true
+    },
+    {
+        title: 'Access Control',
+        href: '/access-control',
+        icon: 'user-shield',
+        auth: true
     }
 ]
 

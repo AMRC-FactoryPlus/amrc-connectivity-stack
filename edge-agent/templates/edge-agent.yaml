@@ -37,7 +37,7 @@ spec:
             - name: DEBUG
               value: {{ .Values.debug | quote }}
             - name: VERBOSE
-              value: "ALL,!token,!service"
+              value: {{ .Values.verbosity | quote }}
             - name: POLL_INT
               value: {{ .Values.poll_interval | quote }}
             - name: DIRECTORY_URL

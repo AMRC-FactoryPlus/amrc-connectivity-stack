@@ -6,6 +6,7 @@ image:
     tag: v3.0.0
     pullPolicy: IfNotPresent
 debug: false
+verbosity: ALL,!token,!service
 poll_int: 10
 authGroup:
   # This must be supplied on deployment. It specifies the Auth group to

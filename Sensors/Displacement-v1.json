@@ -1,0 +1,142 @@
+{
+  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Sensors/Displacement-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "b56aa0eb-5e01-4f32-ae96-a806ee858e64"
+    },
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "X": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Documentation": {
+              "default": null
+            },
+            "Sparkplug_Type": {
+              "enum": [
+                "Int8",
+                "Int16LE",
+                "Int16BE",
+                "Int32LE",
+                "Int32BE",
+                "Int64LE",
+                "Int64BE",
+                "FloatLE",
+                "FloatBE",
+                "DoubleLE",
+                "DoubleBE"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "Y": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Documentation": {
+              "default": null
+            },
+            "Sparkplug_Type": {
+              "enum": [
+                "Int8",
+                "Int16LE",
+                "Int16BE",
+                "Int32LE",
+                "Int32BE",
+                "Int64LE",
+                "Int64BE",
+                "FloatLE",
+                "FloatBE",
+                "DoubleLE",
+                "DoubleBE"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "Z": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Documentation": {
+              "default": null
+            },
+            "Sparkplug_Type": {
+              "enum": [
+                "Int8",
+                "Int16LE",
+                "Int16BE",
+                "Int32LE",
+                "Int32BE",
+                "Int64LE",
+                "Int64BE",
+                "FloatLE",
+                "FloatBE",
+                "DoubleLE",
+                "DoubleBE"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "Angle": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Documentation": {
+              "default": null
+            },
+            "Sparkplug_Type": {
+              "enum": [
+                "Int8",
+                "Int16LE",
+                "Int16BE",
+                "Int32LE",
+                "Int32BE",
+                "Int64LE",
+                "Int64BE",
+                "UInt8",
+                "UInt16LE",
+                "UInt16BE",
+                "UInt32LE",
+                "UInt32BE",
+                "UInt64LE",
+                "UInt64BE",
+                "FloatLE",
+                "FloatBE",
+                "DoubleLE",
+                "DoubleBE"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID"
+  ]
+}

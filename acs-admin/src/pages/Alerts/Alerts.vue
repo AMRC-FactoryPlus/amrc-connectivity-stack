@@ -1,13 +1,17 @@
 <template>
-  <DataTable :data="a.alerts" :columns="columns" :filters="[{
-    name: 'Type',
-    property: 'type',
-    options: types
-  }, {
-    name: 'Device',
-    property: 'device',
-    options: devices
-  }]"/>
+  <DataTable
+      :data="a.alerts"
+      :columns="columns"
+      :default-sort="[{ id: 'since', desc: true }]"
+      :filters="[{
+        name: 'Type',
+        property: 'type',
+        options: types
+      }, {
+        name: 'Device',
+        property: 'device',
+        options: devices
+      }]"/>
 </template>
 
 <script>
@@ -32,7 +36,7 @@ export default {
   },
 
   computed: {
-    types() {
+    types () {
       const types = new Set()
       this.a.alerts.forEach((a) => types.add({
         label: a.type,
@@ -41,14 +45,14 @@ export default {
       return Array.from(types)
     },
 
-    devices() {
+    devices () {
       const devices = new Set()
       this.a.alerts.forEach((a) => devices.add({
         label: a.device,
         value: a.device,
       }))
       return Array.from(devices)
-    }
+    },
   },
 
   mounted () {

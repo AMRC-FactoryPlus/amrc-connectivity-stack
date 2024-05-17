@@ -25,7 +25,7 @@ const a = useAlertsStore();
 <template>
   <div class="flex items-center justify-between">
     <div class="flex flex-1 items-center space-x-2">
-
+      <slot name="left"/>
       <DataTableFacetedFilter
           v-for="filter in filters"
           :key="filter.property"

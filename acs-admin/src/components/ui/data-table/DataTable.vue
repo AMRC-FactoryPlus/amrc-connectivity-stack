@@ -6,13 +6,13 @@ import {
     getFacetedRowModel,
     getFacetedUniqueValues,
     getFilteredRowModel,
-    getPaginationRowModel,
+    // getPaginationRowModel,
     getSortedRowModel,
     useVueTable,
 } from '@tanstack/vue-table'
 
 import {ref} from 'vue'
-import DataTablePagination from './DataTablePagination.vue'
+// import DataTablePagination from './DataTablePagination.vue'
 import DataTableToolbar from './DataTableToolbar.vue'
 import {valueUpdater} from '@/lib/utils'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow,} from '@/components/ui/table'
@@ -22,14 +22,18 @@ interface DataTableProps<T> {
     columns: ColumnDef<T, any>[]
     data: T[],
     filters: { name: string; property: string }[]
+    defaultSort?: SortingState,
+    empty?: string
 }
 
 const props = defineProps<DataTableProps<any>>()
 
-const sorting = ref<SortingState>([{ id: 'since', desc: true }])
+const sorting = ref<SortingState>(props.defaultSort || [])
 const columnFilters = ref<ColumnFiltersState>([])
 const columnVisibility = ref<VisibilityState>({})
 const rowSelection = ref({})
+
+
 
 const l =  useLayoutStore();
 
@@ -61,7 +65,7 @@ const table = useVueTable({
     onRowSelectionChange: updaterOrValue => valueUpdater(updaterOrValue, rowSelection),
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
+    // getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFacetedRowModel: getFacetedRowModel(),
     getFacetedUniqueValues: getFacetedUniqueValues(),
@@ -70,7 +74,11 @@ const table = useVueTable({
 
 <template>
   <div class="space-y-4">
-    <DataTableToolbar v-if="!l.fullscreen" :filters="filters" :table="table"/>
+    <DataTableToolbar v-if="!l.fullscreen" :filters="filters" :table="table">
+      <template #left>
+        <slot name="toolbar-left"></slot>
+      </template>
+    </DataTableToolbar>
     <div class="rounded-md border">
       <Table>
         <TableHeader>
@@ -88,6 +96,8 @@ const table = useVueTable({
                 v-for="row in table.getRowModel().rows"
                 :key="row.id"
                 :data-state="row.getIsSelected() && 'selected'"
+                class="cursor-pointer"
+                @click="$emit('row-click', row)"
             >
               <TableCell v-for="cell in row.getVisibleCells()" :key="cell.id">
                 <FlexRender :render="cell.column.columnDef.cell" :props="cell.getContext()"/>
@@ -100,13 +110,13 @@ const table = useVueTable({
                 :colspan="table.getVisibleLeafColumns().length"
                 class="h-24 text-center"
             >
-              There are no active alerts
+              {{ empty ?? 'No data' }}
             </TableCell>
           </TableRow>
         </TableBody>
       </Table>
     </div>
 
-    <DataTablePagination v-if="!l.fullscreen" :table="table"/>
+<!--    <DataTablePagination v-if="!l.fullscreen" :table="table"/>-->
   </div>
 </template>

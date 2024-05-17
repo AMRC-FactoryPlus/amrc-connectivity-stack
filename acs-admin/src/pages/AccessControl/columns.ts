@@ -34,4 +34,9 @@ export const columns: ColumnDef<PrincipalMapping>[] = [{
     filterFn: (row, id, value) => {
         return value.includes(row.getValue(id))
     },
+},{
+    id: 'actions',
+    cell: ({row}) => {
+        return h('i', {class: 'fa-solid fa-chevron-right'})
+    },
 }]

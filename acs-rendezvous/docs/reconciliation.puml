@@ -1,0 +1,39 @@
+@startuml
+
+participant     Consumer        as cn
+participant     Producer        as pr
+participant     Reconciler      as rc
+participant     MQTT            as sp
+participant     Rendezvous      as rv
+participant     Auth            as au
+
+rc -> rv    : Create device for me
+rv -> au    : Grant Reconciler access to RDev
+rv -> rc    : Return RDev
+rc -> rv    : Request change-notify for requests
+
+...
+cn -> rv    : Create device for me
+rv -> au    : Grant Consumer access to CDev
+rv -> cn    : Return CDev
+cn -> rv    : Publish request
+rv -> sp    : [DDATA RDev] Request changed
+sp -> rc
+rc -> rv    : Fetch request
+rv -> rc
+
+...
+pr -> sp    : [NBIRTH] Advertise schema
+sp -> rc
+rc -> au    : Grant Consumer access to PDev
+rc -> pr    : Configure PDev
+rc -> rv    : Publish response
+rv -> sp    : [DDATA CDev] Response changed
+sp -> cn
+cn -> rv    : Fetch response
+rv -> cn
+cn -> sp    : Subscribe and rebirth PDev
+pr -> sp    : [DBIRTH PDev]
+sp -> cn
+
+@enduml

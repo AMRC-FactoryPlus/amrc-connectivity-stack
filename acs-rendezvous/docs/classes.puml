@@ -1,0 +1,46 @@
+@startuml
+
+class UUID {}
+class Message {
+  id
+  owner
+}
+class Request {
+  responseType
+}
+class Response {
+  responseTo
+}
+class SchemaReq {
+  schema
+  metric
+}
+class DeviceRes {
+    device
+}
+
+metaclass CMessage {}
+metaclass CRequest {}
+metaclass CResponse {}
+
+Message <|-- Request
+Message <|-- Response
+
+CMessage <|-- CRequest
+CMessage <|-- CResponse
+
+Request <|-- SchemaReq
+
+Response <|-- DeviceRes
+
+CMessage <.. Message
+CRequest <.. Request
+CResponse <.. Response
+
+UUID <-- Message::id
+UUID <-- Message::owner
+CResponse <-- Request::responseType
+Request <- Response::responseTo
+UUID <-- SchemaReq::schema
+
+@enduml

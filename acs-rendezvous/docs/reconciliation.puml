@@ -7,33 +7,35 @@ participant     MQTT            as sp
 participant     Rendezvous      as rv
 participant     Auth            as au
 
-rc -> rv    : Create device for me
-rv -> au    : Grant Reconciler access to RDev
-rv -> rc    : Return RDev
-rc -> rv    : Request change-notify for requests
+== Reconciler setup ==
+rc -> rv    : Create listener
+rv -> au    : Grant Reconciler access to List-R
+rv -> rc    : Return List-R
+rc -> rv    : Create channel for requests
 
-...
-cn -> rv    : Create device for me
-rv -> au    : Grant Consumer access to CDev
-rv -> cn    : Return CDev
+== Consumer setup ==
+cn -> rv    : Create listener
+rv -> au    : Grant Consumer access to List-C
+rv -> cn    : Return List-C
+cn -> rv    : Create channel for responses
 cn -> rv    : Publish request
-rv -> sp    : [DDATA RDev] Request changed
+rv -> sp    : [DDATA List-R] Request changed
 sp -> rc
 rc -> rv    : Fetch request
 rv -> rc
 
-...
+== Producer becomes available ==
 pr -> sp    : [NBIRTH] Advertise schema
 sp -> rc
-rc -> au    : Grant Consumer access to PDev
-rc -> pr    : Configure PDev
+rc -> au    : Grant Consumer access to Dev-P
+rc -> pr    : Configure Dev-P
 rc -> rv    : Publish response
-rv -> sp    : [DDATA CDev] Response changed
+rv -> sp    : [DDATA List-C] Response changed
 sp -> cn
 cn -> rv    : Fetch response
 rv -> cn
-cn -> sp    : Subscribe and rebirth PDev
-pr -> sp    : [DBIRTH PDev]
+cn -> sp    : Subscribe and rebirth Dev-P
+pr -> sp    : [DBIRTH Dev-P]
 sp -> cn
 
 @enduml

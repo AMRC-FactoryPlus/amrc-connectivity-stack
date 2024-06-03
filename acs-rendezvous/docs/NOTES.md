@@ -53,85 +53,45 @@ Responses need to contain the following information:
     type: 99ab918e-8b9e-40c7-bfff-83a3ddb9db17
     responseTo: 0fb4fd72-60dd-4b31-862f-92ae834e4e3e
     devices:
-      - AMRC-F2050/Power_Monitoring/0fb4fd72-60dd-4b31-862f-92ae834e4e3e
+      - device: be7c6ed7-fa1b-4f24-bc0d-b94d787c40da
+        address: AMRC-F2050/Power_Monitoring/me1xxx
+        metric: Dynamic/a54fe
 ```
 
-The assumption is that consumers can parse the schema structure of the
-devices and locate the information they need.
+The devices identified will use the `Schema_UUID` _Dynamic_ 
+(`1d230cc3-4cc4-4a88-b1e5-f8a686704171`). The addresses returned are for
+convenience; consumers are expected to track the device via the
+Directory. The `metric` property gives the prefix of a folder containing
+a `Schema_UUID` metric matching the requested schema. The
+`Instance_UUID` in this folder will match that originally used by the
+source device, and can therefore be used to identify a particular data
+source across multiple dynamic deployment requests. Metrics not
+requested will not be present. 
 
-## General change-notify API
+## Rendezvous service API
 
-Several services provide change-notify. This is a general interface to
-replace/supplement the existing `Last_Changed` MQTT interface.
+The Rendezvous service is discovered via the Directory using the Service
+UUID `fa2b5b1b-d0b7-4f8d-9f26-c9560c84214b`.
 
-### HTTP interface
+The Rendezvous service supports the `/notify/v1` [standard change-notify
+interface](notify-v1.md). The old `Last_Changed` interface on the
+Service Node is not supported.
 
-    POST /v1/listener
+### Channels for the Rendezvous service
 
-Clients requiring change-notify service start by creating a listener
-using this endpoint. A listener is a Sparkplug Device under the
-service's Node providing change-notify metrics. The requesting principal
-will be granted access to the device in the Auth service.
+Two forms of channel are needed for the Rendezvous service: reconcilers
+need a channel over which they can watch all requests they understand,
+and consumers need a channel over which they can watch responses to
+their requests. Both can be served by a channel request containing a
+list of message types:
 
-The request body is empty. The response is an object:
+    types:
+        - bd7d5a31-d71e-4018-b165-8935fd38687d
 
-Property|Meaning
----|---
-`uuid`|Device UUID of the new device
-`address`|Sparkplug address of the new device
-
-A listener may be shared between multiple clients at the discretion of the
-service. The address is provided as a convenience only; consumers are
-expected to track the listener via the Directory.
-
-    POST /v1/listener/:device/channel
-
-Create a change-notify channel on the given Device. This will cause the
-Device to rebirth with new metrics supporting the new channel. The new
-metrics will be under a new metric folder; the contents of the folder
-depend on the service and the type of channel requested.
-
-The request body specifies the type of change-notify channel requested.
-The format depends on the individual service. The response is always an
-object:
-
-Property|Meaning
----|---
-`uuid`|A UUID identifying this channel
-`metric`|The metric folder prefix for this channel
-
-The metric folder may be shared with other channels at the discretion of
-the service. The channel UUID is unique to this request. There may or
-may not be an `Instance_UUID` metric in the channel metric folder, and
-it may or may not match the channel UUID.
-
-    PUT /v1/listener/:device/channel/:channel
-
-Update the channel definition. Request and response are as for the
-POST above. The metric folder in the response may be different from
-before. The service may refuse a change request by returning 409.
-
-    DELETE /v1/listener/:device/channel/:channel
-
-Removes a channel from the listener. The metric folder might not be
-removed if it was shared with other channels.
-
-### Sparkplug interface
-
-A listener is a Sparkplug Device under the service's Node containing
-Sparkplug metrics. A listener always uses the `Schema_UUID`
-Listener `97498ef5-bc8f-42a9-b8e5-32f729650313`. This has the following
-metric structure:
-
-    Expiry (DateTime)
-
-The listener may be deleted on or after this date if not refreshed. This
-is to ensure clients don't disappear without clearing up after
-themselves. Any valid CMD, including a rebirth request, will reset the
-expiry date further into the future; a CMD to set Expiry (to any value)
-will also be accepted, and will reset the expiry ignoring the value in
-the CMD.
-
-    Channels (Folder)
-
-The change-notify metrics will appear in folders under here.
+In both cases notifications will only be returned for messages the
+client is authorised to view; consumers which are not also reconcilers
+will in general only be authorised to view responses to their own
+requests. If listeners are shared between multiple app instances running
+under the same account, consumers will have to track which requests are
+theirs and filter out unwanted responses themselves; this should not be
+a problem.

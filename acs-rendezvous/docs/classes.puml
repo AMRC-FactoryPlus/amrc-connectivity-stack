@@ -1,46 +1,83 @@
 @startuml
 
-class UUID {}
-class Message {
-  id
-  owner
+class Principal {
+    uuid
+    kerberos
+    sparkplug
 }
+class Message {
+  uuid
+  owner
+  type
+  content
+}
+class MessageContent { }
 class Request {
   responseType
 }
 class Response {
   responseTo
 }
-class SchemaReq {
-  schema
-  metric
-}
-class DeviceRes {
-    device
+
+class MetricPath {
+    name
 }
 
-metaclass CMessage {}
+class Schema {
+    uuid
+    definition
+}
+class SchemaMetrics {
+    schema
+    metrics[]
+}
+class SchemaReq {
+    schemas[]
+}
+
+class Device {
+    uuid
+    address
+}
+class InstanceMetrics {
+    device
+    address
+    metric
+}
+class SparkplugRes {
+    instances[]   
+}
+
+metaclass CMessageContent {
+    uuid
+}
 metaclass CRequest {}
 metaclass CResponse {}
 
-Message <|-- Request
-Message <|-- Response
+MessageContent <|-- Request
+MessageContent <|-- Response
 
-CMessage <|-- CRequest
-CMessage <|-- CResponse
+CMessageContent <|-- CRequest
+CMessageContent <|-- CResponse
 
-Request <|-- SchemaReq
-
-Response <|-- DeviceRes
-
-CMessage <.. Message
+CMessageContent <.. MessageContent
 CRequest <.. Request
 CResponse <.. Response
 
-UUID <-- Message::id
-UUID <-- Message::owner
+Principal <-- Message::owner
+CMessageContent <-- Message::type
+MessageContent <-- Message::content
 CResponse <-- Request::responseType
 Request <- Response::responseTo
-UUID <-- SchemaReq::schema
+
+Request <|-- SchemaReq
+SchemaMetrics <-- SchemaReq::schemas
+Schema <-- SchemaMetrics::schema
+MetricPath <-- SchemaMetrics::metrics
+
+Response <|-- SparkplugRes
+InstanceMetrics <-- SparkplugRes::instances
+Device <-- InstanceMetrics::device
+MetricPath <-- InstanceMetrics::metric
 
 @enduml

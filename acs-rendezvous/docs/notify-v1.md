@@ -105,3 +105,7 @@ expiry date to some point in the future.
 
 This is always published as False. A CMD to set it to True will reset
 the expiry date without any other side-effect.
+
+All metrics published by a listener should have `is_transient` set to
+True. A record of the notifications is not useful without a
+corresponding record of the data behind them.

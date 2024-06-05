@@ -130,7 +130,8 @@ All topics are under the namespace `fpEdge1`. Each driver then
 communicates using topics under its own connection name. The Edge Agent
 SHOULD disallow publish or subscribe packets to other topics.
 
-In these examples the connection name `Conn` will be used.
+In these examples the connection name `Conn` will be used. Where
+necessary the data topic name `Data` will also be used.
 
     fpEdge1/Conn/status
 
@@ -182,39 +183,56 @@ any time.
 
     fpEdge1/Conn/data/Data
 
-This represents a family of topics, where `Data` is a data topic name
-sent by the Edge Agent. The driver MUST publish to these topics whenever
-it has a new data packet required by the current address configuration.
-The driver is not expected to avoid sending duplicate data packets.
+The driver MUST publish to this topic whenever it has a new data packet
+required by the current address configuration. The driver is not
+expected to avoid sending duplicate data packets.
 
-The driver MAY publish to these topics asynchronously if its southbound
+The driver MAY publish to this topic asynchronously if its southbound
 data source is asynchronous. The driver SHOULD NOT attempt to poll on a
 timer, leaving that up to the Edge Agent.
 
+    fpEdge1/Conn/cmd/Data
+
+The driver subscribes to these topics, preferably with a wildcard
+subscription. The Edge Agent publishes to these topics to write data to
+the driver's southbound device.
+
+When the Edge Agent publishes to this topic, the driver SHOULD attempt
+to write the data to its southbound device at the location given by the
+corresponding address. If the driver is unable or unwilling to write to
+the given address it should report an `RO` address error. Drivers MAY
+refuse to write to southbound devices in general.
+
     fpEdge1/Conn/err/Data
 
-This represents a family of topics, where `Data` is a data topic name.
-The driver publishes to these topics to report an error with a
-particular address.
+The driver publishes to this topic to report an error with a particular
+address.
 
-If the driver has a problem reading an address included in the current
+If the driver has a problem accessing an address included in the current
 address configuration, it MUST publish a single string from the table
 below to the appropriate error topic. If the driver later succeeds in
-reading from the address it MUST clear the error by publishing an empty
+accessing the address it MUST clear the error by publishing an empty
 message to the error topic. The driver MUST NOT publish to a data topic
 when an error has been reported.
 
 Every time the driver publishes `UP` to the status topic this clears all
-reported address errors. If the driver has a problem reading an address
-which is likely to indicate a problem communicating with the southbound
-device altogether, the driver SHOULD report this via the driver status
-topic rather than an individual error topic.
+reported address errors. If the driver has a problem accessing an
+address which is likely to indicate a problem communicating with the
+southbound device altogether, the driver SHOULD report this via the
+driver status topic rather than an individual error topic.
 
 Error code|Meaning
 ---|---
 `CONN`|Connection problem
 `AUTH`|Authentication or authorisation problem
+`RO`|The Edge Agent has attempted to `cmd` a readonly address
+`WO`|The Edge Agent has attempted to `poll` a writeonly address
+`CMD`|The Edge Agent has sent a `cmd` which is not acceptable
 `ERR`|Some other error condition
+
+The `CMD` code is for situations where the Edge Agent has published to a
+`cmd` topic, and the driver believes it can write to the address, but
+the format of the data packet supplied is not suitable for some reason.
 
     fpEdge1/Conn/poll
 

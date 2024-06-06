@@ -4,7 +4,7 @@ This repository contains Helm Charts deployed automatically to edge
 clusters by ACS v3.
 
 Normally an installation of ACS will clone a copy of this repo into its
-internal on-prem Git server. From their the edge clusters will pull the
+internal on-prem Git server. From there the edge clusters will pull the
 Helm charts using Flux.
 
 Helm charts are made available from the Manager by creating 
@@ -68,6 +68,8 @@ Pick a name for the new chart. This needs to be unique and meaningful.
 Ideally it doesn't want to conflict with any existing ACS service or
 application. This description will use `new-app`.
 
+### Create the chart directory
+
 Create a new directory at the top of this repo named after your chart
 name. This directory contains the chart; see [the Helm
 documentation](https://helm.sh/docs/topics/charts/) for the format. The
@@ -90,6 +92,8 @@ minumum necessary is:
 
 * `templates`: A directory containing YAML files, with Helm templating,
   which deploy the correct Kubernetes objects.
+
+### Writing the templates
 
 Writing the templates requires some knowledge of the Helm template
 language. A certain amount can be picked up by looking at the existing
@@ -114,26 +118,73 @@ Label|Value
 `factory-plus.nodeUuid`|Deployment UUID
 `factory-plus.name`|Name supplied to the deployment
 
+* Pods (including pod templates inside Deployments) need to make sure
+  they are deployed to the correct host.
+
 * Where a Service is needed to provide access to a deployed container,
   this should normally have `internalTrafficPolicy: Local`. This will
   only make the Service available on the host the container is running
   on. While this is not a robust security measure it helps.
 
+### Deploying to the correct host
+
+Deploying Pods to the correct host requires two things:
+
+* Setting `nodeSelector`.
+* Setting tolerations so that the Pod will deploy to tainted hosts.
+
+Taints are set on certain hosts to avoid floating and infrastructure
+pods being deployed there. For example, a Pi might be tainted, or a cell
+gateway that is frequently turned off without warning. Deployments
+pushed to a specific host need to tolerate these taints or Kubernetes
+will refuse to schedule the pod.
+
+Pod templates within Deployments should contain this section:
+
+    {{ if .Values.hostname }}
+          nodeSelector:
+            kubernetes.io/hostname: {{ .Values.hostname | quote }}
+          tolerations:
+            - key: factoryplus.app.amrc.co.uk/specialised
+              operator: Exists
+    {{ end }}
+
+This only sets the toleration for host-specific deployments. This will
+require
+
+    values:
+      hostname: "{{hostname}}"
+
+in the _Helm chart template_ to pass the hostname through the values
+file.
+
+### Deploying the chart to the edge
+
 Once the chart is written, commit it to Git and get it pushed to your
 internal Git server. There are three ways to accomplish this:
 
-* Create a PR and get it accepted. When a new version of ACS is
-  released, upgrade to the new version. The new chart will be pulled
-  down automatically. We are unlikely to be possible for an untested
-  chart.
+* Changes that are accepted into an ACS release will be pushed to all
+  installations which are using the default settings. Untested charts
+  are unlikely to be accepted into a release.
 
-* Push to a branch, on this repo or a clone. Change the service-setup
-  config of your ACS installation to pull from your new branch. This
-  will require adjusting your ACS `values.yaml` and redeploying.
+* Push to a branch on this repo, a clone on public Github, or a clone
+  created on your own infrastructure. Change the service-setup config of
+  your ACS installation to pull from your new branch/repo. This will
+  require adjusting your ACS `values.yaml` and redeploying.
 
 * Clone the edge helm charts repo in your internal ACS git server and
-  push to it directly. This will stop your internal mirror from updating
-  from Github when you upgrade ACS.
+  push to `main` directly. This will stop your internal mirror from
+  updating from Github when you upgrade ACS.
+
+To use the last option, clone the repo
+`https://git.BASE/git/shared/helm` where `BASE` is your ACS `baseUrl`.
+(Use `http` if you have an insecure deployment). Any commit pushed to
+`main` on this repo will be deployed to the edge clusters.
+
+When ACS is upgraded the automatic pull performed by service-setup will
+update the `acs` branch. If `main` has moved away from `acs` then
+service-setup won't update `main`, you will need to merge the changes
+manually.
 
 Now create a _Helm chart template_ (see the previous section) so you can
 deploy your new chart.

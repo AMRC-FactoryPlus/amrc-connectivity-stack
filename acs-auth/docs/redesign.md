@@ -223,12 +223,12 @@ from arrays and strings.
 
 Notation:
 
-  ∈           Group membership
-  ⊂           Group subset
-  →           Permission template definition
-  u:[]        Permission grant
-  u:<t i>     Identity
-  ⇒           Permission expansion
+    ∈           Group membership
+    ⊂           Group subset
+    →           Permission template definition
+    u:[]        Permission grant
+    u:<t i>     Identity
+    ⇒           Permission expansion
 
 Titlecase strings represent UUIDs. Lowercase strings represent JSON
 strings. JSON arrays are represented without commas. JSON objects allow
@@ -255,21 +255,21 @@ contents are abbreviated where there is a lot of repetition.
     ReadOwnConfig → [[app]
       [ReadConfig: { app: [app], obj: [principal] }]]
 
-    SpTopic → [[addr]
+    SpTopic → [[type addr]
       [if [has [addr] device] 
         [format "spBv1.0/%s/N%s/%s" 
-          [addr group] [addr type] [addr node]]
+          [get [addr] group] [type] [get [addr] node]]
         [format "spBv1.0/%s/D%s/%s" 
-          [addr group] [addr type] [addr node] [addr device]]]]
+          [get [addr] group] [type] [get [addr] node] [get [addr] device]]]]
     ParticipateAsNode → [[]
-      [let [addr [id [principal] sparkplug]]
-        [map t 
-          [let [base [merge [addr] { type: [t] }]]
-            [Publish [SpTopic [base]]]
-            [Publish [SpTopic [merge [base] { device: "+" }]]]]
-          "BIRTH" "DEATH" "DATA"]
-        [Subscribe [SpTopic [merge [addr] { type: "CMD" }]]]
-        [Subscribe [SpTopic [merge [addr] { type: "CMD", device: "+" }]]]]]
+      [let [node [id [principal] sparkplug]]
+        [map [addr
+            [Publish [SpTopic "BIRTH" [addr]]]
+            [Publish [SpTopic "DATA" [addr]]]
+            [Publish [SpTopic "DEATH" [addr]]]
+            [Subscribe [SpTopic "CMD" [addr]]]]
+          [node]
+          [merge [node] { device: "+" }]]]]
 
     # Groups and identities
     ConfigDB ∈ SparkplugNode
@@ -292,22 +292,30 @@ contents are abbreviated where there is a lot of repetition.
       Node:[ReadConfig { app: Address, obj: Node }]
 
     Node:[ParticipateAsNode]
-    ⇒ [map t 
-        [list
-          [Publish [SpTopic [merge {g:n:} {type:[t]}]]]
-          [Publish [SpTopic [merge {g:n:} {type:[t],device:"+"}]]]]
-        "BIRTH", "DEATH", "DATA"]
-      [Subscribe [SpTopic [merge {g:n:} {type:"CMD"}]]]
-      [Subscribe [SpTopic [merge {g:n:} {type:"CMD",device:"+"}]]]
+    ⇒ [map [addr
+          [Publish [SpTopic "BIRTH" [addr]]]
+          [Publish [SpTopic "DATA" [addr]]]
+          [Publish [SpTopic "DEATH" [addr]]]
+          [Subscribe [SpTopic "CMD" [addr]]]]
+        { group: "Group", node: "Node" }
+        [merge { group: "Group", node: "Node" } { device: "+" }]]
 
-    ⇒ [Publish [SpTopic {g: n: type: "BIRTH"}]]
-      [Publish [SpTopic {g: n: type: "DEATH"}]]
-      [Publish [SpTopic {g: n: type: "DATA"}]]
-      [Publish [SpTopic {g: n: type: "BIRTH", device: +}]]
-      [Publish [SpTopic {g: n: type: "DEATH", device: +}]]
-      [Publish [SpTopic {g: n: type: "CMD", device: +}]]
-      [Subscribe [SpTopic {g: n: type: "CMD"}]]
-      [Subscribe [SpTopic {g: n: type: "DATA", device: +}]]
+    ⇒ [map [addr
+          [Publish [SpTopic "BIRTH" [addr]]]
+          [Publish [SpTopic "DATA" [addr]]]
+          [Publish [SpTopic "DEATH" [addr]]]
+          [Subscribe [SpTopic "CMD" [addr]]]]
+        { group: "Group", node: "Node" }
+        { group: "Group", node: "Node", device: "+" }]
+
+    ⇒ [Publish [SpTopic "BIRTH" {g: n:}]]
+      [Publish [SpTopic "DATA" {g: n:}]]
+      [Publish [SpTopic "DEATH" {g: n:}]]
+      [Subscribe [SpTopic "CMD" {g: n:}]]
+      [Publish [SpTopic "BIRTH" {g: n: d: +}]]
+      [Publish [SpTopic "DATA" {g: n: d: +}]]
+      [Publish [SpTopic "DEATH" {g: n: d: +}]]
+      [Subscribe [SpTopic "CMD" {g: n: d: +}]]
 
       # Under this system we can expand all the way out to the topic
       # ACLs the MQTT broker actually wants.
@@ -323,7 +331,8 @@ contents are abbreviated where there is a lot of repetition.
 #### Consuming Sparkplug data
 
     ReadAddress → [[addr]
-      [map t [Subscribe [SpTopic [merge [addr] { type: [t] }]]]
+      [map [t
+          [Subscribe [SpTopic [merge [addr] { type: [t] }]]]]
         "BIRTH" "DEATH" "DATA"]]
 
     # We can be more specific with CCL ACEs
@@ -338,8 +347,8 @@ contents are abbreviated where there is a lot of repetition.
 
     ConsumeNode → [[node]
       [let [addr [id [node] sparkplug]]
-        [map a [list [ReadAddress [a]] [Rebirth [a]]]
-          [addr] 
+        [map [a [ReadAddress [a]] [Rebirth [a]]]
+          [addr]
           [merge [addr] { device: "+" }]]]]
     ConsumeAddress → [[addr]
       [ReadAddress [a]]
@@ -350,7 +359,7 @@ contents are abbreviated where there is a lot of repetition.
     # A permission template expanding to permissions for more than one
     # service.
     ClusterManager:[ConsumeNode ConfigDB]
-    ⇒ [map a [list [ReadAddress [a]] [Rebirth [a]]]
+    ⇒ [map [a [ReadAddress [a]] [Rebirth [a]]]
         { g: n: }
         [merge {g: n:} {device: "+"}]]
 
@@ -405,7 +414,7 @@ be expecting groups, and expecting to expand them.
         [WriteIdentity { uuid: Mine, kerberos: [format "*/%s@REALM", [group]] }]
         [WriteIdentity { uuid: Mine,
           kerberos: [format "nd1/%s/*@REALM" [group]] }]]
-      [map g [ManageGroup {group: [g], member: Mine}]
+      [map [g [ManageGroup {group: [g], member: Mine}]]
         [members EdgeGroups]]
     ]
 
@@ -435,13 +444,18 @@ an ACE a template definition needs to be created to contain the `map`.
 In this case a template would have been required anyway, as the
 `ManageGroup` base permission now required a structured target.
 
-#### Dynamic device requirements
+#### Change-notify Devices
 
 A simple scheme for allowing certain Nodes to grant read access to their
-Devices might look like this. This relies on a ManageACL permission
-which puts limits on the contents of the target rather than simply
-requiring the target to be in a group. It is also limited to direct
-grants to a Node to manage its own Devices.
+Devices might look like this. This is limited to direct grants to a Node
+to manage its own Devices.
+
+This also relies on a ManageACL permission which puts limits on the
+contents of the target rather than simply requiring the target to be in
+a group; given the general nature of targets under this design it's not
+clear how this would work in general. One possibility might be: perform
+a JSON merge patch of the template onto the proposed target; if the
+result changes then the test fails.
 
     DynamicNodes ⊂ SparkplugNodes
 
@@ -452,6 +466,8 @@ grants to a Node to manage its own Devices.
         node: [[id [principal] sparkplug] node]
       }]
 
+#### Dynamic deployment
+
 A more general scheme for allowing dynamic ACLs on Devices relies on
 ownership. In general an 'ordinary' Device published by a Node will need
 to be created in the services by the Directory. This means the Directory
@@ -460,16 +476,13 @@ published it. It also means there will be a delay before the Node is
 authorised to set permissions on a new Device.
 
 This scheme unavoidably depends on Directory lookups to make
-authorisation decisions. The only alternative would be for the Directory
-to store the current location of every Device in the Auth service, but I
-don't think that's a good idea.
+authorisation decisions. In this case the Directory lookup will need to
+be performed by the MQTT broker, and the broker will need to use
+change-notify to track changes to the Device address.
 
     GiveToGroup → [[group]
-      [map m [ChangeOwner { from: [principal], to: [m] }]
+      [map [m [ChangeOwner { from: [principal], to: [m] }]]
         [members [group]]]]
-    OwnGrant → [[permissions]
-      [map perm [ManageACL { permission: [perm], target: Mine }]
-        [members [permissions]]]]
 
     DeviceAddress → [[device]
       [let [info [lookup DirectorySvc "v1/device/" [device]]]]
@@ -485,7 +498,14 @@ don't think that's a good idea.
     Directory:[GiveToGroup SparkplugNodes]
     
     DynamicNodes ⊂ SparkplugNodes
-    DynamicNodes:[OwnGrant ConsumeDevice]
+    DynamicNodes:[ManageACL {
+      principal: SparkplugConsumers,
+      permission: ConsumeDevice,
+      target: Mine }]
+
+This version of ManageACL expects a group for each of principal,
+permission, target. As usual the permission entry `ConsumeDevice`, which
+is not a group, is expanded by `members` as a singleton group.
 
 Here `lookup` is a new builtin which performs a Factory+ Service API
 call. It takes three parameters: a service function UUID, a path, and

@@ -252,7 +252,7 @@ be expecting groups, and expecting to expand them.
       [ReadConfig { app: Info, obj: Mine }]
       [WriteConfig { app: Info, obj: Mine }]
       [ReadIdentity { uuid: Mine }]
-      [let [group [[id [cluster] sparkplug] group]]
+      [let [group [get [id [cluster] sparkplug] group]]
         [WriteIdentity { uuid: Mine, sparkplug: {group: [group]} }]
         [WriteIdentity { uuid: Mine, kerberos: [format "*/%s@REALM", [group]] }]
         [WriteIdentity { uuid: Mine,
@@ -305,8 +305,8 @@ result changes then the test fails.
     DynamicNodes:[ManageACL {
       permission: ConsumeAddress,
       target: {
-        group:  [[id [principal] sparkplug] group],
-        node: [[id [principal] sparkplug] node]
+        group:  [get [id [principal] sparkplug] group],
+        node: [get [id [principal] sparkplug] node]
       }]
 
 ### Dynamic deployment
@@ -330,11 +330,15 @@ delay before the ACLs change.
         [members [group]]]]
 
     DeviceAddress → [[device]
-      [let [info [lookup DirectorySvc "v1/device/" [device]]]]
-        { group:  [[info] "group_id"],
-          node: [[info] "node_id"],
-          device: [[info] "device_id"]
-        }]
+      [let [info [lookup DirectorySvc "v1/device/" [device]]]
+        [if [has [info] "device_id"]
+          { group:  [get [info] "group_id"],
+            node:   [get [info] "node_id"],
+            device: [get [info] "device_id"],
+          }
+          { group:  [get [info] "group_id"],
+            node:   [get [info] "node_id"],
+          }]]
     ConsumeDevice → [[device]
       [ConsumeAddress [DeviceAddress [device]]]]
 
@@ -358,5 +362,16 @@ call. It takes three parameters: a service function UUID, a path, and
 object ID should only be used for services supporting
 [../acs-rendezvous/docs/notify-v1.md](the new notify-v1 interface) and
 which allow the base path to be used as a channel URL.
+
+This definition of `DeviceAddress` results in a lot of deferred
+evaluation, as the `[if]` depends on the result from the Directory. If
+we adjust the Directory API to return what we need directly we can use a
+direct call:
+
+    DeviceAddress → [[device]
+      [lookup DirectorySvc "v1/device/address/" [device]]]
+
+which does not result in so much work being deferred to the consuming
+service.
 
 vi:set sts=2 sw=2:

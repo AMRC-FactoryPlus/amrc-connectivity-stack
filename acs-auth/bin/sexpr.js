@@ -53,6 +53,8 @@ export function evaluate (depth, definitions, expr) {
                 Object.entries(expr)
                     .map(([k, v]) => [k, sc(v)]))];
 
+    /* Now that we have [get], and given that we don't have lambdas, I'm
+     * not sure this evaluation is needed any more. */
     const name = sc(expr[0]);
 
     if (Array.isArray(name))
@@ -60,8 +62,8 @@ export function evaluate (depth, definitions, expr) {
 
     const letbind = (bind, body) => {
         const entries = new Map(definitions);
-        /* No recursive bindings */
         for (let i = 0; i < bind.length; i += 2)
+            /* This is let* */
             entries.set(bind[i], eve(bind[i + 1], entries));
         return body.flatMap(v => eve(v, entries));
     };

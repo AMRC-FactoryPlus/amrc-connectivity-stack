@@ -15,6 +15,7 @@ import {reHashConf} from "../utils/FormatConfig.js";
 
 // Import device connections
 import {SparkplugNode} from "./sparkplugNode.js";
+import {DriverBroker} from "./driverBroker.js";
 
 // Import devices
 import {RestConnection, RestDevice} from "./devices/REST.js";
@@ -55,6 +56,7 @@ export class Translator extends EventEmitter {
      */
     sparkplugNode!: SparkplugNode
     fplus: ServiceClient
+    broker: DriverBroker
     pollInt: number
 
     connections: {
@@ -64,10 +66,11 @@ export class Translator extends EventEmitter {
         [index: string]: any
     }
 
-    constructor(fplus: ServiceClient, pollInt: number) {
+    constructor(fplus: ServiceClient, pollInt: number, broker: DriverBroker) {
         super();
 
         this.fplus = fplus;
+        this.broker = broker;
         this.pollInt = pollInt;
         this.connections = {};
         this.devices = {};
@@ -95,6 +98,11 @@ export class Translator extends EventEmitter {
 
             // Setup Sparkplug node handlers
             this.setupSparkplug();
+
+            log("Starting driver broker...");
+            this.broker.on("message", (d, t, p) => 
+                log(`Driver message: ${d} ${t}`));
+            this.broker.start();
         } catch (e: any) {
             log(`Error starting translator: ${e.message}`);
             console.error((e as Error).stack);
@@ -119,6 +127,8 @@ export class Translator extends EventEmitter {
             log(`Closing connection ${connection._type}`);
             connection.close();
         }));
+        log("Stopping driver broker...");
+        await this.broker.stop();
         log('Waiting for sparkplug node to stop...');
         await this.sparkplugNode?.stop();
 

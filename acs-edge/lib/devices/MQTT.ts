@@ -107,7 +107,7 @@ export class MQTTConnection extends DeviceConnection {
      * @param delimiter
      */
     writeMetrics(metrics: Metrics, writeCallback: Function, payloadFormat?: string, delimiter?: string) {
-        let err = null;
+        let err: Error|null = null;
         metrics.addresses.forEach((addr) => {
             let payload = writeValuesToPayload(metrics.getByAddress(addr), payloadFormat || "");
             if (payload && payload.length) {

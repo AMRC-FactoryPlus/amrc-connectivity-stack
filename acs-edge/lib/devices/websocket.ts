@@ -47,7 +47,7 @@ export class WebsocketConnection extends DeviceConnection {
    * @param {Array} metrics Array of metric objects to write to device connection
    */
   writeMetrics(metrics: Metrics, writeCallback: Function, payloadFormat?: string, delimiter?: string) {
-    let err = null;
+    let err: Error|null = null;
     let payload = writeValuesToPayload(metrics.array, payloadFormat || "");
     if (payload && payload.length) {
       this.#ws.send(payload, (err) => {

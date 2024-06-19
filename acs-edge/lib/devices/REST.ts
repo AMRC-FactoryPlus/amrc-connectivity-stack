@@ -55,7 +55,7 @@ export class RestConnection extends (
      */
     async readMetrics(metrics: Metrics, payloadFormat?: string, delimiter?: string) {
         if (payloadFormat && payloadFormat !== "Defined by Protocol") {
-            await Promise.all(metrics.addresses.map(async (addr) => {
+            await Promise.all(metrics.addresses.filter(e => e !== 'undefined').map(async (addr) => {
                 let res: AxiosResponse = {data: [], status: -1, statusText: "", headers: "", config: {}};
                 let subAddr = addr.match(/\${(\d):(\w)}/);
                 if (subAddr && subAddr.length > 1) {

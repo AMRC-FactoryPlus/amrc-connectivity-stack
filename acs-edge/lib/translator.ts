@@ -314,16 +314,13 @@ export class Translator extends EventEmitter {
 
         if (!valid) log("Config is invalid or nonexistent, ignoring");
 
-        const rv = {
+        return {
             sparkplug: {
                 nodeControl: config?.sparkplug, configRevision: etag, alerts: {
                     configFetchFailed: !config, configInvalid: !valid,
                 },
             }, deviceConnections: conns,
         };
-
-        log(`Mapped config: ${JSON.stringify(config)}\n->\n${JSON.stringify(rv)}`);
-        return rv;
     }
 
     async retry<RV>(what: string, fetch: () => Promise<RV>): Promise<RV> {

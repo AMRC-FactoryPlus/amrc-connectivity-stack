@@ -117,6 +117,7 @@ export class RestConnection extends (
         // Try to get a response
         return axios.get(this.#baseURL + address, optionsOverride || this.#axiosOptions)
             .catch((err: AxiosError) => {
+                console.log('Error in GET request', err);
                 if (axios.isAxiosError(err)) {
                     if (err.response) {
                         // The request was made and the server responded with a status code

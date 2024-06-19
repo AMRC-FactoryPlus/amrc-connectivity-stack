@@ -11,7 +11,7 @@ import util from "util";
 import Aedes from "aedes";
 
 const prefix = "fpEdge1";
-const topicrx = new RegExp(`^${prefix}/(\\w+)/(.*)`);
+const topicrx = new RegExp(`^${prefix}/(\\w+)/(\\w+)(?:/(\\w+))?$`);
 
 function log (f, ...a) {
     const msg = util.format(f, ...a);
@@ -124,7 +124,7 @@ export class DriverBroker extends EventEmitter {
             return;
         }
 
-        const [, id, path] = match;
-        this.emit("message", id, path, payload);
+        const [, id, msg, data] = match;
+        this.emit("message", { id, msg, data, payload });
     }
 }

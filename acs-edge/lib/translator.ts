@@ -3,7 +3,11 @@
  *  Copyright 2023 AMRC
  */
 
+import {EventEmitter} from "events";
+import fs from "fs";
 import timers from "timers/promises";
+import util from "util";
+
 import type {Identity} from "@amrc-factoryplus/utilities";
 import {ServiceClient} from "@amrc-factoryplus/utilities";
 
@@ -13,11 +17,14 @@ import {ServiceClient} from "@amrc-factoryplus/utilities";
 import {validateConfig} from '../utils/CentralConfig.js';
 import {reHashConf} from "../utils/FormatConfig.js";
 
-// Import device connections
-import {SparkplugNode} from "./sparkplugNode.js";
+import {Device, deviceOptions} from "./device.js";
 import {DriverBroker} from "./driverBroker.js";
+import {SparkplugNode} from "./sparkplugNode.js";
+import * as UUIDs from "./uuids.js";
 
-// Import devices
+import {log} from "./helpers/log.js";
+import {sparkplugConfig,} from "./helpers/typeHandler.js";
+
 import {RestConnection, RestDevice} from "./devices/REST.js";
 import {S7Connection, S7Device} from "./devices/S7.js";
 import {OPCUAConnection, OPCUADevice} from "./devices/OPCUA.js";
@@ -26,12 +33,6 @@ import {UDPConnection, UDPDevice} from "./devices/UDP.js";
 import {WebsocketConnection, WebsocketDevice} from "./devices/websocket.js";
 import {MTConnectConnection, MTConnectDevice} from "./devices/MTConnect.js";
 import {EtherNetIPConnection, EtherNetIPDevice} from "./devices/EtherNetIP.js";
-import {log} from "./helpers/log.js";
-import {sparkplugConfig,} from "./helpers/typeHandler.js";
-import {Device, deviceOptions} from "./device.js";
-import * as UUIDs from "./uuids.js";
-import {EventEmitter} from "events";
-import fs from "node:fs";
 
 /**
  * Translator class basically turns config file into instantiated classes
@@ -100,8 +101,8 @@ export class Translator extends EventEmitter {
             this.setupSparkplug();
 
             log("Starting driver broker...");
-            this.broker.on("message", (d, t, p) => 
-                log(`Driver message: ${d} ${t}`));
+            this.broker.on("message", msg => 
+                log(util.format("Driver message: %O", msg)));
             this.broker.start();
         } catch (e: any) {
             log(`Error starting translator: ${e.message}`);

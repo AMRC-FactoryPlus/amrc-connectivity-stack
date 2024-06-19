@@ -97,7 +97,7 @@ export class Translator extends EventEmitter {
             this.setupSparkplug();
         } catch (e: any) {
             log(`Error starting translator: ${e.message}`);
-            console.log((e as Error).stack);
+            console.error((e as Error).stack);
 
             // If the config is giving us errors we'll stop here
             log(`Error starting translator.`);
@@ -285,12 +285,17 @@ export class Translator extends EventEmitter {
             const configString = JSON.stringify(config);
 
             // Then, replace all occurrences of __FPSI_<v4UUID> with the
-            // actual secret of the same name from /etc/secrets
+            // actual secret of the same name from the secret path
+
+            // If the SECRETS_PATH is set in the environment, use that as the secret path, otherwise use the default
+            const secretBasePath = process.env.SECRETS_PATH || '/etc/secrets';
+
             const secretReplacedConfig = configString.replace(/__FPSI__[a-f0-9-]{36}/g, (match) => {
                 try {
                     // Attempt to get the secret contents from the file in /etc/secrets with the same name
-                    const secretPath = `/etc/secrets/${match}`;
-                    return fs.readFileSync(secretPath, 'utf8');
+                    const secretPath = `${secretBasePath}/${match}`;
+                    const val = fs.readFileSync(secretPath, 'utf8');
+                    return val;
                 } catch (err: any) {
                     // Handle error (e.g., file not found) gracefully
                     console.error(`Error reading secret from ${match}: ${err.message}`);
@@ -316,10 +321,14 @@ export class Translator extends EventEmitter {
 
         return {
             sparkplug: {
-                nodeControl: config?.sparkplug, configRevision: etag, alerts: {
-                    configFetchFailed: !config, configInvalid: !valid,
+                nodeControl: config?.sparkplug,
+                configRevision: etag,
+                alerts: {
+                    configFetchFailed: !config,
+                    configInvalid: !valid,
                 },
-            }, deviceConnections: conns,
+            },
+            deviceConnections: conns,
         };
     }
 

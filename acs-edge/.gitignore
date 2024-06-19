@@ -28,3 +28,4 @@ build/
 *.js
 *.js.*
 /lib/git-version.ts
+local_secrets

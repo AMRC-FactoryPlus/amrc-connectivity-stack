@@ -51,6 +51,7 @@ export abstract class DeviceConnection extends EventEmitter {
     #intHandles: {
         [index: string]: ReturnType<typeof setInterval>
     }
+    #subHandles: Map<string, any>
 
     /**
      * Basic class constructor, doesn't do much. Must emit a 'ready' event when complete.
@@ -63,7 +64,10 @@ export abstract class DeviceConnection extends EventEmitter {
         this._type = type;
         // Define object of polling interval handles for each device
         this.#intHandles = {};
+        // Collection of subscription handles
+        this.#subHandles = new Map();
         // Emit ready event
+        /* XXX this has no listeners */
         this.emit('ready');
     }
 
@@ -101,6 +105,24 @@ export abstract class DeviceConnection extends EventEmitter {
     }
 
     /**
+     * Perform any setup needed to read from certain addresses, e.g. set
+     * up MQTT subscriptions. This does not attempt to detect duplicate
+     * requests.
+     * @param addresses Addresses to start watching
+     */
+    async subscribe (addresses: string[]): Promise<any> {
+        return null;
+    }
+
+    /**
+     * Undo any setup performed by `subscribe`.
+     * @param addresses Addresses to stop watching
+     */
+    async unsubscribe (handle: any): Promise<void> {
+        return;
+    }
+
+    /**
      *
      * @param metrics Metrics object to watch
      * @param payloadFormat String denoting the format of the payload
@@ -109,8 +131,9 @@ export abstract class DeviceConnection extends EventEmitter {
      * @param deviceId The device ID whose metrics are to be watched
      * @param subscriptionStartCallback A function to call once the subscription has been setup
      */
-    startSubscription(metrics: Metrics, payloadFormat: serialisationType, delimiter: string, interval: number, deviceId: string, subscriptionStartCallback: Function) {
-
+    async startSubscription(metrics: Metrics, payloadFormat: serialisationType, delimiter: string, interval: number, deviceId: string, subscriptionStartCallback: Function) {
+        this.#subHandles.set(deviceId, 
+            await this.subscribe(metrics.addresses));
         this.#intHandles[deviceId] = setInterval(() => {
             this.readMetrics(metrics, payloadFormat, delimiter);
 
@@ -123,9 +146,11 @@ export abstract class DeviceConnection extends EventEmitter {
      * @param deviceId The device ID we are cancelling the subscription for
      * @param stopSubCallback A function to call once the subscription has been cancelled
      */
-    stopSubscription(deviceId: string, stopSubCallback: Function) {
+    async stopSubscription(deviceId: string, stopSubCallback: Function) {
         clearInterval(this.#intHandles[deviceId]);
         delete this.#intHandles[deviceId];
+        await this.unsubscribe(this.#subHandles.get(deviceId));
+        this.#subHandles.delete(deviceId);
         stopSubCallback();
     }
 
@@ -142,7 +167,7 @@ export abstract class DeviceConnection extends EventEmitter {
 /**
  * Device class represents both the proprietary connection and Sparkplug connections for a device
  */
-export abstract class Device {
+export class Device {
 
     #spClient: SparkplugNode                        // The sparkplug client
     #devConn: DeviceConnection                      // The associated device connection to this device
@@ -236,8 +261,8 @@ export abstract class Device {
             this.#populateTemplates(options.templates);
         }
         // Add default metrics to the device metrics object
-        // To be populated further by child class as custom manipulations need to take place
         this._metrics = new Metrics(this._defaultMetrics);
+        this._metrics.add(options.metrics);
         // Flag to keep track of device online status
         this.#isAlive = false;
 

@@ -39,6 +39,18 @@ export class MyConnection extends DeviceConnection {
         this.emit("open");
     }
 
+    async subscribe (addresses: string[]): Promise<any> {
+        // Here you prepare to read from the requested addresses. Return
+        // some suitable value that will allow you to undo what you did
+        // here: this might be the `addresses` array, or it might be
+        // something else.
+        return addresses;
+    }
+
+    async unsubscribe (handle: any): Promise<void> {
+        // Undo what you did in `subscribe`.
+    }
+
     /**
      * 
      * @param metrics Metrics object
@@ -72,27 +84,5 @@ export class MyConnection extends DeviceConnection {
      */
     async close() {
         // Do whatever cleanup code you need to here
-    }
-};
-
-
-/**
- * Define device for your device type
- */
-export class MyDevice extends Device {
-    // Declare any class attributes and types here
-    #devConn: MyConnection
-    constructor(spClient: SparkplugNode, devConn: MyConnection, options: deviceOptions) {
-        super(spClient, devConn, options);
-        // Assign device connection to class attribute
-        this.#devConn = devConn;
-
-        // Add metrics from options argument
-        // NOTE: You may need to do some preprocessing here
-        this._metrics.add(options.metrics);
-
-        // When ready, you must set this._isConnected to true to indicate to the parent class
-        this._isConnected = true;
-        log(`${this._name} ready`);
     }
 };

@@ -25,14 +25,14 @@ import * as UUIDs from "./uuids.js";
 import {log} from "./helpers/log.js";
 import {sparkplugConfig,} from "./helpers/typeHandler.js";
 
-import {RestConnection, RestDevice} from "./devices/REST.js";
-import {S7Connection, S7Device} from "./devices/S7.js";
-import {OPCUAConnection, OPCUADevice} from "./devices/OPCUA.js";
-import {MQTTConnection, MQTTDevice} from "./devices/MQTT.js";
-import {UDPConnection, UDPDevice} from "./devices/UDP.js";
-import {WebsocketConnection, WebsocketDevice} from "./devices/websocket.js";
-import {MTConnectConnection, MTConnectDevice} from "./devices/MTConnect.js";
-import {EtherNetIPConnection, EtherNetIPDevice} from "./devices/EtherNetIP.js";
+import {RestConnection} from "./devices/REST.js";
+import {S7Connection} from "./devices/S7.js";
+import {OPCUAConnection} from "./devices/OPCUA.js";
+import {MQTTConnection} from "./devices/MQTT.js";
+import {UDPConnection} from "./devices/UDP.js";
+import {WebsocketConnection} from "./devices/websocket.js";
+import {MTConnectConnection} from "./devices/MTConnect.js";
+import {EtherNetIPConnection} from "./devices/EtherNetIP.js";
 
 /**
  * Translator class basically turns config file into instantiated classes
@@ -45,7 +45,6 @@ export interface translatorConf {
 }
 
 interface deviceInfo {
-    type: any,
     connection: any;
     connectionDetails: any
 }
@@ -188,10 +187,12 @@ export class Translator extends EventEmitter {
         }
 
         // Instantiate device connection
-        const newConn = this.connections[cType] = new deviceInfo.connection(connection.connType, connection[deviceInfo.connectionDetails]);
+        const newConn = this.connections[cType] = new deviceInfo.connection(
+            connection.connType, connection[deviceInfo.connectionDetails]);
 
         connection.devices?.forEach((devConf: deviceOptions) => {
-            this.devices[devConf.deviceId] = new deviceInfo.type(this.sparkplugNode, newConn, devConf);
+            this.devices[devConf.deviceId] = new Device(
+                this.sparkplugNode, newConn, devConf);
         });
 
         // What to do when the connection is open
@@ -226,35 +227,35 @@ export class Translator extends EventEmitter {
         switch (connType) {
             case "REST":
                 return {
-                    type: RestDevice, connection: RestConnection, connectionDetails: 'RESTConnDetails'
+                    connection: RestConnection, connectionDetails: 'RESTConnDetails'
                 }
             case "MTConnect":
                 return {
-                    type: MTConnectDevice, connection: MTConnectConnection, connectionDetails: 'MTConnectConnDetails'
+                    connection: MTConnectConnection, connectionDetails: 'MTConnectConnDetails'
                 }
             case "EtherNet/IP":
                 return {
-                    type: EtherNetIPDevice, connection: EtherNetIPConnection, connectionDetails: 'EtherNetIPConnDetails'
+                    connection: EtherNetIPConnection, connectionDetails: 'EtherNetIPConnDetails'
                 }
             case "S7":
                 return {
-                    type: S7Device, connection: S7Connection, connectionDetails: 's7ConnDetails'
+                    connection: S7Connection, connectionDetails: 's7ConnDetails'
                 }
             case "OPC UA":
                 return {
-                    type: OPCUADevice, connection: OPCUAConnection, connectionDetails: 'OPCUAConnDetails'
+                    connection: OPCUAConnection, connectionDetails: 'OPCUAConnDetails'
                 }
             case "MQTT":
                 return {
-                    type: MQTTDevice, connection: MQTTConnection, connectionDetails: 'MQTTConnDetails'
+                    connection: MQTTConnection, connectionDetails: 'MQTTConnDetails'
                 }
             case "Websocket":
                 return {
-                    type: WebsocketDevice, connection: WebsocketConnection, connectionDetails: 'WebsocketConnDetails'
+                    connection: WebsocketConnection, connectionDetails: 'WebsocketConnDetails'
                 }
             case "UDP":
                 return {
-                    type: UDPDevice, connection: UDPConnection, connectionDetails: 'UDPConnDetails'
+                    connection: UDPConnection, connectionDetails: 'UDPConnDetails'
 
                 }
             default:

@@ -65,35 +65,3 @@ export class WebsocketConnection extends DeviceConnection {
     this.#ws.close()
   }
 };
-
-
-export class WebsocketDevice extends Device {
-  #devConn: WebsocketConnection
-  constructor(spClient: SparkplugNode, devConn: WebsocketConnection, options: deviceOptions) {
-    super(spClient, devConn, options);
-    this.#devConn = devConn;
-
-    this._metrics.add(options.metrics);
-
-    // Define function for handling data pushed to device asynchronously
-    // this.#devConn.on("asyncData", async (msg: any) => {
-    //   // console.log(msg);
-    //   let changedMetrics: sparkplugMetric[] = [];
-    //   for (let i = 0; i < this._metrics.array.length; i++) {
-    //     const metric = this._metrics.array[i];
-    //     if (metric.properties.path.value
-    //       && (metric.properties.method.value as string).search(/^GET/g) > -1) {
-    //       const newVal = parseValueFromPayload(msg, metric, this._payloadFormat, this._delimiter);
-    //       if (!util.isDeepStrictEqual(metric.value, newVal)) {
-    //         this._metrics.setValueByIndex(i, newVal);
-    //         changedMetrics.push(this._metrics.array[i]);
-    //       }
-    //     }
-    //   }
-    //   if (changedMetrics.length) {
-    //     this.onConnData(changedMetrics);
-    //   }
-    // });
-  }
-
-};

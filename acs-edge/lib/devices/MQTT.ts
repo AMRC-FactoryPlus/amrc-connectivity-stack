@@ -91,12 +91,24 @@ export class MQTTConnection extends DeviceConnection {
         this.emit('data', {});
     }
 
-    async subscribe(topic: string) {
-        this.#client.subscribe(topic, (err) => {
-            if (err) {
-                console.log(err);
-            }
-        });
+    async subscribe (addresses: string[]) {
+        const topics = addresses.filter(t => t);
+        const granted = await this.#client.subscribeAsync(topics);
+        const failed = granted
+            .filter(g => g.qos == 128)
+            .map(g => g.topic)
+            .join(", ");
+        if (failed)
+            log(`⚠️ Could not subscribe to southbound topics: ${failed}`);
+        return granted
+            .filter(g => g.qos != 128)
+            .map(g => g.topic);
+    }
+
+    /* This accepts the return value from `subscribe`. */
+    async unsubscribe (handle: any) {
+        const topics = handle as string[];
+        await this.#client.unsubscribeAsync(topics);
     }
 
     /**
@@ -128,34 +140,3 @@ export class MQTTConnection extends DeviceConnection {
     }
 }
 
-
-export class MQTTDevice extends Device {
-    #devConn: MQTTConnection
-
-    constructor(spClient: SparkplugNode, devConn: MQTTConnection, options: deviceOptions) {
-        super(spClient, devConn, options);
-        this.#devConn = devConn;
-
-        this._metrics.add(options.metrics);
-        this._metrics.addresses.forEach((topic) => {
-            if (topic) this.#devConn.subscribe(topic);
-        })
-
-        // Define function for handling data pushed to device asynchronously
-        // this.#devConn.on("asyncData", async (topic: string, msg: any) => {
-        //   let changedMetrics: sparkplugMetric[] = [];
-        //   this._metrics.getPathsForAddr(topic).forEach((path) => {
-        //     const targetMetric = this._metrics.getByAddrPath(topic, path);
-        //     const newVal = parseValueFromPayload(msg, targetMetric, this._payloadFormat, this._delimiter);
-        //     if (!util.isDeepStrictEqual(targetMetric.value, newVal)) {
-        //       this._metrics.setValueByAddrPath(topic, path, newVal);
-        //       changedMetrics.push(targetMetric);
-        //     }
-        //   })
-        //   if (changedMetrics.length) {
-        //     this.onConnData(changedMetrics);
-        //   }
-        // });
-    }
-
-}

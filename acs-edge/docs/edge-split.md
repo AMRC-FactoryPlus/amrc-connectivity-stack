@@ -17,12 +17,31 @@ This represents a particular data source within a driver's southbound
 device. The address itself is a string in a driver-specific format. The
 driver can read an address, the result of which is a binary data packet.
 
+### Address group
+
+Addresses may be collected into groups and each group is assigned a name
+by the Edge Agent. Each group may be assigned a poll interval, which
+indicates the frequency at which the Edge Agent would like to receive
+updates to the addresses in the group. A single address MAY appear in
+more than one group.
+
 ### Address configuration
 
 A configuration packet passed from the Edge Agent to the driver
-specifying the addresses currently in use and their data topic names.
-This MUST take the form of a JSON object mapping from data topic name to
-address.
+specifying the addresses currently in use and their data topic names. A
+given address MUST NOT be associated with more than one data topic name
+within a given address configuration. The address configuration is in
+JSON form and is an object with these properties:
+
+* `version`: The integer `1`.
+* `addrs`: An object whose keys are data topic names and whose values
+  are addresses.
+* `groups`: An object whose keys are group names and whose values are
+  objects with these properties:
+    * `addrs`: An array of data topic names from the top-level `addrs`
+      property.
+    * `poll`: An integer giving the requested poll interval in
+      milliseconds for this group.
 
 ### Asynchronous (driver address)
 
@@ -165,6 +184,16 @@ this topic.
 The driver MUST NOT publish data packets when the most recent message
 published to this topic is anything other than `UP`.
 
+    fpEdge1/Conn/active
+
+The driver subscribes to this topic. All messages MUST be a single
+string, either `ONLINE` or `OFFLINE`, indicating whether the Edge Agent
+expects this driver to be active. On receipt of an `ONLINE` status, the
+driver MUST publish its current status to its `status` topic. On receipt
+of an `OFFLINE` status, the driver MUST discard any configuration and
+revert to `READY` status, and SHOULD disconnect from its data sources if
+possible.
+
     fpEdge1/Conn/conf
 
 The driver subscribes to this topic. The Edge Agent MUST publish the
@@ -180,6 +209,22 @@ use it to configure its southbound connection. The Edge Agent MUST
 republish the address configuration every time it publishes a driver
 configuration. The Edge Agent MAY publish a new address configuration at
 any time. 
+
+A driver receiving a `version` it does not recognise MUST set its status
+to `CONF`. A driver MUST accept and ignore additional keys it does not
+recognise. The Edge Agent MUST NOT supply additional keys except in
+compliance with an updated version of this specification.
+
+The driver SHOULD only attempt to honour a requested poll interval if
+its device connection provides facilities for polling a set of
+addresses. If data is not provided by the driver on time the Edge Agent
+MUST poll explicitly.
+
+If a driver is performing polling it SHOULD attempt to provide new
+values for all addresses in a group in quick succession. The Edge Agent
+MUST assume that any reported value stands until a new value is
+reported and MAY choose to batch values reported upstream over
+Sparkplug.
 
     fpEdge1/Conn/data/Data
 

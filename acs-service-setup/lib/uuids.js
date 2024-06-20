@@ -11,6 +11,9 @@ export const ACS = {
         UserAccount:        "8b3e8f35-78e5-4f93-bf21-7238bcb2ba9d",
         UserGroup:          "f1fabdd1-de90-4399-b3da-ccf6c2b2c08b",
     },
+    App: {
+        SchemaIcon:         "65c0ccba-151d-48d3-97b4-d0026a811900",
+    },
     /* XXX These should probably be deployment-specific */
     Group: {
         Administrators:     "10fc06b7-02f5-45f1-b419-a486b6bc13ba",
@@ -37,6 +40,14 @@ export const ACS = {
         Directory:              "58b5da47-d098-44f7-8c1d-6e4bd800e718",
         Git:                    "c0c55c78-116e-4526-8ff4-e4595251f76c",
         MQTT:                   "a637134a-d06b-41e7-ad86-4bf62fde914a",
+    },
+    Schema: {
+        ThreePhaseCircuitV1:    "0d3dbae6-3195-4249-9ca1-897221db016f",
+        DirectCurrentCircuitV1: "462a55a1-d942-4fe8-83ff-63f66bf069d4",
+        PowerMonitoringV1:      "481dbce2-cabc-4fb1-b402-ee51f49f62b0",
+        PowerMonitoringV2:      "b6253da7-8d95-455c-bc42-23693ca95d46",
+        SinglePhaseCircuitV1:   "d6de8765-bfbe-4f6b-b5d8-822dbd7f3a49",
+        MonitorV1:              "e3ef732b-ee69-46f0-8d1d-8a9cec432d83",
     },
     Service: {
         Manager:                "619eecab-742d-4824-8b97-bcae472e5c04",

@@ -9,8 +9,8 @@ import fs_p from "fs/promises";
 import path from "path";
 import util from "util";
 
-import git from "@amrc-factoryplus/git-client";
-import http from "@amrc-factoryplus/git-client/http/node/index.js";
+import git from "isomorphic-git";
+import http from "isomorphic-git/http/node/index.js";
 import yaml from "yaml";
 
 import { Debug, UUIDs } from "@amrc-factoryplus/utilities";

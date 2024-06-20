@@ -10,7 +10,7 @@ import process from "process";
 
 import cgi from "cgi";
 import express from "express";
-import git from "@amrc-factoryplus/git-client";
+import git from "isomorphic-git";
 
 import { Debug, UUIDs } from "@amrc-factoryplus/utilities";
 

@@ -9,11 +9,8 @@ import k8s              from "@kubernetes/client-node";
 import rx               from "rxjs";
 
 import * as rxx         from "@amrc-factoryplus/rx-util";
-import { Debug, ServiceError, UUIDs } from "@amrc-factoryplus/utilities";
 
 import { Edge }             from "./uuids.js";
-
-const debug = new Debug();
 
 const LABELS = {
     host:           "kubernetes.io/hostname",

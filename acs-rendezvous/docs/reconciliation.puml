@@ -1,0 +1,41 @@
+@startuml
+
+participant     Consumer        as cn
+participant     Producer        as pr
+participant     Reconciler      as rc
+participant     MQTT            as sp
+participant     Rendezvous      as rv
+participant     Auth            as au
+
+== Reconciler setup ==
+rc -> rv    : Create listener
+rv -> au    : Grant Reconciler access to List-R
+rv -> rc    : Return List-R
+rc -> rv    : Create channel for requests
+
+== Consumer setup ==
+cn -> rv    : Create listener
+rv -> au    : Grant Consumer access to List-C
+rv -> cn    : Return List-C
+cn -> rv    : Create channel for responses
+cn -> rv    : Publish request
+rv -> sp    : [DDATA List-R] Request changed
+sp -> rc
+rc -> rv    : Fetch request
+rv -> rc
+
+== Producer becomes available ==
+pr -> sp    : [NBIRTH] Advertise schema
+sp -> rc
+rc -> au    : Grant Consumer access to Dev-P
+rc -> pr    : Configure Dev-P
+rc -> rv    : Publish response
+rv -> sp    : [DDATA List-C] Response changed
+sp -> cn
+cn -> rv    : Fetch response
+rv -> cn
+cn -> sp    : Subscribe and rebirth Dev-P
+pr -> sp    : [DBIRTH Dev-P]
+sp -> cn
+
+@enduml

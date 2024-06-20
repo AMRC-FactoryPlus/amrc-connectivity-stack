@@ -1,0 +1,83 @@
+@startuml
+
+class Principal {
+    uuid
+    kerberos
+    sparkplug
+}
+class Message {
+  uuid
+  owner
+  type
+  content
+}
+class MessageContent { }
+class Request {
+  responseType
+}
+class Response {
+  responseTo
+}
+
+class MetricPath {
+    name
+}
+
+class Schema {
+    uuid
+    definition
+}
+class SchemaMetrics {
+    schema
+    metrics[]
+}
+class SchemaReq {
+    schemas[]
+}
+
+class Device {
+    uuid
+    address
+}
+class InstanceMetrics {
+    device
+    address
+    metric
+}
+class SparkplugRes {
+    instances[]   
+}
+
+metaclass CMessageContent {
+    uuid
+}
+metaclass CRequest {}
+metaclass CResponse {}
+
+MessageContent <|-- Request
+MessageContent <|-- Response
+
+CMessageContent <|-- CRequest
+CMessageContent <|-- CResponse
+
+CMessageContent <.. MessageContent
+CRequest <.. Request
+CResponse <.. Response
+
+Principal <-- Message::owner
+CMessageContent <-- Message::type
+MessageContent <-- Message::content
+CResponse <-- Request::responseType
+Request <- Response::responseTo
+
+Request <|-- SchemaReq
+SchemaMetrics <-- SchemaReq::schemas
+Schema <-- SchemaMetrics::schema
+MetricPath <-- SchemaMetrics::metrics
+
+Response <|-- SparkplugRes
+InstanceMetrics <-- SparkplugRes::instances
+Device <-- InstanceMetrics::device
+MetricPath <-- InstanceMetrics::metric
+
+@enduml

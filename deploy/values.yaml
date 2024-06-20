@@ -90,6 +90,14 @@ configdb:
     repository: acs-configdb
     pullPolicy: IfNotPresent
 
+monitor:
+  enabled: true
+  image:
+    registry: ghcr.io/amrc-factoryplus
+    repository: acs-monitor
+    pullPolicy: IfNotPresent
+  verbosity: "ALL,!service,!token"
+
 # -- The service-setup component loads ACS-specific configuration into
 # the ACS services when the Helm chart is deployed or upgraded.
 serviceSetup:

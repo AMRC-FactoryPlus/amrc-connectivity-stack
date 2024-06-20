@@ -3,6 +3,8 @@
  *  Copyright 2023 AMRC
  */
 
+import util from "util";
+
 import * as dotenv from 'dotenv'
 dotenv.config();
 
@@ -22,4 +24,8 @@ export function log(msg: String) {
             }
         }
     }
+}
+
+export function logf (fmt, ...args) {
+    log(util.format(fmt, ...args));
 }

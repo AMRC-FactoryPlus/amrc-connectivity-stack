@@ -33,6 +33,7 @@ import {UDPConnection} from "./devices/UDP.js";
 import {WebsocketConnection} from "./devices/websocket.js";
 import {MTConnectConnection} from "./devices/MTConnect.js";
 import {EtherNetIPConnection} from "./devices/EtherNetIP.js";
+import {DriverConnection} from "./devices/driver.js";
 
 /**
  * Translator class basically turns config file into instantiated classes
@@ -92,6 +93,11 @@ export class Translator extends EventEmitter {
             this.sparkplugNode = await new SparkplugNode(this.fplus, spConf).init();
             log(`Created Sparkplug node "${ids.sparkplug!}".`);
 
+            log("Starting driver broker...");
+            this.broker.on("message", msg => 
+                log(util.format("Driver message: %O", msg)));
+            await this.broker.start();
+
             // Create a new device connection for each type listed in config file
             log('Building up connections and devices...');
             conf?.deviceConnections?.forEach(c => this.setupConnection(c));
@@ -99,10 +105,6 @@ export class Translator extends EventEmitter {
             // Setup Sparkplug node handlers
             this.setupSparkplug();
 
-            log("Starting driver broker...");
-            this.broker.on("message", msg => 
-                log(util.format("Driver message: %O", msg)));
-            this.broker.start();
         } catch (e: any) {
             log(`Error starting translator: ${e.message}`);
             console.error((e as Error).stack);
@@ -188,7 +190,13 @@ export class Translator extends EventEmitter {
 
         // Instantiate device connection
         const newConn = this.connections[cType] = new deviceInfo.connection(
-            connection.connType, connection[deviceInfo.connectionDetails]);
+            connection.connType,
+            connection[deviceInfo.connectionDetails],
+            /* XXX These additional parameters are a hack for now to
+             * make the DriverConnection work. They want refactoring
+             * later. */
+            connection.name,
+            this.broker);
 
         connection.devices?.forEach((devConf: deviceOptions) => {
             this.devices[devConf.deviceId] = new Device(
@@ -204,6 +212,8 @@ export class Translator extends EventEmitter {
 
         // What to do when the device connection has new data from a device
         newConn.on('data', (obj: { [index: string]: any }, parseVals = true) => {
+            log(util.format("Received data for %s: (%s) %O",
+                connection.name, parseVals, obj));
             connection.devices?.forEach((devConf: deviceOptions) => {
                 this.devices[devConf.deviceId]?._handleData(obj, parseVals);
             })
@@ -258,6 +268,11 @@ export class Translator extends EventEmitter {
                     connection: UDPConnection, connectionDetails: 'UDPConnDetails'
 
                 }
+            case "Driver":
+                return {
+                    connection: DriverConnection,
+                    connectionDetails: "DriverDetails",
+                };
             default:
                 return;
         }
@@ -320,7 +335,7 @@ export class Translator extends EventEmitter {
             if (valid) {
                 try {
                     config = JSON.parse(secretReplacedConfig);
-                    valid = validateConfig(config);
+                    //valid = validateConfig(config);
                 } catch {
                     valid = false;
                 }

@@ -10,7 +10,7 @@ import * as jsonpointer from 'jsonpointer';
 import * as Long from "long";
 import {MessageSecurityMode, SecurityPolicy} from "node-opcua";
 import {Address} from "@amrc-factoryplus/utilities";
-import {log} from "./log.js";
+import {log, logf} from "./log.js";
 
 export enum serialisationType {
     ignored = "Defined by Protocol",
@@ -356,6 +356,8 @@ export class Metrics {
 export function parseValueFromPayload(msg: any, metric: sparkplugMetric, payloadFormat: serialisationType | string, delimiter?: string) {
     let payload: any;
     const path = (typeof metric.properties !== "undefined" && typeof metric.properties.path !== "undefined" ? metric.properties.path.value as string : "");
+    logf("parseValueFP: path [%s], fmt [%s], type [%s], msg [%o]",
+        path, payloadFormat, metric.type, msg);
     switch (payloadFormat) {
         case serialisationType.delimited:
             // Handle no delimiter
@@ -596,6 +598,8 @@ export function typeLens(type: string): number {
  */
 export function parseValFromBuffer(type: sparkplugDataType, endianness: byteOrder, byteAddr: number, buf: Buffer, bit?: number): any {
 
+    logf("parseValFB: addr %s, bit %s, end %s, typ %s, buf: %O",
+        byteAddr, bit, endianness, type, buf);
     switch (type) {
         case sparkplugDataType.boolean:
             if (bit != null) {

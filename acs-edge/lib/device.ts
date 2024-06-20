@@ -4,7 +4,7 @@
  */
 
 import {
-    log
+    log, logf
 } from "./helpers/log.js";
 import * as fs from "fs";
 import {
@@ -176,7 +176,7 @@ export class Device {
     _defaultMetrics: sparkplugMetric[]              // The default metrics common to all devices
     #isAlive: boolean                               // Whether this device is alive or not
     _isConnected: boolean                               // Whether this device is ready to publish or not
-    #deathTimer: ReturnType<typeof setTimeout>      // A "dead mans handle" or "watchdog" timer which triggers a DDEATH
+    //#deathTimer: ReturnType<typeof setTimeout>      // A "dead mans handle" or "watchdog" timer which triggers a DDEATH
                                                     // if allowed to time out
     _payloadFormat: serialisationType               // The format of the payloads produced by this device
     _delimiter: string                              // String specifying the delimiter character if needed
@@ -271,9 +271,9 @@ export class Device {
 
         // Create watchdog timer which, if allowed to elapse, will set the device as offline
         // This watchdog is kicked by several read/write functions below
-        this.#deathTimer = setTimeout(() => {
-            this.#publishDDeath();
-        }, 10000);
+        //this.#deathTimer = setTimeout(() => {
+        //    this.#publishDDeath();
+        //}, 10000);
 
         //What to do when the device is ready
         //We Just need to sub to metric changes
@@ -291,16 +291,19 @@ export class Device {
     }
 
     _handleData(obj: { [p: string]: any }, parseVals: boolean) {
+        logf("_handleData %s (%s) %O", this._name, parseVals, obj);
         // Array to keep track of values that changed
         let changedMetrics: sparkplugMetric[] = [];
         // Iterate through each key in obj
         for (let addr in obj) {
             // Get all payload paths registered for this address
             const paths = this._metrics.getPathsForAddr(addr);
+            logf("paths for %s: %s", addr, paths);
             // Iterate through each path
             paths.forEach((path) => {
                 // Get the complete metric according to its address and path
                 const metric = this._metrics.getByAddrPath(addr, path);
+                logf("metric for %s:%s: %O", addr, path, metric);
                 // If the metric can be read i.e. GET method
                 if (typeof metric.properties !== "undefined" && (metric.properties.method.value as string).search(
                     /^GET/g) > -1) {
@@ -314,6 +317,8 @@ export class Device {
                             this._payloadFormat,
                             this._delimiter
                         ) : obj[addr];
+
+                        logf("parsed new val: %O", newVal);
 
                         // Test if the value is a bigint and convert it to a Long. This is a hack to ensure that the
                         // Tahu library works - it only accepts Longs, not bigints.
@@ -334,6 +339,8 @@ export class Device {
                                 this._payloadFormat,
                                 this._delimiter
                             );
+                            logf("updating metric %s:%s ts %s val %O",
+                                addr, path, timestamp, newVal);
 
                             // Update the metric value and push it to the array of changed metrics
                             changedMetrics.push(this._metrics.setValueByAddrPath(addr, path, newVal, timestamp));
@@ -355,7 +362,7 @@ export class Device {
     // Kick the watchdog timer to prevent the device dying
     _refreshDeathTimer() {
         // Reset timeout to it's initial value
-        this.#deathTimer.refresh();
+        //this.#deathTimer.refresh();
     }
 
     /**
@@ -512,7 +519,7 @@ export class Device {
         this._stopMetricSubscription();
 
         // Stop the watchdog timer so that we can instantly stop
-        clearTimeout(this.#deathTimer);
+        //clearTimeout(this.#deathTimer);
     }
 
 

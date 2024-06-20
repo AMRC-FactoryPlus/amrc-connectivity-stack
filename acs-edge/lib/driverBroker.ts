@@ -18,11 +18,15 @@ function log (f, ...a) {
     console.log("DRIVER: %s", msg);
 }
 
+interface ACL {
+    publish:    RegExp,
+    subscribe:  RegExp,
+}
+
 export class DriverBroker extends EventEmitter {
     broker:     Aedes
     passwords:  string
-    publish:    Map<string, RegExp>
-    subscribe:  Map<string, RegExp>
+    acl:        Map<string, ACL>
     hostname:   string
     port:       number
 
@@ -42,8 +46,7 @@ export class DriverBroker extends EventEmitter {
         this.passwords = env.EDGE_PASSWORDS;
 
         this.broker = new Aedes();
-        this.publish = new Map();
-        this.subscribe = new Map();
+        this.acl = new Map();
 
         const br = this.broker;
         br.authenticate = this.auth.bind(this);
@@ -58,9 +61,13 @@ export class DriverBroker extends EventEmitter {
 
     start () {
         const srv = net.createServer(this.broker.handle);
-        srv.on("listening", () => 
-            log("Listening: %o", srv.address()));
-        srv.listen(this.port, this.hostname);
+        return new Promise<void>(resolve => {
+            srv.once("listening", () => {
+                log("Listening: %o", srv.address());
+                resolve();
+            });
+            srv.listen(this.port, this.hostname);
+        });
     }
 
     stop () {
@@ -84,11 +91,13 @@ export class DriverBroker extends EventEmitter {
             return fail("Unexpected driver %s", username);
         if (expect.compare(password) != 0)
             return fail("Bad password for %s", username);
-
-        this.publish.set(id, new RegExp(
-            `^${prefix}/${id}/(?:status|data/\\w+|err/\\w+)$`));
-        this.subscribe.set(id, new RegExp(
-            `^${prefix}/${id}/(?:conf|addr|cmd/\\w+|poll)$`));
+        
+        this.acl.set(id, {
+            publish: new RegExp(
+                `^${prefix}/${id}/(?:status|data/\\w+|err/\\w+)$`),
+            subscribe: new RegExp(
+                `^${prefix}/${id}/(?:active|conf|addr|cmd/\\w+|poll)$`),
+        });
 
         callback(null, true);
     }
@@ -100,7 +109,7 @@ export class DriverBroker extends EventEmitter {
         log("PUBLISH: %s %s", id, topic);
         if (packet.retain)
             return callback(new Error("Retained PUBLISH forbidden"));
-        if (!this.publish.get(id)!.test(topic))
+        if (!this.acl.get(id)!.publish.test(topic))
             return callback(new Error("Unauthorised PUBLISH"));
         callback(null);
     }
@@ -110,7 +119,7 @@ export class DriverBroker extends EventEmitter {
         const { topic } = subscription;
 
         log("SUBSCRIBE: %s %s", id, topic);
-        if (!this.subscribe.get(id)!.test(topic))
+        if (!this.acl.get(id)!.subscribe.test(topic))
             return callback(new Error("Unauthorised SUBSCRIBE"));
         callback(null, subscription);
     }
@@ -126,5 +135,21 @@ export class DriverBroker extends EventEmitter {
 
         const [, id, msg, data] = match;
         this.emit("message", { id, msg, data, payload });
+    }
+
+    publish (packet: { id, msg, data?, payload }): Promise<void> {
+        const { id, msg, data, payload } = packet;
+
+        const topic = `${prefix}/${id}/${msg}` 
+            + (data ? `/${data}` : "");
+        log("Publishing %s: %O", topic, packet);
+        return new Promise((resolve, reject) =>
+            this.broker.publish({
+                cmd:    "publish",
+                qos:    0,
+                dup:    false,
+                retain: false,
+                topic, payload,
+            }, err => err ? reject(err) : resolve()));
     }
 }

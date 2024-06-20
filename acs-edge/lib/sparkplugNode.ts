@@ -12,7 +12,7 @@ import {
     ServiceClient, 
 } from "@amrc-factoryplus/utilities";
 
-import { log } from "./helpers/log.js";
+import { log, logf } from "./helpers/log.js";
 import {
     metricIndex,
     Metrics,
@@ -412,8 +412,10 @@ export class SparkplugNode extends (
      */
     async #handleNCmd(payload: sparkplugPayload) {
         // For each metric in payload
-        log('Handling NCMD');
-        console.log(payload);
+        logf('Handling NCMD: %O', {
+            ...payload,
+            body: payload.body?.toString(),
+        });
         await Promise.all(
             payload.metrics.map(async (metric: sparkplugMetric) => {
                 // If metric only has an alias, find it's name

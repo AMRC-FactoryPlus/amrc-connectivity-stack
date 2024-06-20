@@ -12,7 +12,7 @@
   that it isn't used for this code path. Ideally we want all device
   writes to accept a plain Buffer as might be provided from a read.
 
-- [ ] The Connection currently handles the poll loop, as part of
+- [x] The Connection currently handles the poll loop, as part of
   `startSubscription`. 
     * For simple connections this is implemented in the base class and
       should be handled by the Device (EA-side).
@@ -23,7 +23,7 @@
 - [ ] More generally, the Connections shouldn't see the Metrics at all.
   They should operate entirely on addresses.
 
-- [ ] Multiple Devices may subscribe to a single Connection. The EA-side
+- [x] Multiple Devices may subscribe to a single Connection. The EA-side
   Connection will need to track the current list of addresses we are
   interested in and push it down to the driver.
 

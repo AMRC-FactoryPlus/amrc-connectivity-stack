@@ -4,7 +4,7 @@
  */
 
 import {
-    log
+    log, logf
 } from "./helpers/log.js";
 import * as fs from "fs";
 import {
@@ -51,6 +51,7 @@ export abstract class DeviceConnection extends EventEmitter {
     #intHandles: {
         [index: string]: ReturnType<typeof setInterval>
     }
+    #subHandles: Map<string, any>
 
     /**
      * Basic class constructor, doesn't do much. Must emit a 'ready' event when complete.
@@ -63,7 +64,10 @@ export abstract class DeviceConnection extends EventEmitter {
         this._type = type;
         // Define object of polling interval handles for each device
         this.#intHandles = {};
+        // Collection of subscription handles
+        this.#subHandles = new Map();
         // Emit ready event
+        /* XXX this has no listeners */
         this.emit('ready');
     }
 
@@ -101,6 +105,24 @@ export abstract class DeviceConnection extends EventEmitter {
     }
 
     /**
+     * Perform any setup needed to read from certain addresses, e.g. set
+     * up MQTT subscriptions. This does not attempt to detect duplicate
+     * requests.
+     * @param addresses Addresses to start watching
+     */
+    async subscribe (addresses: string[]): Promise<any> {
+        return null;
+    }
+
+    /**
+     * Undo any setup performed by `subscribe`.
+     * @param addresses Addresses to stop watching
+     */
+    async unsubscribe (handle: any): Promise<void> {
+        return;
+    }
+
+    /**
      *
      * @param metrics Metrics object to watch
      * @param payloadFormat String denoting the format of the payload
@@ -109,8 +131,9 @@ export abstract class DeviceConnection extends EventEmitter {
      * @param deviceId The device ID whose metrics are to be watched
      * @param subscriptionStartCallback A function to call once the subscription has been setup
      */
-    startSubscription(metrics: Metrics, payloadFormat: serialisationType, delimiter: string, interval: number, deviceId: string, subscriptionStartCallback: Function) {
-
+    async startSubscription(metrics: Metrics, payloadFormat: serialisationType, delimiter: string, interval: number, deviceId: string, subscriptionStartCallback: Function) {
+        this.#subHandles.set(deviceId, 
+            await this.subscribe(metrics.addresses));
         this.#intHandles[deviceId] = setInterval(() => {
             this.readMetrics(metrics, payloadFormat, delimiter);
 
@@ -123,9 +146,11 @@ export abstract class DeviceConnection extends EventEmitter {
      * @param deviceId The device ID we are cancelling the subscription for
      * @param stopSubCallback A function to call once the subscription has been cancelled
      */
-    stopSubscription(deviceId: string, stopSubCallback: Function) {
+    async stopSubscription(deviceId: string, stopSubCallback: Function) {
         clearInterval(this.#intHandles[deviceId]);
         delete this.#intHandles[deviceId];
+        await this.unsubscribe(this.#subHandles.get(deviceId));
+        this.#subHandles.delete(deviceId);
         stopSubCallback();
     }
 
@@ -142,7 +167,7 @@ export abstract class DeviceConnection extends EventEmitter {
 /**
  * Device class represents both the proprietary connection and Sparkplug connections for a device
  */
-export abstract class Device {
+export class Device {
 
     #spClient: SparkplugNode                        // The sparkplug client
     #devConn: DeviceConnection                      // The associated device connection to this device
@@ -151,7 +176,7 @@ export abstract class Device {
     _defaultMetrics: sparkplugMetric[]              // The default metrics common to all devices
     #isAlive: boolean                               // Whether this device is alive or not
     _isConnected: boolean                               // Whether this device is ready to publish or not
-    #deathTimer: ReturnType<typeof setTimeout>      // A "dead mans handle" or "watchdog" timer which triggers a DDEATH
+    //#deathTimer: ReturnType<typeof setTimeout>      // A "dead mans handle" or "watchdog" timer which triggers a DDEATH
                                                     // if allowed to time out
     _payloadFormat: serialisationType               // The format of the payloads produced by this device
     _delimiter: string                              // String specifying the delimiter character if needed
@@ -236,8 +261,8 @@ export abstract class Device {
             this.#populateTemplates(options.templates);
         }
         // Add default metrics to the device metrics object
-        // To be populated further by child class as custom manipulations need to take place
         this._metrics = new Metrics(this._defaultMetrics);
+        this._metrics.add(options.metrics);
         // Flag to keep track of device online status
         this.#isAlive = false;
 
@@ -246,9 +271,9 @@ export abstract class Device {
 
         // Create watchdog timer which, if allowed to elapse, will set the device as offline
         // This watchdog is kicked by several read/write functions below
-        this.#deathTimer = setTimeout(() => {
-            this.#publishDDeath();
-        }, 10000);
+        //this.#deathTimer = setTimeout(() => {
+        //    this.#publishDDeath();
+        //}, 10000);
 
         //What to do when the device is ready
         //We Just need to sub to metric changes
@@ -266,16 +291,19 @@ export abstract class Device {
     }
 
     _handleData(obj: { [p: string]: any }, parseVals: boolean) {
+        logf("_handleData %s (%s) %O", this._name, parseVals, obj);
         // Array to keep track of values that changed
         let changedMetrics: sparkplugMetric[] = [];
         // Iterate through each key in obj
         for (let addr in obj) {
             // Get all payload paths registered for this address
             const paths = this._metrics.getPathsForAddr(addr);
+            logf("paths for %s: %s", addr, paths);
             // Iterate through each path
             paths.forEach((path) => {
                 // Get the complete metric according to its address and path
                 const metric = this._metrics.getByAddrPath(addr, path);
+                logf("metric for %s:%s: %O", addr, path, metric);
                 // If the metric can be read i.e. GET method
                 if (typeof metric.properties !== "undefined" && (metric.properties.method.value as string).search(
                     /^GET/g) > -1) {
@@ -289,6 +317,8 @@ export abstract class Device {
                             this._payloadFormat,
                             this._delimiter
                         ) : obj[addr];
+
+                        logf("parsed new val: %O", newVal);
 
                         // Test if the value is a bigint and convert it to a Long. This is a hack to ensure that the
                         // Tahu library works - it only accepts Longs, not bigints.
@@ -309,6 +339,8 @@ export abstract class Device {
                                 this._payloadFormat,
                                 this._delimiter
                             );
+                            logf("updating metric %s:%s ts %s val %O",
+                                addr, path, timestamp, newVal);
 
                             // Update the metric value and push it to the array of changed metrics
                             changedMetrics.push(this._metrics.setValueByAddrPath(addr, path, newVal, timestamp));
@@ -330,7 +362,7 @@ export abstract class Device {
     // Kick the watchdog timer to prevent the device dying
     _refreshDeathTimer() {
         // Reset timeout to it's initial value
-        this.#deathTimer.refresh();
+        //this.#deathTimer.refresh();
     }
 
     /**
@@ -487,7 +519,7 @@ export abstract class Device {
         this._stopMetricSubscription();
 
         // Stop the watchdog timer so that we can instantly stop
-        clearTimeout(this.#deathTimer);
+        //clearTimeout(this.#deathTimer);
     }
 
 

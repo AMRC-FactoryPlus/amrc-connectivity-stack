@@ -24,7 +24,8 @@ interface s7Vars {
 export class S7Connection extends DeviceConnection {
     #s7Conn: typeof S7Endpoint
     #itemGroup: typeof S7ItemGroup
-    #vars: s7Vars
+    /* XXX I'm not sure what purpose this serves */
+    #vars: Set<string>
     constructor(type: string, connDetails: s7ConnDetails) {
         super(type);
 
@@ -38,8 +39,8 @@ export class S7Connection extends DeviceConnection {
         });
 
         // Prepare variables to hold optimized metric list
-        this.#itemGroup = null;
-        this.#vars = {};
+        this.#itemGroup = new S7ItemGroup(this.#s7Conn);
+        this.#vars = new Set();
 
         // Pass on disconnect event to parent
         this.#s7Conn.on('disconnect', () => {
@@ -59,21 +60,20 @@ export class S7Connection extends DeviceConnection {
         })
     }
 
-    /**
-     * Builds the S7 item group from the defined metric list
-     * @param {object} vars object containing metric names and PLC addresses
-     */
-    addToItemGroup(vars: s7Vars) {
-        // If item group doesn't exist, create a fresh setup
-        if (!this.#itemGroup) {
-            this.#itemGroup = new S7ItemGroup(this.#s7Conn);
-            this.#vars = {}
-            this.#itemGroup.setTranslationCB((metric: string) => this.#vars[metric]); //translates a metric name to its address
+    async subscribe (addresses: string[]) {
+        for (const a of addresses) {
+            this.#vars.add(a);
+            this.#itemGroup.addItems(a);
         }
-        // Merge existing vars with new ones
-        this.#vars = {...this.#vars, ...vars}
-        // Add metrics to read for this connection
-        this.#itemGroup.addItems(Object.keys(this.#vars));
+        return addresses;
+    }
+
+    async unsubscribe (handle: any) {
+        const addresses = handle as string[];
+        for (const a of addresses) {
+            this.#vars.delete(a);
+            this.#itemGroup.removeItems(a);
+        };
     }
 
     /**
@@ -133,7 +133,7 @@ export class S7Connection extends DeviceConnection {
      */
     async close() {
         // Clear the variable list
-        this.#vars = {};
+        this.#vars = new Set();
         // Destroy the metric item group, if it exists
         if (this.#itemGroup) {
             this.#itemGroup.destroy();
@@ -146,32 +146,3 @@ export class S7Connection extends DeviceConnection {
 // !! IMPORTANT !!
 // Ensure metric addresses are as specified here: 
 // https://github.com/st-one-io/node-red-contrib-s7#variable-addressing
-
-
-/**
- * S7 Device class
- */
-export class S7Device extends (Device) {
-    s7Vars: {
-        [index: string]: string // name: address
-    }
-    #devConn: S7Connection
-    constructor(spClient: SparkplugNode, devConn: S7Connection, options: deviceOptions) {
-        super(spClient, devConn, options);
-        this.#devConn = devConn;
-        this._metrics.add(options.metrics);
-        // Prepare list of variables for S7 library to use
-        this.s7Vars = {};
-        // Push metric to S7 variables list
-        options.metrics.forEach((metric) => {
-            if (typeof metric.properties !== "undefined" && metric.properties.address.value) {
-                this.s7Vars[metric.properties.address.value as string] =
-                    metric.properties.address.value as string;
-            }
-        });
-
-        // Set S7 variables as item group (this allows optimization of PLC transactions)
-        this.#devConn.addToItemGroup(this.s7Vars);
-
-    }
-}

@@ -159,20 +159,3 @@ export class RestConnection extends (
     async delete() {
     }
 };
-
-
-export class RestDevice extends (
-    Device
-) {
-    #devConn: RestConnection
-
-    constructor(spClient: SparkplugNode, devConn: RestConnection, options: deviceOptions) {
-        super(spClient, devConn, options);
-        this.#devConn = devConn;
-
-        this._metrics.add(options.metrics);
-
-        this._isConnected = true;
-        log(`${this._name} ready`);
-    }
-};

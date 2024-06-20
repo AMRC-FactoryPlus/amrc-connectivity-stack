@@ -2,7 +2,7 @@
 
 Several services provide change-notify. This is a general interface to
 supplement/replace the existing `Last_Changed` MQTT interface, which is
-limited and causing a number of problems.
+limited, wasteful and causing a number of problems.
 
 These endpoints are all namespaced under `/notify/v1`. The `/notify`
 path prefix is hereby added to the core Factory+ Service spec as a
@@ -14,21 +14,19 @@ The core service spec is also hereby extended to reserve all top-level
 paths not matching `/^v[0-9]/` for future extensions to the core spec.
 The existing Auth service APIs are an exception (and need changing).
 
-Note that although requests paths are written with a leading slash for
+Note that although request paths are written with a leading slash for
 familiarity, in principle the F+ service spec allows a service API to be
-rooted at a path down from the root of an HTTP server.
+rooted at a path down from the root of an HTTP server, in which case the
+service URLs must be resolved as e.g. `notify/v1/listener` relative to
+the service base URL.
 
 ## Discovery
 
-No general mechanism is defined for clients to discover that a
-particular service supports this interface. Individual service
-specifications will need to handle this, including (where necessary)
-specifying which versions of the service spec are applicable.
-
-In practice, the `/notify/v1` path prefix is now reserved by the F+
-service spec, and so may not be used by an F+ service for any other
-purpose. This means that a speculative call to `/notify/v1/listener`
-should either do the right thing or return 404.
+The `/notify/v1` path prefix is now reserved by the F+ service spec, and
+so may not be used by an F+ service for any other purpose. This means
+that a speculative call to `/notify/v1/listener` should either do the
+right thing or return 404. Supported channels can be discovered by
+attempting to create them.
 
 ## HTTP interface
 
@@ -52,35 +50,60 @@ expected to track the listener via the Directory.
 
     POST /notify/v1/listener/:device/channel
 
-Create a change-notify channel on the given Device. This will cause the
-Device to rebirth with new metrics supporting the new channel. The new
-metrics will be under a new metric folder; the contents of the folder
-depend on the service and the type of channel requested.
+Create a change-notify channel on the given Device. This will probably
+cause the Device to rebirth with a new metric supporting the new
+channel.
 
-The request body specifies the type of change-notify channel requested.
-The format depends on the individual service. The response is always an
-object:
+The request body specifies the type of change-notify channel requested,
+and should be an object with these properties:
+
+Property|Meaning
+---|---
+`url`|The URL (relative to the service base URL) to watch
+`children`|Whether to watch all child URLs
+
+The URL should be given as a URL relative to the service base URL. In
+particular, it should **not** start with a leading slash.
+
+A request with `children: false` is a request to watch for changes to a
+single URL. A value will be published to the channel every time the
+content of the URL changes. This value may be the new content of the
+URL, or it may be something else. The service spec may specify this for
+particular endpoints.
+
+A request with `children: true` is a request to watch all URLs
+immediately under the given URL, which should have a trailing slash. The
+value published to the metric is resolved relative to the requested URL
+to obtain the URL whose value has changed.
+
+In normal usage, the URL requested, e.g. `v1/example/`, supports GET
+requests and returns a list of UUIDs (of 'examples'). Then, for each
+UUID, `v1/example/:uuid` also supports GET and returns JSON to a
+consistent schema (a particular example). In this case, the metric will
+be UUID-typed, and every time an example changes, or is created or
+deleted, the example UUID will be published to the channel.
+
+The response body gives the information needed about the new channel, as
+follows:
 
 Property|Meaning
 ---|---
 `uuid`|A UUID identifying this channel
-`metric`|The metric folder prefix for this channel
+`metric`|The metric for this channel
 
-The metric folder may be shared with other channels at the discretion of
-the service. The channel UUID is unique to this request. There may or
-may not be an `Instance_UUID` metric in the channel metric folder, and
-it may or may not match the channel UUID.
+The metric may be shared with other channels at the discretion of the
+service. The channel UUID is unique to this request. Usually the client
+will only be sent notifications for objects they have access to, but
+this is not guaranteed. 
 
-    PUT /notify/v1/listener/:device/channel/:channel
-
-Update the channel definition. Request and response are as for the
-POST above. The metric folder in the response may be different from
-before. The service may refuse a change request by returning 409.
+Services will in general only support requesting channels for certain
+URLs. A 422 response indicates that (this implementation of) this
+service doesn't support the requested form of notification.
 
     DELETE /notify/v1/listener/:device/channel/:channel
 
-Removes a channel from the listener. The metric folder might not be
-removed if it was shared with other channels.
+Removes a channel from the listener. The metric might not be removed if
+it was shared with other channels.
 
 ## Sparkplug interface
 
@@ -91,7 +114,7 @@ metric structure:
 
 * `Channels` (Folder)
 
-The change-notify metrics will appear in folders under here.
+The change-notify metrics will appear under here.
 
 * `Expiry` (DateTime)
 

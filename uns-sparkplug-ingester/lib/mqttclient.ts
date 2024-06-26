@@ -415,6 +415,9 @@ export default class MQTTClient {
         // Get the path as everything behind the last /
         let path = birth.name.substring(0, birth.name.lastIndexOf("/"));
 
+        console.log(`${birth.name}: ${value}`);
+        return;
+
 
         writeApi.useDefaultTags({
             topLevelInstance: birth.instance.top,

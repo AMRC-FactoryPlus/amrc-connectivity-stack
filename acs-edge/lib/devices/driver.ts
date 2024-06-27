@@ -175,6 +175,7 @@ export class DriverConnection extends DeviceConnection {
 
     #send_addrs () {
         const addrs = {
+            version: 1,
             addrs:  Object.fromEntries(this.addrs),
             groups: Object.fromEntries(
                 [...this.groups.entries()]

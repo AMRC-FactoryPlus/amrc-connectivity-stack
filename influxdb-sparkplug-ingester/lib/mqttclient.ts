@@ -396,7 +396,17 @@ export default class MQTTClient {
             if (!birth) {
                 logger.error(`Metric ${metric.alias} is unknown for ${topic.address.group}/${topic.address.node}/${topic.address.device}`);
             }
-            const metricTimestamp = new Date(metric.timestamp);
+
+            let metricTimestamp: Date
+            if (metric.timestamp) {
+                metricTimestamp = new Date(metric.timestamp);
+            } else if (payload.timestamp) {
+                // Metrics might not have a timestamp so use the packet timestamp if we have it.
+                metricTimestamp = new Date(payload.timestamp);
+            } else {
+                // No timestamp can be found on the metric or the payload, just use the current time instead.
+                metricTimestamp = new Date();
+            }
             // Send each metric to InfluxDB
             this.writeToInfluxDB(birth, topic, metric.value, metricTimestamp)
         });

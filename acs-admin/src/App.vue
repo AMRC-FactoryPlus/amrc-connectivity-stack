@@ -99,7 +99,7 @@ export default {
 
   computed: {
     baseUrl () {
-      return import.meta.env.VITE_EXTERNAL_DOMAIN
+      return import.meta.env.EXTERNAL_DOMAIN
     },
   },
 

@@ -3,6 +3,7 @@ import { fileURLToPath, URL } from 'node:url'
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import VueDevTools from 'vite-plugin-vue-devtools'
+import importMetaEnv from '@import-meta-env/unplugin';
 import process from 'process'
 import inject from '@rollup/plugin-inject';
 import path from 'node:path'
@@ -30,6 +31,17 @@ export default defineConfig({
     VueDevTools(),
     inject({
       Buffer: ['buffer', 'Buffer'],
+    }),
+    importMetaEnv.vite({
+      env: ".env",
+      example: ".env.example",
+      // If you are using popular packagers such as Webpack and Vite,
+      // @import-meta-env/unplugin will automatically switch the `transformMode` for you:
+      // - for development mode, `transformMode` will be `"compile-time"`
+      // - for production mode, `transformMode` will be `"runtime"`
+      //
+      // Otherwise, you need to set `transformMode` according to your needs:
+      // transformMode: process.env.NODE_ENV === 'production' ? 'runtime' : 'compile-time',
     }),
   ],
   resolve: {

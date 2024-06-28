@@ -21,8 +21,8 @@ export const useServiceClientStore = defineStore('service-client', {
 
         this.client  = client
         this.loaded  = true
-        this.scheme  = import.meta.env.VITE_SCHEME
-        this.baseUrl = import.meta.env.VITE_BASE_URL
+        this.scheme  = import.meta.env.SCHEME
+        this.baseUrl = import.meta.env.BASE_URL
 
         client.service_urls(UUIDs.Service.MQTT).then((urls) => {
           this.urls.mqtt = urls

@@ -304,7 +304,7 @@ export abstract class Device {
                             );
 
                             // Update the metric value and push it to the array of changed metrics
-                            changedMetrics.push({...{}, ...(this._metrics.setValueByAddrPath(addr,
+                            changedMetrics.push({...(this._metrics.setValueByAddrPath(addr,
                                     path,
                                     newVal,
                                     timestamp))});

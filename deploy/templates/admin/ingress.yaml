@@ -1,23 +1,23 @@
-{{ if .Values.cmdesc.enabled }}
+{{ if .Values.admin.enabled }}
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
-  name: cmdesc-ingressroute
+  name: admin-ingressroute
   namespace: default
 spec:
   entryPoints:
     - {{ .Values.acs.secure | ternary "websecure" "web" }}
   routes:
-    - match: Host(`cmdesc.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}`)
+    - match: Host(`{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}`)
       kind: Rule
       services:
-        - name: cmdesc
+        - name: admin
           port: 80
           namespace: {{ .Release.Namespace }}
   {{- if .Values.acs.secure }}
   tls:
-    secretName: {{ coalesce .Values.cmdesc.tlsSecretName .Values.acs.tlsSecretName }}
+    secretName: {{ coalesce .Values.admin.tlsSecretName .Values.acs.tlsSecretName }}
     domains:
-      - main: cmdesc.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
+      - main: {{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
   {{- end -}}
 {{- end -}}

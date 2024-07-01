@@ -102,3 +102,23 @@ spec:
   principal: sv1git@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
   secret: git-keytabs/client
 {{- end }}
+---
+{{- if .Values.monitor.enabled }}
+apiVersion: factoryplus.app.amrc.co.uk/v1
+kind: KerberosKey
+metadata:
+  name: sv1monitor
+  namespace: {{ .Release.Namespace }}
+spec:
+  type: Random
+  principal: sv1monitor@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+  secret: monitor-keytabs/client
+  account:
+    class: e463b4ae-a322-46cc-8976-4ba76838e908
+    name: Central Monitor
+    groups:
+      - 1bc3dbca-68fe-48d2-9590-3a528c111827
+    sparkplug:
+      group: {{ .Values.acs.organisation }}-Service-Core
+      node: Monitor
+{{- end }}

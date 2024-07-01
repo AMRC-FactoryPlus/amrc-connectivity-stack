@@ -1,14 +1,14 @@
 /*
  * ACS Edge Monitor service
- * Main entry point
+ * Edge monitor entry point
  * Copyright 2023 AMRC
  */
 
-import { ServiceClient } from "@amrc-factoryplus/utilities";
+import { ServiceClient } from "@amrc-factoryplus/service-client";
 
 import { GIT_VERSION } from "../lib/git-version.js";
-import { Monitor } from "../lib/monitor.js";
-import { SparkplugNode } from "../lib/sparkplug.js";
+import { EdgeMonitor } from "../lib/edge.js";
+import { SparkplugNode } from "../lib/sparkplug/node.js";
 
 console.log("Starting ACS edge monitor, revision %s", GIT_VERSION);
 
@@ -21,7 +21,7 @@ const sparkplug = await new SparkplugNode({
     cluster:    process.env.CLUSTER_UUID,
 }).init();
 
-const monitor = await new Monitor({
+const monitor = await new EdgeMonitor({
     fplus, sparkplug,
     namespace: process.env.CLUSTER_NAMESPACE,
 }).init();

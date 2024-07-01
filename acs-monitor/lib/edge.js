@@ -1,5 +1,4 @@
-/*
- * ACS Edge Monitor
+/* ACS Edge Monitor
  * Monitor class
  * Copyright 2023 AMRC
  */
@@ -8,21 +7,9 @@ import imm          from "immutable";
 import rx           from "rxjs";
 import k8s          from "@kubernetes/client-node";
 
-import * as rxx             from "@amrc-factoryplus/rx-util";
+import * as rxx     from "@amrc-factoryplus/rx-util";
 
-import { NodeMonitor }      from "./node.js";
-
-const NodeSpec = imm.Record({
-    uuid:       null, 
-    address:    null,
-    edgeAgent:  false,
-    interval:   "3m",
-    secrets:    imm.Set(),
-});
-NodeSpec.of = spec => NodeSpec({
-    ...spec,
-    secrets:    imm.Set(spec.secrets ?? []),
-});
+import { NodeSpec } from "./nodespec.js";
 
 const SecretStatus = imm.Record({
     uuid:           null,
@@ -38,7 +25,7 @@ SecretStatus.of = obj => SecretStatus({
                         ?.some(c => c.type == "Synced" && c.status == "True"),
 });
 
-export class Monitor {
+export class EdgeMonitor {
     constructor (opts) {
         this.fplus      = opts.fplus;
         this.sparkplug  = opts.sparkplug;
@@ -77,7 +64,10 @@ export class Monitor {
         return rxx.k8s_watch({
             k8s,
             kubeconfig:     this.kubeconfig,
-            errors:         e => this.log("SP node watch error: %s", e),
+            errors:         e => {
+                if (!(e instanceof rxx.StoppedError))
+                    this.log("SP node watch error: %s", e);
+            },
             apiVersion:     "factoryplus.app.amrc.co.uk/v1",
             kind:           "SparkplugNode",
             namespace:      this.namespace,
@@ -118,21 +108,20 @@ export class Monitor {
         /* When we get a "start", start a new sequence monitoring that
          * node. Merge the results into our output. */
         return starts.pipe(
-            rx.tap(u => this.log("START: %s", u)),
             rx.flatMap(spec => {
                 /* Watch for a stop signal for this node UUID */
                 const stopper = stops.pipe(
                     rx.filter(stop => stop.uuid == spec.uuid),
                 );
 
-                const monitor = NodeMonitor.of(this, spec);
-                this.log("Using monitor %s for %s", monitor, spec.uuid);
+                const monitor = spec.monitor(this);
 
                 /* Run the monitor checks until we get a stop */
                 return rx.from(monitor.init()).pipe(
                     rx.mergeMap(m => m.checks()),
                     rx.takeUntil(stopper),
-                    rx.finalize(() => this.log("STOP: %s", spec.uuid)),
+                    rx.finalize(() => this.log(
+                        "Stopped monitor for %s", spec.uuid)),
                 );
             }),
         );
@@ -149,7 +138,6 @@ export class Monitor {
             key:            obj => obj.metadata.name,
             value:          obj => SecretStatus.of(obj),
         }).pipe(
-            rx.tap({ subscribe: () => this.log("SS subscribe") }),
             rxx.shareLatest(),
         );
     }

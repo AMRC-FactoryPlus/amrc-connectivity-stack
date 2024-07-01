@@ -8,7 +8,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
 data:
   .env: |
-    SCHEME={{ .Values.acs.secure | ternary "https://" "http://" }}
+    SCHEME={{ .Values.acs.secure | ternary "https" "http" }}
     BASEURL={{ .Values.acs.baseUrl }}
 ---
 apiVersion: apps/v1

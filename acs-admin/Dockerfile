@@ -33,4 +33,4 @@ COPY .docker/nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 8080
 
 # Start Nginx
-CMD ["sh", "-c", "./import-meta-env-alpine -x .env && nginx -g 'daemon off;'"]
+CMD ["sh", "-c", "./import-meta-env-alpine -x .env -p [\"/usr/share/nginx/html/**/*\"] && nginx -g 'daemon off;'"]

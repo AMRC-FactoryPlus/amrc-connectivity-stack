@@ -227,6 +227,16 @@ clusterManager:
     pullPolicy: IfNotPresent
   verbosity: "ALL,!service,!token"
 
+admin:
+  # -- Whether or not to enable the Admin component
+  enabled: true
+  image:
+    # -- The registry of the Admin component
+    registry: ghcr.io/amrc-factoryplus
+    # -- The repository of the Admin component
+    repository: acs-admin
+    pullPolicy: IfNotPresent
+
 shell:
   image:
     registry: ghcr.io/amrc-factoryplus

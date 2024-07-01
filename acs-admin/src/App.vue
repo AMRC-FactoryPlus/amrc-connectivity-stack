@@ -97,12 +97,6 @@ export default {
     Nav,
   },
 
-  computed: {
-    baseUrl () {
-      return import.meta.env.VITE_EXTERNAL_DOMAIN
-    },
-  },
-
   watch: {
     escape (pressed) {
       if (pressed) {

@@ -30,6 +30,7 @@
         <Button :disabled="!username || !password" @click="login" type="submit" class="w-full">
           Login
         </Button>
+        <div class="text-xs text-gray-300">{{directory}}</div>
       </div>
     </CardContent>
   </Card>
@@ -65,7 +66,7 @@ export default {
 
   computed: {
     directory () {
-      return import.meta.env.VITE_SCHEME + '://directory.' + import.meta.env.VITE_BASE_URL
+      return import.meta.env.SCHEME + '://directory.' + import.meta.env.BASEURL
     },
   },
 

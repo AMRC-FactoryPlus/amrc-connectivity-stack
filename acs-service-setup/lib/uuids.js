@@ -14,14 +14,11 @@ export const ACS = {
     /* XXX These should probably be deployment-specific */
     Group: {
         Administrators:     "10fc06b7-02f5-45f1-b419-a486b6bc13ba",
+        GlobalDebuggers:    "f76f8445-ce78-41c5-90ec-5964fb0cd431",
         SparkplugNode:      "1d3121a0-aade-4376-8fa3-57ba1460ba76",
         EdgeGroups:         "9ba0de4b-056f-4b5e-b966-2d5d85d07767",
         EdgePermissions:    "7594cd71-e5b9-4467-88c0-b11a66d47fec",
         CentralMonitor:     "1bc3dbca-68fe-48d2-9590-3a528c111827",
-    },
-    /* XXX This should definitely be */
-    User: {
-        Administrator:      "d53f476a-29dd-4d79-b614-5b7fe9bc8acf",
     },
     Perm: {
         MQTT: {
@@ -29,7 +26,17 @@ export const ACS = {
             RepresentDevices:   "e82456b3-a7d9-4971-9d8c-fd0be4545ab4",
             ReadAllStates:      "8790cf3d-b793-423c-b373-8cfcf9f63529",
             ReadNode:           "046d6603-fa62-4208-9400-65d61f8b1ec4",
+            ReadWholeNamespace: "81833dbb-1150-4078-b1db-978c646ba73e",
         },
+    },
+    PermGroup: {
+        Auth:                   "50b727d4-3faa-40dc-b347-01c99a226c58",
+        Clusters:               "9e07fd33-6400-4662-92c4-4dff1f61f990",
+        CmdEsc:                 "9584ee09-a35a-4278-bc13-21a8be1f007c",
+        ConfigDB:               "c43c7157-a50b-4d2a-ac1a-86ff8e8e88c1",
+        Directory:              "58b5da47-d098-44f7-8c1d-6e4bd800e718",
+        Git:                    "c0c55c78-116e-4526-8ff4-e4595251f76c",
+        MQTT:                   "a637134a-d06b-41e7-ad86-4bf62fde914a",
     },
     Service: {
         Manager:                "619eecab-742d-4824-8b97-bcae472e5c04",
@@ -121,6 +128,9 @@ export const Edge = {
 export const Fixup = {
     Role: {
         EdgeNode:           "87e4a5b7-9a89-4796-a216-39666a47b9d2",
+    },
+    User: {
+        Administrator:      "d53f476a-29dd-4d79-b614-5b7fe9bc8acf",
     },
 };
 

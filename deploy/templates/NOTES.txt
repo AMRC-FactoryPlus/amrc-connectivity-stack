@@ -14,7 +14,7 @@ before continuing. This chart installs a full end-to-end deployment of Factory+ 
 
 Get your admin password (you may need to wait until all services are running):
 
-echo $(kubectl get secret krb5-passwords -o jsonpath="{.data.admin}" -n {{.Release.Namespace}} | base64 --decode)
+echo $(kubectl get secret admin-password -o jsonpath="{.data.password}" -n {{.Release.Namespace}} | base64 --decode)
 
 Then view the readme to get started:
 

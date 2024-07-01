@@ -153,6 +153,7 @@ jobs:
     strategy:
       matrix:
         service: 
+          - acs-admin
           - acs-cluster-manager
           - acs-cmdesc
           - acs-edge-sync

@@ -5,25 +5,25 @@ ifndef .acs.js.mk
 
 base_version?=${git.tag}
 
+js.pkglock?=	node_modules/.package-lock.json
+
 build_args+=	--build-arg base_version="${base_version}"
 
 ifdef acs_npm
 build_args+=	--build-arg acs_npm="${acs_npm}"
 endif
 
-.PHONY: lint
-
-build: lint
-
-lint:
-	@:
-
 ifdef eslint
+.PHONY: js.lint
+
 lint: js.eslint
 
-js.eslint:
+js.eslint: ${js.pkglock}
 	npx eslint ${eslint}
 endif
+
+${js.pkglock}: package.json
+	npm install
 
 include ${mk}/acs.docker.mk
 

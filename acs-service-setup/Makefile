@@ -9,5 +9,5 @@ include ${mk}/acs.js.mk
 
 lint: check-yaml
 
-check-yaml:
+check-yaml: js.eslint
 	node bin/check-yaml.js

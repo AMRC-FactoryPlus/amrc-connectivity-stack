@@ -8,10 +8,16 @@ mk=${top}/mk
 -include ${top}/config.mk
 -include config.mk
 
-.PHONY: all
+.PHONY: all build lint
 
 # This is defined here so it becomes the default target.
 # Make sure it stays first.
 all:
+
+build: lint
+	@: build
+
+lint:
+	@: lint
 
 endif

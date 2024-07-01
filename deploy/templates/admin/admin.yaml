@@ -1,0 +1,61 @@
+{{- if .Values.admin.enabled }}
+# This is required because import-meta-env only takes a .env file, not env vars. Check the admin Dockerfile for more
+# info and the exact command that's used to inject runtime env vars into the application (`CMD [...]`)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: admin-env-config
+  namespace: {{ .Release.Namespace }}
+data:
+  .env: |
+    SCHEME={{ .Values.acs.secure | ternary "https://" "http://" }}
+    BASEURL={{ .Values.acs.baseUrl }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: admin
+  namespace: {{ .Release.Namespace }}
+  labels:
+    component: admin
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: admin
+  template:
+    metadata:
+      labels:
+        component: admin
+        factory-plus.service: admin
+    spec:
+      {{- with .Values.acs.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: admin
+{{ include "amrc-connectivity-stack.image" (list . .Values.admin) | indent 10 }}
+          volumeMounts:
+            - name: env-file
+              subPath: .env
+              mountPath: /.env
+      volumes:
+        - name: env-file
+          configMap:
+            name: admin-env-config
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: admin
+  namespace: {{ .Release.Namespace }}
+spec:
+  ports:
+    - name: "web"
+      port: 80
+      targetPort: 8080
+  selector:
+    factory-plus.service: admin
+{{- end -}}

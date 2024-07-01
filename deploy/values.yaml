@@ -110,7 +110,7 @@ serviceSetup:
           acs:
             url: https://github.com/AMRC-FactoryPlus/edge-helm-charts.git
             # Pull this branch/tag
-            ref: v3.0.0
+            ref: v3.0.1-rc.4
             # Merge to a local branch, if not otherwise moved
             merge: main
             # Interval to perform updates. 'never' will only update on git
@@ -226,6 +226,16 @@ clusterManager:
     repository: acs-cluster-manager
     pullPolicy: IfNotPresent
   verbosity: "ALL,!service,!token"
+
+admin:
+  # -- Whether or not to enable the Admin component
+  enabled: true
+  image:
+    # -- The registry of the Admin component
+    registry: ghcr.io/amrc-factoryplus
+    # -- The repository of the Admin component
+    repository: acs-admin
+    pullPolicy: IfNotPresent
 
 shell:
   image:

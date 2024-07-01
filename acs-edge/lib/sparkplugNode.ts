@@ -298,6 +298,10 @@ export class SparkplugNode extends (
             }
             // If polled publishing is enabled, start the loop...
             if (!this.#metrics.getByName("Node Control/Async Publish Mode").value) {
+                // Clear the existing interval if it exists
+                if (this.#pubIntHandle) {
+                    this.#stopPublishInterval();
+                }
                 this.#startPublishInterval();
             }
         } else {

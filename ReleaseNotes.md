@@ -8,6 +8,15 @@ chronological order.
 These changes have not been released yet, but are likely to appear in
 the next release.
 
+## v3.1.0
+
+### Administration interface
+A new administration interface has been added to ACS, which will slowly
+become the single-point-of-contact for all administrators and managers
+of ACS installations. Currently this interface only exposes the new
+alerts system, but will be expanded in future releases. It can be
+accessed from the base URL of your ACS installation. 
+
 ### Global admin account changes
 
 The 'Global Administrator Account' user account is now created with a

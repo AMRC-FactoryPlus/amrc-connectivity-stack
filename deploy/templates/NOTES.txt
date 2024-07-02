@@ -8,17 +8,17 @@ Thanks for installing the AMRC Connectivity Stack (ACS), the AMRC's open-source 
 Ensure that you familiarise yourself with the components and concepts of Factory+ (https://factoryplus.app.amrc.co.uk)
 before continuing. This chart installs a full end-to-end deployment of Factory+ and there are a lot of moving parts.
 
+Make sure that you read the release notes for this version of the chart before continuing: github.com/AMRC-FactoryPlus/amrc-connectivity-stack/blob/main/ReleaseNotes.md
+
 ╔══════════════════╗
    🚀 Get Started
 ╚══════════════════╝
 
-Get your admin password (you may need to wait until all services are running):
+1. Get your admin password (you may need to wait until all services are running):
 
 echo $(kubectl get secret admin-password -o jsonpath="{.data.password}" -n {{.Release.Namespace}} | base64 --decode)
 
-Then view the readme to get started:
-
-https://github.com/AMRC-FactoryPlus/amrc-connectivity-stack/blob/main/README.md
+2. View the readme to get started: github.com/AMRC-FactoryPlus/amrc-connectivity-stack/blob/main/README.md
 
 
 ╔══════════════╗

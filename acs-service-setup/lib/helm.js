@@ -71,6 +71,7 @@ async function setup_perms (auth, group) {
         [group.monitor.uuid,    ReadConfig,     Edge.App.AgentConfig],
         [group.monitor.uuid,    EdgeNodeConsumer, ACS.Device.ConfigDB],
         [group.monitor.uuid,    ReloadConfig,   UUIDs.Special.Null],
+        [ACS.Group.CentralMonitor, EdgeNodeConsumer, group.monitor.uuid],
     ];
 
     for (const m of members) {

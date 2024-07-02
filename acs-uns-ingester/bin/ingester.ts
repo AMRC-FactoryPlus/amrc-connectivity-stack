@@ -7,8 +7,12 @@ import {ServiceClient, UUIDs} from "@amrc-factoryplus/utilities";
 import pino from "pino";
 import pretty from 'pino-pretty';
 import MQTTClient from "@lib/mqttclient.js";
+
 let dotenv: any = null;
-try {dotenv = await import ('dotenv')} catch (e) {}
+try {
+    dotenv = await import ('dotenv')
+} catch (e) {
+}
 
 const stream = pretty({
     colorize: true
@@ -22,7 +26,7 @@ if (!directoryUrl) {
 }
 
 export const logger = pino({
-    name: 'InfluxDB Sparkplug Ingester',
+    name: 'ACS UNS Ingester',
     level: process.env.LOG_LEVEL || 'info',
 }, stream);
 
@@ -47,6 +51,6 @@ const mqtt = await new MQTTClient({
     e: {
         serviceClient: client,
     }
-}).init();
+});
 
 mqtt.run();

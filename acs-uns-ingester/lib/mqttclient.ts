@@ -10,6 +10,8 @@ import Long from "long";
 import {InfluxDB, Point} from '@influxdata/influxdb-client'
 import {Agent} from 'http'
 
+import * as mqtt_dev from "mqtt";
+
 let dotenv: any = null;
 try {
     dotenv = await import ('dotenv')
@@ -43,6 +45,12 @@ if (!flushInterval) {
     throw new Error("FLUSH_INTERVAL environment variable is not set");
 }
 
+const unsMqttUrl: string = process.env.UNS_MQTT_URL;
+if (!unsMqttUrl) {
+    throw new Error("UNS_MQTT_URL environment variable is not set");
+}
+
+/*
 let i = 0;
 
 // Node.js HTTP client OOTB does not reuse established TCP connections, a custom node HTTP agent
@@ -62,19 +70,20 @@ let interval: any;
 
 /* points/lines are batched in order to minimize networking and increase performance */
 
+/*
 const writeApi = influxDB.getWriteApi(influxOrganisation, process.env.INFLUX_BUCKET || 'default', 'ns', {
-    /* the maximum points/lines to send in a single batch to InfluxDB server */
+    // the maximum points/lines to send in a single batch to InfluxDB server
     batchSize: batchSize + 1, // don't let automatically flush data
-    /* maximum time in millis to keep points in an unflushed batch, 0 means don't periodically flush */
+    // maximum time in millis to keep points in an unflushed batch, 0 means don't periodically flush
     flushInterval: 0, // Never allow the package to flush: we'll flush manually
-    /* maximum size of the retry buffer - it contains items that could not be sent for the first time */
-    maxBufferLines: 30_000, /* the count of internally-scheduled retries upon write failure, the delays between write attempts follow an exponential backoff strategy if there is no Retry-After HTTP header */
+    // maximum size of the retry buffer - it contains items that could not be sent for the first time
+    maxBufferLines: 30_000, // the count of internally-scheduled retries upon write failure, the delays between write attempts follow an exponential backoff strategy if there is no Retry-After HTTP header
     maxRetries: 0, // do not retry writes
     // ... there are more write options that can be customized, see
     // https://influxdata.github.io/influxdb-client-js/influxdb-client.writeoptions.html and
     // https://influxdata.github.io/influxdb-client-js/influxdb-client.writeretryoptions.html
 });
-
+*/
 interface MQTTClientConstructorParams {
     e: {
         serviceClient: ServiceClient;
@@ -86,33 +95,21 @@ export default class MQTTClient {
     private mqtt: any;
     private aliasResolver = {};
     private birthDebounce = {};
+    private local_mqtt: any;
 
     constructor({e}: MQTTClientConstructorParams) {
         this.serviceClient = e.serviceClient;
     }
 
-    async init() {
-
-        process.on('exit', () => {
-            this.flushBuffer('EXIT');
-            keepAliveAgent.destroy();
-        })
-
-        return this;
-    }
-
-    private flushBuffer(source: string) {
-        let bufferSize = i;
-        i = 0;
-        writeApi.flush().then(() => {
-            logger.info(`🚀 Flushed ${bufferSize} points to InfluxDB [${source}]`);
-            // Reset the interval
-            this.resetInterval();
-        })
-    }
-
     async run() {
+        this.local_mqtt = mqtt_dev.connect(unsMqttUrl);
+        this.local_mqtt.on("connect", () => {
+            logger.info("😁 Connected to local mqtt broker!");
+        });
 
+        this.local_mqtt.on("error", (error) => {
+            logger.error(`🔥 Error from broker: ${error}`);
+        })
         const mqtt = await this.serviceClient.mqtt_client();
         this.mqtt = mqtt;
 
@@ -129,21 +126,10 @@ export default class MQTTClient {
         logger.info("🔌 Connected to Factory+ broker");
         logger.info("👂 Subscribing to entire Factory+ namespace");
         this.mqtt.subscribe('spBv1.0/#');
-        this.resetInterval();
-    }
-
-    private resetInterval() {
-        clearInterval(interval);
-        interval = setInterval(() => {
-            this.flushBuffer(`${flushInterval}ms INTERVAL`);
-        }, flushInterval);
     }
 
     on_close() {
         logger.warn(`❌ Disconnected from Factory+ broker`);
-
-        // Flush any remaining data
-        this.flushBuffer('CONN_CLOSE');
     }
 
     on_reconnect() {
@@ -152,8 +138,6 @@ export default class MQTTClient {
 
     on_error(error: any) {
         logger.error("🚨 MQTT error: %o", error);
-        // Flush any remaining data
-        this.flushBuffer('MQTT_ERROR');
     }
 
     async on_message(topicString: string, message: Uint8Array | Reader) {
@@ -323,7 +307,7 @@ export default class MQTTClient {
                 delete this.birthDebounce?.[topic.address.group]?.[topic.address.node]?.[topic.address.device];
 
                 // Store the default values in InfluxDB
-                this.writeMetrics(payload, topic);
+                this.publishToUNS(payload, topic);
 
                 break;
             case "DEATH":
@@ -349,7 +333,8 @@ export default class MQTTClient {
                 if (this.aliasResolver?.[topic.address.group]?.[topic.address.node]?.[topic.address.device]) {
 
                     // Device is known, resolve aliases and write to InfluxDB
-                    this.writeMetrics(payload, topic);
+                    //this.writeMetrics(payload, topic);
+                    this.publishToUNS(payload, topic)
 
                 } else {
 
@@ -389,6 +374,46 @@ export default class MQTTClient {
         return;
     }
 
+    /**
+     * Publishes received values from the Sparkplug namespace to the UNS with a topic structured to values schema path
+     * @param payload Received payload.
+     * @param topic Topic the payload was received on.
+     */
+    private publishToUNS(payload, topic) {
+        payload.metrics.forEach((metric) => {
+            if (metric.value === null) return;
+            let birth = this.aliasResolver?.[topic.address.group]?.[topic.address.node]?.[topic.address.device]?.[metric.alias];
+
+            if (!birth) {
+                return;
+            }
+
+            if (birth.transient) {
+                logger.debug(`Metric ${birth.name} is transient, not writing to InfluxDB`);
+                return;
+            }
+
+            const metricName = birth.name.split('/').pop() as string;
+            const path = birth.name.substring(0, birth.name.lastIndexOf("/")) as string;
+
+            if (
+                metricName === "Schema_UUID" ||
+                metricName === "Instance_UUID" ||
+                path.includes("Device Control") ||
+                path.includes("Device Information")
+            ) {
+                return;
+            }
+
+            if (path) {
+                this.local_mqtt.publish(`AMRC/Sheffield/F2050/${topic.address.device}/${path}/${metricName}`, `${metric.value}`);
+            } else {
+                this.local_mqtt.publish(`AMRC/Sheffield/F2050/${topic.address.device}/${metricName}`, `${metric.value}`);
+            }
+        });
+    }
+
+    /*
     private writeMetrics(payload, topic: Topic) {
         payload.metrics.forEach((metric) => {
             let birth = this.aliasResolver?.[topic.address.group]?.[topic.address.node]?.[topic.address.device]?.[metric.alias];
@@ -411,7 +436,7 @@ export default class MQTTClient {
             this.writeToInfluxDB(birth, topic, metric.value, metricTimestamp)
         });
     }
-
+    */
     /**
      * Writes metric values to InfluxDB using the metric timestamp.
      * @param birth Birth certificate for device.
@@ -419,6 +444,8 @@ export default class MQTTClient {
      * @param value Metric value to write to InfluxDB.
      * @param timestamp Timestamp from the metric to write to influx.
      */
+
+    /*
     writeToInfluxDB(birth, topic: Topic, value, timestamp: Date) {
         if (value === null) return;
         if (birth.transient) {
@@ -521,7 +548,7 @@ export default class MQTTClient {
         if (i >= batchSize) {
             this.flushBuffer(`${batchSize} point BATCH`);
         }
-    }
+    }*/
 
     setNestedValue(obj, path, value) {
         for (let k = 0; k < path.length - 1; k++) {

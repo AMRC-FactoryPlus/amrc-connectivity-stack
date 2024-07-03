@@ -29,6 +29,8 @@ version: 1
 groups:
   !u ACS.Group.SparkplugNode:
     - !u ACS.Group.CentralMonitor
+  !u ACS.Group.GlobalDebuggers:
+    - !u ACS.Group.CentralMonitor
 aces:
   - principal: !u ACS.Group.CentralMonitor
     permission: !u ACS.Role.EdgeNodeConsumer

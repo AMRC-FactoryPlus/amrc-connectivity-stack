@@ -69,6 +69,7 @@ auth:
     # -- The repository of the Authorisation component
     repository: acs-auth
     pullPolicy: IfNotPresent
+  verbosity: "ALL,!service,!token,!query"
 
 directory:
   # -- Whether or not to enable the Directory component

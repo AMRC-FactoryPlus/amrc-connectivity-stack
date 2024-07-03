@@ -48,7 +48,8 @@ Accounts created by the ACS installation will have been updated to be
 members of the Group, but ACLs referencing the Client Role and the Role
 itself will not have been removed. Any local accounts using the Role
 should be updated to be members of the Group instead, and then any
-access control entries referencing the Role should be removed.
+access control entries referencing the Role (and the role itself)
+should be removed.
 
 ## v3.0.0
 

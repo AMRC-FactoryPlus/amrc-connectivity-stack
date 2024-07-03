@@ -50,6 +50,14 @@ itself will not have been removed. Any local accounts using the Role
 should be updated to be members of the Group instead, and then any
 access control entries referencing the Role should be removed.
 
+### TLS certificate namespace
+IngressRoutes are now namespaced to the namespace of the chart release.
+Previously they were namespaced to the `default` namespace. This means
+that if you are providing your own wildcard TLS certificate you will
+need to ensure that it is moved from the `default` namespace to the
+namespace of the ACS release, otherwise Traefik will serve the default
+certificate instead.
+
 ## v3.0.0
 
 This is a major release, with fundamental changes to the architecture.

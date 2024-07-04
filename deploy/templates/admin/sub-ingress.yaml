@@ -2,13 +2,13 @@
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
-  name: admin
+  name: admin-sub
   namespace: {{ .Release.Namespace }}
 spec:
   entryPoints:
     - {{ .Values.acs.secure | ternary "websecure" "web" }}
   routes:
-    - match: Host(`{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}`)
+    - match: Host(`admin.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}`)
       kind: Rule
       services:
         - name: admin
@@ -16,8 +16,8 @@ spec:
           namespace: {{ .Release.Namespace }}
   {{- if .Values.acs.secure }}
   tls:
-    secretName: {{ coalesce .Values.admin.tlsSecretName .Values.acs.tlsSecretName }}
+    secretName: {{ coalesce .Values.auth.tlsSecretName .Values.acs.tlsSecretName }}
     domains:
-      - main: {{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
+      - main: admin.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
   {{- end -}}
 {{- end -}}

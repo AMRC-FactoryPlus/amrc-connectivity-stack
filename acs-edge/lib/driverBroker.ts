@@ -106,7 +106,7 @@ export class DriverBroker extends EventEmitter {
         const { id } = client;
         const { topic } = packet;
 
-        log("PUBLISH: %s %s", id, topic);
+        //log("PUBLISH: %s %s", id, topic);
         if (packet.retain)
             return callback(new Error("Retained PUBLISH forbidden"));
         if (!this.acl.get(id)!.publish.test(topic))
@@ -125,7 +125,7 @@ export class DriverBroker extends EventEmitter {
     }
 
     message (topic, payload) {
-        log("PACKET: %s %o", topic, payload);
+        //log("PACKET: %s %o", topic, payload);
 
         const match = topic.match(topicrx);
         if (!match) {
@@ -142,7 +142,7 @@ export class DriverBroker extends EventEmitter {
 
         const topic = `${prefix}/${id}/${msg}` 
             + (data ? `/${data}` : "");
-        log("Publishing %s: %O", topic, packet);
+        //log("Publishing %s: %O", topic, packet);
         return new Promise((resolve, reject) =>
             this.broker.publish({
                 cmd:    "publish",

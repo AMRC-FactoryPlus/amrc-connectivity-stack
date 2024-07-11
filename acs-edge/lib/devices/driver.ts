@@ -135,7 +135,7 @@ export class DriverConnection extends DeviceConnection {
         const { id, msg, data, payload } = message;
         if (id != this.id) return;
 
-        log(util.format("DRIVER message: %s %s", id, msg));
+        //log(util.format("DRIVER message: %s %s", id, msg));
         switch (msg) {
         case "status":  return this.#msg_status(payload.toString());
         case "data":    return this.#msg_data(data, payload);
@@ -193,7 +193,7 @@ export class DriverConnection extends DeviceConnection {
 
     #msg_data (data: string, payload: Buffer) {
         const addr = this.addrs.get(data);
-        log(`Driver [${this.id}]: data ${data} ${addr}`);
+        //log(`Driver [${this.id}]: data ${data} ${addr}`);
         if (addr)
             this.emit("data", { [addr]: payload });
     }

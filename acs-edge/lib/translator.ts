@@ -94,8 +94,8 @@ export class Translator extends EventEmitter {
             log(`Created Sparkplug node "${ids.sparkplug!}".`);
 
             log("Starting driver broker...");
-            this.broker.on("message", msg => 
-                log(util.format("Driver message: %O", msg)));
+            //this.broker.on("message", msg => 
+            //    log(util.format("Driver message: %O", msg)));
             await this.broker.start();
 
             // Create a new device connection for each type listed in config file
@@ -212,8 +212,8 @@ export class Translator extends EventEmitter {
 
         // What to do when the device connection has new data from a device
         newConn.on('data', (obj: { [index: string]: any }, parseVals = true) => {
-            log(util.format("Received data for %s: (%s) %O",
-                connection.name, parseVals, obj));
+            //log(util.format("Received data for %s: (%s) %O",
+            //    connection.name, parseVals, obj));
             connection.devices?.forEach((devConf: deviceOptions) => {
                 this.devices[devConf.deviceId]?._handleData(obj, parseVals);
             })

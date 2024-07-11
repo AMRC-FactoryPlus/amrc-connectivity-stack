@@ -286,19 +286,16 @@ export class Device {
     }
 
     _handleData(obj: { [p: string]: any }, parseVals: boolean) {
-        logf("_handleData %s (%s) %O", this._name, parseVals, obj);
         // Array to keep track of values that changed
         let changedMetrics: sparkplugMetric[] = [];
         // Iterate through each key in obj
         for (let addr in obj) {
             // Get all payload paths registered for this address
             const paths = this._metrics.getPathsForAddr(addr);
-            logf("paths for %s: %s", addr, paths);
             // Iterate through each path
             paths.forEach((path) => {
                 // Get the complete metric according to its address and path
                 const metric = this._metrics.getByAddrPath(addr, path);
-                logf("metric for %s:%s: %O", addr, path, metric);
                 // If the metric can be read i.e. GET method
                 if (typeof metric.properties !== "undefined" && (metric.properties.method.value as string).search(
                     /^GET/g) > -1) {
@@ -312,8 +309,6 @@ export class Device {
                             this._payloadFormat,
                             this._delimiter
                         ) : obj[addr];
-
-                        logf("parsed new val: %O", newVal);
 
                         // Test if the value is a bigint and convert it to a Long. This is a hack to ensure that the
                         // Tahu library works - it only accepts Longs, not bigints.
@@ -334,8 +329,6 @@ export class Device {
                                 this._payloadFormat,
                                 this._delimiter
                             );
-                            logf("updating metric %s:%s ts %s val %O",
-                                addr, path, timestamp, newVal);
 
                             // Update the metric value and push it to the array of changed metrics
                             changedMetrics.push({...(this._metrics.setValueByAddrPath(addr,

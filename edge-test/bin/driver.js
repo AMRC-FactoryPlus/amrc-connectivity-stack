@@ -36,11 +36,17 @@ const funcs = {
     const:  (p, a) => t => a,
     sin:    (p, a) => t => a * Math.sin(2 * Math.PI * (t / p)),
     saw:    (p, a) => t => (a / p) * (t % p),
-}
+};
+const packing = {
+    bd:     [8, (b, v) => b.writeDoubleBE(v)],
+    ld:     [8, (b, v) => b.writeDoubleLE(v)],
+    bf:     [4, (b, v) => b.writeFloatBE(v)],
+    lf:     [4, (b, v) => b.writeFloatLE(v)],
+};
 
 function parseAddr (addr) {
     const parts = addr.split(":");
-    if (parts.length != 3) return;
+    if (parts.length != 4) return;
 
     const func = funcs[parts[0]];
     if (!func) return;
@@ -48,8 +54,10 @@ function parseAddr (addr) {
     if (Number.isNaN(period)) return;
     const amplitude = Number.parseFloat(parts[2]);
     if (Number.isNaN(amplitude)) return;
+    const pack = packing[parts[3]];
+    if (!pack) return;
 
-    return func(period, amplitude);
+    return [func(period, amplitude), ...pack];
 }
 
 function setAddrs (pkt) {
@@ -66,17 +74,18 @@ function setAddrs (pkt) {
     }
     
     addrs = new Map(
-        parsed.map(([t, f]) => [t, { topic: t, func: f }]));
+        parsed.map(([t, [f, s, p]]) => 
+            [t, { topic: t, func: f, size: s, pack: p }]));
     console.log("Set addrs: %O", addrs);
     return true;
 }
 
 const polling = asyncjs.queue(async addr => {
     const val = addr.func(performance.now());
-    const buf = Buffer.alloc(8);
+    const buf = Buffer.alloc(addr.size);
     const top = topic("data", addr.topic);
 
-    buf.writeDoubleBE(val);
+    addr.pack(buf, val);
     await mqtt.publishAsync(top, buf);
 });
 

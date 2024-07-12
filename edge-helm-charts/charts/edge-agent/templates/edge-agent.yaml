@@ -49,6 +49,10 @@ spec:
                 secretKeyRef:
                   name: edge-agent-secrets-{{ .Values.uuid }}
                   key: keytab
+            - name: EDGE_MQTT
+              value: "mqtt://0.0.0.0"
+            - name: EDGE_PASSWORDS
+              value: "/usr/app/driver-passwords"
           resources:
             limits:
               memory: {{ .Values.limits.memory | quote }}
@@ -61,6 +65,8 @@ spec:
               readOnly: true
             - mountPath: /home/node/.config
               name: local-config
+            - mountPath: /usr/app/driver-passwords
+              name: driver-passwords
       volumes:
         - name: edge-agent-sensitive-information
           secret:
@@ -68,6 +74,10 @@ spec:
             secretName: edge-agent-sensitive-information-{{ .Values.uuid }}
         - name: local-config
           emptyDir:
+        - name: driver-passwords
+          secret:
+            optional: true
+            secretName: driver-passwords-{{ .Values.uuid }}
 ---
 apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: SparkplugNode

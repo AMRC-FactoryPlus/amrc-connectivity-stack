@@ -95,8 +95,7 @@ paths:
     /alert:
         get:
             summary: >
-                List all known alerts. These endpoints are ALPHA; they
-                are subject to incompatible change in the future.
+                List all known alerts. 
             responses:
                 "200":
                     description: Information about available alerts.
@@ -197,6 +196,55 @@ paths:
                             schema: { $ref: "#/components/schemas/session-list" }
                 "401": { description: "Unauthorised" }
                 "403": { description: "Forbidden" }
+
+    /link:
+        get:
+            summary: List all known links.
+            responses:
+                200:
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/uuid-list" }
+    /link/device/:device:
+        get:
+            summary: List the links published by a given device.
+            responses:
+                200:
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/uuid-list" }
+    /link/source/:uuid:
+        get:
+            summary: List the links from a given object.
+            responses:
+                200:
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/uuid-list" }
+    /link/target/:uuid:
+        get:
+            summary: List the links to a given object.
+            responses:
+                200:
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/uuid-list" }
+    /link/relation/:relation:
+        get:
+            summary: List the links using a given link relation.
+            responses:
+                200:
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/uuid-list" }
+    /link/:uuid:
+        get:
+            summary: Fetch the details of a particular link.
+            responses:
+                200:
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/link" }
 
     /schema:
         get:
@@ -329,6 +377,13 @@ components:
             required: true
             schema: { type: string, format: uuid }
 
+        relation:
+            description: The UUID of a link relation.
+            name: relation
+            in: path
+            required: true
+            schema: { type: string, format: uuid }
+
         schema:
             description: The UUID of the schema we are querying.
             name: schema
@@ -346,6 +401,13 @@ components:
         owner:
             description: The provider of the service.
             name: owner
+            in: path
+            required: true
+            schema: { type: string, format: uuid }
+
+        uuid:
+            description: The UUID of any Factory+ object.
+            name: uuid
             in: path
             required: true
             schema: { type: string, format: uuid }
@@ -422,6 +484,10 @@ components:
                     description: The time this alert last changed status.
                     type: string
                     format: date-time
+                links:
+                    description: Link UUIDs linking from this alert.
+                    type: array
+                    items: { type: string, format: uuid }
 
         alert-list:
             description: A list of alerts.
@@ -451,6 +517,33 @@ components:
                 Represents a list of devices. Order is unimportant.
             type: array
             items: { $ref: "#/components/schemas/device" }
+
+        link:
+            description: A link between objects.
+            type: object
+            required: [uuid, device, source, relation, target]
+            properties:
+                uuid:
+                    description: The UUID of this link.
+                    type: string
+                    format: uuid
+                device:
+                    description: The Device which published this link.
+                    type: string
+                    format: uuid
+                source:
+                    description: The UUID of the source of the link.
+                    type: string
+                    format: uuid
+                relation:
+                    description: >
+                        A UUID identifying the semantics of the link.
+                    type: string
+                    format: uuid
+                target:
+                    description: The UUID of the target of the link.
+                    type: string
+                    format: uuid
 
         service-provider-list:
             description: A list of devices which provide a service.

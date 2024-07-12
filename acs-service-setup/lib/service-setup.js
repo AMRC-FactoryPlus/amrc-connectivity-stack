@@ -28,8 +28,6 @@ export class ServiceSetup {
         const { fplus } = this;
 
         await fplus.init();
-        const princ = await fplus.Auth.find_principal();
-        this.email = princ.kerberos;
 
         return this;
     }

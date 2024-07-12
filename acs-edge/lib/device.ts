@@ -7,24 +7,19 @@ import {
     log, logf
 } from "./helpers/log.js";
 import * as fs from "fs";
+import {SparkplugNode} from "./sparkplugNode.js";
 import {
-    SparkplugNode
-} from "./sparkplugNode.js";
-import {
-    sparkplugDataType,
-    sparkplugMetric,
     Metrics,
-    sparkplugPayload,
-    sparkplugTemplate,
-    sparkplugValue,
+    parseTimeStampFromPayload,
     parseValueFromPayload,
     serialisationType,
-    parseTimeStampFromPayload
+    sparkplugDataType,
+    sparkplugMetric,
+    sparkplugPayload,
+    sparkplugTemplate,
+    sparkplugValue
 } from "./helpers/typeHandler.js";
-import {
-    EventEmitter
-} from "events";
-import * as util from "util";
+import {EventEmitter} from "events";
 import Long from "long";
 
 /**
@@ -343,7 +338,10 @@ export class Device {
                                 addr, path, timestamp, newVal);
 
                             // Update the metric value and push it to the array of changed metrics
-                            changedMetrics.push(this._metrics.setValueByAddrPath(addr, path, newVal, timestamp));
+                            changedMetrics.push({...(this._metrics.setValueByAddrPath(addr,
+                                    path,
+                                    newVal,
+                                    timestamp))});
                         }
                     }
                 }

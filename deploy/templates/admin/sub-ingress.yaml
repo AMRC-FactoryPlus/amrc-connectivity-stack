@@ -1,0 +1,23 @@
+{{ if .Values.admin.enabled }}
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: admin-sub
+  namespace: {{ .Release.Namespace }}
+spec:
+  entryPoints:
+    - {{ .Values.acs.secure | ternary "websecure" "web" }}
+  routes:
+    - match: Host(`admin.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}`)
+      kind: Rule
+      services:
+        - name: admin
+          port: 80
+          namespace: {{ .Release.Namespace }}
+  {{- if .Values.acs.secure }}
+  tls:
+    secretName: {{ coalesce .Values.auth.tlsSecretName .Values.acs.tlsSecretName }}
+    domains:
+      - main: admin.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
+  {{- end -}}
+{{- end -}}

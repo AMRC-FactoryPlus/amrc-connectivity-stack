@@ -14,13 +14,11 @@ export const ACS = {
     /* XXX These should probably be deployment-specific */
     Group: {
         Administrators:     "10fc06b7-02f5-45f1-b419-a486b6bc13ba",
+        GlobalDebuggers:    "f76f8445-ce78-41c5-90ec-5964fb0cd431",
         SparkplugNode:      "1d3121a0-aade-4376-8fa3-57ba1460ba76",
         EdgeGroups:         "9ba0de4b-056f-4b5e-b966-2d5d85d07767",
         EdgePermissions:    "7594cd71-e5b9-4467-88c0-b11a66d47fec",
-    },
-    /* XXX This should definitely be */
-    User: {
-        Administrator:      "d53f476a-29dd-4d79-b614-5b7fe9bc8acf",
+        CentralMonitor:     "1bc3dbca-68fe-48d2-9590-3a528c111827",
     },
     Perm: {
         MQTT: {
@@ -28,7 +26,17 @@ export const ACS = {
             RepresentDevices:   "e82456b3-a7d9-4971-9d8c-fd0be4545ab4",
             ReadAllStates:      "8790cf3d-b793-423c-b373-8cfcf9f63529",
             ReadNode:           "046d6603-fa62-4208-9400-65d61f8b1ec4",
+            ReadWholeNamespace: "81833dbb-1150-4078-b1db-978c646ba73e",
         },
+    },
+    PermGroup: {
+        Auth:                   "50b727d4-3faa-40dc-b347-01c99a226c58",
+        Clusters:               "9e07fd33-6400-4662-92c4-4dff1f61f990",
+        CmdEsc:                 "9584ee09-a35a-4278-bc13-21a8be1f007c",
+        ConfigDB:               "c43c7157-a50b-4d2a-ac1a-86ff8e8e88c1",
+        Directory:              "58b5da47-d098-44f7-8c1d-6e4bd800e718",
+        Git:                    "c0c55c78-116e-4526-8ff4-e4595251f76c",
+        MQTT:                   "a637134a-d06b-41e7-ad86-4bf62fde914a",
     },
     Service: {
         Manager:                "619eecab-742d-4824-8b97-bcae472e5c04",
@@ -44,6 +52,11 @@ export const ACS = {
         ConfigDB:               "36861e8d-9152-40c4-8f08-f51c2d7e3c25",
     },
 };
+
+/* XXX All the UUIDs below here are copied in from elsewhere in ACS.
+ * They should be referenced instead, but it's not clear how to achieve
+ * that. We can't just `import from "../acs-directory/lib/uuids.js"` as
+ * this will not be part of the Docker build context. */
 
 export const Clusters = {
     App: {
@@ -72,10 +85,16 @@ export const Directory = {
         ReadAlertType:          "7b096c2f-9f0e-4da4-a644-5bd647a530f6",
         PublishAlertType:       "8bceb6c8-d330-4130-a732-8db4993234b1",
         ReadDeviceAlerts:       "7e25ba20-f118-41da-a438-a7205f33b232",
+        ReadLinkRelation:       "5a8defab-635f-46fa-8d1a-fbecaa1c2428",
+        ReadDeviceLinks:        "b3dbdd15-f049-4a24-8ed3-9204537b8a22",
     },
 };
 
 export const Edge = {
+    Class: {
+        Alert:              "ddb853fc-262a-4a10-888a-816a961d37c5",
+        LinkRelation:       "2bce9142-6b5b-4a5e-8e2f-f8a8d51d6c15",
+    },
     App: {
         AgentConfig:        "aac6f843-cfee-4683-b121-6943bfdf9173",
         ClusterStatus:      "747a62c9-1b66-4a2e-8dd9-0b70a91b6b75",
@@ -87,11 +106,31 @@ export const Edge = {
     Role: {
         Monitor:            "4cb43b27-287c-4363-b819-944d567d4e48",
     },
+    Alert: {
+        Agent: {
+            Connection:      "633a7da3-ea2a-4e3f-8e84-35691a07465f",
+            ConfigInvalid:   "99c54cb2-2bb9-45c8-88f9-c1a0f792cfd6",
+            ConfigFetch:     "c414c68b-5014-4e46-a0b4-d5f7f8df1d9f",
+        },
+        Monitor: {
+            Offline:        "e6eff8b6-7b16-4827-9136-ac5202c0df59",
+            Reload:         "bfa87a28-9788-45ab-922f-c4cb9eb9e742",
+        },
+    },
+    Link: {
+        Monitor: {
+            Cluster:        "422d47e0-8761-43da-abd4-4f2adaef0d4a",
+            Node:           "ec916189-f4f9-4fc7-af7e-724cc216e9e9",
+        },
+    },
 };
 
 export const Fixup = {
     Role: {
         EdgeNode:           "87e4a5b7-9a89-4796-a216-39666a47b9d2",
+    },
+    User: {
+        Administrator:      "d53f476a-29dd-4d79-b614-5b7fe9bc8acf",
     },
 };
 

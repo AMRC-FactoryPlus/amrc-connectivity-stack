@@ -39,11 +39,11 @@ export default class API {
         let api = this.routes;
 
         /* Validate against the spec */
-        const spec = url.fileURLToPath(new URL("../api/openapi.yaml", import.meta.url));
-        console.log(`Loading OpenAPI spec from ${spec}...`);
-        api.use(OpenApiValidator.middleware({
-            apiSpec: spec,
-        }));
+        //const spec = url.fileURLToPath(new URL("../api/openapi.yaml", import.meta.url));
+        //console.log(`Loading OpenAPI spec from ${spec}...`);
+        //api.use(OpenApiValidator.middleware({
+        //    apiSpec: spec,
+        //}));
 
         api.get("/search", this.search.bind(this));
 
@@ -84,6 +84,14 @@ export default class API {
         api.get("/alert/type/:type", this.alert_list.bind(this, false));
         api.get("/alert/type/:type/active", this.alert_list.bind(this, true));
         api.get("/alert/:uuid", this.alert_single.bind(this));
+
+        const ll = this.link_list.bind(this);
+        api.get("/link", ll);
+        api.get("/link/device/:device", ll);
+        api.get("/link/source/:source", ll);
+        api.get("/link/relation/:relation", ll);
+        api.get("/link/target/:target", ll);
+        api.get("/link/:uuid", this.link_single.bind(this));
     }
 
     async search(req, res) {
@@ -327,12 +335,56 @@ export default class API {
         /* XXX timing attack */
         if (alrt == null) return res.status(404).end();
 
-        const ok = auth.check_acl(req.auth, Perm.Read_Alert_Type, alrt.type, true)
-            || auth.check_acl(req.auth, Perm.Read_Device_Alerts, alrt.device, true);
+        const ck = (p, o) => auth.check_acl(req.auth, p, o, true);
+        const ok = await ck(Perm.Read_Alert_Type, alrt.type)
+            || await ck(Perm.Read_Device_Alerts, alrt.device);
+
         /* We unhelpfully return 404 here to prevent unauthorised
          * clients from discovering which alerts exist. This is
          * consistent with removing them from the lists. */
         if (!ok) return res.status(404).end();
         return res.status(200).json(alrt);
+    }
+
+    async link_list (req, res) {
+        const { params } = req;
+
+        const [st, acl] = await this.acl(req.auth);
+        if (st != 200) return res.status(503).end();
+
+        const mod = this.model;
+        const links = await (
+            "device" in params      ? mod.link_list_by_device(params.device)
+            : "source" in params    ? mod.link_list_by_source(params.source)
+            : "relation" in params  ? mod.link_list_by_relation(params.relation)
+            : "target" in params    ? mod.link_list_by_target(params.target)
+            : mod.link_list());
+
+        const perm = p => {
+            const l = new Set(
+                acl.filter(a => a.permission == p)
+                    .map(a => a.target));
+            const w = l.has(Special.Null);
+            return o => w || l.has(o);
+        };
+        const rel_ok = perm(Perm.Read_Link_Relation);
+        const dev_ok = perm(Perm.Read_Device_Links);
+        const rv = links.filter(l => rel_ok(l.relation) || dev_ok(l.device));
+
+        return res.status(200).json(rv);
+    }
+
+    async link_single (req, res) {
+        const { uuid } = req.params;
+        const auth = this.fplus.Auth;
+
+        const link = await this.model.link_by_uuid(uuid);
+
+        const ck = (p, o) => auth.check_acl(req.auth, p, o, true);
+        const ok = await ck(Perm.Read_Link_Relation, link.relation)
+            || await ck(Perm.Read_Device_Links, link.device);
+
+        if (!ok) return res.status(404).end();
+        return res.status(200).json(link);
     }
 }

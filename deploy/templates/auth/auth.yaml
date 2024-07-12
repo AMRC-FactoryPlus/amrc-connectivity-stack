@@ -52,8 +52,8 @@ spec:
             - name: PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: krb5-passwords
-                  key: admin
+                  name: admin-password
+                  key: password
           command: [ 'sh', '-c', 'until curl -X PUT -o /dev/null -w "%{http_code}" -u "admin:${PASSWORD}" -H "Content-Type: application/json" --data-raw "{ \"url\": \"http://auth.{{.Release.Namespace}}.svc.cluster.local\" }" http://directory.{{.Release.Namespace}}.svc.cluster.local/v1/service/cab2642a-f7d9-42e5-8845-8f35affe1fd4/advertisment/1e1989ab-14e4-42bd-8171-495230acc406 | grep -E "2[0-9]{2}" > /dev/null; do sleep 10; done' ]
         - name: db-init
 {{ include "amrc-connectivity-stack.image" (list . .Values.auth) | indent 10 }}
@@ -128,7 +128,7 @@ spec:
             - name: PGDATABASE
               value: auth
             - name: VERBOSE
-              value: "1"
+              value: {{.Values.auth.verbosity | quote | required "values.auth.verbosity is required!"}}
 {{ include "amrc-connectivity-stack.cache-max-age" (list . "auth") | indent 12 }}
             # These are currently only used for the editor. They need to be resolvable by the
             # user's browser, so in-cluster names will not work.

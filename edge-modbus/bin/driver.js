@@ -74,22 +74,30 @@ function parseAddr (spec) {
     return { id, func, addr, len };
 }
 
-const polling = asyncjs.queue(async ({ data, addr }) => {
+async function poll ({ data, addr }) {
     console.log("READ %O", addr);
     if (!client) {
         console.log("Can't poll, no client!");
         return;
     }
-    if (!client.isOpen)
-        await new Promise((r, j) => 
-            client.open(e => e ? j(e) : r()));
+    if (!client.isOpen) {
+        const st = await new Promise((r, j) => 
+            client.open(e => {
+                console.log("Modbus open: %s", e);
+                r(e ? "CONN" : "UP");
+            }));
+        setStatus(st);
+        if (status != "UP") return;
+    }
 
     client.setID(addr.id);
     const val = await addr.func.read(client, addr.addr, addr.len);
     console.log("DATA %O", val);
 
     await mqtt.publishAsync(data, val.buffer);
-});
+}
+const polling = asyncjs.queue(asyncjs.timeout(poll, 10000));
+polling.error(e => console.log("POLL ERR: %o", e));
 
 function setAddrs (pkt) {
     if (pkt.version != 1) {

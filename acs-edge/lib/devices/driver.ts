@@ -153,8 +153,10 @@ export class DriverConnection extends DeviceConnection {
     }
 
     #msg_status (status: string) {
+        const ost = this.status;
         this.status = status;
-        log(`DRIVER [${this.id}]: status ${status}`);
+        log(`DRIVER [${this.id}]: status ${ost} -> ${status}`);
+
         switch (status) {
         case "READY":
             this.broker.publish({
@@ -165,10 +167,16 @@ export class DriverConnection extends DeviceConnection {
             this.#send_addrs();
             break;
         case "UP":
-            this.emit("open");
+            if (ost != "UP")
+                this.emit("open");
             break;
         case "DOWN":
-            this.emit("close");
+        case "CONF":
+        case "CONN":
+        case "AUTH":
+        case "ERR":
+            if (ost == "UP")
+                this.emit("close");
             break;
         }
     }

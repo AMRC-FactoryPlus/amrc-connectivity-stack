@@ -119,7 +119,7 @@ serviceSetup:
           acs:
             url: https://github.com/AMRC-FactoryPlus/edge-helm-charts.git
             # Pull this branch/tag
-            ref: v3.1.0
+            ref: v3.1.2
             # Merge to a local branch, if not otherwise moved
             merge: main
             # Interval to perform updates. 'never' will only update on git

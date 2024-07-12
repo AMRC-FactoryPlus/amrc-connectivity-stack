@@ -5,6 +5,8 @@
 
 import ModbusRTU from "modbus-serial";
 
+const RECONNECT = 5000;
+
 const funcs = {
     input:      { 
         read:   (c, a, l) => c.readInputRegisters(a, l),
@@ -24,16 +26,35 @@ class ModbusHandler {
     constructor (driver, conf) {
         this.driver = driver;
         this.conf = conf;
+
         this.client = new ModbusRTU();
     }
 
     run () {
-        const { client, driver } = this;
+        const { driver, client, sock } = this;
         const { host, port } = this.conf;
+
+        client.on("close", () => this.reconnect());
 
         client.connectTCP(host, { port })
             .then(() => driver.setStatus("UP"))
-            .catch(() => driver.setStatus("CONN"));
+            .catch(() => this.reconnect());
+    }
+
+    async reconnect () {
+        const { client, driver } = this;
+
+        console.log("Modbus connection closed");
+        setTimeout(() => {
+            console.log("Reconnecting to modbus");
+            client.open(e => {
+                driver.setStatus(e ? "CONN" : "UP");
+                if (e) {
+                    console.log("Failed to connect to modbus: %s", e);
+                    this.reconnect();
+                }
+            });
+        }, RECONNECT);
     }
 
     parseAddr (spec) {
@@ -55,15 +76,7 @@ class ModbusHandler {
     async poll (addr) {
         const { client } = this;
 
-        if (!client.isOpen) {
-            const st = await new Promise((r, j) => 
-                client.open(e => {
-                    console.log("Modbus open: %s", e);
-                    r(e ? "CONN" : "UP");
-                }));
-            this.driver.setStatus(st);
-            if (st != "UP") return;
-        }
+        if (!client.isOpen) return;
 
         client.setID(addr.id);
         const val = await addr.func.read(client, addr.addr, addr.len);

@@ -5,7 +5,8 @@ metadata:
   name: edge-agent-{{ .Values.uuid }}
 spec:
   selector:
-    factory-plus.service: edge-mqtt-{{ .Values.uuid }}
+    factory-plus.app: edge-agent
+    factory-plus.nodeUuid: {{ .Values.uuid }}
   internalTrafficPolicy: Local
   ports:
     - name: mqtt

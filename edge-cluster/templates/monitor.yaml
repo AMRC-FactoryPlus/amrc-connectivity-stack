@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: edge-monitor
+  name: monitor
   namespace: {{ .Release.Namespace }}
 spec:
   replicas: 1
@@ -9,11 +9,11 @@ spec:
     type: Recreate
   selector:
     matchLabels:
-      component: edge-monitor
+      component: monitor
   template:
     metadata:
       labels:
-        component: edge-monitor
+        component: monitor
     spec:
       serviceAccountName: edge-monitor
       volumes:
@@ -22,10 +22,10 @@ spec:
             name: krb5-conf
         - name: keytabs
           secret:
-            secretName: edge-monitor-keytabs
+            secretName: monitor-keytabs
       containers:
         - name: monitor
-{{ list . "edgeMonitor" | include "edge-cluster.image" | indent 10 }}
+{{ list . "monitor" | include "edge-cluster.image" | indent 10 }}
           command: [ "/usr/bin/k5start", "-Uf", "/keytabs/client" ]
           args: ["node", "bin/edge-monitor.js"]
           env:
@@ -50,7 +50,7 @@ metadata:
 spec:
   principal: op1monitor/{{ .Values.cluster.name }}@{{ .Values.krb5.realm }}
   type: Random
-  secret: edge-monitor-keytabs/client
+  secret: monitor-keytabs/client
   account:
     class: {{ .Values.uuid.class.edgeAccount }}
     name: "Edge monitor: {{ .Values.cluster.name }}"

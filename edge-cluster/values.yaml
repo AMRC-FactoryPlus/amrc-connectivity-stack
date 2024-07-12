@@ -28,12 +28,12 @@ image:
     registry: ghcr.io/amrc-factoryplus
     pullPolicy: IfNotPresent
     tag: v3.1.2
-  edgeMonitor:
-    repository: acs-edge-monitor
-    #tag: ''
   edgeSync:
     repository: acs-edge-sync
     #tag: ''
   krbKeys:
     repository: acs-krb-keys-operator
+    #tag: ''
+  monitor:
+    repository: acs-monitor
     #tag: ''

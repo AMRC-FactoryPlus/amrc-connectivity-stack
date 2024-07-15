@@ -184,13 +184,13 @@ export class Deployments {
     create_manifests ({ config, deployments }) {
         return imm.List(deployments)
             .map(deployment => {
-                const { uuid } = deployment;
+                const { uuid, config } = deployment;
                 const chart = deployment.chart({
                     uuid,
-                    name:       deployment.config.name,
-                    hostname:   deployment.config.hostname,
+                    name:       config.name,
+                    hostname:   config.hostname,
                 });
-                const values = [this.values, chart.values, deployment.values]
+                const values = [this.values, chart.values, config.values]
                     .map(v => v ?? {}).reduce(jmp.merge);
                 return config.template({
                     uuid, values,

@@ -1,5 +1,5 @@
 /*
- * AMRC InfluxDB Sparkplug Ingester
+ * AMRC ACS UNS Ingester
  * Copyright "2023" AMRC
  */
 

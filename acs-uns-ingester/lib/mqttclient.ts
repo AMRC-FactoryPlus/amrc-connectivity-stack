@@ -1,5 +1,5 @@
 /*
- * AMRC InfluxDB Sparkplug Ingester
+ * AMRC ACS UNS Ingester
  * Copyright "2024" AMRC
  */
 
@@ -12,6 +12,15 @@ import {Agent} from 'http'
 
 import * as mqtt_dev from "mqtt";
 
+interface UnsMetric {
+    value: string,
+    timestamp: Date,
+}
+
+interface BatchedUnsMetric extends UnsMetric {
+    batch?: UnsMetric[]
+}
+
 let dotenv: any = null;
 try {
     dotenv = await import ('dotenv')
@@ -20,6 +29,7 @@ try {
 
 dotenv?.config()
 
+/*
 const influxURL: string = process.env.INFLUX_URL;
 if (!influxURL) {
     throw new Error("INFLUX_URL environment variable is not set");
@@ -44,7 +54,7 @@ const flushInterval: number = Number.parseInt(process.env.FLUSH_INTERVAL);
 if (!flushInterval) {
     throw new Error("FLUSH_INTERVAL environment variable is not set");
 }
-
+*/
 const unsMqttUrl: string = process.env.UNS_MQTT_URL;
 if (!unsMqttUrl) {
     throw new Error("UNS_MQTT_URL environment variable is not set");
@@ -104,7 +114,7 @@ export default class MQTTClient {
     async run() {
         this.local_mqtt = mqtt_dev.connect(unsMqttUrl);
         this.local_mqtt.on("connect", () => {
-            logger.info("😁 Connected to local mqtt broker!");
+            logger.info("✔  Connected to local mqtt broker!");
         });
 
         this.local_mqtt.on("error", (error) => {
@@ -306,7 +316,7 @@ export default class MQTTClient {
                 // Clear the debounce
                 delete this.birthDebounce?.[topic.address.group]?.[topic.address.node]?.[topic.address.device];
 
-                // Store the default values in InfluxDB
+                // Publish values to UNS
                 this.publishToUNS(payload, topic);
 
                 break;
@@ -332,7 +342,7 @@ export default class MQTTClient {
                 // Check if we have a birth certificate for the device
                 if (this.aliasResolver?.[topic.address.group]?.[topic.address.node]?.[topic.address.device]) {
 
-                    // Device is known, resolve aliases and write to InfluxDB
+                    // Device is known, resolve aliases and publish to UNS
                     //this.writeMetrics(payload, topic);
                     this.publishToUNS(payload, topic)
 
@@ -380,6 +390,8 @@ export default class MQTTClient {
      * @param topic Topic the payload was received on.
      */
     private publishToUNS(payload, topic) {
+        const metricsToPublish: { [metricPath: string]: any[] } = {};
+        //resolve metric aliases
         payload.metrics.forEach((metric) => {
             if (metric.value === null) return;
             let birth = this.aliasResolver?.[topic.address.group]?.[topic.address.node]?.[topic.address.device]?.[metric.alias];
@@ -389,28 +401,54 @@ export default class MQTTClient {
             }
 
             if (birth.transient) {
-                logger.debug(`Metric ${birth.name} is transient, not writing to InfluxDB`);
+                logger.debug(`Metric ${birth.name} is transient, publishing to UNS`);
                 return;
             }
 
             const metricName = birth.name.split('/').pop() as string;
             const path = birth.name.substring(0, birth.name.lastIndexOf("/")) as string;
-
-            if (
-                metricName === "Schema_UUID" ||
-                metricName === "Instance_UUID" ||
-                path.includes("Device Control") ||
-                path.includes("Device Information")
-            ) {
+            if (path.includes("Device Control")) {
                 return;
             }
 
+            let unsTopic: string;
+
             if (path) {
-                this.local_mqtt.publish(`AMRC/Sheffield/F2050/${topic.address.device}/${path}/${metricName}`, `${metric.value}`);
+                // enterprise, site, area, cell, device? namespace where edge is the raw data from the device edge.
+                unsTopic = `AMRC/F2050/MK1/${topic.address.device}/Edge/${path}/${metricName}`;
             } else {
-                this.local_mqtt.publish(`AMRC/Sheffield/F2050/${topic.address.device}/${metricName}`, `${metric.value}`);
+                unsTopic = `AMRC/F2050/MK1/${topic.address.device}/Edge/${metricName}`;
             }
+
+            if (!(unsTopic in metricsToPublish)) {
+                metricsToPublish[unsTopic] = [metric]
+            } else {
+                metricsToPublish[unsTopic].push(metric);
+            }
+
         });
+
+        // format payload to publish to uns.
+        Object.entries(metricsToPublish).forEach(([key, value]) => {
+            // if theirs more than one of the same metric from the same sparkplug payload, add the values to the batch array.
+            if (value.length > 1) {
+                const sortedMetrics = value.sort((a, b) => b.timestamp - a.timestamp);
+                let payload: BatchedUnsMetric = {
+                    timestamp: new Date(sortedMetrics[0].timestamp),
+                    value: sortedMetrics[0].value,
+                    batch: []
+                }
+                //remove the first element, that's our newest and will be the value outside the batch array.
+                sortedMetrics.shift();
+                sortedMetrics.forEach(metric => {
+                    payload.batch.push({timestamp: metric.timestamp, value: metric.value});
+                });
+                this.local_mqtt.publish(key, payload);
+            } else {
+                const payload: UnsMetric = {timestamp: new Date(value[0].timestamp), value: value[0].value};
+                this.local_mqtt.publish(key, payload);
+            }
+        })
     }
 
     /*

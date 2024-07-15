@@ -13,10 +13,18 @@ import * as mqttjs from "mqtt";
 interface UnsMetric {
     value: string,
     timestamp: Date,
+    batch?: UnsMetric[]
 }
 
-interface BatchedUnsMetric extends UnsMetric {
-    batch?: UnsMetric[]
+interface UnsMetricCustomProperties {
+    Instance_UUID: string,
+    Schema_UUID: string,
+    Transient: boolean,
+}
+
+interface MetricContainer {
+    metric: any,
+    customProperties: UnsMetricCustomProperties
 }
 
 let dotenv: any = null;
@@ -50,7 +58,9 @@ export default class MQTTClient {
     }
 
     async run() {
-        this.unsBroker = mqttjs.connect(unsMqttUrl);
+        this.unsBroker = mqttjs.connect(unsMqttUrl, {
+            protocolVersion: 5,
+        });
         this.unsBroker.on("connect", () => {
             logger.info("✔  Connected to local mqtt broker!");
         });
@@ -330,23 +340,19 @@ export default class MQTTClient {
      * @param topic Topic the payload was received on.
      */
     private publishToUNS(payload, topic) {
-        const metricsToPublish: { [metricPath: string]: any[] } = {};
+
+        const metricsToPublish: { [metricPath: string]: MetricContainer[] } = {};
 
         //resolve metric aliases
         payload.metrics.forEach((metric) => {
             if (metric.value === null) return;
+
+
             let birth = this.aliasResolver?.[topic.address.group]?.[topic.address.node]?.[topic.address.device]?.[metric.alias];
 
             if (!birth) {
                 logger.error(`❓ Metric ${metric.alias} is unknown for ${topic.address.group}/${topic.address.node}/${topic.address.device}`);
                 return;
-            }
-
-            // TODO: Build custom properties object - SFIP2-57
-
-            if (birth.transient) {
-                // TODO: Add transient to custom properties if needed
-                logger.debug(`Metric ${birth.name} is transient, publishing to UNS`);
             }
 
             const metricName = birth.name.split('/').pop() as string;
@@ -355,41 +361,84 @@ export default class MQTTClient {
                 return;
             }
 
+            // We don't want to publish Instance_UUID or Schema_UUID metrics
+            if (metricName === "Instance_UUID" || metricName === "Schema_UUID") {
+                return;
+            }
+
+            // Build custom properties object
+
+            let customProperties: UnsMetricCustomProperties = {
+                Instance_UUID: birth.instance.top,
+                Schema_UUID: birth.schema.top,
+                Transient: birth.transient,
+            }
+
             // TODO: Get enterprise information from the Device_Information-v1/Hierarchy-v1 schema - SFIP2-58
 
             let unsTopic = `AMRC/F2050/MK1/${topic.address.device}/Edge/${path ? (path + '/') : ''}${metricName}`;
 
             if (!(unsTopic in metricsToPublish)) {
-                metricsToPublish[unsTopic] = [metric]
+                metricsToPublish[unsTopic] = [{
+                    metric: metric,
+                    customProperties: customProperties
+                }]
             } else {
-                metricsToPublish[unsTopic].push(metric);
+                metricsToPublish[unsTopic].push({
+                    metric: metric,
+                    customProperties: customProperties
+                });
             }
 
         });
 
         // format payload to publish to uns.
-        Object.entries(metricsToPublish).forEach(([topic, value]) => {
+        Object.entries(metricsToPublish).forEach(([topic, metricContainers]) => {
 
-            // TODO: Add custom properties before sending - SFIP2-57
-
+            let payload: UnsMetric;
             // if theirs more than one of the same metric from the same sparkplug payload, add the values to the batch array.
-            if (value.length > 1) {
-                const sortedMetrics = value.sort((a, b) => b.timestamp.toNumber() - a.timestamp.toNumber());
-                let payload: BatchedUnsMetric = {
-                    timestamp: new Date(sortedMetrics[0].timestamp.toNumber()),
-                    value: sortedMetrics[0].value,
+            if (metricContainers.length > 1) {
+                const sortedMetricContainers = metricContainers.sort((a, b) => b.metric.timestamp.toNumber() - a.metric.timestamp.toNumber());
+                payload = {
+                    timestamp: new Date(sortedMetricContainers[0].metric.timestamp.toNumber()),
+                    value: sortedMetricContainers[0].metric.value,
                     batch: []
                 }
                 //remove the first element, that's our newest and will be the value outside the batch array.
-                sortedMetrics.shift();
-                sortedMetrics.forEach(metric => {
-                    payload.batch.push({timestamp: metric.timestamp.toNumber(), value: metric.value});
+                sortedMetricContainers.shift();
+                sortedMetricContainers.forEach(metricContainer => {
+                    payload.batch.push({
+                        timestamp: metricContainer.metric.timestamp.toNumber(),
+                        value: metricContainer.metric.value
+                    });
                 });
-                this.unsBroker.publish(topic, JSON.stringify(payload));
             } else {
-                const payload: UnsMetric = {timestamp: new Date(value[0].timestamp.toNumber()), value: value[0].value};
-                this.unsBroker.publish(topic, JSON.stringify(payload));
+                payload = {
+                    timestamp: new Date(metricContainers[0].metric.timestamp.toNumber()),
+                    value: metricContainers[0].metric.value
+                };
             }
+
+            if (!metricContainers[0]?.customProperties.Instance_UUID) {
+                logger.warn(`${topic} is not broadcasting an Instance_UUID. Not publishing to UNS.`);
+                return;
+            }
+
+            if (!metricContainers[0]?.customProperties.Schema_UUID) {
+                logger.warn(`${topic} is not broadcasting a Schema_UUID. Not publishing to UNS.`);
+                return;
+            }
+
+            this.unsBroker.publish(topic, JSON.stringify(payload), {
+                properties: {
+                    //     Assume that all metrics have the same custom properties
+                    userProperties: {
+                        Instance_UUID: metricContainers[0]?.customProperties.Instance_UUID,
+                        Schema_UUID: metricContainers[0].customProperties.Schema_UUID,
+                        Transient: metricContainers[0].customProperties.Transient ?? false
+                    }
+                }
+            });
         })
     }
 

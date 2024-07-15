@@ -27,6 +27,7 @@ spec:
     - {{ .Values.acs.baseUrl}}
     - visualiser.{{ .Values.acs.baseUrl}}
     - auth.{{ .Values.acs.baseUrl}}
+    - admin.{{ .Values.acs.baseUrl}}
     - clusters.{{ .Values.acs.baseUrl}}
     - cmdesc.{{ .Values.acs.baseUrl}}
     - configdb.{{ .Values.acs.baseUrl}}

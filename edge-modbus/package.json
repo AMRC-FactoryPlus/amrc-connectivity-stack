@@ -1,7 +1,7 @@
 {
-  "name": "amrc-connectivity-stack",
-  "version": "1.0.0",
-  "description": "The AMRC Connectivity Stack (ACS) is a comprehensive collection of open-source services developed by the AMRC that represents a complete end-to-end implementation of the [Factory+](https://factoryplus.app.amrc.co.uk) framework. It is distributed as a Kubernetes Helm chart an can be deployed onto any Kubernetes cluster.",
+  "name": "edge-modbus",
+  "version": "0.0.0",
+  "description": "",
   "main": "index.js",
   "type": "module",
   "directories": {
@@ -14,8 +14,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "async": "^3.2.5",
     "modbus-serial": "^8.0.17",
-    "mqtt": "^5.8.0"
+    "@amrc-factoryplus/edge-driver": "0.0.1-bmz2"
   }
 }

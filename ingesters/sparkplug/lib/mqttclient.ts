@@ -7,8 +7,6 @@ import {ServiceClient, SpB, Topic, UUIDs} from "@amrc-factoryplus/utilities";
 import {Reader} from "protobufjs";
 import {logger} from "../bin/ingester.js";
 import Long from "long";
-import {InfluxDB, Point} from '@influxdata/influxdb-client'
-import {Agent} from 'http'
 
 import * as mqtt_dev from "mqtt";
 
@@ -29,71 +27,11 @@ try {
 
 dotenv?.config()
 
-/*
-const influxURL: string = process.env.INFLUX_URL;
-if (!influxURL) {
-    throw new Error("INFLUX_URL environment variable is not set");
-}
-
-const influxToken: string = process.env.INFLUX_TOKEN
-if (!influxToken) {
-    throw new Error("INFLUX_TOKEN environment variable is not set");
-}
-
-const influxOrganisation: string = process.env.INFLUX_ORG
-if (!influxOrganisation) {
-    throw new Error("INFLUX_ORG environment variable is not set");
-}
-
-const batchSize: number = Number.parseInt(process.env.BATCH_SIZE);
-if (!batchSize) {
-    throw new Error("BATCH_SIZE environment variable is not set");
-}
-
-const flushInterval: number = Number.parseInt(process.env.FLUSH_INTERVAL);
-if (!flushInterval) {
-    throw new Error("FLUSH_INTERVAL environment variable is not set");
-}
-*/
 const unsMqttUrl: string = process.env.UNS_MQTT_URL;
 if (!unsMqttUrl) {
     throw new Error("UNS_MQTT_URL environment variable is not set");
 }
 
-/*
-let i = 0;
-
-// Node.js HTTP client OOTB does not reuse established TCP connections, a custom node HTTP agent
-// can be used to reuse them and thus reduce the count of newly established networking sockets
-const keepAliveAgent = new Agent({
-    keepAlive: true, // reuse existing connections
-    keepAliveMsecs: 20 * 1000, // 20 seconds keep alive
-})
-
-const influxDB = new InfluxDB({
-    url: influxURL, token: influxToken, transportOptions: {
-        agent: keepAliveAgent,
-    }
-})
-
-let interval: any;
-
-/* points/lines are batched in order to minimize networking and increase performance */
-
-/*
-const writeApi = influxDB.getWriteApi(influxOrganisation, process.env.INFLUX_BUCKET || 'default', 'ns', {
-    // the maximum points/lines to send in a single batch to InfluxDB server
-    batchSize: batchSize + 1, // don't let automatically flush data
-    // maximum time in millis to keep points in an unflushed batch, 0 means don't periodically flush
-    flushInterval: 0, // Never allow the package to flush: we'll flush manually
-    // maximum size of the retry buffer - it contains items that could not be sent for the first time
-    maxBufferLines: 30_000, // the count of internally-scheduled retries upon write failure, the delays between write attempts follow an exponential backoff strategy if there is no Retry-After HTTP header
-    maxRetries: 0, // do not retry writes
-    // ... there are more write options that can be customized, see
-    // https://influxdata.github.io/influxdb-client-js/influxdb-client.writeoptions.html and
-    // https://influxdata.github.io/influxdb-client-js/influxdb-client.writeretryoptions.html
-});
-*/
 interface MQTTClientConstructorParams {
     e: {
         serviceClient: ServiceClient;

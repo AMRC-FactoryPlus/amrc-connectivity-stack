@@ -50,7 +50,7 @@ spec:
                   name: edge-agent-secrets-{{ .Values.uuid }}
                   key: keytab
             - name: EDGE_MQTT
-              value: "mqtt://0.0.0.0"
+              value: "mqtt://localhost"
             - name: EDGE_PASSWORDS
               value: "/usr/app/driver-passwords"
           resources:
@@ -67,6 +67,20 @@ spec:
               name: local-config
             - mountPath: /usr/app/driver-passwords
               name: driver-passwords
+{{- range $name, $image := .Values.drivers }}
+        - name: "driver-{{ $name | lower }}"
+          image: "{{ $image }}"
+          env:
+            - name: EDGE_MQTT
+              value: "mqtt://localhost"
+            - name: EDGE_USERNAME
+              value: "{{ $name }}"
+            - name: EDGE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: "driver-passwords-{{ $.Values.uuid }}"
+                  key: "{{ $name }}"
+{{- end }}
       volumes:
         - name: edge-agent-sensitive-information
           secret:

@@ -162,6 +162,9 @@
           }
         }
       ]
+    },
+    "ISA95_Hierarchy": {
+      "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Hierarchy-v1.json"
     }
   },
   "required": [

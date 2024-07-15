@@ -376,7 +376,7 @@ export default class MQTTClient {
 
             // TODO: Get enterprise information from the Device_Information-v1/Hierarchy-v1 schema - SFIP2-58
 
-            let unsTopic = `AMRC/F2050/MK1/${topic.address.device}/Edge/${path ? (path + '/') : ''}${metricName}`;
+            let unsTopic = `UNS/v1/AMRC/F2050/MK1/${topic.address.device}/Edge/${path ? (path + '/') : ''}${metricName}`;
 
             if (!(unsTopic in metricsToPublish)) {
                 metricsToPublish[unsTopic] = [{

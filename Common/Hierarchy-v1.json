@@ -1,0 +1,114 @@
+{
+  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Hierarchy-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "84ac3397-f3a2-440a-99e5-5bb9f6a75091"
+    },
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "Enterprise": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Documentation": {
+              "default": "The Enterprise name according to ISA95 (or BS EN 62264)"
+            },
+            "Sparkplug_Type": {
+              "enum": [
+                "String"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "Site": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Documentation": {
+              "default": "The Site name according to ISA95 (or BS EN 62264)"
+            },
+            "Sparkplug_Type": {
+              "enum": [
+                "String"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "Area": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Documentation": {
+              "default": "The Area name according to ISA95 (or BS EN 62264)"
+            },
+            "Sparkplug_Type": {
+              "enum": [
+                "String"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "Work Center": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Documentation": {
+              "default": "The Work Center name according to ISA95 (or BS EN 62264)"
+            },
+            "Sparkplug_Type": {
+              "enum": [
+                "String"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "Work Unit": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Documentation": {
+              "default": "The Work Unit name according to ISA95 (or BS EN 62264)"
+            },
+            "Sparkplug_Type": {
+              "enum": [
+                "String"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID"
+  ]
+}

@@ -61,34 +61,34 @@ export default class MQTTClient {
         const sparkplugBroker = await this.serviceClient.mqtt_client();
         this.sparkplugBroker = sparkplugBroker;
 
-        sparkplugBroker.on("authenticated", this.on_connect.bind(this));
-        sparkplugBroker.on("error", this.on_error.bind(this));
-        sparkplugBroker.on("message", this.on_message.bind(this));
-        sparkplugBroker.on("close", this.on_close.bind(this));
-        sparkplugBroker.on("reconnect", this.on_reconnect.bind(this));
+        sparkplugBroker.on("connect", this.onConnect.bind(this));
+        sparkplugBroker.on("error", this.onError.bind(this));
+        sparkplugBroker.on("message", this.onMessage.bind(this));
+        sparkplugBroker.on("close", this.onClose.bind(this));
+        sparkplugBroker.on("reconnect", this.onReconnect.bind(this));
 
-        logger.info("Connecting to Factory+ broker...");
+        logger.info("Connecting to Sparkplug channel...");
     }
 
-    on_connect() {
-        logger.info("🔌 Connected to Factory+ broker");
+    onConnect() {
+        logger.info("🔌 Connected to Sparkplug channel");
         logger.info("👂 Subscribing to entire Factory+ namespace");
         this.sparkplugBroker.subscribe('spBv1.0/#');
     }
 
-    on_close() {
-        logger.warn(`❌ Disconnected from Factory+ broker`);
+    onClose() {
+        logger.warn(`❌ Disconnected from Sparkplug channel`);
     }
 
-    on_reconnect() {
-        logger.warn(`⚠️ Reconnecting to Factory+ broker...`);
+    onReconnect() {
+        logger.warn(`⚠️ Reconnecting to Sparkplug channel...`);
     }
 
-    on_error(error: any) {
+    onError(error: any) {
         logger.error("🚨 MQTT error: %o", error);
     }
 
-    async on_message(topicString: string, message: Uint8Array | Reader) {
+    async onMessage(topicString: string, message: Uint8Array | Reader) {
         let topic = Topic.parse(topicString);
         let payload;
 
@@ -118,6 +118,8 @@ export default class MQTTClient {
 
                 // If we have a Factory+ payload then process the Schema UUIDs and Instance UUIDs
                 if (payload.uuid === UUIDs.FactoryPlus) {
+
+                    // TODO: Raise alert if the payload doesn't contain the Device_Information-v1/Heirarchy-v1 schema
 
                     // Schema_UUIDs
                     payload.metrics.forEach((metric) => {
@@ -329,18 +331,22 @@ export default class MQTTClient {
      */
     private publishToUNS(payload, topic) {
         const metricsToPublish: { [metricPath: string]: any[] } = {};
+
         //resolve metric aliases
         payload.metrics.forEach((metric) => {
             if (metric.value === null) return;
             let birth = this.aliasResolver?.[topic.address.group]?.[topic.address.node]?.[topic.address.device]?.[metric.alias];
 
             if (!birth) {
+                logger.error(`❓ Metric ${metric.alias} is unknown for ${topic.address.group}/${topic.address.node}/${topic.address.device}`);
                 return;
             }
 
+            // TODO: Build custom properties object
+
             if (birth.transient) {
+                // TODO: Add transient to custom properties if needed
                 logger.debug(`Metric ${birth.name} is transient, publishing to UNS`);
-                return;
             }
 
             const metricName = birth.name.split('/').pop() as string;
@@ -349,14 +355,9 @@ export default class MQTTClient {
                 return;
             }
 
-            let unsTopic: string;
+            // TODO: Get enterprise information from the Device_Information-v1/Hierarchy-v1 schema
 
-            if (path) {
-                // enterprise, site, area, cell, device? namespace where edge is the raw data from the device edge.
-                unsTopic = `AMRC/F2050/MK1/${topic.address.device}/Edge/${path}/${metricName}`;
-            } else {
-                unsTopic = `AMRC/F2050/MK1/${topic.address.device}/Edge/${metricName}`;
-            }
+            let unsTopic = `AMRC/F2050/MK1/${topic.address.device}/Edge/${path ? (path + '/') : ''}${metricName}`;
 
             if (!(unsTopic in metricsToPublish)) {
                 metricsToPublish[unsTopic] = [metric]
@@ -367,24 +368,27 @@ export default class MQTTClient {
         });
 
         // format payload to publish to uns.
-        Object.entries(metricsToPublish).forEach(([key, value]) => {
+        Object.entries(metricsToPublish).forEach(([topic, value]) => {
+
+            // TODO: Add custom properties before sending
+
             // if theirs more than one of the same metric from the same sparkplug payload, add the values to the batch array.
             if (value.length > 1) {
-                const sortedMetrics = value.sort((a, b) => b.timestamp - a.timestamp);
+                const sortedMetrics = value.sort((a, b) => b.timestamp.toNumber() - a.timestamp.toNumber());
                 let payload: BatchedUnsMetric = {
-                    timestamp: new Date(sortedMetrics[0].timestamp),
+                    timestamp: new Date(sortedMetrics[0].timestamp.toNumber()),
                     value: sortedMetrics[0].value,
                     batch: []
                 }
                 //remove the first element, that's our newest and will be the value outside the batch array.
                 sortedMetrics.shift();
                 sortedMetrics.forEach(metric => {
-                    payload.batch.push({timestamp: metric.timestamp, value: metric.value});
+                    payload.batch.push({timestamp: metric.timestamp.toNumber(), value: metric.value});
                 });
-                this.unsBroker.publish(key, payload);
+                this.unsBroker.publish(topic, JSON.stringify(payload));
             } else {
-                const payload: UnsMetric = {timestamp: new Date(value[0].timestamp), value: value[0].value};
-                this.unsBroker.publish(key, payload);
+                const payload: UnsMetric = {timestamp: new Date(value[0].timestamp.toNumber()), value: value[0].value};
+                this.unsBroker.publish(topic, JSON.stringify(payload));
             }
         })
     }

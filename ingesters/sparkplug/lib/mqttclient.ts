@@ -342,7 +342,7 @@ export default class MQTTClient {
                 return;
             }
 
-            // TODO: Build custom properties object
+            // TODO: Build custom properties object - SFIP2-57
 
             if (birth.transient) {
                 // TODO: Add transient to custom properties if needed
@@ -355,7 +355,7 @@ export default class MQTTClient {
                 return;
             }
 
-            // TODO: Get enterprise information from the Device_Information-v1/Hierarchy-v1 schema
+            // TODO: Get enterprise information from the Device_Information-v1/Hierarchy-v1 schema - SFIP2-58
 
             let unsTopic = `AMRC/F2050/MK1/${topic.address.device}/Edge/${path ? (path + '/') : ''}${metricName}`;
 
@@ -370,7 +370,7 @@ export default class MQTTClient {
         // format payload to publish to uns.
         Object.entries(metricsToPublish).forEach(([topic, value]) => {
 
-            // TODO: Add custom properties before sending
+            // TODO: Add custom properties before sending - SFIP2-57
 
             // if theirs more than one of the same metric from the same sparkplug payload, add the values to the batch array.
             if (value.length > 1) {

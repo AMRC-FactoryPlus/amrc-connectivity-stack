@@ -3,7 +3,7 @@
  * Copyright "2023" AMRC
  */
 
-import {ServiceClient, UUIDs} from "@amrc-factoryplus/utilities";
+import {ServiceClient, UUIDs} from "@amrc-factoryplus/service-client";
 import pino from "pino";
 import pretty from 'pino-pretty';
 import MQTTClient from "@lib/mqttclient.js";
@@ -32,7 +32,7 @@ export const logger = pino({
 
 
 const client = await new ServiceClient({
-    directory_url: directoryUrl,
+    env: process.env
 }).init();
 
 // Overwrite MQTT server if specified in environment

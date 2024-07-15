@@ -153,7 +153,13 @@ export class Deployments {
         const lookup = list => rx.from(list).pipe(
             rx.mergeMap(agent => cdb.get_config(Deployments, agent)
                 .then(spec => ({ uuid: agent, spec }))),
-            rx.mergeMap(deployment => rx.from(deployment.spec.charts).pipe(
+            rx.map(dep => {
+                const { spec } = dep;
+                const charts = 
+                    spec.chart ? rx.of(spec.chart) : rx.from(spec.charts);
+                return [dep, charts];
+            }),
+            rx.mergeMap(([deployment, charts]) => charts.pipe(
                 rx.mergeMap(ch => cdb.get_config(HelmChart, ch)),
                 /* XXX We could cache (against an etag) to avoid
                  * recompiling every time... */

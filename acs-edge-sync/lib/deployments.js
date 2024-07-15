@@ -152,8 +152,8 @@ export class Deployments {
          * deployed. */
         const lookup = list => rx.from(list).pipe(
             rx.mergeMap(agent => cdb.get_config(Deployments, agent)
-                .then(config => ({ uuid: agent, config }))),
-            rx.mergeMap(deployment => rx.from(deployment.config.charts).pipe(
+                .then(spec => ({ uuid: agent, spec }))),
+            rx.mergeMap(deployment => rx.from(deployment.spec.charts).pipe(
                 rx.mergeMap(ch => cdb.get_config(HelmChart, ch)),
                 /* XXX We could cache (against an etag) to avoid
                  * recompiling every time... */
@@ -184,13 +184,13 @@ export class Deployments {
     create_manifests ({ config, deployments }) {
         return imm.List(deployments)
             .map(deployment => {
-                const { uuid, config } = deployment;
+                const { uuid, spec } = deployment;
                 const chart = deployment.chart({
                     uuid,
-                    name:       config.name,
-                    hostname:   config.hostname,
+                    name:       spec.name,
+                    hostname:   spec.hostname,
                 });
-                const values = [this.values, chart.values, config.values]
+                const values = [this.values, chart.values, spec.values]
                     .map(v => v ?? {}).reduce(jmp.merge);
                 return config.template({
                     uuid, values,

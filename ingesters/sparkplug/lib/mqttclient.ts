@@ -8,7 +8,7 @@ import {Reader} from "protobufjs";
 import {logger} from "../bin/ingester.js";
 import Long from "long";
 
-import * as mqtt_dev from "mqtt";
+import * as mqttjs from "mqtt";
 
 interface UnsMetric {
     value: string,
@@ -40,17 +40,17 @@ interface MQTTClientConstructorParams {
 
 export default class MQTTClient {
     private serviceClient: ServiceClient;
-    private mqtt: any;
     private aliasResolver = {};
     private birthDebounce = {};
     private unsBroker: any;
+    private sparkplugBroker: any;
 
     constructor({e}: MQTTClientConstructorParams) {
         this.serviceClient = e.serviceClient;
     }
 
     async run() {
-        this.unsBroker = mqtt_dev.connect(unsMqttUrl);
+        this.unsBroker = mqttjs.connect(unsMqttUrl);
         this.unsBroker.on("connect", () => {
             logger.info("✔  Connected to local mqtt broker!");
         });
@@ -58,14 +58,14 @@ export default class MQTTClient {
         this.unsBroker.on("error", (error) => {
             logger.error(`🔥 Error from broker: ${error}`);
         })
-        const mqtt = await this.serviceClient.mqtt_client();
-        this.mqtt = mqtt;
+        const sparkplugBroker = await this.serviceClient.mqtt_client();
+        this.sparkplugBroker = sparkplugBroker;
 
-        mqtt.on("authenticated", this.on_connect.bind(this));
-        mqtt.on("error", this.on_error.bind(this));
-        mqtt.on("message", this.on_message.bind(this));
-        mqtt.on("close", this.on_close.bind(this));
-        mqtt.on("reconnect", this.on_reconnect.bind(this));
+        sparkplugBroker.on("authenticated", this.on_connect.bind(this));
+        sparkplugBroker.on("error", this.on_error.bind(this));
+        sparkplugBroker.on("message", this.on_message.bind(this));
+        sparkplugBroker.on("close", this.on_close.bind(this));
+        sparkplugBroker.on("reconnect", this.on_reconnect.bind(this));
 
         logger.info("Connecting to Factory+ broker...");
     }
@@ -73,7 +73,7 @@ export default class MQTTClient {
     on_connect() {
         logger.info("🔌 Connected to Factory+ broker");
         logger.info("👂 Subscribing to entire Factory+ namespace");
-        this.mqtt.subscribe('spBv1.0/#');
+        this.sparkplugBroker.subscribe('spBv1.0/#');
     }
 
     on_close() {

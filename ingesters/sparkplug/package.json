@@ -1,5 +1,5 @@
 {
-  "name": "acs-uns-ingester",
+  "name": "sparkplug-ingester",
   "version": "1.0.0",
   "description": "An ingestion engine to enable InfluxDB to be a fully-featured Sparkplug historian",
   "author": "AMRC",
@@ -25,8 +25,6 @@
   },
   "dependencies": {
     "@amrc-factoryplus/utilities": "^1.0.8",
-    "@influxdata/influxdb-client": "^1.33.2",
-    "@influxdata/influxdb-client-apis": "^1.33.2",
     "async": "^3.2.4",
     "long": "^5.2.3",
     "mqtt": "^5.7.3",

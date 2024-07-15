@@ -43,19 +43,19 @@ export default class MQTTClient {
     private mqtt: any;
     private aliasResolver = {};
     private birthDebounce = {};
-    private local_mqtt: any;
+    private unsBroker: any;
 
     constructor({e}: MQTTClientConstructorParams) {
         this.serviceClient = e.serviceClient;
     }
 
     async run() {
-        this.local_mqtt = mqtt_dev.connect(unsMqttUrl);
-        this.local_mqtt.on("connect", () => {
+        this.unsBroker = mqtt_dev.connect(unsMqttUrl);
+        this.unsBroker.on("connect", () => {
             logger.info("✔  Connected to local mqtt broker!");
         });
 
-        this.local_mqtt.on("error", (error) => {
+        this.unsBroker.on("error", (error) => {
             logger.error(`🔥 Error from broker: ${error}`);
         })
         const mqtt = await this.serviceClient.mqtt_client();
@@ -381,10 +381,10 @@ export default class MQTTClient {
                 sortedMetrics.forEach(metric => {
                     payload.batch.push({timestamp: metric.timestamp, value: metric.value});
                 });
-                this.local_mqtt.publish(key, payload);
+                this.unsBroker.publish(key, payload);
             } else {
                 const payload: UnsMetric = {timestamp: new Date(value[0].timestamp), value: value[0].value};
-                this.local_mqtt.publish(key, payload);
+                this.unsBroker.publish(key, payload);
             }
         })
     }

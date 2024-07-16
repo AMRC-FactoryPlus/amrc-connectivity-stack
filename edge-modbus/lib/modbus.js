@@ -27,6 +27,8 @@ class ModbusHandler {
         this.driver = driver;
         this.conf = conf;
 
+        this.log = driver.debug.bound("modbus");
+
         this.client = new ModbusRTU();
         this.on_close = () => this.reconnect();
     }
@@ -54,13 +56,13 @@ class ModbusHandler {
     async reconnect () {
         const { client, driver } = this;
 
-        console.log("Modbus connection closed");
+        this.log("Modbus connection closed");
         setTimeout(() => {
-            console.log("Reconnecting to modbus");
+            this.log("Reconnecting to modbus");
             client.open(e => {
                 driver.setStatus(e ? "CONN" : "UP");
                 if (e) {
-                    console.log("Failed to connect to modbus: %s", e);
+                    this.log("Failed to connect to modbus: %s", e);
                     this.reconnect();
                 }
             });

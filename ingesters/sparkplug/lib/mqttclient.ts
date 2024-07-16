@@ -427,27 +427,27 @@ export default class MQTTClient {
             let unsTopic = null;
 
             // We must have an enterprise or we can't publish. It should never get to this point.
-            if (birth.isa95.enterprise === null) {
+            if (birth.isa95.enterprise == null) {
                 return;
             }
 
             // If we don't have a site then we publish to the enterprise
-            if (birth.isa95.site === null) {
+            if (birth.isa95.site == null) {
                 unsTopic = `UNS/v1/${birth.isa95.enterprise}/Edge/${topic.address.device}/${path ? (path + '/') : ''}${metricName}`;
             }
 
             // If we have a site but no area then we publish to the site
-            else if (birth.isa95.area === null) {
+            else if (birth.isa95.area == null) {
                 unsTopic = `UNS/v1/${birth.isa95.enterprise}/${birth.isa95.site}/Edge/${topic.address.device}/${path ? (path + '/') : ''}${metricName}`;
             }
 
             // If we have a site and an area but no workCenter then we publish to the area
-            else if (birth.isa95.workCenter === null) {
+            else if (birth.isa95.workCenter == null) {
                 unsTopic = `UNS/v1/${birth.isa95.enterprise}/${birth.isa95.site}/${birth.isa95.area}/Edge/${topic.address.device}/${path ? (path + '/') : ''}${metricName}`;
             }
 
             // If we have a site, an area and a workCenter but no workUnit then we publish to the workCenter
-            else if (birth.isa95.workUnit === null) {
+            else if (birth.isa95.workUnit == null) {
                 unsTopic = `UNS/v1/${birth.isa95.enterprise}/${birth.isa95.site}/${birth.isa95.area}/${birth.isa95.workCenter}/Edge/${topic.address.device}/${path ? (path + '/') : ''}${metricName}`;
             }
 

@@ -1,10 +1,20 @@
 image:
-  # Parameters for the Edge Agent image to pull
-  edgeAgent:
+  # Default image parameters. These can be overidden per-image.
+  default:
     registry: ghcr.io/amrc-factoryplus
-    repository: acs-edge
     tag: v3.1.2
     pullPolicy: IfNotPresent
+  # Edge Agent image to pull
+  edgeAgent:
+    repository: acs-edge
+  modbus:
+    repository: edge-modbus
+  test:
+    repository: edge-test
+  # Further image names for drivers as needed
+drivers:
+  # An object mapping connection names to images from the list above.
+  #Test: test
 debug: false
 verbosity: ALL,!token,!service,!sparkplug
 poll_int: 10

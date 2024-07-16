@@ -32,7 +32,7 @@ spec:
 {{ end }}
       containers:
         - name: edge-agent
-{{ include "edge-agent.image" .Values.image.edgeAgent | indent 10 }}
+{{ list . "edgeAgent" | include "edge-agent.image" | indent 10 }}
           env:
             - name: DEBUG
               value: {{ .Values.debug | quote }}
@@ -69,7 +69,7 @@ spec:
               name: driver-passwords
 {{- range $name, $image := .Values.drivers }}
         - name: "driver-{{ $name | lower }}"
-          image: "{{ $image }}"
+{{ list $ $image | include "edge-agent.image" | indent 10 }}
           env:
             - name: EDGE_MQTT
               value: "mqtt://localhost"
@@ -80,6 +80,8 @@ spec:
                 secretKeyRef:
                   name: "driver-passwords-{{ $.Values.uuid }}"
                   key: "{{ $name }}"
+            - name: VERBOSE
+              value: "{{ $.Values.verbosity }}"
 {{- end }}
       volumes:
         - name: edge-agent-sensitive-information

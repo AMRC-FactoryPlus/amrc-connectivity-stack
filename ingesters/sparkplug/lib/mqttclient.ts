@@ -126,6 +126,12 @@ export default class MQTTClient {
                 let topLevelInstance = null;
                 let instanceUUIDMapping = {};
 
+                let enterprise = null;
+                let site = null;
+                let area = null;
+                let workCenter = null;
+                let workUnit = null;
+
                 // If we have a Factory+ payload then process the Schema UUIDs and Instance UUIDs
                 if (payload.uuid === UUIDs.FactoryPlus) {
 
@@ -147,6 +153,25 @@ export default class MQTTClient {
                                 // that all metrics that contain this schema path in their name
                                 // will have
                                 schemaUUIDMapping[schemaPath] = metric.value;
+                            }
+
+                            // Check if this Schema_UUID is the Hierarchy-v1 schema
+                            if (metric.value === "84ac3397-f3a2-440a-99e5-5bb9f6a75091") {
+
+                                // If the Hierarchy-v1 schema is not in Device_Information/ISA95_Hierarchy then ignore
+                                // it - we expect it to be here
+
+                                if (!schemaPath.includes("Device_Information/ISA95_Hierarchy")) {
+                                    logger.warn(`🔎 Hierarchy-v1 schema not found in expected location for ${topic.address.group}/${topic.address.node}/${topic.address.device}. This device will not be published to UNS.`);
+                                    return;
+                                }
+                                // Use the path to this location to view the actual information
+                                // Extract the actual schema initial value information using the location of the Hierarchy-v1 schema
+                                enterprise = payload.metrics.find((metric) => metric.name === schemaPath + "/Enterprise")?.value;
+                                site = payload.metrics.find((metric) => metric.name === schemaPath + "/Site")?.value;
+                                area = payload.metrics.find((metric) => metric.name === schemaPath + "/Area")?.value;
+                                workCenter = payload.metrics.find((metric) => metric.name === schemaPath + "/Work Center")?.value;
+                                workUnit = payload.metrics.find((metric) => metric.name === schemaPath + "/Work Unit")?.value;
                             }
                         }
                     })
@@ -170,6 +195,10 @@ export default class MQTTClient {
                             }
                         }
                     })
+                }
+
+                if (!enterprise) {
+                    logger.warn(`🚨 No ISA-95 hierarchy information found in birth certificate for ${topic.address.group}/${topic.address.node}/${topic.address.device}. This device will not be published to UNS.`);
                 }
 
                 if (this.aliasResolver?.[topic.address.group]?.[topic.address.node]?.[topic.address.device]) {
@@ -254,6 +283,13 @@ export default class MQTTClient {
                             // All schemas between the top and bottom, inclusive
                             full: schemas,
                         },
+                        isa95: {
+                            enterprise: enterprise,
+                            site: site,
+                            area: area,
+                            workCenter: workCenter,
+                            workUnit: workUnit,
+                        },
                         name: obj.name,
                         type: obj.type,
                         alias: alias,
@@ -293,7 +329,6 @@ export default class MQTTClient {
                 if (this.aliasResolver?.[topic.address.group]?.[topic.address.node]?.[topic.address.device]) {
 
                     // Device is known, resolve aliases and publish to UNS
-                    //this.writeMetrics(payload, topic);
                     this.publishToUNS(payload, topic)
 
                 } else {
@@ -347,11 +382,15 @@ export default class MQTTClient {
         payload.metrics.forEach((metric) => {
             if (metric.value === null) return;
 
-
             let birth = this.aliasResolver?.[topic.address.group]?.[topic.address.node]?.[topic.address.device]?.[metric.alias];
 
             if (!birth) {
                 logger.error(`❓ Metric ${metric.alias} is unknown for ${topic.address.group}/${topic.address.node}/${topic.address.device}`);
+                return;
+            }
+
+            // Don't handle data for devices that have not published ISA-95 hierarchy information
+            if (!birth.isa95.enterprise) {
                 return;
             }
 
@@ -367,16 +406,55 @@ export default class MQTTClient {
             }
 
             // Build custom properties object
-
             let customProperties: UnsMetricCustomProperties = {
                 Instance_UUID: birth.instance.top,
                 Schema_UUID: birth.schema.top,
                 Transient: birth.transient,
             }
 
-            // TODO: Get enterprise information from the Device_Information-v1/Hierarchy-v1 schema - SFIP2-58
+            // Here we can access the ISA95 hierarchy information from the birth.isa95 object. This object contains the following keys:
 
-            let unsTopic = `UNS/v1/AMRC/F2050/MK1/${topic.address.device}/Edge/${path ? (path + '/') : ''}${metricName}`;
+            // - enterprise
+            // - site
+            // - area
+            // - workCenter
+            // - workUnit
+            //
+            // enterprise is mandatory, but the remaining are optional but must form an unbroken chain from the top to
+            // the bottom. I.e. you may not have a workCenter without an area, or a workUnit without a workCenter. As
+            // soon as we see a break in the chain publish what we have.
+
+            let unsTopic = null;
+
+            // We must have an enterprise or we can't publish. It should never get to this point.
+            if (birth.isa95.enterprise === null) {
+                return;
+            }
+
+            // If we don't have a site then we publish to the enterprise
+            if (birth.isa95.site === null) {
+                unsTopic = `UNS/v1/${birth.isa95.enterprise}/Edge/${topic.address.device}/${path ? (path + '/') : ''}${metricName}`;
+            }
+
+            // If we have a site but no area then we publish to the site
+            else if (birth.isa95.area === null) {
+                unsTopic = `UNS/v1/${birth.isa95.enterprise}/${birth.isa95.site}/Edge/${topic.address.device}/${path ? (path + '/') : ''}${metricName}`;
+            }
+
+            // If we have a site and an area but no workCenter then we publish to the area
+            else if (birth.isa95.workCenter === null) {
+                unsTopic = `UNS/v1/${birth.isa95.enterprise}/${birth.isa95.site}/${birth.isa95.area}/Edge/${topic.address.device}/${path ? (path + '/') : ''}${metricName}`;
+            }
+
+            // If we have a site, an area and a workCenter but no workUnit then we publish to the workCenter
+            else if (birth.isa95.workUnit === null) {
+                unsTopic = `UNS/v1/${birth.isa95.enterprise}/${birth.isa95.site}/${birth.isa95.area}/${birth.isa95.workCenter}/Edge/${topic.address.device}/${path ? (path + '/') : ''}${metricName}`;
+            }
+
+            // If we have a site, an area, a workCenter and a workUnit then we publish to the workUnit
+            else {
+                unsTopic = `UNS/v1/${birth.isa95.enterprise}/${birth.isa95.site}/${birth.isa95.area}/${birth.isa95.workCenter}/${birth.isa95.workUnit}/Edge/${topic.address.device}/${path ? (path + '/') : ''}${metricName}`;
+            }
 
             if (!(unsTopic in metricsToPublish)) {
                 metricsToPublish[unsTopic] = [{

@@ -12,6 +12,9 @@
       "type": "string",
       "format": "uuid"
     },
+    "Device_Information": {
+      "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Device_Information-v1.json"
+    },
     "Spindle": {
       "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/CNC/Spindle-v1.json"
     },

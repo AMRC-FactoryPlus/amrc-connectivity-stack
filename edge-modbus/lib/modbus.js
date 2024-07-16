@@ -28,17 +28,27 @@ class ModbusHandler {
         this.conf = conf;
 
         this.client = new ModbusRTU();
+        this.on_close = () => this.reconnect();
     }
 
     run () {
-        const { driver, client, sock } = this;
+        const { driver, client } = this;
         const { host, port } = this.conf;
 
-        client.on("close", () => this.reconnect());
+        client.on("close", this.on_close);
 
         client.connectTCP(host, { port })
             .then(() => driver.setStatus("UP"))
-            .catch(() => this.reconnect());
+            .catch(this.on_close);
+
+        return this;
+    }
+
+    close () {
+        const { client } = this;
+        
+        client.off("close", this.on_close);
+        return new Promise(r => client.close(r));
     }
 
     async reconnect () {
@@ -87,5 +97,5 @@ class ModbusHandler {
 export function modbusHandler (driver, conf) {
     if (conf.protocol != "tcp")
         return;
-    return new ModbusHandler(driver, conf);
+    return new ModbusHandler(driver, conf).run();
 }

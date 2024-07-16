@@ -16,14 +16,6 @@ const packing = {
 };
 
 class TestHandler {
-    constructor (driver) {
-        this.driver = driver;
-    }
-
-    run () {
-        this.driver.setStatus("UP");
-    }
-
     parseAddr (spec) {
         const parts = spec.split(":");
         if (parts.length != 4) return;
@@ -54,5 +46,7 @@ class TestHandler {
 }
 
 export function handleTest (driver, conf) {
-    return new TestHandler(driver);
+    const h = new TestHandler();
+    driver.setStatus("UP");
+    return h;
 }

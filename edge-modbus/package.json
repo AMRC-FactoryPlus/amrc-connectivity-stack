@@ -15,6 +15,6 @@
   "license": "ISC",
   "dependencies": {
     "modbus-serial": "^8.0.17",
-    "@amrc-factoryplus/edge-driver": "0.0.1-bmz2"
+    "@amrc-factoryplus/edge-driver": "0.0.1-bmz3"
   }
 }

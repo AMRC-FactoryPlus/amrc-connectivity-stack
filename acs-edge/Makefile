@@ -7,6 +7,7 @@ repo?=acs-edge
 include ${mk}/acs.js.mk
 
 local.build:
+	npm install
 	npx tsc --project tsconfig.json
 
 local.run: local.build

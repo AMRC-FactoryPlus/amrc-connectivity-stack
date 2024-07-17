@@ -35,3 +35,5 @@
     * Supply data topic names to a Device in return for addresses when
       it subscribes to the connection manifold.
     * Poll the manifold using connection/datatopic pairs.
+    * Possibly the Device should always assume we are using a 'smart'
+      driver, and polling should be handled by the manifold?

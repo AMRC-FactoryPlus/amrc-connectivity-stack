@@ -135,7 +135,7 @@ export class DriverConnection extends DeviceConnection {
         const { id, msg, data, payload } = message;
         if (id != this.id) return;
 
-        log(util.format("DRIVER message: %s %s", id, msg));
+        //log(util.format("DRIVER message: %s %s", id, msg));
         switch (msg) {
         case "status":  return this.#msg_status(payload.toString());
         case "data":    return this.#msg_data(data, payload);
@@ -153,8 +153,10 @@ export class DriverConnection extends DeviceConnection {
     }
 
     #msg_status (status: string) {
+        const ost = this.status;
         this.status = status;
-        log(`DRIVER [${this.id}]: status ${status}`);
+        log(`DRIVER [${this.id}]: status ${ost} -> ${status}`);
+
         switch (status) {
         case "READY":
             this.broker.publish({
@@ -165,16 +167,23 @@ export class DriverConnection extends DeviceConnection {
             this.#send_addrs();
             break;
         case "UP":
-            this.emit("open");
+            if (ost != "UP")
+                this.emit("open");
             break;
         case "DOWN":
-            this.emit("close");
+        case "CONF":
+        case "CONN":
+        case "AUTH":
+        case "ERR":
+            if (ost == "UP")
+                this.emit("close");
             break;
         }
     }
 
     #send_addrs () {
         const addrs = {
+            version: 1,
             addrs:  Object.fromEntries(this.addrs),
             groups: Object.fromEntries(
                 [...this.groups.entries()]
@@ -192,7 +201,7 @@ export class DriverConnection extends DeviceConnection {
 
     #msg_data (data: string, payload: Buffer) {
         const addr = this.addrs.get(data);
-        log(`Driver [${this.id}]: data ${data} ${addr}`);
+        //log(`Driver [${this.id}]: data ${data} ${addr}`);
         if (addr)
             this.emit("data", { [addr]: payload });
     }

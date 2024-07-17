@@ -83,7 +83,8 @@ communication with the Edge Agent.
 
 The `env` property should be `process.env`, or a suitable substitute.
 The keys `EDGE_MQTT`, `EDGE_USERNAME` and `EDGE_PASSWORD` will be used
-to initiate communication with the Edge Agent.
+to initiate communication with the Edge Agent. The key `VERBOSE` will be
+used to configure the logger.
 
 The `handler` function creates a handler object when the driver has been
 sent a new configuration. The function takes two arguments, the driver
@@ -94,6 +95,13 @@ The `serial` property is optional. If it is true, this requests that the
 driver not poll more than one address at a time. Poll requests will be
 queued and handled in order. If it is false or omitted poll requests may
 be made in parallel.
+
+### `debug`
+
+    driver.debug.log(channel, message);
+
+This property is a [Debug object](./debug.md) configured from the
+environment. The handler class should use this for logging.
 
 ### `setStatus`
 

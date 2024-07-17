@@ -105,3 +105,15 @@ spec:
   edgeAgent: true
   secrets:
     - edge-agent-sensitive-information-{{ .Values.uuid }}
+{{ range $name, $image := .Values.drivers }}
+---
+apiVersion: factoryplus.app.amrc.co.uk/v1
+kind: LocalSecret
+metadata:
+  namespace: {{ $.Release.Namespace }}
+  name: "driver-passwords-{{ $.Values.uuid }}-{{ $name | lower }}"
+spec:
+  format: Password
+  secret: "driver-passwords-{{ $.Values.uuid }}"
+  key: "{{ $name }}"
+{{- end }}

@@ -10,7 +10,7 @@ import util from "util";
 import concat_stream from "concat-stream";
 import rx from "rxjs";
 
-import { ServiceError } from "@amrc-factoryplus/utilities";
+import { ServiceError } from "@amrc-factoryplus/service-client";
 
 import { Edge } from "./uuids.js";
 

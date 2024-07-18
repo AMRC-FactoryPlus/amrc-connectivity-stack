@@ -11,8 +11,6 @@ import jmp              from "json-merge-patch";
 import rx               from "rxjs";
 import template         from "json-templates";
 
-import { Debug, ServiceError, UUIDs } from "@amrc-factoryplus/utilities";
-
 import { Edge }             from "./uuids.js";
 import { LABELS }           from "./metadata.js";
 

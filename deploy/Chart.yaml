@@ -38,3 +38,7 @@ dependencies:
     version: 2.1.1
     repository: https://helm.influxdata.com/
     condition: influxdb2.enabled
+  - name: cert-manager
+    repository: https://charts.jetstack.io
+    version: v1.14.4
+    condition: acs.letsEncrypt.enabled

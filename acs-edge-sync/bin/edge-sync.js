@@ -6,7 +6,7 @@
  * Copyright 2023 AMRC
  */
 
-import { ServiceClient }    from "@amrc-factoryplus/utilities";
+import { ServiceClient }    from "@amrc-factoryplus/service-client";
 import k8s                  from "@kubernetes/client-node";
 
 import { GIT_VERSION } from "../lib/git-version.js";

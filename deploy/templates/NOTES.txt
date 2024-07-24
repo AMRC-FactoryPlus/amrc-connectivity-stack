@@ -1,0 +1,34 @@
+
+*****************************************************************
+*** PLEASE BE PATIENT: ACS may take a few minutes to install ***
+*****************************************************************
+
+Thanks for installing the AMRC Connectivity Stack (ACS), the AMRC's open-source implementation of the Factory+ framework.
+
+Ensure that you familiarise yourself with the components and concepts of Factory+ (https://factoryplus.app.amrc.co.uk)
+before continuing. This chart installs a full end-to-end deployment of Factory+ and there are a lot of moving parts.
+
+Make sure that you read the release notes for this version of the chart before continuing: github.com/AMRC-FactoryPlus/amrc-connectivity-stack/blob/main/ReleaseNotes.md
+
+╔══════════════════╗
+   🚀 Get Started
+╚══════════════════╝
+
+1. Get your admin password (you may need to wait until all services are running):
+
+echo $(kubectl get secret admin-password -o jsonpath="{.data.password}" -n {{.Release.Namespace}} | base64 --decode)
+
+2. View the readme to get started: github.com/AMRC-FactoryPlus/amrc-connectivity-stack/blob/main/README.md
+
+
+╔══════════════╗
+   🌐 Services
+╚══════════════╝
+
+Admin: {{ .Values.acs.secure | ternary "https://" "http://" }}{{.Values.acs.baseUrl}} (or {{ .Values.acs.secure | ternary "https://" "http://" }}admin.{{.Values.acs.baseUrl}})
+Visualiser: {{ .Values.acs.secure | ternary "https://" "http://" }}visualiser.{{.Values.acs.baseUrl}}
+Manager: {{ .Values.acs.secure | ternary "https://" "http://" }}manager.{{.Values.acs.baseUrl}}
+MQTT: {{ .Values.acs.secure | ternary "mqtts://" "mqtt://" }}mqtt.{{.Values.acs.baseUrl}}:{{ .Values.acs.secure | ternary "8883" "1883" }}
+Grafana: {{ .Values.acs.secure | ternary "https://" "http://" }}grafana.{{.Values.acs.baseUrl}}
+Auth: {{ .Values.acs.secure | ternary "https://" "http://" }}auth.{{.Values.acs.baseUrl}}/editor
+Config Store: {{ .Values.acs.secure | ternary "https://" "http://" }}configdb.{{.Values.acs.baseUrl}}

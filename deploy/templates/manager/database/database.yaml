@@ -1,0 +1,51 @@
+{{ if .Values.manager.enabled }}
+apiVersion: kubegres.reactive-tech.io/v1
+kind: Kubegres
+metadata:
+  name: manager-database
+  namespace: {{ .Release.Namespace }}
+
+spec:
+  replicas: 1
+  image: {{ include "amrc-connectivity-stack.image-name" (list . .Values.postgres ) }}
+  {{- with .Values.acs.imagePullSecrets }}
+  imagePullSecrets:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+
+  database:
+    size: 1Gi
+
+  env:
+    - name: POSTGRES_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: manager-database-secret
+          key: postgres-password
+    - name: POSTGRES_REPLICATION_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: manager-database-secret
+          key: replication-password
+
+  customConfig: manager-database-conf
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: manager-database-conf
+  namespace: {{ .Release.Namespace }}
+
+data:
+  primary_init_script.sh: |
+    #!/bin/sh
+    set -e
+
+    echo "Creating manager database..."
+    psql <<-PSQL
+    create database manager;
+    PSQL
+
+    echo "Done."
+{{- end -}}

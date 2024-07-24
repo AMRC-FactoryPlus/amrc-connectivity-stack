@@ -1,0 +1,59 @@
+{{ if .Values.manager.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: manager-meilisearch
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: manager-meilisearch
+  template:
+    metadata:
+      labels:
+        component: manager-meilisearch
+        factory-plus.service: manager-meilisearch
+    spec:
+      {{- with .Values.acs.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: manager-meilisearch-storage
+          persistentVolumeClaim:
+            claimName: manager-meilisearch-pvc
+      containers:
+        - name: meilisearch
+{{ include "amrc-connectivity-stack.image" (list . .Values.manager.meilisearch) | indent 10 }}
+          volumeMounts:
+            - mountPath: "/data.ms"
+              name: manager-meilisearch-storage
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: manager-meilisearch-pvc
+  namespace: {{ .Release.Namespace }}
+  labels:
+    factory-plus.service: manager-meilisearch
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: manager-meilisearch
+  namespace: {{ .Release.Namespace }}
+spec:
+  ports:
+    - name: "meilisearch"
+      port: 7700
+      targetPort: 7700
+  selector:
+    factory-plus.service: manager-meilisearch
+{{- end -}}

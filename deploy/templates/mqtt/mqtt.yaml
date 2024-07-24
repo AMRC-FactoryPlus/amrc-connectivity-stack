@@ -1,0 +1,98 @@
+{{ if .Values.mqtt.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mqtt
+  namespace: {{ .Release.Namespace }}
+  labels:
+    component: mqtt
+spec:
+  # We can only run one replica with Community Edition as we have no clustering and no (native) bridging.
+  replicas: 1
+  selector:
+    matchLabels:
+      component: mqtt
+  template:
+    metadata:
+      labels:
+        component: mqtt
+        factory-plus.service: mqtt
+    spec:
+      {{- with .Values.acs.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: krb5-conf
+          configMap:
+            name: krb5-conf
+        - name: krb5-keytabs
+          secret:
+            secretName: krb5-keytabs
+            items:
+              - path: server
+                key: mqtt.mqtt
+              - path: client
+                key: sv1mqtt
+        - name: mqtt-conf
+          configMap:
+            name: mqtt-config
+      containers:
+        - name: hivemq
+{{ include "amrc-connectivity-stack.image" (list . .Values.mqtt) | indent 10 }}
+          env:
+            - name: CLIENT_KEYTAB
+              value: /keytabs/client
+            - name: CLIENT_PRINCIPAL
+              value: sv1mqtt@{{ .Values.identity.realm }}
+            - name: SERVER_KEYTAB
+              value: /keytabs/server
+            # This needs to name a principal available in the keytab, used for verifying passwords.
+            - name: SERVER_PRINCIPAL
+              value: mqtt/mqtt.{{ .Release.Namespace }}.svc.cluster.local
+            - name: DIRECTORY_URL
+              value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
+            - name: MQTT_URL
+              value: "{{ .Values.acs.secure | ternary "mqtts://" "mqtt://" }}mqtt.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"
+            - name: VERBOSE
+              value: {{.Values.mqtt.verbosity | quote | required "values.mqtt.verbosity is required!"}}
+          volumeMounts:
+            - mountPath: /etc/krb5.conf
+              name: krb5-conf
+              subPath: krb5.conf
+            - mountPath: /keytabs
+              name: krb5-keytabs
+            - mountPath: /opt/hivemq/conf/config.xml
+              name: mqtt-conf
+              subPath: config.xml
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mqtt-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    component: mqtt
+data:
+  config.xml: |
+    <?xml version="1.0"?>
+    <hivemq>
+        <listeners>
+            <tcp-listener>
+                <port>1883</port>
+                <bind-address>0.0.0.0</bind-address>
+            </tcp-listener>
+            <websocket-listener>
+                <port>9001</port>
+                <bind-address>0.0.0.0</bind-address>
+                <path>/</path>
+                <name>my-websocket-listener</name>
+                <subprotocols>
+                    <subprotocol>mqttv3.1</subprotocol>
+                    <subprotocol>mqtt</subprotocol>
+                </subprotocols>
+                <allow-extensions>true</allow-extensions>
+            </websocket-listener>
+        </listeners>
+    </hivemq>
+{{- end -}}

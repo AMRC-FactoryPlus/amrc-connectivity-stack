@@ -1,0 +1,246 @@
+{{ if .Values.identity.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kdc
+  namespace: {{ .Release.Namespace }}
+  labels:
+    component: kdc
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: kdc
+
+  # Don't perform rolling updates; stop and restart. This prevents more than
+  # one instance from trying to access the storage at a time.
+  strategy:
+    type: Recreate
+
+  template:
+    metadata:
+      labels:
+        component: kdc
+    spec:
+      {{- with .Values.acs.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      # We must run the whole pod as the krbkeys ServiceAccount even though
+      # only the krbkeys initContainer needs access. There is no significant
+      # security issue here as this SA just gives rights to manage the
+      # Kerberos-linked secrets.
+      serviceAccountName: krb-keys-operator
+      automountServiceAccountToken: true
+
+      volumes:
+        - name: krb5-conf
+          configMap:
+            name: krb5-conf
+        - name: kdc-conf
+          configMap:
+            name: kdc-conf
+        - name: kdc-storage
+          persistentVolumeClaim:
+            claimName: kdc-storage
+
+      initContainers:
+        # Do as little work as possible as root... We need to chown the storage
+        # as the default permissions will not be correct.
+        - name: chown-storage
+{{ include "amrc-connectivity-stack.image" (list . .Values.identity.identity) | indent 10 }}
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              echo "Setting KDB permissions"
+              chown kdc:nobody /var/lib/krb5kdc
+              chmod 700 /var/lib/krb5kdc
+              ls -ld /var/lib/krb5kdc
+          securityContext:
+            runAsUser: 0
+          volumeMounts:
+            - mountPath: /var/lib/krb5kdc
+              name: kdc-storage
+
+
+        # Initialise the Kerberos database on first boot.
+        - name: kdb-init
+{{ include "amrc-connectivity-stack.image" (list . .Values.identity.identity) | indent 10 }}
+          command: ["/bin/sh"]
+          {{- if .Values.identity.identity.manualInit }}
+          args: [ "-c", "while test ! -f /tmp/KDB-INIT-COMPLETE; do sleep 5; done" ]
+          {{- else }}
+          args: [ "/usr/sbin/init-kdb.sh" ]
+          {{- end }}
+          #args: ["-c", "while true; do sleep 10; done"]
+          env:
+            - name: KRB5_CONFIG
+              value: /config/krb5-conf/krb5.conf
+          volumeMounts:
+            - mountPath: /config/krb5-conf
+              name: krb5-conf
+            - mountPath: /var/lib/krb5kdc
+              name: kdc-storage
+
+        # This container is not from the krb repo, but is part of
+        # the krb-keys operator. In order for the operator to do its job it
+        # needs a Kerberos principal that has admin permission on the Kerberos
+        # database. The only way to bootstrap this is to run code on the KDC
+        # itself (you can't create a principal remotely until you have a
+        # principal to authenticate with...). It creates the Kerberos principal
+        # needed and stashes its key in a K8s secret for use by the operator.
+        - name: krbkeys
+          image: "{{ include "amrc-connectivity-stack.image-name" (list . .Values.identity.krbKeysOperator) }}"
+          command: ["/usr/bin/python3", "-m", "amrc.factoryplus.krbkeys.bootstrap"]
+          # We need to run as the 'kdc' user from the kdc
+          # image. This user isn't the same UID as the default
+          # user from the krb-keys image
+          securityContext:
+            runAsUser: 100
+          env:
+            - name: KRB5_CONFIG
+              value: /config/krb5-conf/krb5.conf
+            - name: KRB5_KDC_PROFILE
+              value: /config/kdc-conf/kdc.conf
+            - name: NAMESPACE
+              value: {{ .Release.Namespace }}
+            - name: KEYTABS_SECRET
+              value: "krb5-keytabs"
+            - name: PASSWORDS_SECRET
+              value: "krb5-passwords"
+            # Make sure this principal has rights in the kadmin acl file (in
+            # cm/kdc-conf, below).
+            - name: OP_PRINCIPAL
+              value: "op1krbkeys@{{ .Values.identity.realm | required "values.identity.realm is required!" }}"
+            - name: OP_KEYTAB
+              value: "op1krbkeys"
+          volumeMounts:
+            - mountPath: /config/krb5-conf
+              name: krb5-conf
+            - mountPath: /config/kdc-conf
+              name: kdc-conf
+            - mountPath: /var/lib/krb5kdc
+              name: kdc-storage
+
+      containers:
+        # The KDC issues tickets to clients.
+        - name: kdc
+{{ include "amrc-connectivity-stack.image" (list . .Values.identity.identity) | indent 10 }}
+          command: ["/usr/sbin/krb5kdc"]
+          args: [ "-n" ]
+          env:
+            - name: KRB5_CONFIG
+              value: /config/krb5-conf/krb5.conf
+            - name: KRB5_KDC_PROFILE
+              value: /config/kdc-conf/kdc.conf
+          volumeMounts:
+            - mountPath: /config/krb5-conf
+              name: krb5-conf
+            - mountPath: /config/kdc-conf
+              name: kdc-conf
+            - mountPath: /var/lib/krb5kdc
+              name: kdc-storage
+
+        # Kadmind performs Kerberos database administration, including password
+        # changes for users.
+        - name: kadmind
+{{ include "amrc-connectivity-stack.image" (list . .Values.identity.identity) | indent 10 }}
+          command: ["/usr/sbin/kadmind"]
+          args: [ "-nofork" ]
+          env:
+            - name: KRB5_CONFIG
+              value: /config/krb5-conf/krb5.conf
+            - name: KRB5_KDC_PROFILE
+              value: /config/kdc-conf/kdc.conf
+          volumeMounts:
+            - mountPath: /config/krb5-conf
+              name: krb5-conf
+            - mountPath: /config/kdc-conf
+              name: kdc-conf
+            - mountPath: /var/lib/krb5kdc
+              name: kdc-storage
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kdc-conf
+  namespace: {{ .Release.Namespace }}
+data:
+  kdc.conf: |
+    [realms]
+        {{ .Values.identity.realm | required "values.identity.realm is required!" }} = {
+            acl_file = /config/kdc-conf/{{ .Values.identity.realm | required "values.identity.realm is required!" }}.acl
+            kdc_listen = 8888
+            kdc_tcp_listen = 8888
+            kadmind_listen = 8749
+            kpasswd_listen = 8464
+        }
+
+    [logging]
+        default = STDERR
+
+  # http://web.mit.edu/kerberos/krb5-current/doc/admin/conf_files/kadm5_acl.html
+  # This is in the format
+  #   principal       permissions
+  # Permission 'x' means 'anything except extract an existing key
+  # without changing it'.
+  {{ .Values.identity.realm | required "values.identity.realm is required!" }}.acl: |
+    op1krbkeys      x
+    admin           x
+    op1krbkeys/*    x     */*1
+    op1krbkeys/*    x     */*1/*
+    {{- range .Values.identity.kadminUsers }}
+    {{ .principal }} {{ .permission }} {{ .restrictions }}
+    {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kdc
+  namespace: {{ .Release.Namespace }}
+spec:
+  type: ClusterIP
+  selector:
+    component: kdc
+  ports:
+    - protocol: TCP
+      port: 88
+      name: kerberos
+      targetPort: 8888
+---
+# This is a separate service because if we choose to replicate the KDC
+# later it is important that kadmin always contacts the master. So then
+# the services would need to point to different sets of containers.
+apiVersion: v1
+kind: Service
+metadata:
+  name: kadmin
+  namespace: {{ .Release.Namespace }}
+spec:
+  type: ClusterIP
+  selector:
+    component: kdc
+  ports:
+    - protocol: TCP
+      port: 749
+      name: kerberos-adm
+      targetPort: 8749
+    - protocol: TCP
+      port: 464
+      name: kpasswd
+      targetPort: 8464
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: kdc-storage
+  namespace: {{ .Release.Namespace }}
+  labels:
+    component: kdc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+{{- end -}}

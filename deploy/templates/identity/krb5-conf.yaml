@@ -1,0 +1,39 @@
+{{ if .Values.identity.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: krb5-conf
+  namespace: {{ .Release.Namespace }}
+data:
+  krb5.conf: >
+    [libdefaults]
+        default_realm = {{ .Values.identity.realm | required "values.identity.realm is required!" }}
+        dns_canonicalize_hostname = false
+        udp_preference_limit = 1
+        spake_preauth_groups = edwards25519
+
+    [domain_realm]
+        cluster.local = {{ .Values.identity.realm | required "values.identity.realm is required!" }}
+            {{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}} = {{ .Values.identity.realm | required "values.identity.realm is required!" }}
+{{- range .Values.identity.crossRealm }}
+{{- $realm := .realm }}
+        {{ .domain }} = {{ $realm }}
+{{- range .otherDomains }}
+        {{ . }} = {{ $realm }}
+{{- end }}
+{{- end }}
+
+    [realms]
+            {{ .Values.identity.realm | required "values.identity.realm is required!" }} = {
+            kdc = kdc.{{.Release.Namespace }}.svc.cluster.local
+            admin_server = kadmin.{{ .Release.Namespace }}.svc.cluster.local
+            disable_encrypted_timestamp = true
+        }
+{{- range .Values.identity.crossRealm }}
+        {{ .realm }} = {
+            kdc = kdc.{{ .domain }}
+            admin_server = kadmin.{{ .domain }}
+            disable_encrypted_timestamp = true
+        }
+{{- end }}
+{{- end -}}

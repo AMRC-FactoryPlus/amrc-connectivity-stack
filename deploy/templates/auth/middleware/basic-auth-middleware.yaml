@@ -1,0 +1,12 @@
+{{- if .Values.traefik.enabled }}
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: basic-auth
+  namespace: {{ .Release.Namespace }}
+spec:
+  forwardAuth:
+    address: {{ .Values.acs.secure | ternary "https" "http" }}://auth.{{.Values.acs.baseUrl}}/authn/authenticate
+    authResponseHeaders:
+      - X-Auth-Principal
+{{- end }}

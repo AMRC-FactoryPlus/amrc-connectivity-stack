@@ -1,0 +1,115 @@
+# For more information: https://laravel.com/docs/sail
+version: '3'
+services:
+  acs-manager.test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        WWWGROUP: '${WWWGROUP}'
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    ports:
+      - '${APP_PORT:-80}:80'
+      - '${VITE_PORT:-5173}:${VITE_PORT:-5173}'
+    environment:
+      WWWUSER: '${WWWUSER}'
+      LARAVEL_SAIL: 1
+      XDEBUG_MODE: '${SAIL_XDEBUG_MODE:-off}'
+      XDEBUG_CONFIG: '${SAIL_XDEBUG_CONFIG:-client_host=host.docker.internal}'
+    volumes:
+      - '.:/app'
+      - './krb5.conf:/etc/krb5.conf'
+      - './k3s.yaml:/k3s.yaml'
+      - './keytab:/keytab'
+    networks:
+      - sail
+  pgsql:
+    image: 'postgres:15'
+    ports:
+      - '5432:5432'
+    environment:
+      POSTGRES_DB: 'factoryplus-manager'
+      POSTGRES_PASSWORD: 'password'
+    volumes:
+      - 'sail-pgsql:/var/lib/postgresql/data'
+    networks:
+      - sail
+    healthcheck:
+      test:
+        - CMD
+        - pg_isready
+        - '-q'
+        - '-d'
+        - '${DB_DATABASE}'
+        - '-U'
+        - '${DB_USERNAME}'
+      retries: 3
+      timeout: 5s
+  redis:
+    image: 'redis:alpine'
+    ports:
+      - '${FORWARD_REDIS_PORT:-6379}:6379'
+    volumes:
+      - 'sail-redis:/data'
+    networks:
+      - sail
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      retries: 3
+      timeout: 5s
+  meilisearch:
+#    image: 'getmeili/meilisearch:v0.30.0'
+    image: 'metamehta/meilisearch-arm64'
+    ports:
+      - '${FORWARD_MEILISEARCH_PORT:-7700}:7700'
+    volumes:
+      - 'sail-meilisearch:/data.ms'
+    networks:
+      - sail
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--spider",  "http://localhost:7700/health"]
+      retries: 3
+      timeout: 5s
+  minio:
+    image: 'minio/minio:latest'
+    environment:
+      MINIO_ROOT_USER: 'sail'
+      MINIO_ROOT_PASSWORD: 'password'
+    volumes:
+      - 'sail-minio:/data/minio'
+    networks:
+      - sail
+    command: minio server /data/minio --console-address ":8900"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      retries: 3
+      timeout: 5s
+  createminiobuckets:
+    image: minio/mc
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      sleep 5;
+      /usr/bin/mc alias set factoryplus-manager http://minio:9000 sail password
+      && mc mb factoryplus-manager/schemas
+      && mc mb factoryplus-manager/device-connections
+      && mc mb factoryplus-manager/device-configurations
+      exit 0;
+      "
+    networks:
+      - sail
+networks:
+  sail:
+    driver: bridge
+volumes:
+
+  sail-redis:
+    driver: local
+  sail-meilisearch:
+    driver: local
+  sail-minio:
+    driver: local
+  sail-pgsql:
+    driver: local

@@ -1,0 +1,30 @@
+{
+  "name": "acs-git",
+  "version": "0.0.4",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "convert-dumps": "node bin/convert-dumps.js",
+    "git-server": "node bin/git-server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@amrc-factoryplus/rx-util": "^0.0.3",
+    "@amrc-factoryplus/sparkplug-app": "^0.0.6",
+    "@amrc-factoryplus/utilities": "^1.3.2",
+    "cgi": "^0.3.1",
+    "express": "^4.18.2",
+    "immutable": "^5.0.0-beta.5",
+    "isomorphic-git": "^1.25.7",
+    "parse-duration": "^1.1.0",
+    "rxjs": "^7.8.1"
+  },
+  "devDependencies": {
+    "eslint": "^8.52.0",
+    "yaml": "^2.3.1"
+  }
+}

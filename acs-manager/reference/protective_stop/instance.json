@@ -1,0 +1,28 @@
+{
+  "$schema": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Cell/Protective_Stop-v1.json",
+  "Schema_UUID": "24a01fa5-9232-40f5-98e5-0414e383ba9d",
+  "Instance_UUID": "4ce43782-0431-43fa-a5e9-a35a56be13eb",
+  "Device_Information": {
+    "Manufacturer": {
+      "Sparkplug_Type": "String",
+      "Record_To_Historian": true,
+      "Value": "Test"
+    },
+    "Schema_UUID": "2dd093e9-1450-44c5-be8c-c0d78e48219b",
+    "Model": {
+      "Sparkplug_Type": "String",
+      "Record_To_Historian": true,
+      "Value": "Test"
+    },
+    "Serial": {
+      "Sparkplug_Type": "String",
+      "Record_To_Historian": true,
+      "Value": "Test"
+    }
+  },
+  "Active": {
+    "Sparkplug_Type": "Boolean",
+    "Record_To_Historian": true,
+    "Value": "true"
+  }
+}

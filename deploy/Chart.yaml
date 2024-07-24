@@ -1,0 +1,44 @@
+apiVersion: v2
+version: 3.1.0
+appVersion: "3.1.0"
+name: amrc-connectivity-stack
+icon: https://www.sheffield.ac.uk/themes/custom/uos/favicon.svg
+description: The AMRC Connectivity Stack (ACS) is a collection of open-source services developed by the AMRC that enables an end-to-end implementation of the Factory+ framework.
+home: factoryplus.app.amrc.co.uk
+type: application
+keywords:
+  - factoryplus
+  - sheffield
+  - mqtt
+  - sparkplug
+  - iiot
+maintainers:
+  - name: Alex Godbehere
+    email: alex.godbehere@amrc.co.uk
+dependencies:
+  - name: traefik
+    version: 23.1.0
+    repository: https://helm.traefik.io/traefik
+    condition: traefik.enabled
+  - name: grafana
+    version: 6.52.4
+    repository: https://grafana.github.io/helm-charts
+    condition: grafana.enabled
+    # This pulls from my personal repository because the official helm chart doesn't have CRDs in the `crds` directory
+    # https://github.com/minio/operator/pull/1564
+  - name: operator
+    repository: https://alexgodbehere.github.io/helm-repository
+    version: 5.0.4
+    condition: minio.enabled
+  - name: tenant
+    repository: https://operator.min.io
+    version: 5.0.3
+    condition: minio.enabled
+  - name: influxdb2
+    version: 2.1.1
+    repository: https://helm.influxdata.com/
+    condition: influxdb2.enabled
+  - name: cert-manager
+    repository: https://charts.jetstack.io
+    version: v1.14.4
+    condition: acs.letsEncrypt.enabled

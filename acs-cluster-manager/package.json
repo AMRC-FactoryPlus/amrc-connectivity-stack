@@ -1,0 +1,27 @@
+{
+  "name": "acs-cluster-manager",
+  "version": "0.0.5",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node bin/edge-deployment.js",
+    "convert-dumps": "node bin/convert-dumps.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@amrc-factoryplus/sparkplug-app": "^0.0.6",
+    "@amrc-factoryplus/utilities": "^1.3.1",
+    "@kubernetes/client-node": "^0.18.1",
+    "concat-stream": "^2.0.0",
+    "immutable": "^5.0.0-beta.4",
+    "isomorphic-git": "^1.25.7",
+    "json-merge-patch": "^1.0.2",
+    "json-templates": "^5.0.0",
+    "tmp-promise": "^3.0.3",
+    "yaml": "^2.3.1"
+  }
+}

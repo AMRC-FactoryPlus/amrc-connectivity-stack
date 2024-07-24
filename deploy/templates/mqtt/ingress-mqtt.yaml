@@ -1,0 +1,22 @@
+{{ if .Values.mqtt.enabled }}
+apiVersion: traefik.io/v1alpha1
+kind: IngressRouteTCP
+metadata:
+  name: mqtt-ingressroute
+  namespace: {{ .Release.Namespace }}
+spec:
+  entryPoints:
+    - {{ .Values.acs.secure | ternary "mqttsecure" "mqtt" }}
+  routes:
+    - match: HostSNI(`*`)
+      services:
+        - name: mqtt
+          port: 1883
+          namespace: {{ .Release.Namespace }}
+  {{- if .Values.acs.secure }}
+  tls:
+    secretName: {{ coalesce .Values.mqtt.tlsSecretName .Values.acs.tlsSecretName }}
+    domains:
+      - main: mqtt.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
+  {{ end }}
+{{- end -}}

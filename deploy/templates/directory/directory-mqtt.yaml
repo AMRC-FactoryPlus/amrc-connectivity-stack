@@ -1,0 +1,105 @@
+{{ if .Values.directory.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: directory-mqtt
+  namespace: {{ .Release.Namespace }}
+  labels:
+    component: directory-mqtt
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: directory-mqtt
+  template:
+    metadata:
+      labels:
+        component: directory-mqtt
+        factory-plus.service: directory-mqtt
+    spec:
+      {{- with .Values.acs.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: krb5-conf
+          configMap:
+            name: krb5-conf
+        # We have two logical volumes of the secret because the containers need
+        # different credentials.
+        - name: krb5-keytabs-dbinit
+          secret:
+            secretName: krb5-keytabs
+            items:
+              - path: dbadmin
+                key: op1pgadmin
+        - name: krb5-keytabs
+          secret:
+            secretName: krb5-keytabs
+            items:
+              - path: client
+                key: sv1directory
+
+      initContainers:
+        - name: db-init
+{{ include "amrc-connectivity-stack.image" (list . .Values.directory) | indent 10 }}
+          command: [ "/usr/bin/k5start", "-Uf", "/keytabs/dbadmin", "/usr/local/bin/psql" ]
+          args: [ "-w", "-q", "-f", "/home/node/app/sql/migrate.sql" ]
+          env:
+            - name: KRB5_CONFIG
+              value: /config/krb5-conf/krb5.conf
+            - name: PGHOST
+              value: postgres.{{ .Release.Namespace }}.svc.cluster.local
+            - name: PGUSER
+              value: op1pgadmin
+            - name: PGDATABASE
+              value: postgres
+            - name: SRV_DATABASE
+              value: directory
+            - name: SRV_USER
+              value: sv1directory
+          volumeMounts:
+            - mountPath: /config/krb5-conf
+              name: krb5-conf
+            - mountPath: /keytabs
+              name: krb5-keytabs-dbinit
+
+      containers:
+        - name: mqtt
+{{ include "amrc-connectivity-stack.image" (list . .Values.directory) | indent 10 }}
+          command: [ "/usr/bin/k5start", "-Uf", "/keytabs/client" ]
+          args: [ "node", "bin/directory-mqtt" ]
+          env:
+            - name: KRB5_CONFIG
+              value: /config/krb5-conf/krb5.conf
+            - name: DEVICE_UUID
+              value: 5cc3b068-938f-4bb2-8ceb-64338a02fbeb
+            - name: SPARKPLUG_ADDRESS
+              value: {{ .Values.acs.organisation | required "values.acs.organisation is required!" }}-Service-Core/Directory
+            - name: PORT
+              value: "8080"
+            - name: PGHOST
+              value: postgres.{{ .Release.Namespace }}.svc.cluster.local
+            - name: PGUSER
+              value: sv1directory
+            - name: PGDATABASE
+              value: directory
+            - name: VERBOSE
+              value: "1"
+            # If this is set it names a principal which overrides all ACLs. This should be turned off in production.
+            - name: ROOT_PRINCIPAL
+              value: admin@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+            # This is the value published via MQTT. It is also used by the editor so it needs to be externally resolvable.
+            - name: HTTP_API_URL
+              value: "{{ .Values.acs.secure | ternary "https://" "http://" }}directory.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"
+            # This is used to check our ACLs so it does not need to be externally resolvable.
+            - name: AUTHN_URL
+              value: http://auth.{{ .Release.Namespace }}.svc.cluster.local
+            - name: MQTT_BROKER
+              value: mqtt://mqtt.{{ .Release.Namespace }}.svc.cluster.local
+          volumeMounts:
+            - mountPath: /config/krb5-conf
+              name: krb5-conf
+            - mountPath: /keytabs
+              name: krb5-keytabs
+{{- end -}}

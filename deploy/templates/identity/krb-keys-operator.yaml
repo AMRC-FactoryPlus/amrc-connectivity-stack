@@ -1,0 +1,112 @@
+{{ if .Values.identity.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: krb-keys-operator
+  namespace: {{ .Release.Namespace }}
+  labels:
+    component: krb-keys
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: krb-keys
+  template:
+    metadata:
+      labels:
+        component: krb-keys
+    spec:
+      {{- with .Values.acs.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: krb-keys-operator
+      automountServiceAccountToken: true
+      volumes:
+        - name: krb5-conf
+          configMap:
+            name: krb5-conf
+        - name: krb5-keytabs
+          secret:
+            secretName: krb5-keytabs
+            items:
+              - path: client
+                key: op1krbkeys
+        - name: krb5-ccache
+          emptyDir:
+      containers:
+        - name: operator
+{{ include "amrc-connectivity-stack.image" (list . .Values.identity.krbKeysOperator) | indent 10 }}
+          command: [ "/bin/sh", "/home/krbkeys/bin/krb-keys.sh" ]
+          args: []
+          env:
+            - name: KRB5_CONFIG
+              value: /config/krb5-conf/krb5.conf
+            - name: KRB5CCNAME
+              value: /ccache/krbkeys
+            - name: KADMIN_CCNAME
+              value: /ccache/kadmin
+            - name: DIRECTORY_URL
+              value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
+            - name: VERBOSE
+              value: "1"
+            # The k8s namespaces to watch for KerberosKey objects. This should be a comma-separated list.
+            - name: WATCH_NAMESPACES
+              value: {{ coalesce .Values.identity.krbKeysOperator.namespaces .Release.Namespace }}
+            # The default secrets below are only used for KerberosKeys in this namespace. For other namespaces the
+            # secret must be explicitly specified.
+            - name: DEFAULT_NAMESPACE
+              value: {{ .Release.Namespace }}
+            # These two secrets are managed by the operator. The operator will attempt to create them if they don't
+            # exist.
+            - name: KEYTABS_SECRET
+              value: krb5-keytabs
+            - name: PASSWORDS_SECRET
+              value: krb5-passwords
+            # This secret is managed by the administrator, and read by the
+            # operator. It contains passwords for situations where the
+            # actual password used must be known (e.g. off-swarm services
+            # like the warehouse).
+            - name: PRESETS_SECRET
+              value: krb5-presets
+          volumeMounts:
+            - mountPath: /config/krb5-conf
+              name: krb5-conf
+            - mountPath: /ccache
+              name: krb5-ccache
+        - name: tgt-creds
+{{ include "amrc-connectivity-stack.image" (list . .Values.identity.krbKeysOperator) | indent 10 }}
+          command: ["/usr/bin/k5start", "-Uf", "/keytabs/client", "-K", "5"]
+          args: []
+          env:
+            - name: KRB5_CONFIG
+              value: /config/krb5-conf/krb5.conf
+            - name: KRB5CCNAME
+              value: /ccache/krbkeys
+          volumeMounts:
+            - mountPath: /config/krb5-conf
+              name: krb5-conf
+            - mountPath: /keytabs
+              name: krb5-keytabs
+            - mountPath: /ccache
+              name: krb5-ccache
+        - name: kadmin-creds
+{{ include "amrc-connectivity-stack.image" (list . .Values.identity.krbKeysOperator) | indent 10 }}
+          command: [
+            "/usr/bin/k5start", "-K", "5",
+            "-Uf", "/keytabs/client", 
+            "-S", "kadmin", "-I", "admin" ]
+          args: []
+          env:
+            - name: KRB5_CONFIG
+              value: /config/krb5-conf/krb5.conf
+            - name: KRB5CCNAME
+              value: /ccache/kadmin
+          volumeMounts:
+            - mountPath: /config/krb5-conf
+              name: krb5-conf
+            - mountPath: /keytabs
+              name: krb5-keytabs
+            - mountPath: /ccache
+              name: krb5-ccache
+{{- end -}}

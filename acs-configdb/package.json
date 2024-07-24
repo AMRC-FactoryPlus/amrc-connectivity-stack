@@ -1,0 +1,28 @@
+{
+  "name": "acs-configdb",
+  "version": "1.8.2",
+  "description": "The Config Store component of the AMRC Connectivity Stack",
+  "author": "AMRC",
+  "license": "MIT",
+  "keywords": [
+    "amrc",
+    "factory-plus",
+    "factoryplus",
+    "acs",
+    "amrc-connectivity-stack",
+    "mqtt",
+    "sparkplug"
+  ],
+  "scripts": {
+    "start": "k5start -Uf ${CLIENT_KEYTAB} node bin/api.js",
+    "load-dump": "node bin/load-dump.js"
+  },
+  "type": "module",
+  "dependencies": {
+    "@amrc-factoryplus/utilities": "2.0.0",
+    "ajv": "^8.10.0",
+    "ajv-formats": "^2.1.1",
+    "express-openapi-validator": "^4.13.2",
+    "json-merge-patch": "^1.0.2"
+  }
+}

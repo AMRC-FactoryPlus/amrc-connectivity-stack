@@ -1,0 +1,49 @@
+{{ if .Values.identity.enabled }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: krb-keys-operator
+  namespace: {{ .Release.Namespace }}
+---
+# This role is for the krb-keys operator itself. It grants access to create the actual
+# secrets and sealed secrets, and access to read configmaps to find the kubeseal cert.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: krb-keys-operator
+rules:
+  -   apiGroups: [factoryplus.app.amrc.co.uk]
+      resources: [kerberos-keys]
+      verbs: [list, get, watch, patch]
+  -   apiGroups: [factoryplus.app.amrc.co.uk]
+      resources: [kerberos-keys/status]
+      verbs: [list, get, create, update, delete, watch, patch]
+  -   apiGroups: [""]
+      resources: [secrets]
+      verbs: [get, create, update, delete, patch]
+  -   apiGroups: [bitnami.com]
+      resources: [sealedsecrets]
+      verbs: [get, create, update, delete, patch]
+  -   apiGroups: [""]
+      resources: [configmaps]
+      verbs: [get]
+  -   apiGroups: [""]
+      resources: [namespaces]
+      verbs: [get,list]
+  -   apiGroups: [""]
+      resources: [events]
+      verbs: [create]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: krb-keys-operator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: krb-keys-operator
+subjects:
+  -   kind: ServiceAccount
+      name: krb-keys-operator
+      namespace: {{ .Release.Namespace }}
+{{- end -}}

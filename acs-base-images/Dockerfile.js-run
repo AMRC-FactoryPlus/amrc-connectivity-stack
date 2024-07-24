@@ -1,0 +1,12 @@
+# ACS base image for running JS services.
+# This includes the krb5 libraries and k5start.
+
+FROM node:lts-alpine
+
+# Install system packages we need for runtime.
+RUN apk add libedit krb5-libs kstart \
+    # Create the runtime directories root-owned, for security.
+    && install -d -o root -g root -m 755 /home/node \
+    && install -d -o root -g root -m 755 /home/node/app \
+    # NPM has started making a fuss about this
+    && install -d -o node -g node -m 700 /home/node/.npm

@@ -1,0 +1,49 @@
+{{ if .Values.minio.enabled }}
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: data-ingressroute
+  namespace: {{ .Release.Namespace }}
+spec:
+  entryPoints:
+    - {{ .Values.acs.secure | ternary "websecure" "web" }}
+  routes:
+    - match: Host(`data.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}`)
+      kind: Rule
+      services:
+        - name: fplus-minio-core-hl
+          port: 9000
+          scheme: https
+          namespace: {{ .Release.Namespace }}
+  {{- if .Values.acs.secure }}
+  tls:
+    secretName: {{ coalesce .Values.minio.tlsSecretName .Values.acs.tlsSecretName }}
+    domains:
+      - main: data.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
+  {{- end -}}
+---
+{{if .Values.minio.exposeConsole}}
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: fplus-minio-core-console
+  namespace: {{ .Release.Namespace }}
+spec:
+  entryPoints:
+    - {{ .Values.acs.secure | ternary "websecure" "web" }}
+  routes:
+    - match: Host(`minio.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}`)
+      kind: Rule
+      services:
+        - name: fplus-minio-core-console
+          port: 9443
+          scheme: https
+          namespace: {{ .Release.Namespace }}
+  {{- if .Values.acs.secure }}
+  tls:
+    secretName: {{ coalesce .Values.minio.tlsSecretName .Values.acs.tlsSecretName }}
+    domains:
+      - main: minio.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
+  {{- end -}}
+{{- end -}}
+{{- end -}}

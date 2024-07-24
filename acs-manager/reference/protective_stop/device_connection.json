@@ -1,0 +1,12 @@
+{
+    "$schema": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Device_Connection.json",
+    "name": "Smart_Tool_Instance_Connection",
+    "connType": "REST",
+    "RESTConnDetails": {
+        "baseURL": "http://1.2.3.4:5000",
+        "authMethod": "Basic",
+        "payloadFormat": "Defined by Protocol",
+        "username": "safeUsername",
+        "password": "secretPassword"
+    }
+}

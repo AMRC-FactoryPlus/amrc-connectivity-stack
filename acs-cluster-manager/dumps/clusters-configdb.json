@@ -1,0 +1,114 @@
+{
+  "service": "af15f175-78a0-4e05-97c0-2a0bb82b9f3b",
+  "version": 1,
+  "classes": [
+    "f24d354d-abc1-4e32-98e1-0667b3e40b61",
+    "265d481f-87a7-4f93-8fc6-53fa64dc11bb",
+    "ac0d5288-6136-4ced-a372-325fbbcdd70d",
+    "8ae784bb-c4b5-4995-9bf6-799b3c7f21ad",
+    "b419cbc2-ab0f-4311-bd9e-f0591f7e88cb"
+  ],
+  "objects": {
+    "d319bd87-f42b-4b66-be4f-f82ff48b93f0": [
+      "bdb13634-0b3d-4e38-a065-9d88c12ee78d",
+      "f6c67e6f-e48e-4f69-b4bb-bfbddcc2a517",
+      "729fe070-5e67-4bc7-94b5-afd75cb42b03",
+      "88436128-09a3-4c9c-b7f4-b0e495137265",
+      "dbd8a535-52ba-4f6e-b4f8-9b71aefe09d3"
+    ],
+    "265d481f-87a7-4f93-8fc6-53fa64dc11bb": [
+      "2706aa43-a826-441e-9cec-cd3d4ce623c2"
+    ],
+    "ac0d5288-6136-4ced-a372-325fbbcdd70d": [
+      "9e07fd33-6400-4662-92c4-4dff1f61f990"
+    ],
+    "8ae784bb-c4b5-4995-9bf6-799b3c7f21ad": [
+      "a40acff8-0c61-4251-bef3-d8d53e50cdd0",
+      "07fba27a-0d01-4c07-875b-d25345261d3a"
+    ],
+    "b419cbc2-ab0f-4311-bd9e-f0591f7e88cb": [
+      "26d192cf-73c1-4c14-93cf-1e63743bab08",
+      "3a58340c-d4ec-453d-99c3-0cf6ab7d8fa9",
+      "979f7fd9-bbc7-4810-a774-6082c7394db6",
+      "4eeb8156-856d-4251-a4a4-4c1b2f3d3e2c",
+      "8cd08563-7c3c-44fd-af4d-15c0fa6dadcb"
+    ]
+  },
+  "configs": {
+    "64a8bfa9-7772-45c4-9d1a-9e6290690957": {
+      "f24d354d-abc1-4e32-98e1-0667b3e40b61": {
+        "name": "Edge cluster"
+      },
+      "bdb13634-0b3d-4e38-a065-9d88c12ee78d": {
+        "name": "Edge cluster configuration"
+      },
+      "f6c67e6f-e48e-4f69-b4bb-bfbddcc2a517": {
+        "name": "Edge cluster setup status"
+      },
+      "729fe070-5e67-4bc7-94b5-afd75cb42b03": {
+        "name": "Helm chart template"
+      },
+      "88436128-09a3-4c9c-b7f4-b0e495137265": {
+        "name": "HelmRelease template"
+      },
+      "2706aa43-a826-441e-9cec-cd3d4ce623c2": {
+        "name": "Cluster Manager"
+      },
+      "9e07fd33-6400-4662-92c4-4dff1f61f990": {
+        "name": "Clusters permissions"
+      },
+      "a40acff8-0c61-4251-bef3-d8d53e50cdd0": {
+        "name": "Clusters: Manage clusters"
+      },
+      "07fba27a-0d01-4c07-875b-d25345261d3a": {
+        "name": "Clusters: Manage secrets"
+      },
+      "26d192cf-73c1-4c14-93cf-1e63743bab08": {
+        "name": "Clusters service account"
+      },
+      "3a58340c-d4ec-453d-99c3-0cf6ab7d8fa9": {
+        "name": "Edge cluster repositories"
+      },
+      "979f7fd9-bbc7-4810-a774-6082c7394db6": {
+        "name": "Clusters-managed groups"
+      },
+      "4eeb8156-856d-4251-a4a4-4c1b2f3d3e2c": {
+        "name": "Edge flux accounts"
+      },
+      "8cd08563-7c3c-44fd-af4d-15c0fa6dadcb": {
+        "name": "Edge flux roles"
+      }
+    },
+    "dbd8a535-52ba-4f6e-b4f8-9b71aefe09d3": {
+      "bdb13634-0b3d-4e38-a065-9d88c12ee78d": {
+        "title": "Edge cluster configuration",
+        "type": "object",
+        "required": [
+          "name",
+          "namespace"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "description": "A name for the cluster.",
+            "type": "string"
+          },
+          "namespace": {
+            "description": "The k8s namespace to deploy to.",
+            "type": "string"
+          },
+          "chart": {
+            "description": "The Helm chart to deploy.",
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "f6c67e6f-e48e-4f69-b4bb-bfbddcc2a517": {
+        "title": "Clusters private status",
+        "type": "object",
+        "additionalProperties": true
+      }
+    }
+  }
+}

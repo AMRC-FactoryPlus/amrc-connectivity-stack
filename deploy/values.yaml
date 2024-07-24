@@ -1,0 +1,423 @@
+acs:
+  # -- The organisation where ACS is being deployed
+  organisation: AMRC
+  # -- The base URL that services will be served from
+  baseUrl: factoryplus.myorganisation.com
+  # -- Whether or not services should be served over HTTPS
+  secure: true
+  letsEncrypt:
+    # -- Whether or not to use Let's Encrypt to automatically generate
+    # certificates for the services
+    enabled: true
+    # -- The email address to use for Let's Encrypt
+    email: ''
+    # -- Whether or not to use the staging environment for Let's Encrypt
+    staging: false
+  # -- The name of the secret holding the wildcard certificate for the
+  # above domain. It will be used for every service unless that service
+  # specifies its own tlsSecretName.
+  tlsSecretName: factoryplus-tls
+  cacheMaxAge: 300
+  # -- Image pull secrets for container images
+  imagePullSecrets: []
+  # -- An optional tag that will force images to use this version
+  # regardless of the version in the Helm chart. Each component can
+  # further override this value by setting the `tag` property in its
+  # own section. Deployments from a Git checkout must set this value.
+  #defaultTag: ''
+
+identity:
+  # -- Whether or not to enable the Identity component
+  enabled: true
+  # -- The Kerberos realm for this Factory+ deployment.
+  realm: FACTORYPLUS.MYORGANISATION.COM
+  # -- Kerberos UPNs to grant kadmin access. This needs to be list of
+  # objects with 'principal', 'permission' and (optionally)
+  # 'restrictions' properties; see the kadmin documentation for their
+  # meaning.
+  kadminUsers: []
+  # -- Enable support for cross-realm authentication
+  crossRealm: [ ]
+  # crossRealm:
+  #   - realm: MYOTHERREALM.COM
+  #     domain: myotherrealm.com
+  #     otherDomains:
+  #       - myotherrealm.org
+  #       - myotherrealm.net
+  identity:
+    image:
+      # -- The registry of the Identity component
+      registry: ghcr.io/amrc-factoryplus
+      # -- The repository of the Identity component
+      repository: acs-identity
+      pullPolicy: IfNotPresent
+    # If this is set to true, the kdb-init container will not set up the
+    # KDB but will sit and wait. This can be used to halt startup of the
+    # KDC until a restore from backup can be performed. Be aware that
+    # this will halt startup of the KDC every time the pod starts until
+    # the setting is changed.
+    manualInit: false
+  krbKeysOperator:
+    # -- A comma-separated list of namespaces that the KerberosKey Operator should watch for KerberosKey resources in. Defaults to the release namespace if not specified
+    namespaces: ""
+
+    image:
+      # -- The registry of the KerberosKey Operator
+      registry: ghcr.io/amrc-factoryplus
+      # -- The repository of the KerberosKey Operator
+      repository: acs-krb-keys-operator
+      pullPolicy: IfNotPresent
+
+auth:
+  # -- Whether or not to enable the Authorisation component
+  enabled: true
+  image:
+    # -- The registry of the Authorisation component
+    registry: ghcr.io/amrc-factoryplus
+    # -- The repository of the Authorisation component
+    repository: acs-auth
+    pullPolicy: IfNotPresent
+  verbosity: "ALL,!service,!token,!query"
+
+directory:
+  # -- Whether or not to enable the Directory component
+  enabled: true
+  image:
+    # -- The registry of the Directory component
+    registry: ghcr.io/amrc-factoryplus
+    # -- The repository of the Directory component
+    repository: acs-directory
+    pullPolicy: IfNotPresent
+
+configdb:
+  # -- Whether or not to enable the Configuration Store component
+  enabled: true
+  image:
+    # -- The registry of the Configuration Store component
+    registry: ghcr.io/amrc-factoryplus
+    # -- The repository of the Configuration Store component
+    repository: acs-configdb
+    pullPolicy: IfNotPresent
+
+monitor:
+  enabled: true
+  image:
+    registry: ghcr.io/amrc-factoryplus
+    repository: acs-monitor
+    pullPolicy: IfNotPresent
+  verbosity: "ALL,!service,!token"
+
+# -- The service-setup component loads ACS-specific configuration into
+# the ACS services when the Helm chart is deployed or upgraded.
+serviceSetup:
+  enabled: true
+  image:
+    registry: ghcr.io/amrc-factoryplus
+    repository: acs-service-setup
+    pullPolicy: IfNotPresent
+  # This section overrides the classes etc. installed into the ConfigDB
+  config:
+    # Git repos to mirror in the on-prem git server
+    repoMirror:
+      # This repo is expected to hold the edge Helm charts
+      helm:
+        name: Edge Helm charts
+        # Branches to pull from external repos
+        pull:
+          acs:
+            url: https://github.com/AMRC-FactoryPlus/edge-helm-charts.git
+            # Pull this branch/tag
+            ref: v3.1.2
+            # Merge to a local branch, if not otherwise moved
+            merge: main
+            # Interval to perform updates. 'never' will only update on git
+            # server startup and is suitable for tag refs which won't
+            # change.
+            interval: never
+    # Helm charts to deploy to the edge; these default to the charts
+    # created automatically but can be overridden to customise
+    helmChart:
+      # Chart to deploy an edge cluster
+      #cluster: null
+
+mqtt:
+  # -- Whether or not to enable the MQTT component
+  enabled: true
+  image:
+    # -- The registry of the MQTT component
+    registry: ghcr.io/amrc-factoryplus
+    # -- The repository of the MQTT component
+    repository: acs-mqtt
+    pullPolicy: IfNotPresent
+  # -- Possible values are either 1 to enable all possible debugging, or a comma-separated list of debug tags (the tags printed before the log lines). No logging is specified as an empty string.
+  verbosity: 0
+
+visualiser:
+  enabled: true
+  image:
+    # -- The registry of the MQTT component
+    registry: ghcr.io/amrc-factoryplus
+    # -- The repository of the MQTT component
+    repository: acs-visualiser
+    pullPolicy: IfNotPresent
+
+manager:
+  # -- Whether or not to enable the Manager component
+  enabled: true
+  image:
+    # -- The registry of the Manager component
+    registry: ghcr.io/amrc-factoryplus
+    # -- The repository of the Manager component
+    repository: acs-manager
+    pullPolicy: IfNotPresent
+  edge:
+    # -- The registry of the Edge Agent component
+    registry: ghcr.io/amrc-factoryplus
+    # -- The repository of the Edge Agent component
+    repository: acs-edge
+  meilisearch:
+    # -- The key that the manager uses to connect to the Meilisearch search engine
+    key: masterKey
+    image:
+      registry: docker.io
+      repository: getmeili/meilisearch
+      tag: v0.30.0
+      pullPolicy: IfNotPresent
+  # -- A string used to customise the branding of the manager
+  name: Factory+ Manager
+  # -- The environment that the manager is running in
+  env: production
+  # -- Whether debug mode is enabled. DO NOT USE THIS IN PRODUCTION.
+  debug: false
+  # -- The minimum log level that the manager will log messages at
+  logLevel: warning
+
+cmdesc:
+  # -- Whether or not to enable the Commands component
+  enabled: true
+  image:
+    # -- The registry of the Commands component
+    registry: ghcr.io/amrc-factoryplus
+    # -- The repository of the Commands component
+    repository: acs-cmdesc
+    pullPolicy: IfNotPresent
+  # -- Possible values are either 1 to enable all possible debugging, or a comma-separated list of debug tags (the tags printed before the log lines). No logging is specified as an empty string.
+  verbosity: 1
+
+warehouse:
+  # -- Whether or not to enable the Warehouse component
+  ingester:
+    enabled: true
+    # -- The minimum log level that the ingester will log messages at (One of 'fatal', 'error', 'warn', 'info', 'debug', 'trace' or 'silent'.)
+    logLevel: info
+    # -- The number of messages to batch together before sending to InfluxDB
+    batchSize: 5000
+    # -- Send all buffered messages after this amount of time has elapsed if the buffer is not full (in milliseconds)
+    flushInterval: 10000
+    image:
+      # -- The registry of the Warehouse component
+      registry: ghcr.io/amrc-factoryplus
+      # -- The repository of the Warehouse component
+      repository: influxdb-sparkplug-ingester
+      pullPolicy: IfNotPresent
+
+git:
+  # -- Whether or not to enable the Git component
+  enabled: true
+  image:
+    # -- The registry of the Git component
+    registry: ghcr.io/amrc-factoryplus
+    # -- The repository of the Git component
+    repository: acs-git
+    pullPolicy: IfNotPresent
+  # -- Possible values are either 1 to enable all possible debugging, or a comma-separated list of debug tags (the tags printed before the log lines). No logging is specified as an empty string.
+  verbosity: "ALL,!service,!token"
+
+clusterManager:
+  # -- Whether or not to enable the Cluster Manager component
+  enabled: true
+  image:
+    # -- The registry of the Clusters component
+    registry: ghcr.io/amrc-factoryplus
+    # -- The repository of the Clusters component
+    repository: acs-cluster-manager
+    pullPolicy: IfNotPresent
+  verbosity: "ALL,!service,!token"
+
+admin:
+  # -- Whether or not to enable the Admin component
+  enabled: true
+  image:
+    # -- The registry of the Admin component
+    registry: ghcr.io/amrc-factoryplus
+    # -- The repository of the Admin component
+    repository: acs-admin
+    pullPolicy: IfNotPresent
+
+shell:
+  image:
+    registry: ghcr.io/amrc-factoryplus
+    repository: acs-krb-utils
+    tag: v0.0.1
+    pullPolicy: IfNotPresent
+
+# XXX This should probably be included in acs-krb-utils
+curl: 
+  image:
+    registry: docker.io
+    repository: appropriate/curl
+    tag: latest
+    pullPolicy: IfNotPresent
+
+minio:
+  # -- Whether or not to enable MinIO
+  enabled: true
+  # -- Whether or not to expose the MinIO console outside of the cluster
+  exposeConsole: false
+
+
+postgres:
+  # -- Whether or not to enable Postgres
+  enabled: true
+  # Postgres image to use. DO NOT change major version on an
+  # existing installation without being prepared to handle database
+  # dump/restore manually.
+  image:
+    registry: docker.io/library
+    repository: postgres
+    tag: 16.1
+    # Kubegres doesn't support setting pullPolicy
+
+kubegres:
+  kubeProxy:
+    image:
+      registry: gcr.io
+      repository: kubebuilder/kube-rbac-proxy
+      tag: v0.13.0
+      pullPolicy: IfNotPresent
+  kubegres:
+    image:
+      registry: docker.io
+      repository: reactivetechio/kubegres
+      tag: 1.16
+      pullPolicy: IfNotPresent
+
+traefik:
+  enabled: true
+  ports:
+    mqtt:
+      port: 1883
+      expose: false
+      exposedPort: 1883
+      protocol: TCP
+    mqttsecure:
+      port: 8883
+      expose: true
+      exposedPort: 8883
+      protocol: TCP
+    kdc:
+      port: 8888
+      expose: true
+      exposedPort: 88
+      protocol: TCP
+    kpasswd:
+      port: 8464
+      expose: true
+      exposedPort: 464
+      protocol: TCP
+    kadmin:
+      port: 8749
+      expose: true
+      exposedPort: 749
+      protocol: TCP
+  additionalArguments:
+    - --metrics.prometheus=true
+    - --serverstransport.insecureskipverify=true
+  ingressRoute:
+    dashboard:
+      enabled: false
+#   -- [AZURE] Enable the below section to expose your instance of Factory+/ACS over the internet, replacing the <Value>
+#   -- tags with the details of your pre-configured load balancer.
+    service:
+      spec:
+        loadBalancerIP: <External IP address here>
+      annotations:
+        service.beta.kubernetes.io/azure-load-balancer-resource-group: <Load Balancer Resource Group here>
+  providers:
+    kubernetesCRD:
+      allowCrossNamespace: true
+  logs:
+    general:
+      level: DEBUG
+
+grafana:
+  deploymentStrategy:
+    type: Recreate
+  image:
+    tag: 10.0.1
+  enabled: true
+  persistence:
+    enabled: true
+  envFromSecret: influxdb-auth
+  admin:
+    existingSecret: grafana-admin-user
+  grafana.ini:
+    auth.basic:
+      enabled: false
+    auth.proxy:
+      enabled: true
+      header_name: X-Auth-Principal
+      header_property: username
+      auto_sign_up: true
+  sidecar:
+    datasources:
+      enabled: true
+      label: grafana_datasource
+      initDatasources: true
+    dashboards:
+      enabled: true
+      provider:
+        folder: 'Factory+'
+        disableDelete: true
+      searchNamespace: ALL
+
+tenant:
+  tenant:
+    name: fplus-minio-core
+    # Disable TLS on the MinIO level because we terminate TLS at Traefik
+    certificate:
+      externalCaCertSecret: { }
+      externalCertSecret: { }
+      requestAutoCert: false
+      certConfig: { }
+    pools:
+      - servers: 1
+        name: pool-0
+        volumesPerServer: 1
+        size: 20Gi
+    ## List of bucket names to create during tenant provisioning
+    buckets:
+      - name: "device-configurations"
+      - name: "device-connections"
+      - name: "edge-agent-configs"
+    ## List of secret names to use for generating MinIO users during tenant provisioning
+    users:
+      - name: "manager-minio-secret"
+
+influxdb2:
+  enabled: true
+  adminUser:
+    organization: default
+    existingSecret: influxdb-auth
+  initScripts:
+    enabled: true
+    scripts:
+      init.sh: |+
+        #!/bin/bash
+        echo "Creating mapping for bucket ${DOCKER_INFLUXDB_INIT_BUCKET_ID} in org ${DOCKER_INFLUXDB_INIT_ORG}"
+        influx v1 dbrp create --bucket-id ${DOCKER_INFLUXDB_INIT_BUCKET_ID} --db default --rp default --default --org ${DOCKER_INFLUXDB_INIT_ORG}
+  pdb:
+    create: false
+
+cert-manager:
+  fullnameOverride: "cert-manager"

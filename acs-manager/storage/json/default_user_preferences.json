@@ -1,0 +1,16 @@
+{
+  "appearance": {
+    "sectionName": "appearance",
+    "sectionTitle": "Appearance",
+    "sectionDescription": "Tailor the look and feel",
+    "preferences": {
+      "show_uuids": {
+        "name": "show_uuids",
+        "title": "Show UUIDs",
+        "description": "Show UUIDs alongside resources",
+        "type": "bool",
+        "value": false
+      }
+    }
+  }
+}

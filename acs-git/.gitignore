@@ -1,0 +1,21 @@
+/node_modules/
+
+# Don't include package-lock. It differs between Windows and Linux and
+# causes the Docker build to omit the GSSAPI libraries.
+package-lock.json
+
+# Vim swap
+*.swp
+
+# Local build config
+config.mk
+
+# Environment
+.env
+
+# Secrets
+/keytabs/
+/volumes/
+
+# IDE
+.idea/

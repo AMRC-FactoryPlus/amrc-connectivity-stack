@@ -1,0 +1,598 @@
+openapi: 3.0.0
+
+info:
+    title: Factory+ / AMRC Connectivity Stack (ACS) Directory component
+    version: 1.0.0
+    description: This service allows clients to search for devices across Factory+
+
+servers:
+    -   url: /v1
+        description: Directory API v1
+
+security:
+    - basic: []
+    - gssapi: []
+    - token: []
+
+paths:
+    /search:
+        get:
+            summary: Search for devices known to the system.
+            operationId: search
+            responses:
+                "200":
+                    description: List of matching devices.
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/device-list" }
+                "401": { description: "Unauthorised" }
+                "403": { description: "Forbidden" }
+
+    /address:
+        get:
+            summary: Get information about the known Sparkplug Group-IDs.
+            responses:
+                "200":
+                    description: Sparkplug Group-IDs.
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/address-info" }
+    /address/{group}:
+        parameters:
+            -   name: group
+                in: path
+                required: true
+                schema: { $ref: "#/components/schemas/sparkplug-name" }
+        get:
+            summary: Get information about Nodes in a given Group.
+            responses:
+                "200":
+                    description: Sparkplug Node-IDs.
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/address-info" }
+    /address/{group}/{node}:
+        parameters:
+            -   name: group
+                in: path
+                required: true
+                schema: { $ref: "#/components/schemas/sparkplug-name" }
+            -   name: node
+                in: path
+                required: true
+                schema: { $ref: "#/components/schemas/sparkplug-name" }
+        get:
+            summary: Get information about Devices under a given Node.
+            responses:
+                "200":
+                    description: Information about a Sparkplug Node.
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/address-info" }
+    /address/{group}/{node}/{device}:
+        parameters:
+            -   name: group
+                in: path
+                required: true
+                schema: { $ref: "#/components/schemas/sparkplug-name" }
+            -   name: node
+                in: path
+                required: true
+                schema: { $ref: "#/components/schemas/sparkplug-name" }
+            -   name: device
+                in: path
+                required: true
+                schema: { $ref: "#/components/schemas/sparkplug-name" }
+        get:
+            summary: Get information about a particular Device.
+            responses:
+                "200":
+                    description: Information about a Sparkplug Device.
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/address-info" }
+
+    /alert:
+        get:
+            summary: >
+                List all known alerts. 
+            responses:
+                "200":
+                    description: Information about available alerts.
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/alert-list" }
+    /alert/active:
+        get:
+            summary: List all currently active alerts.
+            responses:
+                "200":
+                    description: Information about active alerts.
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/alert-list" }
+    /alert/type/{type}:
+        parameters:
+            - { $ref: "#/components/parameters/alert-type" }
+        get:
+            summary: List all alerts of the given type.
+            responses:
+                "200":
+                    description: Active alerts.
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/alert-list" }
+    /alert/type/{type}/active:
+        parameters:
+            - { $ref: "#/components/parameters/alert-type" }
+        get:
+            summary: List all active alerts of the given type.
+            responses:
+                "200":
+                    description: Active alerts of the given type.
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/alert-list" }
+    /alert/{alert}:
+        parameters:
+            - { $ref: "#/components/parameters/alert" }
+        get:
+            summary: Return the status of a particular alert.
+            responses:
+                "200":
+                    description: Status of the given alert.
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/alert" }
+
+    /device:
+        get:
+            summary: List all known devices.
+            responses:
+                "200":
+                    description: A list of all known device UUIDs.
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/uuid-list" }
+
+    /device/{device}:
+        get:
+            summary: Get information about a particular device.
+            operationId: device
+            parameters:
+                -   { $ref: "#/components/parameters/device" }
+            responses:
+                "200":
+                    description: Information about the device.
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/device" }
+                "401": { description: "Unauthorised" }
+                "403": { description: "Forbidden" }
+
+    /device/{device}/history:
+        get:
+            summary: Get the online/offline history of a device.
+            operationId: device-history
+            description: >
+                Retrieve the history of this device's online/offline status. If start date is
+                omitted, go back as far as we have records of this device. If end date is omitted,
+                return up to the most recent birth or death.
+            parameters:
+                -   { $ref: "#/components/parameters/device" }
+                -   name: start
+                    description: Include records on or after this time.
+                    in: query
+                    schema: { type: string, format: date-time }
+                -   name: finish
+                    description: Include records on or before this time.
+                    in: query
+                    schema: { type: string, format: date-time }
+            responses:
+                "200":
+                    description: The requested history of the device.
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/session-list" }
+                "401": { description: "Unauthorised" }
+                "403": { description: "Forbidden" }
+
+    /link:
+        get:
+            summary: List all known links.
+            responses:
+                200:
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/uuid-list" }
+    /link/device/:device:
+        get:
+            summary: List the links published by a given device.
+            responses:
+                200:
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/uuid-list" }
+    /link/source/:uuid:
+        get:
+            summary: List the links from a given object.
+            responses:
+                200:
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/uuid-list" }
+    /link/target/:uuid:
+        get:
+            summary: List the links to a given object.
+            responses:
+                200:
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/uuid-list" }
+    /link/relation/:relation:
+        get:
+            summary: List the links using a given link relation.
+            responses:
+                200:
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/uuid-list" }
+    /link/:uuid:
+        get:
+            summary: Fetch the details of a particular link.
+            responses:
+                200:
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/link" }
+
+    /schema:
+        get:
+            summary: List all the known schema UUIDs.
+            responses:
+                "200":
+                    description: A list of the known schemas.
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/uuid-list" }
+
+    /schema/{schema}/devices:
+        parameters:
+            -   { $ref: "#/components/parameters/schema" }
+        get:
+            summary: List all devices currently using this schema.
+            description: >
+                Retrieve a list of UUID of the devices that currently advertise this schema in their
+                birth certificate. This will include devices that are currently offline, but will
+                not include devices that have used this schema in the past but which did not use it
+                in their most recent birth certificate.
+            responses:
+                "200":
+                    description: A list of device UUIDs.
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/uuid-list" }
+
+    /service:
+        get:
+            summary: List all the known service UUIDs.
+            responses:
+                "200":
+                    description: A list of the known services.
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/uuid-list" }
+
+    /service/{service}:
+        parameters:
+            - { $ref: "#/components/parameters/service" }
+        get:
+            summary: Return a list of devices providing this service.
+            responses:
+                "200":
+                    description: A list of service providers.
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/service-provider-list" }
+
+    /service/{service}/advertisment:
+        parameters:
+            - { $ref: "#/components/parameters/service" }
+        get:
+            summary: Fetch my service advertisment.
+            responses:
+                "200":
+                    description: Current service advertisment.
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/service-provider" }
+        put:
+            summary: Advertise a service.
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema: { $ref: "#/components/schemas/service-provider" }
+            responses:
+                "201":
+                    description: Advertisment created.
+                "204":
+                    description: Advertisment updated.
+        delete:
+            summary: Remove a service advertisment.
+            responses:
+                "204":
+                    description: Advertisment removed.
+
+    /service/{service}/advertisment/{owner}:
+        parameters:
+            - { $ref: "#/components/parameters/service" }
+            - { $ref: "#/components/parameters/owner" }
+        get:
+            summary: Fetch a service advertisment.
+            responses:
+                "200":
+                    description: Current service advertisment.
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/service-provider" }
+        put:
+            summary: Advertise a service.
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema: { $ref: "#/components/schemas/service-provider" }
+            responses:
+                "201":
+                    description: Advertisment created.
+                "204":
+                    description: Advertisment updated.
+        delete:
+            summary: Remove a service advertisment.
+            responses:
+                "204":
+                    description: Advertisment removed.
+                    
+components:
+    parameters:
+        alert:
+            description: The UUID of an individual alert.
+            name: alert
+            in: path
+            required: true
+            schema: { type: string, format: uuid }
+
+        alert-type:
+            description: The UUID of an alert type.
+            name: type
+            in: path
+            required: true
+            schema: { type: string, format: uuid }
+
+        device:
+            description: The UUID of the device we are querying.
+            name: device
+            in: path
+            required: true
+            schema: { type: string, format: uuid }
+
+        relation:
+            description: The UUID of a link relation.
+            name: relation
+            in: path
+            required: true
+            schema: { type: string, format: uuid }
+
+        schema:
+            description: The UUID of the schema we are querying.
+            name: schema
+            in: path
+            required: true
+            schema: { type: string, format: uuid }
+
+        service:
+            description: The UUID of the service we are querying.
+            name: service
+            in: path
+            required: true
+            schema: { type: string, format: uuid }
+
+        owner:
+            description: The provider of the service.
+            name: owner
+            in: path
+            required: true
+            schema: { type: string, format: uuid }
+
+        uuid:
+            description: The UUID of any Factory+ object.
+            name: uuid
+            in: path
+            required: true
+            schema: { type: string, format: uuid }
+
+    schemas:
+        sparkplug-name:
+            description: A Sparkplug name component.
+            type: string
+            pattern: '^[a-zA-Z0-9_-]+$'
+
+        uuid-list:
+            description: A list of UUIDs.
+            type: array
+            items: { type: string, format: uuid }
+
+        address-info:
+            description: >
+                Information about the devices currently using a given section of the Sparkplug
+                namespace.
+            type: object
+            required: [address]
+            properties:
+                address:
+                    type: string
+                    description: The Sparkplug address we refer to.
+                uuid:
+                    type: string
+                    format: uuid
+                    description: >
+                        The UUID of the device to most recently publish to this address, if any.
+                children:
+                    type: array
+                    items: { $ref: "#/components/schemas/sparkplug-name" }
+                    description: >
+                        The names of the known children of this branch of the tree. If this is a
+                        Group, the children will be Nodes. If this is a Node, the children will be
+                        Devices.
+
+        alert:
+            description: Information about a particular alert.
+            type: object
+            required: [uuid, device, type, metric, active, last_change]
+            properties:
+                uuid:
+                    description: The UUID of this individual alert.
+                    type: string
+                    format: uuid
+                device:
+                    description: >
+                        The UUID of the device which published this alert.
+                    type: string
+                    format: uuid
+                type:
+                    description: >
+                        A UUID identifying the category of alert this
+                        represents. These UUIDs should be registered in
+                        the ConfigDB with at least a human-readable name
+                        in the General Info app.
+                    type: string
+                    format: uuid
+                metric:
+                    description: >
+                        The path to the metric sub-tree within the
+                        device's metrics which represents this alert.
+                        Metrics here should conform to the Alert schema.
+                        Do not attach any significance to the metric
+                        names used; alerts must be identified by their
+                        type and their Links.
+                    type: string
+                active:
+                    description: Is this alert currently active?
+                    type: boolean
+                last_change:
+                    description: The time this alert last changed status.
+                    type: string
+                    format: date-time
+                links:
+                    description: Link UUIDs linking from this alert.
+                    type: array
+                    items: { type: string, format: uuid }
+
+        alert-list:
+            description: A list of alerts.
+            type: array
+            items: { $ref: "#/components/schemas/alert" }
+
+        device:
+            description: >
+                A description of a single Sparkplug device. If deviceId is present the device is a
+                Sparkplug Device, otherwise it is an EON Node. online indicates if the device is
+                online at the moment. lastChange indicates the last time a BIRTH or DEATH was seen.
+                schemas is a list of all schemas used by the most recent birth certificate.
+            type: object
+            required: [uuid, group_id, node_id, online, last_change, schemas, top_schema]
+            properties:
+                uuid: { type: string, format: uuid }
+                group_id: { $ref: "#/components/schemas/sparkplug-name" }
+                node_id: { $ref: "#/components/schemas/sparkplug-name" }
+                device_id: { $ref: "#/components/schemas/sparkplug-name" }
+                online: { type: boolean }
+                last_change: { type: string, format: date-time }
+                schemas: { $ref: "#/components/schemas/uuid-list" }
+                top_schema: { type: string, format: uuid, nullable: true }
+                
+        device-list:
+            description: >
+                Represents a list of devices. Order is unimportant.
+            type: array
+            items: { $ref: "#/components/schemas/device" }
+
+        link:
+            description: A link between objects.
+            type: object
+            required: [uuid, device, source, relation, target]
+            properties:
+                uuid:
+                    description: The UUID of this link.
+                    type: string
+                    format: uuid
+                device:
+                    description: The Device which published this link.
+                    type: string
+                    format: uuid
+                source:
+                    description: The UUID of the source of the link.
+                    type: string
+                    format: uuid
+                relation:
+                    description: >
+                        A UUID identifying the semantics of the link.
+                    type: string
+                    format: uuid
+                target:
+                    description: The UUID of the target of the link.
+                    type: string
+                    format: uuid
+
+        service-provider-list:
+            description: A list of devices which provide a service.
+            type: array
+            items: { $ref: "#/components/schemas/service-provider" }
+
+        service-provider:
+            description: Information about where a service provider can be accessed.
+            type: object
+            properties:
+                device: { type: string, format: uuid }
+                url: { type: string }
+
+        session:
+            description: >
+                A record describing a single device session (the period
+                between a BIRTH and a DEATH or reBIRTH). If finish is
+                not present the session has not yet ended. 
+            type: object
+            required: [groupId, nodeId, start, templates]
+            properties:
+                groupId: { $ref: "#/components/schemas/sparkplug-name" }
+                nodeId: { $ref: "#/components/schemas/sparkplug-name" }
+                deviceId: { $ref: "#/components/schemas/sparkplug-name" }
+                start: { type: string, format: date-time }
+                finish: { type: string, format: date-time }
+                death: { type: boolean }
+                schemas: { $ref: "#/components/schemas/uuid-list" }
+
+        session-list:
+            description: >
+                Represents a list of sessions for a particular device; note that a device may not
+                necessarily have the same group/node/device ID every time it comes online. The list
+                MUST be sorted by birth time, newest first. Entries that overlap in time indicate a
+                problem on the network, but MUST be reported as seen on the wire. Clients MUST
+                correctly handle overlapping entries.
+            type: array
+            items: { $ref: "#/components/schemas/session" }
+
+    securitySchemes:
+        basic:
+            type: http
+            description: User/password HTTP Basic auth
+            scheme: Basic
+        gssapi:
+            type: http
+            description: HTTP Negotiate auth (Kerberos)
+            scheme: Negotiate
+        token:
+            type: http
+            description: HTTP bearer token auth
+            scheme: Bearer

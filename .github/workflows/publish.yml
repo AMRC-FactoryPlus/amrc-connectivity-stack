@@ -164,6 +164,7 @@ jobs:
           - acs-monitor
           - acs-service-setup
           - acs-visualiser
+          - edge-helm-charts
           - influxdb-sparkplug-ingester
     permissions:
       contents: read

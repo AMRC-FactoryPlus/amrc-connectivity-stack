@@ -1,5 +1,7 @@
 *.swp
 tmp
+node_modules
+package-lock.json
 /.idea/.gitignore
 /.idea/edge-helm-charts.iml
 /.idea/misc.xml

@@ -16,7 +16,7 @@ spec:
       volumes:
         - name: git-checkouts
           emptyDir:
-      containers:
+      initContainers:
         - name: service-setup
 {{ include "amrc-connectivity-stack.image" (list . .Values.serviceSetup) | indent 10 }}
           env:
@@ -48,4 +48,24 @@ spec:
           volumeMounts:
             - mountPath: /data
               name: git-checkouts
-            
+        - name: edge-helm-charts
+{{ include "amrc-connectivity-stack.image" (list . .Values.edgeHelm) | indent 10 }}
+          env:
+            - name: DIRECTORY_URL
+              value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
+            - name: SERVICE_USERNAME
+              value: admin
+            - name: SERVICE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: admin-password
+                  key: password
+            - name: VERBOSE
+              value: ALL,!token,!service
+            - name: GIT_REPO_PATH
+              value: {{ .Values.edgeHelm.path }}
+      containers:
+        # We need a do-nothing container to keep k8s happy
+        - name: done
+{{ include "amrc-connectivity-stack.image" (list . .Values.shell) | indent 10 }}
+          command: ["/bin/true"]

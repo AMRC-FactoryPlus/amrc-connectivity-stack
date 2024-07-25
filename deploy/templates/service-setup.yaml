@@ -63,7 +63,7 @@ spec:
             - name: VERBOSE
               value: ALL,!token,!service
             - name: GIT_REPO_PATH
-              value: {{ .Values.edgeHelm.path }}
+              value: {{ .Values.edgeHelm.repoPath }}
       containers:
         # We need a do-nothing container to keep k8s happy
         - name: done

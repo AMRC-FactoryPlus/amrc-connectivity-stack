@@ -129,7 +129,7 @@ edgeHelm:
   enabled: true
   image:
     registry: ghcr.io/amrc-factoryplus
-    repository: acs-service-setup
+    repository: edge-helm-charts
     pullPolicy: IfNotPresent
   repoPath: shared/helm
 

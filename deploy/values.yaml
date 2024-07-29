@@ -117,8 +117,13 @@ serviceSetup:
     pullPolicy: IfNotPresent
   # This section overrides the classes etc. installed into the ConfigDB
   config:
-    # Git repos to mirror in the on-prem git server
-    repoMirror: {}
+    # Git repos to create in the on-prem server. These may be
+    # automatically mirrored from external repos, or populated by the
+    # service setup job.
+    repoMirror:
+      helm:
+        name: Edge Helm charts
+        pull: {}
     # Helm charts to deploy to the edge; these default to the charts
     # created automatically but can be overridden to customise
     helmChart:

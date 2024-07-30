@@ -1,0 +1,4 @@
+Dockerfile
+tmp
+charts/*/tmp
+.git

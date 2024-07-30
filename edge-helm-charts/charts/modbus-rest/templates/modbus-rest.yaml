@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: modbus-rest-{{ .Values.uuid }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    factory-plus.app: modbus-rest
+    factory-plus.nodeUuid: {{ .Values.uuid }}
+    factory-plus.name: {{ .Values.name }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      factory-plus.app: modbus-rest
+      factory-plus.nodeUuid: {{ .Values.uuid }}
+  template:
+    metadata:
+      labels:
+        factory-plus.app: modbus-rest
+        factory-plus.nodeUuid: {{ .Values.uuid }}
+        factory-plus.name: {{ .Values.name }}
+    spec:
+
+{{- if .Values.hostname }}
+      nodeSelector:
+        kubernetes.io/hostname: {{ .Values.hostname | quote }}
+      tolerations: {{ .Values.tolerations.specific | toYaml | nindent 8 }}
+{{- else }}
+      tolerations: {{ .Values.tolerations.floating | toYaml | nindent 8 }}
+{{- end }}
+
+      securityContext:
+          runAsNonRoot: true
+          # User Bun in container is 1000
+          runAsUser: 1000
+
+      containers:
+        - name: modbus-rest
+          image: {{ printf "%s/%s:%s" .Values.image.registry .Values.image.repository .Values.image.version | quote }}
+          pullPolicy: {{ .Values.image.pullPolicy }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: modbus-rest-{{ .Values.uuid }}
+spec:
+  selector:
+    factory-plus.app: modbus-rest
+    factory-plus.nodeUuid: {{ .Values.uuid }}
+
+  ports:
+    - name: http
+      port: 80
+      targetPort: 20900
+{{- if .Values.hostname }}
+  # This only routes to the Service from the Node the modbus-rest Pod is
+  # running on. This is not really security but it's better than
+  # nothing. Properly we need a system for authenticating connections to
+  # these southbound adapters.
+  internalTrafficPolicy: Local
+{{- end }}

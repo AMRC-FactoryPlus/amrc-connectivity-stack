@@ -1,0 +1,4 @@
+apiVersion: v2
+name: modbus-rest
+version: "0.0.1"
+description: "ACS Modbus->REST interface"

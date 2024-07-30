@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: krb5-conf
+  namespace: {{ .Release.Namespace }}
+data:
+  krb5.conf: >
+    [libdefaults]
+        default_realm = {{ .Values.krb5.realm }}
+        dns_canonicalize_hostname = false
+        udp_preference_limit = 1
+        spake_preauth_groups = edwards25519
+
+    [domain_realm]
+        {{ .Values.cluster.domain }} = {{ .Values.krb5.realm }}
+
+    [realms]
+        {{ .Values.krb5.realm }} = {
+            kdc = kdc.{{ .Values.cluster.domain }}
+            admin_server = kadmin.{{ .Values.cluster.domain }}
+            disable_encrypted_timestamp = true
+        }

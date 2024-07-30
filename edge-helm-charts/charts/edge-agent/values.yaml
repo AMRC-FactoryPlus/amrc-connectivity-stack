@@ -1,0 +1,26 @@
+image:
+  # Parameters for the Edge Agent image to pull
+  edgeAgent:
+    registry: ghcr.io/amrc-factoryplus
+    repository: acs-edge
+    tag: v3.1.2
+    pullPolicy: IfNotPresent
+debug: false
+verbosity: ALL,!token,!service,!sparkplug
+poll_int: 10
+authGroup:
+  # This must be supplied on deployment. It specifies the Auth group to
+  # place the Edge Agent user account in.
+  #edgeAgent: 00000000-0000-0000-0000-000000000000
+limits:
+  cpu: "100m"
+  memory: "200Mi"
+# This deploys to a specific host
+#hostname: foo
+tolerations:
+  # Tolerations to apply to pods deploys to a specific host
+  specific:
+    - key: factoryplus.app.amrc.co.uk/specialised
+      operator: Exists
+  # Tolerations to apply to floating pods
+  floating: []

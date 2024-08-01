@@ -30,20 +30,23 @@ class ModbusHandler {
         this.log = driver.debug.bound("modbus");
 
         this.client = new ModbusRTU();
-        this.on_close = () => this.reconnect();
     }
 
-    run () {
+    static create (driver, conf) {
+        if (conf.protocol != "tcp")
+            return;
+        return new ModbusHandler(driver, conf).run();
+    }
+    
+    connect () {
         const { driver, client } = this;
         const { host, port } = this.conf;
 
         client.on("close", this.on_close);
 
         client.connectTCP(host, { port })
-            .then(() => driver.setStatus("UP"))
-            .catch(this.on_close);
-
-        return this;
+            .then(() => driver.connUp())
+            .catch(() => driver.connFailed());
     }
 
     close () {
@@ -51,22 +54,6 @@ class ModbusHandler {
         
         client.off("close", this.on_close);
         return new Promise(r => client.close(r));
-    }
-
-    async reconnect () {
-        const { client, driver } = this;
-
-        this.log("Modbus connection closed");
-        setTimeout(() => {
-            this.log("Reconnecting to modbus");
-            client.open(e => {
-                driver.setStatus(e ? "CONN" : "UP");
-                if (e) {
-                    this.log("Failed to connect to modbus: %s", e);
-                    this.reconnect();
-                }
-            });
-        }, RECONNECT);
     }
 
     parseAddr (spec) {
@@ -94,10 +81,4 @@ class ModbusHandler {
         const val = await addr.func.read(client, addr.addr, addr.len);
         return val.buffer;
     }
-}
-
-export function modbusHandler (driver, conf) {
-    if (conf.protocol != "tcp")
-        return;
-    return new ModbusHandler(driver, conf).run();
 }

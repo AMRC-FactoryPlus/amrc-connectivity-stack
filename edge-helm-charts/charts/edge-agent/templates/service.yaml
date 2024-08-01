@@ -1,0 +1,17 @@
+{{- if .Values.externalIPs }}
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: edge-agent-{{ .Values.uuid }}
+spec:
+  selector:
+    factory-plus.app: edge-agent
+    factory-plus.nodeUuid: {{ .Values.uuid }}
+  internalTrafficPolicy: Local
+  externalTrafficPolicy: Local
+  ports:
+    - name: mqtt
+      port: 1883
+  externalIPs: {{ .Values.externalIPs }}
+{{- end }}

@@ -32,7 +32,7 @@ spec:
 {{ end }}
       containers:
         - name: edge-agent
-{{ include "edge-agent.image" .Values.image.edgeAgent | indent 10 }}
+{{ list . "edgeAgent" | include "edge-agent.image" | indent 10 }}
           env:
             - name: DEBUG
               value: {{ .Values.debug | quote }}
@@ -49,6 +49,14 @@ spec:
                 secretKeyRef:
                   name: edge-agent-secrets-{{ .Values.uuid }}
                   key: keytab
+            - name: EDGE_MQTT
+{{- if .Values.externalIPs }}
+              value: "mqtt://0.0.0.0"
+{{- else }}
+              value: "mqtt://localhost"
+{{- end }}
+            - name: EDGE_PASSWORDS
+              value: "/usr/app/driver-passwords"
           resources:
             limits:
               memory: {{ .Values.limits.memory | quote }}
@@ -61,6 +69,24 @@ spec:
               readOnly: true
             - mountPath: /home/node/.config
               name: local-config
+            - mountPath: /usr/app/driver-passwords
+              name: driver-passwords
+{{- range $name, $image := .Values.drivers }}
+        - name: "driver-{{ $name | lower }}"
+{{ list $ $image | include "edge-agent.image" | indent 10 }}
+          env:
+            - name: EDGE_MQTT
+              value: "mqtt://localhost"
+            - name: EDGE_USERNAME
+              value: "{{ $name }}"
+            - name: EDGE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: "driver-passwords-{{ $.Values.uuid }}"
+                  key: "{{ $name }}"
+            - name: VERBOSE
+              value: "{{ $.Values.verbosity }}"
+{{- end }}
       volumes:
         - name: edge-agent-sensitive-information
           secret:
@@ -68,6 +94,10 @@ spec:
             secretName: edge-agent-sensitive-information-{{ .Values.uuid }}
         - name: local-config
           emptyDir:
+        - name: driver-passwords
+          secret:
+            optional: true
+            secretName: driver-passwords-{{ .Values.uuid }}
 ---
 apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: SparkplugNode
@@ -79,3 +109,15 @@ spec:
   edgeAgent: true
   secrets:
     - edge-agent-sensitive-information-{{ .Values.uuid }}
+{{ range $name, $image := .Values.drivers }}
+---
+apiVersion: factoryplus.app.amrc.co.uk/v1
+kind: LocalSecret
+metadata:
+  namespace: {{ $.Release.Namespace }}
+  name: "driver-passwords-{{ $.Values.uuid }}-{{ $name | lower }}"
+spec:
+  format: Password
+  secret: "driver-passwords-{{ $.Values.uuid }}"
+  key: "{{ $name }}"
+{{- end }}

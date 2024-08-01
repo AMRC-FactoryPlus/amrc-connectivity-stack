@@ -39,11 +39,38 @@ Different devices have different characteristics, and require different
 capabilities of the driver. A given driver should use exactly one of
 these classes.
 
+### Driver base class
+
+[Driver](./docs/driver.md)
+
+This is the base class for all the driver classes. Common methods and
+parameters are documented here.
+
 ### Polled driver
 
+[PolledDriver](./docs/polled.md)
+
 This is for drivers which can read single values from the device when
-requested, and don't need to perform any setup beyond initial connection
-to the device. This driver class is not suitable for devices which may
+requested. This driver class is not suitable for devices which may
 produce data asynchronously.
 
-[Documentation is here.](./docs/polled.md)
+### Async driver
+
+[AsyncDriver](./docs/async.md)
+
+This is for drivers which produce data values asynchronously and cannot
+be polled.
+
+## Utility functions
+
+### Logging
+
+[Debug](./docs/debug.md)
+
+This class provides simple configurable logging.
+
+### Buffer conversions
+
+[BufferX](./docs/bufferx.md)
+
+This object provides static functions to construct Buffers.

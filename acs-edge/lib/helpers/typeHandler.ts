@@ -10,7 +10,7 @@ import * as jsonpointer from 'jsonpointer';
 import * as Long from "long";
 import {MessageSecurityMode, SecurityPolicy} from "node-opcua";
 import {Address} from "@amrc-factoryplus/utilities";
-import {log} from "./log.js";
+import {log, logf} from "./log.js";
 
 export enum serialisationType {
     ignored = "Defined by Protocol",

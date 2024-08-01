@@ -16,15 +16,7 @@ from    amrc.factoryplus    import ServiceClient, uuids
 
 from .              import event
 from .context       import Context
-from .util          import Identifiers, log
-
-CRD = (Identifiers.DOMAIN, Identifiers.CRD_VERSION, Identifiers.CRD_PLURAL)
-
-def kopf_crud (id, handler):
-    kopf.on.resume(*CRD, id=id)(handler)
-    kopf.on.create(*CRD, id=id)(handler)
-    kopf.on.update(*CRD, id=id)(handler)
-    kopf.on.delete(*CRD, id=id)(handler)
+from .util          import CRD, Identifiers, log
 
 class KrbKeys:
     def __init__ (self, env, **kw):
@@ -42,16 +34,22 @@ class KrbKeys:
                 uuids.App.SparkplugAddress, cluster)) \
             .map(lambda addr: addr["group_id"])
 
+    def kopf_crud (self, crd, id, ev):
+        kopf.on.resume(*crd, id=id)(self.process_event(ev))
+        kopf.on.create(*crd, id=id)(self.process_event(ev))
+        kopf.on.update(*crd, id=id)(self.process_event(ev))
+        kopf.on.delete(*crd, id=id)(self.process_event(ev))
+
     def register_handlers (self):
         log("Registering handlers")
-        kopf_crud("rekey", self.process_event(event.Rekey))
-        kopf.on.timer(*CRD,
-            id="trim_keys",
+        self.kopf_crud(CRD.krbkey, "rekey", event.Rekey)
+        kopf.on.timer(*CRD.krbkey, id="trim_keys",
             interval=self.expire_old_keys/2,
             labels={Identifiers.HAS_OLD_KEYS: "true"}
         )(self.process_event(event.TrimKeys))
-        kopf_crud("account_uuid", self.process_event(event.AccUuid))
-        kopf_crud("reconcile_account", self.process_event(event.Account))
+        self.kopf_crud(CRD.krbkey, "account_uuid", event.AccUuid)
+        self.kopf_crud(CRD.krbkey, "reconcile_account", event.Account)
+        self.kopf_crud(CRD.local, "local_secret", event.LocalSecret)
 
     def run (self):
         self.register_handlers()

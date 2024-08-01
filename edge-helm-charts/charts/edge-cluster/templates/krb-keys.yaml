@@ -108,10 +108,10 @@ metadata:
   name: krb-keys
 rules:
   -   apiGroups: [factoryplus.app.amrc.co.uk]
-      resources: [kerberos-keys]
+      resources: [kerberos-keys, localsecrets]
       verbs: [list, get, watch, patch]
   -   apiGroups: [factoryplus.app.amrc.co.uk]
-      resources: [kerberos-keys/status]
+      resources: [kerberos-keys/status, localsecrets/status]
       verbs: [list, get, create, update, delete, watch, patch]
   -   apiGroups: [""]
       resources: [secrets]

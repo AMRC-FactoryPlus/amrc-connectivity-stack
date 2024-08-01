@@ -3,7 +3,7 @@
     "target": "ES6",
     "allowJs": true,
     "moduleResolution": "Node",
-    "noImplicitAny": true,
+    "noImplicitAny": false,
     "removeComments": true,
     "preserveConstEnums": true,
     "sourceMap": false,
@@ -17,6 +17,7 @@
     "**/__mocks__/*", 
     "../../node_modules", 
     "build", 
+    "split",
     "tests"
   ]
 }

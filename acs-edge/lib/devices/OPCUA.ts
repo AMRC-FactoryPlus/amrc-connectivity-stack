@@ -172,7 +172,7 @@ export class OPCUAConnection extends DeviceConnection {
         if (!isErr) writeCallback();
     }
 
-    startSubscription(
+    async startSubscription(
         metrics: Metrics,
         payloadFormat: string,
         delimiter: string,
@@ -246,37 +246,6 @@ export class OPCUAConnection extends DeviceConnection {
             }
             await this.#client.disconnect();
             this.emit('close');
-        } catch (e) {
-            console.log(e);
-        }
-    }
-}
-
-
-export class OPCUADevice extends (Device) {
-    devConn: OPCUAConnection
-
-    constructor(spClient: SparkplugNode, devConn: OPCUAConnection, options: deviceOptions) {
-        super(spClient, devConn, options);
-        this.devConn = devConn;
-
-        this._metrics.add(options.metrics);
-
-        try {
-            this.devConn.on('open', () => {
-                this._isConnected = true;
-                log(`${this._name} ready`);
-            })
-
-
-            // this.devConn.on('asyncData', (changedMetrics: changedMetricType) => {
-            //   let updatedMetrics:sparkplugMetric[] = [];
-            //   for (const addr in changedMetrics) {
-            //     this._metrics.setValueByAddrPath(addr, '', changedMetrics[addr]);
-            //     updatedMetrics.push(this._metrics.getByAddrPath(addr, ''));
-            //   }
-            //   this.onConnData(updatedMetrics);
-            // })
         } catch (e) {
             console.log(e);
         }

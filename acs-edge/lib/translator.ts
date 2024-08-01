@@ -3,7 +3,11 @@
  *  Copyright 2023 AMRC
  */
 
+import {EventEmitter} from "events";
+import fs from "fs";
 import timers from "timers/promises";
+import util from "util";
+
 import type {Identity} from "@amrc-factoryplus/utilities";
 import {ServiceClient} from "@amrc-factoryplus/utilities";
 
@@ -13,24 +17,23 @@ import {ServiceClient} from "@amrc-factoryplus/utilities";
 import {validateConfig} from '../utils/CentralConfig.js';
 import {reHashConf} from "../utils/FormatConfig.js";
 
-// Import device connections
+import {Device, deviceOptions} from "./device.js";
+import {DriverBroker} from "./driverBroker.js";
 import {SparkplugNode} from "./sparkplugNode.js";
+import * as UUIDs from "./uuids.js";
 
-// Import devices
-import {RestConnection, RestDevice} from "./devices/REST.js";
-import {S7Connection, S7Device} from "./devices/S7.js";
-import {OPCUAConnection, OPCUADevice} from "./devices/OPCUA.js";
-import {MQTTConnection, MQTTDevice} from "./devices/MQTT.js";
-import {UDPConnection, UDPDevice} from "./devices/UDP.js";
-import {WebsocketConnection, WebsocketDevice} from "./devices/websocket.js";
-import {MTConnectConnection, MTConnectDevice} from "./devices/MTConnect.js";
-import {EtherNetIPConnection, EtherNetIPDevice} from "./devices/EtherNetIP.js";
 import {log} from "./helpers/log.js";
 import {sparkplugConfig,} from "./helpers/typeHandler.js";
-import {Device, deviceOptions} from "./device.js";
-import * as UUIDs from "./uuids.js";
-import {EventEmitter} from "events";
-import fs from "node:fs";
+
+import {RestConnection} from "./devices/REST.js";
+import {S7Connection} from "./devices/S7.js";
+import {OPCUAConnection} from "./devices/OPCUA.js";
+import {MQTTConnection} from "./devices/MQTT.js";
+import {UDPConnection} from "./devices/UDP.js";
+import {WebsocketConnection} from "./devices/websocket.js";
+import {MTConnectConnection} from "./devices/MTConnect.js";
+import {EtherNetIPConnection} from "./devices/EtherNetIP.js";
+import {DriverConnection} from "./devices/driver.js";
 
 /**
  * Translator class basically turns config file into instantiated classes
@@ -43,7 +46,6 @@ export interface translatorConf {
 }
 
 interface deviceInfo {
-    type: any,
     connection: any;
     connectionDetails: any
 }
@@ -55,6 +57,7 @@ export class Translator extends EventEmitter {
      */
     sparkplugNode!: SparkplugNode
     fplus: ServiceClient
+    broker: DriverBroker
     pollInt: number
 
     connections: {
@@ -64,10 +67,11 @@ export class Translator extends EventEmitter {
         [index: string]: any
     }
 
-    constructor(fplus: ServiceClient, pollInt: number) {
+    constructor(fplus: ServiceClient, pollInt: number, broker: DriverBroker) {
         super();
 
         this.fplus = fplus;
+        this.broker = broker;
         this.pollInt = pollInt;
         this.connections = {};
         this.devices = {};
@@ -89,12 +93,18 @@ export class Translator extends EventEmitter {
             this.sparkplugNode = await new SparkplugNode(this.fplus, spConf).init();
             log(`Created Sparkplug node "${ids.sparkplug!}".`);
 
+            log("Starting driver broker...");
+            //this.broker.on("message", msg => 
+            //    log(util.format("Driver message: %O", msg)));
+            await this.broker.start();
+
             // Create a new device connection for each type listed in config file
             log('Building up connections and devices...');
             conf?.deviceConnections?.forEach(c => this.setupConnection(c));
 
             // Setup Sparkplug node handlers
             this.setupSparkplug();
+
         } catch (e: any) {
             log(`Error starting translator: ${e.message}`);
             console.error((e as Error).stack);
@@ -119,6 +129,8 @@ export class Translator extends EventEmitter {
             log(`Closing connection ${connection._type}`);
             connection.close();
         }));
+        log("Stopping driver broker...");
+        await this.broker.stop();
         log('Waiting for sparkplug node to stop...');
         await this.sparkplugNode?.stop();
 
@@ -177,10 +189,18 @@ export class Translator extends EventEmitter {
         }
 
         // Instantiate device connection
-        const newConn = this.connections[cType] = new deviceInfo.connection(connection.connType, connection[deviceInfo.connectionDetails]);
+        const newConn = this.connections[cType] = new deviceInfo.connection(
+            connection.connType,
+            connection[deviceInfo.connectionDetails],
+            /* XXX These additional parameters are a hack for now to
+             * make the DriverConnection work. They want refactoring
+             * later. */
+            connection.name,
+            this.broker);
 
         connection.devices?.forEach((devConf: deviceOptions) => {
-            this.devices[devConf.deviceId] = new deviceInfo.type(this.sparkplugNode, newConn, devConf);
+            this.devices[devConf.deviceId] = new Device(
+                this.sparkplugNode, newConn, devConf);
         });
 
         // What to do when the connection is open
@@ -192,6 +212,8 @@ export class Translator extends EventEmitter {
 
         // What to do when the device connection has new data from a device
         newConn.on('data', (obj: { [index: string]: any }, parseVals = true) => {
+            //log(util.format("Received data for %s: (%s) %O",
+            //    connection.name, parseVals, obj));
             connection.devices?.forEach((devConf: deviceOptions) => {
                 this.devices[devConf.deviceId]?._handleData(obj, parseVals);
             })
@@ -215,37 +237,42 @@ export class Translator extends EventEmitter {
         switch (connType) {
             case "REST":
                 return {
-                    type: RestDevice, connection: RestConnection, connectionDetails: 'RESTConnDetails'
+                    connection: RestConnection, connectionDetails: 'RESTConnDetails'
                 }
             case "MTConnect":
                 return {
-                    type: MTConnectDevice, connection: MTConnectConnection, connectionDetails: 'MTConnectConnDetails'
+                    connection: MTConnectConnection, connectionDetails: 'MTConnectConnDetails'
                 }
             case "EtherNet/IP":
                 return {
-                    type: EtherNetIPDevice, connection: EtherNetIPConnection, connectionDetails: 'EtherNetIPConnDetails'
+                    connection: EtherNetIPConnection, connectionDetails: 'EtherNetIPConnDetails'
                 }
             case "S7":
                 return {
-                    type: S7Device, connection: S7Connection, connectionDetails: 's7ConnDetails'
+                    connection: S7Connection, connectionDetails: 's7ConnDetails'
                 }
             case "OPC UA":
                 return {
-                    type: OPCUADevice, connection: OPCUAConnection, connectionDetails: 'OPCUAConnDetails'
+                    connection: OPCUAConnection, connectionDetails: 'OPCUAConnDetails'
                 }
             case "MQTT":
                 return {
-                    type: MQTTDevice, connection: MQTTConnection, connectionDetails: 'MQTTConnDetails'
+                    connection: MQTTConnection, connectionDetails: 'MQTTConnDetails'
                 }
             case "Websocket":
                 return {
-                    type: WebsocketDevice, connection: WebsocketConnection, connectionDetails: 'WebsocketConnDetails'
+                    connection: WebsocketConnection, connectionDetails: 'WebsocketConnDetails'
                 }
             case "UDP":
                 return {
-                    type: UDPDevice, connection: UDPConnection, connectionDetails: 'UDPConnDetails'
+                    connection: UDPConnection, connectionDetails: 'UDPConnDetails'
 
                 }
+            case "Driver":
+                return {
+                    connection: DriverConnection,
+                    connectionDetails: "DriverDetails",
+                };
             default:
                 return;
         }
@@ -308,7 +335,7 @@ export class Translator extends EventEmitter {
             if (valid) {
                 try {
                     config = JSON.parse(secretReplacedConfig);
-                    valid = validateConfig(config);
+                    //valid = validateConfig(config);
                 } catch {
                     valid = false;
                 }

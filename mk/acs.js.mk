@@ -11,7 +11,7 @@ ifdef acs_npm
 build_args+=	--build-arg acs_npm="${acs_npm}"
 endif
 
-.PHONY: lint
+.PHONY: lint update
 
 build: lint
 
@@ -24,6 +24,14 @@ lint: js.eslint
 js.eslint:
 	npx eslint ${eslint}
 endif
+
+update:	js.update
+	@:
+
+js.update: git.check-committed
+	npm update
+	git add .
+	git commit -m "npm update $$(git rev-parse --show-prefix)"
 
 include ${mk}/acs.docker.mk
 

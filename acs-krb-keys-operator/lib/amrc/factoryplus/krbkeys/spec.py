@@ -4,13 +4,15 @@
 
 from    enum            import Enum
 import  logging
+from    optional        import Optional
+import  secrets
 import  typing
 from    uuid            import UUID
 
 from    .           import keyops
 from    .context    import kk_ctx
-from    .secrets    import SecretRef
-from    .util       import Identifiers, dslice, fields, hidden, log
+from    .secrets    import SecretRef, LocalSecret
+from    .util       import Identifiers, dslice, fields, hidden, immutable, log
 
 @fields
 class InternalSpec:
@@ -110,3 +112,25 @@ class InternalSpec:
             self.secret.write(status.secret)
 
         return status
+
+@immutable
+class LocalSpec:
+    secret:     LocalSecret
+    format:     str
+
+    @classmethod
+    def of (cls, ns, arg):
+        return Optional.of(arg) \
+            .map(lambda ob: ob.get("spec")) \
+            .map(lambda spec: cls(
+                secret=LocalSecret(ns=ns, 
+                    name=spec["secret"],
+                    key=spec["key"]),
+                format=spec.get("format", "Password")))
+
+    def update (self):
+        passwd = secrets.token_urlsafe().encode()
+        self.secret.write(passwd)
+
+    def remove (self):
+        self.secret.remove()

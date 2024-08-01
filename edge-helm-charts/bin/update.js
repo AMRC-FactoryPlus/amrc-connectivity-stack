@@ -53,7 +53,7 @@ await git.addRemote(opts);
 log("Fetching from %s", path);
 const mirror = await git.fetch(opts);
 
-const main = await get_ref("origin/acs");
+const main = await get_ref("origin/main");
 const acs = (await get_ref("origin/acs")) ?? main;
 const update = (!main || main == acs);
 

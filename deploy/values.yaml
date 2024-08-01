@@ -8,7 +8,7 @@ acs:
   letsEncrypt:
     # -- Whether or not to use Let's Encrypt to automatically generate
     # certificates for the services
-    enabled: true
+    enabled: false
     # -- The email address to use for Let's Encrypt
     email: ''
     # -- Whether or not to use the staging environment for Let's Encrypt

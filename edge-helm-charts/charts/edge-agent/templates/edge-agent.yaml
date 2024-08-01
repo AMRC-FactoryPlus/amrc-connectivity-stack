@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: edge-agent-{{ .Values.uuid }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    factory-plus.app: edge-agent
+    factory-plus.service: edge-agent-{{ .Values.uuid }}
+    factory-plus.nodeUuid: {{ .Values.uuid }}
+    factory-plus.name: {{ .Values.name }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      factory-plus.app: edge-agent
+      factory-plus.nodeUuid: {{ .Values.uuid }}
+  template:
+    metadata:
+      labels:
+        factory-plus.app: edge-agent
+        factory-plus.nodeUuid: {{ .Values.uuid }}
+        factory-plus.name: {{ .Values.name }}
+    spec:
+{{ if .Values.hostname }}
+      nodeSelector:
+        kubernetes.io/hostname: {{ .Values.hostname | quote }}
+      tolerations: {{ .Values.tolerations.specific | toYaml | nindent 8 }}
+{{ else }}
+      tolerations: {{ .Values.tolerations.floating | toYaml | nindent 8 }}
+{{ end }}
+      containers:
+        - name: edge-agent
+{{ include "edge-agent.image" .Values.image.edgeAgent | indent 10 }}
+          env:
+            - name: DEBUG
+              value: {{ .Values.debug | quote }}
+            - name: VERBOSE
+              value: {{ .Values.verbosity | quote }}
+            - name: POLL_INT
+              value: {{ .Values.poll_interval | quote }}
+            - name: DIRECTORY_URL
+              value: "{{ .Values.directory_url }}"
+            - name: SERVICE_USERNAME
+              value: "nd1/{{ .Values.cluster }}/{{ .Values.name }}"
+            - name: SERVICE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: edge-agent-secrets-{{ .Values.uuid }}
+                  key: keytab
+          resources:
+            limits:
+              memory: {{ .Values.limits.memory | quote }}
+            requests:
+              cpu: {{ .Values.limits.cpu | quote }}
+              memory: {{ .Values.limits.memory | quote }}
+          volumeMounts:
+            - name: edge-agent-sensitive-information
+              mountPath: "/etc/secrets"
+              readOnly: true
+            - mountPath: /home/node/.config
+              name: local-config
+      volumes:
+        - name: edge-agent-sensitive-information
+          secret:
+            optional: true
+            secretName: edge-agent-sensitive-information-{{ .Values.uuid }}
+        - name: local-config
+          emptyDir:
+---
+apiVersion: factoryplus.app.amrc.co.uk/v1
+kind: SparkplugNode
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: edge-agent-{{ .Values.uuid }}
+spec:
+  uuid: {{ .Values.uuid }}
+  edgeAgent: true
+  secrets:
+    - edge-agent-sensitive-information-{{ .Values.uuid }}

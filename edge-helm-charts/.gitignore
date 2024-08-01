@@ -1,0 +1,12 @@
+*.swp
+tmp
+node_modules
+package-lock.json
+/.idea/.gitignore
+/.idea/edge-helm-charts.iml
+/.idea/misc.xml
+/.idea/modules.xml
+/.idea/php.xml
+/.idea/vcs.xml
+/.idea/git_toolbox_prj.xml
+/.idea/git_toolbox_blame.xml

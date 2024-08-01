@@ -1,3 +1,4 @@
+{{- if .Values.externalIPs }}
 apiVersion: v1
 kind: Service
 metadata:
@@ -8,9 +9,9 @@ spec:
     factory-plus.app: edge-agent
     factory-plus.nodeUuid: {{ .Values.uuid }}
   internalTrafficPolicy: Local
+  externalTrafficPolicy: Local
   ports:
     - name: mqtt
       port: 1883
-{{- if .Values.externalIPs }}
   externalIPs: {{ .Values.externalIPs }}
 {{- end }}

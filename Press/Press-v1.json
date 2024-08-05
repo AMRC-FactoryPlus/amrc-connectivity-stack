@@ -1,0 +1,265 @@
+{
+  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Press/Press-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "c8318a2e-ceb8-46cb-89d8-3483ce1840a4"
+    },
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "Tools": {
+      "patternProperties": {
+        "^[a-zA-Z0-9_]*$": {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Press/Tool-v1.json"
+        }
+      },
+      "type": "object"
+    },
+    "Steps": {
+      "patternProperties": {
+        "^[a-zA-Z0-9_]*$": {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Press/Step-v1.json"
+        }
+      },
+      "type": "object"
+    },
+    "Cylinder_Groups": {
+      "patternProperties": {
+        "^[a-zA-Z0-9_]*$": {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Press/Cylinder_Group-v1.json"
+        }
+      },
+      "type": "object"
+    },
+    "Machines": {
+      "patternProperties": {
+        "^[a-zA-Z0-9_]*$": {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Press/Machine-v1.json"
+        }
+      },
+      "type": "object"
+    },
+    "Force": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Documentation": {
+              "default": ""
+            },
+            "Sparkplug_Type": {
+              "enum": [
+                "DoubleBE",
+                "DoubleLE",
+                "FloatBE",
+                "FloatLE"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "Cylinder_Position": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Documentation": {
+              "default": ""
+            },
+            "Sparkplug_Type": {
+              "enum": [
+                "String"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "Tool_Gap": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Documentation": {
+              "default": ""
+            },
+            "Sparkplug_Type": {
+              "enum": [
+                "DoubleBE",
+                "DoubleLE",
+                "FloatBE",
+                "FloatLE"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "Sequence_Step": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Documentation": {
+              "default": ""
+            },
+            "Sparkplug_Type": {
+              "enum": [
+                "UInt8",
+                "UInt16LE",
+                "UInt16BE",
+                "UInt32LE",
+                "UInt32BE",
+                "UInt64LE",
+                "UInt64BE"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "Sequence_Timer": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Documentation": {
+              "default": ""
+            },
+            "Sparkplug_Type": {
+              "enum": [
+                "DoubleBE",
+                "DoubleLE",
+                "FloatBE",
+                "FloatLE"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "Step_Timer": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Documentation": {
+              "default": ""
+            },
+            "Sparkplug_Type": {
+              "enum": [
+                "DoubleBE",
+                "DoubleLE",
+                "FloatBE",
+                "FloatLE"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "Healthy": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Documentation": {
+              "default": ""
+            },
+            "Sparkplug_Type": {
+              "enum": [
+                "Boolean"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "In_Auto_Sequence": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Documentation": {
+              "default": ""
+            },
+            "Sparkplug_Type": {
+              "enum": [
+                "Boolean"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "Ejectors": {
+      "type": "object",
+      "properties": {
+        "Lifted": {
+          "allOf": [
+            {
+              "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+            },
+            {
+              "properties": {
+                "Documentation": {
+                  "default": ""
+                },
+                "Sparkplug_Type": {
+                  "enum": [
+                    "Boolean"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "Lowered": {
+          "allOf": [
+            {
+              "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+            },
+            {
+              "properties": {
+                "Documentation": {
+                  "default": ""
+                },
+                "Sparkplug_Type": {
+                  "enum": [
+                    "Boolean"
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      },
+      "required": []
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID"
+  ]
+}

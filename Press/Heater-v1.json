@@ -1,0 +1,126 @@
+{
+  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Press/Heater-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "2a10e3d2-44ee-4910-a42e-4d6154cf39ee"
+    },
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "Temperature": {
+      "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Sensors/Temperature-v1.json"
+    },
+    "Flow_Output": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Documentation": {
+              "default": ""
+            },
+            "Sparkplug_Type": {
+              "enum": [
+                "FloatLE",
+                "FloatBE",
+                "DoubleLE",
+                "DoubleBE"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "State": {
+      "type": "object",
+      "properties": {
+        "Off": {
+          "allOf": [
+            {
+              "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+            },
+            {
+              "properties": {
+                "Documentation": {
+                  "default": ""
+                },
+                "Sparkplug_Type": {
+                  "enum": [
+                    "Boolean"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "Standby": {
+          "allOf": [
+            {
+              "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+            },
+            {
+              "properties": {
+                "Documentation": {
+                  "default": ""
+                },
+                "Sparkplug_Type": {
+                  "enum": [
+                    "Boolean"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "Heating": {
+          "allOf": [
+            {
+              "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+            },
+            {
+              "properties": {
+                "Documentation": {
+                  "default": ""
+                },
+                "Sparkplug_Type": {
+                  "enum": [
+                    "Boolean"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "Switching_Off": {
+          "allOf": [
+            {
+              "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+            },
+            {
+              "properties": {
+                "Documentation": {
+                  "default": ""
+                },
+                "Sparkplug_Type": {
+                  "enum": [
+                    "Boolean"
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      },
+      "required": []
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID"
+  ]
+}

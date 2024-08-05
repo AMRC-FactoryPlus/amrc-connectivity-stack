@@ -1,0 +1,130 @@
+{
+  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Press/Machine-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "cb889395-ff9c-4b2a-a3c0-e3ca720ae89d"
+    },
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "Part_Shot_Running": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Documentation": {
+              "default": ""
+            },
+            "Sparkplug_Type": {
+              "enum": [
+                "Boolean"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "Part_Shot_Finished": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Documentation": {
+              "default": ""
+            },
+            "Sparkplug_Type": {
+              "enum": [
+                "Boolean"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "Injection_Heads": {
+      "patternProperties": {
+        "^[a-zA-Z0-9_]*$": {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Press/Machine/Injection_Head-v1.json"
+        }
+      },
+      "type": "object"
+    },
+    "Injection_Cycle_Running": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Documentation": {
+              "default": ""
+            },
+            "Sparkplug_Type": {
+              "enum": [
+                "Boolean"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "Resin": {
+      "type": "object",
+      "properties": {
+        "Flow": {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Sensors/Flow-v1.json"
+        },
+        "Temperature": {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Sensors/Temperature-v1.json"
+        },
+        "Total_Volume_Delivered": {
+          "allOf": [
+            {
+              "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+            },
+            {
+              "properties": {
+                "Documentation": {
+                  "default": ""
+                },
+                "Sparkplug_Type": {
+                  "enum": [
+                    "FloatBE",
+                    "FloatLE",
+                    "DoubleLE",
+                    "DoubleBE"
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      },
+      "required": []
+    },
+    "Hardener": {
+      "type": "object",
+      "properties": {
+        "Flow": {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Sensors/Flow-v1.json"
+        },
+        "Temperature": {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Sensors/Temperature-v1.json"
+        }
+      },
+      "required": []
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID"
+  ]
+}

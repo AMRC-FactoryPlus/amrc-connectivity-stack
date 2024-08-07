@@ -79,8 +79,11 @@ export class UnsTopic {
         return this.TopicArray.slice(this.EdgeIndex, -1).join("/");
     }
 
+    /**
+     *
+     */
     private GetMetricName() {
-        return this.TopicArray[-1];
+        return this.TopicArray[this.TopicArray.length - 1];
     }
 
 

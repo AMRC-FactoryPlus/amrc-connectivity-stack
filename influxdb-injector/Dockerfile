@@ -29,7 +29,7 @@ RUN <<'SHELL'
     fi
     npm install --save=false
 
-    echo "export const GIT_VERSION=\"$revision\";" > ./lib/git-version.js
+    echo "export const GIT_VERSION=\"$revision\";" > ./src/git-version.js
 
     npm run clean
     echo tsc -v
@@ -64,4 +64,4 @@ WORKDIR /usr/app
 # running application. This is a Good Thing.
 COPY --from=util-build /usr/app ./
 USER node
-CMD [ "node", "--es-module-specifier-resolution=node", "bin/ingester.js" ]
+CMD [ "node", "--es-module-specifier-resolution=node", "bin/app.js" ]

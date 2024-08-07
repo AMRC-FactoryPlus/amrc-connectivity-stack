@@ -2,8 +2,14 @@
   "compileOnSave": false,
   "compilerOptions": {
     "target": "es2017",
-    "lib": ["es2017", "esnext.asynciterable", "dom"],
-    "typeRoots": ["node_modules/@types"],
+    "lib": [
+      "es2017",
+      "esnext.asynciterable",
+      "dom"
+    ],
+    "typeRoots": [
+      "node_modules/@types"
+    ],
     "allowSyntheticDefaultImports": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
@@ -13,20 +19,19 @@
     "pretty": true,
     "sourceMap": true,
     "declaration": true,
-    "outDir": "dist",
+    "outDir": "./dist",
     "allowJs": true,
     "noEmit": false,
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "importHelpers": true,
     "skipLibCheck": true,
-    "baseUrl": "src",
-    "paths": {
-      "@/*": ["*"],
-      "@bin/*": ["../bin/*"],
-      "@lib/*": ["../lib/*"]
-    }
+    "rootDir": "./src"
   },
-  "include": ["bin/**/*.ts", "lib/**/*.json", ".env"],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules"
+  ],
+  "include": [
+    "src/**/*"
+  ]
 }

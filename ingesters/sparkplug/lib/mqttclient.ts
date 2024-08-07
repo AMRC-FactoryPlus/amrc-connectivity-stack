@@ -20,6 +20,8 @@ interface UnsMetricCustomProperties {
     Instance_UUID: string,
     Schema_UUID: string,
     Transient: boolean,
+    Unit: string,
+    Type: string
 }
 
 interface MetricContainer {
@@ -406,10 +408,12 @@ export default class MQTTClient {
             }
 
             // Build custom properties object
-            let customProperties: UnsMetricCustomProperties = {
+            const customProperties: UnsMetricCustomProperties = {
+                Type: birth.type,
+                Unit: birth.unit,
                 Instance_UUID: birth.instance.top,
                 Schema_UUID: birth.schema.top,
-                Transient: birth.transient,
+                Transient: birth.transient
             }
 
             // Here we can access the ISA95 hierarchy information from the birth.isa95 object. This object contains the following keys:

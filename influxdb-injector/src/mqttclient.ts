@@ -3,11 +3,11 @@
  * Copyright "2024" AMRC
  */
 
-import {logger} from "./logger.js";
+import {logger} from "./Utils/logger.js";
 import {InfluxDB, Point} from '@influxdata/influxdb-client'
 import {Agent} from 'http'
 import mqtt from "mqtt";
-import {UnsTopic} from "./UnsTopic.js";
+import {UnsTopic} from "./Utils/UnsTopic.js";
 
 let dotenv: any = null;
 try {
@@ -66,21 +66,25 @@ let interval: any;
 
 /* points/lines are batched in order to minimize networking and increase performance */
 
-const writeApi = influxDB.getWriteApi(influxOrganisation, process.env.INFLUX_BUCKET || 'default', 'ns', {
-    /* the maximum points/lines to send in a single batch to InfluxDB server */
-    batchSize: batchSize + 1, // don't let automatically flush data
-    /* maximum time in millis to keep points in an unflushed batch, 0 means don't periodically flush */
-    flushInterval: 0, // Never allow the package to flush: we'll flush manually
-    /* maximum size of the retry buffer - it contains items that could not be sent for the first time */
-    maxBufferLines: 30_000, /* the count of internally-scheduled retries upon write failure, the delays between write attempts follow an exponential backoff strategy if there is no Retry-After HTTP header */
-    maxRetries: 0, // do not retry writes
-    // ... there are more write options that can be customized, see
-    // https://influxdata.github.io/influxdb-client-js/influxdb-client.writeoptions.html and
-    // https://influxdata.github.io/influxdb-client-js/influxdb-client.writeretryoptions.html
-});
+const writeApi = influxDB.getWriteApi(influxOrganisation,
+    process.env.INFLUX_BUCKET || 'default',
+    'ns',
+    {
+        /* the maximum points/lines to send in a single batch to InfluxDB server */
+        batchSize: batchSize + 1, // don't let automatically flush data
+        /* maximum time in millis to keep points in an unflushed batch, 0 means don't periodically flush */
+        flushInterval: 0, // Never allow the package to flush: we'll flush manually
+        /* maximum size of the retry buffer - it contains items that could not be sent for the first time */
+        maxBufferLines: 30_000, /* the count of internally-scheduled retries upon write failure, the delays between write attempts follow an exponential backoff strategy if there is no Retry-After HTTP header */
+        maxRetries: 0, // do not retry writes
+        // ... there are more write options that can be customized, see
+        // https://influxdata.github.io/influxdb-client-js/influxdb-client.writeoptions.html and
+        // https://influxdata.github.io/influxdb-client-js/influxdb-client.writeretryoptions.html
+    }
+);
 
 export default class MQTTClient {
-    private mqtt: any;
+    private mqtt: mqtt.MqttClient;
 
     async init() {
 
@@ -103,8 +107,10 @@ export default class MQTTClient {
     }
 
     async run() {
-        this.mqtt = mqtt.connect(mqttURL);
-        this.mqtt.on("authenticated", this.on_connect.bind(this));
+        this.mqtt = mqtt.connect(mqttURL, {
+            protocolVersion: 5
+        });
+        this.mqtt.on("connect", this.on_connect.bind(this));
         this.mqtt.on("error", this.on_error.bind(this));
         this.mqtt.on("message", this.on_message.bind(this));
         this.mqtt.on("close", this.on_close.bind(this));
@@ -115,7 +121,7 @@ export default class MQTTClient {
     on_connect() {
         logger.info("🔌 Connected to Factory+ broker");
         logger.info("👂 Subscribing to entire UNS namespace");
-        this.mqtt.subscribe('UNS/v1//#');
+        this.mqtt.subscribe("UNS/v1/#");
         this.resetInterval();
     }
 
@@ -143,16 +149,25 @@ export default class MQTTClient {
         this.flushBuffer('MQTT_ERROR');
     }
 
-    async on_message(topicString: string, message: string) {
-        let payload = JSON.parse(message);
+    async on_message(topicString: string, payload: Buffer, packet: mqtt.IPublishPacket) {
+        const messageString = payload.toString();
+        if (!packet.properties.userProperties) {
+            logger.error(`⁉ Can't find custom properties for topic ${topicString}! Not writing to Influx.`);
+            return
+        }
 
+        const customProperties =
+            packet.properties.userProperties as unknown as UnsMetricCustomProperties;
+
+        const metricPayload: MetricPayload = JSON.parse(messageString);
+        logger.info(`🎉 Received ${messageString} from topic ${topicString}`);
         if (!topicString) {
             logger.error(`🚨 Bad topic: ${topicString}`);
             return;
         }
 
         // write metrics to influx
-        this.writeMetrics(payload, topicString);
+        this.writeMetrics(metricPayload, topicString, customProperties);
         return;
     }
 
@@ -160,10 +175,25 @@ export default class MQTTClient {
      *
      * @param payload
      * @param topic
+     * @param customProperties
      */
-    private writeMetrics(payload, topic: string) {
+    private writeMetrics(payload: MetricPayload, topic: string, customProperties: UnsMetricCustomProperties) {
         const unsTopic = new UnsTopic(topic);
-        payload.metrics.forEach((metric) => {
+        let metricTimestamp: Date
+        if (payload.timestamp) {
+            metricTimestamp = new Date(payload.timestamp);
+        } else if (payload.timestamp) {
+            // Metrics might not have a timestamp so use the packet timestamp if we have it.
+            metricTimestamp = new Date(payload.timestamp);
+        } else {
+            // No timestamp can be found on the metric or the payload, just use the current time instead.
+            metricTimestamp = new Date();
+        }
+
+        this.writeToInfluxDB(unsTopic, payload.value, metricTimestamp, customProperties.Unit, customProperties.Type);
+
+        // Handle the batched metrics
+        payload.batch?.forEach((metric) => {
             let metricTimestamp: Date
             if (metric.timestamp) {
                 metricTimestamp = new Date(metric.timestamp);
@@ -174,11 +204,8 @@ export default class MQTTClient {
                 // No timestamp can be found on the metric or the payload, just use the current time instead.
                 metricTimestamp = new Date();
             }
-
-            const unit = "test";
-            const type = "test";
             // Send each metric to InfluxDB
-            this.writeToInfluxDB(unsTopic, metric.value, metricTimestamp, unit, type)
+            this.writeToInfluxDB(unsTopic, metric.value, metricTimestamp, customProperties.Unit, customProperties.Type);
         });
     }
 
@@ -187,12 +214,13 @@ export default class MQTTClient {
      * @param topic Topic the metric was published on.
      * @param value Metric value to write to InfluxDB.
      * @param timestamp Timestamp from the metric to write to influx.
+     * @param unit
+     * @param type
      */
-    writeToInfluxDB(topic: UnsTopic, value, timestamp: Date, unit: string, type: string) {
+    writeToInfluxDB(topic: UnsTopic, value: string, timestamp: Date, unit: string, type: string) {
         if (value === null) {
             return;
         }
-        let path: string = "";
         let topLevelInstance: string = "";
         let bottomLevelInstance: string = "";
         let instanceFull: string[] = [];

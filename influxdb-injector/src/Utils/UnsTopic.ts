@@ -1,13 +1,5 @@
 import {logger} from "./logger.js";
 
-interface ISA95Schema {
-    Enterprise?: string,
-    Site?: string,
-    Area?: string,
-    WorkCenter?: string,
-    WorkUnit?: string
-}
-
 export class UnsTopic {
     private readonly TopicString: string;
     private readonly TopicArray: string[];

@@ -517,7 +517,9 @@ export default class MQTTClient {
                     userProperties: {
                         Instance_UUID: metricContainers[0]?.customProperties.Instance_UUID,
                         Schema_UUID: metricContainers[0].customProperties.Schema_UUID,
-                        Transient: metricContainers[0].customProperties.Transient ?? false
+                        Transient: metricContainers[0].customProperties.Transient ?? false,
+                        Unit: metricContainers[0].customProperties.Unit ?? '',
+                        Type: metricContainers[0].customProperties.Type ?? 'undefined'
                     }
                 }
             });

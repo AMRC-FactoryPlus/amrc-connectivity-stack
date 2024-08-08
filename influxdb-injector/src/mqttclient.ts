@@ -8,6 +8,7 @@ import {InfluxDB, Point} from '@influxdata/influxdb-client'
 import {Agent} from 'http'
 import mqtt from "mqtt";
 import {UnsTopic} from "./Utils/UnsTopic.js";
+import * as path from "node:path";
 
 let dotenv: any = null;
 try {
@@ -178,7 +179,7 @@ export default class MQTTClient {
      * @param customProperties
      */
     private writeMetrics(payload: MetricPayload, topic: string, customProperties: UnsMetricCustomProperties) {
-        const unsTopic = new UnsTopic(topic);
+        const unsTopic = new UnsTopic(topic, customProperties);
         let metricTimestamp: Date
         if (payload.timestamp) {
             metricTimestamp = new Date(payload.timestamp);
@@ -221,23 +222,20 @@ export default class MQTTClient {
         if (value === null) {
             return;
         }
-        let topLevelInstance: string = "";
-        let bottomLevelInstance: string = "";
-        let instanceFull: string[] = [];
 
         writeApi.useDefaultTags({
-            topLevelInstance,
-            bottomLevelInstance,
-            usesInstances: topLevelInstance + ':' + instanceFull.join(':'),
-            topLevelSchema: topic.TopLevelSchema,
-            bottomLevelSchema: topic.BottomLevelSchema,
-            usesSchemas: topic.TopLevelSchema + ':' + topic.SchemaPath.split("/").join(':'),
-            enterprise: topic.ISA95Schema.Enterprise,
-            site: topic.ISA95Schema.Site,
-            area: topic.ISA95Schema.Area,
-            workCenter: topic.ISA95Schema.WorkCenter,
-            workUnit: topic.ISA95Schema.WorkUnit,
-            path: topic.SchemaPath,
+            topLevelInstance: topic.GetTopLevelInstance(),
+            bottomLevelInstance: topic.GetBottomLevelInstance(),
+            usesInstances: `${topic.GetTopLevelInstance()}:${topic.GetInstanceFull()}`,
+            topLevelSchema: topic.GetTopLevelSchema(),
+            bottomLevelSchema: topic.GetBottomLevelSchema(),
+            usesSchemas: `${topic.GetTopLevelSchema()}:${topic.GetSchemaFull()}`,
+            enterprise: topic.GetISA95Schema().Enterprise ?? "",
+            site: topic.GetISA95Schema().Site ?? "",
+            area: topic.GetISA95Schema().Area ?? "",
+            workCenter: topic.GetISA95Schema().WorkCenter ?? "",
+            workUnit: topic.GetISA95Schema().WorkUnit ?? "",
+            path: topic.GetMetricPath(),
             unit: unit
         });
 
@@ -251,11 +249,11 @@ export default class MQTTClient {
                 // Validate
                 numVal = Number(value);
                 if (!Number.isInteger(numVal)) {
-                    logger.warn(`${topic.SchemaPath} should be a ${type} but received ${numVal}. Not recording.`);
+                    logger.warn(`${topic.GetMetricPath()} should be a ${type} but received ${numVal}. Not recording.`);
                     return;
                 }
                 writeApi.writePoint(
-                    new Point(`${topic.MetricName}:i`)
+                    new Point(`${topic.GetMetricName()}:i`)
                         .intField('value', numVal)
                         .timestamp(timestamp)
                 );
@@ -267,11 +265,11 @@ export default class MQTTClient {
                 // Validate
                 numVal = Number(value);
                 if (!Number.isInteger(numVal)) {
-                    logger.warn(`${topic.Path} should be a ${type} but received ${numVal}. Not recording.`);
+                    logger.warn(`${topic.GetMetricPath()} should be a ${type} but received ${numVal}. Not recording.`);
                     return;
                 }
                 writeApi.writePoint(
-                    new Point(`${topic.MetricName}:u`)
+                    new Point(`${topic.GetMetricName()}:u`)
                         .uintField('value', numVal)
                         .timestamp(timestamp)
                 );
@@ -281,28 +279,28 @@ export default class MQTTClient {
                 // Validate
                 numVal = Number(value);
                 if (isNaN(parseFloat(numVal))) {
-                    logger.warn(`${topic.Path} should be a ${type} but received ${numVal}. Not recording.`);
+                    logger.warn(`${topic.GetMetricPath()} should be a ${type} but received ${numVal}. Not recording.`);
                     return;
                 }
                 writeApi.writePoint(
-                    new Point(`${topic.MetricName}:d`)
+                    new Point(`${topic.GetMetricName()}:d`)
                         .floatField('value', numVal)
                         .timestamp(timestamp)
                 );
                 break;
             case "Boolean":
                 if (typeof value != "boolean") {
-                    logger.warn(`${topic.Path} should be a ${type} but received ${value}. Not recording.`);
+                    logger.warn(`${topic.GetMetricPath()} should be a ${type} but received ${value}. Not recording.`);
                     return;
                 }
                 writeApi.writePoint(
-                    new Point(`${topic.MetricName}:b`)
+                    new Point(`${topic.GetMetricName()}:b`)
                         .booleanField('value', value)
                         .timestamp(timestamp));
                 break;
             default:
                 writeApi.writePoint(
-                    new Point(`${topic.MetricName}:s`)
+                    new Point(`${topic.GetMetricName()}:s`)
                         .stringField('value', value)
                         .timestamp(timestamp));
                 break;
@@ -311,7 +309,7 @@ export default class MQTTClient {
 
         i++;
 
-        logger.debug(`Added to write buffer (${i}/${batchSize}): [${type}] ${topic.Path} = ${value}`);
+        logger.debug(`Added to write buffer (${i}/${batchSize}): [${type}] ${topic.GetMetricPath()} = ${value}`);
 
         if (i >= batchSize) {
             this.flushBuffer(`${batchSize} point BATCH`);

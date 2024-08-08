@@ -11,11 +11,13 @@ interface MetricPayload {
  * MQTTV5 custom properties
  */
 interface UnsMetricCustomProperties {
-    Instance_UUID: string,
-    Schema_UUID: string,
+    InstanceUUID: string,
+    SchemaUUID: string,
     Transient: boolean,
     Unit: string,
-    Type: string
+    Type: string,
+    InstanceUUIDPath: string,
+    SchemaUUIDPath: string
 }
 
 /**

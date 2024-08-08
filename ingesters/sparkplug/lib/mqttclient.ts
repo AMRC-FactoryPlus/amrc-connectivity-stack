@@ -17,11 +17,13 @@ interface UnsMetric {
 }
 
 interface UnsMetricCustomProperties {
-    Instance_UUID: string,
-    Schema_UUID: string,
+    InstanceUUID: string,
+    SchemaUUID: string,
     Transient: boolean,
     Unit: string,
-    Type: string
+    Type: string,
+    InstanceUUIDPath: string,
+    SchemaUUIDPath: string
 }
 
 interface MetricContainer {
@@ -406,13 +408,14 @@ export default class MQTTClient {
             if (metricName === "Instance_UUID" || metricName === "Schema_UUID") {
                 return;
             }
-
             // Build custom properties object
             const customProperties: UnsMetricCustomProperties = {
+                InstanceUUIDPath: birth.instance.top + ':' + birth.instance.full.join(':'),
+                SchemaUUIDPath: birth.schema.top + ':' + birth.schema.full.join(':'),
                 Type: birth.type,
                 Unit: birth.unit,
-                Instance_UUID: birth.instance.top,
-                Schema_UUID: birth.schema.top,
+                InstanceUUID: birth.instance.top,
+                SchemaUUID: birth.schema.top,
                 Transient: birth.transient
             }
 
@@ -501,12 +504,12 @@ export default class MQTTClient {
                 };
             }
 
-            if (!metricContainers[0]?.customProperties.Instance_UUID) {
+            if (!metricContainers[0]?.customProperties.InstanceUUID) {
                 logger.warn(`${topic} is not broadcasting an Instance_UUID. Not publishing to UNS.`);
                 return;
             }
 
-            if (!metricContainers[0]?.customProperties.Schema_UUID) {
+            if (!metricContainers[0]?.customProperties.SchemaUUID) {
                 logger.warn(`${topic} is not broadcasting a Schema_UUID. Not publishing to UNS.`);
                 return;
             }
@@ -515,11 +518,13 @@ export default class MQTTClient {
                 properties: {
                     //     Assume that all metrics have the same custom properties
                     userProperties: {
-                        Instance_UUID: metricContainers[0]?.customProperties.Instance_UUID,
-                        Schema_UUID: metricContainers[0].customProperties.Schema_UUID,
+                        InstanceUUID: metricContainers[0]?.customProperties.InstanceUUID,
+                        SchemaUUID: metricContainers[0].customProperties.SchemaUUID,
                         Transient: metricContainers[0].customProperties.Transient ?? false,
                         Unit: metricContainers[0].customProperties.Unit ?? '',
-                        Type: metricContainers[0].customProperties.Type ?? 'undefined'
+                        Type: metricContainers[0].customProperties.Type ?? 'undefined',
+                        InstanceUUIDPath: metricContainers[0].customProperties.InstanceUUIDPath ?? "",
+                        SchemaUUIDPath: metricContainers[0].customProperties.SchemaUUIDPath ?? "",
                     }
                 }
             });

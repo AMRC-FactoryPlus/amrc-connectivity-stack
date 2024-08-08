@@ -1,7 +1,11 @@
 import {logger} from "./logger.js";
 
 /**
- * Creates a new topic to extract data from the topic path and custom properties.
+ * The UnsTopic class is designed to parse UNS MQTT topics and extract relevant information from
+ * them. UNS topics follow a structured NAMESAPCE_VERSION/ISA95_STRUCTURE/METRIC_PATH.
+ * This class provides methods to dissect these topics and retrieve specific data, such as
+ * device location, metric path and schema and instance UUID paths, based on the predefined structure of
+ * the topic string and MQTTv5 custom properties.
  */
 export class UnsTopic {
     private readonly TopicString: string;

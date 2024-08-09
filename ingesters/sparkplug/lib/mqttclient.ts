@@ -8,8 +8,6 @@ import {Reader} from "protobufjs";
 import {logger} from "../bin/ingester.js";
 import Long from "long";
 
-import * as mqttjs from "mqtt";
-
 interface UnsMetric {
     value: string,
     timestamp: Date,
@@ -39,11 +37,6 @@ try {
 
 dotenv?.config()
 
-const unsMqttUrl: string = process.env.UNS_MQTT_URL;
-if (!unsMqttUrl) {
-    throw new Error("UNS_MQTT_URL environment variable is not set");
-}
-
 interface MQTTClientConstructorParams {
     e: {
         serviceClient: ServiceClient;
@@ -54,7 +47,6 @@ export default class MQTTClient {
     private serviceClient: ServiceClient;
     private aliasResolver = {};
     private birthDebounce = {};
-    private unsBroker: any;
     private sparkplugBroker: any;
 
     constructor({e}: MQTTClientConstructorParams) {
@@ -62,40 +54,30 @@ export default class MQTTClient {
     }
 
     async run() {
-        this.unsBroker = mqttjs.connect(unsMqttUrl, {
-            protocolVersion: 5,
-        });
-        this.unsBroker.on("connect", () => {
-            logger.info("✔  Connected to local mqtt broker!");
-        });
 
-        this.unsBroker.on("error", (error) => {
-            logger.error(`🔥 Error from broker: ${error}`);
-        })
-        const sparkplugBroker = await this.serviceClient.mqtt_client();
-        this.sparkplugBroker = sparkplugBroker;
+        this.sparkplugBroker = await this.serviceClient.mqtt_client();
 
-        sparkplugBroker.on("connect", this.onConnect.bind(this));
-        sparkplugBroker.on("error", this.onError.bind(this));
-        sparkplugBroker.on("message", this.onMessage.bind(this));
-        sparkplugBroker.on("close", this.onClose.bind(this));
-        sparkplugBroker.on("reconnect", this.onReconnect.bind(this));
+        this.sparkplugBroker.on("connect", this.onConnect.bind(this));
+        this.sparkplugBroker.on("error", this.onError.bind(this));
+        this.sparkplugBroker.on("message", this.onMessage.bind(this));
+        this.sparkplugBroker.on("close", this.onClose.bind(this));
+        this.sparkplugBroker.on("reconnect", this.onReconnect.bind(this));
 
-        logger.info("Connecting to Sparkplug channel...");
+        logger.info("Connecting to MQTT Broker...");
     }
 
     onConnect() {
-        logger.info("🔌 Connected to Sparkplug channel");
+        logger.info("🔌 Connected to MQTT Broker");
         logger.info("👂 Subscribing to entire Factory+ namespace");
         this.sparkplugBroker.subscribe('spBv1.0/#');
     }
 
     onClose() {
-        logger.warn(`❌ Disconnected from Sparkplug channel`);
+        logger.warn(`❌ Disconnected from MQTT Broker`);
     }
 
     onReconnect() {
-        logger.warn(`⚠️ Reconnecting to Sparkplug channel...`);
+        logger.warn(`⚠️ Reconnecting to MQTT Broker...`);
     }
 
     onError(error: any) {
@@ -514,7 +496,7 @@ export default class MQTTClient {
                 return;
             }
 
-            this.unsBroker.publish(topic, JSON.stringify(payload), {
+            this.sparkplugBroker.publish(topic, JSON.stringify(payload), {
                 properties: {
                     //     Assume that all metrics have the same custom properties
                     userProperties: {

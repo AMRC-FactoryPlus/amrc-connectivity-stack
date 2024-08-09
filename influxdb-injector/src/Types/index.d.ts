@@ -30,3 +30,12 @@ interface ISA95Schema {
     WorkCenter?: string,
     WorkUnit?: string
 }
+
+/**
+ * Params for creating the factory+ service client
+ */
+interface MQTTClientConstructorParams {
+    e: {
+        serviceClient: ServiceClient;
+    }
+}

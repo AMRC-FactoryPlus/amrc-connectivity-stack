@@ -4,4 +4,6 @@
 #
 
 # bin/bash
-npm run start
+tmpfile=$(mktemp)
+export CLIENT_KEYTAB="$(kubectl --kubeconfig <KUBECONFIG_FILE> get -n factory-plus secret krb5-keytabs -o jsonpath="{.data.sv1warehouse}" | base64 -d >"$tmpfile" && echo "$tmpfile")"
+npm run start:shell

@@ -2,13 +2,12 @@
  * AMRC InfluxDB Sparkplug Ingester
  * Copyright "2024" AMRC
  */
-
+import {ServiceClient} from "@amrc-factoryplus/service-client";
 import {logger} from "./Utils/logger.js";
 import {InfluxDB, Point} from '@influxdata/influxdb-client'
 import {Agent} from 'http'
 import mqtt from "mqtt";
 import {UnsTopic} from "./Utils/UnsTopic.js";
-import * as path from "node:path";
 
 let dotenv: any = null;
 try {
@@ -41,11 +40,6 @@ if (!batchSize) {
 const flushInterval: number = Number.parseInt(process.env.FLUSH_INTERVAL);
 if (!flushInterval) {
     throw new Error("FLUSH_INTERVAL environment variable is not set");
-}
-
-const mqttURL: string = process.env.MQTT_URL;
-if (!mqttURL) {
-    throw new Error("Mqtt URL not set!");
 }
 
 let i = 0;
@@ -85,7 +79,12 @@ const writeApi = influxDB.getWriteApi(influxOrganisation,
 );
 
 export default class MQTTClient {
-    private mqtt: mqtt.MqttClient;
+    private sparkplugBroker: any;
+    private serviceClient: ServiceClient;
+
+    constructor({e}: MQTTClientConstructorParams) {
+        this.serviceClient = e.serviceClient;
+    }
 
     async init() {
 
@@ -108,21 +107,20 @@ export default class MQTTClient {
     }
 
     async run() {
-        this.mqtt = mqtt.connect(mqttURL, {
-            protocolVersion: 5
-        });
-        this.mqtt.on("connect", this.on_connect.bind(this));
-        this.mqtt.on("error", this.on_error.bind(this));
-        this.mqtt.on("message", this.on_message.bind(this));
-        this.mqtt.on("close", this.on_close.bind(this));
-        this.mqtt.on("reconnect", this.on_reconnect.bind(this));
+        this.sparkplugBroker = await this.serviceClient.mqtt_client();
+
+        this.sparkplugBroker.on("connect", this.on_connect.bind(this));
+        this.sparkplugBroker.on("error", this.on_error.bind(this));
+        this.sparkplugBroker.on("message", this.on_message.bind(this));
+        this.sparkplugBroker.on("close", this.on_close.bind(this));
+        this.sparkplugBroker.on("reconnect", this.on_reconnect.bind(this));
         logger.info("Connecting to UNS broker...");
     }
 
     on_connect() {
         logger.info("🔌 Connected to Factory+ broker");
         logger.info("👂 Subscribing to entire UNS namespace");
-        this.mqtt.subscribe("UNS/v1/#");
+        this.sparkplugBroker.subscribe("UNS/v1/#");
         this.resetInterval();
     }
 
@@ -173,10 +171,10 @@ export default class MQTTClient {
     }
 
     /**
-     *
-     * @param payload
-     * @param topic
-     * @param customProperties
+     * Writes all metrics in a UNS MQTT payload to InfluxDB
+     * @param payload The payload from the MQTT packet.
+     * @param topic The topic the payload was received on.
+     * @param customProperties The custom properties from the MQTTv5 payload.
      */
     private writeMetrics(payload: MetricPayload, topic: string, customProperties: UnsMetricCustomProperties) {
         const unsTopic = new UnsTopic(topic, customProperties);
@@ -215,8 +213,8 @@ export default class MQTTClient {
      * @param topic Topic the metric was published on.
      * @param value Metric value to write to InfluxDB.
      * @param timestamp Timestamp from the metric to write to influx.
-     * @param unit
-     * @param type
+     * @param unit The metric unit from the MQTTv5 custom properties.
+     * @param type The Metric type from the MQTTv5 custom properties.
      */
     writeToInfluxDB(topic: UnsTopic, value: string, timestamp: Date, unit: string, type: string) {
         if (value === null) {

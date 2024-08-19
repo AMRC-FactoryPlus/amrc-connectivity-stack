@@ -9,7 +9,7 @@ import {PassThrough} from 'stream';
 import {log} from '../helpers/log.js';
 
 import {Metrics, restConnDetails, serialisationType} from "../helpers/typeHandler.js";
-import {RestConnection, RestDevice} from "./REST.js";
+import {RestConnection} from "./REST.js";
 import axios, {CancelTokenSource, CancelTokenStatic} from "axios";
 
 export class MTConnectConnection extends (
@@ -109,37 +109,5 @@ export class MTConnectConnection extends (
         log("Closing MTConnectConnection");
         this.#source.cancel("Stream Close Requested");
         this.emit("close");
-    }
-};
-
-
-export class MTConnectDevice extends (
-    RestDevice
-) {
-    #devConn: MTConnectConnection
-
-    constructor(spClient: SparkplugNode, devConn: MTConnectConnection, options: deviceOptions) {
-        super(spClient, devConn, options);
-        this.#devConn = devConn;
-        this._payloadFormat = serialisationType.XML;
-
-        this._metrics.add(options.metrics);
-
-        // this.#devConn.on("asyncData", (buffer: Buffer) => {
-        //   let changedMetrics: sparkplugMetric[] = [];
-        //   this._metrics.array.forEach(metric => {
-        //     if (metric.properties.path.value) {
-        //       const newVal = parseValueFromPayload(buffer.toString(), metric, this._payloadFormat, this._delimiter);
-        //       if (!util.isDeepStrictEqual(metric.value, newVal)) {
-        //         this._metrics.setValueByName(metric.name, newVal, Date.now());
-        //         changedMetrics.push(metric);
-        //       }
-        //     }
-        //   })
-        //   this.onConnData(changedMetrics);
-        // });
-        //this.#devConn.sample(this._metrics, options.pollInt);
-        this._isConnected = true;
-        log(`${this._name} ready`);
     }
 };

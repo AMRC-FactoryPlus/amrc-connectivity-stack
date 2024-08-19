@@ -17,14 +17,16 @@ class Identifiers:
     DOMAIN = "factoryplus.app.amrc.co.uk"
     APP = "krbkeys"
     APPID = f"{APP}.{DOMAIN}"
-    CRD_PLURAL = "kerberos-keys"
-    CRD_VERSION = "v1"
 
     FORCE_REKEY = f"{APPID}/force-rekey"
     HAS_OLD_KEYS = f"{APPID}/has-old-keys"
     ACCOUNT_UUID = f"{APPID}/account-uuid"
 
     MANAGED_BY = "app.kubernetes.io/managed-by"
+
+class CRD:
+    krbkey = (Identifiers.DOMAIN, "v1", "kerberos-keys")
+    local = (Identifiers.DOMAIN, "v1", "localsecrets")
 
 def dslice (dct, *args):
     if dct is None:

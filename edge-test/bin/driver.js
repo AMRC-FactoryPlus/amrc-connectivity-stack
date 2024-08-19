@@ -4,11 +4,11 @@
  */
 
 import { PolledDriver } from "@amrc-factoryplus/edge-driver";
-import { handleTest } from "../lib/test.js";
+import { TestHandler } from "../lib/test.js";
 
 const drv = new PolledDriver({
     env:        process.env,
-    handler:    handleTest,
+    handler:    TestHandler,
     serial:     false,
 });
 drv.run();

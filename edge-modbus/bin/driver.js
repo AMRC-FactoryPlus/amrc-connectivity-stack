@@ -4,11 +4,11 @@
  */
 
 import { PolledDriver } from "@amrc-factoryplus/edge-driver";
-import { modbusHandler } from "../lib/modbus.js";
+import { ModbusHandler } from "../lib/modbus.js";
 
 const drv = new PolledDriver({
     env:        process.env,
-    handler:    modbusHandler,
+    handler:    ModbusHandler,
     serial:     true,
 });
 drv.run();

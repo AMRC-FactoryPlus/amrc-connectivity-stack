@@ -11,7 +11,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@amrc-factoryplus/edge-driver": "^0.0.2",
+    "@amrc-factoryplus/edge-driver": "^0.0.3",
     "async": "^3.2.5",
     "mqtt": "^5.7.2"
   }

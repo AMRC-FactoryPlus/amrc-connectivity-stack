@@ -17,7 +17,7 @@ The basic structure of any driver using this library looks like this:
         static create (driver, conf) { }
 
         /* This method is required */
-        connect () { }
+        async connect () { }
 
         /* These properties and methods are optional */
         static validAddrs;
@@ -87,32 +87,15 @@ environment. The handler class should use this for logging.
 This method starts the communication with the Edge Agent. It does not
 return.
 
-### `connUp`
-    
-    driver.connUp();
-
-This should be called by the handler to report a successful southbound
-connection.
-
 ### `connFailed`
 
     driver.connFailed();
 
-This should be called by the handler to report a failure to connect to
-the southbound device. The handler should not attempt to reconnect and
-should not produce any more data after calling this until the driver has
-called `connect` again. A successful connection but bad credentials
-should be reported with `connUnauth`.
-
-### `connUnauth`
-    
-    driver.connUnauth();
-
-This should be called by the handler to report that it has successfully
-connected to the southbound device but it cannot authenticate, or is not
-authorised to do what it needs to do. The handler should not attempt to
-reconnect and should not produce any more data until after the driver
-has called `connect` again.
+This should be called by the handler to report that the connection to
+the southbound device has failed. The handler should not call this
+unless it has previously returned `UP` from the `connect` method. The
+handler should not attempt to reconnect or produce any more data until
+the driver has reconnected.
 
 ## `Handler` interface
 
@@ -134,13 +117,13 @@ This method should not attempt to connect to the southbound device.
 
 ### `connect`
 
-    handler.connect();
+    const status = await handler.connect();
 
 This is called by the driver to initiate connection to the southbound
-device. This must eventually result in a call to one of the `conn...`
-methods on the driver to report the connection state. The method should
-not attempt to retry if the initial connection attempt fails. The driver
-may call this method again if the handler reports a connection failure.
+device. This method is async; it returns a Promise to a string. This
+should be one of the status values in the Edge Driver protocol
+documentation. A return value other than `"UP"` will cause the driver to
+reconnect after a delay.
 
 ### `validAddrs`
 

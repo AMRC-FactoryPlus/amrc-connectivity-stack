@@ -36,6 +36,11 @@ spec:
         - name: config
           configMap:
             name: node-red-{{ .Values.uuid }}
+{{- range $ix, $dev := .Values.devices }}
+        - name: device-{{ $ix }}
+          hostPath:
+            path: "{{ $dev }}"
+{{- end }}
       securityContext:
         runAsUser: 1000
       initContainers:
@@ -58,6 +63,10 @@ spec:
           volumeMounts:
             - mountPath: /data
               name: data
+{{- range $ix, $dev := .Values.devices }}
+            - mountPath: "{{ $dev }}"
+              name: device-{{ $ix }}
+{{- end }}
         {{- if .Values.mqttBroker }}
         - name: mqtt-broker
           {{- with .Values.image.mqttBroker }}

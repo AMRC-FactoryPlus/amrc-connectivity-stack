@@ -13,6 +13,8 @@ image:
 flow: null
 # If this is true we deploy an MQTT broker sidecar
 mqttBroker: false
+# Devices to map in from the host
+devices: []
 # This is required
 # uuid: 12345
 # This deploys to a specific host

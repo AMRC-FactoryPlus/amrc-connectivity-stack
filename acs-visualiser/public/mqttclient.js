@@ -57,9 +57,8 @@ export default class MQTTClient extends EventEmitter {
 
         const parts = [...group.split("-"), node];
         if (device != undefined) parts.push(device);
-        const path = parts.join("/");
-
-        const graph = this.add_to_graph(parts, path);
+        
+        const graph = this.add_to_graph(parts);
         if (kind == "BIRTH" || kind == "DATA") {
             for (let g = graph; g; g = g.parent)
                 g.online = true;
@@ -81,11 +80,20 @@ export default class MQTTClient extends EventEmitter {
             graph.seen_data = true;
             delete graph.expires;
         }
+        if (kind == "CMD") {
+            const from_parts = [...parts, 'cmd'];
+            const cmd_from = this.add_to_graph(from_parts);
+            console.log("Created command to %o", from_parts);
+            cmd_from.expires = Date.now() + 5*1000;
+            cmd_from.is_cmd = true;
+        }
 
-        this.emit("packet", path, kind);
+        this.emit("packet", graph.path, kind);
     }
 
-    add_to_graph (parts, path) {
+    add_to_graph (parts) {
+        const path = parts.join("/");
+
         if (this.known.has(path))
             return this.known.get(path);
 

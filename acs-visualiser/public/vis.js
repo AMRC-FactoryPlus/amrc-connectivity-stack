@@ -142,7 +142,7 @@ export default class Vis {
         }
         else {
             graph.text_roff = graph.radius;
-            const style = graph.online ? "circles" : "offline";
+            const style = graph.is_cmd ? "CMD" : graph.online ? "circles" : "offline";
             this.circle(pos[0], pos[1], graph.radius, style);
         }
         ctx.restore();
@@ -156,7 +156,10 @@ export default class Vis {
                 console.log("No centre for %o", n);
                 continue;
             }
-            ctx.strokeStyle = Style.circles
+            if (n.is_cmd) 
+                ctx.strokeStyle = Style.CMD;
+            else 
+                ctx.strokeStyle = Style.circles;
             ctx.beginPath();
             ctx.moveTo(...graph.centre);
             ctx.lineTo(...n.centre);

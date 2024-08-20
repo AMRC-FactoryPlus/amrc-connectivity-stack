@@ -144,7 +144,8 @@ This method is optional.
 
 This method parses an address string and returns a data structure
 suitable for the handler's internal purposes. This will be passed to the
-driver later in place of the address.
+driver later in place of the address. This method may be called at any
+time; in particular it may be called before the handler has connected. 
 
 The string should be validated for syntax, but no IO can be performed.
 This method should be a pure function: it should produce the same result

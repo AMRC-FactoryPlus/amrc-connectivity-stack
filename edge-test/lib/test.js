@@ -15,7 +15,15 @@ const packing = {
     lf:     [4, (b, v) => b.writeFloatLE(v)],
 };
 
-class TestHandler {
+export class TestHandler {
+    static create (driver, conf) {
+        return new TestHandler();
+    }
+
+    async connect () {
+        return "UP";
+    }
+
     parseAddr (spec) {
         const parts = spec.split(":");
         if (parts.length != 4) return;
@@ -45,8 +53,3 @@ class TestHandler {
     }
 }
 
-export function handleTest (driver, conf) {
-    const h = new TestHandler();
-    driver.setStatus("UP");
-    return h;
-}

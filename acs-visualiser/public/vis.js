@@ -277,13 +277,13 @@ export default class Vis {
         this.pick_centres(this.graph, 0, 0, segment, ring);
     }
 
-    make_active (path, style) {
+    make_active (path, style, stopping) {
         let node = this.paths.get(path);
         if (node) {
             if (node.parent.too_many) {
                 node = node.parent.overflow;
             }
-            this.active.add(new Packet(this, node, style));
+            this.active.add(new Packet(this, node, style, stopping));
         }
     }
 

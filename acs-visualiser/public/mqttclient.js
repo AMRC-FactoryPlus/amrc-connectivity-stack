@@ -15,6 +15,8 @@ export default class MQTTClient extends EventEmitter {
         this.graph = opts.graph;
 
         this.known = new Map();
+
+        this.utf8decoder = new TextDecoder();
     }
 
     static graph (name) {
@@ -81,14 +83,17 @@ export default class MQTTClient extends EventEmitter {
             delete graph.expires;
         }
         if (kind == "CMD") {
-            const from_parts = [...parts, 'cmd'];
+            const sender = this.find_sender(message);
+            const from_parts = [...parts, sender];
             const cmd_from = this.add_to_graph(from_parts);
             console.log("Created command to %o", from_parts);
             cmd_from.expires = Date.now() + 5*1000;
             cmd_from.is_cmd = true;
+            this.emit("packet", cmd_from.path, kind, true);
         }
-
-        this.emit("packet", graph.path, kind);
+        else {
+            this.emit("packet", graph.path, kind, false);
+        }
     }
 
     add_to_graph (parts) {
@@ -129,6 +134,17 @@ export default class MQTTClient extends EventEmitter {
         //console.log("Found schema %s for %s", schema, node.name);
         node.schema = schema;
         this.emit("schema", schema);
+    }
+
+    find_sender (message) {
+        const payload = SpB.decodePayload(message);
+        if (payload.uuid != FactoryPlus)
+            return '';
+        console.log("cmd body %o", payload.body);
+        const decoded = this.utf8decoder.decode(payload.body);
+        const node_name = decoded.split(':')
+        console.log(node_name);
+        return node_name[1];
     }
 
     async check_directory (address, node) {

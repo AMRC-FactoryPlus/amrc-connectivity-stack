@@ -168,7 +168,14 @@ export default class CmdEscD {
             }
         }
 
-        this.mqtt.publish(to, "CMD", [cmd]);
+        this.mqtt.publish({
+            address:    to,
+            type:       "CMD",
+            metrics:    [cmd],
+            from:       from instanceof Address 
+                ? `sparkplug:${from}`
+                : `kerberos:${from}`,
+        });
         return log(200);
     }
 }

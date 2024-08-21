@@ -23,7 +23,8 @@
                 "MTConnect",
                 "Open Protocol",
                 "ASCII TCP",
-                "EtherNet/IP"
+                "EtherNet/IP",
+                "Driver"
             ],
             "minLength": 1
         },
@@ -464,7 +465,6 @@
         },
         "s7ConnDetails": {
             "type": "object",
-            "title": "S7 Connection Details",
             "options": {
                 "dependencies": {
                     "connType": "S7"
@@ -537,6 +537,16 @@
                 "dependencies": {
                     "payloadFormat": "Delimited String"
                 }
+            }
+        },
+        "DriverDetails": {
+            "title": "Driver Details",
+            "type": "object",
+            "options": {
+                "dependencies": {
+                    "connType": "Driver"
+                },
+                "collapsed": false
             }
         }
     }

@@ -47,7 +47,7 @@ export default class Vis {
         if (graph.path)
             this.paths.set(graph.path, graph);
 
-        if (!nodes) {
+        if (!nodes || !nodes.length) {
             this.leaves.push(graph);
             graph.leaves = 1;
             graph.maxdepth = 0;
@@ -101,7 +101,8 @@ export default class Vis {
 				centre: o_cen,
 			};
 		}
-        if (graph.too_many || !nodes) return;
+        if (graph.too_many || !nodes || nodes.length == 0)
+             return;
 
         for (const child of nodes) {
             this.pick_centres(child, angle, radius + ring, segment, ring);

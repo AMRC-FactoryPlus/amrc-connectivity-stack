@@ -86,8 +86,7 @@ export default class MQTTClient extends EventEmitter {
             const sender = this.find_sender(message);
             const from_parts = [...parts, sender];
             const cmd_from = this.add_to_graph(from_parts);
-            console.log("Created command to %o", from_parts);
-            cmd_from.expires = Date.now() + 5*1000;
+            cmd_from.expires = Date.now() + 7.5*1000;
             cmd_from.is_cmd = true;
             this.emit("packet", cmd_from.path, kind, true);
         }
@@ -140,10 +139,8 @@ export default class MQTTClient extends EventEmitter {
         const payload = SpB.decodePayload(message);
         if (payload.uuid != FactoryPlus)
             return '';
-        console.log("cmd body %o", payload.body);
         const decoded = this.utf8decoder.decode(payload.body);
         const node_name = decoded.split(':')
-        console.log(node_name);
         return node_name[1];
     }
 

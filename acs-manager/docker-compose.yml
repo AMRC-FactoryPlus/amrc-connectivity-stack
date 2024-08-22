@@ -25,7 +25,7 @@ services:
   pgsql:
     image: 'postgres:15'
     ports:
-      - '5432:5432'
+      - '5433:5432'
     environment:
       POSTGRES_DB: 'factoryplus-manager'
       POSTGRES_PASSWORD: 'password'

@@ -510,7 +510,7 @@
         },
         "DriverDetails": {
             "title": "Driver Details",
-            "type": "string",
+            "type": "object",
             "options": {
                 "dependencies": {
                     "connType": "Driver"

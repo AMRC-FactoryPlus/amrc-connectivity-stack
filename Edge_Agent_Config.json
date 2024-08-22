@@ -107,7 +107,8 @@
                             "MTConnect",
                             "Open Protocol",
                             "ASCII TCP",
-                            "EtherNet/IP"
+                            "EtherNet/IP",
+                            "Driver"
                         ],
                         "minLength": 1
                     },
@@ -587,6 +588,16 @@
                                 "default": 5000,
                                 "minLength": 1
                             }
+                        }
+                    },
+                    "DriverDetails": {
+                        "title": "Driver Details",
+                        "type": "string",
+                        "options": {
+                            "dependencies": {
+                                "connType": "Driver"
+                            },
+                            "collapsed": false
                         }
                     },
                     "pollInt": {

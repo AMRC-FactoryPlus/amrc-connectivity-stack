@@ -508,6 +508,16 @@
                 }
             }
         },
+        "DriverDetails": {
+            "title": "Driver Details",
+            "type": "string",
+            "options": {
+                "dependencies": {
+                    "connType": "Driver"
+                },
+                "collapsed": false
+            }
+        },
         "pollInt": {
             "type": "number",
             "title": "Polling Interval (ms)",
@@ -537,16 +547,6 @@
                 "dependencies": {
                     "payloadFormat": "Delimited String"
                 }
-            }
-        },
-        "DriverDetails": {
-            "title": "Driver Details",
-            "type": "object",
-            "options": {
-                "dependencies": {
-                    "connType": "Driver"
-                },
-                "collapsed": false
             }
         }
     }

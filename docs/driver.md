@@ -17,7 +17,7 @@ The basic structure of any driver using this library looks like this:
         static create (driver, conf) { }
 
         /* This method is required */
-        async connect () { }
+        connect () { }
 
         /* These properties and methods are optional */
         static validAddrs;
@@ -87,6 +87,14 @@ environment. The handler class should use this for logging.
 This method starts the communication with the Edge Agent. It does not
 return.
 
+### `connUp`
+
+    driver.connUp();
+
+This should be called by the handler to report that the connection to
+the southbound device has been successfully established. If the handler
+`connect` method returns a Promise then this method should not be used.
+
 ### `connFailed`
 
     driver.connFailed();
@@ -96,6 +104,21 @@ the southbound device has failed. The handler should not call this
 unless it has previously returned `UP` from the `connect` method. The
 handler should not attempt to reconnect or produce any more data until
 the driver has reconnected.
+
+### `connUnauth`
+
+    driver.connUnauth();
+
+This should be called by the handler to report an authentication problem
+with the southbound device. This should only be called in the same
+circumstances as `connFailed`.
+
+### `reconnect`
+
+    driver.reconnect = 5000;
+
+This property can be set by the handler to adjust the the reconnection
+delay. The default is 5000 (5 seconds).
 
 ## `Handler` interface
 
@@ -117,13 +140,22 @@ This method should not attempt to connect to the southbound device.
 
 ### `connect`
 
+    handler.connect();
     const status = await handler.connect();
 
 This is called by the driver to initiate connection to the southbound
-device. This method is async; it returns a Promise to a string. This
-should be one of the status values in the Edge Driver protocol
-documentation. A return value other than `"UP"` will cause the driver to
-reconnect after a delay.
+device. This method may either return `undefined` or a Promise to a
+string.
+
+An undefined return value requests use of the callback API; the connect
+method must subsequently call one of the `conn...` method on the Driver
+to report the connection status. A Promise return value must resolve to
+a string, one of `"UP"`, `"CONN"`, or `"AUTH"`, to report the connection
+status directly.
+
+If the connection is reported as having failed the driver will call
+`connect` again after a delay. The handler is responsible for ensuring
+any previous connection is cleaned up properly.
 
 ### `validAddrs`
 

@@ -1,9 +1,10 @@
+{{- $k8sname := include "edge-agent.k8sname" . }}
 {{- if .Values.externalIPs }}
 apiVersion: v1
 kind: Service
 metadata:
   namespace: {{ .Release.Namespace }}
-  name: edge-agent-{{ .Values.uuid }}
+  name: edge-agent-{{ $k8sname }}
 spec:
   selector:
     factory-plus.app: edge-agent

@@ -12,9 +12,23 @@ image:
   test:
     repository: edge-test
   # Further image names for drivers as needed
-drivers:
-  # An object mapping connection names to images from the list above.
-  #Test: test
+
+# An object mapping connection names to driver configuration. This is
+# for deploying on-cluster drivers.
+drivers: {}
+  #Test:
+    # An image name from the image list above.
+    #image: test
+    # An object mapping mount names from driverDevices to mount points
+    # in the driver container.
+    #deviceMounts:
+      #arduino: /dev/arduino
+
+# Host paths which may be mounted into drivers. This is to make host
+# devices available inside the driver containers.
+#driverDevices:
+  #arduino: /dev/ttyUSB0
+
 # Make the driver interface available externally.
 #externalIPs: []
 debug: false

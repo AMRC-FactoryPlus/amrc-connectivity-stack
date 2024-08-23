@@ -71,9 +71,9 @@ spec:
               name: local-config
             - mountPath: /usr/app/driver-passwords
               name: driver-passwords
-{{- range $name, $image := .Values.drivers }}
+{{- range $name, $driver := coalesce .Values.drivers dict }}
         - name: "driver-{{ $name | lower }}"
-{{ list $ $image | include "edge-agent.image" | indent 10 }}
+  {{- list $ $driver.image | include "edge-agent.image" | nindent 10 }}
           env:
             - name: EDGE_MQTT
               value: "mqtt://localhost"
@@ -86,6 +86,13 @@ spec:
                   key: "{{ $name }}"
             - name: VERBOSE
               value: "{{ $.Values.verbosity }}"
+  {{- if $driver.deviceMounts }}
+          volumeMounts:
+    {{- range $name, $path := coalesce $driver.deviceMounts dict }}
+            - mountPath: "{{ $path }}"
+              name: "driver-dev-{{ $name }}"
+    {{- end }}
+  {{- end }}
 {{- end }}
       volumes:
         - name: edge-agent-sensitive-information
@@ -98,6 +105,11 @@ spec:
           secret:
             optional: true
             secretName: driver-passwords-{{ .Values.uuid }}
+{{- range $name, $path := coalesce .Values.driverDevices dict }}
+        - name: "driver-dev-{{ $name }}"
+          hostPath:
+            path: "{{ $path }}"
+{{- end }}
 ---
 apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: SparkplugNode

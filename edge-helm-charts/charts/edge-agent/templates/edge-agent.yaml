@@ -1,11 +1,12 @@
+{{- $k8sname := include "edge-agent.k8sname" . }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: edge-agent-{{ .Values.uuid }}
+  name: edge-agent-{{ $k8sname }}
   namespace: {{ .Release.Namespace }}
   labels:
     factory-plus.app: edge-agent
-    factory-plus.service: edge-agent-{{ .Values.uuid }}
+    factory-plus.service: edge-agent-{{ $k8sname }}
     factory-plus.nodeUuid: {{ .Values.uuid }}
     factory-plus.name: {{ .Values.name }}
 spec:
@@ -47,7 +48,7 @@ spec:
             - name: SERVICE_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: edge-agent-secrets-{{ .Values.uuid }}
+                  name: edge-agent-secrets.{{ $k8sname }}
                   key: keytab
             - name: EDGE_MQTT
 {{- if .Values.externalIPs }}
@@ -82,7 +83,7 @@ spec:
             - name: EDGE_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: "driver-passwords-{{ $.Values.uuid }}"
+                  name: "driver-passwords.{{ $k8sname }}"
                   key: "{{ $name }}"
             - name: VERBOSE
               value: "{{ $.Values.verbosity }}"
@@ -104,7 +105,7 @@ spec:
         - name: driver-passwords
           secret:
             optional: true
-            secretName: driver-passwords-{{ .Values.uuid }}
+            secretName: driver-passwords.{{ $k8sname }}
 {{- range $name, $path := coalesce .Values.driverDevices dict }}
         - name: "driver-dev-{{ $name }}"
           hostPath:
@@ -115,7 +116,7 @@ apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: SparkplugNode
 metadata:
   namespace: {{ .Release.Namespace }}
-  name: edge-agent-{{ .Values.uuid }}
+  name: edge-agent.{{ $k8sname }}
 spec:
   uuid: {{ .Values.uuid }}
   edgeAgent: true
@@ -127,9 +128,9 @@ apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: LocalSecret
 metadata:
   namespace: {{ $.Release.Namespace }}
-  name: "driver-passwords-{{ $.Values.uuid }}-{{ $name | lower }}"
+  name: "driver-passwords.{{ $k8sname }}.{{ $name | lower }}"
 spec:
   format: Password
-  secret: "driver-passwords-{{ $.Values.uuid }}"
+  secret: "driver-passwords.{{ $k8sname }}"
   key: "{{ $name }}"
 {{- end }}

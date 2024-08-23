@@ -7,3 +7,6 @@ image: "{{ $spec.registry }}/{{ $spec.repository }}:{{ $spec.tag }}"
 imagePullPolicy: {{ $spec.pullPolicy }}
 {{- end }}
 
+{{- define "edge-agent.k8sname" }}
+{{- .Values.name | lower | replace "_" "-" }}
+{{- end }}

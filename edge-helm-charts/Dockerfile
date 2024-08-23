@@ -6,6 +6,7 @@ ARG base_prefix=ghcr.io/amrc-factoryplus/acs-base
 FROM ${base_prefix}-js-build:${base_version} AS build
 ARG acs_npm=NO
 ARG revision=unknown
+ARG tag=latest
 
 USER root
 RUN sh -x <<'SHELL'
@@ -27,8 +28,12 @@ SHELL
 COPY --chown=node . .
 RUN sh -x <<'SHELL'
     echo "export const GIT_VERSION=\"$revision\";" > ./lib/git-version.js
-SHELL
 
+    sed -i -e"s/%%TAG%%/${tag}/g" \
+        charts/edge-agent/values.yaml \
+        charts/edge-cluster/values.yaml \
+
+SHELL
 FROM ${base_prefix}-js-run:${base_version} AS run
 # Copy across from the build container.
 WORKDIR /home/node/app

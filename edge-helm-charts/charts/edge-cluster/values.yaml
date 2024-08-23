@@ -27,7 +27,7 @@ image:
   default:
     registry: ghcr.io/amrc-factoryplus
     pullPolicy: IfNotPresent
-    tag: v3.2.1-dev.2
+    tag: %%TAG%%
   edgeSync:
     repository: acs-edge-sync
     #tag: ''

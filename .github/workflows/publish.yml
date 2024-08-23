@@ -191,6 +191,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
+            tag=${{ steps.prepare.outputs.version }}
             revision=${{ steps.prepare.outputs.version }} (${{ github.sha }})
             base_version=${{ env.BASE_JS_VERSION }}
       - uses: ./.github/actions/cleanup

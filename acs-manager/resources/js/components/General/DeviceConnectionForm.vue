@@ -8,7 +8,7 @@
     <Loader v-if="deviceConnectionLoading"></Loader>
     <div v-else class="flex flex-col">
       <div class="p-2 mb-2  flex flex-col" v-for="element in controls"
-           v-if="'showIf' in element.object ? element.object.showIf() : true">
+          v-if="'showIf' in element.object ? element.object.showIf() : true">
         <Wrapper>
           <template #description>
             {{element.object.description}}
@@ -20,33 +20,42 @@
                   (element.namePath.length > 0 ? (element.namePath.join(' > ') + ' > ') : '') + element.object.title
                 }}</h4>
               <Input v-if="(['string', 'number'].includes(element.object.type)) && !('enum' in element.object)"
-                     :showDescription="false"
-                     :control="{}"
-                     :valid="get(element.keyPath.filter(e => e !== 'properties').join('.'), v.model)"
-                     :value="get(element.keyPath.filter(e => e !== 'properties').join('.'), model)"
-                     @input="updateInput(element, $event)"></Input>
+                  :showDescription="false"
+                  :control="{}"
+                  :valid="get(element.keyPath.filter(e => e !== 'properties').join('.'), v.model)"
+                  :value="get(element.keyPath.filter(e => e !== 'properties').join('.'), model)"
+                  @input="updateInput(element, $event)"></Input>
               <Input :password="true"
-                     v-else-if="(['password'].includes(element.object.type)) && !('enum' in element.object)"
-                     :showDescription="false"
-                     :control="{}"
-                     :device="device.id"
-                     :valid="get(element.keyPath.filter(e => e !== 'properties').join('.'), v.model)"
-                     :value="get(element.keyPath.filter(e => e !== 'properties').join('.'), model)"
-                     @input="updateInput(element, $event)"></Input>
+                  v-else-if="(['password'].includes(element.object.type)) && !('enum' in element.object)"
+                  :showDescription="false"
+                  :control="{}"
+                  :device="device.id"
+                  :valid="get(element.keyPath.filter(e => e !== 'properties').join('.'), v.model)"
+                  :value="get(element.keyPath.filter(e => e !== 'properties').join('.'), model)"
+                  @input="updateInput(element, $event)"></Input>
+              <JsonEditorVue
+                  v-else-if="element.object.type === 'json'"
+                  :value="get(element.keyPath.filter(e => e !== 'properties').join('.'), model)"
+                  @input="updateInput(element, $event)"
+                  v-bind="{
+                    mode: 'text',
+                    stringified: false
+                  }"
+              />
               <Dropdown @input="updateInput(element, $event)"
-                        v-else-if="['string', 'number'].includes(element.object.type) && ('enum' in element.object)"
-                        :valid="get(element.keyPath.filter(e => e !== 'properties').join('.'), v.model)"
-                        :value="get(element.keyPath.filter(e => e !== 'properties').join('.'), model)"
-                        :control="{
+                  v-else-if="['string', 'number'].includes(element.object.type) && ('enum' in element.object)"
+                  :valid="get(element.keyPath.filter(e => e !== 'properties').join('.'), v.model)"
+                  :value="get(element.keyPath.filter(e => e !== 'properties').join('.'), model)"
+                  :control="{
               options: element.object.enum.map(e => {return {
               title: e === '' ? 'None' : e,
               value: e
             }})
             }"></Dropdown>
               <Checkbox @input="updateInput(element, $event)" v-else-if="element.object.type === 'boolean'"
-                        :valid="get(element.keyPath.filter(e => e !== 'properties').join('.'), v.model)"
-                        :value="get(element.keyPath.filter(e => e !== 'properties').join('.'), model)"
-                        :control="{
+                  :valid="get(element.keyPath.filter(e => e !== 'properties').join('.'), v.model)"
+                  :value="get(element.keyPath.filter(e => e !== 'properties').join('.'), model)"
+                  :control="{
                         name: element.object.title,
                         description: element.object.description
             }"/>
@@ -69,7 +78,7 @@
         <!--          </div>-->
         <!--        </button>-->
         <button @mouseup="save(true)" :disabled="(v && v.$invalid)" class="fpl-button-brand h-10 ml-2 mt-6"
-                :class="loading ? '!bg-opacity-50' : ''">
+            :class="loading ? '!bg-opacity-50' : ''">
           <div v-if="loading === false" class="text-base mr-3 ml-10 flex items-center justify-center">
             Save & Activate
             <i class="fa-sharp fa-solid fa-arrow-right ml-2"></i>
@@ -87,6 +96,7 @@
 <script>
 import useVuelidate from '@vuelidate/core'
 import { helpers, maxLength, minLength, numeric, required, requiredIf } from '@vuelidate/validators'
+import JsonEditorVue from 'json-editor-vue'
 
 export default {
   setup () {
@@ -95,6 +105,7 @@ export default {
   name: 'DeviceConnectionForm',
 
   components: {
+    JsonEditorVue,
     'Dropdown': () => import(/* webpackPrefetch: true */ './../FormControls/Dropdown.vue'),
     'Checkbox': () => import(/* webpackPrefetch: true */ './../FormControls/Checkbox.vue'),
     'form-control': () => import(/* webpackPrefetch: true */ './FormControl.vue'),
@@ -115,19 +126,18 @@ export default {
     if (this.deviceConnection.file) {
       // Get the existing model
       this.deviceConnectionLoading = true
-      axios.get(
-              `/api/clusters/${this.device.node.cluster}/nodes/${this.device.node}/connections/${this.device?.device_connection_id}`).
-          then((r) => {
-            this.model = { ...this.model, ...r.data.data }
-            this.deviceConnectionLoading = false
-          }).
-          catch(error => {
-            this.deviceConnectionLoading = false
-            if (error && error.response && error.response.status === 401) {
-              this.goto_url('/login')
-            }
-            this.handleError(error)
-          })
+      axios.get(`/api/clusters/${this.device.node.cluster}/nodes/${this.device.node}/connections/${this.device?.device_connection_id}`).
+        then((r) => {
+          this.model                   = { ...this.model, ...r.data.data }
+          this.deviceConnectionLoading = false
+        }).
+        catch(error => {
+          this.deviceConnectionLoading = false
+          if (error && error.response && error.response.status === 401) {
+            this.goto_url('/login')
+          }
+          this.handleError(error)
+        })
     }
     // Get every element that has a 'type' key and NO properties field - that's our control
     this.deepProcessKeys(this.schema)
@@ -136,15 +146,15 @@ export default {
   methods: {
     processCast (value, type) {
       switch (type) {
-        case 'string':
-        case 'password':
-          return String(value)
-        case 'number':
-          return Number(value)
-        case 'boolean':
-          return Boolean(value)
-        default:
-          return value
+      case 'string':
+      case 'password':
+        return String(value)
+      case 'number':
+        return Number(value)
+      case 'boolean':
+        return Boolean(value)
+      default:
+        return value
       }
     },
 
@@ -154,9 +164,9 @@ export default {
     },
 
     get (path, obj) {
-      let schema = obj  // a moving reference to internal objects within obj
+      let schema  = obj  // a moving reference to internal objects within obj
       const pList = path.split('.')
-      const len = pList.length
+      const len   = pList.length
       for (let i = 0; i < len - 1; i++) {
         const elem = pList[i]
         if (!schema[elem]) schema[elem] = {}
@@ -166,9 +176,9 @@ export default {
       return schema[pList[len - 1]]
     },
     set (path, value, obj) {
-      let schema = obj  // a moving reference to internal objects within obj
+      let schema  = obj  // a moving reference to internal objects within obj
       const pList = path.split('.')
-      const len = pList.length
+      const len   = pList.length
 
       for (let i = 0; i < len - 1; i++) {
         const elem = pList[i]
@@ -178,9 +188,9 @@ export default {
       this.$set(schema, pList[len - 1], value)
     },
     unset (path, obj) {
-      let schema = obj  // a moving reference to internal objects within obj
+      let schema  = obj  // a moving reference to internal objects within obj
       const pList = path.split('.')
-      const len = pList.length
+      const len   = pList.length
 
       for (let i = 0; i < len - 1; i++) {
         const elem = pList[i]
@@ -192,13 +202,13 @@ export default {
 
     deepProcessKeys (obj, keyPath = [], namePath = []) {
       if (obj && typeof obj === 'object') {
-        let allKeys = Object.keys(obj)
-        let isParent = false
-        let hasType = false
-        let hasTitle = false
+        let allKeys     = Object.keys(obj)
+        let isParent    = false
+        let hasType     = false
+        let hasTitle    = false
         let validations = {}
         for (let i = 0; i < allKeys.length; i++) {
-          let k = allKeys[i]
+          let k     = allKeys[i]
           let value = obj[k]
           if (k === 'properties') {
             isParent = true
@@ -228,8 +238,12 @@ export default {
 
         // We've been through all of the keys in this object and we have the signature of a control then add it to the array
         if (!isParent && hasType && hasTitle) {
-          this.controls.push(
-              { object: obj, keyPath: Array.from(keyPath), namePath: Array.from(namePath), validations: validations })
+          this.controls.push({
+            object: obj,
+            keyPath: Array.from(keyPath),
+            namePath: Array.from(namePath),
+            validations: validations,
+          })
         }
       }
       return obj
@@ -239,9 +253,8 @@ export default {
       let result, i, j
       result = ''
       for (j = 0; j < 32; j++) {
-        if (j === 8 || j === 12 || j === 16 || j === 20)
-          result = result + '-'
-        i = Math.floor(Math.random() * 16).toString(16).toUpperCase()
+        if (j === 8 || j === 12 || j === 16 || j === 20) result = result + '-'
+        i      = Math.floor(Math.random() * 16).toString(16).toUpperCase()
         result = result + i
       }
       return result
@@ -256,17 +269,14 @@ export default {
         if (!('showIf' in c.object) || ('showIf' in c.object && c.object.showIf() === true)) {
           // Unset the value from the model array
           this.set(c.keyPath.filter(e => e !== 'properties').join('.'),
-              this.processCast(this.get(c.keyPath.filter(e => e !== 'properties').join('.'), this.model),
-                  c.object.type), this.finalModel)
+            this.processCast(this.get(c.keyPath.filter(e => e !== 'properties').join('.'), this.model), c.object.type), this.finalModel)
         }
       })
 
-      axios.patch(
-          `/api/clusters/${this.device.node.cluster}/nodes/${this.device.node}/connections/${this.deviceConnection.id}`,
-          {
-            'configuration': JSON.stringify(this.finalModel),
-            'device': this.device.id,
-          }).then(() => {
+      axios.patch(`/api/clusters/${this.device.node.cluster}/nodes/${this.device.node}/connections/${this.deviceConnection.id}`, {
+        'configuration': JSON.stringify(this.finalModel),
+        'device': this.device.id,
+      }).then(() => {
         this.loading = false
         this.$emit('close')
         this.requestDataReloadFor('deviceConnections')
@@ -304,8 +314,7 @@ export default {
           protocol: 'mqtts',
           port: 8883,
           useSSL: true,
-          clientId: this.device.node.uuid + '-' + this.device.node.node_id + '-' + this.device.device_id + '-' +
-              this.generateGuid(),
+          clientId: this.device.node.uuid + '-' + this.device.node.node_id + '-' + this.device.device_id + '-' + this.generateGuid(),
           username: '',
           password: '',
           cleanSession: true,
@@ -375,16 +384,7 @@ export default {
             },
             description: 'The type of connection to the underlying device.',
             enum: [
-              'Fieldbus',
-              'MQTT',
-              'OPC UA',
-              'REST',
-              'S7',
-              'UDP',
-              'MTConnect',
-              'Open Protocol',
-              'ASCII TCP',
-              'EtherNet/IP',
+              'Fieldbus', 'MQTT', 'OPC UA', 'REST', 'S7', 'UDP', 'MTConnect', 'Open Protocol', 'ASCII TCP', 'EtherNet/IP', 'Driver',
             ],
           },
           'EtherNetIPConnDetails': {
@@ -405,6 +405,24 @@ export default {
                 description: 'The hostname of the EtherNet/IP device to connect to.',
                 title: 'Hostname/IP',
               },
+            },
+          },
+          'DriverDetails': {
+            type: 'object',
+            title: 'Driver Connection Details',
+            description: 'The connection details to the Driver device.',
+            properties: {
+              type: 'json',
+              showIf: () => {
+                return this.model.connType === 'Driver' || false
+              },
+              validations: {
+                requiredIf: requiredIf(() => {
+                  return this.model.connType === 'Driver' || false
+                }),
+              },
+              description: 'Driver-specific connection details.',
+              title: 'DriverDetails',
             },
           },
           'UDPConnDetails': {
@@ -463,12 +481,7 @@ export default {
                 description: 'The protocol to connect to the MQTT server using.',
                 title: 'Protocol',
                 enum: [
-                  'mqtt',
-                  'mqtts',
-                  'tcp',
-                  'tls',
-                  'ws',
-                  'wss',
+                  'mqtt', 'mqtts', 'tcp', 'tls', 'ws', 'wss',
                 ],
                 default: 'mqtt',
               },
@@ -650,14 +663,7 @@ export default {
                 description: 'The encoding to use for the connection.',
                 title: 'Encoding',
                 enum: [
-                  'utf8',
-                  'ascii',
-                  'utf16le',
-                  'ucs2',
-                  'base64',
-                  'latin1',
-                  'binary',
-                  'hex',
+                  'utf8', 'ascii', 'utf16le', 'ucs2', 'base64', 'latin1', 'binary', 'hex',
                 ],
                 default: 'utf8',
               },
@@ -707,9 +713,8 @@ export default {
                     return this.model.connType === 'OPC UA' || false
                   }),
                   minLength: minLength(1),
-                  opcEndpoint: helpers.withMessage(
-                      'This does not look like a valid OPC endpoint (opc.tcp://[HOST]:[PORT])',
-                      helpers.regex(/^opc\.tcp:\/\/.+:\d+\/?$/)),
+                  opcEndpoint: helpers.withMessage('This does not look like a valid OPC endpoint (opc.tcp://[HOST]:[PORT])',
+                    helpers.regex(/^opc\.tcp:\/\/.+:\d+\/?$/)),
 
                 },
                 description: 'The endpoint of the OPC UA server.',
@@ -758,9 +763,7 @@ export default {
                 description: 'The security mode for the OPC UA connection.',
                 title: 'Security Mode',
                 enum: [
-                  'None',
-                  'Sign',
-                  'SignAndEncrypt',
+                  'None', 'Sign', 'SignAndEncrypt',
                 ],
                 default: 'None',
               },
@@ -781,13 +784,11 @@ export default {
               },
               username: {
                 showIf: () => {
-                  return (this.model.connType === 'OPC UA' && this.model.OPCUAConnDetails.useCredentials === true) ||
-                      false
+                  return (this.model.connType === 'OPC UA' && this.model.OPCUAConnDetails.useCredentials === true) || false
                 },
                 validations: {
                   requiredIf: requiredIf(() => {
-                    return (this.model.connType === 'OPC UA' && this.model.OPCUAConnDetails.useCredentials === true) ||
-                        false
+                    return (this.model.connType === 'OPC UA' && this.model.OPCUAConnDetails.useCredentials === true) || false
                   }),
                   minLength: minLength(3),
                 },
@@ -798,13 +799,11 @@ export default {
               password: {
                 type: 'password',
                 showIf: () => {
-                  return (this.model.connType === 'OPC UA' && this.model.OPCUAConnDetails.useCredentials === true) ||
-                      false
+                  return (this.model.connType === 'OPC UA' && this.model.OPCUAConnDetails.useCredentials === true) || false
                 },
                 validations: {
                   requiredIf: requiredIf(() => {
-                    return (this.model.connType === 'OPC UA' && this.model.OPCUAConnDetails.useCredentials === true) ||
-                        false
+                    return (this.model.connType === 'OPC UA' && this.model.OPCUAConnDetails.useCredentials === true) || false
                   }),
                   minLength: minLength(3),
                 },
@@ -837,8 +836,7 @@ export default {
                 description: 'Does the connection employ an authentication method?',
                 title: 'Authentication Method',
                 enum: [
-                  'None',
-                  'Basic',
+                  'None', 'Basic',
                 ],
                 default: 'None',
                 showIf: () => {
@@ -860,8 +858,7 @@ export default {
                 },
                 validations: {
                   requiredIf: requiredIf(() => {
-                    return (this.model.connType === 'REST' && this.model.RESTConnDetails.authMethod === 'Basic') ||
-                        false
+                    return (this.model.connType === 'REST' && this.model.RESTConnDetails.authMethod === 'Basic') || false
                   }),
                   minLength: minLength(1),
                 },
@@ -875,8 +872,7 @@ export default {
                 },
                 validations: {
                   requiredIf: requiredIf(() => {
-                    return (this.model.connType === 'REST' && this.model.RESTConnDetails.authMethod === 'Basic') ||
-                        false
+                    return (this.model.connType === 'REST' && this.model.RESTConnDetails.authMethod === 'Basic') || false
                   }),
                   minLength: minLength(1),
                 },
@@ -906,8 +902,7 @@ export default {
                 description: 'Does the connection employ an authentication method?',
                 title: 'Authentication Method',
                 enum: [
-                  'None',
-                  'Basic',
+                  'None', 'Basic',
                 ],
                 default: 'None',
                 showIf: () => {
@@ -925,13 +920,11 @@ export default {
                 description: 'The username for the MTConnect authentication.',
                 title: 'Username',
                 showIf: () => {
-                  return (this.model.connType === 'REST' && this.model.MTConnectConnDetails.authMethod === 'Basic') ||
-                      false
+                  return (this.model.connType === 'REST' && this.model.MTConnectConnDetails.authMethod === 'Basic') || false
                 },
                 validations: {
                   requiredIf: requiredIf(() => {
-                    return (this.model.connType === 'REST' && this.model.MTConnectConnDetails.authMethod === 'Basic') ||
-                        false
+                    return (this.model.connType === 'REST' && this.model.MTConnectConnDetails.authMethod === 'Basic') || false
                   }),
                   minLength: minLength(1),
                 },
@@ -941,13 +934,11 @@ export default {
                 description: 'The password for the MTConnect authentication.',
                 title: 'Password',
                 showIf: () => {
-                  return (this.model.connType === 'REST' && this.model.MTConnectConnDetails.authMethod === 'Basic') ||
-                      false
+                  return (this.model.connType === 'REST' && this.model.MTConnectConnDetails.authMethod === 'Basic') || false
                 },
                 validations: {
                   requiredIf: requiredIf(() => {
-                    return (this.model.connType === 'REST' && this.model.MTConnectConnDetails.authMethod === 'Basic') ||
-                        false
+                    return (this.model.connType === 'REST' && this.model.MTConnectConnDetails.authMethod === 'Basic') || false
                   }),
                   minLength: minLength(1),
                 },
@@ -1048,12 +1039,7 @@ export default {
             title: 'Payload Format',
             type: 'string',
             enum: [
-              'Defined by Protocol',
-              'Delimited String',
-              'JSON',
-              'XML',
-              'Buffer',
-              'ASCII HEX',
+              'Defined by Protocol', 'Delimited String', 'JSON', 'XML', 'Buffer', 'ASCII HEX',
             ],
             default: 'Defined by Protocol',
             showIf: () => {
@@ -1073,8 +1059,7 @@ export default {
             },
             validations: {
               requiredIf: requiredIf(() => {
-                return (['REST', 'UDP', 'MQTT'].includes(this.model.connType) && this.model.payloadFormat ===
-                    'Delimited String') || false
+                return (['REST', 'UDP', 'MQTT'].includes(this.model.connType) && this.model.payloadFormat === 'Delimited String') || false
               }),
               minLength: minLength(1),
               maxLength: maxLength(1),
@@ -1100,4 +1085,3 @@ export default {
   },
 }
 </script>
-

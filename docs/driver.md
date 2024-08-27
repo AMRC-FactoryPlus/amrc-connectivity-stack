@@ -198,19 +198,16 @@ to set up subscriptions to the southbound device.
 ### `close`
 
     await handler.close();
+    handler.close(done);
 
 This method is optional.
 
 If this method exists it is called when a new configuration is received,
-just before the old handler object will be unreferenced. The result will
-be awaited before a new handler is created. This should perform any
-cleanup (closing connections, etc.) and ensure this is complete before
-the returned Promise resolves.
+just before the old handler object will be unreferenced. The method should
+perform any cleanup (closing connections, etc.) needed before
+reconnecting.
 
-If and when the [TC39 Explicit Resource Management
-proposal](https://github.com/tc39/proposal-explicit-resource-management)
-is accepted and becomes available in Node.js, the `close` method is
-likely to be supplemented by `Symbol.asyncDispose`. A handler object
-implementing `@@asyncDispose` or `@@dispose` should clean up correctly
-when any single disposal method is called.
+The method supports both Promise-based and callback-based APIs. The
+method is passed a callback, which can be called to indicate cleanup is
+finished. Alternatively the method can return a Promise.
 

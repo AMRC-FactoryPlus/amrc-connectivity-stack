@@ -45,6 +45,7 @@ if (process.env.CMD_ESC_URL) {
     client.Discovery.set_service_url(UUIDs.Service.Command_Escalation, process.env.CMD_ESC_URL);
 }
 
+// Well known UUID for MQTT Component service function (see: https://factoryplus.app.amrc.co.uk/docs/framework-components/core-components/mqtt)
 logger.info(client.service_urls('feb27ba3-bd2c-4916-9269-79a61ebc4a47'));
 
 const mqtt = await new MQTTClient({

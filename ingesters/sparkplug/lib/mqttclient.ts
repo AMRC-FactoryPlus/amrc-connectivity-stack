@@ -461,11 +461,10 @@ export default class MQTTClient {
 
         // format payload to publish to uns.
         Object.entries(metricsToPublish).forEach(([topic, metricContainers]) => {
-
             let payload: UnsMetric;
             // if theirs more than one of the same metric from the same sparkplug payload, add the values to the batch array.
             if (metricContainers.length > 1) {
-                const sortedMetricContainers = metricContainers.sort((a, b) => b.metric.timestamp.toNumber() - a.metric.timestamp.toNumber());
+                const sortedMetricContainers = metricContainers.sort((a, b) => a.metric.timestamp.toNumber() - b.metric.timestamp.toNumber());
                 payload = {
                     timestamp: new Date(sortedMetricContainers[0].metric.timestamp.toNumber()),
                     value: sortedMetricContainers[0].metric.value,
@@ -475,7 +474,7 @@ export default class MQTTClient {
                 sortedMetricContainers.shift();
                 sortedMetricContainers.forEach(metricContainer => {
                     payload.batch.push({
-                        timestamp: metricContainer.metric.timestamp.toNumber(),
+                        timestamp: new Date(metricContainer.metric.timestamp.toNumber()),
                         value: metricContainer.metric.value
                     });
                 });
@@ -512,143 +511,6 @@ export default class MQTTClient {
             });
         })
     }
-
-    /*
-    private writeMetrics(payload, topic: Topic) {
-        payload.metrics.forEach((metric) => {
-            let birth = this.aliasResolver?.[topic.address.group]?.[topic.address.node]?.[topic.address.device]?.[metric.alias];
-
-            if (!birth) {
-                logger.error(`Metric ${metric.alias} is unknown for ${topic.address.group}/${topic.address.node}/${topic.address.device}`);
-            }
-
-            let metricTimestamp: Date
-            if (metric.timestamp) {
-                metricTimestamp = new Date(metric.timestamp);
-            } else if (payload.timestamp) {
-                // Metrics might not have a timestamp so use the packet timestamp if we have it.
-                metricTimestamp = new Date(payload.timestamp);
-            } else {
-                // No timestamp can be found on the metric or the payload, just use the current time instead.
-                metricTimestamp = new Date();
-            }
-            // Send each metric to InfluxDB
-            this.writeToInfluxDB(birth, topic, metric.value, metricTimestamp)
-        });
-    }
-    */
-    /**
-     * Writes metric values to InfluxDB using the metric timestamp.
-     * @param birth Birth certificate for device.
-     * @param topic Topic the metric was published on.
-     * @param value Metric value to write to InfluxDB.
-     * @param timestamp Timestamp from the metric to write to influx.
-     */
-
-    /*
-    writeToInfluxDB(birth, topic: Topic, value, timestamp: Date) {
-        if (value === null) return;
-        if (birth.transient) {
-            logger.debug(`Metric ${birth.name} is transient, not writing to InfluxDB`);
-            return;
-        }
-
-        // Get the value after the last /
-        let metricName = birth.name.split('/').pop();
-
-        // Get the path as everything behind the last /
-        let path = birth.name.substring(0, birth.name.lastIndexOf("/"));
-
-        writeApi.useDefaultTags({
-            topLevelInstance: birth.instance.top,
-            bottomLevelInstance: birth.instance.bottom,
-            usesInstances: birth.instance.top + ':' + birth.instance.full.join(':'),
-            topLevelSchema: birth.schema.top,
-            bottomLevelSchema: birth.schema.bottom,
-            usesSchemas: birth.schema.top + ':' + birth.schema.full.join(':'),
-            group: topic.address.group,
-            node: topic.address.node,
-            device: topic.address.device,
-            path: path,
-            unit: birth.unit
-        });
-
-        let numVal = null;
-
-        switch (birth.type) {
-            case "Int8":
-            case "Int16":
-            case "Int32":
-            case "Int64":
-                // Validate
-                numVal = Number(value);
-                if (!Number.isInteger(numVal)) {
-                    logger.warn(`${topic.address}/${path}/${metricName} should be a ${birth.type} but received ${numVal}. Not recording.`);
-                    return;
-                }
-                writeApi.writePoint(
-                    new Point(`${metricName}:i`)
-                        .intField('value', numVal)
-                        .timestamp(timestamp)
-                );
-                break;
-            case "UInt8":
-            case "UInt16":
-            case "UInt32":
-            case "UInt64":
-                // Validate
-                numVal = Number(value);
-                if (!Number.isInteger(numVal)) {
-                    logger.warn(`${topic.address}/${path}/${metricName} should be a ${birth.type} but received ${numVal}. Not recording.`);
-                    return;
-                }
-                writeApi.writePoint(
-                    new Point(`${metricName}:u`)
-                        .uintField('value', numVal)
-                        .timestamp(timestamp)
-                );
-                break;
-            case "Float":
-            case "Double":
-                // Validate
-                numVal = Number(value);
-                if (isNaN(parseFloat(numVal))) {
-                    logger.warn(`${topic.address}/${path}/${metricName} should be a ${birth.type} but received ${numVal}. Not recording.`);
-                    return;
-                }
-                writeApi.writePoint(
-                    new Point(`${metricName}:d`)
-                        .floatField('value', numVal)
-                        .timestamp(timestamp)
-                );
-                break;
-            case "Boolean":
-                if (typeof value != "boolean") {
-                    logger.warn(`${topic.address}/${path}/${metricName} should be a ${birth.type} but received ${value}. Not recording.`);
-                    return;
-                }
-                writeApi.writePoint(
-                    new Point(`${metricName}:b`)
-                        .booleanField('value', value)
-                        .timestamp(timestamp));
-                break;
-            default:
-                writeApi.writePoint(
-                    new Point(`${metricName}:s`)
-                        .stringField('value', value)
-                        .timestamp(timestamp));
-                break;
-
-        }
-
-        i++;
-
-        logger.debug(`Added to write buffer (${i}/${batchSize}): [${birth.type}] ${topic.address}/${path}/${metricName} = ${value}`);
-
-        if (i >= batchSize) {
-            this.flushBuffer(`${batchSize} point BATCH`);
-        }
-    }*/
 
     setNestedValue(obj, path, value) {
         for (let k = 0; k < path.length - 1; k++) {

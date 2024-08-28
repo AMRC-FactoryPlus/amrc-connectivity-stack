@@ -19,6 +19,9 @@
         },
         {
           "properties": {
+            "Documentation": {
+              "default": "Empty distance in the top of the hopper"
+            },
             "Sparkplug_Type": {
               "enum": ["DoubleBE", "DoubleLE", "FloatBE", "FloatLE"]
             }
@@ -33,6 +36,9 @@
         },
         {
           "properties": {
+            "Documentation": {
+              "default": "Current fill of hopper"
+            },
             "Sparkplug_Type": {
               "enum": ["DoubleBE", "DoubleLE", "FloatBE", "FloatLE"]
             }

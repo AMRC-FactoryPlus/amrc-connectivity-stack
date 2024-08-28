@@ -1,7 +1,6 @@
 {
   "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Coffee_Machine/Bean_Hopper-v1.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Bean hopper",
   "type": "object",
   "properties": {
     "Schema_UUID": {
@@ -12,23 +11,6 @@
       "type": "string",
       "format": "uuid"
     },
-    "Distance": {
-      "allOf": [
-        {
-          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
-        },
-        {
-          "properties": {
-            "Documentation": {
-              "default": "Empty distance in the top of the hopper"
-            },
-            "Sparkplug_Type": {
-              "enum": ["DoubleBE", "DoubleLE", "FloatBE", "FloatLE"]
-            }
-          }
-        }
-      ]
-    },
     "Fill": {
       "allOf": [
         {
@@ -37,10 +19,13 @@
         {
           "properties": {
             "Documentation": {
-              "default": "Current fill of hopper"
+              "default": ""
             },
             "Sparkplug_Type": {
-              "enum": ["DoubleBE", "DoubleLE", "FloatBE", "FloatLE"]
+              "enum": [
+                "DoubleLE",
+                "DoubleBE"
+              ]
             }
           }
         }

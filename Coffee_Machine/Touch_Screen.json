@@ -1,0 +1,63 @@
+{
+  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Coffee_Machine/Touch_Screen.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Touch screen",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "dab33fab-bc15-4235-9691-86b0d1e71ae2"
+    },
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "Touch_Active": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "Boolean"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "Touch_Position": {
+      "type": "object",
+      "properties": {
+        "X": {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        "Y": {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        }
+      }
+    },
+    "Selected_Segment": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "UInt8"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID"
+  ]
+}

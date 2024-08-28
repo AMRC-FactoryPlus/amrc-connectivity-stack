@@ -13,10 +13,32 @@
       "format": "uuid"
     },
     "Distance": {
-      "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": ["DoubleBE", "DoubleLE", "FloatBE", "FloatLE"]
+            }
+          }
+        }
+      ]
     },
     "Fill": {
-      "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": ["DoubleBE", "DoubleLE", "FloatBE", "FloatLE"]
+            }
+          }
+        }
+      ]
     }
   },
   "required": [

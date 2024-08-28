@@ -10,7 +10,6 @@ spec:
     factory-plus.app: edge-agent
     factory-plus.nodeUuid: {{ .Values.uuid }}
   internalTrafficPolicy: Local
-  externalTrafficPolicy: Local
   ports:
     - name: mqtt
       port: 1883

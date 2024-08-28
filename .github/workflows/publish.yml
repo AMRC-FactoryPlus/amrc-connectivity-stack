@@ -207,6 +207,8 @@ jobs:
       matrix:
         service:
           - acs-edge
+          - edge-modbus
+          - edge-test
     permissions:
       contents: read
       packages: write

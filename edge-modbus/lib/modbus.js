@@ -5,8 +5,6 @@
 
 import ModbusRTU from "modbus-serial";
 
-const RECONNECT = 5000;
-
 const funcs = {
     input:      { 
         read:   (c, a, l) => c.readInputRegisters(a, l),
@@ -52,11 +50,11 @@ export class ModbusHandler {
             .catch(() => "CONN");
     }
 
-    close () {
+    close (done) {
         const { client } = this;
         
         client.off("close", this.on_close);
-        return new Promise(r => client.close(r));
+        client.close(done);
     }
 
     parseAddr (spec) {

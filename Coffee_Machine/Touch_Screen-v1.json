@@ -1,5 +1,5 @@
 {
-  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Coffee_Machine/Touch_Screen.json",
+  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Coffee_Machine/Touch_Screen-v1.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Touch screen",
   "type": "object",

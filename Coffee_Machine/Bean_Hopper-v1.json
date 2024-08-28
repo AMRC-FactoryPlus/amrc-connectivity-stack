@@ -1,5 +1,5 @@
 {
-  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Coffee_Machine/Bean_Hopper.json",
+  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Coffee_Machine/Bean_Hopper-v1.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Bean hopper",
   "type": "object",

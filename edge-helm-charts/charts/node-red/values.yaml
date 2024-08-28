@@ -15,6 +15,8 @@ flow: null
 mqttBroker: false
 # Devices to map in from the host
 devices: []
+# Does Node-RED require access to host devices?
+privileged: false
 # This is required
 # uuid: 12345
 # This deploys to a specific host

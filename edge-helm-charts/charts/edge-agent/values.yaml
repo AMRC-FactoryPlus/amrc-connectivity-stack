@@ -19,6 +19,9 @@ drivers: {}
   #Test:
     # An image name from the image list above.
     #image: test
+    # Run this driver as a privileged container. This removes a k8s
+    # security feature but is necessary to allow access to hardware.
+    #privileged: true
     # An object mapping mount names from driverDevices to mount points
     # in the driver container.
     #deviceMounts:

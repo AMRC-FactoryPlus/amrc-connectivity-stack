@@ -60,6 +60,10 @@ spec:
           image: "{{ .registry }}/{{ .repository }}:{{ .tag }}"
           imagePullPolicy: {{ .pullPolicy }}
           {{- end }}
+{{- if .Values.privileged }}
+          securityContext:
+            privileged: true
+{{- end }}
           volumeMounts:
             - mountPath: /data
               name: data

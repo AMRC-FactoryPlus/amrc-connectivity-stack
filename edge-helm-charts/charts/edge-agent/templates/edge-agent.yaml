@@ -75,6 +75,10 @@ spec:
 {{- range $name, $driver := coalesce .Values.drivers dict }}
         - name: "driver-{{ $name | lower }}"
   {{- list $ $driver.image | include "edge-agent.image" | nindent 10 }}
+  {{- if $driver.privileged }}
+          securityContext:
+            privileged: true
+  {{- end }}
           env:
             - name: EDGE_MQTT
               value: "mqtt://localhost"

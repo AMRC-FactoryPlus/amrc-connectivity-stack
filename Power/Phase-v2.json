@@ -22,7 +22,9 @@
               "Sparkplug_Type": {
                 "enum": [
                   "FloatLE",
-                  "FloatBE"
+                  "FloatBE",
+                  "DoubleLE",
+                  "DoubleBE"
                 ]
               },
               "Documentation": {
@@ -42,7 +44,9 @@
               "Sparkplug_Type": {
                 "enum": [
                   "FloatLE",
-                  "FloatBE"
+                  "FloatBE",
+                  "DoubleLE",
+                  "DoubleBE"
                 ]
               },
               "Documentation": {
@@ -62,7 +66,9 @@
               "Sparkplug_Type": {
                 "enum": [
                   "FloatLE",
-                  "FloatBE"
+                  "FloatBE",
+                  "DoubleLE",
+                  "DoubleBE"
                 ]
               },
               "Documentation": {
@@ -82,7 +88,9 @@
               "Sparkplug_Type": {
                 "enum": [
                   "FloatLE",
-                  "FloatBE"
+                  "FloatBE",
+                  "DoubleLE",
+                  "DoubleBE"
                 ]
               },
               "Documentation": {
@@ -102,7 +110,9 @@
               "Sparkplug_Type": {
                 "enum": [
                   "FloatLE",
-                  "FloatBE"
+                  "FloatBE",
+                  "DoubleLE",
+                  "DoubleBE"
                 ]
               },
               "Documentation": {
@@ -122,7 +132,9 @@
               "Sparkplug_Type": {
                 "enum": [
                   "FloatLE",
-                  "FloatBE"
+                  "FloatBE",
+                  "DoubleLE",
+                  "DoubleBE"
                 ]
               },
               "Documentation": {
@@ -142,7 +154,9 @@
               "Sparkplug_Type": {
                 "enum": [
                   "FloatLE",
-                  "FloatBE"
+                  "FloatBE",
+                  "DoubleLE",
+                  "DoubleBE"
                 ]
               },
               "Documentation": {
@@ -162,7 +176,9 @@
               "Sparkplug_Type": {
                 "enum": [
                   "FloatLE",
-                  "FloatBE"
+                  "FloatBE",
+                  "DoubleLE",
+                  "DoubleBE"
                 ]
               },
               "Documentation": {
@@ -182,7 +198,9 @@
               "Sparkplug_Type": {
                 "enum": [
                   "FloatLE",
-                  "FloatBE"
+                  "FloatBE",
+                  "DoubleLE",
+                  "DoubleBE"
                 ]
               },
               "Documentation": {
@@ -202,7 +220,9 @@
               "Sparkplug_Type": {
                 "enum": [
                   "FloatLE",
-                  "FloatBE"
+                  "FloatBE",
+                  "DoubleLE",
+                  "DoubleBE"
                 ]
               },
               "Documentation": {
@@ -222,7 +242,9 @@
               "Sparkplug_Type": {
                 "enum": [
                   "FloatLE",
-                  "FloatBE"
+                  "FloatBE",
+                  "DoubleLE",
+                  "DoubleBE"
                 ]
               },
               "Documentation": {
@@ -242,7 +264,9 @@
               "Sparkplug_Type": {
                 "enum": [
                   "FloatLE",
-                  "FloatBE"
+                  "FloatBE",
+                  "DoubleLE",
+                  "DoubleBE"
                 ]
               },
               "Documentation": {

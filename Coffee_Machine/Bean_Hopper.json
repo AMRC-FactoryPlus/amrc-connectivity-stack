@@ -1,0 +1,26 @@
+{
+  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Coffee_Machine/Bean_Hopper.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Bean hopper",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "f0fd36ed-d9a7-4a29-8c24-e1780a767a80"
+    },
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "Distance": {
+      "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+    },
+    "Fill": {
+      "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID"
+  ]
+}

@@ -67,7 +67,7 @@
         {
           "properties": {
             "Sparkplug_Type": {
-              "enum": [ "UInt8" ]
+              "enum": [ "String" ]
             }
           }
         }

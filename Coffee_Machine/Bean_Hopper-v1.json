@@ -17,7 +17,7 @@
     "Spindle": {
       "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/CNC/Spindle-v1.json"
     },
-    "Fill": {
+    "Supply_Available": {
       "allOf": [
         {
           "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"

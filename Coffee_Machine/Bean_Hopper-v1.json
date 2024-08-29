@@ -17,7 +17,7 @@
     "Spindle": {
       "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/CNC/Spindle-v1.json"
     },
-    "Fill": {
+    "Something_Else": {
       "allOf": [
         {
           "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
@@ -25,7 +25,7 @@
         {
           "properties": {
             "Documentation": {
-              "default": "Hopper fill level"
+              "default": "Distance to top of beans"
             },
             "Sparkplug_Type": {
               "enum": [
@@ -40,7 +40,7 @@
         }
       ]
     },
-    "Something_Else": {
+    "Fill": {
       "allOf": [
         {
           "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
@@ -48,7 +48,7 @@
         {
           "properties": {
             "Documentation": {
-              "default": "Distance to top of beans"
+              "default": "Hopper fill level"
             },
             "Sparkplug_Type": {
               "enum": [

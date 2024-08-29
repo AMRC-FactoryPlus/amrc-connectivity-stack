@@ -25,13 +25,22 @@
         {
           "properties": {
             "Documentation": {
-              "default": ""
+              "default": "Fill level of hopper"
             },
             "Sparkplug_Type": {
               "enum": [
                 "DoubleLE",
                 "DoubleBE"
               ]
+            },
+            "Eng_Unit": {
+              "default": "%"
+            },
+            "Eng_Low": {
+              "default": 0
+            },
+            "Eng_High": {
+              "default": 100
             }
           }
         }

@@ -34,7 +34,7 @@
               ]
             },
             "Eng_Unit": {
-              "default": "%"
+              "default": "mm"
             }
           }
         }

@@ -11,25 +11,11 @@
       "type": "string",
       "format": "uuid"
     },
-    "Fill": {
-      "allOf": [
-        {
-          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
-        },
-        {
-          "properties": {
-            "Documentation": {
-              "default": ""
-            },
-            "Sparkplug_Type": {
-              "enum": [
-                "DoubleLE",
-                "DoubleBE"
-              ]
-            }
-          }
-        }
-      ]
+    "Device_Information": {
+      "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Device_Information-v1.json"
+    },
+    "Spindle": {
+      "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/CNC/Spindle-v1.json"
     }
   },
   "required": [

@@ -1043,7 +1043,7 @@ export default {
             ],
             default: 'Defined by Protocol',
             showIf: () => {
-              return ['REST', 'UDP', 'MQTT', 'ASCII TCP'].includes(this.model.connType) || false
+              return ['REST', 'UDP', 'MQTT', 'ASCII TCP', 'Driver'].includes(this.model.connType) || false
             },
             validations: {
               required,
@@ -1059,7 +1059,7 @@ export default {
             },
             validations: {
               requiredIf: requiredIf(() => {
-                return (['REST', 'UDP', 'MQTT'].includes(this.model.connType) && this.model.payloadFormat === 'Delimited String') || false
+                return (['REST', 'UDP', 'MQTT', 'Driver'].includes(this.model.connType) && this.model.payloadFormat === 'Delimited String') || false
               }),
               minLength: minLength(1),
               maxLength: maxLength(1),

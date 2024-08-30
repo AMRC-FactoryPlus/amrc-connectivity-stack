@@ -10,6 +10,8 @@ suffix?=
 tag=${version}${suffix}
 image=${registry}/${repo}:${tag}
 
+platform?=	linux/amd64
+
 build_args+=	--build-arg revision="${git.tag} (${git.sha})"
 build_args+=	--build-arg tag="${tag}"
 
@@ -19,17 +21,17 @@ build_args+=	--build-arg tag="${tag}"
 # has changed, or even to retag an existing image from the same
 # source...
 
-.PHONY: build push run
+.PHONY: build pull run
 
-all: build push
+all: build
 
 build: git.prepare
-	docker build -t "${image}" ${build_args} .
+	docker buildx build --push --platform "${platform}" -t "${image}" ${build_args} .
 
-push:
-	docker push "${image}"
+pull:
+	docker pull "${image}"
 
-run:
+run: pull
 	docker run -ti --rm "${image}" /bin/sh
 
 include ${mk}/acs.git.mk

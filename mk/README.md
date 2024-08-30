@@ -20,9 +20,15 @@ the commands to be run without running them.
 * `all`: This is the default target if you just run `make`. This will
   build and push an image for subdirs that build an image.
 
-* `build`: Just build an image.
+* `build`: Build and push an image. You will need to have overridden the
+  default registry for this to succeed.
 
-* `push`: Just push an image (which must be already built).
+* `pull`: Pull a built image. Since Docker has required use of `buildx`
+  to build images are not normally transferred via the local Docker
+  image cache.
+
+* `run`: Run a shell inside the built image. This will not build but
+  will pull.
 
 * `deploy`: For those subdirs which support this, this will attempt to
   restart a k8s deployment and show the logs. This requires `KUBECONFIG`

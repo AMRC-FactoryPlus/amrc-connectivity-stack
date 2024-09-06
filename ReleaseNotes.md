@@ -8,6 +8,13 @@ chronological order.
 These changes have not been released yet, but are likely to appear in
 the next release.
 
+### Historian value changes
+With the introduction of the UNS ingesters, the historian (formerly 
+the `sparkplug-influxdb-ingester`) has been renamed to support the 
+concept of multiple historians. Therefore, the `warehouse.ingester` 
+values have relocated to the `historians.sparkplug` key. Make sure 
+to update your values file accordingly.
+
 ## v3.1.0
 
 ### Administration interface

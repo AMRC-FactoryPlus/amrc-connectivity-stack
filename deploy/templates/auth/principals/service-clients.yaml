@@ -122,3 +122,15 @@ spec:
       group: {{ .Values.acs.organisation }}-Service-Core
       node: Monitor
 {{- end }}
+---
+{{- if .Values.acs.unsMode }}
+apiVersion: factoryplus.app.amrc.co.uk/v1
+kind: KerberosKey
+metadata:
+  name: sv1sparkplugingester
+  namespace: {{ .Release.Namespace }}
+spec:
+  type: Random
+  principal: sv1sparkplugingester@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+  secret: sparkplugingester-keytabs/client
+{{- end }}

@@ -1,5 +1,5 @@
 /*
- * AMRC InfluxDB Sparkplug Ingester
+ * AMRC InfluxDB UNS Historian
  * Copyright "2024" AMRC
  */
 import {ServiceClient} from "@amrc-factoryplus/service-client";

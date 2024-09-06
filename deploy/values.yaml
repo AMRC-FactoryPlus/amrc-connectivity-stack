@@ -13,8 +13,6 @@ acs:
     email: ''
     # -- Whether or not to use the staging environment for Let's Encrypt
     staging: false
-  # -- Whether the metrics from the sparkplug namespace will be republished to the UNS namespace
-  unsMode: true
   # -- The name of the secret holding the wildcard certificate for the
   # above domain. It will be used for every service unless that service
   # specifies its own tlsSecretName.
@@ -152,7 +150,7 @@ mqtt:
   # -- Possible values are either 1 to enable all possible debugging, or a comma-separated list of debug tags (the tags printed before the log lines). No logging is specified as an empty string.
   verbosity: 0
 
-ingesters:
+unsIngesters:
   sparkplug:
     enabled: true
     image:
@@ -242,8 +240,8 @@ historians:
     image:
       # -- The registry of the Warehouse component
       registry: ghcr.io/amrc-factoryplus
-      # -- The repository of the Warehouse component
-      repository: influxdb-injector
+      # -- The repository of the UNS Historian component
+      repository: historian-uns
       pullPolicy: IfNotPresent
 git:
   # -- Whether or not to enable the Git component

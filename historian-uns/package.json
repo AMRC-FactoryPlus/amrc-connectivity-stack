@@ -1,7 +1,7 @@
 {
-  "name": "influxdb-sparkplug-ingester",
+  "name": "historian-uns",
   "version": "1.0.0",
-  "description": "An ingestion engine to enable InfluxDB to be a fully-featured Sparkplug historian",
+  "description": "An ingestion engine to enable InfluxDB to be a fully-featured UNS historian",
   "author": "AMRC",
   "license": "MIT",
   "main": "./src/app.js",
@@ -13,7 +13,7 @@
     "acs",
     "amrc-connectivity-stack",
     "mqtt",
-    "sparkplug"
+    "uns"
   ],
   "scripts": {
     "start": "node dist/app.js",

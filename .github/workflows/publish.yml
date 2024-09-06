@@ -166,6 +166,7 @@ jobs:
           - acs-visualiser
           - edge-helm-charts
           - influxdb-sparkplug-ingester
+          - historian-uns
     permissions:
       contents: read
       packages: write

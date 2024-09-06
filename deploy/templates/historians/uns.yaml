@@ -1,40 +1,39 @@
-{ { if and (eq .Values.acs.unsMode.enabled) (eq .Values.warehouse.injector true) } }
+# In the future if we have any more ingesters then this should be
+# enabled if any of the ingesters are enabled.
+{{- if .Values.unsIngesters.sparkplug.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: influxdb-injector
-  namespace: { { .Release.Namespace } }
+  name: historian-uns
+  namespace: {{ .Release.Namespace }}
   labels:
-    component: influxdb-injector
+    component: historian-uns
 spec:
   replicas: 1
   selector:
     matchLabels:
-      component: influxdb-injector
+      component: historian-uns
   template:
     metadata:
       labels:
-        component: influxdb-injector
-        factory-plus.service: influxdb-injector
+        component: historian-uns
+        factory-plus.service: historian-uns
     spec:
-      { { - with .Values.acs.imagePullSecrets } }
+      {{- with .Values.acs.imagePullSecrets }}
       imagePullSecrets:
-        { { - toYaml . | nindent 8 } }
-      { { - end } }
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       volumes:
         - name: krb5-conf
           configMap:
             name: krb5-conf
-        - name: krb5-keytabs
+        - name: keytabs
           secret:
-            secretName: krb5-keytabs
-            items:
-              - key: sv1warehouse
-                path: client
+            secretName: historian-uns-keytabs
 
       containers:
-        - name: influxdb-ingester
-          image: "{{ include "amrc-connectivity-stack.image-name" (list . .Values.warehouse.injector) }}"
+        - name: historian-uns
+          image: "{{ include "amrc-connectivity-stack.image-name" (list . .Values.historians.uns) }}"
           command: [ "/usr/bin/k5start", "-Uf", "/keytabs/client" ]
           args: [ "node", "--es-module-specifier-resolution=node", "bin/injector.js" ]
           imagePullPolicy: Always
@@ -44,11 +43,11 @@ spec:
             - name: CLIENT_KEYTAB
               value: /keytabs/client
             - name: LOG_LEVEL
-              value: { { .Values.warehouse.injector.logLevel | required "values.warehouse.injector.logLevel" } }
+              value: {{ .Values.historians.uns.logLevel | required "values.historians.uns.logLevel" }}
             - name: BATCH_SIZE
-              value: { { .Values.warehouse.injector.batchSize | quote | required "values.warehouse.injector.batchSize" } }
+              value: {{ .Values.historians.uns.batchSize | quote | required "values.historians.uns.batchSize" }}
             - name: FLUSH_INTERVAL
-              value: { { .Values.warehouse.injector.flushInterval | quote | required "values.warehouse.injector.flushInterval" } }
+              value: {{ .Values.historians.uns.flushInterval | quote | required "values.historians.uns.flushInterval" }}
             - name: DIRECTORY_URL
               value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
             - name: INFLUX_URL
@@ -56,7 +55,7 @@ spec:
             - name: INFLUX_ORG
               value: default
             - name: INFLUX_BUCKET
-              value: 'default'
+              value: 'uns'
             - name: INFLUX_TOKEN
               valueFrom:
                 secretKeyRef:
@@ -66,5 +65,5 @@ spec:
             - mountPath: /config/krb5-conf
               name: krb5-conf
             - mountPath: /keytabs
-              name: krb5-keytabs
-  { { - end - } }
+              name: keytabs
+{{- end -}}

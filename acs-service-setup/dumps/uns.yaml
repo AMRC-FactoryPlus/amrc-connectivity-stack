@@ -12,27 +12,31 @@ objects:
     - !u ACS.Perm.MQTT.ReadEntireUNS
   !u ACS.Class.ServiceAccount:
     - !u ACS.ServiceAccount.SparkplugIngester
+    - !u ACS.ServiceAccount.HistorianUNS
 configs:
   !u UUIDs.App.Info:
     !u ACS.Perm.MQTT.WriteToEntireUNS: { name: "MQTT: Write to entire UNS" }
     !u ACS.Perm.MQTT.ReadEntireUNS: { name: "MQTT: Read entire UNS" }
-    !u ACS.ServiceAccount.SparkplugIngester: { name: "Sparkplug Ingester" }
+    !u ACS.ServiceAccount.SparkplugIngester: { name: "Ingester (Sparkplug)" }
+    !u ACS.ServiceAccount.HistorianUNS: { name: "Historian (UNS)" }
   !u UUIDs.App.MQTTPermissionTemplate:
     !u ACS.Perm.MQTT.WriteToEntireUNS: "UNS/v1/#: w"
     !u ACS.Perm.MQTT.ReadEntireUNS: "UNS/v1/#: rs"
 ---
 service: !u UUIDs.Service.Authentication
 version: 1
-groups:
-  !u ACS.Role.Warehouse:
-    - !u ACS.Perm.MQTT.ReadEntireUNS
 principals:
   - uuid: !u ACS.ServiceAccount.SparkplugIngester
     kerberos: sv1sparkplugingester@{{realm}}
+  - uuid: !u ACS.ServiceAccount.HistorianUNS
+    kerberos: sv1historianuns@{{realm}}
 aces:
   - principal: !u ACS.ServiceAccount.SparkplugIngester
     permission: !u ACS.Perm.MQTT.WriteToEntireUNS
     target: !u UUIDs.Special.Null
   - principal: !u ACS.ServiceAccount.SparkplugIngester
     permission: !u ACS.Perm.MQTT.ReadWholeNamespace
+    target: !u UUIDs.Special.Null
+  - principal: !u ACS.ServiceAccount.HistorianUNS
+    permission: !u ACS.Perm.MQTT.ReadEntireUNS
     target: !u UUIDs.Special.Null

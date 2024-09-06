@@ -14,5 +14,8 @@ dependencies:
 - name: influxdb2
   repository: https://helm.influxdata.com/
   version: 2.1.1
-digest: sha256:ada9c6053be1c658b5fb7b7e925aecfbd7e4b1bd78b709896cd26ffb4c015520
-generated: "2024-03-27T09:43:35.2275948Z"
+- name: cert-manager
+  repository: https://charts.jetstack.io
+  version: v1.14.4
+digest: sha256:5e6b7a20a96c54dba427cd3913ff2f8246e6a1125b82e2cafd6eb710b722d77d
+generated: "2024-04-19T12:00:46.600094+01:00"

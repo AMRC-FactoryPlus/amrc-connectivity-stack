@@ -15,6 +15,8 @@ export default class MQTTClient extends EventEmitter {
         this.graph = opts.graph;
 
         this.known = new Map();
+
+        this.utf8decoder = new TextDecoder();
     }
 
     static graph (name) {
@@ -57,9 +59,8 @@ export default class MQTTClient extends EventEmitter {
 
         const parts = [...group.split("-"), node];
         if (device != undefined) parts.push(device);
-        const path = parts.join("/");
-
-        const graph = this.add_to_graph(parts, path);
+        
+        const graph = this.add_to_graph(parts);
         if (kind == "BIRTH" || kind == "DATA") {
             for (let g = graph; g; g = g.parent)
                 g.online = true;
@@ -81,11 +82,22 @@ export default class MQTTClient extends EventEmitter {
             graph.seen_data = true;
             delete graph.expires;
         }
-
-        this.emit("packet", path, kind);
+        if (kind == "CMD") {
+            const sender = this.find_sender(message);
+            const from_parts = [...parts, sender];
+            const cmd_from = this.add_to_graph(from_parts);
+            cmd_from.expires = Date.now() + 7.5*1000;
+            cmd_from.is_cmd = true;
+            this.emit("packet", cmd_from.path, kind, true);
+        }
+        else {
+            this.emit("packet", graph.path, kind, false);
+        }
     }
 
-    add_to_graph (parts, path) {
+    add_to_graph (parts) {
+        const path = parts.join("/");
+
         if (this.known.has(path))
             return this.known.get(path);
 
@@ -121,6 +133,15 @@ export default class MQTTClient extends EventEmitter {
         //console.log("Found schema %s for %s", schema, node.name);
         node.schema = schema;
         this.emit("schema", schema);
+    }
+
+    find_sender (message) {
+        const payload = SpB.decodePayload(message);
+        if (payload.uuid != FactoryPlus)
+            return '';
+        const decoded = this.utf8decoder.decode(payload.body);
+        const node_name = decoded.split(':')
+        return node_name[1];
     }
 
     async check_directory (address, node) {

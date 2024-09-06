@@ -1,0 +1,113 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: node-red-{{ .Values.uuid }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    factory-plus.app: node-red
+    factory-plus.nodeUuid: {{ .Values.uuid }}
+    factory-plus.name: {{ .Values.name }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      factory-plus.app: node-red
+      factory-plus.nodeUuid: {{ .Values.uuid }}
+  template:
+    metadata:
+      labels:
+        factory-plus.app: node-red
+        factory-plus.service: node-red-{{ .Values.uuid }}
+        factory-plus.nodeUuid: {{ .Values.uuid }}
+        factory-plus.name: {{ .Values.name }}
+    spec:
+{{ if .Values.hostname }}
+      nodeSelector:
+        kubernetes.io/hostname: {{ .Values.hostname | quote }}
+      tolerations: {{ .Values.tolerations.specific | toYaml | nindent 8 }}
+{{ else }}
+      tolerations: {{ .Values.tolerations.floating | toYaml | nindent 8 }}
+{{ end }}
+      volumes:
+        - name: data
+          emptyDir:
+        - name: config
+          configMap:
+            name: node-red-{{ .Values.uuid }}
+{{- range $ix, $dev := .Values.devices }}
+        - name: device-{{ $ix }}
+          hostPath:
+            path: "{{ $dev }}"
+{{- end }}
+      securityContext:
+        runAsUser: 1000
+      initContainers:
+      {{- if .Values.flow }}
+        - name: copy-flow
+          image: alpine
+          command: ["/bin/sh", "-c", "cp /conf/flows.json /data/"]
+          volumeMounts:
+            - mountPath: /conf
+              name: config
+            - mountPath: /data
+              name: data
+      {{- end }}
+      containers:
+        - name: node-red
+          {{- with .Values.image.nodered }}
+          image: "{{ .registry }}/{{ .repository }}:{{ .tag }}"
+          imagePullPolicy: {{ .pullPolicy }}
+          {{- end }}
+{{- if .Values.privileged }}
+          securityContext:
+            privileged: true
+{{- end }}
+          volumeMounts:
+            - mountPath: /data
+              name: data
+{{- range $ix, $dev := .Values.devices }}
+            - mountPath: "{{ $dev }}"
+              name: device-{{ $ix }}
+{{- end }}
+        {{- if .Values.mqttBroker }}
+        - name: mqtt-broker
+          {{- with .Values.image.mqttBroker }}
+          image: "{{ .registry}}/{{.repository }}:{{ .tag }}"
+          imagePullPolicy: {{ .pullPolicy }}
+          {{- end }}
+          volumeMounts:
+            - mountPath: /mosquitto/config
+              name: config
+        {{- end }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: node-red-{{ .Values.uuid }}
+data:
+  {{- if .Values.flow }}
+  flows.json: {{ .Values.flow | toRawJson | quote }}
+  {{- end }}
+  {{- if .Values.mqttBroker }}
+  mosquitto.conf: |
+    listener 1883
+    allow_anonymous true
+  {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: node-red-{{ .Values.uuid }}
+spec:
+  selector:
+    factory-plus.service: node-red-{{ .Values.uuid }}
+  internalTrafficPolicy: Local
+  ports:
+    - name: node-red
+      port: 1880
+    - name: mqtt
+      port: 1883

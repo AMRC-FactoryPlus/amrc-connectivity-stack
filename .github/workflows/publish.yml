@@ -164,6 +164,7 @@ jobs:
           - acs-monitor
           - acs-service-setup
           - acs-visualiser
+          - edge-helm-charts
           - influxdb-sparkplug-ingester
     permissions:
       contents: read
@@ -190,6 +191,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
+            tag=${{ steps.prepare.outputs.version }}
             revision=${{ steps.prepare.outputs.version }} (${{ github.sha }})
             base_version=${{ env.BASE_JS_VERSION }}
       - uses: ./.github/actions/cleanup
@@ -205,6 +207,8 @@ jobs:
       matrix:
         service:
           - acs-edge
+          - edge-modbus
+          - edge-test
     permissions:
       contents: read
       packages: write

@@ -5,6 +5,14 @@ acs:
   baseUrl: factoryplus.myorganisation.com
   # -- Whether or not services should be served over HTTPS
   secure: true
+  letsEncrypt:
+    # -- Whether or not to use Let's Encrypt to automatically generate
+    # certificates for the services
+    enabled: false
+    # -- The email address to use for Let's Encrypt
+    email: ''
+    # -- Whether or not to use the staging environment for Let's Encrypt
+    staging: false
   # -- Whether the metrics from the sparkplug namespace will be republished to the UNS namespace
   unsMode: true
   # -- The name of the secret holding the wildcard certificate for the
@@ -13,7 +21,7 @@ acs:
   tlsSecretName: factoryplus-tls
   cacheMaxAge: 300
   # -- Image pull secrets for container images
-  imagePullSecrets: [ ]
+  imagePullSecrets: []
   # -- An optional tag that will force images to use this version
   # regardless of the version in the Helm chart. Each component can
   # further override this value by setting the `tag` property in its
@@ -29,7 +37,7 @@ identity:
   # objects with 'principal', 'permission' and (optionally)
   # 'restrictions' properties; see the kadmin documentation for their
   # meaning.
-  kadminUsers: [ ]
+  kadminUsers: []
   # -- Enable support for cross-realm authentication
   crossRealm: [ ]
   # crossRealm:
@@ -111,28 +119,26 @@ serviceSetup:
     pullPolicy: IfNotPresent
   # This section overrides the classes etc. installed into the ConfigDB
   config:
-    # Git repos to mirror in the on-prem git server
+    # Git repos to create in the on-prem server. These may be
+    # automatically mirrored from external repos, or populated by the
+    # service setup job.
     repoMirror:
-      # This repo is expected to hold the edge Helm charts
       helm:
         name: Edge Helm charts
-        # Branches to pull from external repos
-        pull:
-          acs:
-            url: https://github.com/AMRC-FactoryPlus/edge-helm-charts.git
-            # Pull this branch/tag
-            ref: v3.1.2
-            # Merge to a local branch, if not otherwise moved
-            merge: main
-            # Interval to perform updates. 'never' will only update on git
-            # server startup and is suitable for tag refs which won't
-            # change.
-            interval: never
+        pull: {}
     # Helm charts to deploy to the edge; these default to the charts
     # created automatically but can be overridden to customise
     helmChart:
-    # Chart to deploy an edge cluster
-    #cluster: null
+      # Chart to deploy an edge cluster
+      #cluster: null
+
+edgeHelm:
+  enabled: true
+  image:
+    registry: ghcr.io/amrc-factoryplus
+    repository: edge-helm-charts
+    pullPolicy: IfNotPresent
+  repoPath: shared/helm
 
 mqtt:
   # -- Whether or not to enable the MQTT component
@@ -279,7 +285,7 @@ shell:
     pullPolicy: IfNotPresent
 
 # XXX This should probably be included in acs-krb-utils
-curl:
+curl: 
   image:
     registry: docker.io
     repository: appropriate/curl
@@ -322,8 +328,6 @@ kubegres:
 traefik:
   enabled: true
   ports:
-    web:
-      expose: false
     mqtt:
       port: 1883
       expose: false
@@ -355,8 +359,8 @@ traefik:
   ingressRoute:
     dashboard:
       enabled: false
-    #   -- [AZURE] Enable the below section to expose your instance of Factory+/ACS over the internet, replacing the <Value>
-    #   -- tags with the details of your pre-configured load balancer.
+#   -- [AZURE] Enable the below section to expose your instance of Factory+/ACS over the internet, replacing the <Value>
+#   -- tags with the details of your pre-configured load balancer.
     service:
       spec:
         loadBalancerIP: <External IP address here>
@@ -437,3 +441,6 @@ influxdb2:
         influx v1 dbrp create --bucket-id ${DOCKER_INFLUXDB_INIT_BUCKET_ID} --db default --rp default --default --org ${DOCKER_INFLUXDB_INIT_ORG}
   pdb:
     create: false
+
+cert-manager:
+  fullnameOverride: "cert-manager"

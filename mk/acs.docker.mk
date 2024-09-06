@@ -7,9 +7,13 @@ version?=${git.tag}
 registry?=ghcr.io/amrc-factoryplus
 suffix?=
 
-tag=${registry}/${repo}:${version}${suffix}
+tag=${version}${suffix}
+image=${registry}/${repo}:${tag}
+
+platform?=	linux/amd64
 
 build_args+=	--build-arg revision="${git.tag} (${git.sha})"
+build_args+=	--build-arg tag="${tag}"
 
 # `git rev-parse HEAD:directory` gives a SHA for the contents of that
 # directory. In particular, it changes only when changes are made to
@@ -17,18 +21,18 @@ build_args+=	--build-arg revision="${git.tag} (${git.sha})"
 # has changed, or even to retag an existing image from the same
 # source...
 
-.PHONY: build push run
+.PHONY: build pull run
 
-all: build push
+all: build
 
 build: git.prepare
-	docker build -t "${tag}" ${build_args} .
+	docker buildx build --push --platform "${platform}" -t "${image}" ${build_args} .
 
-push:
-	docker push "${tag}"
+pull:
+	docker pull "${image}"
 
-run:
-	docker run -ti --rm "${tag}" /bin/sh
+run: pull
+	docker run -ti --rm "${image}" /bin/sh
 
 include ${mk}/acs.git.mk
 include ${mk}/acs.k8s.mk

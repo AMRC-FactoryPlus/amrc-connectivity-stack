@@ -1,0 +1,55 @@
+image:
+  # Default image parameters. These can be overidden per-image.
+  default:
+    registry: ghcr.io/amrc-factoryplus
+    tag: %%TAG%%
+    pullPolicy: IfNotPresent
+  # Edge Agent image to pull
+  edgeAgent:
+    repository: acs-edge
+  modbus:
+    repository: edge-modbus
+  test:
+    repository: edge-test
+  # Further image names for drivers as needed
+
+# An object mapping connection names to driver configuration. This is
+# for deploying on-cluster drivers.
+drivers: {}
+  #Test:
+    # An image name from the image list above.
+    #image: test
+    # Run this driver as a privileged container. This removes a k8s
+    # security feature but is necessary to allow access to hardware.
+    #privileged: true
+    # An object mapping mount names from driverDevices to mount points
+    # in the driver container.
+    #deviceMounts:
+      #arduino: /dev/arduino
+
+# Host paths which may be mounted into drivers. This is to make host
+# devices available inside the driver containers.
+#driverDevices:
+  #arduino: /dev/ttyUSB0
+
+# Make the driver interface available externally.
+#externalIPs: []
+debug: false
+verbosity: ALL,!token,!service,!sparkplug
+poll_int: 10
+authGroup:
+  # This must be supplied on deployment. It specifies the Auth group to
+  # place the Edge Agent user account in.
+  #edgeAgent: 00000000-0000-0000-0000-000000000000
+limits:
+  cpu: "100m"
+  memory: "200Mi"
+# This deploys to a specific host
+#hostname: foo
+tolerations:
+  # Tolerations to apply to pods deploys to a specific host
+  specific:
+    - key: factoryplus.app.amrc.co.uk/specialised
+      operator: Exists
+  # Tolerations to apply to floating pods
+  floating: []

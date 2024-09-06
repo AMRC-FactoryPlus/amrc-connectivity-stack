@@ -116,25 +116,3 @@ export class EtherNetIPConnection extends DeviceConnection {
         await this.#client.disconnect();
     }
 }
-
-
-/**
- * Define the device
- */
-export class EtherNetIPDevice extends Device {
-    #devConn: EtherNetIPConnection
-
-    constructor(spClient: SparkplugNode, devConn: EtherNetIPConnection, options: deviceOptions) {
-
-        // Force fixed buffer for EtherNet/IP connection before calling super
-        options.payloadFormat = serialisationType.fixedBuffer;
-
-        super(spClient, devConn, options);
-
-        // Assign device connection to class attribute
-        this.#devConn = devConn;
-
-        // Add metrics from options argument
-        this._metrics.add(options.metrics);
-    }
-}

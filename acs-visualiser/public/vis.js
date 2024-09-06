@@ -47,7 +47,7 @@ export default class Vis {
         if (graph.path)
             this.paths.set(graph.path, graph);
 
-        if (!nodes) {
+        if (!nodes || !nodes.length) {
             this.leaves.push(graph);
             graph.leaves = 1;
             graph.maxdepth = 0;
@@ -101,7 +101,8 @@ export default class Vis {
 				centre: o_cen,
 			};
 		}
-        if (graph.too_many || !nodes) return;
+        if (graph.too_many || !nodes || nodes.length == 0)
+             return;
 
         for (const child of nodes) {
             this.pick_centres(child, angle, radius + ring, segment, ring);
@@ -142,7 +143,7 @@ export default class Vis {
         }
         else {
             graph.text_roff = graph.radius;
-            const style = graph.online ? "circles" : "offline";
+            const style = graph.is_cmd ? "CMD" : graph.online ? "circles" : "offline";
             this.circle(pos[0], pos[1], graph.radius, style);
         }
         ctx.restore();
@@ -156,7 +157,10 @@ export default class Vis {
                 console.log("No centre for %o", n);
                 continue;
             }
-            ctx.strokeStyle = Style.circles
+            if (n.is_cmd) 
+                ctx.strokeStyle = Style.CMD;
+            else 
+                ctx.strokeStyle = Style.circles;
             ctx.beginPath();
             ctx.moveTo(...graph.centre);
             ctx.lineTo(...n.centre);
@@ -274,13 +278,13 @@ export default class Vis {
         this.pick_centres(this.graph, 0, 0, segment, ring);
     }
 
-    make_active (path, style) {
+    make_active (path, style, stopping) {
         let node = this.paths.get(path);
         if (node) {
             if (node.parent.too_many) {
                 node = node.parent.overflow;
             }
-            this.active.add(new Packet(this, node, style));
+            this.active.add(new Packet(this, node, style, stopping));
         }
     }
 

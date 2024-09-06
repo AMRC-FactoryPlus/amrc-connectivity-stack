@@ -1,0 +1,16 @@
+{{- $k8sname := include "edge-agent.k8sname" . }}
+apiVersion: factoryplus.app.amrc.co.uk/v1
+kind: KerberosKey
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: edge-agent.{{ $k8sname }}
+spec:
+  type: Password
+  principal: nd1/{{ .Values.cluster }}/{{ .Values.name }}@{{ .Values.realm }}
+  secret: edge-agent-secrets.{{ $k8sname }}/keytab
+  account:
+    uuid: {{ .Values.uuid }}
+    groups:
+      - {{ .Values.authGroup.edgeAgent }}
+    sparkplug:
+      node: {{ .Values.name }}

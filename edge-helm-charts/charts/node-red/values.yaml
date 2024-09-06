@@ -1,0 +1,30 @@
+image:
+  nodered:
+    registry: docker.io/nodered
+    repository: node-red
+    tag: "3.1"
+    pullPolicy: IfNotPresent
+  mqttBroker:
+    registry: docker.io
+    repository: eclipse-mosquitto
+    tag: "2.0"
+    pullPolicy: IfNotPresent
+# If this is non-null it will be deployed as the initial flow file
+flow: null
+# If this is true we deploy an MQTT broker sidecar
+mqttBroker: false
+# Devices to map in from the host
+devices: []
+# Does Node-RED require access to host devices?
+privileged: false
+# This is required
+# uuid: 12345
+# This deploys to a specific host
+#hostname: foo
+tolerations:
+  # Tolerations to apply to pods deployed to a specific host
+  specific:
+    - key: factoryplus.app.amrc.co.uk/specialised
+      operator: Exists
+  # Tolerations to apply to floating pods
+  floating: []

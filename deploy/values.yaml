@@ -152,7 +152,8 @@ mqtt:
   # -- Possible values are either 1 to enable all possible debugging, or a comma-separated list of debug tags (the tags printed before the log lines). No logging is specified as an empty string.
   verbosity: 0
 
-  ingester:
+ingesters:
+  sparkplug:
     enabled: true
     image:
       # -- The registry of the MQTT component
@@ -229,8 +230,8 @@ warehouse:
       # -- The repository of the Warehouse component
       repository: influxdb-sparkplug-ingester
       pullPolicy: IfNotPresent
-
-  injector:
+historians:
+  uns:
     enabled: true
     # -- The minimum log level that the injector will log messages at (One of 'fatal', 'error', 'warn', 'info', 'debug', 'trace' or 'silent'.)
     logLevel: info

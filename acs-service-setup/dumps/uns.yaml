@@ -37,6 +37,9 @@ aces:
   - principal: !u ACS.ServiceAccount.SparkplugIngester
     permission: !u ACS.Perm.MQTT.ReadWholeNamespace
     target: !u UUIDs.Special.Null
+  - principal: !u ACS.ServiceAccount.SparkplugIngester
+    permission: !u UUIDs.Permission.CmdEsc.Rebirth
+    target: !u UUIDs.Special.Null
   - principal: !u ACS.ServiceAccount.HistorianUNS
     permission: !u ACS.Perm.MQTT.ReadEntireUNS
     target: !u UUIDs.Special.Null

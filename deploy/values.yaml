@@ -5,13 +5,15 @@ acs:
   baseUrl: factoryplus.myorganisation.com
   # -- Whether or not services should be served over HTTPS
   secure: true
+  # -- Whether the metrics from the sparkplug namespace will be republished to the UNS namespace
+  unsMode: true
   # -- The name of the secret holding the wildcard certificate for the
   # above domain. It will be used for every service unless that service
   # specifies its own tlsSecretName.
   tlsSecretName: factoryplus-tls
   cacheMaxAge: 300
   # -- Image pull secrets for container images
-  imagePullSecrets: []
+  imagePullSecrets: [ ]
   # -- An optional tag that will force images to use this version
   # regardless of the version in the Helm chart. Each component can
   # further override this value by setting the `tag` property in its
@@ -27,7 +29,7 @@ identity:
   # objects with 'principal', 'permission' and (optionally)
   # 'restrictions' properties; see the kadmin documentation for their
   # meaning.
-  kadminUsers: []
+  kadminUsers: [ ]
   # -- Enable support for cross-realm authentication
   crossRealm: [ ]
   # crossRealm:
@@ -129,8 +131,8 @@ serviceSetup:
     # Helm charts to deploy to the edge; these default to the charts
     # created automatically but can be overridden to customise
     helmChart:
-      # Chart to deploy an edge cluster
-      #cluster: null
+    # Chart to deploy an edge cluster
+    #cluster: null
 
 mqtt:
   # -- Whether or not to enable the MQTT component
@@ -143,6 +145,15 @@ mqtt:
     pullPolicy: IfNotPresent
   # -- Possible values are either 1 to enable all possible debugging, or a comma-separated list of debug tags (the tags printed before the log lines). No logging is specified as an empty string.
   verbosity: 0
+
+  ingester:
+    enabled: true
+    image:
+      # -- The registry of the MQTT component
+      registry: ghcr.io/amrc-factoryplus
+      # -- The repository of the MQTT component
+      repository: sparkplug-ingester
+      pullPolicy: IfNotPresent
 
 visualiser:
   enabled: true
@@ -213,6 +224,20 @@ warehouse:
       repository: influxdb-sparkplug-ingester
       pullPolicy: IfNotPresent
 
+  injector:
+    enabled: true
+    # -- The minimum log level that the injector will log messages at (One of 'fatal', 'error', 'warn', 'info', 'debug', 'trace' or 'silent'.)
+    logLevel: info
+    # -- The number of messages to batch together before sending to InfluxDB
+    batchSize: 5000
+    # -- Send all buffered messages after this amount of time has elapsed if the buffer is not full (in milliseconds)
+    flushInterval: 10000
+    image:
+      # -- The registry of the Warehouse component
+      registry: ghcr.io/amrc-factoryplus
+      # -- The repository of the Warehouse component
+      repository: influxdb-injector
+      pullPolicy: IfNotPresent
 git:
   # -- Whether or not to enable the Git component
   enabled: true
@@ -254,7 +279,7 @@ shell:
     pullPolicy: IfNotPresent
 
 # XXX This should probably be included in acs-krb-utils
-curl: 
+curl:
   image:
     registry: docker.io
     repository: appropriate/curl
@@ -330,8 +355,8 @@ traefik:
   ingressRoute:
     dashboard:
       enabled: false
-#   -- [AZURE] Enable the below section to expose your instance of Factory+/ACS over the internet, replacing the <Value>
-#   -- tags with the details of your pre-configured load balancer.
+    #   -- [AZURE] Enable the below section to expose your instance of Factory+/ACS over the internet, replacing the <Value>
+    #   -- tags with the details of your pre-configured load balancer.
     service:
       spec:
         loadBalancerIP: <External IP address here>

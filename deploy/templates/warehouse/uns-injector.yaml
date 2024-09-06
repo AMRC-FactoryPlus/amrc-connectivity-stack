@@ -1,0 +1,70 @@
+{ { if and (eq .Values.acs.unsMode.enabled) (eq .Values.warehouse.injector true) } }
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: influxdb-injector
+  namespace: { { .Release.Namespace } }
+  labels:
+    component: influxdb-injector
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: influxdb-injector
+  template:
+    metadata:
+      labels:
+        component: influxdb-injector
+        factory-plus.service: influxdb-injector
+    spec:
+      { { - with .Values.acs.imagePullSecrets } }
+      imagePullSecrets:
+        { { - toYaml . | nindent 8 } }
+      { { - end } }
+      volumes:
+        - name: krb5-conf
+          configMap:
+            name: krb5-conf
+        - name: krb5-keytabs
+          secret:
+            secretName: krb5-keytabs
+            items:
+              - key: sv1warehouse
+                path: client
+
+      containers:
+        - name: influxdb-ingester
+          image: "{{ include "amrc-connectivity-stack.image-name" (list . .Values.warehouse.injector) }}"
+          command: [ "/usr/bin/k5start", "-Uf", "/keytabs/client" ]
+          args: [ "node", "--es-module-specifier-resolution=node", "bin/injector.js" ]
+          imagePullPolicy: Always
+          env:
+            - name: KRB5_CONFIG
+              value: /config/krb5-conf/krb5.conf
+            - name: CLIENT_KEYTAB
+              value: /keytabs/client
+            - name: LOG_LEVEL
+              value: { { .Values.warehouse.injector.logLevel | required "values.warehouse.injector.logLevel" } }
+            - name: BATCH_SIZE
+              value: { { .Values.warehouse.injector.batchSize | quote | required "values.warehouse.injector.batchSize" } }
+            - name: FLUSH_INTERVAL
+              value: { { .Values.warehouse.injector.flushInterval | quote | required "values.warehouse.injector.flushInterval" } }
+            - name: DIRECTORY_URL
+              value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
+            - name: INFLUX_URL
+              value: http://acs-influxdb2.{{ .Release.Namespace }}.svc.cluster.local
+            - name: INFLUX_ORG
+              value: default
+            - name: INFLUX_BUCKET
+              value: 'default'
+            - name: INFLUX_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: influxdb-auth
+                  key: admin-token
+          volumeMounts:
+            - mountPath: /config/krb5-conf
+              name: krb5-conf
+            - mountPath: /keytabs
+              name: krb5-keytabs
+  { { - end - } }

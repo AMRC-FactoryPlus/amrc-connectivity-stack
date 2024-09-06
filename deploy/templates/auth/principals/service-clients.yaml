@@ -132,7 +132,7 @@ metadata:
 spec:
   type: Random
   principal: sv1sparkplugingester@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
-  secret: sparkplugingester-keytabs/client
+  secret: uns-ingester-sparkplug-keytabs/client
 {{- end }}
 ---
 # In the future if we have any more ingesters then this should be

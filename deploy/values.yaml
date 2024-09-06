@@ -157,8 +157,11 @@ unsIngesters:
       # -- The registry of the MQTT component
       registry: ghcr.io/amrc-factoryplus
       # -- The repository of the MQTT component
-      repository: sparkplug-ingester
+      repository: uns-ingester-sparkplug
       pullPolicy: IfNotPresent
+    # -- The minimum log level that the historian will log messages at (One of 'fatal', 'error', 'warn', 'info', 'debug', 'trace' or 'silent'.)
+    logLevel: info
+    verbosity: 0
 
 visualiser:
   enabled: true

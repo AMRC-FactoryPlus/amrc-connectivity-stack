@@ -165,7 +165,7 @@ jobs:
           - acs-service-setup
           - acs-visualiser
           - edge-helm-charts
-          - influxdb-sparkplug-ingester
+          - historian-sparkplug
           - historian-uns
     permissions:
       contents: read

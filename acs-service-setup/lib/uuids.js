@@ -23,6 +23,8 @@ export const ACS = {
         EdgeGroups:         "9ba0de4b-056f-4b5e-b966-2d5d85d07767",
         EdgePermissions:    "7594cd71-e5b9-4467-88c0-b11a66d47fec",
         CentralMonitor:     "1bc3dbca-68fe-48d2-9590-3a528c111827",
+        SparkplugIngesters: "e414d355-b991-429b-8f5d-97e823ff71f5",
+        HistorianUNS:       "03f5f08a-f61e-4134-8f66-b2951e3bbb69",
     },
     Perm: {
         MQTT: {

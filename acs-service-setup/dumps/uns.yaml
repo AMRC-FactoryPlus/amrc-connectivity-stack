@@ -10,9 +10,6 @@ objects:
   !u ACS.Class.Permission:
     - !u ACS.Perm.MQTT.WriteToEntireUNS
     - !u ACS.Perm.MQTT.ReadEntireUNS
-  !u ACS.Class.ServiceAccount:
-    - !u ACS.ServiceAccount.SparkplugIngester
-    - !u ACS.ServiceAccount.HistorianUNS
 configs:
   !u UUIDs.App.Info:
     !u ACS.Perm.MQTT.WriteToEntireUNS: { name: "MQTT: Write to entire UNS" }
@@ -25,24 +22,13 @@ configs:
 ---
 service: !u UUIDs.Service.Authentication
 version: 1
-principals:
-  - uuid: !u ACS.ServiceAccount.SparkplugIngester
-    kerberos: sv1sparkplugingester@{{realm}}
-  - uuid: !u ACS.ServiceAccount.HistorianUNS
-    kerberos: sv1historianuns@{{realm}}
 aces:
-  - principal: !u ACS.ServiceAccount.SparkplugIngester
-    permission: !u ACS.Perm.MQTT.WriteToEntireUNS
-    target: !u UUIDs.Special.Null
-  - principal: !u ACS.ServiceAccount.SparkplugIngester
-    permission: !u ACS.Perm.MQTT.ReadWholeNamespace
-    target: !u UUIDs.Special.Null
-  - principal: !u ACS.ServiceAccount.SparkplugIngester
-    permission: !u UUIDs.Permission.CmdEsc.Rebirth
-    target: !u UUIDs.Special.Null
-  - principal: !u ACS.ServiceAccount.HistorianUNS
+  - principal: !u ACS.Group.HistorianUNS
     permission: !u ACS.Perm.MQTT.ReadEntireUNS
     target: !u UUIDs.Special.Null
+  - principal: !u ACS.Group.SparkplugIngesters
+    permission: !u ACS.Perm.MQTT.WriteToEntireUNS
+    target: !u UUIDs.Special.Self
 groups:
   !u ACS.Group.GlobalDebuggers:
-    - !u ACS.Perm.MQTT.ReadEntireUNS
+    - !u ACS.Group.SparkplugIngesters

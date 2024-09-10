@@ -1,0 +1,187 @@
+{
+  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Tracking_System/Sensor-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "592d0eb9-b176-4360-b995-81d19c3bb507"
+    },
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "Position": {
+      "type": "object",
+      "properties": {
+        "X": {
+          "allOf": [
+            {
+              "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+            },
+            {
+              "properties": {
+                "Documentation": {
+                  "default": ""
+                },
+                "Sparkplug_Type": {
+                  "enum": [
+                    "FloatLE",
+                    "FloatBE",
+                    "DoubleLE",
+                    "DoubleBE"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "Y": {
+          "allOf": [
+            {
+              "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+            },
+            {
+              "properties": {
+                "Documentation": {
+                  "default": ""
+                },
+                "Sparkplug_Type": {
+                  "enum": [
+                    "FloatLE",
+                    "FloatBE",
+                    "DoubleLE",
+                    "DoubleBE"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "Z": {
+          "allOf": [
+            {
+              "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+            },
+            {
+              "properties": {
+                "Documentation": {
+                  "default": ""
+                },
+                "Sparkplug_Type": {
+                  "enum": [
+                    "FloatLE",
+                    "FloatBE",
+                    "DoubleLE",
+                    "DoubleBE"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "I": {
+          "allOf": [
+            {
+              "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+            },
+            {
+              "properties": {
+                "Documentation": {
+                  "default": ""
+                },
+                "Sparkplug_Type": {
+                  "enum": [
+                    "FloatLE",
+                    "FloatBE",
+                    "DoubleLE",
+                    "DoubleBE"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "J": {
+          "allOf": [
+            {
+              "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+            },
+            {
+              "properties": {
+                "Documentation": {
+                  "default": ""
+                },
+                "Sparkplug_Type": {
+                  "enum": [
+                    "FloatLE",
+                    "FloatBE",
+                    "DoubleLE",
+                    "DoubleBE"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "K": {
+          "allOf": [
+            {
+              "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+            },
+            {
+              "properties": {
+                "Documentation": {
+                  "default": ""
+                },
+                "Sparkplug_Type": {
+                  "enum": [
+                    "FloatLE",
+                    "FloatBE",
+                    "DoubleLE",
+                    "DoubleBE"
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      },
+      "required": []
+    },
+    "Ring_Light": {
+      "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Tracking_System/Sensor/Ring_Light-v1.json"
+    },
+    "Mode": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Documentation": {
+              "default": ""
+            },
+            "Sparkplug_Type": {
+              "enum": [
+                "String"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "Environmental_Sensors": {
+      "patternProperties": {
+        "^[a-zA-Z0-9_]*$": {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Sensors/Environmental-v1.json"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID"
+  ]
+}

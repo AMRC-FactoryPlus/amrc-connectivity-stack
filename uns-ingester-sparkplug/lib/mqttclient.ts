@@ -334,24 +334,15 @@ export default class MQTTClient {
                     }, Math.floor(Math.random() * (10000 - 5000 + 1) + 5000));
 
                     // Request birth certificate
-                    let response = await this.serviceClient.fetch({
-                        service: UUIDs.Service.Command_Escalation,
-                        url: `/v1/address/${topic.address.group}/${topic.address.node}/${topic.address.device}`,
-                        method: "POST",
-                        headers: {
-                            "content-type": "application/json"
-                        },
-                        body: JSON.stringify({
-                            "name": "Device Control/Rebirth", "value": "true"
-                        })
-                    })
-
-                    logger.info('📣 Birth certificate request sent for %s. Status: %s', topic.address, response.status);
-
+                    try {
+                        await this.serviceClient.CmdEsc.rebirth(topic.address);
+                        logger.info(`📣 Birth certificate request sent for ${topic.address}`);
+                    } catch (e) {
+                        logger.error(`🔥 Birth certificate request failed for ${topic.address}. Error: ${e.message}`);
+                    }
                 }
                 break;
         }
-
         return;
     }
 

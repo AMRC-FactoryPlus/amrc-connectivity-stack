@@ -14,6 +14,6 @@ const stream = pretty({
 dotenv?.config();
 
 export const logger = pino({
-    name: 'InfluxDB Sparkplug Ingester',
+    name: 'ACS Historian UNS',
     level: process.env.LOG_LEVEL || 'info',
 }, stream);

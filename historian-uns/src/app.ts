@@ -2,10 +2,9 @@
  * AMRC InfluxDB UNS Historian
  * Copyright "2023" AMRC
  */
-import {ServiceClient, UUIDs} from "@amrc-factoryplus/service-client";
+import {ServiceClient} from "@amrc-factoryplus/service-client";
 import MQTTClient from "./mqttclient.js";
-import pretty from "pino-pretty";
-import pino from "pino";
+import {logger} from "./Utils/logger.js";
 
 let dotenv: any = null;
 try {
@@ -13,22 +12,12 @@ try {
 } catch (e) {
 }
 
-const stream = pretty({
-    colorize: true
-})
-
 dotenv?.config();
 
 const directoryUrl = process.env.DIRECTORY_URL;
 if (!directoryUrl) {
     throw new Error("DIRECTORY_URL environment variable is not set");
 }
-
-export const logger = pino({
-    name: 'ACS Historian UNS',
-    level: process.env.LOG_LEVEL || 'info',
-}, stream);
-
 
 const client = await new ServiceClient({
     env: process.env

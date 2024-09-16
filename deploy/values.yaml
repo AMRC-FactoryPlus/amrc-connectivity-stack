@@ -115,7 +115,7 @@ serviceSetup:
   # an array it can only be overridden as a whole, so the step
   # definitions are separate so they can be added to rather than
   # replaced.
-  runSteps: [service-setup, edge-helm]
+  runSteps: [service-setup, acs-schemas, edge-helm]
   # This defines what to run for each step.
   steps:
     service-setup:
@@ -123,6 +123,8 @@ serviceSetup:
         registry: ghcr.io/amrc-factoryplus
         repository: acs-service-setup
         pullPolicy: IfNotPresent
+      # Environment variables to pass to this step. Plain strings are
+      # placed in the environment as-is, other values are JSON-encoded.
       env:
         # This section overrides the classes etc. installed into the ConfigDB
         SS_CONFIG:
@@ -138,6 +140,12 @@ serviceSetup:
           helmChart:
             # Chart to deploy an edge cluster
             #cluster: null
+    acs-schemas:
+      image:
+        registry: ghcr.io/amrc-factoryplus
+        repository: acs-schemas
+        tag: v0.0.1
+        pullPolicy: IfNotPresent
     edge-helm:
       image:
         registry: ghcr.io/amrc-factoryplus

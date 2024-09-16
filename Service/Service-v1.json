@@ -13,7 +13,7 @@
             "format": "uuid"
         },
         "Device_Information": {
-            "$ref": "../Common/Device_Information-v1.json"
+            "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Device_Information-v1.json"
         },
 
         "Service_UUID": {

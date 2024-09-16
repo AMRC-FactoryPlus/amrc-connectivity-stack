@@ -1,0 +1,4 @@
+.git
+deploy/node_modules
+deploy/schemas.json
+validate/node_modules

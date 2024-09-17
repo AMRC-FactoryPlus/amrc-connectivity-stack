@@ -14,9 +14,10 @@ use Illuminate\Support\ServiceProvider;
 use Opis\JsonSchema\Validator;
 use Opis\JsonSchema\Uri;
 
+const MetricSchema = "b16e85fb-53c2-49f9-8d83-cdf6763304ba";
+
 class AppServiceProvider extends ServiceProvider
 {
-    const MetricSchema = "b16e85fb-53c2-49f9-8d83-cdf6763304ba";
 
     /**
      * Register any application services.
@@ -54,8 +55,11 @@ class AppServiceProvider extends ServiceProvider
 
         $this->app->singleton(Validator::class, function (Application $app) {
             $validator = new Validator;
-            $validator->resolver()->registerProtocol("urn", function (Uri $uri) {
-                if (!preg_match("/^uuid:([-0-9a-f]{36})$/", $uri->path(), $m)) {
+            $configdb = $app->make(ServiceClient::class)->getConfigDB();
+            $lookup = function (Uri $uri) use ($configdb) {
+                $ok = preg_match("/^uuid:([-0-9a-f]{36})$/", 
+                    $uri->path(), $match);
+                if (!$ok) {
                     Log::warning("Unknown urn: schema ref: " . $uri->path());
                     return null;
                 }
@@ -63,10 +67,15 @@ class AppServiceProvider extends ServiceProvider
                  * world this validator would persist beyond the scope
                  * of a single request, at which point we would need a
                  * ServiceClient using the Manager's own credentials. */
-                return $app->make(ServiceClient::class)
-                    ->getConfigDB()
-                    ->getConfig(MetricSchema, $m[1]);
-            });
+                $schema = $configdb->getConfig(MetricSchema, $match[1]);
+                /* The ServiceClient returns JSON parsed into arrays.
+                 * The Validator expects it parsed into objects. */
+                $json = json_decode(json_encode($schema));
+                Log::info("Fetched schema {uuid}: {schema}",
+                    ["uuid" => $match[1], "schema" => $json]);
+                return $json;
+            };
+            $validator->resolver()->registerProtocol("urn", $lookup);
             return $validator;
         });
     }

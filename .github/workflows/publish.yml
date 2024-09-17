@@ -350,7 +350,7 @@ jobs:
             build_version=${{ env.BUILD_PHP_VERSION }}
 
       - name: Upload Backend
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.prepare.outputs.version }}-backend
           path: /tmp/image.tar
@@ -385,7 +385,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Download artifact
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4
         with:
           name: ${{ steps.prepare.outputs.version }}-backend
           path: /tmp

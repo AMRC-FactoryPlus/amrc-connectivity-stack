@@ -11,6 +11,8 @@ const ignore = new Set([
 const base = "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main";
 const id_rx = RegExp(`^${base}/([\\w/_]+)-v(\\d+).json$`);
 
+const load_json = async f => JSON.parse(await $fs.readFile(f));
+
 /* Walk should be an async iterator really. But meh. */
 const schemas = new Map();
 
@@ -24,8 +26,7 @@ await walker("..", async (err, path, dirent) => {
     if (dirent.isDirectory()) return;
     if (!path.match(/\.json$/)) return;
 
-    const data = await $fs.readFile(path);
-    const json = JSON.parse(data);
+    const json = await load_json(path);
 
     const id = json.$id;
     if (!id) return;
@@ -93,3 +94,9 @@ for (const sch of schemas.values()) {
 }
 
 await $fs.writeFile("schemas.json", JSON.stringify(configs, null, 2));
+
+const priv = {
+    EdgeAgent:  await load_json("../Edge_Agent_Config.json"),
+    Connection: await load_json("../Device_Connection.json"),
+};
+await $fs.writeFile("private.json", JSON.stringify(priv, null, 2));

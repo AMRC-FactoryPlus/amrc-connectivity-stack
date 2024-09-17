@@ -9,7 +9,10 @@ namespace App\Support\Providers;
 use AMRCFactoryPlus\ServiceClient;
 use App\Exceptions\ReauthenticationRequiredException;
 use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\ServiceProvider;
+use Opis\JsonSchema\Validator;
+use Opis\JsonSchema\Uri;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -20,6 +23,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register()
     {
+        // XXX bmz: I wonder if this should be ->scoped? This is a
+        // per-request object, not a per-worker.
         $this->app->singletonIf(ServiceClient::class, function (Application $app) {
             $ccache = new \KRB5CCache;
 
@@ -43,6 +48,16 @@ class AppServiceProvider extends ServiceProvider
                 ->setScheme(config('manager.scheme'))
                 ->setCache($app->make('cache.store'))
                 ->setCcache($ccache);
+        });
+
+        $this->app->singleton(Validator::class, function (Application $app) {
+            $validator = new Validator;
+            $validator->resolver()->registerProtocol("urn", function (Uri $uri) {
+                Log::info(sprintf("Resolving schema [%s]: path [%s]",
+                    $uri, $uri->path()));
+                return null;
+            });
+            return $validator;
         });
     }
 

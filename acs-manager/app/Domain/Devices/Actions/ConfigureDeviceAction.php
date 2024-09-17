@@ -75,37 +75,39 @@ class ConfigureDeviceAction
 #            }
 #        }
 #
-#        // Validate that the JSON supplied is valid against the supplied schema
-#        $validated = $deviceValidator->validate($deviceConfig, $deviceSchema->url . '-v' . $version->version . '.json');
-#        if (! $validated->isValid()) {
-#            // Get the error
-#            $error = $validated->error();
-#
-#            // Create an error formatter
-#            $formatter = new ErrorFormatter;
-#
-#            $custom = function (ValidationError $error) use ($formatter) {
-#                return [
-#                    'keyword' => $error->keyword(),
-#                    'message' => $formatter->formatErrorMessage($error),
-#
-#                    'dataPath' => $formatter->formatErrorKey($error),
-#                    'dataValue' => $error->data()
-#                                         ->value(),
-#                ];
-#            };
-#
-#            $errors = $formatter->formatFlat($error, $custom);
-#            Log::error('JSON file is not valid against ' . $deviceSchema->name . '-v' . $version->version . '!', [
-#                'error' => $errors[count($errors) - 1],
-#            ]);
-#
-#            throw new ActionFailException(
-#                'The configuration is not valid for ' . $deviceSchema->name . '-v' . $version->version . '. ' . $errors[count(
-#                    $errors
-#                ) - 1]['message'] . ' at ' . $errors[count($errors) - 1]['dataPath']
-#            );
-#        }
+        // Validate that the JSON supplied is valid against the supplied schema
+        $deviceValidator = resolve(Validator::class);
+        $validated = $deviceValidator->validate($deviceConfig, 
+                "urn:uuid:" . $schemaUUID);
+        if (! $validated->isValid()) {
+            // Get the error
+            $error = $validated->error();
+
+            // Create an error formatter
+            $formatter = new ErrorFormatter;
+
+            $custom = function (ValidationError $error) use ($formatter) {
+                return [
+                    'keyword' => $error->keyword(),
+                    'message' => $formatter->formatErrorMessage($error),
+
+                    'dataPath' => $formatter->formatErrorKey($error),
+                    'dataValue' => $error->data()
+                                         ->value(),
+                ];
+            };
+
+            $errors = $formatter->formatFlat($error, $custom);
+            Log::error('JSON file is not valid against ' . $deviceSchema->name . '-v' . $version->version . '!', [
+                'error' => $errors[count($errors) - 1],
+            ]);
+
+            throw new ActionFailException(
+                'The configuration is not valid for ' . $deviceSchema->name . '-v' . $version->version . '. ' . $errors[count(
+                    $errors
+                ) - 1]['message'] . ' at ' . $errors[count($errors) - 1]['dataPath']
+            );
+        }
 
         // Upload the origin map
         $originMapFilename = uniqid('', true);

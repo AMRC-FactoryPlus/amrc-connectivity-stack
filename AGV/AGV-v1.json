@@ -1,0 +1,94 @@
+{
+  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/AGV/AGV-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "dce8a007-6a64-41d2-9851-89451e871613"
+    },
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "Device_Information": {
+      "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Device_Information-v1.json"
+    },
+    "Emergency_Stops": {
+      "patternProperties": {
+        "^[a-zA-Z0-9_]*$": {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Cell/Emergency_Stop-v1.json"
+        }
+      },
+      "type": "object"
+    },
+    "Position": {
+      "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Pose-v1.json"
+    },
+    "Velocity": {
+      "type": "object",
+      "properties": {
+        "Linear": {
+          "allOf": [
+            {
+              "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+            },
+            {
+              "properties": {
+                "Documentation": {
+                  "default": ""
+                },
+                "Sparkplug_Type": {
+                  "enum": [
+                    "FloatLE",
+                    "FloatBE",
+                    "DoubleLE",
+                    "DoubleBE"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "Angular": {
+          "allOf": [
+            {
+              "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+            },
+            {
+              "properties": {
+                "Documentation": {
+                  "default": ""
+                },
+                "Sparkplug_Type": {
+                  "enum": [
+                    "FloatLE",
+                    "FloatBE",
+                    "DoubleLE",
+                    "DoubleBE"
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      },
+      "required": []
+    },
+    "Current_Job": {
+      "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/AGV/Job-v1.json"
+    },
+    "Job_Queue": {
+      "patternProperties": {
+        "^[a-zA-Z0-9_]*$": {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/AGV/Job-v1.json"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID"
+  ]
+}

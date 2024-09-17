@@ -16,6 +16,8 @@ use Opis\JsonSchema\Uri;
 
 class AppServiceProvider extends ServiceProvider
 {
+    const MetricSchema = "b16e85fb-53c2-49f9-8d83-cdf6763304ba";
+
     /**
      * Register any application services.
      *
@@ -53,9 +55,17 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(Validator::class, function (Application $app) {
             $validator = new Validator;
             $validator->resolver()->registerProtocol("urn", function (Uri $uri) {
-                Log::info(sprintf("Resolving schema [%s]: path [%s]",
-                    $uri, $uri->path()));
-                return null;
+                if (!preg_match("/^uuid:([-0-9a-f]{36})$/", $uri->path(), $m)) {
+                    Log::warning("Unknown urn: schema ref: " . $uri->path());
+                    return null;
+                }
+                /* XXX This uses the user's ServiceClient. In an ideal
+                 * world this validator would persist beyond the scope
+                 * of a single request, at which point we would need a
+                 * ServiceClient using the Manager's own credentials. */
+                return $app->make(ServiceClient::class)
+                    ->getConfigDB()
+                    ->getConfig(MetricSchema, $m[1]);
             });
             return $validator;
         });

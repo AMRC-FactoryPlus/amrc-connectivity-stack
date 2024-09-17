@@ -165,6 +165,95 @@
     },
     "ISA95_Hierarchy": {
       "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Hierarchy-v1.json"
+    },
+    "Battery": {
+      "type": "object",
+      "properties": {
+        "Percentage": {
+          "allOf": [
+            {
+              "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+            },
+            {
+              "properties": {
+                "Documentation": {
+                  "default": "The current battery percentage"
+                },
+                "Sparkplug_Type": {
+                  "enum": [
+                    "FloatLE",
+                    "FloatBE",
+                    "DoubleLE",
+                    "DoubleBE"
+                  ]
+                },
+                "Eng_Unit": {
+                  "default": "%"
+                },
+                "Eng_Low": {
+                  "default": 0
+                },
+                "Eng_High": {
+                  "default": 100
+                }
+              }
+            }
+          ]
+        },
+        "Time_Remaining": {
+          "allOf": [
+            {
+              "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+            },
+            {
+              "properties": {
+                "Documentation": {
+                  "default": "The amount of time remaining until the battery is depleted"
+                },
+                "Sparkplug_Type": {
+                  "enum": [
+                    "String",
+                    "UInt64BE",
+                    "UInt64LE",
+                    "UInt32BE",
+                    "UInt32LE",
+                    "UInt16BE",
+                    "UInt16LE",
+                    "UInt8"
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      },
+      "required": []
+    },
+    "Uptime": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Documentation": {
+              "default": "The amount of time that the device has been online"
+            },
+            "Sparkplug_Type": {
+              "enum": [
+                "String",
+                "UInt32LE",
+                "UInt32BE",
+                "UInt64BE",
+                "UInt64LE",
+                "UInt16BE",
+                "UInt16LE",
+                "UInt8"
+              ]
+            }
+          }
+        }
+      ]
     }
   },
   "required": [

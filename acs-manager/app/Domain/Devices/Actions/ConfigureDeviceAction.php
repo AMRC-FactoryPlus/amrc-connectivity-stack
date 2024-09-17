@@ -33,8 +33,9 @@ class ConfigureDeviceAction
 
     public function execute(
         Device $device,
-        DeviceSchema $deviceSchema,
-        DeviceSchemaVersion $version,
+        string $schemaUUID,
+        #DeviceSchema $deviceSchema,
+        #DeviceSchemaVersion $version,
         string $deviceConfiguration,
         bool $active
     ) {
@@ -61,50 +62,50 @@ class ConfigureDeviceAction
         // Decode $deviceConfig
         $deviceConfig = json_decode($deviceConfiguration, false, 512, JSON_THROW_ON_ERROR);
 
-        // Register all known schemas
-        $deviceValidator = new Validator;
-
-        foreach (
-            HTTP::get('https://api.github.com/repos/AMRC-FactoryPlus/schemas/git/trees/main?recursive=1')
-                ->json()['tree'] as $item
-        ) {
-            if (preg_match("/-v\d+.json$/", $item['path'])) {
-                $deviceValidator->resolver()
-                                ->registerRaw(file_get_contents('https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/' . $item['path']));
-            }
-        }
-
-        // Validate that the JSON supplied is valid against the supplied schema
-        $validated = $deviceValidator->validate($deviceConfig, $deviceSchema->url . '-v' . $version->version . '.json');
-        if (! $validated->isValid()) {
-            // Get the error
-            $error = $validated->error();
-
-            // Create an error formatter
-            $formatter = new ErrorFormatter;
-
-            $custom = function (ValidationError $error) use ($formatter) {
-                return [
-                    'keyword' => $error->keyword(),
-                    'message' => $formatter->formatErrorMessage($error),
-
-                    'dataPath' => $formatter->formatErrorKey($error),
-                    'dataValue' => $error->data()
-                                         ->value(),
-                ];
-            };
-
-            $errors = $formatter->formatFlat($error, $custom);
-            Log::error('JSON file is not valid against ' . $deviceSchema->name . '-v' . $version->version . '!', [
-                'error' => $errors[count($errors) - 1],
-            ]);
-
-            throw new ActionFailException(
-                'The configuration is not valid for ' . $deviceSchema->name . '-v' . $version->version . '. ' . $errors[count(
-                    $errors
-                ) - 1]['message'] . ' at ' . $errors[count($errors) - 1]['dataPath']
-            );
-        }
+#        // Register all known schemas
+#        $deviceValidator = new Validator;
+#
+#        foreach (
+#            HTTP::get('https://api.github.com/repos/AMRC-FactoryPlus/schemas/git/trees/main?recursive=1')
+#                ->json()['tree'] as $item
+#        ) {
+#            if (preg_match("/-v\d+.json$/", $item['path'])) {
+#                $deviceValidator->resolver()
+#                                ->registerRaw(file_get_contents('https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/' . $item['path']));
+#            }
+#        }
+#
+#        // Validate that the JSON supplied is valid against the supplied schema
+#        $validated = $deviceValidator->validate($deviceConfig, $deviceSchema->url . '-v' . $version->version . '.json');
+#        if (! $validated->isValid()) {
+#            // Get the error
+#            $error = $validated->error();
+#
+#            // Create an error formatter
+#            $formatter = new ErrorFormatter;
+#
+#            $custom = function (ValidationError $error) use ($formatter) {
+#                return [
+#                    'keyword' => $error->keyword(),
+#                    'message' => $formatter->formatErrorMessage($error),
+#
+#                    'dataPath' => $formatter->formatErrorKey($error),
+#                    'dataValue' => $error->data()
+#                                         ->value(),
+#                ];
+#            };
+#
+#            $errors = $formatter->formatFlat($error, $custom);
+#            Log::error('JSON file is not valid against ' . $deviceSchema->name . '-v' . $version->version . '!', [
+#                'error' => $errors[count($errors) - 1],
+#            ]);
+#
+#            throw new ActionFailException(
+#                'The configuration is not valid for ' . $deviceSchema->name . '-v' . $version->version . '. ' . $errors[count(
+#                    $errors
+#                ) - 1]['message'] . ' at ' . $errors[count($errors) - 1]['dataPath']
+#            );
+#        }
 
         // Upload the origin map
         $originMapFilename = uniqid('', true);
@@ -117,7 +118,7 @@ class ConfigureDeviceAction
             'device_id' => $device->id,
             'file' => $originMapFilename . '.json',
             'active' => $active,
-            'schema_uuid' => $version->schema_uuid,
+            'schema_uuid' => $schemaUUID,
         ]);
 
         // Save the InstanceUUID and SchemaUUID against the device

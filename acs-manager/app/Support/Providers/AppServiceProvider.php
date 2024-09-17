@@ -8,17 +8,16 @@ namespace App\Support\Providers;
 
 use AMRCFactoryPlus\ServiceClient;
 use App\Exceptions\ReauthenticationRequiredException;
+use App\Support\ManagerUUIDs;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\ServiceProvider;
 use Opis\JsonSchema\Validator;
 use Opis\JsonSchema\Uri;
 
-const MetricSchema = "b16e85fb-53c2-49f9-8d83-cdf6763304ba";
 
 class AppServiceProvider extends ServiceProvider
 {
-
     /**
      * Register any application services.
      *
@@ -67,7 +66,8 @@ class AppServiceProvider extends ServiceProvider
                  * world this validator would persist beyond the scope
                  * of a single request, at which point we would need a
                  * ServiceClient using the Manager's own credentials. */
-                $schema = $configdb->getConfig(MetricSchema, $match[1]);
+                $schema = $configdb->getConfig(
+                        ManagerUUIDs::JsonSchema, $match[1]);
                 /* The ServiceClient returns JSON parsed into arrays.
                  * The Validator expects it parsed into objects. */
                 $json = json_decode(json_encode($schema));

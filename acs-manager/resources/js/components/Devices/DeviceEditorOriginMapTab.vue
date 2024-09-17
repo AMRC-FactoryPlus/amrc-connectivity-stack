@@ -612,7 +612,7 @@ export default {
     selectSchema (schema) {
       this.schemaBrowserVisible = false
       this.schema = schema.parsedSchema
-      this.selectedSchemaId = schema.schemaObj.device_schema_id
+      //this.selectedSchemaId = schema.schemaObj.device_schema_id
       this.selectedSchemaUUID = schema.schemaObj.schema_uuid
       this.loadingExistingConfig = false
     },
@@ -628,7 +628,7 @@ export default {
       axios.patch(`/api/devices/${this.device.id}/origin-map`, {
         'configuration': JSON.stringify(this.model),
         'activate': activate,
-        'device_schema_id': this.selectedSchemaId,
+        //'device_schema_id': this.selectedSchemaId,
         'schema_uuid': this.selectedSchemaUUID,
       }).then(() => {
         this.loading = false
@@ -666,7 +666,7 @@ export default {
       model: {},
       schemaBrowserVisible: false,
       schema: null,
-      selectedSchemaId: null,
+      //selectedSchemaId: null,
       selectedSchemaUUID: null,
       showCDSImport: false,
       controls: [],

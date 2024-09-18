@@ -1,7 +1,9 @@
+import fs from "fs";
 import $fs from "fs/promises";
 import $path from "path";
 
 import Walk from "@root/walk";
+import git from "isomorphic-git";
 
 const ignore = new Set([
     ".git", ".githooks", ".github",
@@ -81,10 +83,18 @@ for (const sch of schemas.values()) {
     if (!sch.uuid)
         continue;
 
+    const changes = (await git.log({
+        fs, 
+        dir:        "..", 
+        filepath:   $path.relative("..", sch.path),
+    })).map(l => l.commit.author.timestamp);
+
     configs[sch.uuid] = {
         metadata: {
             name:       sch.name,
             version:    sch.version,
+            created:    changes.at(-1),
+            modified:   changes.at(0),
         },
         schema: {
             ...fixup(sch.json),

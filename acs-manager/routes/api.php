@@ -92,7 +92,7 @@ Route::middleware('auth:api')->get('/default-helm-chart-templates', [HelmChartCo
 
 // ------ Schemas ------ //
 Route::middleware('auth:api')->get('/device-schemas', [DeviceSchemaController::class, 'index']);
-Route::middleware('auth:api')->get('/device-schemas/{schema}/versions', [DeviceSchemaVersionController::class, 'index']);
+Route::middleware('auth:api')->get('/device-schemas/{schema}', [DeviceSchemaController::class, 'schema']);
 
 // ------ Sensitive Information ------ //
 Route::middleware('auth:api')->post('/sensitive-information', [SensitiveInformationController::class, 'create']);

@@ -14,7 +14,6 @@
 </template>
 
 <script>
-import $RefParser from '@apidevtools/json-schema-ref-parser'
 import { v4 as uuidv4 } from 'uuid'
 
 export default {
@@ -56,39 +55,34 @@ export default {
 
     async schemaVersionSelected (schemaObj) {
       // Get the raw JSON in case our caller needs that (e.g. Schema Editor)
-      let raw = null
-      axios.post('/api/github-proxy/', {
-        path: schemaObj.url.replace('https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/', ''),
-      }).then(k => {
-        let data = k.data
-        raw = data.data
-
-        // This resolves all references to other schemas and returns a JSON object of the complete flattened schema
-        this.refParser.dereference(schemaObj.url, (err, parsedSchema) => {
-          if (err) {
-            console.error(err)
-          } else {
-            this.$emit('schema-selected', {
-              parsedSchema: parsedSchema,
-              schemaObj: schemaObj,
-              rawSchema: raw,
-            })
+      const uuid = schemaObj.schema_uuid;
+      console.log("SELECT SCHEMA VERSION %s", uuid);
+      const raw = await this.refParser.fetchSchema(uuid)
+        .catch(error => {
+          if (error && error.response && error.response.status === 401) {
+            this.goto_url('/login');
           }
-        })
-      }).catch(error => {
-        if (error && error.response && error.response.status === 401) {
-          this.goto_url('/login')
-        }
-        this.handleError(error)
-      })
+          this.handleError(error);
+        });
+      console.log("FETCHED RAW SCHEMA: %o", raw);
+      const parsed = await this.refParser(`urn:uuid:${uuid}`)
+        .catch(err => console.error(err));
+      console.log("PARSED SCHEMA: %o", parsed);
+
+      this.$emit('schema-selected', {
+        parsedSchema: parsed,
+        schemaObj: schemaObj,
+        rawSchema: raw,
+      });
     },
   },
 
   data () {
     return {
-      refParser: $RefParser,
       parsedSchema: null,
     }
   },
+
+  inject: ["refParser"],
 }
 </script>

@@ -104,6 +104,7 @@ export default {
 
     selectDeviceSchemaVersion(version) {
       this.loading = true;
+      console.log("SchemaBrowser.selectDeviceSchemaVersion: %o", version);
       this.$emit('selected', {
         schema_uuid: version.uuid
       });

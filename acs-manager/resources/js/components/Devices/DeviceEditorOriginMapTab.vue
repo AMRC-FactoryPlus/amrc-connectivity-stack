@@ -154,6 +154,45 @@ export default {
 
   methods: {
 
+    buildRefParser () {
+      const parser = {
+        order: 1,
+        canParse: true,
+        parse: file => {
+          console.log("Parsed schema %s: %o", file.url, file.data);
+          return file.data;
+        },
+      };
+      const fetchSchema = uuid => axios.get(`/api/device-schemas/${uuid}`)
+        .then(res => res.data.data);
+      const resolver = {
+        order: 1,
+        /* We accept an extraneous / here because some part of the awful
+         * URL-munging done by schema-ref-parser introduces it. */
+        canRead: /^urn:uuid\/?:[-0-9a-f]{36}$/,
+        async read (file) {
+          console.log("READ SCHEMA %o", file);
+          const uuid = file.url.replace(/^urn:uuid\/?:/, "");
+          console.log("SCHEMA UUID %s", uuid);
+          const sch = await fetchSchema(uuid);
+          console.log("Fetched schema %s: %o", file, sch);
+          return sch;
+        },
+      };
+
+      const rp = new $RefParser();
+      const rv = url => rp.dereference(url, {
+        parse:    { all: parser },
+        resolve:  {
+          uuid: resolver,
+          file: false,
+          http: false,
+        },
+      });
+      rv.fetchSchema = fetchSchema;
+      return rv;
+    },
+
     checkDirty () {
       if (this.isDirty) {
         return ''
@@ -175,16 +214,14 @@ export default {
         device_schema_id: this.device.latest_origin_map.schema_version.device_schema_id,
         schema_uuid: this.device.latest_origin_map.schema_uuid,
       }
-      this.refParser.dereference(schemaObj.url, (err, parsedSchema) => {
-        if (err) {
-          console.error(err)
-        } else {
+      this.refParser(schemaObj.schema_uuid)
+        .then((parsedSchema) => {
           this.selectSchema({
             parsedSchema: parsedSchema,
             schemaObj: schemaObj,
           }, false)
-        }
-      })
+        })
+        .catch(e => console.error(e));
 
       // 2. Load the model object
       this.model = this.device.model
@@ -610,6 +647,8 @@ export default {
     },
 
     selectSchema (schema) {
+      console.log("SELECT SCHEMA: %o", schema);
+
       this.schemaBrowserVisible = false
       this.schema = schema.parsedSchema
       //this.selectedSchemaId = schema.schemaObj.device_schema_id
@@ -658,7 +697,7 @@ export default {
     return {
       isDirty: false,
       loadingExistingConfig: true,
-      refParser: $RefParser,
+      refParser: this.buildRefParser(),
       loading: false,
       selectedMetric: null,
       groupRerenderTrigger: +new Date(),
@@ -675,6 +714,12 @@ export default {
       metricLoading: false,
     }
   },
+
+  provide () {
+    return {
+      refParser: this.refParser,
+    };
+  }
 }
 </script>
 

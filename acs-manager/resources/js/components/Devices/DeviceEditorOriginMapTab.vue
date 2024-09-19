@@ -109,7 +109,6 @@
 </template>
 <script>
 import { v4 as uuidv4 } from 'uuid'
-import $RefParser from '@apidevtools/json-schema-ref-parser'
 
 export default {
   name: 'DeviceEditorOriginMapTab',
@@ -154,38 +153,6 @@ export default {
 
   methods: {
 
-    buildRefParser () {
-      const parser = {
-        order: 1,
-        canParse: true,
-        parse: file => file.data,
-      };
-      const fetchSchema = uuid => axios.get(`/api/device-schemas/${uuid}`)
-        .then(res => res.data.data);
-      const resolver = {
-        order: 1,
-        /* We accept an extraneous / here because some part of the awful
-         * URL-munging done by schema-ref-parser introduces it. */
-        canRead: /^urn:uuid\/?:[-0-9a-f]{36}$/,
-        read (file) {
-          const uuid = file.url.replace(/^urn:uuid\/?:/, "");
-          return fetchSchema(uuid);
-        },
-      };
-
-      const rp = new $RefParser();
-      const rv = url => rp.dereference(url, {
-        parse:    { all: parser },
-        resolve:  {
-          uuid: resolver,
-          file: false,
-          http: false,
-        },
-      });
-      rv.fetchSchema = fetchSchema;
-      return rv;
-    },
-
     checkDirty () {
       if (this.isDirty) {
         return ''
@@ -202,12 +169,9 @@ export default {
 
       // 1. Get the latest version of the schema from the model
       let schemaObj = {
-        url: this.device.latest_origin_map.schema_version.schema.url + '-v' +
-            this.device.latest_origin_map.schema_version.version + '.json',
-        device_schema_id: this.device.latest_origin_map.schema_version.device_schema_id,
         schema_uuid: this.device.latest_origin_map.schema_uuid,
       }
-      this.refParser(schemaObj.schema_uuid)
+      this.refParser.dereference(schemaObj.schema_uuid)
         .then((parsedSchema) => {
           this.selectSchema({
             parsedSchema: parsedSchema,
@@ -688,7 +652,6 @@ export default {
     return {
       isDirty: false,
       loadingExistingConfig: true,
-      refParser: this.buildRefParser(),
       loading: false,
       selectedMetric: null,
       groupRerenderTrigger: +new Date(),
@@ -706,11 +669,7 @@ export default {
     }
   },
 
-  provide () {
-    return {
-      refParser: this.refParser,
-    };
-  }
+  inject: ["refParser"],
 }
 </script>
 

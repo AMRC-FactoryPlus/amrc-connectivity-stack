@@ -127,10 +127,12 @@ export default {
 
   computed: {
     schemaNames () {
+      if (!this.deviceSchemas) return null;
       return Object.keys(this.deviceSchemas).toSorted();
     },
 
     schemaVersions () {
+      if (!this.deviceSchemas) return null;
       if (!this.selectedSchemaName) return null;
       const vers = x => Number.parseInt(x.version, 10);
       return this.deviceSchemas[this.selectedSchemaName]

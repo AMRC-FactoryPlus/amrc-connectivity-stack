@@ -172,13 +172,13 @@ export default {
         schema_uuid: this.device.latest_origin_map.schema_uuid,
       }
       this.refParser.dereference(schemaObj.schema_uuid)
-        .then((parsedSchema) => {
+        .then(parsedSchema => {
           this.selectSchema({
             parsedSchema: parsedSchema,
             schemaObj: schemaObj,
           }, false)
         })
-        .catch(e => console.error(e));
+        .catch(e => this.handleError(e));
 
       // 2. Load the model object
       this.model = this.device.model
@@ -606,7 +606,6 @@ export default {
     selectSchema (schema) {
       this.schemaBrowserVisible = false
       this.schema = schema.parsedSchema
-      //this.selectedSchemaId = schema.schemaObj.device_schema_id
       this.selectedSchemaUUID = schema.schemaObj.schema_uuid
       this.loadingExistingConfig = false
     },
@@ -622,7 +621,6 @@ export default {
       axios.patch(`/api/devices/${this.device.id}/origin-map`, {
         'configuration': JSON.stringify(this.model),
         'activate': activate,
-        //'device_schema_id': this.selectedSchemaId,
         'schema_uuid': this.selectedSchemaUUID,
       }).then(() => {
         this.loading = false
@@ -659,7 +657,6 @@ export default {
       model: {},
       schemaBrowserVisible: false,
       schema: null,
-      //selectedSchemaId: null,
       selectedSchemaUUID: null,
       showCDSImport: false,
       controls: [],

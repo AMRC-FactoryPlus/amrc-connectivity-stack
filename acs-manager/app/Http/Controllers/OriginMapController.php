@@ -20,28 +20,10 @@ class OriginMapController extends Controller
     {
         $validated = $request->validated();
 
-#        // Get the deviceSchema
-#        $deviceSchema = DeviceSchema::where('id', $validated['device_schema_id'])->first();
-#        if (! $deviceSchema) {
-#            throw new ActionFailException(
-#                'The device schema does not exist.', 404
-#            );
-#        }
-#
-#        // Get the deviceSchemaVersion
-#        $deviceSchemaVersion = DeviceSchemaVersion::where('schema_uuid', $validated['schema_uuid'])->first();
-#        if (! $deviceSchemaVersion) {
-#            throw new ActionFailException(
-#                'The device schema version does not exist.', 404
-#            );
-#        }
-
         // Configure the device with a draft pre-written device configuration
         (new ConfigureDeviceAction)->execute(
             device                    : $device->fresh()->load('originMaps'),
             schemaUUID                : $validated['schema_uuid'],
-            #deviceSchema              : $deviceSchema->fresh(),
-            #version                   : $deviceSchemaVersion,
             deviceConfiguration       : $validated['configuration'],
             active                    : $validated['activate']
         );

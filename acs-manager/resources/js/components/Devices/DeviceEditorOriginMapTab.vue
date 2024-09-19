@@ -158,10 +158,7 @@ export default {
       const parser = {
         order: 1,
         canParse: true,
-        parse: file => {
-          console.log("Parsed schema %s: %o", file.url, file.data);
-          return file.data;
-        },
+        parse: file => file.data,
       };
       const fetchSchema = uuid => axios.get(`/api/device-schemas/${uuid}`)
         .then(res => res.data.data);
@@ -170,13 +167,9 @@ export default {
         /* We accept an extraneous / here because some part of the awful
          * URL-munging done by schema-ref-parser introduces it. */
         canRead: /^urn:uuid\/?:[-0-9a-f]{36}$/,
-        async read (file) {
-          console.log("READ SCHEMA %o", file);
+        read (file) {
           const uuid = file.url.replace(/^urn:uuid\/?:/, "");
-          console.log("SCHEMA UUID %s", uuid);
-          const sch = await fetchSchema(uuid);
-          console.log("Fetched schema %s: %o", file, sch);
-          return sch;
+          return fetchSchema(uuid);
         },
       };
 
@@ -647,8 +640,6 @@ export default {
     },
 
     selectSchema (schema) {
-      console.log("SELECT SCHEMA: %o", schema);
-
       this.schemaBrowserVisible = false
       this.schema = schema.parsedSchema
       //this.selectedSchemaId = schema.schemaObj.device_schema_id

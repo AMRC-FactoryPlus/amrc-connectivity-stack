@@ -56,7 +56,6 @@ export default {
     async schemaVersionSelected (schemaObj) {
       // Get the raw JSON in case our caller needs that (e.g. Schema Editor)
       const uuid = schemaObj.schema_uuid;
-      console.log("SELECT SCHEMA VERSION %s", uuid);
       const raw = await this.refParser.fetchSchema(uuid)
         .catch(error => {
           if (error && error.response && error.response.status === 401) {
@@ -64,10 +63,8 @@ export default {
           }
           this.handleError(error);
         });
-      console.log("FETCHED RAW SCHEMA: %o", raw);
       const parsed = await this.refParser(`urn:uuid:${uuid}`)
-        .catch(err => console.error(err));
-      console.log("PARSED SCHEMA: %o", parsed);
+        .catch(err => this.handleError(err));
 
       this.$emit('schema-selected', {
         parsedSchema: parsed,

@@ -209,6 +209,7 @@ jobs:
           - acs-edge
           - edge-modbus
           - edge-test
+          - edge-bacnet
     permissions:
       contents: read
       packages: write

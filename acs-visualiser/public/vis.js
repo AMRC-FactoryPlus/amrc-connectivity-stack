@@ -63,6 +63,7 @@ export default class Vis {
                 graph.too_many = nodes.length;
             }
             else {
+                graph.too_many = null;
                 graph.leaves = nodes
                     .map(c => c.leaves)
                     .reduce((a, b) => a + b, 0);
@@ -92,15 +93,16 @@ export default class Vis {
         ];
         
         const nodes = graph.children;
-		if (graph.too_many) {
-			const o_cen = [
-            (radius + ring) * Math.cos(myangle) * this.xscale, 
-            (radius + ring) * Math.sin(myangle)];
-			graph.overflow = {
-				parent: graph,
-				centre: o_cen,
-			};
-		}
+        if (graph.too_many) {
+            const o_cen = [
+                (radius + ring) * Math.cos(myangle) * this.xscale, 
+                (radius + ring) * Math.sin(myangle),
+            ];
+            graph.overflow = {
+                parent: graph,
+                centre: o_cen,
+            };
+        }
         if (graph.too_many || !nodes || nodes.length == 0)
              return;
 
@@ -187,6 +189,9 @@ export default class Vis {
 
         const th = TURN / graph.too_many;
         for (let i = 0; i < graph.too_many; i++) {
+            if (!graph.children[i]) {
+                continue;
+            }
             ctx.strokeStyle = graph.children[i].online ? Style.circles : Style.offline;
             ctx.beginPath();
             ctx.arc(x, y, r, th*i, th*(i + 1), true);

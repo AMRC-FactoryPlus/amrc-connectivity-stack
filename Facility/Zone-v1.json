@@ -58,6 +58,14 @@
         }
       },
       "type": "object"
+    },
+    "Zones": {
+      "patternProperties": {
+        "^[a-zA-Z0-9_]*$": {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Facility/Zone-v1.json"
+        }
+      },
+      "type": "object"
     }
   },
   "required": [

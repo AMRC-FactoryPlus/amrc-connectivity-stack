@@ -82,7 +82,7 @@
             </button>
           </div>
         </div>
-        <div v-if="metricLoading" class="flex flex-grow w-full gap-x-6">
+        <div v-if="!sparkplugMetricSchema" class="flex flex-grow w-full gap-x-6">
           <div class="flex items-center justify-center flex-grow">
             <div class="text-center mt-10 pb-3 flex-grow">
               <i class="fa-sharp fa-solid fa-circle-notch fa-spin fa-2x text-gray-300"></i>
@@ -90,9 +90,11 @@
             </div>
           </div>
         </div>
-        <div v-if="selectedMetric" class="flex flex-col h-full overflow-y-auto border-l">
-          <SparkplugMetric :key="rerenderTrigger" :selected-metric="selectedMetric" :model="model"
-                           @input="metricDetailsEdited" @loaded="metricLoading = false"></SparkplugMetric>
+        <div v-else-if="selectedMetric" class="flex flex-col h-full overflow-y-auto border-l">
+          <SparkplugMetric :key="rerenderTrigger"
+            :selected-metric="selectedMetric" :model="model"
+            :schema="sparkplugMetricSchema" @input="metricDetailsEdited">
+          </SparkplugMetric>
         </div>
         <div v-else class="flex flex-grow w-full gap-x-6">
           <div class="flex items-center justify-center flex-grow">
@@ -109,6 +111,8 @@
 </template>
 <script>
 import { v4 as uuidv4 } from 'uuid'
+
+const SparkplugMetric = "b16275f1-e443-4c41-a482-fcbdfbd20769";
 
 export default {
   name: 'DeviceEditorOriginMapTab',
@@ -133,6 +137,7 @@ export default {
     window.onbeforeunload = this.checkDirty
 
     document.addEventListener('keydown', this.doSave)
+    this.loadSparkplugMetricSchema();
     this.loadExistingConfig()
   },
 
@@ -157,6 +162,13 @@ export default {
       if (this.isDirty) {
         return ''
       }
+    },
+
+    /* Load the Sparkplug Metric schema once here and then pass it in to
+     * the SparkplugMetric components. */
+    async loadSparkplugMetricSchema () {
+      const sch = await this.refParser.fetchSchema(SparkplugMetric);
+      this.sparkplugMetricSchema = sch;
     },
 
     loadExistingConfig () {
@@ -218,7 +230,7 @@ export default {
           Object.keys(modelLevel).includes('Schema_UUID')
 
           // Do not process this if it's a metric schema
-          && modelLevel.Schema_UUID !== 'b16275f1-e443-4c41-a482-fcbdfbd20769'
+          && modelLevel.Schema_UUID !== SparkplugMetric
 
           // Do not process this if it's already been added to the schema object
           && !_.get(this.schema, n.join('.') + '.properties.' + objectName)) {
@@ -476,9 +488,6 @@ export default {
     },
 
     selectMetric (val) {
-
-      this.metricLoading = true
-
       let reversed = [...val].reverse()
 
       // Get the existing value
@@ -533,7 +542,7 @@ export default {
                 '.')
 
             // Generate an Instance_UUID for this schema instance, only if we're stamping this for the first time and it's not a metric
-            if (e.schemaUUID !== 'b16275f1-e443-4c41-a482-fcbdfbd20769') {
+            if (e.schemaUUID !== SparkplugMetric) {
               this.set(reversed.slice(0, index + 1).map(e => e.key).join('.') + '.Instance_UUID', uuidv4(), this.model,
                   '.')
             }
@@ -662,7 +671,7 @@ export default {
       controls: [],
 
       newObjectContext: null,
-      metricLoading: false,
+      sparkplugMetricSchema: null,
     }
   },
 

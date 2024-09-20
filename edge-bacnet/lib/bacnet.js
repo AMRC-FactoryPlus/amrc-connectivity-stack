@@ -39,6 +39,16 @@ export class BacnetHandler {
 
   parseAddr (spec) {
 
+    // XXX - This is a hack and shouldn't need to handle this at all.
+    // This originates from an upstream edge agent bug.
+    if (spec === 'undefined') {
+      return {
+        type: null,
+        instance: null,
+        propertyId: null,
+      }
+    }
+
     const parts = spec.split(',')
 
     // If there are three parts, then the last one is the propertyID. If
@@ -60,7 +70,14 @@ export class BacnetHandler {
   }
 
   async poll (addr) {
+
     const { client } = this
+
+    // XXX - This is a hack and shouldn't need to handle this at all.
+    // This originates from an upstream edge agent bug.
+    if (addr.type === null) {
+      return;
+    }
 
     return new Promise((resolve, reject) => {
 

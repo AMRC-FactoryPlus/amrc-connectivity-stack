@@ -179,22 +179,22 @@ export default class Vis {
         ctx.moveTo(...graph.centre);
         ctx.lineTo(...graph.overflow.centre);
         ctx.strokeStyle = Style.circles;
-        ctx.fillStyle = Style.background;
         ctx.stroke();
         ctx.lineWidth = 3 * this.line_width;
 
         const [x, y] = graph.overflow.centre;
         const r = 0.35*this.root_node;
+        ctx.strokeStyle = Style.background;
+        ctx.fillStyle = Style.background;
         this.circle(x, y, r, null, false);
 
         const th = TURN / graph.too_many;
         for (let i = 0; i < graph.too_many; i++) {
-            if (!graph.children[i]) {
-                continue;
-            }
+            if (!graph.children[i]) continue;
             ctx.strokeStyle = graph.children[i].online ? Style.circles : Style.offline;
+            const [st, en] = [th*i, th*(i + 1)];
             ctx.beginPath();
-            ctx.arc(x, y, r, th*i, th*(i + 1), true);
+            ctx.arc(x, y, r, st, en, false);
             ctx.stroke();
         }
 

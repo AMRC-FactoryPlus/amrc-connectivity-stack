@@ -40,9 +40,6 @@ if (env('APP_ENV', 'local') !== 'production') {
 // ------ Auth ------ //
 Route::post('/reauthenticate', [ReauthenticateController::class, 'reauthenticate']);
 
-// ------ Proxy ------ //
-Route::middleware('auth:api')->post('/github-proxy', [\App\Http\Controllers\GithubProxyController::class, 'get']);
-
 // ------ User ------ //
 Route::middleware('auth:api')->patch('/user', [UserPreferenceController::class, 'update'])->name('user.update');
 

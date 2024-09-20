@@ -39,6 +39,8 @@ export class BacnetHandler {
 
   parseAddr (spec) {
 
+    // XXX - This is a hack and shouldn't need to handle this at all.
+    // This originates from an upstream edge agent bug.
     if (spec === 'undefined') {
       return {
         type: null,
@@ -71,6 +73,8 @@ export class BacnetHandler {
 
     const { client } = this
 
+    // XXX - This is a hack and shouldn't need to handle this at all.
+    // This originates from an upstream edge agent bug.
     if (addr.type === null) {
       return;
     }

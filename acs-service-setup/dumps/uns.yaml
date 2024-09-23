@@ -17,6 +17,8 @@ configs:
   !u UUIDs.App.Info:
     !u ACS.Perm.MQTT.WriteToEntireUNS: { name: "MQTT: Write to entire UNS" }
     !u ACS.Perm.MQTT.ReadEntireUNS: { name: "MQTT: Read entire UNS" }
+    !u ACS.Group.SparkplugIngesters: { name: "Sparkplug Ingesters" }
+    !u ACS.Group.HistorianUNS: { name: "Historian UNS" }
   !u UUIDs.App.MQTTPermissionTemplate:
     !u ACS.Perm.MQTT.WriteToEntireUNS: "UNS/v1/#: w"
     !u ACS.Perm.MQTT.ReadEntireUNS: "UNS/v1/#: rs"

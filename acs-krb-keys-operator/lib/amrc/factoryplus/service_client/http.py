@@ -78,7 +78,6 @@ class HTTP:
         res = self._fetch(
             url=urljoin(host, "/token"),
             method="POST",
-            verify=False,
             auth=auth,
             force_refresh=True
         )
@@ -92,4 +91,4 @@ class HTTP:
 
     def _fetch (self, **opts):
         log.debug(f"Fetch: {opts!r}")
-        return self.session.request(**opts)
+        return self.session.request(verify=False, **opts)

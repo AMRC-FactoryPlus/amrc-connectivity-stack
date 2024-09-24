@@ -78,7 +78,10 @@ class HTTP:
         res = self._fetch(
             url=urljoin(host, "/token"),
             method="POST",
-            auth=auth, force_refresh=True)
+            verify=False,
+            auth=auth,
+            force_refresh=True
+        )
 
         if res.ok:
             return res.json()["token"]

@@ -250,15 +250,19 @@ export class Metrics {
             const metric = this.#array[i];
             this.#nameIndex[metric.name || ""] = i;
             // this.#aliasIndex[metric.alias as number] = i;
-            if (metric.properties != null && metric.properties.address != null && metric.properties.path != null && (metric.properties.method.value as string).search(
-                /^GET/g) > -1) {
-                const addr = metric.properties.address.value as string;
+            const props = metric.properties;
+            const addr = props?.address?.value;
+            const path = props?.path?.value;
+            const meth = props?.method?.value ?? "";
+            /* XXX bmz: This does not support metrics with addr but no
+             * path. This ought to be a valid combination but I think
+             * has never been supported. */
+            if (addr && path && /GET/.test(meth)) {
                 if (!this.#addrIndex[addr]) {
                     this.#addrIndex[addr] = [];
                 }
                 this.#addrIndex[addr].push(i);
                 this.#addrIndex[addr].push(i);
-                const path = metric.properties.path.value as string;
                 if (!this.#addrPathIndex[addr]) {
                     this.#addrPathIndex[addr] = {};
                 }

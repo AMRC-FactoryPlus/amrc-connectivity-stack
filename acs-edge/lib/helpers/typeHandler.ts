@@ -253,12 +253,9 @@ export class Metrics {
             const props = metric.properties;
             logf("Processing metric %O", props);
             const addr = props?.address?.value as string|undefined;
-            const path = props?.path?.value as string|undefined;
+            const path = (props?.path?.value ?? "") as string;
             const meth = (props?.method?.value ?? "") as string;
-            /* XXX bmz: This does not support metrics with addr but no
-             * path. This ought to be a valid combination but I think
-             * has never been supported. */
-            if (addr != null && path != null && /GET/.test(meth)) {
+            if (addr != null && /GET/.test(meth)) {
                 if (!this.#addrIndex[addr]) {
                     this.#addrIndex[addr] = [];
                 }

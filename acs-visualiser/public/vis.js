@@ -42,36 +42,45 @@ export default class Vis {
 
     count_leaves (graph, depth) {
         graph.depth = depth;
-        const nodes = graph.children;
+        const nodes = graph.children ?? [];
 
         if (graph.path)
             this.paths.set(graph.path, graph);
 
-        if (!nodes || !nodes.length) {
+        if (!nodes.length) {
             this.leaves.push(graph);
+            graph.kids = 0;
             graph.leaves = 1;
             graph.maxdepth = 0;
+            return;
         }
-        else {
-            nodes.forEach(c => {
-                this.count_leaves(c, depth + 1);
-                c.parent = graph;
-            });
-            if (nodes.every(n => !n.children) && nodes.length > 5) {
-                graph.leaves = 1;
-                graph.maxdepth = 0;
-                graph.too_many = nodes.length;
-            }
-            else {
-                graph.too_many = null;
-                graph.leaves = nodes
-                    .map(c => c.leaves)
-                    .reduce((a, b) => a + b, 0);
-                graph.maxdepth = 1 + nodes
-                    .map(c => c.maxdepth)
-                    .reduce((a,b) => a > b ? a : b, 0);
-            }
+
+        nodes.forEach(c => {
+            this.count_leaves(c, depth + 1);
+            c.parent = graph;
+        });
+
+        const devs = nodes.filter(n => !n.is_cmd);
+        const cmds = nodes.filter(n => n.is_cmd);
+
+        if (devs.every(n => !n.children) && devs.length > 5) {
+            graph.render = [
+                { is_o
+
+            graph.too_many = true;
+            graph.leaves = graph.kids = cmds.length + 1;
+            graph.maxdepth = cmds.length ? 1 : 0;
+            return;
         }
+
+        graph.too_many = false;
+        graph.kids = nodes.length;
+        graph.leaves = nodes
+            .map(c => c.leaves)
+            .reduce((a, b) => a + b, 0);
+        graph.maxdepth = 1 + nodes
+            .map(c => c.maxdepth)
+            .reduce((a,b) => a > b ? a : b, 0);
     }
 
     pick_centres (graph, angle, radius, segment, ring) {
@@ -92,7 +101,6 @@ export default class Vis {
             //        ? txtangle - TURN/2 : txtangle,
         ];
         
-        const nodes = graph.children;
         if (graph.too_many) {
             const o_cen = [
                 (radius + ring) * Math.cos(myangle) * this.xscale, 
@@ -103,6 +111,10 @@ export default class Vis {
                 centre: o_cen,
             };
         }
+        
+        const nodes = graph.too_many
+            ? graph.children.filter(
+
         if (graph.too_many || !nodes || nodes.length == 0)
              return;
 
@@ -119,7 +131,7 @@ export default class Vis {
             if (graph.too_many)
                 this.render_too_many(graph);
             else
-              this.render_children(graph, now);
+                this.render_children(graph, now);
         }
 
         const pos = graph.centre;
@@ -188,10 +200,13 @@ export default class Vis {
         ctx.fillStyle = Style.background;
         this.circle(x, y, r, null, false);
 
-        const th = TURN / graph.too_many;
-        for (let i = 0; i < graph.too_many; i++) {
-            if (!graph.children[i]) continue;
-            ctx.strokeStyle = graph.children[i].online ? Style.circles : Style.offline;
+        const nodes = graph.children;
+        const devs = nodes.filter(n => !n.is_cmd);
+        const cmds = nodes.filter(n => n.is_cmd);
+
+        const th = TURN / devs.length;
+        for (let i = 0; i < devs.length; i++) {
+            ctx.strokeStyle = devs[i].online ? Style.circles : Style.offline;
             const [st, en] = [th*i, th*(i + 1)];
             ctx.beginPath();
             ctx.arc(x, y, r, st, en, false);

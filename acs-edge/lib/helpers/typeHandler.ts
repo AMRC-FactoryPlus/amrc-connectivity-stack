@@ -251,7 +251,6 @@ export class Metrics {
             this.#nameIndex[metric.name || ""] = i;
             // this.#aliasIndex[metric.alias as number] = i;
             const props = metric.properties;
-            logf("Processing metric %O", props);
             const addr = props?.address?.value as string|undefined;
             const path = (props?.path?.value ?? "") as string;
             const meth = (props?.method?.value ?? "") as string;
@@ -265,9 +264,6 @@ export class Metrics {
                     this.#addrPathIndex[addr] = {};
                 }
                 this.#addrPathIndex[addr][path] = i;
-            }
-            else {
-                log("Metric skipped, no addr");
             }
         }
     }

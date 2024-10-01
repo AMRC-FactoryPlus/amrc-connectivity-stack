@@ -174,12 +174,11 @@ export default class MQTTClient extends EventEmitter {
         if (!node.children) return;
         node.children = node.children.filter(kid => {
             this.check_expiry(now, kid, changed);
-            const ok = !kid.expires || kid.expires > now;
-            if (!ok) {
-                changed[0] = true;
-                this.known.delete(kid.path);
-            }
-            return ok;
+            if (!kid.expires || kid.expires > now)
+                return true;
+            changed[0] = true;
+            this.known.delete(kid.path);
+            return false;
         });
         if (!node.children.length && !node.seen_data)
             node.expires = now;

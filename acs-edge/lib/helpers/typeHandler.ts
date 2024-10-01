@@ -251,13 +251,14 @@ export class Metrics {
             this.#nameIndex[metric.name || ""] = i;
             // this.#aliasIndex[metric.alias as number] = i;
             const props = metric.properties;
-            const addr = props?.address?.value;
-            const path = props?.path?.value;
-            const meth = props?.method?.value ?? "";
+            logf("Processing metric %O", props);
+            const addr = props?.address?.value as string|undefined;
+            const path = props?.path?.value as string|undefined;
+            const meth = (props?.method?.value ?? "") as string;
             /* XXX bmz: This does not support metrics with addr but no
              * path. This ought to be a valid combination but I think
              * has never been supported. */
-            if (addr && path && /GET/.test(meth)) {
+            if (addr != null && path != null && /GET/.test(meth)) {
                 if (!this.#addrIndex[addr]) {
                     this.#addrIndex[addr] = [];
                 }
@@ -267,6 +268,9 @@ export class Metrics {
                     this.#addrPathIndex[addr] = {};
                 }
                 this.#addrPathIndex[addr][path] = i;
+            }
+            else {
+                log("Metric skipped, no addr");
             }
         }
     }

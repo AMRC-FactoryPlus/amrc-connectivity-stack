@@ -127,7 +127,15 @@ export default {
               disabled: false,
               initialValue: '',
               value: '',
-            }
+            },
+            bare: {
+              name: 'Bare deployment',
+              description: 'We already have Flux and Sealed Secrets deployed.',
+              type: 'checkbox',
+              disabled: false,
+              initialValue: false,
+              value: false,
+            },
           },
           buttons: [
             {

@@ -38,6 +38,10 @@ class CreateEdgeClusterRequest extends FormRequest
                 'uuid',
                 'string',
             ],
+            'bare' => [
+                'optional',
+                'bool',
+            ],
         ];
     }
 }

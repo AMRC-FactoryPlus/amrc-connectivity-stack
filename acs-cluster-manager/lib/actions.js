@@ -182,6 +182,9 @@ export class Update extends Action {
             },
         });
 
+        if (spec.bare)
+            delete flux["flux-system.yaml"];
+
         return flux;
     }
 }

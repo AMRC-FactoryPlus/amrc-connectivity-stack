@@ -71,15 +71,45 @@ configs:
               done
           }
 
+          kexist () {
+              kubectl get -o name -n "$1" "$2" >/dev/null 2>/dev/null
+          }
+          
+          flux_ver () {
+              kubectl get -o jsonpath='{$.spec.version.*.name}' \
+                  crd/"$1".toolkit.fluxcd.io 2>/dev/null \
+                  | grep -q "$2"
+          }
 
-          kubectl create namespace $N
+          want_flux=YES
+          if kexist flux-system deploy/helm-controller
+          then
+              want_flux=NO
+              echo "Flux is already installed, checking compatibility..."
+              if ! flux_ver helmreleases.helm v2beta2 \
+                  && flux_ver gitrepositories.source v1 \
+                  && flux_ver kustomizations.kustomize v1
+              then
+                  echo "Flux version is incompatible with ACS edge cluster!" >&2
+                  exit 1
+              fi
+          fi
+
+          kexist none namespace/"$N" || kubectl create namespace "$N"
+
           kubectl create -f edge-bootstrap.yaml
-
           wait_ready pod/edge-bootstrap
           kubectl attach -ti -n $N -c bootstrap edge-bootstrap </dev/tty
-
           kubectl delete -f edge-bootstrap.yaml
-          kubectl apply -f flux-system.yaml
+
+          if ! kexist $N secret/flux-secrets
+          then
+              echo "Cluster join failed! (wrong password?)" >&2
+              exit 1
+          fi
+
+          [ "$want_flux" = "YES" ] && kubectl apply -f flux-system.yaml
+
           kubectl apply -f self-link.yaml
           wait_ready kustomization/self-link
         edge-bootstrap.yaml: |

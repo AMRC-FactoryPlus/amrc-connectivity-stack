@@ -90,11 +90,6 @@ class DeviceController extends Controller
                 'method' => 'get',
                 'url' => '/api/device-schemas',
             ],
-            'deviceSchemaVersions' => [
-                'value' => null,
-                'method' => 'get',
-                'url' => '/api/device-schemas/{schema}/versions',
-            ],
             'deviceConnections' => [
                 'value' => null,
                 'method' => 'get',

@@ -18,11 +18,6 @@ class SchemaEditorController extends Controller
                 'method' => 'get',
                 'url' => '/api/device-schemas',
             ],
-            'deviceSchemaVersions' => [
-                'value' => null,
-                'method' => 'get',
-                'url' => '/api/device-schemas/{schema}/versions',
-            ],
         ];
 
         // Return the view with the initial data

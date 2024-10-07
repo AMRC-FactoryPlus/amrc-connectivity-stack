@@ -12,6 +12,7 @@ use App\Domain\Devices\Models\Device;
 use App\Domain\Nodes\Actions\UpdateEdgeAgentConfigurationForNodeAction;
 use App\Exceptions\ActionFailException;
 use App\Exceptions\ActionForbiddenException;
+use App\Support\ManagerUUIDs;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Opis\JsonSchema\Errors\ErrorFormatter;
@@ -58,17 +59,11 @@ class ConfigureDeviceConnectionAction
         // =======================================
         $connectionConfig = json_decode($connectionConfiguration, false, 512, JSON_THROW_ON_ERROR);
         // Register the connection schema
-        $connectionValidator = new Validator;
-        $connectionValidator->resolver()->registerRaw(
-                file_get_contents(
-                    'https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Device_Connection.json'
-                ),
-                'https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Device_Connection.json'
-            );
+        $connectionValidator = resolve(Validator::class);
         // Validate that the JSON supplied is valid against the connection schema
         $validated = $connectionValidator->validate(
             $connectionConfig,
-            'https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Device_Connection.json'
+            "urn:uuid:" . ManagerUUIDs::DeviceConnection
         );
         if (!$validated->isValid()) {
             // Get the error

@@ -4,7 +4,7 @@ classes:
   - !u UUIDs.Class.PermGroup
   - !u ACS.Class.UserGroup
 objects:
-  !u UUIDs.Class.Application:
+  !u UUIDs.Class.App:
     - !u Edge.App.ClusterStatus
     - !u Edge.App.Deployment
   !u UUIDs.Class.PermGroup:

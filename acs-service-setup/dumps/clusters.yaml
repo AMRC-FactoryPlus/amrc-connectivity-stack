@@ -49,7 +49,7 @@ configs:
     !u Clusters.Requirement.FluxRoles: { name: "Edge flux roles" }
     !u Clusters.Requirement.Groups: { name: "Clusters-managed groups" }
     !u Clusters.Requirement.ServiceAccount: { name: "Clusters service account" }
-    !u Clusters.Service.EdgeDeployment: { name: "Cluster Manager" }
+    !u Clusters.Service.ClusterManager: { name: "Cluster Manager" }
   !u UUIDs.App.ConfigSchema:
     !u Clusters.App.Bootstrap:
       title: Edge cluster bootstrap script template
@@ -337,7 +337,7 @@ version: 1
 aces:
   - principal: !u Clusters.Requirement.ServiceAccount
     permission: !u UUIDs.Permission.Directory.AdvertiseService 
-    target: !u Clusters.Service.EdgeDeployment
+    target: !u Clusters.Service.ClusterManager
 
   - principal: !u Clusters.Requirement.ServiceAccount
     permission: !u UUIDs.Permission.Auth.ReadACL

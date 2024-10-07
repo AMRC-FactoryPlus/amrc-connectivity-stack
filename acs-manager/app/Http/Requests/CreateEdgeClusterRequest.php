@@ -39,7 +39,6 @@ class CreateEdgeClusterRequest extends FormRequest
                 'string',
             ],
             'bare' => [
-                'optional',
                 'bool',
             ],
         ];

@@ -5,7 +5,7 @@
 
 import { UUIDs } from "@amrc-factoryplus/utilities";
 
-import { ACS, Fixup } from "./uuids.js";
+import { ACS, Clusters, Fixup } from "./uuids.js";
 
 export async function fixups (ss) {
     const { fplus } = ss;

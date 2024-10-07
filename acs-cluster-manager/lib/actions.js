@@ -4,6 +4,7 @@
  * Copyright 2023 AMRC
  */
 
+import jmp from "json-merge-patch";
 import rx from "rxjs";
 import yaml from "yaml";
 
@@ -169,8 +170,9 @@ export class Update extends Action {
 
         /* Build the cluster helm chart template */
         const cluster = cluster_template({ uuid, name });
+        const values = jmp.merge(cluster.values, spec.values ?? {});
         /* Build the cluster HelmRelease manifest */
-        const helm = template.helm({ uuid, ...cluster }).template;
+        const helm = template.helm({ ...cluster, uuid, values }).template;
         helm.metadata.namespace = spec.namespace;
         /* Build the initial repo contents */
         const flux = template.flux({

@@ -91,6 +91,14 @@ configs:
           description: The Helm chart to deploy.
           type: string
           format: uuid
+        bare:
+          description: Don't deploy Flux manifests
+          type: boolean
+          default: false
+        values:
+          description: Helm values for the cluster deployment
+          type: object
+          additionalProperties: true
     !u Clusters.App.Flux:
       title: Edge cluster Flux template
       description: >

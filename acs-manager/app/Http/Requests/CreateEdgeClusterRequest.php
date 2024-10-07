@@ -39,8 +39,16 @@ class CreateEdgeClusterRequest extends FormRequest
                 'string',
             ],
             'bare' => [
-                'bool',
+                'boolean',
             ],
         ];
+    }
+
+    public function prepareForValidation(): void
+    {
+        $bare = $this->input("bare");
+        $this->merge([
+            "bare" => ($bare == "true"),
+        ]);
     }
 }

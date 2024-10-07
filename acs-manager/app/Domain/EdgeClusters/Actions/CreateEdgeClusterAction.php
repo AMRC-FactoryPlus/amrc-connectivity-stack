@@ -18,7 +18,7 @@ class CreateEdgeClusterAction
      * This action creates a new edge cluster
      **/
 
-    public function execute(string $name, string $chart, bool $bare = false)
+    public function execute(string $name, string $chart, bool $bare)
     {
         // =========================
         // Validate User Permissions
@@ -55,11 +55,7 @@ class CreateEdgeClusterAction
         } 
 
         // Create an entry in the Edge Cluster Configuration app
-        $configDB->putConfig(App::EdgeClusterConfiguration, $uuid, [
-            'chart' => $chart,
-            "name" => $name,
-            "namespace" => 'fplus-edge',
-        ]);
+        $configDB->putConfig(App::EdgeClusterConfiguration, $uuid, $cconf);
 
         return action_success();
     }

@@ -420,8 +420,6 @@ aces:
     permission: !u Clusters.Perm.Secrets
     target: !u UUIDs.Special.Null
 groups:
-  !u Clusters.Requirement.ServiceAccount:
-    - !u ACS.ServiceAccount.ClusterManager
   !u Clusters.Perm.All:
     - !u Clusters.Perm.Clusters
     - !u Clusters.Perm.Secrets

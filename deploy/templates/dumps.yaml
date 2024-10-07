@@ -1018,16 +1018,5 @@ data:
         }
       ]
     }
-  clusters-acs: |
-    {
-      "service": {{$service_authorisation}},
-      "version": 1,
-      "principals": [
-        {
-          "uuid": {{$serviceAccount_clusterManager}},
-          "kerberos": "sv1clustermanager@{{ .Values.identity.realm }}"
-        }
-      ]
-    }
 
 {{end}}{{/* auth.enabled */}}

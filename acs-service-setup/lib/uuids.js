@@ -66,7 +66,6 @@ export const ACS = {
      * per-deployment accounts created by krbkeys, and
      * ServiceRequirement groups to grant them permissions. */
     ServiceAccount: {
-        ClusterManager:         "127cde3c-773a-4f61-b0ba-7412a2695253",
         KrbKeys:                "a04b4195-7db4-4480-b3f3-4d22c08b96ea",
     },
 };
@@ -167,6 +166,7 @@ export const Fixup = {
     },
     User: {
         Administrator:      "d53f476a-29dd-4d79-b614-5b7fe9bc8acf",
+        ClusterManager:     "127cde3c-773a-4f61-b0ba-7412a2695253",
     },
 };
 

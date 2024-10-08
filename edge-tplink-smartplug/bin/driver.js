@@ -4,11 +4,11 @@
  */
 
 import { PolledDriver } from "@amrc-factoryplus/edge-driver";
-import { tplinkHandler } from "../lib/tplink.js";
+import { TplinkHandler } from "../lib/tplink.js";
 
 const drv = new PolledDriver({
     env:        process.env,
-    handler:    tplinkHandler,
+    handler:    TplinkHandler,
     serial:     true,
 });
 drv.run();

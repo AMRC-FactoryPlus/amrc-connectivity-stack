@@ -3,7 +3,7 @@
  * Copyright 2024 AMRC
  */
 
-import { Buffer } from 'node:buffer';
+import { BufferX } from "@amrc-factoryplus/edge-driver";
 import tplink from 'tplink-smarthome-api';
 
 class TplinkHandler {
@@ -16,8 +16,18 @@ class TplinkHandler {
         this.client = new tplink.Client();
     }
 
-    async run () {
-        console.log("run")
+    static create (driver, conf) {
+        console.log("Handler called: conf %o", conf)
+        if (conf.host == null)
+            return;
+        const h = new TplinkHandler(driver, conf);
+        console.log("h is ", h)
+        h.connect();
+        return h;
+    }    
+
+    async connect () {
+        console.log("connect")
         const { driver, client } = this;
         const { host, timeout } = this.conf;
 
@@ -30,9 +40,9 @@ class TplinkHandler {
         console.log(`PLUG: Device ${host} connected`);
 
         if (device) 
-            driver.setStatus("UP");
+            driver.connUp();
         else 
-            driver.setStatus("CONN");
+            driver.connFailed();
 
         this.device = device;
     }
@@ -53,33 +63,20 @@ class TplinkHandler {
         const { device } = this;
         if (!device) return;
 
-        const convert = value => 
-            Buffer.from(JSON.stringify(value));
-
         switch (addr) {
             case 'SysInfo':
                 const value = await device.getSysInfo();
                 console.log("SysInfo read %o", value);
-                return convert(value);
+                return BufferX.fromJSON(value);
             case 'PowerState':
-                return convert(await device.getPowerState());
+                return BufferX.fromJSON(await device.getPowerState());
             case 'InUse':
-                return convert(await device.getInUse());
+                return BufferX.fromJSON(await device.getInUse());
             case 'Meter': {
                 const value = await device.emeter.getRealtime();
                 console.log("Meter read %o", value);
-                return convert(value);
+                return BufferX.fromJSON(value);
             }
         }
     }
-}
-
-export function tplinkHandler (driver, conf) {
-    console.log("Handler called: conf %o", conf)
-    if (conf.host == null)
-        return;
-    const h = new TplinkHandler(driver, conf);
-    console.log("h is ", h)
-    h.run();
-    return h;
 }

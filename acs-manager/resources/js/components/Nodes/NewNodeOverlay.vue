@@ -184,7 +184,7 @@ export default {
           controls: {
             node_name: {
               name: 'Node Name',
-              description: 'Node names must use underscores for spaces',
+              description: 'Node names use underscores for spaces and hyphens for structure',
               prefix: '',
               placeholder: 'e.g. Assembly_Cell',
               type: 'input',
@@ -192,7 +192,7 @@ export default {
                 required: helpers.withMessage('Please enter a Node name', required),
                 minLength: minLength(5),
                 valid: helpers.withMessage('This Node name does not conform to the naming convention',
-                    helpers.regex(/^[\w_]+$/i)),
+                    helpers.regex(/^[-\w]+$/)),
               },
               initialValue: '',
               value: ''

@@ -4,6 +4,9 @@ classes:
   - !u UUIDs.Class.PermGroup
   - !u ACS.Class.UserGroup
 objects:
+  !u UUIDs.Class.App:
+    - !u Edge.App.ClusterStatus
+    - !u Edge.App.Deployment
   !u UUIDs.Class.PermGroup:
     # XXX Properly this is not a permission group, but a group of
     # groups. Since we don't have quoting for group membership grant
@@ -18,6 +21,8 @@ configs:
     !u ACS.Group.EdgeGroups:        { name: "Edge-managed groups" }
     !u ACS.Group.EdgePermissions:   { name: "Edge-managed permissions" }
     !u ACS.Group.CentralMonitor:    { name: "Central Monitors" }
+    !u Edge.App.ClusterStatus:      { name: "Edge cluster status" }
+    !u Edge.App.Deployment:         { name: "Edge deployment" }
 ---
 service: !u UUIDs.Service.Authentication
 version: 1

@@ -62,6 +62,12 @@ export const ACS = {
     Device: {
         ConfigDB:               "36861e8d-9152-40c4-8f08-f51c2d7e3c25",
     },
+    /* XXX These should not be fixed. They should be replaced by
+     * per-deployment accounts created by krbkeys, and
+     * ServiceRequirement groups to grant them permissions. */
+    ServiceAccount: {
+        KrbKeys:                "a04b4195-7db4-4480-b3f3-4d22c08b96ea",
+    },
 };
 
 /* XXX All the UUIDs below here are copied in from elsewhere in ACS.
@@ -72,15 +78,33 @@ export const ACS = {
 export const Clusters = {
     App: {
         Bootstrap:          "a807d8fc-63ff-48bb-85c7-82b93beb606e",
+        Cluster:            "bdb13634-0b3d-4e38-a065-9d88c12ee78d",
+        EdgeStatus:         "747a62c9-1b66-4a2e-8dd9-0b70a91b6b75",
         Flux:               "72804a19-636b-4836-b62b-7ad1476f2b86",
+        HelmChart:          "729fe070-5e67-4bc7-94b5-afd75cb42b03",
         HelmRelease:        "88436128-09a3-4c9c-b7f4-b0e495137265",
         HelmTemplate:       "729fe070-5e67-4bc7-94b5-afd75cb42b03",
+        Status:             "f6c67e6f-e48e-4f69-b4bb-bfbddcc2a517",
     },
     Class: {
+        Cluster:            "f24d354d-abc1-4e32-98e1-0667b3e40b61",
+        Account:            "97756c9a-38e6-4238-b78c-3df6f227a6c9",
         HelmChart:          "f9be0334-0ff7-43d3-9d8a-188d3e4d472b",
+    },
+    Service: {
+        ClusterManager:     "2706aa43-a826-441e-9cec-cd3d4ce623c2",
+    },
+    Perm: {
+        All:                "9e07fd33-6400-4662-92c4-4dff1f61f990",
+        Clusters:           "a40acff8-0c61-4251-bef3-d8d53e50cdd0",
+        Secrets:            "07fba27a-0d01-4c07-875b-d25345261d3a",
     },
     Requirement: {
         ServiceAccount:     "26d192cf-73c1-4c14-93cf-1e63743bab08",
+        EdgeRepos:          "3a58340c-d4ec-453d-99c3-0cf6ab7d8fa9",
+        Groups:             "979f7fd9-bbc7-4810-a774-6082c7394db6",
+        FluxAccounts:       "4eeb8156-856d-4251-a4a4-4c1b2f3d3e2c",
+        FluxRoles:          "8cd08563-7c3c-44fd-af4d-15c0fa6dadcb",
     },
 };
 
@@ -142,6 +166,7 @@ export const Fixup = {
     },
     User: {
         Administrator:      "d53f476a-29dd-4d79-b614-5b7fe9bc8acf",
+        ClusterManager:     "127cde3c-773a-4f61-b0ba-7412a2695253",
     },
 };
 

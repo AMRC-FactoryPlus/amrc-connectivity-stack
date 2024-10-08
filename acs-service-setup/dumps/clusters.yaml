@@ -1,14 +1,56 @@
 service: !u UUIDs.Service.ConfigDB
 version: 1
+overwrite: true
 classes:
+  - !u Clusters.Class.Account
+  - !u Clusters.Class.Cluster
+  # XXX Needed for now
+  - !u UUIDs.Class.Service
+  - !u UUIDs.Class.PermGroup
+  - !u UUIDs.Class.Permission
+  - !u UUIDs.Class.Requirement
 objects:
   !u UUIDs.Class.App:
     - !u Clusters.App.Bootstrap
+    - !u Clusters.App.Cluster
     - !u Clusters.App.Flux
+    - !u Clusters.App.HelmChart
+    - !u Clusters.App.HelmRelease
+    - !u Clusters.App.Status
+    # XXX Needed for now
+    - !u UUIDs.App.ConfigSchema
+  !u UUIDs.Class.Service:
+    - !u Clusters.Service.ClusterManager
+  !u UUIDs.Class.PermGroup:
+    - !u Clusters.Perm.All
+  !u UUIDs.Class.Permission:
+    - !u Clusters.Perm.Clusters
+    - !u Clusters.Perm.Secrets
+  !u UUIDs.Class.Requirement:
+    - !u Clusters.Requirement.ServiceAccount
+    - !u Clusters.Requirement.EdgeRepos
+    - !u Clusters.Requirement.Groups
+    - !u Clusters.Requirement.FluxAccounts
+    - !u Clusters.Requirement.FluxRoles
 configs:
   !u UUIDs.App.Info:
-    !u Clusters.App.Bootstrap:      { name: "Boostrap script" }
+    !u Clusters.App.Bootstrap:      { name: "Bootstrap script" }
+    !u Clusters.App.Cluster: { name: "Edge cluster configuration" }
     !u Clusters.App.Flux:           { name: "Flux template" }
+    !u Clusters.App.HelmChart: { name: "Helm chart template" }
+    !u Clusters.App.HelmRelease: { name: "HelmRelease template" }
+    !u Clusters.App.Status: { name: "Edge cluster setup status" }
+    !u Clusters.Class.Account: { name: "Edge cluster account" }
+    !u Clusters.Class.Cluster: { name: "Edge cluster" }
+    !u Clusters.Perm.All: { name: "Clusters permissions" }
+    !u Clusters.Perm.Clusters: { name: "Clusters: Manage clusters" }
+    !u Clusters.Perm.Secrets: { name: "Clusters: Manage secrets" }
+    !u Clusters.Requirement.EdgeRepos: { name: "Edge cluster repositories" }
+    !u Clusters.Requirement.FluxAccounts: { name: "Edge flux accounts" }
+    !u Clusters.Requirement.FluxRoles: { name: "Edge flux roles" }
+    !u Clusters.Requirement.Groups: { name: "Clusters-managed groups" }
+    !u Clusters.Requirement.ServiceAccount: { name: "Clusters service account" }
+    !u Clusters.Service.ClusterManager: { name: "Cluster Manager" }
   !u UUIDs.App.ConfigSchema:
     !u Clusters.App.Bootstrap:
       title: Edge cluster bootstrap script template
@@ -34,6 +76,30 @@ configs:
             bootstrap. The `{{files}}` template will be expanded to a
             set of commands to unpack the packed files.
           type: string
+    !u Clusters.App.Cluster:
+      title: Edge cluster configuration
+      type: object
+      required: [name, namespace]
+      additionalProperties: false
+      properties:
+        name:
+          description: A name for the cluster.
+          type: string
+        namespace:
+          description: The k8s namespace to deploy to.
+          type: string
+        chart:
+          description: The Helm chart to deploy.
+          type: string
+          format: uuid
+        bare:
+          description: Don't deploy Flux manifests
+          type: boolean
+          default: false
+        values:
+          description: Helm values for the cluster deployment
+          type: object
+          additionalProperties: true
     !u Clusters.App.Flux:
       title: Edge cluster Flux template
       description: >
@@ -53,6 +119,11 @@ configs:
               required: [apiVersion, kind]
             - type: string
               pattern: ^\{\{.*\}\}$
+    !u Clusters.App.Status:
+      title: Clusters private status
+      type: object
+      additionalProperties: true
+      # No additional constraints, this is our private data
   # XXX These single-object configs don't give the user any opportunity
   # to override the configuration. But where is an override specified?
   !u Clusters.App.Bootstrap:
@@ -71,17 +142,67 @@ configs:
               done
           }
 
+          kexist () {
+              kubectl get -o name -n "$1" "$2" >/dev/null 2>/dev/null
+          }
+          
+          flux_ver () {
+              kubectl get -o jsonpath='{$.spec.version.*.name}' \
+                  crd/"$1".toolkit.fluxcd.io 2>/dev/null \
+                  | grep -q "$2"
+          }
 
-          kubectl create namespace $N
+          if ! kubectl get nodes >/dev/null 2>&1
+          then
+              echo "I don't appear to have access to a cluster." >&2
+              echo "Maybe you need to set KUBECONFIG?" >&2
+              exit 1
+          fi
+          echo "Deploying to edge cluster:"
+          kubectl get nodes
+          read -p "Press Return to continue or Ctrl-C to abort:" \
+              tmp </dev/tty
+
+          want_flux=YES
+          if kexist flux-system deploy/helm-controller
+          then
+              want_flux=NO
+              echo "Flux is already installed, checking compatibility..."
+              if ! flux_ver helmreleases.helm v2beta2 \
+                  && flux_ver gitrepositories.source v1 \
+                  && flux_ver kustomizations.kustomize v1
+              then
+                  echo "Flux version is incompatible with ACS edge cluster!" >&2
+                  exit 1
+              fi
+          fi
+
+          echo "Creating namespace $N..."
+          kexist none namespace/"$N" || kubectl create namespace "$N"
+
+          echo "Joining edge cluster to central cluster..."
           kubectl create -f edge-bootstrap.yaml
-
           wait_ready pod/edge-bootstrap
           kubectl attach -ti -n $N -c bootstrap edge-bootstrap </dev/tty
-
           kubectl delete -f edge-bootstrap.yaml
-          kubectl apply -f flux-system.yaml
+
+          if ! kexist $N secret/flux-secrets
+          then
+              echo "Cluster join failed! (wrong password?)" >&2
+              exit 1
+          fi
+
+          if [ "$want_flux" = "YES" ]
+          then
+              echo "Installing Flux..."
+              kubectl apply -f flux-system.yaml
+          fi
+
+          echo "Installing edge cluster components..."
           kubectl apply -f self-link.yaml
           wait_ready kustomization/self-link
+
+          echo "Done."
         edge-bootstrap.yaml: |
           ---
           apiVersion: v1
@@ -163,7 +284,7 @@ configs:
       wrapper: |
         #!/bin/sh
         
-        set -ex
+        set -e
 
         wd=$(mktemp -d)
         cd "$wd"
@@ -228,3 +349,106 @@ configs:
             sourceRef:
               kind: GitRepository
               name: self-link
+---
+service: !u UUIDs.Service.Authentication
+version: 1
+# This grants permissions in terms of Service Requirement UUIDs. These
+# need to be populated as groups in the Auth service with the
+# appropriate objects.
+aces:
+  - principal: !u Clusters.Requirement.ServiceAccount
+    permission: !u UUIDs.Permission.Directory.AdvertiseService 
+    target: !u Clusters.Service.ClusterManager
+
+  - principal: !u Clusters.Requirement.ServiceAccount
+    permission: !u UUIDs.Permission.Auth.ReadACL
+    target: !u Clusters.Perm.All
+
+  # XXX This is nearly root-equivalent.
+  - principal: !u Clusters.Requirement.ServiceAccount
+    permission: !u UUIDs.Permission.Auth.ManageKerberos
+    target: !u UUIDs.Null
+
+  - principal: !u Clusters.Requirement.ServiceAccount
+    permission: !u UUIDs.Permission.Auth.ManageACL
+    target: !u Git.Perm.Pull
+
+  # XXX This is a very broad grant; it is very nearly root-equivalent.
+  # But currently any grant of ManageGroup will be equivalent to this,
+  # as groups are expanded recursively and we can just add a victim
+  # group to one of our target groups. We have an Clusters.Requirement.Groups,
+  # but it is not set up properly by service-setup, and using it won't
+  # improve security until the Auth groups are fixed.
+  - principal: !u Clusters.Requirement.ServiceAccount
+    permission: !u UUIDs.Permission.Auth.ManageGroup
+    target: !u UUIDs.Null
+
+  # XXX This should be per-deployment but it's not clear how to acheive
+  # that. The notify/v1 proposal would dynamically grant Sparkplug
+  # permissions based on some other set of change-notify permissions.
+  - principal: !u Clusters.Requirement.ServiceAccount
+    permission: !u ACS.Role.EdgeNodeConsumer
+    target: !u ACS.Device.ConfigDB
+
+  - principal: !u Clusters.Requirement.ServiceAccount
+    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
+    target: !u UUIDs.App.Info
+  - principal: !u Clusters.Requirement.ServiceAccount
+    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
+    target: !u UUIDs.App.ServiceConfig
+  - principal: !u Clusters.Requirement.ServiceAccount
+    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
+    target: !u Clusters.App.Cluster
+  - principal: !u Clusters.Requirement.ServiceAccount
+    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
+    target: !u Clusters.App.Status
+  - principal: !u Clusters.Requirement.ServiceAccount
+    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
+    target: !u Clusters.App.EdgeStatus
+  - principal: !u Clusters.Requirement.ServiceAccount
+    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
+    target: !u Clusters.App.Flux
+  - principal: !u Clusters.Requirement.ServiceAccount
+    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
+    target: !u Clusters.App.HelmChart
+  - principal: !u Clusters.Requirement.ServiceAccount
+    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
+    target: !u Clusters.App.HelmRelease
+  - principal: !u Clusters.Requirement.ServiceAccount
+    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
+    target: !u Clusters.App.Bootstrap
+  - principal: !u Clusters.Requirement.ServiceAccount
+    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
+    target: !u UUIDs.App.SparkplugAddress
+
+  - principal: !u Clusters.Requirement.ServiceAccount
+    permission: !u UUIDs.Permission.ConfigDB.WriteConfig
+    target: !u UUIDs.App.Info
+  - principal: !u Clusters.Requirement.ServiceAccount
+    permission: !u UUIDs.Permission.ConfigDB.WriteConfig
+    target: !u Clusters.App.Status
+  - principal: !u Clusters.Requirement.ServiceAccount
+    permission: !u UUIDs.Permission.ConfigDB.WriteConfig
+    target: !u Git.App.Config
+  - principal: !u Clusters.Requirement.ServiceAccount
+    permission: !u UUIDs.Permission.ConfigDB.WriteConfig
+    target: !u UUIDs.App.SparkplugAddress
+
+  - principal: !u Clusters.Requirement.ServiceAccount
+    permission: !u UUIDs.Permission.ConfigDB.ManageObjects
+    target: !u Clusters.Class.Account
+
+  - principal: !u Clusters.Requirement.ServiceAccount
+    permission: !u Git.Perm.Pull
+    target: !u Clusters.Requirement.EdgeRepos
+  - principal: !u Clusters.Requirement.ServiceAccount
+    permission: !u Git.Perm.Push
+    target: !u Clusters.Requirement.EdgeRepos
+
+  - principal: !u ACS.ServiceAccount.KrbKeys
+    permission: !u Clusters.Perm.Secrets
+    target: !u UUIDs.Special.Null
+groups:
+  !u Clusters.Perm.All:
+    - !u Clusters.Perm.Clusters
+    - !u Clusters.Perm.Secrets

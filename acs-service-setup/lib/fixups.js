@@ -5,7 +5,7 @@
 
 import { UUIDs } from "@amrc-factoryplus/utilities";
 
-import { ACS, Fixup } from "./uuids.js";
+import { ACS, Clusters, Fixup } from "./uuids.js";
 
 export async function fixups (ss) {
     const { fplus } = ss;
@@ -15,7 +15,7 @@ export async function fixups (ss) {
 
     await fixup_null(cdb);
     await fixup_sparkplug_nodes(auth);
-    await fixup_admin_account(cdb, auth);
+    await remove_old_accounts(cdb, auth);
 }
 
 /* Null was originally registered as a Class, which was wrong.
@@ -49,12 +49,20 @@ async function fixup_sparkplug_nodes (auth) {
     }
 }
 
-async function fixup_admin_account (cdb, auth) {
-    const admin = Fixup.User.Administrator;
+async function remove_old_accounts (cdb, auth) {
+    const accs = [
+        [Fixup.User.Administrator, 
+            ACS.Group.Administrators],
+        [Fixup.User.ClusterManager, 
+            Clusters.Requirement.ServiceAccount],
+    ];
 
-    await auth.delete_principal(admin);
-    await auth.remove_from_group(ACS.Group.Administrators, admin)
-        .catch(() => null);
-    await cdb.mark_object_deleted(admin)
-        .catch(() => null);
+    for (const [acc, ...grps] of accs) {
+        await auth.delete_principal(acc);
+        for (const grp of grps)
+            await auth.remove_from_group(grp, acc)
+                .catch(() => null);
+        await cdb.mark_object_deleted(acc)
+            .catch(() => null);
+    }
 }

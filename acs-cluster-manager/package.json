@@ -6,7 +6,6 @@
   "type": "module",
   "scripts": {
     "start": "node bin/edge-deployment.js",
-    "convert-dumps": "node bin/convert-dumps.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

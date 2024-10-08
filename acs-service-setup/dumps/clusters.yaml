@@ -151,6 +151,16 @@ configs:
                   | grep -q "$2"
           }
 
+          if ! kubectl get nodes >/dev/null 2>&1
+          then
+              echo "I don't appear to have access to a cluster." >&2
+              echo "Maybe you need to set KUBECONFIG?" >&2
+              exit 1
+          fi
+          echo "Deploying to edge cluster:"
+          kubectl get nodes
+          read -p "Press Return to continue or Ctrl-C to abort:" tmp
+
           want_flux=YES
           if kexist flux-system deploy/helm-controller
           then
@@ -165,8 +175,10 @@ configs:
               fi
           fi
 
+          echo "Creating namespace $N..."
           kexist none namespace/"$N" || kubectl create namespace "$N"
 
+          echo "Joining edge cluster to central cluster..."
           kubectl create -f edge-bootstrap.yaml
           wait_ready pod/edge-bootstrap
           kubectl attach -ti -n $N -c bootstrap edge-bootstrap </dev/tty
@@ -178,10 +190,17 @@ configs:
               exit 1
           fi
 
-          [ "$want_flux" = "YES" ] && kubectl apply -f flux-system.yaml
+          if [ "$want_flux" = "YES" ]
+          then
+              echo "Installing Flux..."
+              kubectl apply -f flux-system.yaml
+          fi
 
+          echo "Installing edge cluster components..."
           kubectl apply -f self-link.yaml
           wait_ready kustomization/self-link
+
+          echo "Done."
         edge-bootstrap.yaml: |
           ---
           apiVersion: v1
@@ -263,7 +282,7 @@ configs:
       wrapper: |
         #!/bin/sh
         
-        set -ex
+        set -e
 
         wd=$(mktemp -d)
         cd "$wd"

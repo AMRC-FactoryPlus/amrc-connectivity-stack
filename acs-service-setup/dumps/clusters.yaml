@@ -160,7 +160,8 @@ configs:
           fi
           echo "Deploying to edge cluster:"
           kubectl get nodes
-          read -p "Press Return to continue or Ctrl-C to abort:" tmp
+          read -p "Press Return to continue or Ctrl-C to abort:" \
+              tmp </dev/tty
 
           want_flux=YES
           if kexist flux-system deploy/helm-controller

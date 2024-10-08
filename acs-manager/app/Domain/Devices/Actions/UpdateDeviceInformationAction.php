@@ -20,7 +20,7 @@ class UpdateDeviceInformationAction
      * - The user must have access to the node that the device is attached to
      */
 
-    public function execute(Device $device, $deviceId)
+    public function execute(Device $device, $deviceId, $pubInterval)
     {
         if (! auth()->user()->administrator && ! auth()->user()->accessibleNodes->contains($device->node)) {
             throw new ActionFailException('You do not have permission to update this device.', 401);
@@ -31,6 +31,7 @@ class UpdateDeviceInformationAction
         // ===================
         $device->update([
             'device_id' => $deviceId,
+            'pub_interval' => $pubInterval,
         ]);
 
         // Create a for all active devices in this node and attach it to the Node

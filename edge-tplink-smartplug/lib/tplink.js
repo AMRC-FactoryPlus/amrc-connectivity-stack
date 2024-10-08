@@ -6,7 +6,7 @@
 import { BufferX } from "@amrc-factoryplus/edge-driver";
 import tplink from 'tplink-smarthome-api';
 
-class TplinkHandler {
+export class TplinkHandler {
     constructor (driver, conf) {
         this.driver = driver;
         this.conf = conf;

@@ -3,7 +3,7 @@ ARG base_version
 ARG build_version
 ARG base_prefix=ghcr.io/amrc-factoryplus/acs-manager
 
-FROM --platform=linux/amd64 oven/bun:latest as build-frontend
+FROM --platform=linux/amd64 oven/bun:1.1.29 as build-frontend
 WORKDIR /app
 COPY . /app/
 

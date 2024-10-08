@@ -27,6 +27,7 @@ class NodeController extends Controller
 
         return process_action(
             (new CreateNodeAction)->execute(
+                infoName: $validated['info_name'],
                 nodeName: $validated['node_name'],
                 destinationCluster: $validated['destination_cluster'],
                 charts: $validated['charts'],

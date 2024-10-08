@@ -159,6 +159,11 @@ export default {
           type: 'post',
           url: 'replaced',
           parameters: {
+            info_name: {
+              dataType: "collected",
+              dataSource: ["nodeSelection", "controls", "info_name", "value"],
+              data: null,
+            },
             node_name: {
               dataType: 'collected',
               dataSource: ['nodeSelection', 'controls', 'node_name', 'value'],
@@ -182,14 +187,27 @@ export default {
         nodeSelection: {
           tagline: 'Choose the edge cluster and node on which to deploy the new node',
           controls: {
+            info_name: {
+              name: "Name",
+              description: "This is a short human-readable name for this Node",
+              prefix: "",
+              placeholder: "e.g. Assembly Cell",
+              type: "input",
+              validations: {
+                required: helpers.withMessage('Please enter a name for this Node', required),
+                minLength: minLength(5),
+              },
+              initialValue: "",
+              value: "",
+            },
             node_name: {
-              name: 'Node Name',
+              name: 'Sparkplug Name',
               description: 'Node names use underscores for spaces and hyphens for structure',
               prefix: '',
               placeholder: 'e.g. Assembly_Cell',
               type: 'input',
               validations: {
-                required: helpers.withMessage('Please enter a Node name', required),
+                required: helpers.withMessage('Please enter a Sparkplug name', required),
                 minLength: minLength(5),
                 valid: helpers.withMessage('This Node name does not conform to the naming convention',
                     helpers.regex(/^[-\w]+$/)),

@@ -1,5 +1,6 @@
 service: !u UUIDs.Service.ConfigDB
 version: 1
+overwrite: true
 classes:
   - !u Clusters.Class.Account
   - !u Clusters.Class.Cluster

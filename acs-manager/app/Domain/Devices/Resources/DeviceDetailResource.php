@@ -40,6 +40,7 @@ class DeviceDetailResource extends JsonResource
                 JSON_THROW_ON_ERROR
             ) : null,
             'device_connection' => $this->deviceConnection,
+            'pub_interval' => $this['pub_interval'],
         ];
     }
 }

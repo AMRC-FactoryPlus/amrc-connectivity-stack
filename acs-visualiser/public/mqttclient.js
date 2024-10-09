@@ -57,7 +57,7 @@ export default class MQTTClient extends EventEmitter {
         const { address, type: kind } = topic;
         const { group, node, device } = address;
 
-        const parts = [...group.split("-"), node];
+        const parts = [...group.split("-"), ...node.split("-")];
         if (device != undefined) parts.push(device);
         
         const graph = this.add_to_graph(parts);

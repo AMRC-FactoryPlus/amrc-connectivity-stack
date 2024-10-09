@@ -48,7 +48,8 @@ class CreateNodeRequest extends FormRequest
     public function rules()
     {
         return [
-            'node_name' => ['required', 'string', 'min:5', 'regex:/^\w+$/i'],
+            'info_name' => ['required', 'string', 'min:5'],
+            'node_name' => ['required', 'string', 'min:5', 'regex:/^[-\w]+$/i'],
             'charts' => ['required', 'string'],
             'destination_cluster' => ['required', 'string'],
             'destination_node' => ['string', 'nullable'],

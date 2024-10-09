@@ -207,9 +207,10 @@ jobs:
       matrix:
         service:
           - acs-edge
+          - edge-bacnet
           - edge-modbus
           - edge-test
-          - edge-bacnet
+          - edge-tplink-smartplug
     permissions:
       contents: read
       packages: write

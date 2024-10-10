@@ -177,7 +177,7 @@ All proposals need to meet these conditions:
 
 ### Permission templates
 
-[Full proposal](./redesign/sexpr.md).
+[Full proposal](./auth/sexpr.md).
 
 This proposal is intended as a simple way to define a JSON-based
 expression language which can be used to express rich permission
@@ -191,7 +191,7 @@ partial evaluation is difficult to handle correctly.
 
 ### Dynamic groups
 
-[Full proposal](./redesign/dyn-groups.md).
+[Full proposal](./auth/dyn-groups.md).
 
 This is intended as a simplest-possible proposal while still meeting the
 conditions above.

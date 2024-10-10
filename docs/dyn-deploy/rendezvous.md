@@ -47,6 +47,9 @@ These properties are used as follows:
   The Rendezvous service does not interpret or validate this beyond the
   generic request and response fields defined below.
 
+A response is distinguished from a request by the presence of the
+`responseTypes` or `responseTo` property in the `content`, see below.
+
 ### Consumption requests
 
 These are published by consumers to specify what they wish to consume.
@@ -104,7 +107,7 @@ Responses have the following format:
 The additional field here is `responseTo`, which identifies this as a
 response and gives the UUID of the request we are responding to.
 
-Currently the only response type defined is _Factory+ Instance_ 
+Currently the only response type defined is _Sparkplug Instance_ 
 (`99ab918e-8b9e-40c7-bfff-83a3ddb9db17`) which contains a schema
 instance within a Sparkplug Devices publishing the information
 requested.

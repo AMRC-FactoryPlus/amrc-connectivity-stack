@@ -1,21 +1,21 @@
-{{ if .Values.warehouse.ingester.enabled }}
+{{ if .Values.historians.sparkplug.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: influxdb-ingester
+  name: historian-sparkplug
   namespace: {{ .Release.Namespace }}
   labels:
-    component: influxdb-ingester
+    component: historian-sparkplug
 spec:
   replicas: 1
   selector:
     matchLabels:
-      component: influxdb-ingester
+      component: historian-sparkplug
   template:
     metadata:
       labels:
-        component: influxdb-ingester
-        factory-plus.service: influxdb-ingester
+        component: historian-sparkplug
+        factory-plus.service: historian-sparkplug
     spec:
       {{- with .Values.acs.imagePullSecrets }}
       imagePullSecrets:
@@ -33,8 +33,8 @@ spec:
                 path: client
 
       containers:
-        - name: influxdb-ingester
-          image: "{{ include "amrc-connectivity-stack.image-name" (list . .Values.warehouse.ingester) }}"
+        - name: historian-sparkplug
+          image: "{{ include "amrc-connectivity-stack.image-name" (list . .Values.historians.sparkplug) }}"
           command: [ "/usr/bin/k5start", "-Uf", "/keytabs/client" ]
           args: [ "node", "--es-module-specifier-resolution=node", "bin/ingester.js" ]
           imagePullPolicy: Always
@@ -44,11 +44,11 @@ spec:
             - name: CLIENT_KEYTAB
               value: /keytabs/client
             - name: LOG_LEVEL
-              value: {{ .Values.warehouse.ingester.logLevel | required "values.warehouse.ingester.logLevel" }}
+              value: {{ .Values.historians.sparkplug.logLevel | required "values.historians.sparkplug.logLevel" }}
             - name: BATCH_SIZE
-              value: {{ .Values.warehouse.ingester.batchSize | quote | required "values.warehouse.ingester.batchSize" }}
+              value: {{ .Values.historians.sparkplug.batchSize | quote | required "values.historians.sparkplug.batchSize" }}
             - name: FLUSH_INTERVAL
-              value: {{ .Values.warehouse.ingester.flushInterval | quote | required "values.warehouse.ingester.flushInterval" }}
+              value: {{ .Values.historians.sparkplug.flushInterval | quote | required "values.historians.sparkplug.flushInterval" }}
             - name: DIRECTORY_URL
               value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
             - name: INFLUX_URL

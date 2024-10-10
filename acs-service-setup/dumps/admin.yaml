@@ -49,3 +49,6 @@ aces:
   - principal: !u ACS.Group.GlobalDebuggers
     permission: !u UUIDs.Permission.CmdEsc.Rebirth
     target: !u UUIDs.Special.Null
+  - principal: !u ACS.Group.GlobalDebuggers
+    permission: !u ACS.Perm.MQTT.ReadEntireUNS
+    target: !u UUIDs.Special.Null

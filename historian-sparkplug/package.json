@@ -1,0 +1,41 @@
+{
+  "name": "historian-sparkplug",
+  "version": "1.0.0",
+  "description": "An ingestion engine to enable InfluxDB to be a fully-featured Sparkplug historian",
+  "author": "AMRC",
+  "license": "MIT",
+  "keywords": [
+    "amrc",
+    "factory-plus",
+    "factoryplus",
+    "acs",
+    "amrc-connectivity-stack",
+    "mqtt",
+    "sparkplug"
+  ],
+  "type": "module",
+  "scripts": {
+    "start": "node --trace-warnings dist/bin/ingester.js",
+    "start:shell": "k5start -Uf $CLIENT_KEYTAB npm run start",
+    "dev": " npm run build && npm run start:dev",
+    "build": "tsc && tsc-alias",
+    "clean": "tsc --build --clean",
+    "lint": "eslint --ignore-path .gitignore --ext .ts src/",
+    "lint:fix": "npm run lint -- --fix"
+  },
+  "dependencies": {
+    "@amrc-factoryplus/utilities": "^1.0.8",
+    "@influxdata/influxdb-client": "^1.33.2",
+    "@influxdata/influxdb-client-apis": "^1.33.2",
+    "async": "^3.2.4",
+    "long": "^5.2.3",
+    "pino": "^8.11.0",
+    "pino-pretty": "^10.0.0"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "dotenv": "^16.0.3",
+    "ts-node": "^10.9.1",
+    "tsc-alias": "^1.7.0"
+  }
+}

@@ -1,5 +1,5 @@
 /*
- * AMRC InfluxDB Sparkplug Ingester
+ * AMRC InfluxDB Sparkplug Historian
  * Copyright "2024" AMRC
  */
 

@@ -4,4 +4,4 @@
 #
 
 # bin/bash
-kubectl --kubeconfig ./k3s.yaml get -n fpd-v3 secret manager-keytab -o jsonpath="{.data.client-keytab}" | base64 -d >"./keytab"
+kubectl --kubeconfig /Users/me1ago/.kube/ago.yaml get -n factory-plus secret manager-keytab -o jsonpath="{.data.client-keytab}" | base64 -d >"./keytab"

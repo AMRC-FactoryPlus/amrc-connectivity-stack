@@ -30,6 +30,7 @@ class CreateNodeAction
      */
 
     public function execute(
+        $infoName,
         $nodeName,
         $destinationCluster,
         $charts,
@@ -70,7 +71,7 @@ class CreateNodeAction
         ]);
 
         $configDB->putConfig(App::Info, $uuid, [
-            "name" => $nodeName,
+            "name" => $infoName,
         ]);
 
         // Split the $charts string (comma-delimited) into an array of UUIDs

@@ -29,6 +29,7 @@ class UpdateDeviceInformationRequest extends FormRequest
     {
         return [
             'device_id' => ['required', 'string', 'min:3', 'regex:/^\w+$/i'],
+            'pub_interval' => ['required', 'integer', 'min:0'],
         ];
     }
 }

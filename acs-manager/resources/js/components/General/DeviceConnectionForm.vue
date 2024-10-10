@@ -417,9 +417,6 @@ export default {
                 return this.model.connType === 'Driver' || false
               },
               validations: {
-                requiredIf: requiredIf(() => {
-                  return this.model.connType === 'Driver' || false
-                }),
               },
               description: 'Driver-specific connection details.',
               title: 'DriverDetails',

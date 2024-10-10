@@ -120,7 +120,8 @@ class DeviceController extends Controller
             );
         }
 
-        (new UpdateDeviceInformationAction)->execute($device, $validated['device_id']);
+        (new UpdateDeviceInformationAction)->execute(
+                $device, $validated['device_id'], $validated['pub_interval']);
     }
 
     public function destroy(DeleteDeviceRequest $request)

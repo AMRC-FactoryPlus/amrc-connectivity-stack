@@ -98,6 +98,11 @@ export default {
               dataType: 'static',
               data: null,
             },
+            bare: {
+              dataType: 'collected',
+              dataSource: ['clusterConfiguration', 'controls', 'bare', 'value'],
+              data: false,
+            },
           },
         },
         clusterConfiguration: {
@@ -127,7 +132,18 @@ export default {
               disabled: false,
               initialValue: '',
               value: '',
-            }
+            },
+            bare: {
+              name: 'Bare deployment',
+              description: 'We already have Flux and Sealed Secrets deployed.',
+              type: 'checkbox',
+              validations: {
+                required: helpers.withMessage('Please choose', required),
+              },
+              disabled: false,
+              initialValue: false,
+              value: false,
+            },
           },
           buttons: [
             {

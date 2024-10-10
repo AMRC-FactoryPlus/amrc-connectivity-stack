@@ -19,15 +19,20 @@ endif
 
 ifdef k8s.deployment
 
+_dep=		deploy/"${k8s.deployment}"
+ifdef k8s.container
+_cont=		-c "${k8s.container}"
+endif
+
 deploy: all restart logs
 
 restart:
-	${_kubectl} rollout restart deploy/"${k8s.deployment}"
-	${_kubectl} rollout status deploy/"${k8s.deployment}"
+	${_kubectl} rollout restart ${_dep}
+	${_kubectl} rollout status ${_dep}
 	sleep 2
 
 logs:
-	${_kubectl} logs -f deploy/"${k8s.deployment}"
+	${_kubectl} logs -f ${_cont} ${_dep}
 
 else
 

@@ -4,7 +4,7 @@
  */
 
 import { Device, deviceOptions, DeviceConnection } from "../device.js";
-import { log } from "../helpers/log.js";
+import { log, logf } from "../helpers/log.js";
 import { SparkplugNode } from "../sparkplugNode.js";
 import { S7Endpoint, S7ItemGroup } from '@st-one-io/nodes7';
 import { Metrics, sparkplugMetric } from '../helpers/typeHandler.js';
@@ -61,6 +61,7 @@ export class S7Connection extends DeviceConnection {
     }
 
     async subscribe (addresses: string[]) {
+        logf("S7 Subscribe: %O", addresses); 
         for (const a of addresses) {
             this.#vars.add(a);
             this.#itemGroup.addItems(a);

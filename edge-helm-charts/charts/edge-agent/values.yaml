@@ -7,10 +7,14 @@ image:
   # Edge Agent image to pull
   edgeAgent:
     repository: acs-edge
+  bacnet:
+    repository: edge-bacnet
   modbus:
     repository: edge-modbus
   test:
     repository: edge-test
+  tplink-smartplug:
+    repository: edge-tplink-smartplug
   # Further image names for drivers as needed
 
 # An object mapping connection names to driver configuration. This is

@@ -10,7 +10,7 @@ import * as jsonpointer from 'jsonpointer';
 import * as Long from "long";
 import {MessageSecurityMode, SecurityPolicy} from "node-opcua";
 import {Address} from "@amrc-factoryplus/utilities";
-import {log, logf} from "./log.js";
+import {log} from "./log.js";
 
 export enum serialisationType {
     ignored = "Defined by Protocol",
@@ -250,14 +250,16 @@ export class Metrics {
             const metric = this.#array[i];
             this.#nameIndex[metric.name || ""] = i;
             // this.#aliasIndex[metric.alias as number] = i;
-            if (metric.properties != null && metric.properties.address != null && metric.properties.path != null && (metric.properties.method.value as string).search(/^GET/g) > -1) {
-                const addr = metric.properties.address.value as string;
+            const props = metric.properties;
+            const addr = props?.address?.value as string|undefined;
+            const path = (props?.path?.value ?? "") as string;
+            const meth = (props?.method?.value ?? "") as string;
+            if (addr != null && /GET/.test(meth)) {
                 if (!this.#addrIndex[addr]) {
                     this.#addrIndex[addr] = [];
                 }
                 this.#addrIndex[addr].push(i);
                 this.#addrIndex[addr].push(i);
-                const path = metric.properties.path.value as string;
                 if (!this.#addrPathIndex[addr]) {
                     this.#addrPathIndex[addr] = {};
                 }
@@ -382,8 +384,11 @@ export function parseValueFromPayload(msg: any, metric: sparkplugMetric, payload
             if (path) {
                 /* Work around a bug in the JSONPath library */
                 let newVal = path === "$" && payload === false
-                    ? [ false ] 
-                    : JSONPath({path: path, json: payload});
+                    ? [false]
+                    : JSONPath({
+                        path: path,
+                        json: payload
+                    });
                 if (payload === 0 || !Array.isArray(newVal)) {
                     return 0;
                 } else {
@@ -467,12 +472,47 @@ export function parseTimeStampFromPayload(msg: any, metric: sparkplugMetric, pay
             }
 
             const timestamp = JSONPath({
-                path: '$.timestamp', json: payload
+                path: '$.timestamp',
+                json: payload
             });
-            return Array.isArray(timestamp) ? timestamp[0] : undefined;
+
+            const extractedTimestamp = Array.isArray(timestamp) ? timestamp[0] : undefined;
+
+            // The timestamp will be a unix timestamp in milliseconds or
+            // seconds, however upstream Factory+ expects it to be in
+            // milliseconds. Here, we detect if the timestamp is in seconds
+            // and convert it to milliseconds if necessary.
+
+            if (extractedTimestamp) {
+                if (isTimestampInMilliseconds(extractedTimestamp)) {
+                    return extractedTimestamp;
+                }
+
+                return extractedTimestamp * 1000;
+            }
+
+            return undefined;
+
         default:
             return undefined;
     }
+}
+
+function isTimestampInMilliseconds(timestamp: number) {
+    // Convert the timestamp to a number (in case it's a string)
+    timestamp = Number(timestamp);
+
+    // Check if the timestamp is in milliseconds or seconds
+    if (timestamp > 1e12) {
+        // If it's larger than 1e12 (approximately 13 digits), it's in milliseconds
+        return true;
+    } else if (timestamp > 1e9 && timestamp <= 1e12) {
+        // If it's between 1e9 and 1e12 (approximately 10 digits), it's in seconds
+        return false;
+    }
+
+    // Return false by default if the timestamp is outside expected ranges
+    return false;
 }
 
 function parseTypeFromString(type: string, val: any) {

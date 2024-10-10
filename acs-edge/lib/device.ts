@@ -28,6 +28,7 @@ import Long from "long";
 export interface deviceOptions {
     deviceId: string,                 // The name/ID of the device
     pollInt: number                   // The polling interval for polled devices, in ms
+    pubInterval: number               // Batch publish interval
     templates: sparkplugMetric[],     // An array of Sparkplug templates to be used by this device
     metrics: sparkplugMetric[],       // An array of metrics to be used by this device
     payloadFormat: serialisationType, // The format of the payloads produced by this device. Must be one of
@@ -35,6 +36,7 @@ export interface deviceOptions {
     delimiter?: string                // An optional delimiter character if the payload is a delimited string type
 }
 
+type Timer = ReturnType<typeof setTimeout> | null | undefined;
 
 /**
  * DeviceConnection is a superclass which is to be extended to provide  metric access
@@ -171,6 +173,10 @@ export class Device {
     _defaultMetrics: sparkplugMetric[]              // The default metrics common to all devices
     #isAlive: boolean                               // Whether this device is alive or not
     _isConnected: boolean                               // Whether this device is ready to publish or not
+    #pollInterval: number                           // Poll interval
+    #pubInterval: number                            // Batch interval for DATA packets
+    #pubTimer: Timer                                // Batch timer
+    #pubBuffer: sparkplugMetric[]                   // Batch buffer
     //#deathTimer: ReturnType<typeof setTimeout>      // A "dead mans handle" or "watchdog" timer which triggers a DDEATH
                                                     // if allowed to time out
     _payloadFormat: serialisationType               // The format of the payloads produced by this device
@@ -184,6 +190,9 @@ export class Device {
         this._delimiter = "delimiter" in options ? options.delimiter || "" : "";
         // Set device name
         this._name = options.deviceId;
+        this.#pollInterval = options.pollInt;
+        this.#pubInterval = options.pubInterval;
+        this.#pubBuffer = [];
         // Define default properties of device
         this._defaultMetrics = [
             {
@@ -209,6 +218,31 @@ export class Device {
                         value: 1, type: sparkplugDataType.float,
                     }, tooltip: {
                         value: "Polling interval for device metrics in ms.", type: sparkplugDataType.string,
+                    },
+                },
+            }, {
+                name: "Device Control/Publish Interval",
+                value: options.pubInterval,
+                type: sparkplugDataType.uInt16,
+                timestamp: Date.now(),
+                isTransient: true,
+                properties: {
+                    method: {
+                        value: "", type: sparkplugDataType.string,
+                    }, address: {
+                        value: "", type: sparkplugDataType.string,
+                    }, path: {
+                        value: "", type: sparkplugDataType.string,
+                    }, friendlyName: {
+                        value: "Device Publish Interval", type: sparkplugDataType.string,
+                    }, engUnit: {
+                        value: "ms", type: sparkplugDataType.string,
+                    }, engLow: {
+                        value: 0, type: sparkplugDataType.float,
+                    }, engHigh: {
+                        value: 1, type: sparkplugDataType.float,
+                    }, tooltip: {
+                        value: "Publish interval for device metrics in ms.", type: sparkplugDataType.string,
                     },
                 },
             }, {
@@ -343,7 +377,7 @@ export class Device {
         // If any metrics have changed
         if (changedMetrics.length) {
             // Publish the changes
-            this._publishDData(changedMetrics);
+            this.#bufferOrPublish(changedMetrics);
         }
 
         // Kick the watchdog timer to prevent the device dying
@@ -409,17 +443,26 @@ export class Device {
      */
     #subscribeToMetricChanges() {
         // Get the polling interval time from config
-        const pollInterval = this._metrics.getByName("Device Control/Polling Interval").value as number;
+        /* XXX bmz: The Manager only configures a single polling
+         * interval per connection, so we could run a single poll loop
+         * over all devices. However instead each device runs its own
+         * poll loop. */
         // Request subscription from device connection and save interval handle
         this.#devConn.startSubscription(this._metrics,
             this._payloadFormat,
             this._delimiter,
-            pollInterval,
+            this.#pollInterval,
             this._name,
             () => {
-                log(`Started subscription to metrics changes for ${this._name} with ${pollInterval} ms interval.`);
+                log(`Started subscription to metrics changes for ${this._name} with ${this.#pollInterval} ms interval.`);
             }
         );
+        if (this.#pubInterval) {
+            this.#pubTimer = setInterval(
+                () => this.#publishBuffer(),
+                this.#pubInterval);
+            log(`Started buffered publish for ${this._name} with ${this.#pubInterval} ms interval.`);
+        }
     }
 
     /**
@@ -429,7 +472,26 @@ export class Device {
         // Stop subscription for this devices interval handle
         this.#devConn.stopSubscription(this._name, () => {
             log(`Stopped metric change subscription for ${this._name}`);
+            if (this.#pubTimer) {
+                clearInterval(this.#pubTimer);
+                this.#pubTimer = null;
+                this.#publishBuffer();
+            }
         });
+    }
+
+    #bufferOrPublish(metrics: sparkplugMetric[]) {
+        if (this.#pubTimer) {
+            this.#pubBuffer.push(...metrics);
+        }
+        else {
+            this._publishDData(metrics);
+        }
+    }
+
+    #publishBuffer() {
+        this._publishDData(this.#pubBuffer);
+        this.#pubBuffer = [];
     }
 
     /**
@@ -522,44 +584,6 @@ export class Device {
     }
 
     /**
-     * Update config file for this device
-     * @param {string} key Key for config value to update
-     * @param {sparkplugValue} value Value of config element to be updated
-     */
-    #updateConfig(key: string, value: sparkplugValue) {
-        // Open config file
-        fs.readFile("./config/conf.json", (err, data) => {
-            if (err) {
-                console.error(err);
-            }
-
-            // Parse config file to object
-            let conf = JSON.parse(data.toString());
-            // Find this device in the config file
-            for (let i = 0; i < conf.deviceConnections.length; i++) {
-                const devConn = conf.deviceConnections[i];
-                // Check each connection
-                for (let j = 0; j < devConn.devices.length; j++) {
-                    const dev = devConn.devices[j];
-                    // Check each device on connection
-                    if (dev.deviceId == this._name) {
-                        // If device found
-                        dev[key] = value; // .. updated config value
-                        break;
-                    }
-                }
-            }
-            // Write new config to file
-            fs.writeFile("./config/conf.json", JSON.stringify(conf), (err) => {
-                if (err) {
-                    console.error(err);
-                }
-                log(`Updated config with ${key} = ${value}`);
-            });
-        });
-    }
-
-    /**
      * Perform required actions from DCMD request from Sparkplug client
      * @param {sparkplugPayload} payload Incoming DCMD payload from Sparkplug client
      */
@@ -592,17 +616,12 @@ export class Device {
                     }
                     break;
 
-                case "Device Control/Polling Interval": // Request to change polling interval
-                    // Stop current subscription
-                    this._stopMetricSubscription();
-                    // Update interval value
-                    this._metrics.setValueByName(metric.name, metric.value, metric.timestamp || Date.now());
-                    // Report new value to Sparkplug
-                    this._publishDData([metric]);
-                    // Restart subscription using new interval
-                    this.#subscribeToMetricChanges();
-                    // Write new interval to config file in order to persist over reboot
-                    this.#updateConfig("pollInt", metric.value);
+                case "Device Control/Polling Interval":
+                case "Device Control/Publish Interval":
+                    /* These metrics are now read-only. With central
+                     * configs it isn't practical to persist the
+                     * changes. */
+                    log(`${this._name} Ignoring CMD to read-only metric`);
                     break;
 
                 default:

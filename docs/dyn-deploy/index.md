@@ -27,7 +27,7 @@ There are several advantages to this.
 
 The current ACS v3 Edge Agent deployment process works like this:
 
-![v3-deploy.svg](ACS v3 deployment diagram)
+![ACS v3 deployment diagram](./v3-deploy.svg)
 
 1. An administrator configures an Edge Agent in the Manager. This
    includes information about where the Edge Agent should run, the
@@ -52,7 +52,7 @@ The current ACS v3 Edge Agent deployment process works like this:
 The proposed new process adds an extra service sitting between
 configuration and deployment, and works like this:
 
-![dyn-deploy.svg](ACS dynamic deployment diagram)
+![ACS dynamic deployment diagram](./dyn-deploy.svg)
 
 1. An administrator configures an available connection in the Manager.
    This is not yet attached to a specific Edge Agent, but information is

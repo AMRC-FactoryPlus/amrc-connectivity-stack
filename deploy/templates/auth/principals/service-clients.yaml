@@ -143,7 +143,7 @@ spec:
 ---
 # In the future if we have any more ingesters then this should be
 # enabled if any of the ingesters are enabled.
-{{- if .Values.unsIngesters.sparkplug.enabled }}
+{{- if .Values.historians.uns.enabled }}
 apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey
 metadata:

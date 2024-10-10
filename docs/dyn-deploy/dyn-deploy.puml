@@ -6,6 +6,9 @@ node "Device" as device
 
 rectangle "Central cluster" {
     agent "Manager" as manager
+    agent "Auth" as auth
+    agent "MQTT" as mqtt
+    agent "Reconcilation" as recon
 
     database "ConfigDB" as configdb {
         file "Connection/Instance" as connection
@@ -13,13 +16,12 @@ rectangle "Central cluster" {
         file "Edge Agent config" as config
     }
 
-    agent "MQTT" as mqtt
-    agent "Reconcilation" as recon
 
     database "Rendezvous" as rvous {
         file "Request" as rvreq
         file "Response" as rvres
     }
+
 }
 
 rectangle "Edge cluster" {
@@ -28,24 +30,26 @@ rectangle "Edge cluster" {
 }
 
 admin -ri-> manager         : [1]
-manager ==>> connection     : [2]
+manager ==> connection      : [2]
 
-consumer =up=>> rvreq       : [3]
+consumer =up=> rvreq        : [3]
 rvreq -up-> recon           : [4]
 connection -do-> recon      : [4]
 
-recon =up=>> deployment     : [5]
-recon =up=>> config         : [5]
-recon =do=> rvres           : [5]
+recon =up=> deployment      : [5]
+recon =up=> config          : [5]
+recon --> auth              : [6]
+recon =do=> rvres           : [6]
 
-deployment --> sync         : [6]
-sync =do=>> agent           : [6]
+deployment --> sync         : [7]
+sync =do=> agent            : [7]
 
-config -do-> agent          : [7]
-device -do-> agent          : [7]
+config -> agent             : [7]
+device -up-> agent          : [7]
 agent -> mqtt               : [7]
 
 rvres --> consumer          : [8]
-mqtt -> consumer            : [8]
+auth --> mqtt               : [8]
+mqtt --> consumer           : [8]
 
 @enduml

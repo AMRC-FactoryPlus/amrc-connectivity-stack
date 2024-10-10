@@ -46,8 +46,8 @@ The current ACS v3 Edge Agent deployment process works like this:
 5. The Edge Agent connects to its data sources, starts reading data and
    publishing it over Sparkplug, with attached semantics.
 
-6. A consumer with appropriate permissions can subscribe to MQTT to read
-   the data.
+6. An administrator grants permission for a consumer to consume the data
+   via MQTT.
 
 The proposed new process adds an extra service sitting between
 configuration and deployment, and works like this:
@@ -80,15 +80,17 @@ configuration and deployment, and works like this:
    service collates this into a set of Edge Agents that need to be
    deployed. It is likely that a single Edge Agent will be collecting
    data from multiple connections and distributing it to multiple
-   consumers. The Reconcilation service create _Edge deployment_ and
-   _Edge Agent config_ entries, and also publishes one or more responses
-   to the Rendezvous service.
+   consumers. The Reconcilation service creates _Edge deployment_ and
+   _Edge Agent config_ entries.
 
-6. The Edge Sync operator on the edge cluster deploys the Edge Agent as
-   before.
+6. The Reconciliation service configures the Auth service to allow the
+   consumer to subscribe to the new Device and publishes a response via
+   the Rendezvous service to let the consumer know where to find the new
+   Device.
 
-7. The Edge Agent reads its config, connects to its data sources, and
-   publishes the requested data to MQTT. 
+7. The Edge Sync operator on the edge cluster deploys the Edge Agent as
+   before. The Edge Agent reads its config, connects to its data
+   sources, and publishes the requested data to MQTT. 
 
 8. The Consumer reads the responses published to the Rendezvous service.
    These contain the information needed to make appropriate Sparkplug

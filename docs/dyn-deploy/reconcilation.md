@@ -51,13 +51,72 @@ might be no restriction at all. (The last case is perhaps not very
 likely. Even where a system is generally accessible control over where
 it is accessed from is probably desirable.)
 
-Something that will need considering here is how to store authentication
-information securely. The current system transports this information to
-the edge cluster securely but has (by design) no way to retrieve it.
-Moving a connection across clusters would either require keeping this
-information centrally, which is less secure, or would require
-re-entering credentials or creating new credentials when a connection
-moves.
+Since connections now exist as dedicated objects in the ConfigDB it is
+possible for other parts of F+, such as Edge Agent Alerts, to refer to
+them. A provisional structure for a _Connection config_ might be:
+
+```yaml
+driver: 132cb88a-9ada-41fa-803e-809f37186c1e
+topology:
+    cluster: 277c8c3a-bdc7-4b30-85b5-5247cf1eb3c3
+    hostname: edge-host-1234
+deployment: {}
+config:
+    endpoint: opc.tcp://192.168.1.1:4840
+    securityMode: Node
+    securityPolicy: Node
+    useCredentials: false
+source:
+  payloadFormat: Buffer
+  pollInterval: 1000
+```
+
+This information is used in the following ways:
+
+* `driver` identifies the driver used for this connection. These will
+  need to be registered in the ConfigDB and information provided about
+  the container image to use.
+* `topology` identifies the cluster and host from which this connection
+  may be made. This is used to combine connections into Edge Agents and
+  to build the _Edge deployment_ entry.
+* `deployment` contains additional information passed in the Helm values
+  in the _Edge deployment_ entry for this connection. This will be
+  needed for things like providing access to host devices.
+* `config` is the driver-specific config which is passed through into
+  the _Edge Agent config_ and then passed down to the driver.
+* `source` is the remaining information needed in the _Edge Agent
+  config_ to be able to read from the connection.
+
+### Driver definitions
+
+The connection config definition above assumes the external driver work
+on the Edge Agent has been carried through to completion, in particular:
+
+* All drivers are implemented externally.
+* Available drivers are registered in the ConfigDB.
+* Information is available in the ConfigDB giving a schema for the
+  driver config and details of the driver image.
+
+The schema for the driver config will be needed by the Manager to build
+a sensible UI for configuration. The driver image details will need to
+be copied into the Helm values in the _Edge deployment_ config entry;
+these will probably want to be overridable from the `deployment` key of
+individual connections, for testing new container images.
+
+The `edge-agent` Helm chart will need adjusting to make this work. In
+particular, the driver image definitions will need moving around; the
+logic to define a list of images which are then referenced is useful
+when writing values files by hand, but much less so when generating
+them. The default images will want removing altogether in favour of a
+default set of drivers registered in the ConfigDB. The logic to expose
+host devices to the container will also need changing; it should be
+possible to collate the list of required host devices for the `volumes`
+part of the Pod from a set of per-driver mappings.
+
+If any drivers are still implemented internally in the Edge Agent these
+will need special-casing somewhere. This can either be done by the
+Reconcilation service (preferably under ConfigDB control) or the Edge
+Agent can be changed to accept a new config file format.
 
 ### Instance configs
 
@@ -99,18 +158,22 @@ Birth, Data and Cmd packets.
 Something like this is likely to be needed:
 
 ```yaml
-  schema: d6de8765-bfbe-4f6b-b5d8-822dbd7f3a49
-  connection: 948a5669-fed9-4d8e-ac46-78fcf825ee38
-  metrics:
-    Switch_Closed:
-      type: Boolean
-      method: GET
-      address: PowerState
-      path: $
-      properties:
-        Record_To_Historian: true
-  instances:
-    Characteristics: a30aee1e-e896-4ba2-930c-8da81dc8f897
+schema: d6de8765-bfbe-4f6b-b5d8-822dbd7f3a49
+connection: 948a5669-fed9-4d8e-ac46-78fcf825ee38
+metrics:
+  Voltage:
+    type: Double
+    source:
+      address: Meter
+      path: $.voltage
+      deadband: 0.1
+    properties:
+      update: BD
+      engUnit: V
+      engLow: 0
+      engHigh: 320
+instances:
+  Characteristics: a30aee1e-e896-4ba2-930c-8da81dc8f897
 ```
 
 Obviously validation will be needed, for example that metrics and
@@ -229,7 +292,8 @@ simple. Every time we create a new Device for a given principal, we
 grant that principal rights to access the Device. Under the current Auth
 system, dynamic Devices will need to have their addresses preregistered
 in the ConfigDB, and the Reconciliation Service will need very broad
-rights to grant access to MQTT.
+rights to grant access to MQTT. The proposed Auth service changes would
+allow this to be permitted more flexibly.
 
 Notifying the consumer via the Rendezvous service is also
 straightforward. The problem of successfully consuming these
@@ -242,3 +306,28 @@ intended consumer, either over Sparkplug or in the ConfigDB. With a
 fairly minor modification to the Influx ingester it would then be
 possible to record each user's data into their own private Influx
 bucket, meaning we could apply Influx's ACLs in a useful way.
+
+## Additional considerations
+
+### MQTT auth
+
+The current HiveMQ auth plugin fetches an ACL for each client on
+connection. This ACL is then fixed for the life of the connection. If we
+are dynamically creating devices and granting a consumer access to them
+this will have to change. Working out how to enable change-notify for
+auth changes is the first step, whether this means a change-notify
+interface from the Auth service or pushing more of the ACL resolution to
+the consuming service with references to data sources which themselves
+have change-notify. Watching for change-notify from with HiveMQ will
+also be non-trivial, unless the plugin is moved out of process.
+
+### Southbound credentials
+
+Something that will need considering here is how to store authentication
+information securely. The current system transports this information to
+the edge cluster securely but has (by design) no way to retrieve it.
+Moving a connection across clusters would either require keeping this
+information centrally, which is less secure, or would require
+re-entering credentials or creating new credentials when a connection
+moves.
+

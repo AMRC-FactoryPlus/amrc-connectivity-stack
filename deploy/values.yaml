@@ -217,7 +217,7 @@ cmdesc:
 
 historians:
   uns:
-    enabled: true
+    enabled: false
     # -- The minimum log level that the historian will log messages at (One of 'fatal', 'error', 'warn', 'info', 'debug', 'trace' or 'silent'.)
     logLevel: info
     # -- The number of messages to batch together before sending to InfluxDB

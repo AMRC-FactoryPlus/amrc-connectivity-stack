@@ -20,8 +20,10 @@ configs:
     !u ACS.Group.SparkplugIngesters: { name: "Sparkplug Ingesters" }
     !u ACS.Group.HistorianUNS: { name: "Historian UNS" }
   !u UUIDs.App.MQTTPermissionTemplate:
-    !u ACS.Perm.MQTT.WriteToEntireUNS: "UNS/v1/#: w"
-    !u ACS.Perm.MQTT.ReadEntireUNS: "UNS/v1/#: rs"
+    !u ACS.Perm.MQTT.WriteToEntireUNS:
+      UNS/v1/#: w
+    !u ACS.Perm.MQTT.ReadEntireUNS:
+      UNS/v1/#: rs
 ---
 service: !u UUIDs.Service.Authentication
 version: 1

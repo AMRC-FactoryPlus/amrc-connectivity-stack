@@ -30,6 +30,9 @@ version: 1
 groups:
   !u ACS.Group.GlobalDebuggers:
     - !u ACS.Group.SparkplugIngesters
+  !u ACS.PermGroup.MQTT:
+    - !u ACS.Perm.MQTT.WriteToEntireUNS
+    - !u ACS.Perm.MQTT.ReadEntireUNS
 aces:
   - principal: !u ACS.Group.HistorianUNS
     permission: !u ACS.Perm.MQTT.ReadEntireUNS

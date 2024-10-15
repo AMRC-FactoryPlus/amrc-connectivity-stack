@@ -1,0 +1,41 @@
+{
+  "$id": "urn:uuid:d4e32f15-3276-4e9f-b9ef-d9e1a1e4c535",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "d4e32f15-3276-4e9f-b9ef-d9e1a1e4c535"
+    },
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "Active": {
+      "allOf": [
+        {
+          "$ref": "urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769"
+        },
+        {
+          "properties": {
+            "Documentation": {
+              "default": "Whether the proximity sensor is active"
+            },
+            "Sparkplug_Type": {
+              "enum": [
+                "Boolean"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "Device_Information": {
+      "$ref": "urn:uuid:2dd093e9-1450-44c5-be8c-c0d78e48219b"
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID"
+  ]
+}

@@ -1,0 +1,80 @@
+{
+  "$id": "urn:uuid:3ad967aa-9cec-429b-b31d-53e62b25c0c6",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Accelerometer",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "3ad967aa-9cec-429b-b31d-53e62b25c0c6"
+    },
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "X": {
+      "allOf": [
+        {
+          "$ref": "urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "FloatLE",
+                "FloatBE"
+              ]
+            },
+            "Documentation": {
+              "default": "The X component"
+            }
+          }
+        }
+      ]
+    },
+    "Y": {
+      "allOf": [
+        {
+          "$ref": "urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "FloatLE",
+                "FloatBE"
+              ]
+            },
+            "Documentation": {
+              "default": "The Y component"
+            }
+          }
+        }
+      ]
+    },
+    "Z": {
+      "allOf": [
+        {
+          "$ref": "urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "FloatLE",
+                "FloatBE"
+              ]
+            },
+            "Documentation": {
+              "default": "The Z component"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID"
+  ]
+}

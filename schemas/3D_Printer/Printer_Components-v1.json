@@ -1,0 +1,200 @@
+{
+  "$id": "urn:uuid:1863290a-72de-40a1-b69e-24ea99207212",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "3D Printer Components",
+  "description": "A JSON Schema representation of a Printer Components object of a 3D Printer.",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "1863290a-72de-40a1-b69e-24ea99207212"
+    },
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "Model_Extruder": {
+      "$ref": "urn:uuid:27c26802-9093-4ad5-8c4c-bcc81afb0e7b"
+    },
+    "Support_Extruder": {
+      "$ref": "urn:uuid:27c26802-9093-4ad5-8c4c-bcc81afb0e7b"
+    },
+    "Power": {
+      "type": "object",
+      "properties": {
+        "Controller_3p3V": {
+          "allOf": [
+            {
+              "$ref": "urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769"
+            },
+            {
+              "properties": {
+                "Sparkplug_Type": {
+                  "enum": [
+                    "FloatBE"
+                  ]
+                },
+                "Documentation": {
+                  "default": "Voltage value for the 3.3v controller."
+                }
+              }
+            }
+          ]
+        },
+        "System_12V": {
+          "allOf": [
+            {
+              "$ref": "urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769"
+            },
+            {
+              "properties": {
+                "Sparkplug_Type": {
+                  "enum": [
+                    "FloatBE"
+                  ]
+                },
+                "Documentation": {
+                  "default": "Voltage value for the 12v power on the system."
+                }
+              }
+            }
+          ]
+        },
+        "System_3p3V": {
+          "allOf": [
+            {
+              "$ref": "urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769"
+            },
+            {
+              "properties": {
+                "Sparkplug_Type": {
+                  "enum": [
+                    "FloatBE"
+                  ]
+                },
+                "Documentation": {
+                  "default": "Voltage value for the 3.3v power on the system."
+                }
+              }
+            }
+          ]
+        },
+        "System_5V": {
+          "allOf": [
+            {
+              "$ref": "urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769"
+            },
+            {
+              "properties": {
+                "Sparkplug_Type": {
+                  "enum": [
+                    "FloatBE"
+                  ]
+                },
+                "Documentation": {
+                  "default": "Voltage value for the 5v power on the system."
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "Enclosure": {
+      "type": "object",
+      "properties": {
+        "Cover": {
+          "allOf": [
+            {
+              "$ref": "urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769"
+            },
+            {
+              "properties": {
+                "Sparkplug_Type": {
+                  "enum": [
+                    "String"
+                  ]
+                },
+                "Value": {
+                  "enum": [
+                    "",
+                    "OPEN",
+                    "CLOSED"
+                  ]
+                },
+                "Documentation": {
+                  "default": "Whether the enclosure cover is OPEN/CLOSED."
+                }
+              }
+            }
+          ]
+        },
+        "Door_Open_State": {
+          "allOf": [
+            {
+              "$ref": "urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769"
+            },
+            {
+              "properties": {
+                "Sparkplug_Type": {
+                  "enum": [
+                    "String"
+                  ]
+                },
+                "Value": {
+                  "enum": [
+                    "",
+                    "LATCHED",
+                    "UNLATCHED"
+                  ]
+                },
+                "Documentation": {
+                  "default": "Whether the enclosure door is LATCHED/UNLATCHED."
+                }
+              }
+            }
+          ]
+        },
+        "Door_Lock_State": {
+          "allOf": [
+            {
+              "$ref": "urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769"
+            },
+            {
+              "properties": {
+                "Sparkplug_Type": {
+                  "enum": [
+                    "String"
+                  ]
+                },
+                "Value": {
+                  "enum": [
+                    "",
+                    "ACTIVE",
+                    "INACTIVE"
+                  ]
+                },
+                "Documentation": {
+                  "default": "Whether the enclosure door lock is ACTIVE/INACTIVE."
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "Oven_List": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-zA-Z0-9_]*$": {
+          "$comment": "An oven name or identifier - can be any regular string",
+          "$ref": "urn:uuid:802574dd-0d43-4001-a9d0-8f08e4cfb032"
+        }
+      }
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID"
+  ]
+}

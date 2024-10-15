@@ -1,0 +1,60 @@
+{
+  "$id": "urn:uuid:a6cc8a36-fa97-4157-a277-27468bd08b8a",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Fuel",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "a6cc8a36-fa97-4157-a277-27468bd08b8a"
+    },
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "Percentage": {
+      "allOf": [
+        {
+          "$ref": "urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "FloatLE",
+                "FloatBE"
+              ]
+            },
+            "Documentation": {
+              "default": "Percentage of fuel on generation mix"
+            }
+          }
+        }
+      ]
+    },
+    "Power": {
+      "allOf": [
+        {
+          "$ref": "urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "FloatLE",
+                "FloatBE"
+              ]
+            },
+            "Documentation": {
+              "default": "Generated power of particular fuel"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID"
+  ]
+}

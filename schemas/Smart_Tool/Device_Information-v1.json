@@ -1,0 +1,401 @@
+{
+  "$id": "urn:uuid:30ad8be1-8236-47a8-a411-2dbb8fb7bc7c",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Smart Tool Device Information",
+  "description": "A JSON Schema representation of a Device Information object of a Smart Tool.",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "30ad8be1-8236-47a8-a411-2dbb8fb7bc7c"
+    },
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "Cell_ID": {
+      "allOf": [
+        {
+          "$ref": "urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "UInt32BE"
+              ]
+            },
+            "Documentation": {
+              "default": "The cell ID is four bytes long specified by four ASCII digits. Range: 0000-9999."
+            }
+          }
+        }
+      ]
+    },
+    "Channel_ID": {
+      "allOf": [
+        {
+          "$ref": "urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "UInt16BE"
+              ]
+            },
+            "Documentation": {
+              "default": "The channel ID is two bytes long specified by two ASCII digits. Range: 00-20."
+            }
+          }
+        }
+      ]
+    },
+    "Controller_name": {
+      "allOf": [
+        {
+          "$ref": "urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "String"
+              ]
+            },
+            "Documentation": {
+              "default": "The controller name is 25 bytes."
+            }
+          }
+        }
+      ]
+    },
+    "Supplier_Code": {
+      "allOf": [
+        {
+          "$ref": "urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "String"
+              ]
+            },
+            "Documentation": {
+              "default": "ACT (supplier code for Atlas Copco Tools) specified by three ASCII characters."
+            }
+          }
+        }
+      ]
+    },
+    "Open_Protocol_Version": {
+      "allOf": [
+        {
+          "$ref": "urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "String"
+              ]
+            },
+            "Documentation": {
+              "default": "Open Protocol version. 19 ASCII characters. This version mirrors the IMPLEMENTED version of the Open Protocol and is hence not the same as the version of the specification. This is caused by, for instance, the possibility of implementation done of only a subset of the protocol."
+            }
+          }
+        }
+      ]
+    },
+    "Controller_Software_Version": {
+      "allOf": [
+        {
+          "$ref": "urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "String"
+              ]
+            },
+            "Documentation": {
+              "default": "The controller software version. 19 ASCII characters."
+            }
+          }
+        }
+      ]
+    },
+    "Tool_Number_Of_Tightening": {
+      "allOf": [
+        {
+          "$ref": "urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "UInt64BE"
+              ]
+            },
+            "Documentation": {
+              "default": "Total number of tightenings of tool 10 ASCII digits. Max 4294967295."
+            }
+          }
+        }
+      ]
+    },
+    "Last_Calibration_Date": {
+      "allOf": [
+        {
+          "$ref": "urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "String"
+              ]
+            },
+            "Documentation": {
+              "default": "Last time tool was calibrated 19 ASCII characters. YYYY-MM-DD:HH:MM:SS."
+            }
+          }
+        }
+      ]
+    },
+    "Controller_Serial_Number": {
+      "allOf": [
+        {
+          "$ref": "urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "String"
+              ]
+            },
+            "Documentation": {
+              "default": "Serial number of controller 10 ASCII characters."
+            }
+          }
+        }
+      ]
+    },
+    "Calibration_Value": {
+      "allOf": [
+        {
+          "$ref": "urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "UInt64BE"
+              ]
+            },
+            "Documentation": {
+              "default": "The tool calibration value is multiplied by 100 and sent as an integer (2 decimals truncated). Six ASCII digits."
+            }
+          }
+        }
+      ]
+    },
+    "Last_Service_Date": {
+      "allOf": [
+        {
+          "$ref": "urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "String"
+              ]
+            },
+            "Documentation": {
+              "default": "Last time tool was serviced YYYY-MM-DD:HH:MM:SS."
+            }
+          }
+        }
+      ]
+    },
+    "Tightenings_Since_Service": {
+      "allOf": [
+        {
+          "$ref": "urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "UInt64BE"
+              ]
+            },
+            "Documentation": {
+              "default": "The number of tightenings since last service is specified by 10 ASCII digits. Max 4294967295."
+            }
+          }
+        }
+      ]
+    },
+    "Tool_Type": {
+      "allOf": [
+        {
+          "$ref": "urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "UInt16BE"
+              ]
+            },
+            "Documentation": {
+              "default": "The tool type is specified by 2 ASCII digits: 00=No Tool, 01=S-tool, 02=DS-tool, 03=Ref. transducer, 04=ST-tool, 05=EP-tool, 06=ETX-tool, 07=SL-tool, 08=DL-tool, 09=IRC Offline, 10=STB-tool, 11=QST-tool, 12=STT-tool, 13=STwrench, 14 = ES-tool."
+            }
+          }
+        }
+      ]
+    },
+    "Motor_Size": {
+      "allOf": [
+        {
+          "$ref": "urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "UInt16BE"
+              ]
+            },
+            "Documentation": {
+              "default": "The motor size is specified by 2 ASCII digits, range 00-99. 00 = no motor, 01-99 = motor size xx in Atlas Copco nomenclature, or motor size = 10xx in Atlas Copco nomenclature (certain numbers correspond to 2 different motor sizes, for example 62 for both motor size 62."
+            }
+          }
+        }
+      ]
+    },
+    "Open_End_Data": {
+      "allOf": [
+        {
+          "$ref": "urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "UInt32BE"
+              ]
+            },
+            "Documentation": {
+              "default": "The open end data is specified by 3 ASCII digits. The first digit represents the 'use open end': 1=true, 0=false. The second digit indicates the tightening direction: 0=CW, 1=CCW. The third digit indicates motor rotation: 0=normal, 1=inverted."
+            }
+          }
+        }
+      ]
+    },
+    "Tool_Max_Torque": {
+      "allOf": [
+        {
+          "$ref": "urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "UInt64BE"
+              ]
+            },
+            "Documentation": {
+              "default": "The tool max torque value is multiplied by 100 and sent as an integer (2 decimals truncated). Six ASCII digits."
+            }
+          }
+        }
+      ]
+    },
+    "Gear_Ratio": {
+      "allOf": [
+        {
+          "$ref": "urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "UInt64BE"
+              ]
+            },
+            "Documentation": {
+              "default": "The gear ratio value is multiplied by 100 and sent as an integer (2 decimals truncated). Six ASCII digits."
+            }
+          }
+        }
+      ]
+    },
+    "Tool_Full_Speed": {
+      "allOf": [
+        {
+          "$ref": "urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "UInt64BE"
+              ]
+            },
+            "Documentation": {
+              "default": "The tool full speed value is multiplied by 100 and sent as an integer (2 decimals truncated). Six ASCII digits."
+            }
+          }
+        }
+      ]
+    },
+    "Primary_Tool": {
+      "allOf": [
+        {
+          "$ref": "urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "UInt16BE"
+              ]
+            },
+            "Documentation": {
+              "default": "Primary tool. The primary tool is two byte-long and specified by two ASCII digits. 01=Cable (invalid for IRC-controller), 02=IRC-B, 03=IRC-W."
+            }
+          }
+        }
+      ]
+    },
+    "Tool_Model": {
+      "allOf": [
+        {
+          "$ref": "urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "String"
+              ]
+            },
+            "Documentation": {
+              "default": "12 ASCII characters with padding at the end of the string if needed. The padding is done with spaces."
+            }
+          }
+        }
+      ]
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID"
+  ]
+}

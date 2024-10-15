@@ -1,0 +1,75 @@
+{
+  "$id": "urn:uuid:09a88805-9844-44dd-b686-e61608908e08",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "09a88805-9844-44dd-b686-e61608908e08"
+    },
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "Carbon_Dioxide_Sensors": {
+      "patternProperties": {
+        "^[a-zA-Z0-9_]*$": {
+          "$ref": "urn:uuid:aaeaf814-521e-4e08-a8e3-3a5be64ae0c3"
+        }
+      },
+      "type": "object"
+    },
+    "Electrical_Energy_Sensors": {
+      "patternProperties": {
+        "^[a-zA-Z0-9_]*$": {
+          "$ref": "urn:uuid:093c0186-f4ee-479a-b00b-c849b152b33e"
+        }
+      },
+      "type": "object"
+    },
+    "Temperature_Sensors": {
+      "patternProperties": {
+        "^[a-zA-Z0-9_]*$": {
+          "$ref": "urn:uuid:abaaabad-ccfd-4a93-8ad6-1aca9f863ee8"
+        }
+      },
+      "type": "object"
+    },
+    "Humidity_Sensors": {
+      "patternProperties": {
+        "^[a-zA-Z0-9_]*$": {
+          "$ref": "urn:uuid:e4b9c2e0-e265-44ff-96aa-09ed55173000"
+        }
+      },
+      "type": "object"
+    },
+    "Light_Intensity_Sensors": {
+      "patternProperties": {
+        "^[a-zA-Z0-9_]*$": {
+          "$ref": "urn:uuid:51b96441-76f9-4627-ba14-c2e97be2cd07"
+        }
+      },
+      "type": "object"
+    },
+    "Sound_Level_Sensors": {
+      "patternProperties": {
+        "^[a-zA-Z0-9_]*$": {
+          "$ref": "urn:uuid:b38e7a34-acec-4151-8493-257a767ab4bb"
+        }
+      },
+      "type": "object"
+    },
+    "Zones": {
+      "patternProperties": {
+        "^[a-zA-Z0-9_]*$": {
+          "$ref": "urn:uuid:09a88805-9844-44dd-b686-e61608908e08"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID"
+  ]
+}

@@ -1,0 +1,80 @@
+{
+  "$id": "urn:uuid:1a2c3594-d311-4f6b-865b-b97db3fa6d42",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Commanded Value",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "1a2c3594-d311-4f6b-865b-b97db3fa6d42"
+    },
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "Actual": {
+      "allOf": [
+        {
+          "$ref": "urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "DoubleLE",
+                "DoubleBE"
+              ]
+            },
+            "Documentation": {
+              "default": "Current actual value."
+            }
+          }
+        }
+      ]
+    },
+    "Commanded": {
+      "allOf": [
+        {
+          "$ref": "urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "DoubleLE",
+                "DoubleBE"
+              ]
+            },
+            "Documentation": {
+              "default": "Setpoint value."
+            }
+          }
+        }
+      ]
+    },
+    "Remaining": {
+      "allOf": [
+        {
+          "$ref": "urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "DoubleLE",
+                "DoubleBE"
+              ]
+            },
+            "Documentation": {
+              "default": "Remaining value."
+            }
+          }
+        }
+      ]
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID"
+  ]
+}

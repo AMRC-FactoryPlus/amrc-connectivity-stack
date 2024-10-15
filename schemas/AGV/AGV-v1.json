@@ -1,0 +1,94 @@
+{
+  "$id": "urn:uuid:dce8a007-6a64-41d2-9851-89451e871613",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "dce8a007-6a64-41d2-9851-89451e871613"
+    },
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "Device_Information": {
+      "$ref": "urn:uuid:2dd093e9-1450-44c5-be8c-c0d78e48219b"
+    },
+    "Emergency_Stops": {
+      "patternProperties": {
+        "^[a-zA-Z0-9_]*$": {
+          "$ref": "urn:uuid:1a1ef094-bbf4-4f15-a63d-5692ef13a9f1"
+        }
+      },
+      "type": "object"
+    },
+    "Position": {
+      "$ref": "urn:uuid:8e029429-237f-479e-9991-594437c62781"
+    },
+    "Velocity": {
+      "type": "object",
+      "properties": {
+        "Linear": {
+          "allOf": [
+            {
+              "$ref": "urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769"
+            },
+            {
+              "properties": {
+                "Documentation": {
+                  "default": ""
+                },
+                "Sparkplug_Type": {
+                  "enum": [
+                    "FloatLE",
+                    "FloatBE",
+                    "DoubleLE",
+                    "DoubleBE"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "Angular": {
+          "allOf": [
+            {
+              "$ref": "urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769"
+            },
+            {
+              "properties": {
+                "Documentation": {
+                  "default": ""
+                },
+                "Sparkplug_Type": {
+                  "enum": [
+                    "FloatLE",
+                    "FloatBE",
+                    "DoubleLE",
+                    "DoubleBE"
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      },
+      "required": []
+    },
+    "Current_Job": {
+      "$ref": "urn:uuid:0fb61e8d-a6ca-4907-9a14-ff11ec857fd9"
+    },
+    "Job_Queue": {
+      "patternProperties": {
+        "^[a-zA-Z0-9_]*$": {
+          "$ref": "urn:uuid:0fb61e8d-a6ca-4907-9a14-ff11ec857fd9"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID"
+  ]
+}

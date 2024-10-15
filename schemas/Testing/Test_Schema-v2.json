@@ -1,0 +1,67 @@
+{
+  "$id": "urn:uuid:214b7fe8-6a92-4743-b782-4230458ccdde",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "214b7fe8-6a92-4743-b782-4230458ccdde"
+    },
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "Int": {
+      "patternProperties": {
+        "^[a-zA-Z0-9_]*$": {
+          "$ref": "urn:uuid:483a2aae-8871-45a2-8795-53dc513717df"
+        }
+      },
+      "type": "object"
+    },
+    "UInt": {
+      "patternProperties": {
+        "^[a-zA-Z0-9_]*$": {
+          "$ref": "urn:uuid:01b7f027-ef6e-4dd4-9edd-aca578aeaf59"
+        }
+      },
+      "type": "object"
+    },
+    "Boolean": {
+      "patternProperties": {
+        "^[a-zA-Z0-9_]*$": {
+          "$ref": "urn:uuid:7c1a911c-18e0-449f-b8c6-5815773ee22b"
+        }
+      },
+      "type": "object"
+    },
+    "Float": {
+      "patternProperties": {
+        "^[a-zA-Z0-9_]*$": {
+          "$ref": "urn:uuid:61f5b3c5-9945-4eab-b5ca-55de04a84de6"
+        }
+      },
+      "type": "object"
+    },
+    "Double": {
+      "patternProperties": {
+        "^[a-zA-Z0-9_]*$": {
+          "$ref": "urn:uuid:9cb27c21-3b99-4c3f-95b5-bb77e92f0351"
+        }
+      },
+      "type": "object"
+    },
+    "String": {
+      "patternProperties": {
+        "^[a-zA-Z0-9_]*$": {
+          "$ref": "urn:uuid:dc137814-e6e3-49ce-b39d-08118af64b29"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID"
+  ]
+}

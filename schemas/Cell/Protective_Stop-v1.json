@@ -1,0 +1,43 @@
+{
+  "$id": "urn:uuid:24a01fa5-9232-40f5-98e5-0414e383ba9d",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Protective Stop",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "24a01fa5-9232-40f5-98e5-0414e383ba9d"
+    },
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "Device_Information": {
+      "$ref": "urn:uuid:2dd093e9-1450-44c5-be8c-c0d78e48219b"
+    },
+    "Active": {
+      "allOf": [
+        {
+          "$ref": "urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "Boolean"
+              ]
+            },
+            "Documentation": {
+              "default": "A representation of whether the protective stop is activated."
+            }
+          }
+        }
+      ]
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID",
+    "Active"
+  ]
+}

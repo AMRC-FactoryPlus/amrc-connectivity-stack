@@ -1,0 +1,84 @@
+{
+  "$id": "urn:uuid:e39007e9-1427-4867-9d72-1c00c663db15",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CNC Axis",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "e39007e9-1427-4867-9d72-1c00c663db15"
+    },
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "Base_Axis": {
+      "$ref": "urn:uuid:777dd941-f426-4355-8130-e144530b1376"
+    },
+    "Act_Channel": {
+      "allOf": [
+        {
+          "$ref": "urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "String"
+              ]
+            },
+            "Documentation": {
+              "default": "NodeId of the channel object (CncChannelType) that administrates this drive to expose drive channel affiliation. ActChannel remains empty in case of drives without channel affiliation."
+            }
+          }
+        }
+      ]
+    },
+    "Is_Inactive": {
+      "allOf": [
+        {
+          "$ref": "urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "Boolean"
+              ]
+            },
+            "Documentation": {
+              "default": "Drive inactive state (true in case of inactive drive, else false)."
+            }
+          }
+        }
+      ]
+    },
+    "Is_Virtual": {
+      "allOf": [
+        {
+          "$ref": "urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "Boolean"
+              ]
+            },
+            "Documentation": {
+              "default": "Virtual axis (no hardware present; true in case of virtual axis, else false)."
+            }
+          }
+        }
+      ]
+    },
+    "Position_Indirect": {
+      "$ref": "urn:uuid:1a2c3594-d311-4f6b-865b-b97db3fa6d42"
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID",
+    "Base_Axis"
+  ]
+}

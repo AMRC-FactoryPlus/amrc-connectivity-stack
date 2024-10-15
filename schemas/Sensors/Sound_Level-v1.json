@@ -1,0 +1,40 @@
+{
+  "$id": "urn:uuid:b38e7a34-acec-4151-8493-257a767ab4bb",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Sound Level",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "b38e7a34-acec-4151-8493-257a767ab4bb"
+    },
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "Sound_Level": {
+      "allOf": [
+        {
+          "$ref": "urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "FloatLE",
+                "FloatBE"
+              ]
+            },
+            "Documentation": {
+              "default": "The Sound Level measured by the sensor in dB"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID"
+  ]
+}

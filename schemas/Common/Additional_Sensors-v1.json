@@ -1,0 +1,36 @@
+{
+  "$id": "urn:uuid:ebafa837-c572-4586-9edc-ba1cf033cd7d",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Additional Sensors",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "ebafa837-c572-4586-9edc-ba1cf033cd7d"
+    },
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "Accelerometers": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-zA-Z0-9_]*$": {
+          "$ref": "urn:uuid:3ad967aa-9cec-429b-b31d-53e62b25c0c6"
+        }
+      }
+    },
+    "Temperature": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-zA-Z0-9_]*$": {
+          "$ref": "urn:uuid:abaaabad-ccfd-4a93-8ad6-1aca9f863ee8"
+        }
+      }
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID"
+  ]
+}

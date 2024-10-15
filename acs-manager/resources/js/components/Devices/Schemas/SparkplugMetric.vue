@@ -4,8 +4,7 @@
   -->
 
 <template>
-  <div :key="this.selectedMetric.path.join('.')" v-if="schema && schemaLoading === false"
-       class="flex flex-col p-4 w-full">
+  <div :key="this.selectedMetric.path.join('.')" class="flex flex-col p-4 w-full">
     <div class="grid grid-cols-2 gap-10 mb-6 w-full">
       <div class="flex flex-col w-full">
         <div class="text-sm text-gray-400 mb-1 w-full">{{selectedMetric.path.join(' / ')}}</div>
@@ -136,8 +135,15 @@ export default {
       required: true,
       type: Object,
     },
+    schema: { required: true },
   },
   watch: {
+    selectedMetric: {
+      handler (val) {
+        this.localModel = this.selectedMetric.model;
+      },
+      immediate: true,
+    },
 
     localModel: {
       handler (val) {
@@ -164,31 +170,14 @@ export default {
         }
       })
     },
-  },
-  mounted () {
-    this.schemaLoading = true
-    axios.post('/api/github-proxy/', {
-      path: 'Common/Metric-v1.json',
-    }).then(k => {
-      let data = k.data
-      this.methods = data.data.properties.Method.enum.map(e => {
+    methods () {
+      return this.schema?.properties?.Method?.enum?.map(e => {
         return {
           title: e === '' ? 'None' : e,
           value: e,
         }
-      })
-      this.schema = data.data
-      this.schemaLoading = false
-      this.localModel = this.selectedMetric.model
-      this.$emit('loaded')
-    }).catch(error => {
-      this.posting = false
-      if (error && error.response && error.response.status === 401) {
-        this.goto_url('/login')
-      }
-      this.handleError(error)
-    })
-
+      });
+    },
   },
   methods: {
     populateForm () {
@@ -253,9 +242,6 @@ export default {
   data () {
     return {
       localModel: {},
-      schema: null,
-      schemaLoading: true,
-      methods: [],
     }
   },
 }

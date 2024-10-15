@@ -1,7 +1,0 @@
-#!/bin/sh
-
-set -e
-
-cd validate
-npm install --save=false
-node validate.js

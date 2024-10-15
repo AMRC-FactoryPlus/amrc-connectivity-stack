@@ -1,0 +1,56 @@
+$id: urn:uuid:e0e3ad33-e2e2-416f-acc0-6e8e0c0e79fb
+$schema: https://json-schema.org/draft/2020-12/schema
+title: Program
+type: object
+properties:
+  Schema_UUID:
+    const: e0e3ad33-e2e2-416f-acc0-6e8e0c0e79fb
+  Instance_UUID:
+    description: The unique identifier for this object. (A UUID specified by RFC4122).
+    type: string
+    format: uuid
+  Start_Time:
+    $ref: urn:uuid:4ce3f6a6-7456-40d1-8818-eec3bba6bd40
+  End_Time:
+    $ref: urn:uuid:4ce3f6a6-7456-40d1-8818-eec3bba6bd40
+  Cycle:
+    type: object
+    properties:
+      Start_Time:
+        $ref: urn:uuid:4ce3f6a6-7456-40d1-8818-eec3bba6bd40
+      End_Time:
+        $ref: urn:uuid:4ce3f6a6-7456-40d1-8818-eec3bba6bd40
+  File_Name:
+    allOf:
+      - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+      - properties:
+          Sparkplug_Type:
+            enum:
+              - String
+          Documentation:
+            default: file_name
+  Recipe:
+    type: object
+    properties:
+      Name:
+        allOf:
+          - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+          - properties:
+              Sparkplug_Type:
+                enum:
+                  - String
+              Documentation:
+                default: Recipe name
+      Active_Step:
+        allOf:
+          - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+          - properties:
+              Sparkplug_Type:
+                enum:
+                  - UInt16LE
+                  - UInt16BE
+              Documentation:
+                default: Active Step of recipe
+required:
+  - Schema_UUID
+  - Instance_UUID

@@ -1,0 +1,54 @@
+$id: urn:uuid:3cd41716-a07f-4951-9111-d822092230f8
+$schema: https://json-schema.org/draft/2020-12/schema
+title: 3D Printer Axis
+description: A JSON Schema representation of an Axis object of a 3D Printer.
+type: object
+properties:
+  Schema_UUID:
+    const: 3cd41716-a07f-4951-9111-d822092230f8
+  Instance_UUID:
+    description: The unique identifier for this object. (A UUID specified by RFC4122).
+    type: string
+    format: uuid
+  Base_Axis:
+    $ref: urn:uuid:777dd941-f426-4355-8130-e144530b1376
+  Motor_Current:
+    allOf:
+      - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+      - properties:
+          Sparkplug_Type:
+            enum:
+              - FloatBE
+          Documentation:
+            default: Current applied in Amps to the axis motor.
+  Following_Error:
+    allOf:
+      - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+      - properties:
+          Sparkplug_Type:
+            enum:
+              - FloatBE
+          Documentation:
+            default: Error in the axis position.
+  Velocity_Error:
+    allOf:
+      - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+      - properties:
+          Sparkplug_Type:
+            enum:
+              - FloatBE
+          Documentation:
+            default: Error in the velocity for the axis.
+  Racking_Error:
+    allOf:
+      - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+      - properties:
+          Sparkplug_Type:
+            enum:
+              - FloatBE
+          Documentation:
+            default: Error between the two Y axis motors.
+required:
+  - Schema_UUID
+  - Instance_UUID
+  - Base_Axis

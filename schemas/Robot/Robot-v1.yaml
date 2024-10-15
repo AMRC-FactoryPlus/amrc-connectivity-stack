@@ -1,0 +1,39 @@
+$id: urn:uuid:6012580d-fd0a-442c-8d71-7f31f7155633
+$schema: https://json-schema.org/draft/2020-12/schema
+title: Robotic Object
+type: object
+properties:
+  Schema_UUID:
+    const: 6012580d-fd0a-442c-8d71-7f31f7155633
+  Instance_UUID:
+    description: The unique identifier for this object. (A UUID specified by RFC4122).
+    type: string
+    format: uuid
+  Controller_UUID:
+    allOf:
+      - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+      - properties:
+          Sparkplug_Type:
+            enum:
+              - UUID
+          Documentation:
+            default: A reference to the controller that this robot uses
+  Device_Information:
+    $ref: urn:uuid:2dd093e9-1450-44c5-be8c-c0d78e48219b
+  Axes:
+    type: object
+    patternProperties:
+      ^[a-zA-Z0-9_]*$:
+        $comment: An axis name or identifier - can be any regular string
+        $ref: urn:uuid:777dd941-f426-4355-8130-e144530b1376
+  End_Effectors:
+    type: object
+    patternProperties:
+      ^[a-zA-Z0-9_]*$:
+        $comment: An end effector position identifier
+        $ref: urn:uuid:875f13d7-035b-4519-bec1-6d82715050a8
+required:
+  - Schema_UUID
+  - Instance_UUID
+  - Device_Information
+  - Axes

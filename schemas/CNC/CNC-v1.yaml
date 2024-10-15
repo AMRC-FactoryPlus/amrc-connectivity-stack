@@ -1,0 +1,32 @@
+$id: urn:uuid:4701e66e-0f77-42b0-8ddd-cef60db6ef4a
+$schema: https://json-schema.org/draft/2020-12/schema
+title: CNC Machine
+type: object
+properties:
+  Schema_UUID:
+    const: 4701e66e-0f77-42b0-8ddd-cef60db6ef4a
+  Instance_UUID:
+    description: The unique identifier for this object. (A UUID specified by RFC4122).
+    type: string
+    format: uuid
+  Device_Information:
+    $ref: urn:uuid:0f9f3955-a8fa-467f-b288-c39ff3fa75f1
+  Axes:
+    type: object
+    patternProperties:
+      ^[a-zA-Z0-9_]*$:
+        $ref: urn:uuid:e39007e9-1427-4867-9d72-1c00c663db15
+  Channels:
+    type: object
+    patternProperties:
+      ^[a-zA-Z0-9_]*$:
+        $comment: Group of CNC channel objects that are subordinated to a CncInterface.
+        $ref: urn:uuid:0a30ab9b-915d-4513-8cd3-40251b387ade
+  Spindles:
+    type: object
+    patternProperties:
+      ^[a-zA-Z0-9_]*$:
+        $ref: urn:uuid:71df1162-40ca-4d19-bacc-95dea227d98b
+required:
+  - Schema_UUID
+  - Instance_UUID

@@ -1,0 +1,78 @@
+$id: urn:uuid:3e1b966d-71af-47b0-9bc0-837f95c9f0e8
+$schema: https://json-schema.org/draft/2020-12/schema
+type: object
+properties:
+  Schema_UUID:
+    const: 3e1b966d-71af-47b0-9bc0-837f95c9f0e8
+  Instance_UUID:
+    description: The unique identifier for this object. (A UUID specified by RFC4122).
+    type: string
+    format: uuid
+  Device_Information:
+    $ref: urn:uuid:2dd093e9-1450-44c5-be8c-c0d78e48219b
+  Measurement_Count:
+    allOf:
+      - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+      - properties:
+          Documentation:
+            default: The total number of measurements made by this vision system
+          Sparkplug_Type:
+            enum:
+              - UInt8
+              - UInt16LE
+              - UInt16BE
+              - UInt32LE
+              - UInt32BE
+              - UInt64LE
+              - UInt64BE
+  Program_Number:
+    allOf:
+      - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+      - properties:
+          Documentation:
+            default: The number of the currently loaded program
+          Sparkplug_Type:
+            enum:
+              - UInt8
+              - UInt16LE
+              - UInt16BE
+              - UInt32LE
+              - UInt32BE
+              - UInt64LE
+              - UInt64BE
+  Total_Status:
+    allOf:
+      - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+      - properties:
+          Documentation:
+            default: The success status of the inspection
+          Sparkplug_Type:
+            enum:
+              - Boolean
+  Pattern_X_Position:
+    allOf:
+      - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+      - properties:
+          Documentation:
+            default: The X position of the pattern in the frame
+          Sparkplug_Type:
+            enum:
+              - FloatLE
+              - FloatBE
+              - DoubleLE
+              - DoubleBE
+  Pattern_Y_Position:
+    allOf:
+      - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+      - properties:
+          Documentation:
+            default: The Y position of the pattern in the frame
+          Sparkplug_Type:
+            enum:
+              - FloatLE
+              - FloatBE
+              - DoubleLE
+              - DoubleBE
+required:
+  - Schema_UUID
+  - Instance_UUID

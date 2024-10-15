@@ -1,0 +1,24 @@
+$id: urn:uuid:55586df7-6430-48a6-952a-0ab18ed10dbf
+$schema: https://json-schema.org/draft/2020-12/schema
+type: object
+properties:
+  Schema_UUID:
+    const: 55586df7-6430-48a6-952a-0ab18ed10dbf
+  Instance_UUID:
+    description: The unique identifier for this object. (A UUID specified by RFC4122).
+    type: string
+    format: uuid
+  Sensor:
+    $ref: urn:uuid:b3c4b273-9528-45de-8842-9f77c9ef272a
+  Visible:
+    allOf:
+      - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+      - properties:
+          Documentation:
+            default: Whether or not the linked sensor can see this target
+          Sparkplug_Type:
+            enum:
+              - Boolean
+required:
+  - Schema_UUID
+  - Instance_UUID

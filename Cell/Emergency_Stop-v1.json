@@ -1,43 +1,43 @@
 {
-    "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Cell/Emergency_Stop-v1.json",
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "title": "Emergency Stop",
-    "type": "object",
-    "properties": {
-        "Schema_UUID": {
-            "const": "1a1ef094-bbf4-4f15-a63d-5692ef13a9f1"
-        },
-        "Instance_UUID": {
-            "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
-            "type": "string",
-            "format": "uuid"
-        },
-        "Device_Information": {
-            "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Device_Information-v1.json"
-        },
-        "Active": {
-            "allOf": [
-                {
-                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
-                },
-                {
-                    "properties": {
-                        "Sparkplug_Type": {
-                            "enum": [
-                                "Boolean"
-                            ]
-                        },
-                        "Documentation": {
-                            "default": "A representation of whether the emergency stop is activated."
-                        }
-                    }
-                }
-            ]
-        }
+  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Cell/Emergency_Stop-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Emergency Stop",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "1a1ef094-bbf4-4f15-a63d-5692ef13a9f1"
     },
-    "required": [
-        "Schema_UUID",
-        "Instance_UUID",
-        "Active"
-    ]
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "Device_Information": {
+      "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Device_Information-v1.json"
+    },
+    "Active": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "Boolean"
+              ]
+            },
+            "Documentation": {
+              "default": "A representation of whether the emergency stop is activated."
+            }
+          }
+        }
+      ]
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID",
+    "Active"
+  ]
 }

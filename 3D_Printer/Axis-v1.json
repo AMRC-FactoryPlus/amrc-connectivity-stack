@@ -1,101 +1,101 @@
 {
-    "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/3D_Printer/Axis-v1.json",
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "title": "3D Printer Axis",
-    "description": "A JSON Schema representation of an Axis object of a 3D Printer.",
-    "type": "object",
-    "properties": {
-        "Schema_UUID": {
-            "const": "3cd41716-a07f-4951-9111-d822092230f8"
-        },
-        "Instance_UUID": {
-            "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
-            "type": "string",
-            "format": "uuid"
-        },
-        "Base_Axis": {
-            "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Axis-v1.json"
-        },
-        "Motor_Current": {
-            "allOf": [
-                {
-                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
-                },
-                {
-                    "properties": {
-                        "Sparkplug_Type": {
-                            "enum": [
-                                "FloatBE"
-                            ]
-                        },
-                        "Documentation": {
-                            "default": "Current applied in Amps to the axis motor."
-                        }
-                    }
-                }
-            ]
-        },
-        "Following_Error": {
-            "allOf": [
-                {
-                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
-                },
-                {
-                    "properties": {
-                        "Sparkplug_Type": {
-                            "enum": [
-                                "FloatBE"
-                            ]
-                        },
-                        "Documentation": {
-                            "default": "Error in the axis position."
-                        }
-                    }
-                }
-            ]
-        },
-        "Velocity_Error": {
-            "allOf": [
-                {
-                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
-                },
-                {
-                    "properties": {
-                        "Sparkplug_Type": {
-                            "enum": [
-                                "FloatBE"
-                            ]
-                        },
-                        "Documentation": {
-                            "default": "Error in the velocity for the axis."
-                        }
-                    }
-                }
-            ]
-        },
-        "Racking_Error": {
-            "allOf": [
-                {
-                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
-                },
-                {
-                    "properties": {
-                        "Sparkplug_Type": {
-                            "enum": [
-                                "FloatBE"
-                            ]
-                        },
-                        "Documentation": {
-                            "default": "Error between the two Y axis motors."
-                        }
-                    }
-                }
-            ]
-        }
+  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/3D_Printer/Axis-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "3D Printer Axis",
+  "description": "A JSON Schema representation of an Axis object of a 3D Printer.",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "3cd41716-a07f-4951-9111-d822092230f8"
     },
-    "required": [
-        "Schema_UUID",
-        "Instance_UUID",
-        "Base_Axis"
-    ]
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "Base_Axis": {
+      "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Axis-v1.json"
+    },
+    "Motor_Current": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "FloatBE"
+              ]
+            },
+            "Documentation": {
+              "default": "Current applied in Amps to the axis motor."
+            }
+          }
+        }
+      ]
+    },
+    "Following_Error": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "FloatBE"
+              ]
+            },
+            "Documentation": {
+              "default": "Error in the axis position."
+            }
+          }
+        }
+      ]
+    },
+    "Velocity_Error": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "FloatBE"
+              ]
+            },
+            "Documentation": {
+              "default": "Error in the velocity for the axis."
+            }
+          }
+        }
+      ]
+    },
+    "Racking_Error": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "FloatBE"
+              ]
+            },
+            "Documentation": {
+              "default": "Error between the two Y axis motors."
+            }
+          }
+        }
+      ]
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID",
+    "Base_Axis"
+  ]
 }

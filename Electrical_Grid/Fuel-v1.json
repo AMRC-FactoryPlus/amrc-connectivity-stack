@@ -1,60 +1,60 @@
 {
-    "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Electrical_Grid/Fuel-v1.json",
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "title": "Fuel",
-    "type": "object",
-    "properties": {
-        "Schema_UUID": {
-            "const": "a6cc8a36-fa97-4157-a277-27468bd08b8a"
-        },
-        "Instance_UUID": {
-            "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
-            "type": "string",
-            "format": "uuid"
-        },
-        "Percentage": {
-            "allOf": [
-                {
-                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
-                },
-                {
-                    "properties": {
-                        "Sparkplug_Type": {
-                            "enum": [
-                                "FloatLE",
-                                "FloatBE"
-                            ]
-                        },
-                        "Documentation": {
-                            "default": "Percentage of fuel on generation mix"
-                        }
-                    }
-                }
-            ]
-        },
-        "Power": {
-            "allOf": [
-                {
-                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
-                },
-                {
-                    "properties": {
-                        "Sparkplug_Type": {
-                            "enum": [
-                                "FloatLE",
-                                "FloatBE"
-                            ]
-                        },
-                        "Documentation": {
-                            "default": "Generated power of particular fuel"
-                        }
-                    }
-                }
-            ]
-        }
+  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Electrical_Grid/Fuel-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Fuel",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "a6cc8a36-fa97-4157-a277-27468bd08b8a"
     },
-    "required": [
-        "Schema_UUID",
-        "Instance_UUID"
-    ]
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "Percentage": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "FloatLE",
+                "FloatBE"
+              ]
+            },
+            "Documentation": {
+              "default": "Percentage of fuel on generation mix"
+            }
+          }
+        }
+      ]
+    },
+    "Power": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "FloatLE",
+                "FloatBE"
+              ]
+            },
+            "Documentation": {
+              "default": "Generated power of particular fuel"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID"
+  ]
 }

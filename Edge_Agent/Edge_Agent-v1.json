@@ -20,7 +20,10 @@
     "Alerts": {
       "description": "Alerts raised by the Edge Agent",
       "type": "object",
-      "required": ["Config_Unavailable", "Config_Invalid"],
+      "required": [
+        "Config_Unavailable",
+        "Config_Invalid"
+      ],
       "properties": {
         "Config_Unavailable": {
           "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Alert-v1.json"
@@ -40,5 +43,10 @@
       }
     }
   },
-  "required": ["Schema_UUID", "Instance_UUID", "Config_Revision", "Alerts"]
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID",
+    "Config_Revision",
+    "Alerts"
+  ]
 }

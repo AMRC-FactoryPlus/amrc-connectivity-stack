@@ -1,57 +1,57 @@
 {
-    "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/End_Effector-v1.json",
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "title": "Common End Effector Object",
-    "type": "object",
-    "properties": {
-        "Schema_UUID": {
-            "const": "875f13d7-035b-4519-bec1-6d82715050a8"
-        },
-        "Instance_UUID": {
-            "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
-            "type": "string",
-            "format": "uuid"
-        },
-        "End_Effector_Index": {
-            "allOf": [
-                {
-                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
-                },
-                {
-                    "properties": {
-                        "Sparkplug_Type": {
-                            "enum": [
-                                "UInt8",
-                                "UInt16",
-                                "UInt32"
-                            ]
-                        },
-                        "Value": {
-                            "type": "integer"
-                        },
-                        "Documentation": {
-                            "default": "End effector index (specific to this end effector position)."
-                        }
-                    }
-                }
-            ]
-        },
-        "Axes": {
-            "type": "object",
-            "patternProperties": {
-                "^[a-zA-Z0-9_]*$": {
-                    "$comment": "An axis name or identifier - can be any regular string",
-                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Axis-v1.json"
-                }
-            }
-        },
-        "Pose": {
-            "$comment": "The position of the end effector",
-            "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Pose-v1.json"
-        }
+  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/End_Effector-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Common End Effector Object",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "875f13d7-035b-4519-bec1-6d82715050a8"
     },
-    "required": [
-        "Schema_UUID",
-        "Instance_UUID"
-    ]
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "End_Effector_Index": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "UInt8",
+                "UInt16",
+                "UInt32"
+              ]
+            },
+            "Value": {
+              "type": "integer"
+            },
+            "Documentation": {
+              "default": "End effector index (specific to this end effector position)."
+            }
+          }
+        }
+      ]
+    },
+    "Axes": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-zA-Z0-9_]*$": {
+          "$comment": "An axis name or identifier - can be any regular string",
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Axis-v1.json"
+        }
+      }
+    },
+    "Pose": {
+      "$comment": "The position of the end effector",
+      "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Pose-v1.json"
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID"
+  ]
 }

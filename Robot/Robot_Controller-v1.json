@@ -1,24 +1,24 @@
 {
-    "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Robot/Robot_Controller-v1.json",
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "title": "Robot Controller",
-    "type": "object",
-    "properties": {
-        "Schema_UUID": {
-            "const": "6bb55a32-5b20-496d-b695-5346c4d201e9"
-        },
-        "Instance_UUID": {
-            "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
-            "type": "string",
-            "format": "uuid"
-        },
-        "Device_Information": {
-            "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Device_Information-v1.json"
-        }
+  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Robot/Robot_Controller-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Robot Controller",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "6bb55a32-5b20-496d-b695-5346c4d201e9"
     },
-    "required": [
-        "Schema_UUID",
-        "Instance_UUID",
-        "Device_Information"
-    ]
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "Device_Information": {
+      "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Device_Information-v1.json"
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID",
+    "Device_Information"
+  ]
 }

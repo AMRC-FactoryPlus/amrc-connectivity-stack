@@ -20,7 +20,9 @@
         {
           "properties": {
             "Sparkplug_Type": {
-              "enum": [ "Boolean" ]
+              "enum": [
+                "Boolean"
+              ]
             }
           }
         }
@@ -37,7 +39,12 @@
             {
               "properties": {
                 "Sparkplug_Type": {
-                  "enum": ["DoubleBE", "DoubleLE", "FloatBE", "FloatLE"]
+                  "enum": [
+                    "DoubleBE",
+                    "DoubleLE",
+                    "FloatBE",
+                    "FloatLE"
+                  ]
                 }
               }
             }
@@ -51,7 +58,12 @@
             {
               "properties": {
                 "Sparkplug_Type": {
-                  "enum": ["DoubleBE", "DoubleLE", "FloatBE", "FloatLE"]
+                  "enum": [
+                    "DoubleBE",
+                    "DoubleLE",
+                    "FloatBE",
+                    "FloatLE"
+                  ]
                 }
               }
             }
@@ -67,7 +79,9 @@
         {
           "properties": {
             "Sparkplug_Type": {
-              "enum": [ "String" ]
+              "enum": [
+                "String"
+              ]
             }
           }
         }

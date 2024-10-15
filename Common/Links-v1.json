@@ -29,7 +29,10 @@
           "format": "uuid"
         }
       },
-      "required": ["Target", "Relation"]
+      "required": [
+        "Target",
+        "Relation"
+      ]
     }
   },
   "required": [

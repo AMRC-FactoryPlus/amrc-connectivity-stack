@@ -1,173 +1,173 @@
 {
-    "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/3D_Printer/Material_Info-v1.json",
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "title": "3D Printer Material Information",
-    "description": "A JSON Schema representation of a Material Information object of a 3D Printer.",
-    "type": "object",
-    "properties": {
-        "Schema_UUID": {
-            "const": "720ec0bb-b11a-45a7-95d4-3521fd6fe9f1"
-        },
-        "Instance_UUID": {
-            "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
-            "type": "string",
-            "format": "uuid"
-        },
-        "Serial_Number": {
-            "allOf": [
-                {
-                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
-                },
-                {
-                    "properties": {
-                        "Sparkplug_Type": {
-                            "enum": [
-                                "String"
-                            ]
-                        },
-                        "Documentation": {
-                            "default": "Serial Number for the loaded material."
-                        }
-                    }
-                }
-            ]
-        },
-        "Material_ID": {
-            "allOf": [
-                {
-                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
-                },
-                {
-                    "properties": {
-                        "Sparkplug_Type": {
-                            "enum": [
-                                "String"
-                            ]
-                        },
-                        "Documentation": {
-                            "default": "ID number for the loaded material."
-                        }
-                    }
-                }
-            ]
-        },
-        "Material_Name": {
-            "allOf": [
-                {
-                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
-                },
-                {
-                    "properties": {
-                        "Sparkplug_Type": {
-                            "enum": [
-                                "String"
-                            ]
-                        },
-                        "Documentation": {
-                            "default": "Name for the loaded material."
-                        }
-                    }
-                }
-            ]
-        },
-        "Manufacturing_Date": {
-            "allOf": [
-                {
-                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
-                },
-                {
-                    "properties": {
-                        "Sparkplug_Type": {
-                            "enum": [
-                                "DateTime"
-                            ]
-                        },
-                        "Documentation": {
-                            "default": "Date and Time the loaded material was manufactured."
-                        }
-                    }
-                }
-            ]
-        },
-        "Manufacturing_Lot": {
-            "allOf": [
-                {
-                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
-                },
-                {
-                    "properties": {
-                        "Sparkplug_Type": {
-                            "enum": [
-                                "UInt32BE"
-                            ]
-                        },
-                        "Documentation": {
-                            "default": "Lot number for the loaded material."
-                        }
-                    }
-                }
-            ]
-        },
-        "Load_State": {
-            "allOf": [
-                {
-                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
-                },
-                {
-                    "properties": {
-                        "Sparkplug_Type": {
-                            "enum": [
-                                "String"
-                            ]
-                        },
-                        "Documentation": {
-                            "default": "Status for if the material is loaded with filament present."
-                        }
-                    }
-                }
-            ]
-        },
-        "Current_Volume": {
-            "allOf": [
-                {
-                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
-                },
-                {
-                    "properties": {
-                        "Sparkplug_Type": {
-                            "enum": [
-                                "FloatBE"
-                            ]
-                        },
-                        "Documentation": {
-                            "default": "Remaining amount/volume of material left."
-                        }
-                    }
-                }
-            ]
-        },
-        "Initial_Volume": {
-            "allOf": [
-                {
-                    "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
-                },
-                {
-                    "properties": {
-                        "Sparkplug_Type": {
-                            "enum": [
-                                "FloatBE"
-                            ]
-                        },
-                        "Documentation": {
-                            "default": "Initial amount/volume of material."
-                        }
-                    }
-                }
-            ]
-        }
+  "$id": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/3D_Printer/Material_Info-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "3D Printer Material Information",
+  "description": "A JSON Schema representation of a Material Information object of a 3D Printer.",
+  "type": "object",
+  "properties": {
+    "Schema_UUID": {
+      "const": "720ec0bb-b11a-45a7-95d4-3521fd6fe9f1"
     },
-    "required": [
-        "Schema_UUID",
-        "Instance_UUID"
-    ]
+    "Instance_UUID": {
+      "description": "The unique identifier for this object. (A UUID specified by RFC4122).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "Serial_Number": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "String"
+              ]
+            },
+            "Documentation": {
+              "default": "Serial Number for the loaded material."
+            }
+          }
+        }
+      ]
+    },
+    "Material_ID": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "String"
+              ]
+            },
+            "Documentation": {
+              "default": "ID number for the loaded material."
+            }
+          }
+        }
+      ]
+    },
+    "Material_Name": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "String"
+              ]
+            },
+            "Documentation": {
+              "default": "Name for the loaded material."
+            }
+          }
+        }
+      ]
+    },
+    "Manufacturing_Date": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "DateTime"
+              ]
+            },
+            "Documentation": {
+              "default": "Date and Time the loaded material was manufactured."
+            }
+          }
+        }
+      ]
+    },
+    "Manufacturing_Lot": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "UInt32BE"
+              ]
+            },
+            "Documentation": {
+              "default": "Lot number for the loaded material."
+            }
+          }
+        }
+      ]
+    },
+    "Load_State": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "String"
+              ]
+            },
+            "Documentation": {
+              "default": "Status for if the material is loaded with filament present."
+            }
+          }
+        }
+      ]
+    },
+    "Current_Volume": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "FloatBE"
+              ]
+            },
+            "Documentation": {
+              "default": "Remaining amount/volume of material left."
+            }
+          }
+        }
+      ]
+    },
+    "Initial_Volume": {
+      "allOf": [
+        {
+          "$ref": "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Common/Metric-v1.json"
+        },
+        {
+          "properties": {
+            "Sparkplug_Type": {
+              "enum": [
+                "FloatBE"
+              ]
+            },
+            "Documentation": {
+              "default": "Initial amount/volume of material."
+            }
+          }
+        }
+      ]
+    }
+  },
+  "required": [
+    "Schema_UUID",
+    "Instance_UUID"
+  ]
 }

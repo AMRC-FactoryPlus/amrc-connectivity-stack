@@ -1,6 +1,6 @@
 # In the future if we have any more ingesters then this should be
 # enabled if any of the ingesters are enabled.
-{{- if .Values.unsIngesters.sparkplug.enabled }}
+{{- if .Values.historians.uns.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:

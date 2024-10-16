@@ -1,0 +1,17 @@
+$id: urn:uuid:10e40102-c712-44f3-9be0-a3091991dd87
+$schema: https://json-schema.org/draft/2020-12/schema
+type: object
+properties:
+  Schema_UUID:
+    const: 10e40102-c712-44f3-9be0-a3091991dd87
+  Instance_UUID:
+    description: The unique identifier for this object. (A UUID specified by RFC4122).
+    type: string
+    format: uuid
+  Hardener_Pressure:
+    $ref: urn:uuid:2f6565bf-72ba-4394-a6fd-90d2d5bd49dd
+  Resin_Pressure:
+    $ref: urn:uuid:2f6565bf-72ba-4394-a6fd-90d2d5bd49dd
+required:
+  - Schema_UUID
+  - Instance_UUID

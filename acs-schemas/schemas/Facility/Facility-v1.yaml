@@ -1,0 +1,18 @@
+$id: urn:uuid:efb3c472-6346-45b7-a482-5c9bcebe866d
+$schema: https://json-schema.org/draft/2020-12/schema
+type: object
+properties:
+  Schema_UUID:
+    const: efb3c472-6346-45b7-a482-5c9bcebe866d
+  Instance_UUID:
+    description: The unique identifier for this object. (A UUID specified by RFC4122).
+    type: string
+    format: uuid
+  Zones:
+    patternProperties:
+      ^[a-zA-Z0-9_]*$:
+        $ref: urn:uuid:09a88805-9844-44dd-b686-e61608908e08
+    type: object
+required:
+  - Schema_UUID
+  - Instance_UUID

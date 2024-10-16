@@ -1,0 +1,122 @@
+$id: urn:uuid:777dd941-f426-4355-8130-e144530b1376
+$schema: https://json-schema.org/draft/2020-12/schema
+title: Common Axis Object
+type: object
+properties:
+  Schema_UUID:
+    const: 777dd941-f426-4355-8130-e144530b1376
+  Instance_UUID:
+    description: The unique identifier for this object. (A UUID specified by RFC4122).
+    type: string
+    format: uuid
+  Axis_Type:
+    allOf:
+      - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+      - properties:
+          Sparkplug_Type:
+            enum:
+              - String
+          Value:
+            type: string
+            enum:
+              - Linear
+              - Angular
+              - Linear_Endless
+              - Angular_Endless
+              - TCP
+              - Spindle
+              - End_Effector
+              - AGV
+              - Fixture
+          Documentation:
+            default: Type of axis.
+  Axis_Coord_System:
+    allOf:
+      - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+      - properties:
+          Sparkplug_Type:
+            enum:
+              - String
+          Value:
+            type: string
+            enum:
+              - NA
+              - Workpiece
+              - Base
+              - Tool
+              - Task
+              - Object
+              - Camera
+              - Measurement
+              - Mobile_Platform
+              - Unknown
+          Documentation:
+            default: Coordinate system of axis. NA - Not Applicable
+  Status:
+    allOf:
+      - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+      - properties:
+          Sparkplug_Type:
+            enum:
+              - String
+          Documentation:
+            default: Any status information of an axis.
+  Zero_Offset:
+    allOf:
+      - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+      - properties:
+          Sparkplug_Type:
+            enum:
+              - FloatLE
+              - DoubleLE
+              - FloatBE
+              - DoubleBE
+          Documentation:
+            default: Zero offset of an axis.
+  Locked:
+    allOf:
+      - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+      - properties:
+          Sparkplug_Type:
+            enum:
+              - Boolean
+          Documentation:
+            default: Is the axis locked?
+  Load:
+    allOf:
+      - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+      - properties:
+          Sparkplug_Type:
+            enum:
+              - FloatLE
+              - DoubleLE
+              - FloatBE
+              - DoubleBE
+          Documentation:
+            default: Actual load of an axis.
+  Power:
+    allOf:
+      - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+      - properties:
+          Sparkplug_Type:
+            enum:
+              - FloatLE
+              - DoubleLE
+              - FloatBE
+              - DoubleBE
+          Documentation:
+            default: Actual power of an axis' drive.
+  Position:
+    $ref: urn:uuid:1a2c3594-d311-4f6b-865b-b97db3fa6d42
+  Angle:
+    $ref: urn:uuid:1a2c3594-d311-4f6b-865b-b97db3fa6d42
+  Speed:
+    $ref: urn:uuid:1a2c3594-d311-4f6b-865b-b97db3fa6d42
+  Acceleration:
+    $ref: urn:uuid:1a2c3594-d311-4f6b-865b-b97db3fa6d42
+  Torque:
+    $ref: urn:uuid:1a2c3594-d311-4f6b-865b-b97db3fa6d42
+required:
+  - Schema_UUID
+  - Instance_UUID
+  - Axis_Type

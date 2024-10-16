@@ -1,0 +1,17 @@
+$id: urn:uuid:94d42772-6202-4565-9b9a-f67d332b2e54
+$schema: https://json-schema.org/draft/2020-12/schema
+title: Coordinate Measuring Machine (CMM)
+type: object
+properties:
+  Schema_UUID:
+    const: 94d42772-6202-4565-9b9a-f67d332b2e54
+  Instance_UUID:
+    description: The unique identifier for this object. (A UUID specified by RFC4122).
+    type: string
+    format: uuid
+  Device_Information:
+    $ref: urn:uuid:2dd093e9-1450-44c5-be8c-c0d78e48219b
+required:
+  - Schema_UUID
+  - Instance_UUID
+  - Device_Information

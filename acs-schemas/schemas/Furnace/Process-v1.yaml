@@ -1,0 +1,79 @@
+$id: urn:uuid:8862ad25-d2e9-48f2-b0d8-cb74d1c69e4d
+$schema: https://json-schema.org/draft/2020-12/schema
+title: Process
+type: object
+properties:
+  Schema_UUID:
+    const: 8862ad25-d2e9-48f2-b0d8-cb74d1c69e4d
+  Instance_UUID:
+    description: The unique identifier for this object. (A UUID specified by RFC4122).
+    type: string
+    format: uuid
+  Charge:
+    type: object
+    properties:
+      Name:
+        allOf:
+          - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+          - properties:
+              Sparkplug_Type:
+                enum:
+                  - String
+              Documentation:
+                default: Name of the Charge of the alloy being melted
+      Commanded:
+        allOf:
+          - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+          - properties:
+              Sparkplug_Type:
+                enum:
+                  - FloatLE
+                  - FloatBE
+              Documentation:
+                default: Set Charge of the alloy being melted
+      Actual:
+        allOf:
+          - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+          - properties:
+              Sparkplug_Type:
+                enum:
+                  - FloatLE
+                  - FloatBE
+              Documentation:
+                default: Real Charge of the alloy being melted
+  Quantity:
+    type: object
+    properties:
+      Commanded:
+        allOf:
+          - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+          - properties:
+              Sparkplug_Type:
+                enum:
+                  - FloatLE
+                  - FloatBE
+              Documentation:
+                default: Set quantity/weight has been placed in to the furnace to melt
+      Actual:
+        allOf:
+          - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+          - properties:
+              Sparkplug_Type:
+                enum:
+                  - FloatLE
+                  - FloatBE
+              Documentation:
+                default: Real quantity/weight has been placed in to the furnace to melt
+  Pressure_Steps:
+    allOf:
+      - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+      - properties:
+          Sparkplug_Type:
+            enum:
+              - Int16LE
+              - Int16BE
+          Documentation:
+            default: Set Charge of the alloy being melted
+required:
+  - Schema_UUID
+  - Instance_UUID

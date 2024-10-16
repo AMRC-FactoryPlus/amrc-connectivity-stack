@@ -1,0 +1,51 @@
+$id: urn:uuid:dab33fab-bc15-4235-9691-86b0d1e71ae2
+$schema: https://json-schema.org/draft/2020-12/schema
+title: Touch screen
+type: object
+properties:
+  Schema_UUID:
+    const: dab33fab-bc15-4235-9691-86b0d1e71ae2
+  Instance_UUID:
+    description: The unique identifier for this object. (A UUID specified by RFC4122).
+    type: string
+    format: uuid
+  Touch_Active:
+    allOf:
+      - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+      - properties:
+          Sparkplug_Type:
+            enum:
+              - Boolean
+  Touch_Position:
+    type: object
+    properties:
+      X:
+        allOf:
+          - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+          - properties:
+              Sparkplug_Type:
+                enum:
+                  - DoubleBE
+                  - DoubleLE
+                  - FloatBE
+                  - FloatLE
+      Y:
+        allOf:
+          - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+          - properties:
+              Sparkplug_Type:
+                enum:
+                  - DoubleBE
+                  - DoubleLE
+                  - FloatBE
+                  - FloatLE
+  Selected_Segment:
+    allOf:
+      - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+      - properties:
+          Sparkplug_Type:
+            enum:
+              - String
+required:
+  - Schema_UUID
+  - Instance_UUID

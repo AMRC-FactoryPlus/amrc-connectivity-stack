@@ -1,0 +1,142 @@
+$id: urn:uuid:2dd093e9-1450-44c5-be8c-c0d78e48219b
+$schema: https://json-schema.org/draft/2020-12/schema
+type: object
+properties:
+  Schema_UUID:
+    const: 2dd093e9-1450-44c5-be8c-c0d78e48219b
+  Manufacturer:
+    allOf:
+      - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+      - type: object
+        properties:
+          Sparkplug_Type:
+            enum:
+              - String
+          Documentation:
+            default: The name of the manufacturer that produced this device.
+  Model:
+    allOf:
+      - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+      - type: object
+        properties:
+          Sparkplug_Type:
+            enum:
+              - String
+          Documentation:
+            default: The model name or number of this device.
+  Serial:
+    allOf:
+      - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+      - type: object
+        properties:
+          Sparkplug_Type:
+            enum:
+              - String
+          Documentation:
+            default: The serial number or unique identifier of the device.
+  Variant:
+    allOf:
+      - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+      - type: object
+        properties:
+          Sparkplug_Type:
+            enum:
+              - String
+          Documentation:
+            default: The model variant of this device.
+  Software_Version:
+    allOf:
+      - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+      - type: object
+        properties:
+          Sparkplug_Type:
+            enum:
+              - String
+          Documentation:
+            default: Details of software/firmware running on the device.
+  MAC_Address:
+    allOf:
+      - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+      - properties:
+          Sparkplug_Type:
+            enum:
+              - String
+          Documentation:
+            default: The MAC address of the interface on the device that Factory+ connects
+              to
+  Friendly_Name:
+    allOf:
+      - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+      - properties:
+          Sparkplug_Type:
+            enum:
+              - String
+          Documentation:
+            default: A human-readable friendly name for the device
+  Status:
+    allOf:
+      - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+      - properties:
+          Sparkplug_Type:
+            enum:
+              - String
+          Documentation:
+            default: The current status of the device
+  ISA95_Hierarchy:
+    $ref: urn:uuid:84ac3397-f3a2-440a-99e5-5bb9f6a75091
+  Battery:
+    type: object
+    properties:
+      Percentage:
+        allOf:
+          - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+          - properties:
+              Documentation:
+                default: The current battery percentage
+              Sparkplug_Type:
+                enum:
+                  - FloatLE
+                  - FloatBE
+                  - DoubleLE
+                  - DoubleBE
+              Eng_Unit:
+                default: "%"
+              Eng_Low:
+                default: 0
+              Eng_High:
+                default: 100
+      Time_Remaining:
+        allOf:
+          - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+          - properties:
+              Documentation:
+                default: The amount of time remaining until the battery is depleted
+              Sparkplug_Type:
+                enum:
+                  - String
+                  - UInt64BE
+                  - UInt64LE
+                  - UInt32BE
+                  - UInt32LE
+                  - UInt16BE
+                  - UInt16LE
+                  - UInt8
+    required: []
+  Uptime:
+    allOf:
+      - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+      - properties:
+          Documentation:
+            default: The amount of time that the device has been online
+          Sparkplug_Type:
+            enum:
+              - String
+              - UInt32LE
+              - UInt32BE
+              - UInt64BE
+              - UInt64LE
+              - UInt16BE
+              - UInt16LE
+              - UInt8
+required:
+  - Schema_UUID

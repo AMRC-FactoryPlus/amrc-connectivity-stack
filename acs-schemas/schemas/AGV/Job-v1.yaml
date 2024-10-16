@@ -1,0 +1,132 @@
+$id: urn:uuid:0fb61e8d-a6ca-4907-9a14-ff11ec857fd9
+$schema: https://json-schema.org/draft/2020-12/schema
+type: object
+properties:
+  Schema_UUID:
+    const: 0fb61e8d-a6ca-4907-9a14-ff11ec857fd9
+  Instance_UUID:
+    description: The unique identifier for this object. (A UUID specified by RFC4122).
+    type: string
+    format: uuid
+  Name:
+    allOf:
+      - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+      - properties:
+          Documentation:
+            default: null
+          Sparkplug_Type:
+            enum:
+              - String
+  ID:
+    allOf:
+      - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+      - properties:
+          Documentation:
+            default: null
+          Sparkplug_Type:
+            enum:
+              - String
+              - UInt8
+              - UInt16LE
+              - UInt16BE
+              - UInt32LE
+              - UInt32BE
+              - UInt64LE
+              - UInt64BE
+  Description:
+    allOf:
+      - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+      - properties:
+          Documentation:
+            default: null
+          Sparkplug_Type:
+            enum:
+              - String
+  Type:
+    allOf:
+      - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+      - properties:
+          Documentation:
+            default: null
+          Sparkplug_Type:
+            enum:
+              - String
+  Timestamps:
+    type: object
+    properties:
+      Queued:
+        allOf:
+          - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+          - properties:
+              Documentation:
+                default: ""
+              Sparkplug_Type:
+                enum:
+                  - String
+                  - UInt8
+                  - UInt16LE
+                  - UInt16BE
+                  - UInt32LE
+                  - UInt32BE
+                  - UInt64LE
+                  - UInt64BE
+      Started:
+        allOf:
+          - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+          - properties:
+              Documentation:
+                default: ""
+              Sparkplug_Type:
+                enum:
+                  - String
+                  - UInt8
+                  - UInt16LE
+                  - UInt16BE
+                  - UInt32LE
+                  - UInt32BE
+                  - UInt64LE
+                  - UInt64BE
+      Completed:
+        allOf:
+          - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+          - properties:
+              Documentation:
+                default: ""
+              Sparkplug_Type:
+                enum:
+                  - String
+                  - UInt8
+                  - UInt16LE
+                  - UInt16BE
+                  - UInt32LE
+                  - UInt32BE
+                  - UInt64LE
+                  - UInt64BE
+    required: []
+  Status:
+    allOf:
+      - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+      - properties:
+          Documentation:
+            default: ""
+          Sparkplug_Type:
+            enum:
+              - String
+  Fail_Count:
+    allOf:
+      - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+      - properties:
+          Documentation:
+            default: ""
+          Sparkplug_Type:
+            enum:
+              - UInt8
+              - UInt16LE
+              - UInt16BE
+              - UInt32LE
+              - UInt32BE
+              - UInt64LE
+              - UInt64BE
+required:
+  - Schema_UUID
+  - Instance_UUID

@@ -3,7 +3,6 @@ import $fs from "fs/promises";
 import $path from "path";
 
 import Walk from "@root/walk";
-import git from "isomorphic-git";
 import YAML from "yaml";
 
 const schemas = "../schemas";
@@ -41,17 +40,9 @@ for (const [path, meta] of yamls.entries()) {
         throw `Schema_UUID mismatch for ${path}`;
     console.log("Found Schema_UUID %s", uuid);
 
-    const changes = (await git.log({
-        fs, 
-        dir:        "..", 
-        filepath:   $path.posix.relative("..", path),
-    })).map(l => l.commit.author.timestamp);
-
     configs[uuid] = {
         metadata: {
             ...meta,
-            created:    changes.at(-1),
-            modified:   changes.at(0),
         },
         schema,
     };

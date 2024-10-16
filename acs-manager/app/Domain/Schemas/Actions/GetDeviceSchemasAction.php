@@ -18,7 +18,7 @@ class GetDeviceSchemasAction
     {
         $cdb = resolve(ServiceClient::class)->getConfigDB();
 
-        $keys = ["name", "version", "created", "modified"];
+        $keys = ["name", "version"];
 
         /* This endpoint isn't wrapped in php-service-client yet. Using
          * search for this is a bit of a hack; properly we should call

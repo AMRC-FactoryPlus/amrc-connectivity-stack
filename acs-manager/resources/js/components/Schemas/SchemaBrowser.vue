@@ -48,15 +48,6 @@
             {{
               item.version
             }}</a>
-          <a href="#"
-             class="text-gray-400">Created
-            {{
-              moment.unix(item.created).fromNow()
-            }},
-            Updated
-            {{
-              moment.unix(item.modified).fromNow()
-            }}</a>
         </div>
       </template>
     </ColumnList>

@@ -1,5 +1,5 @@
 $id: urn:uuid:d4f59d8a-5391-49c3-b591-e74e2468ef43
-title: Configure Device Translation
+title: Edge Agent config
 type: object
 required:
   - sparkplug

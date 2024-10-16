@@ -10,10 +10,6 @@ const App = {
 const Class = {
     Private:        "eda329ca-4e55-4a92-812d-df74993c47e2",
 };
-const Private = {
-    Connection:     "7d08564b-5235-41a4-8acf-bbee7c2e2006",
-    EdgeAgent:      "d4f59d8a-5391-49c3-b591-e74e2468ef43",
-};
 
 console.log(`ACS schemas revision ${GIT_VERSION}`);
 
@@ -22,6 +18,26 @@ const schemas = JSON.parse(await $fs.readFile("schemas.json"));
 const fplus = await new ServiceClient({ env: process.env }).init();
 const cdb = fplus.ConfigDB;
 const log = fplus.debug.bound("schemas");
+
+/* Set a ConfigDB entry without allowing overwrite. We must use
+ * If-None-Match here to avoid race conditions. */
+async function maybe_put (app, obj, conf) {
+    const [st] = await cdb.fetch({
+        method:     "PUT",
+        url:        `/v1/app/${app}/object/${obj}`,
+        headers:    {
+            "If-None-Match": "*",
+        },
+        body:       conf,
+    });
+    /* We succeeded or failed correctly */
+    if (st == 201 || st == 412) return;
+    /* We overwrote an existing entry */
+    if (st == 204)
+        throw new Error("Unexpected 204 response from ConfigDB PUT");
+    /* Throw as though this was the CDB interface */
+    cdb.throw(`Can't set ${app} for ${obj}`, st);
+}
 
 log("Creating required Apps");
 await cdb.create_object(UUIDs.Class.App, App.Schema);
@@ -45,23 +61,22 @@ for (const [uuid, { metadata, schema }] of Object.entries(schemas)) {
     /* XXX It might be better to use the schema title here? But at the
      * moment those aren't unique. */
     const name = `${metadata.name} (v${metadata.version})`;
-    await cdb.put_config(UUIDs.App.Info, uuid, { name });
-    await cdb.put_config(App.Metadata, uuid, metadata);
-    await cdb.put_config(App.Schema, uuid, schema);
+    await maybe_put(UUIDs.App.Info, uuid, { name });
+    await maybe_put(App.Metadata, uuid, metadata);
+    await maybe_put(App.Schema, uuid, schema);
 }
+
+/* These entries are PUT unconditionally. */
 
 const priv = JSON.parse(await $fs.readFile("private.json"));
 
-log("Updating Edge Agent Config schema");
-await cdb.create_object(Class.Private, Private.EdgeAgent);
-await cdb.put_config(UUIDs.App.Info, Private.EdgeAgent,
-    { name: "Edge Agent config schema" });
-await cdb.put_config(App.Schema, Private.EdgeAgent, priv.EdgeAgent);
-
-log("Updating Device Connection schema");
-await cdb.create_object(Class.Private, Private.Connection);
-await cdb.put_config(UUIDs.App.Info, Private.Connection,
-    { name: "Device Connection schema" });
-await cdb.put_config(App.Schema, Private.Connection, priv.Connection);
+for (const [uuid, schema] of Object.entries(priv)) {
+    const name = schema.title ?? uuid;
+    log("Updating private schema %s", name);
+    await cdb.create_object(Class.Private, uuid);
+    if (schema.title)
+        await cdb.put_config(UUIDs.App.Info, uuid, { name: schema.title });
+    await cdb.put_config(App.Schema, uuid, schema);
+}
 
 log("Done");

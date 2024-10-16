@@ -1,0 +1,26 @@
+$id: urn:uuid:1a1ef094-bbf4-4f15-a63d-5692ef13a9f1
+$schema: https://json-schema.org/draft/2020-12/schema
+title: Emergency Stop
+type: object
+properties:
+  Schema_UUID:
+    const: 1a1ef094-bbf4-4f15-a63d-5692ef13a9f1
+  Instance_UUID:
+    description: The unique identifier for this object. (A UUID specified by RFC4122).
+    type: string
+    format: uuid
+  Device_Information:
+    $ref: urn:uuid:2dd093e9-1450-44c5-be8c-c0d78e48219b
+  Active:
+    allOf:
+      - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+      - properties:
+          Sparkplug_Type:
+            enum:
+              - Boolean
+          Documentation:
+            default: A representation of whether the emergency stop is activated.
+required:
+  - Schema_UUID
+  - Instance_UUID
+  - Active

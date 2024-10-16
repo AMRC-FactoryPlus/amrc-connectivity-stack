@@ -1,0 +1,38 @@
+$id: urn:uuid:b77789ff-c85a-4105-bc48-19a6513d5410
+$schema: https://json-schema.org/draft/2020-12/schema
+type: object
+properties:
+  Schema_UUID:
+    const: b77789ff-c85a-4105-bc48-19a6513d5410
+  Instance_UUID:
+    description: The unique identifier for this object. (A UUID specified by RFC4122).
+    type: string
+    format: uuid
+  Device_Information:
+    $ref: urn:uuid:2dd093e9-1450-44c5-be8c-c0d78e48219b
+  Links:
+    patternProperties:
+      ^[a-zA-Z0-9_]*$:
+        $ref: urn:uuid:b3c4b273-9528-45de-8842-9f77c9ef272a
+    type: object
+  Set_Point:
+    $ref: urn:uuid:abaaabad-ccfd-4a93-8ad6-1aca9f863ee8
+  Actual_Temperatures:
+    patternProperties:
+      ^[a-zA-Z0-9_]*$:
+        $ref: urn:uuid:abaaabad-ccfd-4a93-8ad6-1aca9f863ee8
+    type: object
+  Elements:
+    patternProperties:
+      ^[a-zA-Z0-9_]*$:
+        $ref: urn:uuid:acff6c68-a7f3-49bd-89a4-e7c22a954abe
+    type: object
+  Elapsed_Time:
+    $ref: urn:uuid:4ce3f6a6-7456-40d1-8818-eec3bba6bd40
+  Remaining_Time:
+    $ref: urn:uuid:4ce3f6a6-7456-40d1-8818-eec3bba6bd40
+  Program:
+    $ref: urn:uuid:e0e3ad33-e2e2-416f-acc0-6e8e0c0e79fb
+required:
+  - Schema_UUID
+  - Instance_UUID

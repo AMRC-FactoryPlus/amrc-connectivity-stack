@@ -4,109 +4,74 @@ import $path from "path";
 
 import Walk from "@root/walk";
 import git from "isomorphic-git";
+import YAML from "yaml";
 
-const ignore = new Set([
-    ".git", ".githooks", ".github",
-    "deploy", "validate",
-]);
+const schemas = "../schemas";
+const path_rx = RegExp(`^${schemas}/([\\w/_]+)-v(\\d+).yaml$`);
 
-const base = "https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main";
-const id_rx = RegExp(`^${base}/([\\w/_]+)-v(\\d+).json$`);
+const load_yaml = async f => YAML.parse(
+    await $fs.readFile(f, { encoding: "utf8" }));
 
-const load_json = async f => JSON.parse(await $fs.readFile(f));
-
-/* Walk should be an async iterator really. But meh. */
-const schemas = new Map();
-
-const walker = Walk.create({
-    sort: des => des
-        .filter(d => !(d.parentPath == ".." && ignore.has(d.name))),
-});
-await walker("..", async (err, path, dirent) => {
+const yamls = new Map();
+await Walk.walk("../schemas", async (err, path, dirent) => {
     if (err) throw err;
+    /* grr win32 */
+    path = path.replaceAll("\\", "/");
 
     if (dirent.isDirectory()) return;
-    if (!path.match(/\.json$/)) return;
 
-    const json = await load_json(path);
-
-    const id = json.$id;
-    if (!id) return;
-    if (schemas.has(id))
-        throw `Duplicate $id for ${path}`;
-
-    const matches = id.match(id_rx);
+    const matches = path.match(path_rx);
     if (!matches)
-        throw `Bad $id for ${path}: ${id}`;
-
+        throw `Bad schema filename: ${path}`;
     const [, name, version] = matches;
-    const uuid = json.properties?.Schema_UUID?.const;
     if (!name || !version)
         throw `Bad name or version for ${path}`;
 
-    schemas.set(id, { uuid, path, name, version, json });
+    yamls.set(path, { name, version });
 });
 
-function fixup (obj) {
-    if (obj == null || typeof(obj) != "object")
-        return obj;
-    
-    if (Array.isArray(obj))
-        return obj.map(v => fixup(v));
-
-    const fix = Object.fromEntries(
-        Object.entries(obj).map(([k, v]) => [k, fixup(v)]));
-
-    const ref = obj.$ref;
-    if (!ref)
-        return fix;
-
-    const sch = schemas.get(ref);
-    if (!sch)
-        throw `Unknown $ref: ${ref}`;
-
-    if (sch.uuid)
-        return { ...fix, $ref: `urn:uuid:${sch.uuid}` };
-
-    /* The Sparkplug_Types and Eng_Units schemas are sub-schemas of
-     * Metric. As such they cannot include a Schema_UUID metric. For now
-     * just expand them inline (they are only used in Metric). */
-    const expand = { ...sch.json, ...fix };
-    delete expand.$id;
-    delete expand.$ref;
-    delete expand.$schema;
-    return expand;
-}
-
 const configs = {};
-for (const sch of schemas.values()) {
-    if (!sch.uuid)
-        continue;
+for (const [path, meta] of yamls.entries()) {
+    console.log("Processing %s", path);
+
+    const schema = await load_yaml(path);
+
+    const uuid = schema.properties?.Schema_UUID?.const;
+    if (schema.$id != `urn:uuid:${uuid}`)
+        throw `Schema_UUID mismatch for ${path}`;
+    console.log("Found Schema_UUID %s", uuid);
 
     const changes = (await git.log({
         fs, 
         dir:        "..", 
-        filepath:   $path.relative("..", sch.path),
+        filepath:   $path.posix.relative("..", path),
     })).map(l => l.commit.author.timestamp);
 
-    configs[sch.uuid] = {
+    configs[uuid] = {
         metadata: {
-            name:       sch.name,
-            version:    sch.version,
+            ...meta,
             created:    changes.at(-1),
             modified:   changes.at(0),
         },
-        schema: {
-            ...fixup(sch.json),
-            $id:        `urn:uuid:${sch.uuid}`,
-        },
+        schema,
     };
 }
 
 await $fs.writeFile("schemas.json", JSON.stringify(configs, null, 2));
 
-const priv = {
-    EdgeAgent:  await load_json("../Edge_Agent_Config.json"),
-    Connection: await load_json("../Device_Connection.json"),
-};
+const priv = {};
+await Walk.walk("../private",  async (err, path, dirent) => {
+    if (err) throw err;
+    if (dirent.isDirectory()) return;
+
+    console.log("Processing %s", path);
+    const schema = await load_yaml(path);
+    const matches = schema.$id?.match(/^urn:uuid:([-a-f0-9]{36})$/);
+    if (!matches) return;
+    const [, uuid] = matches;
+    if (!uuid) return;
+
+    priv[uuid] = schema;
+    console.log("Found private schema %s", uuid);
+});
 await $fs.writeFile("private.json", JSON.stringify(priv, null, 2));

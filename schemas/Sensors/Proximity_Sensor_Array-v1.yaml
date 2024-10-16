@@ -1,0 +1,18 @@
+$id: urn:uuid:b902e0b4-e7c0-440b-b7ad-ed4a66026e7f
+$schema: https://json-schema.org/draft/2020-12/schema
+type: object
+properties:
+  Schema_UUID:
+    const: b902e0b4-e7c0-440b-b7ad-ed4a66026e7f
+  Instance_UUID:
+    description: The unique identifier for this object. (A UUID specified by RFC4122).
+    type: string
+    format: uuid
+  Sensors:
+    patternProperties:
+      ^[a-zA-Z0-9_]*$:
+        $ref: urn:uuid:d4e32f15-3276-4e9f-b9ef-d9e1a1e4c535
+    type: object
+required:
+  - Schema_UUID
+  - Instance_UUID

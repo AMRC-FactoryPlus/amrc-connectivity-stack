@@ -1,0 +1,28 @@
+$id: urn:uuid:60e6ddee-9a8d-4c9a-9042-8f1339e7bb11
+$schema: https://json-schema.org/draft/2020-12/schema
+title: Facility Environment Characteristics
+type: object
+properties:
+  Schema_UUID:
+    const: 60e6ddee-9a8d-4c9a-9042-8f1339e7bb11
+  Instance_UUID:
+    description: The unique identifier for this object. (A UUID specified by RFC4122).
+    type: string
+    format: uuid
+  Device_Information:
+    $ref: urn:uuid:2dd093e9-1450-44c5-be8c-c0d78e48219b
+  Temperature:
+    $ref: urn:uuid:abaaabad-ccfd-4a93-8ad6-1aca9f863ee8
+  Humidity:
+    $ref: urn:uuid:e4b9c2e0-e265-44ff-96aa-09ed55173000
+  Pressure:
+    $ref: urn:uuid:2f6565bf-72ba-4394-a6fd-90d2d5bd49dd
+  Sound_Level:
+    $ref: urn:uuid:b38e7a34-acec-4151-8493-257a767ab4bb
+  Carbon_Dioxide:
+    $ref: urn:uuid:aaeaf814-521e-4e08-a8e3-3a5be64ae0c3
+  Light_Intensity:
+    $ref: urn:uuid:51b96441-76f9-4627-ba14-c2e97be2cd07
+required:
+  - Schema_UUID
+  - Instance_UUID

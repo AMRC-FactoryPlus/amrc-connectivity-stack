@@ -1,0 +1,697 @@
+$id: urn:uuid:d4f59d8a-5391-49c3-b591-e74e2468ef43
+title: Edge Agent config
+type: object
+required:
+  - sparkplug
+properties:
+  sparkplug:
+    type: object
+    title: Sparkplug Client
+    required:
+      - groupId
+      - edgeNode
+      - username
+      - password
+      - serverUrl
+    options:
+      collapsed: false
+    properties:
+      serverUrl:
+        type: string
+        title: Server URL
+        minLength: 1
+      groupId:
+        type: string
+        title: Sparkplug Group ID
+        pattern: ^[^+#/]*$
+        options:
+          patternmessage: "Field cannot contain +, #, or / characters"
+        minLength: 1
+      edgeNode:
+        type: string
+        title: Sparkplug Node ID
+        pattern: ^[^+#/]*$
+        options:
+          patternmessage: "Field cannot contain +, #, or / characters"
+        minLength: 1
+      username:
+        type: string
+        title: Username
+        minLength: 1
+      password:
+        type: string
+        title: Sparkplug password
+        format: password
+        minLength: 1
+      asyncPubMode:
+        type: boolean
+        title: Asynchronous publish mode
+      pubInterval:
+        type: number
+        title: Publish Cycle Interval
+        options:
+          dependencies:
+            asyncPubMode: false
+      compressPayload:
+        type: boolean
+        title: Compress payloads
+  deviceConnections:
+    type: array
+    title: Device Connections
+    options:
+      collapsed: false
+    items:
+      type: object
+      title: Device Connection
+      headerTemplate: "{{self.name}}"
+      required:
+        - connType
+      options:
+        collapsed: false
+      properties:
+        name:
+          title: Connection Name
+          type: string
+        connType:
+          title: Connection Type
+          type: string
+          enum:
+            - ""
+            - Fieldbus
+            - MQTT
+            - OPC UA
+            - REST
+            - S7
+            - UDP
+            - MTConnect
+            - Open Protocol
+            - ASCII TCP
+            - EtherNet/IP
+            - Driver
+          minLength: 1
+        EtherNetIPConnDetails:
+          type: object
+          title: EtherNet/IP Connection Details
+          options:
+            dependencies:
+              connType: EtherNet/IP
+            collapsed: false
+          required:
+            - host
+          properties:
+            host:
+              type: string
+              title: Hostname/IP
+              minLength: 1
+        UDPConnDetails:
+          type: object
+          title: UDP Server Details
+          options:
+            dependencies:
+              connType: UDP
+            collapsed: false
+          properties:
+            port:
+              title: Port
+              type: number
+              enum:
+                - 50205
+        MQTTConnDetails:
+          type: object
+          title: MQTT Server Details
+          options:
+            dependencies:
+              connType: MQTT
+            collapsed: false
+          required:
+            - host
+            - port
+            - protocol
+          properties:
+            host:
+              type: string
+              title: Hostname/IP
+              minLength: 1
+            protocol:
+              type: string
+              title: Protocol
+              enum:
+                - mqtt
+                - mqtts
+                - tcp
+                - tls
+                - ws
+                - wss
+              default: mqtt
+              minLength: 1
+            port:
+              type: number
+              title: Port
+              minLength: 1
+              default: 1883
+            useSSL:
+              type: boolean
+              title: Use SSL?
+            clientId:
+              type: string
+              title: Client ID
+              options:
+                inputAttributes:
+                  placeholder: Leave blank for auto generation
+            username:
+              type: string
+              title: Username
+            password:
+              type: string
+              title: Password
+              format: password
+            cleanSession:
+              type: boolean
+              title: Clean Session
+              default: true
+            keepAlive:
+              type: number
+              title: Keep Alive Interval (sec)
+              default: 60
+        OpenProtocolConnDetails:
+          type: object
+          title: Open Protocol Details
+          options:
+            dependencies:
+              connType: Open Protocol
+            collapsed: false
+          required:
+            - host
+            - port
+          properties:
+            host:
+              type: string
+              title: Hostname/IP
+              minLength: 1
+            port:
+              type: number
+              title: Port
+              minLength: 1
+              default: 4545
+        OPCUAConnDetails:
+          type: object
+          title: OPC-UA Server Details
+          options:
+            dependencies:
+              connType: OPC UA
+            collapsed: false
+          required:
+            - endpoint
+            - securityPolicy
+            - securityMode
+            - useCredentials
+          properties:
+            endpoint:
+              type: string
+              title: Endpoint
+              pattern: ^opc.tcp://.+:\d+/?$
+              options:
+                inputAttributes:
+                  placeholder: e.g. opc.tcp://myserver:1234
+                patternmessage: This doesn't look like a valid OPC UA address.
+              minLength: 1
+            securityPolicy:
+              type: string
+              title: Security Policy
+              enum:
+                - None
+                - Basic128
+                - Basic192
+                - Basic192Rsa15
+                - Basic256Rsa15
+                - Basic256Sha256
+                - Aes128_Sha256
+                - Aes128_Sha256_RsaOaep
+                - PubSub_Aes128_CTR
+                - PubSub_Aes256_CTR
+                - Basic128Rsa15
+                - Basic256
+              default: None
+              minLength: 1
+            securityMode:
+              type: string
+              title: Security Mode
+              enum:
+                - None
+                - Sign
+                - SignAndEncrypt
+              default: None
+              minLength: 1
+            useCredentials:
+              title: Use credentials
+              type: boolean
+              minLength: 1
+            username:
+              title: Username
+              type: string
+              options:
+                dependencies:
+                  useCredentials: true
+              minLength: 1
+            password:
+              type: string
+              title: Password
+              format: password
+              options:
+                dependencies:
+                  useCredentials: true
+              minLength: 1
+        ASCIITCPConnDetails:
+          type: object
+          title: ASCII TCP Details
+          options:
+            dependencies:
+              connType: ASCII TCP
+            collapsed: false
+          required:
+            - ip
+            - port
+            - encoding
+            - delimiter
+            - keepAlive
+          properties:
+            ip:
+              type: string
+              minLength: 3
+            port:
+              type: number
+              minLength: 1
+            encoding:
+              type: string
+              enum:
+                - utf8
+                - ascii
+                - utf16le
+                - ucs2
+                - base64
+                - latin1
+                - binary
+                - hex
+              default: utf8
+              minLength: 1
+            delimiter:
+              type: string
+              minLength: 1
+        fieldbusConnDetails:
+          type: object
+          title: Fieldbus Gateway Details
+          options:
+            dependencies:
+              connType: Fieldbus
+          required:
+            - protocol
+          properties:
+            protocol:
+              type: string
+              title: Protocol
+              enum:
+                - ""
+                - DMX
+                - CANOpen
+                - DeviceNet
+                - EtherCAT
+                - Ethernet/IP
+                - ModbusRTU Gateway
+                - ModbusTCP Gateway
+                - Virtual Device 32 Byte
+                - Virtual Device 32 Byte (Ext.)
+                - Virtual ModbusTCP Slave
+                - Virtual ModbusTCP Slave (512)
+                - Virtual ModbusRTU Slave
+                - Virtual ModbusRTU Slave (512)
+                - Virtual ModbusTCP Master
+                - Virtual ModbusRTU Master
+                - Virtual ModbusRTU Master 150
+                - Virtual ModbusTCP Master 150
+                - Virtual RevPi7
+                - Virtual RevPiTimer
+                - Powerlink
+                - Profibus
+                - Profinet
+                - SercosIII
+                - Serial
+                - CANopen Master
+                - Can
+                - M-Bus
+                - DIO
+                - DI
+                - DO
+                - AIO
+              default: ""
+              minLength: 1
+        RESTConnDetails:
+          type: object
+          title: REST Connection Details
+          options:
+            dependencies:
+              connType: REST
+            collapsed: false
+          required:
+            - baseURL
+            - authMethod
+          properties:
+            baseURL:
+              type: string
+              title: Base URL
+              minLength: 1
+            authMethod:
+              type: string
+              title: Authentication Method
+              enum:
+                - None
+                - Basic
+              default: None
+              minLength: 1
+            username:
+              type: string
+              title: Username
+              options:
+                dependencies:
+                  authMethod: Basic
+              minLength: 1
+            password:
+              type: string
+              format: password
+              title: Password
+              options:
+                dependencies:
+                  authMethod: Basic
+              minLength: 1
+        MTConnectConnDetails:
+          type: object
+          title: MTConnect Connection Details
+          options:
+            dependencies:
+              connType: MTConnect
+            collapsed: false
+          required:
+            - baseURL
+            - authMethod
+          properties:
+            baseURL:
+              type: string
+              title: Base URL
+              minLength: 1
+            authMethod:
+              type: string
+              title: Authentication Method
+              enum:
+                - None
+                - Basic
+              default: None
+              minLength: 1
+            username:
+              type: string
+              title: Username
+              options:
+                dependencies:
+                  authMethod: Basic
+              minLength: 1
+            password:
+              type: string
+              format: password
+              title: Password
+              options:
+                dependencies:
+                  authMethod: Basic
+              minLength: 1
+        s7ConnDetails:
+          type: object
+          title: S7 Connection Details
+          options:
+            dependencies:
+              connType: S7
+            collapsed: false
+          required:
+            - hostname
+            - port
+            - rack
+            - slot
+            - timeout
+          properties:
+            hostname:
+              type: string
+              title: Hostname/IP Address
+              minLength: 1
+            port:
+              type: number
+              title: Port
+              minLength: 1
+              default: 102
+            rack:
+              type: number
+              title: Rack
+              minLength: 1
+            slot:
+              type: number
+              title: Slot
+              minLength: 1
+            timeout:
+              type: number
+              title: Timeout
+              default: 5000
+              minLength: 1
+        DriverDetails:
+          title: Driver Details
+          type: object
+          options:
+            dependencies:
+              connType: Driver
+            collapsed: false
+        pollInt:
+          type: number
+          title: Polling Interval (ms)
+          default: 1000
+          minLength: 1
+          options:
+            infoText: Ignored for async devices
+        payloadFormat:
+          title: Payload Format
+          type: string
+          enum:
+            - Defined by Protocol
+            - Delimited String
+            - JSON
+            - XML
+            - Buffer
+            - ASCII HEX
+        delimiter:
+          title: Delimiter
+          type: string
+          maxLength: 1
+          options:
+            dependencies:
+              payloadFormat: Delimited String
+        devices:
+          title: Devices
+          $ref: "#/definitions/devices"
+definitions:
+  tags:
+    type: array
+    title: Tag
+    items:
+      type: object
+      title: Tag
+      headerTemplate: "{{self.friendlyName}}"
+      properties:
+        friendlyName:
+          title: Friendly Name
+          type: string
+        type:
+          title: DataType
+          type: string
+          enum:
+            - Unknown
+            - Int8
+            - Int16LE
+            - Int16BE
+            - Int32LE
+            - Int32BE
+            - Int64LE
+            - Int64BE
+            - UInt8
+            - UInt16LE
+            - UInt16BE
+            - UInt32LE
+            - UInt32BE
+            - UInt64LE
+            - UInt64BE
+            - FloatLE
+            - FloatBE
+            - DoubleLE
+            - DoubleBE
+            - Boolean
+            - String
+            - UUID
+            - DateTime
+            - Template
+        templateRef:
+          title: Template Name
+          type: string
+          options:
+            dependencies:
+              type: Template
+        method:
+          title: Method
+          type: string
+          enum:
+            - GET
+            - PUT
+            - POST
+            - DELETE
+            - GET,POST
+        address:
+          title: TagAddress
+          type: string
+        path:
+          title: TagPath
+          type: string
+        value:
+          title: Value
+          type: string
+        engUnit:
+          title: EngUnit
+          type: string
+        engLow:
+          title: EngLow
+          type: number
+        engHigh:
+          title: EngHigh
+          type: number
+        deadBand:
+          title: Deadband
+          type: string
+        Name:
+          title: CDSName
+          type: string
+        tooltip:
+          title: Tooltip
+          type: string
+        docs:
+          title: Documentation
+          type: string
+        recordToDB:
+          title: Record to Historian
+          type: boolean
+  devices:
+    type: array
+    title: Device
+    options:
+      collapsed: false
+    items:
+      type: object
+      title: Device
+      headerTemplate: "{{self.deviceId}}"
+      required:
+        - deviceId
+        - templates
+      options:
+        collapsed: false
+      properties:
+        deviceId:
+          title: Sparkplug Device ID
+          type: string
+          pattern: ^[^+#/]*$
+          options:
+            patternmessage: "Field cannot contain +, #, or / characters"
+          minLength: 1
+        deviceType:
+          title: Device Type
+          type: string
+          minLength: 1
+        templates:
+          title: Template Definitions
+          $ref: "#/definitions/templates"
+        tags:
+          title: Tag Definitions
+          $ref: "#/definitions/tags"
+  templates:
+    type: array
+    title: Templates
+    items:
+      type: object
+      title: Template
+      headerTemplate: "{{self.name}}"
+      properties:
+        name:
+          title: Template Name
+          type: string
+        value:
+          type: object
+          properties:
+            metrics:
+              title: Metrics
+              $ref: "#/definitions/templateDefs"
+  templateDefs:
+    type: array
+    title: Template Metrics
+    items:
+      type: object
+      title: Metric
+      headerTemplate: "{{self.Name}}"
+      properties:
+        Name:
+          title: Name
+          type: string
+        type:
+          title: DataType
+          type: string
+          enum:
+            - Unknown
+            - Int8
+            - Int16LE
+            - Int16BE
+            - Int32LE
+            - Int32BE
+            - Int64LE
+            - Int64BE
+            - UInt8
+            - UInt16LE
+            - UInt16BE
+            - UInt32LE
+            - UInt32BE
+            - UInt64LE
+            - UInt64BE
+            - FloatLE
+            - FloatBE
+            - DoubleLE
+            - DoubleBE
+            - Boolean
+            - String
+            - DateTime
+            - Template
+        templateRef:
+          title: Template Name
+          type: string
+          options:
+            dependencies:
+              type: Template
+        path:
+          title: Path
+          type: string
+        value:
+          title: Value
+          type: string
+        engUnit:
+          title: EngUnit
+          type: string
+        engLow:
+          title: EngLow
+          type: number
+        engHigh:
+          title: EngHigh
+          type: number
+        deadBand:
+          title: Deadband
+          type: string
+        tooltip:
+          title: Tooltip
+          type: string
+        docs:
+          title: Documentation
+          type: string

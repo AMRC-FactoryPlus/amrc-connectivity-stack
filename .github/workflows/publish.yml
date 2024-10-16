@@ -162,6 +162,7 @@ jobs:
           - acs-krb-keys-operator
           - acs-krb-utils
           - acs-monitor
+          - acs-schemas
           - acs-service-setup
           - acs-visualiser
           - edge-helm-charts

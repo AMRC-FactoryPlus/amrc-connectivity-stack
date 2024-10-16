@@ -57,7 +57,6 @@ export const ACS = {
     Service: {
         Manager:                "619eecab-742d-4824-8b97-bcae472e5c04",
     },
-    ServiceAccount: {},
     Role: {
         EdgeNodeConsumer:       "17a64293-b82d-4db4-af4d-63359bb62934",
         GlobalDebugger:         "4473fe9c-05b0-42cc-ad8c-8e05f6d0ca86",

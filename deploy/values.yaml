@@ -439,10 +439,6 @@ influxdb2:
         #!/bin/bash
         echo "Creating mapping for bucket ${DOCKER_INFLUXDB_INIT_BUCKET_ID} in org ${DOCKER_INFLUXDB_INIT_ORG}"
         influx v1 dbrp create --bucket-id ${DOCKER_INFLUXDB_INIT_BUCKET_ID} --db default --rp default --default --org ${DOCKER_INFLUXDB_INIT_ORG}
-        # create UNS ducket and DB mapping
-        influx bucket create --name uns --retention 0 --org ${DOCKER_INFLUXDB_INIT_ORG}
-        UNS_BUCKET_ID=$(influx bucket list --name uns --org ${DOCKER_INFLUXDB_INIT_ORG} | awk 'NR==2 {print $1}')
-        influx v1 dbrp create --bucket-id $UNS_BUCKET_ID --db uns --rp uns --default --org ${DOCKER_INFLUXDB_INIT_ORG}
   pdb:
     create: false
 

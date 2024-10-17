@@ -44,9 +44,9 @@
         <div
             class="flex-1 px-4 py-2 text-sm truncate flex flex-col justify-center">
           <svg v-if="item.icon" 
-            viewBox="{{item.icon.bbox.left}} {{item.icon.bbox.top}} {{item.icon.bbox.width}} {{item.icon.bbox.height}}"
+            :viewBox="`${item.icon.bbox.left} ${item.icon.bbox.top} ${item.icon.bbox.width} ${item.icon.bbox.height}`"
             fill="black">
-            <path d="{{item.icon.path}}"/>
+            <path :d="item.icon.path"/>
           </svg>
 
           <a href="#"

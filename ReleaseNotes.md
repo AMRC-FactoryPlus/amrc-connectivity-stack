@@ -8,6 +8,24 @@ chronological order.
 These changes have not been released yet, but are likely to appear in
 the next release.
 
+## v3.4.0
+
+### Unified Namespace & Historian
+This release of ACS enables a true Unified Namespace (UNS). The UNS is a
+single point of truth for all data collected by ACS in human-readable
+format. The UNS is "fed" by ingesters, which take channels of data (in
+this case, Sparkplug), and publishes the human-readable content to
+`UNS/v1`. In the future additional ingesters may be added to ACS.
+
+In addition to the Sparkplug ingester, this release features a UNS 
+historian, which persists the UNS data to the same InfluxDB 
+database used by the legacy Sparkplug historian. **By default, the 
+UNS historian is disabled** in an effort to minimise the impact of
+this change on existing installations. To enable the UNS historian,
+set the `historians.uns.enabled` environment variable to `true`. If 
+you only want to exclusively persist UNS data (and not legacy 
+Sparkplug data) then set `historians.sparkplug.enabled` to `false`.
+
 ## v3.1.0
 
 ### Administration interface

@@ -150,6 +150,19 @@ mqtt:
   # -- Possible values are either 1 to enable all possible debugging, or a comma-separated list of debug tags (the tags printed before the log lines). No logging is specified as an empty string.
   verbosity: 0
 
+unsIngesters:
+  sparkplug:
+    enabled: true
+    image:
+      # -- The registry of the MQTT component
+      registry: ghcr.io/amrc-factoryplus
+      # -- The repository of the MQTT component
+      repository: uns-ingester-sparkplug
+      pullPolicy: IfNotPresent
+    # -- The minimum log level that the historian will log messages at (One of 'fatal', 'error', 'warn', 'info', 'debug', 'trace' or 'silent'.)
+    logLevel: info
+    verbosity: 0
+
 visualiser:
   enabled: true
   image:
@@ -202,11 +215,24 @@ cmdesc:
   # -- Possible values are either 1 to enable all possible debugging, or a comma-separated list of debug tags (the tags printed before the log lines). No logging is specified as an empty string.
   verbosity: 1
 
-warehouse:
-  # -- Whether or not to enable the Warehouse component
-  ingester:
+historians:
+  uns:
+    enabled: false
+    # -- The minimum log level that the historian will log messages at (One of 'fatal', 'error', 'warn', 'info', 'debug', 'trace' or 'silent'.)
+    logLevel: info
+    # -- The number of messages to batch together before sending to InfluxDB
+    batchSize: 5000
+    # -- Send all buffered messages after this amount of time has elapsed if the buffer is not full (in milliseconds)
+    flushInterval: 10000
+    image:
+      # -- The registry of the Warehouse component
+      registry: ghcr.io/amrc-factoryplus
+      # -- The repository of the UNS Historian component
+      repository: historian-uns
+      pullPolicy: IfNotPresent
+  sparkplug:
     enabled: true
-    # -- The minimum log level that the ingester will log messages at (One of 'fatal', 'error', 'warn', 'info', 'debug', 'trace' or 'silent'.)
+    # -- The minimum log level that the historian will log messages at (One of 'fatal', 'error', 'warn', 'info', 'debug', 'trace' or 'silent'.)
     logLevel: info
     # -- The number of messages to batch together before sending to InfluxDB
     batchSize: 5000
@@ -216,9 +242,8 @@ warehouse:
       # -- The registry of the Warehouse component
       registry: ghcr.io/amrc-factoryplus
       # -- The repository of the Warehouse component
-      repository: influxdb-sparkplug-ingester
+      repository: historian-sparkplug
       pullPolicy: IfNotPresent
-
 git:
   # -- Whether or not to enable the Git component
   enabled: true
@@ -414,6 +439,10 @@ influxdb2:
         #!/bin/bash
         echo "Creating mapping for bucket ${DOCKER_INFLUXDB_INIT_BUCKET_ID} in org ${DOCKER_INFLUXDB_INIT_ORG}"
         influx v1 dbrp create --bucket-id ${DOCKER_INFLUXDB_INIT_BUCKET_ID} --db default --rp default --default --org ${DOCKER_INFLUXDB_INIT_ORG}
+        # create UNS ducket and DB mapping
+        influx bucket create --name uns --retention 0 --org ${DOCKER_INFLUXDB_INIT_ORG}
+        UNS_BUCKET_ID=$(influx bucket list --name uns --org ${DOCKER_INFLUXDB_INIT_ORG} | awk 'NR==2 {print $1}')
+        influx v1 dbrp create --bucket-id $UNS_BUCKET_ID --db uns --rp uns --default --org ${DOCKER_INFLUXDB_INIT_ORG}
   pdb:
     create: false
 

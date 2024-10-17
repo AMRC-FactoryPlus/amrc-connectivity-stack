@@ -18,6 +18,6 @@ spec:
   tls:
     secretName: {{ coalesce .Values.influxdb2.tlsSecretName .Values.acs.tlsSecretName }}
     domains:
-      - main: influxdb-ingester.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
+      - main: influxdb.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
   {{- end -}}
 {{- end -}}

@@ -32,7 +32,7 @@ spec:
             secretName: historian-uns-keytabs
       initContainers:
         - name: create-bucket
-          image: "{{ include "amrc-connectivity-stack.image-name" (list . .Values.influxdb2) }}"
+          image: "{{.Values.influxdb2.image.repository}}:{{.Values.influxdb2.image.tag}}"
           env:
             - name: INFLUX_TOKEN
               valueFrom:

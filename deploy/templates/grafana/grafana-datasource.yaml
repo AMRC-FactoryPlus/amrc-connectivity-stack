@@ -1,8 +1,7 @@
-{{ if .Values.historians.uns.enabled }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: grafana-datasource-uns
+  name: grafana-datasource
   namespace: {{ .Release.Namespace }}
   labels:
     grafana_datasource: "1"
@@ -14,7 +13,52 @@ data:
     # list of datasources to insert/update depending
     # what's available in the database
     datasources:
+      {{ if .Values.historians.sparkplug.enabled }}
       # <string, required> name of the datasource. Required
+      - name: InfluxDB (Flux)
+        # <string, required> datasource type. Required
+        type: influxdb
+        # <string, required> access mode. proxy or direct (Server or Browser in the UI). Required
+        access: proxy
+        # <int> org id. will default to orgId 1 if not specified
+        orgId: 1
+        # <string> custom UID which can be used to reference this datasource in other parts of the configuration, if not specified will be generated automatically
+        uid: influxdb-flux
+        # <string> url
+        url: http://acs-influxdb2
+        # <bool> mark as default datasource. Max one per org
+        isDefault: false
+        jsonData:
+          organization: default
+          defaultBucket: default
+          version: Flux
+        # <string> json object of data that will be encrypted.
+        secureJsonData:
+          token: ${admin-token}
+        version: 1
+        editable: true
+      - name: InfluxDB (InfluxQL)
+        type: influxdb
+        # <string, required> access mode. proxy or direct (Server or Browser in the UI). Required
+        access: proxy
+        # <int> org id. will default to orgId 1 if not specified
+        orgId: 1
+        # <string> custom UID which can be used to reference this datasource in other parts of the configuration, if not specified will be generated automatically
+        uid: influxdb-influxql
+        # <string> url
+        url: http://acs-influxdb2
+        # <bool> mark as default datasource. Max one per org
+        isDefault: true
+        jsonData:
+          dbName: default
+          httpHeaderName1: Authorization
+        secureJsonData:
+          httpHeaderValue1: Token ${admin-token}
+        version: 1
+        editable: true
+        {{- end -}}
+        {{ if .Values.historians.uns.enabled }}
+        # <string, required> name of the datasource. Required
       - name: UNS (Flux)
         # <string, required> datasource type. Required
         type: influxdb
@@ -56,4 +100,4 @@ data:
           httpHeaderValue1: Token ${admin-token}
         version: 1
         editable: true
-{{- end -}}
+        {{- end -}}

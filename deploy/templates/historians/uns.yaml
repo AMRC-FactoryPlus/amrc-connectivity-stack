@@ -30,7 +30,27 @@ spec:
         - name: keytabs
           secret:
             secretName: historian-uns-keytabs
-
+      initContainers:
+        - name: create-bucket
+          image: "{{.Values.influxdb2.image.repository}}:{{.Values.influxdb2.image.tag}}"
+          env:
+            - name: INFLUX_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  key: admin-token
+                  name: influxdb-auth
+            - name: INFLUX_HOST
+              value: http://acs-influxdb2.{{ .Release.Namespace }}.svc.cluster.local
+          command:
+            - /bin/sh
+            - "-ec"
+            - |+
+              if ! influx bucket list -o default -n uns
+              then
+                influx bucket create --name uns --retention 0 --org default
+                UNS_BUCKET_ID=$(influx bucket list --name uns --org default | awk 'NR==2 {print $1}')
+                influx v1 dbrp create --bucket-id $UNS_BUCKET_ID --db uns --rp uns --default --org default
+              fi
       containers:
         - name: historian-uns
           image: "{{ include "amrc-connectivity-stack.image-name" (list . .Values.historians.uns) }}"

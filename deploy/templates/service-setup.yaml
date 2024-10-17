@@ -14,14 +14,16 @@ spec:
     spec:
       restartPolicy: OnFailure
       volumes:
-        - name: git-checkouts
+        - name: scratch
           emptyDir:
       initContainers:
-        - name: service-setup
-{{ include "amrc-connectivity-stack.image" (list . .Values.serviceSetup) | indent 10 }}
+{{- range $name := .Values.serviceSetup.runSteps }}
+  {{- $step := get $.Values.serviceSetup.steps $name }}
+        - name: {{ $name }}
+  {{- include "amrc-connectivity-stack.image" (list $ $step) | nindent 10 }}
           env:
             - name: DIRECTORY_URL
-              value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
+              value: http://directory.{{ $.Release.Namespace }}.svc.cluster.local
             - name: SERVICE_USERNAME
               value: admin
             - name: SERVICE_PASSWORD
@@ -31,39 +33,29 @@ spec:
                   key: password
             - name: VERBOSE
               value: ALL,!token,!service
-            - name: GIT_CHECKOUTS
-              value: /data
-            - name: SS_CONFIG
-              value: {{ .Values.serviceSetup.config | toRawJson | quote }}
+            - name: SCRATCH_DIR
+              value: /scratch
             - name: ACS_CONFIG
               value: {{
                 dict
-                  "organisation"    .Values.acs.organisation
-                  "domain"          .Values.acs.baseUrl
-                  "realm"           .Values.identity.realm
+                  "organisation"    $.Values.acs.organisation
+                  "domain"          $.Values.acs.baseUrl
+                  "realm"           $.Values.identity.realm
                   "directory"
                     (include "amrc-connectivity-stack.external-url" 
-                      (list . "directory"))
+                      (list $ "directory"))
                 | toRawJson | quote }}
+  {{- range $k, $v := coalesce $step.env dict }}
+            - name: {{ $k | quote }}
+              value: {{
+                kindIs "string" $v
+                | ternary $v (toRawJson $v)
+                | quote }}
+  {{- end }}
           volumeMounts:
-            - mountPath: /data
-              name: git-checkouts
-        - name: edge-helm-charts
-{{ include "amrc-connectivity-stack.image" (list . .Values.edgeHelm) | indent 10 }}
-          env:
-            - name: DIRECTORY_URL
-              value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
-            - name: SERVICE_USERNAME
-              value: admin
-            - name: SERVICE_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: admin-password
-                  key: password
-            - name: VERBOSE
-              value: ALL,!token,!service
-            - name: GIT_REPO_PATH
-              value: {{ .Values.edgeHelm.repoPath }}
+            - mountPath: /scratch
+              name: scratch
+{{- end }}
       containers:
         # We need a do-nothing container to keep k8s happy
         - name: done

@@ -12,6 +12,7 @@ use AMRCFactoryPlus\UUIDs\App;
 use App\Domain\Nodes\Models\Node;
 use App\Exceptions\ActionFailException;
 use App\Exceptions\ActionForbiddenException;
+use App\Support\ManagerUUIDs;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use JsonException;
@@ -56,7 +57,6 @@ class UpdateEdgeAgentConfigurationForNodeAction
         // ==================
 
         $config = [
-            '$schema' => 'https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Edge_Agent_Config.json',
             'sparkplug' => [
                 'DEPRECATED' => 'This is no longer required in V3. It has been kept to prevent too many moving parts from being changed in one go.',
                 'serverUrl' => 'DEPRECATED',
@@ -193,15 +193,9 @@ class UpdateEdgeAgentConfigurationForNodeAction
         }
 
         // Validate the resulting config against the edge agent schema
-        $validator = new Validator;
-        $validator->resolver()
-                  ->registerRaw(
-                      file_get_contents('https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Edge_Agent_Config.json'),
-                      'https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Edge_Agent_Config.json'
-                  );
+        $validator = resolve(Validator::class);
         $validated = $validator->validate(
-            $config,
-            'https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/Edge_Agent_Config.json'
+            $config, "urn:uuid:" . ManagerUUIDs::EdgeAgent
         );
         if (! $validated->isValid()) {
             // Get the error

@@ -8,6 +8,7 @@ export const ACS = {
         ClientRole:         "1c567e3c-5519-4418-8682-6086f22fbc13",
         EdgeAccount:        "97756c9a-38e6-4238-b78c-3df6f227a6c9",
         ServiceAccount:     "e463b4ae-a322-46cc-8976-4ba76838e908",
+        Permission:         "8ae784bb-c4b5-4995-9bf6-799b3c7f21ad",
         UserAccount:        "8b3e8f35-78e5-4f93-bf21-7238bcb2ba9d",
         UserGroup:          "f1fabdd1-de90-4399-b3da-ccf6c2b2c08b",
     },
@@ -22,6 +23,8 @@ export const ACS = {
         EdgeGroups:         "9ba0de4b-056f-4b5e-b966-2d5d85d07767",
         EdgePermissions:    "7594cd71-e5b9-4467-88c0-b11a66d47fec",
         CentralMonitor:     "1bc3dbca-68fe-48d2-9590-3a528c111827",
+        SparkplugIngesters: "e414d355-b991-429b-8f5d-97e823ff71f5",
+        HistorianUNS:       "03f5f08a-f61e-4134-8f66-b2951e3bbb69",
     },
     Perm: {
         MQTT: {
@@ -30,6 +33,8 @@ export const ACS = {
             ReadAllStates:      "8790cf3d-b793-423c-b373-8cfcf9f63529",
             ReadNode:           "046d6603-fa62-4208-9400-65d61f8b1ec4",
             ReadWholeNamespace: "81833dbb-1150-4078-b1db-978c646ba73e",
+            WriteToEntireUNS:   "9fa6ff20-9d2a-4444-960c-40ebcf56f5b4",
+            ReadEntireUNS:      "ffa40b36-3a61-4545-832a-2d1e8b860d63",
         },
     },
     PermGroup: {
@@ -55,6 +60,7 @@ export const ACS = {
     Role: {
         EdgeNodeConsumer:       "17a64293-b82d-4db4-af4d-63359bb62934",
         GlobalDebugger:         "4473fe9c-05b0-42cc-ad8c-8e05f6d0ca86",
+        Warehouse:              "6958c812-fbe2-4e6c-b997-6f850b89f679",
     },
     /* XXX This should not be fixed. Currently this matches the fixed
      * UUID deployed by the dumps in the ACS Helm chart. This needs

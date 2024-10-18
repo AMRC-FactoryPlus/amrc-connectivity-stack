@@ -1,5 +1,5 @@
 /*
- * AMRC InfluxDB Sparkplug Ingester
+ * AMRC InfluxDB Sparkplug Historian
  * Copyright "2023" AMRC
  */
 
@@ -22,7 +22,7 @@ if (!directoryUrl) {
 }
 
 export const logger = pino({
-    name: 'InfluxDB Sparkplug Ingester',
+    name: 'InfluxDB Sparkplug Historian',
     level: process.env.LOG_LEVEL || 'info',
 }, stream);
 

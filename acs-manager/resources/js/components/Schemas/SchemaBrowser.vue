@@ -6,57 +6,59 @@
 <template>
   <div>
     <ColumnList
-        v-if="!selectedDeviceSchema"
+        v-if="!selectedSchemaName"
         name="Device Schema"
         description="Choose a schema to represent the device you are configuring."
         @selected="selectDeviceSchema"
-        :selected-item="selectDeviceSchema ? selectDeviceSchema.id : null"
-        property="deviceSchemas"
+        :selected-item="null"
+        property="schemaNames"
         :loading="deviceSchemasLoading"
-        :items="deviceSchemas"
-        :show-divider="false">
+        :items="schemaNames"
+        :show-divider="false" :show-search="false">
       <template #admin-actions>
         <button v-if="showNew" @click="newSchema" class="fpl-button-brand h-10">
           <span>New</span>
           <i class="fa-sharp fa-solid ml-2 fa-plus"></i>
         </button>
       </template>
-      <template
-          v-slot:item="{ item }">
+      <template v-slot:item="{ item }">
         <div class="flex-1 px-4 py-2 text-sm truncate h-10 flex flex-col justify-center">
-          <a href="#" class="text-gray-600 font-semibold">{{ item.name }}</a>
+          <a href="#" class="text-gray-600 font-semibold">{{ item }}</a>
         </div>
       </template>
     </ColumnList>
     <ColumnList
         name="Version"
-        :description="'Choose the version of ' + selectedDeviceSchema.name + ' to use.'"
+        :description="'Choose the version of ' + selectedSchemaName + ' to use.'"
         description-action="(Change Schema)"
         @descriptionAction="clearSchema"
         v-else-if="!loading"
         @selected="selectDeviceSchemaVersion"
-        :selected-item="selectDeviceSchemaVersion ? selectDeviceSchemaVersion.id : null"
-        property="deviceSchemaVersions"
-        :loading="deviceSchemaVersionsLoading"
-        :items="deviceSchemaVersions"
-        :show-divider="false">
+        :selected-item="null"
+        property="schemaVersions"
+        :loading="deviceSchemasLoading"
+        :items="schemaVersions"
+        :show-divider="false" :show-search="false">
       <template
           v-slot:item="{ item }">
         <div
             class="flex-1 px-4 py-2 text-sm truncate flex flex-col justify-center">
-          <a href="#"
-             class="text-gray-600 font-semibold">Version
-            {{
-              item.version
-            }}</a>
+          <a href="#" class="text-gray-600 font-semibold flex">
+            <svg v-if="item.icon" 
+              :viewBox="`${item.icon.bbox.left} ${item.icon.bbox.top} ${item.icon.bbox.width} ${item.icon.bbox.height}`"
+              style="height: 1lh; margin-right: 1ex;" fill="black">
+              <path :d="item.icon.path"/>
+            </svg>
+            Version {{ item.version }}
+          </a>
           <a href="#"
              class="text-gray-400">Created
             {{
-              moment(item.created_at).fromNow()
+              moment.unix(item.created).fromNow()
             }},
             Updated
             {{
-              moment(item.updated_at).fromNow()
+              moment.unix(item.modified).fromNow()
             }}</a>
         </div>
       </template>
@@ -70,7 +72,7 @@
             class="text-center mt-10 pb-3 flex-grow">
           <i class="fa-sharp fa-solid fa-circle-notch fa-spin fa-2x text-gray-300"></i>
           <h3 class="mt-2 text-sm font-medium text-gray-700">
-            Initialising instance of {{ selectedDeviceSchema?.name }}</h3>
+            Initialising instance of {{ selectedSchemaName }}</h3>
           <p class="mt-1 text-sm text-gray-400">Shouldn't take two seconds.</p>
         </div>
       </div>
@@ -81,8 +83,7 @@
 export default {
   name: 'SchemaBrowser',
   props: {
-    deviceSchemas: {},
-    deviceSchemaVersions: {},
+    deviceSchemas: null,
     showNew: { required: false, type: Boolean, default: false}
   },
 
@@ -93,32 +94,30 @@ export default {
   methods: {
 
     clearSchema() {
-      this.selectedDeviceSchema = null;
+      this.selectedSchemaName = null;
     },
 
-    selectDeviceSchema(deviceSchema) {
-      this.selectedDeviceSchema = deviceSchema;
-      this.requestDataReloadFor('deviceSchemaVersions', null, {schema: this.selectedDeviceSchema.id});
+    selectDeviceSchema(name) {
+      this.selectedSchemaName = name;
     },
 
     newSchema() {
       this.$emit('new-schema', {});
     },
 
-    selectDeviceSchemaVersion(deviceSchemaVersion) {
-      this.selectedDeviceSchemaVersion = deviceSchemaVersion;
+    selectDeviceSchemaVersion(version) {
       this.loading = true;
       this.$emit('selected', {
-        url: this.selectedDeviceSchema.url + '-v' + deviceSchemaVersion.version + '.json',
-        device_schema_id: this.selectedDeviceSchema.id,
-        schema_uuid: deviceSchemaVersion.schema_uuid
+        schema_uuid: version.uuid
       });
     },
   },
 
   data() {
     return {
-      selectedDeviceSchema: null,
+      deviceSchemas: null,
+
+      selectedSchemaName: null,
       deviceSchemasLoading: false,
 
       loading: false,
@@ -126,8 +125,22 @@ export default {
       selectedDeviceSchemaVersion: null,
       deviceSchemaVersionsLoading: false,
       deviceSchemaVersionsPreventLoad: true,
-
     };
+  },
+
+  computed: {
+    schemaNames () {
+      if (!this.deviceSchemas) return null;
+      return Object.keys(this.deviceSchemas).toSorted();
+    },
+
+    schemaVersions () {
+      if (!this.deviceSchemas) return null;
+      if (!this.selectedSchemaName) return null;
+      const vers = x => Number.parseInt(x.version, 10);
+      return this.deviceSchemas[this.selectedSchemaName]
+        .toSorted((a, b) => vers(a) - vers(b));
+    },
   },
 };
 </script>

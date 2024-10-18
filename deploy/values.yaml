@@ -111,32 +111,48 @@ monitor:
 # the ACS services when the Helm chart is deployed or upgraded.
 serviceSetup:
   enabled: true
-  image:
-    registry: ghcr.io/amrc-factoryplus
-    repository: acs-service-setup
-    pullPolicy: IfNotPresent
-  # This section overrides the classes etc. installed into the ConfigDB
-  config:
-    # Git repos to create in the on-prem server. These may be
-    # automatically mirrored from external repos, or populated by the
-    # service setup job.
-    repoMirror:
-      helm:
-        name: Edge Helm charts
-        pull: {}
-    # Helm charts to deploy to the edge; these default to the charts
-    # created automatically but can be overridden to customise
-    helmChart:
-      # Chart to deploy an edge cluster
-      #cluster: null
-
-edgeHelm:
-  enabled: true
-  image:
-    registry: ghcr.io/amrc-factoryplus
-    repository: edge-helm-charts
-    pullPolicy: IfNotPresent
-  repoPath: shared/helm
+  # This chooses which steps to run, and in which order. Since this is
+  # an array it can only be overridden as a whole, so the step
+  # definitions are separate so they can be added to rather than
+  # replaced.
+  runSteps: [service-setup, acs-schemas, edge-helm]
+  # This defines what to run for each step.
+  steps:
+    service-setup:
+      image:
+        registry: ghcr.io/amrc-factoryplus
+        repository: acs-service-setup
+        pullPolicy: IfNotPresent
+      # Environment variables to pass to this step. Plain strings are
+      # placed in the environment as-is, other values are JSON-encoded.
+      env:
+        # This section overrides the classes etc. installed into the ConfigDB
+        SS_CONFIG:
+          # Git repos to create in the on-prem server. These may be
+          # automatically mirrored from external repos, or populated by the
+          # service setup job.
+          repoMirror:
+            helm:
+              name: Edge Helm charts
+              pull: {}
+          # Helm charts to deploy to the edge; these default to the charts
+          # created automatically but can be overridden to customise
+          helmChart:
+            # Chart to deploy an edge cluster
+            #cluster: null
+    acs-schemas:
+      image:
+        registry: ghcr.io/amrc-factoryplus
+        repository: acs-schemas
+        tag: v1.0.0
+        pullPolicy: IfNotPresent
+    edge-helm:
+      image:
+        registry: ghcr.io/amrc-factoryplus
+        repository: edge-helm-charts
+        pullPolicy: IfNotPresent
+      env:
+        GIT_REPO_PATH: shared/helm
 
 mqtt:
   # -- Whether or not to enable the MQTT component

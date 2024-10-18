@@ -144,7 +144,7 @@ serviceSetup:
       image:
         registry: ghcr.io/amrc-factoryplus
         repository: acs-schemas
-        tag: v0.0.1
+        tag: v1.0.0
         pullPolicy: IfNotPresent
     edge-helm:
       image:

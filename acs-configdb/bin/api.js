@@ -10,7 +10,7 @@ import url from "url";
 import express from "express";
 
 import { Debug, ServiceClient, UUIDs }  from "@amrc-factoryplus/service-client";
-import { WebAPI }                       from "@amrc-factoryplus/utilities";
+import { WebAPI }                       from "@amrc-factoryplus/service-api";
 
 import { GIT_VERSION } from "../lib/git-version.js";
 import { Service, Version } from "../lib/constants.js";
@@ -36,7 +36,7 @@ const api = await new WebAPI({
             revision:       GIT_VERSION,
         },
     },
-    verbose:    process.env.VERBOSE,
+    debug:      fplus.debug,
     realm:      process.env.REALM,
     hostname:   process.env.HOSTNAME,
     keytab:     process.env.SERVER_KEYTAB,

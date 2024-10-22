@@ -128,7 +128,7 @@ export default class Model extends EventEmitter {
     }
 
     async object_set_class(obj, klass) {
-        return await this.db.txn({}, async query => {
+        const st = await this.db.txn({}, async query => {
             const class_id = await this._class_id(query, klass);
             if (class_id == null) return 404;
 
@@ -149,6 +149,12 @@ export default class Model extends EventEmitter {
 
             return dbr.rows[0]?.ok ? 204 : 404;
         });
+        if (st == 204)
+            this.updates.next({
+                app:    App.Registration,
+                object: obj,
+                config: { "class": klass },
+            });
     }
 
     async object_list() {
@@ -174,7 +180,7 @@ export default class Model extends EventEmitter {
     }
 
     async object_create(uuid, klass) {
-        return await this.db.txn({}, async query => {
+        const st = await this.db.txn({}, async query => {
             const class_id = await this._class_id(query, klass);
             if (class_id == null) return 404;
 
@@ -191,10 +197,17 @@ export default class Model extends EventEmitter {
             await this._maybe_special_class(query, uuid, klass);
             return 201;
         });
+        if (st == 201 || st == 200)
+            this.updates.next({
+                app:    App.Registration,
+                object: uuid,
+                config: { "class": klass },
+            });
+        return st;
     }
 
     async object_create_new(klass) {
-        return await this.db.txn({}, async query => {
+        const [st, uuid] = await this.db.txn({}, async query => {
             const class_id = await this._class_id(query, klass);
             if (class_id == null) return [404, null];
 
@@ -212,19 +225,22 @@ export default class Model extends EventEmitter {
                 }
             }
         });
+        if (st == 201)
+            this.updates.next({
+                app:    App.Registration,
+                object: uuid,
+                config: { "class": klass },
+            });
+        return [st, uuid];
     }
 
     /* Delete an object. Deletes configs associated with this object,
      * but won't delete objects belonging to a class or configs
-     * belonging to an app. Returns:
-     *  true            Success
-     *  undefined       Object not found
-     *  false           Object cannot ever be deleted
-     *  array           UUIDs of objects preventing deletion
+     * belonging to an app. Returns [st, body?].
      */
-    object_delete(object) {
-        return this.db.txn({}, async query => {
-            if (Immutable.has(object)) return false;
+    async object_delete(object) {
+        const [st, body] = await this.db.txn({}, async query => {
+            if (Immutable.has(object)) return [405];
 
             const row = await _q_row(query, `
                 select o.id, c.uuid klass
@@ -232,7 +248,7 @@ export default class Model extends EventEmitter {
                     join object c on c.id = o.class
                 where o.uuid = $1
             `, [object]);
-            if (row == undefined) return undefined;
+            if (row == undefined) return [404];
 
             const {id, klass} = row;
 
@@ -242,7 +258,7 @@ export default class Model extends EventEmitter {
                     select uuid from object where class = $1
                 `, [id]);
                 if (objs.length > 0)
-                    return objs.map(r => r.uuid);
+                    return [409, objs.map(r => r.uuid)];
                 await query(`delete from class where id = $1`, [id]);
             }
 
@@ -255,16 +271,28 @@ export default class Model extends EventEmitter {
                     where c.app = $1
                 `, [id]);
                 if (objs.length > 0)
-                    return objs.map(r => r.uuid);
+                    return [409, objs.map(r => r.uuid)];
                 await query(`delete from app where id = $1`, [id]);
             }
 
             /* Delete configs belonging to this object. */
-            await query(`delete from config where object = $1`, [id]);
+            const confs = await _q_set(query, `
+                delete from config c using object a
+                where a.id = c.app and c.object = $1
+                returning a.uuid
+            `, [id]);
             /* Delete the object. */
             await query(`delete from object where id = $1`, [id]);
-            return true;
+            return [204, confs.map(r => r.uuid)];
         });
+
+        if (st != 204)
+            return [st, body];
+
+        for (const app of body)
+            this.updates.next({ app, object });
+        this.updates.next({ app: App.Registration, object });
+        return [st];
     }
 
     async class_list() {
@@ -344,6 +372,7 @@ export default class Model extends EventEmitter {
 
     async config_put(q, json, check_etag) {
         /* XXX specials currently don't support etags */
+        /* XXX specials should push to updates */
         const special = this.special.get(q.app);
         if (special) return await special.put(q.object, json);
 
@@ -399,6 +428,7 @@ export default class Model extends EventEmitter {
     }
 
     async config_delete(q, check_etag) {
+        /* XXX specials should push to updates */
         const special = this.special.get(q.app);
         if (special) return await special.delete(q.object);
 

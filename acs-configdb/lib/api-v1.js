@@ -59,13 +59,8 @@ export default class API {
 
         this.routes = express.Router();
         this.model = opts.model;
-    }
 
-    async init() {
-        await this.model.init();
         this.setup_routes();
-
-        return this;
     }
 
     setup_mqtt_link(mqtt) {
@@ -233,12 +228,10 @@ export default class API {
         const ok = await this._check_acl(req.auth, Perm.Delete_Obj, object, true);
         if (!ok) return res.status(403).end();
 
-        const rv = await this.model.object_delete(object);
+        const [st, rv] = await this.model.object_delete(object);
 
-        if (rv == true) return res.status(204).end();
-        if (rv == undefined) return res.status(404).end();
-        if (rv == false) return res.status(405).end();
-        if (Array.isArray(rv)) return res.status(409).json(rv);
+        res.status(st);
+        rv ? res.json(rv) : res.end();
     }
 
     async class_list(req, res) {

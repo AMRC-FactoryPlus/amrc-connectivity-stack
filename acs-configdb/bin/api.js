@@ -18,16 +18,23 @@ import { Service, Version } from "../lib/constants.js";
 import Model from "../lib/model.js";
 import APIv1 from "../lib/api-v1.js";
 import MQTTCli from "../lib/mqttcli.js";
+import { Notify } from "../lib/notify-v2.js";
 
 const Device_UUID = process.env.DEVICE_UUID;
 
 const fplus = await new ServiceClient({ env: process.env }).init();
-const model = new Model({ log: fplus.debug.bound("model") });
+const model = await new Model({
+    log: fplus.debug.bound("model"),
+}).init();
 
-const api_v1 = await new APIv1({
+const api_v1 = new APIv1({
     fplus_client:   fplus,
     model,
-}).init();
+});
+const notify = new Notify({
+    log:    fplus.debug.bound("notify"),
+    model,
+});
 
 const api = await new WebAPI({
     ping:       {
@@ -76,6 +83,5 @@ else {
     mqtt.run();
 }
 
-const watch = fplus.debug.bound("watch");
-model.updates.subscribe(u => watch("UPDATE: %o", u));
+notify.setup(api.http, "/notify/v2");
 api.run();

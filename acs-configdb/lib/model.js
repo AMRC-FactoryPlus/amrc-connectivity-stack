@@ -13,7 +13,7 @@ import rx from "rxjs";
 
 import { DB } from "@amrc-factoryplus/utilities";
 
-import {App, Class, Null_UUID, Service} from "./constants.js";
+import {App, Class, Service} from "./constants.js";
 import { Specials } from "./special.js";
 
 const DB_Version = 7;
@@ -211,7 +211,7 @@ export default class Model extends EventEmitter {
             const class_id = await this._class_id(query, klass);
             if (class_id == null) return [404, null];
 
-            while (1) {
+            for (;;) {
                 let dbr = await query(`
                     insert into object (uuid, class)
                     values (gen_random_uuid(), $1) on conflict (uuid) do nothing

@@ -4,8 +4,6 @@
  * Copyright 2022 AMRC
  */
 
-import fs from "node:fs";
-
 import { GIT_VERSION } from "./git-version.js";
 
 /* This is the version of the ConfigDB service spec we comply to */

@@ -4,11 +4,11 @@
  * Copyright 2024 University of Sheffield
  */
 
-import rx from "rxjs";
+//import rx from "rxjs";
 import { WebSocketServer } from "ws";
 import { v4 as uuidv4 } from "uuid";
 
-const Token_rx = /^Bearer ([A-Za-z0-9+\/]+)$/;
+const Token_rx = /^Bearer ([A-Za-z0-9+/]+)$/;
 
 export class Notify {
     constructor (opts) {
@@ -17,7 +17,7 @@ export class Notify {
         this.api = opts.api;
     }
 
-    init () {
+    run () {
         this.wss = new WebSocketServer({ 
             server: this.api.http, 
             path:   "/notify/v2",

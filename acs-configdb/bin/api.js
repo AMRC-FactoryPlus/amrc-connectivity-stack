@@ -9,8 +9,8 @@
 import url from "url";
 import express from "express";
 
-import { Debug, ServiceClient, UUIDs }  from "@amrc-factoryplus/service-client";
-import { WebAPI }                       from "@amrc-factoryplus/service-api";
+import { ServiceClient }    from "@amrc-factoryplus/service-client";
+import { WebAPI }           from "@amrc-factoryplus/service-api";
 
 import { GIT_VERSION } from "../lib/git-version.js";
 import { Service, Version } from "../lib/constants.js";
@@ -63,10 +63,10 @@ const api = await new WebAPI({
     },
 }).init();
 
-const notify = await new Notify({
+const notify = new Notify({
     api, model,
     log:    fplus.debug.bound("notify"),
-}).init();
+});
 
 if (process.env.MQTT_DISABLE) {
     fplus.debug.log("mqtt", "Disabling MQTT connection.");
@@ -84,4 +84,5 @@ else {
     mqtt.run();
 }
 
+notify.run();
 api.run();

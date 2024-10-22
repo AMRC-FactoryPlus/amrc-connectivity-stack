@@ -11,7 +11,6 @@ import { UUIDs } from "@amrc-factoryplus/service-client";
 import * as etags from "./etags.js";
 
 import {App, Class} from "./constants.js";
-import Model from "./model.js";
 
 const Perm = {
     All: "c43c7157-a50b-4d2a-ac1a-86ff8e8e88c1",
@@ -31,23 +30,6 @@ function compat(dest) {
                 : p)
             .join("/");
         next();
-    }
-}
-
-function json_value(str) {
-    let val;
-    try {
-        val = JSON.parse(str);
-    } catch (e) {
-    }
-
-    switch (typeof (val)) {
-        case "string":
-        case "number":
-        case "boolean":
-            return val;
-        default:
-            return;
     }
 }
 
@@ -414,7 +396,7 @@ export default class API {
     async dump_save(req, res) {
         const ok = await this._check_acl(req.auth, Perm.Manage_Obj, UUIDs.Null)
             && await this._check_acl(req.auth, Perm.Read_App, UUIDs.Null);
-        if (!ok) return rest.status(403).end();
+        if (!ok) return res.status(403).end();
 
         const dump = await this.model.dump_save();
         res.status(200).json(dump);

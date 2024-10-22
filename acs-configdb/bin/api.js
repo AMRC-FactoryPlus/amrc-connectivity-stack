@@ -31,10 +31,6 @@ const api_v1 = new APIv1({
     fplus_client:   fplus,
     model,
 });
-const notify = new Notify({
-    log:    fplus.debug.bound("notify"),
-    model,
-});
 
 const api = await new WebAPI({
     ping:       {
@@ -67,6 +63,11 @@ const api = await new WebAPI({
     },
 }).init();
 
+const notify = await new Notify({
+    api, model,
+    log:    fplus.debug.bound("notify"),
+}).init();
+
 if (process.env.MQTT_DISABLE) {
     fplus.debug.log("mqtt", "Disabling MQTT connection.");
 }
@@ -83,5 +84,4 @@ else {
     mqtt.run();
 }
 
-notify.setup(api.http, "/notify/v2");
 api.run();

@@ -60,15 +60,15 @@ the path `notify/v2`, resolved under the service's URL prefix as usual,
 and translated to the `ws`/`wss` scheme if required by the library in
 use. No sub-protocol should be requested in the WebSocket negotiation.
 
-Authentication headers must be provided in the WebSocket connection
-request as usual. The service must accept the same authentication as it
-would accept for a plain HTTP request; in particular Bearer tokens
-obtained from the HTTP API must be accepted in the WebSocket request.
-
-All messages exchanged over this WebSocket must use text frames and
-contain JSON data. Message boundaries are significant; each message must
-contain a single JSON value. Messages sent by the client are
-subscription requests; messages sent by the server are updates.
+Despite WebSockets being designed to be compatible with HTTP, the
+WebSocket client interface provided by the browser does not support any
+options to set the HTTP headers required for authentication. So the
+initial exchange must be an authentication exchange, as detailed in the
+next section. All subsequent messages exchanged over this WebSocket must
+use text frames and contain JSON data. Message boundaries are
+significant; each message must contain a single JSON value. Messages
+sent by the client are subscription requests; messages sent by the
+server are updates.
 
 For each open WebSocket the server maintains a list of 'subscriptions'.
 Each subscription maps to a request to the service's plain HTTP API, and
@@ -82,6 +82,31 @@ The client is responsible for remembering its own list of subscriptions;
 the server will not report this information. If the WebSocket is closed
 for any reason (including network problems) the list of subscriptions is
 dropped. The client must resubscribe as needed once it has reconnected.
+
+### Authentication
+
+The first message sent by the client must be a text message containing
+the string `Bearer ` followed by a valid bearer token for the service
+being contacted. The string `Bearer` is case-sensitive and followed by
+exactly one space before the bearer token. The message must end
+immediatley after the token with no following whitespace or newline. The
+client must not send any more messages until it has received a
+successful response.
+
+The service must respond with a text message exactly three characters
+long containing an HTTP status code. The code must be one of these:
+
+Code | Meaning
+---|---
+200 | Successful response
+400 | The service did not understand the client's first message
+401 | The token is not valid
+403 | The client is not permitted to use the notify interface at all
+404 | This interface is not available
+503 | This interface is temporarily unavailable
+
+Some of these codes are liable to be returned as part of the WebSocket
+exchange instead.
 
 ### Requests
 

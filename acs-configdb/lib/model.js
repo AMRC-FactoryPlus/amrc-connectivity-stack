@@ -12,7 +12,7 @@ import merge_patch from "json-merge-patch";
 
 import { DB } from "@amrc-factoryplus/utilities";
 
-import {App, Class, Null_UUID, Service} from "../constants.js";
+import {App, Class, Null_UUID, Service} from "./constants.js";
 import { Specials } from "./special.js";
 
 const DB_Version = 7;

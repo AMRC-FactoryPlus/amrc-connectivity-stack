@@ -14,7 +14,7 @@ import { WebAPI }                       from "@amrc-factoryplus/service-api";
 
 import { GIT_VERSION } from "../lib/git-version.js";
 import { Service, Version } from "../lib/constants.js";
-import APIv1 from "../lib/api-v1/controller.js";
+import APIv1 from "../lib/api-v1.js";
 import MQTTCli from "../lib/mqttcli.js";
 
 const Device_UUID = process.env.DEVICE_UUID;

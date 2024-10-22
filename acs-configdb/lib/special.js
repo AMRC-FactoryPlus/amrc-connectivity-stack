@@ -4,7 +4,7 @@
  * Copyright 2021 AMRC
  */
 
-import { App } from "../constants.js";
+import { App } from "./constants.js";
 
 class SpecialApp {
     constructor (model) {

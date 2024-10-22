@@ -8,9 +8,9 @@ import express from "express";
 
 import { UUIDs } from "@amrc-factoryplus/service-client";
 
-import * as etags from "../etags.js";
+import * as etags from "./etags.js";
 
-import {App, Class} from "../constants.js";
+import {App, Class} from "./constants.js";
 import Model from "./model.js";
 
 const Perm = {

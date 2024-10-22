@@ -9,6 +9,7 @@ import EventEmitter from "node:events";
 import Ajv from "ajv/dist/2020.js";
 import ajv_formats from "ajv-formats";
 import merge_patch from "json-merge-patch";
+import rx from "rxjs";
 
 import { DB } from "@amrc-factoryplus/utilities";
 
@@ -55,6 +56,10 @@ export default class Model extends EventEmitter {
         this.schemas = new Map();
 
         this.special = new Map();
+
+        /* { app, obj, config }
+         * config is undefined for a delete entry */
+        this.updates = new rx.Subject();
     }
 
     async init() {
@@ -385,8 +390,10 @@ export default class Model extends EventEmitter {
             return 201;
         });
 
-        if (rv == 204 || rv == 201)
+        if (rv == 204 || rv == 201) {
             this.emit_change(q);
+            this.updates.next({ app: q.app, object: q.object, config: json });
+        }
         /* PUT doesn't return 304 */
         return rv == 304 ? 204 : rv;
     }
@@ -418,7 +425,10 @@ export default class Model extends EventEmitter {
             return 204;
         });
 
-        if (rv == 204) this.emit_change(q);
+        if (rv == 204) {
+            this.emit_change(q);
+            this.updates.next(q);
+        }
         return rv;
     }
 
@@ -436,8 +446,6 @@ export default class Model extends EventEmitter {
         /* This needs to be null, not undefined, for a nonexistent
          * object, or the 409 test below will fail. */
         const json = conf?.json ?? null;
-        console.log("PATCH: source: %o", json);
-        console.log("PATCH: patch: %o", patch);
 
         /* Safety check: applying a merge-patch to a non-object destroys
          * the whole thing. */
@@ -445,7 +453,6 @@ export default class Model extends EventEmitter {
             return 409;
 
         const nconf = merge_patch.apply(json, patch);
-        console.log("PATCH: result: %o", nconf);
         return await this.config_put(q, nconf);
     }
 
@@ -578,23 +585,23 @@ export default class Model extends EventEmitter {
 
     async dump_validate(dump) {
         if (typeof (dump) != "object") {
-            this.log("dump", "Dump not an object");
+            this.log("Dump not an object");
             return false;
         }
         if (dump.service != Service.Registry) {
-            this.log("dump", "Dump not for ConfigDB");
+            this.log("Dump not for ConfigDB");
             return false;
         }
         if (dump.version != 1) {
-            this.log("dump", "Dump should be version 1");
+            this.log("Dump should be version 1");
             return false;
         }
         if (Class.Class in (dump.objects ?? {})) {
-            this.log("dump", "Dump cannot create classes via objects key.");
+            this.log("Dump cannot create classes via objects key.");
             return false;
         }
         if (App.Registration in (dump.configs ?? {})) {
-            this.log("dump", "Dump cannot create objects via configs key.");
+            this.log("Dump cannot create objects via configs key.");
             return false;
         }
         return true;
@@ -614,7 +621,7 @@ export default class Model extends EventEmitter {
         for (const klass of dump.classes ?? []) {
             const st = await this.object_create(klass, Class.Class);
             if (st > 299) {
-                this.log("dump", "Dump failed [%s] on class %s", st, klass);
+                this.log("Dump failed [%s] on class %s", st, klass);
                 return st;
             }
         }
@@ -625,7 +632,7 @@ export default class Model extends EventEmitter {
                     st = await this.object_set_class(obj, klass);
                 }
                 if (st > 299) {
-                    this.log("dump", "Dump failed [%s] on object %s (%s)",
+                    this.log("Dump failed [%s] on object %s (%s)",
                         st, obj, klass);
                     return st;
                 }
@@ -637,7 +644,7 @@ export default class Model extends EventEmitter {
                     {app, object, exclusive: !overwrite},
                     conf);
                 if (st > 299 && st != 409) {
-                    this.log("dump", "Dump failed [%s] on config %s/%s", 
+                    this.log("Dump failed [%s] on config %s/%s", 
                         st, app, object);
                     return st;
                 }

@@ -55,12 +55,10 @@ export default class API {
     constructor(opts) {
         this.fplus = opts.fplus_client;
 
-        this.log = this.fplus.debug.log.bind(this.fplus.debug);
+        this.log = this.fplus.debug.bound("apiv1");
 
         this.routes = express.Router();
-        this.model = new Model({
-            log:    this.log,
-        });
+        this.model = opts.model;
     }
 
     async init() {
@@ -410,7 +408,7 @@ export default class API {
                 const ok = await this._check_acl(
                     req.auth, perm, UUIDs.Null, false);
                 if (!ok) {
-                    this.log("dump", "Refusing dump (%s)", key);
+                    this.log("Refusing dump (%s)", key);
                     return res.status(403).end();
                 }
             }

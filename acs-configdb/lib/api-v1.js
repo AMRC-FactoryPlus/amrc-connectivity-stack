@@ -10,16 +10,7 @@ import { UUIDs } from "@amrc-factoryplus/service-client";
 
 import * as etags from "./etags.js";
 
-import {App, Class} from "./constants.js";
-
-const Perm = {
-    All: "c43c7157-a50b-4d2a-ac1a-86ff8e8e88c1",
-    Read_App: "4a339562-cd57-408d-9d1a-6529a383ea4b",
-    Write_App: "6c799ccb-d2ad-4715-a2a7-3c8728d6c0bf",
-    Manage_Obj: "f0b7917b-d475-4888-9d5a-2af96b3c26b6",
-    Delete_Obj: "6957174b-7b08-45ca-ac5c-c03ab6928a6e",
-    Manage_App: "95c7cbcb-ce60-49ed-aa81-2fe3eec4559d",
-};
+import {App, Class, Perm} from "./constants.js";
 
 function compat(dest) {
     const pieces = dest.split("/");
@@ -35,7 +26,8 @@ function compat(dest) {
 
 export default class API {
     constructor(opts) {
-        this.fplus = opts.fplus_client;
+        this.fplus = opts.fplus;
+        this.auth = opts.auth;
 
         this.log = this.fplus.debug.bound("apiv1");
 
@@ -98,13 +90,8 @@ export default class API {
         api.get("/save", this.dump_save.bind(this));
     }
 
-    async _check_acl(principal, permission, target, wild) {
-        const acl = await this.fplus.fetch_acl(principal, Perm.All);
-        return acl(permission, target, wild);
-    }
-
     async apps_get(req, res) {
-        const ok = await this._check_acl(req.auth, Perm.Manage_Obj, Class.App, true);
+        const ok = await this.auth.check_acl(req.auth, Perm.Manage_Obj, Class.App, true);
         if (!ok) return res.status(403).end();
 
         let list = await this.model.apps_get();
@@ -112,7 +99,7 @@ export default class API {
     }
 
     async apps_post(req, res) {
-        const ok = await this._check_acl(req.auth, Perm.Manage_Obj, Class.App, true);
+        const ok = await this.auth.check_acl(req.auth, Perm.Manage_Obj, Class.App, true);
         if (!ok) return res.status(403).end();
 
         const uuid = req.body.uuid;
@@ -131,7 +118,7 @@ export default class API {
     }
 
     async app_get(req, res) {
-        const ok = await this._check_acl(req.auth, Perm.Manage_Obj, Class.App, true);
+        const ok = await this.auth.check_acl(req.auth, Perm.Manage_Obj, Class.App, true);
         if (!ok) return res.status(403).end();
 
         const uuid = req.params.app;
@@ -141,7 +128,7 @@ export default class API {
 
         const info = await this.model.config_get(
             {app: App.Info, object: uuid});
-        const name = info?.json?.name ?? "";
+        const name = info?.config?.name ?? "";
 
         res.status(200).json({uuid, name});
     }
@@ -149,7 +136,7 @@ export default class API {
     async app_schema_get(req, res) {
         const app = req.params.app;
 
-        const ok = await this._check_acl(req.auth, Perm.Read_App, app, true);
+        const ok = await this.auth.check_acl(req.auth, Perm.Read_App, app, true);
         if (!ok) return res.status(403).end();
 
         let rv = await this.model.app_schema(app);
@@ -162,7 +149,7 @@ export default class API {
     async app_schema_put(req, res) {
         const app = req.params.app;
 
-        const ok = await this._check_acl(req.auth, Perm.Manage_App, app, true);
+        const ok = await this.auth.check_acl(req.auth, Perm.Manage_App, app, true);
         if (!ok) return res.status(403).end();
 
         let rv = await this.model.app_schema_update(app, req.body);
@@ -178,7 +165,7 @@ export default class API {
     }
 
     async object_list(req, res) {
-        const ok = await this._check_acl(req.auth, Perm.Manage_Obj, UUIDs.Null);
+        const ok = await this.auth.check_acl(req.auth, Perm.Manage_Obj, UUIDs.Null);
         if (!ok) return res.status(403).end();
 
         let list = await this.model.object_list();
@@ -188,7 +175,7 @@ export default class API {
     async object_create(req, res) {
         let {uuid, "class": klass} = req.body;
 
-        const ok = await this._check_acl(req.auth, Perm.Manage_Obj, klass, true);
+        const ok = await this.auth.check_acl(req.auth, Perm.Manage_Obj, klass, true);
         if (!ok) return res.status(403).end();
 
         let st;
@@ -207,7 +194,7 @@ export default class API {
     async object_delete(req, res) {
         const {object} = req.params;
 
-        const ok = await this._check_acl(req.auth, Perm.Delete_Obj, object, true);
+        const ok = await this.auth.check_acl(req.auth, Perm.Delete_Obj, object, true);
         if (!ok) return res.status(403).end();
 
         const [st, rv] = await this.model.object_delete(object);
@@ -217,7 +204,7 @@ export default class API {
     }
 
     async class_list(req, res) {
-        const ok = await this._check_acl(req.auth, Perm.Manage_Obj, UUIDs.Null);
+        const ok = await this.auth.check_acl(req.auth, Perm.Manage_Obj, UUIDs.Null);
         if (!ok) return res.status(403).end();
 
         const list = await this.model.class_list();
@@ -226,7 +213,7 @@ export default class API {
 
     async class_get(req, res) {
         const klass = req.params.class;
-        const ok = await this._check_acl(req.auth, Perm.Manage_Obj, klass, true);
+        const ok = await this.auth.check_acl(req.auth, Perm.Manage_Obj, klass, true);
         if (!ok) return res.status(403).end();
 
         const list = await this.model.class_get(klass);
@@ -238,7 +225,7 @@ export default class API {
     async config_list(req, res) {
         let {app, "class": klass} = req.params;
 
-        const ok = await this._check_acl(req.auth, Perm.Read_App, app, true);
+        const ok = await this.auth.check_acl(req.auth, Perm.Read_App, app, true);
         if (!ok) return res.status(403).end();
 
         let list = klass
@@ -252,7 +239,7 @@ export default class API {
     }
 
     async config_get(req, res) {
-        const ok = await this._check_acl(req.auth, Perm.Read_App,
+        const ok = await this.auth.check_acl(req.auth, Perm.Read_App,
             req.params.app, true);
         if (!ok) return res.status(403).end();
 
@@ -268,11 +255,11 @@ export default class API {
 
         res.status(200);
         if (entry.etag) res.header("ETag", `"${entry.etag}"`);
-        res.json(entry.json);
+        res.json(entry.config);
     }
 
     async config_put(req, res) {
-        const ok = await this._check_acl(req.auth, Perm.Write_App,
+        const ok = await this.auth.check_acl(req.auth, Perm.Write_App,
             req.params.app, true);
         if (!ok) return res.status(403).end();
 
@@ -288,7 +275,7 @@ export default class API {
     }
 
     async config_delete(req, res) {
-        const ok = await this._check_acl(req.auth, Perm.Write_App,
+        const ok = await this.auth.check_acl(req.auth, Perm.Write_App,
             req.params.app, true);
         if (!ok) return res.status(403).end();
 
@@ -304,7 +291,7 @@ export default class API {
 
         const ok = await Promise.all(
             [Perm.Read_App, Perm.Write_App]
-            .map(p => this._check_acl(req.auth, p, req.params.app, true)));
+            .map(p => this.auth.check_acl(req.auth, p, req.params.app, true)));
         if (ok.includes(false))
             return res.status(403).end();
 
@@ -342,7 +329,7 @@ export default class API {
 
     async config_search(req, res) {
         const {app, "class": klass} = req.params;
-        const ok = await this._check_acl(req.auth, Perm.Read_App, app, true);
+        const ok = await this.auth.check_acl(req.auth, Perm.Read_App, app, true);
         if (!ok) return res.status(403).end();
 
         const query = this.config_search_parse(req.query);
@@ -380,7 +367,7 @@ export default class API {
         };
         for (const [key, perm] of Object.entries(perms)) {
             if (key in dump) {
-                const ok = await this._check_acl(
+                const ok = await this.auth.check_acl(
                     req.auth, perm, UUIDs.Null, false);
                 if (!ok) {
                     this.log("Refusing dump (%s)", key);
@@ -394,8 +381,8 @@ export default class API {
     }
 
     async dump_save(req, res) {
-        const ok = await this._check_acl(req.auth, Perm.Manage_Obj, UUIDs.Null)
-            && await this._check_acl(req.auth, Perm.Read_App, UUIDs.Null);
+        const ok = await this.auth.check_acl(req.auth, Perm.Manage_Obj, UUIDs.Null)
+            && await this.auth.check_acl(req.auth, Perm.Read_App, UUIDs.Null);
         if (!ok) return res.status(403).end();
 
         const dump = await this.model.dump_save();

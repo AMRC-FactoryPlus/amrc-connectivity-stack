@@ -15,6 +15,7 @@ import { WebAPI }           from "@amrc-factoryplus/service-api";
 import { GIT_VERSION } from "../lib/git-version.js";
 import { Service, Version } from "../lib/constants.js";
 
+import { Auth } from "../lib/auth.js";
 import Model from "../lib/model.js";
 import APIv1 from "../lib/api-v1.js";
 import MQTTCli from "../lib/mqttcli.js";
@@ -27,9 +28,9 @@ const model = await new Model({
     log: fplus.debug.bound("model"),
 }).init();
 
+const auth = new Auth({ fplus });
 const api_v1 = new APIv1({
-    fplus_client:   fplus,
-    model,
+    auth, model, fplus
 });
 
 const api = await new WebAPI({
@@ -64,7 +65,7 @@ const api = await new WebAPI({
 }).init();
 
 const notify = new Notify({
-    api, model,
+    auth, api, model,
     log:    fplus.debug.bound("notify"),
 });
 

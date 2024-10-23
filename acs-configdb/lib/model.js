@@ -359,7 +359,7 @@ export default class Model extends EventEmitter {
             return await special.get(q.object);
 
         let dbr = await this.db.query(`
-            select c.json, c.etag
+            select c.json config, c.etag
             from config c
                 join object a on a.id = c.app
                 join object o on o.id = c.object

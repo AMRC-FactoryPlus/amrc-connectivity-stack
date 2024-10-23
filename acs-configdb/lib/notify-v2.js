@@ -9,6 +9,7 @@ import rx from "rxjs";
 import { WebSocketServer } from "ws";
 import { v4 as uuidv4 } from "uuid";
 
+import { Perm } from "./constants.js";
 import * as rxu from "./rx-util.js";
 
 const Token_rx = /^Bearer ([A-Za-z0-9+/]+)$/;
@@ -19,24 +20,34 @@ function register_handler (path, handler) {
     Handlers.push([pathToRegexp(path), handler]);
 }
 
-function single_config (model, app, object) {
-    return rxu.rx(
-        rx.concat(
-            rxu.rx(
-                model.config_get({ app, object }),
-                rx.map(r => ({
-                    status:     r ? 200 : 404,
-                    body:       r?.config,
-                })),
-                rx.map(response => ({ status: 201, response }))),
-            rxu.rx(
-                model.updates,
-                rx.filter(u => u.app == app && u.object == object),
-                rx.map(u => ({
-                    status: u.config ? 200 : 404,
-                    body:   u.config,
-                })),
-                rx.map(response => ({ status: 200, response })))));
+function single_config (session, app, object) {
+    const to_response = async upd => {
+        session.log("Map update: %o", upd);
+        const ok = await session.check_acl(Perm.Read_App, app, true);
+        if (!ok)
+            return { status: 403 };
+        if (!upd?.config)
+            return { status: 404 };
+        const res = { status: 200, body: upd.config };
+        if (upd.etag)
+            res.headers = { etag: upd.etag };
+        return res;
+    };
+
+    /* XXX Strictly there is a race condition here: the initial fetch
+     * does not slot cleanly into the sequence of updates. This would be
+     * difficult to fix. */
+    return rx.concat(
+        rxu.rx(
+            session.model.config_get({ app, object }),
+            rx.flatMap(to_response),
+            rx.map(response => ({ status: 201, response }))),
+        rxu.rx(
+            session.model.updates,
+            rx.filter(u => u.app == app && u.object == object),
+            rx.flatMap(to_response),
+            rx.map(response => ({ status: 200, response }))),
+    );
 }
 register_handler("app/:app/object/:object", single_config);
 
@@ -44,7 +55,8 @@ class Session {
     constructor (opts) {
         this.ws = opts.ws;
 
-        this.fpauth = opts.notify.api.auth;
+        this.authn = opts.notify.api.auth;
+        this.authz = opts.notify.auth;
         this.log = (m, ...a) => 
             opts.notify.log(`[%s] ${m}`, this.uuid, ...a);
         this.model = opts.notify.model;
@@ -82,7 +94,7 @@ class Session {
         if (!creds)
             return fail("400", "Bad auth message");
 
-        const princ = await this.fpauth.auth_bearer({ creds: creds[1] })
+        const princ = await this.authn.auth_bearer({ creds: creds[1] })
             .catch(e => { this.log(e); return null; });
         if (!princ)
             return fail("401", "WS auth failed");
@@ -93,9 +105,15 @@ class Session {
         return princ;
     }
 
-    build_updates () {
-        const { ws } = this;
+    check_acl (...args) {
+        if (!this.principal) {
+            this.log("Checking ACL with no principal");
+            return false;
+        }
+        return this.authz.check_acl(this.principal, ...args);
+    }
 
+    build_updates () {
         const [closes, opens] = rx.partition(
             this.requests(),
             r => r.method == "CLOSE");
@@ -159,7 +177,7 @@ class Session {
         for (const [rxp, handler] of Handlers) {
             const match = rxp.exec(req.url);
             if (!match) continue;
-            return handler(this.model, ...match.slice(1));
+            return handler(this, ...match.slice(1));
         }
         return fail(404);
     }
@@ -184,6 +202,7 @@ export class Notify {
         this.log = opts.log;
         this.model = opts.model;
         this.api = opts.api;
+        this.auth = opts.auth;
     }
 
     run () {

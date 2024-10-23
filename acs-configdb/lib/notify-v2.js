@@ -24,12 +24,19 @@ function single_config (model, app, object) {
         rx.concat(
             rxu.rx(
                 model.config_get({ app, object }),
-                rx.map(r => ({ status: 201, body: r?.json }))),
+                rx.map(r => ({
+                    status:     r ? 200 : 404,
+                    body:       r?.config,
+                })),
+                rx.map(response => ({ status: 201, response }))),
             rxu.rx(
                 model.updates,
                 rx.filter(u => u.app == app && u.object == object),
-                rx.map(u => ({ status: 200, body: u.config })))),
-        rx.map(u => u.body ? u : { status: 404 }));
+                rx.map(u => ({
+                    status: u.config ? 200 : 404,
+                    body:   u.config,
+                })),
+                rx.map(response => ({ status: 200, response })))));
 }
 register_handler("app/:app/object/:object", single_config);
 

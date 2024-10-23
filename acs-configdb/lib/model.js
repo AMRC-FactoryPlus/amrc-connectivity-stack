@@ -57,7 +57,7 @@ export default class Model extends EventEmitter {
 
         this.special = new Map();
 
-        /* { app, obj, config }
+        /* { app, obj, etag, config }
          * config is undefined for a delete entry */
         this.updates = new rx.Subject();
     }

@@ -370,11 +370,11 @@ export default class Model extends EventEmitter {
         return dbr.rows[0];
     }
 
-    async config_put(q, json, check_etag) {
+    async config_put(q, config, check_etag) {
         /* XXX specials currently don't support etags */
         /* XXX specials should push to updates */
         const special = this.special.get(q.app);
-        if (special) return await special.put(q.object, json);
+        if (special) return await special.put(q.object, config);
 
         const rv = await this.db.txn({}, async query => {
             const appid = await this._app_id(query, q.app);
@@ -382,23 +382,23 @@ export default class Model extends EventEmitter {
             const objid = await this._obj_id(query, q.object);
             if (objid == null) return 404;
 
-            const conf = await _q_row(query, `
+            const old = await _q_row(query, `
                 select id, etag 
                 from config
                 where app = $1 and object = $2
             `, [appid, objid]);
 
             if (check_etag) {
-                const etst = check_etag(conf?.etag);
+                const etst = check_etag(old?.etag);
                 if (etst) return etst;
             }
 
             const schema = await this.find_schema(query, appid);
-            if (schema && !schema(json)) return 422;
+            if (schema && !schema(config)) return 422;
 
-            json = JSON.stringify(json);
+            const json = JSON.stringify(config);
 
-            if (conf) {
+            if (old) {
                 if (q.exclusive) return 409;
 
                 const ok = await query(`
@@ -406,7 +406,7 @@ export default class Model extends EventEmitter {
                     set json = $2, etag = default
                     where id = $1 and json != $2
                     returning 1 ok
-                `, [conf.id, json]);
+                `, [old.id, json]);
 
                 return ok.rowCount == 0 ? 304 : 204;
             }
@@ -421,7 +421,7 @@ export default class Model extends EventEmitter {
 
         if (rv == 204 || rv == 201) {
             this.emit_change(q);
-            this.updates.next({ app: q.app, object: q.object, config: json });
+            this.updates.next({ ...q, config });
         }
         /* PUT doesn't return 304 */
         return rv == 304 ? 204 : rv;

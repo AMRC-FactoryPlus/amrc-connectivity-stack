@@ -70,7 +70,7 @@ significant; each message must contain a single JSON value. Messages
 sent by the client are subscription requests; messages sent by the
 server are updates.
 
-For each open WebSocket the server maintains a list of 'subscriptions'.
+For each open WebSocket the server maintains a list of subscriptions.
 Each subscription maps to a request to the service's plain HTTP API, and
 has the effect of producing a response from the server whenever the
 resource identified by the subscription has changed. The client could
@@ -89,7 +89,7 @@ The first message sent by the client must be a text message containing
 the string `Bearer ` followed by a valid bearer token for the service
 being contacted. The string `Bearer` is case-sensitive and followed by
 exactly one space before the bearer token. The message must end
-immediatley after the token with no following whitespace or newline. The
+immediately after the token with no following whitespace or newline. The
 client must not send any more messages until it has received a
 successful response.
 
@@ -118,10 +118,10 @@ for ensuring uniqueness of these across the life of the connection.
 A subscription request must be a JSON object with the following keys:
 
 * `uuid`: The UUID of the subscription the client is changing.
-* `method`: Either `UPDATE` or `CLOSE`.
+* `method`: Either `WATCH` or `CLOSE`.
 * `request` (optional): A description of an HTTP request as defined below.
 
-The method `UPDATE` creates a new subscription to the given HTTP
+The method `WATCH` creates a new subscription to the given HTTP
 request. The UUID of the subscription must be unique and may not be
 reused. If the subscription is successful the server will send at least
 one update equivalent to the response that a plain HTTP request would
@@ -140,9 +140,8 @@ connection.
 
 Other request methods may be defined in the future.
 
-An `UPDATE` request must describe the HTTP request which is the subject
-of the subscription. The `request` key must be an object with these
-keys:
+A `WATCH` request must describe the HTTP request which is the subject of
+the subscription. The `request` key must be an object with these keys:
 
 * `url`: The URL we are requesting to watch. This is interpreted
   relative to the service base URL and may include a query string.

@@ -87,33 +87,55 @@ class Session {
         return princ;
     }
 
-    send_updates () {
+    build_updates () {
         const { ws } = this;
 
-        const [opens, closes] = rx.partition(
+        const [closes, opens] = rx.partition(
             this.requests(),
-            r => r.type == "CLOSE");
+            r => r.method == "CLOSE");
 
-        const updates = opens.pipe(
+        return opens.pipe(
             rx.tap(r => this.log("New sub: %O", r)),
             rx.flatMap(req => {
+                const { uuid } = req;
+
                 const closed = closes.pipe(
-                    rx.filter(cl => cl.uuid == req.uuid),
-                    rx.tap(cl => this.log("Close for sub %s", cl.uuid)),
-                    rx.map(cl => ({ uuid: cl.uuid, status: 410 })),
+                    rx.filter(cl => cl.uuid == uuid),
+                    rx.tap(cl => this.log("Close for sub %s", uuid)),
+                    rx.map(cl => ({ status: 410 })),
                 );
 
                 return rxu.rx(
                     this.subscription(req),
                     rx.mergeWith(closed),
+                    rx.catchError(e => {
+                        this.log("Sub error: %s: %s", uuid, e);
+                        return rx.of({ status: 503 });
+                    }),
                     rx.takeWhile(res => res.status < 400, true),
+                    rx.map(res => ({ ...res, uuid })),
+                    rx.finalize(() => this.log("Sub closed: %s", uuid)),
                 );
             }));
+    }
 
-        const sub = updates.subscribe(u => {
-            const data = JSON.stringify(u, null, 2);
-            this.log("Notify %s", data);
-            ws.send(data);
+    send_updates () {
+        const { ws } = this;
+
+        const sub = this.build_updates().subscribe({
+            next: u => {
+                const data = JSON.stringify(u, null, 2);
+                this.log("Notify %s", data);
+                ws.send(data);
+            },
+            complete: () => {
+                this.log("Notify closed");
+                ws.close();
+            },
+            error: e => {
+                this.log("Notify error: %s", e);
+                ws.close();
+            },
         });
         ws.on("close", () => sub.unsubscribe());
     }
@@ -123,7 +145,7 @@ class Session {
 
         const fail = status => rx.of({ uuid, status });
 
-        if (sub.type != "WATCH" || !req)
+        if (sub.method != "WATCH" || !req)
             return fail(400);
         if (req.method && !/^GET$/i.test(req.method))
             return fail(404);
@@ -141,6 +163,7 @@ class Session {
         return rxu.rx(
             rx.fromEvent(ws, "message"),
             rx.map(m => JSON.parse(m.data)),
+            rx.tap(r => this.log("Client req: %o", r)),
             rx.map(r => {
                 if (!r.uuid)
                     throw new Error("No UUID for subscription request");

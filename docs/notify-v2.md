@@ -185,6 +185,7 @@ Status | Meaning
 403 | Client not permitted to make this subscription
 404 | This request cannot be subscribed to
 410 | Subscription closed in response to a client request
+500 | Subscription closed due to a service error
 503 | The service is closing this subscription unilaterally
 
 Other status codes should not be used but clients must interpret them

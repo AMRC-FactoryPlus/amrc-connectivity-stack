@@ -116,7 +116,7 @@ class Session {
                     rx.mergeWith(closed),
                     rx.catchError(e => {
                         this.log("Sub error: %s: %s", uuid, e);
-                        return rx.of({ status: 503 });
+                        return rx.of({ status: 500 });
                     }),
                     rx.takeWhile(res => res.status < 400, true),
                     rx.map(res => ({ ...res, uuid })),

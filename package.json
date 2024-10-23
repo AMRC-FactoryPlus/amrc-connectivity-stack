@@ -12,6 +12,7 @@
   "license": "ISC",
   "dependencies": {
     "content-type": "^1.0.5",
+    "isomorphic-ws": "^5.0.0",
     "mqtt": "^5.3.6",
     "optional-js": "^2.3.0",
     "semver": "^7.6.0",

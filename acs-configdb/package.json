@@ -23,6 +23,7 @@
     "@amrc-factoryplus/utilities": "2.0.0",
     "ajv": "^8.10.0",
     "ajv-formats": "^2.1.1",
+    "deep-equal": "^2.2.3",
     "express-openapi-validator": "^4.13.2",
     "json-merge-patch": "^1.0.2",
     "path-to-regexp": "^6.3.0",

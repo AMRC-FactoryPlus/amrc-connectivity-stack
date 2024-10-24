@@ -4,6 +4,7 @@
  * Copyright 2024 University of Sheffield
  */
 
+import deep_equal from "deep-equal";
 import { pathToRegexp } from "path-to-regexp";
 import rx from "rxjs";
 import { WebSocketServer } from "ws";
@@ -131,6 +132,7 @@ class Session {
 
                 return rxu.rx(
                     this.subscription(req),
+                    rx.distinctUntilChanged(deep_equal),
                     rx.mergeWith(closed),
                     rx.catchError(e => {
                         this.log("Sub error: %s: %s", uuid, e);

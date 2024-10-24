@@ -195,6 +195,7 @@ class Session {
                     throw new Error("No UUID for subscription request");
                 return r;
             }),
+            rx.share(),
         );
     }
 }

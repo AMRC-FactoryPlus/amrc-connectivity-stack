@@ -19,7 +19,7 @@ import { Auth } from "../lib/auth.js";
 import Model from "../lib/model.js";
 import APIv1 from "../lib/api-v1.js";
 import MQTTCli from "../lib/mqttcli.js";
-import { Notify } from "../lib/notify-v2.js";
+import { CDBNotify } from "../lib/notify-v2.js";
 
 const Device_UUID = process.env.DEVICE_UUID;
 
@@ -65,7 +65,7 @@ const api = await new WebAPI({
     },
 }).init();
 
-const notify = new Notify({
+const notify = new CDBNotify({
     auth, api, model,
     log:    fplus.debug.bound("notify"),
 });

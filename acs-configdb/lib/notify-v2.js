@@ -15,46 +15,28 @@ import * as rxu from "./rx-util.js";
 
 const Token_rx = /^Bearer ([A-Za-z0-9+/]+)$/;
 
-const Handlers = [];
 
-function register_handler (path, handler) {
-    Handlers.push([pathToRegexp(path), handler]);
+export class PathHandler {
+    constructor (opts) {
+        this.regex = pathToRegexp(opts.path);
+        this.handler = opts.handler;
+    }
+
+    handle (session, sub) {
+        if (sub.method != "WATCH") return;
+        
+        const match = this.regex.exec(sub.request.url);
+        if (!match) return;
+
+        return this.handler(session, ...match.slice(1));
+    }
 }
 
-function single_config (session, app, object) {
-    const to_response = async upd => {
-        session.log("Map update: %o", upd);
-        const ok = await session.check_acl(Perm.Read_App, app, true);
-        if (!ok)
-            return { status: 403 };
-        if (!upd?.config)
-            return { status: 404 };
-        const res = { status: 200, body: upd.config };
-        if (upd.etag)
-            res.headers = { etag: upd.etag };
-        return res;
-    };
-
-    /* XXX Strictly there is a race condition here: the initial fetch
-     * does not slot cleanly into the sequence of updates. This would be
-     * difficult to fix. */
-    return rx.concat(
-        rxu.rx(
-            session.model.config_get({ app, object }),
-            rx.flatMap(to_response),
-            rx.map(response => ({ status: 201, response }))),
-        rxu.rx(
-            session.model.updates,
-            rx.filter(u => u.app == app && u.object == object),
-            rx.flatMap(to_response),
-            rx.map(response => ({ status: 200, response }))),
-    );
-}
-register_handler("app/:app/object/:object", single_config);
 
 class Session {
     constructor (opts) {
         this.ws = opts.ws;
+        this.notify = opts.notify;
 
         this.authn = opts.notify.api.auth;
         this.authz = opts.notify.auth;
@@ -176,12 +158,10 @@ class Session {
         if (req.method && !/^GET$/i.test(req.method))
             return fail(404);
 
-        for (const [rxp, handler] of Handlers) {
-            const match = rxp.exec(req.url);
-            if (!match) continue;
-            return handler(this, ...match.slice(1));
-        }
-        return fail(404);
+        const seq = this.notify.find_handler(this, sub);
+        if (!seq) return fail(404);
+
+        return seq;
     }
 
     requests () {
@@ -206,6 +186,18 @@ export class Notify {
         this.model = opts.model;
         this.api = opts.api;
         this.auth = opts.auth;
+
+        this.handlers = this.build_handlers();
+    }
+
+    build_handlers () { throw new TypeError("Notify is abstract"); }
+
+    find_handler (session, sub) {
+        for (const h of this.handlers) {
+            const seq = h.handle(session, sub);
+            if (seq) return seq;
+        }
+        return;
     }
 
     run () {
@@ -218,5 +210,52 @@ export class Notify {
 
     new_client (ws) {
         new Session({ notify: this, ws }).start();
+    }
+}
+
+export class CDBNotify extends Notify {
+    constructor (opts) {
+        super(opts);
+        this.model = opts.model;
+        this.auth = opts.auth;
+    }
+
+    build_handlers () {
+        return [
+            new PathHandler({
+                path:       "app/:app/object/:obj",
+                handler:    (...a) => this.single_config(...a),
+            }),
+        ];
+    }
+    
+    async create_response (session, app, update) {
+        session.log("Map update: %o", update);
+        const ok = await session.check_acl(Perm.Read_App, app, true);
+        if (!ok)
+            return { status: 403 };
+        if (!update?.config)
+            return { status: 404 };
+        const res = { status: 200, body: update.config };
+        if (update.etag)
+            res.headers = { etag: update.etag };
+        return res;
+    }
+
+    single_config (session, app, object) {
+        /* XXX Strictly there is a race condition here: the initial fetch
+         * does not slot cleanly into the sequence of updates. This would be
+         * difficult to fix. */
+        return rx.concat(
+            rxu.rx(
+                session.model.config_get({ app, object }),
+                rx.flatMap(u => this.create_response(session, app, u)),
+                rx.map(response => ({ status: 201, response }))),
+            rxu.rx(
+                session.model.updates,
+                rx.filter(u => u.app == app && u.object == object),
+                rx.flatMap(u => this.create_response(session, app, u)),
+                rx.map(response => ({ status: 200, response }))),
+        );
     }
 }

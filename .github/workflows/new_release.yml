@@ -22,6 +22,11 @@ jobs:
         with:
           node-version: '20.x'
 
+      - name: Install Kerberos libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libkrb5-dev
+
       - name: Update version in package.json
         run: |
           CURRENT_TAG=${GITHUB_REF#refs/tags/}

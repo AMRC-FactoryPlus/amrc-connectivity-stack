@@ -19,7 +19,7 @@ import { Auth } from "../lib/auth.js";
 import Model from "../lib/model.js";
 import APIv1 from "../lib/api-v1.js";
 import MQTTCli from "../lib/mqttcli.js";
-import { CDBNotify } from "../lib/notify-v2.js";
+import { CDBNotify } from "../lib/notify.js";
 
 const Device_UUID = process.env.DEVICE_UUID;
 

@@ -2,6 +2,8 @@
 
 base=	ghcr.io/amrc-factoryplus/acs-base-js-build:v3.0.0
 
+-include config.mk
+
 all:
 
 .PHONY: all dev
@@ -21,3 +23,6 @@ amend:
 
 dev:
 	docker run --rm -ti -v $$(pwd):/local -w /local ${base} /bin/sh
+
+pubdev:
+	sh ./tools/pub-dev.sh "${js.dev_tag}"

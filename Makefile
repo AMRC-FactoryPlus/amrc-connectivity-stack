@@ -24,5 +24,5 @@ amend:
 dev:
 	docker run --rm -ti -v $$(pwd):/local -w /local ${base} /bin/sh
 
-pubdev:
+pubdev: check-committed lint
 	sh ./tools/pub-dev.sh "${js.dev_tag}"

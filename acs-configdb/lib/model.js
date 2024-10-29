@@ -9,10 +9,11 @@ import EventEmitter from "node:events";
 import Ajv from "ajv/dist/2020.js";
 import ajv_formats from "ajv-formats";
 import merge_patch from "json-merge-patch";
+import rx from "rxjs";
 
 import { DB } from "@amrc-factoryplus/utilities";
 
-import {App, Class, Null_UUID, Service} from "../constants.js";
+import {App, Class, Service} from "./constants.js";
 import { Specials } from "./special.js";
 
 const DB_Version = 7;
@@ -55,6 +56,10 @@ export default class Model extends EventEmitter {
         this.schemas = new Map();
 
         this.special = new Map();
+
+        /* { app, obj, etag, config }
+         * config is undefined for a delete entry */
+        this.updates = new rx.Subject();
     }
 
     async init() {
@@ -123,7 +128,7 @@ export default class Model extends EventEmitter {
     }
 
     async object_set_class(obj, klass) {
-        return await this.db.txn({}, async query => {
+        const st = await this.db.txn({}, async query => {
             const class_id = await this._class_id(query, klass);
             if (class_id == null) return 404;
 
@@ -144,6 +149,12 @@ export default class Model extends EventEmitter {
 
             return dbr.rows[0]?.ok ? 204 : 404;
         });
+        if (st == 204)
+            this.updates.next({
+                app:    App.Registration,
+                object: obj,
+                config: { "class": klass },
+            });
     }
 
     async object_list() {
@@ -169,7 +180,7 @@ export default class Model extends EventEmitter {
     }
 
     async object_create(uuid, klass) {
-        return await this.db.txn({}, async query => {
+        const st = await this.db.txn({}, async query => {
             const class_id = await this._class_id(query, klass);
             if (class_id == null) return 404;
 
@@ -186,14 +197,21 @@ export default class Model extends EventEmitter {
             await this._maybe_special_class(query, uuid, klass);
             return 201;
         });
+        if (st == 201 || st == 200)
+            this.updates.next({
+                app:    App.Registration,
+                object: uuid,
+                config: { "class": klass },
+            });
+        return st;
     }
 
     async object_create_new(klass) {
-        return await this.db.txn({}, async query => {
+        const [st, uuid] = await this.db.txn({}, async query => {
             const class_id = await this._class_id(query, klass);
             if (class_id == null) return [404, null];
 
-            while (1) {
+            for (;;) {
                 let dbr = await query(`
                     insert into object (uuid, class)
                     values (gen_random_uuid(), $1) on conflict (uuid) do nothing
@@ -207,19 +225,22 @@ export default class Model extends EventEmitter {
                 }
             }
         });
+        if (st == 201)
+            this.updates.next({
+                app:    App.Registration,
+                object: uuid,
+                config: { "class": klass },
+            });
+        return [st, uuid];
     }
 
     /* Delete an object. Deletes configs associated with this object,
      * but won't delete objects belonging to a class or configs
-     * belonging to an app. Returns:
-     *  true            Success
-     *  undefined       Object not found
-     *  false           Object cannot ever be deleted
-     *  array           UUIDs of objects preventing deletion
+     * belonging to an app. Returns [st, body?].
      */
-    object_delete(object) {
-        return this.db.txn({}, async query => {
-            if (Immutable.has(object)) return false;
+    async object_delete(object) {
+        const [st, body] = await this.db.txn({}, async query => {
+            if (Immutable.has(object)) return [405];
 
             const row = await _q_row(query, `
                 select o.id, c.uuid klass
@@ -227,7 +248,7 @@ export default class Model extends EventEmitter {
                     join object c on c.id = o.class
                 where o.uuid = $1
             `, [object]);
-            if (row == undefined) return undefined;
+            if (row == undefined) return [404];
 
             const {id, klass} = row;
 
@@ -237,7 +258,7 @@ export default class Model extends EventEmitter {
                     select uuid from object where class = $1
                 `, [id]);
                 if (objs.length > 0)
-                    return objs.map(r => r.uuid);
+                    return [409, objs.map(r => r.uuid)];
                 await query(`delete from class where id = $1`, [id]);
             }
 
@@ -250,16 +271,28 @@ export default class Model extends EventEmitter {
                     where c.app = $1
                 `, [id]);
                 if (objs.length > 0)
-                    return objs.map(r => r.uuid);
+                    return [409, objs.map(r => r.uuid)];
                 await query(`delete from app where id = $1`, [id]);
             }
 
             /* Delete configs belonging to this object. */
-            await query(`delete from config where object = $1`, [id]);
+            const confs = await _q_set(query, `
+                delete from config c using object a
+                where a.id = c.app and c.object = $1
+                returning a.uuid
+            `, [id]);
             /* Delete the object. */
             await query(`delete from object where id = $1`, [id]);
-            return true;
+            return [204, confs.map(r => r.uuid)];
         });
+
+        if (st != 204)
+            return [st, body];
+
+        for (const app of body)
+            this.updates.next({ app, object });
+        this.updates.next({ app: App.Registration, object });
+        return [st];
     }
 
     async class_list() {
@@ -326,7 +359,7 @@ export default class Model extends EventEmitter {
             return await special.get(q.object);
 
         let dbr = await this.db.query(`
-            select c.json, c.etag
+            select c.json config, c.etag
             from config c
                 join object a on a.id = c.app
                 join object o on o.id = c.object
@@ -337,10 +370,11 @@ export default class Model extends EventEmitter {
         return dbr.rows[0];
     }
 
-    async config_put(q, json, check_etag) {
+    async config_put(q, config, check_etag) {
         /* XXX specials currently don't support etags */
+        /* XXX specials should push to updates */
         const special = this.special.get(q.app);
-        if (special) return await special.put(q.object, json);
+        if (special) return await special.put(q.object, config);
 
         const rv = await this.db.txn({}, async query => {
             const appid = await this._app_id(query, q.app);
@@ -348,23 +382,23 @@ export default class Model extends EventEmitter {
             const objid = await this._obj_id(query, q.object);
             if (objid == null) return 404;
 
-            const conf = await _q_row(query, `
+            const old = await _q_row(query, `
                 select id, etag 
                 from config
                 where app = $1 and object = $2
             `, [appid, objid]);
 
             if (check_etag) {
-                const etst = check_etag(conf?.etag);
+                const etst = check_etag(old?.etag);
                 if (etst) return etst;
             }
 
             const schema = await this.find_schema(query, appid);
-            if (schema && !schema(json)) return 422;
+            if (schema && !schema(config)) return 422;
 
-            json = JSON.stringify(json);
+            const json = JSON.stringify(config);
 
-            if (conf) {
+            if (old) {
                 if (q.exclusive) return 409;
 
                 const ok = await query(`
@@ -372,7 +406,7 @@ export default class Model extends EventEmitter {
                     set json = $2, etag = default
                     where id = $1 and json != $2
                     returning 1 ok
-                `, [conf.id, json]);
+                `, [old.id, json]);
 
                 return ok.rowCount == 0 ? 304 : 204;
             }
@@ -385,13 +419,16 @@ export default class Model extends EventEmitter {
             return 201;
         });
 
-        if (rv == 204 || rv == 201)
+        if (rv == 204 || rv == 201) {
             this.emit_change(q);
+            this.updates.next({ ...q, config });
+        }
         /* PUT doesn't return 304 */
         return rv == 304 ? 204 : rv;
     }
 
     async config_delete(q, check_etag) {
+        /* XXX specials should push to updates */
         const special = this.special.get(q.app);
         if (special) return await special.delete(q.object);
 
@@ -418,7 +455,10 @@ export default class Model extends EventEmitter {
             return 204;
         });
 
-        if (rv == 204) this.emit_change(q);
+        if (rv == 204) {
+            this.emit_change(q);
+            this.updates.next(q);
+        }
         return rv;
     }
 
@@ -436,8 +476,6 @@ export default class Model extends EventEmitter {
         /* This needs to be null, not undefined, for a nonexistent
          * object, or the 409 test below will fail. */
         const json = conf?.json ?? null;
-        console.log("PATCH: source: %o", json);
-        console.log("PATCH: patch: %o", patch);
 
         /* Safety check: applying a merge-patch to a non-object destroys
          * the whole thing. */
@@ -445,7 +483,6 @@ export default class Model extends EventEmitter {
             return 409;
 
         const nconf = merge_patch.apply(json, patch);
-        console.log("PATCH: result: %o", nconf);
         return await this.config_put(q, nconf);
     }
 
@@ -578,23 +615,23 @@ export default class Model extends EventEmitter {
 
     async dump_validate(dump) {
         if (typeof (dump) != "object") {
-            this.log("dump", "Dump not an object");
+            this.log("Dump not an object");
             return false;
         }
         if (dump.service != Service.Registry) {
-            this.log("dump", "Dump not for ConfigDB");
+            this.log("Dump not for ConfigDB");
             return false;
         }
         if (dump.version != 1) {
-            this.log("dump", "Dump should be version 1");
+            this.log("Dump should be version 1");
             return false;
         }
         if (Class.Class in (dump.objects ?? {})) {
-            this.log("dump", "Dump cannot create classes via objects key.");
+            this.log("Dump cannot create classes via objects key.");
             return false;
         }
         if (App.Registration in (dump.configs ?? {})) {
-            this.log("dump", "Dump cannot create objects via configs key.");
+            this.log("Dump cannot create objects via configs key.");
             return false;
         }
         return true;
@@ -614,7 +651,7 @@ export default class Model extends EventEmitter {
         for (const klass of dump.classes ?? []) {
             const st = await this.object_create(klass, Class.Class);
             if (st > 299) {
-                this.log("dump", "Dump failed [%s] on class %s", st, klass);
+                this.log("Dump failed [%s] on class %s", st, klass);
                 return st;
             }
         }
@@ -625,7 +662,7 @@ export default class Model extends EventEmitter {
                     st = await this.object_set_class(obj, klass);
                 }
                 if (st > 299) {
-                    this.log("dump", "Dump failed [%s] on object %s (%s)",
+                    this.log("Dump failed [%s] on object %s (%s)",
                         st, obj, klass);
                     return st;
                 }
@@ -637,7 +674,7 @@ export default class Model extends EventEmitter {
                     {app, object, exclusive: !overwrite},
                     conf);
                 if (st > 299 && st != 409) {
-                    this.log("dump", "Dump failed [%s] on config %s/%s", 
+                    this.log("Dump failed [%s] on config %s/%s", 
                         st, app, object);
                     return st;
                 }

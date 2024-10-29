@@ -4,8 +4,6 @@
  * Copyright 2022 AMRC
  */
 
-import fs from "node:fs";
-
 import { GIT_VERSION } from "./git-version.js";
 
 /* This is the version of the ConfigDB service spec we comply to */
@@ -41,3 +39,13 @@ export const Device_Info = {
     Model: "AMRC Connectivity Stack (ACS) ConfigDB",
     Serial: GIT_VERSION,
 };
+
+export const Perm = {
+    All: "c43c7157-a50b-4d2a-ac1a-86ff8e8e88c1",
+    Read_App: "4a339562-cd57-408d-9d1a-6529a383ea4b",
+    Write_App: "6c799ccb-d2ad-4715-a2a7-3c8728d6c0bf",
+    Manage_Obj: "f0b7917b-d475-4888-9d5a-2af96b3c26b6",
+    Delete_Obj: "6957174b-7b08-45ca-ac5c-c03ab6928a6e",
+    Manage_App: "95c7cbcb-ce60-49ed-aa81-2fe3eec4559d",
+};
+

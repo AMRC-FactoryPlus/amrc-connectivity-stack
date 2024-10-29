@@ -3,7 +3,8 @@
 ifndef .acs.js.mk
 .acs.js.mk=1
 
-base_version?=${git.tag}
+base_image?=	ghcr.io/amrc-factoryplus/acs-base-js-build
+base_version?=	${git.tag}
 
 build_args+=	--build-arg base_version="${base_version}"
 
@@ -32,6 +33,16 @@ js.update: git.check-committed
 	npm update
 	git add .
 	git commit -m "npm update $$(git rev-parse --show-prefix)"
+
+.PHONY: dev js.dev
+
+dev: js.dev
+	@:
+
+js.dev:
+	docker run --rm -ti -w /local \
+		-v $$(pwd):/local -v $${HOME}/.npmrc:/home/node/.npmrc \
+		${base_image}:${base_version} /bin/sh
 
 include ${mk}/acs.docker.mk
 

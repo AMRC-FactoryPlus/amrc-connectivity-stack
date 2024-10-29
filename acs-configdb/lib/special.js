@@ -4,7 +4,7 @@
  * Copyright 2021 AMRC
  */
 
-import { App } from "../constants.js";
+import { App } from "./constants.js";
 
 class SpecialApp {
     constructor (model) {
@@ -33,7 +33,7 @@ class ObjectRegistration extends SpecialApp {
         const klass = await this.model.object_class(obj);
         if (klass == null) return null;
         return {
-            json: {"class": klass},
+            config: {"class": klass},
         };
     }
 
@@ -54,7 +54,7 @@ class ConfigSchema extends SpecialApp {
     async get (obj) {
         const rv = await this.model.app_schema(obj);
         if (rv == null) return;
-        return { json: rv.schema };
+        return { config: rv.schema };
     }
 
     async put (obj, json) {

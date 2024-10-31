@@ -97,9 +97,10 @@ class CDBWatch {
             rx.mergeAll(),
             rx.mergeMap(object => model.config_get({ app, object })
                 .then(entry_response)
-                .then(mk_res(true))
-                .then(upd => ({ ...upd, child: object }))),
-            rx.endWith({ status: 201, response: { status: 204 } }));
+                .then(res => [object, res])),
+            rx.toArray(),
+            rx.map(Object.fromEntries),
+            rx.map(children => ({ status: 201, children })));
 
         const updates = rxx.rx(
             model.updates,

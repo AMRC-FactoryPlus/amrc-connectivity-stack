@@ -7,7 +7,9 @@
 import * as rx from "rxjs";
 
 import * as rxx                 from "@amrc-factoryplus/rx-util";
-import { Notify, PathHandler }  from "@amrc-factoryplus/service-api";
+import { 
+    Notify, WatchFilter, SearchFilter
+}  from "@amrc-factoryplus/service-api";
 
 import { Perm } from "./constants.js";
 
@@ -85,6 +87,31 @@ class CDBWatch {
                 .then(mk_res(!!upd))),
             rx.flatMap(u => this.check_acl(u)));
     }
+
+    config_search () {
+        const { model, app } = this;
+
+        /* XXX It would be better to fetch these atomically */
+        const initial = rxx.rx(
+            rx.defer(() => model.config_list(app)),
+            rx.mergeAll(),
+            rx.mergeMap(object => model.config_get({ app, object })
+                .then(entry_response)
+                .then(mk_res(true))
+                .then(upd => ({ ...upd, child: object }))),
+            rx.endWith({ status: 201, response: { status: 204 } }));
+
+        const updates = rxx.rx(
+            model.updates,
+            rx.filter(u => u.app == app),
+            rx.map(entry => ({
+                status:     200,
+                child:      entry.object,
+                response:   entry_response(entry),
+            })));
+
+        return rx.concat(initial, updates);
+    }
 }
 
 export class CDBNotify extends Notify {
@@ -95,13 +122,17 @@ export class CDBNotify extends Notify {
 
     build_handlers () {
         return [
-            new PathHandler({
+            new WatchFilter({
                 path:       "app/:app/object/:obj",
                 handler:    (s, a, o) => new CDBWatch(s, a).single_config(o),
             }),
-            new PathHandler({
+            new WatchFilter({
                 path:       "app/:app/object/",
                 handler:    (s, a) => new CDBWatch(s, a).config_list(),
+            }),
+            new SearchFilter({
+                path:       "app/:app/object/",
+                handler:    (s, a) => new CDBWatch(s, a).config_search(),
             }),
         ];
     }

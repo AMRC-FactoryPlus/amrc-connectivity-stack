@@ -100,7 +100,11 @@ class CDBWatch {
                 .then(res => [object, res])),
             rx.toArray(),
             rx.map(Object.fromEntries),
-            rx.map(children => ({ status: 201, children })));
+            rx.map(children => ({
+                status:     201, 
+                response:   { status: 204 },
+                children,
+            })));
 
         const updates = rxx.rx(
             model.updates,

@@ -288,42 +288,49 @@ A SEARCH request must contain these additional keys:
 #### Monitoring all children
 
 Without a filter, a SEARCH will monitor all resources immediately under
-the `parent` URL. Successful updates referring to children of the parent
-resource must have an additional property `child`, indicating the path of
-the resource returned resource relative to the parent URL. (The parent
-URL must end with a slash to make the relative URL resolution rules work
-correctly.)
+the `parent` URL. Each such resource can be identified by a 'child
+path', which is a string containing no slashes. When interpreted
+relative to the parent URL this gives the URL of the child resource.
+(The parent URL must end in a slash to make the relative URL resolution
+rules work correctly.)
 
-Updates referring to the parent resource itself must not have the `child`
-property, and must not convey the contents of the parent as this will
-usually just be a list of the children. Instead the 204 HTTP status code
-must be used to indicate successful access to the parent. When a
-subscription is successful, a 201/200 update must be sent for all
-existing (and selected) children, followed by a 201/204 update for the
-parent resource. This informs the client it has a complete view of the
-state of the child resources.
+There are three forms of update returned by SEARCH:
 
-Subsequent changes to child resources must be sent as follows:
-* An updated child resource will cause a 200/200 update.
-* A new child resource will cause a 200/201 update.
-* A removed child resource will cause a 200/404 update.
-* An ACL change to deny this client permission to a child resource will
-  cause either a 200/403 or a 200/404 update.
-* A change which causes a child resource to leave the filtered set will
-  cause a 200/412 update.
+* Full updates, with a `children` key.
+* Child updates, with a `child` key.
+* No-access updates, with neither.
 
-Changes to the list of children must not be reported as updates to the
-parent resource, even though the content returned from a GET request to
-that resource has changed. However if the parent (or access to the
-parent) is removed a 200/404 (or 200/403) update for the parent must
-be sent; this implies also removal of (access to) all children.
-Subsequent recreation must send a (possibly empty) set of 200/200
-updates for children followed by a 200/204 update for the parent.
+The resource body of the parent resource is not included in any update
+response. Normally where SEARCH is appropriate the parent resource
+contains a list of child paths, which is redundant information. To
+indicate the omitted body successful HTTP responses relating to the
+parent resource must use the 204 status code rather than 200 or 201.
+
+A full update contains the complete current state of all children. The
+initial 201 update must be a full update. The `children` key must be an
+object mapping each existing child path to an HTTP response for that
+child. The `response` key must contain a response for the parent
+resource, which should normally just be `{ status: 204 }`. For
+consistency, where the client can discover the existence of a child
+which will return a 403 response, this child should be included in
+`children` (with a 403 HTTP status).
+
+A child update notifies the client of a change to a single child. The
+`child` key contains the child path of that child, and the `response`
+key the HTTP response. A 200/404 child update indicates the child
+concerned has been removed. A child update must not follow a no-access
+update without an intervening full update.
+
+A no-access update informs the client that access is not available to
+the entire set of children. The `response` key must contain a response
+for the parent URL, which will normally have HTTP status 403 or 404. On
+receipt of a no-access update the client must discard all responses
+previously received for child resources.
 
 #### Example
 
 For example, we have our `v1/example/` endpoints above. A subscription
-request like this:
+request like this (displayed in YAML for ease of reading):
 
 ```yaml
 uuid: eb546f59-26c1-4c80-b40b-992401396bfb
@@ -331,31 +338,22 @@ method: SEARCH
 parent: v1/example/
 ```
 
-might return these initial updates (these are displayed as a list of
-YAML documents but would be returned as series of WS messages containing
-the equivalent JSON):
+might return this initial update:
 
 ```yaml
 uuid: eb546f59-26c1-4c80-b40b-992401396bfb
 status: 201
-child: abc-123
-response:
-    status: 200
-    body:
-        name: abc-123
----
-uuid: eb546f59-26c1-4c80-b40b-992401396bfb
-status: 201
-child: xyz-789
-response:
-    status: 200
-    body:
-        name: xyz-789
----
-uuid: eb546f59-26c1-4c80-b40b-992401396bfb
-status: 201
 response:
     status: 204
+children:
+    abc-123:
+        status: 200
+        body:
+            name: abc-123
+    xyz-789:
+        status: 200
+        body:
+            name: xyz-789
 ```
 
 This indicates that at the time of initial subscription the parent
@@ -396,18 +394,14 @@ child resources. In this case the client can specify a `filter`, which
 is used to select the child resources to monitor, as follows ('selected'
 resources match the filter, 'filtered out' resources do not):
 
-* Existing resources which are filtered out will not be returned as part
-  of the initial 201/200 updates.
-* Updates to filtered-out resources which leave them filtered out will
-  be ignored.
-* Updates which bring an existing resource into the selected set will be
+* Children which are filtered out will not be returned as part of any
+  full update or receive any child updates.
+* Updates which bring an existing child into the selected set will be
   reported with a 200/200 update.
-* Updates which move an existing resource (which has already been
-  reported) out of the selected set will be reported with a 200/412
-  update.
-* Newly-created selected resources will be reported with a 200/201
-  update. Removed selected resources will be reported with 200/404.
-* Creation or deletion of filtered-out resources will be ignored.
+* Updates which move an existing child (which has already been reported)
+  out of the selected set will be reported with a 200/412 update.
+* Newly-created selected children will be reported with a 200/201
+  update. Removed selected children will be reported with 200/404.
 
 The filter is a JSON value, and is applied, as a JSON Merge Patch, to
 the body of a resource. If this results in no change the resource is
@@ -416,7 +410,8 @@ selected; otherwise it is filtered out. This means
 * In practice both filter and body must be JSON objects to achieve a
   useful result.
 * A property can be explicitly selected for non-presence by specifying
-  it as `null`.
+  it as `null`. Omitting a property from the filter allows any value, or
+  none.
 * Selecting `null` as a value is therefore not possible.
 * Arrays are treated as units; filtering on individual items in an array
   is not possible.

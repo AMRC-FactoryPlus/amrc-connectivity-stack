@@ -12,6 +12,7 @@ import {
 }  from "@amrc-factoryplus/service-api";
 
 import { Perm } from "./constants.js";
+import * as rxu from "./rx-util.js";
 
 const mk_res = init => response => ({ status: init ? 201 : 200, response });
 
@@ -92,7 +93,7 @@ class CDBWatch {
         const { model, app } = this;
 
         /* XXX It would be better to fetch these atomically */
-        const initial = rxx.rx(
+        const full = status => rxx.rx(
             rx.defer(() => model.config_list(app)),
             rx.mergeAll(),
             rx.mergeMap(object => model.config_get({ app, object })
@@ -101,21 +102,29 @@ class CDBWatch {
             rx.toArray(),
             rx.map(Object.fromEntries),
             rx.map(children => ({
-                status:     201, 
+                status,
                 response:   { status: 204 },
                 children,
             })));
 
-        const updates = rxx.rx(
+        return rxx.rx(
             model.updates,
             rx.filter(u => u.app == app),
             rx.map(entry => ({
                 status:     200,
                 child:      entry.object,
                 response:   entry_response(entry),
-            })));
-
-        return rx.concat(initial, updates);
+            })),
+            /* This will always be replaced with a full update */
+            rx.startWith({ status: 201, child: true }),
+            /* This will send a parent 403 if the ACL check fails */
+            rx.concatMap(u => this.check_acl(u)),
+            rxu.withState(true, (need_full, u) => {
+                /* No-access will always be a parent update */
+                const ok = u.child;
+                return [!ok, need_full && ok ? full(u.status) : rx.of(u)];
+            }),
+            rx.concatAll());
     }
 }
 

@@ -57,7 +57,6 @@ class CDBWatch {
         this.session = session;
         this.model = session.model;
         this.app = app;
-        this.log = session.log.bind(session);
     }
 
     /* XXX This is not right. Until we have a push Auth API we will need
@@ -135,7 +134,6 @@ class CDBWatch {
         return rxx.rx(
             seq,
             rxu.withState(imm.Set(), (okids, u) => {
-                this.log("FILTER: %o %o", okids.toJS(), u);
                 if (!u.child) {
                     /* Don't touch no-access updates */
                     if (!u.children)
@@ -154,8 +152,7 @@ class CDBWatch {
                     : rx.EMPTY;
                 return [nkids, nu];
             }),
-            rx.mergeAll(),
-            rx.tap(v => this.log("FILTER RETURN: %o", v)));
+            rx.mergeAll());
     }
 
     config_search (filter) {

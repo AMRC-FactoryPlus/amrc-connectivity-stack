@@ -29,3 +29,21 @@ export function withState (initial, accum) {
         });
     });
 }
+
+/* This is like `withState` but the accumulator function is async. */
+export function asyncState (initial, accum) {
+    return upstream => new rx.Observable(subscriber => {
+        let state = initial;
+        return upstream.subscribe({
+            next (value) {
+                accum(state, value)
+                    .then(([st, val]) => {
+                        state = st;
+                        subscriber.next(val);
+                    });
+            },
+            error (err) { subscriber.error(err); },
+            complete () { subscriber.complete(); },
+        });
+    });
+}

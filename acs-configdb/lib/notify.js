@@ -110,23 +110,23 @@ class CDBWatch {
             rx.flatMap(u => this.check_acl(u)));
     }
 
-    search_full (status) {
+    async search_full (status) {
         const { model, app } = this;
 
-        /* XXX It would be better to fetch these atomically */
-        return rxx.rx(
-            rx.defer(() => model.config_list(app)),
-            rx.mergeAll(),
-            rx.mergeMap(object => model.config_get({ app, object })
+        const list = await model.config_list(app);
+        if (!list)
+            return { status, response: { status: 404 } };
+
+        const entries = await Promise.all(
+            list.map(object => model.config_get({ app, object })
                 .then(entry_response)
-                .then(res => [object, res])),
-            rx.toArray(),
-            rx.map(Object.fromEntries),
-            rx.map(children => ({
-                status,
-                response:   { status: 204 },
-                children,
-            })));
+                .then(res => [object, res])));
+
+        return {
+            status,
+            response:   { status: 204 },
+            children:   Object.fromEntries(entries),
+        };
     }
 
     search_filter (seq, filter) {
@@ -170,15 +170,12 @@ class CDBWatch {
             rx.startWith({ status: 201, child: true }),
             /* This will send a parent 403 if the ACL check fails */
             rx.concatMap(u => this.check_acl(u)),
-            rxu.withState(true, (need_full, u) => {
-                /* No-access will always be a parent update */
-                const ok = u.child;
-                const rv = need_full && ok
-                    ? this.search_full(u.status)
-                    : rx.of(u);
-                return [!ok, rv];
-            }),
-            rx.concatAll());
+            rxu.asyncState(false, async (child_ok, u) => {
+                const rv = u.child && !child_ok
+                    ? await this.search_full(u.status)
+                    : u;
+                return [rv.child || rv.children, rv];
+            }));
 
         return filter ? this.search_filter(search, filter) : search;
     }

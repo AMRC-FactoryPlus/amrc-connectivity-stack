@@ -4,6 +4,8 @@
  * Copyright 2024 University of Sheffield
  */
 
+import deep_equal from "deep-equal";
+import * as imm from "immutable";
 import * as rx from "rxjs";
 
 import * as rxx                 from "@amrc-factoryplus/rx-util";
@@ -31,11 +33,31 @@ function list_response (list) {
     return { status: 200, body: list };
 }
 
+function jmp_match (cand, filter) {
+    if (filter === null || typeof(filter) != "object")
+        return cand === filter;
+    if (Array.isArray(filter))
+        return deep_equal(cand, filter);
+
+    for (const [k, v] of Object.entries(filter)) {
+        if (v === null) {
+            if (k in cand)
+                return false;
+        }
+        else {
+            if (!(k in cand) || !jmp_match(cand[k], v))
+                return false;
+        }
+    }
+    return true;
+}
+
 class CDBWatch {
     constructor (session, app) {
         this.session = session;
         this.model = session.model;
         this.app = app;
+        this.log = session.log.bind(session);
     }
 
     /* XXX This is not right. Until we have a push Auth API we will need
@@ -89,11 +111,11 @@ class CDBWatch {
             rx.flatMap(u => this.check_acl(u)));
     }
 
-    config_search () {
+    search_full (status) {
         const { model, app } = this;
 
         /* XXX It would be better to fetch these atomically */
-        const full = status => rxx.rx(
+        return rxx.rx(
             rx.defer(() => model.config_list(app)),
             rx.mergeAll(),
             rx.mergeMap(object => model.config_get({ app, object })
@@ -106,8 +128,40 @@ class CDBWatch {
                 response:   { status: 204 },
                 children,
             })));
+    }
 
+    search_filter (seq, filter) {
+        const want = r => r.status < 300 && jmp_match(r.body, filter)
         return rxx.rx(
+            seq,
+            rxu.withState(imm.Set(), (okids, u) => {
+                this.log("FILTER: %o %o", okids.toJS(), u);
+                if (!u.child) {
+                    /* Don't touch no-access updates */
+                    if (!u.children)
+                        return [imm.Set(), rx.of(u)];
+                    const entries = imm.Seq(u.children).filter(want);
+                    return [
+                        entries.keySeq().toSet(),
+                        rx.of({ ...u, children: entries.toJS() }),
+                    ];
+                }
+                const child = u.child;
+                const nkids = want(u.response) ? okids.add(child) : okids.delete(child);
+                const nu = nkids.has(child) ? rx.of(u)
+                    : okids.has(child)
+                        ? rx.of({ status: 200, child, response: { status: 412 } })
+                    : rx.EMPTY;
+                return [nkids, nu];
+            }),
+            rx.mergeAll(),
+            rx.tap(v => this.log("FILTER RETURN: %o", v)));
+    }
+
+    config_search (filter) {
+        const { model, app } = this;
+
+        const search = rxx.rx(
             model.updates,
             rx.filter(u => u.app == app),
             rx.map(entry => ({
@@ -122,9 +176,14 @@ class CDBWatch {
             rxu.withState(true, (need_full, u) => {
                 /* No-access will always be a parent update */
                 const ok = u.child;
-                return [!ok, need_full && ok ? full(u.status) : rx.of(u)];
+                const rv = need_full && ok
+                    ? this.search_full(u.status)
+                    : rx.of(u);
+                return [!ok, rv];
             }),
             rx.concatAll());
+
+        return filter ? this.search_filter(search, filter) : search;
     }
 }
 
@@ -146,7 +205,7 @@ export class CDBNotify extends Notify {
             }),
             new SearchFilter({
                 path:       "app/:app/object/",
-                handler:    (s, a) => new CDBWatch(s, a).config_search(),
+                handler:    (s, f, a) => new CDBWatch(s, a).config_search(f),
             }),
         ];
     }

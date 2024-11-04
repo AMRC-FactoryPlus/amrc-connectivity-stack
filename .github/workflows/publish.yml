@@ -212,6 +212,7 @@ jobs:
           - edge-bacnet
           - edge-modbus
           - edge-test
+          - edge-openprotocol
           - edge-tplink-smartplug
     permissions:
       contents: read

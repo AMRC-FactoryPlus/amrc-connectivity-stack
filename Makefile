@@ -22,7 +22,9 @@ amend:
 	git commit -C HEAD -a --amend
 
 dev:
-	docker run --rm -ti -v $$(pwd):/local -w /local ${base} /bin/sh
+	docker run --rm -ti -w /local \
+		-v $$(pwd):/local -v $${HOME}/.npmrc:/home/node/.npmrc \
+		${base} /bin/sh
 
 pubdev: check-committed lint
 	sh ./tools/pub-dev.sh "${js.dev_tag}"

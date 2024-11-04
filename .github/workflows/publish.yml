@@ -285,6 +285,7 @@ jobs:
           - edge-bacnet
           - edge-modbus
           - edge-test
+          - edge-openprotocol
           - edge-tplink-smartplug
           - edge-ads
           - edge-rtde

@@ -190,15 +190,15 @@ export class CDBNotify extends Notify {
     build_handlers () {
         return [
             new WatchFilter({
-                path:       "app/:app/object/:obj",
+                path:       "v1/app/:app/object/:obj",
                 handler:    (s, a, o) => new CDBWatch(s, a).single_config(o),
             }),
             new WatchFilter({
-                path:       "app/:app/object/",
+                path:       "v1/app/:app/object/",
                 handler:    (s, a) => new CDBWatch(s, a).config_list(),
             }),
             new SearchFilter({
-                path:       "app/:app/object/",
+                path:       "v1/app/:app/object/",
                 handler:    (s, f, a) => new CDBWatch(s, a).config_search(f),
             }),
         ];

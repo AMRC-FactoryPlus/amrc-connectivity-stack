@@ -88,6 +88,7 @@ export class BacnetHandler {
         instance: addr.instance,
       }, addr.propertyId, (err, value) => {
         if (err) {
+          this.log('Error reading property %o: %o', addr, err)
           resolve(undefined)
         }
         else {

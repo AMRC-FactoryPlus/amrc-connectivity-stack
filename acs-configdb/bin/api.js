@@ -50,6 +50,7 @@ const api = await new WebAPI({
     keytab:     process.env.SERVER_KEYTAB,
     http_port:  process.env.PORT,
     max_age:    process.env.CACHE_MAX_AGE,
+    body_limit: process.env.BODY_LIMIT,
 
     routes: app => {
         /* No fancy query-string parsing */

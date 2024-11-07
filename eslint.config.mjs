@@ -16,7 +16,10 @@ export default [
 
         rules: {
             "no-unreachable": "warn",
-            "no-unused-vars": "warn",
+            "no-unused-vars": ["warn", {
+                args:           "none",
+                caughtErrors:   "none",
+            }],
         },
     },
 ];

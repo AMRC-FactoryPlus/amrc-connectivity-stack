@@ -17,6 +17,10 @@ spec:
         component: cluster-manager
         factory-plus.service: cluster-manager
     spec:
+      {{- with .Values.acs.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       volumes:
         - name: krb5-conf
           configMap:

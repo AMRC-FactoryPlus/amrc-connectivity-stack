@@ -98,6 +98,7 @@ configdb:
     # -- The repository of the Configuration Store component
     repository: acs-configdb
     pullPolicy: IfNotPresent
+  bodyLimit: 100kb
 
 monitor:
   enabled: true

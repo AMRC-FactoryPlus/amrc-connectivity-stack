@@ -132,6 +132,8 @@ spec:
             - name: VERBOSE
               value: "1"
 {{ include "amrc-connectivity-stack.cache-max-age" (list . "configdb") | indent 12 }}
+            - name: BODY_LIMIT
+              value: "{{ .Values.configdb.bodyLimit }}"
             # If this is set it names a principal which overrides all ACLs. This should be turned off in production.
             - name: ROOT_PRINCIPAL
               value: admin@{{ .Values.identity.realm | required "values.identity.realm is required!" }}

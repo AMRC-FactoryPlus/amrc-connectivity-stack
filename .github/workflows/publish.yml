@@ -30,7 +30,7 @@ jobs:
           docker manifest inspect ghcr.io/amrc-factoryplus/acs-base-${{ matrix.type }}:${{ env.BASE_JS_VERSION }} || echo "needs-build=true" >> $GITHUB_OUTPUT
       - name: Checkout
         if: steps.check.outputs.needs-build == 'true'
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - uses: ./.github/actions/prepare
         if: steps.check.outputs.needs-build == 'true'
         id: prepare
@@ -40,7 +40,7 @@ jobs:
       - name: Build
         id: build-and-push
         if: steps.check.outputs.needs-build == 'true'
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/amd64,linux/arm64
@@ -73,7 +73,7 @@ jobs:
           docker manifest inspect ghcr.io/amrc-factoryplus/acs-base-pg-build:${{ env.BASE_JS_VERSION }} || echo "needs-build=true" >> $GITHUB_OUTPUT
       - name: Checkout
         if: steps.check.outputs.needs-build == 'true'
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - uses: ./.github/actions/prepare
         id: prepare
         if: steps.check.outputs.needs-build == 'true'
@@ -83,7 +83,7 @@ jobs:
       - name: Build
         id: build-and-push
         if: steps.check.outputs.needs-build == 'true'
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/amd64
@@ -118,7 +118,7 @@ jobs:
           docker manifest inspect ghcr.io/amrc-factoryplus/acs-base-pg-run:${{ env.BASE_JS_VERSION }} || echo "needs-build=true" >> $GITHUB_OUTPUT
       - name: Checkout
         if: steps.check.outputs.needs-build == 'true'
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - uses: ./.github/actions/prepare
         if: steps.check.outputs.needs-build == 'true'
         id: prepare
@@ -128,7 +128,7 @@ jobs:
       - name: Build
         if: steps.check.outputs.needs-build == 'true'
         id: build-and-push
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/amd64
@@ -175,7 +175,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - uses: ./.github/actions/prepare
         id: prepare
         with:
@@ -183,7 +183,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         id: build-and-push
         with:
           context: ./${{ steps.prepare.outputs.service-name }}
@@ -220,14 +220,14 @@ jobs:
       pull-requests: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - uses: ./.github/actions/prepare
         id: prepare
         with:
           service-name: ${{ matrix.service }}
           token: ${{ secrets.GITHUB_TOKEN }}
       - name: Build
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         id: build-and-push
         with:
           context: ./${{ steps.prepare.outputs.service-name }}
@@ -263,7 +263,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - uses: ./.github/actions/prepare
         id: prepare
         with:
@@ -271,7 +271,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         id: build-and-push
         with:
           context: ./${{ steps.prepare.outputs.service-name }}
@@ -299,7 +299,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - uses: ./.github/actions/prepare
         id: prepare
@@ -315,7 +315,7 @@ jobs:
       - name: Build Backend Builder
         id: build-backend-builder
         if: steps.check-backend-builder.outputs.needs-build == 'true'
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v6
         with:
           context: ./acs-manager
           file: ./acs-manager/.docker/Dockerfiles/Dockerfile.backend-build
@@ -330,7 +330,7 @@ jobs:
       - name: Build Backend Base
         id: build-backend-base
         if: steps.check-backend-base.outputs.needs-build == 'true'
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v6
         with:
           context: ./acs-manager
           file: ./acs-manager/.docker/Dockerfiles/Dockerfile.backend-base
@@ -339,7 +339,7 @@ jobs:
 
       - name: Build Backend
         id: build-backend
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v6
         with:
           context: ./acs-manager
           file: ./acs-manager/.docker/Dockerfiles/Dockerfile
@@ -359,7 +359,7 @@ jobs:
 
       - name: Build & Push Frontend
         id: build-and-push-frontend
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v6
         with:
           context: ./acs-manager
           push: true
@@ -379,7 +379,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - uses: ./.github/actions/prepare
         id: prepare
         with:
@@ -407,7 +407,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - uses: ./.github/actions/prepare
         id: prepare
         with:
@@ -433,7 +433,7 @@ jobs:
           cp "target/${krb_zipfile}" "../${{ steps.prepare.outputs.service-name }}"
       - name: Build and push Docker image
         id: build-and-push
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ./${{ steps.prepare.outputs.service-name }}
           push: true
@@ -458,7 +458,7 @@ jobs:
         run: |
           curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ github.event.release.tag_name }}
       - name: Login to GitHub Container Registry
@@ -489,11 +489,11 @@ jobs:
         run: |
           curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: release
       - name: add-new-release
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: new-release
           path: build
@@ -502,7 +502,7 @@ jobs:
           cd build
           helm repo index --url https://amrc-factoryplus.github.io/amrc-connectivity-stack/build .
       - name: commit
-        uses: stefanzweifel/git-auto-commit-action@v4
+        uses: stefanzweifel/git-auto-commit-action@v5
         id: auto_commit_action
         with:
           commit_message: Release ${{ github.event.release.tag_name }}

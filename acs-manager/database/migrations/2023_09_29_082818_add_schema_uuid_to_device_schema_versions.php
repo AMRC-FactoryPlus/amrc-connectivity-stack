@@ -1,7 +1,6 @@
 <?php
 /*
- *  Factory+ / AMRC Connectivity Stack (ACS) Manager component
- *  Copyright 2023 AMRC
+ * Copyright (c) University of Sheffield AMRC 2024.
  */
 
 use Illuminate\Database\Migrations\Migration;
@@ -20,8 +19,6 @@ return new class extends Migration
         Schema::table('device_schema_versions', function (Blueprint $table) {
             $table->string('schema_uuid')->nullable();
         });
-
-        Artisan::call('schemas:import');
     }
 
     /**

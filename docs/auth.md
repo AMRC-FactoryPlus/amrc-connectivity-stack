@@ -17,7 +17,7 @@ provides information used in making authorisation decisions.
 
 ### Sparkplug Node address is a security identifier
 
-During the development of the auth service I have realised that a
+During the development of the cmdesc service I have realised that a
 Sparkplug Node is a security principal. Node address information should
 live in the Auth service; a Node address is simply an alternative
 identifier for the principal.
@@ -68,22 +68,13 @@ example:
   restriction can be placed on value.
 * Git: Restrictions are only at the repo level. Per-branch restrictions
   cannot be expressed.
-* The new change-notify system means services need to be able to create
-  Devices under their own Node and grant permissions to them.
-* A reconciliation service will need to create Devices under random
-  Nodes and grant permissions to them.
 
 ### No change-notify
 
-The Auth service has no Sparkplug presence and no change-notify
-interface. Trying to create these is likely to open a large can of
-worms; one of the design principles of the Auth service is that it is
-entirely standalone and doesn't depend on any of the other services.
-
-This means that, in general, changes to data in the Auth service will
-not be picked up quickly. This in turn suggests that in a dynamic
-environment the Auth data should be rules for assimilating other data
-sources rather than specific lists of objects that can be accessed.
+The Auth service has no change-notify interface. With the `notify/v2`
+spec which does not rely on Sparkplug it would be possible to create a
+change-notify interface for the Auth service which doesn't cause
+bootstrapping problems.
 
 ## Possible solutions
 
@@ -118,20 +109,10 @@ The biggest issue here will be working out how to pass the information
 about which endpoint(s) to use on which service in a sufficiently
 generic way.
 
-### Owners
-
-Can any of these problems be simplified by introducing the general
-concept of an 'owner'? This would need to be registered with the Auth
-service by the ConfigDB at the point where the object was created. This
-might allow a reconciliation service to be owner of a Device rather than
-the Node which is publishing it, for example. More generally it should
-allow restricting the actions of services to objects they have created,
-where this is useful.
-
 ### Structured targets
 
 Some of these problems can be solved by allowing the target of an ACE to
-be more than just a UUID. SPO works for RDF, but only because the IRI
+be more than just a UUID. Triples work for RDF, but only because the IRI
 used as object can itself have structure. 
 
 This is obviously equivalent to referencing a ConfigDB application, but
@@ -146,6 +127,15 @@ as templates. Given an appropriate template language, it would be
 possible for this expansion to happen inside the Auth service. It would
 be necessary to also support structured targets, as the targets for MQTT
 and CCL permissions cannot be reasonably represented as a single UUID.
+
+This still leaves the question of how to handle data from external
+services: leaving the job to the consuming service potentially requires
+a complex service library implementation and means the consuming service
+needs access to all the data it needs to evaluate the ACL. On the other
+hand providing a complete, dynamic ACL resolution function on the Auth
+service means the Auth service needs to consume notifications from the
+relevant external services, which opens up the bootstrapping problem
+again.
 
 ## Design proposals
 
@@ -170,10 +160,6 @@ All proposals need to meet these conditions:
 
 * It must be possible to create groups of principals and to grant
   permissions to all members of the group.
-
-* Factory+ objects can be assigned owners. Creating an object in the
-  ConfigDB grants ownership to the creator. Ownership can be reassigned,
-  subject to permissions.
 
 ### Permission templates
 

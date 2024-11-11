@@ -5,45 +5,44 @@ import util from "util";
 import imm from "immutable";
 
 export const builtins = new Map();
-export const expanders = new Set();
+export const lookups = new Map();
+export const permissions = new Set();
 export const functions = new Map();
 
 const verbose = process.env.VERBOSE ? console.log : () => {};
 
-/* Might this form expand to a list? */
-function expandable (f, definitions) {
-    if (!Array.isArray(f))
-        return false;
-    if (functions.has(f[0]))
-        return true;
-    if (definitions.has(f[0]))
-        return true;
-    if (expanders.has(f[0]))
-        return true;
-    return false;
+function value (v) {
+    if (Array.isArray(v))
+        throw util.format("Unexpected unevaluated form %O", v);
+    return v;
 }
 
-export function evaluate (depth, definitions, expr) {
-    verbose("EVAL[%s] %O %O", depth, definitions, expr);
+export function evaluate (expr, ctx) {
+    verbose("EVAL[%s] %O %O", ctx.depth,
+        Object.fromEntries(ctx.definitions.entries()), expr);
 
     /* Constants */
     if (expr == null || typeof expr != "object")
         return [expr];
 
     /* Recursion */
-    if (depth > 20)
+    if (ctx.depth > 20)
         throw "Recursion exceeded";
     const eve = (x, e) => {
-        const rv = evaluate(depth + 1, e, x);
-        verbose(" -> [%s] %O", depth + 1, rv);
+        const rv = evaluate(x, {
+            ...ctx,
+            depth:          ctx.depth + 1,
+            definitions:    e,
+        });
+        verbose(" -> [%s] %O", ctx.depth + 1, rv);
         return rv;
     };
-    const ev = x => eve(x, definitions);
+    const ev = x => eve(x, ctx.definitions);
     const sc = x => {
         const v = ev(x);
         if (v.length != 1)
             throw util.format("Expected single element, not %O", v);
-        return v[0];
+        return value(v[0]);
     };
 
     /* Evaluate tuple values */
@@ -55,13 +54,14 @@ export function evaluate (depth, definitions, expr) {
 
     /* Now that we have [get], and given that we don't have lambdas, I'm
      * not sure this evaluation is needed any more. */
-    const name = sc(expr[0]);
+    //const name = sc(expr[0]);
+    const name = value(expr[0]);
 
     if (Array.isArray(name))
         throw "Unexpected list as function name";
 
     const letbind = (bind, body) => {
-        const entries = new Map(definitions);
+        const entries = new Map(ctx.definitions);
         for (let i = 0; i < bind.length; i += 2)
             /* This is let* */
             entries.set(bind[i], eve(bind[i + 1], entries));
@@ -83,27 +83,19 @@ export function evaluate (depth, definitions, expr) {
 
         case "if": {
             const cond = sc(expr[1]);
-            const listify = l => l.length == 1 ? l[0] : ["list", ...l];
-            if (Array.isArray(cond))
-                return [["if", cond, 
-                    listify(ev(expr[2])),
-                    listify(ev(expr[3]))]];
             if (cond) return ev(expr[2]);
             if (expr.length < 3) return [];
             return ev(expr[3]);
         }
 
         case "map": {
-            const [bind, ...body] = expr[1];
-            const list = expr.slice(2).flatMap(ev);
-            if (list.some(v => expandable(v, definitions)))
-                return [["map", 
-                    [bind, ...letbind([bind, ["quote", [bind]]], body)],
-                    ...list]];
+            const [, [bind, ...body], ...list] = expr;
+            verbose("MAP: bind %O, body %O, list %O", bind, body, list);
             return list
-                .map(v => ["list", v])
+                .flatMap(ev)
                 .flatMap(e => letbind([bind, e], body));
         }
+
     }
 
     /* Evaluate arguments */
@@ -117,8 +109,8 @@ export function evaluate (depth, definitions, expr) {
         return builtins.get(name)(...args);
     }
 
-    if (definitions.has(name))
-        return definitions.get(name);
+    if (ctx.definitions.has(name))
+        return ctx.definitions.get(name);
 
     if (functions.has(name)) {
         const [param, ...body] = functions.get(name);
@@ -126,28 +118,41 @@ export function evaluate (depth, definitions, expr) {
         return letbind(bind, body);
     }
 
-    /* We return a list (everything is flatmapped), so we need to quote
-     * an unevaluated form to return it. */
-    return [[name, ...args]];
-}
+    if (permissions.has(name)) 
+        return [[name, ...args]];
 
-/* Forms which may require flatmapping if left unevaluated */
-expanders.add("list");
-expanders.add("let");
-expanders.add("if");
-expanders.add("map");
-expanders.add("lookup");
-expanders.add("members");
+    throw util.format("Unknown form %s", name);
+}
 
 builtins.set("get", (tuple, key) => [tuple[key]]);
 builtins.set("has", (tuple, key) => [key in tuple]);
 builtins.set("merge", (...tups) => [Object.assign({}, ...tups)]);
 builtins.set("format", (f, ...a) => [util.format(f, ...a)]);
+builtins.set("lookup", (s, u, a) => {
+    const key = `${s}/${u}${a}`;
+    const val = lookups.get(key);
+    verbose("LOOKUP: %s -> %o", key, val);
+    return val ? [val] : [];
+});
 
 builtins.set("principal", () => ["ConfigDB-SA"]);
 const ids = new Map();
 ids.set("ConfigDB-SA", { sparkplug: { group: "Core", node: "ConfigDB" } });
 builtins.set("id", (princ, type) => [ids.get(princ)[type]]);
+
+lookups.set("DirectorySvc/v1/device/Node",
+    { group_id: "Group", node_id: "Node" });
+lookups.set("DirectorySvc/v1/device/address/Node",
+    { group: "Group", node: "Node" });
+lookups.set("DirectorySvc/v1/device/Device",
+    { group_id: "Group", node_id: "Node", device_id: "Device" });
+lookups.set("DirectorySvc/v1/device/address/Device",
+    { group: "Group", node: "Node", device: "Device" });
+
+permissions.add("Unknown");
+permissions.add("Publish");
+permissions.add("Subscribe");
+permissions.add("SendCmd");
 
 functions.set("Id", [["x"], ["x"]]);
 functions.set("Twice", [["y"], ["y"], ["y"]]);
@@ -212,7 +217,7 @@ functions.set("ConsumeGroup", [["group"],
     ["map", ["m", ["ConsumeDevice", ["m"]]],
         ["members", ["group"]]]]);
 
-export const ev = v => evaluate(0, new Map(), v);
+export const ev = v => evaluate(v, { depth: 0, definitions: new Map() });
 
 const logger = new console.Console({
     stdout: process.stdout,
@@ -238,11 +243,12 @@ is("number", 1, [1]);
 is("string", "foo", ["foo"]);
 is("tuple", {a: 2}, [{a: 2}]);
 is("get", ["get", {a: 2}, "a"], [2]);
-is("unevaluated", ["Unknown", 2], [["Unknown", 2]]);
+is("perm", ["Unknown", 2], [["Unknown", 2]]);
 
 is("list", ["list", 1], [1]);
 is("list", ["list", 1, 2, 3], [1, 2, 3]);
-is("list uneval", ["list", ["Uk", 1], ["Uk", 2]], [["Uk", 1], ["Uk", 2]]);
+is("list perm", ["list", ["Unknown", 1], ["Unknown", 2]], 
+    [["Unknown", 1], ["Unknown", 2]]);
 
 is("if", ["if", true, 1, 2], [1]);
 is("!if", ["if", false, 1, 2], [2]);
@@ -253,17 +259,11 @@ is("if has", ["if", ["has", {foo:5}, "bar"], "yes", "no"], ["no"]);
 
 is("map constant", ["map", ["a", 1], 2, 3], [1, 1]);
 is("map expand", ["map", ["a", ["a"]], 2, 3], [2, 3]);
-is("map flatmap", ["map", ["a", ["a"], ["Unk", ["a"]]], 2, 3],
-    [2, ["Unk", 2], 3, ["Unk", 3]]);
-is("map unevaluated",
-    ["map", ["a", ["Grant", ["a"]]], ["lookup", "Group"]],
-    [["map", ["a", ["Grant", ["a"]]], ["lookup", "Group"]]]);
-is("map uneval expand bindings",
-    ["let", ["a", 2], ["map", ["b", ["Gr", ["a"], ["b"]]], ["lookup"]]],
-    [["map", ["b", ["Gr", 2, ["b"]]], ["lookup"]]]);
-is("map uneval scope",
-    ["let", ["a", 2], ["map", ["a", ["a"]], ["lookup"]]],
-    [["map", ["a", ["a"]], ["lookup"]]]);
+is("map flatmap", ["map", ["a", ["a"], ["Unknown", ["a"]]], 2, 3],
+    [2, ["Unknown", 2], 3, ["Unknown", 3]]);
+is("map scope",
+    ["let", ["a", 2], ["map", ["a", ["a"]], ["a"]]],
+    [2]);
 
 is("call Id", ["Id", 2], [2]);
 is("call Twice", ["Twice", 4], [4, 4]);
@@ -273,8 +273,8 @@ is("nested let",
     ["let", ["a", 4], ["let", ["b", 6], ["a"], ["b"]]],
     [4, 6]);
 is("recursive let",
-    ["let", ["a", 4, "b", ["Ck", ["a"]]], ["b"]],
-    [["Ck", 4]]);
+    ["let", ["a", 4, "b", ["Unknown", ["a"]]], ["b"]],
+    [["Unknown", 4]]);
     
 is("SpTopic node",
     ["SpTopic", "DATA", { group: "Gr", node: "Nd" }],
@@ -324,38 +324,34 @@ is("ConsumeAddress device",
         value: true,
     }]]);
 
-{
-    const dev = ["lookup", "DirectorySvc", "v1/device/", "ConfigDB-SA"];
-    is("DeviceAddress expanded", ["DeviceAddress", "ConfigDB-SA"], [
-        ["if", ["has", dev, "device_id"],
-            {   group:  ["get", dev, "group_id"],
-                node:   ["get", dev, "node_id"],
-                device: ["get", dev, "device_id"],
-            },
-            {   group:  ["get", dev, "group_id"],
-                node:   ["get", dev, "node_id"],
-            }],
-    ]);
-}
-{
-    const dev = ["lookup", "DirectorySvc", "v1/device/address/", "ConfigDB-SA"];
-    const ntopic = t => ["format", "spBv1.0/%s/N%s/%s",
-        ["get", dev, "group"], t, ["get", dev, "node"]];
-    const dtopic = t => ["format", "spBv1.0/%s/D%s/%s/%s",
-        ["get", dev, "group"], t, ["get", dev, "node"], ["get", dev, "device"]];
-    const topic = t => ["if", ["has", dev, "device"], dtopic(t), ntopic(t)];
+is("DeviceAddressDirect Node", ["DeviceAddressDirect", "Node"],
+    [{ group: "Group", node: "Node" }]);
+is("DeviceAddressDirect Device", ["DeviceAddressDirect", "Device"],
+    [{ group: "Group", node: "Node", device: "Device" }]);
+is("DeviceAddress Node", ["DeviceAddress", "Node"],
+    [{ group: "Group", node: "Node" }]);
+is("DeviceAddress Device", ["DeviceAddress", "Device"],
+    [{ group: "Group", node: "Node", device: "Device" }]);
 
-    is("DeviceAddress direct", ["DeviceAddressDirect", "ConfigDB-SA"], [dev]);
-    is("ConsumeDevice", ["ConsumeDevice", "ConfigDB-SA"], [
-        ["Subscribe", topic("BIRTH")],
-        ["Subscribe", topic("DATA")],
-        ["Subscribe", topic("DEATH")],
-        ["SendCmd", {
-            address: dev,
-            name: ["if", ["has", dev, "device"],
-                "Device Control/Rebirth", "Node Control/Rebirth"],
-            type: "Boolean",
-            value: true,
-        }],
-    ]);
-}
+is("ConsumeDevice Node", ["ConsumeDevice", "Node"], [
+    ["Subscribe", "spBv1.0/Group/NBIRTH/Node"],
+    ["Subscribe", "spBv1.0/Group/NDATA/Node"],
+    ["Subscribe", "spBv1.0/Group/NDEATH/Node"],
+    ["SendCmd", {
+        address: { group: "Group", node: "Node" },
+        name: "Node Control/Rebirth",
+        type: "Boolean",
+        value: true,
+    }],
+]);
+is("ConsumeDevice Device", ["ConsumeDevice", "Device"], [
+    ["Subscribe", "spBv1.0/Group/DBIRTH/Node/Device"],
+    ["Subscribe", "spBv1.0/Group/DDATA/Node/Device"],
+    ["Subscribe", "spBv1.0/Group/DDEATH/Node/Device"],
+    ["SendCmd", {
+        address: { group: "Group", node: "Node", device: "Device" },
+        name: "Device Control/Rebirth",
+        type: "Boolean",
+        value: true,
+    }],
+]);

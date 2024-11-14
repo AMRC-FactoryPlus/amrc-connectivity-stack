@@ -1,73 +1,260 @@
 # S-expression based permission templates
 
-This is a proposal for an Auth service redesign based on s-expressions
-expressed as JSON arrays.
+This is a proposal for an Auth service redesign based on defining
+permission templates to replace the current concept of 'roles'. The
+intent of these was to allow multiple permissions to be granted
+simultaneously (for example: MQTT subscribe and Cmdesc Rebirth), but the
+model is not flexible enough as all permissions in the role are applied
+to a single target. In addition, both MQTT and Cmdesc have implemented
+ad-hoc template expansions based on ConfigDB entries; these are
+generalised into a template language defined in S-expressions (LISP data
+structures) expressed as JSON arrays.
 
-* Groups can only be used for principals or targets (nouns). Groups of
-  permissions are no longer expanded.
+## Data structure
 
-* The function `members` expands the members of a group. Expanding a
-  UUID which does not represent a group returns a singleton list.
+### Identity and ownership
 
-* The principal of an ACE is always a UUID and is always expanded with
-  `members`. The ACE is granted to any identifier belonging to a UUID on
-  the resulting list. Principal UUIDs should not normally be used as
-  group UUIDs.
+* Sparkplug Nodes are principals; their Sparkplug address information is
+  moved into the Auth service to sit alongside the Kerberos identity as
+  an alternative name.
 
-* The target of an ACE is a JSON value, which must be either an object,
-  a string or `null`. Arrays are reserved to represent template calls.
-  In some cases this will be a string representing a UUID but this is up
-  to the service to interpret. Wildcards and group expansion are also up
-  to the service.
+* Currently the design is that Sparkplug Devices are still assigned
+  their names and UUIDs by the Node. Finding a Device address means a
+  request to the Directory. Authorisation for Directory indexing is
+  still an open question.
 
-* A permission is always a UUID. There are two categories of permission:
-  base permissions which are returned to the requesting service, and
-  permission templates. Templates are defined in the Auth service and
-  permissions defined as templates will never be returned to a service.
+* Objects in the ConfigDB have an 'owner' property. This will be exposed
+  as part of the _Object registration_ config entries. Objects are
+  initially assigned the ownership of the principal who created them;
+  permissions will be needed to allow for ownership transfer.
 
-## Permission templates
+### Auth groups and ConfigDB classes
 
-A permission template is a function which accepts the principal UUID and
-the target value and returns a list of ACEs. When ACLs are looked up all
+* Auth groups are removed and replaced with ConfigDB classes. These are
+  extended to support subclasses and classes-of-classes, as distinct
+  concepts from each other, and to any depth.
+
+* Multiple classification and multiple inheritance are supported. (When
+  expressed in terms of 'groups' they are both obviously necessary.) We
+  will need to establish a sensible classification structure, and
+  probably some concept of 'primary class for an object' for human
+  display purposes.
+
+* In the long term some form of restriction or validation of the members
+  of a class would be a good idea; in particular an assertion that
+  certain classes must remain distinct. Derived classes (whether from
+  set operations on other classes or from config property filters) are
+  also an interesting possibility. Neither are specified at this point.
+
+* The 'members of a class' are determined as follows. A UUID which is
+  not recorded as being a class has no members. A class UUID records a
+  set of direct members, and a set of direct subclasses. All direct
+  members are included. To these are added all members of all
+  subclasses, recursively. The UUIDs of the class and subclasses
+  themselves are not included as members.
+
+### Permission grants
+
+* A permission grant has the form `[principal, permission,
+  ...arguments]`. There may be zero or more arguments. Principal and
+  permission must both be UUIDs; the arguments must be objects, strings
+  or `null`.
+
+* The principal of an ACE is a UUID, which can represent either an
+  individual principal or a class. A given UUID can be valid either as
+  an individual principal, or as a class of principals, but not both.
+  These possibilities are identified by the UUID being a member of one
+  of two well-known classes. A grant to an individual applies to that
+  principal only, even if that principal is itself a class. A grant to a
+  class applies to all members of that class.
+
+* The permission of an ACE is always a UUID. There are two categories of
+  permission: base permissions which are returned to the requesting
+  service, and permission templates. These are identified by being
+  members of distinct well-known classes. Template permissions have a
+  template definition in the ConfigDB, and will be fully expanded by the
+  Auth service; templates will never be returned to a requesting
+  service.
+
+* The arguments of an ACE are JSON values, which must be either objects,
+  strings or `null`. (Arrays are reserved to represent template calls
+  internally.) In some cases a string will represent a UUID but this is
+  up to the service to interpret. Wildcards and class expansion are also
+  up to the service; when a service defines its permissions it must be
+  explicit about whether a UUID is interpreted as an individual or a
+  class, and how wildcards apply.
+
+A permission grant using a template permission is evaluated as though it
+were the expression `[template ...arguments]`. The resulting list will
+only contain base permissions and 
+
+## Template evaluation
+
+In this section the following notation conventions are used:
+
+* JSON arrays are referred to as 'lists', and are written without
+  commas.
+
+* An unquoted string is a syntax variable; this represents a single JSON
+  value.
+
+* The notation `...values` within a list indicates zero or more JSON
+  values.
+
+### Evaluation
+
+When a JSON value is 'evaluated', these rules are applied. To
+'list-evaluate' a list means to evaluate each element and create a list
+of the resulting values. Values marked below as '(Scalar)' will be
+included in the result list directly; values marked '(List)' will be
+concatenated onto the result list.
+
+Evaluation always occurs in relation to a set of bindings, which is a
+map from strings to values. Evaluation is eager: a bound value is
+already fully evaluated, and will not be evaluated again. Unless
+otherwise specified any recursive evaluation is against the same set of
+bindings; `let`, `map` and template calls change the bindings.
+
+* A `null`, boolean, number or string evaluates to itself. (Scalar)
+
+* An object evaluates to an object with the same keys as the evaluated
+  object, where each corresponding value has been evaluated. (Scalar)
+
+* An empty list evaluates to an empty list. (List)
+
+* Any other list represents a function call; the first member of the
+  list names the item to call. This must be a string and it names a
+  builtin, a binding, a base permission or a permission template.
+
+* Certain strings name builtins; these are listed below. Some builtins
+  start by evaluating all their arguments like other calls, but others
+  have special evaluation rules; these are also described below.
+
+* Other calls always begin by list-evaluating the remaining members of
+  the call list. The evaluated list forms the arguments to the call.
+
+* A call naming a current binding with no arguments evaluates to the
+  value of that binding. Bindings must be called, unlike in LISP, to
+  avoid an ambiguity with a literal string; we have no symbols in JSON.
+  (List)
+
+* A call naming a current binding with arguments requires that the value
+  of the binding is an object or `null`. Each argument represents a key
+  to look up; a nonexistent key or `null` value at any point terminates
+  the process and evaluates to `null`. (Scalar)
+
+* Base permissions are named by UUIDs which are members of the _Base
+  permission_ well-known class. A call to a base permission returns a
+  JSON array `[perm ...arguments]`, but note the arguments have been
+  evaluated. (Scalar)
+
+* Templates are named by UUIDs which are members of the _Permission
+  template_ well-known class and have a _Permission template definition_ 
+  ConfigDB entry. Bindings are created for the template parameters from
+  the argument list, and the results list is list-evaluated using (only)
+  these bindings and returned. (List)
+
+* Other calls evaluate as though they were an appropriate call to the
+  `throw` builtin.
+
+Note that the name of a call is not evaluated and must be specified as a
+literal string. There is no dynamic-call facility. The language has no
+lambdas and no first-class functions so the loss of flexibility is
+minor, and the restriction enables useful static analysis.
+
+### Builtins
+
+Builtins are all named by short, lowercase strings. Builtins fall into
+two categories: those which evaluate and flatten their arguments as
+though they were normal template calls with outside sources of
+information, and 'special forms' which evaluate their arguments
+differently.
+
+Special forms are denoted (*) below; these must be explicitly in the
+form documented, before evaluation. The notes '(Scalar)' and '(List)'
+mean the same as above.
+
+* `equal`: `["equal" a b]`. This performs deep equality testing on two
+  JSON values. Returns `true` or `false`. (Scalar)
+
+* `flat`: `["flat" list]`. Given a list value which has not already been
+  flattened, e.g. from `list` or `quote` or `lookup`, return the list
+  such that it will flatten into a return list. (List)
+
+* `format`: `["format" str ...args]`. Performs sprintf formatting using
+  Node's `util.format`.
+
+* `has`: `["has" obj key]`. Expects the first argument to be an object
+  and the second to be a string. Returns `true` if the object has the
+  named key, `false` otherwise. (Scalar)
+
+* `id`: `["id" principal type]`. Looks up identity details for the given
+  principal. The type can be `kerberos` or `sparkplug`.
+
+* `if` (*): `["if" cond pass]` or `["if" cond pass fail]`. Both forms
+  start by evaluating the condition. If this results in the empty list,
+  or if the first item is `null` or `false`, we evaluate the `fail`
+  value, or return the empty list. Otherwise we evaluate the `pass`
+  value. (List)
+
+* `let` (*): `["let" bindings ...body]`. The `bindings` must be a list
+  with an even number of items; odd numbered items must be strings and
+  name new bindings. Each is followed by a value. A new set of bindings
+  is constructed starting from the current set. The first value is
+  evaluated using the current bindings and a binding for the first name
+  is added with the result. Each subsequent value is evaluated using the
+  new bindings and added to the set. Finally `body` is list-evaluated
+  using the new bindings and the result returned. (List)
+
+* `list`: Returns its arguments (after evaluation). This is the only way
+  to construct a JSON array in a result list. (Scalar)
+
+* `lookup`: `["lookup" service prefix key]`. This performs a lookup on a
+  F+ service and returns the result. (Scalar)
+
+* `map` (*): `["map" [bind ...body] ...list]`. Map starts by
+  list-evaluating `list`, using the current bindings. Then, for each
+  element in the result, a new set of bindings is created with that
+  element bound to `bind`. The `body` is list-evaluated against each set
+  of bindings and the results concatenated and returned. (List)
+
+* `merge`: `["merge" ...objs]`. Merge the properties of all objects,
+  with values from later objects overwriting those from earlier objects.
+  (Scalar)
+
+* `principal`: `["principal"]`. Returns the UUID of the principal to
+  whom this ACE applies. (Scalar)
+
+* `quote` (*): `["quote" value]`. Returns its value unchanged and
+  unevaluated. (Scalar)
+
+### Template definitions
+
+A permission template is a function which accepts zero or more arguments
+and returns a list of permission grants. When ACLs are looked up all
 permission templates are expanded recursively and the result included in
 the list of ACEs returned. Some form of recursion control will obviously
 be necessary.
 
-A template definition is represented in JSON as an s-expression built
-from arrays and strings.
+If a template is called with too many arguments additional arguments are
+ignored. If a template is called with too few arguments the additional
+parameters are bound to `null`.
 
-* A 'base value' is `null`, a string, or an object whose values are all
-  base values.
-
-* An array represents a function call. The first member of the array
-  names the function to call. This must be a string and it names a
-  builtin, a `let` binding, or a permission UUID.
-
-* Certain strings name builtins. These are: `list`, `let`, `merge`,
-  `if`, `get`, `has`, `equal`, `map`, `join`, `format`, `members`,
-  `principal`, `id`, `lookup`.
-
-* Let bindings are created with the `let` builtin and are only available
-  over the scope of the call to `let`. Function arguments are available
-  as though they were `let` bindings. Let bindings must be called as
-  though they were functions with no arguments to avoid an ambiguity
-  with a literal string (we have no symbols in JSON).
-
-* Functions which are UUIDs without a template definition represent base
-  permission grants. These should be called with one argument, the
-  target of the permission, which should be a base value.
-
-* The top-level of a function definition is an array. The first element
-  is another array naming the parameters. Subsequent elements are the
-  result list. Where the result of evaluating a result list element is
-  itself a list, this is flattened into the function result.
+A template definition is represented in JSON as an S-expression built
+from lists (i.e. arrays) and strings. The top level of the definition
+must be a list of the form `[[...params] ...results]`. The first
+element is a list of parameter names; these must be strings, and when
+the template is called the arguments will be bound to the parameters as
+though via `let`. The remainder of the definition forms the result list;
+each item will be evaluated and the result flattened into the template's
+return list.
 
 ## Examples
 
 Notation:
 
-    ∈           Group membership
-    ⊂           Group subset
+    ∈           Class membership
+    ⊂           Class subset
     →           Permission template definition
     u:[]        Permission grant
     u:<t i>     Identity
@@ -100,10 +287,9 @@ contents are abbreviated where there is a lot of repetition.
 
     SpTopic → [[type addr]
       [if [has [addr] device] 
-        [format "spBv1.0/%s/N%s/%s" 
-          [get [addr] group] [type] [get [addr] node]]
+        [format "spBv1.0/%s/N%s/%s" [addr group] [type] [addr node]]
         [format "spBv1.0/%s/D%s/%s" 
-          [get [addr] group] [type] [get [addr] node] [get [addr] device]]]]
+          [addr group] [type] [addr node] [addr device]]]]
     ParticipateAsNode → [[]
       [let [node [id [principal] sparkplug]]
         [map [addr
@@ -234,25 +420,21 @@ contents are abbreviated where there is a lot of repetition.
 
 This assumes that we create Sparkplug identities for edge clusters in
 the Auth service. This doesn't quite add up as clusters are not
-principals, but this is definitely auth information. 
-
-This also assumes the Auth service can optionally store an 'owner' for
-each object, and that the ConfigDB sets the owner to the creator when an
-object is created. ACEs concerning ownership must be explicitly
-implemented by the consuming service. Expanding an explicit list of
-objects into an ACL returned from the Auth service and cached would
-quickly become stale.
+principals, but this is definitely auth information. (Alternatively all
+the naming, Kerberos as well as Sparkplug, moves to the ConfigDB.)
 
 A Special UUID, `Mine`, matches any object owned by the requesting
 principal. This is treated as a group, so here the base permissions must
-be expecting groups, and expecting to expand them.
+be expecting groups, and expecting to expand them. (_XXX_ Can this be
+replaced with a `map` over an ownership lookup?) 
 
     KkForCluster → [[cluster]
       [CreateObject { class: EdgeAccount, uuid: false }]
       [ReadConfig { app: Info, obj: Mine }]
       [WriteConfig { app: Info, obj: Mine }]
       [ReadIdentity { uuid: Mine }]
-      [let [group [get [id [cluster] sparkplug] group]]
+      [let [addr [id [cluster] sparkplug]
+            group [addr group]]
         [WriteIdentity { uuid: Mine, sparkplug: {group: [group]} }]
         [WriteIdentity { uuid: Mine, kerberos: [format "*/%s@REALM", [group]] }]
         [WriteIdentity { uuid: Mine,
@@ -291,7 +473,8 @@ In this case a template would have been required anyway, as the
 
 A simple scheme for allowing certain Nodes to grant read access to their
 Devices might look like this. This is limited to direct grants to a Node
-to manage its own Devices.
+to manage its own Devices. (This use-case is no longer required with the
+v2 change-notify spec but demonstrates what is possible.)
 
 This also relies on a ManageACL permission which puts limits on the
 contents of the target rather than simply requiring the target to be in
@@ -302,12 +485,13 @@ result changes then the test fails.
 
     DynamicNodes ⊂ SparkplugNodes
 
-    DynamicNodes:[ManageACL {
-      permission: ConsumeAddress,
-      target: {
-        group:  [get [id [principal] sparkplug] group],
-        node: [get [id [principal] sparkplug] node]
-      }]
+    ManageMyConsumers → [[]
+      [let [addr [id [principal] sparkplug]]
+        [ManageACL {
+          permission: ConsumeAddress,
+          target: { group: [addr group], node: [addr node] }]]]
+
+    DynamicNodes:[ManageMyConsumers]
 
 ### Dynamic deployment
 
@@ -317,6 +501,12 @@ to be created in the services by the Directory. This means the Directory
 will need to be able to chown the Device to the Node which originally
 published it. It also means there will be a delay before the Node is
 authorised to set permissions on a new Device.
+
+(_XXX_ Can all this be avoided by dropping the concept that Nodes can
+publish any Devices and assign them UUIDs, and requiring Device
+addresses to be pre-registered? This makes mobile Devices more
+difficult, but that is a concept we've never tried to make use of, and
+I'm not now sure that mobile instances wouldn't be a better concept.)
 
 This scheme unavoidably depends on Directory lookups to make
 authorisation decisions. In this case the Directory lookup will need to
@@ -332,12 +522,12 @@ delay before the ACLs change.
     DeviceAddress → [[device]
       [let [info [lookup DirectorySvc "v1/device/" [device]]]
         [if [has [info] "device_id"]
-          { group:  [get [info] "group_id"],
-            node:   [get [info] "node_id"],
-            device: [get [info] "device_id"],
+          { group:  [info "group_id"],
+            node:   [info "node_id"],
+            device: [info "device_id"],
           }
-          { group:  [get [info] "group_id"],
-            node:   [get [info] "node_id"],
+          { group:  [info "group_id"],
+            node:   [info "node_id"],
           }]]
     ConsumeDevice → [[device]
       [ConsumeAddress [DeviceAddress [device]]]]
@@ -356,22 +546,18 @@ This version of ManageACL expects a group for each of principal,
 permission, target. As usual the permission entry `ConsumeDevice`, which
 is not a group, is expanded by `members` as a singleton group.
 
-Here `lookup` is a new builtin which performs a Factory+ Service API
+Here `lookup` is a builtin which performs a Factory+ Service API
 call. It takes three parameters: a service function UUID, a path, and
-(optionally) an object ID relative to that path. The form with separate
-object ID should only be used for services supporting
-[../acs-rendezvous/docs/notify-v1.md](the new notify-v1 interface) and
-which allow the base path to be used as a channel URL.
+(optionally) an object ID relative to that path. Where the consuming
+service has subscribed to change-notify for its ACLs the Auth service
+will need to subscribe to the appropriate external services.
 
-This definition of `DeviceAddress` results in a lot of deferred
-evaluation, as the `[if]` depends on the result from the Directory. If
-we adjust the Directory API to return what we need directly we can use a
-direct call:
+This definition of `DeviceAddress` needs to reformat the address into
+the (now-)standard form we are using for Sparkplug addresses. A
+modification to the Directory API would allow this to be written as
+something this instead:
 
     DeviceAddress → [[device]
       [lookup DirectorySvc "v1/device/address/" [device]]]
-
-which does not result in so much work being deferred to the consuming
-service.
 
 vi:set sts=2 sw=2:

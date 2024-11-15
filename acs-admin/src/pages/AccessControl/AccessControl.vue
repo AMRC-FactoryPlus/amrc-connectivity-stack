@@ -1,9 +1,13 @@
+<!--
+  - Copyright (c) University of Sheffield AMRC 2024.
+  -->
+
 <template>
   <Sheet :open="selectedRow" @update:open="handleSheetOpen">
     <PrincipalManagementSidebar :selected-row="selectedRow"></PrincipalManagementSidebar>
   </Sheet>
   <Skeleton v-if="loading" v-for="i in 10" class="h-10 rounded-lg"/>
-  <DataTable v-else :data="aces" :columns="columns" :filters="[{
+  <DataTable v-else :data="principals" :columns="columns" :filters="[{
     name: 'Principal',
     property: 'kerberos',
     options: principals
@@ -41,21 +45,14 @@ export default {
 
     this.loading = true
 
-    this.s.client.Auth.fetch('authz/principal').then((returnObject) => {
-
-      this.aces    = returnObject[1]
-      this.loading = false
-
-    }).catch((err) => {
-      console.error(`Can't read ACEs`, err)
-    })
+    this.getPrincipals()
 
   },
 
   computed: {
     principals () {
       const principals = new Set()
-      this.aces.forEach((a) => principals.add({
+      this.principals.forEach((a) => principals.add({
         label: a.kerberos,
         value: a.kerberos,
       }))
@@ -64,7 +61,7 @@ export default {
 
     uuids () {
       const uuids = new Set()
-      this.aces.forEach((a) => uuids.add({
+      this.principals.forEach((a) => uuids.add({
         label: a.uuid,
         value: a.uuid,
       }))
@@ -73,6 +70,18 @@ export default {
   },
 
   methods: {
+
+    getPrincipals () {
+      this.s.client.Auth.fetch('authz/principal').then((returnObject) => {
+
+        this.principals = returnObject[1]
+        this.loading    = false
+
+      }).catch((err) => {
+        console.error(`Can't read principals`, err)
+      })
+    },
+
     rowClick (row) {
       this.selectedRow = row.original
     },
@@ -94,7 +103,7 @@ export default {
   data () {
     return {
       loading: false,
-      aces: [],
+      principals: [],
       selectedRow: null,
     }
   },

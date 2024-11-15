@@ -1,3 +1,7 @@
+<!--
+  - Copyright (c) University of Sheffield AMRC 2024.
+  -->
+
 <template>
   <div class="flex flex-col flex-1">
     <div v-if="s.loaded && connected" id="app"
@@ -23,12 +27,12 @@
             <div class="text-md font-bold line-clamp-1">
               {{topic.device ?? topic.node}}
             </div>
-            <p class="text-xs">
+            <div class="text-xs">
               <div class="text-xs mt-2 line-clamp-1"
                   :class="pendingDeletions[topic.path] ? 'text-white' : 'text-gray-400'">{{dayjs(
                   updatedTimes.find(e => e.path === topic.path).lastUpdated).fromNow()}}
               </div>
-            </p>
+            </div>
           </CardContent>
         </Card>
       </div>

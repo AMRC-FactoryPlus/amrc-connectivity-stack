@@ -13,12 +13,10 @@ call migrate_to(8, $$
     alter table config
         drop constraint config_object_fkey,
         add foreign key (object) references object on update cascade;
-    alter table class
-        drop constraint class_id_fkey,
-        add foreign key (id) references object on update cascade;
     alter table object
         drop constraint object_class_fkey,
-        add foreign key (class) references class on update cascade;
+        add foreign key (class) references object on update cascade;
+    drop table class;
 
     insert into object (id, uuid, class)
     values (10, 'ddb132e4-5cdd-49c8-b9b1-2f35879eab6d', 1), 
@@ -31,14 +29,14 @@ call migrate_to(8, $$
  
     -- Create new class structure
 
-    create table member (
-        class integer not null references class on update cascade,
+    create table membership (
+        class integer not null references object on update cascade,
         member integer not null references object on update cascade,
         unique(class, member)
     );
     create table subclass (
-        parent integer not null references class on update cascade,
-        child integer not null references class on update cascade,
+        parent integer not null references object on update cascade,
+        child integer not null references object on update cascade,
         unique(parent, child)
     );
 
@@ -46,7 +44,7 @@ call migrate_to(8, $$
     -- _Well-founded set_, the proper class of all sets; as a proper
     -- class it cannot itself be a member of any other class.
 
-    insert into member (class, member)
+    insert into membership (class, member)
     select o.class, o.id from object o
     where o.id != 1;
 

@@ -15,7 +15,7 @@ call migrate_to(9, $$
     values (13, 'dbd8a535-52ba-4f6e-b4f8-9b71aefe09d3')
     on conflict (uuid) do update set id = excluded.id;
     
-    insert into member (class, member)
+    insert into membership (class, member)
     values (2, 13)
     on conflict (class, member) do nothing;
 

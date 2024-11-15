@@ -1,3 +1,7 @@
+<!--
+  - Copyright (c) University of Sheffield AMRC 2024.
+  -->
+
 <script setup lang="ts">
 import type {Table} from '@tanstack/vue-table'
 import {computed} from 'vue'
@@ -6,7 +10,7 @@ import type {Alert} from './columns'
 import DataTableFacetedFilter from './DataTableFacetedFilter.vue'
 import DataTableViewOptions from './DataTableViewOptions.vue'
 import {Button} from '@/components/ui/button'
-import {useAlertsStore} from '@/store/useAlertsStore.js'
+import {useAlertStore} from '@/store/useAlertStore.js'
 
 
 interface DataTableToolbarProps {
@@ -18,7 +22,7 @@ const props = defineProps<DataTableToolbarProps>()
 
 const isFiltered = computed(() => props.table.getState().columnFilters.length > 0)
 
-const a = useAlertsStore();
+const a = useAlertStore();
 
 </script>
 

@@ -1,8 +1,12 @@
+/*
+ * Copyright (c) University of Sheffield AMRC 2024.
+ */
+
 import { defineStore } from 'pinia'
 import { UUIDs } from '@amrc-factoryplus/service-client'
 import * as rx from 'rxjs'
 
-export const useAlertsStore = defineStore('alerts', {
+export const useAlertStore = defineStore('alert', {
   state: () => ({
     alerts: [],
   }),

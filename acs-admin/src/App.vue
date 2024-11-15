@@ -1,4 +1,9 @@
+<!--
+  - Copyright (c) University of Sheffield AMRC 2024.
+  -->
+
 <template>
+  <Toaster rich-colors/>
   <div class="grid h-screen overflow-auto w-full"
       :class="!l.fullscreen ? 'md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]' : 'grid-cols-1'">
     <div v-if="!l.fullscreen" class="hidden border-r bg-muted/40 md:block">
@@ -62,6 +67,7 @@ import Nav from '@/components/Nav.vue'
 import { useServiceClientStore } from '@/store/serviceClientStore.js'
 import { useLayoutStore } from '@/store/layoutStore.js'
 import { useMagicKeys } from '@vueuse/core'
+import { Toaster } from '@/components/ui/sonner'
 
 export default {
   name: 'App',
@@ -95,6 +101,7 @@ export default {
     SheetContent,
     SheetTrigger,
     Nav,
+    Toaster
   },
 
   watch: {

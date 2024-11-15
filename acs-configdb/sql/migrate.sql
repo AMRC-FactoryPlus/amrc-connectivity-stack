@@ -48,6 +48,7 @@ BEGIN;
 \ir v6.sql
 \ir v7.sql
 \ir v8.sql
+\ir v9.sql
 
 \ir grant.sql
 

@@ -32,13 +32,13 @@ call migrate_to(8, $$
     -- Create new class structure
 
     create table member (
-        class integer not null references class,
-        member integer not null references object,
+        class integer not null references class on update cascade,
+        member integer not null references object on update cascade,
         unique(class, member)
     );
     create table subclass (
-        parent integer not null references class,
-        child integer not null references class,
+        parent integer not null references class on update cascade,
+        child integer not null references class on update cascade,
         unique(parent, child)
     );
 

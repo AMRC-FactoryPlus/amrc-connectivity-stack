@@ -50,14 +50,6 @@ export default {
   },
 
   computed: {
-    principals () {
-      const principals = new Set()
-      this.principals.forEach((a) => principals.add({
-        label: a.kerberos,
-        value: a.kerberos,
-      }))
-      return Array.from(principals)
-    },
 
     uuids () {
       const uuids = new Set()
@@ -74,7 +66,12 @@ export default {
     getPrincipals () {
       this.s.client.Auth.fetch('authz/principal').then((returnObject) => {
 
-        this.principals = returnObject[1]
+        this.principals = returnObject[1].map((p) => {
+          return {
+            uuid: p.uuid,
+            kerberos: p.kerberos,
+          }
+        })
         this.loading    = false
 
       }).catch((err) => {

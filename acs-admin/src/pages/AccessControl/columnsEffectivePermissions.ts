@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) University of Sheffield AMRC 2024.
+ */
+
 import type {ColumnDef} from '@tanstack/vue-table'
 import {h} from 'vue'
 import {Badge} from '@/components/ui/badge'
@@ -32,9 +36,11 @@ export const columns: ColumnDef<EffectivePermission>[] = [{
     }),
 
     cell: ({row}) => {
-        if  (row.original.target.uuid === '00000000-0000-0000-0000-000000000000') {
-            return h(Badge, {variant: 'destructive'}, row.original.target.name);
+        if (row.original.target.uuid === '00000000-0000-0000-0000-000000000000') {
+            return h(Badge, {variant: 'destructive'}, {
+                default: () => row.original.target.name
+            });
         }
-        return h('span', {class: 'max-w-[500px] truncate font-medium'}, row.original.target.name)
+        return h('span', {class: 'max-w-[500px] truncate font-medium'}, row.original.target.name);
     },
 }]

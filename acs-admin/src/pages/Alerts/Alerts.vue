@@ -1,3 +1,7 @@
+<!--
+  - Copyright (c) University of Sheffield AMRC 2024.
+  -->
+
 <template>
   <DataTable
       :data="a.alerts"
@@ -16,7 +20,7 @@
 
 <script>
 import { useServiceClientStore } from '@/store/serviceClientStore.js'
-import { useAlertsStore } from '@/store/useAlertsStore.js'
+import { useAlertStore } from '@store/useAlertStore.js'
 
 import { columns } from './columns'
 import DataTable from '@/components/ui/data-table/DataTable.vue'
@@ -30,7 +34,7 @@ export default {
   setup () {
     return {
       s: useServiceClientStore(),
-      a: useAlertsStore(),
+      a: useAlertStore(),
       columns,
     }
   },

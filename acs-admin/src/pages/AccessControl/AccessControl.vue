@@ -7,7 +7,7 @@
     <PrincipalManagementSidebar :selected-row="selectedRow"></PrincipalManagementSidebar>
   </Sheet>
   <Tabs default-value="principals">
-    <TabsList class="mb-3">
+    <TabsList class="mb-6">
       <TabsTrigger value="principals">
         Principals
       </TabsTrigger>

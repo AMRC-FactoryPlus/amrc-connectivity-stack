@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) University of Sheffield AMRC 2024.
+ */
+
 import type {ColumnDef} from '@tanstack/vue-table'
 import {h} from 'vue'
 
@@ -29,7 +33,7 @@ export const columns: ColumnDef<PrincipalMapping>[] = [{
     }),
 
     cell: ({row}) => {
-        return h('span', {class: 'max-w-[500px] truncate font-medium'}, row.getValue('uuid'))
+        return h('span', {class: 'max-w-[500px] truncate text-gray-500'}, row.getValue('uuid'))
     },
     filterFn: (row, id, value) => {
         return value.includes(row.getValue(id))

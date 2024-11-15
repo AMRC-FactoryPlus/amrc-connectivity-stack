@@ -1,6 +1,6 @@
 <template>
   <Sheet :open="selectedRow" @update:open="handleSheetOpen">
-    <EffectivePermissions :selected-row="selectedRow"></EffectivePermissions>
+    <PrincipalManagementSidebar :selected-row="selectedRow"></PrincipalManagementSidebar>
   </Sheet>
   <Skeleton v-if="loading" v-for="i in 10" class="h-10 rounded-lg"/>
   <DataTable v-else :data="aces" :columns="columns" :filters="[{
@@ -34,7 +34,7 @@ export default {
     SheetHeader,
     SheetTitle,
     SheetTrigger,
-    EffectivePermissions: defineAsyncComponent(() => import('./EffectivePermissions.vue')),
+    PrincipalManagementSidebar: defineAsyncComponent(() => import('./PrincipalManagementSidebar.vue')),
   },
 
   async mounted () {

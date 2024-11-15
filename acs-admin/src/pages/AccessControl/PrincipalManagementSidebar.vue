@@ -1,3 +1,7 @@
+<!--
+  - Copyright (c) University of Sheffield AMRC 2024.
+  -->
+
 <template>
   <SheetContent v-if="selectedRow" class="gap-6 flex flex-col overflow-auto">
     <SheetHeader>
@@ -27,7 +31,7 @@ import { UUIDs } from '@amrc-factoryplus/service-client'
 
 export default {
 
-  name: 'EffectivePermissions',
+  name: 'PrincipalManagementSidebar',
 
   components: {
     DataTable,

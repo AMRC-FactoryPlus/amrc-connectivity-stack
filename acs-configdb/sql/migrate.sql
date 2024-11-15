@@ -47,6 +47,7 @@ BEGIN;
 -- Version 6 was the first to use this setup.
 \ir v6.sql
 \ir v7.sql
+\ir v8.sql
 
 \ir grant.sql
 

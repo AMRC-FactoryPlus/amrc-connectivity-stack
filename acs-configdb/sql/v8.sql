@@ -25,6 +25,10 @@ call migrate_to(8, $$
     on conflict (uuid) do update set id = excluded.id, class = excluded.class;
 
     -- GI entries can be more easily updated by service-setup.
+
+    -- This should have always been the default
+    alter table object
+        alter column uuid set default gen_random_uuid();
  
     -- Create new class structure
 
@@ -70,4 +74,27 @@ call migrate_to(8, $$
 
     update config set json = json #- '{deleted}'
     where app = 7 and json ? 'deleted';
+
+    -- Create views to simplify querying the class tree. There is a
+    -- substantial performance benefit to making all_subclass a
+    -- materialized view, but this would mean ensuring it was refreshed
+    -- appropriately. It may be better to cache client-side.
+
+    create view all_class as
+    select id from subclass
+    union select class from subclass
+    union select class from membership;
+
+    create view all_subclass as
+    with recursive sc as (
+        select id class, id from all_class
+        union select p.class, c.id
+            from sc p join subclass c on c.class = p.id
+    )
+    select * from sc;
+
+    create view all_membership as
+    select c.class, m.id
+    from all_subclass c
+        join membership m on c.id = m.class;
 $$);

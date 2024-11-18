@@ -4,7 +4,7 @@
 
 <template>
   <Skeleton v-if="g.loading || loading" v-for="i in 10" class="h-16 rounded-lg mb-2"/>
-  <DataTable v-else :data="g.data" :columns="columns" :filters="[]">
+  <DataTable v-else :data="g.data.map(e => ({...e,principal: principal}))" :columns="columns" :filters="[]">
     <template #toolbar-left>
       <Alert class="mr-6">
         <div class="flex items-start gap-3">

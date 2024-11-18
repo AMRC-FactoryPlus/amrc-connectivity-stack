@@ -17,7 +17,6 @@
 <script>
 import { Skeleton } from '@components/ui/skeleton'
 import DataTable from '@components/ui/data-table/DataTable.vue'
-import { useServiceClientStore } from '@store/serviceClientStore.js'
 import { usePrincipalStore } from '@store/usePrincipalStore.js'
 import { columns } from './principalListColumns.ts'
 
@@ -28,7 +27,6 @@ export default {
 
   setup () {
     return {
-      s: useServiceClientStore(),
       p: usePrincipalStore(),
       columns: columns,
     }

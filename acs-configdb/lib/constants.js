@@ -17,6 +17,7 @@ export const Class = {
     Schema: "83ee28d4-023e-4c2c-ab86-12c24e86372c",
     App: "d319bd87-f42b-4b66-be4f-f82ff48b93f0",
     Service: "265d481f-87a7-4f93-8fc6-53fa64dc11bb",
+    SpecialObj: "ddb132e4-5cdd-49c8-b9b1-2f35879eab6d",
 };
 
 export const App = {
@@ -24,6 +25,11 @@ export const App = {
     Info: "64a8bfa9-7772-45c4-9d1a-9e6290690957",
     SparkplugAddress: "8e32801b-f35a-4cbf-a5c3-2af64d3debd7",
     ConfigSchema: "dbd8a535-52ba-4f6e-b4f8-9b71aefe09d3",
+};
+
+export const SpecialObj = {
+    Wildcard:   "00000000-0000-0000-0000-000000000000",
+    Unowned:    "091e796a-65c0-4080-adff-c3ce01a65b2e",
 };
 
 export const Schema = {

@@ -9,6 +9,7 @@ import { App } from "./constants.js";
 class SpecialApp {
     constructor (model) {
         this.model = model;
+        this.log = model.log;
     }
 
     put (obj, json) { return 405; }
@@ -30,18 +31,13 @@ class ObjectRegistration extends SpecialApp {
     }
 
     async get(obj) {
-        const klass = await this.model.object_class(obj);
-        if (klass == null) return null;
-        return {
-            config: {"class": klass},
-        };
+        this.log("REGISTRATION FOR %s", obj);
+        const info = await this.model.object_info(obj);
+        this.log("REGISTRATION INFO %s: %O", obj, info);
+        return { config: info };
     }
 
-    async put(obj, json) {
-        const klass = json?.class;
-        if (klass == null) return 400;
-        return await this.model.object_set_class(obj, klass);
-    }
+    /* Disallow PUT. Maybe allow PATCH later? */
 }
 
 class ConfigSchema extends SpecialApp {
@@ -76,4 +72,4 @@ class ConfigSchema extends SpecialApp {
     }
 }
 
-export const Specials = [ObjectRegistration, ConfigSchema];
+export const SpecialApps = [ObjectRegistration, ConfigSchema];

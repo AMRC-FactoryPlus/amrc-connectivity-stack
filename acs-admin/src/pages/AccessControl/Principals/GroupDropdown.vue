@@ -10,10 +10,13 @@ import {Button} from '@/components/ui/button'
 import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger} from '@/components/ui/dropdown-menu'
 import {toast} from "vue-sonner";
 import {useDialog} from '@/composables/useDialog';
+import {useServiceClientStore} from '@store/serviceClientStore.js'
 
 interface DataTableRowActionsProps {
     row: Row<Alert>
 }
+
+const s = useServiceClientStore()
 
 const props = defineProps<DataTableRowActionsProps>()
 
@@ -23,13 +26,18 @@ function copy(id: string) {
 }
 
 function handleDelete() {
-    console.log(props.row.original);
     useDialog({
         title: 'Remove from group?',
-        message: `Are you sure that you want to remove this user from the ${props.row.original.name} group? The user will lose all permissions associated with the group.`,
+        message: `Are you sure that you want to remove ${props.row.original.principal.kerberos} from the ${props.row.original.name} group? The user will lose all permissions associated with the group.`,
         confirmText: 'Remove from Group',
         onConfirm: () => {
-            toast.error('This feature is not implemented yet')
+            console.log(props.row.original.principal);
+            s.client.Auth.remove_from_group(props.row.original.uuid, props.row.original.principal.uuid).then(() => {
+                toast.success(`${props.row.original.principal.kerberos} has been removed from the ${props.row.original.name} group`)
+            }).catch((err) => {
+                toast.error(`Unable to remove ${props.row.original.principal.kerberos} from ${props.row.original.name}`)
+                console.error(`Unable to remove ${props.row.original.principal.kerberos} from ${props.row.original.name}`, err)
+            })
         }
     });
 }

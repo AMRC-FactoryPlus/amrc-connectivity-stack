@@ -25,28 +25,29 @@ call migrate_to(8, $$
     on conflict (uuid) do update set id = excluded.id, class = excluded.class;
 
     -- GI entries can be more easily updated by service-setup.
-    -- Subclass relationships ditto.
  
     -- Create new class structure
 
     create table membership (
         class integer not null references object on update cascade,
-        member integer not null references object on update cascade,
-        unique(class, member)
+        id integer not null references object on update cascade,
+        unique(class, id)
     );
     create table subclass (
-        parent integer not null references object on update cascade,
-        child integer not null references object on update cascade,
-        unique(parent, child)
+        class integer not null references object on update cascade,
+        id integer not null references object on update cascade,
+        unique(class, id)
     );
 
     -- We exclude id 1 _Class definition_ here. This will become
     -- _Well-founded set_, the proper class of all sets; as a proper
     -- class it cannot itself be a member of any other class.
 
-    insert into membership (class, member)
+    insert into membership (class, id)
     select o.class, o.id from object o
     where o.id != 1;
+
+    -- Subclass relationships can be created by s-s.
 
     insert into config (app, object, json)
     select 7, o.id, jsonb_build_object('primaryClass', c.uuid)

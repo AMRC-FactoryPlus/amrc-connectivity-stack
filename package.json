@@ -12,6 +12,7 @@
   "license": "ISC",
   "dependencies": {
     "content-type": "^1.0.5",
+    "isomorphic-ws": "^5.0.0",
     "mqtt": "^5.3.6",
     "optional-js": "^2.3.0",
     "semver": "^7.6.0",
@@ -20,5 +21,11 @@
   "optionalDependencies": {
     "got-fetch": "^5.1.8",
     "gssapi.js": "^2.0.1"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.1.0",
+    "@eslint/js": "^9.13.0",
+    "eslint": "^9.13.0",
+    "globals": "^15.11.0"
   }
 }

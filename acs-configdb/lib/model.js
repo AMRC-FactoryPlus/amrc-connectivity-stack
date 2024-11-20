@@ -269,11 +269,18 @@ export default class Model extends EventEmitter {
         return [st];
     }
 
-    class_list() {
+    class_list () {
         return _q_uuids(this.db.query.bind(this.db), `
             select o.uuid
             from all_class k join object o on o.id = k.id
         `)
+    }
+
+    class_list_proper () {
+        return _q_uuids(this.db.query.bind(this.db), `
+            select o.uuid from object o
+            where o.id not in (select id from membership)
+        `);
     }
 
     _class_lookup (query, id, table) {

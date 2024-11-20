@@ -21,6 +21,12 @@ class SpecialApp {
  * the database like everyone else. Then they would get the benefit of
  * etags and any other future improvements to config handling
  * (e.g. transactions, ownership, ...).
+ *
+ * Idea: these are both sideways caches, in that we the ConfigDB need
+ * access to the information in a form other than JSON. They both also
+ * need different validation from normal entries. So maybe all we need
+ * here is a pre-PUT validate-and-cache method which can update our
+ * sideways storage (object table, schema cache).
  */
 
 class ObjectRegistration extends SpecialApp {

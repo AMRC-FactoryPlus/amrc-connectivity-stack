@@ -73,7 +73,8 @@ export default class API {
         api.get("/object", this.object_list.bind(this));
         api.post("/object", this.object_create.bind(this));
         api.delete("/object/:object", this.object_delete.bind(this));
-        api.get("/class", this.class_list.bind(this));
+        api.get("/class", this.class_list.bind(this, false));
+        api.get("/class/proper", this.class_list.bind(this, true));
         api.get("/class/:class", compat(`/class/:class/all/member`));
 
         const clk = t => this.class_lookup.bind(this, t);
@@ -198,11 +199,14 @@ export default class API {
         rv ? res.json(rv) : res.end();
     }
 
-    async class_list(req, res) {
+    async class_list(proper, req, res) {
         const ok = await this.auth.check_acl(req.auth, Perm.Manage_Obj, UUIDs.Null);
         if (!ok) return res.status(403).end();
 
-        const list = await this.model.class_list();
+        const list = await (proper 
+            ? this.model.class_list_proper()
+            : this.model.class_list());
+
         return res.status(200).json(list);
     }
 

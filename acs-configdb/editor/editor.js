@@ -4,6 +4,9 @@
  * Copyright 2022 AMRC
  */
 
+/* Tell ESLint this is DOM code. */
+/* global document */
+
 import { h, render, createContext } 
                     from "https://esm.sh/preact@10.19.2";
 import { useContext, useEffect, useRef, useState }
@@ -61,27 +64,19 @@ async function fetch_json(path) {
     return json;
 }
 
-async function get_class(obj) {
-    const reg = await fetch_json(`app/${AppUuid.Registration}/object/${obj}`);
-    return reg ? reg["class"] : null;
-}
-
-async function _get_name (obj) {
-    const gi = await fetch_json(`app/${AppUuid.General_Info}/object/${obj}`);
-    return gi 
-        ? gi.deleted
-            ? html`<s>${gi.name}</s>`
-            : gi.name
-        : html`<i>NO NAME</i>`;
-}
-
 async function get_name (obj, with_class) {
-    const name = await _get_name(obj);
-    if (!with_class) return name;
+    const [reg, inf] = await Promise.all(
+        [AppUuid.Registration, AppUuid.General_Info]
+        .map(app => fetch_json(`app/${app}/object/${obj}`)));
 
-    const kid = await get_class(obj);
-    const kname = kid ? await _get_name(kid) : html`<i>NO CLASS</i>`;
-    return html`${name} <small>(${kname})</small>`;
+    const name = inf ? inf.name : html`<i>NO NAME</i>`;
+    const dname = reg.deleted ? html`<s>${name}</s>` : name;
+    if (!with_class) return dname;
+
+    const kname = inf?.primaryClass
+        ? await get_name(inf.primaryClass, false)
+        : html`<i>Proper class</i>`;
+    return html`${dname} <small>(${kname})</small>`;
 }
 
 function st_ok (st) { return st >= 200 && st < 300; }
@@ -138,11 +133,11 @@ function build_opener() {
 }
 
 function Opener(props) {
-    const { obj, children, with_class } = props;
+    const { obj, children } = props;
     const [open, button] = build_opener();
 
     const title = "obj" in props
-        ? html`<${ObjTitle} obj=${obj} with_class=${with_class}/>`
+        ? html`<${ObjTitle} obj=${obj}/>`
         : props.title;
 
     return html`
@@ -168,10 +163,10 @@ function Uuid(props) {
 }
 
 function ObjTitle(props) {
-    const { obj, with_class } = props;
+    const { obj } = props;
     const [name, set_name] = useState("...");
 
-    useEffect(async () => set_name(await get_name(obj, with_class)), [obj]);
+    useEffect(async () => set_name(await get_name(obj, true)), [obj]);
 
     return html`
         <${Uuid}>${obj}<//> ${name}`;
@@ -276,54 +271,82 @@ function Apps(props) {
     `;
 }
 
+const Classes = createContext(null);
+
 function Objs(props) {
     const [classes, set_classes] = useState(null);
+    const [proper, set_proper] = useState(null);
 
-    useEffect(async () => set_classes(await fetch_json("class")), []);
+    useEffect(() => {
+        fetch_json("class")
+            .then(cs => new Set(cs))
+            .then(set_classes);
+        fetch_json("class/proper").then(set_proper);
+    }, []);
 
+    if (!classes || !proper)
+        return html`<b>...</b>`;
+
+    const disp = proper.map(c => html`<${Obj} obj=${c} key=${c}/>`)
+  
     return html`
         <${NewObj}/>
-        <dl>${
-                classes?.map(c => html`
-                    <${Opener} obj=${c} key=${c}>
-                        <${Klass} klass=${c}/></
-                        />`)
-                ?? html`<br/><b>...</b>`
-        }
-        </dl>
+        <${Classes.Provider} value=${classes}>
+            <dl>${disp}</dl>
+        <//>
     `;
 }
 
 function Klass(props) {
     const {klass} = props;
+    const [subs, set_subs] = useState(null);
     const [objs, set_objs] = useState(null);
 
-    const update = async () => set_objs(await fetch_json(`class/${klass}`));
+    const update = () => {
+        fetch_json(`class/${klass}/member`).then(set_objs);
+        fetch_json(`class/${klass}/subclass`).then(set_subs);
+    };
     useEffect(update, [klass]);
 
-    return html`${
-        objs?.map(o => html`
-            <${Obj} obj=${o} key=${o} update=${update}/><br/>`)
-        ?? html`<b>...</b><br/>`
-    }`;
+    const notyet = html`<b>...</b><br/>`;
+    const hsubs = subs?.map(s => 
+        html`<${Klass} klass=${s} key=${s}/>`);
+    const hobjs = objs?.map(o =>
+        html`<${MaybeKlass} obj=${o} key=${o}/>`);
+
+    return html`
+        <b>Subclasses</b><br/>
+        ${hsubs ?? notyet}
+        <b>Members</b><br/>
+        ${hobjs ?? notyet}
+    `;
 }
 
 function Obj(props) {
     const {obj, update} = props;
     const [msg, set_msg] = useState("");
 
-    const do_delete = async () => {
+    return html`<${ObjTitle} obj=${obj}/><br/>`;
+}
+
+function MaybeKlass (props) {
+    const {obj} = props;
+    const classes = useContext(Classes);
+
+    /*const do_delete = async () => {
         const ok = await delete_path(`object/${obj}`);
         if (!ok) set_msg("Delete failed");
         await update();
-    };
+    };*/
+
+    if (!classes) return;
+    if (!classes.has(obj))
+        return html`<${Obj} obj=${obj}/>`;
 
     return html`
-        <button onClick=${do_delete}>Delete
-        </button
-        >
-        <${ObjTitle} obj=${obj}
-        /> ${msg}
+        <${Opener} obj=${obj} key=${obj}>
+            <${Klass} klass=${obj}/>
+        <//>
     `;
 }
 
@@ -382,7 +405,7 @@ function App(props) {
             <${Opener} title="New config">
                 <${NewConf} update=${update} app=${app}/><//>
             ${objs.map(o => html`
-                <${Opener} key=${o} obj=${o} with_class=${true}>
+                <${Opener} key=${o} obj=${o}>
                     <${Conf} app=${app} obj=${o} update_parent=${update}/>
                 <//>
             `)}

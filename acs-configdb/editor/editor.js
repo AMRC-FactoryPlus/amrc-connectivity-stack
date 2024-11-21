@@ -54,7 +54,7 @@ async function service_fetch(path, opts) {
 }
 
 async function fetch_json(path) {
-    const rsp = await service_fetch(`/v1/${path}`);
+    const rsp = await service_fetch(`/v2/${path}`);
     if (rsp.status != 200) return;
 
     const json = await rsp.json();
@@ -287,7 +287,8 @@ function Objs(props) {
     if (!classes || !proper)
         return html`<b>...</b>`;
 
-    const disp = proper.map(c => html`<${Obj} obj=${c} key=${c}/>`)
+    const disp = proper.map(c => 
+        html`<${Obj} obj=${c} key=${c} klass=${true}/>`)
   
     return html`
         <${NewObj}/>
@@ -310,9 +311,9 @@ function Klass(props) {
 
     const notyet = html`<b>...</b><br/>`;
     const hsubs = subs?.map(s => 
-        html`<${Klass} klass=${s} key=${s}/>`);
+        html`<${Obj} obj=${s} key=${s} klass=${true}/>`);
     const hobjs = objs?.map(o =>
-        html`<${MaybeKlass} obj=${o} key=${o}/>`);
+        html`<${Obj} obj=${o} key=${o}/>`);
 
     return html`
         <b>Subclasses</b><br/>
@@ -322,15 +323,8 @@ function Klass(props) {
     `;
 }
 
-function Obj(props) {
-    const {obj, update} = props;
-    const [msg, set_msg] = useState("");
-
-    return html`<${ObjTitle} obj=${obj}/><br/>`;
-}
-
-function MaybeKlass (props) {
-    const {obj} = props;
+function Obj (props) {
+    const {obj, klass} = props;
     const classes = useContext(Classes);
 
     /*const do_delete = async () => {
@@ -340,8 +334,8 @@ function MaybeKlass (props) {
     };*/
 
     if (!classes) return;
-    if (!classes.has(obj))
-        return html`<${Obj} obj=${obj}/>`;
+    if (!klass && !classes.has(obj))
+        return html`<${ObjTitle} obj=${obj}/><br/>`;
 
     return html`
         <${Opener} obj=${obj} key=${obj}>

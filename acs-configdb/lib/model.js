@@ -510,7 +510,7 @@ export default class Model extends EventEmitter {
             select o.uuid, jsonb_strip_nulls(r.results) results
             from config c
                 join results r on r.id = c.id
-                join object o on o.id = c.id
+                join object o on o.id = c.object
                 ${k_join}
             where r.matches
                 and c.app = $1

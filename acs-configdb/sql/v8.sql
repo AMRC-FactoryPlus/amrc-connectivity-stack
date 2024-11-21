@@ -2,11 +2,15 @@
 -- Database creation/upgrade DDL.
 -- Copyright 2023 AMRC.
 
-call migrate_to(8, $$
-    -- XXX We want to create a new Special, Unowned. Special and
-    -- Wildcard should have both been in our private id space from the
-    -- start, so we need to move them there now.
-    
+call migrate_to(8, $migrate$
+    -- These should have been done before
+    alter table config
+        alter column etag set not null;
+    alter table object
+        alter column uuid set default gen_random_uuid();
+
+    -- FKs to the other tables need moving to object. Make them cascade
+    -- so we can move objects to our private ID space.
     alter table app
         drop constraint app_id_fkey,
         add foreign key (id) references object on update cascade;
@@ -14,22 +18,10 @@ call migrate_to(8, $$
         drop constraint config_object_fkey,
         add foreign key (object) references object on update cascade;
     alter table object
+        -- we are about to remove this column
         drop constraint object_class_fkey,
-        add foreign key (class) references object on update cascade;
-    drop table class;
+        alter column class drop not null;
 
-    insert into object (id, uuid, class)
-    values (10, 'ddb132e4-5cdd-49c8-b9b1-2f35879eab6d', 1), 
-        (11, '00000000-0000-0000-0000-000000000000', 10), 
-        (12, '091e796a-65c0-4080-adff-c3ce01a65b2e', 10)
-    on conflict (uuid) do update set id = excluded.id, class = excluded.class;
-
-    -- GI entries can be more easily updated by service-setup.
-
-    -- This should have always been the default
-    alter table object
-        alter column uuid set default gen_random_uuid();
- 
     -- Create new class structure
 
     create table membership (
@@ -43,37 +35,53 @@ call migrate_to(8, $$
         unique(class, id)
     );
 
-    -- We exclude id 1 _Class definition_ here. This will become
-    -- _Well-founded set_, the proper class of all sets; as a proper
-    -- class it cannot itself be a member of any other class.
+    create function set_primary_class(xobj integer, xclass integer)
+        returns void language sql
+        as $$
+            insert into membership (id, class)
+                values (xobj, xclass)
+                on conflict (id, class) do nothing;
+            insert into config (app, object, json)
+                select 7, xobj, jsonb_build_object(
+                        'primaryClass', c.uuid)
+                    from object c
+                    where c.id = xclass
+                on conflict (app, object) do update
+                    set json = config.json || excluded.json,
+                        etag = default;
+        $$;
 
-    insert into membership (class, id)
-    select o.class, o.id from object o
-    where o.id != 1;
-
-    -- Subclass relationships can be created by s-s.
-
+    insert into object (id, uuid)
+    values (0, 'd7445df3-7394-4404-af1d-af287f30a6f2'),
+        (10, '1f2ee062-6782-48c8-926b-904f56bd18b1'),
+        (11, '33343846-8c14-4cb0-8027-989071a20724'),
+        (12, 'e5ba3bd1-2943-4818-84be-5733e865d398');
     insert into config (app, object, json)
-    select 7, o.id, jsonb_build_object('primaryClass', c.uuid)
-    from object o
-        join object c on c.id = o.class
-        where o.id != 1
-    on conflict (app, object) do update
-        set json = config.json || excluded.json,
-            etag = default;
+        values (7, 0, '{ "name": "Object" }'),
+            (7, 10, '{ "name": "Rank of object" }'),
+            (7, 11, '{ "name": "Individual" }'),
+            (7, 12, '{ "name": "Rank 1 class" }');
 
-    alter table object drop column class,
-        add column owner integer not null references object default 12,
-        add column deleted boolean not null default false;
+    select set_primary_class(11, 10);
+    select set_primary_class(12, 10);
+    insert into subclass (id, class)
+        values (1, 0), (11, 0), (10, 1), (12, 1);
 
-    update object o set deleted = true
-    from config c
-    where o.id = c.object
-        and c.app = 7
-        and c.json->'deleted' = 'true';
+    -- Classify individuals into their correct classes
+    select set_primary_class(o.id, o.class)
+        from object o
+        where o.class != 1;
 
-    update config set json = json #- '{deleted}'
-    where app = 7 and json ? 'deleted';
+    -- Existing classes are R1 and subclasses of Individual
+    select set_primary_class(c.id, 12)
+        from class c
+        where c.id != 1;
+    insert into subclass (id, class)
+        select c.id, 11 from class c
+        where c.id != 1;
+
+    drop table class;
+    alter table object drop column class;
 
     -- Create views to simplify querying the class tree. There is a
     -- substantial performance benefit to making all_subclass a
@@ -97,4 +105,10 @@ call migrate_to(8, $$
     select c.class, m.id
     from all_subclass c
         join membership m on c.id = m.class;
-$$);
+
+    -- This is useful when querying directly
+    create view names as
+    select object as id, json->>'name' as name
+    from config c
+    where app = 7;
+$migrate$);

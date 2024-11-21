@@ -21,15 +21,19 @@ const DB_Version = 9;
 /* Well-known object IDs. This is cheating but it's stupid to keep
  * looking them up. */
 const ObjID = {
+    Object:         0,
     Class:          1,
     App:            2,
-    Object:         6,
+    Registration:   6,
     Info:           7,
     ConfigDB:       9,
-    Special:        10,
-    Wildcard:       11,
-    Unowned:        12,
-    ConfigSchema:   13,
+    Rank:           10,
+    Individual:     11,
+    R1Class:        12,
+    Special:        13,
+    Wildcard:       14,
+    Unowned:        15,
+    ConfigSchema:   16,
 };
 
 const Immutable = new Set([

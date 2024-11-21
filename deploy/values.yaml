@@ -3,6 +3,10 @@ acs:
   organisation: AMRC
   # -- The base URL that services will be served from
   baseUrl: factoryplus.myorganisation.com
+  # -- Whether or not to create a core-dns patch ConfigMap to redirect
+  # baseUrl requests from inside the cluster to the internal service of
+  # Traefik
+  patchCoreDNS: true
   # -- Whether or not services should be served over HTTPS
   secure: true
   letsEncrypt:

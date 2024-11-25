@@ -681,14 +681,12 @@ export default class Model extends EventEmitter {
             for (const [object, conf] of Object.entries(objs)) {
                 /* Hack: we always patch Info, as the v2 object creation
                  * will have created the primaryClass propery. */
-                if (app == App.Info) {
-                    await this.config_merge_patch(
-                        { app, object }, conf, () => {});
-                    continue;
-                }
-                const st = await this.config_put(
-                    {app, object, exclusive: !overwrite},
-                    conf);
+                const st = app == App.Info
+                    ? await this.config_merge_patch(
+                        { app, object }, conf, () => {})
+                    : await this.config_put(
+                        {app, object, exclusive: !overwrite},
+                        conf);
                 if (st > 299 && st != 409) {
                     this.log("Dump failed [%s] on config %s/%s", 
                         st, app, object);

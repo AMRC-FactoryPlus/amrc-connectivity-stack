@@ -81,11 +81,13 @@ async function get_name (obj, with_class) {
 
 function st_ok (st) { return st >= 200 && st < 300; }
 
-async function put_string(path, conf, method = "PUT") {
+async function put_string(path, conf, method, type) {
+    method ??= "PUT";
+    type ??= "application/json";
     const rsp = await service_fetch(`/v1/${path}`, {
-        method: method,
+        method,
         headers: {
-            "Content-Type": "application/json",
+            "Content-Type": type,
         },
         body: conf,
     });
@@ -93,8 +95,12 @@ async function put_string(path, conf, method = "PUT") {
     return rsp.status;
 }
 
-function put_json(path, json, method = "PUT") {
-    return put_string(path, JSON.stringify(json), method);
+function put_json(path, json, method, type) {
+    return put_string(path, JSON.stringify(json), method, type);
+}
+
+function patch_json (path, patch) {
+    return put_json(path, patch, "PATCH", "application/merge-patch+json");
 }
 
 async function post_json(path, json) {
@@ -364,7 +370,7 @@ function NewObj(props) {
 
             const name = new_name.current?.value;
             if (name) {
-                await put_json(
+                await patch_json(
                     `app/${AppUuid.General_Info}/object/${rsp.uuid}`,
                     {name});
             }

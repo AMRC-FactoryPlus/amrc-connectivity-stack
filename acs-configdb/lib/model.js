@@ -192,7 +192,7 @@ export default class Model extends EventEmitter {
     async object_create(uuid, klass) {
         const obj = await this.db.txn({}, async query => {
             const class_id = await this._class_id(query, klass);
-            if (!class_id) return 404;
+            if (class_id == null) return 404;
 
             const obj = await (uuid
                 ? this._object_create(query, uuid)
@@ -227,7 +227,7 @@ export default class Model extends EventEmitter {
             if (Immutable.has(object)) return [405];
 
             const id = this._obj_id(query, object);
-            if (!id) return [404];
+            if (id == null) return [404];
 
             const members = await _q_uuids(query, `
                 select o.uuid 
@@ -298,7 +298,7 @@ export default class Model extends EventEmitter {
     class_lookup (klass, table) {
         return this.db.txn({}, async query => {
             const id = await this._class_id(query, klass);
-            if (!id) return;
+            if (id == null) return;
             return this._class_lookup(query, id, table);
         });
     }

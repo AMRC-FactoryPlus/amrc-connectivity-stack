@@ -21,6 +21,10 @@ const AppUuid = {
     Registration: "cb40bed5-49ad-4443-a7f5-08c75009da8f",
     General_Info: "64a8bfa9-7772-45c4-9d1a-9e6290690957",
 };
+const Class = {
+    Rank:       "1f2ee062-6782-48c8-926b-904f56bd18b1",
+    Individual: "33343846-8c14-4cb0-8027-989071a20724",
+};
 
 let Token = null;
 
@@ -187,16 +191,13 @@ function Editor(props) {
         <dl>
             <${Opener} title="Applications">
                 <${Apps}/>
-            </
-            />
+            <//>
             <${Opener} title="Objects">
                 <${Objs}/>
-            </
-            />
+            <//>
             <${Opener} title="JSON dumps">
                 <${Dumps}/>
-            </
-            />
+            <//>
         </dl>
     `
 }
@@ -277,49 +278,70 @@ function Apps(props) {
     `;
 }
 
-const Classes = createContext(null);
-
 function Objs(props) {
-    const [classes, set_classes] = useState(null);
-    const [proper, set_proper] = useState(null);
+    const [ranks, set_ranks] = useState(null);
 
     useEffect(() => {
-        fetch_json("class")
-            .then(cs => new Set(cs))
-            .then(set_classes);
-        fetch_json("class/proper").then(set_proper);
+        fetch_json(`class/${Class.Rank}/direct/member`).then(set_ranks);
     }, []);
 
-    if (!classes || !proper)
+    if (!ranks)
         return html`<b>...</b>`;
 
-    const disp = proper.map(c => 
-        html`<${Obj} obj=${c} key=${c} klass=${true}/>`)
+    const hranks = ranks.map(r => html`
+        <${Opener} obj=${r} key=${r}><${Rank} rank=${r}/><//>
+    `);
   
     return html`
         <${NewObj}/>
-        <${Classes.Provider} value=${classes}>
-            <dl>${disp}</dl>
-        <//>
+        <dl>
+            ${hranks}
+            <${Opener} title="Unclassified objects" key="all">
+                <${Unclassified}/>
+            <//>
+        </dl>
     `;
 }
 
+function Rank (props) {
+    const { rank } = props;
+    const [subs, set_subs] = useState(null);
+
+    useEffect(() =>
+        fetch_json(`class/${rank}/direct/subclass`).then(set_subs), []);
+
+    if (!subs) return html`<b>...</b>`;
+
+    return subs.map(s => html`<${Obj} obj=${s} key=${s} klass=${true}/>`);
+}
+
+function Unclassified (props) {
+    const [objs, set_objs] = useState(null);
+
+    useEffect(() => fetch_json("/object/unclassified").then(set_objs), []);
+
+    if (!objs) return html`<b>...</b>`;
+
+    return objs.map(o => 
+        html`<${Obj} obj=${o} key=${o} all=${true}/>`);
+}
+
 function Klass(props) {
-    const {klass} = props;
+    const {klass, all} = props;
     const [subs, set_subs] = useState(null);
     const [objs, set_objs] = useState(null);
 
     const update = () => {
-        fetch_json(`class/${klass}/member`).then(set_objs);
-        fetch_json(`class/${klass}/subclass`).then(set_subs);
+        fetch_json(`class/${klass}/direct/member`).then(set_objs);
+        fetch_json(`class/${klass}/direct/subclass`).then(set_subs);
     };
     useEffect(update, [klass]);
 
     const notyet = html`<b>...</b><br/>`;
     const hsubs = subs?.map(s => 
-        html`<${Obj} obj=${s} key=${s} klass=${true}/>`);
+        html`<${Obj} obj=${s} key=${s} klass=${true} all=${all}/>`);
     const hobjs = objs?.map(o =>
-        html`<${Obj} obj=${o} key=${o}/>`);
+        html`<${Obj} obj=${o} key=${o} all=${all}/>`);
 
     return html`
         <b>Subclasses</b><br/>
@@ -330,8 +352,13 @@ function Klass(props) {
 }
 
 function Obj (props) {
-    const {obj, klass} = props;
-    const classes = useContext(Classes);
+    const {obj, klass, all} = props;
+    const [ind, set_ind] = useState(false);
+
+    if (!klass && !all)
+        useEffect(() => service_fetch(
+            `class/${Class.Individual}/any/member/${obj}`)
+            .then(rsp => set_ind(rsp.status == 204)));
 
     /*const do_delete = async () => {
         const ok = await delete_path(`object/${obj}`);
@@ -339,13 +366,12 @@ function Obj (props) {
         await update();
     };*/
 
-    if (!classes) return;
-    if (!klass && !classes.has(obj))
+    if (ind)
         return html`<${ObjTitle} obj=${obj}/><br/>`;
 
     return html`
         <${Opener} obj=${obj} key=${obj}>
-            <${Klass} klass=${obj}/>
+            <${Klass} klass=${obj} all=${all}/>
         <//>
     `;
 }

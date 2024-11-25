@@ -133,6 +133,13 @@ export default class Model extends EventEmitter {
             `select o.uuid from object o`);
     }
 
+    object_unclassified () {
+        return _q_uuids(this.db.query.bind(this.db), `
+            select o.uuid from object o
+            where o.id not in (select id from membership)
+        `);
+    }
+
     /* XXX This is the correct place to set the owner of the new object
      * but I don't have access to that information yet. */
     async _object_create (query, uuid) {
@@ -288,13 +295,6 @@ export default class Model extends EventEmitter {
         `)
     }
 
-    class_list_proper () {
-        return _q_uuids(this.db.query.bind(this.db), `
-            select o.uuid from object o
-            where o.id not in (select id from membership)
-        `);
-    }
-
     _class_lookup (query, id, table) {
         return _q_uuids(query, `
             select o.uuid
@@ -309,6 +309,17 @@ export default class Model extends EventEmitter {
             if (id == null) return;
             return this._class_lookup(query, id, table);
         });
+    }
+
+    async class_has (klass, table, obj) {
+        const dbr = await this.db.query(`
+            select 1
+            from ${table} r
+                join object c on c.id = r.class
+                join object o on o.id = r.id
+            where c.uuid = $1 and o.uuid = $2
+        `, [klass, obj]);
+        return !!dbr.rows;
     }
 
     class_add_member (klass, obj) {

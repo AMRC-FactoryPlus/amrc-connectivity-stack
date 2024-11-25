@@ -49,21 +49,25 @@ export class APIv2 {
             }
         };
 
-        api.get("/app", compat(`/class/${Class.App}/all/member`));
+        api.get("/app", compat(`/class/${Class.App}/any/member`));
+        api.get("/class", compat(`/class/${Class.Class}/any/member`));
 
         api.get("/object", this.object_list.bind(this));
         api.post("/object", this.object_create.bind(this));
         api.delete("/object/:object", this.object_delete.bind(this));
+        api.get("/object/unclassified", this.object_unclassified.bind(this));
 
-        api.get("/class", this.class_list.bind(this, false));
-        api.get("/class/proper", this.class_list.bind(this, true));
         api.get("/class/:class", this.class_info.bind(this));
 
-        const clk = t => this.class_lookup.bind(this, t);
-        api.get("/class/:class/member", clk("membership"));
-        api.get("/class/:class/subclass", clk("subclass"));
-        api.get("/class/:class/all/member", clk("all_membership"));
-        api.get("/class/:class/all/subclass", clk("all_subclass"));
+        const clookup = (path, table) => {
+            const lookup = this.class_lookup.bind(this, table);
+            api.get(`/class/:class/${path}`, lookup);
+            api.get(`/class/:class/${path}/:object`, lookup);
+        };
+        clookup("direct/member", "membership");
+        clookup("direct/subclass", "subclass");
+        clookup("any/member", "all_membership");
+        clookup("any/subclass", "all_subclass");
 
         api.get("/app/:app/object", this.config_list.bind(this));
         api.get("/app/:app/class/:class", this.config_list.bind(this));
@@ -164,6 +168,13 @@ export class APIv2 {
         res.status(200).json(list);
     }
 
+    async object_unclassified(req, res) {
+        const ok = await this.auth.check_acl(req.auth, Perm.Manage_Obj, UUIDs.Null);
+        if (!ok) return res.status(403).end();
+        const list = await this.model.object_unclassified();
+        return res.status(200).json(list);
+    }
+
     async object_create(req, res) {
         let {uuid, "class": klass} = req.body;
 
@@ -190,14 +201,10 @@ export class APIv2 {
         rv ? res.json(rv) : res.end();
     }
 
-    async class_list(proper, req, res) {
+    async class_list(req, res) {
         const ok = await this.auth.check_acl(req.auth, Perm.Manage_Obj, UUIDs.Null);
         if (!ok) return res.status(403).end();
-
-        const list = await (proper 
-            ? this.model.class_list_proper()
-            : this.model.class_list());
-
+        const list = await this.model.class_list();
         return res.status(200).json(list);
     }
 
@@ -219,12 +226,17 @@ export class APIv2 {
     }
 
     async class_lookup (rel, req, res) {
-        const klass = req.params.class;
+        const { class: klass, object } = req.params;
         if (!Valid.uuid.test(klass))
             return res.status(410).end();
 
         const ok = await this.auth.check_acl(req.auth, Perm.Manage_Obj, klass, true);
         if (!ok) return res.status(403).end();
+
+        if (object) {
+            const present = await this.model.class_has(klass, rel, object);
+            return present ? 204 : 404;
+        }
 
         const list = await this.model.class_lookup(klass, rel);
         if (!list) return res.status(404).end();

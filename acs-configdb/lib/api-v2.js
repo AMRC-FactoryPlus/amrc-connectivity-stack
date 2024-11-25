@@ -99,7 +99,7 @@ export class APIv2 {
 
     async app_get(req, res) {
         if (!Valid.uuid.test(req.params.app))
-            return res.status(404).end();
+            return res.status(410).end();
 
         const ok = await this.auth.check_acl(req.auth, Perm.Manage_Obj, Class.App, true);
         if (!ok) return res.status(403).end();
@@ -121,7 +121,7 @@ export class APIv2 {
 
     async app_schema_get(req, res) {
         if (!Valid.uuid.test(req.params.app))
-            return res.status(404).end();
+            return res.status(410).end();
 
         const app = req.params.app;
 
@@ -137,7 +137,7 @@ export class APIv2 {
 
     async app_schema_put(req, res) {
         if (!Valid.uuid.test(req.params.app))
-            return res.status(404).end();
+            return res.status(410).end();
 
         const app = req.params.app;
 
@@ -179,7 +179,7 @@ export class APIv2 {
     async object_delete(req, res) {
         const {object} = req.params;
         if (!Valid.uuid.test(object))
-            return res.status(404).end();
+            return res.status(410).end();
 
         const ok = await this.auth.check_acl(req.auth, Perm.Delete_Obj, object, true);
         if (!ok) return res.status(403).end();
@@ -204,7 +204,7 @@ export class APIv2 {
     async class_info (req, res) {
         const klass = req.params.class;
         if (!Valid.uuid.test(klass))
-            return res.status(404).end();
+            return res.status(410).end();
 
         const ok = await this.auth.check_acl(req.auth, Perm.Manage_Obj, klass, true);
         if (!ok) return res.status(403).end();
@@ -221,7 +221,7 @@ export class APIv2 {
     async class_lookup (rel, req, res) {
         const klass = req.params.class;
         if (!Valid.uuid.test(klass))
-            return res.status(404).end();
+            return res.status(410).end();
 
         const ok = await this.auth.check_acl(req.auth, Perm.Manage_Obj, klass, true);
         if (!ok) return res.status(403).end();
@@ -233,8 +233,8 @@ export class APIv2 {
 
     async config_list(req, res) {
         let {app, "class": klass} = req.params;
-        if (!Valid.uuid.test(app) || !Valid.uuid.test(klass))
-            return res.status(404).end();
+        if (!Valid.uuid.test(app) || (klass && !Valid.uuid.test(klass)))
+            return res.status(410).end();
 
         const ok = await this.auth.check_acl(req.auth, Perm.Read_App, app, true);
         if (!ok) return res.status(403).end();
@@ -252,7 +252,7 @@ export class APIv2 {
     async config_get(req, res) {
         const { app, object } = req.params;
         if (!Valid.uuid.test(app) || !Valid.uuid.test(object))
-            return res.status(404).end();
+            return res.status(410).end();
 
         const ok = await this.auth.check_acl(req.auth, Perm.Read_App,
             req.params.app, true);
@@ -276,7 +276,7 @@ export class APIv2 {
     async config_put(req, res) {
         const { app, object } = req.params;
         if (!Valid.uuid.test(app) || !Valid.uuid.test(object))
-            return res.status(404).end();
+            return res.status(410).end();
         const ok = await this.auth.check_acl(req.auth, Perm.Write_App,
             req.params.app, true);
         if (!ok) return res.status(403).end();
@@ -295,7 +295,7 @@ export class APIv2 {
     async config_delete(req, res) {
         const { app, object } = req.params;
         if (!Valid.uuid.test(app) || !Valid.uuid.test(object))
-            return res.status(404).end();
+            return res.status(410).end();
         const ok = await this.auth.check_acl(req.auth, Perm.Write_App,
             req.params.app, true);
         if (!ok) return res.status(403).end();
@@ -308,7 +308,7 @@ export class APIv2 {
     async config_patch (req, res) {
         const { app, object } = req.params;
         if (!Valid.uuid.test(app) || !Valid.uuid.test(object))
-            return res.status(404).end();
+            return res.status(410).end();
 
         const { type } = content_type.parse(req.header("Content-Type"));
         if (type != "application/merge-patch+json")
@@ -355,7 +355,7 @@ export class APIv2 {
     async config_search(req, res) {
         const {app, "class": klass} = req.params;
         if (!Valid.uuid.test(app) || (klass && !Valid.uuid.test(klass)))
-            return res.status(404).end();
+            return res.status(410).end();
         const ok = await this.auth.check_acl(req.auth, Perm.Read_App, app, true);
         if (!ok) return res.status(403).end();
 

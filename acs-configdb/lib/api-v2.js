@@ -12,6 +12,10 @@ import * as etags from "./etags.js";
 
 import {App, Class, Perm} from "./constants.js";
 
+const Valid = {
+    uuid:   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+};
+
 export class APIv2 {
     constructor(opts) {
         this.fplus = opts.fplus;
@@ -94,6 +98,9 @@ export class APIv2 {
     }
 
     async app_get(req, res) {
+        if (!Valid.uuid.test(req.params.app))
+            return res.status(404).end();
+
         const ok = await this.auth.check_acl(req.auth, Perm.Manage_Obj, Class.App, true);
         if (!ok) return res.status(403).end();
 
@@ -113,6 +120,9 @@ export class APIv2 {
     }
 
     async app_schema_get(req, res) {
+        if (!Valid.uuid.test(req.params.app))
+            return res.status(404).end();
+
         const app = req.params.app;
 
         const ok = await this.auth.check_acl(req.auth, Perm.Read_App, app, true);
@@ -126,6 +136,9 @@ export class APIv2 {
     }
 
     async app_schema_put(req, res) {
+        if (!Valid.uuid.test(req.params.app))
+            return res.status(404).end();
+
         const app = req.params.app;
 
         const ok = await this.auth.check_acl(req.auth, Perm.Manage_App, app, true);
@@ -165,6 +178,8 @@ export class APIv2 {
 
     async object_delete(req, res) {
         const {object} = req.params;
+        if (!Valid.uuid.test(object))
+            return res.status(404).end();
 
         const ok = await this.auth.check_acl(req.auth, Perm.Delete_Obj, object, true);
         if (!ok) return res.status(403).end();
@@ -188,6 +203,9 @@ export class APIv2 {
 
     async class_info (req, res) {
         const klass = req.params.class;
+        if (!Valid.uuid.test(klass))
+            return res.status(404).end();
+
         const ok = await this.auth.check_acl(req.auth, Perm.Manage_Obj, klass, true);
         if (!ok) return res.status(403).end();
 
@@ -202,6 +220,9 @@ export class APIv2 {
 
     async class_lookup (rel, req, res) {
         const klass = req.params.class;
+        if (!Valid.uuid.test(klass))
+            return res.status(404).end();
+
         const ok = await this.auth.check_acl(req.auth, Perm.Manage_Obj, klass, true);
         if (!ok) return res.status(403).end();
 
@@ -212,6 +233,8 @@ export class APIv2 {
 
     async config_list(req, res) {
         let {app, "class": klass} = req.params;
+        if (!Valid.uuid.test(app) || !Valid.uuid.test(klass))
+            return res.status(404).end();
 
         const ok = await this.auth.check_acl(req.auth, Perm.Read_App, app, true);
         if (!ok) return res.status(403).end();
@@ -227,11 +250,15 @@ export class APIv2 {
     }
 
     async config_get(req, res) {
+        const { app, object } = req.params;
+        if (!Valid.uuid.test(app) || !Valid.uuid.test(object))
+            return res.status(404).end();
+
         const ok = await this.auth.check_acl(req.auth, Perm.Read_App,
             req.params.app, true);
         if (!ok) return res.status(403).end();
 
-        let entry = await this.model.config_get(req.params);
+        let entry = await this.model.config_get({ app, object });
 
         const etst = etags.checker(req)(entry?.etag);
         if (etst == 412) {
@@ -247,6 +274,9 @@ export class APIv2 {
     }
 
     async config_put(req, res) {
+        const { app, object } = req.params;
+        if (!Valid.uuid.test(app) || !Valid.uuid.test(object))
+            return res.status(404).end();
         const ok = await this.auth.check_acl(req.auth, Perm.Write_App,
             req.params.app, true);
         if (!ok) return res.status(403).end();
@@ -257,29 +287,36 @@ export class APIv2 {
          * the database normalises the JSON so we can't guarantee that.
          * A PUT ETag is only useful for If-Match, and a weak etag can't
          * be used for that. */
-        let st = await this.model.config_put(req.params, req.body,
+        let st = await this.model.config_put({ app, object }, req.body,
             etags.checker(req));
         res.status(st).send();
     }
 
     async config_delete(req, res) {
+        const { app, object } = req.params;
+        if (!Valid.uuid.test(app) || !Valid.uuid.test(object))
+            return res.status(404).end();
         const ok = await this.auth.check_acl(req.auth, Perm.Write_App,
             req.params.app, true);
         if (!ok) return res.status(403).end();
 
-        let st = await this.model.config_delete(req.params,
+        let st = await this.model.config_delete({ app, object },
             etags.checker(req));
         res.status(st).end();
     }
 
     async config_patch (req, res) {
+        const { app, object } = req.params;
+        if (!Valid.uuid.test(app) || !Valid.uuid.test(object))
+            return res.status(404).end();
+
         const { type } = content_type.parse(req.header("Content-Type"));
         if (type != "application/merge-patch+json")
             return res.status(415).end();
 
         const ok = await Promise.all(
             [Perm.Read_App, Perm.Write_App]
-            .map(p => this.auth.check_acl(req.auth, p, req.params.app, true)));
+            .map(p => this.auth.check_acl(req.auth, p, app, true)));
         if (ok.includes(false))
             return res.status(403).end();
 
@@ -317,6 +354,8 @@ export class APIv2 {
 
     async config_search(req, res) {
         const {app, "class": klass} = req.params;
+        if (!Valid.uuid.test(app) || (klass && !Valid.uuid.test(klass)))
+            return res.status(404).end();
         const ok = await this.auth.check_acl(req.auth, Perm.Read_App, app, true);
         if (!ok) return res.status(403).end();
 

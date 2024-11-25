@@ -18,6 +18,9 @@ export const Class = {
     App: "d319bd87-f42b-4b66-be4f-f82ff48b93f0",
     Service: "265d481f-87a7-4f93-8fc6-53fa64dc11bb",
     SpecialObj: "ddb132e4-5cdd-49c8-b9b1-2f35879eab6d",
+    Rank:   "1f2ee062-6782-48c8-926b-904f56bd18b1",
+    Individual: "33343846-8c14-4cb0-8027-989071a20724",
+    R1Class:    "e5ba3bd1-2943-4818-84be-5733e865d398",
 };
 
 export const App = {

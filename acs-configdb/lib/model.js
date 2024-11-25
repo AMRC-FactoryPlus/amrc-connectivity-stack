@@ -178,6 +178,14 @@ export default class Model extends EventEmitter {
         `, [klass, object]);
     }
 
+    _add_subclass (query, klass, object) {
+        return query(`
+            insert into subclass (class, id)
+            values ($1, $2)
+            on conflict (class, id) do nothing
+        `, [klass, object]);
+    }
+
     _set_primary_class (query, objid, klass) {
         return query(`
             insert into config (app, object, json)
@@ -300,6 +308,24 @@ export default class Model extends EventEmitter {
             const id = await this._class_id(query, klass);
             if (id == null) return;
             return this._class_lookup(query, id, table);
+        });
+    }
+
+    class_add_member (klass, obj) {
+        return this.db.txn({}, async query => {
+            const c_id = await this._class_id(query, klass);
+            const o_id = await this._obj_id(query, obj);
+            if (c_id == null || o_id == null) return;
+            return this._add_member(query, c_id, o_id);
+        });
+    }
+
+    class_add_subclass (klass, subclass) {
+        return this.db.txn({}, async query => {
+            const c_id = await this._class_id(query, klass);
+            const s_id = await this._class_id(query, subclass);
+            if (c_id == null || s_id == null) return;
+            return this._add_subclass(query, c_id, s_id);
         });
     }
 
@@ -630,11 +656,16 @@ export default class Model extends EventEmitter {
         /* The order of loading here is important. This is why Classes
          * are handled separately from the others. */
         for (const klass of dump.classes ?? []) {
-            const st = await this.object_create(klass, Class.Class);
+            /* XXX temporary hack while the ACS dumps attempt to create
+             * this class */
+            if (klass == Class.Class)
+                continue;
+            const st = await this.object_create(klass, Class.R1Class);
             if (st > 299) {
                 this.log("Dump failed [%s] on class %s", st, klass);
                 return st;
             }
+            await this.class_add_subclass(Class.Individual, klass);
         }
         for (const [klass, objs] of Object.entries(dump.objects ?? {})) {
             for (const obj of objs) {
@@ -648,6 +679,13 @@ export default class Model extends EventEmitter {
         }
         for (const [app, objs] of Object.entries(dump.configs ?? {})) {
             for (const [object, conf] of Object.entries(objs)) {
+                /* Hack: we always patch Info, as the v2 object creation
+                 * will have created the primaryClass propery. */
+                if (app == App.Info) {
+                    await this.config_merge_patch(
+                        { app, object }, conf, () => {});
+                    continue;
+                }
                 const st = await this.config_put(
                     {app, object, exclusive: !overwrite},
                     conf);

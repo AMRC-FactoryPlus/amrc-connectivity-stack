@@ -490,7 +490,7 @@ export default class Model extends EventEmitter {
 
         /* This needs to be null, not undefined, for a nonexistent
          * object, or the 409 test below will fail. */
-        const json = conf?.json ?? null;
+        const json = conf?.config ?? null;
 
         /* Safety check: applying a merge-patch to a non-object destroys
          * the whole thing. */
@@ -681,9 +681,10 @@ export default class Model extends EventEmitter {
             for (const [object, conf] of Object.entries(objs)) {
                 /* Hack: we always patch Info, as the v2 object creation
                  * will have created the primaryClass propery. */
+                this.log("LOADING DUMP ENTRY %s/%s", app, object);
                 const st = app == App.Info
                     ? await this.config_merge_patch(
-                        { app, object }, conf, () => {})
+                        { app, object }, { name: conf.name })
                     : await this.config_put(
                         {app, object, exclusive: !overwrite},
                         conf);

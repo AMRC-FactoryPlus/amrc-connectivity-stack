@@ -21,15 +21,15 @@ const DB_Version = 9;
 /* Well-known object IDs. This is cheating but it's stupid to keep
  * looking them up. */
 const ObjID = {
-    Object:         0,
-    Class:          1,
+    R1Class:        1,
     App:            2,
     Registration:   6,
     Info:           7,
     ConfigDB:       9,
-    Rank:           10,
-    Individual:     11,
-    R1Class:        12,
+    Individual:     10,
+    R2Class:        11,
+    R3Class:        12,
+
     Special:        13,
     Wildcard:       14,
     Unowned:        15,
@@ -119,13 +119,26 @@ export default class Model extends EventEmitter {
     _app_id (query, app) { return this._obj_id(query, app); }
     _class_id (query, klass) { return this._obj_id(query, klass); }
 
-    object_info (obj) {
-        return _q_row(this.db.query.bind(this.db), `
-            select o.deleted, p.uuid owner
+    async _rank_id (query, rank) {
+        const dbr = await query(`
+            select r.id
+            from rank r 
+            where r.depth = $1
+        `, [rank]);
+        return dbr.rows[0]?.id;
+    }
+
+    _object_info (query, obj) {
+        return _q_row(query, `
+            select o.uuid, c.uuid class, o.rank, p.uuid owner, o.deleted
             from object o
+                left join object c on c.id = o.class
                 join object p on p.id = o.owner
             where o.uuid = $1
         `, [obj]);
+    }
+    object_info (obj) {
+        return this._object_info(this.db.query.bind(this.db), obj);
     }
 
     object_list() {
@@ -133,48 +146,55 @@ export default class Model extends EventEmitter {
             `select o.uuid from object o`);
     }
 
-    object_unclassified () {
+    object_ranks () {
         return _q_uuids(this.db.query.bind(this.db), `
-            select o.uuid from object o
-            where o.id not in (select id from membership)
+            select o.uuid
+            from rank r
+                join object o on o.id = r.id
+            order by r.depth
         `);
     }
 
     /* XXX This is the correct place to set the owner of the new object
      * but I don't have access to that information yet. */
-    async _object_create (query, uuid) {
-        const created = await query(`
-            insert into object (uuid) values ($1)
-            on conflict (uuid) do update
-                set deleted = false
-                where object.deleted
-            returning id, owner
-        `, [uuid]);
-
-        if (created.rowCount)
-            return { ...created.rows[0], uuid, created: true }
-
-        const obj = await query(`
-            select id, owner from object
-            where uuid = $1
-        `, [uuid]);
-
-        return { ...obj.rows[0], uuid, created: false };
+    async _object_create (query, uuid, klass) {
+        return _q_row(query, `
+            insert into object (uuid, class, rank)
+            select $1, c.id, c.rank - 1
+                from object c
+                where c.id = $2
+            returning id, uuid
+        `, [uuid, klass]);
     }
 
-    async _object_create_new (query) {
+    async _object_create_new (query, klass) {
         /* Normally this loop will return first time round. On the
          * (astronomically) rare occasion that Pg generates a UUID which
          * conflicts with one already in the database we will retry. */
         for (;;) {
             const obj = await query(`
-                insert into object default values
+                insert into object (class, rank)
+                select c.id, c.rank - 1
+                    from object c
+                    where c.id = $1
                 on conflict (uuid) do nothing
-                returning id, uuid, owner
-            `);
+                returning id, uuid
+            `, [klass]);
             if (obj.rowCount)
-                return { ...obj.rows[0], created: true };
+                return obj.rows[0];
         }
+    }
+
+    /* This will do nothing for individuals as depth -1 cannot exist in
+     * the rank table. */
+    _add_rank_superclass (query, object) {
+        return query(`
+            insert into subclass (class, id)
+            select r.id, o.id
+            from object o
+                join rank r on r.depth = o.rank - 1
+            where o.id = $1
+        `, [object]);
     }
 
     _add_member (query, klass, object) {
@@ -193,44 +213,71 @@ export default class Model extends EventEmitter {
         `, [klass, object]);
     }
 
-    _set_primary_class (query, objid, klass) {
-        return query(`
-            insert into config (app, object, json)
-            values ($1, $2, $3)
-            on conflict (app, object) do update
-                set json = config.json || excluded.json,
-                    etag = default
-        `, [ObjID.Info, objid, { primaryClass: klass }]);
+    /* XXX This is to create a new rank. This must be the parent of the
+     * current topmost rank. */
+    _maybe_new_rank (q, spec) {
+        return [404];
     }
 
-    /* User-created objects must be members of a class */
-    async object_create(uuid, klass) {
-        const obj = await this.db.txn({}, async query => {
-            const class_id = await this._class_id(query, klass);
-            if (class_id == null) return 404;
+    /* Accept or revive an existing object */
+    async _update_existing (q, spec, info) {
+        if (spec.class != null && spec.class != info.class) {
+            this.log("Class mismatch for create: %s: have %s, want %s",
+                info.uuid, info.class, spec.class);
+            return [409];
+        }
+        if (spec.rank != null && spec.rank != info.rank) {
+            this.log("Rank mismatch for create: %s: have %s, want %s",
+                info.uuid, info.rank, spec.rank);
+            return [409];
+        }
+        await q(`
+            update object set deleted = false
+            where id = $1
+        `, [info.id]);
+        return [200, info.uuid];
+    }
 
-            const obj = await (uuid
-                ? this._object_create(query, uuid)
-                : this._object_create_new(query))
+    /* Object creation must supply a class or a rank (not both) */
+    async object_create(spec) {
+        const [st, uuid] = await this.db.txn({}, async q => {
+            if (spec.uuid) {
+                const info = await this._object_info(q, spec.uuid);
+                if (info) return this._update_existing(q, spec, info);
+            }
 
-            /* XXX This matches approximately the existing API where
-             * creating an existing object only fails if the class
-             * doesn't match. We can add objects to multiple classes now
-             * so we never fail for that reason; this call will update
-             * the primaryClass but leave any existing class memberships
-             * alone. However when we handle ownership correctly we
-             * might need to fail because the owner is incorrect. */
+            let c_id;
+            if (spec.rank) {
+                if (spec.class) return [422];
+                const id = await this._rank_id(q, spec.rank);
+                if (!id)
+                    return this._maybe_new_rank(q, spec);
+                c_id = id;
+            }
+            else {
+                if (!spec.class) return [422];
+                const id = await this._obj_id(q, spec.class);
+                if (!id) return [404];
+                c_id = id;
+            }
 
-            await this._add_member(query, class_id, obj.id);
-            await this._set_primary_class(query, obj.id, klass);
-            return obj;
+            const obj = await (spec.uuid
+                ? this._object_create(q, spec.uuid, c_id)
+                : this._object_create_new(q, c_id))
+
+            await this._add_member(q, c_id, obj.id);
+            await this._add_rank_superclass(q, obj.id);
+
+            return [201, obj.uuid];
         });
-        this.updates.next({
-            app:    App.Registration,
-            object: uuid,
-            config: { deleted: false },
-        });
-        return obj;
+
+        if (st < 299)
+            this.updates.next({
+                app:    App.Registration,
+                object: uuid,
+                config: { deleted: false },
+            });
+        return [st, uuid];
     }
 
     /* Delete an object. Deletes configs associated with this object,
@@ -666,37 +713,33 @@ export default class Model extends EventEmitter {
 
         /* The order of loading here is important. This is why Classes
          * are handled separately from the others. */
-        for (const klass of dump.classes ?? []) {
+        for (const uuid of dump.classes ?? []) {
             /* XXX temporary hack while the ACS dumps attempt to create
              * this class */
-            if (klass == Class.Class)
+            if (uuid == Class.Class)
                 continue;
-            const st = await this.object_create(klass, Class.R1Class);
+            this.log("LOAD CLASS %s", uuid);
+            const [st] = await this.object_create({ uuid, rank: 1 });
             if (st > 299) {
-                this.log("Dump failed [%s] on class %s", st, klass);
+                this.log("Dump failed [%s] on class %s", st, uuid);
                 return st;
             }
-            await this.class_add_subclass(Class.Individual, klass);
         }
         for (const [klass, objs] of Object.entries(dump.objects ?? {})) {
-            for (const obj of objs) {
-                let st = await this.object_create(obj, klass);
+            for (const uuid of objs) {
+                this.log("LOAD OBJECT %s/%s", klass, uuid);
+                let [st] = await this.object_create({ uuid, class: klass });
                 if (st > 299) {
                     this.log("Dump failed [%s] on object %s (%s)",
-                        st, obj, klass);
+                        st, uuid, klass);
                     return st;
                 }
             }
         }
         for (const [app, objs] of Object.entries(dump.configs ?? {})) {
             for (const [object, conf] of Object.entries(objs)) {
-                /* Hack: we always patch Info, as the v2 object creation
-                 * will have created the primaryClass propery. */
-                this.log("LOADING DUMP ENTRY %s/%s", app, object);
-                const st = app == App.Info
-                    ? await this.config_merge_patch(
-                        { app, object }, { name: conf.name })
-                    : await this.config_put(
+                this.log("LOAD CONFIG %s/%s", app, object);
+                const st = await this.config_put(
                         {app, object, exclusive: !overwrite},
                         conf);
                 if (st > 299 && st != 409) {

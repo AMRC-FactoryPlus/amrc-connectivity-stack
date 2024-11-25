@@ -37,9 +37,7 @@ class ObjectRegistration extends SpecialApp {
     }
 
     async get(obj) {
-        this.log("REGISTRATION FOR %s", obj);
         const info = await this.model.object_info(obj);
-        this.log("REGISTRATION INFO %s: %O", obj, info);
         return { config: info };
     }
 

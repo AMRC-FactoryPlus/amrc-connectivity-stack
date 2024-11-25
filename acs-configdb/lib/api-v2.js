@@ -55,7 +55,7 @@ export class APIv2 {
         api.get("/object", this.object_list.bind(this));
         api.post("/object", this.object_create.bind(this));
         api.delete("/object/:object", this.object_delete.bind(this));
-        api.get("/object/unclassified", this.object_unclassified.bind(this));
+        api.get("/object/rank", this.object_ranks.bind(this));
 
         api.get("/class/:class", this.class_info.bind(this));
 
@@ -80,25 +80,6 @@ export class APIv2 {
 
         api.post("/load", this.dump_load.bind(this));
         api.get("/save", this.dump_save.bind(this));
-    }
-
-    async apps_post(req, res) {
-        const ok = await this.auth.check_acl(req.auth, Perm.Manage_Obj, Class.App, true);
-        if (!ok) return res.status(403).end();
-
-        const uuid = req.body.uuid;
-
-        let rv = await this.model.object_create(uuid, Class.App);
-
-        if (rv < 300) {
-            /* XXX this overwrites any existing information */
-            /* ignore errors */
-            await this.model.config_put(
-                {app: App.Info, object: uuid},
-                {name: req.body.name, primaryClass: Class.App});
-        }
-
-        res.status(rv).end();
     }
 
     async app_get(req, res) {
@@ -168,23 +149,28 @@ export class APIv2 {
         res.status(200).json(list);
     }
 
-    async object_unclassified(req, res) {
+    async object_ranks (req, res) {
         const ok = await this.auth.check_acl(req.auth, Perm.Manage_Obj, UUIDs.Null);
         if (!ok) return res.status(403).end();
-        const list = await this.model.object_unclassified();
-        return res.status(200).json(list);
+
+        const list = await this.model.object_ranks();
+        res.status(200).json(list);
     }
 
     async object_create(req, res) {
-        let {uuid, "class": klass} = req.body;
+        const spec = req.body;
 
-        const ok = await this.auth.check_acl(req.auth, Perm.Manage_Obj, klass, true);
+        const ok = await this.auth.check_acl(req.auth, Perm.Manage_Obj, 
+            spec.class ?? UUIDs.Null, true);
         if (!ok) return res.status(403).end();
 
-        const obj = await this.model.object_create(uuid, klass);
+        const [st, uuid] = await this.model.object_create(spec);
 
-        res.status(obj.created ? 201 : 200);
-        res.json({uuid: obj.uuid});
+        res.status(st);
+        if (st > 299) return res.end();
+
+        const obj = await this.model.object_info(uuid);
+        res.json(obj);
     }
 
     async object_delete(req, res) {
@@ -235,7 +221,7 @@ export class APIv2 {
 
         if (object) {
             const present = await this.model.class_has(klass, rel, object);
-            return present ? 204 : 404;
+            return res.status(present ? 204 : 404).end();
         }
 
         const list = await this.model.class_lookup(klass, rel);

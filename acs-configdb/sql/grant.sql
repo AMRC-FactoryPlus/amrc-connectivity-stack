@@ -13,7 +13,7 @@ grant select on
     version, all_class, all_subclass, all_membership
 to :"role";
 grant select, insert, update, delete on
-    object, config, membership, subclass
+    object, config, membership, subclass, rank
 to :"role";
 grant usage on
     object_id_seq, config_id_seq

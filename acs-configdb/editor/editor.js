@@ -74,12 +74,14 @@ async function get_name (obj, with_class) {
         .map(app => fetch_json(`app/${app}/object/${obj}`)));
 
     const name = inf ? inf.name : html`<i>NO NAME</i>`;
-    const dname = reg.deleted ? html`<s>${name}</s>` : name;
+    const dname = reg?.deleted ? html`<s>${name}</s>` : name;
     if (!with_class) return dname;
 
-    const kname = inf?.primaryClass
-        ? await get_name(inf.primaryClass, false)
-        : html`<i>Proper class</i>`;
+    const kname = reg
+        ? reg.class
+            ? await get_name(reg.class, false)
+            : html`<i>No class</i>`
+        : html`<i>UNREGISTERED</i>`;
     return html`${dname} <small>(${kname})</small>`;
 }
 
@@ -282,7 +284,9 @@ function Objs(props) {
     const [ranks, set_ranks] = useState(null);
 
     useEffect(() => {
-        fetch_json(`class/${Class.Rank}/direct/member`).then(set_ranks);
+        service_fetch("/v2/object/rank")
+            .then(r => r.status == 200 ? r.json() : null)
+            .then(set_ranks);
     }, []);
 
     if (!ranks)
@@ -296,9 +300,6 @@ function Objs(props) {
         <${NewObj}/>
         <dl>
             ${hranks}
-            <${Opener} title="Unclassified objects" key="all">
-                <${Unclassified}/>
-            <//>
         </dl>
     `;
 }
@@ -313,17 +314,6 @@ function Rank (props) {
     if (!subs) return html`<b>...</b>`;
 
     return subs.map(s => html`<${Obj} obj=${s} key=${s} klass=${true}/>`);
-}
-
-function Unclassified (props) {
-    const [objs, set_objs] = useState(null);
-
-    useEffect(() => fetch_json("/object/unclassified").then(set_objs), []);
-
-    if (!objs) return html`<b>...</b>`;
-
-    return objs.map(o => 
-        html`<${Obj} obj=${o} key=${o} all=${true}/>`);
 }
 
 function Klass(props) {
@@ -357,7 +347,7 @@ function Obj (props) {
 
     if (!klass && !all)
         useEffect(() => service_fetch(
-            `class/${Class.Individual}/any/member/${obj}`)
+            `/v2/class/${Class.Individual}/any/member/${obj}`)
             .then(rsp => set_ind(rsp.status == 204)));
 
     /*const do_delete = async () => {

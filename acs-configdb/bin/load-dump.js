@@ -23,7 +23,9 @@ const model = await new Model({ log }).init();
 for (const [file, dump] of dumps) {
     console.log(`Loading dump ${file}...`);
     const st = await model.dump_load(dump, false);
-    if (st > 299)
+    if (st > 299) {
         console.log(`Dump failed to load: ${st}`);
+        process.exit(1);
+    }
 }
 console.log("Done.");

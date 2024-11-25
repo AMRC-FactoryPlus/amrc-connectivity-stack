@@ -18,12 +18,17 @@ call migrate_to(8, $migrate$
         drop constraint config_object_fkey,
         add foreign key (object) references object on update cascade;
     alter table object
-        -- we are about to remove this column
         drop constraint object_class_fkey,
-        alter column class drop not null;
+        alter column class drop not null,
+        add foreign key (class) references object on update cascade,
+        add column rank integer check(rank >= 0);
+    drop table class;
 
     -- Create new class structure
-
+    create table rank (
+        depth integer primary key check(depth >= 0),
+        id integer unique not null references object on update cascade
+    );
     create table membership (
         class integer not null references object on update cascade,
         id integer not null references object on update cascade,
@@ -35,53 +40,41 @@ call migrate_to(8, $migrate$
         unique(class, id)
     );
 
-    create function set_primary_class(xobj integer, xclass integer)
-        returns void language sql
-        as $$
-            insert into membership (id, class)
-                values (xobj, xclass)
-                on conflict (id, class) do nothing;
-            insert into config (app, object, json)
-                select 7, xobj, jsonb_build_object(
-                        'primaryClass', c.uuid)
-                    from object c
-                    where c.id = xclass
-                on conflict (app, object) do update
-                    set json = config.json || excluded.json,
-                        etag = default;
-        $$;
-
-    insert into object (id, uuid)
-    values (0, 'd7445df3-7394-4404-af1d-af287f30a6f2'),
-        (10, '1f2ee062-6782-48c8-926b-904f56bd18b1'),
-        (11, '33343846-8c14-4cb0-8027-989071a20724'),
-        (12, 'e5ba3bd1-2943-4818-84be-5733e865d398');
+    insert into object (id, uuid, class, rank) values
+        (10, '52b80183-6998-4bf9-9b30-132755e7dede', null, 4),
+        (11, '705888ce-53fa-434d-afee-274b331d4642', 10, 3),
+        (12, '2494ae9b-cd87-4c01-98db-437a303b43e9', 1, 1);
     insert into config (app, object, json)
-        values (7, 0, '{ "name": "Object" }'),
-            (7, 10, '{ "name": "Rank of object" }'),
-            (7, 11, '{ "name": "Individual" }'),
-            (7, 12, '{ "name": "Rank 1 class" }');
+        values (7, 1, '{ "name": "Rank 1 class" }'),
+            (7, 10, '{ "name": "Rank 3 class" }'),
+            (7, 11, '{ "name": "Rank 2 class" }'),
+            (7, 12, '{ "name": "Individual" }')
+        on conflict (app, object) do update
+            set json = excluded.json, etag = default;
 
-    select set_primary_class(11, 10);
-    select set_primary_class(12, 10);
+    insert into rank (depth, id)
+        values (0, 12), (1, 1), (2, 11), (3, 10);
+
+    -- Set rank of existing objects. Assume objects are individuals for
+    -- now. We will need an endpoint to change the rank of a class and
+    -- all its members.
+    update object set rank = 0 where class != 1;
+    update object set rank = 1 where class = 1;
+    update object set class = 11, rank = 2 where id = 1;
+
+    -- We have one object (R3Class) with no class.
+    insert into membership (id, class)
+        select id, class from object
+        where class is not null;
+    -- Make existing classes direct subclasses of Individual.
     insert into subclass (id, class)
-        values (1, 0), (11, 0), (10, 1), (12, 1);
+        select id, 12 from object
+        where rank = 1 and id != 12;
 
-    -- Classify individuals into their correct classes
-    select set_primary_class(o.id, o.class)
-        from object o
-        where o.class != 1;
-
-    -- Existing classes are R1 and subclasses of Individual
-    select set_primary_class(c.id, 12)
-        from class c
-        where c.id != 1;
-    insert into subclass (id, class)
-        select c.id, 11 from class c
-        where c.id != 1;
-
-    drop table class;
-    alter table object drop column class;
+    -- An FK to rank would be good, but the topmost rank must reference
+    -- a rank which doesn't have an assigned UUID yet.
+    alter table object
+        alter column rank set not null;
 
     -- Create views to simplify querying the class tree. There is a
     -- substantial performance benefit to making all_subclass a

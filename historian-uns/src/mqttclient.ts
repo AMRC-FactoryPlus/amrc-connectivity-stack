@@ -150,7 +150,7 @@ export default class MQTTClient {
 
     async on_message(topicString: string, payload: Buffer, packet: mqtt.IPublishPacket) {
         const messageString = payload.toString();
-        if (!packet.properties.userProperties) {
+        if (!packet.properties?.userProperties) {
             logger.error(`⁉ Can't find custom properties for topic ${topicString}! Not writing to Influx.`);
             return
         }

@@ -1,0 +1,10 @@
+{{ if .Values.acs.patchCoreDNS }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: acs-rewrite-config
+  namespace: {{ .Release.Namespace }}
+data:
+  rewrite-config: |
+    rewrite stop name regex .*\.{{ .Values.acs.baseUrl | regexReplaceAll "\\." "\\\\." }} {{ .Release.Name }}-traefik.{{ .Release.Namespace }}.svc.cluster.local answer auto
+{{ end }}

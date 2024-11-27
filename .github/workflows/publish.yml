@@ -474,7 +474,7 @@ jobs:
           helm package -u -d deploy/build --version="$VERSION" --app-version="$VERSION" deploy
           echo "VERSION=$VERSION"
           echo "VERSION=$VERSION" >> $GITHUB_ENV
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: new-release
           path: deploy/build/amrc-connectivity-stack-${{ env.VERSION }}.tgz

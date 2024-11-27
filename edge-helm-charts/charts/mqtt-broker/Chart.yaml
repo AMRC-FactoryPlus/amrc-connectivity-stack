@@ -1,0 +1,4 @@
+apiVersion: v2
+name: mqtt-broker
+version: "0.0.1"
+description: "ACS edge MQTT broker"

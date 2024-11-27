@@ -1,0 +1,27 @@
+# This is required
+# uuid: 12345
+# This deploys to a specific host
+#hostname: foo
+image:
+  default:
+    pullPolicy: IfNotPresent
+  mosquitto:
+    registry: docker.io
+    repository: eclipse-mosquitto
+    tag: "2.0"
+tolerations:
+  # Tolerations to apply to pods deployed to a specific host
+  specific:
+    - key: factoryplus.app.amrc.co.uk/specialised
+      operator: Exists
+  # Tolerations to apply to floating pods
+  floating: []
+# Whether to expose the broker externally
+expose:
+  # Expose on an existing external IP
+  externalIPs: []
+  # Port to expose on
+  port: 1883
+  # How to route cluster-internal traffic. Setting this to Local will
+  # prevent pods on different nodes from contacting the service.
+  internalTrafficPolicy: Local

@@ -11,6 +11,7 @@ export const ACS = {
         Permission:         "8ae784bb-c4b5-4995-9bf6-799b3c7f21ad",
         UserAccount:        "8b3e8f35-78e5-4f93-bf21-7238bcb2ba9d",
         UserGroup:          "f1fabdd1-de90-4399-b3da-ccf6c2b2c08b",
+        EdgeDeployment:     "e6f6a6e6-f6b2-422a-bc86-2dcb417a362a",
     },
     App: {
         SchemaIcon:         "65c0ccba-151d-48d3-97b4-d0026a811900",

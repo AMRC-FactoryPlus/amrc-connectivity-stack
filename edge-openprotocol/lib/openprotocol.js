@@ -2,10 +2,13 @@
  * Copyright (c) University of Sheffield AMRC 2024.
  */
 
-import { createClient } from 'node-open-protocol'
+import pkg from 'node-open-protocol-desoutter'
+import { BufferX } from '@amrc-factoryplus/edge-driver'
+
+const { createClient } = pkg
 
 /* This is the handler interface */
-class OpenProtocolHandler {
+export class OpenProtocolHandler {
 
   /* The constructor is private */
   constructor (driver, conf) {
@@ -14,8 +17,35 @@ class OpenProtocolHandler {
     this.log    = driver.debug.bound('open-protocol')
   }
 
+  static validAddresses = new Set([
+    'psetSelected',
+    'lockAtBatchDoneUpload',
+    'jobInfo',
+    'vin',
+    'lastTightening',
+    'alarm',
+    'alarmStatus',
+    'alarmAcknowledged',
+    'multiSpindleStatus',
+    'multiSpindleResult',
+    'lastPowerMACSTighteningResultStationData',
+    'jobLineControl',
+    'multipleIdentifierResultParts',
+    'statusExternallyMonitoredInputs',
+    'relayFunction',
+    'digitalInputFunction',
+    'userData',
+    'selectorSocketInfo',
+    'toolTagID',
+    'automaticManualMode',
+    'openProtocolCommandsDisabled',
+    'motorTuningResultData',
+  ])
+
   /* This is called to create a handler */
-  static create (driver, conf) {}
+  static create (driver, conf) {
+    return new OpenProtocolHandler(driver, conf)
+  }
 
   /* Methods required by Driver */
   connect () {
@@ -23,18 +53,57 @@ class OpenProtocolHandler {
     const host = this.conf.host
     const port = this.conf.port ?? 4545
 
-    createClient(port, host, null, (data) => {
-      const deviceInfo = JSON.stringify(data)
-      this.log(`OpenProtocol connection established with ${host}:${port}. Gave MID 0002 of ${deviceInfo}`)
-      return 'UP'
+    this.log('Connecting to Open Protocol', host, port)
+
+    this.client = createClient(port, host, null, (data) => {
+      this.log('Connected to Open Protocol')
+      this.driver.connUp()
+
+      // This is debug
+      // this.client.command('enableTool')
+      // this.client.command('selectPset', { payload: { parameterSetID: 11 } })
+
+    })
+
+    this.client.on('error', (err) => {
+      this.log('Error connecting to Open Protocol')
+      this.driver.connFailed()
+    })
+
+    OpenProtocolHandler.validAddresses.forEach(address => {
+      this.client.on(address, (midData) => {
+        this.log(midData)
+        this.driver.data(address, BufferX.fromJSON(midData))
+      })
     })
   }
 
-  parseAddr (addr) {
+  async subscribe (specs) {
 
-  }
+    this.log(specs)
 
-  subscribe (specs) {
+    const promises = specs.map(addressFromManager => new Promise((resolve, reject) => {
+
+      this.client.subscribe(addressFromManager, (err, data) => {
+        if (err) {
+          this.log('Error subscribing to Open Protocol', err)
+          reject(err)
+        }
+        else {
+          this.log(`Subscribed to ${addressFromManager}`)
+          resolve()
+        }
+      })
+    }))
+
+    try {
+      await Promise.all(promises)
+      return true
+    }
+    catch (err) {
+      this.log('Error subscribing to Open Protocol', err)
+      return false
+    }
 
   }
 

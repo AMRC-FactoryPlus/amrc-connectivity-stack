@@ -13,7 +13,8 @@
   "dependencies": {
     "@amrc-factoryplus/edge-driver": "^0.0.4",
     "async": "^3.2.5",
+    "dotenv": "^16.4.5",
     "mqtt": "^5.7.2",
-    "node-open-protocol": "^1.1.1"
+    "node-open-protocol-desoutter": "^2.0.1"
   }
 }

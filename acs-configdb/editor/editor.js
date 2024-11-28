@@ -145,7 +145,7 @@ function build_opener() {
 }
 
 function Opener(props) {
-    const { obj, children } = props;
+    const { obj, extra, children } = props;
     const [open, button] = build_opener();
 
     const title = "obj" in props
@@ -153,7 +153,7 @@ function Opener(props) {
         : props.title;
 
     return html`
-        <dt>${button} ${title}</dt>
+        <dt>${button} ${extra} ${title}</dt>
         <dd>${open ? children : ""}</dd>
     `;
 }
@@ -182,6 +182,25 @@ function ObjTitle(props) {
 
     return html`
         <${Uuid}>${obj}<//> ${name}`;
+}
+
+function MenuButton (props) {
+    const { menu } = props;
+    const [open, set_open] = useState(false);
+
+    if (!open)
+        return html`<button onClick=${() => set_open(true)}>...<//>`;
+
+    const buttons = menu.map(([title, action]) => html`
+        <button onClick=${action}>${title}<//><br/>`);
+
+    return html`
+        <button className="menu-button">...
+            <div className="menu-popup">
+                ${buttons}
+                <button onClick=${() => set_open(false)}>Cancel<//>
+        <//><//>
+    `;
 }
 
 function Editor(props) {
@@ -313,11 +332,17 @@ function Rank (props) {
 
     if (!subs) return html`<b>...</b>`;
 
-    return subs.map(s => html`<${Obj} obj=${s} key=${s} klass=${true}/>`);
+    const menu = s => [
+        ["Raise rank",   () => console.log("Raise rank of %s", s)],
+    ];
+
+    return subs.map(s => html`
+        <${Obj} obj=${s} key=${s} klass=${true} menu=${menu(s)}/>
+    `);
 }
 
 function Klass(props) {
-    const {klass, all} = props;
+    const {klass} = props;
     const [subs, set_subs] = useState(null);
     const [objs, set_objs] = useState(null);
 
@@ -327,11 +352,20 @@ function Klass(props) {
     };
     useEffect(update, [klass]);
 
+    const s_menu = s => [
+        ["Remove",   () => 
+            console.log("Remove subclass %s from %s", s, klass)],
+    ];
+    const m_menu = m => [
+        ["Remove",  () =>
+            console.log("Remove member %s from %s", m, klass)],
+    ];
+
     const notyet = html`<b>...</b><br/>`;
     const hsubs = subs?.map(s => 
-        html`<${Obj} obj=${s} key=${s} klass=${true} all=${all}/>`);
+        html`<${Obj} obj=${s} key=${s} klass=${true} menu=${s_menu(s)}/>`);
     const hobjs = objs?.map(o =>
-        html`<${Obj} obj=${o} key=${o} all=${all}/>`);
+        html`<${Obj} obj=${o} key=${o} menu=${m_menu(o)}/>`);
 
     return html`
         <b>Subclasses</b><br/>
@@ -342,10 +376,10 @@ function Klass(props) {
 }
 
 function Obj (props) {
-    const {obj, klass, all} = props;
+    const {obj, klass, menu} = props;
     const [ind, set_ind] = useState(false);
 
-    if (!klass && !all)
+    if (!klass)
         useEffect(() => service_fetch(
             `/v2/class/${Class.Individual}/any/member/${obj}`)
             .then(rsp => set_ind(rsp.status == 204)));
@@ -356,12 +390,14 @@ function Obj (props) {
         await update();
     };*/
 
+    const mbutt = menu && html`<${MenuButton} menu=${menu}/>`;
+
     if (ind)
-        return html`<${ObjTitle} obj=${obj}/><br/>`;
+        return html`${mbutt} <${ObjTitle} obj=${obj}/><br/>`;
 
     return html`
-        <${Opener} obj=${obj} key=${obj}>
-            <${Klass} klass=${obj} all=${all}/>
+        <${Opener} obj=${obj} key=${obj} extra=${mbutt}>
+            <${Klass} klass=${obj}/>
         <//>
     `;
 }

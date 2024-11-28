@@ -13,29 +13,53 @@ import rx from "rxjs";
 
 import { DB } from "@amrc-factoryplus/utilities";
 
-import {App, Class, Service} from "./constants.js";
-import { Specials } from "./special.js";
+import {App, Class, Service, SpecialObj} from "./constants.js";
+import { SpecialApps } from "./special.js";
 
-const DB_Version = 7;
+const DB_Version = 9;
+
+/* Well-known object IDs. This is cheating but it's stupid to keep
+ * looking them up. */
+const ObjID = {
+    R1Class:        1,
+    App:            2,
+    Registration:   6,
+    Info:           7,
+    ConfigDB:       9,
+    Individual:     10,
+    R2Class:        11,
+    R3Class:        12,
+
+    Special:        13,
+    Wildcard:       14,
+    Unowned:        15,
+    ConfigSchema:   16,
+};
 
 const Immutable = new Set([
     Class.Class,
     Class.App,
+    Class.SpecialObj,
     App.Registration,
+    App.ConfigSchema,
+    SpecialObj.Wildcard,
+    SpecialObj.Unowned,
     /* These are required only for the compat endpoints */
     Class.Device,
     Class.Schema,
 ]);
 
 /* XXX These should be methods on a query object or something... */
-async function _q_row(query, sql, params) {
-    const dbr = await query(sql, params);
-    return dbr.rows[0];
+function _q_set(query, sql, params) {
+    return query(sql, params).then(dbr => dbr.rows);
 }
 
-async function _q_set(query, sql, params) {
-    const dbr = await query(sql, params);
-    return dbr.rows;
+function _q_row (...args) {
+    return _q_set(...args).then(rs => rs[0]);
+}
+
+function _q_uuids (...args) {
+    return _q_set(...args).then(rs => rs.map(r => r.uuid));
 }
 
 export default class Model extends EventEmitter {
@@ -65,7 +89,7 @@ export default class Model extends EventEmitter {
     async init() {
         await this.db.init();
 
-        for (const Sp of Specials)
+        for (const Sp of SpecialApps)
             this.special.set(Sp.application, new Sp(this));
 
         return this;
@@ -78,158 +102,180 @@ export default class Model extends EventEmitter {
         });
     }
 
+    /* XXX For now I am not verifying the e.g. App-UUIDs actually refer
+     * to objects in the Application class. These class membership tests
+     * seem to be unavoidably slow which is not surprising. Possibly
+     * this can be resolved with caching of some kind. */
+
     async _obj_id (query, uuid) {
         const dbr = await query(`
             select o.id
             from object o
             where o.uuid = $1
-            for share
         `, [uuid]);
         return dbr.rows[0]?.id;
     }
 
-    async _app_id(query, uuid) {
-        /* FOR SHARE because we need this app to persist */
-        let dbr = await query(`
-            select a.id
-            from app a
-                join object o on o.id = a.id
-            where o.uuid = $1
-            for share
-        `, [uuid]);
+    _app_id (query, app) { return this._obj_id(query, app); }
+    _class_id (query, klass) { return this._obj_id(query, klass); }
+
+    async _rank_id (query, rank) {
+        const dbr = await query(`
+            select r.id
+            from rank r 
+            where r.depth = $1
+        `, [rank]);
         return dbr.rows[0]?.id;
     }
 
-    async _class_id(query, uuid) {
-        let dbr = await query(`
-            select c.id
-            from class c
-                join object o on o.id = c.id
-            where o.uuid = $1
-            for share
-        `, [uuid]);
-        return dbr.rows[0]?.id;
-    }
-
-    async _object_class(query, uuid) {
-        let dbr = await query(`
-            select c.uuid
+    _object_info (query, obj) {
+        return _q_row(query, `
+            select o.uuid, c.uuid class, o.rank, p.uuid owner, o.deleted
             from object o
-                join object c on o.class = c.id
+                left join object c on c.id = o.class
+                join object p on p.id = o.owner
             where o.uuid = $1
-        `, [uuid]);
-
-        return dbr.rows[0]?.uuid;
+        `, [obj]);
+    }
+    object_info (obj) {
+        return this._object_info(this.db.query.bind(this.db), obj);
     }
 
-    async object_class(uuid) {
-        return await this._object_class(
-            this.db.query.bind(this.db), uuid);
+    object_list() {
+        return _q_uuids(this.db.query.bind(this.db),
+            `select o.uuid from object o`);
     }
 
-    async object_set_class(obj, klass) {
-        const st = await this.db.txn({}, async query => {
-            const class_id = await this._class_id(query, klass);
-            if (class_id == null) return 404;
-
-            const old_class = await this._object_class(query, obj);
-            for (const k of [klass, old_class]) {
-                switch (k) {
-                    case Class.Class:
-                    case Class.App:
-                        return 400;
-                }
-            }
-
-            let dbr = await query(`
-                update object
-                set class = $1
-                where uuid = $2 returning 1 ok
-            `, [class_id, obj]);
-
-            return dbr.rows[0]?.ok ? 204 : 404;
-        });
-        if (st == 204)
-            this.updates.next({
-                app:    App.Registration,
-                object: obj,
-                config: { "class": klass },
-            });
+    object_ranks () {
+        return _q_uuids(this.db.query.bind(this.db), `
+            select o.uuid
+            from rank r
+                join object o on o.id = r.id
+            order by r.depth
+        `);
     }
 
-    async object_list() {
-        let dbr = await this.db.query(`select o.uuid from object o`);
-        return dbr.rows.map(r => r.uuid);
+    /* XXX This is the correct place to set the owner of the new object
+     * but I don't have access to that information yet. */
+    async _object_create (query, uuid, klass) {
+        return _q_row(query, `
+            insert into object (uuid, class, rank)
+            select $1, c.id, c.rank - 1
+                from object c
+                where c.id = $2
+            returning id, uuid
+        `, [uuid, klass]);
     }
 
-    async _maybe_special_class(query, uuid, klass) {
-        switch (klass) {
-            case Class.Class:
-                await query(`
-                    insert into class (id)
-                    select id from object where uuid = $1
-                `, [uuid]);
-                break;
-            case Class.App:
-                await query(`
-                    insert into app (id)
-                    select id from object where uuid = $1
-                `, [uuid]);
-                break;
+    async _object_create_new (query, klass) {
+        /* Normally this loop will return first time round. On the
+         * (astronomically) rare occasion that Pg generates a UUID which
+         * conflicts with one already in the database we will retry. */
+        for (;;) {
+            const obj = await query(`
+                insert into object (class, rank)
+                select c.id, c.rank - 1
+                    from object c
+                    where c.id = $1
+                on conflict (uuid) do nothing
+                returning id, uuid
+            `, [klass]);
+            if (obj.rowCount)
+                return obj.rows[0];
         }
     }
 
-    async object_create(uuid, klass) {
-        const st = await this.db.txn({}, async query => {
-            const class_id = await this._class_id(query, klass);
-            if (class_id == null) return 404;
-
-            let dbr = await query(`
-                insert into object (uuid, class)
-                values ($1, $2) on conflict (uuid) do nothing
-                returning 1 ok
-            `, [uuid, class_id]);
-
-            if (dbr.rowCount == 0) {
-                const existing = await this._object_class(query, uuid);
-                return existing == klass ? 200 : 409;
-            }
-            await this._maybe_special_class(query, uuid, klass);
-            return 201;
-        });
-        if (st == 201 || st == 200)
-            this.updates.next({
-                app:    App.Registration,
-                object: uuid,
-                config: { "class": klass },
-            });
-        return st;
+    /* This will do nothing for individuals as depth -1 cannot exist in
+     * the rank table. */
+    _add_rank_superclass (query, object) {
+        return query(`
+            insert into subclass (class, id)
+            select r.id, o.id
+            from object o
+                join rank r on r.depth = o.rank - 1
+            where o.id = $1
+        `, [object]);
     }
 
-    async object_create_new(klass) {
-        const [st, uuid] = await this.db.txn({}, async query => {
-            const class_id = await this._class_id(query, klass);
-            if (class_id == null) return [404, null];
+    _add_member (query, klass, object) {
+        return query(`
+            insert into membership (class, id)
+            values ($1, $2)
+            on conflict (class, id) do nothing
+        `, [klass, object]);
+    }
 
-            for (;;) {
-                let dbr = await query(`
-                    insert into object (uuid, class)
-                    values (gen_random_uuid(), $1) on conflict (uuid) do nothing
-                    returning uuid
-                `, [class_id]);
+    _add_subclass (query, klass, object) {
+        return query(`
+            insert into subclass (class, id)
+            values ($1, $2)
+            on conflict (class, id) do nothing
+        `, [klass, object]);
+    }
 
-                if (dbr.rowCount != 0) {
-                    const uuid = dbr.rows[0].uuid;
-                    await this._maybe_special_class(query, uuid, klass);
-                    return [201, uuid];
-                }
+    /* XXX This is to create a new rank. This must be the parent of the
+     * current topmost rank. */
+    _maybe_new_rank (q, spec) {
+        return [404];
+    }
+
+    /* Accept or revive an existing object */
+    async _update_existing (q, spec, info) {
+        if (spec.class != null && spec.class != info.class) {
+            this.log("Class mismatch for create: %s: have %s, want %s",
+                info.uuid, info.class, spec.class);
+            return [409];
+        }
+        if (spec.rank != null && spec.rank != info.rank) {
+            this.log("Rank mismatch for create: %s: have %s, want %s",
+                info.uuid, info.rank, spec.rank);
+            return [409];
+        }
+        await q(`
+            update object set deleted = false
+            where id = $1
+        `, [info.id]);
+        return [200, info.uuid];
+    }
+
+    /* Object creation must supply a class or a rank (not both) */
+    async object_create(spec) {
+        const [st, uuid] = await this.db.txn({}, async q => {
+            if (spec.uuid) {
+                const info = await this._object_info(q, spec.uuid);
+                if (info) return this._update_existing(q, spec, info);
             }
+
+            let c_id;
+            if (spec.rank) {
+                if (spec.class) return [422];
+                const id = await this._rank_id(q, spec.rank);
+                if (!id)
+                    return this._maybe_new_rank(q, spec);
+                c_id = id;
+            }
+            else {
+                if (!spec.class) return [422];
+                const id = await this._obj_id(q, spec.class);
+                if (!id) return [404];
+                c_id = id;
+            }
+
+            const obj = await (spec.uuid
+                ? this._object_create(q, spec.uuid, c_id)
+                : this._object_create_new(q, c_id))
+
+            await this._add_member(q, c_id, obj.id);
+            await this._add_rank_superclass(q, obj.id);
+
+            return [201, obj.uuid];
         });
-        if (st == 201)
+
+        if (st < 299)
             this.updates.next({
                 app:    App.Registration,
                 object: uuid,
-                config: { "class": klass },
+                config: { deleted: false },
             });
         return [st, uuid];
     }
@@ -242,48 +288,42 @@ export default class Model extends EventEmitter {
         const [st, body] = await this.db.txn({}, async query => {
             if (Immutable.has(object)) return [405];
 
-            const row = await _q_row(query, `
-                select o.id, c.uuid klass
-                from object o
-                    join object c on c.id = o.class
-                where o.uuid = $1
-            `, [object]);
-            if (row == undefined) return [404];
+            const id = this._obj_id(query, object);
+            if (id == null) return [404];
 
-            const {id, klass} = row;
+            const members = await _q_uuids(query, `
+                select o.uuid 
+                from membership m join object o on o.id = m.id
+                where m.class = $1
+            `, [id]);
+            if (members.length)
+                return [409, members];
 
-            /* Don't allow deleting a class which still has objects. */
-            if (klass == Class.Class) {
-                const objs = await _q_set(query, `
-                    select uuid from object where class = $1
-                `, [id]);
-                if (objs.length > 0)
-                    return [409, objs.map(r => r.uuid)];
-                await query(`delete from class where id = $1`, [id]);
-            }
+            const subclasses = await _q_uuids(query, `
+                select o.uuid
+                from subclass s join object o on o.id = s.id
+                where s.class = $1
+            `, [id]);
+            if (subclasses.length)
+                return [409, subclasses];
 
-            /* Don't allow deleting an app which still has configs. */
-            if (klass == Class.App) {
-                const objs = await _q_set(query, `
-                    select o.uuid
-                    from config c
-                        join object o on o.id = c.object
-                    where c.app = $1
-                `, [id]);
-                if (objs.length > 0)
-                    return [409, objs.map(r => r.uuid)];
-                await query(`delete from app where id = $1`, [id]);
-            }
+            const usage = await _q_uuids(query, `
+                select o.uuid
+                from config c join object o on o.id = c.object
+                where c.app = $1
+            `, [id]);
+            if (usage.length)
+                return [409, usage];
 
             /* Delete configs belonging to this object. */
-            const confs = await _q_set(query, `
+            const confs = await _q_uuids(query, `
                 delete from config c using object a
                 where a.id = c.app and c.object = $1
                 returning a.uuid
             `, [id]);
             /* Delete the object. */
             await query(`delete from object where id = $1`, [id]);
-            return [204, confs.map(r => r.uuid)];
+            return [204, confs];
         });
 
         if (st != 204)
@@ -295,79 +335,112 @@ export default class Model extends EventEmitter {
         return [st];
     }
 
-    async class_list() {
-        const dbr = await this.db.query(`
+    class_list () {
+        return _q_uuids(this.db.query.bind(this.db), `
             select o.uuid
-            from class c
-                join object o on o.id = c.id
-        `);
-        return dbr.rows.map(r => r.uuid);
+            from all_class k join object o on o.id = k.id
+        `)
     }
 
-    class_get(klass) {
-        return this.db.txn({}, async query => {
-            const class_id = await this._class_id(query, klass);
-            if (class_id == null) return;
+    _class_lookup (query, id, table) {
+        return _q_uuids(query, `
+            select o.uuid
+            from ${table} k join object o on o.id = k.id
+            where k.class = $1
+        `, [id]);
+    }
 
-            const dbr = await query(`
-                select o.uuid
-                from object o
-                where o.class = $1
-            `, [class_id]);
-            return dbr.rows.map(r => r.uuid);
+    class_lookup (klass, table) {
+        return this.db.txn({}, async query => {
+            const id = await this._class_id(query, klass);
+            if (id == null) return;
+            return this._class_lookup(query, id, table);
         });
     }
 
-    async config_list(app) {
-        const special = this.special.get(app);
-        if (special) return await special.list();
+    async class_has (klass, table, obj) {
+        const dbr = await this.db.query(`
+            select 1
+            from ${table} r
+                join object c on c.id = r.class
+                join object o on o.id = r.id
+            where c.uuid = $1 and o.uuid = $2
+        `, [klass, obj]);
+        return !!dbr.rows;
+    }
 
-        return await this.db.txn({}, async query => {
-            let app_id = await this._app_id(query, app);
+    class_add_member (klass, obj) {
+        return this.db.txn({}, async query => {
+            const c_id = await this._class_id(query, klass);
+            const o_id = await this._obj_id(query, obj);
+            if (c_id == null || o_id == null) return;
+            return this._add_member(query, c_id, o_id);
+        });
+    }
+
+    class_add_subclass (klass, subclass) {
+        return this.db.txn({}, async query => {
+            const c_id = await this._class_id(query, klass);
+            const s_id = await this._class_id(query, subclass);
+            if (c_id == null || s_id == null) return;
+            return this._add_subclass(query, c_id, s_id);
+        });
+    }
+
+    _config_list (app) {
+        return this.db.txn({}, async query => {
+            const app_id = await this._app_id(query, app);
             if (app_id == null) return null;
 
-            let dbr = await query(`
+            return _q_uuids(query, `
                 select o.uuid
                 from config c
                     join object o on o.id = c.object
                 where c.app = $1
             `, [app_id]);
-            return dbr.rows.map(r => r.uuid);
         });
+    }
+
+    async config_list(app) {
+        const special = this.special.get(app);
+        if (special) return special.list();
+        return this._config_list(app);
     }
 
     async config_class_list(app, klass) {
         return await this.db.txn({}, async query => {
-            let app_id = await this._app_id(query, app);
+            const app_id = await this._app_id(query, app);
             if (app_id == null) return null;
+            const class_id = await this._class_id(query, klass);
+            if (class_id == null) return null;
 
-            let dbr = await query(`
+            return _q_uuids(query, `
                 select o.uuid
                 from config c
                     join object o on o.id = c.object
-                    join object k on o.class = k.id
+                    join all_membership m on m.id = c.object
                 where c.app = $1
-                    and k.uuid = $2
+                    and m.class = $2
             `, [app_id, klass]);
-            return dbr.rows.map(r => r.uuid);
         });
     }
 
-    async config_get(q) {
-        const special = this.special.get(q.app)
-        if (special)
-            return await special.get(q.object);
-
-        let dbr = await this.db.query(`
+    _config_get (app, object) {
+        return _q_row(this.db.query.bind(this.db), `
             select c.json config, c.etag
             from config c
                 join object a on a.id = c.app
                 join object o on o.id = c.object
             where a.uuid = $1
                 and o.uuid = $2
-        `, [q.app, q.object]);
+        `, [app, object]);
+    }
 
-        return dbr.rows[0];
+    config_get(q) {
+        const special = this.special.get(q.app)
+        if (special)
+            return special.get(q.object);
+        return this._config_get(q.app, q.object);
     }
 
     async config_put(q, config, check_etag) {
@@ -475,7 +548,7 @@ export default class Model extends EventEmitter {
 
         /* This needs to be null, not undefined, for a nonexistent
          * object, or the 409 test below will fail. */
-        const json = conf?.json ?? null;
+        const json = conf?.config ?? null;
 
         /* Safety check: applying a merge-patch to a non-object destroys
          * the whole thing. */
@@ -487,6 +560,12 @@ export default class Model extends EventEmitter {
     }
 
     async config_search(app, klass, query) {
+        const select = Object.fromEntries(query.select);
+        const where = Array.from(query.where)
+            .map(([path, val]) => 
+                val == "undefined" ? `!exists($.${path})`
+                : `$.${path} == ${val}`);
+
         return await this.db.txn({}, async q => {
             const a_id = await this._app_id(q, app);
             const c_id = klass == null ? null : await this._class_id(q, klass);
@@ -494,18 +573,17 @@ export default class Model extends EventEmitter {
             if (a_id === undefined || c_id === undefined)
                 return [];
 
-            const select = Object.fromEntries(query.select);
-            const where = Array.from(query.where)
-                .map(([path, val]) => 
-                    val == "undefined" ? `!exists($.${path})`
-                    : `$.${path} == ${val}`);
-
-            return await this._do_config_search(q, [a_id, c_id, where, select]);
+            return await this._do_config_search(q, c_id, a_id, where, select);
         });
     }
 
-    async _do_config_search(query, bind) {
-        const dbr = await query(`
+    async _do_config_search(query, klass, app, where, select) {
+        const k_join = klass ? `join all_membership m on m.id = c.id` : "";
+        const k_whre = klass ? `and m.class = $4` : "";
+        const bind = [app, where, select];
+        if (klass) bind.push(klass);
+
+        return _q_set(query, `
             with results as (
                 select c.id,
                     coalesce(every(c.json @@ w.test), true) matches,
@@ -514,42 +592,29 @@ export default class Model extends EventEmitter {
                         c.json #> string_to_array(p.path, '.')
                     ) results
                 from config c
-                    left join unnest($3::jsonpath[]) w(test) on true
-                    left join jsonb_each_text($4) p(prop, path) on true
+                    left join unnest($2::jsonpath[]) w(test) on true
+                    left join jsonb_each_text($3) p(prop, path) on true
                 group by c.id)
             select o.uuid, jsonb_strip_nulls(r.results) results
             from config c
                 join results r on r.id = c.id
                 join object o on o.id = c.object
+                ${k_join}
             where r.matches
                 and c.app = $1
-                and (o.class = $2 or $2 is null);
+                ${k_whre}
         `, bind);
-
-        return dbr.rows;
-    }
-
-    async apps_get() {
-        let dbr = await this.db.query(`
-            select o.uuid
-            from app a
-                join object o on o.id = a.id
-        `);
-
-        return dbr.rows.map(r => r.uuid);
     }
 
     async find_schema(query, app) {
         if (this.schemas.has(app))
             return this.schemas.get(app);
 
-        let dbr = await query(`
-            select a.schema
-            from app a
-            where a.id = $1
-        `, [app]);
+        const schema_text = await _q_row(query, `
+            select json from config
+            where app = ${ObjID.ConfigSchema} and object = $1
+        `, [app]).then(r => r?.json);
 
-        const schema_text = dbr.rows[0]?.schema;
         if (schema_text == null)
             return null;
 
@@ -558,14 +623,8 @@ export default class Model extends EventEmitter {
         return schema;
     }
 
-    async app_schema_list () {
-        const dbr = await this.db.query(`
-            select o.uuid
-            from app a
-                join object o on o.id = a.id
-            where a.schema is not null
-        `);
-        return dbr.rows.map(r => r.uuid);
+    app_schema_list () {
+        return this._config_list(App.ConfigSchema);
     }
 
     app_schema(app) {
@@ -589,26 +648,32 @@ export default class Model extends EventEmitter {
             const app_id = await this._app_id(query, app);
             if (app_id == null) return false;
 
-            // FOR SHARE so we lock the rows
-            let dbr = await query(`
+            const configs = await _q_set(query, `
                 select o.uuid object, c.json
                 from config c
                     join object o on o.id = c.object
                 where c.app = $1
-                for share
             `, [app_id]);
 
-            const bad = dbr.rows
+            const bad = configs
                 .filter(r => !validate(r.json))
                 .map(r => r.object);
             if (bad.length > 0) return bad;
 
-            dbr = await query(`
-                update app set schema = $2 where id = $1
+            await query(`
+                insert into config (app, object, json)
+                values (${ObjID.ConfigSchema}, $1, $2)
+                on conflict (app, object) do update
+                set json = excluded.json, etag = default
             `, [app_id, schema]);
 
             this.schemas.set(app_id, validate);
             this.emit("change", {app});
+            this.updates.next({
+                app:    App.ConfigSchema, 
+                object: app,
+                config: schema,
+            });
             return true;
         });
     }
@@ -648,31 +713,35 @@ export default class Model extends EventEmitter {
 
         /* The order of loading here is important. This is why Classes
          * are handled separately from the others. */
-        for (const klass of dump.classes ?? []) {
-            const st = await this.object_create(klass, Class.Class);
+        for (const uuid of dump.classes ?? []) {
+            /* XXX temporary hack while the ACS dumps attempt to create
+             * this class */
+            if (uuid == Class.Class)
+                continue;
+            this.log("LOAD CLASS %s", uuid);
+            const [st] = await this.object_create({ uuid, rank: 1 });
             if (st > 299) {
-                this.log("Dump failed [%s] on class %s", st, klass);
+                this.log("Dump failed [%s] on class %s", st, uuid);
                 return st;
             }
         }
         for (const [klass, objs] of Object.entries(dump.objects ?? {})) {
-            for (const obj of objs) {
-                let st = await this.object_create(obj, klass);
-                if (st == 409 && overwrite) {
-                    st = await this.object_set_class(obj, klass);
-                }
+            for (const uuid of objs) {
+                this.log("LOAD OBJECT %s/%s", klass, uuid);
+                let [st] = await this.object_create({ uuid, class: klass });
                 if (st > 299) {
                     this.log("Dump failed [%s] on object %s (%s)",
-                        st, obj, klass);
+                        st, uuid, klass);
                     return st;
                 }
             }
         }
         for (const [app, objs] of Object.entries(dump.configs ?? {})) {
             for (const [object, conf] of Object.entries(objs)) {
+                this.log("LOAD CONFIG %s/%s", app, object);
                 const st = await this.config_put(
-                    {app, object, exclusive: !overwrite},
-                    conf);
+                        {app, object, exclusive: !overwrite},
+                        conf);
                 if (st > 299 && st != 409) {
                     this.log("Dump failed [%s] on config %s/%s", 
                         st, app, object);

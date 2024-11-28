@@ -1,7 +1,7 @@
 top=..
 include ${top}/mk/acs.init.mk
 
-eslint=	bin lib
+eslint=	bin lib editor
 
 repo?=acs-configdb
 k8s.deployment?=configdb

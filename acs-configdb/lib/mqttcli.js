@@ -28,8 +28,18 @@ export default class MQTTCli {
         this.seq = 0;
     }
 
-    async init() {
-        return this;
+    static fromEnv (fplus, env) {
+        if (env.MQTT_DISABLE) {
+            fplus.debug.log("mqtt", "Disabling MQTT connection.");
+            return;
+        }
+        return new MQTTCli({
+            fplus,
+            sparkplug_address:  env.SPARKPLUG_ADDRESS,
+            device_uuid:        env.DEVICE_UUID,
+            url:                env.HTTP_API_URL,
+            silent:             !!env.MQTT_MONITOR_ONLY,
+        });
     }
 
     will() {

@@ -4,6 +4,9 @@
  * Copyright 2022 AMRC
  */
 
+/* Tell ESLint this is DOM code. */
+/* global document */
+
 import { h, render, createContext } 
                     from "https://esm.sh/preact@10.19.2";
 import { useContext, useEffect, useRef, useState }
@@ -17,6 +20,10 @@ const html = htm.bind(h);
 const AppUuid = {
     Registration: "cb40bed5-49ad-4443-a7f5-08c75009da8f",
     General_Info: "64a8bfa9-7772-45c4-9d1a-9e6290690957",
+};
+const Class = {
+    Rank:       "1f2ee062-6782-48c8-926b-904f56bd18b1",
+    Individual: "33343846-8c14-4cb0-8027-989071a20724",
 };
 
 let Token = null;
@@ -51,7 +58,7 @@ async function service_fetch(path, opts) {
 }
 
 async function fetch_json(path) {
-    const rsp = await service_fetch(`/v1/${path}`);
+    const rsp = await service_fetch(`/v2/${path}`);
     if (rsp.status != 200) return;
 
     const json = await rsp.json();
@@ -61,36 +68,32 @@ async function fetch_json(path) {
     return json;
 }
 
-async function get_class(obj) {
-    const reg = await fetch_json(`app/${AppUuid.Registration}/object/${obj}`);
-    return reg ? reg["class"] : null;
-}
-
-async function _get_name (obj) {
-    const gi = await fetch_json(`app/${AppUuid.General_Info}/object/${obj}`);
-    return gi 
-        ? gi.deleted
-            ? html`<s>${gi.name}</s>`
-            : gi.name
-        : html`<i>NO NAME</i>`;
-}
-
 async function get_name (obj, with_class) {
-    const name = await _get_name(obj);
-    if (!with_class) return name;
+    const [reg, inf] = await Promise.all(
+        [AppUuid.Registration, AppUuid.General_Info]
+        .map(app => fetch_json(`app/${app}/object/${obj}`)));
 
-    const kid = await get_class(obj);
-    const kname = kid ? await _get_name(kid) : html`<i>NO CLASS</i>`;
-    return html`${name} <small>(${kname})</small>`;
+    const name = inf ? inf.name : html`<i>NO NAME</i>`;
+    const dname = reg?.deleted ? html`<s>${name}</s>` : name;
+    if (!with_class) return dname;
+
+    const kname = reg
+        ? reg.class
+            ? await get_name(reg.class, false)
+            : html`<i>No class</i>`
+        : html`<i>UNREGISTERED</i>`;
+    return html`${dname} <small>(${kname})</small>`;
 }
 
 function st_ok (st) { return st >= 200 && st < 300; }
 
-async function put_string(path, conf, method = "PUT") {
+async function put_string(path, conf, method, type) {
+    method ??= "PUT";
+    type ??= "application/json";
     const rsp = await service_fetch(`/v1/${path}`, {
-        method: method,
+        method,
         headers: {
-            "Content-Type": "application/json",
+            "Content-Type": type,
         },
         body: conf,
     });
@@ -98,8 +101,12 @@ async function put_string(path, conf, method = "PUT") {
     return rsp.status;
 }
 
-function put_json(path, json, method = "PUT") {
-    return put_string(path, JSON.stringify(json), method);
+function put_json(path, json, method, type) {
+    return put_string(path, JSON.stringify(json), method, type);
+}
+
+function patch_json (path, patch) {
+    return put_json(path, patch, "PATCH", "application/merge-patch+json");
 }
 
 async function post_json(path, json) {
@@ -138,11 +145,11 @@ function build_opener() {
 }
 
 function Opener(props) {
-    const { obj, children, with_class } = props;
+    const { obj, children } = props;
     const [open, button] = build_opener();
 
     const title = "obj" in props
-        ? html`<${ObjTitle} obj=${obj} with_class=${with_class}/>`
+        ? html`<${ObjTitle} obj=${obj}/>`
         : props.title;
 
     return html`
@@ -168,10 +175,10 @@ function Uuid(props) {
 }
 
 function ObjTitle(props) {
-    const { obj, with_class } = props;
+    const { obj } = props;
     const [name, set_name] = useState("...");
 
-    useEffect(async () => set_name(await get_name(obj, with_class)), [obj]);
+    useEffect(async () => set_name(await get_name(obj, true)), [obj]);
 
     return html`
         <${Uuid}>${obj}<//> ${name}`;
@@ -186,16 +193,13 @@ function Editor(props) {
         <dl>
             <${Opener} title="Applications">
                 <${Apps}/>
-            </
-            />
+            <//>
             <${Opener} title="Objects">
                 <${Objs}/>
-            </
-            />
+            <//>
             <${Opener} title="JSON dumps">
                 <${Dumps}/>
-            </
-            />
+            <//>
         </dl>
     `
 }
@@ -277,53 +281,88 @@ function Apps(props) {
 }
 
 function Objs(props) {
-    const [classes, set_classes] = useState(null);
+    const [ranks, set_ranks] = useState(null);
 
-    useEffect(async () => set_classes(await fetch_json("class")), []);
+    useEffect(() => {
+        service_fetch("/v2/object/rank")
+            .then(r => r.status == 200 ? r.json() : null)
+            .then(set_ranks);
+    }, []);
 
+    if (!ranks)
+        return html`<b>...</b>`;
+
+    const hranks = ranks.map(r => html`
+        <${Opener} obj=${r} key=${r}><${Rank} rank=${r}/><//>
+    `);
+  
     return html`
         <${NewObj}/>
-        <dl>${
-                classes?.map(c => html`
-                    <${Opener} obj=${c} key=${c}>
-                        <${Klass} klass=${c}/></
-                        />`)
-                ?? html`<br/><b>...</b>`
-        }
+        <dl>
+            ${hranks}
         </dl>
     `;
 }
 
-function Klass(props) {
-    const {klass} = props;
-    const [objs, set_objs] = useState(null);
+function Rank (props) {
+    const { rank } = props;
+    const [subs, set_subs] = useState(null);
 
-    const update = async () => set_objs(await fetch_json(`class/${klass}`));
-    useEffect(update, [klass]);
+    useEffect(() =>
+        fetch_json(`class/${rank}/direct/subclass`).then(set_subs), []);
 
-    return html`${
-        objs?.map(o => html`
-            <${Obj} obj=${o} key=${o} update=${update}/><br/>`)
-        ?? html`<b>...</b><br/>`
-    }`;
+    if (!subs) return html`<b>...</b>`;
+
+    return subs.map(s => html`<${Obj} obj=${s} key=${s} klass=${true}/>`);
 }
 
-function Obj(props) {
-    const {obj, update} = props;
-    const [msg, set_msg] = useState("");
+function Klass(props) {
+    const {klass, all} = props;
+    const [subs, set_subs] = useState(null);
+    const [objs, set_objs] = useState(null);
 
-    const do_delete = async () => {
+    const update = () => {
+        fetch_json(`class/${klass}/direct/member`).then(set_objs);
+        fetch_json(`class/${klass}/direct/subclass`).then(set_subs);
+    };
+    useEffect(update, [klass]);
+
+    const notyet = html`<b>...</b><br/>`;
+    const hsubs = subs?.map(s => 
+        html`<${Obj} obj=${s} key=${s} klass=${true} all=${all}/>`);
+    const hobjs = objs?.map(o =>
+        html`<${Obj} obj=${o} key=${o} all=${all}/>`);
+
+    return html`
+        <b>Subclasses</b><br/>
+        ${hsubs ?? notyet}
+        <b>Members</b><br/>
+        ${hobjs ?? notyet}
+    `;
+}
+
+function Obj (props) {
+    const {obj, klass, all} = props;
+    const [ind, set_ind] = useState(false);
+
+    if (!klass && !all)
+        useEffect(() => service_fetch(
+            `/v2/class/${Class.Individual}/any/member/${obj}`)
+            .then(rsp => set_ind(rsp.status == 204)));
+
+    /*const do_delete = async () => {
         const ok = await delete_path(`object/${obj}`);
         if (!ok) set_msg("Delete failed");
         await update();
-    };
+    };*/
+
+    if (ind)
+        return html`<${ObjTitle} obj=${obj}/><br/>`;
 
     return html`
-        <button onClick=${do_delete}>Delete
-        </button
-        >
-        <${ObjTitle} obj=${obj}
-        /> ${msg}
+        <${Opener} obj=${obj} key=${obj}>
+            <${Klass} klass=${obj} all=${all}/>
+        <//>
     `;
 }
 
@@ -347,7 +386,7 @@ function NewObj(props) {
 
             const name = new_name.current?.value;
             if (name) {
-                await put_json(
+                await patch_json(
                     `app/${AppUuid.General_Info}/object/${rsp.uuid}`,
                     {name});
             }
@@ -382,7 +421,7 @@ function App(props) {
             <${Opener} title="New config">
                 <${NewConf} update=${update} app=${app}/><//>
             ${objs.map(o => html`
-                <${Opener} key=${o} obj=${o} with_class=${true}>
+                <${Opener} key=${o} obj=${o}>
                     <${Conf} app=${app} obj=${o} update_parent=${update}/>
                 <//>
             `)}

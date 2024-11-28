@@ -12,11 +12,16 @@ export const Version = "1.7.0";
 export const Null_UUID = "00000000-0000-0000-0000-000000000000";
 
 export const Class = {
+    Individual: "2494ae9b-cd87-4c01-98db-437a303b43e9",
     Class: "04a1c90d-2295-4cbe-b33a-74eded62cbf1",
+    R2Class: "705888ce-53fa-434d-afee-274b331d4642",
+    R3Class: "52b80183-6998-4bf9-9b30-132755e7dede",
+
     Device: "18773d6d-a70d-443a-b29a-3f1583195290",
     Schema: "83ee28d4-023e-4c2c-ab86-12c24e86372c",
     App: "d319bd87-f42b-4b66-be4f-f82ff48b93f0",
     Service: "265d481f-87a7-4f93-8fc6-53fa64dc11bb",
+    SpecialObj: "ddb132e4-5cdd-49c8-b9b1-2f35879eab6d",
 };
 
 export const App = {
@@ -24,6 +29,11 @@ export const App = {
     Info: "64a8bfa9-7772-45c4-9d1a-9e6290690957",
     SparkplugAddress: "8e32801b-f35a-4cbf-a5c3-2af64d3debd7",
     ConfigSchema: "dbd8a535-52ba-4f6e-b4f8-9b71aefe09d3",
+};
+
+export const SpecialObj = {
+    Wildcard:   "00000000-0000-0000-0000-000000000000",
+    Unowned:    "091e796a-65c0-4080-adff-c3ce01a65b2e",
 };
 
 export const Schema = {

@@ -9,6 +9,7 @@ import { App } from "./constants.js";
 class SpecialApp {
     constructor (model) {
         this.model = model;
+        this.log = model.log;
     }
 
     put (obj, json) { return 405; }
@@ -20,6 +21,12 @@ class SpecialApp {
  * the database like everyone else. Then they would get the benefit of
  * etags and any other future improvements to config handling
  * (e.g. transactions, ownership, ...).
+ *
+ * Idea: these are both sideways caches, in that we the ConfigDB need
+ * access to the information in a form other than JSON. They both also
+ * need different validation from normal entries. So maybe all we need
+ * here is a pre-PUT validate-and-cache method which can update our
+ * sideways storage (object table, schema cache).
  */
 
 class ObjectRegistration extends SpecialApp {
@@ -30,18 +37,11 @@ class ObjectRegistration extends SpecialApp {
     }
 
     async get(obj) {
-        const klass = await this.model.object_class(obj);
-        if (klass == null) return null;
-        return {
-            config: {"class": klass},
-        };
+        const info = await this.model.object_info(obj);
+        return { config: info };
     }
 
-    async put(obj, json) {
-        const klass = json?.class;
-        if (klass == null) return 400;
-        return await this.model.object_set_class(obj, klass);
-    }
+    /* Disallow PUT. Maybe allow PATCH later? */
 }
 
 class ConfigSchema extends SpecialApp {
@@ -76,4 +76,4 @@ class ConfigSchema extends SpecialApp {
     }
 }
 
-export const Specials = [ObjectRegistration, ConfigSchema];
+export const SpecialApps = [ObjectRegistration, ConfigSchema];

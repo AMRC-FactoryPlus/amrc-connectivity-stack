@@ -21,7 +21,9 @@ call migrate_to(8, $migrate$
         drop constraint object_class_fkey,
         alter column class drop not null,
         add foreign key (class) references object on update cascade,
-        add column rank integer check(rank >= 0);
+        -- An FK to rank would be good, but the topmost rank must reference
+        -- a rank which doesn't have an assigned UUID yet.
+        add column rank integer not null check(rank >= 0) default 0;
     drop table class;
 
     -- Create new class structure
@@ -55,10 +57,8 @@ call migrate_to(8, $migrate$
     insert into rank (depth, id)
         values (0, 12), (1, 1), (2, 11), (3, 10);
 
-    -- Set rank of existing objects. Assume objects are individuals for
-    -- now. We will need an endpoint to change the rank of a class and
-    -- all its members.
-    update object set rank = 0 where class != 1;
+    -- Set rank of existing classes. Other objects will be imported as
+    -- individuals. Reset the class of R1Class.
     update object set rank = 1 where class = 1;
     update object set class = 11, rank = 2 where id = 1;
 
@@ -71,8 +71,6 @@ call migrate_to(8, $migrate$
         select id, 12 from object
         where rank = 1 and id != 12;
 
-    -- An FK to rank would be good, but the topmost rank must reference
-    -- a rank which doesn't have an assigned UUID yet.
     alter table object
         alter column rank set not null;
 

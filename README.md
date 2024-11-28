@@ -4,8 +4,9 @@ This library exists to make it easier to write drivers for the ACS Edge
 Agent. The Edge Agent exposes an MQTT broker for drivers to communicate
 with and requires drivers to use a specific protocol for communication.
 
-This version of the library supports creating read-only, polled device
-drivers. Other forms of driver may be implemented in the future.
+This version of the library supports creating read-only, polled and
+asynchronous device drivers. Other forms of driver may be implemented in
+the future.
 
 ## Core concepts
 

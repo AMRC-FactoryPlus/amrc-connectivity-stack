@@ -26,6 +26,7 @@ interface ACL {
 export class DriverBroker extends EventEmitter {
     broker:     Aedes
     passwords:  string
+    debugUser:  string | undefined
     acl:        Map<string, ACL>
     hostname:   string
     port:       number
@@ -44,6 +45,7 @@ export class DriverBroker extends EventEmitter {
             : 1883;
 
         this.passwords = env.EDGE_PASSWORDS;
+        this.debugUser = env.EDGE_DEBUG_USER;
 
         this.broker = new Aedes();
         this.acl = new Map();
@@ -81,17 +83,26 @@ export class DriverBroker extends EventEmitter {
 
         const fail = (f, ...a) => { log(f, ...a); callback(null, false); };
 
-        if (id != username)
-            return fail("Invalid client-id %s for %s", id, username);
         if (!password)
             return fail("No password for %s", username);
         const expect = await fs.readFile(`${this.passwords}/${username}`)
             .catch(e => null);
         if (!expect)
-            return fail("Unexpected driver %s", username);
+            return fail("Unknown user %s", username);
         if (expect.compare(password) != 0)
             return fail("Bad password for %s", username);
+
+        if (username == this.debugUser) {
+            this.acl.set(id, {
+                publish: /./,
+                subscribe: /./,
+            });
+            return callback(null, true);
+        }
         
+        if (id != username)
+            return fail("Invalid client-id %s for %s", id, username);
+
         this.acl.set(id, {
             publish: new RegExp(
                 `^${prefix}/${id}/(?:status|data/\\w+|err/\\w+)$`),

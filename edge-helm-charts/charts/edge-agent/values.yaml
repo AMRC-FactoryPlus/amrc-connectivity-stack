@@ -40,6 +40,8 @@ drivers: {}
 
 # Make the driver interface available externally.
 #externalIPs: []
+# Create a privileged account on the driver broker.
+#driverDebugUser: admin
 debug: false
 verbosity: ALL,!token,!service,!sparkplug
 poll_int: 10

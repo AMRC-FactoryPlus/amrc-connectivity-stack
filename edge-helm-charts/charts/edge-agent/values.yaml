@@ -23,6 +23,8 @@ drivers: {}
   #Test:
     # An image name from the image list above.
     #image: test
+    # OR: this driver is deployed externally
+    #external: false
     # Run this driver as a privileged container. This removes a k8s
     # security feature but is necessary to allow access to hardware.
     #privileged: true

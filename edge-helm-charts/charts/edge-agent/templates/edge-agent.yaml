@@ -58,6 +58,10 @@ spec:
 {{- end }}
             - name: EDGE_PASSWORDS
               value: "/usr/app/driver-passwords"
+{{- if .Values.driverDebugUser }}
+            - name: EDGE_DEBUG_USER
+              value: "{{ .Values.driverDebugUser }}"
+{{- end }}
           resources:
             limits:
               memory: {{ .Values.limits.memory | quote }}
@@ -128,15 +132,3 @@ spec:
   edgeAgent: true
   secrets:
     - edge-agent-sensitive-information-{{ .Values.uuid }}
-{{ range $name, $image := .Values.drivers }}
----
-apiVersion: factoryplus.app.amrc.co.uk/v1
-kind: LocalSecret
-metadata:
-  namespace: {{ $.Release.Namespace }}
-  name: "driver-passwords.{{ $k8sname }}.{{ $name | lower }}"
-spec:
-  format: Password
-  secret: "driver-passwords.{{ $k8sname }}"
-  key: "{{ $name }}"
-{{- end }}

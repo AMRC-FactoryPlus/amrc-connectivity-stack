@@ -9,7 +9,7 @@
 
 import { h, render, createContext } 
                     from "https://esm.sh/preact@10.19.2";
-import { useContext, useEffect, useRef, useState }
+import { useContext, useEffect, useId, useRef, useState }
                     from "https://esm.sh/preact@10.19.2/hooks";
 import { signal }   from "https://esm.sh/@preact/signals@1.2.2";
 import htm          from "https://esm.sh/htm@3.1.1";
@@ -68,21 +68,16 @@ async function fetch_json(path) {
     return json;
 }
 
-async function get_name (obj, with_class) {
-    const [reg, inf] = await Promise.all(
+async function get_info (uuid, with_class) {
+    const [reg, info] = await Promise.all(
         [AppUuid.Registration, AppUuid.General_Info]
-        .map(app => fetch_json(`app/${app}/object/${obj}`)));
+        .map(app => fetch_json(`app/${app}/object/${uuid}`)));
 
-    const name = inf ? inf.name : html`<i>NO NAME</i>`;
-    const dname = reg?.deleted ? html`<s>${name}</s>` : name;
-    if (!with_class) return dname;
+    const rv = { uuid, reg, info };
+    if (with_class && reg?.class)
+        rv.klass = await get_info(reg.class, false);
 
-    const kname = reg
-        ? reg.class
-            ? await get_name(reg.class, false)
-            : html`<i>No class</i>`
-        : html`<i>UNREGISTERED</i>`;
-    return html`${dname} <small>(${kname})</small>`;
+    return rv;
 }
 
 function st_ok (st) { return st >= 200 && st < 300; }
@@ -133,6 +128,8 @@ async function delete_path(path) {
     return rsp.status == 204;
 }
 
+const ObjInfo = createContext(true);
+
 function build_opener() {
     const [open, set_open] = useState(false);
 
@@ -148,9 +145,7 @@ function Opener(props) {
     const { obj, extra, children } = props;
     const [open, button] = build_opener();
 
-    const title = "obj" in props
-        ? html`<${ObjTitle} obj=${obj}/>`
-        : props.title;
+    const title = props.title ?? html`<${ObjTitle} obj=${obj}/>`;
 
     return html`
         <dt>${button} ${extra} ${title}</dt>
@@ -174,32 +169,92 @@ function Uuid(props) {
     return html`<tt ref=${ref} onClick=${copy}>${uuid}</tt>`;
 }
 
-function ObjTitle(props) {
-    const { obj } = props;
-    const [name, set_name] = useState("...");
+function ObjName (props) {
+    const { obj, with_class } = props;
 
-    useEffect(async () => set_name(await get_name(obj, true)), [obj]);
+    const format = ({ info, reg }) => {
+        const name = info ? info.name : html`<i>NO NAME</i>`;
+        return reg?.deleted ? html`<s>${name}</s>` : name;
+    };
+
+    const oname = format(obj);
+    if (!with_class) return oname;
+
+    const kname = 
+        obj.reg ?
+            obj.klass ? format(obj.klass) : html`<i>No class</i>`
+        : html`<i>UNREGISTERED</i>`;
+    return html`${oname} <small>(${kname})</small>`;
+}
+
+function ObjTitleCtx(props) {
+    const { with_class } = props;
+    const obj = useContext(ObjInfo);
+
+    const name = obj.reg
+        ? html`<${ObjName} obj=${obj} with_class=${with_class}/>`
+        : html`<b>...</b>`;
+
+    return html`<${Uuid}>${obj.uuid}<//> ${name}`;
+}
+
+function ObjTitle (props) {
+    const { obj } = props;
 
     return html`
-        <${Uuid}>${obj}<//> ${name}`;
+        <${ObjFetchInfo} obj=${obj}>
+            <${ObjTitleCtx}/>
+        <//>
+    `;
+}
+
+function ObjMenu (props) {
+    const { menu } = props;
+    const info = useContext(ObjInfo);
+
+    if (!info) return;
+
+    const obj = info.uuid;
+    const name = info.info?.name ?? obj;
+
+    const reg = `app/${AppUuid.Registration}/object`;
+    const items = [
+        ...menu,
+        [null],
+        ["Delete object", "DELETE", `object/${obj}`],
+        ["Raise rank", "PATCH", `${reg}/${obj}`, { rank: info.reg?.rank + 1 }],
+        ["Lower rank", "PATCH", `${reg}/${obj}`, { rank: info.reg?.rank - 1 }],
+    ];
+
+    return html`<${MenuButton} title=${name} items=${items}/>`;
 }
 
 function MenuButton (props) {
-    const { menu } = props;
-    const [open, set_open] = useState(false);
+    const { title, items } = props;
+    const id = useId();
 
-    if (!open)
-        return html`<button onClick=${() => set_open(true)}>...<//>`;
-
-    const buttons = menu.map(([title, action]) => html`
-        <button onClick=${action}>${title}<//><br/>`);
+    const buttons = items.map(([title, method, path, body]) => {
+        const action = () => service_fetch(`/v2/${path}`, {
+            method,
+            headers:    { 
+                "Content-Type": method == "PATCH"
+                    ? "application/merge-patch+json"
+                    : "application/json",
+            },
+            body:       body ? JSON.stringify(body) : undefined,
+        });
+        return title ? html`<li><button onClick=${action}>${title}<//><//>`
+            : html`<li><hr/><//>`;
+    });
 
     return html`
-        <button className="menu-button">...
-            <div className="menu-popup">
+        <span className="menu-anchor">
+            <button className="menu-button" popovertarget="${id}">...<//>
+            <menu id="${id}" className="menu-popup" popover="auto">
+                <li><b>${title}<//><//>
                 ${buttons}
-                <button onClick=${() => set_open(false)}>Cancel<//>
-        <//><//>
+            <//>
+        <//>
     `;
 }
 
@@ -311,34 +366,18 @@ function Objs(props) {
     if (!ranks)
         return html`<b>...</b>`;
 
-    const hranks = ranks.map(r => html`
-        <${Opener} obj=${r} key=${r}><${Rank} rank=${r}/><//>
-    `);
+    //const hranks = ranks.map((r, d) => html`
+    //    <${Opener} obj=${r} key=${r}><${Rank} rank=${r} depth=${d}/><//>
+    //`);
+    const hranks = ranks.map(r => html`<${Obj} obj=${r}/>`);
   
     return html`
         <${NewObj}/>
+        <h2>Ranks of object</h2>
         <dl>
             ${hranks}
         </dl>
     `;
-}
-
-function Rank (props) {
-    const { rank } = props;
-    const [subs, set_subs] = useState(null);
-
-    useEffect(() =>
-        fetch_json(`class/${rank}/direct/subclass`).then(set_subs), []);
-
-    if (!subs) return html`<b>...</b>`;
-
-    const menu = s => [
-        ["Raise rank",   () => console.log("Raise rank of %s", s)],
-    ];
-
-    return subs.map(s => html`
-        <${Obj} obj=${s} key=${s} klass=${true} menu=${menu(s)}/>
-    `);
 }
 
 function Klass(props) {
@@ -352,54 +391,60 @@ function Klass(props) {
     };
     useEffect(update, [klass]);
 
+    const reg = `app/${AppUuid.Registration}/object`;
     const s_menu = s => [
-        ["Remove",   () => 
-            console.log("Remove subclass %s from %s", s, klass)],
+        ["Remove as subclass", "DELETE", `class/${klass}/direct/subclass/${s}`],
     ];
     const m_menu = m => [
-        ["Remove",  () =>
-            console.log("Remove member %s from %s", m, klass)],
+        ["Remove as member", "DELETE", `class/${klass}/direct/member/${m}`],
+        ["Set primary class", "PATCH", `${reg}/${m}`, { "class": klass }],
     ];
 
     const notyet = html`<b>...</b><br/>`;
     const hsubs = subs?.map(s => 
-        html`<${Obj} obj=${s} key=${s} klass=${true} menu=${s_menu(s)}/>`);
+        html`<${Obj} obj=${s} key=${s} menu=${s_menu(s)}/>`);
     const hobjs = objs?.map(o =>
         html`<${Obj} obj=${o} key=${o} menu=${m_menu(o)}/>`);
 
     return html`
-        <b>Subclasses</b><br/>
-        ${hsubs ?? notyet}
-        <b>Members</b><br/>
-        ${hobjs ?? notyet}
+        <h3>Subclasses<//>
+        <dl>${hsubs ?? notyet}<//>
+        <h3>Members<//>
+        <dl>${hobjs ?? notyet}<//>
+    `;
+}
+
+function ObjFetchInfo (props) {
+    const { obj, children } = props;
+    const [info, set_info] = useState({ uuid: obj });
+
+    useEffect(() => get_info(obj, true).then(set_info), [obj]);
+
+    return html`<${ObjInfo.Provider} value=${info}>${children}<//>`;
+}
+
+function ObjDisplay (props) {
+    const { menu } = props;
+    const info = useContext(ObjInfo);
+
+    const obj = info.uuid;
+
+    const mbutt = menu ? html`<${ObjMenu} menu=${menu}/>` : "";
+    const title = html`${mbutt} <${ObjTitleCtx} with_class=${true}/>`
+
+    if (info?.reg?.rank == 0)
+        return html`<dt>${title}<//>`;
+
+    return html`
+        <${Opener} key=${obj} title=${title}>
+            <${Klass} klass=${obj}/>
+        <//>
     `;
 }
 
 function Obj (props) {
-    const {obj, klass, menu} = props;
-    const [ind, set_ind] = useState(false);
-
-    if (!klass)
-        useEffect(() => service_fetch(
-            `/v2/class/${Class.Individual}/any/member/${obj}`)
-            .then(rsp => set_ind(rsp.status == 204)));
-
-    /*const do_delete = async () => {
-        const ok = await delete_path(`object/${obj}`);
-        if (!ok) set_msg("Delete failed");
-        await update();
-    };*/
-
-    const mbutt = menu && html`<${MenuButton} menu=${menu}/>`;
-
-    if (ind)
-        return html`${mbutt} <${ObjTitle} obj=${obj}/><br/>`;
-
-    return html`
-        <${Opener} obj=${obj} key=${obj} extra=${mbutt}>
-            <${Klass} klass=${obj}/>
-        <//>
-    `;
+    const {obj, menu} = props;
+    return html`<${ObjFetchInfo} obj=${obj}><${ObjDisplay} menu=${menu}/><//>`;
 }
 
 function NewObj(props) {

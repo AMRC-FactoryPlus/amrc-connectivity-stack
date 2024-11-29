@@ -33,12 +33,14 @@ call migrate_to(8, $migrate$
     );
     create table membership (
         class integer not null references object on update cascade,
-        id integer not null references object on update cascade,
+        id integer not null references object 
+            on update cascade on delete cascade,
         unique(class, id)
     );
     create table subclass (
         class integer not null references object on update cascade,
-        id integer not null references object on update cascade,
+        id integer not null references object 
+            on update cascade on delete cascade,
         unique(class, id)
     );
 

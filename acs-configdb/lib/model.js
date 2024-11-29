@@ -288,7 +288,7 @@ export default class Model extends EventEmitter {
         const [st, body] = await this.db.txn({}, async query => {
             if (Immutable.has(object)) return [405];
 
-            const id = this._obj_id(query, object);
+            const id = await this._obj_id(query, object);
             if (id == null) return [404];
 
             const members = await _q_uuids(query, `

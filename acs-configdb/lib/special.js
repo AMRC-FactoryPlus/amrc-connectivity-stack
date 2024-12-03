@@ -12,8 +12,9 @@ class SpecialApp {
         this.log = model.log;
     }
 
-    put (obj, json) { return 405; }
-    delete (obj) { return 405; }
+    /* These are called from within a transaction */
+    validate (query, obj, config) { return { status: 405 }; }
+    delete (query, obj) { return 405; }
 }
 
 /* XXX These should work the other way: they should be stored as normal
@@ -32,47 +33,47 @@ class SpecialApp {
 class ObjectRegistration extends SpecialApp {
     static application = App.Registration;
 
-    list () {
-        return this.model.object_list();
-    }
-
-    async get(obj) {
-        const info = await this.model.object_info(obj);
-        return { config: info };
-    }
-
-    /* Disallow PUT. Maybe allow PATCH later? */
 }
 
 class ConfigSchema extends SpecialApp {
     static application = App.ConfigSchema;
 
-    list () {
-        return this.model.app_schema_list();
+    parse (schema) {
+        try {
+            return this.model.ajv.compile(schema);
+        } catch (e) {
+            this.log("Error parsing schema: %s", e);
+            return;
+        }
     }
 
-    async get (obj) {
-        const rv = await this.model.app_schema(obj);
-        if (rv == null) return;
-        return { config: rv.schema };
+    async validate (query, app, schema) {
+        /* XXX Validate app is an app? */
+
+        const validate = this.parse(schema);
+        if (!validate)
+            return { status: 422 };
+
+        const configs = await query(`
+            select o.uuid object, c.json
+            from config c
+                join object o on o.id = c.object
+            where c.app = $1
+        `, [app]).then(dbr => dbr.rows);
+
+        const bad = configs
+            .filter(r => !validate(r.json))
+            .map(r => r.object);
+        if (bad.length > 0)
+            return { status: 409, body: bad };
+
+        this.model.schemas.set(app, validate);
+        return { status: 204 };
     }
 
-    async put (obj, json) {
-        const rv = await this.model.app_schema_update(obj, json);
-        
-        if (rv === null)
-            return 422;
-        else if (rv === true)
-            return 204;
-        else if (rv === false)
-            /* XXX Properly we should distinguish here between 404 for
-             * object-not-found and 405 for object-is-not-an-app. */
-            return 405;
-        else
-            /* XXX The /config-schema endpoint returned a list of
-             * conflicting objects, which we now throw away. This
-             * convention could be generalised? */
-            return 409;
+    delete (query, app) {
+        this.model.schemas.delete(app);
+        return 204;
     }
 }
 

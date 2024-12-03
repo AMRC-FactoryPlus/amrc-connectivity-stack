@@ -104,43 +104,6 @@ export class APIv2 {
         res.status(200).json({uuid, name});
     }
 
-    async app_schema_get(req, res) {
-        if (!Valid.uuid.test(req.params.app))
-            return res.status(410).end();
-
-        const app = req.params.app;
-
-        const ok = await this.auth.check_acl(req.auth, Perm.Read_App, app, true);
-        if (!ok) return res.status(403).end();
-
-        let rv = await this.model.app_schema(app);
-        if (rv == null)
-            res.status(404).end();
-        else
-            res.status(200).type("application/json").send(rv.schema);
-    }
-
-    async app_schema_put(req, res) {
-        if (!Valid.uuid.test(req.params.app))
-            return res.status(410).end();
-
-        const app = req.params.app;
-
-        const ok = await this.auth.check_acl(req.auth, Perm.Manage_App, app, true);
-        if (!ok) return res.status(403).end();
-
-        let rv = await this.model.app_schema_update(app, req.body);
-
-        if (rv === null)
-            res.status(400).end();
-        else if (rv === true)
-            res.status(204).end();
-        else if (rv === false)
-            res.status(404).end();
-        else
-            res.status(409).json(rv);
-    }
-
     async object_list(req, res) {
         const ok = await this.auth.check_acl(req.auth, Perm.Manage_Obj, UUIDs.Null);
         if (!ok) return res.status(403).end();

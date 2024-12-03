@@ -219,31 +219,43 @@ export default class Model extends EventEmitter {
         return [404];
     }
 
-    /* Accept or revive an existing object */
-    async _update_existing (q, spec, info) {
+    async _update_registration (q, id, spec) {
+        const info = await this._config_get(ObjID.Registration, id)
+            .then(r => r?.config);
+        if (!info) {
+            this.log("Object ID with no Registration entry: %s", id);
+            return 500;
+        }
+
+        /* XXX These should be changable, with restrictions. */
         if (spec.class != null && spec.class != info.class) {
             this.log("Class mismatch for create: %s: have %s, want %s",
                 info.uuid, info.class, spec.class);
-            return [409];
+            return 409;
         }
         if (spec.rank != null && spec.rank != info.rank) {
             this.log("Rank mismatch for create: %s: have %s, want %s",
                 info.uuid, info.rank, spec.rank);
-            return [409];
+            return 409;
         }
-        await q(`
-            update object set deleted = false
-            where id = $1
-        `, [info.id]);
-        return [200, info.uuid];
+
+        await q(`update object set deleted = $2 where id = $1`,
+            [id, spec.deleted]);
+        await q(`call update_registration($1)`, [id]);
+
+        return 200;
     }
 
     /* Object creation must supply a class or a rank (not both) */
     async object_create(spec) {
         const [st, uuid] = await this.db.txn({}, async q => {
             if (spec.uuid) {
-                const info = await this._object_info(q, spec.uuid);
-                if (info) return this._update_existing(q, spec, info);
+                const id = await this._obj_id(q, spec.uuid);
+                if (id) {
+                    const st = await this._update_registration(q, id, 
+                        { ...spec, deleted: false });
+                    return [st, spec.uuid];
+                }
             }
 
             let c_id;
@@ -267,6 +279,7 @@ export default class Model extends EventEmitter {
 
             await this._add_member(q, c_id, obj.id);
             await this._add_rank_superclass(q, obj.id);
+            await q(`call update_registration($1)`, [obj.id]);
 
             return [201, obj.uuid];
         });
@@ -403,7 +416,8 @@ export default class Model extends EventEmitter {
 
     async config_list(app) {
         const special = this.special.get(app);
-        if (special) return special.list();
+        if (special && special.list)
+            return special.list();
         return this._config_list(app);
     }
 
@@ -427,27 +441,77 @@ export default class Model extends EventEmitter {
 
     _config_get (app, object) {
         return _q_row(this.db.query.bind(this.db), `
+            select c.id, c.json config, c.etag
+            from config c
+            where c.app = $1 and c.object = $2
+        `, [app, object]);
+    }
+
+    config_get(q) {
+        const special = this.special.get(q.app)
+        /* XXX This is not correct. We need to at least cache the result
+         * for PATCH. */
+        if (special && special.get)
+            return special.get(q.object);
+
+        return _q_row(this.db.query.bind(this.db), `
             select c.json config, c.etag
             from config c
                 join object a on a.id = c.app
                 join object o on o.id = c.object
             where a.uuid = $1
                 and o.uuid = $2
-        `, [app, object]);
+        `, [q.app, q.object]);
     }
 
-    config_get(q) {
-        const special = this.special.get(q.app)
-        if (special)
-            return special.get(q.object);
-        return this._config_get(q.app, q.object);
+    async _config_validate (query, app, config) {
+        const schema = await this.find_schema(query, app);
+        if (schema && !schema(config))
+            return { status: 422 };
+        return { status: 204 };
+    }
+
+    /* The caller must pass (in opts):
+     * app, object      object ids (not UUIDs)
+     * config           the new config
+     * old              the id in the config table of the existing entry
+     * special          a SpecialApp, or undefined
+     * Etags must be already checked. We will return 304 to indicate a
+     * successful no-change update.
+     */
+    async _config_put (query, opts) {
+        const valid = opts.special?.validate
+            ? await opts.special.validate(query, opts.object, opts.config)
+            : await this._config_validate(query, opts.app, opts.config);
+        if (valid.status > 299)
+            return valid.status;
+
+        const config = valid.config ?? opts.config;
+        /* Don't rely on node-postgres, it will pass through a bare
+         * string without stringifying it again. */
+        const json = JSON.stringify(config);
+            
+        if (opts.old) {
+            const ok = await query(`
+                update config as c
+                set json = $2, etag = default
+                where id = $1 and json != $2
+                returning 1 ok
+            `, [opts.old, json]);
+
+            return ok.rowCount ? 204 : 304;
+        }
+
+        await query(`
+            insert into config (app, object, json)
+            values ($1, $2, $3)
+        `, [opts.app, opts.object, json]);
+
+        return 201;
     }
 
     async config_put(q, config, check_etag) {
-        /* XXX specials currently don't support etags */
-        /* XXX specials should push to updates */
         const special = this.special.get(q.app);
-        if (special) return await special.put(q.object, config);
 
         const rv = await this.db.txn({}, async query => {
             const appid = await this._app_id(query, q.app);
@@ -462,34 +526,16 @@ export default class Model extends EventEmitter {
             `, [appid, objid]);
 
             if (check_etag) {
-                const etst = check_etag(old?.etag);
-                if (etst) return etst;
+                const st = check_etag(old?.etag);
+                if (st) return st;
             }
 
-            const schema = await this.find_schema(query, appid);
-            if (schema && !schema(config)) return 422;
-
-            const json = JSON.stringify(config);
-
-            if (old) {
-                if (q.exclusive) return 409;
-
-                const ok = await query(`
-                    update config as c
-                    set json = $2, etag = default
-                    where id = $1 and json != $2
-                    returning 1 ok
-                `, [old.id, json]);
-
-                return ok.rowCount == 0 ? 304 : 204;
-            }
-
-            await query(`
-                insert into config (app, object, json)
-                values ($1, $2, $3)
-            `, [appid, objid, json]);
-
-            return 201;
+            return await this._config_put(query, {
+                config, special,
+                app:        appid,
+                object:     objid,
+                old:        old?.id,
+            });
         });
 
         if (rv == 204 || rv == 201) {
@@ -501,30 +547,29 @@ export default class Model extends EventEmitter {
     }
 
     async config_delete(q, check_etag) {
-        /* XXX specials should push to updates */
         const special = this.special.get(q.app);
-        if (special) return await special.delete(q.object);
 
         const rv = await this.db.txn({}, async query => {
             const conf = await _q_row(query, `
-                select c.id, c.etag
+                select c.id, c.etag, o.id objid
                 from config c
                     join object a on a.id = c.app
-                    join app on app.id = a.id
                     join object o on o.id = c.object
                 where a.uuid = $1 and o.uuid = $2
             `, [q.app, q.object]);
 
             if (check_etag) {
-                const etst = check_etag(conf?.etag);
-                if (etst) return etst;
+                const st = check_etag(conf?.etag);
+                if (st) return st;
             }
             if (!conf) return 404;
 
-            await query(`
-                delete from config
-                where id = $1
-            `, [conf.id]);
+            if (special?.delete) {
+                const st = special.delete(conf.objid);
+                if (st > 299) return st;
+            }
+
+            await query(`delete from config where id = $1`, [conf.id]);
             return 204;
         });
 
@@ -535,28 +580,42 @@ export default class Model extends EventEmitter {
         return rv;
     }
 
-    /* XXX This does not perform the patch atomically. Properly we
-     * should do this all under one transaction, but that would require
-     * a substantial rework of the code. */
     async config_merge_patch (q, patch, check_etag) {
-        const conf = await this.config_get(q);
+        const special = this.special.get(q.app);
 
-        if (check_etag) {
-            const etst = check_etag(conf?.etag);
-            if (etst) return etst;
+        const [st, config] = await this.db.txn({}, async query => {
+            const app = await this._app_id(query, q.app);
+            const object = await this._obj_id(query, q.object);
+            if (!app || !object) return [404];
+
+            const old = await this._config_get(app, object);
+
+            if (check_etag) {
+                const st = check_etag(old?.etag);
+                if (st) return [st];
+            }
+
+            /* This needs to be null, not undefined, for a nonexistent
+             * object, or the 409 test below will fail. */
+            const json = old?.json ?? null;
+
+            /* Safety check: applying a merge-patch to a non-object destroys
+             * the whole thing. */
+            if (typeof(json) != "object" || Array.isArray(json))
+                return [409];
+
+            const config = merge_patch.apply(json, patch);
+            const put = await this._config_put(query, {
+                app, object, config, special,
+                old:    old?.id,
+            });
+            return [put, config];
+        });
+        if (st < 300) {
+            this.emit_change({ app: q.app, config });
+            this.updates.next({ app: q.app, object: q.object, config });
         }
-
-        /* This needs to be null, not undefined, for a nonexistent
-         * object, or the 409 test below will fail. */
-        const json = conf?.config ?? null;
-
-        /* Safety check: applying a merge-patch to a non-object destroys
-         * the whole thing. */
-        if (typeof(json) != "object" || Array.isArray(json))
-            return 409;
-
-        const nconf = merge_patch.apply(json, patch);
-        return await this.config_put(q, nconf);
+        return st;
     }
 
     async config_search(app, klass, query) {
@@ -610,72 +669,14 @@ export default class Model extends EventEmitter {
         if (this.schemas.has(app))
             return this.schemas.get(app);
 
-        const schema_text = await _q_row(query, `
+        const text = await _q_row(query, `
             select json from config
             where app = ${ObjID.ConfigSchema} and object = $1
         `, [app]).then(r => r?.json);
 
-        if (schema_text == null)
-            return null;
-
-        const schema = this.ajv.compile(schema_text);
+        const schema = text ? this.ajv.compile(text) : null;
         this.schemas.set(app, schema);
         return schema;
-    }
-
-    app_schema_list () {
-        return this._config_list(App.ConfigSchema);
-    }
-
-    app_schema(app) {
-        return this.db.txn({}, async query => {
-            const appid = await this._app_id(query, app);
-            if (appid == null) return null;
-            return this.find_schema(query, appid);
-        });
-    }
-
-    async app_schema_update(app, schema) {
-        /* blecch v = try {} pretty please */
-        let validate;
-        try {
-            validate = this.ajv.compile(schema);
-        } catch (e) {
-            return null;
-        }
-
-        return await this.db.txn({}, async query => {
-            const app_id = await this._app_id(query, app);
-            if (app_id == null) return false;
-
-            const configs = await _q_set(query, `
-                select o.uuid object, c.json
-                from config c
-                    join object o on o.id = c.object
-                where c.app = $1
-            `, [app_id]);
-
-            const bad = configs
-                .filter(r => !validate(r.json))
-                .map(r => r.object);
-            if (bad.length > 0) return bad;
-
-            await query(`
-                insert into config (app, object, json)
-                values (${ObjID.ConfigSchema}, $1, $2)
-                on conflict (app, object) do update
-                set json = excluded.json, etag = default
-            `, [app_id, schema]);
-
-            this.schemas.set(app_id, validate);
-            this.emit("change", {app});
-            this.updates.next({
-                app:    App.ConfigSchema, 
-                object: app,
-                config: schema,
-            });
-            return true;
-        });
     }
 
     async dump_validate(dump) {

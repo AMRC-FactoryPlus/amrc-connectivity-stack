@@ -31,6 +31,7 @@ call migrate_to(9, $$
     insert into subclass (id, class) values (13, 12)
         on conflict (id, class) do nothing;
 
+    -- Migrate config schemas into plain config entries
     alter table config
         drop constraint config_app_fkey,
         add foreign key (app) references object on update cascade;
@@ -41,6 +42,7 @@ call migrate_to(9, $$
 
     drop table app;
 
+    -- Add owner information and move deletion into `object`
     alter table object
         add column owner integer not null references object default 15,
         add column deleted boolean not null default false;
@@ -53,4 +55,26 @@ call migrate_to(9, $$
 
     update config set json = json #- '{deleted}'
     where app = 7 and json ? 'deleted';
+
+    -- Create Object Registration config entries. This procedure needs
+    -- to be called whenever the object table is changed directly.
+    create or replace procedure update_registration(_obj integer)
+    language sql
+    begin atomic
+        insert into config (app, object, json)
+        select 6, o.id, jsonb_build_object(
+            'uuid', o.uuid,
+            'class', c.uuid,
+            'rank', o.rank,
+            'owner', p.uuid,
+            'deleted', o.deleted) json
+        from object o
+            left join object c on c.id = o.class
+            join object p on p.id = o.owner
+        where _obj is null or o.id = _obj
+        on conflict (app, object) do update
+            set json = excluded.json, etag = default
+            where config.json != excluded.json;
+    end;
+    call update_registration(null);
 $$);

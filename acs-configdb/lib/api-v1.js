@@ -36,6 +36,10 @@ export class APIv1 {
         //}));
 
         //api.use(this.authz.bind(this));
+
+        /* XXX The v1 API supported ?exclusive=true on a PUT config
+         * request to forbid overwrites. This could be mapped into an
+         * If-None-Match, but I don't think it's used anywhere. */
         
         const forwards = [
             ["/app",                `/v2/class/${Class.App}/all/members`],

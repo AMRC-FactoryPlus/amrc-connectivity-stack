@@ -13,26 +13,12 @@ class SpecialApp {
     }
 
     /* These are called from within a transaction */
-    validate (query, obj, config) { return { status: 405 }; }
+    validate (query, obj, config) { return 405; }
     delete (query, obj) { return 405; }
 }
 
-/* XXX These should work the other way: they should be stored as normal
- * config entries, and the ConfigDB code should look up what it needs in
- * the database like everyone else. Then they would get the benefit of
- * etags and any other future improvements to config handling
- * (e.g. transactions, ownership, ...).
- *
- * Idea: these are both sideways caches, in that we the ConfigDB need
- * access to the information in a form other than JSON. They both also
- * need different validation from normal entries. So maybe all we need
- * here is a pre-PUT validate-and-cache method which can update our
- * sideways storage (object table, schema cache).
- */
-
 class ObjectRegistration extends SpecialApp {
     static application = App.Registration;
-
 }
 
 class ConfigSchema extends SpecialApp {
@@ -52,7 +38,7 @@ class ConfigSchema extends SpecialApp {
 
         const validate = this.parse(schema);
         if (!validate)
-            return { status: 422 };
+            return 422;
 
         const configs = await query(`
             select o.uuid object, c.json
@@ -65,10 +51,10 @@ class ConfigSchema extends SpecialApp {
             .filter(r => !validate(r.json))
             .map(r => r.object);
         if (bad.length > 0)
-            return { status: 409, body: bad };
+            return 409;
 
         this.model.schemas.set(app, validate);
-        return { status: 204 };
+        return 204;
     }
 
     delete (query, app) {

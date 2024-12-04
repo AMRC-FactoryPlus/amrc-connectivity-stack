@@ -464,11 +464,15 @@ export default class Model extends EventEmitter {
         `, [q.app, q.object]);
     }
 
-    async _config_validate (query, app, config) {
+    async _config_validate (query, { app, object, config, special }) {
         const schema = await this.find_schema(query, app);
         if (schema && !schema(config))
-            return { status: 422 };
-        return { status: 204 };
+            return 422;
+        if (special?.validate) {
+            const st = await special.validate(query, object, config);
+            if (st > 299) return st;
+        }
+        return 204;
     }
 
     /* The caller must pass (in opts):
@@ -480,16 +484,12 @@ export default class Model extends EventEmitter {
      * successful no-change update.
      */
     async _config_put (query, opts) {
-        const valid = opts.special?.validate
-            ? await opts.special.validate(query, opts.object, opts.config)
-            : await this._config_validate(query, opts.app, opts.config);
-        if (valid.status > 299)
-            return valid.status;
+        const valid = await this._config_validate(query, opts);
+        if (valid > 299) return valid;
 
-        const config = valid.config ?? opts.config;
         /* Don't rely on node-postgres, it will pass through a bare
          * string without stringifying it again. */
-        const json = JSON.stringify(config);
+        const json = JSON.stringify(opts.config);
             
         if (opts.old) {
             const ok = await query(`
@@ -551,7 +551,7 @@ export default class Model extends EventEmitter {
 
         const rv = await this.db.txn({}, async query => {
             const conf = await _q_row(query, `
-                select c.id, c.etag, o.id objid
+                select c.id, c.etag, c.object
                 from config c
                     join object a on a.id = c.app
                     join object o on o.id = c.object
@@ -565,7 +565,7 @@ export default class Model extends EventEmitter {
             if (!conf) return 404;
 
             if (special?.delete) {
-                const st = special.delete(conf.objid);
+                const st = special.delete(query, conf.object);
                 if (st > 299) return st;
             }
 

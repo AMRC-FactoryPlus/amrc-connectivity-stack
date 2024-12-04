@@ -37,7 +37,7 @@ call migrate_to(9, $$
         add foreign key (app) references object on update cascade;
     
     insert into config (app, object, json)
-    select 13, a.id, a.schema 
+    select 16, a.id, a.schema 
     from app a where a.schema is not null;
 
     drop table app;
@@ -77,4 +77,21 @@ call migrate_to(9, $$
             where config.json != excluded.json;
     end;
     call update_registration(null);
+
+    -- Add a config schema for Registration
+    insert into config (app, object, json)
+    values (16, 6, '{
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["uuid", "rank", "class", "deleted", "owner"],
+        "properties": {
+            "uuid": { "type": "string", "format": "uuid" },
+            "rank": { "type": "integer", "minimum": 0 },
+            "class": { "type": "string", "format": "uuid" },
+            "deleted": { "type": "boolean" },
+            "owner": { "type": "string", "format": "uuid" }
+        }
+    }')
+    on conflict (app, object) do update
+        set json = excluded.json, etag = default;
 $$);

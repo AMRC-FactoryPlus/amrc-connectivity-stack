@@ -8,6 +8,7 @@ import EventEmitter from "node:events";
 
 import Ajv from "ajv/dist/2020.js";
 import ajv_formats from "ajv-formats";
+import deep_equal from "deep-equal";
 import merge_patch from "json-merge-patch";
 import rx from "rxjs";
 
@@ -49,6 +50,9 @@ const Immutable = new Set([
     Class.Schema,
 ]);
 
+/* I'm not really building a triplestore, honest... */
+const Relations = new Set(["membership", "subclass"]);
+
 /* XXX These should be methods on a query object or something... */
 function _q_set(query, sql, params) {
     return query(sql, params).then(dbr => dbr.rows);
@@ -60,6 +64,10 @@ function _q_row (...args) {
 
 function _q_uuids (...args) {
     return _q_set(...args).then(rs => rs.map(r => r.uuid));
+}
+
+function _q_exists (...args) {
+    return _q_set(...args).then(rs => rs.length != 0);
 }
 
 export default class Model extends EventEmitter {
@@ -197,20 +205,35 @@ export default class Model extends EventEmitter {
         `, [object]);
     }
 
-    _add_member (query, klass, object) {
-        return query(`
-            insert into membership (class, id)
-            values ($1, $2)
-            on conflict (class, id) do nothing
-        `, [klass, object]);
+    _class_lookup (query, id, table) {
+        return _q_uuids(query, `
+            select o.uuid
+            from ${table} k join object o on o.id = k.id
+            where k.class = $1
+        `, [id]);
     }
 
-    _add_subclass (query, klass, object) {
+    _class_has (query, klass, table, obj) {
         return query(`
-            insert into subclass (class, id)
+            select 1 from ${table} r
+            where r.class = $1 and r.id = $2
+        `, [klass, obj])
+            .then(r => r.rowCount != 0);
+    }
+
+    _class_add (query, klass, table, obj) {
+        return query(`
+            insert into ${table} (class, id)
             values ($1, $2)
             on conflict (class, id) do nothing
-        `, [klass, object]);
+        `, [klass, obj]);
+    }
+
+    _class_remove (query, klass, table, obj) {
+        return query(`
+            delete from ${table}
+            where class = $1 and id = $2
+        `, [klass, obj]);
     }
 
     /* XXX This is to create a new rank. This must be the parent of the
@@ -219,19 +242,25 @@ export default class Model extends EventEmitter {
         return [404];
     }
 
-    async _update_registration (q, id, spec) {
+    async update_registration (q, id, spec) {
         const info = await this._config_get(ObjID.Registration, id)
-            .then(r => r?.config);
+            .then(r => r?.json);
         if (!info) {
             this.log("Object ID with no Registration entry: %s", id);
             return 500;
         }
 
+        if (deep_equal(info, spec))
+            return 204;
+
         /* XXX These should be changable, with restrictions. */
         if (spec.class != null && spec.class != info.class) {
-            this.log("Class mismatch for create: %s: have %s, want %s",
-                info.uuid, info.class, spec.class);
-            return 409;
+            const ok = await _q_exists(q, `
+                select 1 from membership m
+                    join object c on c.id = m.class
+                where c.uuid = $1 and m.id = $2
+            `, [spec.class, id]);
+            if (!ok) return 409;
         }
         if (spec.rank != null && spec.rank != info.rank) {
             this.log("Rank mismatch for create: %s: have %s, want %s",
@@ -239,11 +268,17 @@ export default class Model extends EventEmitter {
             return 409;
         }
 
-        await q(`update object set deleted = $2 where id = $1`,
-            [id, spec.deleted]);
+        await q(`
+            update object o
+            set class = c.id,
+                deleted = $3
+            from object c
+            where o.id = $1
+                and c.uuid = $2
+        `, [id, spec.class, spec.deleted]);
         await q(`call update_registration($1)`, [id]);
 
-        return 200;
+        return 204;
     }
 
     /* Object creation must supply a class or a rank (not both) */
@@ -252,7 +287,7 @@ export default class Model extends EventEmitter {
             if (spec.uuid) {
                 const id = await this._obj_id(q, spec.uuid);
                 if (id) {
-                    const st = await this._update_registration(q, id, 
+                    const st = await this.update_registration(q, id, 
                         { ...spec, deleted: false });
                     return [st, spec.uuid];
                 }
@@ -277,7 +312,7 @@ export default class Model extends EventEmitter {
                 ? this._object_create(q, spec.uuid, c_id)
                 : this._object_create_new(q, c_id))
 
-            await this._add_member(q, c_id, obj.id);
+            await this._class_add(q, c_id, "membership", obj.id);
             await this._add_rank_superclass(q, obj.id);
             await q(`call update_registration($1)`, [obj.id]);
 
@@ -355,14 +390,6 @@ export default class Model extends EventEmitter {
         `)
     }
 
-    _class_lookup (query, id, table) {
-        return _q_uuids(query, `
-            select o.uuid
-            from ${table} k join object o on o.id = k.id
-            where k.class = $1
-        `, [id]);
-    }
-
     class_lookup (klass, table) {
         return this.db.txn({}, async query => {
             const id = await this._class_id(query, klass);
@@ -382,21 +409,19 @@ export default class Model extends EventEmitter {
         return !!dbr.rows;
     }
 
-    class_add_member (klass, obj) {
+    class_relation (action, relation, klass, obj) {
+        const perform = action == "add" ? this._class_add.bind(this)
+            : action == "remove" ? this._class_remove.bind(this)
+            : null;
+        if (!perform || !Relations.has(relation)) return null;
+
         return this.db.txn({}, async query => {
             const c_id = await this._class_id(query, klass);
             const o_id = await this._obj_id(query, obj);
-            if (c_id == null || o_id == null) return;
-            return this._add_member(query, c_id, o_id);
-        });
-    }
-
-    class_add_subclass (klass, subclass) {
-        return this.db.txn({}, async query => {
-            const c_id = await this._class_id(query, klass);
-            const s_id = await this._class_id(query, subclass);
-            if (c_id == null || s_id == null) return;
-            return this._add_subclass(query, c_id, s_id);
+            if (c_id == null || o_id == null)
+                return false;
+            await perform(query, c_id, relation, o_id);
+            return true;
         });
     }
 
@@ -441,7 +466,7 @@ export default class Model extends EventEmitter {
 
     _config_get (app, object) {
         return _q_row(this.db.query.bind(this.db), `
-            select c.id, c.json config, c.etag
+            select c.id, c.json, c.etag
             from config c
             where c.app = $1 and c.object = $2
         `, [app, object]);

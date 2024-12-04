@@ -219,21 +219,26 @@ function ObjMenu (props) {
 
     const reg = `app/${AppUuid.Registration}/object`;
     const items = [
-        ...menu,
-        [null],
+        name,
         ["Delete object", "DELETE", `object/${obj}`],
         ["Raise rank", "PATCH", `${reg}/${obj}`, { rank: info.reg?.rank + 1 }],
         ["Lower rank", "PATCH", `${reg}/${obj}`, { rank: info.reg?.rank - 1 }],
+        null,
+        ...menu,
     ];
 
-    return html`<${MenuButton} title=${name} items=${items}/>`;
+    return html`<${MenuButton} items=${items}/>`;
 }
 
 function MenuButton (props) {
     const { title, items } = props;
     const id = useId();
 
-    const buttons = items.map(([title, method, path, body]) => {
+    const buttons = items.map(item => {
+        if (item == null) return html`<hr/>`;
+        if (typeof item == "string") return html`<b>${item}<//>`;
+
+        const [title, method, path, body] = item;
         const action = () => service_fetch(`/v2/${path}`, {
             method,
             headers:    { 
@@ -243,15 +248,13 @@ function MenuButton (props) {
             },
             body:       body ? JSON.stringify(body) : undefined,
         });
-        return title ? html`<li><button onClick=${action}>${title}<//><//>`
-            : html`<li><hr/><//>`;
-    });
+        return html`<button onClick=${action}>${title}<//>`
+    }).map(i => html`<li>${i}<//>`);
 
     return html`
         <span className="menu-anchor">
             <button className="menu-button" popovertarget="${id}">...<//>
             <menu id="${id}" className="menu-popup" popover="auto">
-                <li><b>${title}<//><//>
                 ${buttons}
             <//>
         <//>
@@ -382,8 +385,11 @@ function Objs(props) {
 
 function Klass(props) {
     const {klass} = props;
+    const info = useContext(ObjInfo);
+
     const [subs, set_subs] = useState(null);
     const [objs, set_objs] = useState(null);
+    const [status, set_status] = useState(null);
 
     const update = () => {
         fetch_json(`class/${klass}/direct/member`).then(set_objs);
@@ -391,11 +397,28 @@ function Klass(props) {
     };
     useEffect(update, [klass]);
 
+    const new_s = useRef(null);
+    const new_m = useRef(null);
+    const add_rel = (rel, ref) => async () => {
+        const obj = ref?.current?.value;
+        if (!obj) return;
+        const rsp = await service_fetch(
+            `/v2/class/${klass}/direct/${rel}/${obj}`,
+            { method: "PUT" });
+        if (rsp.status == 204)
+            set_status(`Added ${obj} as ${rel}`);
+        else
+            set_status(`Adding ${rel} failed: ${rsp.status}`);
+    };
+
     const reg = `app/${AppUuid.Registration}/object`;
+    const name = info?.info?.name ?? klass;
     const s_menu = s => [
+        `Subclass of ${name}`,
         ["Remove as subclass", "DELETE", `class/${klass}/direct/subclass/${s}`],
     ];
     const m_menu = m => [
+        `Member of ${name}`,
         ["Remove as member", "DELETE", `class/${klass}/direct/member/${m}`],
         ["Set primary class", "PATCH", `${reg}/${m}`, { "class": klass }],
     ];
@@ -407,9 +430,16 @@ function Klass(props) {
         html`<${Obj} obj=${o} key=${o} menu=${m_menu(o)}/>`);
 
     return html`
-        <h3>Subclasses<//>
+        ${status && html`<p onClick=${() => set_status()}>${status}<//>`}
+        <h3>Subclasses ${""}
+            <input type=text size=40 ref=${new_s}/>
+            <button onClick=${add_rel("subclass", new_s)}>Add subclass<//>
+        <//>
         <dl>${hsubs ?? notyet}<//>
-        <h3>Members<//>
+        <h3>Members ${""}
+            <input type=text size=40 ref=${new_m}/>
+            <button onClick=${add_rel("member", new_m)}>Add member<//>
+        <//>
         <dl>${hobjs ?? notyet}<//>
     `;
 }

@@ -19,6 +19,10 @@ class SpecialApp {
 
 class ObjectRegistration extends SpecialApp {
     static application = App.Registration;
+
+    validate (query, obj, spec) {
+        return this.model.update_registration(query, obj, spec);
+    }
 }
 
 class ConfigSchema extends SpecialApp {

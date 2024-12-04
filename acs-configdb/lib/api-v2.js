@@ -69,6 +69,13 @@ export class APIv2 {
         clookup("any/member", "all_membership");
         clookup("any/subclass", "all_subclass");
 
+        api.route("/class/:class/direct/member/:object")
+            .put(this.class_rel.bind(this, "add", "membership"))
+            .delete(this.class_rel.bind(this, "remove", "membership"));
+        api.route("/class/:class/direct/subclass/:object")
+            .put(this.class_rel.bind(this, "add", "subclass"))
+            .delete(this.class_rel.bind(this, "remove", "subclass"));
+
         api.get("/app/:app/object", this.config_list.bind(this));
         api.get("/app/:app/class/:class", this.config_list.bind(this));
 
@@ -129,11 +136,11 @@ export class APIv2 {
 
         const [st, uuid] = await this.model.object_create(spec);
 
-        res.status(st);
-        if (st > 299) return res.end();
+        if (st > 299)
+            return res.status(st).end();
 
         const obj = await this.model.object_info(uuid);
-        res.json(obj);
+        res.status(200).json(obj);
     }
 
     async object_delete(req, res) {
@@ -176,7 +183,7 @@ export class APIv2 {
 
     async class_lookup (rel, req, res) {
         const { class: klass, object } = req.params;
-        if (!Valid.uuid.test(klass))
+        if (!Valid.uuid.test(klass) || (object && !Valid.uuid.test(object)))
             return res.status(410).end();
 
         const ok = await this.auth.check_acl(req.auth, Perm.Manage_Obj, klass, true);
@@ -190,6 +197,18 @@ export class APIv2 {
         const list = await this.model.class_lookup(klass, rel);
         if (!list) return res.status(404).end();
         return res.status(200).json(list);
+    }
+
+    async class_rel (action, rel, req, res) {
+        const { class: klass, object } = req.params;
+        if (!Valid.uuid.test(klass) || !Valid.uuid.test(object))
+            return res.status(410).end();
+
+        const ok = await this.auth.check_acl(req.auth, Perm.Manage_Obj, klass, true);
+        if (!ok) return res.status(403).end();
+
+        const st = await this.model.class_relation(action, rel, klass, object);
+        return res.status(st ? 204 : 404).end();
     }
 
     async config_list(req, res) {

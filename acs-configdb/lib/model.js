@@ -243,7 +243,7 @@ export default class Model extends EventEmitter {
     }
 
     async update_registration (q, id, spec) {
-        const info = await this._config_get(ObjID.Registration, id)
+        const info = await this._config_get(q, ObjID.Registration, id)
             .then(r => r?.json);
         if (!info) {
             this.log("Object ID with no Registration entry: %s", id);
@@ -464,8 +464,8 @@ export default class Model extends EventEmitter {
         });
     }
 
-    _config_get (app, object) {
-        return _q_row(this.db.query.bind(this.db), `
+    _config_get (q, app, object) {
+        return _q_row(q, `
             select c.id, c.json, c.etag
             from config c
             where c.app = $1 and c.object = $2
@@ -613,7 +613,7 @@ export default class Model extends EventEmitter {
             const object = await this._obj_id(query, q.object);
             if (!app || !object) return [404];
 
-            const old = await this._config_get(app, object);
+            const old = await this._config_get(query, app, object);
 
             if (check_etag) {
                 const st = check_etag(old?.etag);

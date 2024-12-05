@@ -43,6 +43,8 @@ down:
 
 up:
 	${_kubectl} scale --replicas=${k8s.replicas} ${_dep}
+	${_kubectl} rollout status ${_dep}
+	sleep 2
 
 else
 

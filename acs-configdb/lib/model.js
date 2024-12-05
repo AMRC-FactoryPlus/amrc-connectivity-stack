@@ -165,7 +165,7 @@ export default class Model extends EventEmitter {
 
     /* XXX This is the correct place to set the owner of the new object
      * but I don't have access to that information yet. */
-    async _object_create (query, uuid, klass) {
+    async _object_create_uuid (query, uuid, klass) {
         return _q_row(query, `
             insert into object (uuid, class, rank)
             select $1, c.id, c.rank - 1
@@ -373,49 +373,58 @@ export default class Model extends EventEmitter {
 
     /* Object creation must supply a class or a rank (not both) */
     async object_create(spec) {
-        const [st, uuid] = await this.db.txn({}, async q => {
-            if (spec.uuid) {
-                const id = await this._obj_id(q, spec.uuid);
-                if (id) {
-                    const st = await this.update_registration(q, id, 
-                        { ...spec, deleted: false });
-                    return [st, spec.uuid];
-                }
-            }
+        const [st, config] = await this.db.txn({}, async q => {
+            const [st, id] = await this._object_create(q, spec);
+            if (st > 299) return [st];
 
-            let c_id;
-            if (spec.rank) {
-                if (spec.class) return [422];
-                const id = await this._rank_id(q, spec.rank);
-                if (!id)
-                    return this._maybe_new_rank(q, spec);
-                c_id = id;
-            }
-            else {
-                if (!spec.class) return [422];
-                const id = await this._obj_id(q, spec.class);
-                if (!id) return [404];
-                c_id = id;
-            }
+            await q(`call update_registration($1)`, [id]);
+            const info = await this._config_get(q, ObjID.Registration, id)
+                .then(r => r?.json);
 
-            const obj = await (spec.uuid
-                ? this._object_create(q, spec.uuid, c_id)
-                : this._object_create_new(q, c_id))
-
-            await this._class_add(q, c_id, "membership", obj.id);
-            await this._add_rank_superclass(q, obj.id);
-            await q(`call update_registration($1)`, [obj.id]);
-
-            return [201, obj.uuid];
+            return [st, info];
         });
 
         if (st < 299)
             this.updates.next({
                 app:    App.Registration,
-                object: uuid,
-                config: { deleted: false },
+                object: config.uuid,
+                config,
             });
-        return [st, uuid];
+        return [st, config];
+    }
+
+    async _object_create (q, spec) {
+        if (spec.uuid) {
+            const id = await this._obj_id(q, spec.uuid);
+            if (id) {
+                const st = await this.update_registration(q, id, 
+                    { ...spec, deleted: false });
+                return [st, id];
+            }
+        }
+
+        let c_id;
+        if (spec.rank) {
+            if (spec.class) return [422];
+            const id = await this._rank_id(q, spec.rank);
+            if (!id)
+                return this._maybe_new_rank(q, spec);
+            c_id = id;
+        }
+        else {
+            if (!spec.class) return [422];
+            const id = await this._obj_id(q, spec.class);
+            if (!id) return [404];
+            c_id = id;
+        }
+
+        const obj = await (spec.uuid
+            ? this._object_create_uuid(q, spec.uuid, c_id)
+            : this._object_create_new(q, c_id))
+
+        await this._class_add(q, c_id, "membership", obj.id);
+        await this._add_rank_superclass(q, obj.id);
+        return [201, obj.id];
     }
 
     /* Delete an object. Deletes configs associated with this object,
@@ -595,8 +604,8 @@ export default class Model extends EventEmitter {
      * config           the new config
      * old              the id in the config table of the existing entry
      * special          a SpecialApp, or undefined
-     * Etags must be already checked. We will return 304 to indicate a
-     * successful no-change update.
+     * Etags must be already checked. 
+     * We will return 299 to indicate a successful no-change update.
      */
     async _config_put (query, opts) {
         const valid = await this._config_validate(query, opts);
@@ -614,7 +623,7 @@ export default class Model extends EventEmitter {
                 returning 1 ok
             `, [opts.old, json]);
 
-            return ok.rowCount ? 204 : 304;
+            return ok.rowCount ? 204 : 299;
         }
 
         await query(`
@@ -653,12 +662,12 @@ export default class Model extends EventEmitter {
             });
         });
 
-        if (rv == 204 || rv == 201) {
+        if (rv < 299) {
             this.emit_change(q);
             this.updates.next({ ...q, config });
         }
-        /* PUT doesn't return 304 */
-        return rv == 304 ? 204 : rv;
+        /* Fixup our fake status code */
+        return rv == 299 ? 204 : rv;
     }
 
     async config_delete(q, check_etag) {
@@ -726,11 +735,12 @@ export default class Model extends EventEmitter {
             });
             return [put, config];
         });
-        if (st < 300) {
+        /* 299 is returned by _config_put for 'no change made' */
+        if (st < 299) {
             this.emit_change({ app: q.app, config });
             this.updates.next({ app: q.app, object: q.object, config });
         }
-        return st;
+        return st == 299 ? 204 : st;
     }
 
     async config_search(app, klass, query) {

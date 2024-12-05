@@ -134,13 +134,12 @@ export class APIv2 {
             spec.class ?? UUIDs.Null, true);
         if (!ok) return res.status(403).end();
 
-        const [st, uuid] = await this.model.object_create(spec);
+        const [st, info] = await this.model.object_create(spec);
 
         if (st > 299)
             return res.status(st).end();
 
-        const obj = await this.model.object_info(uuid);
-        res.status(200).json(obj);
+        res.status(st).json(info);
     }
 
     async object_delete(req, res) {

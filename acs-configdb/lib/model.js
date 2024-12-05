@@ -386,6 +386,7 @@ export default class Model extends EventEmitter {
 
         if (st < 299)
             this.updates.next({
+                type:   "config",
                 app:    App.Registration,
                 object: config.uuid,
                 config,
@@ -477,8 +478,8 @@ export default class Model extends EventEmitter {
             return [st, body];
 
         for (const app of body)
-            this.updates.next({ app, object });
-        this.updates.next({ app: App.Registration, object });
+            this.updates.next({ type: "config", app, object });
+        this.updates.next({ type: "config", app: App.Registration, object });
         return [st];
     }
 
@@ -664,7 +665,7 @@ export default class Model extends EventEmitter {
 
         if (rv < 299) {
             this.emit_change(q);
-            this.updates.next({ ...q, config });
+            this.updates.next({ ...q, type: "config", config });
         }
         /* Fixup our fake status code */
         return rv == 299 ? 204 : rv;
@@ -699,7 +700,7 @@ export default class Model extends EventEmitter {
 
         if (rv == 204) {
             this.emit_change(q);
-            this.updates.next(q);
+            this.updates.next({ ...q, type: "config" });
         }
         return rv;
     }
@@ -738,7 +739,7 @@ export default class Model extends EventEmitter {
         /* 299 is returned by _config_put for 'no change made' */
         if (st < 299) {
             this.emit_change({ app: q.app, config });
-            this.updates.next({ app: q.app, object: q.object, config });
+            this.updates.next({ type: "config", app: q.app, object: q.object, config });
         }
         return st == 299 ? 204 : st;
     }

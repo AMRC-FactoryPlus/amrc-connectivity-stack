@@ -52,11 +52,15 @@ function jmp_match (cand, filter) {
     return true;
 }
 
-class CDBWatch {
+class ConfigWatch {
     constructor (session, app) {
         this.session = session;
         this.model = session.model;
         this.app = app;
+
+        this.updates = rxx.rx(
+            this.model.updates,
+            rx.filter(u => u.type == "config"));
     }
 
     /* XXX This is not right. Until we have a push Auth API we will need
@@ -88,7 +92,7 @@ class CDBWatch {
                     rx.map(entry_response),
                     rx.map(mk_res(true))),
                 rxx.rx(
-                    model.updates,
+                    this.updates,
                     rx.filter(u => u.app == app && u.object == object),
                     rx.map(entry_response),
                     rx.map(mk_res(false)))),
@@ -101,7 +105,7 @@ class CDBWatch {
         /* Here we fetch the complete list every time. We could track
          * the list contents from changes but this is safer. */
         return rxx.rx(
-            model.updates,
+            this.updates,
             rx.filter(u => u.app == app),
             rx.startWith(null),
             rx.concatMap(upd => model.config_list(app)
@@ -159,7 +163,7 @@ class CDBWatch {
         const { model, app } = this;
 
         const search = rxx.rx(
-            model.updates,
+            this.updates,
             rx.filter(u => u.app == app),
             rx.map(entry => ({
                 status:     200,
@@ -191,15 +195,15 @@ export class CDBNotify extends Notify {
         return [
             new WatchFilter({
                 path:       "v1/app/:app/object/:obj",
-                handler:    (s, a, o) => new CDBWatch(s, a).single_config(o),
+                handler:    (s, a, o) => new ConfigWatch(s, a).single_config(o),
             }),
             new WatchFilter({
                 path:       "v1/app/:app/object/",
-                handler:    (s, a) => new CDBWatch(s, a).config_list(),
+                handler:    (s, a) => new ConfigWatch(s, a).config_list(),
             }),
             new SearchFilter({
                 path:       "v1/app/:app/object/",
-                handler:    (s, f, a) => new CDBWatch(s, a).config_search(f),
+                handler:    (s, f, a) => new ConfigWatch(s, a).config_search(f),
             }),
         ];
     }

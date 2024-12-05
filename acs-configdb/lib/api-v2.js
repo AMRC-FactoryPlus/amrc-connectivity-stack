@@ -49,8 +49,8 @@ export class APIv2 {
             }
         };
 
-        api.get("/app", compat(`/class/${Class.App}/any/member`));
-        api.get("/class", compat(`/class/${Class.Class}/any/member`));
+        api.get("/app", compat(`/class/${Class.App}/member`));
+        api.get("/class", compat(`/class/${Class.Class}/member`));
 
         api.get("/object", this.object_list.bind(this));
         api.post("/object", this.object_create.bind(this));
@@ -66,8 +66,8 @@ export class APIv2 {
         };
         clookup("direct/member", "membership");
         clookup("direct/subclass", "subclass");
-        clookup("any/member", "all_membership");
-        clookup("any/subclass", "all_subclass");
+        clookup("member", "all_membership");
+        clookup("subclass", "all_subclass");
 
         api.route("/class/:class/direct/member/:object")
             .put(this.class_rel.bind(this, "add", "membership"))

@@ -99,6 +99,11 @@ call migrate_to(8, $migrate$
     from all_subclass c
         join membership m on c.id = m.class;
 
+    -- This is only needed for rank changes
+    create view any_child as
+    select * from membership
+    union select * from subclass;
+
     -- This is useful when querying directly
     create view names as
     select object as id, json->>'name' as name

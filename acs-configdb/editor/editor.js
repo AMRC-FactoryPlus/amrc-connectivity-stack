@@ -129,6 +129,7 @@ async function delete_path(path) {
 }
 
 const ObjInfo = createContext(true);
+const Ranks = createContext(null);
 
 function build_opener() {
     const [open, set_open] = useState(false);
@@ -211,18 +212,22 @@ function ObjTitle (props) {
 function ObjMenu (props) {
     const { menu } = props;
     const info = useContext(ObjInfo);
+    const ranks = useContext(Ranks);
 
-    if (!info) return;
+    if (!info || !ranks) return;
 
     const obj = info.uuid;
     const name = info.info?.name ?? obj;
+    const rank = info.reg?.rank;
 
     const reg = `app/${AppUuid.Registration}/object`;
     const items = [
         name,
         ["Delete object", "DELETE", `object/${obj}`],
-        ["Raise rank", "PATCH", `${reg}/${obj}`, { rank: info.reg?.rank + 1 }],
-        ["Lower rank", "PATCH", `${reg}/${obj}`, { rank: info.reg?.rank - 1 }],
+        ["Raise rank", "PATCH", `${reg}/${obj}`, 
+            { rank: rank + 1, class: ranks[rank + 1] }],
+        ["Lower rank", "PATCH", `${reg}/${obj}`, 
+            { rank: rank - 1, class: ranks[rank - 1] }],
         null,
         ...menu,
     ];
@@ -375,11 +380,11 @@ function Objs(props) {
     const hranks = ranks.map(r => html`<${Obj} obj=${r}/>`);
   
     return html`
-        <${NewObj}/>
-        <h2>Ranks of object</h2>
-        <dl>
-            ${hranks}
-        </dl>
+        <${Ranks.Provider} value=${ranks}>
+            <${NewObj}/>
+            <h2>Ranks of object</h2>
+            <dl>${hranks}</dl>
+        <//>
     `;
 }
 

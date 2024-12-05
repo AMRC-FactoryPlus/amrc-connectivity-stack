@@ -250,35 +250,125 @@ export default class Model extends EventEmitter {
             return 500;
         }
 
+        /* Calls from object_create won't be complete */
+        spec = merge_patch.apply({ ...info }, spec);
         if (deep_equal(info, spec))
             return 204;
 
-        /* XXX These should be changable, with restrictions. */
-        if (spec.class != null && spec.class != info.class) {
-            const ok = await _q_exists(q, `
-                select 1 from membership m
-                    join object c on c.id = m.class
-                where c.uuid = $1 and m.id = $2
-            `, [spec.class, id]);
-            if (!ok) return 409;
+        if (spec.rank != info.rank) {
+            const st = await this._update_rank(q, id, info, spec);
+            if (st != 204) return st;
         }
-        if (spec.rank != null && spec.rank != info.rank) {
-            this.log("Rank mismatch for create: %s: have %s, want %s",
-                info.uuid, info.rank, spec.rank);
-            return 409;
+        else if (spec.class != info.class) {
+            const st = await this._update_class(q, id, spec);
+            if (st != 204) return st;
         }
 
         await q(`
-            update object o
-            set class = c.id,
-                deleted = $3
-            from object c
-            where o.id = $1
-                and c.uuid = $2
-        `, [id, spec.class, spec.deleted]);
-        await q(`call update_registration($1)`, [id]);
+            update object
+            set deleted = $2
+            where id = $1
+        `, [id, spec.deleted]);
 
         return 204;
+    }
+
+    async _class_of_rank (q, uuid, rank) {
+        const klass = await _q_row(q, `
+            select id from object c
+            where c.uuid = $1 and c.rank = $2
+        `, [uuid, rank]);
+        if (!klass) return;
+        return klass.id;
+    }
+
+    /* We know the rank is not changing */
+    async _update_class (q, id, spec) {
+        const klass = await this._class_of_rank(q, spec.class, spec.rank + 1);
+        if (!klass) return 409;
+
+        await this._class_add(q, klass, "membership", id);
+        await q(`update object set class = $2 where id = $1`, [id, klass]);
+        return 204;
+    }
+    
+    /* When updating an object's rank:
+     * - All members and subclasses are updated, to full depth.
+     * - This must not cause objects to go below rank 0.
+     * - These children must not be direct members or subclasses of any
+     *   object outside the set of children, except rank classes.
+     * - The object updated becomes subclass of the rank class.
+     * - The object updated becomes a member of its primary class only.
+     */
+    async _to_from_individual (q, id, spec) {
+        const klass = await this._class_of_rank(q, spec.class, spec.rank + 1);
+        if (!klass) return 409;
+
+        if (spec.rank == 0) {
+            const kids = await _q_row(q,
+                `select count(*) n from any_child where class = $1`, [id]);
+            if (kids.n > 0) return 409;
+        }
+
+        await q(`delete from membership where id = $1`, [id]);
+        await q(`delete from subclass where id = $1`, [id]);
+        await this._class_add(q, klass, "membership", id);
+
+        await q(`update object set rank = $2, class = $3 where id = $1`,
+            [id, spec.rank, klass]);
+        await this._add_rank_superclass(q, id);
+
+        return 204;
+    }
+
+    _update_rank_find_kids (q, id) {
+        return q(`
+            create temporary table rank_update
+            on commit drop
+            as with recursive kid as (
+                select id class, id from all_class
+                union select p.class, c.id
+                    from kid p
+                        join any_child c on c.class = p.id)
+            select distinct o.id, o.rank
+                from kid k
+                    join object o on o.id = k.id
+                where k.class = $1
+
+        `, [id]);
+    }
+
+    async _update_rank_checks (q, delta) {
+        const too_low = await _q_row(q, `
+            select count(*) n from rank_update where rank + $1 < 0`, [delta]);
+        if (too_low.n > 0) return false;
+
+        const unrelated = await _q_row(q, `
+            select count(*) n
+            from rank_update u
+                join any_child c on c.id = u.id
+            where c.class not in (
+                select id from rank_update
+                union select id from rank)`);
+        if (unrelated.n > 0) return false;
+
+        return true;
+    }
+
+    async _update_rank (q, id, info, spec) {
+        if (info.rank == 0 || spec.rank == 0)
+            return this._to_from_individual(q, id, spec);
+
+        /* XXX For now disable this code; it isn't complete. We need to
+         * decide what the desired behaviour is here: do we update
+         * existing children, abandon them, or forbid them? */
+        return 409;
+
+//        const delta = spec.rank - info.rank;
+//
+//        await this._update_rank_find_kids(q, id);
+//        const ok = await this._update_rank_checks(q, delta);
+//        if (!ok) return fail;
     }
 
     /* Object creation must supply a class or a rank (not both) */

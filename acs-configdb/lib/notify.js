@@ -16,7 +16,7 @@ import {
 import { Perm } from "./constants.js";
 import * as rxu from "./rx-util.js";
 
-const mk_res = init => response => ({ status: init ? 201 : 200, response });
+const mk_res = (response, ix) => ({ status: ix ? 200 : 201, response });
 
 function entry_response (entry) {
     if (!entry?.config)
@@ -30,7 +30,37 @@ function entry_response (entry) {
 function list_response (list) {
     if (!list)
         return { status: 404 };
-    return { status: 200, body: list };
+    return { status: 200, body: [...list] };
+}
+
+function set_contents (lookup) {
+    return rx.pipe(
+        rx.startWith(null),
+        rx.switchMap(lookup),
+        rx.map(l => l && new Set(l)),
+        rx.distinctUntilChanged(deep_equal),
+        rx.map(list_response),
+        rx.map(mk_res));
+}
+
+/* XXX This is not right. Until we have a push Auth API we will need
+ * to check ACLs for every update, but we should avoid sending more
+ * updates after a 403 until we get an ACL change. */
+function acl_checker (session, ...args) {
+    const check = async update => {
+        const ok = await session.check_acl(...args);
+        if (ok)
+            return update;
+
+        return {
+            status: update.status,
+            response: {
+                status: 403,
+            },
+        };
+    };
+
+    return rx.concatMap(check);
 }
 
 function jmp_match (cand, filter) {
@@ -61,22 +91,8 @@ class ConfigWatch {
         this.updates = rxx.rx(
             this.model.updates,
             rx.filter(u => u.type == "config"));
-    }
 
-    /* XXX This is not right. Until we have a push Auth API we will need
-     * to check ACLs for every update, but we should avoid sending more
-     * updates after a 403 until we get an ACL change. */
-    async check_acl (update) {
-        const { session, app } = this;
-
-        const ok = await session.check_acl(Perm.Read_App, app, true);
-        if (ok)
-            return update;
-
-        return {
-            status:     update.status,
-            response:   { status: 403 },
-        };
+        this.check_acl = acl_checker(this.session, Perm.Read_App, this.app, true);
     }
 
     single_config (object) {
@@ -87,16 +103,13 @@ class ConfigWatch {
          * difficult to fix. */
         return rxx.rx(
             rx.concat(
-                rxx.rx(
-                    model.config_get({ app, object }),
-                    rx.map(entry_response),
-                    rx.map(mk_res(true))),
+                model.config_get({ app, object }),
                 rxx.rx(
                     this.updates,
-                    rx.filter(u => u.app == app && u.object == object),
-                    rx.map(entry_response),
-                    rx.map(mk_res(false)))),
-            rx.flatMap(u => this.check_acl(u)));
+                    rx.filter(u => u.app == app && u.object == object))),
+            rx.map(entry_response),
+            rx.map(mk_res),
+            this.check_acl);
     }
 
     config_list () {
@@ -107,11 +120,8 @@ class ConfigWatch {
         return rxx.rx(
             this.updates,
             rx.filter(u => u.app == app),
-            rx.startWith(null),
-            rx.concatMap(upd => model.config_list(app)
-                .then(list_response)
-                .then(mk_res(!!upd))),
-            rx.flatMap(u => this.check_acl(u)));
+            set_contents(() => model.config_list(app)),
+            this.check_acl);
     }
 
     async search_full (status) {
@@ -173,7 +183,7 @@ class ConfigWatch {
             /* This will always be replaced with a full update */
             rx.startWith({ status: 201, child: true }),
             /* This will send a parent 403 if the ACL check fails */
-            rx.concatMap(u => this.check_acl(u)),
+            this.check_acl,
             rxu.asyncState(false, async (child_ok, u) => {
                 const rv = u.child && !child_ok
                     ? await this.search_full(u.status)
@@ -191,15 +201,14 @@ class ConfigWatch {
  * the whole class structure js-side. */
 function class_watch (rel, session, klass) {
     const model = session.model;
+
+    const ck_acl = acl_checker(session, Perm.Manage_Obj, klass, true);
+
     return rxx.rx(
         model.updates,
         rx.filter(u => u.type == "class"),
-        rx.startWith(null),
-        rx.switchMap(u => model.class_lookup(klass, rel)),
-        rx.map(l => new Set(l)),
-        rx.distinctUntilChanged(deep_equal),
-        rx.map(s => list_response([...s])),
-        rx.map((r, ix) => mk_res(!ix)(r)));
+        set_contents(() => model.class_lookup(klass, rel)),
+        ck_acl);
 }
 
 export class CDBNotify extends Notify {

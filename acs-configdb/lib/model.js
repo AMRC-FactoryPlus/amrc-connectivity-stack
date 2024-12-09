@@ -528,10 +528,8 @@ export default class Model extends EventEmitter {
 
         /* We send a single notification for all updates. The watcher
          * needs to look up the current state each time. */
-        if (ok) {
-            this.log("SENDING CLASS UPDATE");
+        if (ok)
             this.updates.next({ type: "class" });
-        }
         return ok;
     }
 

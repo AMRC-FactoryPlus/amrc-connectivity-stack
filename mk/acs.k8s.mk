@@ -19,6 +19,7 @@ endif
 
 ifdef k8s.deployment
 
+k8s.replicas?=	1
 _dep=		deploy/"${k8s.deployment}"
 ifdef k8s.container
 _cont=		-c "${k8s.container}"
@@ -33,6 +34,17 @@ restart:
 
 logs:
 	${_kubectl} logs -f ${_cont} ${_dep}
+
+alllogs:
+	${_kubectl} logs -f --all-containers --ignore-errors ${_dep}
+
+down:
+	${_kubectl} scale --replicas=0 ${_dep}
+
+up:
+	${_kubectl} scale --replicas=${k8s.replicas} ${_dep}
+	${_kubectl} rollout status ${_dep}
+	sleep 2
 
 else
 

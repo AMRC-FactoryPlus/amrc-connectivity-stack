@@ -10,7 +10,7 @@ revoke all on schema public from public;
 grant connect on database :"db" to :"role";
 grant usage on schema public to :"role";
 grant select on
-    version, all_class, all_subclass, all_membership
+    version, all_class, all_subclass, all_membership, any_child
 to :"role";
 grant select, insert, update, delete on
     object, config, membership, subclass, rank

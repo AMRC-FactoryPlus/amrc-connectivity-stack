@@ -8,6 +8,7 @@ import EventEmitter from "node:events";
 
 import Ajv from "ajv/dist/2020.js";
 import ajv_formats from "ajv-formats";
+import deep_equal from "deep-equal";
 import merge_patch from "json-merge-patch";
 import rx from "rxjs";
 
@@ -49,6 +50,9 @@ const Immutable = new Set([
     Class.Schema,
 ]);
 
+/* I'm not really building a triplestore, honest... */
+const Relations = new Set(["membership", "subclass"]);
+
 /* XXX These should be methods on a query object or something... */
 function _q_set(query, sql, params) {
     return query(sql, params).then(dbr => dbr.rows);
@@ -60,6 +64,10 @@ function _q_row (...args) {
 
 function _q_uuids (...args) {
     return _q_set(...args).then(rs => rs.map(r => r.uuid));
+}
+
+function _q_exists (...args) {
+    return _q_set(...args).then(rs => rs.length != 0);
 }
 
 export default class Model extends EventEmitter {
@@ -157,7 +165,7 @@ export default class Model extends EventEmitter {
 
     /* XXX This is the correct place to set the owner of the new object
      * but I don't have access to that information yet. */
-    async _object_create (query, uuid, klass) {
+    async _object_create_uuid (query, uuid, klass) {
         return _q_row(query, `
             insert into object (uuid, class, rank)
             select $1, c.id, c.rank - 1
@@ -197,20 +205,35 @@ export default class Model extends EventEmitter {
         `, [object]);
     }
 
-    _add_member (query, klass, object) {
-        return query(`
-            insert into membership (class, id)
-            values ($1, $2)
-            on conflict (class, id) do nothing
-        `, [klass, object]);
+    _class_lookup (query, id, table) {
+        return _q_uuids(query, `
+            select distinct o.uuid
+            from ${table} k join object o on o.id = k.id
+            where k.class = $1
+        `, [id]);
     }
 
-    _add_subclass (query, klass, object) {
+    _class_has (query, klass, table, obj) {
         return query(`
-            insert into subclass (class, id)
+            select 1 from ${table} r
+            where r.class = $1 and r.id = $2
+        `, [klass, obj])
+            .then(r => r.rowCount != 0);
+    }
+
+    _class_add (query, klass, table, obj) {
+        return query(`
+            insert into ${table} (class, id)
             values ($1, $2)
             on conflict (class, id) do nothing
-        `, [klass, object]);
+        `, [klass, obj]);
+    }
+
+    _class_remove (query, klass, table, obj) {
+        return query(`
+            delete from ${table}
+            where class = $1 and id = $2
+        `, [klass, obj]);
     }
 
     /* XXX This is to create a new rank. This must be the parent of the
@@ -219,65 +242,192 @@ export default class Model extends EventEmitter {
         return [404];
     }
 
-    /* Accept or revive an existing object */
-    async _update_existing (q, spec, info) {
-        if (spec.class != null && spec.class != info.class) {
-            this.log("Class mismatch for create: %s: have %s, want %s",
-                info.uuid, info.class, spec.class);
-            return [409];
+    async update_registration (q, id, spec) {
+        const info = await this._config_get(q, ObjID.Registration, id)
+            .then(r => r?.json);
+        if (!info) {
+            this.log("Object ID with no Registration entry: %s", id);
+            return 500;
         }
-        if (spec.rank != null && spec.rank != info.rank) {
-            this.log("Rank mismatch for create: %s: have %s, want %s",
-                info.uuid, info.rank, spec.rank);
-            return [409];
+
+        /* Calls from object_create won't be complete */
+        spec = merge_patch.apply({ ...info }, spec);
+        if (deep_equal(info, spec))
+            return 204;
+
+        if (spec.rank != info.rank) {
+            const st = await this._update_rank(q, id, info, spec);
+            if (st != 204) return st;
         }
+        else if (spec.class != info.class) {
+            const st = await this._update_class(q, id, spec);
+            if (st != 204) return st;
+        }
+
         await q(`
-            update object set deleted = false
+            update object
+            set deleted = $2
             where id = $1
-        `, [info.id]);
-        return [200, info.uuid];
+        `, [id, spec.deleted]);
+
+        return 204;
+    }
+
+    async _class_of_rank (q, uuid, rank) {
+        const klass = await _q_row(q, `
+            select id from object c
+            where c.uuid = $1 and c.rank = $2
+        `, [uuid, rank]);
+        if (!klass) return;
+        return klass.id;
+    }
+
+    /* We know the rank is not changing */
+    async _update_class (q, id, spec) {
+        const klass = await this._class_of_rank(q, spec.class, spec.rank + 1);
+        if (!klass) return 409;
+
+        await this._class_add(q, klass, "membership", id);
+        await q(`update object set class = $2 where id = $1`, [id, klass]);
+        return 204;
+    }
+    
+    /* When updating an object's rank:
+     * - All members and subclasses are updated, to full depth.
+     * - This must not cause objects to go below rank 0.
+     * - These children must not be direct members or subclasses of any
+     *   object outside the set of children, except rank classes.
+     * - The object updated becomes subclass of the rank class.
+     * - The object updated becomes a member of its primary class only.
+     */
+    async _to_from_individual (q, id, spec) {
+        const klass = await this._class_of_rank(q, spec.class, spec.rank + 1);
+        if (!klass) return 409;
+
+        if (spec.rank == 0) {
+            const kids = await _q_row(q,
+                `select count(*) n from any_child where class = $1`, [id]);
+            if (kids.n > 0) return 409;
+        }
+
+        await q(`delete from membership where id = $1`, [id]);
+        await q(`delete from subclass where id = $1`, [id]);
+        await this._class_add(q, klass, "membership", id);
+
+        await q(`update object set rank = $2, class = $3 where id = $1`,
+            [id, spec.rank, klass]);
+        await this._add_rank_superclass(q, id);
+
+        return 204;
+    }
+
+    _update_rank_find_kids (q, id) {
+        return q(`
+            create temporary table rank_update
+            on commit drop
+            as with recursive kid as (
+                select id class, id from all_class
+                union select p.class, c.id
+                    from kid p
+                        join any_child c on c.class = p.id)
+            select distinct o.id, o.rank
+                from kid k
+                    join object o on o.id = k.id
+                where k.class = $1
+
+        `, [id]);
+    }
+
+    async _update_rank_checks (q, delta) {
+        const too_low = await _q_row(q, `
+            select count(*) n from rank_update where rank + $1 < 0`, [delta]);
+        if (too_low.n > 0) return false;
+
+        const unrelated = await _q_row(q, `
+            select count(*) n
+            from rank_update u
+                join any_child c on c.id = u.id
+            where c.class not in (
+                select id from rank_update
+                union select id from rank)`);
+        if (unrelated.n > 0) return false;
+
+        return true;
+    }
+
+    async _update_rank (q, id, info, spec) {
+        if (info.rank == 0 || spec.rank == 0)
+            return this._to_from_individual(q, id, spec);
+
+        /* XXX For now disable this code; it isn't complete. We need to
+         * decide what the desired behaviour is here: do we update
+         * existing children, abandon them, or forbid them? */
+        return 409;
+
+//        const delta = spec.rank - info.rank;
+//
+//        await this._update_rank_find_kids(q, id);
+//        const ok = await this._update_rank_checks(q, delta);
+//        if (!ok) return fail;
     }
 
     /* Object creation must supply a class or a rank (not both) */
     async object_create(spec) {
-        const [st, uuid] = await this.db.txn({}, async q => {
-            if (spec.uuid) {
-                const info = await this._object_info(q, spec.uuid);
-                if (info) return this._update_existing(q, spec, info);
-            }
+        const [st, config] = await this.db.txn({}, async q => {
+            const [st, id] = await this._object_create(q, spec);
+            if (st > 299) return [st];
 
-            let c_id;
-            if (spec.rank) {
-                if (spec.class) return [422];
-                const id = await this._rank_id(q, spec.rank);
-                if (!id)
-                    return this._maybe_new_rank(q, spec);
-                c_id = id;
-            }
-            else {
-                if (!spec.class) return [422];
-                const id = await this._obj_id(q, spec.class);
-                if (!id) return [404];
-                c_id = id;
-            }
+            await q(`call update_registration($1)`, [id]);
+            const info = await this._config_get(q, ObjID.Registration, id)
+                .then(r => r?.json);
 
-            const obj = await (spec.uuid
-                ? this._object_create(q, spec.uuid, c_id)
-                : this._object_create_new(q, c_id))
-
-            await this._add_member(q, c_id, obj.id);
-            await this._add_rank_superclass(q, obj.id);
-
-            return [201, obj.uuid];
+            return [st, info];
         });
 
-        if (st < 299)
+        if (st < 299) {
             this.updates.next({
+                type:   "config",
                 app:    App.Registration,
-                object: uuid,
-                config: { deleted: false },
+                object: config.uuid,
+                config,
             });
-        return [st, uuid];
+            this.updates.next({ type: "class" });
+        }
+        return [st, config];
+    }
+
+    async _object_create (q, spec) {
+        if (spec.uuid) {
+            const id = await this._obj_id(q, spec.uuid);
+            if (id) {
+                const st = await this.update_registration(q, id, 
+                    { ...spec, deleted: false });
+                return [st, id];
+            }
+        }
+
+        let c_id;
+        if (spec.rank) {
+            if (spec.class) return [422];
+            const id = await this._rank_id(q, spec.rank);
+            if (!id)
+                return this._maybe_new_rank(q, spec);
+            c_id = id;
+        }
+        else {
+            if (!spec.class) return [422];
+            const id = await this._obj_id(q, spec.class);
+            if (!id) return [404];
+            c_id = id;
+        }
+
+        const obj = await (spec.uuid
+            ? this._object_create_uuid(q, spec.uuid, c_id)
+            : this._object_create_new(q, c_id))
+
+        await this._class_add(q, c_id, "membership", obj.id);
+        await this._add_rank_superclass(q, obj.id);
+        return [201, obj.id];
     }
 
     /* Delete an object. Deletes configs associated with this object,
@@ -288,7 +438,7 @@ export default class Model extends EventEmitter {
         const [st, body] = await this.db.txn({}, async query => {
             if (Immutable.has(object)) return [405];
 
-            const id = this._obj_id(query, object);
+            const id = await this._obj_id(query, object);
             if (id == null) return [404];
 
             const members = await _q_uuids(query, `
@@ -330,8 +480,8 @@ export default class Model extends EventEmitter {
             return [st, body];
 
         for (const app of body)
-            this.updates.next({ app, object });
-        this.updates.next({ app: App.Registration, object });
+            this.updates.next({ type: "config", app, object });
+        this.updates.next({ type: "config", app: App.Registration, object });
         return [st];
     }
 
@@ -340,14 +490,6 @@ export default class Model extends EventEmitter {
             select o.uuid
             from all_class k join object o on o.id = k.id
         `)
-    }
-
-    _class_lookup (query, id, table) {
-        return _q_uuids(query, `
-            select o.uuid
-            from ${table} k join object o on o.id = k.id
-            where k.class = $1
-        `, [id]);
     }
 
     class_lookup (klass, table) {
@@ -369,22 +511,26 @@ export default class Model extends EventEmitter {
         return !!dbr.rows;
     }
 
-    class_add_member (klass, obj) {
-        return this.db.txn({}, async query => {
+    async class_relation (action, relation, klass, obj) {
+        const perform = action == "add" ? this._class_add.bind(this)
+            : action == "remove" ? this._class_remove.bind(this)
+            : null;
+        if (!perform || !Relations.has(relation)) return null;
+
+        const ok = await this.db.txn({}, async query => {
             const c_id = await this._class_id(query, klass);
             const o_id = await this._obj_id(query, obj);
-            if (c_id == null || o_id == null) return;
-            return this._add_member(query, c_id, o_id);
+            if (c_id == null || o_id == null)
+                return false;
+            await perform(query, c_id, relation, o_id);
+            return true;
         });
-    }
 
-    class_add_subclass (klass, subclass) {
-        return this.db.txn({}, async query => {
-            const c_id = await this._class_id(query, klass);
-            const s_id = await this._class_id(query, subclass);
-            if (c_id == null || s_id == null) return;
-            return this._add_subclass(query, c_id, s_id);
-        });
+        /* We send a single notification for all updates. The watcher
+         * needs to look up the current state each time. */
+        if (ok)
+            this.updates.next({ type: "class" });
+        return ok;
     }
 
     _config_list (app) {
@@ -403,7 +549,8 @@ export default class Model extends EventEmitter {
 
     async config_list(app) {
         const special = this.special.get(app);
-        if (special) return special.list();
+        if (special && special.list)
+            return special.list();
         return this._config_list(app);
     }
 
@@ -425,7 +572,21 @@ export default class Model extends EventEmitter {
         });
     }
 
-    _config_get (app, object) {
+    _config_get (q, app, object) {
+        return _q_row(q, `
+            select c.id, c.json, c.etag
+            from config c
+            where c.app = $1 and c.object = $2
+        `, [app, object]);
+    }
+
+    config_get(q) {
+        const special = this.special.get(q.app)
+        /* XXX This is not correct. We need to at least cache the result
+         * for PATCH. */
+        if (special && special.get)
+            return special.get(q.object);
+
         return _q_row(this.db.query.bind(this.db), `
             select c.json config, c.etag
             from config c
@@ -433,21 +594,57 @@ export default class Model extends EventEmitter {
                 join object o on o.id = c.object
             where a.uuid = $1
                 and o.uuid = $2
-        `, [app, object]);
+        `, [q.app, q.object]);
     }
 
-    config_get(q) {
-        const special = this.special.get(q.app)
-        if (special)
-            return special.get(q.object);
-        return this._config_get(q.app, q.object);
+    async _config_validate (query, { app, object, config, special }) {
+        const schema = await this.find_schema(query, app);
+        if (schema && !schema(config))
+            return 422;
+        if (special?.validate) {
+            const st = await special.validate(query, object, config);
+            if (st > 299) return st;
+        }
+        return 204;
+    }
+
+    /* The caller must pass (in opts):
+     * app, object      object ids (not UUIDs)
+     * config           the new config
+     * old              the id in the config table of the existing entry
+     * special          a SpecialApp, or undefined
+     * Etags must be already checked. 
+     * We will return 299 to indicate a successful no-change update.
+     */
+    async _config_put (query, opts) {
+        const valid = await this._config_validate(query, opts);
+        if (valid > 299) return valid;
+
+        /* Don't rely on node-postgres, it will pass through a bare
+         * string without stringifying it again. */
+        const json = JSON.stringify(opts.config);
+            
+        if (opts.old) {
+            const ok = await query(`
+                update config as c
+                set json = $2, etag = default
+                where id = $1 and json != $2
+                returning 1 ok
+            `, [opts.old, json]);
+
+            return ok.rowCount ? 204 : 299;
+        }
+
+        await query(`
+            insert into config (app, object, json)
+            values ($1, $2, $3)
+        `, [opts.app, opts.object, json]);
+
+        return 201;
     }
 
     async config_put(q, config, check_etag) {
-        /* XXX specials currently don't support etags */
-        /* XXX specials should push to updates */
         const special = this.special.get(q.app);
-        if (special) return await special.put(q.object, config);
 
         const rv = await this.db.txn({}, async query => {
             const appid = await this._app_id(query, q.app);
@@ -462,101 +659,100 @@ export default class Model extends EventEmitter {
             `, [appid, objid]);
 
             if (check_etag) {
-                const etst = check_etag(old?.etag);
-                if (etst) return etst;
+                const st = check_etag(old?.etag);
+                if (st) return st;
             }
 
-            const schema = await this.find_schema(query, appid);
-            if (schema && !schema(config)) return 422;
-
-            const json = JSON.stringify(config);
-
-            if (old) {
-                if (q.exclusive) return 409;
-
-                const ok = await query(`
-                    update config as c
-                    set json = $2, etag = default
-                    where id = $1 and json != $2
-                    returning 1 ok
-                `, [old.id, json]);
-
-                return ok.rowCount == 0 ? 304 : 204;
-            }
-
-            await query(`
-                insert into config (app, object, json)
-                values ($1, $2, $3)
-            `, [appid, objid, json]);
-
-            return 201;
+            return await this._config_put(query, {
+                config, special,
+                app:        appid,
+                object:     objid,
+                old:        old?.id,
+            });
         });
 
-        if (rv == 204 || rv == 201) {
+        if (rv < 299) {
             this.emit_change(q);
-            this.updates.next({ ...q, config });
+            this.updates.next({ ...q, type: "config", config });
+            special?.notify(q.object, q.config);
         }
-        /* PUT doesn't return 304 */
-        return rv == 304 ? 204 : rv;
+        /* Fixup our fake status code */
+        return rv == 299 ? 204 : rv;
     }
 
     async config_delete(q, check_etag) {
-        /* XXX specials should push to updates */
         const special = this.special.get(q.app);
-        if (special) return await special.delete(q.object);
 
         const rv = await this.db.txn({}, async query => {
             const conf = await _q_row(query, `
-                select c.id, c.etag
+                select c.id, c.etag, c.object
                 from config c
                     join object a on a.id = c.app
-                    join app on app.id = a.id
                     join object o on o.id = c.object
                 where a.uuid = $1 and o.uuid = $2
             `, [q.app, q.object]);
 
             if (check_etag) {
-                const etst = check_etag(conf?.etag);
-                if (etst) return etst;
+                const st = check_etag(conf?.etag);
+                if (st) return st;
             }
             if (!conf) return 404;
 
-            await query(`
-                delete from config
-                where id = $1
-            `, [conf.id]);
+            if (special?.delete) {
+                const st = special.delete(query, conf.object);
+                if (st > 299) return st;
+            }
+
+            await query(`delete from config where id = $1`, [conf.id]);
             return 204;
         });
 
         if (rv == 204) {
             this.emit_change(q);
-            this.updates.next(q);
+            this.updates.next({ ...q, type: "config" });
+            special?.notify(q.app, q.config);
         }
         return rv;
     }
 
-    /* XXX This does not perform the patch atomically. Properly we
-     * should do this all under one transaction, but that would require
-     * a substantial rework of the code. */
     async config_merge_patch (q, patch, check_etag) {
-        const conf = await this.config_get(q);
+        const special = this.special.get(q.app);
 
-        if (check_etag) {
-            const etst = check_etag(conf?.etag);
-            if (etst) return etst;
+        const [st, config] = await this.db.txn({}, async query => {
+            const app = await this._app_id(query, q.app);
+            const object = await this._obj_id(query, q.object);
+            if (!app || !object) return [404];
+
+            const old = await this._config_get(query, app, object);
+
+            if (check_etag) {
+                const st = check_etag(old?.etag);
+                if (st) return [st];
+            }
+
+            /* This needs to be null, not undefined, for a nonexistent
+             * object, or the 409 test below will fail. */
+            const json = old?.json ?? null;
+
+            /* Safety check: applying a merge-patch to a non-object destroys
+             * the whole thing. */
+            if (typeof(json) != "object" || Array.isArray(json))
+                return [409];
+
+            const config = merge_patch.apply(json, patch);
+            const put = await this._config_put(query, {
+                app, object, config, special,
+                old:    old?.id,
+            });
+            return [put, config];
+        });
+        /* 299 is returned by _config_put for 'no change made' */
+        if (st < 299) {
+            this.emit_change({ app: q.app, config });
+            this.updates.next({ type: "config", app: q.app, object: q.object, config });
+            special?.notify(q.object, q.config);
         }
-
-        /* This needs to be null, not undefined, for a nonexistent
-         * object, or the 409 test below will fail. */
-        const json = conf?.config ?? null;
-
-        /* Safety check: applying a merge-patch to a non-object destroys
-         * the whole thing. */
-        if (typeof(json) != "object" || Array.isArray(json))
-            return 409;
-
-        const nconf = merge_patch.apply(json, patch);
-        return await this.config_put(q, nconf);
+        return st == 299 ? 204 : st;
     }
 
     async config_search(app, klass, query) {
@@ -610,72 +806,14 @@ export default class Model extends EventEmitter {
         if (this.schemas.has(app))
             return this.schemas.get(app);
 
-        const schema_text = await _q_row(query, `
+        const text = await _q_row(query, `
             select json from config
             where app = ${ObjID.ConfigSchema} and object = $1
         `, [app]).then(r => r?.json);
 
-        if (schema_text == null)
-            return null;
-
-        const schema = this.ajv.compile(schema_text);
+        const schema = text ? this.ajv.compile(text) : null;
         this.schemas.set(app, schema);
         return schema;
-    }
-
-    app_schema_list () {
-        return this._config_list(App.ConfigSchema);
-    }
-
-    app_schema(app) {
-        return this.db.txn({}, async query => {
-            const appid = await this._app_id(query, app);
-            if (appid == null) return null;
-            return this.find_schema(query, appid);
-        });
-    }
-
-    async app_schema_update(app, schema) {
-        /* blecch v = try {} pretty please */
-        let validate;
-        try {
-            validate = this.ajv.compile(schema);
-        } catch (e) {
-            return null;
-        }
-
-        return await this.db.txn({}, async query => {
-            const app_id = await this._app_id(query, app);
-            if (app_id == null) return false;
-
-            const configs = await _q_set(query, `
-                select o.uuid object, c.json
-                from config c
-                    join object o on o.id = c.object
-                where c.app = $1
-            `, [app_id]);
-
-            const bad = configs
-                .filter(r => !validate(r.json))
-                .map(r => r.object);
-            if (bad.length > 0) return bad;
-
-            await query(`
-                insert into config (app, object, json)
-                values (${ObjID.ConfigSchema}, $1, $2)
-                on conflict (app, object) do update
-                set json = excluded.json, etag = default
-            `, [app_id, schema]);
-
-            this.schemas.set(app_id, validate);
-            this.emit("change", {app});
-            this.updates.next({
-                app:    App.ConfigSchema, 
-                object: app,
-                config: schema,
-            });
-            return true;
-        });
     }
 
     async dump_validate(dump) {

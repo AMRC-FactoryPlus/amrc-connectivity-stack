@@ -33,12 +33,14 @@ call migrate_to(8, $migrate$
     );
     create table membership (
         class integer not null references object on update cascade,
-        id integer not null references object on update cascade,
+        id integer not null references object 
+            on update cascade on delete cascade,
         unique(class, id)
     );
     create table subclass (
         class integer not null references object on update cascade,
-        id integer not null references object on update cascade,
+        id integer not null references object 
+            on update cascade on delete cascade,
         unique(class, id)
     );
 
@@ -96,6 +98,11 @@ call migrate_to(8, $migrate$
     select c.class, m.id
     from all_subclass c
         join membership m on c.id = m.class;
+
+    -- This is only needed for rank changes
+    create view any_child as
+    select * from membership
+    union select * from subclass;
 
     -- This is useful when querying directly
     create view names as

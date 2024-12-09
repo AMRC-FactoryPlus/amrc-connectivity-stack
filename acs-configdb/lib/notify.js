@@ -218,19 +218,23 @@ export class CDBNotify extends Notify {
     }
 
     build_handlers () {
-        return [
+        const v1_2 = vers => [
             new WatchFilter({
-                path:       "v1/app/:app/object/:obj",
+                path:       `${vers}/app/:app/object/:obj`,
                 handler:    (s, a, o) => new ConfigWatch(s, a).single_config(o),
             }),
             new WatchFilter({
-                path:       "v1/app/:app/object/",
+                path:       `${vers}/app/:app/object/`,
                 handler:    (s, a) => new ConfigWatch(s, a).config_list(),
             }),
             new SearchFilter({
-                path:       "v1/app/:app/object/",
+                path:       `${vers}/app/:app/object/`,
                 handler:    (s, f, a) => new ConfigWatch(s, a).config_search(f),
             }),
+        ];
+        return [
+            ...v1_2("v1"),
+            ...v1_2("v2"),
             new WatchFilter({
                 path:       "v2/class/:class/member/",
                 handler:    class_watch.bind(null, "all_membership"),

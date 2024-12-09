@@ -207,7 +207,7 @@ export default class Model extends EventEmitter {
 
     _class_lookup (query, id, table) {
         return _q_uuids(query, `
-            select o.uuid
+            select distinct o.uuid
             from ${table} k join object o on o.id = k.id
             where k.class = $1
         `, [id]);
@@ -384,12 +384,15 @@ export default class Model extends EventEmitter {
             return [st, info];
         });
 
-        if (st < 299)
+        if (st < 299) {
             this.updates.next({
+                type:   "config",
                 app:    App.Registration,
                 object: config.uuid,
                 config,
             });
+            this.updates.next({ type: "class" });
+        }
         return [st, config];
     }
 
@@ -477,8 +480,8 @@ export default class Model extends EventEmitter {
             return [st, body];
 
         for (const app of body)
-            this.updates.next({ app, object });
-        this.updates.next({ app: App.Registration, object });
+            this.updates.next({ type: "config", app, object });
+        this.updates.next({ type: "config", app: App.Registration, object });
         return [st];
     }
 
@@ -508,13 +511,13 @@ export default class Model extends EventEmitter {
         return !!dbr.rows;
     }
 
-    class_relation (action, relation, klass, obj) {
+    async class_relation (action, relation, klass, obj) {
         const perform = action == "add" ? this._class_add.bind(this)
             : action == "remove" ? this._class_remove.bind(this)
             : null;
         if (!perform || !Relations.has(relation)) return null;
 
-        return this.db.txn({}, async query => {
+        const ok = await this.db.txn({}, async query => {
             const c_id = await this._class_id(query, klass);
             const o_id = await this._obj_id(query, obj);
             if (c_id == null || o_id == null)
@@ -522,6 +525,14 @@ export default class Model extends EventEmitter {
             await perform(query, c_id, relation, o_id);
             return true;
         });
+
+        /* We send a single notification for all updates. The watcher
+         * needs to look up the current state each time. */
+        if (ok) {
+            this.log("SENDING CLASS UPDATE");
+            this.updates.next({ type: "class" });
+        }
+        return ok;
     }
 
     _config_list (app) {
@@ -664,7 +675,8 @@ export default class Model extends EventEmitter {
 
         if (rv < 299) {
             this.emit_change(q);
-            this.updates.next({ ...q, config });
+            this.updates.next({ ...q, type: "config", config });
+            special?.notify(q.object, q.config);
         }
         /* Fixup our fake status code */
         return rv == 299 ? 204 : rv;
@@ -699,7 +711,8 @@ export default class Model extends EventEmitter {
 
         if (rv == 204) {
             this.emit_change(q);
-            this.updates.next(q);
+            this.updates.next({ ...q, type: "config" });
+            special?.notify(q.app, q.config);
         }
         return rv;
     }
@@ -738,7 +751,8 @@ export default class Model extends EventEmitter {
         /* 299 is returned by _config_put for 'no change made' */
         if (st < 299) {
             this.emit_change({ app: q.app, config });
-            this.updates.next({ app: q.app, object: q.object, config });
+            this.updates.next({ type: "config", app: q.app, object: q.object, config });
+            special?.notify(q.object, q.config);
         }
         return st == 299 ? 204 : st;
     }

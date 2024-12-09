@@ -15,6 +15,9 @@ class SpecialApp {
     /* These are called from within a transaction */
     validate (query, obj, config) { return 405; }
     delete (query, obj) { return 405; }
+
+    /* This is called after the transaction if we changed anything */
+    notify (obj, config) { }
 }
 
 class ObjectRegistration extends SpecialApp {
@@ -22,6 +25,10 @@ class ObjectRegistration extends SpecialApp {
 
     validate (query, obj, spec) {
         return this.model.update_registration(query, obj, spec);
+    }
+
+    notify (obj, config) {
+        this.model.updates.next({ type: "class" });
     }
 }
 

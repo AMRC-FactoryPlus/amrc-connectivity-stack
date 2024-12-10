@@ -2,9 +2,9 @@
 # Grant appropriate permissions
 ---
 service: !u UUIDs.Service.ConfigDB
-version: 1
-overwrite: true
-# XXX This relies on load order of these objects pending v2 dump format.
+version: 2
+# XXX This relies on load order of these objects pending a better
+# solution.
 objects:
   !u ConfigDB.Class.R2Class:
     - !u Auth.Class.PrincipalGroup

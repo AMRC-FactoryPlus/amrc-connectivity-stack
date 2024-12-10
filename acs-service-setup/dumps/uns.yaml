@@ -4,8 +4,7 @@
 # that the UNS historian can use it and has permission to read the UNS.
 ---
 service: !u UUIDs.Service.ConfigDB
-version: 1
-overwrite: true
+version: 2
 objects:
   !u ConfigDB.Class.R2Class:
     - !u Auth.Class.PrincipalGroup

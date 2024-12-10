@@ -85,7 +85,6 @@ export class APIv2 {
             .delete(this.config_delete.bind(this))
             .patch(this.config_patch.bind(this));
 
-        api.post("/load", this.dump_load.bind(this));
         api.get("/save", this.dump_save.bind(this));
     }
 
@@ -348,42 +347,6 @@ export class APIv2 {
             : Object.fromEntries(results.map(r => [r.uuid, r.results]));
 
         return res.status(200).json(json);
-    }
-
-    async dump_load(req, res) {
-        const dump = req.body;
-        const booleans = {
-            "true": true, "false": false,
-            "1": true, "0": false,
-            on: true, off: false,
-            yes: true, no: false,
-        };
-
-        const overwrite = booleans[req.query.overwrite];
-        if (overwrite == undefined)
-            return res.status(400).end();
-
-        if (!await this.model.dump_validate(dump))
-            return res.status(400).end();
-
-        const perms = {
-            classes: Perm.Manage_Obj,
-            objects: Perm.Manage_Obj,
-            configs: Perm.Write_App,
-        };
-        for (const [key, perm] of Object.entries(perms)) {
-            if (key in dump) {
-                const ok = await this.auth.check_acl(
-                    req.auth, perm, UUIDs.Null, false);
-                if (!ok) {
-                    this.log("Refusing dump (%s)", key);
-                    return res.status(403).end();
-                }
-            }
-        }
-
-        const st = await this.model.dump_load(dump, !!overwrite);
-        res.status(st).end();
     }
 
     async dump_save(req, res) {

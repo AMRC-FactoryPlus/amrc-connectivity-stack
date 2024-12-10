@@ -197,14 +197,14 @@ mean the same as above.
   value, or return the empty list. Otherwise we evaluate the `pass`
   value. (List)
 
-* `let` (*): `["let" bindings ...body]`. The `bindings` must be a list
-  with an even number of items; odd numbered items must be strings and
-  name new bindings. Each is followed by a value. A new set of bindings
-  is constructed starting from the current set. The first value is
-  evaluated using the current bindings and a binding for the first name
-  is added with the result. Each subsequent value is evaluated using the
-  new bindings and added to the set. Finally `body` is list-evaluated
-  using the new bindings and the result returned. (List)
+* `let` (*): `["let" bindings ...body]`. The `bindings` specify a new
+  set of bindings to introduce for the evaluation of `body`. If
+  `bindings` is an object then keys name new bindings to introduce and
+  all values are evaluated in the outer scope. If `bindings` is a list
+  it must be a list of objects; the values in each object are evaluated
+  in scope of all the previous objects. (This gives the functionality of
+  Scheme's `let*`.) Finally `body` is list-evaluated using the final set
+  of bindings and the result returned. (List)
 
 * `list`: Returns its arguments (after evaluation). This is the only way
   to construct a JSON array in a result list. (Scalar)
@@ -291,7 +291,7 @@ contents are abbreviated where there is a lot of repetition.
         [format "spBv1.0/%s/D%s/%s" 
           [addr group] [type] [addr node] [addr device]]]]
     ParticipateAsNode → [[]
-      [let [node [id [principal] sparkplug]]
+      [let {node: [id [principal] sparkplug]}
         [map [addr
             [Publish [SpTopic "BIRTH" [addr]]]
             [Publish [SpTopic "DATA" [addr]]]
@@ -375,7 +375,7 @@ contents are abbreviated where there is a lot of repetition.
       }]]
 
     ConsumeNode → [[node]
-      [let [addr [id [node] sparkplug]]
+      [let {addr: [id [node] sparkplug]}
         [map [a [ReadAddress [a]] [Rebirth [a]]]
           [addr]
           [merge [addr] { device: "+" }]]]]
@@ -433,8 +433,8 @@ replaced with a `map` over an ownership lookup?)
       [ReadConfig { app: Info, obj: Mine }]
       [WriteConfig { app: Info, obj: Mine }]
       [ReadIdentity { uuid: Mine }]
-      [let [addr [id [cluster] sparkplug]
-            group [addr group]]
+      [let [{addr: [id [cluster] sparkplug]}
+          {group: [addr group]}]
         [WriteIdentity { uuid: Mine, sparkplug: {group: [group]} }]
         [WriteIdentity { uuid: Mine, kerberos: [format "*/%s@REALM", [group]] }]
         [WriteIdentity { uuid: Mine,
@@ -486,7 +486,7 @@ result changes then the test fails.
     DynamicNodes ⊂ SparkplugNodes
 
     ManageMyConsumers → [[]
-      [let [addr [id [principal] sparkplug]]
+      [let {addr: [id [principal] sparkplug]}
         [ManageACL {
           permission: ConsumeAddress,
           target: { group: [addr group], node: [addr node] }]]]
@@ -520,7 +520,7 @@ delay before the ACLs change.
         [members [group]]]]
 
     DeviceAddress → [[device]
-      [let [info [lookup DirectorySvc "v1/device/" [device]]]
+      [let {info [lookup DirectorySvc "v1/device/" [device]]}
         [if [has [info] "device_id"]
           { group:  [info "group_id"],
             node:   [info "node_id"],

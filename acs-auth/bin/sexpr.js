@@ -3,6 +3,7 @@
 import util from "util";
 
 import imm from "immutable";
+import { parse } from "@thi.ng/sexpr";
 
 export const builtins = new Map();
 export const permissions = new Set();
@@ -63,9 +64,11 @@ export function evaluate (expr, ctx) {
         case "let": {
             const [, bind, ...body] = expr;
             const entries = new Map(ctx.definitions);
-            for (let i = 0; i < bind.length; i += 2)
-                /* This is let* */
-                entries.set(bind[i], eve(bind[i + 1], entries));
+            for (const bs of Array.isArray(bind) ? bind : [bind]) {
+                Object.entries(bs)
+                    .map(([k, v]) => [k, eve(v, entries)])
+                    .forEach(([k, v]) => entries.set(k, v));
+            }
             return body.flatMap(v => eve(v, entries));
         }
 
@@ -119,6 +122,48 @@ export function evaluate (expr, ctx) {
         return [[name, ...args]];
 
     throw util.format("Unknown form %s", name);
+}
+
+function fail (...args) { throw util.format(...args); }
+
+function sx_to_json (sx) {
+    /* fall through is important */
+    switch (sx.type) {
+        case "root":
+            return sx.children.length > 1 
+                ? fail("multiple sx")
+                : sx_to_json(sx.children[0]); 
+        case "sym":
+            switch (sx.value) {
+                case "null": return null;
+                case "true": return true;
+                case "false": return false;
+            }
+        case "str": 
+        case "num":
+            return sx.value;
+        case "expr": 
+            switch (sx.value) {
+                case "[": 
+                    return sx.children.map(sx_to_json); 
+                case "{": 
+                    return sx.children.reduce(
+                        ([key, obj], val) => key
+                            ? [null, {...obj, [key]: sx_to_json(val) }]
+                            : [val.type == "sym" && val.value.endsWith(":")
+                                ? val.value.slice(0, -1)
+                                : fail("bad object key: %O", val), obj],
+                        [null, {}])[1];
+            }
+        default:
+            fail("unknown sx: %O", sx)
+    }
+}
+
+function sx (strs) {
+    if (strs.length != 1)
+        fail("sx with interpolation");
+    return sx_to_json(parse(strs[0], { scopes: [["[", "]"], ["{", "}"]] }));
 }
 
 function preprocess_expr (expr, ctx) {
@@ -212,8 +257,8 @@ lookups.set("DirectorySvc/v1/device/address/Directory-SA",
     "ReadIdentity", "WriteIdentity", "ManageGroup",
 ].forEach(p => permissions.add(p));
 
-functions.set("Id", [["x"], ["x"]]);
-functions.set("Twice", [["y"], ["y"], ["y"]]);
+functions.set("Id", sx`[[x] [x]]`);
+functions.set("Twice", sx`[[y] [y] [y]]`);
 
 functions.set("SpTopic", [["type", "addr"],
     ["if", ["has", ["addr"], "device"],
@@ -226,15 +271,15 @@ functions.set("SpTopic", [["type", "addr"],
             ["addr", "group"], 
             ["type"], 
             ["addr", "node"]]]]);
-functions.set("ParticipateAsNode", [[], 
-    ["let", ["node", ["id", ["principal"], "sparkplug"]],
-        ["map", ["addr",
-                ["Publish", ["SpTopic", "BIRTH", ["addr"]]],
-                ["Publish", ["SpTopic", "DATA", ["addr"]]],
-                ["Publish", ["SpTopic", "DEATH", ["addr"]]],
-                ["Subscribe", ["SpTopic", "CMD", ["addr"]]]],
-            ["node"],
-            ["merge", ["node"], { device: "+" }]]]]);
+functions.set("ParticipateAsNode", sx`[[]
+    [let {node: [id [principal] sparkplug]}
+        [map [addr
+                [Publish [SpTopic "BIRTH" [addr]]]
+                [Publish [SpTopic "DATA" [addr]]]
+                [Publish [SpTopic "DEATH" [addr]]]
+                [Subscribe [SpTopic "CMD" [addr]]]]
+            [node]
+            [merge [node] { device: "+" }]]]]`);
 functions.set("ReadAddress", [["addr"],
       ["map", ["t", ["Subscribe", ["SpTopic", ["t"], ["addr"]]]],
         "BIRTH", "DEATH", "DATA"]]);
@@ -249,7 +294,7 @@ functions.set("Rebirth", [["addr"],
       }]]);
 
 functions.set("ConsumeNode", [["node"],
-      ["let", ["addr", ["id", ["node"], "sparkplug"]],
+      ["let", {"addr": ["id", ["node"], "sparkplug"]},
         ["map", ["a", ["ReadAddress", ["a"]], ["Rebirth", ["a"]]],
           ["addr"], 
           ["merge", ["addr"], { device: "+" }]]]]);
@@ -258,7 +303,7 @@ functions.set("ConsumeAddress", [["addr"],
       ["Rebirth", ["addr"]]]);
 
 functions.set("DeviceAddress", [["device"],
-      ["let", ["info", ["lookup", "DirectorySvc", "v1/device/%", ["device"]]],
+      ["let", {"info": ["lookup", "DirectorySvc", "v1/device/%", ["device"]]},
         ["if", ["has", ["info"], "device_id"],
             { group:  ["info", "group_id"],
               node: ["info", "node_id"],
@@ -279,20 +324,18 @@ functions.set("Members", [["group"],
 functions.set("ConsumeGroup", [["group"],
     ["map", ["m", ["ConsumeNode", ["m"]]], ["Members", ["group"]]]]);
 
-functions.set("KkForCluster", [["cluster"],
-    ["CreateObject", { class: "EdgeAccount", uuid: false }],
-    ["ReadConfig", { app: "Info", obj: "Mine" }],
-    ["WriteConfig", { app: "Info", obj: "Mine" }],
-    ["ReadIdentity", { uuid: "Mine" }],
-    ["let", ["addr", ["id", ["cluster"], "sparkplug"],
-            "group", ["addr", "group"]],
-        ["WriteIdentity", { uuid: "Mine", sparkplug: { group: ["group"] }}],
-        ["WriteIdentity", { uuid: "Mine", 
-            kerberos: ["format", "*/%s@REALM", ["group"]]}],
-        ["WriteIdentity", { uuid: "Mine",
-            kerberos: ["format", "nd1/%s/*@REALM", ["group"]]}]],
-    ["map", ["g", ["ManageGroup", { group: ["g"], member: "Mine"}]],
-        ["Members", "EdgeGroups"]]]);
+functions.set("KkForCluster", sx`[[cluster]
+    [CreateObject { class: EdgeAccount, uuid: false }]
+    [ReadConfig { app: Info, obj: Mine }]
+    [WriteConfig { app: Info, obj: Mine }]
+    [ReadIdentity { uuid: Mine }]
+    [let [{addr: [id [cluster] sparkplug]}
+            {group: [addr group]}]
+        [WriteIdentity { uuid: Mine, sparkplug: { group: [group] }}]
+        [WriteIdentity { uuid: Mine, kerberos: [format "*/%s@REALM" [group]]}]
+        [WriteIdentity { uuid: Mine, kerberos: [format "nd1/%s/*@REALM" [group]]}]]
+    [map [g [ManageGroup { group: [g], member: Mine}]]
+        [Members EdgeGroups]]]`);
 
 const metadata = preprocess_all();
 
@@ -307,78 +350,106 @@ const logger = new console.Console({
     },
 });
 
+logger.log("FUNCTIONS: %O", functions);
+
 let failed = [];
-function is (msg, expr, want_a, test) {
+function ok (msg, ok) {
+    if (ok) {
+        logger.log("ok %s", msg);
+        return true;
+    }
+    logger.log("not ok %s", msg);
+    failed.push(msg);
+    return false;
+}
+
+function is (msg, got, want) {
+    if (ok(msg, got === want))
+        return;
+    logger.log("# Got: %O", got);
+    logger.log("# Expected: %O", want);
+}
+
+function is_deep (msg, got, want) {
+    if (ok(msg, imm.is(imm.fromJS(got), imm.fromJS(want))))
+        return;
+    logger.log("# Got: %O", got);
+    logger.log("# Expected: %O", want);
+}
+
+function isev (msg, expr, want_a, test) {
     const want = imm.fromJS(want_a).toSet();
     const got = imm.fromJS(ev(expr)).toSet();
-    if (want.equals(got)) {
-        logger.log("ok %s", msg);
+
+    if (ok(msg, imm.is(got, want)))
         return;
-    }
-    logger.log("not ok %s\n# Evaluated %O", msg, expr);
+
+    logger.log("# Evaluated %O", expr);
     const not_want = got.subtract(want);
     if (not_want.size > 0)
         logger.log("# Didn't expect %O", not_want.sort().toJS());
     const not_got = want.subtract(got);
     if (not_got.size > 0)
         logger.log("# Didn't get %O", not_got.sort().toJS());
-    failed.push(msg);
 }
 
-is("number", 1, [1]);
-is("string", "foo", ["foo"]);
-is("tuple", {a: 2}, [{a: 2}]);
-is("get", ["get", {a: 2}, "a"], [2]);
-is("perm", ["Unknown", 2], [["Unknown", 2]]);
+is("sx null", sx`null`, null);
+is("sx true", sx`true`, true);
+is("sx number", sx`1.0`, 1);
+is("sx sym", sx`foo`, "foo");
+is("sx str", sx`"foo"`, "foo");
+is("sx str true", sx`"true"`, "true");
+is_deep("sx list", sx`[a b]`, ["a", "b"]);
+is_deep("sx obj", sx`{a: b}`, {a: "b"});
 
-is("quote 1", ["quote", 1], [1]);
-is("quote list", ["quote", [1]], [[1]]);
-is("quote value", {a: ["quote", [2]]}, [{a: [2]}]);
+isev("number", 1, [1]);
+isev("string", "foo", ["foo"]);
+isev("tuple", {a: 2}, [{a: 2}]);
+isev("get", ["get", {a: 2}, "a"], [2]);
+isev("perm", ["Unknown", 2], [["Unknown", 2]]);
 
-is("list", ["list", 1], [[1]]);
-is("list", ["list", 1, 2, 3], [[1, 2, 3]]);
-is("list perm", ["list", ["Unknown", 1], ["Unknown", 2]], 
+isev("quote 1", ["quote", 1], [1]);
+isev("quote list", ["quote", [1]], [[1]]);
+isev("quote value", {a: ["quote", [2]]}, [{a: [2]}]);
+
+isev("list", ["list", 1], [[1]]);
+isev("list", ["list", 1, 2, 3], [[1, 2, 3]]);
+isev("list perm", ["list", ["Unknown", 1], ["Unknown", 2]], 
     [[["Unknown", 1], ["Unknown", 2]]]);
 
-is("if", ["if", true, 1, 2], [1]);
-is("!if", ["if", false, 1, 2], [2]);
-is("merge", ["merge", {a:2}, {b:3}], [{a:2, b:3}]);
-is("has", ["has", {a:2}, "a"], [true]);
-is("!has", ["has", {a:2}, "b"], [false]);
-is("if has", ["if", ["has", {foo:5}, "bar"], "yes", "no"], ["no"]);
+isev("if", ["if", true, 1, 2], [1]);
+isev("!if", ["if", false, 1, 2], [2]);
+isev("merge", ["merge", {a:2}, {b:3}], [{a:2, b:3}]);
+isev("has", ["has", {a:2}, "a"], [true]);
+isev("!has", ["has", {a:2}, "b"], [false]);
+isev("if has", ["if", ["has", {foo:5}, "bar"], "yes", "no"], ["no"]);
 
-is("map constant", ["map", ["a", 1], 2, 3], [1, 1]);
-is("map expand", ["map", ["a", ["a"]], 2, 3], [2, 3]);
-is("map flatmap", ["map", ["a", ["a"], ["Unknown", ["a"]]], 2, 3],
+isev("map constant", ["map", ["a", 1], 2, 3], [1, 1]);
+isev("map expand", ["map", ["a", ["a"]], 2, 3], [2, 3]);
+isev("map flatmap", ["map", ["a", ["a"], ["Unknown", ["a"]]], 2, 3],
     [2, ["Unknown", 2], 3, ["Unknown", 3]]);
-is("map scope",
-    ["let", ["a", 2], ["map", ["a", ["a"]], ["a"]]],
-    [2]);
+isev("map scope", sx`[let {a: 2} [map [a [a]] [a]]]`, [2]);
 
-is("call Id", ["Id", 2], [2]);
-is("call Twice", ["Twice", 4], [4, 4]);
-is("nested call", ["Twice", ["Id", 6]], [6, 6]);
-is("let", ["let", ["a", 4], ["a"]], [4]);
-is("nested let", 
-    ["let", ["a", 4], ["let", ["b", 6], ["a"], ["b"]]],
-    [4, 6]);
-is("recursive let",
-    ["let", ["a", 4, "b", ["Unknown", ["a"]]], ["b"]],
-    [["Unknown", 4]]);
+isev("call Id", ["Id", 2], [2]);
+isev("call Twice", ["Twice", 4], [4, 4]);
+isev("nested call", ["Twice", ["Id", 6]], [6, 6]);
+isev("let", sx`[let {a: 4} [a]]`, [4]);
+isev("nested let", sx`[let {a: 4} [let {b: 6} [a] [b]]]`, [4, 6]);
+isev("recursive let", sx`[let [{a: 4} {b: [Unknown [a]]}] [b]]`, sx`[[Unknown 4]]`);
     
-is("SpTopic node",
+isev("SpTopic node",
     ["SpTopic", "DATA", { group: "Gr", node: "Nd" }],
     ["spBv1.0/Gr/NDATA/Nd"]);
-is("SpTopic device",
+isev("SpTopic device",
     ["SpTopic", "BIRTH", {group: "Gr", node: "Nd", device: "Dv" }],
     ["spBv1.0/Gr/DBIRTH/Nd/Dv"]);
 
 principal = "ConfigDB-SA";
-is("principal", ["principal"], ["ConfigDB-SA"]);
-is("id sparkplug", 
+isev("principal", ["principal"], ["ConfigDB-SA"]);
+isev("id sparkplug", 
     ["id", ["principal"], "sparkplug"],
     [{group: "Core", node: "ConfigDB"}]);
-is("ParticipateAsNode", ["ParticipateAsNode"],
+isev("ParticipateAsNode", ["ParticipateAsNode"],
     [["Publish", "spBv1.0/Core/NBIRTH/ConfigDB"],
     ["Publish", "spBv1.0/Core/NDATA/ConfigDB"],
     ["Publish", "spBv1.0/Core/NDEATH/ConfigDB"],
@@ -388,12 +459,12 @@ is("ParticipateAsNode", ["ParticipateAsNode"],
     ["Subscribe", "spBv1.0/Core/NCMD/ConfigDB"],
     ["Subscribe", "spBv1.0/Core/DCMD/ConfigDB/+"]]);
 
-is("ReadAddress node",
+isev("ReadAddress node",
     ["ReadAddress", { group: "Gr", node: "Nd" }],
     [["Subscribe", "spBv1.0/Gr/NBIRTH/Nd"],
     ["Subscribe", "spBv1.0/Gr/NDATA/Nd"],
     ["Subscribe", "spBv1.0/Gr/NDEATH/Nd"]]);
-is("ConsumeAddress node",
+isev("ConsumeAddress node",
     ["ConsumeAddress", { group: "Gr", node: "Nd" }],
     [["Subscribe", "spBv1.0/Gr/NBIRTH/Nd"],
     ["Subscribe", "spBv1.0/Gr/NDATA/Nd"],
@@ -404,7 +475,7 @@ is("ConsumeAddress node",
         type: "Boolean",
         value: true,
     }]]);
-is("ConsumeAddress device",
+isev("ConsumeAddress device",
     ["ConsumeAddress", { group: "Gr", node: "Nd", device: "Dv" }],
     [["Subscribe", "spBv1.0/Gr/DBIRTH/Nd/Dv"],
     ["Subscribe", "spBv1.0/Gr/DDATA/Nd/Dv"],
@@ -416,16 +487,16 @@ is("ConsumeAddress device",
         value: true,
     }]]);
 
-is("DeviceAddressDirect Node", ["DeviceAddressDirect", "Node"],
+isev("DeviceAddressDirect Node", ["DeviceAddressDirect", "Node"],
     [{ group: "Group", node: "Node" }]);
-is("DeviceAddressDirect Device", ["DeviceAddressDirect", "Device"],
+isev("DeviceAddressDirect Device", ["DeviceAddressDirect", "Device"],
     [{ group: "Group", node: "Node", device: "Device" }]);
-is("DeviceAddress Node", ["DeviceAddress", "Node"],
+isev("DeviceAddress Node", ["DeviceAddress", "Node"],
     [{ group: "Group", node: "Node" }]);
-is("DeviceAddress Device", ["DeviceAddress", "Device"],
+isev("DeviceAddress Device", ["DeviceAddress", "Device"],
     [{ group: "Group", node: "Node", device: "Device" }]);
 
-is("ConsumeDevice Node", ["ConsumeDevice", "Node"], [
+isev("ConsumeDevice Node", ["ConsumeDevice", "Node"], [
     ["Subscribe", "spBv1.0/Group/NBIRTH/Node"],
     ["Subscribe", "spBv1.0/Group/NDATA/Node"],
     ["Subscribe", "spBv1.0/Group/NDEATH/Node"],
@@ -436,7 +507,7 @@ is("ConsumeDevice Node", ["ConsumeDevice", "Node"], [
         value: true,
     }],
 ]);
-is("ConsumeDevice Device", ["ConsumeDevice", "Device"], [
+isev("ConsumeDevice Device", ["ConsumeDevice", "Device"], [
     ["Subscribe", "spBv1.0/Group/DBIRTH/Node/Device"],
     ["Subscribe", "spBv1.0/Group/DDATA/Node/Device"],
     ["Subscribe", "spBv1.0/Group/DDEATH/Node/Device"],
@@ -448,7 +519,7 @@ is("ConsumeDevice Device", ["ConsumeDevice", "Device"], [
     }],
 ]);
 
-is("ConsumeGroup", ["ConsumeGroup", "Services"], [
+isev("ConsumeGroup", ["ConsumeGroup", "Services"], [
     ["Subscribe", "spBv1.0/Core/NBIRTH/ConfigDB"],
     ["Subscribe", "spBv1.0/Core/NDATA/ConfigDB"],
     ["Subscribe", "spBv1.0/Core/NDEATH/ConfigDB"],
@@ -487,7 +558,7 @@ is("ConsumeGroup", ["ConsumeGroup", "Services"], [
     }],
 ]);
 
-is("KkForCluster", ["KkForCluster", "Edge-Cl"], [
+isev("KkForCluster", ["KkForCluster", "Edge-Cl"], [
   ["CreateObject", { class: "EdgeAccount", uuid: false }],
   ["ManageGroup", { group: "EdgeAgent", member: "Mine" }],
   ["ManageGroup", { group: "EdgeSync", member: "Mine" }],
@@ -504,7 +575,6 @@ if (failed.length) {
     throw util.format("%s tests failed", failed.length);
 }
 
-/*
 logger.log("METADATA: %O", metadata);
 const Analysis = imm.Record({
     calls:      imm.Set(),
@@ -532,15 +602,32 @@ const analysis = imm.Seq.Set(functions.keys())
 logger.log("ANALYSIS: %O", analysis.toJS());
 
 const Requirements = imm.Record({
-    functions:  imm.Set(),
+    grants:     imm.Set(),
     lookups:    imm.Set(),
 });
 const requirements = analysis.entrySeq()
     .flatMap(([f, a]) => a.perms.map(p => [p, f]))
     .reduce((r, [p, f]) => r.set(p, r.get(p, imm.Set()).add(f)), imm.Map())
-    .map(fs => Requirements({
-        functions:  fs.flatMap(f => analysis.get(f).calls.add(f)),
+    .map((fs, p) => Requirements({
+        grants:     fs.flatMap(f => analysis.get(f).calls.add(f)).add(p),
         lookups:    fs.flatMap(f => analysis.get(f).lookups),
     }));
 logger.log("REQUIREMENTS: %O", requirements.toJS());
-*/
+
+["Unknown", "Publish", "Subscribe", "SendCmd",
+    "CreateObject", "ReadConfig", "WriteConfig",
+    "ReadIdentity", "WriteIdentity", "ManageGroup",
+].forEach(p => permissions.add(p));
+
+const services = imm.Map({
+    MQTT:       imm.Set(["Publish", "Subscribe"]),
+    CmdEsc:     imm.Set(["SendCmd"]),
+    ConfigDB:   imm.Set(["CreateObject", "ReadConfig", "WriteConfig", "ManageGroup"]),
+    Auth:       imm.Set(["ReadIdentity", "WriteIdentity"]),
+});
+const service_req = services
+    .map(ps => Requirements({
+        grants:     ps.flatMap(p => requirements.get(p).grants),
+        lookups:    ps.flatMap(p => requirements.get(p).lookups),
+    }));
+logger.log("SERVICE REQS: %O", service_req.toJS());

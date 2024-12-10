@@ -11,12 +11,6 @@ import { UUIDs } from "@amrc-factoryplus/utilities";
 
 import * as local_UUIDs from "./uuids.js";
 
-/* Grr who made these different? */
-const Paths = new Map([
-    [UUIDs.Service.Authentication,  "/authz/load"],
-    [UUIDs.Service.ConfigDB,        "/v1/load"],
-]);
-
 const UUID_SOURCES = { UUIDs, ...local_UUIDs };
 
 function resolve (str) {
@@ -51,14 +45,17 @@ export async function load_yaml (f) {
 }
 
 async function load_dump (fplus, dump) {
-    const { service } = dump;
+    const { service, version } = dump;
+    const { Authentication, ConfigDB } = UUIDs.Service;
 
-    const url = Paths.get(service);
-    if (url == undefined)
-        throw new Error(`Unrecognised service UUID ${service}`);
+    /* I am standardising a new /load endpoint. Legacy dumps need to
+     * be loaded via the legacy endpoints. */
+    const url = 
+        service == Authentication && version == 1   ? "/authz/load"
+        : service == ConfigDB && version == 1       ? "/v1/load"
+        : "/load";
 
-    /* The ConfigDB should accept this in the dump */
-    const query = service == UUIDs.Service.ConfigDB
+    const query = service == ConfigDB && version == 1
         ? { overwrite: dump.overwrite ? "true" : "false" }
         : {};
 

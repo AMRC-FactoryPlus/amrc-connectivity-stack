@@ -1,9 +1,6 @@
 service: !u UUIDs.Service.ConfigDB
-version: 1
-overwrite: true
-# XXX For the time being, pending the creation of a v2 CDB dump format,
-# this dump relies on the objects here being loaded in order. We have no
-# other way to define higher-order classes yet.
+version: 2
+# XXX This relies on load order pending a better solution.
 objects:
   !u UUIDs.Class.Class:
     - !u Auth.Class.Principal

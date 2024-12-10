@@ -85,8 +85,8 @@ export default class Model extends EventEmitter {
             addUsedSchema: false,
         });
         ajv_formats(this.ajv);
-        this.schemas = new Map();
 
+        this.schemas = new Map();
         this.special = new Map();
 
         /* { app, obj, etag, config }
@@ -825,13 +825,26 @@ export default class Model extends EventEmitter {
             this.log("Dump not for ConfigDB");
             return false;
         }
-        if (dump.version != 1) {
-            this.log("Dump should be version 1");
-            return false;
-        }
-        if (Class.Class in (dump.objects ?? {})) {
-            this.log("Dump cannot create classes via objects key.");
-            return false;
+        switch (dump.version) {
+            case 1:
+                if (Class.Class in (dump.objects ?? {})) {
+                    this.log("Dump cannot create classes via objects key.");
+                    return false;
+                }
+                break;
+            case 2:
+                if ("classes" in dump) {
+                    this.log("Cannot use .classes in v2 dump.");
+                    return false;
+                }
+                if ("overwrite" in dump) {
+                    this.log("Version 2 dumps always overwrite.");
+                    return false;
+                }
+                break;
+            default:
+                this.log("Unknown dump version %s", dump.version);
+                return false;
         }
         if (App.Registration in (dump.configs ?? {})) {
             this.log("Dump cannot create objects via configs key.");
@@ -845,9 +858,6 @@ export default class Model extends EventEmitter {
          * not ideal. But loading in one transaction, with the
          * additional logic involved, means reworking all the
          * transaction handling. Maybe later... */
-
-        if (!this.dump_validate(dump))
-            return 400;
 
         /* The order of loading here is important. This is why Classes
          * are handled separately from the others. */

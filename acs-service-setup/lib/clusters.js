@@ -6,7 +6,7 @@
 import { UUIDs }            from "@amrc-factoryplus/utilities";
 
 import { ServiceConfig }    from "./service-config.js";
-import { ACS, Clusters, Git }
+import { ACS, Auth, Clusters, Git }
                             from "./uuids.js";
 
 class ClustersConfig extends ServiceConfig {
@@ -60,8 +60,8 @@ async function setup_config (ss, chart) {
     await conf.setup_groups(
         ["shared",  UUIDs.Class.GitRepoGroup,   "Shared repositories"],
         ["cluster", UUIDs.Class.GitRepoGroup,   "Edge cluster repositories"],
-        ["krbkeys", ACS.Class.UserGroup,        "Edge krbkeys accounts"],
-        ["flux",    ACS.Class.UserGroup,        "Edge flux accounts"],
+        ["krbkeys", Auth.Class.PrincipalGroup,  "Edge krbkeys accounts"],
+        ["flux",    Auth.Class.PrincipalGroup,  "Edge flux accounts"],
     );
 
     /* This is probably not the best place for this, but for now the EDO

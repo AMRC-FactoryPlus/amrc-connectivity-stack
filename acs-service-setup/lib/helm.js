@@ -6,7 +6,7 @@
 import { UUIDs } from "@amrc-factoryplus/utilities";
 
 import { ServiceConfig }    from "./service-config.js";
-import { ACS, Clusters, Edge }    
+import { ACS, Auth, Clusters, Edge }    
                             from "./uuids.js";
 
 class HelmConfig extends ServiceConfig {
@@ -89,9 +89,9 @@ export async function setup_helm (ss) {
     }).init();
 
     await conf.setup_groups(
-        ["agent",   ACS.Class.UserGroup,    "Edge Agent"],
-        ["sync",    ACS.Class.UserGroup,    "Edge Sync account"],
-        ["monitor", ACS.Class.UserGroup,    "Edge Monitor account"],
+        ["agent",   Auth.Class.PrincipalGroup,  "Edge Agent"],
+        ["sync",    Auth.Class.PrincipalGroup,  "Edge Sync account"],
+        ["monitor", Auth.Class.PrincipalGroup,  "Edge Monitor account"],
     );
 
     const acs = ss.acs_config;

@@ -144,7 +144,6 @@ data:
         {{$classDef_serviceFunction}},
         {{$classDef_clientRole}},
         {{$classDef_userAccount}},
-        {{$classDef_userGroup}},
         {{$classDef_permission}},
         {{$classDef_permissionGroup}},
         {{$classDef_serviceAccount}},

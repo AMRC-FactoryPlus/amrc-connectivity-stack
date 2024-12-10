@@ -4,17 +4,15 @@
 service: !u UUIDs.Service.ConfigDB
 version: 1
 overwrite: true
-classes:
-  - !u ACS.Class.UserAccount
-  - !u ACS.Class.UserGroup
+# XXX This relies on load order of these objects pending v2 dump format.
 objects:
-  !u ACS.Class.UserGroup:
+  !u ConfigDB.Class.R2Class:
+    - !u Auth.Class.PrincipalGroup
+  !u Auth.Class.PrincipalGroup:
     - !u ACS.Group.Administrators
     - !u ACS.Group.GlobalDebuggers
 configs:
   !u UUIDs.App.Info:
-    !u ACS.Class.UserAccount:     { name: "User account" }
-    !u ACS.Class.UserGroup:       { name: "User group" }
     !u ACS.Group.Administrators:  { name: "Administrators" }
     !u ACS.Group.GlobalDebuggers: { name: "MQTT global debuggers" }
 ---
@@ -22,6 +20,7 @@ service: !u UUIDs.Service.Authentication
 version: 1
 groups:
   !u ACS.Group.GlobalDebuggers:
+    # This should be a subclass relation
     - !u ACS.Group.Administrators
 aces:
   - principal: !u ACS.Group.Administrators

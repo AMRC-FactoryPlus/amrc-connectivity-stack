@@ -1,0 +1,21 @@
+service: !u UUIDs.Service.ConfigDB
+version: 1
+overwrite: true
+# XXX For the time being, pending the creation of a v2 CDB dump format,
+# this dump relies on the objects here being loaded in order. We have no
+# other way to define higher-order classes yet.
+objects:
+  !u UUIDs.Class.Class:
+    - !u Auth.Class.Principal
+    - !u Auth.Class.BasePerm
+    - !u Auth.Class.Template
+    - !u ACS.Class.UserAccount
+  !u ConfigDB.Class.R2Class:
+    - !u Auth.Class.PrincipalGroup
+configs:
+  !u UUIDs.App.Info:
+    !u Auth.Class.Principal:      { name: "Principal" }
+    !u Auth.Class.BasePerm:       { name: "Base permission" }
+    !u Auth.Class.Template:       { name: "Permission template" }
+    !u ACS.Class.UserAccount:     { name: "User account" }
+    !u Auth.Class.PrincipalGroup: { name: "Principal group" }

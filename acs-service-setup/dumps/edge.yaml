@@ -2,11 +2,12 @@ service: !u UUIDs.Service.ConfigDB
 version: 1
 classes:
   - !u UUIDs.Class.PermGroup
-  - !u ACS.Class.UserGroup
 objects:
   !u UUIDs.Class.App:
     - !u Edge.App.ClusterStatus
     - !u Edge.App.Deployment
+  !u ConfigDB.Class.R2Class:
+    - !u Auth.Class.PrincipalGroup
   !u UUIDs.Class.PermGroup:
     # XXX Properly this is not a permission group, but a group of
     # groups. Since we don't have quoting for group membership grant
@@ -14,7 +15,7 @@ objects:
     # krbkeys is root-equivalent.
     - !u ACS.Group.EdgeGroups
     - !u ACS.Group.EdgePermissions
-  !u ACS.Class.UserGroup:
+  !u Auth.Class.PrincipalGroup:
     - !u ACS.Group.CentralMonitor
 configs:
   !u UUIDs.App.Info:

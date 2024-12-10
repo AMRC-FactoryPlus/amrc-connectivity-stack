@@ -7,10 +7,12 @@ service: !u UUIDs.Service.ConfigDB
 version: 1
 overwrite: true
 objects:
+  !u ConfigDB.Class.R2Class:
+    - !u Auth.Class.PrincipalGroup
   !u ACS.Class.Permission:
     - !u ACS.Perm.MQTT.WriteToEntireUNS
     - !u ACS.Perm.MQTT.ReadEntireUNS
-  !u ACS.Class.UserGroup:
+  !u Auth.Class.PrincipalGroup:
     - !u ACS.Group.SparkplugIngesters
     - !u ACS.Group.HistorianUNS
 configs:

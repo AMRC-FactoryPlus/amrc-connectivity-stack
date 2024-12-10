@@ -5,13 +5,14 @@ classes:
   - !u UUIDs.Class.EdgeAgent
   # Not created here
   - !u ACS.Class.ClientRole
-  - !u ACS.Class.UserGroup
 objects:
+  !u ConfigDB.Class.R2Class:
+    - !u Auth.Class.PrincipalGroup
   !u UUIDs.Class.App:
     - !u Edge.App.AgentConfig
   !u ACS.Class.ClientRole:
     - !u Edge.Role.Monitor
-  !u ACS.Class.UserGroup:
+  !u Auth.Class.PrincipalGroup:
     - !u ACS.Group.SparkplugNode
 configs:
   !u UUIDs.App.Info:

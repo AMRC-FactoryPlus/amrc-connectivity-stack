@@ -10,7 +10,6 @@ export const ACS = {
         ServiceAccount:     "e463b4ae-a322-46cc-8976-4ba76838e908",
         Permission:         "8ae784bb-c4b5-4995-9bf6-799b3c7f21ad",
         UserAccount:        "8b3e8f35-78e5-4f93-bf21-7238bcb2ba9d",
-        UserGroup:          "f1fabdd1-de90-4399-b3da-ccf6c2b2c08b",
     },
     App: {
         SchemaIcon:         "65c0ccba-151d-48d3-97b4-d0026a811900",
@@ -80,6 +79,29 @@ export const ACS = {
  * They should be referenced instead, but it's not clear how to achieve
  * that. We can't just `import from "../acs-directory/lib/uuids.js"` as
  * this will not be part of the Docker build context. */
+
+export const ConfigDB = {
+    Class: {
+        Individual:         "2494ae9b-cd87-4c01-98db-437a303b43e9",
+        R2Class:            "705888ce-53fa-434d-afee-274b331d4642",
+        R3Class:            "52b80183-6998-4bf9-9b30-132755e7dede",
+    },
+    Special: {
+        Unowned:            "091e796a-65c0-4080-adff-c3ce01a65b2e",
+    },
+};
+
+export const Auth = {
+    Class: {
+        BasePerm:           "02795190-b6d7-11ef-a58e-6b98fe4ed4f9",
+        Template:           "0a096ada-b6d7-11ef-8092-233f813c6263",
+        Principal:          "11614546-b6d7-11ef-aebd-8fbb45451d7c",
+        PrincipalGroup:     "f1fabdd1-de90-4399-b3da-ccf6c2b2c08b",
+    },
+    App: {
+        Template:           "2760634a-b6d7-11ef-b5f5-cfe88d82bd26",
+    },
+};
 
 export const Clusters = {
     App: {

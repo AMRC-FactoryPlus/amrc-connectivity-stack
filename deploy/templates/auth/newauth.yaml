@@ -36,6 +36,31 @@ spec:
         - name: krb5-keytabs
           secret:
             secretName: newauth-keytabs
+
+      initContainers:
+        - name: db-init
+{{ include "amrc-connectivity-stack.image" (list . .Values.newauth) | indent 10 }}
+          command: [ "/usr/bin/k5start", "-Uf", "/keytabs/dbadmin", "/usr/local/bin/psql" ]
+          args: [ "-w", "-q", "-f", "/home/node/app/sql/migrate.sql" ]
+          env:
+            - name: KRB5_CONFIG
+              value: /config/krb5-conf/krb5.conf
+            - name: PGHOST
+              value: postgres.{{ .Release.Namespace }}.svc.cluster.local
+            - name: PGUSER
+              value: op1pgadmin
+            - name: PGDATABASE
+              value: postgres
+            - name: SRV_DATABASE
+              value: newauth
+            - name: SRV_USER
+              value: sv1newauth
+          volumeMounts:
+            - mountPath: /config/krb5-conf
+              name: krb5-conf
+            - mountPath: /keytabs
+              name: krb5-keytabs-dbinit
+
       containers:
         - name: webapi
 {{ include "amrc-connectivity-stack.image" (list . .Values.newauth) | indent 10 }}

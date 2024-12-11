@@ -37,7 +37,7 @@ spec:
           secret:
             secretName: newauth-keytabs
 
-      initContainers:
+#      initContainers:
 #        - name: register-with-directory
 #{{ include "amrc-connectivity-stack.image" (list . .Values.curl) | indent 10 }}
 #          env:

@@ -40,7 +40,6 @@ spec:
         - name: webapi
 {{ include "amrc-connectivity-stack.image" (list . .Values.newauth) | indent 10 }}
           command: ["/usr/bin/k5start", "-Uf", "/keytabs/client"]
-          args: ["node", "bin/newauthn.js"]
           env:
             - name: KRB5_CONFIG
               value: /config/krb5-conf/krb5.conf

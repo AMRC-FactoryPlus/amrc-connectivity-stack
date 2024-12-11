@@ -115,7 +115,7 @@ spec:
     secretName: {{ coalesce .Values.newauth.tlsSecretName .Values.acs.tlsSecretName }}
     domains:
       - main: newauth.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
-  {{- end -}}
+  {{- end }}
 ---
 apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey
@@ -138,4 +138,4 @@ spec:
   type: Random
   principal: sv1newauth@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
   secret: newauth-keytabs/client
-{{- end -}}
+{{- end }}

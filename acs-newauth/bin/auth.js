@@ -11,7 +11,7 @@ import { UUIDs } from "@amrc-factoryplus/service-client";
 
 import { GIT_VERSION } from "../lib/git-version.js";
 
-import { Auth } from "../lib/auth.js";
+import { Auth } from "../lib/authz.js";
 import { AuthNotify } from "../lib/notify.js";
 
 /* This is the F+ service spec version */

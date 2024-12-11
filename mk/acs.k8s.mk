@@ -5,6 +5,8 @@ ifndef .acs.k8s.mk
 
 .PHONY: deploy restart logs
 
+k8s.replicas?=	1
+
 kubectl?=	kubectl
 kubectl_args=	
 _kubectl=	${kubectl} ${kubectl_args}
@@ -28,12 +30,13 @@ endif
 deploy: all restart logs
 
 restart:
-	${_kubectl} rollout restart ${_dep}
+	${_kubectl} scale --replicas=0 ${_dep}
 	${_kubectl} rollout status ${_dep}
+	${_kubectl} scale --replicas=${k8s.replicas} ${_dep}
 	sleep 2
 
 logs:
-	${_kubectl} logs -f ${_cont} ${_dep}
+	${_kubectl} logs --ignore-errors -f ${_cont} ${_dep}
 
 alllogs:
 	${_kubectl} logs -f --all-containers --ignore-errors ${_dep}

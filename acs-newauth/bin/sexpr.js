@@ -213,7 +213,6 @@ function preprocess_all () {
 
 let principal;
 const ids = new Map();
-const owners = new Map();
 const lookups = new Map();
 
 builtins.set("flat", a => a);

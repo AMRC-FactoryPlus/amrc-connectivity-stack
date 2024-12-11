@@ -6,8 +6,8 @@
  * Copyright 2024 University of Sheffield AMRC
  */
 
-import { Debug, WebAPI } from "@amrc-factoryplus/service-api";
-import { UUIDs } from "@amrc-factoryplus/service-client";
+import { WebAPI } from "@amrc-factoryplus/service-api";
+import { Debug, UUIDs } from "@amrc-factoryplus/service-client";
 
 import { GIT_VERSION } from "../lib/git-version.js";
 

@@ -79,6 +79,17 @@ auth:
     pullPolicy: IfNotPresent
   verbosity: "ALL,!service,!token,!query"
 
+newauth:
+  # -- Whether or not to enable the experimental Authorisation component
+  enabled: false
+  image:
+    # -- The registry of the Authorisation component
+    registry: ghcr.io/amrc-factoryplus
+    # -- The repository of the Authorisation component
+    repository: acs-auth
+    pullPolicy: IfNotPresent
+  verbosity: "ALL,!service,!token,!query"
+
 directory:
   # -- Whether or not to enable the Directory component
   enabled: true

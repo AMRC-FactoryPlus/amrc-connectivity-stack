@@ -1,0 +1,199 @@
+{{- if .Values.newauth.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: newauth
+  namespace: {{ .Release.Namespace }}
+  labels:
+    component: newauth
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: newauth
+  template:
+    metadata:
+      labels:
+        component: newauth
+        factory-plus.service: newauth
+    spec:
+      {{- with .Values.acs.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: krb5-conf
+          configMap:
+            name: krb5-conf
+        # We map this secret to two different logical volumes,
+        # because the different containers need different creds.
+        - name: krb5-keytabs-dbinit
+          secret:
+            secretName: krb5-keytabs
+            items:
+              - path: dbadmin
+                key: op1pgadmin
+        - name: krb5-keytabs
+          secret:
+            secretName: newauth-keytabs
+
+      initContainers:
+#        - name: register-with-directory
+#{{ include "amrc-connectivity-stack.image" (list . .Values.curl) | indent 10 }}
+#          env:
+#            - name: PASSWORD
+#              valueFrom:
+#                secretKeyRef:
+#                  name: admin-password
+#                  key: password
+#          command: [ 'sh', '-c', 'until curl -X PUT -o /dev/null -w "%{http_code}" -u "admin:${PASSWORD}" -H "Content-Type: application/json" --data-raw "{ \"url\": \"http://newauth.{{.Release.Namespace}}.svc.cluster.local\" }" http://directory.{{.Release.Namespace}}.svc.cluster.local/v1/service/cab2642a-f7d9-42e5-8845-8f35affe1fd4/advertisment/1e1989ab-14e4-42bd-8171-495230acc406 | grep -E "2[0-9]{2}" > /dev/null; do sleep 10; done' ]
+
+#        - name: db-init
+#{{ include "amrc-connectivity-stack.image" (list . .Values.newauth) | indent 10 }}
+#          command: [ "/usr/bin/k5start", "-Uf", "/keytabs/dbadmin", "/usr/local/bin/psql" ]
+#          args: [ "-w", "-q", "-f", "/home/node/app/sql/migrate.sql" ]
+#          env:
+#            - name: KRB5_CONFIG
+#              value: /config/krb5-conf/krb5.conf
+#            - name: PGHOST
+#              value: postgres.{{ .Release.Namespace }}.svc.cluster.local
+#            - name: PGUSER
+#              value: op1pgadmin
+#            - name: PGDATABASE
+#              value: postgres
+#            - name: SRV_DATABASE
+#              value: newauth
+#            - name: SRV_USER
+#              value: sv1newauth
+#          volumeMounts:
+#            - mountPath: /config/krb5-conf
+#              name: krb5-conf
+#            - mountPath: /keytabs
+#              name: krb5-keytabs-dbinit
+
+#        - name: load-dumps
+#{{ include "amrc-connectivity-stack.image" (list . .Values.newauth) | indent 10 }}
+#          command: [ "/usr/bin/k5start", "-Uf", "/keytabs/client" ]
+#          args: [ "node", "bin/load-dump.js", "/dumps" ]
+#          env:
+#            - name: KRB5_CONFIG
+#              value: /config/krb5-conf/krb5.conf
+#            - name: PGHOST
+#              value: postgres.{{ .Release.Namespace }}.svc.cluster.local
+#            - name: PGUSER
+#              value: sv1newauth
+#            - name: PGDATABASE
+#              value: newauth
+#            - name: VERBOSE
+#              value: "1"
+#          volumeMounts:
+#            - mountPath: /config/krb5-conf
+#              name: krb5-conf
+#            - mountPath: /keytabs
+#              name: krb5-keytabs
+#            - mountPath: /dumps
+#              name: json-dumps
+
+      containers:
+        - name: webapi
+{{ include "amrc-connectivity-stack.image" (list . .Values.newauth) | indent 10 }}
+          command: ["/usr/bin/k5start", "-Uf", "/keytabs/client"]
+          args: ["node", "bin/newauthn.js"]
+          env:
+            - name: KRB5_CONFIG
+              value: /config/krb5-conf/krb5.conf
+            - name: CLIENT_KEYTAB
+              value: /keytabs/client
+            - name: SERVER_KEYTAB
+              value: /keytabs/server
+            # These two values are used to construct a principal name we have a key for, to verify
+            # passwords for Basic newauth. They are not used for anything else.
+            - name: HOSTNAME
+              value: newauth.{{ .Release.Namespace }}.svc.cluster.local
+            - name: REALM
+              value: {{ .Values.identity.realm | required "values.identity.realm is required!" }}
+            - name: PORT
+              value: "8080"
+            - name: PGHOST
+              value: postgres.{{ .Release.Namespace }}.svc.cluster.local
+            - name: PGUSER
+              value: sv1newauth
+            - name: PGDATABASE
+              value: newauth
+            - name: VERBOSE
+              value: {{.Values.newauth.verbosity | quote | required "values.newauth.verbosity is required!"}}
+{{ include "amrc-connectivity-stack.cache-max-age" (list . "newauth") | indent 12 }}
+            # These are currently only used for the editor. They need to be resolvable by the
+            # user's browser, so in-cluster names will not work.
+            - name: HTTP_API_URL
+              value: "{{ .Values.acs.secure | ternary "https://" "http://" }}newauth.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"
+            - name: CONFIGDB_URL
+              value: "{{ .Values.acs.secure | ternary "https://" "http://" }}configdb.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"
+            # This principal, if configured, bypasses all ACLs. This is important for
+            # bootstrapping but perhaps shouldn't be left in place once we can bootstrap without
+            # manual intervention.
+            - name: ROOT_PRINCIPAL
+              value: admin@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+          volumeMounts:
+            - mountPath: /config/krb5-conf
+              name: krb5-conf
+            - mountPath: /keytabs
+              name: krb5-keytabs
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: newauth
+  namespace: {{ .Release.Namespace }}
+spec:
+  ports:
+    - name: "web"
+      port: 80
+      targetPort: 8080
+  selector:
+    factory-plus.service: newauth
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: newauth-ingressroute
+  namespace: {{ .Release.Namespace }}
+spec:
+  entryPoints:
+    - {{ .Values.acs.secure | ternary "websecure" "web" }}
+  routes:
+    - match: Host(`newauth.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}`)
+      kind: Rule
+      services:
+        - name: newauth
+          port: 80
+          namespace: {{ .Release.Namespace }}
+  {{- if .Values.acs.secure }}
+  tls:
+    secretName: {{ coalesce .Values.newauth.tlsSecretName .Values.acs.tlsSecretName }}
+    domains:
+      - main: newauth.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
+  {{- end -}}
+---
+apiVersion: factoryplus.app.amrc.co.uk/v1
+kind: KerberosKey
+metadata:
+  name: http.newauth
+  namespace: {{ .Release.Namespace }}
+spec:
+  type: Random
+  principal: HTTP/newauth.{{ .Release.Namespace }}.svc.cluster.local@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+  additionalPrincipals:
+    - HTTP/newauth.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+  secret: newauth-keytabs/server
+---
+apiVersion: factoryplus.app.amrc.co.uk/v1
+kind: KerberosKey
+metadata:
+  name: sv1newauth
+  namespace: {{ .Release.Namespace }}
+spec:
+  type: Random
+  principal: sv1newauth@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+  secret: newauth-keytabs/client
+{{- end -}}

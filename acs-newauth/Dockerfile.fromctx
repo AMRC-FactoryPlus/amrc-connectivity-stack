@@ -1,0 +1,18 @@
+ARG local=scratch
+ARG base_version=v3.0.0
+ARG base_prefix=ghcr.io/amrc-factoryplus/acs-base
+
+FROM ${local} AS local
+
+FROM ${base_prefix}-pg-build:${base_version} AS build
+
+WORKDIR /app
+COPY package*.json .
+RUN --mount=type=bind,from=local,target=/local <<SHELL
+    if [ -d /local/node_modules ]
+    then
+        cp -R /local/node_modules .
+        #rm -f package-lock.json
+    fi
+    npm install --no-save
+SHELL

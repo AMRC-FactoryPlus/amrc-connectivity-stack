@@ -16,5 +16,5 @@ select schema_version() < 2 need_update \gset
         args jsonb[] not null
     );
 
-    call set_schema_version(2);
+    select set_schema_version(2);
 \endif

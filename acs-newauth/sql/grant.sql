@@ -17,8 +17,8 @@ grant select on
     version
 to :"role";
 grant select, insert, update, delete on
-    uuid, grant
+    uuid, ace
 to :"role";
 grant usage on
-    uuid_id_seq, grant_id_seq
+    uuid_id_seq, ace_id_seq
 to :"role";

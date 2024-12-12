@@ -9,6 +9,10 @@ objects:
     - !u ACS.Class.UserAccount
   !u ConfigDB.Class.R2Class:
     - !u Auth.Class.PrincipalGroup
+  !u UUIDs.Class.App:
+    - !u Auth.App.Template
+  !u Auth.Class.PrincipalGroup:
+    - !u ACS.Group.AuthService
 configs:
   !u UUIDs.App.Info:
     !u Auth.Class.Principal:      { name: "Principal" }
@@ -16,3 +20,22 @@ configs:
     !u Auth.Class.Template:       { name: "Permission template" }
     !u ACS.Class.UserAccount:     { name: "User account" }
     !u Auth.Class.PrincipalGroup: { name: "Principal group" }
+    !u Auth.App.Template:         { name: "Permission template definition" }
+    !u ACS.Group.AuthService:     { name: "Auth services" }
+---
+service: !u UUIDs.Service.Authentication
+version: 1
+aces:
+  - principal: !u ACS.Group.AuthService
+    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
+    target: !u Auth.App.Template
+  # XXX These should be some new read-class permission
+  - principal: !u ACS.Group.AuthService
+    permission: !u UUIDs.Permission.ConfigDB.ManageObjects
+    target: !u Auth.Class.BasePerm
+  - principal: !u ACS.Group.AuthService
+    permission: !u UUIDs.Permission.ConfigDB.ManageObjects
+    target: !u Auth.Class.Template
+  - principal: !u ACS.Group.AuthService
+    permission: !u UUIDs.Permission.ConfigDB.ManageObjects
+    target: !u Auth.Class.Principal

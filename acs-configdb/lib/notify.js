@@ -202,6 +202,7 @@ class ConfigWatch {
 function class_watch (rel, session, klass) {
     const model = session.model;
 
+    /* XXX This should use some read-class permission. */
     const ck_acl = acl_checker(session, Perm.Manage_Obj, klass, true);
 
     return rxx.rx(

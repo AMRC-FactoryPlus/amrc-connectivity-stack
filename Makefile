@@ -6,7 +6,9 @@ base=	ghcr.io/amrc-factoryplus/acs-base-js-build:v3.0.0
 
 all:
 
-.PHONY: all dev
+.PHONY: all
+
+.PHONY: check-committed lint docs amend dev pubdev
 
 check-committed:
 	[ -z "$$(git status --porcelain)" ] || (git status; exit 1)
@@ -14,9 +16,9 @@ check-committed:
 lint:
 	npx eslint lib
 
-publish: check-committed lint
-	npm version prerelease
-	npm publish
+docs:
+	rm -rf docs
+	npx jsdoc -c jsdoc.json
 
 amend:
 	git commit -C HEAD -a --amend

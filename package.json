@@ -1,6 +1,6 @@
 {
-  "name": "js-rx-client",
-  "version": "1.0.0",
+  "name": "@amrc-factoryplus/rx-client",
+  "version": "v0.0.1-bmz.1",
   "description": "",
   "main": "./lib/index.js",
   "type": "module",

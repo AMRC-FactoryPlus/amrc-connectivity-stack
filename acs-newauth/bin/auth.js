@@ -8,16 +8,20 @@
 
 import { WebAPI } from "@amrc-factoryplus/service-api";
 import { Debug, UUIDs } from "@amrc-factoryplus/service-client";
+import { RxClient } from "@amrc-factoryplus/rx-client";
 
 import { GIT_VERSION } from "../lib/git-version.js";
 
 import { Auth } from "../lib/authz.js";
 import { AuthNotify } from "../lib/notify.js";
+import { TemplateEngine } from "../lib/templates.js";
 
 /* This is the F+ service spec version */
 const Version = "1.0.0";
 
-const debug = new Debug({ verbose: process.env.VERBOSE });
+const fplus = new RxClient({ env: process.env });
+const { debug } = fplus;
+
 const auth = new Auth();
 
 const api = await new WebAPI({
@@ -40,10 +44,13 @@ const api = await new WebAPI({
     },
 }).init();
 
+const engine = new TemplateEngine({ fplus });
+
 const notify = new AuthNotify({
-    auth, api,
+    auth, api, fplus,
     log:    debug.bound("notify"),
 });
     
 api.run();
+engine.run();
 notify.run();

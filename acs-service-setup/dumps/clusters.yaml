@@ -31,7 +31,6 @@ objects:
     !u Clusters.Requirement.Groups: { name: "Clusters-managed groups" }
     !u Clusters.Requirement.ServiceAccount: { name: "Clusters service account" }
 configs:
-  !u UUIDs.App.Info:
   !u UUIDs.App.ConfigSchema:
     !u Clusters.App.Bootstrap:
       title: Edge cluster bootstrap script template

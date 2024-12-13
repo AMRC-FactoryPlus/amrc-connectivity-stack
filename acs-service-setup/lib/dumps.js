@@ -7,7 +7,7 @@ import fsp from "fs/promises";
 
 import yaml from "yaml";
 
-import { UUIDs } from "@amrc-factoryplus/utilities";
+import { UUIDs } from "@amrc-factoryplus/service-client";
 
 import * as local_UUIDs from "./uuids.js";
 

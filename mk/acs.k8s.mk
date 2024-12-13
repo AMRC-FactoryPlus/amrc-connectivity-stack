@@ -29,14 +29,10 @@ endif
 
 deploy: all restart logs
 
-restart:
-	${_kubectl} scale --replicas=0 ${_dep}
-	${_kubectl} rollout status ${_dep}
-	${_kubectl} scale --replicas=${k8s.replicas} ${_dep}
-	sleep 2
+restart: down up
 
 logs:
-	${_kubectl} logs --ignore-errors -f ${_cont} ${_dep}
+	${_kubectl} logs -f ${_cont} ${_dep}
 
 alllogs:
 	${_kubectl} logs -f --all-containers --ignore-errors ${_dep}

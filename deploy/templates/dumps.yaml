@@ -9,7 +9,6 @@
 {{$classDef_serviceFunction := "265d481f-87a7-4f93-8fc6-53fa64dc11bb" | quote}}
 {{$classDef_serviceAccount := "e463b4ae-a322-46cc-8976-4ba76838e908" | quote}}
 {{$classDef_permission := "8ae784bb-c4b5-4995-9bf6-799b3c7f21ad" | quote}}
-{{$classDef_permissionGroup := "ac0d5288-6136-4ced-a372-325fbbcdd70d" | quote}}
 {{$classDef_clientRole := "1c567e3c-5519-4418-8682-6086f22fbc13" | quote}}
 {{$classDef_userAccount := "8b3e8f35-78e5-4f93-bf21-7238bcb2ba9d" | quote}}
 {{$classDef_userGroup := "f1fabdd1-de90-4399-b3da-ccf6c2b2c08b" | quote}}
@@ -145,7 +144,6 @@ data:
         {{$classDef_clientRole}},
         {{$classDef_userAccount}},
         {{$classDef_permission}},
-        {{$classDef_permissionGroup}},
         {{$classDef_serviceAccount}},
         {{$classDef_serviceRequirement}},
         {{$classDef_cellGateway}},
@@ -203,12 +201,6 @@ data:
           {{$permission_ccl_rebirth}},
           {{$permission_ccl_reloadEdgeAgentConfig}}
         ],
-        {{$classDef_permissionGroup}}: [
-          {{$permissionGroup_authorisation}},
-          {{$permissionGroup_configStore}},
-          {{$permissionGroup_mqtt}},
-          {{$permissionGroup_commands}}
-        ],
         {{$classDef_serviceAccount}}: [
           {{$serviceAccount_mqtt}},
           {{$serviceAccount_directory}},
@@ -254,9 +246,6 @@ data:
           {{$classDef_permission}}: {
             "name": "Permission"
           },
-          {{$classDef_permissionGroup}}: {
-            "name": "Permission Group"
-          },
           {{$permission_auth_manageKerberosMappings}}: {
             "name": "Auth: Manage Kerberos mappings"
           },
@@ -272,9 +261,6 @@ data:
           {{$permission_auth_manageGroups}}: {
             "name": "Auth: Manage groups"
           },
-          {{$permissionGroup_authorisation}}: {
-            "name": "Auth permissions"
-          },
           {{$permission_configStore_readConfigForApp}}: {
             "name": "ConfigDB: Read config for app"
           },
@@ -289,12 +275,6 @@ data:
           },
           {{$permission_configStore_deleteObjects}}: {
             "name": "ConfigDB: Delete objects"
-          },
-          {{$permissionGroup_configStore}}: {
-            "name": "ConfigDB Permissions"
-          },
-          {{$permissionGroup_mqtt}}: {
-            "name": "MQTT Permissions"
           },
           {{$application_mqttPermissionTemplate}}: {
             "name": "MQTT Permission Template Application"
@@ -407,9 +387,6 @@ data:
           {{$role_commandEscalation}}: {
             "name": "Role: Command Escalation Service"
           },
-          {{$permissionGroup_commands}}: {
-            "name": "CCL Permissions"
-          },
           {{$serviceAccount_dataWarehouse}}: {
             "name": "Data Warehouse"
           },
@@ -506,122 +483,6 @@ data:
               "type": "Boolean"
             }
           ]
-        }
-      }
-    }
-  # This dump is copied in directly from the acs-git repo. It sets up
-  # entries as required by the service implementation. This does not use
-  # the UUID variables as these entries are not maintained here.
-  git: |
-    {
-      "service": "af15f175-78a0-4e05-97c0-2a0bb82b9f3b",
-      "version": 1,
-      "classes": [
-        "d25f2afc-1ab8-4d27-b51b-d02314624e3e",
-        "b03d4dfe-7e78-4252-8e62-af594cf316c9",
-        "ac0d5288-6136-4ced-a372-325fbbcdd70d",
-        "8ae784bb-c4b5-4995-9bf6-799b3c7f21ad",
-        "b419cbc2-ab0f-4311-bd9e-f0591f7e88cb"
-      ],
-      "objects": {
-        "265d481f-87a7-4f93-8fc6-53fa64dc11bb": [
-          "7adf4db0-2e7b-4a68-ab9d-376f4c5ce14b"
-        ],
-        "d319bd87-f42b-4b66-be4f-f82ff48b93f0": [
-          "38d62a93-b6b4-4f63-bad4-d433e3eaff29",
-          "dbd8a535-52ba-4f6e-b4f8-9b71aefe09d3"
-        ],
-        "ac0d5288-6136-4ced-a372-325fbbcdd70d": [
-          "c0c55c78-116e-4526-8ff4-e4595251f76c"
-        ],
-        "8ae784bb-c4b5-4995-9bf6-799b3c7f21ad": [
-          "3668660f-f949-4657-be76-21967144c1a2",
-          "55870092-91b6-4d5e-828f-7637d080bf1c",
-          "12ecb694-b4b9-4d2a-927e-d100019f7ebe",
-          "b2d8d437-5060-4202-bcc2-bd2beda09651",
-          "7fd8a8c1-6050-4950-97bd-a35bb83ff750"
-        ],
-        "b419cbc2-ab0f-4311-bd9e-f0591f7e88cb": [
-          "a461ef62-0560-4be2-8d97-1a56916ce4f8"
-        ]
-      },
-      "configs": {
-        "64a8bfa9-7772-45c4-9d1a-9e6290690957": {
-          "d25f2afc-1ab8-4d27-b51b-d02314624e3e": {
-            "name": "Git repository"
-          },
-          "b03d4dfe-7e78-4252-8e62-af594cf316c9": {
-            "name": "Git repository group"
-          },
-          "7adf4db0-2e7b-4a68-ab9d-376f4c5ce14b": {
-            "name": "Git hosting"
-          },
-          "38d62a93-b6b4-4f63-bad4-d433e3eaff29": {
-            "name": "Git repository configuration"
-          },
-          "c0c55c78-116e-4526-8ff4-e4595251f76c": {
-            "name": "Git permissions"
-          },
-          "3668660f-f949-4657-be76-21967144c1a2": {
-            "name": "Git: create repo"
-          },
-          "55870092-91b6-4d5e-828f-7637d080bf1c": {
-            "name": "Git: delete repo"
-          },
-          "12ecb694-b4b9-4d2a-927e-d100019f7ebe": {
-            "name": "Git: pull from repo"
-          },
-          "b2d8d437-5060-4202-bcc2-bd2beda09651": {
-            "name": "Git: push to repo"
-          },
-          "7fd8a8c1-6050-4950-97bd-a35bb83ff750": {
-            "name": "Git: manage repo storage"
-          },
-          "a461ef62-0560-4be2-8d97-1a56916ce4f8": {
-            "name": "Git hosting service account"
-          }
-        },
-        "dbd8a535-52ba-4f6e-b4f8-9b71aefe09d3": {
-          "38d62a93-b6b4-4f63-bad4-d433e3eaff29": {
-            "type": "object",
-            "required": [
-              "path"
-            ],
-            "properties": {
-              "path": {
-                "type": "string"
-              }
-            }
-          }
-        }
-      }
-    }
-  # This is the ACS-specific configuration of the git service. XXX There
-  # is redundency here to make the dump self-contained. This needs
-  # fixing in the ConfigDB dump-loading code.
-  git-acs: |
-    {
-      "service": {{$service_configStore}},
-      "version": 1,
-      "classes": [
-        {{$classDef_serviceAccount}}
-      ],
-      "objects": {
-        {{$classDef_serviceAccount}}: [
-          {{$serviceAccount_git}}
-        ]
-      },
-      "configs": {
-        {{$application_generalObjectInformation}}: {
-          {{$serviceAccount_git}}: {
-            "name": "Git repository server"
-          }
-        },
-        {{$application_sparkplugAddressInformation}}: {
-          {{$serviceAccount_git}}: {
-            "node_id": "Git",
-            "group_id": "{{ .Values.acs.organisation }}-Service-Core"
-          }
         }
       }
     }
@@ -957,65 +818,4 @@ data:
         }
       ]
     }
-  # This is copied directly from the acs-git repo and so doesn't use
-  # UUID variables.
-  git: |
-    {
-      "service": "cab2642a-f7d9-42e5-8845-8f35affe1fd4",
-      "version": 1,
-      "aces": [
-        {
-          "principal": "a461ef62-0560-4be2-8d97-1a56916ce4f8",
-          "permission": "4db4c39a-f18d-4e83-aeb0-5af2c14ddc2b",
-          "target": "7adf4db0-2e7b-4a68-ab9d-376f4c5ce14b"
-        },
-        {
-          "principal": "a461ef62-0560-4be2-8d97-1a56916ce4f8",
-          "permission": "ba566181-0e8a-405b-b16e-3fb89130fbee",
-          "target": "c0c55c78-116e-4526-8ff4-e4595251f76c"
-        },
-        {
-          "principal": "a461ef62-0560-4be2-8d97-1a56916ce4f8",
-          "permission": "4a339562-cd57-408d-9d1a-6529a383ea4b",
-          "target": "38d62a93-b6b4-4f63-bad4-d433e3eaff29"
-        }
-      ],
-      "groups": {
-        "c0c55c78-116e-4526-8ff4-e4595251f76c": [
-          "3668660f-f949-4657-be76-21967144c1a2",
-          "55870092-91b6-4d5e-828f-7637d080bf1c",
-          "12ecb694-b4b9-4d2a-927e-d100019f7ebe",
-          "b2d8d437-5060-4202-bcc2-bd2beda09651",
-          "7fd8a8c1-6050-4950-97bd-a35bb83ff750"
-        ]
-      }
-    }
-  # This is the ACS-specific configuration of the git service.
-  git-acs: |
-    {
-      "service": {{$service_authorisation}},
-      "version": 1,
-      "principals": [
-        {
-          "uuid": {{$serviceAccount_git}},
-          "kerberos": "sv1git@{{ .Values.identity.realm }}"
-        }
-      ],
-      "groups": {
-          {{$serviceRequirement_gitServiceAccount}}: [
-            {{$serviceAccount_git}}
-          ],
-          {{$userGroup_sparkplugNode}}: [
-            {{$serviceAccount_git}}
-          ]
-      },
-      "aces": [
-        {
-          "principal": {{$serviceAccount_git}},
-          "permission": {{$role_edgeNodeConsumer}},
-          "target": {{$serviceAccount_configStore}}
-        }
-      ]
-    }
-
 {{end}}{{/* auth.enabled */}}

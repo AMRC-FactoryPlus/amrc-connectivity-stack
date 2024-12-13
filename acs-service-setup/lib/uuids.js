@@ -72,6 +72,7 @@ export const ACS = {
      * ServiceRequirement groups to grant them permissions. */
     ServiceAccount: {
         KrbKeys:                "a04b4195-7db4-4480-b3f3-4d22c08b96ea",
+        Git:                    "626df296-8156-4c67-8aed-aac70161aa8b",
     },
 };
 
@@ -217,5 +218,9 @@ export const Git = {
         Delete:     "55870092-91b6-4d5e-828f-7637d080bf1c",
         Pull:       "12ecb694-b4b9-4d2a-927e-d100019f7ebe",
         Push:       "b2d8d437-5060-4202-bcc2-bd2beda09651",
+        Manage_Storage: "7fd8a8c1-6050-4950-97bd-a35bb83ff750",
+    },
+    Requirement: {
+        ServiceAccount:     "a461ef62-0560-4be2-8d97-1a56916ce4f8",
     },
 };

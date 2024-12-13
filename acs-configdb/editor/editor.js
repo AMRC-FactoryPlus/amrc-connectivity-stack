@@ -105,7 +105,7 @@ function patch_json (path, patch) {
 }
 
 async function post_json(path, json) {
-    const rsp = await service_fetch(`/v1/${path}`, {
+    const rsp = await service_fetch(`/${path}`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
@@ -338,7 +338,7 @@ function Apps(props) {
             uuid: new_uuid.current.value,
             name: new_name.current.value,
         };
-        if (await post_json(`app`, body)) {
+        if (await post_json(`v1/app`, body)) {
             set_msg("App created");
         } else {
             set_msg("Error");
@@ -494,7 +494,7 @@ function NewObj(props) {
             uuid: new_obj.current.value || undefined,
             "class": new_class.current.value,
         };
-        const rsp = await post_json("object", spec);
+        const rsp = await post_json("v2/object", spec);
 
         if (rsp) {
             set_msg(html`Created
@@ -639,7 +639,6 @@ function Dumps(props) {
 
     const dump_r = useRef(null);
     const file_r = useRef(null);
-    const ovrw_r = useRef(null);
 
     const load = async () => {
         const dump = JSON.parse(dump_r.current?.value);
@@ -647,9 +646,8 @@ function Dumps(props) {
             set_msg("Error reading dump from textbox");
             return;
         }
-        const ovrw = !!ovrw_r.current?.checked;
 
-        const ok = await post_json(`load?overwrite=${ovrw}`, dump);
+        const ok = await post_json(`load`, dump);
         set_msg(ok ? "Loaded dump" : "Failed");
         if (ok) dump_r.current.value = "";
     };
@@ -670,7 +668,6 @@ function Dumps(props) {
         </p>
         <p><textarea cols=80 rows=24 ref=${dump_r}></textarea></p>
         <p><input type=file ref=${file_r} onChange=${read_file}/></p>
-        <p><label><input type=checkbox ref=${ovrw_r}/> Overwrite existing entries</label></p>
         <p>
             <button onClick=${load}>Load JSON dump</button>
             ${msg}

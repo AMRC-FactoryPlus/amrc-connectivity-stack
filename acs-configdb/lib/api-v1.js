@@ -185,10 +185,14 @@ export class APIv1 {
         if (overwrite == undefined)
             return res.status(400).end();
 
-        if (!await this.model.dump_validate(dump))
+        if (!this.model.dump_validate(dump)) {
+            this.log("Dump failed to validate: %o", this.model.dump_validate.errors);
             return res.status(400).end();
-        if (dump.version != 1)
+        }
+        if (dump.version != 1) {
+            this.log("/v1/load can only load version 1 dumps");
             return res.status(400).end();
+        }
 
         const perms = {
             classes: Perm.Manage_Obj,

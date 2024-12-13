@@ -3,7 +3,7 @@
  * Copyright 2023 AMRC
  */
 
-import { ServiceClient } from "@amrc-factoryplus/utilities";
+import { ServiceClient } from "@amrc-factoryplus/service-client";
 
 import { setup_clusters }       from "./clusters.js";
 import { load_dumps }           from "./dumps.js";

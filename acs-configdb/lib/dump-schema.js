@@ -51,8 +51,12 @@ export const dump_schema = {
                     type: "object",
                     propertyNames: { format: "uuid" },
                     additionalProperties: {
-                        type: "array",
-                        items: { type: "string", format: "uuid" }}},
+                        type: "object",
+                        propertyNames: { format: "uuid" },
+                        additionalProperties: {
+                            type: "object",
+                            properties: {
+                                name: { type: "string" }}}}},
                 configs: {
                     type: "object",
                     properties: {

@@ -89,7 +89,7 @@ export default class Model extends EventEmitter {
 
         this.schemas = new Map();
         this.special = new Map();
-        this.dump_validate = this.ajv.compile(dump_schemas);
+        this.dump_validate = this.ajv.compile(dump_schema);
 
         /* { app, obj, etag, config }
          * config is undefined for a delete entry */
@@ -818,12 +818,7 @@ export default class Model extends EventEmitter {
         return schema;
     }
 
-    async dump_load(dump, overwrite) {
-        /* XXX This loads the dump in multiple transactions, which is
-         * not ideal. But loading in one transaction, with the
-         * additional logic involved, means reworking all the
-         * transaction handling. Maybe later... */
-
+    async _dump_load_obj_v1 (dump) {
         /* The order of loading here is important. This is why Classes
          * are handled separately from the others. */
         for (const uuid of dump.classes ?? []) {
@@ -831,7 +826,7 @@ export default class Model extends EventEmitter {
              * this class */
             if (uuid == Class.Class)
                 continue;
-            this.log("LOAD CLASS %s", uuid);
+            this.log("LOAD v1 CLASS %s", uuid);
             const [st] = await this.object_create({ uuid, rank: 1 });
             if (st > 299) {
                 this.log("Dump failed [%s] on class %s", st, uuid);
@@ -840,7 +835,7 @@ export default class Model extends EventEmitter {
         }
         for (const [klass, objs] of Object.entries(dump.objects ?? {})) {
             for (const uuid of objs) {
-                this.log("LOAD OBJECT %s/%s", klass, uuid);
+                this.log("LOAD v1 OBJECT %s/%s", klass, uuid);
                 let [st] = await this.object_create({ uuid, class: klass });
                 if (st > 299) {
                     this.log("Dump failed [%s] on object %s (%s)",
@@ -849,6 +844,48 @@ export default class Model extends EventEmitter {
                 }
             }
         }
+        return 204;
+    }
+
+    async _dump_load_obj_v2 (dump) {
+        /* XXX For now we rely on preservation of object order in YAML,
+         * and on careful ordering of the source dumps. Properly we want
+         * to validate the ranks of everything and create objects in the
+         * correct order. */
+        for (const [klass, objs] of Object.entries(dump.objects ?? {})) {
+            for (const [uuid, spec] of Object.entries(objs)) {
+                this.log("LOAD v2 OBJECT %s/%s", klass, uuid);
+                const [st] = await this.object_create({ uuid, class: klass });
+                if (st > 299) {
+                    this.log("Dump failed [%s] on object %s (%s)",
+                        st, uuid, klass);
+                    return st;
+                }
+                if (spec.name) {
+                    /* We don't care if this fails */
+                    await this.config_merge_patch(
+                        { app: App.Info, object: uuid },
+                        { name: spec.name });
+                }
+            }
+        }
+        return 204;
+    }
+
+    /* The dump must have already been validated */
+    async dump_load(dump, overwrite) {
+        /* XXX This loads the dump in multiple transactions, which is
+         * not ideal. But loading in one transaction, with the
+         * additional logic involved, means reworking all the
+         * transaction handling. Maybe later... */
+
+        const v = dump.version;
+        const st = await (
+            v == 1 ? this._dump_load_obj_v1(dump)
+            : v == 2 ? this._dump_load_obj_v2(dump)
+            : 400);
+        if (st > 299) return st;
+
         for (const [app, objs] of Object.entries(dump.configs ?? {})) {
             for (const [object, conf] of Object.entries(objs)) {
                 this.log("LOAD CONFIG %s/%s", app, object);

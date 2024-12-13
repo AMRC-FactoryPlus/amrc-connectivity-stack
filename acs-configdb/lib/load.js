@@ -21,8 +21,11 @@ export class Loader {
     async load(req, res) {
         const dump = req.body;
 
-        if (!await this.model.dump_validate(dump))
+        if (!this.model.dump_validate(dump)) {
+            /* XXX this is an awful API */
+            this.log("Dump failed validation: %o", this.model.dump_validate.errors);
             return res.status(400).end();
+        }
 
         const perms = {
             classes: Perm.Manage_Obj,

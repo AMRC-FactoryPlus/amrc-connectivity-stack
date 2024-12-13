@@ -1,29 +1,22 @@
 service: !u UUIDs.Service.ConfigDB
-version: 1
-classes:
-  - !u UUIDs.Class.PermGroup
+version: 2
 objects:
-  !u UUIDs.Class.App:
-    - !u Edge.App.ClusterStatus
-    - !u Edge.App.Deployment
   !u ConfigDB.Class.R2Class:
-    - !u Auth.Class.PrincipalGroup
-  !u UUIDs.Class.PermGroup:
+    !u Auth.Class.PermissionGroup: {}
+    !u Auth.Class.PrincipalGroup: {}
+  !u UUIDs.Class.App:
+    !u Edge.App.ClusterStatus:      { name: "Edge cluster status" }
+    !u Edge.App.Deployment:         { name: "Edge deployment" }
+  !u Auth.Class.PermissionGroup:
     # XXX Properly this is not a permission group, but a group of
     # groups. Since we don't have quoting for group membership grant
     # here will be much too large; the grant of ManageGroup to the edge
     # krbkeys is root-equivalent.
-    - !u ACS.Group.EdgeGroups
-    - !u ACS.Group.EdgePermissions
-  !u Auth.Class.PrincipalGroup:
-    - !u ACS.Group.CentralMonitor
-configs:
-  !u UUIDs.App.Info:
+    # ??? This needs reworking as a subclass of PermissionGroup.
     !u ACS.Group.EdgeGroups:        { name: "Edge-managed groups" }
     !u ACS.Group.EdgePermissions:   { name: "Edge-managed permissions" }
+  !u Auth.Class.PrincipalGroup:
     !u ACS.Group.CentralMonitor:    { name: "Central Monitors" }
-    !u Edge.App.ClusterStatus:      { name: "Edge cluster status" }
-    !u Edge.App.Deployment:         { name: "Edge deployment" }
 ---
 service: !u UUIDs.Service.Authentication
 version: 1

@@ -1,29 +1,20 @@
 service: !u UUIDs.Service.ConfigDB
-version: 1
-classes:
-  - !u UUIDs.Class.Service
-  - !u UUIDs.Class.Permission
-  - !u UUIDs.Class.PermGroup
+version: 2
 objects:
+  !u UUIDs.Class.Class:
+    !u UUIDs.Class.Permission: {} 
+    !u UUIDs.Class.Service: {}
+  !u ConfigDB.Class.R2Class:
+    !u Auth.Class.PermissionGroup: {}
   !u UUIDs.Class.Service:
-    - !u UUIDs.Service.Directory
-  !u UUIDs.Class.PermGroup:
-    - !u Directory.Perm.All
-  !u UUIDs.Class.Permission:
-    - !u Directory.Perm.AdvertiseService
-    - !u Directory.Perm.ManageService
-    - !u Directory.Perm.OverrideService
-    - !u Directory.Perm.ReadAlertType
-    - !u Directory.Perm.PublishAlertType
-    - !u Directory.Perm.ReadDeviceAlerts
-    - !u Directory.Perm.ReadLinkRelation
-    - !u Directory.Perm.ReadDeviceLinks
-configs:
-  !u UUIDs.App.Info:
     !u UUIDs.Service.Directory:
       name: "Directory service"
+  !u Auth.Class.PermissionGroup:
     !u Directory.Perm.All:
       name: "Directory permissions"
+  # XXX These are legacy permissions for now. They probably want
+  # migrating to base permissions later.
+  !u UUIDs.Class.Permission:
     !u Directory.Perm.AdvertiseService:
       name: "Directory: Advertise service"
     !u Directory.Perm.ManageService:

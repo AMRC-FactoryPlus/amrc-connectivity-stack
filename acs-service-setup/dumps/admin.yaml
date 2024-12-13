@@ -7,12 +7,8 @@ version: 2
 # solution.
 objects:
   !u ConfigDB.Class.R2Class:
-    - !u Auth.Class.PrincipalGroup
+    !u Auth.Class.PrincipalGroup: {}
   !u Auth.Class.PrincipalGroup:
-    - !u ACS.Group.Administrators
-    - !u ACS.Group.GlobalDebuggers
-configs:
-  !u UUIDs.App.Info:
     !u ACS.Group.Administrators:  { name: "Administrators" }
     !u ACS.Group.GlobalDebuggers: { name: "MQTT global debuggers" }
 ---

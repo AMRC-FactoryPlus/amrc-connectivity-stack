@@ -3,16 +3,19 @@ version: 2
 # XXX This relies on load order pending a better solution.
 objects:
   !u UUIDs.Class.Class:
-    - !u Auth.Class.Principal
-    - !u Auth.Class.BasePerm
-    - !u Auth.Class.Template
-    - !u ACS.Class.UserAccount
-  !u ConfigDB.Class.R2Class:
-    - !u Auth.Class.PrincipalGroup
-configs:
-  !u UUIDs.App.Info:
     !u Auth.Class.Principal:      { name: "Principal" }
+    !u ACS.Class.UserAccount:     { name: "User account" }
     !u Auth.Class.BasePerm:       { name: "Base permission" }
     !u Auth.Class.Template:       { name: "Permission template" }
-    !u ACS.Class.UserAccount:     { name: "User account" }
+    !u UUIDs.Class.Permission:    { name: "Permission" }
+  !u ConfigDB.Class.R2Class:
     !u Auth.Class.PrincipalGroup: { name: "Principal group" }
+    !u Auth.Class.PermissionGroup: { name: "Permission group" }
+  !u Auth.Class.PermissionGroup:
+    !u ACS.PermGroup.Auth:        { name: "Auth" }
+    !u ACS.PermGroup.Clusters:    { name: "Cluster Manager" }
+    !u ACS.PermGroup.CmdEsc:      { name: "Command Escalation" }
+    !u ACS.PermGroup.ConfigDB:    { name: "ConfigDB" }
+    !u ACS.PermGroup.Directory:   { name: "Directory" }
+    !u ACS.PermGroup.Git:         { name: "Git" }
+    !u ACS.PermGroup.MQTT:        { name: "MQTT" }

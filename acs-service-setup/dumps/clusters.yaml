@@ -1,56 +1,37 @@
 service: !u UUIDs.Service.ConfigDB
-version: 1
-overwrite: true
-classes:
-  - !u Clusters.Class.Account
-  - !u Clusters.Class.Cluster
-  # XXX Needed for now
-  - !u UUIDs.Class.Service
-  - !u UUIDs.Class.PermGroup
-  - !u UUIDs.Class.Permission
-  - !u UUIDs.Class.Requirement
+version: 2
 objects:
+  !u ConfigDB.Class.R2Class:
+    !u Auth.Class.PermissionGroup: {}
+  !u UUIDs.Class.Class:
+    !u UUIDs.Class.Permission: {}
+    !u UUIDs.Class.Requirement: {}
+    !u Clusters.Class.Cluster: { name: "Edge cluster" }
+  !u Auth.Class.PrincipalGroup:
+    !u Clusters.Class.Account: { name: "Edge cluster account" }
   !u UUIDs.Class.App:
-    - !u Clusters.App.Bootstrap
-    - !u Clusters.App.Cluster
-    - !u Clusters.App.Flux
-    - !u Clusters.App.HelmChart
-    - !u Clusters.App.HelmRelease
-    - !u Clusters.App.Status
-    # XXX Needed for now
-    - !u UUIDs.App.ConfigSchema
-  !u UUIDs.Class.Service:
-    - !u Clusters.Service.ClusterManager
-  !u UUIDs.Class.PermGroup:
-    - !u Clusters.Perm.All
-  !u UUIDs.Class.Permission:
-    - !u Clusters.Perm.Clusters
-    - !u Clusters.Perm.Secrets
-  !u UUIDs.Class.Requirement:
-    - !u Clusters.Requirement.ServiceAccount
-    - !u Clusters.Requirement.EdgeRepos
-    - !u Clusters.Requirement.Groups
-    - !u Clusters.Requirement.FluxAccounts
-    - !u Clusters.Requirement.FluxRoles
-configs:
-  !u UUIDs.App.Info:
     !u Clusters.App.Bootstrap:      { name: "Bootstrap script" }
     !u Clusters.App.Cluster: { name: "Edge cluster configuration" }
     !u Clusters.App.Flux:           { name: "Flux template" }
     !u Clusters.App.HelmChart: { name: "Helm chart template" }
     !u Clusters.App.HelmRelease: { name: "HelmRelease template" }
     !u Clusters.App.Status: { name: "Edge cluster setup status" }
-    !u Clusters.Class.Account: { name: "Edge cluster account" }
-    !u Clusters.Class.Cluster: { name: "Edge cluster" }
+    !u UUIDs.App.ConfigSchema: {}
+  !u UUIDs.Class.Service:
+    !u Clusters.Service.ClusterManager: { name: "Cluster Manager" }
+  !u Auth.Class.PermissionGroup:
     !u Clusters.Perm.All: { name: "Clusters permissions" }
+  !u UUIDs.Class.Permission:
     !u Clusters.Perm.Clusters: { name: "Clusters: Manage clusters" }
     !u Clusters.Perm.Secrets: { name: "Clusters: Manage secrets" }
+  !u UUIDs.Class.Requirement:
     !u Clusters.Requirement.EdgeRepos: { name: "Edge cluster repositories" }
     !u Clusters.Requirement.FluxAccounts: { name: "Edge flux accounts" }
     !u Clusters.Requirement.FluxRoles: { name: "Edge flux roles" }
     !u Clusters.Requirement.Groups: { name: "Clusters-managed groups" }
     !u Clusters.Requirement.ServiceAccount: { name: "Clusters service account" }
-    !u Clusters.Service.ClusterManager: { name: "Cluster Manager" }
+configs:
+  !u UUIDs.App.Info:
   !u UUIDs.App.ConfigSchema:
     !u Clusters.App.Bootstrap:
       title: Edge cluster bootstrap script template

@@ -32,13 +32,12 @@ const TError = imm.Record({
     detail: null,
 });
 const Environment = imm.Record({
-    log:            () => {},
     permissions:    imm.Set(),
     templates:      imm.Map(),
 });
 /* This is the final analysis in frozen form */
 const Analysis = imm.Record({
-    calls:      imm.Set(),
+    definition: null,
     lookups:    imm.Set(),
     perms:      imm.Set(),
     errors:     imm.Set(),
@@ -52,13 +51,10 @@ const showJS = e => util.inspect(e.toJS(), { depth: null })
  * permissions and service lookups required to evaluate. */
 function analyze_all (engine, templates, permissions) {
     const log = engine.log.bind(engine);
-    const env = Environment({ log, templates, permissions });
-
-    log("ENV: %s", showJS(env));
+    const env = Environment({ templates, permissions });
 
     /* Perform initial analysis of the expressions in the templates */
     const shallow = templates.map(([args, ...defn], name) => {
-        log("Shallow analysis for %s", name);
         const ctx = { 
             env, name,
             calls:      new Set(),
@@ -69,7 +65,6 @@ function analyze_all (engine, templates, permissions) {
         defn.forEach(e => analyze_expr(ctx, e));
         return ctx;
     });
-    log("SHALLOW: %s", showJS(shallow));
 
     /* Find all calls recursively */
     const rr = f => {
@@ -79,24 +74,22 @@ function analyze_all (engine, templates, permissions) {
     };
     /* Compile a full-depth analysis of a template */
     const compile = name => {
-        log("Compiling for %s", name);
         const calls = rr(name).toSet();
-        log("Calls: %s", showJS(calls));
         const all = fn => calls.flatMap(f => fn(shallow.get(f)));
         const rv = Analysis({
-            calls:      calls,
+            definition: templates.get(name),
             lookups:    all(m => m.lookups),
             perms:      all(m => m.perms),
             errors:     all(m => m.errors),
         });
-        log("Analysis: %s: %s", name, showJS(rv));
         return rv;
     };
-    return templates.keySeq()
+    const analyzed = templates.keySeq()
         /* This gives a Seq.Keyed (a, a), ... */
         .toSetSeq().toKeyedSeq()
         .map(compile)
         .toMap();
+    return Environment({ permissions, templates: analyzed });
 };
 
 /** Analyze a single template expression and record the results into the
@@ -121,17 +114,12 @@ function analyze_expr (ctx, expr) {
         analyze_expr(ctx, item);
     }
     else {
-        if (name == ctx.name) {
-            ctx.env.log("Ignoring recursive call to %s", name)
-        }
-        else if (ctx.env.permissions.has(name)) {
-            ctx.env.log("Found permission %s", name);
+        if (name == ctx.name)
+            ;/* Ignore recursive calls */
+        else if (ctx.env.permissions.has(name))
             ctx.perms.add(name);
-        }
-        else if (ctx.env.templates.has(name)) {
-            ctx.env.log("Found call to %s", name);
+        else if (ctx.env.templates.has(name))
             ctx.calls.add(name);
-        }
         args.forEach(e => analyze_expr(ctx, e));
     }
 }

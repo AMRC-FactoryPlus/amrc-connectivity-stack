@@ -57,12 +57,12 @@ async function service_fetch(path, opts) {
     return res;
 }
 
-async function fetch_json(path) {
+async function fetch_json(path, sort) {
     const rsp = await service_fetch(`/v2/${path}`);
     if (rsp.status != 200) return;
 
     const json = await rsp.json();
-    if (Array.isArray(json))
+    if (sort)
         json.sort();
 
     return json;
@@ -326,7 +326,7 @@ function Apps(props) {
     const [apps, set_apps] = useState([]);
     const [msg, set_msg] = useState("");
 
-    const update_apps = async () => set_apps(await fetch_json("app"));
+    const update_apps = async () => set_apps(await fetch_json("app", true));
 
     useEffect(update_apps, []);
 
@@ -397,8 +397,8 @@ function Klass(props) {
     const [status, set_status] = useState(null);
 
     const update = () => {
-        fetch_json(`class/${klass}/direct/member`).then(set_objs);
-        fetch_json(`class/${klass}/direct/subclass`).then(set_subs);
+        fetch_json(`class/${klass}/direct/member`, true).then(set_objs);
+        fetch_json(`class/${klass}/direct/subclass`, true).then(set_subs);
     };
     useEffect(update, [klass]);
 
@@ -529,7 +529,7 @@ function App(props) {
     const {app} = props;
     const [objs, set_objs] = useState([]);
 
-    const update = async () => set_objs(await fetch_json(`app/${app}/object`));
+    const update = async () => set_objs(await fetch_json(`app/${app}/object`, true));
     useEffect(update, []);
 
     return html`

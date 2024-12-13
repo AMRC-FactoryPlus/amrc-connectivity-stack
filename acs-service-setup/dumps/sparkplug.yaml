@@ -3,21 +3,17 @@ service: !u UUIDs.Service.ConfigDB
 version: 2
 objects:
   !u ConfigDB.Class.R2Class:
-    - !u Auth.Class.PrincipalGroup
+    !u Auth.Class.PrincipalGroup: {}
   !u UUIDs.Class.Class:
-    - !u UUIDs.Class.EdgeAgent
-    - !u ACS.Class.ClientRole
-  !u UUIDs.Class.App:
-    - !u Edge.App.AgentConfig
-  !u ACS.Class.ClientRole:
-    - !u Edge.Role.Monitor
-  !u Auth.Class.PrincipalGroup:
-    - !u ACS.Group.SparkplugNode
-configs:
-  !u UUIDs.App.Info:
     !u UUIDs.Class.EdgeAgent:     { name: "Edge Agent" }
+    # XXX This will go
+    !u ACS.Class.ClientRole:      { name: "Client role" }
+  !u UUIDs.Class.App:
     !u Edge.App.AgentConfig:      { name: "Edge Agent config" }
+  !u ACS.Class.ClientRole:
+    # XXX This should be a template
     !u Edge.Role.Monitor:         { name: "Edge Monitor for Agent" }
+  !u Auth.Class.PrincipalGroup:
     !u ACS.Group.SparkplugNode:   { name: "Sparkplug Node" }
 ---
 service: !u UUIDs.Service.Authentication

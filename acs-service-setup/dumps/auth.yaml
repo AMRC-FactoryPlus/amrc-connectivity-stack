@@ -3,25 +3,27 @@ version: 2
 # XXX This relies on load order pending a better solution.
 objects:
   !u UUIDs.Class.Class:
-    - !u Auth.Class.Principal
-    - !u Auth.Class.BasePerm
-    - !u Auth.Class.Template
-    - !u ACS.Class.UserAccount
-  !u ConfigDB.Class.R2Class:
-    - !u Auth.Class.PrincipalGroup
-  !u UUIDs.Class.App:
-    - !u Auth.App.Template
-  !u Auth.Class.PrincipalGroup:
-    - !u ACS.Group.AuthService
-configs:
-  !u UUIDs.App.Info:
     !u Auth.Class.Principal:      { name: "Principal" }
+    !u ACS.Class.UserAccount:     { name: "User account" }
+    !u Auth.Class.Permission:     { name: "Permission" }
     !u Auth.Class.BasePerm:       { name: "Base permission" }
     !u Auth.Class.Template:       { name: "Permission template" }
-    !u ACS.Class.UserAccount:     { name: "User account" }
+    !u UUIDs.Class.Permission:    { name: "Legacy permission" }
+  !u ConfigDB.Class.R2Class:
     !u Auth.Class.PrincipalGroup: { name: "Principal group" }
+    !u Auth.Class.PermissionGroup: { name: "Permission group" }
+  !u UUIDs.Class.App:
     !u Auth.App.Template:         { name: "Permission template definition" }
-    !u ACS.Group.AuthService:     { name: "Auth services" }
+  !u Auth.Class.PrincipalGroup:
+    !u ACS.Group.AuthService:     { name: "Auth service" }
+  !u Auth.Class.PermissionGroup:
+    !u ACS.PermGroup.Auth:        { name: "Auth" }
+    !u ACS.PermGroup.Clusters:    { name: "Cluster Manager" }
+    !u ACS.PermGroup.CmdEsc:      { name: "Command Escalation" }
+    !u ACS.PermGroup.ConfigDB:    { name: "ConfigDB" }
+    !u ACS.PermGroup.Directory:   { name: "Directory" }
+    !u ACS.PermGroup.Git:         { name: "Git" }
+    !u ACS.PermGroup.MQTT:        { name: "MQTT" }
 ---
 service: !u UUIDs.Service.Authentication
 version: 1

@@ -8,7 +8,6 @@ export const ACS = {
         ClientRole:         "1c567e3c-5519-4418-8682-6086f22fbc13",
         EdgeAccount:        "97756c9a-38e6-4238-b78c-3df6f227a6c9",
         ServiceAccount:     "e463b4ae-a322-46cc-8976-4ba76838e908",
-        Permission:         "8ae784bb-c4b5-4995-9bf6-799b3c7f21ad",
         UserAccount:        "8b3e8f35-78e5-4f93-bf21-7238bcb2ba9d",
     },
     App: {
@@ -94,6 +93,8 @@ export const ConfigDB = {
 
 export const Auth = {
     Class: {
+        Permission:         "372d4348-b942-11ef-a67b-4fb3623f68f3",
+        PermissionGroup:    "ac0d5288-6136-4ced-a372-325fbbcdd70d",
         BasePerm:           "02795190-b6d7-11ef-a58e-6b98fe4ed4f9",
         Template:           "0a096ada-b6d7-11ef-8092-233f813c6263",
         Principal:          "11614546-b6d7-11ef-aebd-8fbb45451d7c",

@@ -16,8 +16,10 @@
     "yaml": "^2.3.4"
   },
   "devDependencies": {
+    "@eslint/js": "^9.16.0",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
-    "eslint": "^8.55.0"
+    "eslint": "^9.16.0",
+    "globals": "^15.13.0"
   }
 }

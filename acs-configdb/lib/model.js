@@ -16,6 +16,7 @@ import { DB } from "@amrc-factoryplus/utilities";
 
 import {App, Class, Service, SpecialObj} from "./constants.js";
 import { SpecialApps } from "./special.js";
+import { dump_schema } from "./dump-schema.js";
 
 const DB_Version = 9;
 
@@ -88,6 +89,7 @@ export default class Model extends EventEmitter {
 
         this.schemas = new Map();
         this.special = new Map();
+        this.dump_validate = this.ajv.compile(dump_schemas);
 
         /* { app, obj, etag, config }
          * config is undefined for a delete entry */
@@ -814,43 +816,6 @@ export default class Model extends EventEmitter {
         const schema = text ? this.ajv.compile(text) : null;
         this.schemas.set(app, schema);
         return schema;
-    }
-
-    async dump_validate(dump) {
-        if (typeof (dump) != "object") {
-            this.log("Dump not an object");
-            return false;
-        }
-        if (dump.service != Service.Registry) {
-            this.log("Dump not for ConfigDB");
-            return false;
-        }
-        switch (dump.version) {
-            case 1:
-                if (Class.Class in (dump.objects ?? {})) {
-                    this.log("Dump cannot create classes via objects key.");
-                    return false;
-                }
-                break;
-            case 2:
-                if ("classes" in dump) {
-                    this.log("Cannot use .classes in v2 dump.");
-                    return false;
-                }
-                if ("overwrite" in dump) {
-                    this.log("Version 2 dumps always overwrite.");
-                    return false;
-                }
-                break;
-            default:
-                this.log("Unknown dump version %s", dump.version);
-                return false;
-        }
-        if (App.Registration in (dump.configs ?? {})) {
-            this.log("Dump cannot create objects via configs key.");
-            return false;
-        }
-        return true;
     }
 
     async dump_load(dump, overwrite) {

@@ -13,6 +13,7 @@ spec:
   template:
     spec:
       restartPolicy: OnFailure
+      backoffLimit: 9999
       volumes:
         - name: git-checkouts
           emptyDir:

@@ -158,6 +158,7 @@ export class TemplateEngine {
             /* This performs a complete analysis every time anything
              * changes. For now I think this is the simplest strategy,
              * pending evidence of performance problems. */
-            rx.map(args => analyze_all(this, ...args)));
+            rx.map(args => analyze_all(this, ...args)),
+            rxx.shareLatest());
     }
 }

@@ -10,25 +10,33 @@ import yaml from "yaml";
 import { UUIDs } from "@amrc-factoryplus/service-client";
 
 import * as local_UUIDs from "./uuids.js";
+import { SxFormat } from "./s-expr.js";
 
 const UUID_SOURCES = { UUIDs, ...local_UUIDs };
 
-function resolve (str) {
-    const cpts = str.split(".");
-    let it = UUID_SOURCES;
-    for (const c of cpts) {
-        if (!(c in it))
-            throw new Error(`UUID ref ${str} not found`);
-        it = it[c];
-    }
-    return it;
+export function u_flat (obj) {
+    return Object.entries(obj).flatMap(([k, v]) =>
+        typeof v == "string"
+            ? [[k, v]]
+            : u_flat(v).map(([s, v]) => [`${k}.${s}`, v]));
 }
+
+const uuids = new Map(u_flat(UUID_SOURCES));
+const sx = new SxFormat(uuids);
 
 const yamlOpts = {
     customTags: [
         {
             tag:        "!u",
-            resolve:    str => resolve(str),
+            resolve:    str => {
+                if (uuids.has(str))
+                    return uuids.get(str)
+                throw `Unknown UUID ${str}`;
+            },
+        },
+        {
+            tag:        "!sx",
+            resolve:    str => sx.from_sx(str),
         },
     ],
 };

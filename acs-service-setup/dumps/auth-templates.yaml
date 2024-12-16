@@ -1,0 +1,49 @@
+service: !u UUIDs.Service.ConfigDB
+version: 2
+# XXX This relies on load order pending a better solution.
+objects:
+  !u UUIDs.Class.Class:
+    !u Auth.Class.Template:       {}
+    !u Auth.Class.BasePerm:       {}
+  !u UUIDs.Class.App:
+    !u Auth.App.Template:         {}
+  !u Auth.Class.BasePerm:
+    !u ACS.Perm.MQTT.Subscribe:   { name: "Subscribe" }
+    !u ACS.Perm.MQTT.Publish:     { name: "Publish" }
+  !u Auth.Class.Template:
+    !u ACS.Perm.CDBLookup:          { name: "ConfigDB entry lookup" }
+    !u ACS.Perm.ParticipateAsNode:  { name: "Participate as Node" }
+    !u ACS.Perm.ReadSparkplugAddr:  { name: "Read Sparkplug address" }
+    !u ACS.Perm.SparkplugAddr:      { name: "Find Sparkplug address" }
+    !u ACS.Perm.SparkplugTopic:     { name: "Sparkplug topic" }
+configs:
+  !u Auth.App.Template:
+    !u ACS.Perm.CDBLookup: !sx |
+      [[app obj] 
+        [lookup UUIDs.Service.ConfigDB [format "v2/app/%s/object/%s" app obj]]]
+
+    !u ACS.Perm.ParticipateAsNode: !sx |
+      [[]
+        [let {node: [ACS.Perm.SparkplugAddr [principal]]}
+          [map [addr
+              [ACS.Perm.MQTT.Publish [ACS.Perm.SparkplugTopic "BIRTH" [addr]]]
+              [ACS.Perm.MQTT.Publish [ACS.Perm.SparkplugTopic "DATA" [addr]]]
+              [ACS.Perm.MQTT.Publish [ACS.Perm.SparkplugTopic "DEATH" [addr]]]
+              [ACS.Perm.MQTT.Subscribe [ACS.Perm.SparkplugTopic "CMD" [addr]]]]
+            [node]
+            [merge [node] {device: "+"}]]]]
+
+    !u ACS.Perm.ReadSparkplugAddr: !sx |
+      [[addr]
+        [map [t
+            [ACS.Perm.MQTT.Subscribe [ACS.Perm.SparkplugTopic [t] [addr]]]]
+          "BIRTH" "DEATH" "DATA"]]
+
+    !u ACS.Perm.SparkplugAddr: !sx |
+      [[uuid] [ACS.Perm.CDBLookup UUIDs.App.SparkplugAddress uuid]]
+
+    !u ACS.Perm.SparkplugTopic: !sx |
+      [[type addr]
+        [if [has [addr] device]
+          [format "spBv1.0/%s/D%s/%s/%s" [addr group] [type] [addr node] [addr device]]
+          [format "spBv1.0/%s/N%s/%s" [addr group] [type] [addr node]]]]

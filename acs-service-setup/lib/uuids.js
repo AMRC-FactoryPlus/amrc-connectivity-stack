@@ -35,7 +35,15 @@ export const ACS = {
             ReadWholeNamespace: "81833dbb-1150-4078-b1db-978c646ba73e",
             WriteToEntireUNS:   "9fa6ff20-9d2a-4444-960c-40ebcf56f5b4",
             ReadEntireUNS:      "ffa40b36-3a61-4545-832a-2d1e8b860d63",
+
+            Publish:            "479dfd46-a6ba-4506-ba4d-d9370a9c7f3f",
+            Subscribe:          "f1ad248c-2a6d-42c7-921c-db44e8eec673",
         },
+        CDBLookup:              "e218a752-bbc7-11ef-a6ac-2f141c1ee22b",
+        ParticipateAsNode:      "8b30e818-eb54-43b6-a0a6-bda13d56dd5f",
+        ReadSparkplugAddr:      "e4f6de4d-da9e-44ea-89d5-c85531bd49e2",
+        SparkplugAddr:          "fce361e0-bbc6-11ef-affb-03bbc00d3e64",
+        SparkplugTopic:         "ead75839-a07d-4fbc-b4c9-efc406cbad24",
     },
     PermGroup: {
         Auth:                   "50b727d4-3faa-40dc-b347-01c99a226c58",

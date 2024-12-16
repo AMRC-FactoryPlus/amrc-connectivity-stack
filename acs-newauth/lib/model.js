@@ -11,7 +11,8 @@ import { Queries }  from "./queries.js";
 export class Model extends Queries {
     constructor(opts) {
         const db = new DB({
-            version: Queries.DBVersion,
+            debug:      opts.debug,
+            version:    Queries.DBVersion,
         });
 
         super(db.query.bind(db))

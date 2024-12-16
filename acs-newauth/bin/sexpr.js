@@ -166,6 +166,57 @@ function sx (strs) {
     return sx_to_json(parse(strs[0], { scopes: [["[", "]"], ["{", "}"]] }));
 }
 
+function to_sx (v) {
+    const s = _to_sx(v);
+    return Array.isArray(s) ? s.join("\n") : s;
+}
+
+function _to_sx (v) {
+    if (v == null)
+        return "null";
+    if (typeof v == "string")
+        return _to_sx_str(v);
+    if (typeof v != "object")
+        return JSON.stringify(v);
+    if (Array.isArray(v))
+        return _to_sx_array(v);
+    return _to_sx_obj(v);
+}
+
+function _to_sx_str (s) {
+    const sym = /^[a-zA-Z]+$/.test(s);
+    return sym ? s : JSON.stringify(s);
+}
+
+function _to_sx_array (a) {
+    const items = a.map(v => _to_sx(v));
+    return _to_sx_items(items, "[", " ", "]");
+}
+
+function _to_sx_obj (o) {
+    const items = Object.entries(o).map(([k, v]) => {
+        const sk = _to_sx_str(k);
+        const sv = _to_sx(v);
+        if (Array.isArray(sv))
+            return [`${sk}: ${sv[0]}`, ...sv.slice(1)];
+        return `${sk}: ${sv}`;
+    });
+    return _to_sx_items(items, "{", ", ", "}");
+}
+
+function _to_sx_items (items, start, sep, end) {
+    if (!items.some(Array.isArray)) {
+        const line = `${start}${items.join(sep)}${end}`;
+        const opens = line.match(/\[/g);
+        if (line.length < 80 && !(opens?.length > 4)) {
+            return line;
+        }
+    }
+    const ind = is => is.flatMap(i => Array.isArray(i) ? ind(i) : [`  ${i}`]);
+    const lines = ind(items.slice(1));
+    return [start + items[0], ...lines.slice(0, -1), lines.at(-1) + end];
+}
+
 function preprocess_expr (expr, ctx) {
     verbose("PREPROCESSING %o", expr);
     if (is_scalar(expr))
@@ -350,6 +401,11 @@ const logger = new console.Console({
 });
 
 logger.log("FUNCTIONS: %O", functions);
+logger.log("SX WRITE:");
+for (const [n, f] of functions.entries()) {
+    logger.log("  %s:", n);
+    logger.log("%s", to_sx(f));
+}
 
 let failed = [];
 function ok (msg, ok) {
@@ -568,6 +624,12 @@ isev("KkForCluster", ["KkForCluster", "Edge-Cl"], [
   ["WriteIdentity", { uuid: "Mine", kerberos: "nd1/Edge/*@REALM" }],
   ["WriteIdentity", { uuid: "Mine", sparkplug: { group: "Edge" } }]
 ]);
+
+for (const [name, def] of functions.entries()) {
+    const ex = to_sx(def);
+    const rt = sx([ex]);
+    is_deep(`Sx round-trip for ${name}`, rt, def);
+}
 
 if (failed.length) {
     console.log("FAILED TESTS: %O", failed);

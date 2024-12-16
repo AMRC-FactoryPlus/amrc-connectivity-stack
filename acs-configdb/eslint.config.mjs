@@ -20,6 +20,7 @@ export default [
                 args:           "none",
                 caughtErrors:   "none",
             }],
+            "no-fallthrough": "off",
         },
     },
 ];

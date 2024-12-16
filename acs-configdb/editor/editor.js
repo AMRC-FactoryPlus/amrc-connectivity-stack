@@ -15,6 +15,8 @@ import { signal }   from "https://esm.sh/@preact/signals@1.2.2";
 import htm          from "https://esm.sh/htm@3.1.1";
 import yaml         from "https://esm.sh/yaml@2.3.4";
 
+import { from_sx, to_sx }   from "./s-expr.js";
+
 const html = htm.bind(h);
 
 const AppUuid = {
@@ -271,7 +273,7 @@ function Editor(props) {
         <h1>ACS | Config Store</h1>
         <p>The display does not always update when you change things.
             You might need to reopen sections or refresh the page.</p>
-       <${SetUseYAML}/> 
+       <${SetFormatter}/> 
         <dl>
             <${Opener} title="Applications">
                 <${Apps}/>
@@ -299,10 +301,14 @@ const Formats = {
             indent:             2,
         }),
     },
+    sx: {
+        read:   from_sx,
+        write:  to_sx,
+    },
 };
 const Formatter = createContext(signal(Formats.yaml));
 
-function SetUseYAML (props) {
+function SetFormatter (props) {
     const format = useContext(Formatter);
 
     const option = (frm, label) => html`
@@ -318,6 +324,7 @@ function SetUseYAML (props) {
         <span>
             ${option(Formats.yaml, "YAML")}
             ${option(Formats.json, "JSON")}
+            ${option(Formats.sx, "S-expr")}
         </span>
     `;
 }

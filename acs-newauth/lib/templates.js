@@ -35,6 +35,11 @@ const Environment = imm.Record({
     permissions:    imm.Set(),
     templates:      imm.Map(),
 });
+const Lookup = imm.Record({
+    service:    null,
+    url:        null,
+    item:       null,
+});
 /* This is the final analysis in frozen form */
 const Analysis = imm.Record({
     definition: null,
@@ -58,7 +63,7 @@ function analyze_all (engine, templates, permissions) {
         const ctx = { 
             env, name,
             calls:      new Set(),
-            lookups:    new Set(),
+            lookups:    [],
             perms:      new Set(),
             errors:     [],
         };
@@ -78,7 +83,7 @@ function analyze_all (engine, templates, permissions) {
         const all = fn => calls.flatMap(f => fn(shallow.get(f)));
         const rv = Analysis({
             definition: templates.get(name),
-            lookups:    all(m => m.lookups),
+            lookups:    all(m => m.lookups.map(Lookup)),
             perms:      all(m => m.perms),
             errors:     all(m => m.errors),
         });
@@ -105,12 +110,12 @@ function analyze_expr (ctx, expr) {
 
     const [name, ...args] = expr;
     if (name == "lookup") {
-        const [svc, url, item] = args;
-        if (!is_scalar(svc) || !is_scalar(url)) {
+        const [service, url, item] = args;
+        if (!is_scalar(service) || !is_scalar(url)) {
             ctx.errors.push(TError({ type: "lookup", detail: args }));
             return;
         }
-        ctx.lookups.add(`${svc}/${url}`);
+        ctx.lookups.push({ service, url, item });
         analyze_expr(ctx, item);
     }
     else {

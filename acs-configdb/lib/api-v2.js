@@ -70,11 +70,11 @@ export class APIv2 {
         clookup("subclass", "all_subclass");
 
         api.route("/class/:class/direct/member/:object")
-            .put(this.class_rel.bind(this, "add", "membership"))
-            .delete(this.class_rel.bind(this, "remove", "membership"));
+            .put(this.class_rel.bind(this, m => m.class_add_member))
+            .delete(this.class_rel.bind(this, m => m.class_remove_member));
         api.route("/class/:class/direct/subclass/:object")
-            .put(this.class_rel.bind(this, "add", "subclass"))
-            .delete(this.class_rel.bind(this, "remove", "subclass"));
+            .put(this.class_rel.bind(this, m => m.class_add_subclass))
+            .delete(this.class_rel.bind(this, m => m.class_remove_subclass));
 
         api.get("/app/:app/object", this.config_list.bind(this));
         api.get("/app/:app/class/:class", this.config_list.bind(this));
@@ -197,7 +197,7 @@ export class APIv2 {
         return res.status(200).json(list);
     }
 
-    async class_rel (action, rel, req, res) {
+    async class_rel (action, req, res) {
         const { class: klass, object } = req.params;
         if (!Valid.uuid.test(klass) || !Valid.uuid.test(object))
             return res.status(410).end();
@@ -205,8 +205,8 @@ export class APIv2 {
         const ok = await this.auth.check_acl(req.auth, Perm.Manage_Obj, klass, true);
         if (!ok) return res.status(403).end();
 
-        const st = await this.model.class_relation(action, rel, klass, object);
-        return res.status(st ? 204 : 404).end();
+        const st = await action(this.model).call(this.model, klass, object);
+        return res.status(st).end();
     }
 
     async config_list(req, res) {

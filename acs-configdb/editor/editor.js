@@ -383,6 +383,7 @@ function Objs(props) {
         <${Ranks.Provider} value=${ranks}>
             <${NewObj}/>
             <h2>Ranks of object</h2>
+            <p><b>⊃</b> indicates a subclass, <b>∋</b> indicates a class member.<//>
             <dl>${hranks}</dl>
         <//>
     `;
@@ -428,24 +429,29 @@ function Klass(props) {
         ["Set primary class", "PATCH", `${reg}/${m}`, { "class": klass }],
     ];
 
-    const notyet = html`<b>...</b><br/>`;
+    const notyet = html`<dt><b>...</b><//>`;
     const hsubs = subs?.map(s => 
-        html`<${Obj} obj=${s} key=${s} menu=${s_menu(s)}/>`);
+        html`<${Obj} obj=${s} key=${s} menu=${s_menu(s)} pfx="⊃"/>`);
     const hobjs = objs?.map(o =>
-        html`<${Obj} obj=${o} key=${o} menu=${m_menu(o)}/>`);
+        html`<${Obj} obj=${o} key=${o} menu=${m_menu(o)} pfx="∋"/>`);
+    const hstat = status && html`
+        <dt><p onClick=${() => set_status()}>${status}<//><//>`;
 
+        //<h3>Subclasses ${""}
+        //<h3>Members ${""}
     return html`
-        ${status && html`<p onClick=${() => set_status()}>${status}<//>`}
-        <h3>Subclasses ${""}
-            <input type=text size=40 ref=${new_s}/>
-            <button onClick=${add_rel("subclass", new_s)}>Add subclass<//>
-        <//>
-        <dl>${hsubs ?? notyet}<//>
-        <h3>Members ${""}
-            <input type=text size=40 ref=${new_m}/>
-            <button onClick=${add_rel("member", new_m)}>Add member<//>
-        <//>
-        <dl>${hobjs ?? notyet}<//>
+        <dl>
+            ${hstat}
+            <dt>
+                <b>⊃</b> <input type=text size=40 ref=${new_s}/>
+                <button onClick=${add_rel("subclass", new_s)}>Add subclass<//>
+            <//><dt>
+                <b>∋</b> <input type=text size=40 ref=${new_m}/>
+                <button onClick=${add_rel("member", new_m)}>Add member<//>
+            <//>
+            ${hsubs ?? notyet}
+            ${hobjs ?? notyet}
+        </dl>
     `;
 }
 
@@ -459,13 +465,15 @@ function ObjFetchInfo (props) {
 }
 
 function ObjDisplay (props) {
-    const { menu } = props;
+    const { menu, pfx } = props;
     const info = useContext(ObjInfo);
 
     const obj = info.uuid;
 
     const mbutt = menu ? html`<${ObjMenu} menu=${menu}/>` : "";
-    const title = html`${mbutt} <${ObjTitleCtx} with_class=${true}/>`
+    const title = html`
+        ${mbutt} <b>${pfx}</b>
+        <${ObjTitleCtx} with_class=${true}/>`;
 
     if (info?.reg?.rank == 0)
         return html`<dt>${title}<//>`;
@@ -478,8 +486,11 @@ function ObjDisplay (props) {
 }
 
 function Obj (props) {
-    const {obj, menu} = props;
-    return html`<${ObjFetchInfo} obj=${obj}><${ObjDisplay} menu=${menu}/><//>`;
+    const {obj, menu, pfx} = props;
+    return html`
+        <${ObjFetchInfo} obj=${obj}>
+            <${ObjDisplay} menu=${menu} pfx=${pfx}/>
+        <//>`;
 }
 
 function NewObj(props) {

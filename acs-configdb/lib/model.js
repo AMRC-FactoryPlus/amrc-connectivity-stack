@@ -51,9 +51,6 @@ const Immutable = new Set([
     Class.Schema,
 ]);
 
-/* I'm not really building a triplestore, honest... */
-const Relations = new Set(["membership", "subclass"]);
-
 /* XXX These should be methods on a query object or something... */
 function _q_set(query, sql, params) {
     return query(sql, params).then(dbr => dbr.rows);
@@ -125,6 +122,13 @@ export default class Model extends EventEmitter {
         `, [uuid]);
         return dbr.rows[0]?.id;
     }
+    async _obj_info (query, uuid) {
+        return _q_row(query, `
+            select o.id, o.uuid, o.class, o.rank
+            from object o
+            where o.uuid = $1
+        `, [uuid]);
+    }
 
     _app_id (query, app) { return this._obj_id(query, app); }
     _class_id (query, klass) { return this._obj_id(query, klass); }
@@ -136,19 +140,6 @@ export default class Model extends EventEmitter {
             where r.depth = $1
         `, [rank]);
         return dbr.rows[0]?.id;
-    }
-
-    _object_info (query, obj) {
-        return _q_row(query, `
-            select o.uuid, c.uuid class, o.rank, p.uuid owner, o.deleted
-            from object o
-                left join object c on c.id = o.class
-                join object p on p.id = o.owner
-            where o.uuid = $1
-        `, [obj]);
-    }
-    object_info (obj) {
-        return this._object_info(this.db.query.bind(this.db), obj);
     }
 
     object_list() {
@@ -373,8 +364,11 @@ export default class Model extends EventEmitter {
 //        if (!ok) return fail;
     }
 
-    /* Object creation must supply a class or a rank (not both) */
+    /* Object creation must supply a class */
     async object_create(spec) {
+        /* Setting rank via object_create is forbidden */
+        if (spec.rank) return [422];
+
         const [st, config] = await this.db.txn({}, async q => {
             const [st, id] = await this._object_create(q, spec);
             if (st > 299) return [st];
@@ -408,20 +402,9 @@ export default class Model extends EventEmitter {
             }
         }
 
-        let c_id;
-        if (spec.rank) {
-            if (spec.class) return [422];
-            const id = await this._rank_id(q, spec.rank);
-            if (!id)
-                return this._maybe_new_rank(q, spec);
-            c_id = id;
-        }
-        else {
-            if (!spec.class) return [422];
-            const id = await this._obj_id(q, spec.class);
-            if (!id) return [404];
-            c_id = id;
-        }
+        if (!spec.class) return [422];
+        const c_id = await this._obj_id(q, spec.class);
+        if (!c_id) return [404];
 
         const obj = await (spec.uuid
             ? this._object_create_uuid(q, spec.uuid, c_id)
@@ -513,26 +496,61 @@ export default class Model extends EventEmitter {
         return !!dbr.rows;
     }
 
-    async class_relation (action, relation, klass, obj) {
-        const perform = action == "add" ? this._class_add.bind(this)
-            : action == "remove" ? this._class_remove.bind(this)
-            : null;
-        if (!perform || !Relations.has(relation)) return null;
-
-        const ok = await this.db.txn({}, async query => {
-            const c_id = await this._class_id(query, klass);
-            const o_id = await this._obj_id(query, obj);
-            if (c_id == null || o_id == null)
-                return false;
-            await perform(query, c_id, relation, o_id);
-            return true;
+    async _class_relation (klass, obj, perform) {
+        const st = await this.db.txn({}, async query => {
+            const c = await this._obj_info(query, klass);
+            const o = await this._obj_info(query, obj);
+            if (c == null || o == null)
+                return 404;
+            const st = await perform(query, c, o);
+            return st ?? 204;
         });
 
         /* We send a single notification for all updates. The watcher
          * needs to look up the current state each time. */
-        if (ok)
+        if (st < 300)
             this.updates.next({ type: "class" });
-        return ok;
+        return st;
+    }
+
+    class_add_member (klass, obj) {
+        return this._class_relation(klass, obj, async (q, c, o) => {
+            if (c.rank != o.rank + 1) return 409;
+            await this._class_add(q, c.id, "membership", o.id);
+        });
+    }
+    class_remove_member (klass, obj) {
+        return this._class_relation(klass, obj, async (q, c, o) => {
+            if (o.class == c.id) return 409;
+            await this._class_remove(q, c.id, "membership", o.id);
+        });
+    }
+    class_add_subclass (klass, obj) {
+        return this._class_relation(klass, obj, async (q, c, o) => {
+            if (o.rank == 0) return 409;
+            if (c.rank != o.rank) return 409;
+            await q(`
+                delete from subclass r
+                using all_subclass s
+                where s.id = $1
+                    and s.class = r.class
+                    and r.id = $2
+            `, [c.id, o.id]);
+            await this._class_add(q, c.id, "subclass", o.id);
+        });
+    }
+    class_remove_subclass (klass, obj) {
+        return this._class_relation(klass, obj, async (q, c, o) => {
+            if (o.rank == 0) return 404;
+            await this._class_remove(q, c.id, "subclass", o.id);
+            const { ok } = await _q_row(q, `
+                select exists(select 1 from subclass where id = $1)
+                    or exists(select 1 from rank where id = $1)
+                    ok
+            `, [o.id]);
+            if (!ok)
+                await this._add_rank_superclass(q, o.id);
+        });
     }
 
     _config_list (app) {
@@ -827,7 +845,7 @@ export default class Model extends EventEmitter {
             if (uuid == Class.Class)
                 continue;
             this.log("LOAD v1 CLASS %s", uuid);
-            const [st] = await this.object_create({ uuid, rank: 1 });
+            const [st] = await this.object_create({ uuid, class: Class.Class });
             if (st > 299) {
                 this.log("Dump failed [%s] on class %s", st, uuid);
                 return st;

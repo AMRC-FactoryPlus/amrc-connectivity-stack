@@ -1,28 +1,29 @@
-R1Class
-    ⊃ Principal group
-        ⊃ Service role
+R1Class [Class definition]
+    ⊃ *Principal group [User group]
+        ⊃ Service role [Service requirement]
             ∋ Central monitor
             ∋ Cluster manager
             ∋ Git server
             ∋ UNS Sparkplug ingester
-        ⊃ Edge role
+        ⊃ *Edge role
+            ⊃ Clusters-managed group
+                ∋ Edge flux
+                ∋ Edge krbkeys
             ⊃ Edge-managed group
                 ∋ Edge Agent
                 ∋ Edge monitor
                 ∋ Edge sync
-            ∋ Edge flux
-            ∋ Edge krbkeys
-        ⊃ Client role
+        ⊃ *Client role
             ∋ Administrator
             ∋ Sparkplug Node
             ∋ Sparkplug global reader
             ∋ UNS global reader
     ⊃ Permission group
-        ⊃ Service permissions
+        ⊃ *Service permissions
             ∋ Auth
             ∋ MQTT
             ∋ ⋮
-        ⊃ Client role
+        ⊃ Composite permission [Client role]
             ∋ Edge Node consumer
             ∋ Edge monitor for agent
             ∋ Warehouse
@@ -35,9 +36,9 @@ Individual
         ∋ Wildcard
         ∋ Self
         ∋ Unowned
-    ⊃ Principal
-        ⊃ Human user
-        ⊃ Central service
+    ⊃ *Principal
+        ⊃ Human user [User account]
+        ⊃ Central service [Service account]
             ⊃ Cluster manager
                 ∋ sv1clustermanager
             ⊃ UNS Sparkplug ingester
@@ -51,13 +52,15 @@ Individual
             ∋ sv1cmdesc
             ∋ sv1configdb
             ∋ ⋮
-        ⊃ Edge service
+        ⊃ Edge service [Edge cluster account]
             ⊃ Edge flux
             ⊃ Edge krbkeys
             ⊃ Edge sync
             ⊃ Edge monitor
             ⊃ Edge Agent
-        ⊃ Application account
+                ⊃ Cell Gateway
+                ⊃ Soft Gateway
+        ⊃ *Application account
         ⊃ Sparkplug Node
             ⊃ Edge Agent
             ⊃ Edge monitor
@@ -65,15 +68,15 @@ Individual
             ∋ sv1configdb
             ∋ sv1directory
             ∋ sv1git
-        ⊃ Sparkplug global reader
+        ⊃ Sparkplug global reader [MQTT global debugger]
             ⊃ Administrator
             ⊃ Central monitor
             ⊃ Edge monitor
             ⊃ UNS Sparkplug ingester
-        ⊃ UNS global reader
+        ⊃ *UNS global reader
             ⊃ UNS historian
         ∋ Admin account
-        ∋ Root account
+        ∋ *Root account
     ⊃ Permission
         ⊃ Auth
         ⊃ MQTT

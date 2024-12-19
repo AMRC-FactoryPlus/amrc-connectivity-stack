@@ -21,6 +21,7 @@ export const ACS = {
         SparkplugNode:      "1d3121a0-aade-4376-8fa3-57ba1460ba76",
         EdgeGroups:         "9ba0de4b-056f-4b5e-b966-2d5d85d07767",
         EdgePermissions:    "7594cd71-e5b9-4467-88c0-b11a66d47fec",
+        ServicePermissions: "a31b1902-be03-11ef-8347-6f18501a5e9e",
         CentralMonitor:     "1bc3dbca-68fe-48d2-9590-3a528c111827",
         SparkplugIngesters: "e414d355-b991-429b-8f5d-97e823ff71f5",
         HistorianUNS:       "03f5f08a-f61e-4134-8f66-b2951e3bbb69",
@@ -99,6 +100,7 @@ export const Auth = {
         Template:           "0a096ada-b6d7-11ef-8092-233f813c6263",
         Principal:          "11614546-b6d7-11ef-aebd-8fbb45451d7c",
         PrincipalGroup:     "f1fabdd1-de90-4399-b3da-ccf6c2b2c08b",
+        ClientRole:         "b2053a3e-bdf8-11ef-9423-771a19e4a8a4",
     },
     App: {
         Template:           "2760634a-b6d7-11ef-b5f5-cfe88d82bd26",

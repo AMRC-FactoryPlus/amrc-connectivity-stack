@@ -3,19 +3,75 @@ version: 2
 # XXX This relies on load order pending a better solution.
 objects:
   !u UUIDs.Class.Class:
-    !u Auth.Class.Principal:      { name: "Principal" }
-    !u ACS.Class.UserAccount:     { name: "User account" }
-    !u Auth.Class.BasePerm:       { name: "Base permission" }
-    !u Auth.Class.Template:       { name: "Permission template" }
-    !u UUIDs.Class.Permission:    { name: "Permission" }
+    !u Auth.Class.Principal:
+      name: "Principal"
+    !u ACS.Class.UserAccount:
+      name: "Human user"
+      subclassOf:
+        - !u Auth.Class.Principal
+    !u ACS.Class.ServiceAccount:
+      name: "Central service"
+      subclassOf:
+        - !u Auth.Class.Principal
+    !u ACS.Class.EdgeAccount:
+      name: "Edge service"
+      subclassOf:
+        - !u Auth.Class.Principal
+    !u UUIDs.Class.EdgeAgent:
+      name: "Edge Agent"
+      subclassOf:
+        - !u ACS.Class.EdgeAccount
+        - !u ACS.Group.SparkplugNode
+      memberOf:
+        - !u ACS.Group.EdgeGroups
+    !u UUIDs.Class.Permission:
+      name: "Permission"
+
   !u ConfigDB.Class.R2Class:
-    !u Auth.Class.PrincipalGroup: { name: "Principal group" }
-    !u Auth.Class.PermissionGroup: { name: "Permission group" }
-  !u Auth.Class.PermissionGroup:
-    !u ACS.PermGroup.Auth:        { name: "Auth" }
-    !u ACS.PermGroup.Clusters:    { name: "Cluster Manager" }
-    !u ACS.PermGroup.CmdEsc:      { name: "Command Escalation" }
-    !u ACS.PermGroup.ConfigDB:    { name: "ConfigDB" }
-    !u ACS.PermGroup.Directory:   { name: "Directory" }
-    !u ACS.PermGroup.Git:         { name: "Git" }
-    !u ACS.PermGroup.MQTT:        { name: "MQTT" }
+    !u Auth.Class.PrincipalGroup:
+      name: "Principal group"
+    !u ACS.Group.EdgeGroups:
+      name: "Edge-managed group"
+      subclassOf:
+        - !u Auth.Class.PrincipalGroup
+    !u Auth.Class.ClientRole:
+      name: "Client role"
+      subclassOf:
+        - !u Auth.Class.PrincipalGroup
+
+    !u Auth.Class.PermissionGroup: 
+      name: "Permission group"
+    !u ACS.Group.ServicePermissions:
+      name: "Service permissions"
+      subclassOf:
+        - !u Auth.Class.PermissionGroup
+
+  !u ACS.Group.ServicePermissions:
+    !u ACS.PermGroup.Auth:
+      name: "Auth"
+      subclassOf:
+        - !u UUIDs.Class.Permission
+    !u ACS.PermGroup.Clusters:
+      name: "Cluster Manager"
+      subclassOf:
+        - !u UUIDs.Class.Permission
+    !u ACS.PermGroup.CmdEsc:
+      name: "Command Escalation"
+      subclassOf:
+        - !u UUIDs.Class.Permission
+    !u ACS.PermGroup.ConfigDB:
+      name: "ConfigDB"
+      subclassOf:
+        - !u UUIDs.Class.Permission
+    !u ACS.PermGroup.Directory:
+      name: "Directory"
+      subclassOf:
+        - !u UUIDs.Class.Permission
+    !u ACS.PermGroup.Git:
+      name: "Git"
+      subclassOf:
+        - !u UUIDs.Class.Permission
+    !u ACS.PermGroup.MQTT:
+      name: "MQTT"
+      subclassOf:
+        - !u UUIDs.Class.Permission

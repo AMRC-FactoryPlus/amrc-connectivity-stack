@@ -18,7 +18,7 @@ import {App, Class, Service, SpecialObj} from "./constants.js";
 import { SpecialApps } from "./special.js";
 import { dump_schema } from "./dump-schema.js";
 
-const DB_Version = 9;
+const DB_Version = 10;
 
 /* Well-known object IDs. This is cheating but it's stupid to keep
  * looking them up. */

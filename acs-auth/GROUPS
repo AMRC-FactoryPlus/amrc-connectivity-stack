@@ -1,5 +1,5 @@
 R1Class [Class definition]
-    ⊃ *Principal group
+    ⊃ *Principal group [User group]
         ⊃ Service role [Service requirement]
             ∋ Central monitor
             ∋ Cluster manager
@@ -13,7 +13,7 @@ R1Class [Class definition]
                 ∋ Edge Agent
                 ∋ Edge monitor
                 ∋ Edge sync
-        ⊃ Client role [User group]
+        ⊃ *Client role
             ∋ Administrator
             ∋ Sparkplug Node
             ∋ Sparkplug global reader

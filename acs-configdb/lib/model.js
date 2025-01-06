@@ -280,7 +280,8 @@ export default class Model extends EventEmitter {
         const klass = await this._class_of_rank(q, spec.class, spec.rank + 1);
         if (!klass) return 409;
 
-        await this._class_add(q, klass, "membership", id);
+        if (!await this._class_has(q, klass, "all_membership", id))
+            await this._class_add(q, klass, "membership", id);
         await q(`update object set class = $2 where id = $1`, [id, klass]);
         return 204;
     }
@@ -502,9 +503,11 @@ export default class Model extends EventEmitter {
             const o = await this._obj_info(query, obj);
             if (c == null || o == null)
                 return 404;
-            const st = await perform(query, c, o);
-            return st ?? 204;
-        });
+            return perform(query, c, o);
+        }).catch(e => {
+            this.log("Class update failed: %s", e);
+            return 409;
+        }) ?? 204;
 
         /* We send a single notification for all updates. The watcher
          * needs to look up the current state each time. */
@@ -515,20 +518,24 @@ export default class Model extends EventEmitter {
 
     class_add_member (klass, obj) {
         return this._class_relation(klass, obj, async (q, c, o) => {
-            if (c.rank != o.rank + 1) return 409;
+            if (c.rank != o.rank + 1)
+                throw "Class must be one rank above member";
             await this._class_add(q, c.id, "membership", o.id);
         });
     }
     class_remove_member (klass, obj) {
         return this._class_relation(klass, obj, async (q, c, o) => {
-            if (o.class == c.id) return 409;
             await this._class_remove(q, c.id, "membership", o.id);
+            if (!await this._class_has(q, o.class, "all_membership", o.id))
+                throw "Cannot remove object from primary class";
         });
     }
     class_add_subclass (klass, obj) {
         return this._class_relation(klass, obj, async (q, c, o) => {
-            if (o.rank == 0) return 409;
-            if (c.rank != o.rank) return 409;
+            if (o.rank == 0)
+                throw "Individuals cannot be subclasses";
+            if (c.rank != o.rank)
+                throw "Subclasses must match in rank";
             await q(`
                 delete from subclass r
                 using all_subclass s

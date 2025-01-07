@@ -44,7 +44,7 @@ export async function load_yaml (f) {
     return ds;
 }
 
-async function load_dump (fplus, dump) {
+export async function load_dump (fplus, dump) {
     const { service, version } = dump;
     const { Authentication, ConfigDB } = UUIDs.Service;
 

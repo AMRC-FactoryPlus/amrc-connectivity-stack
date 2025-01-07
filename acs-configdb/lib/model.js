@@ -872,29 +872,14 @@ export default class Model extends EventEmitter {
         return 204;
     }
 
-    async _dump_load_obj_v2 (dump) {
-        /* XXX For now we rely on preservation of object order in YAML,
-         * and on careful ordering of the source dumps. Properly we want
-         * to validate the ranks of everything and create objects in the
-         * correct order. */
-        for (const [klass, objs] of Object.entries(dump.objects ?? {})) {
-            for (const [uuid, spec] of Object.entries(objs)) {
-                this.log("LOAD v2 OBJECT %s/%s", klass, uuid);
-                const [st] = await this.object_create({ uuid, class: klass });
-                if (st > 299) {
-                    this.log("Dump failed [%s] on object %s (%s)",
-                        st, uuid, klass);
-                    return st;
-                }
-                if (spec.name) {
-                    /* We don't care if this fails */
-                    await this.config_merge_patch(
-                        { app: App.Info, object: uuid },
-                        { name: spec.name });
-                }
-            }
-        }
-        return 204;
+    _dump_load_obj_v2 (dump) {
+        /* XXX This txn should include the configs. */
+        return this.db.txn({}, q => q(`select load_dump($1)`, [dump.objects]))
+            .then(() => 204)
+            .catch(e => {
+                this.log("Dump failed: %s", e);
+                return 409;
+            });
     }
 
     /* The dump must have already been validated */

@@ -7,7 +7,7 @@ revoke all on database :"db" from public;
 revoke all on schema public from public;
 
 -- Grant permissions.
-grant connect on database :"db" to :"role";
+grant connect, temporary on database :"db" to :"role";
 grant usage on schema public to :"role";
 grant select on
     version, all_class, all_subclass, all_membership, any_child

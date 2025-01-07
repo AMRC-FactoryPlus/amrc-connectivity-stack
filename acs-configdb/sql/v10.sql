@@ -111,8 +111,13 @@ call migrate_to(10, $dump$
     language plpgsql
     as $function$
         declare
+            unranked integer;
             bad uuid;
         begin
+            -- If the database is already invalid there's no point
+            -- continuing.
+            perform verify_invariants();
+
             -- Pull the objects into a temporary table
             create temporary table n_obj
             on commit drop
@@ -123,17 +128,20 @@ call migrate_to(10, $dump$
             from jsonb_each(dump) c,
                 lateral jsonb_each(c.value) o;
 
-            -- Allow rank to be unspecified, temporarily
-            alter table object
-                alter column rank drop not null;
+            -- This is a hack. Rank is not-null, and we can't defer a
+            -- not-null constraint. So use top-rank + 1 to mark
+            -- temporarily unranked objects.
+            select rank + 1 into unranked
+            from object
+            where class is null;
 
             -- Insert new objects without class, as the FK may not validate.
             -- Explicitly reset rank on objects we will insert, they will
             -- all need recalculating.
             insert into object (uuid, rank)
-            select obj, null from n_obj
+            select obj, unranked from n_obj
             on conflict (uuid) do update
-                set class = null, rank = null, deleted = false;
+                set class = null, rank = unranked, deleted = false;
 
             -- Update the classes
             update object o
@@ -148,20 +156,18 @@ call migrate_to(10, $dump$
                 set rank = c.rank - 1
                 from object c
                 where c.id = o.class
-                    and o.rank is null
-                    and c.rank is not null;
+                    and o.rank = unranked
+                    and c.rank != unranked;
 
                 exit when not found;
             end loop;
 
             -- Verify we have set all ranks and reset constraint
-            for bad in select uuid from object where rank is null
+            for bad in select uuid from object where rank = unranked
             loop
                 raise notice 'Rank not set for %', bad;
             end loop;
             if found then raise 'Ranks not all set'; end if;
-            alter table object
-                alter column rank set not null;
 
             -- Dumps are authoritative about membership and superclass
             -- information for the objects they contain.
@@ -175,10 +181,13 @@ call migrate_to(10, $dump$
             where o.uuid = n.obj
                 and s.id = o.id;
 
+            -- An explicit memberOf list overrides the default
+            -- membership in the primary class.
             insert into membership (class, id)
             select o.class, o.id
             from n_obj n
-                join object o on o.uuid = n.obj;
+                join object o on o.uuid = n.obj
+            where not n.spec ? 'memberOf';
 
             insert into membership (class, id)
             select c.id, o.id
@@ -188,11 +197,14 @@ call migrate_to(10, $dump$
                 join object o on o.uuid = n.obj
                 join object c on c.uuid = m.class::uuid;
 
+            -- A class defaults to the rank superclass. This will not
+            -- affect individuals as there is no entry for rank -1.
             insert into subclass (class, id)
             select r.id, o.id
             from n_obj n
                 join object o on o.uuid = n.obj
-                join rank r on r.depth = o.rank - 1;
+                join rank r on r.depth = o.rank - 1
+            where not n.spec ? 'subclassOf';
 
             insert into subclass (class, id)
             select c.id, o.id
@@ -202,6 +214,15 @@ call migrate_to(10, $dump$
                 join object o on o.uuid = n.obj
                 join object c on c.uuid = m.class::uuid;
 
+            insert into config (app, object, json)
+            select 7, o.id, jsonb_build_object('name', n.spec->>'name')
+            from n_obj n
+                join object o on o.uuid = n.obj
+            where n.spec ? 'name'
+            on conflict (app, object) do update
+                set json = config.json || excluded.json;
+
+            call update_registration(null);
             perform verify_invariants();
         end
     $function$;

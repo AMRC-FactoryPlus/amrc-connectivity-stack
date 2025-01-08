@@ -25,21 +25,29 @@ let exit = 0;
 for (const f of files) {
     if (!f.endsWith(".yaml"))
         continue;
+
+    const fail = (cause, ...args) => {
+        throw new Error(`${f}: ` + util.format(...args), { cause });
+    };
+
     try { 
         const ds = await load_yaml(f);
+        ds.filter(d => !d.service || !d.version)
+            .forEach(d => fail(null, "Missing service or version"));
         ds.filter(d => d.service == UUIDs.Service.ConfigDB)
             .forEach(d => {
                 if (!cdb_validate(d)) {
-                    throw new Error(`Schema validation failed for ${f}`, { 
-                        cause: cdb_validate.errors.map(util.inspect),
-                    });
+                    fail(cdb_validate.errors.map(util.inspect),
+                        "Schema validation failed");
                 }
             });
     } 
     catch (e) {
         exit = 1;
-        console.error("===> %s:\n\n%s", e.message, 
-            e.cause.map(c => c.toString()).join("\n"));
+        const detail = Array.isArray(e.cause)
+            ? ":\n\n" + e.cause.map(c => c.toString()).join("\n")
+            : "";
+        console.error("===> %s%s", e.message, detail);
     }
 }
 

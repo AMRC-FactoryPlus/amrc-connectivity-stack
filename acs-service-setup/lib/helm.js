@@ -58,7 +58,7 @@ async function setup_perms (auth, group) {
     const members = [
         [ACS.Group.SparkplugNode,       group.agent.uuid],
         [ACS.Group.SparkplugNode,       group.monitor.uuid],
-        [ACS.Group.GlobalDebuggers,     group.monitor.uuid],
+        [ACS.Group.SparkplugReader,     group.monitor.uuid],
     ];
     const aces = [
         [group.agent.uuid,      ReadConfig,     Edge.App.AgentConfig],
@@ -89,9 +89,9 @@ export async function setup_helm (ss) {
     }).init();
 
     await conf.setup_groups(
-        ["agent",   Auth.Class.PrincipalGroup,  "Edge Agent"],
-        ["sync",    Auth.Class.PrincipalGroup,  "Edge Sync account"],
-        ["monitor", Auth.Class.PrincipalGroup,  "Edge Monitor account"],
+        ["agent",   Auth.Class.PrincipalGroup,  "Active Edge Agent"],
+        ["sync",    Auth.Class.PrincipalGroup,  "Edge sync"],
+        ["monitor", Auth.Class.PrincipalGroup,  "Edge monitor"],
     );
 
     const acs = ss.acs_config;

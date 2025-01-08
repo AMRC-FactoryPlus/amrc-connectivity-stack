@@ -1,14 +1,34 @@
+# REQUIRE: auth git
+---
 service: !u UUIDs.Service.ConfigDB
 version: 2
 objects:
   !u ConfigDB.Class.R2Class:
-    !u Auth.Class.PermissionGroup: {}
+    !u Clusters.Requirement.Groups:
+      name: "Clusters-managed group"
+      subclassOf:
+        - !u Auth.Class.EdgeRole
+
+  !u Auth.Class.ServiceRole:
+    !u Clusters.Requirement.ServiceAccount:
+      name: "Cluster manager"
+      subclassOf:
+        - !u Auth.Class.CentralService
+  !u Auth.Class.ServicePerms:
+    !u Clusters.Perm.All:
+      name: "Cluster manager permission"
+      subclassOf:
+        - !u UUIDs.Class.Permission
+
   !u UUIDs.Class.Class:
-    !u UUIDs.Class.Permission: {}
-    !u UUIDs.Class.Requirement: {}
     !u Clusters.Class.Cluster: { name: "Edge cluster" }
-  !u Auth.Class.PrincipalGroup:
-    !u Clusters.Class.Account: { name: "Edge cluster account" }
+
+  !u Git.Class.Group:
+    !u Clusters.Requirement.EdgeRepos:
+        name: "Edge cluster repositories"
+        subclassOf:
+          - !u Git.Class.Repo
+
   !u UUIDs.Class.App:
     !u Clusters.App.Bootstrap:      { name: "Bootstrap script" }
     !u Clusters.App.Cluster: { name: "Edge cluster configuration" }
@@ -16,20 +36,11 @@ objects:
     !u Clusters.App.HelmChart: { name: "Helm chart template" }
     !u Clusters.App.HelmRelease: { name: "HelmRelease template" }
     !u Clusters.App.Status: { name: "Edge cluster setup status" }
-    !u UUIDs.App.ConfigSchema: {}
   !u UUIDs.Class.Service:
-    !u Clusters.Service.ClusterManager: { name: "Cluster Manager" }
-  !u Auth.Class.PermissionGroup:
-    !u Clusters.Perm.All: { name: "Clusters permissions" }
-  !u UUIDs.Class.Permission:
-    !u Clusters.Perm.Clusters: { name: "Clusters: Manage clusters" }
-    !u Clusters.Perm.Secrets: { name: "Clusters: Manage secrets" }
-  !u UUIDs.Class.Requirement:
-    !u Clusters.Requirement.EdgeRepos: { name: "Edge cluster repositories" }
-    !u Clusters.Requirement.FluxAccounts: { name: "Edge flux accounts" }
-    !u Clusters.Requirement.FluxRoles: { name: "Edge flux roles" }
-    !u Clusters.Requirement.Groups: { name: "Clusters-managed groups" }
-    !u Clusters.Requirement.ServiceAccount: { name: "Clusters service account" }
+    !u Clusters.Service.ClusterManager: { name: "Cluster manager" }
+  !u Clusters.Perm.All:
+    !u Clusters.Perm.Clusters: { name: "Manage clusters" }
+    !u Clusters.Perm.Secrets: { name: "Manage secrets" }
 configs:
   !u UUIDs.App.ConfigSchema:
     !u Clusters.App.Bootstrap:
@@ -428,7 +439,3 @@ aces:
   - principal: !u ACS.ServiceAccount.KrbKeys
     permission: !u Clusters.Perm.Secrets
     target: !u UUIDs.Special.Null
-groups:
-  !u Clusters.Perm.All:
-    - !u Clusters.Perm.Clusters
-    - !u Clusters.Perm.Secrets

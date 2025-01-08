@@ -6,7 +6,7 @@
 import { UUIDs }            from "@amrc-factoryplus/service-client";
 
 import { ServiceConfig }    from "./service-config.js";
-import { ACS, Auth, Clusters, Git }
+import { ACS, Auth, Clusters, Edge, Git }
                             from "./uuids.js";
 
 class ClustersConfig extends ServiceConfig {
@@ -47,7 +47,12 @@ class ClustersConfig extends ServiceConfig {
             path:   `${this.group}/${name}`,
             pull:   spec.pull,
         });
-        await Auth.add_to_group(this.config.group[this.group].uuid, uuid);
+        const shared = this.config.group[this.group].uuid;
+        await Auth.add_to_group(shared, uuid);
+        await CDB.fetch({
+            method:     "PUT",
+            url:        `v2/class/${shared}/direct/member/${uuid}`,
+        });
     }
 }    
 
@@ -60,8 +65,8 @@ async function setup_config (ss, chart) {
     await conf.setup_groups(
         ["shared",  UUIDs.Class.GitRepoGroup,   "Shared repositories"],
         ["cluster", UUIDs.Class.GitRepoGroup,   "Edge cluster repositories"],
-        ["krbkeys", Auth.Class.PrincipalGroup,  "Edge krbkeys accounts"],
-        ["flux",    Auth.Class.PrincipalGroup,  "Edge flux accounts"],
+        ["krbkeys", Auth.Class.EdgeRole,        "Edge krbkeys accounts"],
+        ["flux",    Auth.Class.EdgeRole,        "Edge flux accounts"],
     );
 
     /* This is probably not the best place for this, but for now the EDO
@@ -90,7 +95,7 @@ async function setup_perms (auth, group, edge) {
         [account_req,           Git.Perm.Pull,      group.cluster.uuid],
         [account_req,           Git.Perm.Push,      group.cluster.uuid],
         [group.flux.uuid,       Git.Perm.Pull,      group.shared.uuid],
-        [group.krbkeys.uuid,    ManageObjects,      ACS.Class.EdgeAccount],
+        [group.krbkeys.uuid,    ManageObjects,      Auth.Class.EdgeService],
         [group.krbkeys.uuid,    ReadConfig,         UUIDs.App.Info],
         [group.krbkeys.uuid,    WriteConfig,        UUIDs.App.Info],
         [group.krbkeys.uuid,    ReadConfig,         UUIDs.App.SparkplugAddress],
@@ -99,8 +104,8 @@ async function setup_perms (auth, group, edge) {
         [group.krbkeys.uuid,    ManageKerberos,     UUIDs.Special.Null],
         [group.krbkeys.uuid,    ReadKerberos,       UUIDs.Special.Null],
         /* XXX This is root-equivalent due to lack of group member quoting */
-        [group.krbkeys.uuid,    ManageGroup,        ACS.Group.EdgeGroups],
-        [group.krbkeys.uuid,    ManageACL,          ACS.Group.EdgePermissions],
+        [group.krbkeys.uuid,    ManageGroup,        Edge.Group.EdgeGroup],
+        [group.krbkeys.uuid,    ManageACL,          Edge.Group.EdgePermission],
     ];
     for (const ace of aces) {
         auth.fplus.debug.log("clusters", "Adding %o", ace);
@@ -108,7 +113,7 @@ async function setup_perms (auth, group, edge) {
     }
 
     for (const e of edge) {
-        await auth.add_to_group(ACS.Group.EdgeGroups, e);
+        await auth.add_to_group(Edge.Group.EdgeGroup, e);
     }
 }
 

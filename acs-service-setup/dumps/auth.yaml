@@ -1,58 +1,76 @@
 service: !u UUIDs.Service.ConfigDB
 version: 2
-# XXX This relies on load order pending a better solution.
 objects:
-  !u UUIDs.Class.Class:
-    !u Auth.Class.Principal:
-      name: "Principal"
-    !u ACS.Class.UserAccount:
-      name: "Human user"
-      subclassOf:
-        - !u Auth.Class.Principal
-    !u ACS.Class.ServiceAccount:
-      name: "Central service"
-      subclassOf:
-        - !u Auth.Class.Principal
-    !u ACS.Class.EdgeAccount:
-      name: "Edge service"
-      subclassOf:
-        - !u Auth.Class.Principal
-    !u UUIDs.Class.EdgeAgent:
-      name: "Edge Agent"
-      subclassOf:
-        - !u ACS.Class.EdgeAccount
-        - !u ACS.Group.SparkplugNode
-      memberOf:
-        - !u ACS.Group.EdgeGroups
-    !u UUIDs.Class.Permission:
-      name: "Permission"
-
   !u ConfigDB.Class.R2Class:
     !u Auth.Class.PrincipalGroup:
       name: "Principal group"
-    !u ACS.Group.EdgeGroups:
-      name: "Edge-managed group"
+    !u Auth.Class.PrincipalType:
+      name: "Principal type"
       subclassOf:
         - !u Auth.Class.PrincipalGroup
+    !u Auth.Class.Role:
+      name: "Role"
+      subclassOf:
+        - !u Auth.Class.PrincipalGroup
+    !u Auth.Class.ServiceRole:
+      name: "Service role"
+      subclassOf:
+        - !u Auth.Class.Role
+    !u Auth.Class.EdgeRole:
+      name: "Edge role"
+      subclassOf:
+        - !u Auth.Class.Role
     !u Auth.Class.ClientRole:
       name: "Client role"
       subclassOf:
-        - !u Auth.Class.PrincipalGroup
+        - !u Auth.Class.Role
 
     !u Auth.Class.PermissionGroup: 
       name: "Permission group"
-    !u ACS.Group.ServicePermissions:
-      name: "Service permissions"
+    !u Auth.Class.ServicePerms:
+      name: "Service permission set"
+      subclassOf:
+        - !u Auth.Class.PermissionGroup
+    !u Auth.Class.CompositePerm:
+      name: "Composite permission"
       subclassOf:
         - !u Auth.Class.PermissionGroup
 
-  !u ACS.Group.ServicePermissions:
+  !u UUIDs.Class.Class:
+    !u Auth.Class.Principal:
+      name: "Principal"
+    !u UUIDs.Class.Permission:
+      name: "Permission"
+
+  !u Auth.Class.PrincipalType:
+    !u Auth.Class.HumanUser:
+      name: "Human user"
+      subclassOf:
+        - !u Auth.Class.Principal
+    !u Auth.Class.CentralService:
+      name: "Central service"
+      subclassOf:
+        - !u Auth.Class.Principal
+    !u Auth.Class.EdgeService:
+      name: "Edge service"
+      subclassOf:
+        - !u Auth.Class.Principal
+    !u Auth.Class.EdgeAgent:
+      name: "Edge Agent"
+      subclassOf:
+        - !u Auth.Class.Principal
+    !u Auth.Class.AppAccount:
+      name: "Application account"
+      subclassOf:
+        - !u Auth.Class.Principal
+    !u Auth.Class.SpecialAccount:
+      name: "Special account"
+      subclassOf:
+        - !u Auth.Class.Principal
+
+  !u Auth.Class.ServicePerms:
     !u ACS.PermGroup.Auth:
       name: "Auth"
-      subclassOf:
-        - !u UUIDs.Class.Permission
-    !u ACS.PermGroup.Clusters:
-      name: "Cluster Manager"
       subclassOf:
         - !u UUIDs.Class.Permission
     !u ACS.PermGroup.CmdEsc:
@@ -67,11 +85,14 @@ objects:
       name: "Directory"
       subclassOf:
         - !u UUIDs.Class.Permission
-    !u ACS.PermGroup.Git:
-      name: "Git"
-      subclassOf:
-        - !u UUIDs.Class.Permission
     !u ACS.PermGroup.MQTT:
       name: "MQTT"
       subclassOf:
         - !u UUIDs.Class.Permission
+
+# Composite permissions are still created in the legacy dumps for now.
+# I'm not sure how to handle them in v2 dumps as it isn't possible to
+# list their members. There's only actually one composite permission
+# that deserves the name: _Edge Node consumer_. _Edge Monitor for Agent_
+# is not used any more (we have one monitor per cluster) and the others
+# are always granted to Wildcard and should be multiple plain grants.

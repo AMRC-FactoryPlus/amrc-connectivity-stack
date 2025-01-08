@@ -1,25 +1,41 @@
+#   Comment
+*   New object
+%   Dynamic (per-install) object
+[]  Renamed object
+()  Primary class
+
 R1Class [Class definition]
-    ⊃ *Principal group [User group]
-        ⊃ Service role [Service requirement]
-            ∋ Central monitor
-            ∋ Cluster manager
-            ∋ Git server
-            ∋ UNS Sparkplug ingester
-        ⊃ *Edge role
-            ⊃ Clusters-managed group
-                ∋ Edge flux
-                ∋ Edge krbkeys
-            ⊃ Edge-managed group
-                ∋ Edge Agent
-                ∋ Edge monitor
-                ∋ Edge sync
-        ⊃ *Client role
-            ∋ Administrator
-            ∋ Sparkplug Node
-            ∋ Sparkplug global reader
-            ∋ UNS global reader
+    # This is now effectively ₡Principal.
+    ⊃ *Principal group
+        ⊃ *Principal type
+            ∋ Human user
+            ∋ Central service
+            ∋ Edge service
+            ∋ Edge Agent
+            ∋ Application account
+            ∋ Special account
+        ⊃ Role [User group]
+            ⊃ Service role [Service requirement]
+                ∋ Central monitor
+                ∋ Cluster manager
+                ∋ Git server
+                ∋ UNS Sparkplug ingester
+            ⊃ *Edge role
+                ⊃ Clusters-managed group
+                    ∋ %Edge flux
+                    ∋ %Edge krbkeys
+                ⊃ Edge-managed group
+                    ∋ %Active Edge Agent
+                    ∋ %Edge monitor
+                    ∋ %Edge sync
+            ⊃ *Client role
+                ∋ Administrator
+                ∋ Sparkplug Node
+                ∋ Sparkplug global reader
+                ∋ UNS global reader
+    # Ditto, this is now ₡Permission.
     ⊃ Permission group
-        ⊃ *Service permissions
+        ⊃ *Service permission set
             ∋ Auth
             ∋ MQTT
             ∋ ⋮
@@ -32,35 +48,34 @@ R1Class [Class definition]
             ∋ Command Escalation service
 
 Individual
-    ⊃ Special
-        ∋ Wildcard
-        ∋ Self
-        ∋ Unowned
     ⊃ *Principal
         ⊃ Human user [User account]
         ⊃ Central service [Service account]
             ⊃ Cluster manager
-                ∋ sv1clustermanager
+                ∋ %sv1clustermanager
             ⊃ UNS Sparkplug ingester
-                ∋ sv1sparkplugingester
+                ∋ %sv1sparkplugingester
             ⊃ Central monitor
-                ∋ sv1monitor
+                ∋ %sv1monitor
             ⊃ Git servers
-                ∋ sv1git
+                ∋ %sv1git
             ⊃ UNS historian
+                ∋ %sv1historianuns
             ∋ sv1auth
             ∋ sv1cmdesc
             ∋ sv1configdb
             ∋ ⋮
         ⊃ Edge service [Edge cluster account]
-            ⊃ Edge flux
-            ⊃ Edge krbkeys
-            ⊃ Edge sync
-            ⊃ Edge monitor
-            ⊃ Edge Agent
-                ⊃ Cell Gateway
-                ⊃ Soft Gateway
+            ⊃ %Edge flux
+            ⊃ %Edge krbkeys
+            ⊃ %Edge sync
+            ⊃ %Edge monitor
+        ⊃ Edge Agent [Cell Gateway] (Principal type)
+            ⊃ %Edge Agent (Edge role)
         ⊃ *Application account
+        ⊃ *Special account
+            ∋ %Admin account
+            ∋ *%Root account
         ⊃ Sparkplug Node
             ⊃ Edge Agent
             ⊃ Edge monitor
@@ -70,13 +85,15 @@ Individual
             ∋ sv1git
         ⊃ Sparkplug global reader [MQTT global debugger]
             ⊃ Administrator
+                ∋ Admin account
             ⊃ Central monitor
             ⊃ Edge monitor
             ⊃ UNS Sparkplug ingester
+        ⊃ *UNS ingester
+            ⊃ UNS Sparkplug ingester
         ⊃ *UNS global reader
+            ⊃ Administrator
             ⊃ UNS historian
-        ∋ Admin account
-        ∋ *Root account
     ⊃ Permission
         ⊃ Auth
         ⊃ MQTT
@@ -88,18 +105,18 @@ Individual
             ∋ Read Node
             ∋ Reload Edge Agent config
             ∋ Rebirth
+        # These are not composite permissions
         ⊃ Warehouse
             ∋ Subscribe and read whole namespace
             ∋ Rebirth
-        ⊃ Edge Node
-            ∋ Subscribe and read STATE
-            ∋ Participate as Node
-            ∋ Represent Devices
-        ⊃ Global Primary Application
         ⊃ Command Escalation service
             ∋ Issue global commands
             ∋ Subscribe and read whole namespace
-    ⊃ Git repository
-        ⊃ Edge cluster repositories
-        ⊃ Shared repositories
-            ∋ shared/helm
+        ⊃ Global debugger
+            ∋ Subscribe and read whole namespace
+        # Obsolete and deleted
+#        ⊃ Edge Node
+#            ∋ Subscribe and read STATE
+#            ∋ Participate as Node
+#            ∋ Represent Devices
+#        ⊃ Global Primary Application

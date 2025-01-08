@@ -1,35 +1,37 @@
+# REQUIRE: auth sparkplug
+---
 service: !u UUIDs.Service.ConfigDB
 version: 2
 objects:
   !u ConfigDB.Class.R2Class:
-    !u Auth.Class.PermissionGroup: {}
-    !u Auth.Class.PrincipalGroup: {}
+    !u Edge.Group.EdgeGroup:
+      name: "Edge-managed group"
+      subclassOf:
+        - !u Auth.Class.EdgeRole
+
+  # Not currently used. This would be difficult to implement with the
+  # current implementation of composite perms as classes; we don't
+  # support multi-rank classes yet.
+  !u Auth.Class.PermissionGroup:
+    !u Edge.Group.EdgePermission:
+      name: "Edge-managed permissions"
+      subclassOf:
+        - !u Auth.Class.Permission
+
+  !u Auth.Class.ServiceRole:
+    !u ACS.Group.CentralMonitor:
+      name: "Central monitor"
+      subclassOf:
+        - !u Auth.Class.CentralService
+        - !u ACS.Group.SparkplugNode
+        - !u ACS.Group.SparkplugReader
+
   !u UUIDs.Class.App:
     !u Edge.App.ClusterStatus:      { name: "Edge cluster status" }
     !u Edge.App.Deployment:         { name: "Edge deployment" }
-  !u Auth.Class.PermissionGroup:
-    # XXX Properly this is not a permission group, but a group of
-    # groups. Since we don't have quoting for group membership grant
-    # here will be much too large; the grant of ManageGroup to the edge
-    # krbkeys is root-equivalent.
-    # ??? This needs reworking as a subclass of PermissionGroup.
-    !u ACS.Group.EdgeGroups:        { name: "Edge-managed groups" }
-    !u ACS.Group.EdgePermissions:   { name: "Edge-managed permissions" }
-  !u Auth.Class.PrincipalGroup:
-    !u ACS.Group.CentralMonitor:    { name: "Central Monitors" }
 ---
 service: !u UUIDs.Service.Authentication
 version: 1
-#groups:
-#     These are all granted dynamically
-#  !u ACS.Group.EdgeGroups
-#     We currently don't need any explicit ACEs granted at the edge
-#  !u ACS.Group.EdgePermissions:
-groups:
-  !u ACS.Group.SparkplugNode:
-    - !u ACS.Group.CentralMonitor
-  !u ACS.Group.GlobalDebuggers:
-    - !u ACS.Group.CentralMonitor
 aces:
   - principal: !u ACS.Group.CentralMonitor
     permission: !u ACS.Role.EdgeNodeConsumer

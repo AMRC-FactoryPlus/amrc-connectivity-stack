@@ -106,7 +106,7 @@ call migrate_to(10, $dump$
         end
     $fn$;
 
-    create or replace function load_dump(dump jsonb)
+    create or replace function _load_dump_set_ranks ()
     returns void
     language plpgsql
     as $function$
@@ -114,20 +114,6 @@ call migrate_to(10, $dump$
             unranked integer;
             bad uuid;
         begin
-            -- If the database is already invalid there's no point
-            -- continuing.
-            perform verify_invariants();
-
-            -- Pull the objects into a temporary table
-            create temporary table n_obj
-            on commit drop
-            as select row_number() over () id,
-                c.key::uuid class,
-                o.key::uuid obj,
-                o.value spec
-            from jsonb_each(dump) c,
-                lateral jsonb_each(c.value) o;
-
             -- This is a hack. Rank is not-null, and we can't defer a
             -- not-null constraint. So use top-rank + 1 to mark
             -- temporarily unranked objects.
@@ -192,7 +178,14 @@ call migrate_to(10, $dump$
                 raise notice 'Rank not set for %', bad;
             end loop;
             if found then raise 'Ranks not all set'; end if;
+        end;
+    $function$;
 
+    create or replace function _load_dump_set_relations ()
+    returns void
+    language plpgsql
+    as $function$
+        begin
             -- Dumps are authoritative about membership and superclass
             -- information for the objects they contain.
             delete from membership m
@@ -262,6 +255,32 @@ call migrate_to(10, $dump$
                     jsonb_array_elements_text(n.spec->'subclassOf') m(class)
                 join object o on o.uuid = n.obj
                 join object c on c.uuid = m.class::uuid;
+        end;
+    $function$;
+
+    create or replace function load_dump(dump jsonb)
+    returns void
+    language plpgsql
+    as $function$
+        begin
+            -- If the database is already invalid there's no point
+            -- continuing.
+            perform verify_invariants();
+
+            -- Pull the objects into a temporary table
+            create temporary table n_obj
+            on commit drop
+            as select row_number() over () id,
+                c.key::uuid class,
+                o.key::uuid obj,
+                o.value spec
+            from jsonb_each(dump) c,
+                lateral jsonb_each(c.value) o;
+
+            -- This creates the was_individual temp table.
+            perform _load_dump_set_ranks();
+            -- This uses was_individual.
+            perform _load_dump_set_relations();
 
             insert into config (app, object, json)
             select 7, o.id, jsonb_build_object('name', n.spec->>'name')

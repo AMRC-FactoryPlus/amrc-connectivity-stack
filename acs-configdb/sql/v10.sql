@@ -150,6 +150,30 @@ call migrate_to(10, $dump$
             where o.uuid = n.obj
                 and c.uuid = n.class;
 
+            -- Clear ranks on all primary members, recursively
+            loop
+                update object o
+                set rank = unranked
+                from object c
+                where c.id = o.class
+                    and c.rank = unranked
+                    and o.rank != unranked;
+
+                exit when not found;
+            end loop;
+
+            -- Record all existing individuals which might get promoted
+            -- by the rank updates. We may need to give them a rank
+            -- superclass. Existing classes must be subclasses only of
+            -- classes which will be modified, or the dump will fail.
+            create temporary table was_individual
+            on commit drop
+            as select o.id
+            from object o
+            where o.rank = unranked
+                and o.id not in (select id from subclass)
+                and o.uuid not in (select obj from n_obj);
+
             -- Update ranks based on primary class
             loop
                 update object o
@@ -162,7 +186,7 @@ call migrate_to(10, $dump$
                 exit when not found;
             end loop;
 
-            -- Verify we have set all ranks and reset constraint
+            -- Verify we have set all ranks
             for bad in select uuid from object where rank = unranked
             loop
                 raise notice 'Rank not set for %', bad;
@@ -180,6 +204,21 @@ call migrate_to(10, $dump$
             using object o, n_obj n
             where o.uuid = n.obj
                 and s.id = o.id;
+
+--             -- Remove membership and subclass relations where the new
+--             -- ranks conflict. Do this before installing our new
+--             -- relations as problems there should raise errors.
+--             delete from membership m
+--             using object o, object c
+--             where o.id = m.id
+--                 and c.id = m.class
+--                 and c.rank != o.rank + 1;
+-- 
+--             delete from subclass s
+--             using object o, object c
+--             where o.id = s.id
+--                 and c.id = s.class
+--                 and c.rank != o.rank;
 
             -- An explicit memberOf list overrides the default
             -- membership in the primary class.
@@ -205,6 +244,16 @@ call migrate_to(10, $dump$
                 join object o on o.uuid = n.obj
                 join rank r on r.depth = o.rank - 1
             where not n.spec ? 'subclassOf';
+
+            -- Existing individuals which have been promoted need a
+            -- superclass. In the absence of a better option use the
+            -- rank superclass. We could perhaps handle this better if
+            -- we had explicit powersets?
+            insert into subclass (class, id)
+            select r.id, o.id
+            from was_individual i
+                join object o on o.id = i.id
+                join rank r on r.depth = o.rank - 1;
 
             insert into subclass (class, id)
             select c.id, o.id

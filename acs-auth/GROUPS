@@ -114,9 +114,9 @@ Individual
             ∋ Subscribe and read whole namespace
         ⊃ Global debugger
             ∋ Subscribe and read whole namespace
-        # Obsolete and deleted
-#        ⊃ Edge Node
-#            ∋ Subscribe and read STATE
-#            ∋ Participate as Node
-#            ∋ Represent Devices
-#        ⊃ Global Primary Application
+        # These are obsolete and unused
+        ⊃ Edge Node
+            ∋ Subscribe and read STATE
+            ∋ Participate as Node
+            ∋ Represent Devices
+        ⊃ Global Primary Application

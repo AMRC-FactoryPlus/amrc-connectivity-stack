@@ -1,4 +1,3 @@
-import fsp from "fs/promises";
 import process from "process";
 import util from "util";
 
@@ -7,7 +6,7 @@ import ajv_formats from "ajv-formats";
 
 import { UUIDs } from "@amrc-factoryplus/service-client";
 
-import {load_yaml} from "../lib/dumps.js";
+import { read_all_files, parse_yaml } from "../lib/dumps.js";
 
 const { dump_schema } = await import("../../acs-configdb/lib/dump-schema.js")
     .catch(e => null);
@@ -19,19 +18,16 @@ ajv_formats(ajv);
 
 const cdb_validate = dump_schema ? ajv.compile(dump_schema) : () => true;
 
-const files = await fsp.readdir("dumps");
+const files = await read_all_files();
 let exit = 0;
 
 for (const f of files) {
-    if (!f.endsWith(".yaml"))
-        continue;
-
     const fail = (cause, ...args) => {
-        throw new Error(`${f}: ` + util.format(...args), { cause });
+        throw new Error(`${f.file}: ` + util.format(...args), { cause });
     };
 
     try { 
-        const ds = await load_yaml(f);
+        const ds = parse_yaml(f);
         ds.filter(d => !d.service || !d.version)
             .forEach(d => fail(null, "Missing service or version"));
         ds.filter(d => d.service == UUIDs.Service.ConfigDB)

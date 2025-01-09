@@ -23,6 +23,8 @@ drivers: {}
   #Test:
     # An image name from the image list above.
     #image: test
+    # OR: this driver is deployed externally
+    #external: false
     # Run this driver as a privileged container. This removes a k8s
     # security feature but is necessary to allow access to hardware.
     #privileged: true
@@ -38,6 +40,8 @@ drivers: {}
 
 # Make the driver interface available externally.
 #externalIPs: []
+# Create a privileged account on the driver broker.
+#driverDebugUser: admin
 debug: false
 verbosity: ALL,!token,!service,!sparkplug
 poll_int: 10

@@ -20,19 +20,12 @@ export class Loader {
 
     async load(req, res) {
         const dump = req.body;
-        const booleans = {
-            "true": true, "false": false,
-            "1": true, "0": false,
-            on: true, off: false,
-            yes: true, no: false,
-        };
 
-        const overwrite = booleans[req.query.overwrite];
-        if (overwrite == undefined)
+        if (!this.model.dump_validate(dump)) {
+            /* XXX this is an awful API */
+            this.log("Dump failed validation: %o", this.model.dump_validate.errors);
             return res.status(400).end();
-
-        if (!await this.model.dump_validate(dump))
-            return res.status(400).end();
+        }
 
         const perms = {
             classes: Perm.Manage_Obj,
@@ -50,7 +43,7 @@ export class Loader {
             }
         }
 
-        const st = await this.model.dump_load(dump, !!overwrite);
+        const st = await this.model.dump_load(dump);
         res.status(st).end();
     }
 }

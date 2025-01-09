@@ -105,7 +105,7 @@ function patch_json (path, patch) {
 }
 
 async function post_json(path, json) {
-    const rsp = await service_fetch(`/v1/${path}`, {
+    const rsp = await service_fetch(`/${path}`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
@@ -338,7 +338,7 @@ function Apps(props) {
             uuid: new_uuid.current.value,
             name: new_name.current.value,
         };
-        if (await post_json(`app`, body)) {
+        if (await post_json(`v1/app`, body)) {
             set_msg("App created");
         } else {
             set_msg("Error");
@@ -383,6 +383,7 @@ function Objs(props) {
         <${Ranks.Provider} value=${ranks}>
             <${NewObj}/>
             <h2>Ranks of object</h2>
+            <p><b>⊃</b> indicates a subclass, <b>∋</b> indicates a class member.<//>
             <dl>${hranks}</dl>
         <//>
     `;
@@ -428,24 +429,29 @@ function Klass(props) {
         ["Set primary class", "PATCH", `${reg}/${m}`, { "class": klass }],
     ];
 
-    const notyet = html`<b>...</b><br/>`;
+    const notyet = html`<dt><b>...</b><//>`;
     const hsubs = subs?.map(s => 
-        html`<${Obj} obj=${s} key=${s} menu=${s_menu(s)}/>`);
+        html`<${Obj} obj=${s} key=${s} menu=${s_menu(s)} pfx="⊃"/>`);
     const hobjs = objs?.map(o =>
-        html`<${Obj} obj=${o} key=${o} menu=${m_menu(o)}/>`);
+        html`<${Obj} obj=${o} key=${o} menu=${m_menu(o)} pfx="∋"/>`);
+    const hstat = status && html`
+        <dt><p onClick=${() => set_status()}>${status}<//><//>`;
 
+        //<h3>Subclasses ${""}
+        //<h3>Members ${""}
     return html`
-        ${status && html`<p onClick=${() => set_status()}>${status}<//>`}
-        <h3>Subclasses ${""}
-            <input type=text size=40 ref=${new_s}/>
-            <button onClick=${add_rel("subclass", new_s)}>Add subclass<//>
-        <//>
-        <dl>${hsubs ?? notyet}<//>
-        <h3>Members ${""}
-            <input type=text size=40 ref=${new_m}/>
-            <button onClick=${add_rel("member", new_m)}>Add member<//>
-        <//>
-        <dl>${hobjs ?? notyet}<//>
+        <dl>
+            ${hstat}
+            <dt>
+                <b>⊃</b> <input type=text size=40 ref=${new_s}/>
+                <button onClick=${add_rel("subclass", new_s)}>Add subclass<//>
+            <//><dt>
+                <b>∋</b> <input type=text size=40 ref=${new_m}/>
+                <button onClick=${add_rel("member", new_m)}>Add member<//>
+            <//>
+            ${hsubs ?? notyet}
+            ${hobjs ?? notyet}
+        </dl>
     `;
 }
 
@@ -459,13 +465,15 @@ function ObjFetchInfo (props) {
 }
 
 function ObjDisplay (props) {
-    const { menu } = props;
+    const { menu, pfx } = props;
     const info = useContext(ObjInfo);
 
     const obj = info.uuid;
 
     const mbutt = menu ? html`<${ObjMenu} menu=${menu}/>` : "";
-    const title = html`${mbutt} <${ObjTitleCtx} with_class=${true}/>`
+    const title = html`
+        ${mbutt} <b>${pfx}</b>
+        <${ObjTitleCtx} with_class=${true}/>`;
 
     if (info?.reg?.rank == 0)
         return html`<dt>${title}<//>`;
@@ -478,8 +486,11 @@ function ObjDisplay (props) {
 }
 
 function Obj (props) {
-    const {obj, menu} = props;
-    return html`<${ObjFetchInfo} obj=${obj}><${ObjDisplay} menu=${menu}/><//>`;
+    const {obj, menu, pfx} = props;
+    return html`
+        <${ObjFetchInfo} obj=${obj}>
+            <${ObjDisplay} menu=${menu} pfx=${pfx}/>
+        <//>`;
 }
 
 function NewObj(props) {
@@ -494,7 +505,7 @@ function NewObj(props) {
             uuid: new_obj.current.value || undefined,
             "class": new_class.current.value,
         };
-        const rsp = await post_json("object", spec);
+        const rsp = await post_json("v2/object", spec);
 
         if (rsp) {
             set_msg(html`Created
@@ -639,7 +650,6 @@ function Dumps(props) {
 
     const dump_r = useRef(null);
     const file_r = useRef(null);
-    const ovrw_r = useRef(null);
 
     const load = async () => {
         const dump = JSON.parse(dump_r.current?.value);
@@ -647,9 +657,8 @@ function Dumps(props) {
             set_msg("Error reading dump from textbox");
             return;
         }
-        const ovrw = !!ovrw_r.current?.checked;
 
-        const ok = await post_json(`load?overwrite=${ovrw}`, dump);
+        const ok = await post_json(`load`, dump);
         set_msg(ok ? "Loaded dump" : "Failed");
         if (ok) dump_r.current.value = "";
     };
@@ -670,7 +679,6 @@ function Dumps(props) {
         </p>
         <p><textarea cols=80 rows=24 ref=${dump_r}></textarea></p>
         <p><input type=file ref=${file_r} onChange=${read_file}/></p>
-        <p><label><input type=checkbox ref=${ovrw_r}/> Overwrite existing entries</label></p>
         <p>
             <button onClick=${load}>Load JSON dump</button>
             ${msg}

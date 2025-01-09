@@ -3,7 +3,7 @@
  * Copyright 2023 AMRC
  */
 
-import { UUIDs } from "@amrc-factoryplus/utilities";
+import { UUIDs } from "@amrc-factoryplus/service-client";
 
 import { ACS, Clusters, Fixup } from "./uuids.js";
 
@@ -52,7 +52,7 @@ async function fixup_sparkplug_nodes (auth) {
 async function remove_old_accounts (cdb, auth) {
     const accs = [
         [Fixup.User.Administrator, 
-            ACS.Group.Administrators],
+            ACS.Group.Administrator],
         [Fixup.User.ClusterManager, 
             Clusters.Requirement.ServiceAccount],
     ];

@@ -6,13 +6,14 @@ kind: Job
 metadata:
   namespace: {{ .Release.Namespace }}
   name: service-setup
-  annotations:
-    helm.sh/hook: post-install, post-upgrade
+#  annotations:
+#    helm.sh/hook: post-install, post-upgrade
 spec:
   ttlSecondsAfterFinished: 300
   template:
     spec:
       restartPolicy: OnFailure
+      backoffLimit: 9999
       volumes:
         - name: git-checkouts
           emptyDir:

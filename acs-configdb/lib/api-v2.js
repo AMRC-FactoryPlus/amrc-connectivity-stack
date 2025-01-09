@@ -70,11 +70,11 @@ export class APIv2 {
         clookup("subclass", "all_subclass");
 
         api.route("/class/:class/direct/member/:object")
-            .put(this.class_rel.bind(this, "add", "membership"))
-            .delete(this.class_rel.bind(this, "remove", "membership"));
+            .put(this.class_rel.bind(this, m => m.class_add_member))
+            .delete(this.class_rel.bind(this, m => m.class_remove_member));
         api.route("/class/:class/direct/subclass/:object")
-            .put(this.class_rel.bind(this, "add", "subclass"))
-            .delete(this.class_rel.bind(this, "remove", "subclass"));
+            .put(this.class_rel.bind(this, m => m.class_add_subclass))
+            .delete(this.class_rel.bind(this, m => m.class_remove_subclass));
 
         api.get("/app/:app/object", this.config_list.bind(this));
         api.get("/app/:app/class/:class", this.config_list.bind(this));
@@ -85,7 +85,6 @@ export class APIv2 {
             .delete(this.config_delete.bind(this))
             .patch(this.config_patch.bind(this));
 
-        api.post("/load", this.dump_load.bind(this));
         api.get("/save", this.dump_save.bind(this));
     }
 
@@ -198,7 +197,7 @@ export class APIv2 {
         return res.status(200).json(list);
     }
 
-    async class_rel (action, rel, req, res) {
+    async class_rel (action, req, res) {
         const { class: klass, object } = req.params;
         if (!Valid.uuid.test(klass) || !Valid.uuid.test(object))
             return res.status(410).end();
@@ -206,8 +205,8 @@ export class APIv2 {
         const ok = await this.auth.check_acl(req.auth, Perm.Manage_Obj, klass, true);
         if (!ok) return res.status(403).end();
 
-        const st = await this.model.class_relation(action, rel, klass, object);
-        return res.status(st ? 204 : 404).end();
+        const st = await action(this.model).call(this.model, klass, object);
+        return res.status(st).end();
     }
 
     async config_list(req, res) {
@@ -348,42 +347,6 @@ export class APIv2 {
             : Object.fromEntries(results.map(r => [r.uuid, r.results]));
 
         return res.status(200).json(json);
-    }
-
-    async dump_load(req, res) {
-        const dump = req.body;
-        const booleans = {
-            "true": true, "false": false,
-            "1": true, "0": false,
-            on: true, off: false,
-            yes: true, no: false,
-        };
-
-        const overwrite = booleans[req.query.overwrite];
-        if (overwrite == undefined)
-            return res.status(400).end();
-
-        if (!await this.model.dump_validate(dump))
-            return res.status(400).end();
-
-        const perms = {
-            classes: Perm.Manage_Obj,
-            objects: Perm.Manage_Obj,
-            configs: Perm.Write_App,
-        };
-        for (const [key, perm] of Object.entries(perms)) {
-            if (key in dump) {
-                const ok = await this.auth.check_acl(
-                    req.auth, perm, UUIDs.Null, false);
-                if (!ok) {
-                    this.log("Refusing dump (%s)", key);
-                    return res.status(403).end();
-                }
-            }
-        }
-
-        const st = await this.model.dump_load(dump, !!overwrite);
-        res.status(st).end();
     }
 
     async dump_save(req, res) {

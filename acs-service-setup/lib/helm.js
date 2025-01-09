@@ -3,10 +3,10 @@
  * Copyright 2023 AMRC
  */
 
-import { UUIDs } from "@amrc-factoryplus/utilities";
+import { UUIDs } from "@amrc-factoryplus/service-client";
 
 import { ServiceConfig }    from "./service-config.js";
-import { ACS, Clusters, Edge }    
+import { ACS, Auth, Clusters, Edge }    
                             from "./uuids.js";
 
 class HelmConfig extends ServiceConfig {
@@ -58,7 +58,7 @@ async function setup_perms (auth, group) {
     const members = [
         [ACS.Group.SparkplugNode,       group.agent.uuid],
         [ACS.Group.SparkplugNode,       group.monitor.uuid],
-        [ACS.Group.GlobalDebuggers,     group.monitor.uuid],
+        [ACS.Group.SparkplugReader,     group.monitor.uuid],
     ];
     const aces = [
         [group.agent.uuid,      ReadConfig,     Edge.App.AgentConfig],
@@ -89,9 +89,9 @@ export async function setup_helm (ss) {
     }).init();
 
     await conf.setup_groups(
-        ["agent",   ACS.Class.UserGroup,    "Edge Agent"],
-        ["sync",    ACS.Class.UserGroup,    "Edge Sync account"],
-        ["monitor", ACS.Class.UserGroup,    "Edge Monitor account"],
+        ["agent",   Auth.Class.PrincipalGroup,  "Active Edge Agent"],
+        ["sync",    Auth.Class.PrincipalGroup,  "Edge sync"],
+        ["monitor", Auth.Class.PrincipalGroup,  "Edge monitor"],
     );
 
     const acs = ss.acs_config;

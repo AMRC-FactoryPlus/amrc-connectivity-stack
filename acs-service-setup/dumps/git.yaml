@@ -1,0 +1,59 @@
+# REQUIRE: auth
+service: !u UUIDs.Service.ConfigDB
+version: 2
+objects:
+  !u Auth.Class.ServiceRole:
+    !u Git.Requirement.ServiceAccount:
+      name: "Git server"
+      subclassOf:
+        - !u Auth.Class.CentralService
+        - !u ACS.Group.SparkplugNode
+
+  !u Auth.Class.ServicePerms:
+    !u Git.Perm.All:
+      name: "Git permission"
+      subclassOf:
+        - !u UUIDs.Class.Permission
+
+  !u ConfigDB.Class.R2Class:
+    !u Git.Class.Group: { name: "Git repository group" }
+
+  !u ConfigDB.Class.R1Class:
+    !u Git.Class.Repo: { name: "Git repository" }
+
+  !u UUIDs.Class.Service:
+    !u Git.Service.Git: { name: "Git hosting" }
+  !u UUIDs.Class.App:
+    !u Git.App.Config: { name: "Git repository configuration" }
+  !u Git.Perm.All:
+    !u Git.Perm.Create: { name: "Create repo" }
+    !u Git.Perm.Delete: { name: "delete repo" }
+    !u Git.Perm.Pull: { name: "Pull from repo" }
+    !u Git.Perm.Push: { name: "Push to repo" }
+    !u Git.Perm.Manage_Storage: { name: "Manage repo storage" }
+configs:
+  !u UUIDs.App.ConfigSchema:
+    !u Git.App.Config:
+      type: object
+      required: [path]
+      properties:
+        path: { type: string }
+---
+service: !u UUIDs.Service.Authentication
+version: 1
+aces:
+  - principal: !u Git.Requirement.ServiceAccount
+    permission: !u UUIDs.Permission.Directory.AdvertiseService
+    target: !u Git.Service.Git
+
+  - principal: !u Git.Requirement.ServiceAccount
+    permission: !u UUIDs.Permission.Auth.ReadACL
+    target: !u Git.Perm.All
+
+  - principal: !u Git.Requirement.ServiceAccount
+    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
+    target: !u Git.App.Config
+
+  - principal: !u Git.Requirement.ServiceAccount
+    permission: !u ACS.Role.EdgeNodeConsumer
+    target: !u ACS.Device.ConfigDB

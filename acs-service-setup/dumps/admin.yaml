@@ -1,54 +1,35 @@
-# Create the Administrator account and group
-# Grant appropriate permissions
+# Grant appropriate permissions to the Administrator group
+# REQUIRE: auth sparkplug uns
 ---
 service: !u UUIDs.Service.ConfigDB
-version: 1
-overwrite: true
-classes:
-  - !u ACS.Class.UserAccount
-  - !u ACS.Class.UserGroup
+version: 2
 objects:
-  !u ACS.Class.UserGroup:
-    - !u ACS.Group.Administrators
-    - !u ACS.Group.GlobalDebuggers
-configs:
-  !u UUIDs.App.Info:
-    !u ACS.Class.UserAccount:     { name: "User account" }
-    !u ACS.Class.UserGroup:       { name: "User group" }
-    !u ACS.Group.Administrators:  { name: "Administrators" }
-    !u ACS.Group.GlobalDebuggers: { name: "MQTT global debuggers" }
+  !u Auth.Class.ClientRole:
+    !u ACS.Group.Administrator:
+      name: "Administrator"
+      subclassOf:
+        - !u ACS.Group.SparkplugReader
+        - !u UNS.Group.Reader
 ---
 service: !u UUIDs.Service.Authentication
 version: 1
-groups:
-  !u ACS.Group.GlobalDebuggers:
-    - !u ACS.Group.Administrators
 aces:
-  - principal: !u ACS.Group.Administrators
+  - principal: !u ACS.Group.Administrator
     permission: !u ACS.PermGroup.Auth
     target: !u UUIDs.Special.Null
-  - principal: !u ACS.Group.Administrators
+  - principal: !u ACS.Group.Administrator
     permission: !u ACS.PermGroup.Clusters
     target: !u UUIDs.Special.Null
-  - principal: !u ACS.Group.Administrators
+  - principal: !u ACS.Group.Administrator
     permission: !u ACS.PermGroup.CmdEsc
     target: !u UUIDs.Special.Null
-  - principal: !u ACS.Group.Administrators
+  - principal: !u ACS.Group.Administrator
     permission: !u ACS.PermGroup.ConfigDB
     target: !u UUIDs.Special.Null
-  - principal: !u ACS.Group.Administrators
+  - principal: !u ACS.Group.Administrator
     permission: !u ACS.PermGroup.Directory
     target: !u UUIDs.Special.Null
-  - principal: !u ACS.Group.Administrators
+  - principal: !u ACS.Group.Administrator
     permission: !u ACS.PermGroup.Git
     target: !u UUIDs.Special.Null
 
-  - principal: !u ACS.Group.GlobalDebuggers
-    permission: !u ACS.Perm.MQTT.ReadWholeNamespace
-    target: !u UUIDs.Special.Null
-  - principal: !u ACS.Group.GlobalDebuggers
-    permission: !u UUIDs.Permission.CmdEsc.Rebirth
-    target: !u UUIDs.Special.Null
-  - principal: !u ACS.Group.GlobalDebuggers
-    permission: !u ACS.Perm.MQTT.ReadEntireUNS
-    target: !u UUIDs.Special.Null

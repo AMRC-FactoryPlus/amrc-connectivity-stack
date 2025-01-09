@@ -1,24 +1,28 @@
 # ACS-specific deployment decisions
+# REQUIRE: auth
+---
 service: !u UUIDs.Service.ConfigDB
-version: 1
-classes:
-  - !u UUIDs.Class.EdgeAgent
-  # Not created here
-  - !u ACS.Class.ClientRole
-  - !u ACS.Class.UserGroup
+version: 2
 objects:
-  !u UUIDs.Class.App:
-    - !u Edge.App.AgentConfig
-  !u ACS.Class.ClientRole:
-    - !u Edge.Role.Monitor
-  !u ACS.Class.UserGroup:
-    - !u ACS.Group.SparkplugNode
-configs:
-  !u UUIDs.App.Info:
-    !u UUIDs.Class.EdgeAgent:     { name: "Edge Agent" }
-    !u Edge.App.AgentConfig:      { name: "Edge Agent config" }
+  !u Auth.Class.CompositePerm:
     !u Edge.Role.Monitor:         { name: "Edge Monitor for Agent" }
-    !u ACS.Group.SparkplugNode:   { name: "Sparkplug Node" }
+    # This is deprecated
+    !u ACS.Role.GlobalDebugger:
+      name: "Sparkplug global debugger"
+
+  !u Auth.Class.ClientRole:
+    !u ACS.Group.SparkplugNode:
+      name: "Sparkplug Node"
+      subclassOf:
+        - !u Auth.Class.Principal
+    # _Active Edge Agent_ is created by helm.js.
+    !u ACS.Group.SparkplugReader:
+      name: "Sparkplug global reader"
+      subclassOf:
+        - !u Auth.Class.Principal
+
+  !u UUIDs.Class.App:
+    !u Edge.App.AgentConfig:      { name: "Edge Agent config" }
 ---
 service: !u UUIDs.Service.Authentication
 version: 1
@@ -36,8 +40,20 @@ aces:
   - principal: !u ACS.Group.SparkplugNode
     permission: !u UUIDs.Permission.ConfigDB.ReadConfig
     target: !u UUIDs.App.SparkplugAddress
+
+  - principal: !u ACS.Group.SparkplugReader
+    permission: !u ACS.Perm.MQTT.ReadWholeNamespace
+    target: !u UUIDs.Special.Null
+  - principal: !u ACS.Group.SparkplugReader
+    permission: !u UUIDs.Permission.CmdEsc.Rebirth
+    target: !u UUIDs.Special.Null
+
 groups:
+  # XXX These are enumerated classes (not supported yet in v2 ConfigDB dumps)
   !u Edge.Role.Monitor:
     - !u ACS.Perm.MQTT.ReadNode
     - !u Edge.Perm.ReloadConfig
+    - !u UUIDs.Permission.CmdEsc.Rebirth
+  !u ACS.Role.GlobalDebugger:
+    - !u ACS.Perm.MQTT.ReadWholeNamespace
     - !u UUIDs.Permission.CmdEsc.Rebirth

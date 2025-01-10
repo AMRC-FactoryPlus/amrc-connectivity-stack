@@ -59,6 +59,26 @@ export default class AuthZ {
         //}));
 
         //api.use(this.authz.bind(this));
+        
+        /* v1 API:
+         *
+         * GET acl/:uuid
+         * GET acl/identity/:type/:name
+         *
+         * GET ace # Lists all ACEs we can read?
+         * PUT ace/:principal/:permission/:target # Boolean body?
+         * DELETE ace/:principal/:permission/:target
+         *
+         * OR: ACEs get their own UUIDs. (This moves towards treating a
+         * Permission as a set of grants.) Then:
+         *
+         * GET ace
+         * POST ace
+         * GET ace/:ace
+         * PUT ace/:ace
+         * DELETE ace/:ace
+         * 
+         */
 
         api.get("/acl", this.get_acl.bind(this));
 

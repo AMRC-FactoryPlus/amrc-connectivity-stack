@@ -48,6 +48,10 @@ R1Class [Class definition]
             ∋ Command Escalation service
 
 Individual
+    ⊃ Application
+        ⊃ *Identity type
+            ∋ *Kerberos
+            ∋ *Sparkplug
     ⊃ *Principal
         ⊃ Human user [User account]
         ⊃ Central service [Service account]

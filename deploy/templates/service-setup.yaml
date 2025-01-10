@@ -10,10 +10,10 @@ metadata:
 #    helm.sh/hook: post-install, post-upgrade
 spec:
   ttlSecondsAfterFinished: 300
+  backoffLimit: 9999
   template:
     spec:
       restartPolicy: OnFailure
-      backoffLimit: 9999
       volumes:
         - name: git-checkouts
           emptyDir:

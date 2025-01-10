@@ -8,9 +8,16 @@
 
 \set id_Kerberos        1
 \set id_Sparkplug       2
+\set id_Principal       3
+\set id_PrincipalGroup  4
+\set id_Permission      5
+\set id_PermissionGroup 6
+\set id_Self            7
 
 select version < 2 need_update from version \gset
 \if :need_update
+    \echo Migrating to version 2
+
     -- We can't just rename ace, the sequence name will conflict with
     -- the new table.
     create temporary table old_ace
@@ -63,7 +70,12 @@ select version < 2 need_update from version \gset
     insert into uuid (id, uuid)
     values 
         (:id_Kerberos,          '75556036-ce98-11ef-9534-637ef5d37456'),
-        (:id_Sparkplug,         '7c51a61a-ce98-11ef-834a-976fb7c5dd4c');
+        (:id_Sparkplug,         '7c51a61a-ce98-11ef-834a-976fb7c5dd4c'),
+        (:id_Principal,         '11614546-b6d7-11ef-aebd-8fbb45451d7c'),
+        (:id_PrincipalGroup,    'c0157038-ccff-11ef-a4db-63c6212e998f'),
+        (:id_Permission,        '8ae784bb-c4b5-4995-9bf6-799b3c7f21ad'),
+        (:id_PermissionGroup,   'ac0d5288-6136-4ced-a372-325fbbcdd70d'),
+        (:id_Self,              '5855a1cc-46d8-4b16-84f8-ab3916ecb230');
 
     insert into uuid (uuid)
     select uuid from principal

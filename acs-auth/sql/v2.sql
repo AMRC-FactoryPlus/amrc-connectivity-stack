@@ -11,7 +11,18 @@
 
 select version < 2 need_update from version \gset
 \if :need_update
-    alter table ace rename to old_ace;
+    -- We can't just rename ace, the sequence name will conflict with
+    -- the new table.
+    create temporary table old_ace
+    on commit drop
+    as select principal, permission, target
+    from ace;
+
+    drop function members_of;
+    drop view resolved_ace;
+    drop view group_members;
+
+    drop table ace;
     alter table member rename to old_member;
 
     create table uuid (
@@ -49,7 +60,7 @@ select version < 2 need_update from version \gset
     -- Reserve some IDs
     alter sequence uuid_id_seq restart with 100;
 
-    insert into uuid (uuid)
+    insert into uuid (id, uuid)
     values 
         (:id_Kerberos,          '75556036-ce98-11ef-9534-637ef5d37456'),
         (:id_Sparkplug,         '7c51a61a-ce98-11ef-834a-976fb7c5dd4c');
@@ -74,14 +85,12 @@ select version < 2 need_update from version \gset
     insert into ace (principal, permission, target, plural)
     select u.id, p.id, t.id, false
     from old_ace e
-        join uuids u on u.uuid = e.principal
-        join uuids p on p.uuid = e.permission
-        join uuids t on t.uuid = e.target;
-
-    drop table old_ace;
+        join uuid u on u.uuid = e.principal
+        join uuid p on p.uuid = e.permission
+        join uuid t on t.uuid = e.target;
 
     -- XXX Migrate group members directly for now.
-    insert into member (class, id)
+    insert into member (parent, child)
     select c.id, o.id
     from old_member m
         join uuid c on c.uuid = m.parent

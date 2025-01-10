@@ -17,13 +17,13 @@ objects:
 ## Redis. I'm not going this way for now in the limited time we have but
 ## I think it might be the way forward in future.
 #
-# R3Class
+# R2Class
 #   ⊃ Permission group
 #     𝒫 Permission
 #     ⊃ Service permission set
 #     ⊃ Composite permission
 #
-# R2Class 
+# R1Class 
 #   ⊃ Config entry group
 #     𝒫 Config entry
 #     ⊃ Application
@@ -32,7 +32,7 @@ objects:
 #       𝒫 Grant
 #       ⊃ Permission
 #
-# R1Class
+# Individual
 #   ⊃ Config entry
 #     ⊃ Grant
 #       ∋ Admins have full ConfigDB access

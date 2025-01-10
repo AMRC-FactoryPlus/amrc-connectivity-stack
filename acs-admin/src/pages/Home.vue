@@ -1,5 +1,9 @@
+<!--
+  - Copyright (c) University of Sheffield AMRC 2025.
+  -->
+
 <template>
-    <div v-if="s.loaded" class="flex flex-col gap-4">
+  <div v-if="s.loaded" class="flex flex-col gap-4">
       <Card>
         <CardHeader class="pb-2">
           <CardDescription>MQTT Server</CardDescription>

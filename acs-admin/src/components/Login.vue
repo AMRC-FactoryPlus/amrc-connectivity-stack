@@ -1,3 +1,7 @@
+<!--
+  - Copyright (c) University of Sheffield AMRC 2025.
+  -->
+
 <template>
   <Card class="mx-auto max-w-sm">
     <CardHeader>
@@ -19,6 +23,7 @@
               placeholder="e.g. me1ago"
               required
               v-model="username"
+              @keydown.enter="login"
           />
         </div>
         <div class="grid gap-2">
@@ -27,8 +32,11 @@
           </div>
           <Input @keydown.enter="login" v-model="password" id="password" type="password" required/>
         </div>
-        <Button :disabled="!username || !password" @click="login" type="submit" class="w-full">
-          Login
+        <Button :disabled="buttonDisabled" @click="login" type="submit" class="w-full">
+          <div v-if="!loggingIn">Login</div>
+          <div v-else class="flex items-center justify-center">
+            <i class="fa-solid fa-circle-notch animate-spin"></i>
+          </div>
         </Button>
         <div class="text-xs text-gray-300">{{directory}}</div>
       </div>
@@ -65,6 +73,10 @@ export default {
   },
 
   computed: {
+    buttonDisabled () {
+      return !this.username || !this.password || this.loggingIn
+    },
+
     directory () {
       return import.meta.env.SCHEME + '://directory.' + import.meta.env.BASEURL
     },
@@ -72,17 +84,20 @@ export default {
 
   methods: {
     login () {
+      this.loggingIn = true
       this.s.login({
         directory_url: this.directory,
         username: this.username,
         password: this.password,
         browser: true,
       })
+      this.loggingIn = false
     },
   },
 
   data () {
     return {
+      loggingIn: false,
       username: null,
       password: null,
     }

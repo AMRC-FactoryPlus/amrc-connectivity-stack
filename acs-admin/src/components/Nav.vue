@@ -1,7 +1,10 @@
+<!--
+  - Copyright (c) University of Sheffield AMRC 2025.
+  -->
+
 <script setup lang="ts">
-import {cn} from '@/lib/utils'
 import {Button} from '@components/ui/button'
-import { useServiceClientStore } from '@/store/serviceClientStore.js'
+import {useServiceClientStore} from '@/store/serviceClientStore.js'
 
 interface Item {
     title: string
@@ -46,13 +49,11 @@ const sidebarNavItems: Item[] = [
           v-if="!item.auth || (item.auth && useServiceClientStore().loaded)"
           :key="item.title"
           :variant="$route.path === item.href ? 'default' : 'ghost'"
-          :class="cn(
-        'w-full text-left justify-start',
-      )"
+          class="w-full text-left justify-start"
       >
         <div class="flex items-center justify-center gap-2">
           <i :class="`fa-solid fa-${item.icon}`"></i>
-          {{item.title}}
+          <span>{{item.title}}</span>
         </div>
       </Button>
     </RouterLink>

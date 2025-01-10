@@ -8,11 +8,14 @@
       :class="!l.fullscreen ? 'md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]' : 'grid-cols-1'">
     <div v-if="!l.fullscreen" class="hidden border-r bg-muted/40 md:block">
       <div class="flex h-full max-h-screen flex-col">
-        <div class="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6">
+        <div class="flex h-14 items-center justify-between border-b px-4 lg:h-[60px] lg:px-6">
           <a href="/" class="flex items-center gap-2 font-semibold">
             <img class="size-4" src="/favicon.svg">
             <span class="">ACS</span>
           </a>
+          <div class="flex items-center justify-center gap-2 text-sm text-gray-600">
+            <i class="fa-solid fa-user text-xs"></i>
+            <span class="">{{s.username}}</span>
         </div>
         <div class="flex-1 p-2">
           <Nav/>

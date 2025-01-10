@@ -108,5 +108,59 @@ select version < 2 need_update from version \gset
         join uuid c on c.uuid = m.parent
         join uuid o on o.uuid = m.child;
 
+    create view principal_lookup as
+    select m.child match, m.child result
+        from member m
+        where m.parent = :id_Principal
+    union all select m.parent, m.child
+        from member m
+            join member p on p.child = m.parent
+        where p.parent = :id_PrincipalGroup;
+
+    -- This duplication is not ideal; with a proper powerset
+    -- implementation it could perhaps be avoided.
+    create view permission_lookup as
+    select m.child match, m.child result
+        from member m
+        where m.parent = :id_Principal
+    union all select m.parent, m.child
+        from member m
+            join member p on p.child = m.parent
+        where p.parent = :id_PrincipalGroup;
+
+--    create table powerset (id integer, class integer);
+--    create view powerset_lookup as
+--    select p.id, l.match, l.result
+--    from powerset p
+--        cross join lateral (
+--            select m.child match, m.child result
+--                from member m
+--                where m.parent = p.id
+--            union all select m.parent, m.child
+--                from member m
+--                    join member n on n.child = m.parent
+--                where n.parent = p.class
+--        ) l;
+
+    create view resolved_ace as
+    select u.result id, pu.uuid permission, tu.uuid target
+    from ace e
+        join principal_lookup u on u.match = e.principal
+        join permission_lookup p on p.match = e.permission
+        cross join lateral (
+            select child
+                from member
+                where parent = e.target
+                    and e.plural
+            union all select e.target
+                where not e.plural
+        ) t(target)
+        join uuid pu on pu.id = p.result
+        join uuid tu on tu.id = 
+            case t.target
+                when 5 then u.result
+                else t.target
+            end;
+
     update version set version = 2;
 \endif

@@ -1,12 +1,11 @@
 <!--
-  - Copyright (c) University of Sheffield AMRC 2024.
+  - Copyright (c) University of Sheffield AMRC 2025.
   -->
 
 <template>
   <Toaster rich-colors/>
-  <div class="grid h-screen overflow-auto w-full"
-      :class="!l.fullscreen ? 'md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]' : 'grid-cols-1'">
-    <div v-if="!l.fullscreen" class="hidden border-r bg-muted/40 md:block">
+  <div class="grid h-screen overflow-auto w-full" :class="!l.fullscreen ? 'md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]' : 'grid-cols-1'">
+    <div id="sidebar" v-if="!l.fullscreen" class="hidden border-r bg-muted/40 md:block">
       <div class="flex h-full max-h-screen flex-col">
         <div class="flex h-14 items-center justify-between border-b px-4 lg:h-[60px] lg:px-6">
           <a href="/" class="flex items-center gap-2 font-semibold">
@@ -16,8 +15,9 @@
           <div class="flex items-center justify-center gap-2 text-sm text-gray-600">
             <i class="fa-solid fa-user text-xs"></i>
             <span class="">{{s.username}}</span>
+          </div>
         </div>
-        <div class="flex-1 p-2">
+        <div class="p-2">
           <Nav/>
         </div>
         <div class="mt-auto p-4">
@@ -104,7 +104,7 @@ export default {
     SheetContent,
     SheetTrigger,
     Nav,
-    Toaster
+    Toaster,
   },
 
   watch: {
@@ -116,12 +116,12 @@ export default {
   },
 
   async mounted () {
+
     // Check if opts exists in local storage
     if (localStorage.getItem('opts')) {
       // If it does then create the service client
       this.s.login(JSON.parse(localStorage.getItem('opts')))
     }
-
 
     this.$router.isReady().then(() => {
       if (this.$route.query.fullscreen) {

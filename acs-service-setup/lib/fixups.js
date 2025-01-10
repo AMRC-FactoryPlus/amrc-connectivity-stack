@@ -7,26 +7,15 @@ import { UUIDs } from "@amrc-factoryplus/service-client";
 
 import { ACS, Clusters, Fixup } from "./uuids.js";
 
+/* This file is currently redundant; it did migrations needed when
+ * upgrading ACS v2 -> v3. These have now been removed; we do not
+ * support skipping major versions. I am keeping the file, as we will
+ * probably need more fixups in the future... */
+
 export async function fixups (ss) {
     const { fplus } = ss;
 
-    const auth = fplus.Auth;
-    const cdb = fplus.ConfigDB;
-
-    await fixup_null(cdb);
-    await fixup_sparkplug_nodes(auth);
-    await remove_old_accounts(cdb, auth);
-}
-
-/* Null was originally registered as a Class, which was wrong.
- * We can't change a Class to not be a Class, it must be deleted and
- * recreated. The dumps will recreate it as a Special. */
-async function fixup_null (cdb) {
-    const reg = await cdb.get_config(
-        UUIDs.App.Registration, UUIDs.Special.Null);
-
-    if (reg?.class == UUIDs.Class.Class)
-        await cdb.delete_object(UUIDs.Special.Null);
+    return;
 }
 
 /* Previously Sparkplug Nodes were granted Role: Edge Node as a

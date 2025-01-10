@@ -11,6 +11,8 @@ config.mk
 /keytabs/
 /volumes/
 
+/tmp/
+
 # IDE
 .idea/
 /node_modules/

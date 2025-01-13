@@ -20,12 +20,21 @@ export const ACS = {
         CentralMonitor:     "1bc3dbca-68fe-48d2-9590-3a528c111827",
     },
     Perm: {
+        Composite: {
+            CmdEsc:             "dbd0c099-6c59-4bc6-aa92-4ba8a9b543f4",
+            EdgeNode:           "87e4a5b7-9a89-4796-a216-39666a47b9d2",
+            EdgeNodeConsumer:   "17a64293-b82d-4db4-af4d-63359bb62934",
+            PrimaryApp:         "c0d17bcf-2a90-40e5-b244-07bf631f7417",
+            Warehouse:          "6958c812-fbe2-4e6c-b997-6f850b89f679",
+        },
         MQTT: {
+            IssueCommands:      "50f1e694-7e18-4930-aa59-97cc90a6a1ec",
             ParticipateAsNode:  "a1314953-8226-44f4-8a3e-e87b09310579",
             RepresentDevices:   "e82456b3-a7d9-4971-9d8c-fd0be4545ab4",
             ReadAllStates:      "8790cf3d-b793-423c-b373-8cfcf9f63529",
             ReadNode:           "046d6603-fa62-4208-9400-65d61f8b1ec4",
             ReadWholeNamespace: "81833dbb-1150-4078-b1db-978c646ba73e",
+            UpdateOwnState:     "bdc96a3e-d6fb-48ed-b790-0aa95cf826f0",
         },
     },
     PermGroup: {
@@ -63,8 +72,16 @@ export const ACS = {
      * per-deployment accounts created by krbkeys, and
      * ServiceRequirement groups to grant them permissions. */
     ServiceAccount: {
+        Auth:                   "1e1989ab-14e4-42bd-8171-495230acc406",
+        CmdEsc:                 "23d4e8f9-76c0-49d5-addc-00b6ac05ee58",
+        ConfigDB:               "36861e8d-9152-40c4-8f08-f51c2d7e3c25",
+        Warehouse:              "388ddbdc-4eb4-4ae8-bbd0-9be32f3c31e8",
+        Directory:              "5cc3b068-938f-4bb2-8ceb-64338a02fbeb",
+        Manager:                "2340e706-1280-420c-84a6-016547b55e95",
+        MQTT:                   "2f42daeb-4521-4522-8e19-85dfb73db88e",
         KrbKeys:                "a04b4195-7db4-4480-b3f3-4d22c08b96ea",
         Git:                    "626df296-8156-4c67-8aed-aac70161aa8b",
+        ClusterManager:         "127cde3c-773a-4f61-b0ba-7412a2695253",
     },
 };
 

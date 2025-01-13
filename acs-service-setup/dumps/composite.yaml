@@ -1,0 +1,46 @@
+# Composite permission definitions
+#
+# REQUIRE: auth
+service: !u UUIDs.Service.ConfigDB
+version: 2
+objects:
+  !u Auth.Class.CompositePerm:
+    !u ACS.Perm.Composite.CmdEsc:
+      name: "Command Escalation service"
+    !u ACS.Perm.Composite.EdgeNode:
+      name: "Edge Node"
+    !u ACS.Perm.Composite.EdgeNodeConsumer:
+      name: "Edge Node consumer"
+    !u ACS.Perm.Composite.PrimaryApp:
+      name: "Global Primary App"
+    !u ACS.Perm.Composite.Warehouse:
+      name: "Warehouse"
+---
+service: !u UUIDs.Service.Authentication
+version: 1
+aces:
+  - principal: !u ACS.ServiceAccount.CmdEsc
+    permission: !u ACS.Perm.Composite.CmdEsc
+    target: !u UUIDs.Special.Null
+  - principal: !u ACS.ServiceAccount.Warehouse
+    permission: !u ACS.Perm.Composite.Warehouse
+    target: !u UUIDs.Special.Null
+groups:
+  !u ACS.Perm.Composite.EdgeNodeConsumer:
+    - !u ACS.Perm.MQTT.ReadNode
+    - !u UUIDs.Permission.CmdEsc.Rebirth:
+  !u ACS.Perm.Composite.Warehouse:
+    - !u ACS.Perm.MQTT.ReadWholeNamespace
+    - !u UUIDs.Permission.CmdEsc.Rebirth
+  !u ACS.Perm.Composite.CmdEsc:
+    - !u ACS.Perm.MQTT.IssueCommands
+    - !u ACS.Perm.MQTT.ReadWholeNamespace
+  !u ACS.Perm.Composite.EdgeNode:
+    - !u ACS.Perm.MQTT.ReadAllStates
+    - !u ACS.Perm.MQTT.ParticipateAsNode
+    - !u ACS.Perm.MQTT.RepresentDevices
+  !u ACS.Perm.Composite.PrimaryApp:
+    - !u ACS.Perm.MQTT.IssueCommands
+    - !u ACS.Perm.MQTT.ReadWholeNamespace
+    - !u ACS.Perm.MQTT.ReadAllStates
+    - !u ACS.Perm.MQTT.UpdateOwnState

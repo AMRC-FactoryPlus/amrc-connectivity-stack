@@ -22,7 +22,7 @@ const { env } = process;
 
 const fplus = await new ServiceClient({ env }).init();
 const model = await new Model({
-    log: fplus.debug.bound("model"),
+    debug:  fplus.debug,
 }).init();
 
 const auth = new Auth({ fplus });

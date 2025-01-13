@@ -21,7 +21,7 @@
   "dependencies": {
     "@amrc-factoryplus/rx-util": "^0.0.3",
     "@amrc-factoryplus/service-api": "^0.0.2",
-    "@amrc-factoryplus/service-client": "1.4.0-bmz.1",
+    "@amrc-factoryplus/service-client": "1.4.0-bmz.2",
     "@amrc-factoryplus/pg-client": "^0.0.1",
     "ajv": "^8.10.0",
     "ajv-formats": "^2.1.1",

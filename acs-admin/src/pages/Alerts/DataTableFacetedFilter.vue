@@ -34,8 +34,8 @@ const selectedValues = computed(() => new Set(props.column?.getFilterValue() as 
 <template>
   <Popover>
     <PopoverTrigger as-child>
-      <Button variant="outline" size="sm" class="h-8 border-dashed flex items-center justify-center gap-1.5">
-        <i class="fa-solid fa-filter text-gray-900"></i>
+      <Button variant="outline" size="sm" class="h-8 border-dashed flex items-center justify-center gap-1.5 dark:text-slate-50 dark:bg-slate-800">
+        <i class="fa-solid fa-filter"></i>
         {{ title }}
         <template v-if="selectedValues.size > 0">
           <Separator orientation="vertical" class="mx-2 h-4" />

@@ -1,6 +1,6 @@
 <template>
     <div v-if="s.loaded" class="flex flex-col gap-4">
-      <Card>
+      <Card class="dark:bg-slate-900">
         <CardHeader class="pb-2">
           <CardDescription>MQTT Server</CardDescription>
           <CardTitle class="text-4xl hover:underline hover:cursor-pointer flex items-center gap-2 group" @click="copy">
@@ -18,7 +18,7 @@
         </CardContent>
       </Card>
       <div class="grid gap-4 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4">
-        <Card class="sm:col-span-2">
+        <Card class="sm:col-span-2 dark:bg-slate-900">
           <CardHeader class="pb-3">
             <CardTitle>Graph</CardTitle>
             <CardDescription class="max-w-lg text-balance leading-relaxed">
@@ -31,7 +31,7 @@
             </Button>
           </CardFooter>
         </Card>
-        <Card class="sm:col-span-2">
+        <Card class="sm:col-span-2 dark:bg-slate-900">
           <CardHeader class="pb-3">
             <CardTitle>Activity</CardTitle>
             <CardDescription class="max-w-lg text-balance leading-relaxed">

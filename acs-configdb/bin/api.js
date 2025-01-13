@@ -13,6 +13,7 @@ import { GIT_VERSION } from "../lib/git-version.js";
 import { Service, Version } from "../lib/constants.js";
 
 import { Auth } from "../lib/auth.js";
+import { BootstrapUUIDs } from "../lib/constants.js";
 import Model from "../lib/model.js";
 import MQTTCli from "../lib/mqttcli.js";
 import { CDBNotify } from "../lib/notify.js";
@@ -20,7 +21,10 @@ import { routes } from "../lib/routes.js";
 
 const { env } = process;
 
-const fplus = await new ServiceClient({ env }).init();
+const fplus = await new ServiceClient({
+    env,
+    bootstrap_uuids:    BootstrapUUIDs,
+}).init();
 const model = await new Model({
     debug:  fplus.debug,
 }).init();

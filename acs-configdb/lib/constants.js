@@ -59,3 +59,5 @@ export const Perm = {
     Manage_App: "95c7cbcb-ce60-49ed-aa81-2fe3eec4559d",
 };
 
+export const BootstrapUUIDs = { App, Perm, SpecialObj };
+

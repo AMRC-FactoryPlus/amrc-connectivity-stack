@@ -2,7 +2,7 @@
   <div class="flex flex-col flex-1">
     <div v-if="s.loaded && connected" id="app"
         class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 w-full gap-1 p-1 line">
-      <div class="rounded-lg" :key="topic.path" :ref="topic.path" v-for="topic in topics">
+      <div class="rounded-lg dark:bg-slate-900" :key="topic.path" :ref="topic.path" v-for="topic in topics">
         <Card class="bg-transparent">
           <CardHeader class="flex flex-row items-center justify-between space-y-0 !pb-0">
             <CardTitle class="text-sm font-medium">
@@ -166,18 +166,18 @@ export default {
           if (this.flashTimeouts[path]) {
             clearTimeout(this.flashTimeouts[path])
             if (this.$refs[path] && this.$refs[path][0]) {
-              this.$refs[path][0].classList.remove('bg-gray-200');
+              this.$refs[path][0].classList.remove('!bg-gray-200', 'dark:!bg-slate-800');
             }
           }
 
           // Apply flash effect and set a new timeout
           if (this.$refs[path] && this.$refs[path][0]) {
-            this.$refs[path][0].classList.add('bg-gray-200');
+            this.$refs[path][0].classList.add('!bg-gray-200', 'dark:!bg-slate-800');
             this.flashTimeouts[path] = setTimeout(() => {
-              this.$refs[path][0].classList.remove('bg-gray-200');
+              this.$refs[path][0].classList.remove('!bg-gray-200', 'dark:!bg-slate-800');
               // Clean up after the timeout executes
               delete this.flashTimeouts[path]
-            }, 200)
+            }, 150)
           }
         }
         else {

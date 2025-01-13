@@ -1,11 +1,11 @@
 <template>
-  <div class="grid h-screen overflow-auto w-full"
-      :class="!l.fullscreen ? 'md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]' : 'grid-cols-1'">
-    <div v-if="!l.fullscreen" class="hidden border-r bg-muted/40 md:block">
+  <div class="grid h-screen overflow-auto w-full dark:bg-slate-950 dark:text-slate-50"
+       :class="!l.fullscreen ? 'md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]' : 'grid-cols-1'">
+    <div id="sidebar" v-if="!l.fullscreen" class="hidden border-r dark:border-slate-800 bg-muted/40 md:block">
       <div class="flex h-full max-h-screen flex-col">
-        <div class="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6">
+        <div class="flex h-14 items-center justify-between border-b dark:border-slate-800 px-4 lg:h-[60px] lg:px-6">
           <a href="/" class="flex items-center gap-2 font-semibold">
-            <img class="size-4" src="/favicon.svg">
+            <img class="size-4 dark:invert" src="/favicon.svg">
             <span class="">ACS</span>
           </a>
         </div>
@@ -13,7 +13,7 @@
           <Nav/>
         </div>
         <div class="mt-auto p-4">
-          <Card>
+          <Card class="dark:bg-slate-900">
             <CardHeader class="p-2 pt-0 md:p-4">
               <CardTitle>Factory+</CardTitle>
               <CardDescription>
@@ -34,7 +34,7 @@
     </div>
     <div class="flex flex-col overflow-auto">
       <header v-if="!l.fullscreen"
-          class="flex justify-between items-center border-b px-4 lg:h-[60px] flex-shrink-0 lg:px-6">
+          class="flex justify-between items-center border-b dark:border-slate-800 px-4 lg:h-[60px] flex-shrink-0 lg:px-6">
         <div class="flex items-center justify-center gap-2">
           <i :class="`fa-solid fa-${$route.meta.icon}`"></i>
           <h3 class="text-lg font-bold tracking-tight">{{$route.meta.name}}</h3>

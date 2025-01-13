@@ -71,7 +71,7 @@ const table = useVueTable({
 <template>
   <div class="space-y-4">
     <DataTableToolbar v-if="!l.fullscreen" :table="table"/>
-    <div class="rounded-md border">
+    <div class="rounded-md border dark:border-slate-800">
       <Table>
         <TableHeader>
           <TableRow v-for="headerGroup in table.getHeaderGroups()" :key="headerGroup.id">

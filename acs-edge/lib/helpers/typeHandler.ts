@@ -1,6 +1,5 @@
 /*
- *  Factory+ / AMRC Connectivity Stack (ACS) Edge component
- *  Copyright 2023 AMRC
+ * Copyright (c) University of Sheffield AMRC 2025.
  */
 
 import {JSONPath} from "jsonpath-plus";
@@ -365,9 +364,11 @@ export function parseValueFromPayload(msg: any, metric: sparkplugMetric, payload
                 .split(delimiter) : msg.toString();
 
             // Handle no path parsing
-            let newVal = (path != '') ? payload[path] : payload;
-
-            return parseTypeFromString(metric.type, newVal);
+            if (path == null || path == '') {
+                return parseTypeFromString(metric.type, payload);
+            } else {
+                return parseTypeFromString(metric.type, payload[path]);
+            }
         case serialisationType.JSON:
             try { // Handles error if invalid JSON is sent in
                 if (typeof msg == "string") {

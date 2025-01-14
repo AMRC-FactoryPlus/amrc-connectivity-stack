@@ -1,0 +1,7 @@
+Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: python-kadmv
+Source: python-kadmv
+
+Files: *
+Copyright: 2014-2017 Russell Jancewicz
+License: MIT

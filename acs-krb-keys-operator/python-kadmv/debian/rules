@@ -1,0 +1,10 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+
+export PYBUILD_NAME=python-kadmv
+
+%:
+	dh $@ --with python3 --buildsystem=pybuild
+
+override_dh_auto_test:
+	echo "no tests"

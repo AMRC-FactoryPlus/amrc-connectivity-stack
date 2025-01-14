@@ -21,7 +21,9 @@
   "author": "AMRC",
   "license": "MIT",
   "dependencies": {
-    "@amrc-factoryplus/utilities": "^2.0.0",
+    "@amrc-factoryplus/pg-client": "^0.0.1",
+    "@amrc-factoryplus/service-api": "^0.0.2",
+    "@amrc-factoryplus/service-client": "^1.4.0-bmz.2",
     "express": "^4.18.1",
     "express-basic-auth": "^1.2.1",
     "http-errors": "^2.0.0",

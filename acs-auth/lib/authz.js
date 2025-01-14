@@ -6,7 +6,7 @@
 
 import express from "express";
 
-import {Debug, UUIDs} from "@amrc-factoryplus/utilities";
+import { UUIDs } from "@amrc-factoryplus/service-client";
 
 import Model from "./model.js";
 import {Perm} from "./uuids.js";
@@ -38,7 +38,7 @@ function valid_krb(krb) {
 
 export default class AuthZ {
     constructor(opts) {
-        this.debug  = new Debug(opts);
+        this.debug  = opts.debug;
         this.model  = new Model(opts);
         this.routes = express.Router();
     }

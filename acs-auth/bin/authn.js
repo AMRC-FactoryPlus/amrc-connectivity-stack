@@ -6,7 +6,8 @@
  * Copyright 2022 AMRC
  */
 
-import { WebAPI, UUIDs } from "@amrc-factoryplus/utilities";
+import { WebAPI } from "@amrc-factoryplus/service-api";
+import { Debug, UUIDs } from "@amrc-factoryplus/service-client";
 
 import AuthN from "../lib/authn.js";
 import AuthZ from "../lib/authz.js";
@@ -17,11 +18,13 @@ import { GIT_VERSION } from "../lib/git-version.js";
 /* This is the F+ service spec version */
 const Version = "1.0.0";
 
+const debug = new Debug({ verbose: process.env.VERBOSE });
+
 const authn = await new AuthN({ }).init();
 const authz = await new AuthZ({
+    debug,
     acl_cache:          process.env.ACL_CACHE ?? 5,
     root_principal:     process.env.ROOT_PRINCIPAL,
-    verbose:            process.env.VERBOSE,
 }).init();
 
 const editor = await new Editor({
@@ -32,6 +35,7 @@ const editor = await new Editor({
 }).init();
 
 const api = await new WebAPI({
+    debug,
     ping:       {
         version:    Version,
         service:    UUIDs.Service.Authentication,
@@ -41,12 +45,12 @@ const api = await new WebAPI({
             revision:       GIT_VERSION,
         },
     },
-    verbose:    process.env.VERBOSE,
     realm:      process.env.REALM,
     hostname:   process.env.HOSTNAME,
     keytab:     process.env.SERVER_KEYTAB,
     http_port:  process.env.PORT ?? 80,
     max_age:    process.env.CACHE_MAX_AGE ?? 60,
+    body_limit: env.BODY_LIMIT,
     routes: app => {
         app.use("/authn", authn.routes);
         app.use("/authz", authz.routes);

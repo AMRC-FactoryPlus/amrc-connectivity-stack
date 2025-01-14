@@ -50,7 +50,7 @@ const api = await new WebAPI({
     keytab:     process.env.SERVER_KEYTAB,
     http_port:  process.env.PORT ?? 80,
     max_age:    process.env.CACHE_MAX_AGE ?? 60,
-    body_limit: env.BODY_LIMIT,
+    body_limit: process.env.BODY_LIMIT,
     routes: app => {
         app.use("/authn", authn.routes);
         app.use("/authz", authz.routes);

@@ -4,7 +4,7 @@
  * Copyright 2022 AMRC
  */
 
-import { Debug, UUIDs} from "@amrc-factoryplus/service-client";
+import { UUIDs} from "@amrc-factoryplus/service-client";
 import { DB } from "@amrc-factoryplus/pg-client";
 
 import Queries from "./queries.js";

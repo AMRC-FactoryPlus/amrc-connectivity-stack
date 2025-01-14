@@ -121,54 +121,53 @@ export function evaluate (expr, ctx) {
     throw util.format("Unknown form %s", name);
 }
 
-function preprocess_expr (expr, ctx) {
-    verbose("PREPROCESSING %o", expr);
-    if (is_scalar(expr))
-        return;
-
-    if (!Array.isArray(expr)) {
-        Object.values(expr).forEach(e => preprocess_expr(e, ctx));
-        return;
-    }
-
-    const [name, ...args] = expr;
-    if (name == "lookup") {
-        const [svc, url, item] = args;
-        if (!is_scalar(svc) || !is_scalar(url))
-            throw util.format("Inappropriate args for lookup: %O", args);
-        ctx.lookups.add(`${svc}/${url}`);
-        preprocess_expr(item, ctx);
-    }
-    else {
-        if (permissions.has(name))
-            ctx.perms.add(name);
-        if (functions.has(name))
-            ctx.calls.add(name);
-        args.forEach(e => preprocess_expr(e, ctx));
-    }
-}
-        
-function preprocess ([args, ...definition]) {
-    const ctx = {
-        calls:      new Set(),
-        lookups:    new Set(),
-        perms:      new Set(),
-    };
-    definition.forEach(e => preprocess_expr(e, ctx));
-    return ctx;
-}
-
-function preprocess_all () {
-    const meta = new Map();
-    for (const [name, definition] of functions.entries()) {
-        meta.set(name, preprocess(definition));
-    }
-    return meta;
-}
+//function preprocess_expr (expr, ctx) {
+//    verbose("PREPROCESSING %o", expr);
+//    if (is_scalar(expr))
+//        return;
+//
+//    if (!Array.isArray(expr)) {
+//        Object.values(expr).forEach(e => preprocess_expr(e, ctx));
+//        return;
+//    }
+//
+//    const [name, ...args] = expr;
+//    if (name == "lookup") {
+//        const [svc, url, item] = args;
+//        if (!is_scalar(svc) || !is_scalar(url))
+//            throw util.format("Inappropriate args for lookup: %O", args);
+//        ctx.lookups.add(`${svc}/${url}`);
+//        preprocess_expr(item, ctx);
+//    }
+//    else {
+//        if (permissions.has(name))
+//            ctx.perms.add(name);
+//        if (functions.has(name))
+//            ctx.calls.add(name);
+//        args.forEach(e => preprocess_expr(e, ctx));
+//    }
+//}
+//        
+//function preprocess ([args, ...definition]) {
+//    const ctx = {
+//        calls:      new Set(),
+//        lookups:    new Set(),
+//        perms:      new Set(),
+//    };
+//    definition.forEach(e => preprocess_expr(e, ctx));
+//    return ctx;
+//}
+//
+//function preprocess_all () {
+//    const meta = new Map();
+//    for (const [name, definition] of functions.entries()) {
+//        meta.set(name, preprocess(definition));
+//    }
+//    return meta;
+//}
 
 let principal;
 const ids = new Map();
-const owners = new Map();
 const lookups = new Map();
 
 builtins.set("flat", a => a);
@@ -294,7 +293,7 @@ functions.set("KkForCluster", [["cluster"],
     ["map", ["g", ["ManageGroup", { group: ["g"], member: "Mine"}]],
         ["Members", "EdgeGroups"]]]);
 
-const metadata = preprocess_all();
+//const metadata = preprocess_all();
 
 export const ev = v => evaluate(v, { depth: 0, definitions: new Map() });
 

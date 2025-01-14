@@ -47,7 +47,7 @@ export default class Queries {
     }
 
     async ace_add (ace) {
-        const dbr = await this.query(`
+        await this.query(`
             insert into ace (principal, permission, target)
             values ($1, $2, $3)
             on conflict do nothing
@@ -56,7 +56,7 @@ export default class Queries {
     }
 
     async ace_delete (ace) {
-        const dbr = await this.query(`
+        await this.query(`
             delete from ace
             where principal = $1
                 and permission = $2
@@ -151,7 +151,7 @@ export default class Queries {
     }
 
     async group_add (group, member) {
-        const dbr = await this.query(`
+        await this.query(`
             insert into member (parent, child)
             values ($1, $2)
             on conflict do nothing
@@ -160,7 +160,7 @@ export default class Queries {
     }
 
     async group_delete (group, member) {
-        const dbr = await this.query(`
+        await this.query(`
             delete from member
             where parent = $1
                 and child = $2

@@ -4,6 +4,9 @@
  * Copyright 2022 AMRC
  */
 
+/* Tell ESLint this is DOM code. */
+/* global document */
+
 import { h, render } from "https://unpkg.com/preact@latest?module";
 import { useState, useEffect, useRef } from "https://unpkg.com/preact@latest/hooks/dist/hooks.module.js?module";
 import htm from "https://unpkg.com/htm?module";

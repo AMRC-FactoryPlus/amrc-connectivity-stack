@@ -1,11 +1,9 @@
 /*
- *  Factory+ / AMRC Connectivity Stack (ACS) Edge component
- *  Copyright 2023 AMRC
+ * Copyright (c) University of Sheffield AMRC 2025.
  */
 
-import {Device, DeviceConnection, deviceOptions} from "../device.js";
+import {DeviceConnection} from "../device.js";
 import {log} from "../helpers/log.js";
-import {SparkplugNode} from "../sparkplugNode.js";
 import {Metrics, writeValuesToPayload} from "../helpers/typeHandler.js";
 import * as mqtt from "mqtt";
 import {v4 as uuidv4} from 'uuid';

@@ -131,6 +131,8 @@ spec:
               value: configdb
             - name: VERBOSE
               value: "1"
+            - name: MQTT_DISABLE
+              value: "1"
 {{ include "amrc-connectivity-stack.cache-max-age" (list . "configdb") | indent 12 }}
             - name: BODY_LIMIT
               value: "{{ .Values.configdb.bodyLimit }}"

@@ -32,7 +32,7 @@ export default class MQTTCli {
 
     static fromEnv (fplus, env) {
         if (env.MQTT_DISABLE) {
-            this.log("Disabling MQTT connection.");
+            fplus.debug.log("mqtt", "Disabling MQTT connection.");
             return;
         }
         return new MQTTCli({

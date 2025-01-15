@@ -14,7 +14,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "modbus-serial": "^8.0.17",
-    "@amrc-factoryplus/edge-driver": "^0.0.4"
+    "@amrc-factoryplus/edge-driver": "^0.0.5",
+    "modbus-serial": "^8.0.17"
   }
 }

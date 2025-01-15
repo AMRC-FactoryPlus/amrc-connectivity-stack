@@ -14,7 +14,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@amrc-factoryplus/edge-driver": "^0.0.4",
+    "@amrc-factoryplus/edge-driver": "^0.0.5",
     "tplink-smarthome-api": "^5.0.0"
   }
 }

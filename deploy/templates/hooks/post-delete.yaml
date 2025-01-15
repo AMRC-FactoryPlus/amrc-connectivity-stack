@@ -8,7 +8,7 @@ spec:
   ttlSecondsAfterFinished: 30
   template:
     spec:
-      serviceAccountName: {{ .Release.Namespace }}-cleanup
+      serviceAccountName: post-delete-cleanup
       containers:
         - name: script-runner
           image: bitnami/kubectl:latest
@@ -28,7 +28,7 @@ spec:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: {{ .Release.Namespace }}-cleanup
+  name: post-delete-cleanup
   namespace: {{ .Release.Namespace }}
   annotations:
     "helm.sh/hook": pre-delete,post-delete
@@ -39,12 +39,11 @@ metadata:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: {{ .Release.Namespace }}-cleanup-role
+  name: post-delete-cleanup-role
   namespace: {{ .Release.Namespace }}
   annotations:
     "helm.sh/hook": pre-delete,post-delete
     "helm.sh/hook-delete-policy": before-hook-creation
-
 rules:
   - apiGroups: [ "factoryplus.app.amrc.co.uk" ]
     resources: [ "kerberos-keys" ]
@@ -55,7 +54,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: {{ .Release.Namespace }}-cleanup-binding
+  name: post-delete-cleanup-binding
   namespace: {{ .Release.Namespace }}
   annotations:
     "helm.sh/hook": pre-delete,post-delete
@@ -63,9 +62,9 @@ metadata:
 
 subjects:
   - kind: ServiceAccount
-    name: {{ .Release.Namespace }}-cleanup
+    name: post-delete-cleanup
     namespace: {{ .Release.Namespace }}
 roleRef:
   kind: Role
-  name: {{ .Release.Namespace }}-cleanup-role
+  name: post-delete-cleanup-role
   apiGroup: rbac.authorization.k8s.io

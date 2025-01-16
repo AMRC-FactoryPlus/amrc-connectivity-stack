@@ -13,7 +13,6 @@ import {
 } from "@amrc-factoryplus/utilities";
 
 import { log } from "./helpers/log.js";
-import { prefixMetrics } from "./helpers/sparkplug.js";
 import {
     metricIndex,
     Metrics,
@@ -198,7 +197,6 @@ export class SparkplugNode extends (
             ...builder.build_alert(
                 UUIDs.Alert.ConfigInvalid, "Config_Invalid",
                 this.#conf.alerts?.configInvalid ?? false),
-            ...prefixMetrics(this.#conf.available, "Available_Metrics"),
         ]);
 
         return this;

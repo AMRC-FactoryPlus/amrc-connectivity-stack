@@ -111,7 +111,6 @@ export interface nodeControl {
 export interface sparkplugConfig {
     address: Address,
     uuid: string,
-    available: sparkplugMetric[],
     alerts?: {
         configFetchFailed: boolean, configInvalid: boolean,
     },

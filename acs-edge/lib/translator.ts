@@ -26,8 +26,7 @@ import {WebsocketConnection, WebsocketDevice} from "./devices/websocket.js";
 import {MTConnectConnection, MTConnectDevice} from "./devices/MTConnect.js";
 import {EtherNetIPConnection, EtherNetIPDevice} from "./devices/EtherNetIP.js";
 import {log} from "./helpers/log.js";
-import {prefixMetrics} from "./helpers/sparkplug.js";
-import {sparkplugConfig, sparkplugMetric} from "./helpers/typeHandler.js";
+import {sparkplugConfig,} from "./helpers/typeHandler.js";
 import {Device, deviceOptions} from "./device.js";
 import * as UUIDs from "./uuids.js";
 import {EventEmitter} from "events";
@@ -82,25 +81,20 @@ export class Translator extends EventEmitter {
             // Fetch our config
             const ids = await this.fetchIdentities();
             const conf = await this.fetchConfig(ids.uuid!);
-
-            log('Finding available metrics...');
-            const conns = conf.deviceConnections ?? [];
-            const available = conns
-                .flatMap(c => c.devices)
-                .flatMap(d => prefixMetrics(d.metrics, d.deviceId));
-
-            // Setup Sparkplug node
             const spConf = {
-                ...conf.sparkplug!, 
-                address:    ids.sparkplug!,
-                uuid:       ids.uuid!,
-                available,
+                ...conf.sparkplug!, address: ids.sparkplug!, uuid: ids.uuid!,
             };
-            this.sparkplugNode = await this.setupSparkplug(spConf);
 
+            // Create sparkplug node
+            this.sparkplugNode = await new SparkplugNode(this.fplus, spConf).init();
+            log(`Created Sparkplug node "${ids.sparkplug!}".`);
+
+            // Create a new device connection for each type listed in config file
             log('Building up connections and devices...');
-            /* This uses this.sparkplugNode */
-            conns.forEach(c => this.setupConnection(c));
+            conf?.deviceConnections?.forEach(c => this.setupConnection(c));
+
+            // Setup Sparkplug node handlers
+            this.setupSparkplug();
         } catch (e: any) {
             log(`Error starting translator: ${e.message}`);
             console.error((e as Error).stack);
@@ -133,9 +127,8 @@ export class Translator extends EventEmitter {
         this.emit('stopped', kill);
     }
 
-    async setupSparkplug(spConf: sparkplugConfig) : Promise<SparkplugNode> {
-        const sp = await new SparkplugNode(this.fplus, spConf).init();
-        log(`Created Sparkplug node "${spConf.address}".`);
+    setupSparkplug() {
+        const sp = this.sparkplugNode;
 
         /**
          * What to do when a Sparkplug Birth certificate is requested
@@ -172,8 +165,6 @@ export class Translator extends EventEmitter {
             log('Handling stop request for all devices');
             this.stop();
         })
-
-        return sp;
     }
 
     setupConnection(connection: any): void {
@@ -213,6 +204,7 @@ export class Translator extends EventEmitter {
             })
         });
 
+        // Open the connection
         newConn.open();
     }
 

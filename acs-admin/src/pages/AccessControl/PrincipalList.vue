@@ -4,9 +4,17 @@
 <template>
   <Skeleton v-if="p.loading" v-for="i in 10" class="h-16 rounded-lg mb-2"/>
   <DataTable v-else :data="p.data" :columns="columns" :filters="[{
+        name: 'Name',
+        property: 'name',
+        options: filterOptions.names,
+      }, {
         name: 'Principal',
         property: 'kerberos',
         options: filterOptions.principals,
+      }, {
+        name: 'Account Type',
+        property: 'class',
+        options: filterOptions.class,
       }, {
         name: 'UUID',
         property: 'uuid',
@@ -41,7 +49,19 @@ export default {
 
     filterOptions () {
       return {
+        names: this.p.data.map((p) => p.name).filter((v, i, a) => a.indexOf(v) === i).map((p) => {
+          return {
+            label: p,
+            value: p,
+          }
+        }),
         principals: this.p.data.map((p) => p.kerberos).filter((v, i, a) => a.indexOf(v) === i).map((p) => {
+          return {
+            label: p,
+            value: p,
+          }
+        }),
+        class: this.p.data.map((p) => p.class.name).filter((v, i, a) => a.indexOf(v) === i).map((p) => {
           return {
             label: p,
             value: p,

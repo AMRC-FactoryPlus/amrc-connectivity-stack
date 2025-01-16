@@ -1,5 +1,5 @@
 <!--
-  - Copyright (c) University of Sheffield AMRC 2024.
+  - Copyright (c) University of Sheffield AMRC 2025.
   -->
 
 <template>
@@ -45,8 +45,8 @@ import { usePrincipalStore } from '@store/usePrincipalStore.js'
 import { useGroupStore } from '@store/useGroupStore.js'
 import PrincipalList from './PrincipalList.vue'
 import GroupList from './GroupList.vue'
-import PermissionList from "@pages/AccessControl/PermissionList.vue";
-import { usePermissionStore } from "@store/usePermissionStore.js";
+import PermissionList from '@pages/AccessControl/Permissions/PermissionList.vue'
+import { usePermissionStore } from '@store/usePermissionStore.js'
 
 export default {
   name: 'AccessControl',

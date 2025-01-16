@@ -17,7 +17,7 @@
       <TabsTrigger value="groups">
         Groups
       </TabsTrigger>
-      <TabsTrigger disabled value="permissions">
+      <TabsTrigger value="permissions">
         Permissions
       </TabsTrigger>
     </TabsList>
@@ -26,6 +26,9 @@
     </TabsContent>
     <TabsContent value="groups">
       <GroupList @rowClick="e => selectedGroup = e.original"/>
+    </TabsContent>
+    <TabsContent value="permissions">
+      <PermissionList @rowClick="e => {console.log('Selected Permission', e.original); selectedPermission = e.original}"/>
     </TabsContent>
   </Tabs>
 </template>
@@ -42,6 +45,8 @@ import { usePrincipalStore } from '@store/usePrincipalStore.js'
 import { useGroupStore } from '@store/useGroupStore.js'
 import PrincipalList from './PrincipalList.vue'
 import GroupList from './GroupList.vue'
+import PermissionList from "@pages/AccessControl/PermissionList.vue";
+import { usePermissionStore } from "@store/usePermissionStore.js";
 
 export default {
   name: 'AccessControl',
@@ -50,11 +55,13 @@ export default {
     return {
       s: useServiceClientStore(),
       p: usePrincipalStore(),
+      ps: usePermissionStore(),
       g: useGroupStore(),
     }
   },
 
   components: {
+    PermissionList,
     Button,
     DataTable,
     Skeleton,
@@ -82,12 +89,14 @@ export default {
     // in other tables so this is cleaner.
     this.p.fetch()
     this.g.fetch()
+    this.ps.fetch()
   },
 
   data () {
     return {
       selectedPrincipal: null,
       selectedGroup: null,
+      selectedPermission: null
     }
   },
 }

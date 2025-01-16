@@ -4,7 +4,7 @@
 
 <template>
   <Skeleton v-if="g.loading || loading" v-for="i in 10" class="h-16 rounded-lg mb-2"/>
-  <DataTable v-else :data="g.data.map(e => ({...e,principal: principal}))" :columns="columns" :filters="[]">
+  <DataTable v-else :data="this.groups" :columns="columns" :filters="[]">
     <template #toolbar-left>
       <Alert class="mr-6">
         <div class="flex items-start gap-3">
@@ -29,8 +29,6 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { useGroupStore } from '@store/useGroupStore.js'
 
 export default {
-  name: 'EffectivePermissions',
-
   setup () {
     return {
       columns,
@@ -55,8 +53,15 @@ export default {
 
   computed: {
     groups () {
+      if (this.g.loading) {
+        return []
+      }
+
       this.loading = false
-      return this.principal.groups
+
+      return this.g.data.filter(group => {
+        return group.members.includes(this.principal.uuid)
+      })
     },
   },
 

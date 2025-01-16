@@ -1,10 +1,10 @@
 /*
- * Copyright (c) University of Sheffield AMRC 2024.
+ * Copyright (c) University of Sheffield AMRC 2025.
  */
 
 import { defineStore } from 'pinia'
 import { useServiceClientStore } from '@/store/serviceClientStore.js'
-import { UUIDs } from "@amrc-factoryplus/service-client";
+import { UUIDs } from '@amrc-factoryplus/service-client'
 
 export const usePermissionStore = defineStore('permission', {
   state: () => ({
@@ -39,7 +39,6 @@ export const usePermissionStore = defineStore('permission', {
           }
         }))
 
-        console.log(testData)
         this.data = testData
         this.loading = false
       }).catch((err) => {

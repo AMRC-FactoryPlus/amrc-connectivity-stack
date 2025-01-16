@@ -8,6 +8,7 @@
         property: 'name',
         options: filterOptions.names
       }, {
+
         name: 'UUID',
         property: 'uuid',
         options: filterOptions.uuids,
@@ -26,7 +27,7 @@ import { useGroupStore } from '@store/useGroupStore.js'
 import { columns } from './groupListColumns.ts'
 
 export default {
-  name: 'PrincipalList',
+  name: 'GroupList',
 
   emits: ['rowClick'],
 
@@ -48,6 +49,12 @@ export default {
     filterOptions () {
       return {
         names: this.g.data.map((g) => g.name).filter((v, i, a) => a.indexOf(v) === i).map((g) => {
+          return {
+            label: g,
+            value: g,
+          }
+        }),
+        class: this.g.data.map((g) => g.class.name).filter((v, i, a) => a.indexOf(v) === i).map((g) => {
           return {
             label: g,
             value: g,

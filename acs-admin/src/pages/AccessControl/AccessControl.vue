@@ -6,6 +6,9 @@
   <Sheet :open="selectedPrincipal !== null" @update:open="e => !e ? selectedPrincipal = null : null">
     <PrincipalManagementSidebar :principal="selectedPrincipal"></PrincipalManagementSidebar>
   </Sheet>
+  <Sheet :open="selectedGroup !== null" @update:open="e => !e ? selectedGroup = null : null">
+    <GroupManagementSidebar :group="selectedGroup"></GroupManagementSidebar>
+  </Sheet>
   <Tabs default-value="principals">
     <TabsList class="mb-6">
       <TabsTrigger value="principals">
@@ -66,6 +69,7 @@ export default {
     TabsList,
     TabsTrigger,
     PrincipalManagementSidebar: defineAsyncComponent(() => import('./Principals/PrincipalManagementSidebar.vue')),
+    GroupManagementSidebar: defineAsyncComponent(() => import('./Groups/GroupManagementSidebar.vue')),
     PrincipalList,
     GroupList,
   },

@@ -6,15 +6,12 @@ import type {ColumnDef} from '@tanstack/vue-table'
 import {h} from 'vue'
 
 import DataTableColumnHeader from '@/components/ui/data-table/DataTableColumnHeader.vue'
+import GroupDropdown from '../Principals/GroupDropdown.vue'
 
 export interface Group {
     uuid: string
     name: string
     members: string[]
-    class: {
-        uuid: string
-        name: string
-    }
 }
 
 export const columns: ColumnDef<Group>[] = [
@@ -27,21 +24,6 @@ export const columns: ColumnDef<Group>[] = [
 
         cell: ({row}) => {
             return h('span', {class: 'max-w-[500px] truncate font-medium'}, row.getValue('name'))
-        },
-        filterFn: (row, id, value) => {
-            return value.includes(row.getValue(id))
-        },
-    },
-    {
-        accessorKey: 'class',
-        accessorFn: (row) => row.class.name,
-        header: ({column}) => h(DataTableColumnHeader, {
-            column,
-            title: 'Group Type'
-        }),
-
-        cell: ({row}) => {
-            return h('span', {class: 'max-w-[500px] truncate text-gray-500'}, row.getValue('class'))
         },
         filterFn: (row, id, value) => {
             return value.includes(row.getValue(id))
@@ -62,20 +44,6 @@ export const columns: ColumnDef<Group>[] = [
         },
     },
     {
-        // Use accessorFn to calculate member count
-        accessorKey: 'memberCount',
-        accessorFn: (row) => row.members?.length || 0,
-        header: ({column}) => h(DataTableColumnHeader, {
-            column,
-            title: 'Member Count'
-        }),
-        cell: ({row}) => {
-            return h('span', {class: 'max-w-[500px] truncate font-medium'}, row.getValue('memberCount'))
-        },
-    },
-    {
         id: 'actions',
-        cell: ({row}) => {
-            return h('i', {class: 'fa-solid fa-chevron-right'})
-        },
+        cell: ({row}) => h(GroupDropdown, {row}),
     }]

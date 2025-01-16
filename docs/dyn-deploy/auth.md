@@ -171,10 +171,6 @@ All proposals need to meet these conditions:
 * It must be possible to create groups of principals and to grant
   permissions to all members of the group.
 
-* Factory+ objects can be assigned owners. Creating an object in the
-  ConfigDB grants ownership to the creator. Ownership can be reassigned,
-  subject to permissions.
-
 ### Permission templates
 
 [Full proposal](./auth/sexpr.md).
@@ -189,9 +185,9 @@ consuming service based on change-notify channels.
 The result is more complex than I hoped it would be, in particular the
 partial evaluation is difficult to handle correctly. 
 
-### Dynamic groups
+### Minimal changes
 
-[Full proposal](./auth/dyn-groups.md).
+[Full proposal](./auth/minimal.md).
 
 This is intended as a simplest-possible proposal while still meeting the
 conditions above.

@@ -15,6 +15,12 @@ Most of the components deployed by ACS are implementations of the core component
 * [Edge clusters: Bootstrap process](./docs/edge-bootstrap.md)
 * [Internal Git server](./docs/git-server.md)
 
+## Future work
+
+These are proposals for potential future work.
+
+* [Dynamic deployment](./docs/dyn-deploy/index.md)
+
 ## Maintainers
 
 | Name           | Email                       |

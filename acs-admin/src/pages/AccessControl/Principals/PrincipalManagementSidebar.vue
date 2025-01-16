@@ -5,7 +5,10 @@
 <template>
   <SheetContent v-if="principal" class="gap-6 flex flex-col overflow-auto">
     <SheetHeader>
-      <SheetTitle>{{principal.kerberos}}</SheetTitle>
+      <SheetTitle>{{principal.name}}</SheetTitle>
+      <SheetDescription>
+        {{principal.kerberos}}
+      </SheetDescription>
       <SheetDescription>
         {{principal.uuid}}
       </SheetDescription>

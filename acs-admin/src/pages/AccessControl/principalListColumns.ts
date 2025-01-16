@@ -9,10 +9,42 @@ import DataTableColumnHeader from '@/components/ui/data-table/DataTableColumnHea
 
 export interface PrincipalMapping {
     uuid: string
-    kerberos: string;
+    kerberos: string
+    name: string
+    class: {
+        uuid: string
+        name: string
+    }
 }
 
 export const columns: ColumnDef<PrincipalMapping>[] = [{
+    accessorKey: 'name',
+    header: ({column}) => h(DataTableColumnHeader, {
+        column,
+        title: 'Name'
+    }),
+
+    cell: ({row}) => {
+        return h('span', {class: 'max-w-[500px] truncate font-medium'}, row.getValue('name'))
+    },
+    filterFn: (row, id, value) => {
+        return value.includes(row.getValue(id))
+    },
+}, {
+    accessorKey: 'class',
+    accessorFn: (row) => row.class.name,
+    header: ({column}) => h(DataTableColumnHeader, {
+        column,
+        title: 'Account Type'
+    }),
+
+    cell: ({row}) => {
+        return h('span', {class: 'max-w-[500px] truncate font-medium'}, row.getValue('class'))
+    },
+    filterFn: (row, id, value) => {
+        return value.includes(row.getValue(id))
+    },
+}, {
     accessorKey: 'kerberos',
     header: ({column}) => h(DataTableColumnHeader, {
         column,

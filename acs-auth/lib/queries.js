@@ -135,33 +135,16 @@ export default class Queries {
         return dbr.rows[0]?.uuid;
     }
 
-    async group_list () {
+    async group_all () {
         const dbr = await this.query(`
-            select distinct parent from member
-        `);
-        return dbr.rows.map(r => r.parent);
-    }
-
-    async group_get (grp) {
-        const dbr = await this.query(`
-            select child from member
-            where parent = $1
-        `, [grp]);
-        return dbr.rows.map(r => r.child);
-    }
-
-    async group_add (group, member) {
-        await this.query(`
-            insert into member (parent, child)
-            values ($1, $2)
-            on conflict do nothing
-        `, [group, member]);
-        return 204;
+            select parent, child from old_member
+        `,);
+        return dbr.rows;
     }
 
     async group_delete (group, member) {
         await this.query(`
-            delete from member
+            delete from old_member
             where parent = $1
                 and child = $2
         `, [group, member]);

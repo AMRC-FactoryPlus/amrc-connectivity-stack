@@ -7,6 +7,9 @@
 # Local config
 config.mk
 
+# Generated files
+lib/git-version.js
+
 # Secrets
 /keytabs/
 /volumes/

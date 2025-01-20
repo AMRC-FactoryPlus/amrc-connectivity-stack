@@ -94,9 +94,12 @@ export default class AuthZ {
             //.put(this.principal_update.bind(this))
             .delete(this.principal_delete.bind(this));
 
-        api.get("/group", this.group_list.bind(this));
-        api.get("/group/:group", this.group_get.bind(this));
-        api.put("/group/:group/:member", this.group_add.bind(this));
+        /* These endpoints are for migration only. PUT has been removed
+         * so group members can only be deleted. Normally all groups
+         * will be cleared the first time service-setup runs; the only
+         * reason for this not happening would be if groups were not
+         * correctly registered in the ConfigDB. */
+        api.get("/group/all", this.group_all.bind(this));
         api.delete("/group/:group/:member", this.group_delete.bind(this));
 
         api.get("/effective", this.effective_list.bind(this));

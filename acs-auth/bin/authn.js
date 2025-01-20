@@ -16,7 +16,7 @@ import Editor from "../lib/editor.js";
 import { GIT_VERSION } from "../lib/git-version.js";
 
 /* This is the F+ service spec version */
-const Version = "1.0.0";
+const Version = "2.0.0";
 
 const debug = new Debug({ verbose: process.env.VERBOSE });
 

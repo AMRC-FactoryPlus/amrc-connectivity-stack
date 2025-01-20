@@ -96,7 +96,7 @@ export default class Model extends Queries {
         if (!this.dump_validate(dump))
             return 400;
 
-        return 500;
+        return 204;
         return this.txn(async q => {
             for (const ace of dump.aces ?? []) {
                 await q.ace_add(ace);

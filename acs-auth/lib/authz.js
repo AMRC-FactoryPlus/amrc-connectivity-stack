@@ -226,35 +226,13 @@ export default class AuthZ {
         return res.status(200).json(uuid);
     }
 
-    async group_list(req, res) {
+    async group_all(req, res) {
         const ok = await this.model.check_acl(
             req.auth, Perm.Manage_Group, UUIDs.Null, false);
         if (!ok) return res.status(403).end();
 
-        const groups = await this.model.group_list();
+        const groups = await this.model.group_all();
         return res.status(200).json(groups);
-    }
-
-    async group_get(req, res) {
-        const grp = req.params.group;
-
-        const ok = await this.model.check_acl(
-            req.auth, Perm.Manage_Group, grp, true);
-        if (!ok) return res.status(403).end();
-
-        const members = await this.model.group_get(grp);
-        return res.status(200).json(members);
-    }
-
-    async group_add(req, res) {
-        const {group, member} = req.params;
-
-        const ok = await this.model.check_acl(
-            req.auth, Perm.Manage_Group, group, true);
-        if (!ok) return res.status(403).end();
-
-        const st = await this.model.group_add(group, member);
-        return res.status(st).end();
     }
 
     async group_delete(req, res) {

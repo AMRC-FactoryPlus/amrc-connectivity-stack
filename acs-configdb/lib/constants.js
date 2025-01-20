@@ -7,7 +7,7 @@
 import { GIT_VERSION } from "./git-version.js";
 
 /* This is the version of the ConfigDB service spec we comply to */
-export const Version = "1.7.0";
+export const Version = "2.0.0";
 
 export const Null_UUID = "00000000-0000-0000-0000-000000000000";
 

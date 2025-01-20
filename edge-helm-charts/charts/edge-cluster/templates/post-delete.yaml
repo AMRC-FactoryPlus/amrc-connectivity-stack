@@ -64,6 +64,7 @@ metadata:
   annotations:
     "helm.sh/hook": pre-delete,post-delete
     "helm.sh/hook-delete-policy": before-hook-creation
+
 subjects:
   - kind: ServiceAccount
     name: edge-cluster-post-delete-cleanup

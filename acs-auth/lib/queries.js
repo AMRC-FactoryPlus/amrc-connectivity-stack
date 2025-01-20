@@ -6,6 +6,17 @@
 
 import { Special } from "./uuids.js";
 
+/* This must match the \sets in sql/v2.sql */
+const IDs = {
+    Kerberos:           1,
+    Sparkplug:          2,
+    Principal:          3,
+    PrincipalGroup:     4,
+    Permission:         5,
+    PermissionGroup:    6,
+    Self:               7,
+};
+
 /* Queries is a separate class, because sometimes we want to query on
  * the database directly, and sometimes we need to query using a query
  * function for a transaction. The model inherits from this class. */
@@ -128,9 +139,10 @@ export default class Queries {
 
     async principal_find_by_krb (kerberos) {
         const dbr = await this.query(`
-            select uuid
-            from principal
-            where kerberos = $1
+            select u.uuid
+            from identity i
+                join uuid u on u.id = i.principal
+            where i.kind = ${IDs.Kerberos} and i.name = $1
         `, [kerberos]);
         return dbr.rows[0]?.uuid;
     }

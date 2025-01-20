@@ -121,6 +121,8 @@ export default class AuthZ {
         if (!princ_valid || !valid_uuid(permission))
             return res.status(400).end();
 
+        return res.status(500).end();
+
         const ok = await this.model.check_acl(
             req.auth, Perm.Read_ACL, permission, true)
         if (!ok)
@@ -178,6 +180,9 @@ export default class AuthZ {
         if (!valid_uuid(uuid))
             return res.status(400).end();
 
+        /* XXX I don't know if we want to keep this API? It is used
+         * currently... */
+        return res.status(500).end();
         const ids = await this.model.principal_get(uuid);
 
         /* We can return 403 here as long as we don't return 404 until

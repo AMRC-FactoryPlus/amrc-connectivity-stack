@@ -13,10 +13,11 @@ function interp (from, to, by) {
 }
 
 export default class Packet {
-    constructor (vis, node, style) {
+    constructor (vis, node, style, stopping) {
         this.vis = vis;
         this.node = node;
         this.style = style;
+        this.stopping = stopping;
     }
 
     render (time, circle) {
@@ -24,6 +25,8 @@ export default class Packet {
         let dT = (time - this.start) / 700;
     
         if (dT > 1) {
+            if (this.stopping)
+                return false;
             this.node = this.node.parent;
             if (!this.node.parent)
                 return false;

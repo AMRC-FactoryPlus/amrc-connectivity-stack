@@ -5,6 +5,14 @@ acs:
   baseUrl: factoryplus.myorganisation.com
   # -- Whether or not services should be served over HTTPS
   secure: true
+  letsEncrypt:
+    # -- Whether or not to use Let's Encrypt to automatically generate
+    # certificates for the services
+    enabled: false
+    # -- The email address to use for Let's Encrypt
+    email: ''
+    # -- Whether or not to use the staging environment for Let's Encrypt
+    staging: false
   # -- The name of the secret holding the wildcard certificate for the
   # above domain. It will be used for every service unless that service
   # specifies its own tlsSecretName.
@@ -69,6 +77,7 @@ auth:
     # -- The repository of the Authorisation component
     repository: acs-auth
     pullPolicy: IfNotPresent
+  verbosity: "ALL,!service,!token,!query"
 
 directory:
   # -- Whether or not to enable the Directory component
@@ -89,6 +98,15 @@ configdb:
     # -- The repository of the Configuration Store component
     repository: acs-configdb
     pullPolicy: IfNotPresent
+  bodyLimit: 100kb
+
+monitor:
+  enabled: true
+  image:
+    registry: ghcr.io/amrc-factoryplus
+    repository: acs-monitor
+    pullPolicy: IfNotPresent
+  verbosity: "ALL,!service,!token"
 
 # -- The service-setup component loads ACS-specific configuration into
 # the ACS services when the Helm chart is deployed or upgraded.
@@ -100,28 +118,26 @@ serviceSetup:
     pullPolicy: IfNotPresent
   # This section overrides the classes etc. installed into the ConfigDB
   config:
-    # Git repos to mirror in the on-prem git server
+    # Git repos to create in the on-prem server. These may be
+    # automatically mirrored from external repos, or populated by the
+    # service setup job.
     repoMirror:
-      # This repo is expected to hold the edge Helm charts
       helm:
         name: Edge Helm charts
-        # Branches to pull from external repos
-        pull:
-          acs:
-            url: https://github.com/AMRC-FactoryPlus/edge-helm-charts.git
-            # Pull this branch/tag
-            ref: v3.0.0
-            # Merge to a local branch, if not otherwise moved
-            merge: main
-            # Interval to perform updates. 'never' will only update on git
-            # server startup and is suitable for tag refs which won't
-            # change.
-            interval: never
+        pull: {}
     # Helm charts to deploy to the edge; these default to the charts
     # created automatically but can be overridden to customise
     helmChart:
       # Chart to deploy an edge cluster
       #cluster: null
+
+edgeHelm:
+  enabled: true
+  image:
+    registry: ghcr.io/amrc-factoryplus
+    repository: edge-helm-charts
+    pullPolicy: IfNotPresent
+  repoPath: shared/helm
 
 mqtt:
   # -- Whether or not to enable the MQTT component
@@ -134,6 +150,19 @@ mqtt:
     pullPolicy: IfNotPresent
   # -- Possible values are either 1 to enable all possible debugging, or a comma-separated list of debug tags (the tags printed before the log lines). No logging is specified as an empty string.
   verbosity: 0
+
+unsIngesters:
+  sparkplug:
+    enabled: true
+    image:
+      # -- The registry of the MQTT component
+      registry: ghcr.io/amrc-factoryplus
+      # -- The repository of the MQTT component
+      repository: uns-ingester-sparkplug
+      pullPolicy: IfNotPresent
+    # -- The minimum log level that the historian will log messages at (One of 'fatal', 'error', 'warn', 'info', 'debug', 'trace' or 'silent'.)
+    logLevel: info
+    verbosity: 0
 
 visualiser:
   enabled: true
@@ -187,11 +216,24 @@ cmdesc:
   # -- Possible values are either 1 to enable all possible debugging, or a comma-separated list of debug tags (the tags printed before the log lines). No logging is specified as an empty string.
   verbosity: 1
 
-warehouse:
-  # -- Whether or not to enable the Warehouse component
-  ingester:
+historians:
+  uns:
+    enabled: false
+    # -- The minimum log level that the historian will log messages at (One of 'fatal', 'error', 'warn', 'info', 'debug', 'trace' or 'silent'.)
+    logLevel: info
+    # -- The number of messages to batch together before sending to InfluxDB
+    batchSize: 5000
+    # -- Send all buffered messages after this amount of time has elapsed if the buffer is not full (in milliseconds)
+    flushInterval: 10000
+    image:
+      # -- The registry of the Warehouse component
+      registry: ghcr.io/amrc-factoryplus
+      # -- The repository of the UNS Historian component
+      repository: historian-uns
+      pullPolicy: IfNotPresent
+  sparkplug:
     enabled: true
-    # -- The minimum log level that the ingester will log messages at (One of 'fatal', 'error', 'warn', 'info', 'debug', 'trace' or 'silent'.)
+    # -- The minimum log level that the historian will log messages at (One of 'fatal', 'error', 'warn', 'info', 'debug', 'trace' or 'silent'.)
     logLevel: info
     # -- The number of messages to batch together before sending to InfluxDB
     batchSize: 5000
@@ -201,9 +243,8 @@ warehouse:
       # -- The registry of the Warehouse component
       registry: ghcr.io/amrc-factoryplus
       # -- The repository of the Warehouse component
-      repository: influxdb-sparkplug-ingester
+      repository: historian-sparkplug
       pullPolicy: IfNotPresent
-
 git:
   # -- Whether or not to enable the Git component
   enabled: true
@@ -226,6 +267,16 @@ clusterManager:
     repository: acs-cluster-manager
     pullPolicy: IfNotPresent
   verbosity: "ALL,!service,!token"
+
+admin:
+  # -- Whether or not to enable the Admin component
+  enabled: true
+  image:
+    # -- The registry of the Admin component
+    registry: ghcr.io/amrc-factoryplus
+    # -- The repository of the Admin component
+    repository: acs-admin
+    pullPolicy: IfNotPresent
 
 shell:
   image:
@@ -278,8 +329,6 @@ kubegres:
 traefik:
   enabled: true
   ports:
-    web:
-      expose: false
     mqtt:
       port: 1883
       expose: false
@@ -393,3 +442,6 @@ influxdb2:
         influx v1 dbrp create --bucket-id ${DOCKER_INFLUXDB_INIT_BUCKET_ID} --db default --rp default --default --org ${DOCKER_INFLUXDB_INIT_ORG}
   pdb:
     create: false
+
+cert-manager:
+  fullnameOverride: "cert-manager"

@@ -4,11 +4,6 @@
  * Copyright 2023 AMRC
  */
 
-import {Debug} from "@amrc-factoryplus/utilities";
-
-const debug = new Debug();
-const log = debug.log.bind(debug, "etag");
-
 /* An ETag consists of an opaque string and a type. Currently there are
  * two types: strong and weak. */
 export class ETag {

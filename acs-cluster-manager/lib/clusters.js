@@ -69,11 +69,14 @@ export class Clusters {
             .subscribe(() => process.exit(0));
 
         this.config = await cdb.get_config(
-            UUIDs.App.ServiceConfig, Edge.Service.EdgeDeployment);
+            UUIDs.App.ServiceConfig, Edge.Service.EdgeDeployment)
+            .catch(() => null);
 
-        /* If we have no SS config, wait 10 minutes and then exit */
+        /* If we have no SS config, wait 2 minutes and then exit */
         if (!this.config) {
-            await timers.setTimeout(10*60*1000);
+            this.log("No SS config, restarting in 2 minutes...");
+            await timers.setTimeout(2*60*1000);
+            this.log("Restarting to reload SS config");
             process.exit(0);
         }
     }

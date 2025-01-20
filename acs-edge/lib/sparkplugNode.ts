@@ -12,7 +12,7 @@ import {
     ServiceClient, 
 } from "@amrc-factoryplus/utilities";
 
-import { log } from "./helpers/log.js";
+import { log, logf } from "./helpers/log.js";
 import {
     metricIndex,
     Metrics,
@@ -78,8 +78,6 @@ export class SparkplugNode extends (
     #client: any
     #metrics: Metrics
     isOnline: boolean
-    #metricBuffer: { [index: string]: sparkplugMetric[] }
-    #pubIntHandle: ReturnType<typeof setInterval>
     #aliasCounter: number
     #metricNameIndex: metricIndex
 
@@ -93,12 +91,7 @@ export class SparkplugNode extends (
          * mess everywhere. */
         this.#metrics = new Metrics([]);
         this.#metricNameIndex = {};
-        this.#metricBuffer = {}; // Buffer to hold metrics when periodic publishing enabled
         this.#aliasCounter = 0; // Counter to keep track of metrics aliases for this Edge Node
-        /* XXX This is awful. But it's the only way to get the right
-         * type, and again we really don't want this nullable. */
-        this.#pubIntHandle = setTimeout(() => {
-        }, 1); // Handle for publish interval
 
         this.isOnline = false; // Whether client is online or not
     }
@@ -168,22 +161,10 @@ export class SparkplugNode extends (
                 value: false,
             },
             {
-                // Whether metrics changes should be pushed immediately or buffered and published periodically
-                name: "Node Control/Async Publish Mode",
-                type: sparkplugDataType.boolean,
-                value: this.#conf.nodeControl?.asyncPubMode ?? false,
-            },
-            {
                 // Command to reload the node configuration from the Management App
                 name: "Node Control/Reload Edge Agent Config",
                 type: sparkplugDataType.boolean,
                 value: false
-            },
-            {
-                // If client is to publish periodically then define how often should this be done
-                name: "Node Control/Publish Interval",
-                type: sparkplugDataType.uInt16,
-                value: this.#conf.nodeControl?.pubInterval ?? 0,
             },
             {
                 // Whether payload should be compressed or not
@@ -296,60 +277,11 @@ export class SparkplugNode extends (
             } catch (err) {
                 console.log(err);
             }
-            // If polled publishing is enabled, start the loop...
-            if (!this.#metrics.getByName("Node Control/Async Publish Mode").value) {
-                this.#startPublishInterval();
-            }
         } else {
             log(`Skipping DBIRTH for ${deviceId} until we're connected to the Factory+ UNS.`);
         }
     }
 
-    /**
-     * Start periodic publishing
-     */
-    async #startPublishInterval() {
-        // Get required publishing interval
-        const pubInt = this.#metrics.getByName("Node Control/Publish Interval").value as number;
-        // Start periodic publishing of metrics from buffer
-        this.#pubIntHandle = setInterval(() => {
-            this.#publishMetricBuffer();
-        }, pubInt);
-        log(`Started publishing metrics every ${pubInt} ms`);
-    }
-
-    /**
-     * Stop periodic publishing of metrics from buffer
-     */
-    async #stopPublishInterval() {
-        clearInterval(this.#pubIntHandle);
-        this.#publishMetricBuffer(); // Flush any remaining messages
-    }
-
-    /**
-     * If periodic publishing is enabled, publish any queue metrics from the message buffer
-     */
-    async #publishMetricBuffer() {
-        // For all devices we are publsing on behalf of...
-        await Promise.all(
-            Object.keys(this.#metricBuffer).map(async (deviceId) => {
-                const metricsToPublish = this.#metricBuffer[deviceId].length;
-                // If there are metrics waiting to be published and we're online
-                if (metricsToPublish && this.isOnline) {
-                    // Prepare payload and publish metrics
-                    let payload = await this.#preparePayload(
-                        this.#metricBuffer[deviceId].splice(0, metricsToPublish)
-                    );
-                    await this.#client.publishDeviceData(deviceId, payload, {
-                        compress: this.#metrics.getByName("Node Control/Payload Compression").value,
-                    });
-                    log(
-                        `${metricsToPublish} metrics published from buffer for device ${deviceId}.`
-                    );
-                }
-            })
-        );
-    }
 
     /**
      * Publish DDATA on behalf of connected device
@@ -357,29 +289,17 @@ export class SparkplugNode extends (
      * @param {sparkplugMetric[]} metrics Array of metric objects to be published
      */
     async publishDData(deviceId: string, metrics: sparkplugMetric[]) {
-
-        // If metrics are to be published immediately...
-        if (this.#metrics.getByName("Node Control/Async Publish Mode").value) {
-            // Prepare payload and publish metrics now!
-            let payload = await this.#preparePayload(metrics);
-            try {
-                this.#client.publishDeviceData(deviceId, payload, {
-                    compress: this.#metrics.getByName("Node Control/Payload Compression").value,
-                });
-                // console.dir(payload, {depth: null});
-                // console.log(Date.now() - (metrics[2].value as number));
-                log(`Async DDATA published for ${deviceId}.`);
-            } catch (err) {
-                console.log(err);
-            }
-        } else {
-            // Otherwise if metrics are being buffered before publishing
-            // If this device doesn't have an entry in the metric buffer, add one
-            if (!this.#metricBuffer[deviceId]) {
-                this.#metricBuffer[deviceId] = [];
-            }
-            // Then add these metrics to the publish buffer to be published later
-            this.#metricBuffer[deviceId] = this.#metricBuffer[deviceId].concat(metrics);
+        // Prepare payload and publish metrics now!
+        let payload = await this.#preparePayload(metrics);
+        try {
+            this.#client.publishDeviceData(deviceId, payload, {
+                compress: this.#metrics.getByName("Node Control/Payload Compression").value,
+            });
+            // console.dir(payload, {depth: null});
+            // console.log(Date.now() - (metrics[2].value as number));
+            log(`Async DDATA published for ${deviceId}.`);
+        } catch (err) {
+            console.log(err);
         }
     }
 
@@ -412,8 +332,10 @@ export class SparkplugNode extends (
      */
     async #handleNCmd(payload: sparkplugPayload) {
         // For each metric in payload
-        log('Handling NCMD');
-        console.log(payload);
+        logf('Handling NCMD: %O', {
+            ...payload,
+            body: payload.body?.toString(),
+        });
         await Promise.all(
             payload.metrics.map(async (metric: sparkplugMetric) => {
                 // If metric only has an alias, find it's name

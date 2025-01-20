@@ -38,6 +38,17 @@ class CreateEdgeClusterRequest extends FormRequest
                 'uuid',
                 'string',
             ],
+            'bare' => [
+                'boolean',
+            ],
         ];
+    }
+
+    public function prepareForValidation(): void
+    {
+        $bare = $this->input("bare");
+        $this->merge([
+            "bare" => ($bare == "true"),
+        ]);
     }
 }

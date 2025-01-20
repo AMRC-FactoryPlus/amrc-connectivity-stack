@@ -178,6 +178,7 @@ class UpdateEdgeAgentConfigurationForNodeAction
                     // We currently copy across the same pollInt and payloadFormat to every device from the deviceConnection. If the need arises we can
                     // natively move these to properties of the device.
                     'pollInt' => $deviceConnectionConfig->pollInt,
+                    'pubInterval' => $device->pub_interval,
                     'payloadFormat' => $deviceConnectionConfig->payloadFormat ?? 'Defined by Protocol',
                 ];
             }

@@ -5,17 +5,34 @@ ifndef .acs.k8s.mk
 
 .PHONY: deploy restart logs
 
+kubectl?=	kubectl
+kubectl_args=	
+_kubectl=	${kubectl} ${kubectl_args}
+
+ifdef k8s.namespace
+kubectl_args+=	-n ${k8s.namespace}
+endif
+
+ifdef k8s.kubeconfig
+kubectl_args+=	--kubeconfig=${k8s.kubeconfig}
+endif
+
 ifdef k8s.deployment
+
+_dep=		deploy/"${k8s.deployment}"
+ifdef k8s.container
+_cont=		-c "${k8s.container}"
+endif
 
 deploy: all restart logs
 
 restart:
-	kubectl rollout restart deploy/"${k8s.deployment}"
-	kubectl rollout status deploy/"${k8s.deployment}"
+	${_kubectl} rollout restart ${_dep}
+	${_kubectl} rollout status ${_dep}
 	sleep 2
 
 logs:
-	kubectl logs -f deploy/"${k8s.deployment}"
+	${_kubectl} logs -f ${_cont} ${_dep}
 
 else
 

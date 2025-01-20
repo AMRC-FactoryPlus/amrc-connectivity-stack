@@ -3,11 +3,13 @@ ARG base_version
 ARG build_version
 ARG base_prefix=ghcr.io/amrc-factoryplus/acs-manager
 
-FROM --platform=linux/amd64 oven/bun:latest as build-frontend
+FROM --platform=linux/amd64 oven/bun:1.1.29 as build-frontend
 WORKDIR /app
-COPY . /app/
 
+COPY package.json bun.lockb .
 RUN bun install --immutable --immutable-cache --check-cache
+
+COPY . .
 RUN bun run build
 RUN rm -rf node_modules
 

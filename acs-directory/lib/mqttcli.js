@@ -52,6 +52,20 @@ function for_each_metric(tree, action) {
     }
 }
 
+function for_each_instance (tree, action, parent) {
+    const schema = tree.Schema_UUID?.value;
+    const uuid = tree.Instance_UUID?.value;
+    if (schema && uuid) {
+        action(schema, uuid, tree, parent);
+        parent = uuid;
+    }
+    for (const metric of Object.values(tree)) {
+        if (!(metric instanceof MetricBranch))
+            continue;
+        for_each_instance(metric, action, parent);
+    }
+}
+
 export default class MQTTCli {
     constructor(opts) {
         this.fplus = opts.fplus;
@@ -255,6 +269,9 @@ export default class MQTTCli {
             case "alert":
                 this.on_alert_notify(id);
                 break;
+            case "link":
+                this.on_link_notify(id);
+                break;
             case "session":
                 this.on_session_notify(id);
                 break;
@@ -270,6 +287,11 @@ export default class MQTTCli {
         const alrt = await this.model.alert_by_id(id);
 
         this.publish_changed([["Alert_Type", alrt.type]]);
+    }
+
+    async on_link_notify (id) {
+        const lnk = await this.model.link_by_id(id);
+        this.publish_changed([["Link_Relation", lnk.relation]]);
     }
 
     async on_session_notify(id) {
@@ -341,16 +363,17 @@ export default class MQTTCli {
     find_alerts(metrics, timestamp) {
         const alerts = [];
 
-        for_each_metric(metrics, (branch, leaf, metric) => {
-            if (leaf != "Schema_UUID" || metric.value != Schema.Alert)
-                return;
+        for_each_instance(metrics, (schema, uuid, branch) => {
+            if (schema != Schema.Alert) return;
+
+            const active = branch.Active;
             alerts.push({
-                uuid:   branch.Instance_UUID.value,
+                uuid,
                 type:   branch.Type.value,
-                metric: branch.Active.name,
-                active: branch.Active.value,
-                alias:  branch.Active.alias,
-                stamp:  ts_date(metric.timestamp ?? timestamp),
+                metric: active.name,
+                active: active.value,
+                alias:  active.alias,
+                stamp:  ts_date(active.timestamp ?? timestamp),
             });
         });
 
@@ -359,31 +382,56 @@ export default class MQTTCli {
     }
 
     record_alert_metrics(address, alerts) {
+        /* We must stringify the address otherwise the Map uses object
+         * identity, and Addresses are not interned */
         const metrics = map_get_or_create(
-            this.alerts, address, 
+            this.alerts, address.toString(), 
             () => ({ name: new Map(), alias: new Map() }));
 
         for (const alrt of alerts.values()) {
             metrics.name.set(alrt.metric, alrt.uuid);
             if (alrt.alias != undefined) {
-                metrics.alias.set(alrt.alias, alrt.uuid);
+                /* We must stringify the alias as it is a Long */
+                metrics.alias.set(alrt.alias.toString(), alrt.uuid);
             }
         }
+        this.log("alerts", "Recorded aliases for %s: %o", address, metrics);
     }
 
     handle_alert_updates(address, payload) {
-        const alerts = this.alerts.get(address);
+        /* Stringification as above */
+        const alerts = this.alerts.get(address.toString());
+        this.log("alerts", "Found aliases for %s: %o", address, alerts);
         if (!alerts) return;
 
         const updates = payload.metrics.flatMap(m => {
             const uuid = "alias" in m 
-                ? alerts.alias.get(m.alias) : alerts.name.get(m.name);
+                ? alerts.alias.get(m.alias.toString()) 
+                : alerts.name.get(m.name);
             if (!uuid) return [];
             const stamp = ts_date(m.timestamp ?? payload.timestamp);
             return [[uuid, m.value, stamp]];
         });
+        this.log("alerts", "Updates: %o", updates);
 
         this.model.update_alerts(updates);
+    }
+
+    find_links(metrics, timestamp) {
+        const links = [];
+
+        for_each_instance(metrics, (schema, uuid, tree, parent) => {
+            if (schema != Schema.Link) return;
+            links.push({
+                uuid,
+                source:     parent,
+                relation:   tree.Relation.value,
+                target:     tree.Target.value,
+            });
+        });
+
+        this.log("links", "Found links: %o", links);
+        return links;
     }
 
     publish_changed(changes) {
@@ -416,9 +464,10 @@ export default class MQTTCli {
             address,
             uuid: tree.Instance_UUID?.value,
             top_schema: tree.Schema_UUID?.value,
-            schemas: this.find_schemas(tree),
-            service: this.find_service(tree),
+            schemas:    this.find_schemas(tree),
+            service:    this.find_service(tree),
             alerts,
+            links:      this.find_links(tree),
         });
 
         this.log("device", `Finished BIRTH for ${address}`);

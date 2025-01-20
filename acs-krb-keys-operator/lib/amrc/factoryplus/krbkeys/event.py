@@ -8,7 +8,7 @@ from    optional    import Optional
 
 from .account       import FPAccount
 from .context       import kk_ctx
-from .spec          import InternalSpec
+from .spec          import InternalSpec, LocalSpec
 from .util          import Identifiers, dslice, log
 
 class KrbKeyEvent:
@@ -155,3 +155,19 @@ class Account (KrbKeyEvent):
 
         if self.new is not None:
             self.new.reconcile()
+
+class LocalSecret (KrbKeyEvent):
+    def __init__ (self, args):
+        super().__init__(args)
+
+        self.old = LocalSpec.of(self.ns, args.get("old"))
+        self.new = Optional.of(self.reason) \
+            .map(lambda r: None if r == "delete" else args.get("new")) \
+            .flat_map(lambda a: LocalSpec.of(self.ns, a))
+
+    def process (self):
+        log(f"Process LocalSecret {self.old} -> {self.new}")
+
+        self.old.if_present(lambda s: s.remove())
+        self.new.if_present(lambda s: s.update())
+

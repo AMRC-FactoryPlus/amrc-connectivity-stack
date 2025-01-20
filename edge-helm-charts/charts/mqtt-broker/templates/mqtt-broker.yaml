@@ -1,0 +1,52 @@
+{{- $k8sname := include "acs.k8sname" . }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Chart.Name }}-{{ $k8sname }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    factory-plus.app: {{ .Chart.Name }}
+    factory-plus.uuid: {{ .Values.uuid }}
+    factory-plus.name: {{ .Values.name }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      factory-plus.app: {{ .Chart.Name }}
+      factory-plus.uuid: {{ .Values.uuid }}
+  template:
+    metadata:
+      labels:
+        factory-plus.app: {{ .Chart.Name }}
+        factory-plus.uuid: {{ .Values.uuid }}
+        factory-plus.name: {{ .Values.name }}
+    spec:
+{{ if .Values.hostname }}
+      nodeSelector:
+        kubernetes.io/hostname: {{ .Values.hostname | quote }}
+      tolerations: {{ .Values.tolerations.specific | toYaml | nindent 8 }}
+{{ else }}
+      tolerations: {{ .Values.tolerations.floating | toYaml | nindent 8 }}
+{{ end }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ .Chart.Name }}-{{ $k8sname }} 
+      containers:
+        - name: mqtt-broker
+{{ list . "mosquitto" | include "acs.image" | indent 10 }}
+          volumeMounts:
+            - mountPath: /mosquitto/config
+              name: config
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: {{ .Chart.Name }}-{{ $k8sname }}
+data:
+  mosquitto.conf: |
+    listener 1883
+    allow_anonymous true

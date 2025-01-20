@@ -23,7 +23,11 @@ class EdgeClusterController extends Controller
         $validated = $request->validated();
 
         return process_action(
-            (new CreateEdgeClusterAction())->execute(name: $validated['name'], chart: $validated['chart'])
+            (new CreateEdgeClusterAction())->execute(
+                name: $validated['name'],
+                chart: $validated['chart'],
+                bare: $validated['bare'],
+            )
         );
     }
 

@@ -48,6 +48,8 @@ export default defineConfig({
 
   // This allows us to get values out of the tailwind file
   build: {
+    target: "esnext",
+    minify: false,
     assetsInlineLimit: 0,
     commonjsOptions: {
       include: ['/tailwind.config.js', 'node_modules/**'],

@@ -9,21 +9,29 @@
 import url from "url";
 import express from "express";
 
-import { Debug, ServiceClient, UUIDs }  from "@amrc-factoryplus/service-client";
-import { WebAPI }                       from "@amrc-factoryplus/utilities";
+import { ServiceClient }    from "@amrc-factoryplus/service-client";
+import { WebAPI }           from "@amrc-factoryplus/service-api";
 
 import { GIT_VERSION } from "../lib/git-version.js";
 import { Service, Version } from "../lib/constants.js";
-import APIv1 from "../lib/api-v1/controller.js";
+
+import { Auth } from "../lib/auth.js";
+import Model from "../lib/model.js";
+import APIv1 from "../lib/api-v1.js";
 import MQTTCli from "../lib/mqttcli.js";
+import { CDBNotify } from "../lib/notify.js";
 
 const Device_UUID = process.env.DEVICE_UUID;
 
 const fplus = await new ServiceClient({ env: process.env }).init();
-
-const api_v1 = await new APIv1({
-    fplus_client:   fplus,
+const model = await new Model({
+    log: fplus.debug.bound("model"),
 }).init();
+
+const auth = new Auth({ fplus });
+const api_v1 = new APIv1({
+    auth, model, fplus
+});
 
 const api = await new WebAPI({
     ping:       {
@@ -36,12 +44,13 @@ const api = await new WebAPI({
             revision:       GIT_VERSION,
         },
     },
-    verbose:    process.env.VERBOSE,
+    debug:      fplus.debug,
     realm:      process.env.REALM,
     hostname:   process.env.HOSTNAME,
     keytab:     process.env.SERVER_KEYTAB,
     http_port:  process.env.PORT,
     max_age:    process.env.CACHE_MAX_AGE,
+    body_limit: process.env.BODY_LIMIT,
 
     routes: app => {
         /* No fancy query-string parsing */
@@ -55,6 +64,11 @@ const api = await new WebAPI({
         app.use("/v1", api_v1.routes);
     },
 }).init();
+
+const notify = new CDBNotify({
+    auth, api, model,
+    log:    fplus.debug.bound("notify"),
+});
 
 if (process.env.MQTT_DISABLE) {
     fplus.debug.log("mqtt", "Disabling MQTT connection.");
@@ -72,4 +86,5 @@ else {
     mqtt.run();
 }
 
+notify.run();
 api.run();

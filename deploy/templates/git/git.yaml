@@ -19,6 +19,10 @@ spec:
         component: git
         factory-plus.service: git
     spec:
+      {{- with .Values.acs.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       volumes:
         - name: krb5-conf
           configMap:

@@ -97,7 +97,7 @@ export default {
 
     localValue (val) {
 
-      if (val.length === 0) {
+      if (val == null || val.length === 0) {
         val = null
       } else if (this.type === 'number') {
         val = Number(val)

@@ -20,7 +20,9 @@ jobs:
       id-token: write
     strategy:
       matrix:
-        type: [ "js-build", "js-run" ]
+        type: 
+          - js-build
+          - js-run
     steps:
       - name: Check if build required
         id: check
@@ -28,7 +30,7 @@ jobs:
           docker manifest inspect ghcr.io/amrc-factoryplus/acs-base-${{ matrix.type }}:${{ env.BASE_JS_VERSION }} || echo "needs-build=true" >> $GITHUB_OUTPUT
       - name: Checkout
         if: steps.check.outputs.needs-build == 'true'
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - uses: ./.github/actions/prepare
         if: steps.check.outputs.needs-build == 'true'
         id: prepare
@@ -38,7 +40,7 @@ jobs:
       - name: Build
         id: build-and-push
         if: steps.check.outputs.needs-build == 'true'
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/amd64,linux/arm64
@@ -71,7 +73,7 @@ jobs:
           docker manifest inspect ghcr.io/amrc-factoryplus/acs-base-pg-build:${{ env.BASE_JS_VERSION }} || echo "needs-build=true" >> $GITHUB_OUTPUT
       - name: Checkout
         if: steps.check.outputs.needs-build == 'true'
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - uses: ./.github/actions/prepare
         id: prepare
         if: steps.check.outputs.needs-build == 'true'
@@ -81,7 +83,7 @@ jobs:
       - name: Build
         id: build-and-push
         if: steps.check.outputs.needs-build == 'true'
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/amd64
@@ -116,7 +118,7 @@ jobs:
           docker manifest inspect ghcr.io/amrc-factoryplus/acs-base-pg-run:${{ env.BASE_JS_VERSION }} || echo "needs-build=true" >> $GITHUB_OUTPUT
       - name: Checkout
         if: steps.check.outputs.needs-build == 'true'
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - uses: ./.github/actions/prepare
         if: steps.check.outputs.needs-build == 'true'
         id: prepare
@@ -126,7 +128,7 @@ jobs:
       - name: Build
         if: steps.check.outputs.needs-build == 'true'
         id: build-and-push
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/amd64
@@ -150,9 +152,22 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        service: [ 'acs-cluster-manager', 'acs-cmdesc', 'acs-edge-monitor', 'acs-edge-sync', 'acs-git',
-                   'acs-identity', 'acs-krb-keys-operator', 'acs-krb-utils', 'acs-service-setup', 'acs-visualiser',
-                   'influxdb-sparkplug-ingester']
+        service: 
+          - acs-admin
+          - acs-cluster-manager
+          - acs-cmdesc
+          - acs-edge-sync
+          - acs-git
+          - acs-identity
+          - acs-krb-keys-operator
+          - acs-krb-utils
+          - acs-monitor
+          - acs-service-setup
+          - acs-visualiser
+          - edge-helm-charts
+          - historian-sparkplug
+          - historian-uns
+          - uns-ingester-sparkplug
     permissions:
       contents: read
       packages: write
@@ -160,7 +175,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - uses: ./.github/actions/prepare
         id: prepare
         with:
@@ -168,7 +183,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         id: build-and-push
         with:
           context: ./${{ steps.prepare.outputs.service-name }}
@@ -178,6 +193,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
+            tag=${{ steps.prepare.outputs.version }}
             revision=${{ steps.prepare.outputs.version }} (${{ github.sha }})
             base_version=${{ env.BASE_JS_VERSION }}
       - uses: ./.github/actions/cleanup
@@ -191,7 +207,12 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        service: [ 'acs-edge' ]
+        service:
+          - acs-edge
+          - edge-bacnet
+          - edge-modbus
+          - edge-test
+          - edge-tplink-smartplug
     permissions:
       contents: read
       packages: write
@@ -199,14 +220,14 @@ jobs:
       pull-requests: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - uses: ./.github/actions/prepare
         id: prepare
         with:
           service-name: ${{ matrix.service }}
           token: ${{ secrets.GITHUB_TOKEN }}
       - name: Build
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         id: build-and-push
         with:
           context: ./${{ steps.prepare.outputs.service-name }}
@@ -231,7 +252,10 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        service: [ 'acs-auth', 'acs-directory', 'acs-configdb' ]
+        service: 
+          - acs-auth
+          - acs-configdb
+          - acs-directory
     permissions:
       contents: read
       packages: write
@@ -239,7 +263,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - uses: ./.github/actions/prepare
         id: prepare
         with:
@@ -247,7 +271,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         id: build-and-push
         with:
           context: ./${{ steps.prepare.outputs.service-name }}
@@ -275,7 +299,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - uses: ./.github/actions/prepare
         id: prepare
@@ -291,7 +315,7 @@ jobs:
       - name: Build Backend Builder
         id: build-backend-builder
         if: steps.check-backend-builder.outputs.needs-build == 'true'
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v6
         with:
           context: ./acs-manager
           file: ./acs-manager/.docker/Dockerfiles/Dockerfile.backend-build
@@ -306,7 +330,7 @@ jobs:
       - name: Build Backend Base
         id: build-backend-base
         if: steps.check-backend-base.outputs.needs-build == 'true'
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v6
         with:
           context: ./acs-manager
           file: ./acs-manager/.docker/Dockerfiles/Dockerfile.backend-base
@@ -315,7 +339,7 @@ jobs:
 
       - name: Build Backend
         id: build-backend
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v6
         with:
           context: ./acs-manager
           file: ./acs-manager/.docker/Dockerfiles/Dockerfile
@@ -328,14 +352,14 @@ jobs:
             build_version=${{ env.BUILD_PHP_VERSION }}
 
       - name: Upload Backend
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.prepare.outputs.version }}-backend
           path: /tmp/image.tar
 
       - name: Build & Push Frontend
         id: build-and-push-frontend
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v6
         with:
           context: ./acs-manager
           push: true
@@ -355,7 +379,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - uses: ./.github/actions/prepare
         id: prepare
         with:
@@ -363,7 +387,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Download artifact
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4
         with:
           name: ${{ steps.prepare.outputs.version }}-backend
           path: /tmp
@@ -383,7 +407,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - uses: ./.github/actions/prepare
         id: prepare
         with:
@@ -409,7 +433,7 @@ jobs:
           cp "target/${krb_zipfile}" "../${{ steps.prepare.outputs.service-name }}"
       - name: Build and push Docker image
         id: build-and-push
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ./${{ steps.prepare.outputs.service-name }}
           push: true
@@ -434,7 +458,7 @@ jobs:
         run: |
           curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ github.event.release.tag_name }}
       - name: Login to GitHub Container Registry
@@ -450,7 +474,7 @@ jobs:
           helm package -u -d deploy/build --version="$VERSION" --app-version="$VERSION" deploy
           echo "VERSION=$VERSION"
           echo "VERSION=$VERSION" >> $GITHUB_ENV
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: new-release
           path: deploy/build/amrc-connectivity-stack-${{ env.VERSION }}.tgz
@@ -465,11 +489,11 @@ jobs:
         run: |
           curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: release
       - name: add-new-release
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: new-release
           path: build
@@ -478,7 +502,7 @@ jobs:
           cd build
           helm repo index --url https://amrc-factoryplus.github.io/amrc-connectivity-stack/build .
       - name: commit
-        uses: stefanzweifel/git-auto-commit-action@v4
+        uses: stefanzweifel/git-auto-commit-action@v5
         id: auto_commit_action
         with:
           commit_message: Release ${{ github.event.release.tag_name }}

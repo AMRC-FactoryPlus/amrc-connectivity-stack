@@ -17,17 +17,28 @@ Kubectl is a command-line tool for controlling Kubernetes clusters. It must be i
 
 ### Configure DNS
 
-This Chart creates a load balancer on your Kubernetes cluster that exposes all services at various subdomains. Please ensure that you have a wildcard DNS entry configured to direct all `*.<baseURL>` requests to your Kubernetes cluster.
+This Chart creates a load balancer on your Kubernetes cluster that exposes all services at various subdomains. Please ensure that you have both a wildcard DNS `A Record` configured to direct all `*.<baseURL>` requests and a root `A Record` to direct all `<baseURL>` requests to your load balancer IP.
 
 ### Configure TLS
 
-#### Production deployment
+If `acs.letsEncrypt.enabled` is true (default) then ACS will utilise `cert-manager` and Let's Encrypt to automatically issue and renew TLS certificates for your ACS installation. Please note that the cluster's DNS will need to be resolvable via the internet for this to work. If you intend on utilising Let's Encrypt to handle certificates for you then you need to ensure that the cert-manager CRDs are installed onto your cluster.
 
-If `acs.secure` is set to `true` in your deployment (enabled by default) then you must also create a wildcard TLS secret on the cluster in the`default` namespace with the same name as the value specified in `acs.tlsSecretName` _before_ installing ACS. The TLS certificate must be valid for all domains covered by the wildcard DNS entry.
+```bash
+kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.14.4/cert-manager.crds.yaml
+```
+
+> Please ensure that you set a valid email address in `acs.letsEncrypt.email` before installing.
+
+#### Bringing your own certificate
+If you'd prefer to use your own certificate, create a wildcard TLS secret in your namespace with the name of `acs.tlsSecretName` (`factoryplus-tls` by default) and set the `acs.letsEncrypt.enabled` value to `false`.
 
 #### Development (insecure) deployment
 
-To deploy a development/testing instance without TLS set `acs.secure` to `false` and ensure that you update the `traefik.ports.web.expose` and `traefik.ports.mqtt.expose` values to `true` in your `values.yaml` file.
+To deploy a development/testing instance without TLS set:
+
+- `acs.secure` to `false`
+- `acs.letsEncrypt.enabled` to `false`
+- `traefik.ports.mqtt.expose` to `true`
 
 ## Install ACS
 
@@ -46,6 +57,8 @@ Next, create a `values.yaml` file in a sensible location on your local machine. 
 acs:
   baseUrl: factoryplus.myorganisation.com # Set this to the domain that ACS will be served from. This should be the same as the wildcard DNS entry you created earlier.
   organisation: MYORGANISATION # Set this to the name of your organisation. It will be used across the deployment for branding and naming.
+  letsEncrypt:
+    email: factoryplus@myorganisation.co.uk
 identity:
   realm: FACTORYPLUS.MYORGANISATION.COM # Set the identity realm for the deployment. This is used to namespace the identity server and should be unique to your deployment. It is recommended that you use the baseUrl in capitals for this value.
 ```
@@ -61,7 +74,7 @@ kubectl create namespace factory-plus
 Finally, install ACS by running the following command.
 
 ```bash
-helm install acs amrc-connectivity-stack/amrc-connectivity-stack --version ^3.0.0 -f values.yaml --namespace factory-plus
+helm install acs amrc-connectivity-stack/amrc-connectivity-stack --version ^3.0.0 -f values.yaml --namespace factory-plus --wait --timeout 30m
 ```
 
 If all went to plan you should now have a fully functioning ACS deployment beginning to deploy to your Kubernetes cluster. Note that it can take a few minutes to have all services operational as the containers are pulled and started.

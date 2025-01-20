@@ -1,0 +1,42 @@
+# This dump creates a service account for the Sparkplug Ingester service
+# and grants it the necessary permissions to read and write to the UNS.
+# It also adds the ReadEntireUNS permission to the Warehouse role so
+# that the UNS historian can use it and has permission to read the UNS.
+---
+service: !u UUIDs.Service.ConfigDB
+version: 1
+overwrite: true
+objects:
+  !u ACS.Class.Permission:
+    - !u ACS.Perm.MQTT.WriteToEntireUNS
+    - !u ACS.Perm.MQTT.ReadEntireUNS
+  !u ACS.Class.UserGroup:
+    - !u ACS.Group.SparkplugIngesters
+    - !u ACS.Group.HistorianUNS
+configs:
+  !u UUIDs.App.Info:
+    !u ACS.Perm.MQTT.WriteToEntireUNS: { name: "MQTT: Write to entire UNS" }
+    !u ACS.Perm.MQTT.ReadEntireUNS: { name: "MQTT: Read entire UNS" }
+    !u ACS.Group.SparkplugIngesters: { name: "Sparkplug Ingesters" }
+    !u ACS.Group.HistorianUNS: { name: "Historian UNS" }
+  !u UUIDs.App.MQTTPermissionTemplate:
+    !u ACS.Perm.MQTT.WriteToEntireUNS:
+      UNS/v1/#: w
+    !u ACS.Perm.MQTT.ReadEntireUNS:
+      UNS/v1/#: rs
+---
+service: !u UUIDs.Service.Authentication
+version: 1
+groups:
+  !u ACS.Group.GlobalDebuggers:
+    - !u ACS.Group.SparkplugIngesters
+  !u ACS.PermGroup.MQTT:
+    - !u ACS.Perm.MQTT.WriteToEntireUNS
+    - !u ACS.Perm.MQTT.ReadEntireUNS
+aces:
+  - principal: !u ACS.Group.HistorianUNS
+    permission: !u ACS.Perm.MQTT.ReadEntireUNS
+    target: !u UUIDs.Special.Null
+  - principal: !u ACS.Group.SparkplugIngesters
+    permission: !u ACS.Perm.MQTT.WriteToEntireUNS
+    target: !u UUIDs.Special.Self

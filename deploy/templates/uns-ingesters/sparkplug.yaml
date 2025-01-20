@@ -1,0 +1,54 @@
+{{- if .Values.unsIngesters.sparkplug.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: uns-ingester-sparkplug
+  namespace: {{ .Release.Namespace }}
+  labels:
+    component: uns-ingester-sparkplug
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: uns-ingester-sparkplug
+  template:
+    metadata:
+      labels:
+        component: uns-ingester-sparkplug
+        factory-plus.service: uns-ingester-sparkplug
+    spec:
+      {{- with .Values.acs.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: krb5-conf
+          configMap:
+            name: krb5-conf
+        - name: keytabs
+          secret:
+            secretName: uns-ingester-sparkplug-keytabs
+
+      containers:
+        - name: uns-ingester-sparkplug
+          image: "{{ include "amrc-connectivity-stack.image-name" (list . .Values.unsIngesters.sparkplug) }}"
+          command: [ "/usr/bin/k5start", "-Uf", "/keytabs/client" ]
+          args: [ "node", "--es-module-specifier-resolution=node", "bin/ingester.js" ]
+          imagePullPolicy: {{ .Values.unsIngesters.sparkplug.image.pullPolicy }}
+          env:
+            - name: KRB5_CONFIG
+              value: /config/krb5-conf/krb5.conf
+            - name: CLIENT_KEYTAB
+              value: /keytabs/client
+            - name: LOG_LEVEL
+              value: {{ .Values.unsIngesters.sparkplug.logLevel | required "values.unsIngesters.sparkplug.logLevel" }}
+            - name: DIRECTORY_URL
+              value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
+            - name: VERBOSE
+              value: {{.Values.unsIngesters.sparkplug.verbosity | quote | required "values.unsIngesters.sparkplug.verbosity"}}
+          volumeMounts:
+            - mountPath: /config/krb5-conf
+              name: krb5-conf
+            - mountPath: /keytabs
+              name: keytabs
+{{- end -}}

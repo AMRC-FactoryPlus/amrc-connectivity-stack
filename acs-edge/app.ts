@@ -3,12 +3,15 @@
  *  Copyright 2023 AMRC
  */
 
-import {ServiceClient, UUIDs} from "@amrc-factoryplus/utilities";
-import {Translator} from "./lib/translator.js";
-import {log} from "./lib/helpers/log.js";
-import {GIT_VERSION} from "./lib/git-version.js";
 import * as dotenv from 'dotenv';
 import sourceMapSupport from 'source-map-support'
+
+import {ServiceClient, UUIDs} from "@amrc-factoryplus/utilities";
+
+import {DriverBroker} from "./lib/driverBroker.js";
+import {GIT_VERSION} from "./lib/git-version.js";
+import {log} from "./lib/helpers/log.js";
+import {Translator} from "./lib/translator.js";
 
 sourceMapSupport.install()
 dotenv.config({path: '../.env'});
@@ -20,9 +23,10 @@ async function run() {
 
     const pollInt = parseInt(process.env.POLL_INT) || 30;
     const fplus = await new ServiceClient({ env: process.env }).init();
+    const broker = new DriverBroker(process.env);
 
     // Once a configuration has been loaded then start up the translator
-    let transApp = new Translator(fplus, pollInt);
+    let transApp = new Translator(fplus, pollInt, broker);
     process.once('SIGTERM', () => {
         log('🔪️SIGTERM RECEIVED');
         transApp.stop(true);

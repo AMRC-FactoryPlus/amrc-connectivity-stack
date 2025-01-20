@@ -10,7 +10,7 @@ import { Special } from "./uuids.js";
  * the database directly, and sometimes we need to query using a query
  * function for a transaction. The model inherits from this class. */
 export default class Queries {
-    static DBVersion = 1;
+    static DBVersion = 2;
 
     constructor (query) {
         this.query = query;

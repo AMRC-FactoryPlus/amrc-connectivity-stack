@@ -16,6 +16,7 @@ spec:
             - /bin/sh
             - -c
             - |
+              # Your shell script starts here
               echo "Starting cleanup..."
               for i in $(kubectl -n {{ .Release.Namespace }} get kerberos-keys -o name); do kubectl -n {{ .Release.Namespace }} patch $i --type=json -p='[{"op": "remove", "path": "/metadata/finalizers"}]'; done
               echo "Cleanup complete!"
@@ -58,6 +59,7 @@ metadata:
   annotations:
     "helm.sh/hook": pre-delete,post-delete
     "helm.sh/hook-delete-policy": before-hook-creation
+
 subjects:
   - kind: ServiceAccount
     name: post-delete-cleanup

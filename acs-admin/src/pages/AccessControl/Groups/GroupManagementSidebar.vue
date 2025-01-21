@@ -16,7 +16,7 @@
           <TabsTrigger value="members">
             Members
           </TabsTrigger>
-          <TabsTrigger disabled value="permissions">
+          <TabsTrigger value="permissions">
             Permissions
           </TabsTrigger>
         </TabsList>
@@ -24,7 +24,7 @@
           <MembersTab :group/>
         </TabsContent>
         <TabsContent value="permissions">
-          Permissions
+          <PermissionsTab :group />
         </TabsContent>
       </Tabs>
     </div>
@@ -35,6 +35,7 @@
 import { SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@components/ui/sheet/index.js'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@components/ui/tabs/index.js'
 import MembersTab from './MembersTab.vue'
+import PermissionsTab from './PermissionsTab.vue'
 
 export default {
 
@@ -50,6 +51,7 @@ export default {
     TabsTrigger,
     TabsContent,
     MembersTab,
+    PermissionsTab,
   },
 
   props: {

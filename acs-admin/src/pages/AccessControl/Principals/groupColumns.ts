@@ -19,7 +19,7 @@ export const columns: ColumnDef<Group>[] = [
         accessorKey: 'name',
         header: ({column}) => h(DataTableColumnHeader, {
             column,
-            title: 'Name'
+            title: 'Group Name'
         }),
 
         cell: ({row}) => {

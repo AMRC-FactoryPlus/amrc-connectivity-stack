@@ -27,13 +27,13 @@
           </TabsTrigger>
         </TabsList>
         <TabsContent value="groups">
-          <GroupsTab :principal/>
+          <GroupsTab :principal @objectClick="e => $emit('objectClick', e)" />
         </TabsContent>
         <TabsContent value="permissions">
-          <PermissionsTab :principal/>
+          <PermissionsTab :principal @objectClick="e => $emit('objectClick', e)" />
         </TabsContent>
         <TabsContent value="effective">
-          <EffectivePermissionsTab :principal/>
+          <EffectivePermissionsTab :principal @objectClick="e => $emit('objectClick', e)" />
         </TabsContent>
       </Tabs>
     </div>
@@ -46,12 +46,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import EffectivePermissionsTab from './EffectivePermissionsTab.vue'
 import GroupsTab from './GroupsTab.vue'
 import PermissionsTab from './PermissionsTab.vue'
+import MembersTab from "@pages/AccessControl/Groups/MembersTab.vue";
 
 export default {
-
   name: 'PrincipalManagementSidebar',
 
+  emits: ['objectClick'],
+
   components: {
+    MembersTab,
     SheetHeader,
     SheetTitle,
     SheetContent,

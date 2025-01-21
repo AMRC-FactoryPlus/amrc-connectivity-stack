@@ -5,7 +5,7 @@
 <template>
   <Skeleton v-if="g.loading || loading" v-for="i in 10" class="h-16 rounded-lg mb-2"/>
   <!-- Need to check whether the click is on a permission or a principal -->
-  <DataTable v-else :data="this.members" :columns="columns" :filters="[]" @row-click="e => $emit('principalClick', e)">
+  <DataTable v-else :data="this.members" :columns="columns" :filters="[]" @row-click="e => $emit('objectClick', e)">
     <template #toolbar-left>
       <Alert class="mr-6">
         <div class="flex items-start gap-3">
@@ -35,7 +35,7 @@ import { UUIDs } from "@amrc-factoryplus/service-client";
 export default {
   name: 'GroupMembership',
 
-  emits: ['principalClick'],
+  emits: ['objectClick'],
 
   setup () {
     return {
@@ -46,32 +46,50 @@ export default {
     }
   },
 
+  watch: {
+    group: {
+      handler (val) {
+        if (val == null) {
+          return
+        }
+
+        this.updateData()
+      },
+      immediate: true,
+    },
+  },
+
+  methods: {
+    async updateData () {
+      // Fill in the member details
+      this.loading = true
+      this.members = await Promise.all(this.group.members.map(async (memberUUID) => {
+        let obj = this.p.data.find(v => v.uuid === memberUUID)
+        if (obj && (obj.name || obj.kerberos)) {
+          return {
+            uuid: memberUUID,
+            name: obj.name ?? obj.kerberos
+          }
+        }
+        try {
+          let objectResponse = await useServiceClientStore().client.ConfigDB.get_config(UUIDs.App.Info, memberUUID);
+          let memberName = objectResponse.name
+          return {
+            uuid: memberUUID,
+            name: memberName
+          }
+        } catch (err) {
+          console.error(`Can't read member details`, err)
+          return {
+            uuid: memberUUID,
+          }
+        }
+      }))
+      this.loading = false
+    }
+  },
+
   async created() {
-    // Fill in the member details
-    this.loading = true
-    this.members = await Promise.all(this.group.members.map(async (memberUUID) => {
-      let obj = this.p.data.find(v => v.uuid === memberUUID)
-      if (obj && (obj.name || obj.kerberos)) {
-        return {
-          uuid: memberUUID,
-          name: obj.name ?? obj.kerberos
-        }
-      }
-      try {
-        let objectResponse = await useServiceClientStore().client.ConfigDB.get_config(UUIDs.App.Info, memberUUID);
-        let memberName = objectResponse.name
-        return {
-          uuid: memberUUID,
-          name: memberName
-        }
-      } catch (err) {
-        console.error(`Can't read member details`, err)
-        return {
-          uuid: memberUUID,
-        }
-      }
-    }))
-    this.loading = false
   },
 
   components: {

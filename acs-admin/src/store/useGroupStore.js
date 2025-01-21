@@ -12,6 +12,15 @@ export const useGroupStore = defineStore('group', {
     loading: false,
   }),
   actions: {
+    async getMembers (group) {
+      // Let's get the list of group members
+      try {
+        let groupMembersResponse = await useServiceClientStore().client.Auth.fetch(`authz/group/${group.uuid}`)
+        return groupMembersResponse[1]
+      } catch(err) {
+        console.error(`Can't read group members`, err)
+      }
+    },
 
     fetch () {
       this.loading = true
@@ -61,8 +70,7 @@ export const useGroupStore = defineStore('group', {
 
           // Let's get the list of group members
           try {
-            let groupMembersResponse = await useServiceClientStore().client.Auth.fetch(`authz/group/${uuid}`)
-            groupDetails.members = groupMembersResponse[1]
+            groupDetails.members = await this.getMembers(groupDetails)
           } catch(err) {
             console.error(`Can't read group members`, err)
           }

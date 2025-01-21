@@ -21,10 +21,10 @@
           </TabsTrigger>
         </TabsList>
         <TabsContent value="members">
-          <MembersTab :group @principalClick="e => $emit('principalClick', e)" />
+          <MembersTab :group @objectClick="e => $emit('objectClick', e)" />
         </TabsContent>
         <TabsContent value="permissions">
-          <PermissionsTab :group />
+          <PermissionsTab :group @objectClick="e => $emit('objectClick', e)" />
         </TabsContent>
       </Tabs>
     </div>
@@ -41,7 +41,7 @@ import DataTable from "@components/ui/data-table/DataTable.vue";
 export default {
   name: 'GroupManagementSidebar',
 
-  emits: ['principalClick'],
+  emits: ['objectClick'],
 
   components: {
     DataTable,

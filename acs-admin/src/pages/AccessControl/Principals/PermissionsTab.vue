@@ -68,7 +68,7 @@ export default {
   },
 
   methods: {
-    async fetchSpecificPermissions (principal) {
+    async fetchSpecificPermissions (uuid) {
       this.loading = true
 
       const res = await this.s.client.Auth.fetch(`/authz/ace`)
@@ -76,7 +76,7 @@ export default {
         return;
       }
       const fullList = res[1];
-      const filteredList = fullList.filter(e => e.principal === principal)
+      const filteredList = fullList.filter(e => e.principal === uuid)
 
       const info = o => this.s.client.ConfigDB.get_config(UUIDs.App.Info, o)
       const name = o => info(o).then(v => v?.name)

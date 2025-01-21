@@ -4,7 +4,8 @@
 
 <template>
   <Skeleton v-if="g.loading || loading" v-for="i in 10" class="h-16 rounded-lg mb-2"/>
-  <DataTable v-else :data="this.members" :columns="columns" :filters="[]">
+  <!-- Need to check whether the click is on a permission or a principal -->
+  <DataTable v-else :data="this.members" :columns="columns" :filters="[]" @row-click="e => $emit('principalClick', e)">
     <template #toolbar-left>
       <Alert class="mr-6">
         <div class="flex items-start gap-3">
@@ -33,6 +34,8 @@ import { UUIDs } from "@amrc-factoryplus/service-client";
 
 export default {
   name: 'GroupMembership',
+
+  emits: ['principalClick'],
 
   setup () {
     return {

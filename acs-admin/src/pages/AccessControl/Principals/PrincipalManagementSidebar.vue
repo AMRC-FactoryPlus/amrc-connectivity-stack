@@ -19,7 +19,7 @@
           <TabsTrigger value="groups">
             Groups
           </TabsTrigger>
-          <TabsTrigger disabled value="permissions">
+          <TabsTrigger value="permissions">
             Permissions
           </TabsTrigger>
           <TabsTrigger value="effective">
@@ -30,7 +30,7 @@
           <GroupsTab :principal/>
         </TabsContent>
         <TabsContent value="permissions">
-          Permissions
+          <PermissionsTab :principal/>
         </TabsContent>
         <TabsContent value="effective">
           <EffectivePermissionsTab :principal/>
@@ -45,6 +45,7 @@ import { SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@compon
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import EffectivePermissionsTab from './EffectivePermissionsTab.vue'
 import GroupsTab from './GroupsTab.vue'
+import PermissionsTab from './PermissionsTab.vue'
 
 export default {
 
@@ -61,6 +62,7 @@ export default {
     TabsContent,
     EffectivePermissionsTab,
     GroupsTab,
+    PermissionsTab,
   },
 
   props: {

@@ -23,7 +23,7 @@ export const usePermissionStore = defineStore('permission', {
         }
 
         // Fill in the permission names
-        let testData = await Promise.all(permissionListResponse[1].map(async (permissionsUUID) => {
+        this.data = await Promise.all(permissionListResponse[1].map(async (permissionsUUID) => {
           try {
             let permissionObjectResponse = await useServiceClientStore().client.ConfigDB.get_config(UUIDs.App.Info, permissionsUUID);
             return {
@@ -39,7 +39,6 @@ export const usePermissionStore = defineStore('permission', {
           }
         }))
 
-        this.data = testData
         this.loading = false
       }).catch((err) => {
         console.error(`Can't read principals`, err)

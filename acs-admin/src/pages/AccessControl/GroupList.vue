@@ -8,14 +8,17 @@
         property: 'name',
         options: filterOptions.names
       }, {
-
-        name: 'UUID',
-        property: 'uuid',
-        options: filterOptions.uuids,
+        name: 'Group Type',
+        property: 'class',
+        options: filterOptions.class,
       }, {
         name: 'Member Count',
         property: 'memberCount',
         options: filterOptions.memberCount,
+      }, {
+        name: 'UUID',
+        property: 'uuid',
+        options: filterOptions.uuids,
       }]" @row-click="e => $emit('rowClick', e)"/>
 </template>
 
@@ -45,7 +48,6 @@ export default {
   },
 
   computed: {
-
     filterOptions () {
       return {
         names: this.g.data.map((g) => g.name).filter((v, i, a) => a.indexOf(v) === i).map((g) => {

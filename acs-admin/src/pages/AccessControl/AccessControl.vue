@@ -7,7 +7,7 @@
     <PrincipalManagementSidebar :principal="selectedPrincipal"></PrincipalManagementSidebar>
   </Sheet>
   <Sheet :open="selectedGroup !== null" @update:open="e => !e ? selectedGroup = null : null">
-    <GroupManagementSidebar :group="selectedGroup"></GroupManagementSidebar>
+    <GroupManagementSidebar :group="selectedGroup" @principalClick="e => selectPrincipal(e.original)"></GroupManagementSidebar>
   </Sheet>
   <Tabs default-value="principals">
     <TabsList class="mb-6">
@@ -22,7 +22,7 @@
       </TabsTrigger>
     </TabsList>
     <TabsContent value="principals">
-      <PrincipalList @rowClick="e => selectedPrincipal = e.original"/>
+      <PrincipalList @rowClick="e => selectPrincipal(e.original)"/>
     </TabsContent>
     <TabsContent value="groups">
       <GroupList @rowClick="e => selectedGroup = e.original"/>
@@ -34,19 +34,19 @@
 </template>
 
 <script>
-import { useServiceClientStore } from '@/store/serviceClientStore.js'
-import { Skeleton } from '@components/ui/skeleton'
+import {useServiceClientStore} from '@/store/serviceClientStore.js'
+import {Skeleton} from '@components/ui/skeleton'
 import DataTable from '@components/ui/data-table/DataTable.vue'
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { defineAsyncComponent } from 'vue'
-import { Button } from '@components/ui/button/index.js'
-import { usePrincipalStore } from '@store/usePrincipalStore.js'
-import { useGroupStore } from '@store/useGroupStore.js'
+import {Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger} from '@/components/ui/sheet'
+import {Tabs, TabsContent, TabsList, TabsTrigger} from '@/components/ui/tabs'
+import {defineAsyncComponent} from 'vue'
+import {Button} from '@components/ui/button/index.js'
+import {usePrincipalStore} from '@store/usePrincipalStore.js'
+import {useGroupStore} from '@store/useGroupStore.js'
 import PrincipalList from './PrincipalList.vue'
 import GroupList from './GroupList.vue'
 import PermissionList from '@pages/AccessControl/Permissions/PermissionList.vue'
-import { usePermissionStore } from '@store/usePermissionStore.js'
+import {usePermissionStore} from '@store/usePermissionStore.js'
 
 export default {
   name: 'AccessControl',
@@ -79,6 +79,18 @@ export default {
     GroupManagementSidebar: defineAsyncComponent(() => import('./Groups/GroupManagementSidebar.vue')),
     PrincipalList,
     GroupList,
+  },
+
+  methods: {
+    selectPrincipal (principal) {
+      this.selectedGroup = null
+      this.selectedPermission = null
+      if (principal.kerberos) {
+        this.selectedPrincipal = principal
+      } else {
+        this.selectedPrincipal = this.p.data.find(p => p.uuid === principal.uuid)
+      }
+    }
   },
 
   async mounted () {

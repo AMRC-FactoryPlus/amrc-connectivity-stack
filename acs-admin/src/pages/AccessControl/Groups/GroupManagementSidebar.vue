@@ -21,7 +21,7 @@
           </TabsTrigger>
         </TabsList>
         <TabsContent value="members">
-          <MembersTab :group/>
+          <MembersTab :group @principalClick="e => $emit('principalClick', e)" />
         </TabsContent>
         <TabsContent value="permissions">
           <PermissionsTab :group />
@@ -36,12 +36,15 @@ import { SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@compon
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@components/ui/tabs/index.js'
 import MembersTab from './MembersTab.vue'
 import PermissionsTab from './PermissionsTab.vue'
+import DataTable from "@components/ui/data-table/DataTable.vue";
 
 export default {
-
   name: 'GroupManagementSidebar',
 
+  emits: ['principalClick'],
+
   components: {
+    DataTable,
     SheetHeader,
     SheetTitle,
     SheetContent,

@@ -16,7 +16,7 @@
           <TabsTrigger value="principals">
             Principals
           </TabsTrigger>
-          <TabsTrigger disabled value="groups">
+          <TabsTrigger value="groups">
             Groups
           </TabsTrigger>
         </TabsList>
@@ -24,7 +24,7 @@
           <PrincipalsTab :permission @objectClick="e => $emit('objectClick', e)" />
         </TabsContent>
         <TabsContent value="groups">
-<!--          <GroupsTab :permission @objectClick="e => $emit('objectClick', e)" />-->
+          <GroupsTab :permission @objectClick="e => $emit('objectClick', e)" />
         </TabsContent>
       </Tabs>
     </div>
@@ -35,7 +35,7 @@
 import { SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@components/ui/sheet/index.js'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import PrincipalsTab from './PrincipalsTab.vue'
-import MembersTab from "@pages/AccessControl/Groups/MembersTab.vue";
+import GroupsTab from "./GroupsTab.vue";
 
 export default {
   name: 'PermissionManagementSidebar',
@@ -43,7 +43,6 @@ export default {
   emits: ['objectClick'],
 
   components: {
-    MembersTab,
     SheetHeader,
     SheetTitle,
     SheetContent,
@@ -53,6 +52,7 @@ export default {
     TabsTrigger,
     TabsContent,
     PrincipalsTab,
+    GroupsTab
   },
 
   props: {

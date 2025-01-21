@@ -9,6 +9,9 @@
   <Sheet :open="selectedGroup !== null" @update:open="e => !e ? selectedGroup = null : null">
     <GroupManagementSidebar :group="selectedGroup" @objectClick="e => objectClicked(e.original)"></GroupManagementSidebar>
   </Sheet>
+  <Sheet :open="selectedPermission !== null" @update:open="e => !e ? selectedPermission = null : null">
+    <PermissionManagementSidebar :permission="selectedPermission" @objectClick="e => objectClicked(e.original)"></PermissionManagementSidebar>
+  </Sheet>
   <Tabs default-value="principals">
     <TabsList class="mb-6">
       <TabsTrigger value="principals">
@@ -78,6 +81,7 @@ export default {
     TabsTrigger,
     PrincipalManagementSidebar: defineAsyncComponent(() => import('./Principals/PrincipalManagementSidebar.vue')),
     GroupManagementSidebar: defineAsyncComponent(() => import('./Groups/GroupManagementSidebar.vue')),
+    PermissionManagementSidebar: defineAsyncComponent(() => import('./Permissions/PermissionManagementSidebar.vue')),
     PrincipalList,
     GroupList,
   },
@@ -92,7 +96,7 @@ export default {
         let principalObjectResponse = await this.s.client.ConfigDB.get_config(UUIDs.App.Registration, object.uuid);
         classUUID = principalObjectResponse.class
       }
-      console.log(object, classUUID)
+
       switch (classUUID) {
         case UUIDs.Class.Permission:
           this.selectPermission(object)

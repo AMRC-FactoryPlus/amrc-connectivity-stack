@@ -19,17 +19,21 @@ export interface EffectivePermission {
 }
 
 export const columns: ColumnDef<EffectivePermission>[] = [{
-    accessorKey: 'permission.name',
+    accessorKey: 'permission',
+    accessorFn: (row) => row.permission.name,
     header: ({column}) => h(DataTableColumnHeader, {
         column,
         title: 'Permission'
     }),
-
     cell: ({row}) => {
-        return h('span', {class: 'max-w-[500px] truncate font-medium'}, row.original.permission.name)
+        return h('div', {class: 'max-w-[500px] truncate'}, [
+            h('div', {class: 'max-w-[500px] truncate font-medium'}, row.getValue('permission')),
+            h('div', {class: 'max-w-[500px] truncate text-gray-400'}, row.original.permission.uuid)
+        ])
     },
 }, {
-    accessorKey: 'target.name',
+    accessorKey: 'target',
+    accessorFn: (row) => row.target.name,
     header: ({column}) => h(DataTableColumnHeader, {
         column,
         title: 'Target'
@@ -41,6 +45,9 @@ export const columns: ColumnDef<EffectivePermission>[] = [{
                 default: () => row.original.target.name
             });
         }
-        return h('span', {class: 'max-w-[500px] truncate font-medium'}, row.original.target.name);
+        return h('div', {class: 'max-w-[500px] truncate'}, [
+            h('div', {class: 'max-w-[500px] truncate font-medium'}, row.getValue('target')),
+            h('div', {class: 'max-w-[500px] truncate text-gray-400'}, row.original.target.uuid)
+        ])
     },
 }]

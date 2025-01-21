@@ -4,6 +4,7 @@
 
 import type {ColumnDef} from '@tanstack/vue-table'
 import {h} from 'vue'
+import {Badge} from '@/components/ui/badge'
 
 import DataTableColumnHeader from '@/components/ui/data-table/DataTableColumnHeader.vue'
 import GroupDropdown from './GroupDropdown.vue'
@@ -29,7 +30,6 @@ export const columns: ColumnDef<Permission>[] = [
         }),
 
         cell: ({row}) => {
-            // return h('span', {class: 'max-w-[500px] truncate font-medium'}, row.getValue('permission')) // row.original.permission.name
             return h('div', {class: 'max-w-[500px] truncate'}, [
                 h('div', {class: 'max-w-[500px] truncate font-medium'}, row.getValue('permission')),
                 h('div', {class: 'max-w-[500px] truncate text-gray-400'}, row.original.permission.uuid)
@@ -48,7 +48,11 @@ export const columns: ColumnDef<Permission>[] = [
         }),
 
         cell: ({row}) => {
-            // return h('span', {class: 'max-w-[500px] truncate text-gray-500'}, row.getValue('target'))
+            if (row.original.target.uuid === '00000000-0000-0000-0000-000000000000') {
+                return h(Badge, {variant: 'destructive'}, {
+                    default: () => row.original.target.name
+                });
+            }
             return h('div', {class: 'max-w-[500px] truncate'}, [
                 h('div', {class: 'max-w-[500px] truncate font-medium'}, row.getValue('target')),
                 h('div', {class: 'max-w-[500px] truncate text-gray-400'}, row.original.target.uuid)

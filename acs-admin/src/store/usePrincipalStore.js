@@ -74,7 +74,6 @@ export const usePrincipalStore = defineStore('principal', {
         }))
 
         this.loading = false
-
       }).catch((err) => {
         console.error(`Can't read principals`, err)
       })

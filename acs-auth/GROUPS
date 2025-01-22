@@ -1,12 +1,14 @@
 #   Comment
+⊃   Subclass
+∋   Class member
+𝒫   Power set (not implemented)
 *   New object
 %   Dynamic (per-install) object
 []  Renamed object
-()  Primary class
 
 R1Class [Class definition]
-    # This is now effectively ₡Principal.
     ⊃ *Principal group
+        𝒫 Principal
         ⊃ *Principal type
             ∋ Human user
             ∋ Central service
@@ -24,6 +26,7 @@ R1Class [Class definition]
                 ⊃ Clusters-managed group
                     ∋ %Edge flux
                     ∋ %Edge krbkeys
+                    ∋ %Edge cluster repo
                 ⊃ Edge-managed group
                     ∋ %Active Edge Agent
                     ∋ %Edge monitor
@@ -33,8 +36,8 @@ R1Class [Class definition]
                 ∋ Sparkplug Node
                 ∋ Sparkplug global reader
                 ∋ UNS global reader
-    # Ditto, this is now ₡Permission.
     ⊃ Permission group
+        𝒫 Permission.
         ⊃ *Service permission set
             ∋ Auth
             ∋ MQTT
@@ -46,6 +49,10 @@ R1Class [Class definition]
             ∋ Edge Node
             ∋ Global Primary Application
             ∋ Command Escalation service
+    ⊃ Git repository group
+        𝒫 Git repository
+        ∋ %Shared repo
+        ∋ %Edge cluster repo
 
 Individual
     ⊃ Application
@@ -74,8 +81,8 @@ Individual
             ⊃ %Edge krbkeys
             ⊃ %Edge sync
             ⊃ %Edge monitor
-        ⊃ Edge Agent [Cell Gateway] (Principal type)
-            ⊃ %Edge Agent (Edge role)
+        ⊃ Edge Agent [Cell Gateway]
+            ⊃ %Active Edge Agent
         ⊃ *Application account
         ⊃ *Special account
             ∋ %Admin account
@@ -124,3 +131,7 @@ Individual
             ∋ Participate as Node
             ∋ Represent Devices
         ⊃ Global Primary Application
+    ⊃ Git repository
+        ⊃ %Shared repo
+           ∋ %Edge Helm charts
+        ⊃ %Edge cluster repo

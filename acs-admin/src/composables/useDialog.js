@@ -9,8 +9,6 @@ export function useDialog(options) {
   const container = document.createElement('div');
   document.body.appendChild(container);
 
-  console.log(options)
-
   const app = createApp(GlobalDialog, {
     ...options,
     onClose() {

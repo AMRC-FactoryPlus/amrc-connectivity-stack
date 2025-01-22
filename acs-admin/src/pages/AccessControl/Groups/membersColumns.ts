@@ -6,15 +6,19 @@ import type {ColumnDef} from '@tanstack/vue-table'
 import {h} from 'vue'
 
 import DataTableColumnHeader from '@/components/ui/data-table/DataTableColumnHeader.vue'
-import GroupDropdown from '../Principals/GroupDropdown.vue'
+import GroupDropdown from './GroupDropdown.vue'
 
-export interface Group {
+export interface Principal {
     uuid: string
     name: string
-    members: string[]
+    kerberos: string
+    group: {
+        uuid: string
+        name: string
+    }
 }
 
-export const columns: ColumnDef<Group>[] = [
+export const columns: ColumnDef<Principal>[] = [
     {
         accessorKey: 'name',
         header: ({column}) => h(DataTableColumnHeader, {

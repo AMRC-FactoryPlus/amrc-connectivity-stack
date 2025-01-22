@@ -4,7 +4,6 @@
 
 <template>
   <Skeleton v-if="g.loading || loading" v-for="i in 10" class="h-16 rounded-lg mb-2"/>
-  <!-- Need to check whether the click is on a permission or a principal -->
   <DataTable v-else :data="this.members" :columns="columns" :filters="[]" @row-click="e => $emit('objectClick', e)">
     <template #toolbar-left>
       <Alert class="mr-6">

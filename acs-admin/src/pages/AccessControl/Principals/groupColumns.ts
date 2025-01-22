@@ -12,6 +12,11 @@ export interface Group {
     uuid: string
     name: string
     members: string[]
+    principal: {
+        uuid: string
+        name: string
+        kerberos: string
+    }
 }
 
 export const columns: ColumnDef<Group>[] = [

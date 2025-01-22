@@ -79,6 +79,7 @@ const table = useVueTable({
         <slot name="toolbar-left"></slot>
       </template>
     </DataTableToolbar>
+    <slot name="below-toolbar"></slot>
     <div class="rounded-md border">
       <Table>
         <TableHeader>

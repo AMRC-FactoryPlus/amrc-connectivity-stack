@@ -18,6 +18,33 @@
         </div>
       </Alert>
     </template>
+    <template #below-toolbar>
+      <Dialog :open="this.addMemberDialogOpen" @update:open="(isOpen) => this.addMemberDialogOpen = isOpen">
+        <DialogTrigger>
+          <Button>
+            Add Member
+          </Button>
+        </DialogTrigger>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add a Member</DialogTitle>
+          </DialogHeader>
+          <div>
+            <Label for="">
+              UUID
+            </Label>
+            <Input id="uuid" v-model="newMember" />
+          </div>
+          <DialogFooter>
+            <DialogClose as-child>
+              <Button @click="this.addMember">
+                Add
+              </Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </template>
   </DataTable>
 </template>
 
@@ -30,6 +57,20 @@ import { useGroupStore } from '@store/useGroupStore.js'
 import { usePrincipalStore } from "@store/usePrincipalStore.js";
 import { useServiceClientStore } from "@store/serviceClientStore.js";
 import { UUIDs } from "@amrc-factoryplus/service-client";
+import {Button} from "@components/ui/button/index.js";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
+} from "@components/ui/dialog/index.js";
+import {Label} from "@components/ui/label/index.js";
+import {Input} from "@components/ui/input/index.js";
+import {toast} from "vue-sonner";
+import {provide} from "vue";
 
 export default {
   name: 'GroupMembership',
@@ -42,6 +83,12 @@ export default {
       p: usePrincipalStore(),
       g: useGroupStore(),
       s: useServiceClientStore()
+    }
+  },
+
+  provide () {
+    return {
+      groupMembersUpdated: this.updateData
     }
   },
 
@@ -62,12 +109,16 @@ export default {
     async updateData () {
       // Fill in the member details
       this.loading = true
-      this.members = await Promise.all(this.group.members.map(async (memberUUID) => {
+      // Make sure we have the latest set of members
+      let groupMembersResponse = await this.s.client.Auth.fetch(`authz/group/${this.group.uuid}`)
+      let members = groupMembersResponse[1]
+      this.members = await Promise.all(members.map(async (memberUUID) => {
         let obj = this.p.data.find(v => v.uuid === memberUUID)
         if (obj && (obj.name || obj.kerberos)) {
           return {
             uuid: memberUUID,
-            name: obj.name ?? obj.kerberos
+            name: obj.name ?? obj.kerberos,
+            group: this.group
           }
         }
         try {
@@ -75,16 +126,32 @@ export default {
           let memberName = objectResponse.name
           return {
             uuid: memberUUID,
-            name: memberName
+            name: memberName,
+            group: this.group
           }
         } catch (err) {
           console.error(`Can't read member details`, err)
           return {
             uuid: memberUUID,
+            group: this.group
           }
         }
       }))
       this.loading = false
+    },
+
+    async addMember () {
+      this.s.client.Auth.add_to_group(this.group.uuid, this.newMember).then(async () => {
+        toast.success(`${this.newMember} has been added to ${this.group.name}`)
+        this.s.client.Fetch.cache = "reload"
+        await this.updateData()
+        this.s.client.Fetch.cache = "default"
+        // TODO: Need to actually update the group member list, not just re-map the existing members
+      }).catch((err) => {
+        toast.error(`Unable to add ${this.newMember} to ${this.group.name}`)
+        console.error(`Unable to add ${this.newMember} to ${this.group.name}`, err)
+      })
+      this.addMemberDialogOpen = false
     }
   },
 
@@ -92,6 +159,16 @@ export default {
   },
 
   components: {
+    DialogTitle,
+    Input,
+    Label,
+    DialogClose,
+    DialogFooter,
+    DialogHeader,
+    DialogContent,
+    DialogTrigger,
+    Dialog,
+    Button,
     DataTable,
     Skeleton,
     Alert,
@@ -109,7 +186,9 @@ export default {
   data () {
     return {
       loading: false,
-      members: []
+      members: [],
+      newMember: "",
+      addMemberDialogOpen: false
     }
   },
 

@@ -4,7 +4,7 @@ service: !u UUIDs.Service.ConfigDB
 version: 2
 objects:
   !u ConfigDB.Class.R2Class:
-    !u Clusters.Requirement.Groups:
+    !u Clusters.Class.ClusterGroups:
       name: "Clusters-managed group"
       subclassOf:
         - !u Auth.Class.EdgeRole

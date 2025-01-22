@@ -5,10 +5,18 @@ service: !u UUIDs.Service.ConfigDB
 version: 2
 objects:
   !u Auth.Class.CompositePerm:
-    !u Edge.Role.Monitor:         { name: "Edge Monitor for Agent" }
+    !u Edge.Role.Monitor:
+      name: "Edge Monitor for Agent"
+      enum:
+        - !u ACS.Perm.MQTT.ReadNode
+        - !u Edge.Perm.ReloadConfig
+        - !u UUIDs.Permission.CmdEsc.Rebirth
     # This is deprecated
     !u ACS.Role.GlobalDebugger:
       name: "Sparkplug global debugger"
+      enum:
+        - !u ACS.Perm.MQTT.ReadWholeNamespace
+        - !u UUIDs.Permission.CmdEsc.Rebirth
 
   !u Auth.Class.ClientRole:
     !u ACS.Group.SparkplugNode:
@@ -47,13 +55,3 @@ aces:
   - principal: !u ACS.Group.SparkplugReader
     permission: !u UUIDs.Permission.CmdEsc.Rebirth
     target: !u UUIDs.Special.Null
-
-groups:
-  # XXX These are enumerated classes (not supported yet in v2 ConfigDB dumps)
-  !u Edge.Role.Monitor:
-    - !u ACS.Perm.MQTT.ReadNode
-    - !u Edge.Perm.ReloadConfig
-    - !u UUIDs.Permission.CmdEsc.Rebirth
-  !u ACS.Role.GlobalDebugger:
-    - !u ACS.Perm.MQTT.ReadWholeNamespace
-    - !u UUIDs.Permission.CmdEsc.Rebirth

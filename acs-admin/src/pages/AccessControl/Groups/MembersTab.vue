@@ -30,7 +30,7 @@
             <DialogTitle>Add a Member</DialogTitle>
           </DialogHeader>
           <div>
-            <Label for="">
+            <Label for="uuid">
               UUID
             </Label>
             <Input id="uuid" v-model="newMember" />

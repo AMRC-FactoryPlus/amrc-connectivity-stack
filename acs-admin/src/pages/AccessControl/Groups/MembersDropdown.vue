@@ -67,7 +67,7 @@ function handleDelete() {
     </div>
     <DropdownMenuContent align="end" class="w-[250px]">
       <DropdownMenuGroup>
-        <DropdownMenuItem @click="copy(props.row.original.uuid)">
+        <DropdownMenuItem @click="copy(props.row.original.uuid)" class="cursor-pointer">
           <div class="flex items-center justify-center gap-2">
             <i class="fa-solid fa-fw fa-tag"></i>
             Copy UUID
@@ -76,7 +76,7 @@ function handleDelete() {
       </DropdownMenuGroup>
       <DropdownMenuSeparator/>
       <DropdownMenuGroup>
-        <DropdownMenuItem @click="handleDelete">
+        <DropdownMenuItem @click="handleDelete" class="cursor-pointer">
           <div class="flex items-center justify-center gap-2">
             <i class="fa-solid fa-fw fa-trash text-red-500"></i>
             Remove from Group

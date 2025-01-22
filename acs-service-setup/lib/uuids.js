@@ -158,6 +158,7 @@ export const Clusters = {
         Cluster:            "f24d354d-abc1-4e32-98e1-0667b3e40b61",
         Account:            "97756c9a-38e6-4238-b78c-3df6f227a6c9",
         HelmChart:          "f9be0334-0ff7-43d3-9d8a-188d3e4d472b",
+        ClusterGroups:      "979f7fd9-bbc7-4810-a774-6082c7394db6",
     },
     Service: {
         ClusterManager:     "2706aa43-a826-441e-9cec-cd3d4ce623c2",
@@ -170,7 +171,6 @@ export const Clusters = {
     Requirement: {
         ServiceAccount:     "26d192cf-73c1-4c14-93cf-1e63743bab08",
         EdgeRepos:          "3a58340c-d4ec-453d-99c3-0cf6ab7d8fa9",
-        Groups:             "979f7fd9-bbc7-4810-a774-6082c7394db6",
         FluxAccounts:       "4eeb8156-856d-4251-a4a4-4c1b2f3d3e2c",
     },
 };

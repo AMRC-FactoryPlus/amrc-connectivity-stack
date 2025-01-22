@@ -56,4 +56,30 @@ export class ServiceConfig {
             await this.setup_group(...g);
         }
     }
+
+    async setup_subgroups (...subgroups) {
+        const { CDB } = this;
+        const { group } = this.config;
+
+        for (const [parent, ...paths] of subgroups) {
+            for (const p of paths) {
+                const obj = group[p].uuid;
+                this.log("Adding %s ⊂ %s", obj, parent);
+                await CDB.class_add_subclass(parent, obj);
+            }
+        }
+    }
+
+    async setup_members (...members) {
+        const { CDB } = this;
+        const { group } = this.config;
+
+        for (const [parent, ...paths] of members) {
+            for (const p of paths) {
+                const obj = group[p].uuid;
+                this.log("Adding %s ∈ %s", obj, parent);
+                await CDB.class_add_member(parent, obj);
+            }
+        }
+    }
 }

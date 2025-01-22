@@ -5,6 +5,7 @@
 <template>
   <SheetContent v-if="group" class="gap-6 flex flex-col overflow-auto">
     <SheetHeader>
+      <SheetTitle>{{ group.class.name ?? "Group" }}</SheetTitle>
       <SheetTitle>{{group.name}}</SheetTitle>
       <SheetDescription>
         {{group.uuid}}

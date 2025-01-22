@@ -5,6 +5,7 @@
 <template>
   <SheetContent v-if="principal" class="gap-6 flex flex-col overflow-auto">
     <SheetHeader>
+      <SheetTitle>{{ principal.class.name ?? "Principal" }}</SheetTitle>
       <SheetTitle>{{principal.name}}</SheetTitle>
       <SheetDescription>
         {{principal.kerberos}}

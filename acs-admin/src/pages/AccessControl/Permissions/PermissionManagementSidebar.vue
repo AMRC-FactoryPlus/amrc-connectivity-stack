@@ -5,6 +5,7 @@
 <template>
   <SheetContent v-if="permission" class="gap-6 flex flex-col overflow-auto">
     <SheetHeader>
+      <SheetTitle>Permission</SheetTitle>
       <SheetTitle>{{ permission.name }}</SheetTitle>
       <SheetDescription>
         {{ permission.uuid }}

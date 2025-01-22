@@ -6,7 +6,7 @@ import type {ColumnDef} from '@tanstack/vue-table'
 import {h} from 'vue'
 
 import DataTableColumnHeader from '@/components/ui/data-table/DataTableColumnHeader.vue'
-import GroupDropdown from './GroupDropdown.vue'
+import MembersDropdown from './MembersDropdown.vue'
 
 export interface Principal {
     uuid: string
@@ -49,5 +49,5 @@ export const columns: ColumnDef<Principal>[] = [
     },
     {
         id: 'actions',
-        cell: ({row}) => h(GroupDropdown, {row}),
+        cell: ({row}) => h(MembersDropdown, {row}),
     }]

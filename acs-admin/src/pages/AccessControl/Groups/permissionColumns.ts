@@ -7,7 +7,7 @@ import {h} from 'vue'
 import {Badge} from '@/components/ui/badge'
 
 import DataTableColumnHeader from '@/components/ui/data-table/DataTableColumnHeader.vue'
-import GroupDropdown from './GroupDropdown.vue'
+import MembersDropdown from './MembersDropdown.vue'
 
 export interface Permission {
     permission: {
@@ -64,5 +64,5 @@ export const columns: ColumnDef<Permission>[] = [
     },
     {
         id: 'actions',
-        cell: ({row}) => h(GroupDropdown, {row}),
+        cell: ({row}) => h(MembersDropdown, {row}),
     }]

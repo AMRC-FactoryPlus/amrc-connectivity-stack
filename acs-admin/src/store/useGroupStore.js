@@ -24,6 +24,7 @@ export const useGroupStore = defineStore('group', {
 
     fetch () {
       this.loading = true
+      this.data = []
       useServiceClientStore().client.Auth.fetch('authz/group').then(async (groupListResponse) => {
 
         // Check if the return object is an array and if not, return

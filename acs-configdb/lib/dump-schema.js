@@ -63,6 +63,9 @@ export const dump_schema = {
                                     items: { type: "string", format: "uuid" }},
                                 subclassOf: {
                                     type: "array",
+                                    items: { type: "string", format: "uuid" }},
+                                enum: {
+                                    type: "array",
                                     items: { type: "string", format: "uuid" }}}}}},
                 configs: {
                     type: "object",

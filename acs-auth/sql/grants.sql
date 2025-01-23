@@ -15,6 +15,9 @@ to :"role";
 grant select, insert, update, delete on
     ace, identity, member, uuid
 to :"role";
+grant select, delete on
+    old_member
+to :"role";
 grant usage on
     ace_id_seq, identity_id_seq, uuid_id_seq
 to :"role";

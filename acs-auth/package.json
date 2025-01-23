@@ -22,12 +22,9 @@
   "license": "MIT",
   "dependencies": {
     "@amrc-factoryplus/pg-client": "^0.0.1",
-    "@amrc-factoryplus/service-api": "^0.0.2",
+    "@amrc-factoryplus/service-api": "^0.1.0-bmz.1",
     "@amrc-factoryplus/service-client": "^1.4.0-bmz.2",
-    "express": "^4.18.1",
-    "express-basic-auth": "^1.2.1",
-    "http-errors": "^2.0.0",
-    "timers-promises": "^1.0.1"
+    "express": "^5.0.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.18.0",

@@ -134,9 +134,10 @@ export default class Queries {
 
     async principal_get (uuid) {
         const dbr = await this.query(`
-            select uuid, kerberos
-            from principal
-            where uuid = $1
+            select u.uuid, i.name kerberos
+            from identity i
+                join uuid u on u.id = i.principal
+            where i.kind = ${IDs.Kerberos} and u.uuid = $1
         `, [uuid]);
         return dbr.rows[0];
     }

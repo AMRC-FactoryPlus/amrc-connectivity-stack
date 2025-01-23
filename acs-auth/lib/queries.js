@@ -51,22 +51,35 @@ export default class Queries {
 
     async ace_get_all () {
         const dbr = await this.query(`
-            select ace.principal, ace.permission, ace.target
-            from ace
+            select e.uuid, u.uuid principal, p.uuid permission, t.uuid target,
+                e.plural
+            from ace e
+                join uuid u on u.id = e.principal
+                join uuid p on p.id = e.permission
+                join uuid t on t.id = e.target
         `);
         return dbr.rows;
     }
 
     async ace_add (ace) {
         await this.query(`
-            insert into ace (principal, permission, target)
-            values ($1, $2, $3)
+            insert into uuid (uuid)
+            select uuid
+            from unnest($1) n(uuid)
+            on conflict (uuid) do nothing
+        `, [[ace.principal, ace.permission, ace.target]]);
+        await this.query(`
+            insert into ace (principal, permission, target, plural)
+            select u.id, p.id, t.id, $4
+            from uuid u, uuid p, uuid t
+            where u.uuid = $1 and p.uuid = $2 and t.uuid = $3
             on conflict do nothing
-        `, [ace.principal, ace.permission, ace.target]);
+        `, [ace.principal, ace.permission, ace.target, ace.plural ?? false]);
         return 204;
     }
 
     async ace_delete (ace) {
+        throw "unimplemented";
         await this.query(`
             delete from ace
             where principal = $1

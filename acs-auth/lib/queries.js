@@ -31,19 +31,44 @@ export default class Queries {
      * should change to a DB unique ID soon... Don't rely on it, just
      * use principal_by_krb or principal_by_uuid and pass back what you get. */
     async acl_get (princ_id, permission) {
-        /* XXX This query, with a setof function to resolve the group
-         * members, is incorrect. If I normalise to a table of UUIDs
-         * then I can make it an ordinary left join. */
+        /* This is a mess to keep authz/acl working for now. This
+         * expands all groups regardless as before. This goes
+         * round-the-houses from IDs to UUIDs and back. */
         const dbr = await this.query(`
-            select a.permission, 
-                case a.target
-                    when '${Special.Self}'::uuid then a.principal
-                    else a.target
-                end target
-            from resolved_ace a
-            where a.principal = $1
-                and a.permission in (
-                    select members_of($2::uuid))
+            with recursive
+                aceu as (
+                    select u.uuid principal, p.uuid permission, t.uuid target, e.plural
+                    from ace e
+                        join uuid u on u.id = e.principal
+                        join uuid p on p.id = e.permission
+                        join uuid t on t.id = e.target),
+                group_members as (
+                    select m.parent, m.parent child
+                        from old_member m
+                    union select g.parent, m.child
+                        from group_members g
+                            join old_member m on m.parent = g.child),
+                resolved_ace as (
+                    select coalesce(princ.child, a.principal) principal, 
+                        coalesce(perm.child, a.permission) permission,
+                        coalesce(targ.child, a.target) target
+                    from aceu a
+                        left join group_members princ on princ.parent = a.principal
+                        left join group_members perm on perm.parent = a.permission
+                        left join group_members targ on targ.parent = a.target),
+                full_acl as (
+                    select u.id principal, a.permission, 
+                        case a.target 
+                            when '5855a1cc-46d8-4b16-84f8-ab3916ecb230'::uuid
+                                then a.principal
+                            else a.target
+                        end target
+                    from resolved_ace a
+                        join uuid u on u.uuid = a.principal)
+            select a.principal, a.permission, a.target
+            from full_acl a
+                left join group_members g on g.child = a.permission
+            where a.principal = $1 and g.parent = $2
         `, [princ_id, permission]);
 
         return dbr.rows;
@@ -89,23 +114,23 @@ export default class Queries {
         return 204;
     }
 
-    /* This returns a UUID. Soon it will return an integer ID. */
+    /* This returns an ID. */
     async principal_by_krb (principal) {
         const dbr = await this.query(`
-            select p.uuid from principal p
-            where p.kerberos = $1
+            select i.principal 
+            from identity i
+            where i.kind = ${IDs.Kerberos} and i.name = $1
         `, [principal]);
-        return dbr.rows[0]?.uuid;
+        return dbr.rows[0]?.principal;
     }
 
-    /* This returns a UUID. Soon it will return an integer ID. */
+    /* This returns an ID. */
     async principal_by_uuid (uuid) {
-        /* I am allowing principal UUIDs that don't have a Kerberos
-         * principal. This is needed ATM for command escalation; there
-         * isn't a 1-1 mapping between Nodes and Kerberos principals,
-         * and NDATA-style cmdesc needs command escalation rights to be
-         * granted to the Node, not the user account behind it. */
-        return uuid;
+        /* I am allowing any object to be a principal at this point. */
+        const dbr = await this.query(`
+            select id from uuid where uuid = $1
+        `, [uuid]);
+        return dbr.rows[0].id;
     }
 
     async principal_get_all () {

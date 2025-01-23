@@ -65,7 +65,7 @@ export default class Queries {
         await this.query(`
             insert into uuid (uuid)
             select uuid
-            from unnest($1) n(uuid)
+            from unnest($1::uuid[]) n(uuid)
             on conflict (uuid) do nothing
         `, [[ace.principal, ace.permission, ace.target]]);
         await this.query(`

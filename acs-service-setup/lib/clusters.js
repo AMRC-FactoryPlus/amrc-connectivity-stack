@@ -15,8 +15,6 @@ class ClustersConfig extends ServiceConfig {
             name: "clusters",
             service: UUIDs.Service.Clusters,
         });
-
-        this.group = opts.group;
     }
 
     async create_repo (name) {
@@ -30,7 +28,7 @@ class ClustersConfig extends ServiceConfig {
         }
 
         this.log("Creating repo %s", name);
-        const uuid = await CDB.create_object(Git.Class.Repo);
+        const uuid = await CDB.create_object(UUIDs.Class.GitRepo);
         this.log("Created repo %s: %s", name, uuid);
         repo[name] = { uuid };
         return uuid;
@@ -44,29 +42,35 @@ class ClustersConfig extends ServiceConfig {
         await CDB.patch_config(UUIDs.App.Info, uuid, "merge", 
             { name: spec.name });
         await CDB.put_config(Git.App.Config, uuid, {
-            path:   `${this.group}/${name}`,
+            path:   `shared/${name}`,
             pull:   spec.pull,
         });
-        const shared = this.config.group[this.group].uuid;
-        await Auth.add_to_group(shared, uuid);
-        await CDB.fetch({
-            method:     "PUT",
-            url:        `v2/class/${shared}/direct/member/${uuid}`,
-        });
+        const shared = this.config.group.shared.uuid;
+        this.log("Adding %s ∈ %s", uuid, shared);
+        await CDB.class_add_member(shared, uuid);
     }
 }    
 
 async function setup_config (ss, chart) {
     const conf = await new ClustersConfig({
         ss,
-        group:  "shared",
     }).init();
 
+    const { GitRepo, GitRepoGroup } = UUIDs.Class;
+    const { EdgeService, EdgeRole } = Auth.Class;
+    const { ClusterGroups } = Clusters.Class;
     await conf.setup_groups(
-        ["shared",  UUIDs.Class.GitRepoGroup,   "Shared repositories"],
-        ["cluster", UUIDs.Class.GitRepoGroup,   "Edge cluster repositories"],
-        ["krbkeys", Auth.Class.EdgeRole,        "Edge krbkeys accounts"],
-        ["flux",    Auth.Class.EdgeRole,        "Edge flux accounts"],
+        ["shared",  GitRepoGroup,   "Shared repo"],
+        ["cluster", GitRepoGroup,   "Edge cluster repo"],
+        ["krbkeys", EdgeRole,       "Edge krbkeys account"],
+        ["flux",    EdgeRole,       "Edge flux account"],
+    );
+    await conf.setup_subgroups(
+        [GitRepo,       "shared", "cluster"],
+        [EdgeService,   "krbkeys", "flux"],
+    );
+    await conf.setup_members(
+        [ClusterGroups, "flux", "krbkeys", "cluster"],
     );
 
     /* This is probably not the best place for this, but for now the EDO
@@ -84,7 +88,7 @@ async function setup_config (ss, chart) {
     return await conf.finish();
 }
 
-async function setup_perms (auth, group, edge) {
+async function setup_perms (auth, group) {
     const account_req = Clusters.Requirement.ServiceAccount;
     const { ManageObjects, ReadConfig, WriteConfig } = UUIDs.Permission.ConfigDB;
     const { ManageKerberos, ManageGroup, ManageACL } = UUIDs.Permission.Auth;
@@ -111,18 +115,13 @@ async function setup_perms (auth, group, edge) {
         auth.fplus.debug.log("clusters", "Adding %o", ace);
         await auth.add_ace(...ace);
     }
-
-    for (const e of edge) {
-        await auth.add_to_group(Edge.Group.EdgeGroup, e);
-    }
 }
 
 export async function setup_clusters (ss, helm) {
     const chart = ss.config.helmChart ?? helm.helm.cluster;
     const config = await setup_config(ss, chart);
 
-    const edge = Object.values(helm.group).map(g => g.uuid);
-    await setup_perms(ss.fplus.Auth, config.group, edge);
+    await setup_perms(ss.fplus.Auth, config.group);
 
     return config;
 }

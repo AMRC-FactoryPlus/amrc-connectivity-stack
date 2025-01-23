@@ -1,0 +1,45 @@
+# Composite permission definitions
+#
+# REQUIRE: auth
+service: !u UUIDs.Service.ConfigDB
+version: 2
+objects:
+  !u Auth.Class.CompositePerm:
+    !u ACS.Perm.Composite.CmdEsc:
+      name: "Command Escalation service"
+      enum:
+        - !u ACS.Perm.MQTT.IssueCommands
+        - !u ACS.Perm.MQTT.ReadWholeNamespace
+    !u ACS.Perm.Composite.EdgeNode:
+      name: "Edge Node"
+      enum:
+        - !u ACS.Perm.MQTT.ReadAllStates
+        - !u ACS.Perm.MQTT.ParticipateAsNode
+        - !u ACS.Perm.MQTT.RepresentDevices
+    !u ACS.Perm.Composite.EdgeNodeConsumer:
+      name: "Edge Node consumer"
+      enum:
+        - !u ACS.Perm.MQTT.ReadNode
+        - !u UUIDs.Permission.CmdEsc.Rebirth
+    !u ACS.Perm.Composite.PrimaryApp:
+      name: "Global Primary App"
+      enum:
+        - !u ACS.Perm.MQTT.IssueCommands
+        - !u ACS.Perm.MQTT.ReadWholeNamespace
+        - !u ACS.Perm.MQTT.ReadAllStates
+        - !u ACS.Perm.MQTT.UpdateOwnState
+    !u ACS.Perm.Composite.Warehouse:
+      name: "Warehouse"
+      enum:
+        - !u ACS.Perm.MQTT.ReadWholeNamespace
+        - !u UUIDs.Permission.CmdEsc.Rebirth
+---
+service: !u UUIDs.Service.Authentication
+version: 1
+aces:
+  - principal: !u ACS.ServiceAccount.CmdEsc
+    permission: !u ACS.Perm.Composite.CmdEsc
+    target: !u UUIDs.Special.Null
+  - principal: !u ACS.ServiceAccount.Warehouse
+    permission: !u ACS.Perm.Composite.Warehouse
+    target: !u UUIDs.Special.Null

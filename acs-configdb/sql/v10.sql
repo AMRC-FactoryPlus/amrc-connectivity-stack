@@ -198,6 +198,16 @@ call migrate_to(10, $dump$
             where o.uuid = n.obj
                 and s.id = o.id;
 
+            -- Enums are also authoritative about their members.
+            delete from membership m
+            using object c, n_obj n
+            where c.uuid = n.obj
+                and m.class = c.id
+                and n.spec ? 'enum';
+
+-- For now I am omitting this step, which means that any conflicts will
+-- fail the dump. This is less risky in one sense (we don't silently
+-- remove anything) but makes it more likely and ACS upgrade will fail.
 --             -- Remove membership and subclass relations where the new
 --             -- ranks conflict. Do this before installing our new
 --             -- relations as problems there should raise errors.
@@ -228,6 +238,14 @@ call migrate_to(10, $dump$
                     jsonb_array_elements_text(n.spec->'memberOf') m(class)
                 join object o on o.uuid = n.obj
                 join object c on c.uuid = m.class::uuid;
+
+            insert into membership (class, id)
+            select c.id, o.id
+            from n_obj n
+                cross join lateral
+                    jsonb_array_elements_text(n.spec->'enum') e(member)
+                join object c on c.uuid = n.obj
+                join object o on o.uuid = e.member::uuid;
 
             -- A class defaults to the rank superclass. This will not
             -- affect individuals as there is no entry for rank -1.

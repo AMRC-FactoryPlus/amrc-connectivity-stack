@@ -55,11 +55,6 @@ async function setup_perms (auth, group) {
      * involve either a per-monitor explicit ACE or a new reflexive
      * UUID for group access. */
 
-    const members = [
-        [ACS.Group.SparkplugNode,       group.agent.uuid],
-        [ACS.Group.SparkplugNode,       group.monitor.uuid],
-        [ACS.Group.SparkplugReader,     group.monitor.uuid],
-    ];
     const aces = [
         [group.agent.uuid,      ReadConfig,     Edge.App.AgentConfig],
         [group.sync.uuid,       ReadConfig,     Clusters.App.HelmRelease],
@@ -73,10 +68,6 @@ async function setup_perms (auth, group) {
         [group.monitor.uuid,    ReloadConfig,   UUIDs.Special.Null],
     ];
 
-    for (const m of members) {
-        auth.fplus.debug.log("helm", "Adding member %s", m.join(", "));
-        await auth.add_to_group(...m);
-    }
     for (const a of aces) {
         auth.fplus.debug.log("helm", "Adding ACE %s", a.join(", "));
         await auth.add_ace(...a);
@@ -88,10 +79,20 @@ export async function setup_helm (ss) {
         ss,
     }).init();
 
+    const { EdgeRole } = Auth.Class;
+    const { SparkplugNode, SparkplugReader } = ACS.Group;
+    const { EdgeGroup } = Edge.Group;
     await conf.setup_groups(
-        ["agent",   Auth.Class.PrincipalGroup,  "Active Edge Agent"],
-        ["sync",    Auth.Class.PrincipalGroup,  "Edge sync"],
-        ["monitor", Auth.Class.PrincipalGroup,  "Edge monitor"],
+        ["agent",   EdgeRole,  "Active Edge Agent"],
+        ["sync",    EdgeRole,  "Edge sync"],
+        ["monitor", EdgeRole,  "Edge monitor"],
+    );
+    await conf.setup_subgroups(
+        [SparkplugNode,     "agent", "monitor"],
+        [SparkplugReader,   "monitor"],
+    );
+    await conf.setup_members(
+        [EdgeGroup,     "agent", "sync", "monitor"],
     );
 
     const acs = ss.acs_config;

@@ -20,7 +20,7 @@ git.prepare: git.pull
 endif
 
 git.check-committed:
-	[ -z "$$(git status --porcelain)" ] || (git status; exit 1)
+	[ -z "$$(git status --porcelain .)" ] || (git status .; exit 1)
 
 git.pull:
 	git pull --ff-only

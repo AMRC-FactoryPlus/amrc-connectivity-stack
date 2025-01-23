@@ -6,7 +6,7 @@
 
 import express from "express";
 
-import {Debug, UUIDs} from "@amrc-factoryplus/utilities";
+import { UUIDs } from "@amrc-factoryplus/service-client";
 
 import Model from "./model.js";
 import {Perm} from "./uuids.js";
@@ -38,7 +38,7 @@ function valid_krb(krb) {
 
 export default class AuthZ {
     constructor(opts) {
-        this.debug  = new Debug(opts);
+        this.debug  = opts.debug;
         this.model  = new Model(opts);
         this.routes = express.Router();
     }
@@ -59,6 +59,26 @@ export default class AuthZ {
         //}));
 
         //api.use(this.authz.bind(this));
+        
+        /* v1 API:
+         *
+         * GET acl/:uuid
+         * GET acl/identity/:type/:name
+         *
+         * GET ace # Lists all ACEs we can read?
+         * PUT ace/:principal/:permission/:target # Boolean body?
+         * DELETE ace/:principal/:permission/:target
+         *
+         * OR: ACEs get their own UUIDs. (This moves towards treating a
+         * Permission as a set of grants.) Then:
+         *
+         * GET ace
+         * POST ace
+         * GET ace/:ace
+         * PUT ace/:ace
+         * DELETE ace/:ace
+         * 
+         */
 
         api.get("/acl", this.get_acl.bind(this));
 
@@ -74,9 +94,12 @@ export default class AuthZ {
             //.put(this.principal_update.bind(this))
             .delete(this.principal_delete.bind(this));
 
-        api.get("/group", this.group_list.bind(this));
-        api.get("/group/:group", this.group_get.bind(this));
-        api.put("/group/:group/:member", this.group_add.bind(this));
+        /* These endpoints are for migration only. PUT has been removed
+         * so group members can only be deleted. Normally all groups
+         * will be cleared the first time service-setup runs; the only
+         * reason for this not happening would be if groups were not
+         * correctly registered in the ConfigDB. */
+        api.get("/group/all", this.group_all.bind(this));
         api.delete("/group/:group/:member", this.group_delete.bind(this));
 
         api.get("/effective", this.effective_list.bind(this));
@@ -203,35 +226,13 @@ export default class AuthZ {
         return res.status(200).json(uuid);
     }
 
-    async group_list(req, res) {
+    async group_all(req, res) {
         const ok = await this.model.check_acl(
             req.auth, Perm.Manage_Group, UUIDs.Null, false);
         if (!ok) return res.status(403).end();
 
-        const groups = await this.model.group_list();
+        const groups = await this.model.group_all();
         return res.status(200).json(groups);
-    }
-
-    async group_get(req, res) {
-        const grp = req.params.group;
-
-        const ok = await this.model.check_acl(
-            req.auth, Perm.Manage_Group, grp, true);
-        if (!ok) return res.status(403).end();
-
-        const members = await this.model.group_get(grp);
-        return res.status(200).json(members);
-    }
-
-    async group_add(req, res) {
-        const {group, member} = req.params;
-
-        const ok = await this.model.check_acl(
-            req.auth, Perm.Manage_Group, group, true);
-        if (!ok) return res.status(403).end();
-
-        const st = await this.model.group_add(group, member);
-        return res.status(st).end();
     }
 
     async group_delete(req, res) {

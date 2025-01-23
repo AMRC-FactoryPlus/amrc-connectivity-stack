@@ -7,7 +7,7 @@
 import { GIT_VERSION } from "./git-version.js";
 
 /* This is the version of the ConfigDB service spec we comply to */
-export const Version = "1.7.0";
+export const Version = "2.0.0";
 
 export const Null_UUID = "00000000-0000-0000-0000-000000000000";
 
@@ -58,4 +58,6 @@ export const Perm = {
     Delete_Obj: "6957174b-7b08-45ca-ac5c-c03ab6928a6e",
     Manage_App: "95c7cbcb-ce60-49ed-aa81-2fe3eec4559d",
 };
+
+export const BootstrapUUIDs = { App, Perm, SpecialObj };
 

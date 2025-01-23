@@ -4,7 +4,8 @@
  * Copyright 2022 AMRC
  */
 
-import {DB, Debug, UUIDs} from "@amrc-factoryplus/utilities";
+import { UUIDs} from "@amrc-factoryplus/service-client";
+import { DB } from "@amrc-factoryplus/pg-client";
 
 import Queries from "./queries.js";
 import {Perm} from "./uuids.js";
@@ -12,12 +13,13 @@ import {Perm} from "./uuids.js";
 export default class Model extends Queries {
     constructor(opts) {
         const db = new DB({
-            version: Queries.DBVersion,
+            debug:      opts.debug,
+            version:    Queries.DBVersion,
         });
 
         super(db.query.bind(db))
 
-        this.debug = new Debug(opts);
+        this.debug = opts.debug;
 
         this.db = db;
         this.acl_cache_age = opts.acl_cache * 1000;
@@ -94,6 +96,7 @@ export default class Model extends Queries {
         if (!this.dump_validate(dump))
             return 400;
 
+        return 204;
         return this.txn(async q => {
             for (const ace of dump.aces ?? []) {
                 await q.ace_add(ace);

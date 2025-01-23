@@ -12,7 +12,7 @@ import deep_equal from "deep-equal";
 import merge_patch from "json-merge-patch";
 import rx from "rxjs";
 
-import { DB } from "@amrc-factoryplus/utilities";
+import { DB } from "@amrc-factoryplus/pg-client";
 
 import {App, Class, Service, SpecialObj} from "./constants.js";
 import { SpecialApps } from "./special.js";
@@ -71,10 +71,11 @@ function _q_exists (...args) {
 export default class Model extends EventEmitter {
     constructor(opts) {
         super();
-        this.log = opts.log;
+        this.log = opts.debug.bound("model");
 
         this.db = new DB({
-            version: DB_Version,
+            debug:      opts.debug,
+            version:    DB_Version,
         });
 
         this.ajv = new Ajv({

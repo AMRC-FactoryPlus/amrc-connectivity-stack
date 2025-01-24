@@ -5,7 +5,7 @@
  */
 
 export const Class = {
-    Principal:      "c0157038-ccff-11ef-a4db-63c6212e998f",
+    Principal:      "11614546-b6d7-11ef-aebd-8fbb45451d7c",
     Permission:     "8ae784bb-c4b5-4995-9bf6-799b3c7f21ad",
 };
 

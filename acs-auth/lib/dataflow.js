@@ -31,7 +31,14 @@ export class DataFlow {
     }
 
     _build_groups () {
-        const { cdb } = this;
+        const { cdb, aces } = this;
+
+        const target_groups = rxx.rx(
+            aces,
+            rx.map(es => imm.Seq(es)
+                .filter(e => e.plural)
+                .map(e => e.target)
+                .toSet()));
 
         return rxx.rx(
             rx.combineLatest({
@@ -39,6 +46,7 @@ export class DataFlow {
                 princ_grp:  cdb.watch_powerset(Class.Principal),
                 perm:       cdb.watch_members(Class.Permission),
                 perm_grp:   cdb.watch_powerset(Class.Permission),
+                targ_grp:   cdb.expand_members(target_groups),
             }),
             rx.shareReplay(1));
     }
@@ -70,11 +78,21 @@ export class DataFlow {
                     /* Expand composite permissions */
                     .flatMap(e => 
                         groups.perm.has(e.permission) ? [e]
-                        : groups.perm_grp.has(e.permission)
-                            ? groups.perm_grp.get(e.permission)
+                        : groups.perm_grp.has(e.permission) ?
+                            groups.perm_grp.get(e.permission)
                                 .toArray()
                                 .map(m => ({ ...e, permission: m }))
                         : [])
+                    /* Expand target groups */
+                    .flatMap(e => e.plural
+                        /* We may not have the members of this group
+                         * yet. We'll get another update later. */
+                        ? groups.targ_grp.has(e.target)
+                            ? groups.targ_grp.get(e.target)
+                                .toArray()
+                                .map(m => ({ ...e, target: m }))
+                            : []
+                        : [e])
                     /* Substitute Self and remove unwanted properties */
                     .map(e => ({
                         permission: e.permission,

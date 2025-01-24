@@ -4,6 +4,11 @@
  * Copyright 2022 AMRC
  */
 
+export const Class = {
+    Principal:      "c0157038-ccff-11ef-a4db-63c6212e998f",
+    Permission:     "8ae784bb-c4b5-4995-9bf6-799b3c7f21ad",
+};
+
 export const Perm = {
     All:            "50b727d4-3faa-40dc-b347-01c99a226c58",
     Read_ACL:       "ba566181-0e8a-405b-b16e-3fb89130fbee",

@@ -6,11 +6,14 @@
  * Copyright 2022 AMRC
  */
 
+import { RxClient } from "@amrc-factoryplus/rx-client";
 import { WebAPI } from "@amrc-factoryplus/service-api";
-import { Debug, UUIDs } from "@amrc-factoryplus/service-client";
+import { UUIDs } from "@amrc-factoryplus/service-client";
 
 import AuthN from "../lib/authn.js";
 import AuthZ from "../lib/authz.js";
+import { DataFlow } from "../lib/dataflow.js";
+import Model from "../lib/model.js";
 import Editor from "../lib/editor.js";
 
 import { GIT_VERSION } from "../lib/git-version.js";
@@ -18,14 +21,18 @@ import { GIT_VERSION } from "../lib/git-version.js";
 /* This is the F+ service spec version */
 const Version = "2.0.0";
 
-const debug = new Debug({ verbose: process.env.VERBOSE });
+const fplus = new RxClient({ env: process.env });
+const debug = fplus.debug;
 
-const authn = await new AuthN({ }).init();
-const authz = await new AuthZ({
+const model  = await new Model({
     debug,
     acl_cache:          process.env.ACL_CACHE ?? 5,
     root_principal:     process.env.ROOT_PRINCIPAL,
 }).init();
+const data = new DataFlow({ fplus, model });
+
+const authn = await new AuthN({ }).init();
+const authz = await new AuthZ({ model });
 
 const editor = await new Editor({
     services: {
@@ -58,4 +65,5 @@ const api = await new WebAPI({
     },
 }).init();
     
+data.run();
 api.run();

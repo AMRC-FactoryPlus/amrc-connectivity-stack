@@ -39,18 +39,13 @@ function valid_krb(krb) {
 export default class AuthZ {
     constructor(opts) {
         this.debug  = opts.debug;
-        this.model  = new Model(opts);
-        this.routes = express.Router();
-    }
+        this.model = opts.model;
 
-    async init() {
-        await this.model.init();
-        this.setup_routes();
-        return this;
+        this.routes = this.setup_routes();
     }
 
     setup_routes() {
-        let api = this.routes;
+        let api = express.Router();
 
         /* Validate against the spec */
         //const spec = url.fileURLToPath(new URL("openapi.yaml", import.meta.url));
@@ -107,6 +102,8 @@ export default class AuthZ {
 
         api.post("/load", this.dump_load.bind(this));
         api.get("/save", this.dump_save.bind(this));
+
+        return api;
     }
 
     async get_acl(req, res) {

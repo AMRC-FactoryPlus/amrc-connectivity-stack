@@ -22,6 +22,8 @@
   "license": "MIT",
   "dependencies": {
     "@amrc-factoryplus/pg-client": "^0.0.1",
+    "@amrc-factoryplus/rx-client": "0.0.1-bmz.7",
+    "@amrc-factoryplus/rx-util": "0.0.4-bmz.1",
     "@amrc-factoryplus/service-api": "^0.1.0-bmz.1",
     "@amrc-factoryplus/service-client": "^1.4.0-bmz.2",
     "express": "^5.0.1"

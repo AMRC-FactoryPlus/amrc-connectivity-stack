@@ -1,6 +1,5 @@
 <!--
-  -  Factory+ / AMRC Connectivity Stack (ACS) Manager component
-  -  Copyright 2023 AMRC
+  - Copyright (c) University of Sheffield AMRC 2025.
   -->
 
 <template>
@@ -97,6 +96,10 @@
     ></new-node-overlay>
     <node-user-overlay v-if="showNodeUserDialogFor" :show="!!showNodeUserDialogFor" :node="showNodeUserDialogFor" :cluster="selectedCluster"
                        @close="() => {showNodeUserDialogFor = null;}"></node-user-overlay>
+    <import-devices-overlay v-if="showImportDevicesOverlay" :show="showImportDevicesOverlay" @close="showImportDevicesOverlay=false"
+        :node="selectedNode"
+        @complete="devicesImported"
+    ></import-devices-overlay>
 
     <!--Devices-->
     <ColumnList class="px-4" @selected="selectDevice" :selected-item="selectedDevice ? selectedDevice.id : null"
@@ -105,12 +108,21 @@
                 :loading="devicesLoading" :items="devices"
                 name="Devices">
       <template #actions>
-        <button type="button"
-                class="fpl-button-brand"
-                @click="createNewDevice">
-          <div class="mr-2">New Device</div>
-          <i class="fa-sharp fa-solid fa-plus text-xs"></i>
-        </button>
+        <div class="flex items-center justify-center gap-2">
+          <button type="button"
+              v-tooltip="'Create devices automatically from a JSON configuration file'"
+              class="fpl-button-secondary h-10"
+              @click="importConfig">
+            <div class="mr-2">Import Devices</div>
+            <i class="fa-sharp fa-solid fa-upload text-xs"></i>
+          </button>
+          <button type="button"
+              class="fpl-button-brand"
+              @click="createNewDevice">
+            <div class="mr-2">New Device</div>
+            <i class="fa-sharp fa-solid fa-plus text-xs"></i>
+          </button>
+        </div>
       </template>
       <template v-slot:item="{ item }">
         <div class="flex-1 px-4 py-2 text-sm truncate h-16 flex flex-col justify-center">
@@ -141,6 +153,7 @@ export default {
     'new-node-overlay': () => import(/* webpackPrefetch: true */ '../Nodes/NewNodeOverlay.vue'),
     'node-user-overlay': () => import(/* webpackPrefetch: true */ '../Nodes/NodeUserOverlay.vue'),
     'new-edge-cluster-overlay': () => import(/* webpackPrefetch: true */ '../EdgeClusters/NewEdgeClusterOverlay.vue'),
+    'import-devices-overlay': () => import(/* webpackPrefetch: true */ '../Devices/ImportDevicesOverlay.vue'),
   },
 
   props: {
@@ -185,10 +198,6 @@ export default {
       this.selectNode(response.data.data.node)
     },
 
-    showNewDeviceDialog () {
-      this.newDeviceDialogVisible = true
-    },
-
     selectCluster (cluster) {
 
       this.selectedCluster = cluster
@@ -204,6 +213,15 @@ export default {
 
     selectDevice (device) {
       this.goto_url('/clusters/' + this.selectedCluster.uuid + '/nodes/' + this.selectedNode.id + '/devices/' + device.id)
+    },
+
+    importConfig() {
+      this.showImportDevicesOverlay = true
+    },
+
+    devicesImported() {
+      this.showImportDevicesOverlay = false
+      this.requestDataReloadFor('devices')
     },
 
     createNewDevice () {
@@ -349,6 +367,7 @@ export default {
       newNodeDialogVisible: false,
       newDeviceDialogVisible: false,
       showNodeUserDialogFor: null,
+      showImportDevicesOverlay: false,
 
       // nodes
       nodes: null,

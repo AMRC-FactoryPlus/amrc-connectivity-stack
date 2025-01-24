@@ -1,7 +1,6 @@
 <?php
 /*
- *  Factory+ / AMRC Connectivity Stack (ACS) Manager component
- *  Copyright 2023 AMRC
+ * Copyright (c) University of Sheffield AMRC 2025.
  */
 
 use App\Http\Controllers\APITestController;
@@ -73,6 +72,7 @@ Route::middleware('auth:api')->post('/clusters/{cluster}/nodes/{node}/connection
 Route::middleware('auth:api')->delete('/clusters/{cluster}/nodes/{node}', [NodeController::class, 'destroy']);
 
 // ------ Devices ------ //
+Route::middleware('auth:api')->post('/nodes/{node}/devices/import', [DeviceController::class, 'import']);
 Route::middleware('auth:api')->get('/clusters/{cluster}/nodes/{node}/devices', [DeviceController::class, 'index']);
 Route::middleware('auth:api')->post('/clusters/{cluster}/nodes/{node}/devices', [DeviceController::class, 'store']);
 Route::middleware('auth:api')->get('/clusters/{cluster}/nodes/{node}/devices/{device}', [DeviceController::class, 'show']);

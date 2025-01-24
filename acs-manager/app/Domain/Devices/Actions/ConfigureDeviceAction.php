@@ -1,7 +1,6 @@
 <?php
 /*
- *  Factory+ / AMRC Connectivity Stack (ACS) Manager component
- *  Copyright 2023 AMRC
+ * Copyright (c) University of Sheffield AMRC 2025.
  */
 
 namespace App\Domain\Devices\Actions;
@@ -13,6 +12,7 @@ use App\Domain\OriginMaps\Actions\ActivateOriginMapAction;
 use App\Domain\OriginMaps\Models\OriginMap;
 use App\Exceptions\ActionFailException;
 use App\Exceptions\ActionForbiddenException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -36,21 +36,23 @@ class ConfigureDeviceAction
         DeviceSchema $deviceSchema,
         DeviceSchemaVersion $version,
         string $deviceConfiguration,
-        bool $active
+        bool $active,
     ) {
         // =========================
         // Validate User Permissions
         // =========================
-        if ((! auth()->user()->administrator) && ! in_array(
-            $device->node->id,
-            auth()
-                ->user()
-                ->accessibleNodes()
-                ->get()
-                ->pluck('id')
-            ->all(),
-            true
-        )) {
+        if ((!auth()->user()->administrator)
+            && !in_array(
+                $device->node->id,
+                auth()
+                    ->user()
+                    ->accessibleNodes()
+                    ->get()
+                    ->pluck('id')
+                    ->all(),
+                true,
+            )
+        ) {
             throw new ActionForbiddenException('You do not have permission to configure a device in this node.');
         }
 
@@ -64,19 +66,32 @@ class ConfigureDeviceAction
         // Register all known schemas
         $deviceValidator = new Validator;
 
-        foreach (
-            HTTP::get('https://api.github.com/repos/AMRC-FactoryPlus/schemas/git/trees/main?recursive=1')
-                ->json()['tree'] as $item
-        ) {
+        // Define cache key and expiration time
+        $cacheKey = 'github_schemas';
+        $cacheDuration = now()->addMinutes(15);
+
+        // Fetch the data from the cache or API
+        $schemas = Cache::remember($cacheKey, $cacheDuration, function () {
+            return HTTP::get('https://api.github.com/repos/AMRC-FactoryPlus/schemas/git/trees/main?recursive=1')->json()['tree'];
+        });
+
+        // Loop through the schemas
+        foreach ($schemas as $item) {
             if (preg_match("/-v\d+.json$/", $item['path'])) {
-                $deviceValidator->resolver()
-                                ->registerRaw(file_get_contents('https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/' . $item['path']));
+                $cacheKeyForFile = 'schema:'.$item['path'];
+
+                // Fetch schema from cache or API
+                $schemaContent = Cache::remember($cacheKeyForFile, $cacheDuration, function () use ($item) {
+                    return file_get_contents('https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/'.$item['path']);
+                });
+
+                $deviceValidator->resolver()->registerRaw($schemaContent);
             }
         }
 
         // Validate that the JSON supplied is valid against the supplied schema
-        $validated = $deviceValidator->validate($deviceConfig, $deviceSchema->url . '-v' . $version->version . '.json');
-        if (! $validated->isValid()) {
+        $validated = $deviceValidator->validate($deviceConfig, $deviceSchema->url.'-v'.$version->version.'.json');
+        if (!$validated->isValid()) {
             // Get the error
             $error = $validated->error();
 
@@ -88,35 +103,36 @@ class ConfigureDeviceAction
                     'keyword' => $error->keyword(),
                     'message' => $formatter->formatErrorMessage($error),
 
-                    'dataPath' => $formatter->formatErrorKey($error),
-                    'dataValue' => $error->data()
-                                         ->value(),
+                    'dataPath'  => $formatter->formatErrorKey($error),
+                    'dataValue' => $error
+                        ->data()
+                        ->value(),
                 ];
             };
 
             $errors = $formatter->formatFlat($error, $custom);
-            Log::error('JSON file is not valid against ' . $deviceSchema->name . '-v' . $version->version . '!', [
+            Log::error('JSON file is not valid against '.$deviceSchema->name.'-v'.$version->version.'!', [
                 'error' => $errors[count($errors) - 1],
             ]);
 
             throw new ActionFailException(
-                'The configuration is not valid for ' . $deviceSchema->name . '-v' . $version->version . '. ' . $errors[count(
-                    $errors
-                ) - 1]['message'] . ' at ' . $errors[count($errors) - 1]['dataPath']
+                'The configuration is not valid for '.$deviceSchema->name.'-v'.$version->version.'. '.$errors[count(
+                    $errors,
+                ) - 1]['message'].' at '.$errors[count($errors) - 1]['dataPath'],
             );
         }
 
         // Upload the origin map
         $originMapFilename = uniqid('', true);
         Storage::disk('device-configurations')
-                ->put($originMapFilename . '.json', json_encode($deviceConfig, JSON_THROW_ON_ERROR));
+            ->put($originMapFilename.'.json', json_encode($deviceConfig, JSON_THROW_ON_ERROR));
 
         // Create the origin map for this device
         $originMap = OriginMap::create([
-            'name' => Str::uuid(),
-            'device_id' => $device->id,
-            'file' => $originMapFilename . '.json',
-            'active' => $active,
+            'name'        => Str::uuid(),
+            'device_id'   => $device->id,
+            'file'        => $originMapFilename.'.json',
+            'active'      => $active,
             'schema_uuid' => $version->schema_uuid,
         ]);
 

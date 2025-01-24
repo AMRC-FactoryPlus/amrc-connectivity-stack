@@ -58,7 +58,7 @@ export class DataFlow {
             rx.map(({ groups, aces }) => {
                 if (!groups.princ.has(principal))
                     return;
-                /* Find groups this principal is member of */
+                /* Find principals we will accept in an ACE */
                 const accept_princ = groups.princ_grp
                     .filter(ms => ms.has(principal))
                     .keySeq()
@@ -75,10 +75,10 @@ export class DataFlow {
                                 .toArray()
                                 .map(m => ({ ...e, permission: m }))
                         : [])
-                    /* Substitute Self */
+                    /* Substitute Self and remove unwanted properties */
                     .map(e => ({
-                        ...e,
-                        target: e.target == Special.Self ? principal : e.target,
+                        permission: e.permission,
+                        target:     e.target == Special.Self ? principal : e.target,
                     }));
             }));
     }

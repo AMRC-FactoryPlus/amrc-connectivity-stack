@@ -382,6 +382,7 @@ export default class Model extends EventEmitter {
             return [st, info];
         });
 
+        this.log("OBJECT CREATE: %s", st);
         if (st < 299) {
             this.updates.next({
                 type:   "config",
@@ -389,6 +390,7 @@ export default class Model extends EventEmitter {
                 object: config.uuid,
                 config,
             });
+            this.log("SENDING class UPDATE");
             this.updates.next({ type: "class" });
         }
         return [st, config];

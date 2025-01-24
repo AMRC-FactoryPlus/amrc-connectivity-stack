@@ -35,10 +35,12 @@ export class DataFlow {
 
         const target_groups = rxx.rx(
             aces,
+            rx.tap(v => this.log("TARG GRP: got ACEs")),
             rx.map(es => imm.Seq(es)
                 .filter(e => e.plural)
                 .map(e => e.target)
-                .toSet()));
+                .toSet()),
+            rx.tap(gs => this.log("TARG GRPs: %o", gs)));
 
         return rxx.rx(
             rx.combineLatest({
@@ -46,7 +48,9 @@ export class DataFlow {
                 princ_grp:  cdb.watch_powerset(Class.Principal),
                 perm:       cdb.watch_members(Class.Permission),
                 perm_grp:   cdb.watch_powerset(Class.Permission),
-                targ_grp:   cdb.expand_members(target_groups),
+                targ_grp:   rxx.rx(
+                    cdb.expand_members(target_groups),
+                    rx.tap(gs => this.log("TARG GRPs: got members"))),
             }),
             rx.shareReplay(1));
     }
@@ -54,7 +58,7 @@ export class DataFlow {
     run () {
         this.groups.subscribe(gs => this.log("GROUPS UPDATE"));
             //imm.Map(gs).toJS()));
-        this.aces.subscribe(es => this.log("ACES: %o", es));
+        this.aces.subscribe(es => this.log("ACE UPDATE"));
     }
 
     acl_for (principal) {
@@ -63,6 +67,7 @@ export class DataFlow {
                 groups:     this.groups,
                 aces:       this.aces,
             }),
+            rx.tap(v => this.log("ACL UPDATE: %s", principal)),
             rx.map(({ groups, aces }) => {
                 if (!groups.princ.has(principal))
                     return;

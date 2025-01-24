@@ -15,9 +15,10 @@ import { booleans, valid_krb, valid_uuid } from "./validate.js";
 
 export class APIv2 {
     constructor(opts) {
-        this.debug  = opts.debug;
         this.model = opts.model;
         this.data = opts.data;
+
+        this.log = opts.debug.bound("apiv2");
 
         this.routes = this.setup_routes();
     }
@@ -34,8 +35,10 @@ export class APIv2 {
         /* XXX No auth for now */
         const { principal } = req.params;
 
+        this.log("Fetching ACL for %s", principal);
         const acl = await rx.firstValueFrom(
             this.data.acl_for(principal));
+        this.log("Got ACL for %s", principal);
 
         if (!acl) return res.status(404).end();
         return res.status(200).json(acl);

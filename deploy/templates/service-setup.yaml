@@ -9,7 +9,6 @@ metadata:
 #  annotations:
 #    helm.sh/hook: post-install, post-upgrade
 spec:
-  ttlSecondsAfterFinished: 300
   backoffLimit: 9999
   template:
     spec:

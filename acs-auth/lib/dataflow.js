@@ -59,12 +59,14 @@ export class DataFlow {
                 if (!groups.princ.has(principal))
                     return;
                 /* Find groups this principal is member of */
-                const roles = groups.princ_grp
+                const accept_princ = groups.princ_grp
                     .filter(ms => ms.has(principal))
-                    .keySeq().toSet();
+                    .keySeq()
+                    .concat(principal)
+                    .toSet();
                 return aces
                     /* Filter ACEs by principal or group */
-                    .filter(e => roles.has(e.principal))
+                    .filter(e => accept_princ.has(e.principal))
                     /* Expand composite permissions */
                     .flatMap(e => 
                         groups.perm.has(e.permission) ? [e]

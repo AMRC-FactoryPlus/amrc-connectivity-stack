@@ -10,6 +10,7 @@ import { RxClient } from "@amrc-factoryplus/rx-client";
 import { WebAPI } from "@amrc-factoryplus/service-api";
 import { UUIDs } from "@amrc-factoryplus/service-client";
 
+import { APIv2 } from "../lib/api_v2.js";
 import AuthN from "../lib/authn.js";
 import AuthZ from "../lib/authz.js";
 import { DataFlow } from "../lib/dataflow.js";
@@ -32,7 +33,8 @@ const model  = await new Model({
 const data = new DataFlow({ fplus, model });
 
 const authn = await new AuthN({ }).init();
-const authz = await new AuthZ({ model });
+const authz = await new AuthZ({ debug, model });
+const apiv2 = new APIv2({ data, debug, model });
 
 const editor = await new Editor({
     services: {
@@ -61,6 +63,7 @@ const api = await new WebAPI({
     routes: app => {
         app.use("/authn", authn.routes);
         app.use("/authz", authz.routes);
+        app.use("/v2", apiv2.routes);
         app.use("/editor", editor.routes);
     },
 }).init();

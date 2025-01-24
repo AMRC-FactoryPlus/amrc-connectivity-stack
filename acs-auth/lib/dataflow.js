@@ -9,7 +9,7 @@ import rx from "rxjs";
 
 import * as rxx from "@amrc-factoryplus/rx-util";
 
-import { Class } from "./uuids.js";
+import { Class, Special } from "./uuids.js";
 
 export class DataFlow {
     constructor (opts) {
@@ -47,5 +47,37 @@ export class DataFlow {
         this.groups.subscribe(gs => this.log("GROUPS UPDATE"));
             //imm.Map(gs).toJS()));
         this.aces.subscribe(es => this.log("ACES: %o", es));
+    }
+
+    acl_for (principal) {
+        return rxx.rx(
+            rx.combineLatest({
+                groups:     this.groups,
+                aces:       this.aces,
+            }),
+            rx.map(({ groups, aces }) => {
+                if (!groups.princ.has(principal))
+                    return;
+                /* Find groups this principal is member of */
+                const roles = groups.princ_grp
+                    .filter(ms => ms.has(principal))
+                    .keySeq().toSet();
+                return aces
+                    /* Filter ACEs by principal or group */
+                    .filter(e => roles.has(e.principal))
+                    /* Expand composite permissions */
+                    .flatMap(e => 
+                        groups.perm.has(e.permission) ? [e]
+                        : groups.perm_grp.has(e.permission)
+                            ? groups.perm_grp.get(e.permission)
+                                .toArray()
+                                .map(m => ({ ...e, permission: m }))
+                        : [])
+                    /* Substitute Self */
+                    .map(e => ({
+                        ...e,
+                        target: e.target == Special.Self ? principal : e.target,
+                    }));
+            }));
     }
 }

@@ -10,31 +10,7 @@ import { UUIDs } from "@amrc-factoryplus/service-client";
 
 import Model from "./model.js";
 import {Perm} from "./uuids.js";
-
-const UUID_rx = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-const KRB_rx = /^[a-zA-Z0-9_./-]+@[A-Z0-9-.]+$/;
-
-const booleans = {
-    undefined: false,
-    "true": true, "false": false,
-    "1": true, "0": false,
-    on: true, off: false,
-    yes: true, no: false,
-};
-
-function valid_uuid(uuid) {
-    if (UUID_rx.test(uuid))
-        return true;
-    //debug.log("debug", `Ignoring invalid UUID [${uuid}]`);
-    return false;
-}
-
-function valid_krb(krb) {
-    if (KRB_rx.test(krb))
-        return true;
-    //debug.log("debug", `Ignoring invalid principal [${krb}]`);
-    return false;
-}
+import { booleans, valid_krb, valid_uuid } from "./validate.js";
 
 export default class AuthZ {
     constructor(opts) {

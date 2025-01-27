@@ -15,6 +15,8 @@
   <ObjectSelector
       v-model="selectedUsers"
       :store-data="p.data"
+      title="Select Users"
+      subtitle="Select users to add to the principal"
       detail-header="Prinipal"
       detail-key="kerberos"
       title-header="Name"

@@ -475,7 +475,7 @@ export default class Model extends EventEmitter {
 
         /* This needs to be null, not undefined, for a nonexistent
          * object, or the 409 test below will fail. */
-        const json = conf?.json ?? null;
+        const json = conf?.config ?? null;
 
         /* Safety check: applying a merge-patch to a non-object destroys
          * the whole thing. */

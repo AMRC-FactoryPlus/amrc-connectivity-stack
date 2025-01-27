@@ -1,3 +1,7 @@
+<!--
+  - Copyright (c) University of Sheffield AMRC 2025.
+  -->
+
 <script setup lang="ts">
 import type {ColumnDef, ColumnFiltersState, SortingState, VisibilityState,} from '@tanstack/vue-table'
 import {
@@ -6,7 +10,6 @@ import {
     getFacetedRowModel,
     getFacetedUniqueValues,
     getFilteredRowModel,
-    // getPaginationRowModel,
     getSortedRowModel,
     useVueTable,
 } from '@tanstack/vue-table'
@@ -16,7 +19,7 @@ import {ref} from 'vue'
 import DataTableToolbar from './DataTableToolbar.vue'
 import {valueUpdater} from '@/lib/utils'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow,} from '@/components/ui/table'
-import { useLayoutStore } from '@/store/layoutStore.js'
+import {useLayoutStore} from '@/store/layoutStore.js'
 
 interface DataTableProps<T> {
     columns: ColumnDef<T, any>[]
@@ -76,7 +79,7 @@ const table = useVueTable({
   <div class="space-y-4">
     <DataTableToolbar v-if="!l.fullscreen" :filters="filters" :table="table">
       <template #left>
-        <slot name="toolbar-left"></slot>
+        <slot name="toolbar-left" :table="table"></slot>
       </template>
     </DataTableToolbar>
     <slot name="below-toolbar"></slot>

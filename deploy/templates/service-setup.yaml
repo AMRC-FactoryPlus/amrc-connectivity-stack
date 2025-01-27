@@ -5,9 +5,8 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   namespace: {{ .Release.Namespace }}
-  name: service-setup
-  annotations:
-    helm.sh/hook: post-install, post-upgrade
+  # Give the job a random id so helm reruns it on helm upgrade.
+  name: service-setup-{{ randAlphaNum 8 | lower }}
 spec:
   ttlSecondsAfterFinished: 300
   template:

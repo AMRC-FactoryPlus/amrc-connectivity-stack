@@ -12,6 +12,17 @@
   <Sheet :open="selectedPermission !== null" @update:open="e => !e ? selectedPermission = null : null">
     <PermissionManagementSidebar :permission="selectedPermission" @objectClick="e => objectClicked(e.original)"></PermissionManagementSidebar>
   </Sheet>
+  <ObjectSelector
+      v-model="selectedUsers"
+      :store-data="p.data"
+      detail-header="Prinipal"
+      detail-key="kerberos"
+      title-header="Name"
+      title-key="name"
+  >
+    <Button>Select Users</Button>
+  </ObjectSelector>
+  {{selectedUsers}}
   <Tabs default-value="principals">
     <TabsList class="mb-6">
       <TabsTrigger value="principals">
@@ -37,20 +48,20 @@
 </template>
 
 <script>
-import {useServiceClientStore} from '@/store/serviceClientStore.js'
-import {Skeleton} from '@components/ui/skeleton'
+import { useServiceClientStore } from '@/store/serviceClientStore.js'
+import { Skeleton } from '@components/ui/skeleton'
 import DataTable from '@components/ui/data-table/DataTable.vue'
-import {Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger} from '@/components/ui/sheet'
-import {Tabs, TabsContent, TabsList, TabsTrigger} from '@/components/ui/tabs'
-import {defineAsyncComponent} from 'vue'
-import {Button} from '@components/ui/button/index.js'
-import {usePrincipalStore} from '@store/usePrincipalStore.js'
-import {useGroupStore} from '@store/useGroupStore.js'
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { defineAsyncComponent } from 'vue'
+import { Button } from '@components/ui/button/index.js'
+import { usePrincipalStore } from '@store/usePrincipalStore.js'
+import { useGroupStore } from '@store/useGroupStore.js'
 import PrincipalList from './PrincipalList.vue'
 import GroupList from './GroupList.vue'
 import PermissionList from '@pages/AccessControl/Permissions/PermissionList.vue'
-import {usePermissionStore} from '@store/usePermissionStore.js'
-import {UUIDs} from "@amrc-factoryplus/service-client";
+import { usePermissionStore } from '@store/usePermissionStore.js'
+import { UUIDs } from '@amrc-factoryplus/service-client'
 
 export default {
   name: 'AccessControl',
@@ -84,6 +95,7 @@ export default {
     PermissionManagementSidebar: defineAsyncComponent(() => import('./Permissions/PermissionManagementSidebar.vue')),
     PrincipalList,
     GroupList,
+    ObjectSelector: defineAsyncComponent(() => import('@components/ObjectSelector/ObjectSelector.vue')),
   },
 
   methods: {
@@ -156,7 +168,8 @@ export default {
     return {
       selectedPrincipal: null,
       selectedGroup: null,
-      selectedPermission: null
+      selectedPermission: null,
+      selectedUsers: [],
     }
   },
 }

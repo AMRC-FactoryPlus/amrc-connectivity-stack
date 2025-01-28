@@ -10,9 +10,10 @@ import * as rx from "rxjs";
 
 import { UUIDs } from "@amrc-factoryplus/service-client";
 
-import Model from "./model.js";
 import {Perm} from "./uuids.js";
-import { booleans, valid_krb, valid_uuid } from "./validate.js";
+import { valid_uuid } from "./validate.js";
+
+const Wildcard = UUIDs.Special.Null;
 
 function fail (status) {
     throw { status };
@@ -33,6 +34,14 @@ export class APIv2 {
 
         api.get("/acl/:principal", this.get_acl.bind(this));
 
+        api.route("/grant")
+            .get(this.grant_list.bind(this))
+            .post(this.grant_new.bind(this));
+        api.route("/grant/:uuid")
+            .get(this.grant_get.bind(this))
+            .put(this.grant_put.bind(this))
+            .delete(this.grant_put.bind(this));
+
         return api;
     }
 
@@ -43,12 +52,22 @@ export class APIv2 {
         return acl;
     }
 
-    async check_acl (krb, perm, targ, wild) {
-        const princ = await this.model.principal_find_by_krb(krb);
-        if (!princ) fail(403);
+    async permitted (req, perm) {
+        const permitted = await this.model.principal_find_by_krb(req.auth)
+            .then(p => p ? this.fetch_acl(p) : [])
+            .then(acl => imm.Seq(acl)
+                .filter(e => e.permission == perm)
+                .map(e => e.target)
+                .toSet());
+        this.log("Permitted %s for %s: %o", perm, req.auth, permitted.toJS());
+        return permitted;
+    }
 
-        const acl = await this.fetch_acl(princ);
-        throw "incomplete";
+    async check_acl (req, perm, targ, wild) {
+        const targs = await this.permitted(req, perm);
+        if (targs.has(targ)) return;
+        if (wild && targs.has(Wildcard)) return;
+        fail(403);
     }
 
     async get_acl (req, res) {
@@ -58,18 +77,55 @@ export class APIv2 {
         const acl = await this.fetch_acl(principal);
         if (!acl) fail(404);
 
-        const permitted = await this.model.principal_find_by_krb(req.auth)
-            .then(r => this.fetch_acl(r))
-            .then(acl => imm.Seq(acl)
-                .filter(e => e.permission == Perm.Read_ACL)
-                .map(e => e.target)
-                .toSet());
-        this.log("Permitted Read_ACL for %s: %o", req.auth, permitted.toJS());
-
-        const rv = permitted.has(UUIDs.Special.Null) ? acl
+        const permitted = await this.permitted(req, Perm.Read_ACL);
+        const rv = permitted.has(Wildcard) ? acl
             : acl.filter(e => permitted.has(e.permission));
         this.log("Returning ACL %o", rv);
 
         return res.status(200).json(rv);
+    }
+
+    async grant_list (req, res) {
+        /* XXX I'm not sure this is right, but we generally allow
+         * listing UUIDs of objects which can't be read. */
+        const targs = await this.permitted(req, Perm.Manage_ACL);
+        if (!targs.size) fail(403);
+
+        const uuids = await this.model.grant_list();
+        return res.status(200).json(uuids);
+    }
+
+    async grant_get (req, res) {
+        const { uuid } = req.params;
+        if (!valid_uuid(uuid)) fail(410);
+
+        const g = await this.model.grant_get(uuid);
+        if (!g) fail(404);
+
+        await this.check_acl(req, Perm.Manage_ACL, g.permission, true);
+
+        return res.status(200).json(g);
+    }
+
+    async grant_new (req, res) {
+        const grant = req.body;
+
+        const permitted = await this.permitted(req, Perm.Manage_ACL);
+        const rv = await this.data.request({ kind: "grant", grant, permitted });
+        if (rv.status != 201)
+            fail(rv.status);
+
+        return res.status(201).json({ uuid: rv.uuid });
+    }
+
+    async grant_put (req, res) {
+        const { uuid } = req.params;
+        if (!valid_uuid(uuid)) fail(410);
+
+        const grant = req.method == "PUT" ? req.body : null;
+        const permitted = await this.permitted(req, Perm.Manage_ACL);
+
+        const rv = await this.data.request({ kind: "grant", uuid, grant, permitted });
+        return res.status(rv.status).end();
     }
 }

@@ -8,7 +8,6 @@ import express from "express";
 
 import { UUIDs } from "@amrc-factoryplus/service-client";
 
-import Model from "./model.js";
 import {Perm} from "./uuids.js";
 import { booleans, valid_krb, valid_uuid } from "./validate.js";
 
@@ -108,7 +107,7 @@ export default class AuthZ {
             req.auth, Perm.Manage_ACL, UUIDs.Null, false);
         if (!ok) return res.status(403).end();
 
-        const aces = await this.model.ace_get_all();
+        const aces = await this.model.grant_get_all();
         return res.status(200).json(aces);
     }
 

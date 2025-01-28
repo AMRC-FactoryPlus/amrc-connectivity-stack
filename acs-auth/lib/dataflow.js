@@ -6,6 +6,7 @@
 
 import imm from "immutable";
 import rx from "rxjs";
+import { v4 as uuidv4 } from "uuid";
 
 import * as rxx from "@amrc-factoryplus/rx-util";
 
@@ -20,13 +21,31 @@ export class DataFlow {
         this.log = fplus.debug.bound("data");
         this.cdb = fplus.ConfigDB;
 
+        /* Requests to update the database */
+        this.requests = new rx.Subject();
+        /* Responses to these requests */
+        this.responses = this._build_responses();
+
         this.aces = this._build_aces();
         this.groups = this._build_groups();
     }
 
+    _build_responses () {
+        const { model } = this;
+        return rxx.rx(this.requests,
+            rx.mergeMap(r => {
+                const updater = 
+                    r.kind == "grant"   ? model.grant_request
+                    : async () => ({ status: 500 });
+
+                return updater.call(model, r)
+                    .then(rv => ({ ...rv, request: r.request }));
+            }));
+    }
+
     _build_aces () {
         return rxx.rx(
-            rx.defer(() => this.model.ace_get_all()),
+            rx.defer(() => this.model.grant_get_all()),
             rx.shareReplay(1));
     }
 
@@ -55,6 +74,27 @@ export class DataFlow {
         this.groups.subscribe(gs => this.log("GROUPS UPDATE"));
             //imm.Map(gs).toJS()));
         this.aces.subscribe(es => this.log("ACE UPDATE"));
+    }
+
+    /** Request a change to the database.
+     *
+     * This submits a change request to the database and returns a
+     * Promise containing an HTTP status code for the outcome. If a
+     * change is made then the change will also be published to
+     * `updates`.
+     *
+     * @param r A request object. Must contain a `kind` field.
+     * @returns A response object containing a `status` field.
+     */
+    request (r) {
+        const request = uuidv4();
+        /* Construct the Promise to the response before we send the
+         * request. This avoids a race condition. */
+        const response = rx.firstValueFrom(rxx.rx(
+            this.responses,
+            rx.filter(r => r.request == request)));
+        this.requests.next({ ...r, request });
+        return response;
     }
 
     _acl_for (principal) {

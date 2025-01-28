@@ -9,6 +9,7 @@ import { DB } from "@amrc-factoryplus/pg-client";
 
 import Queries from "./queries.js";
 import {Perm} from "./uuids.js";
+import { has_wild } from "./validate.js";
 
 export default class Model extends Queries {
     constructor(opts) {
@@ -81,6 +82,25 @@ export default class Model extends Queries {
         return key in actions
             ? this[actions[key]](...args)
             : 400;
+    }
+
+    async grant_request (r) {
+        if (r.grant && !has_wild(r.permitted, r.grant.permission))
+            return { status: 403 };
+
+        return this.txn(async q => {
+            if (r.uuid == null)
+                return q.grant_new(r.grant);
+
+            const [status, id] = await q.grant_find(r.uuid, r.permitted);
+            if (status != 200) return { status };
+
+            if (r.grant == null)
+                await q.grant_delete(id);
+            else
+                await q.grant_update(id, r.grant);
+            return { status: 204 };
+        });
     }
 
     dump_validate(dump) {

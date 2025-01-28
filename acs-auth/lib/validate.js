@@ -15,6 +15,8 @@ export const booleans = {
     yes: true, no: false,
 };
 
+export const Wildcard = "00000000-0000-0000-0000-000000000000";
+
 export function valid_uuid(uuid) {
     if (UUID_rx.test(uuid))
         return true;
@@ -29,3 +31,6 @@ export function valid_krb(krb) {
     return false;
 }
 
+export function has_wild (set, member) {
+    return set.has(member) || set.has(Wildcard);
+}

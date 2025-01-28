@@ -48,6 +48,7 @@ interface DataTableProps<T> {
   columns: ColumnDef<T, any>[]
   data: T[],
   searchKey: string,
+  limitHeight: boolean,
   filters: { name: string; property: string }[]
   defaultSort?: SortingState,
   empty?: string
@@ -95,7 +96,7 @@ const table = useVueTable({
         <slot :selected-users="table.getSelectedRowModel().rows.map(r => r.original)"></slot>
       </div>
     </div>
-    <div class="rounded-md border">
+    <div class="rounded-md border" :class="{'max-h-[50vh] overflow-auto': this.limitHeight}">
       <Table>
         <TableHeader>
           <TableRow v-for="headerGroup in table.getHeaderGroups()" :key="headerGroup.id">

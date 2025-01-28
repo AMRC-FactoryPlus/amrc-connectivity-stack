@@ -3,7 +3,7 @@
   -->
 
 <template>
-  <Dialog>
+  <Dialog :open="showModal" @update:open="e => showModal = e">
     <DialogTrigger>
       <slot></slot>
     </DialogTrigger>
@@ -21,36 +21,24 @@
         </div>
       </DialogHeader>
       <div class="flex flex-col justify-center gap-6 overflow-auto flex-1 fix-inset">
-        <DataTable v-if="columns" :data="storeData" :columns="columns" :filters="[{
-        name: titleHeader,
-        property: titleKey,
-        options: filterOptions
-        }]">
-          <template #toolbar-left="{table}">
-            <div class="p-1 w-full flex flex-col overflow-auto">
-              <div class="relative w-full max-w-sm items-center">
-                <Input class="pl-8" id="search" type="text" placeholder="Search..."
-                    :model-value="table.getColumn(titleKey)?.getFilterValue()"
-                    @update:model-value=" table.getColumn(titleKey)?.setFilterValue($event)"
-                />
-                <div class="px-3 absolute start-0 inset-y-0 flex items-center justify-center text-gray-500">
-                  <i class="text-sm fa-solid fa-search"></i>
-                </div>
-              </div>
-            </div>
+        <DataTableSearchable v-if="columns" :data="storeData" :search-key="titleKey" :columns="columns" :filters="[]">
+          <template #default="slotProps">
+            <Button @click="() => {$emit('update:modelValue', slotProps.selectedUsers); showModal = false}" >Confirm Selection</Button>
           </template>
-        </DataTable>
+        </DataTableSearchable>
       </div>
     </DialogContent>
   </Dialog>
 </template>
 
 <script>
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@components/ui/Dialog'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@components/ui/dialog'
 import { VisuallyHidden } from 'radix-vue'
-import DataTable from '@components/ui/data-table/DataTable.vue'
+import DataTableSearchable from '@components/ui/data-table-searchable/DataTableSearchable.vue'
 import { Input } from '@/components/ui/input'
 import { buildColumns } from './columns.ts'
+import {Button} from "@components/ui/button/index.js";
+import {Sheet} from "@components/ui/sheet/index.js";
 
 export default {
 
@@ -59,7 +47,9 @@ export default {
   },
 
   components: {
-    DataTable,
+    Sheet,
+    Button,
+    DataTableSearchable,
     Dialog,
     DialogContent,
     DialogDescription,
@@ -70,6 +60,8 @@ export default {
     VisuallyHidden,
     Input,
   },
+
+  emits: ['update:modelValue'],
 
   props: {
     modelValue: {
@@ -127,22 +119,11 @@ export default {
     this.columns = buildColumns(this.valueKey, this.titleKey, this.titleHeader, this.detailKey, this.detailHeader)
   },
 
-  computed: {
-    filterOptions () {
-      return this.storeData.map((g) => g[this.titleKey]).filter((v, i, a) => a.indexOf(v) === i).map((g) => {
-        return {
-          label: g,
-          value: g,
-        }
-      })
-
-    },
-  },
-
   data () {
     return {
       columns: null,
       selected: [],
+      showModal: false
     }
   },
 }

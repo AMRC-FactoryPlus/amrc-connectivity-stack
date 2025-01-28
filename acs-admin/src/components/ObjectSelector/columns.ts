@@ -46,9 +46,6 @@ export function buildColumns(valueKey, titleKey, titleHeader, detailKey, detailH
                 title: titleHeader
             }),
             cell: ({row}) => h('span', {class: 'max-w-[500px] truncate font-medium'}, row.getValue(titleKey)),
-            filterFn: (row, id, value) => {
-                return value.includes(row.getValue(id))
-            },
         },
         {
             accessorKey: detailKey,
@@ -57,9 +54,6 @@ export function buildColumns(valueKey, titleKey, titleHeader, detailKey, detailH
                 title: detailHeader
             }),
             cell: ({row}) => h('span', {class: 'max-w-[500px] truncate text-gray-600'}, row.getValue(detailKey)),
-            filterFn: (row, id, value) => {
-                return value.includes(row.getValue(id))
-            },
         }
     ]
 

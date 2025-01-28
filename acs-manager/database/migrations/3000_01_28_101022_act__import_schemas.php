@@ -4,8 +4,7 @@
  */
 
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Artisan;
 
 return new class extends Migration
 {
@@ -16,9 +15,7 @@ return new class extends Migration
      */
     public function up()
     {
-        Schema::table('device_schema_versions', function (Blueprint $table) {
-            $table->string('schema_uuid')->nullable();
-        });
+        Artisan::call('schemas:import');
     }
 
     /**
@@ -28,8 +25,6 @@ return new class extends Migration
      */
     public function down()
     {
-        Schema::table('device_schema_versions', function (Blueprint $table) {
-            $table->dropColumn('schema_uuid');
-        });
+        //
     }
 };

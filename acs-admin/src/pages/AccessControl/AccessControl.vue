@@ -12,19 +12,6 @@
   <Sheet :open="selectedPermission !== null" @update:open="e => !e ? selectedPermission = null : null">
     <PermissionManagementSidebar :permission="selectedPermission" @objectClick="e => objectClicked(e.original)"></PermissionManagementSidebar>
   </Sheet>
-  <ObjectSelector
-      v-model="selectedUsers"
-      :store-data="p.data"
-      title="Select Users"
-      subtitle="Select users to add to the principal"
-      detail-header="Prinipal"
-      detail-key="kerberos"
-      title-header="Name"
-      title-key="name"
-  >
-    <Button>Select Users</Button>
-  </ObjectSelector>
-  {{selectedUsers}}
   <Tabs default-value="principals">
     <TabsList class="mb-6">
       <TabsTrigger value="principals">
@@ -97,7 +84,6 @@ export default {
     PermissionManagementSidebar: defineAsyncComponent(() => import('./Permissions/PermissionManagementSidebar.vue')),
     PrincipalList,
     GroupList,
-    ObjectSelector: defineAsyncComponent(() => import('@components/ObjectSelector/ObjectSelector.vue')),
   },
 
   methods: {
@@ -171,7 +157,6 @@ export default {
       selectedPrincipal: null,
       selectedGroup: null,
       selectedPermission: null,
-      selectedUsers: [],
     }
   },
 }

@@ -30,7 +30,7 @@ import {
   getCoreRowModel,
   getExpandedRowModel,
   getFilteredRowModel,
-  getPaginationRowModel,
+  // getPaginationRowModel,
   getSortedRowModel,
   useVueTable,
 } from '@tanstack/vue-table'
@@ -63,7 +63,7 @@ const table = useVueTable({
     return props.columns
   },
   getCoreRowModel: getCoreRowModel(),
-  getPaginationRowModel: getPaginationRowModel(),
+  // getPaginationRowModel: getPaginationRowModel(),
   getSortedRowModel: getSortedRowModel(),
   getFilteredRowModel: getFilteredRowModel(),
   getExpandedRowModel: getExpandedRowModel(),
@@ -80,7 +80,6 @@ const table = useVueTable({
     get expanded() { return expanded.value },
   },
 })
-const test = "text"
 </script>
 
 <template>
@@ -93,7 +92,7 @@ const test = "text"
           @update:model-value="table.getColumn(props.searchKey)?.setFilterValue($event)"
       />
       <div>
-        <slot :selected-users="table.getSelectedRowModel().rows.map(r => r.original)" :test="test"></slot>
+        <slot :selected-users="table.getSelectedRowModel().rows.map(r => r.original)"></slot>
       </div>
     </div>
     <div class="rounded-md border">

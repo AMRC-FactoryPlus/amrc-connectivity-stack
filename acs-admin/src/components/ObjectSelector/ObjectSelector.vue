@@ -21,7 +21,7 @@
         </div>
       </DialogHeader>
       <div class="flex flex-col justify-center gap-6 overflow-auto flex-1 fix-inset">
-        <DataTableSearchable v-if="columns" :data="storeData" :search-key="titleKey" :columns="columns" :filters="[]">
+        <DataTableSearchable v-if="columns" :data="storeData" :search-key="titleKey" :columns="columns" :limit-height="true" :filters="[]">
           <template #default="slotProps">
             <Button @click="() => {$emit('update:modelValue', slotProps.selectedUsers); showModal = false}" >Confirm Selection</Button>
           </template>

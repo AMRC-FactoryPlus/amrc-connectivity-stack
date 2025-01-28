@@ -19,31 +19,18 @@
       </Alert>
     </template>
     <template #below-toolbar>
-      <Dialog :open="this.groupInsertionDialogOpen" @update:open="(isOpen) => this.groupInsertionDialogOpen = isOpen">
-        <DialogTrigger>
-          <Button>
-            Add to Group
-          </Button>
-        </DialogTrigger>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add to a Group</DialogTitle>
-          </DialogHeader>
-          <div>
-            <Label for="uuid">
-              UUID
-            </Label>
-            <Input id="uuid" v-model="groupToAddTo" />
-          </div>
-          <DialogFooter>
-            <DialogClose as-child>
-              <Button @click="this.addToGroup">
-                Add
-              </Button>
-            </DialogClose>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ObjectSelector
+          v-model="groupsToAddTo"
+          :store-data="g.data.filter(group => !group.members.includes(principal.uuid))"
+          title="Select Groups"
+          subtitle="Select groups which which user should be added to"
+          detail-header="UUID"
+          detail-key="uuid"
+          title-header="Name"
+          title-key="name"
+      >
+        <Button>Add to Group</Button>
+      </ObjectSelector>
     </template>
   </DataTable>
 </template>
@@ -60,6 +47,7 @@ import {Input} from "@components/ui/input/index.js";
 import {toast} from "vue-sonner";
 import {Label} from "@components/ui/label/index.js";
 import {useServiceClientStore} from "@store/serviceClientStore.js";
+import {defineAsyncComponent} from "vue";
 
 export default {
   setup () {
@@ -72,7 +60,7 @@ export default {
 
   provide () {
     return {
-      groupMembershipUpdated: this.updateDate
+      groupMembershipUpdated: this.updateData
     }
   },
 
@@ -87,6 +75,7 @@ export default {
     Alert,
     AlertTitle,
     AlertDescription,
+    ObjectSelector: defineAsyncComponent(() => import('@components/ObjectSelector/ObjectSelector.vue')),
   },
 
   props: {
@@ -96,22 +85,30 @@ export default {
     },
   },
 
-  methods: {
-    async addToGroup () {
-      this.s.client.Auth.add_to_group(this.groupToAddTo, this.principal.uuid).then(async () => {
-        toast.success(`${this.principal.name} has been added to ${this.groupToAddTo}`)
-        this.s.client.Fetch.cache = "reload"
-        await this.g.fetch()
-        this.s.client.Fetch.cache = "default"
-        // TODO: Need to actually update the group member list, not just re-map the existing members
-      }).catch((err) => {
-        toast.error(`Unable to add ${this.principal.name} to ${this.groupToAddTo}`)
-        console.error(`Unable to add ${this.principal.name} to ${this.groupToAddTo}`, err)
-      })
-      this.addMemberDialogOpen = false
-    },
+  watch: {
+    groupsToAddTo: async function(val, oldVal) {
+      if (!val.length) {
+        return
+      }
 
-    async updateDate() {
+      for (const group of val) {
+        await this.addToGroup(group.uuid)
+      }
+      await this.updateData()
+    }
+  },
+
+  methods: {
+    async addToGroup (groupUuid) {
+      try {
+        await this.s.client.Auth.add_to_group(groupUuid, this.principal.uuid)
+        toast.success(`${this.principal.name} has been added to ${groupUuid}`)
+      } catch (err) {
+        toast.error(`Unable to add ${this.principal.name} to ${groupUuid}`)
+        console.error(`Unable to add ${this.principal.name} to ${groupUuid}`, err)
+      }
+    },
+    async updateData() {
       this.s.client.Fetch.cache = "reload"
       await this.g.fetch()
       this.s.client.Fetch.cache = "default"
@@ -137,8 +134,7 @@ export default {
   data () {
     return {
       loading: false,
-      groupToAddTo: "",
-      groupInsertionDialogOpen: false
+      groupsToAddTo: []
     }
   },
 

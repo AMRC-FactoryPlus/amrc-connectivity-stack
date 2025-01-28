@@ -19,31 +19,18 @@
       </Alert>
     </template>
     <template #below-toolbar>
-      <Dialog :open="this.addMemberDialogOpen" @update:open="(isOpen) => this.addMemberDialogOpen = isOpen">
-        <DialogTrigger>
-          <Button>
-            Add Member
-          </Button>
-        </DialogTrigger>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add a Member</DialogTitle>
-          </DialogHeader>
-          <div>
-            <Label for="uuid">
-              UUID
-            </Label>
-            <Input id="uuid" v-model="newMember" />
-          </div>
-          <DialogFooter>
-            <DialogClose as-child>
-              <Button @click="this.addMember">
-                Add
-              </Button>
-            </DialogClose>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ObjectSelector
+          v-model="membersToAdd"
+          :store-data="p.data.filter(principal => !memberUuids.includes(principal.uuid))"
+          title="Select Members"
+          subtitle="Select principals which should be added to this group"
+          detail-header="Principal"
+          detail-key="kerberos"
+          title-header="Name"
+          title-key="name"
+      >
+        <Button>Add Members</Button>
+      </ObjectSelector>
     </template>
   </DataTable>
 </template>
@@ -70,7 +57,7 @@ import {
 import {Label} from "@components/ui/label/index.js";
 import {Input} from "@components/ui/input/index.js";
 import {toast} from "vue-sonner";
-import {provide} from "vue";
+import {defineAsyncComponent, provide} from "vue";
 
 export default {
   name: 'GroupMembership',
@@ -92,7 +79,27 @@ export default {
     }
   },
 
+  computed: {
+    memberUuids () {
+      if (this.g.loading || this.loading) {
+        return []
+      }
+
+      return this.members.map(m => m.uuid)
+    }
+  },
+
   watch: {
+    membersToAdd: async function(val, oldVal) {
+      if (!val.length) {
+        return
+      }
+
+      for (const user of val) {
+        await this.addMember(user.uuid)
+      }
+      await this.updateData()
+    },
     group: {
       handler (val) {
         if (val == null) {
@@ -110,7 +117,9 @@ export default {
       // Fill in the member details
       this.loading = true
       // Make sure we have the latest set of members
+      this.s.client.Fetch.cache = "reload"
       let groupMembersResponse = await this.s.client.Auth.fetch(`authz/group/${this.group.uuid}`)
+      this.s.client.Fetch.cache = "default"
       let members = groupMembersResponse[1]
       this.members = await Promise.all(members.map(async (memberUUID) => {
         let obj = this.p.data.find(v => v.uuid === memberUUID)
@@ -139,20 +148,15 @@ export default {
       }))
       this.loading = false
     },
-
-    async addMember () {
-      this.s.client.Auth.add_to_group(this.group.uuid, this.newMember).then(async () => {
-        toast.success(`${this.newMember} has been added to ${this.group.name}`)
-        this.s.client.Fetch.cache = "reload"
-        await this.updateData()
-        this.s.client.Fetch.cache = "default"
-        // TODO: Need to actually update the group member list, not just re-map the existing members
-      }).catch((err) => {
-        toast.error(`Unable to add ${this.newMember} to ${this.group.name}`)
-        console.error(`Unable to add ${this.newMember} to ${this.group.name}`, err)
-      })
-      this.addMemberDialogOpen = false
-    }
+    async addMember (userUuid) {
+      try {
+        await this.s.client.Auth.add_to_group(this.group.uuid, userUuid)
+        toast.success(`${userUuid} has been added to ${this.group.name}`)
+      } catch (err) {
+        toast.error(`Unable to add ${userUuid} to ${this.group.name}`)
+        console.error(`Unable to add ${userUuid} to ${this.group.name}`, err)
+      }
+    },
   },
 
   async created() {
@@ -174,6 +178,7 @@ export default {
     Alert,
     AlertTitle,
     AlertDescription,
+    ObjectSelector: defineAsyncComponent(() => import('@components/ObjectSelector/ObjectSelector.vue')),
   },
 
   props: {
@@ -187,7 +192,7 @@ export default {
     return {
       loading: false,
       members: [],
-      newMember: "",
+      membersToAdd: [],
       addMemberDialogOpen: false
     }
   },

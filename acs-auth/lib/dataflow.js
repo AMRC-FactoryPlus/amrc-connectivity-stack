@@ -35,12 +35,10 @@ export class DataFlow {
 
         const target_groups = rxx.rx(
             aces,
-            rx.tap(v => this.log("TARG GRP: got ACEs")),
             rx.map(es => imm.Seq(es)
                 .filter(e => e.plural)
                 .map(e => e.target)
-                .toSet()),
-            rx.tap(gs => this.log("TARG GRPs: %o", gs)));
+                .toSet()));
 
         return rxx.rx(
             rx.combineLatest({
@@ -48,9 +46,7 @@ export class DataFlow {
                 princ_grp:  cdb.watch_powerset(Class.Principal),
                 perm:       cdb.watch_members(Class.Permission),
                 perm_grp:   cdb.watch_powerset(Class.Permission),
-                targ_grp:   rxx.rx(
-                    cdb.expand_members(target_groups),
-                    rx.tap(gs => this.log("TARG GRPs: got members"))),
+                targ_grp:   cdb.expand_members(target_groups),
             }),
             rx.shareReplay(1));
     }
@@ -61,48 +57,44 @@ export class DataFlow {
         this.aces.subscribe(es => this.log("ACE UPDATE"));
     }
 
-    acl_for (principal) {
+    _acl_for (principal) {
         return rxx.rx(
             rx.combineLatest({
                 groups:     this.groups,
                 aces:       this.aces,
             }),
-            rx.tap(v => this.log("ACL UPDATE: %s", principal)),
             rx.map(({ groups, aces }) => {
                 if (!groups.princ.has(principal))
                     return;
-                /* Find principals we will accept in an ACE */
                 const accept_princ = groups.princ_grp
                     .filter(ms => ms.has(principal))
                     .keySeq()
                     .concat(principal)
                     .toSet();
+                const expand = (grp, key, e) => {
+                    const ms = groups[grp].get(e[key]);
+                    return ms?.toArray()
+                        ?.map(m => ({ ...e, [key]: m }))
+                        ?? [];
+                };
                 return aces
-                    /* Filter ACEs by principal or group */
                     .filter(e => accept_princ.has(e.principal))
-                    /* Expand composite permissions */
-                    .flatMap(e => 
-                        groups.perm.has(e.permission) ? [e]
-                        : groups.perm_grp.has(e.permission) ?
-                            groups.perm_grp.get(e.permission)
-                                .toArray()
-                                .map(m => ({ ...e, permission: m }))
-                        : [])
-                    /* Expand target groups */
-                    .flatMap(e => e.plural
-                        /* We may not have the members of this group
-                         * yet. We'll get another update later. */
-                        ? groups.targ_grp.has(e.target)
-                            ? groups.targ_grp.get(e.target)
-                                .toArray()
-                                .map(m => ({ ...e, target: m }))
-                            : []
-                        : [e])
-                    /* Substitute Self and remove unwanted properties */
+                    .flatMap(e => groups.perm.has(e.permission) ? [e]
+                        : expand("perm_grp", "permission", e))
+                    .flatMap(e => e.plural ? expand("targ_grp", "target", e) : [e])
                     .map(e => ({
                         permission: e.permission,
                         target:     e.target == Special.Self ? principal : e.target,
                     }));
             }));
     }
+
+    /* These sequences cache the full ACL for a principal. This is not
+     * that expensive and doesn't require any additional upstream
+     * subscriptions, so cache for half an hour. */
+    acl_for = rxx.cacheSeq({
+        factory:    p => this._acl_for(p),
+        replay:     true,
+        timeout:    1800000,
+    });
 }

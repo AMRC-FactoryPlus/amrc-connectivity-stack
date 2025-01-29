@@ -10,6 +10,7 @@ import { load_dumps }           from "./dumps.js";
 import { fixups }               from "./fixups.js";
 import { setup_helm }           from "./helm.js";
 import { setup_manager }        from "./manager.js";
+import { migrate_connections }  from "./conn-objects.js";
 
 export class ServiceSetup {
     constructor (opts) {
@@ -47,6 +48,9 @@ export class ServiceSetup {
 
         this.log("Creating Manager config");
         await setup_manager(this, helm);
+
+        this.log("Migrating Connection objects from Edge Agent configs");
+        await migrate_connections(this);
 
         this.log("Finished setup");
     }

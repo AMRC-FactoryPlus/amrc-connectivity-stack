@@ -44,11 +44,13 @@ class ConnMigration extends ServiceConfig {
     }
 
     async register_drivers () {
+        this.log("Registering custom external drivers");
         const cdb = this.CDB;
         const { agent } = this.config.helm;
 
         const drivers = await this.fetch_configs(DriverDef);
         this.drivers = new Map([...drivers.entries()]
+            .filter(([u, d]) => d.image)
             .map(([u, d]) => [image_tag(d.image), u]));
 
         this.deployments = await this.fetch_configs(Deployment);
@@ -64,13 +66,14 @@ class ConnMigration extends ServiceConfig {
                     continue;
 
                 const driver = await cdb.create_object(Driver);
+                this.log("Registering %s as %s", tag, driver);
                 await cdb.put_config(DriverDef, driver, { image });
                 this.drivers.set(tag, driver);
             }
         }
     }
 
-    find_driver (conn) {
+    find_driver (conn, dep) {
         if (conn.connType != "Driver") {
             const internal = internalDrivers.get(conn.connType);
             if (!internal)
@@ -78,9 +81,6 @@ class ConnMigration extends ServiceConfig {
             return internal;
         }
 
-        const dep = this.deployments.get(uuid);
-        if (!dep)
-            throw `No Deployment, can't find driver`;
         const img = dep.drivers[conn.name]?.image;
         if (!img)
             throw `No image specified, can't find driver`;
@@ -96,25 +96,26 @@ class ConnMigration extends ServiceConfig {
     }
 
     async register_connections () {
+        this.log("Registering Edge Agent connections");
         const cdb = this.CDB;
 
-        const uuids = await cdb.list(AgentConfig);
-        const configs = await Promise.all(
-            uuids.map(uuid =>
-                cdb.get_config_with_etag(AgentConfig, uuid)
-                    .then(([config, etag]) => ({ uuid, config, etag }))));
+        const configs = await this.fetch_configs(AgentConfig);
 
-        for (const { uuid, config, etag } of configs) {
-            const dep = this.deployments.get(uuid);
+        for (const [uuid, config] of configs.entries()) {
+            this.log("Migrating connections for %s", uuid);
             let changed = false;
+
+            const dep = this.deployments.get(uuid);
+            if (!dep)
+                throw `No Deployment, can't find drivers`;
 
             for (const conn of config.deviceConnections) {
                 if (conn.uuid)
                     continue;
 
-                this.log("Migrating connection %s for %s", conn.name, uuid);
+                this.log("  Migrating connection %s", conn.name);
 
-                const [driver, details] = this.find_driver(conn);
+                const [driver, details] = this.find_driver(conn, dep);
                 const cconf = {
                     driver,
                     topology: {
@@ -136,8 +137,11 @@ class ConnMigration extends ServiceConfig {
                 changed = true;
             }
 
-            if (changed)
+            if (changed) {
+                /* XXX Properly we should use If-Match */
                 cdb.put_config(AgentConfig, uuid, config);
+                /* XXX Update Manager */
+            }
         }
     }
 }
@@ -147,7 +151,7 @@ export async function migrate_connections (ss) {
         ss,
         name:       "conns",
         service:    ACS.Service.Manager,
-    });
+    }).init();
 
     await conf.register_drivers();
     await conf.register_connections();

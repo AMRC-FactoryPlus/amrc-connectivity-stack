@@ -3,10 +3,14 @@ version: 1
 classes:
   - !u UUIDs.Class.PermGroup
   - !u ACS.Class.UserGroup
+  - !u Edge.Class.Connection
+  - !u Edge.Class.Driver
 objects:
   !u UUIDs.Class.App:
+    - !u Edge.App.ConnConfig
     - !u Edge.App.ClusterStatus
     - !u Edge.App.Deployment
+    - !u Edge.App.DriverDef
   !u UUIDs.Class.PermGroup:
     # XXX Properly this is not a permission group, but a group of
     # groups. Since we don't have quoting for group membership grant
@@ -16,13 +20,92 @@ objects:
     - !u ACS.Group.EdgePermissions
   !u ACS.Class.UserGroup:
     - !u ACS.Group.CentralMonitor
+  !u Edge.Class.Driver:
+    - !u ACS.Driver.REST
+    - !u ACS.Driver.MTConnect
+    - !u ACS.Driver.EtherNetIP
+    - !u ACS.Driver.S7
+    - !u ACS.Driver.OPCUA
+    - !u ACS.Driver.MQTT
+    - !u ACS.Driver.Websocket
+    - !u ACS.Driver.UDP
+    - !u ACS.Driver.Bacnet
+    - !u ACS.Driver.Modbus
+    - !u ACS.Driver.Test
+    - !u ACS.Driver.TPlinkSmartPlug
 configs:
   !u UUIDs.App.Info:
+    !u Edge.Class.Connection:       { name: "Edge Agent SB connection" }
+    !u Edge.Class.Driver:           { name: "Edge Agent driver" }
+    !u Edge.App.ConnConfig:         { name: "Connection config" }
+    !u Edge.App.DriverDef:          { name: "Driver definition" }
     !u ACS.Group.EdgeGroups:        { name: "Edge-managed groups" }
     !u ACS.Group.EdgePermissions:   { name: "Edge-managed permissions" }
     !u ACS.Group.CentralMonitor:    { name: "Central Monitors" }
     !u Edge.App.ClusterStatus:      { name: "Edge cluster status" }
     !u Edge.App.Deployment:         { name: "Edge deployment" }
+    !u ACS.Driver.REST:             { name: "REST driver" }
+    !u ACS.Driver.MTConnect:        { name: "MTConnect driver" }
+    !u ACS.Driver.EtherNetIP:       { name: "EtherNet/IP driver" }
+    !u ACS.Driver.S7:               { name: "S7 driver" }
+    !u ACS.Driver.OPCUA:            { name: "OPC-UA driver" }
+    !u ACS.Driver.MQTT:             { name: "MQTT driver" }
+    !u ACS.Driver.Websocket:        { name: "Websocket driver" }
+    !u ACS.Driver.UDP:              { name: "UDP driver" }
+
+    !u ACS.Driver.Bacnet:           { name: "Bacnet driver" }
+    !u ACS.Driver.Modbus:           { name: "Modbus driver" }
+    !u ACS.Driver.Test:             { name: "Test driver" }
+    !u ACS.Driver.TPlinkSmartPlug:  { name: "TP-Link smart plug driver" }
+  !u Edge.App.DriverDef:
+    !u ACS.Driver.REST:
+      internal:
+        connType: REST
+        details: RESTConnDetails
+    !u ACS.Driver.MTConnect:
+      internal:
+        connType: MTConnect
+        details: MTConnectConnDetails
+    !u ACS.Driver.EtherNetIP:
+      internal:
+        connType: EtherNet/IP
+        details: EtherNetIPConnDetails
+    !u ACS.Driver.S7:
+      internal:
+        connType: S7
+        details: s7ConnDetails
+    !u ACS.Driver.OPCUA:
+      internal:
+        connType: OPC UA
+        details: OPCUAConnDetails
+    !u ACS.Driver.MQTT:
+      internal:
+        connType: MQTT
+        details: MQTTConnDetails
+    !u ACS.Driver.Websocket:
+      internal:
+        connType: Websocket
+        details: WebsocketConnDetails
+    !u ACS.Driver.UDP:
+      internal:
+        connType: UDP
+        details: UDPConnDetails
+    !u ACS.Driver.Bacnet:
+      image:
+        registry: ghcr.io/amrc-factoryplus
+        repository: edge-bacnet
+    !u ACS.Driver.Modbus:
+      image:
+        registry: ghcr.io/amrc-factoryplus
+        repository: edge-modbus
+    !u ACS.Driver.Test:
+      image:
+        registry: ghcr.io/amrc-factoryplus
+        repository: edge-test
+    !u ACS.Driver.TPlinkSmartPlug:
+      image:
+        registry: ghcr.io/amrc-factoryplus
+        repository: edge-tplink-smartplug
 ---
 service: !u UUIDs.Service.Authentication
 version: 1

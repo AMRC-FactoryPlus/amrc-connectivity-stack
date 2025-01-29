@@ -66,3 +66,4 @@ async function remove_old_accounts (cdb, auth) {
             .catch(() => null);
     }
 }
+

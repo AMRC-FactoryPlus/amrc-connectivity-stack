@@ -20,7 +20,7 @@
           <h3 class="text-xs text-gray-400 -mt-0.5">{{subtitle}}</h3>
         </div>
       </DialogHeader>
-      <div class="flex flex-col justify-center gap-6 overflow-auto flex-1 fix-inset">
+      <div class="flex flex-col justify-center gap-6 overflow-auto flex-1 !p-1 !-m-1">
         <DataTableSearchable v-if="columns" :data="storeData" :search-key="titleKey" :columns="columns" :limit-height="true" :filters="[]">
           <template #default="slotProps">
             <Button :disabled="!slotProps.selectedUsers.length" @click="() => {$emit('update:modelValue', slotProps.selectedUsers); updateOpen(false)}" >Confirm Selection</Button>
@@ -37,8 +37,8 @@ import { VisuallyHidden } from 'radix-vue'
 import DataTableSearchable from '@components/ui/data-table-searchable/DataTableSearchable.vue'
 import { Input } from '@/components/ui/input'
 import { buildColumns } from './columns.ts'
-import {Button} from "@components/ui/button/index.js";
-import {Sheet} from "@components/ui/sheet/index.js";
+import { Button } from '@components/ui/button/index.js'
+import { Sheet } from '@components/ui/sheet/index.js'
 
 export default {
 

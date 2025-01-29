@@ -23,7 +23,13 @@
       <div class="flex flex-col justify-center gap-6 overflow-auto flex-1 !p-1 !-m-1">
         <DataTableSearchable v-if="columns" :data="storeData" :search-key="titleKey" :columns="columns" :limit-height="true" :filters="[]">
           <template #default="slotProps">
-            <Button :disabled="!slotProps.selectedUsers.length" @click="() => {$emit('update:modelValue', slotProps.selectedUsers); updateOpen(false)}" >Confirm Selection</Button>
+            <Button :disabled="!slotProps.selectedUsers.length"
+                @click="() => {$emit('update:modelValue', slotProps.selectedUsers); updateOpen(false)}">
+              <div class="flex items-center justify-center gap-2">
+                <div>{{confirmText}}</div>
+                <i v-if="confirmIcon" :class="`fa-solid fa-${confirmIcon}`"></i>
+              </div>
+            </Button>
           </template>
         </DataTableSearchable>
       </div>
@@ -67,7 +73,7 @@ export default {
     updateOpen (value) {
       this.showModal = value
       this.$emit('update:open', value)
-    }
+    },
   },
 
   props: {
@@ -116,6 +122,16 @@ export default {
       type: String,
       default: 'Description',
     },
+
+    confirmText: {
+      type: String,
+      default: 'Confirm',
+    },
+
+    confirmIcon: {
+      type: String,
+      default: 'check',
+    },
   },
 
   watch: {
@@ -124,7 +140,7 @@ export default {
     },
     open (value) {
       this.showModal = value
-    }
+    },
   },
 
   mounted () {
@@ -135,7 +151,7 @@ export default {
     return {
       columns: null,
       selected: [],
-      showModal: false
+      showModal: false,
     }
   },
 }

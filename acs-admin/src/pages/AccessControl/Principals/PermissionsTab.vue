@@ -28,6 +28,8 @@
           detail-key="uuid"
           title-header="Name"
           title-key="name"
+          confirm-text="Choose Targets"
+          confirm-icon="arrow-right-long"
       >
         <Button>Grant Permissions</Button>
       </ObjectSelector>

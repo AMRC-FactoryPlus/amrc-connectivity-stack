@@ -1,5 +1,5 @@
 <!--
-  - Copyright (c) University of Sheffield AMRC 2024.
+  - Copyright (c) University of Sheffield AMRC 2025.
   -->
 
 <template>
@@ -38,7 +38,7 @@
       v-model="targetsToAdd"
       :store-data="pr.data"
       title="Select Targets"
-      subtitle={targetsSubtitle}
+      :subtitle="targetsSubtitle"
       detail-header="UUID"
       detail-key="uuid"
       title-header="Name"
@@ -52,13 +52,13 @@ import DataTable from '@components/ui/data-table/DataTable.vue'
 import { Skeleton } from '@components/ui/skeleton/index.js'
 import { columns } from './permissionColumns.ts'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { usePermissionStore } from "@store/usePermissionStore.js";
-import { UUIDs } from "@amrc-factoryplus/service-client";
-import { useServiceClientStore } from "@store/serviceClientStore.js";
-import {Button} from "@components/ui/button/index.js";
-import {defineAsyncComponent} from "vue";
-import {usePrincipalStore} from "@store/usePrincipalStore.js";
-import {toast} from "vue-sonner";
+import { usePermissionStore } from '@store/usePermissionStore.js'
+import { UUIDs } from '@amrc-factoryplus/service-client'
+import { useServiceClientStore } from '@store/serviceClientStore.js'
+import { Button } from '@components/ui/button/index.js'
+import { defineAsyncComponent } from 'vue'
+import { usePrincipalStore } from '@store/usePrincipalStore.js'
+import { toast } from 'vue-sonner'
 
 export default {
   emits: ['objectClick'],

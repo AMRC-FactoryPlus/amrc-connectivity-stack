@@ -23,7 +23,7 @@ export interface Alert {
 dayjs.extend(relativeTime);
 
 export function buildColumns(valueKey, titleKey, titleHeader, detailKey, detailHeader): ColumnDef<Alert>[] {
-    const retVal = [
+    return [
         {
             id: 'select',
             header: ({table}) => h(Checkbox, {
@@ -56,7 +56,5 @@ export function buildColumns(valueKey, titleKey, titleHeader, detailKey, detailH
             cell: ({row}) => h('span', {class: 'max-w-[500px] truncate text-gray-600'}, row.getValue(detailKey)),
         }
     ]
-
-    return retVal
 
 }

@@ -26,7 +26,7 @@ export class DataFlow {
         /* Responses to these requests */
         this.responses = this._build_responses();
 
-        this.aces = this._build_aces();
+        this.grants = this._build_grants();
         this.groups = this._build_groups();
     }
 
@@ -39,21 +39,27 @@ export class DataFlow {
                     : async () => ({ status: 500 });
 
                 return updater.call(model, r)
-                    .then(rv => ({ ...rv, request: r.request }));
+                    .then(rv => ({ ...rv, kind: r.kind, request: r.request }));
             }));
     }
 
-    _build_aces () {
+    /* XXX This is not the best way to do this; we refetch the entire
+     * grant list every time. We should be able to track the changes
+     * made without going back to the database. */
+    _build_grants () {
         return rxx.rx(
-            rx.defer(() => this.model.grant_get_all()),
+            this.responses,
+            rx.filter(r => r.kind == "grant" && r.status < 300),
+            rx.startWith(null),
+            rx.switchMap(() => this.model.grant_get_all()),
             rx.shareReplay(1));
     }
 
     _build_groups () {
-        const { cdb, aces } = this;
+        const { cdb, grants } = this;
 
         const target_groups = rxx.rx(
-            aces,
+            grants,
             rx.map(es => imm.Seq(es)
                 .filter(e => e.plural)
                 .map(e => e.target)
@@ -73,7 +79,7 @@ export class DataFlow {
     run () {
         this.groups.subscribe(gs => this.log("GROUPS UPDATE"));
             //imm.Map(gs).toJS()));
-        this.aces.subscribe(es => this.log("ACE UPDATE"));
+        this.grants.subscribe(es => this.log("GRANT UPDATE"));
     }
 
     /** Request a change to the database.
@@ -101,9 +107,9 @@ export class DataFlow {
         return rxx.rx(
             rx.combineLatest({
                 groups:     this.groups,
-                aces:       this.aces,
+                grants:       this.grants,
             }),
-            rx.map(({ groups, aces }) => {
+            rx.map(({ groups, grants }) => {
                 if (!groups.princ.has(principal))
                     return;
                 const accept_princ = groups.princ_grp
@@ -117,7 +123,7 @@ export class DataFlow {
                         ?.map(m => ({ ...e, [key]: m }))
                         ?? [];
                 };
-                return aces
+                return grants
                     .filter(e => accept_princ.has(e.principal))
                     .flatMap(e => groups.perm.has(e.permission) ? [e]
                         : expand("perm_grp", "permission", e))

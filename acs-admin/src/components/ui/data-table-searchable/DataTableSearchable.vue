@@ -1,42 +1,14 @@
-﻿<script setup lang="ts">
-import type {
-  ColumnDef,
-  ColumnFiltersState,
-  ExpandedState,
-  SortingState,
-  VisibilityState,
-} from '@tanstack/vue-table'
-import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
+﻿<!--
+  - Copyright (c) University of Sheffield AMRC 2025.
+  -->
 
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { Input } from '@/components/ui/input'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
+<script setup lang="ts">
+import type {ColumnDef, ColumnFiltersState, ExpandedState, SortingState, VisibilityState,} from '@tanstack/vue-table'
+import {FlexRender, getCoreRowModel, getExpandedRowModel, getFilteredRowModel, getSortedRowModel, useVueTable,} from '@tanstack/vue-table'
+import {Input} from '@/components/ui/input'
+import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow,} from '@/components/ui/table'
 import {valueUpdater} from '@/lib/utils'
-import {
-  FlexRender,
-  getCoreRowModel,
-  getExpandedRowModel,
-  getFilteredRowModel,
-  // getPaginationRowModel,
-  getSortedRowModel,
-  useVueTable,
-} from '@tanstack/vue-table'
-import { ArrowUpDown, ChevronDown } from 'lucide-vue-next'
-import { h, ref } from 'vue'
-import DataTableToolbar from "@components/ui/data-table/DataTableToolbar.vue";
+import {ref} from 'vue'
 
 const sorting = ref<SortingState>([])
 const columnFilters = ref<ColumnFiltersState>([])
@@ -95,7 +67,7 @@ const limitHeight = props.limitHeight
           @update:model-value="table.getColumn(props.searchKey)?.setFilterValue($event)"
       />
       <div>
-        <slot :selected-users="table.getSelectedRowModel().rows.map(r => r.original)"></slot>
+        <slot :selected-objects="table.getSelectedRowModel().rows.map(r => r.original)"></slot>
       </div>
     </div>
     <div class="rounded-md border" :class="{'max-h-[50vh] overflow-auto': limitHeight}">

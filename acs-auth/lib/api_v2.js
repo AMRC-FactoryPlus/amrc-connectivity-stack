@@ -11,7 +11,7 @@ import * as rx from "rxjs";
 import { UUIDs } from "@amrc-factoryplus/service-client";
 
 import {Perm} from "./uuids.js";
-import { valid_uuid } from "./validate.js";
+import { valid_krb, valid_uuid } from "./validate.js";
 
 const Wildcard = UUIDs.Special.Null;
 
@@ -33,6 +33,7 @@ export class APIv2 {
         let api = express.Router();
 
         api.get("/acl/:principal", this.get_acl.bind(this));
+        api.get("/acl/kerberos/:upn", this.get_krb_acl.bind(this));
 
         api.route("/grant")
             .get(this.grant_list.bind(this))
@@ -70,10 +71,7 @@ export class APIv2 {
         fail(403);
     }
 
-    async get_acl (req, res) {
-        const { principal } = req.params;
-        if (!valid_uuid(principal)) fail(410);
-
+    async _get_acl (req, res, principal) {
         const acl = await this.fetch_acl(principal);
         if (!acl) fail(404);
 
@@ -83,6 +81,25 @@ export class APIv2 {
         this.log("Returning ACL %o", rv);
 
         return res.status(200).json(rv);
+    }
+
+    get_acl (req, res) {
+        const { principal } = req.params;
+        if (!valid_uuid(principal)) fail(410);
+
+        return this._get_acl(req, res, principal);
+    }
+
+    async get_krb_acl (req, res) {
+        const { upn } = req.params;
+        if (!valid_krb(upn)) fail(410);
+        
+        const principal = await this.model.principal_find_by_krb(upn);
+        /* Don't return 404, we haven't checked ACLs */
+        if (!principal)
+            return res.status(200).json([]);
+
+        return this._get_acl(req, res, principal);
     }
 
     async grant_list (req, res) {

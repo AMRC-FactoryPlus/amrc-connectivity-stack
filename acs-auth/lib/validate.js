@@ -5,7 +5,7 @@
  */
 
 export const UUID_rx = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-export const KRB_rx = /^[a-zA-Z0-9_./-]+@[A-Z0-9-.]+$/;
+export const KRB_rx = /^[a-zA-Z0-9_./-]+@[A-Za-z0-9-.]+$/;
 
 export const booleans = {
     undefined: false,

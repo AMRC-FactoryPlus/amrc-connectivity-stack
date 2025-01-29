@@ -82,7 +82,7 @@ export default class AuthZ {
     }
 
     async get_acl(req, res) {
-        const {principal, permission} = req.query;
+        const { principal, permission } = req.query;
         const by_uuid = booleans[req.query["by-uuid"]];
 
         if (by_uuid == undefined)

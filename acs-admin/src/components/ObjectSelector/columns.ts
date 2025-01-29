@@ -33,7 +33,6 @@ export function buildColumns(valueKey, titleKey, titleHeader, detailKey, detailH
             }),
             cell: ({row}) => h(Checkbox, {
                 'checked': row.getIsSelected(),
-                'onUpdate:checked': value => row.toggleSelected(!!value),
                 'ariaLabel': 'Select row',
             }),
             enableSorting: false,

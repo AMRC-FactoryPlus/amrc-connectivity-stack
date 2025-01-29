@@ -17,41 +17,56 @@ const rowSelection = ref({})
 const expanded = ref<ExpandedState>({})
 
 interface DataTableProps<T> {
-  columns: ColumnDef<T, any>[]
-  data: T[],
-  searchKey: string,
-  limitHeight: boolean,
-  filters: { name: string; property: string }[]
-  defaultSort?: SortingState,
-  empty?: string
+    columns: ColumnDef<T, any>[]
+    data: T[],
+    searchKey: string,
+    limitHeight: boolean,
+    filters: { name: string; property: string }[]
+    defaultSort?: SortingState,
+    empty?: string
+}
+
+// Write a method to toggle the expanded state of a row
+const toggle = (row: any) => {
+    row.toggleSelected()
 }
 
 const props = defineProps<DataTableProps<any>>()
 
 const table = useVueTable({
-  get data() {
-    return props.data
-  },
-  get columns() {
-    return props.columns
-  },
-  getCoreRowModel: getCoreRowModel(),
-  // getPaginationRowModel: getPaginationRowModel(),
-  getSortedRowModel: getSortedRowModel(),
-  getFilteredRowModel: getFilteredRowModel(),
-  getExpandedRowModel: getExpandedRowModel(),
-  onSortingChange: updaterOrValue => valueUpdater(updaterOrValue, sorting),
-  onColumnFiltersChange: updaterOrValue => valueUpdater(updaterOrValue, columnFilters),
-  onColumnVisibilityChange: updaterOrValue => valueUpdater(updaterOrValue, columnVisibility),
-  onRowSelectionChange: updaterOrValue => valueUpdater(updaterOrValue, rowSelection),
-  onExpandedChange: updaterOrValue => valueUpdater(updaterOrValue, expanded),
-  state: {
-    get sorting() { return sorting.value },
-    get columnFilters() { return columnFilters.value },
-    get columnVisibility() { return columnVisibility.value },
-    get rowSelection() { return rowSelection.value },
-    get expanded() { return expanded.value },
-  },
+    get data() {
+        return props.data
+    },
+    get columns() {
+        return props.columns
+    },
+    getCoreRowModel: getCoreRowModel(),
+    // getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getExpandedRowModel: getExpandedRowModel(),
+    onSortingChange: updaterOrValue => valueUpdater(updaterOrValue, sorting),
+    onColumnFiltersChange: updaterOrValue => valueUpdater(updaterOrValue, columnFilters),
+    onColumnVisibilityChange: updaterOrValue => valueUpdater(updaterOrValue, columnVisibility),
+    onRowSelectionChange: updaterOrValue => valueUpdater(updaterOrValue, rowSelection),
+    onExpandedChange: updaterOrValue => valueUpdater(updaterOrValue, expanded),
+    state: {
+        get sorting() {
+            return sorting.value
+        },
+        get columnFilters() {
+            return columnFilters.value
+        },
+        get columnVisibility() {
+            return columnVisibility.value
+        },
+        get rowSelection() {
+            return rowSelection.value
+        },
+        get expanded() {
+            return expanded.value
+        },
+    },
 })
 
 const limitHeight = props.limitHeight
@@ -75,21 +90,21 @@ const limitHeight = props.limitHeight
         <TableHeader>
           <TableRow v-for="headerGroup in table.getHeaderGroups()" :key="headerGroup.id">
             <TableHead v-for="header in headerGroup.headers" :key="header.id">
-              <FlexRender v-if="!header.isPlaceholder" :render="header.column.columnDef.header" :props="header.getContext()" />
+              <FlexRender v-if="!header.isPlaceholder" :render="header.column.columnDef.header" :props="header.getContext()"/>
             </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           <template v-if="table.getRowModel().rows?.length">
             <template v-for="row in table.getRowModel().rows" :key="row.id">
-              <TableRow :data-state="row.getIsSelected() && 'selected'">
+              <TableRow class="cursor-pointer" :data-state="row.getIsSelected() && 'selected'" @click="() => {toggle(row)}">
                 <TableCell v-for="cell in row.getVisibleCells()" :key="cell.id">
-                  <FlexRender :render="cell.column.columnDef.cell" :props="cell.getContext()" />
+                  <FlexRender :render="cell.column.columnDef.cell" :props="cell.getContext()"/>
                 </TableCell>
               </TableRow>
               <TableRow v-if="row.getIsExpanded()">
                 <TableCell :colspan="row.getAllCells().length">
-                  {{ JSON.stringify(row.original) }}
+                  {{JSON.stringify(row.original)}}
                 </TableCell>
               </TableRow>
             </template>

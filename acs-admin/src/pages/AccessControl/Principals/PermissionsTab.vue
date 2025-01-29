@@ -4,7 +4,6 @@
 
 <template>
   <Skeleton v-if="loading || p.loading" v-for="i in 10" class="h-16 rounded-lg mb-2"/>
-<!--  <DataTable v-else :data="this.permissions" :columns="columns" :filters="[]" @row-click="e => $emit('objectClick', e)">-->
   <DataTable v-else :data="this.permissions" :columns="columns" :filters="[]">
     <template #toolbar-left>
       <Alert class="mr-6">
@@ -75,7 +74,8 @@ export default {
 
   provide () {
     return {
-      permissionMembershipUpdated: this.updateData
+      permissionMembershipUpdated: this.updateData,
+      objectClicked: (object) => {this.$emit('objectClick', object)}
     }
   },
 
@@ -121,8 +121,6 @@ export default {
         return
       }
 
-      console.log(this.permissionsToAdd, this.targetsToAdd)
-
       for (const permission of this.permissionsToAdd) {
         for (const target of val) {
           await this.addEntry(this.principal, permission, target)
@@ -150,21 +148,31 @@ export default {
       const filteredList = fullList.filter(e => e.principal === this.principal.uuid)
 
       const info = o => this.s.client.ConfigDB.get_config(UUIDs.App.Info, o)
+      const classGet = o => this.s.client.ConfigDB.get_config(UUIDs.App.Registration, o).then(v => v?.class)
       const name = o => info(o).then(v => v?.name)
 
       const rv = []
       for (const entry of filteredList) {
-        const permissionName = this.p.data.find(v => v.uuid === entry.permission)?.name ?? await name(entry.permission)
-        const targetName     = await name(entry.target)
+        const permissionLookup = this.p.data.find(v => v.uuid === entry.permission)
+        const permissionName   = permissionLookup?.name ?? await name(entry.permission)
+        const permissionClass  = permissionLookup?.class?.uuid ?? await classGet(entry.permission)
+        const targetName       = await name(entry.target)
+        const targetClass      = await classGet(entry.target)
 
         rv.push({
           permission: {
             uuid: entry.permission,
             name: permissionName,
+            class: {
+              uuid: permissionClass
+            }
           },
           target: {
             uuid: entry.target,
             name: targetName,
+            class: {
+              uuid: targetClass
+            }
           },
           principal: {
             uuid: this.principal.uuid,

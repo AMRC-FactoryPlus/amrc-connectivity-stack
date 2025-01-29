@@ -98,6 +98,10 @@ export default {
             uuid: entry.target,
             name: targetName,
           },
+          principal: {
+            uuid: this.principal.uuid,
+            name: this.principal.name
+          }
         })
       }
 

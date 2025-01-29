@@ -12,8 +12,10 @@ import {toast} from "vue-sonner";
 import {useDialog} from '@/composables/useDialog';
 import {useServiceClientStore} from '@store/serviceClientStore.js'
 import { inject } from 'vue'
+import {UUIDs} from "@amrc-factoryplus/service-client";
 
 const permissionMembershipUpdated = inject('permissionMembershipUpdated')
+const objectClicked = inject('objectClicked')
 
 interface DataTableRowActionsProps {
     row: Row<Permission>
@@ -24,8 +26,13 @@ const s = useServiceClientStore()
 const props = defineProps<DataTableRowActionsProps>()
 
 function copy(id: string) {
-    navigator.clipboard.writeText(id)
-    toast.success('UUID copied to clipboard')
+  navigator.clipboard.writeText(id)
+  toast.success('UUID copied to clipboard')
+}
+
+function manage(object) {
+  // Jetbrains doesn't understand this, but it works
+  objectClicked({original: object})
 }
 
 function handleDelete() {
@@ -75,6 +82,21 @@ function handleDelete() {
           <div class="flex items-center justify-center gap-2">
             <i class="fa-solid fa-fw fa-tag"></i>
             Copy Target UUID
+          </div>
+        </DropdownMenuItem>
+      </DropdownMenuGroup>
+      <DropdownMenuSeparator/>
+      <DropdownMenuGroup>
+        <DropdownMenuItem @click="manage(props.row.original.permission)" class="cursor-pointer">
+          <div class="flex items-center justify-center gap-2">
+            <i class="fa-solid fa-fw fa-tag"></i>
+            Manage Permission
+          </div>
+        </DropdownMenuItem>
+        <DropdownMenuItem v-if="props.row.original.target.uuid !== UUIDs.Special.Null" @click="manage(props.row.original.target)" class="cursor-pointer">
+          <div class="flex items-center justify-center gap-2">
+            <i class="fa-solid fa-fw fa-tag"></i>
+            Manage Target
           </div>
         </DropdownMenuItem>
       </DropdownMenuGroup>

@@ -81,6 +81,8 @@ const table = useVueTable({
     get expanded() { return expanded.value },
   },
 })
+
+const limitHeight = props.limitHeight
 </script>
 
 <template>
@@ -96,7 +98,7 @@ const table = useVueTable({
         <slot :selected-users="table.getSelectedRowModel().rows.map(r => r.original)"></slot>
       </div>
     </div>
-    <div class="rounded-md border" :class="{'max-h-[50vh] overflow-auto': this.limitHeight}">
+    <div class="rounded-md border" :class="{'max-h-[50vh] overflow-auto': limitHeight}">
       <Table>
         <TableHeader>
           <TableRow v-for="headerGroup in table.getHeaderGroups()" :key="headerGroup.id">

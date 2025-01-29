@@ -19,7 +19,33 @@
         </div>
       </Alert>
     </template>
+    <template #below-toolbar>
+      <ObjectSelector
+          v-model="permissionsToAdd"
+          :store-data="p.data"
+          title="Select Permissions"
+          subtitle="Select permissions which the principal should be granted, targets can be selected next"
+          detail-header="UUID"
+          detail-key="uuid"
+          title-header="Name"
+          title-key="name"
+      >
+        <Button>Grant Permissions</Button>
+      </ObjectSelector>
+    </template>
   </DataTable>
+  <ObjectSelector
+      v-model:open="isTargetSelectorOpen"
+      v-model="targetsToAdd"
+      :store-data="pr.data"
+      title="Select Targets"
+      subtitle={targetsSubtitle}
+      detail-header="UUID"
+      detail-key="uuid"
+      title-header="Name"
+      title-key="name"
+  >
+  </ObjectSelector>
 </template>
 
 <script>
@@ -30,6 +56,10 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { usePermissionStore } from "@store/usePermissionStore.js";
 import { UUIDs } from "@amrc-factoryplus/service-client";
 import { useServiceClientStore } from "@store/serviceClientStore.js";
+import {Button} from "@components/ui/button/index.js";
+import {defineAsyncComponent} from "vue";
+import {usePrincipalStore} from "@store/usePrincipalStore.js";
+import {toast} from "vue-sonner";
 
 export default {
   emits: ['objectClick'],
@@ -39,15 +69,24 @@ export default {
       columns,
       p: usePermissionStore(),
       s: useServiceClientStore(),
+      pr: usePrincipalStore()
+    }
+  },
+
+  provide () {
+    return {
+      permissionMembershipUpdated: this.updateData
     }
   },
 
   components: {
+    Button,
     DataTable,
     Skeleton,
     Alert,
     AlertTitle,
     AlertDescription,
+    ObjectSelector: defineAsyncComponent(() => import('@components/ObjectSelector/ObjectSelector.vue')),
   },
 
   props: {
@@ -68,10 +107,39 @@ export default {
       },
       immediate: true,
     },
+    permissionsToAdd: async function(val, oldVal) {
+      if (!val.length) {
+        this.isTargetSelectorOpen = false
+        return
+      }
+
+      this.isTargetSelectorOpen = true
+    },
+    targetsToAdd: async function(val, oldVal) {
+      if (!val.length) {
+        this.permissionsToAdd = []
+        return
+      }
+
+      console.log(this.permissionsToAdd, this.targetsToAdd)
+
+      for (const permission of this.permissionsToAdd) {
+        for (const target of val) {
+          await this.addEntry(this.principal, permission, target)
+        }
+      }
+      await this.updateData()
+    }
+  },
+
+  computed: {
+    targetsSubtitle () {
+      return `Select targets for which the selected permission should be granted: ${this.permissionsToAdd.map(p => p.name).join(", ")}`
+    }
   },
 
   methods: {
-    async fetchSpecificPermissions (uuid) {
+    async fetchSpecificPermissions () {
       this.loading = true
 
       const res = await this.s.client.Auth.fetch(`/authz/ace`)
@@ -79,7 +147,7 @@ export default {
         return;
       }
       const fullList = res[1];
-      const filteredList = fullList.filter(e => e.principal === uuid)
+      const filteredList = fullList.filter(e => e.principal === this.principal.uuid)
 
       const info = o => this.s.client.ConfigDB.get_config(UUIDs.App.Info, o)
       const name = o => info(o).then(v => v?.name)
@@ -108,12 +176,29 @@ export default {
       this.permissions = rv
       this.loading     = false
     },
+    async updateData() {
+      this.s.client.Fetch.cache = "reload"
+      await this.fetchSpecificPermissions()
+      this.s.client.Fetch.cache = "default"
+    },
+    async addEntry(principal, permission, target) {
+      try {
+        await this.s.client.Auth.add_ace(principal.uuid, permission.uuid, target.uuid)
+        toast.success(`${this.principal.name} has been granted ${permission.name} on ${target.name}`)
+      } catch (err) {
+        toast.error(`Unable to grant ${permission.name} to ${this.principal.name} on ${target.name}`)
+        console.error(`Unable to grant ${permission.name} to ${this.principal.name} on ${target.name}`, err)
+      }
+    }
   },
 
   data () {
     return {
       loading: false,
-      permissions: []
+      permissions: [],
+      permissionsToAdd: [],
+      targetsToAdd: [],
+      isTargetSelectorOpen: false
     }
   },
 

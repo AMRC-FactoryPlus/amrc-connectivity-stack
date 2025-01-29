@@ -46,6 +46,9 @@
       title-header="Name"
       title-key="name"
   >
+    <template #actions>
+      PLACEHOLDER
+    </template>
   </ObjectSelector>
 </template>
 
@@ -70,14 +73,14 @@ export default {
       columns,
       p: usePermissionStore(),
       s: useServiceClientStore(),
-      pr: usePrincipalStore()
+      pr: usePrincipalStore(),
     }
   },
 
   provide () {
     return {
       permissionMembershipUpdated: this.updateData,
-      objectClicked: (object) => {this.$emit('objectClick', object)}
+      objectClicked: (object) => {this.$emit('objectClick', object)},
     }
   },
 
@@ -109,7 +112,8 @@ export default {
       },
       immediate: true,
     },
-    permissionsToAdd: async function(val, oldVal) {
+
+    permissionsToAdd: async function (val, oldVal) {
       if (!val.length) {
         this.isTargetSelectorOpen = false
         return
@@ -117,7 +121,8 @@ export default {
 
       this.isTargetSelectorOpen = true
     },
-    targetsToAdd: async function(val, oldVal) {
+
+    targetsToAdd: async function (val, oldVal) {
       if (!val.length) {
         this.permissionsToAdd = []
         return
@@ -129,13 +134,13 @@ export default {
         }
       }
       await this.updateData()
-    }
+    },
   },
 
   computed: {
     targetsSubtitle () {
-      return `Select targets for which the selected permission should be granted: ${this.permissionsToAdd.map(p => p.name).join(", ")}`
-    }
+      return `Select targets for which the selected permission should be granted: ${this.permissionsToAdd.map(p => p.name).join(', ')}`
+    },
   },
 
   methods: {
@@ -144,14 +149,14 @@ export default {
 
       const res = await this.s.client.Auth.fetch(`/authz/ace`)
       if (!Array.isArray(res[1])) {
-        return;
+        return
       }
-      const fullList = res[1];
+      const fullList     = res[1]
       const filteredList = fullList.filter(e => e.principal === this.principal.uuid)
 
-      const info = o => this.s.client.ConfigDB.get_config(UUIDs.App.Info, o)
+      const info     = o => this.s.client.ConfigDB.get_config(UUIDs.App.Info, o)
       const classGet = o => this.s.client.ConfigDB.get_config(UUIDs.App.Registration, o).then(v => v?.class)
-      const name = o => info(o).then(v => v?.name)
+      const name     = o => info(o).then(v => v?.name)
 
       const rv = []
       for (const entry of filteredList) {
@@ -166,40 +171,41 @@ export default {
             uuid: entry.permission,
             name: permissionName,
             class: {
-              uuid: permissionClass
-            }
+              uuid: permissionClass,
+            },
           },
           target: {
             uuid: entry.target,
             name: targetName,
             class: {
-              uuid: targetClass
-            }
+              uuid: targetClass,
+            },
           },
           principal: {
             uuid: this.principal.uuid,
-            name: this.principal.name
-          }
+            name: this.principal.name,
+          },
         })
       }
 
       this.permissions = rv
       this.loading     = false
     },
-    async updateData() {
-      this.s.client.Fetch.cache = "reload"
+    async updateData () {
+      this.s.client.Fetch.cache = 'reload'
       await this.fetchSpecificPermissions()
-      this.s.client.Fetch.cache = "default"
+      this.s.client.Fetch.cache = 'default'
     },
-    async addEntry(principal, permission, target) {
+    async addEntry (principal, permission, target) {
       try {
         await this.s.client.Auth.add_ace(principal.uuid, permission.uuid, target.uuid)
         toast.success(`${this.principal.name} has been granted ${permission.name} on ${target.name}`)
-      } catch (err) {
+      }
+      catch (err) {
         toast.error(`Unable to grant ${permission.name} to ${this.principal.name} on ${target.name}`)
         console.error(`Unable to grant ${permission.name} to ${this.principal.name} on ${target.name}`, err)
       }
-    }
+    },
   },
 
   data () {
@@ -208,7 +214,7 @@ export default {
       permissions: [],
       permissionsToAdd: [],
       targetsToAdd: [],
-      isTargetSelectorOpen: false
+      isTargetSelectorOpen: false,
     }
   },
 

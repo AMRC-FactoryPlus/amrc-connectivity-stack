@@ -3,7 +3,7 @@
   -->
 
 <template>
-  <Dialog :open="showModal" @update:open="e => showModal = e">
+  <Dialog :open="showModal" @update:open="e => updateOpen(e)">
     <DialogTrigger>
       <slot></slot>
     </DialogTrigger>
@@ -23,7 +23,7 @@
       <div class="flex flex-col justify-center gap-6 overflow-auto flex-1 fix-inset">
         <DataTableSearchable v-if="columns" :data="storeData" :search-key="titleKey" :columns="columns" :limit-height="true" :filters="[]">
           <template #default="slotProps">
-            <Button :disabled="!slotProps.selectedUsers.length" @click="() => {$emit('update:modelValue', slotProps.selectedUsers); showModal = false}" >Confirm Selection</Button>
+            <Button :disabled="!slotProps.selectedUsers.length" @click="() => {$emit('update:modelValue', slotProps.selectedUsers); updateOpen(false)}" >Confirm Selection</Button>
           </template>
         </DataTableSearchable>
       </div>
@@ -61,9 +61,18 @@ export default {
     Input,
   },
 
-  emits: ['update:modelValue'],
+  emits: ['update:modelValue', 'update:open'],
+
+  methods: {
+    updateOpen (value) {
+      this.showModal = value
+      this.$emit('update:open', value)
+    }
+  },
 
   props: {
+    open: false,
+
     modelValue: {
       type: Array,
       default: () => [],
@@ -113,6 +122,9 @@ export default {
     selected (val) {
       this.$emit('update:modelValue', val)
     },
+    open (value) {
+      this.showModal = value
+    }
   },
 
   mounted () {

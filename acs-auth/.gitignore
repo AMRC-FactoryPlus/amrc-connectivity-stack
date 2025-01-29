@@ -16,6 +16,9 @@ lib/git-version.js
 
 /tmp/
 
+# Generated files
+lib/git-version.js
+
 # IDE
 .idea/
 /node_modules/

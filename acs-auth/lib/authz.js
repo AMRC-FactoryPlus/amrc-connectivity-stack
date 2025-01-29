@@ -8,49 +8,19 @@ import express from "express";
 
 import { UUIDs } from "@amrc-factoryplus/service-client";
 
-import Model from "./model.js";
 import {Perm} from "./uuids.js";
-
-const UUID_rx = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-const KRB_rx = /^[a-zA-Z0-9_./-]+@[A-Z0-9-.]+$/;
-
-const booleans = {
-    undefined: false,
-    "true": true, "false": false,
-    "1": true, "0": false,
-    on: true, off: false,
-    yes: true, no: false,
-};
-
-function valid_uuid(uuid) {
-    if (UUID_rx.test(uuid))
-        return true;
-    //debug.log("debug", `Ignoring invalid UUID [${uuid}]`);
-    return false;
-}
-
-function valid_krb(krb) {
-    if (KRB_rx.test(krb))
-        return true;
-    //debug.log("debug", `Ignoring invalid principal [${krb}]`);
-    return false;
-}
+import { booleans, valid_krb, valid_uuid } from "./validate.js";
 
 export default class AuthZ {
     constructor(opts) {
         this.debug  = opts.debug;
-        this.model  = new Model(opts);
-        this.routes = express.Router();
-    }
+        this.model = opts.model;
 
-    async init() {
-        await this.model.init();
-        this.setup_routes();
-        return this;
+        this.routes = this.setup_routes();
     }
 
     setup_routes() {
-        let api = this.routes;
+        let api = express.Router();
 
         /* Validate against the spec */
         //const spec = url.fileURLToPath(new URL("openapi.yaml", import.meta.url));
@@ -107,10 +77,12 @@ export default class AuthZ {
 
         api.post("/load", this.dump_load.bind(this));
         api.get("/save", this.dump_save.bind(this));
+
+        return api;
     }
 
     async get_acl(req, res) {
-        const {principal, permission} = req.query;
+        const { principal, permission } = req.query;
         const by_uuid = booleans[req.query["by-uuid"]];
 
         if (by_uuid == undefined)
@@ -135,7 +107,7 @@ export default class AuthZ {
             req.auth, Perm.Manage_ACL, UUIDs.Null, false);
         if (!ok) return res.status(403).end();
 
-        const aces = await this.model.ace_get_all();
+        const aces = await this.model.grant_get_all();
         return res.status(200).json(aces);
     }
 

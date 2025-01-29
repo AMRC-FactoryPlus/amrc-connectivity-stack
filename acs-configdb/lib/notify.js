@@ -207,8 +207,10 @@ function class_watch (rel, session, klass) {
     return rxx.rx(
         model.updates,
         rx.filter(u => u.type == "class"),
+        rx.tap(v => model.log("CLASS UPDATE: %s %s", rel, klass)),
         set_contents(() => model.class_lookup(klass, rel)),
-        ck_acl);
+        ck_acl,
+        rx.tap(l => model.log("SENDING CLASS UPDATE: %s %s: %o", rel, klass, l)));
 }
 
 export class CDBNotify extends Notify {

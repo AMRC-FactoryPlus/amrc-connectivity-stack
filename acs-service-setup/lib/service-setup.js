@@ -5,6 +5,7 @@
 
 import { ServiceClient } from "@amrc-factoryplus/service-client";
 
+import { migrate_auth_groups }  from "./auth-group.js";
 import { setup_clusters }       from "./clusters.js";
 import { load_dumps }           from "./dumps.js";
 import { fixups }               from "./fixups.js";
@@ -38,6 +39,9 @@ export class ServiceSetup {
 
         this.log("Loading service dump files");
         await load_dumps(this);
+
+        this.log("Migrating legacy Auth groups");
+        await migrate_auth_groups(this);
 
         this.log("Creating Helm chart templates");
         const helm = await setup_helm(this);

@@ -4,7 +4,10 @@
  * Copyright 2022 AMRC
  */
 
+import util from "util";
+
 import { Special } from "./uuids.js";
+import { has_wild } from "./validate.js";
 
 /* This must match the \sets in sql/v2.sql */
 const IDs = {
@@ -17,6 +20,30 @@ const IDs = {
     Self:               7,
 };
 
+class QueryError extends Error {
+    constructor (sql, bind, msg, ...args) {
+        super(util.format(msg, ...args));
+        this.status = 500;
+        this.sql = sql;
+        this.bind = bind;
+    }
+
+    static throw (...args) {
+        throw new this(...args);
+    }
+}
+
+class OnlyOneError extends QueryError {
+    constructor (sql, bind, n) {
+        super(sql, bind, "Query returned %s rows instead of 1", n);
+    }
+
+    static check (dbr, sql, bind) {
+        if (dbr.rowCount > 1)
+            this.throw(sql, bind, dbr.rowCount);
+    }
+}
+
 /* Queries is a separate class, because sometimes we want to query on
  * the database directly, and sometimes we need to query using a query
  * function for a transaction. The model inherits from this class. */
@@ -25,6 +52,25 @@ export default class Queries {
 
     constructor (query) {
         this.query = query;
+    }
+
+    async q_rows (sql, bind) {
+        const dbr = await this.query(sql, bind);
+        return dbr.rows;
+    }
+    async q_row (sql, bind) {
+        const dbr = await this.query(sql, bind);
+        OnlyOneError.check(dbr, sql, bind);
+        return dbr.rows[0];
+    }
+    async q_single (text, values) {
+        const dbr = await this.query({ text, values, rowMode: "array" });
+        OnlyOneError.check(dbr, text, values);
+        return dbr.rows[0]?.[0];
+    }
+    async q_list (text, values) {
+        const dbr = await this.query({ text, values, rowMode: "array" });
+        return dbr.rows.map(r => r[0]);
     }
 
     /* This takes a principal id. Right now this is a UUID, but it
@@ -74,8 +120,46 @@ export default class Queries {
         return dbr.rows;
     }
 
-    async ace_get_all () {
-        const dbr = await this.query(`
+    async uuid_find (uuid) {
+        return await this.q_single(
+                `select id from uuid where uuid = $1`,
+                [uuid])
+            ?? await this.q_single(
+                `insert into uuid (uuid) values ($1) returning id`,
+                [uuid]);
+    }
+
+    async grant_find (uuid, permitted) {
+        const g = await this.q_row(`
+            select e.id, p.uuid permission
+            from ace e
+                join uuid p on p.id = e.permission
+            where e.uuid = $1
+        `, [uuid]);
+        if (!g) return [404];
+        if (!has_wild(permitted, g.permission)) return [403];
+        return [200, g.id];
+    }
+
+    grant_list () {
+        return this.q_list(`select uuid from ace`);
+    }
+
+    grant_get (uuid) {
+        /* XXX I don't like this duplication */
+        return this.q_row(`
+            select e.uuid, u.uuid principal, p.uuid permission, t.uuid target,
+                e.plural
+            from ace e
+                join uuid u on u.id = e.principal
+                join uuid p on p.id = e.permission
+                join uuid t on t.id = e.target
+            where e.uuid = $1
+        `, [uuid]);
+    }
+
+    grant_get_all () {
+        return this.q_rows(`
             select e.uuid, u.uuid principal, p.uuid permission, t.uuid target,
                 e.plural
             from ace e
@@ -83,7 +167,40 @@ export default class Queries {
                 join uuid p on p.id = e.permission
                 join uuid t on t.id = e.target
         `);
-        return dbr.rows;
+    }
+
+    async grant_resolve_uuids (g) {
+        /* XXX These cannot run in parallel as we are in a txn and only
+         * have a single Pg connection. */
+        return Promise.all(
+            [g.principal, g.permission, g.target]
+                .map(u => this.uuid_find(u)));
+    }
+
+    async grant_new (g) {
+        const ids = await this.grant_resolve_uuids(g);
+        const uuid = await this.q_single(`
+            insert into ace (principal, permission, target, plural)
+            values ($1, $2, $3, $4)
+            returning uuid
+        `, [...ids, g.plural]);
+        return { status: 201, uuid };
+    }
+
+    grant_delete (id) {
+        return this.q_single(
+            `delete from ace where id = $1`,
+            [id]);
+    }
+
+    async grant_update (id, g) {
+        const ids = await this.grant_resolve_uuids(g);
+        return this.q_single(`
+            update ace
+            set principal = $2, permission = $3, target = $4, plural = $5
+            where id = $1
+            returning 1 ok
+        `, [id, ...ids, g.plural]);
     }
 
     async ace_add (ace) {

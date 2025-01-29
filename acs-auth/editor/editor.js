@@ -230,12 +230,13 @@ function ACEs (props) {
 
     return html`
         <table>
-            <tr><th>Principal</th><th>Permission</th><th>Target</th></tr>
+            <tr><th>Principal</th><th>Permission</th><th>Target</th><th>Plural</th></tr>
             ${ aces.map(a => html`
             <tr key=${`${a.principal}/${a.permission}/${a.target}`}>
                 <td><${Obj} obj=${a.principal}/></td>
                 <td><${Obj} obj=${a.permission}/></td>
                 <td><${Obj} obj=${a.target}/></td>
+                <td>${ a.plural ? "🗸" : "🗴" }</td>
                 <td><button onClick=${() => del_ace(a)}>Delete ACE</button></td>
             </tr>
             `) }

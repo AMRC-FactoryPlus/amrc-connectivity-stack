@@ -21,15 +21,18 @@
         </div>
       </DialogHeader>
       <div class="flex flex-col justify-center gap-6 overflow-auto flex-1 !p-1 !-m-1">
-        <DataTableSearchable v-if="columns" :data="storeData" :search-key="titleKey" :columns="columns" :limit-height="true" :filters="[]">
+        <DataTableSearchable :selectedObjects="modelValue" v-if="columns" :data="storeData" :search-key="titleKey" :columns="columns" :limit-height="true" :filters="[]">
           <template #default="slotProps">
-            <Button :disabled="!slotProps.selectedUsers.length"
-                @click="() => {$emit('update:modelValue', slotProps.selectedUsers); updateOpen(false)}">
-              <div class="flex items-center justify-center gap-2">
-                <div>{{confirmText}}</div>
-                <i v-if="confirmIcon" :class="`fa-solid fa-${confirmIcon}`"></i>
-              </div>
-            </Button>
+            <div class="flex items-center justify-center gap-2">
+              <slot name="actions"></slot>
+              <Button :disabled="!slotProps.selectedObjects.length"
+                  @click="() => {$emit('update:modelValue', slotProps.selectedObjects); updateOpen(false)}">
+                <div class="flex items-center justify-center gap-2">
+                  <div>{{confirmText}}</div>
+                  <i v-if="confirmIcon" :class="`fa-solid fa-${confirmIcon}`"></i>
+                </div>
+              </Button>
+            </div>
           </template>
         </DataTableSearchable>
       </div>

@@ -43,8 +43,7 @@ class RegisterConnectionsCommand extends Command
      */
     public function handle()
     {
-        Log::info("REGISTER CONNECTIONS");
-        #(new RegisterConnections)->execute();
+        (new RegisterConnections)->execute();
 
         return 0;
     }

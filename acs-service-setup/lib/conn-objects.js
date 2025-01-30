@@ -3,7 +3,7 @@
  * Copyright 2025 University of Sheffield AMRC
  */
 
-import { UUIDs } from "@amrc-factoryplus/service-client";
+import { ServiceError, UUIDs } from "@amrc-factoryplus/service-client";
 
 import { ServiceConfig } from "./service-config.js";
 import { ACS, Edge } from "./uuids.js";
@@ -81,7 +81,7 @@ class ConnMigration extends ServiceConfig {
             return internal;
         }
 
-        const img = dep.drivers[conn.name]?.image;
+        const img = dep.drivers?.[conn.name]?.image;
         if (!img)
             throw `No image specified, can't find driver`;
 
@@ -103,7 +103,6 @@ class ConnMigration extends ServiceConfig {
 
         for (const [uuid, config] of configs.entries()) {
             this.log("Migrating connections for %s", uuid);
-            let changed = false;
 
             const dep = this.deployments.get(uuid);
             if (!dep)
@@ -131,13 +130,10 @@ class ConnMigration extends ServiceConfig {
                 };
 
                 const cuuid = await cdb.create_object(Connection);
+                this.log("  Migrating as %s", cuuid);
                 await cdb.put_config(ConnConfig, cuuid, cconf);
 
                 conn.uuid = cuuid;
-                changed = true;
-            }
-
-            if (changed) {
                 /* XXX Properly we should use If-Match */
                 cdb.put_config(AgentConfig, uuid, config);
                 /* XXX Update Manager */
@@ -147,13 +143,24 @@ class ConnMigration extends ServiceConfig {
 }
 
 export async function migrate_connections (ss) {
-    const conf = await new ConnMigration({
-        ss,
-        name:       "conns",
-        service:    ACS.Service.Manager,
-    }).init();
+    const { fplus } = ss;
 
-    await conf.register_drivers();
-    await conf.register_connections();
+    const res = await fplus.Fetch.fetch({
+        service:    ACS.Service.Manager,
+        method:     "POST",
+        url:        "api/setup/connections",
+    });
+    if (res[0] != 200)
+        throw new ServiceError(ACS.Service.Manager,
+            "Connection migration failed", res[0]);
+
+//    const conf = await new ConnMigration({
+//        ss,
+//        name:       "conns",
+//        service:    ACS.Service.Manager,
+//    }).init();
+//
+//    await conf.register_drivers();
+//    await conf.register_connections();
 }
 

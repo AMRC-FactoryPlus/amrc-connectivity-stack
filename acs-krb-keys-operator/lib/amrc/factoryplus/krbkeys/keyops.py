@@ -84,13 +84,20 @@ class Keytab (KeyOps):
 
             principals = set(str(kte.principal) for kte in entries)
             for princ in principals:
-                mine    = [kte for kte in entries if str(kte.principal) == princ]
-                ckvno   = max((kte.kvno for kte in mine), default=-1)
-                atrisk  = [kte for kte in mine if kte.kvno < ckvno]
+                # Find keytab entries for current principle.
+                mine   = [kte for kte in entries if str(kte.principal) == princ]
+                # Sort entries by KVNO, then timestamp (oldest to newest).
+                mine.sort(key=lambda kte: (kte.kvno, kte.timestamp))
+                # Find the highest current version number for the principle.
+                ckvno  = max((kte.kvno for kte in mine), default=-1)
+                # Keys with a key version number less than ckvno.
+                atrisk = [kte for kte in mine if kte.kvno < ckvno]
+                # For each KVNO, find the creation timestamp of the next highest KVNO.
+                # If no higher KVNO exists, the key is "active"
                 replacement_times = {
                     kte.kvno: min(
                         (next_kte.timestamp for next_kte in mine if next_kte.kvno > kte.kvno),
-                        default=float('inf')  # No replacement, so treat it as active
+                        default=float('inf')
                     )
                     for kte in mine
                 }

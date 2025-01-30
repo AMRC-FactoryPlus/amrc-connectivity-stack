@@ -33,9 +33,9 @@ class RegisterConnections
 {
     public function execute()
     {
-        // Validate and authorise the request
-        $this->authorise(...func_get_args());
-        $this->validate(...func_get_args());
+        // No auth, we run from the console
+        //$this->authorise(...func_get_args());
+        //$this->validate(...func_get_args());
 
         $fplus = resolve(ServiceClient::class);
         $this->cdb = $fplus->getConfigDB();

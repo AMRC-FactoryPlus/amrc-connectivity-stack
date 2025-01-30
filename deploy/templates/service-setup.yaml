@@ -8,8 +8,7 @@ metadata:
   # Give the job a random id so helm reruns it on helm upgrade.
   name: service-setup-{{ randAlphaNum 8 | lower }}
 spec:
-  ttlSecondsAfterFinished: 300
-  backoffLimit: 10
+  backoffLimit: 9999
   template:
     spec:
       serviceAccountName: service-setup

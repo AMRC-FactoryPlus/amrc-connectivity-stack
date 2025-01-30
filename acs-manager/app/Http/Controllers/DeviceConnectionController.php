@@ -110,9 +110,4 @@ class DeviceConnectionController extends Controller
 
         return process_action((new AssignConnectionToDeviceAction)->execute(deviceConnection: $deviceConnection, device: $device));
     }
-
-    public function registerAll ()
-    {
-        return process_action((new RegisterConnections)->execute());
-    }
 }

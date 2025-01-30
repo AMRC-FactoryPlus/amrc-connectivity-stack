@@ -20,7 +20,7 @@
           <h3 class="text-xs text-gray-400 -mt-0.5">{{subtitle}}</h3>
         </div>
       </DialogHeader>
-      <div class="flex flex-col justify-center gap-6 overflow-auto flex-1 !p-1 !-m-1">
+      <div class="flex flex-col justify-center gap-6 overflow-auto flex-1 fix-inset">
         <DataTableSearchable :selectedObjects="modelValue" v-if="columns" :data="storeData" :search-key="titleKey" :columns="columns" :limit-height="true" :filters="[]">
           <template #default="slotProps">
             <div class="flex items-center justify-center gap-2">

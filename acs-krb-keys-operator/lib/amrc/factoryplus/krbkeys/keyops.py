@@ -87,7 +87,14 @@ class Keytab (KeyOps):
                 mine    = [kte for kte in entries if str(kte.principal) == princ]
                 ckvno   = max((kte.kvno for kte in mine), default=-1)
                 atrisk  = [kte for kte in mine if kte.kvno < ckvno]
-                expired = [kte for kte in atrisk if kte.timestamp < since]
+                replacement_times = {
+                    kte.kvno: min(
+                        (next_kte.timestamp for next_kte in mine if next_kte.kvno > kte.kvno),
+                        default=float('inf')  # No replacement, so treat it as active
+                    )
+                    for kte in mine
+                }
+                expired = [kte for kte in atrisk if replacement_times[kte.kvno] < since]
 
                 for kte in expired:
                     log(f"Removing {kte.principal} kvno {kte.kvno}")

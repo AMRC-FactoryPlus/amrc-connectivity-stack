@@ -75,7 +75,7 @@ spec:
         - name: manager
           image: "{{ include "amrc-connectivity-stack.image-name" (list . .Values.manager ) }}-backend"
           imagePullPolicy: {{ .Values.manager.image.pullPolicy }}
-          command: ["/bin/sh", "-c", "while true; do sleep 10; done"]
+          command: ["/bin/sh", "-c", "php artisan connections:register"]
           env:
             - name: KRB5_CONFIG
               value: /config/krb5-conf/krb5.conf

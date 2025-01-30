@@ -12,18 +12,21 @@
   <Sheet :open="selectedPermission !== null" @update:open="e => !e ? selectedPermission = null : null">
     <PermissionManagementSidebar :permission="selectedPermission" @objectClick="e => objectClicked(e.original)"></PermissionManagementSidebar>
   </Sheet>
-  <Tabs default-value="principals">
-    <TabsList class="mb-6">
-      <TabsTrigger value="principals">
-        Principals
-      </TabsTrigger>
-      <TabsTrigger value="groups">
-        Groups
-      </TabsTrigger>
-      <TabsTrigger value="permissions">
-        Permissions
-      </TabsTrigger>
-    </TabsList>
+  <Tabs @update:modelValue="e => currentTab = e" :default-value="defaultTab">
+    <div class="flex items-center justify-between gap-2">
+      <TabsList class="mb-6">
+        <TabsTrigger value="principals">
+          Principals
+        </TabsTrigger>
+        <TabsTrigger value="groups">
+          Groups
+        </TabsTrigger>
+        <TabsTrigger value="permissions">
+          Permissions
+        </TabsTrigger>
+      </TabsList>
+      <LinkUserDialog v-if="currentTab"/>
+    </div>
     <TabsContent value="principals">
       <PrincipalList @rowClick="e => objectClicked(e.original)"/>
     </TabsContent>
@@ -38,12 +41,9 @@
 
 <script>
 import { useServiceClientStore } from '@/store/serviceClientStore.js'
-import { Skeleton } from '@components/ui/skeleton'
-import DataTable from '@components/ui/data-table/DataTable.vue'
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import { Sheet } from '@/components/ui/sheet'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { defineAsyncComponent } from 'vue'
-import { Button } from '@components/ui/button/index.js'
 import { usePrincipalStore } from '@store/usePrincipalStore.js'
 import { useGroupStore } from '@store/useGroupStore.js'
 import PrincipalList from './PrincipalList.vue'
@@ -51,6 +51,7 @@ import GroupList from './GroupList.vue'
 import PermissionList from '@pages/AccessControl/Permissions/PermissionList.vue'
 import { usePermissionStore } from '@store/usePermissionStore.js'
 import { UUIDs } from '@amrc-factoryplus/service-client'
+import LinkUserDialog from '@pages/AccessControl/LinkUserDialog.vue'
 
 export default {
   name: 'AccessControl',
@@ -65,16 +66,9 @@ export default {
   },
 
   components: {
+    LinkUserDialog,
     PermissionList,
-    Button,
-    DataTable,
-    Skeleton,
     Sheet,
-    SheetContent,
-    SheetDescription,
-    SheetHeader,
-    SheetTitle,
-    SheetTrigger,
     Tabs,
     TabsContent,
     TabsList,
@@ -153,7 +147,12 @@ export default {
   },
 
   data () {
+
+    const defaultTab = 'principals'
+
     return {
+      defaultTab: defaultTab,
+      currentTab: defaultTab,
       selectedPrincipal: null,
       selectedGroup: null,
       selectedPermission: null,

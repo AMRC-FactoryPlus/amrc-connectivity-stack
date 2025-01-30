@@ -10,6 +10,7 @@ use AMRCFactoryPlus\ServiceClient;
 use App\Exceptions\ReauthenticationRequiredException;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\Log;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -26,9 +27,21 @@ class AppServiceProvider extends ServiceProvider
             // If the ccache has expired then re-authenticate by ending the session
             // and showing the login modal
             try {
-                // If the user is logged in then get their ccache
-                // and use that for all future requests
-                $ccache->open("FILE:/app/storage/ccache/" . auth()->user()->username . '.ccache');
+                $user = config('manager.service_username');
+                $passwd = config('manager.service_password');
+
+                if ($user && $passwd) {
+                    Log::info("Using service credentials for " . $user);
+                    $flags = ['tkt_life' => config('manager.tkt_life', 21600)];
+                    $ccache->initPassword($user, $passwd, $flags);
+                }
+                else {
+                    $user = auth()->user()->username;
+                    Log::info("Using existing credentials for " . $user);
+                    // If the user is logged in then get their ccache
+                    // and use that for all future requests
+                    $ccache->open("FILE:/app/storage/ccache/" . $user . '.ccache');
+                }
 
                 $ccache->isValid();
             } catch (\Exception $e) {

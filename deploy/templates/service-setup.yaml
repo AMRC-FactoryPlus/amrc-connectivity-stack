@@ -94,6 +94,15 @@ spec:
                 secretKeyRef:
                   name: manager-database-secret
                   key: postgres-password
+            - name: SERVICE_USERNAME
+              value: admin
+            - name: SERVICE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: admin-password
+                  key: password
+            - name: LOG_LEVEL
+              value: debug
           envFrom:
             - configMapRef:
                 name: manager-config

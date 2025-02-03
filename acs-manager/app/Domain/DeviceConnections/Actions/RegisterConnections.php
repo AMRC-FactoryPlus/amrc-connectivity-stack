@@ -95,7 +95,14 @@ class RegisterConnections
         $deps = [];
         foreach (Node::all() as $node) {
             $uuid = $node->uuid;
-            $deps[$uuid] = $this->cdb->getConfig($App, $uuid);
+            $dep = $this->cdb->getConfig($App, $uuid);
+            $deps[$uuid] = $dep;
+
+            $host = aget($dep, "hostname");
+            if ($node->hostname != $host) {
+                $node->hostname = $host;
+                $node->save();
+            }
         }
         $this->deployments = $deps;
     }
@@ -199,8 +206,8 @@ class RegisterConnections
         $deployment = $this->deployment_config($values, $dvals);
 
         $topo = ["cluster" => $node->cluster];
-        if (!is_null($dep) && array_key_exists("hostname", $dep))
-            $topo["hostname"] = $dep["hostname"];
+        if (!is_null($node->hostname))
+            $topo["hostname"] = $node->hostname;
 
         return [
             "driver"        => $driver["uuid"],
@@ -228,6 +235,10 @@ class RegisterConnections
                 $dconn->name, $node->uuid));
 
             $cconf = $this->connection_config($dconn, $node);
+            $dconn->update([
+                "driver"        => $cconf["driver"],
+                "deployment"    => json_encode($cconf["deployment"]),
+            ]);
         }
     }
 

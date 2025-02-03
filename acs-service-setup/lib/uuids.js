@@ -87,11 +87,14 @@ export const ACS = {
         Websocket:              "f5fa94ee-de4d-11ef-882f-a7f7c2ad5273",
         UDP:                    "f76120f0-de4d-11ef-baeb-4b617561ae1d",
 
-        /* Stock external drivers */
+        /* Stock in-cluster drivers */
         Bacnet:                 "bdc64178-de4c-11ef-b15e-3711aef7cf9b",
         Modbus:                 "c355a44e-de4c-11ef-8a5a-e31f3872ed79",
         Test:                   "c8798cba-de4c-11ef-8a43-8766e8683af8",
         TPlinkSmartPlug:        "d46e1374-de4c-11ef-b469-c388a038fd5c",
+
+        /* External driver */
+        External:               "eb669a2c-e213-11ef-998e-a7fc6f4817b5",
     },
 };
 

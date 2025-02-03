@@ -33,6 +33,7 @@ objects:
     - !u ACS.Driver.Modbus
     - !u ACS.Driver.Test
     - !u ACS.Driver.TPlinkSmartPlug
+    - !u ACS.Driver.External
 configs:
   !u UUIDs.App.Info:
     !u Edge.Class.Connection:       { name: "Edge Agent SB connection" }
@@ -57,6 +58,7 @@ configs:
     !u ACS.Driver.Modbus:           { name: "Modbus" }
     !u ACS.Driver.Test:             { name: "Test" }
     !u ACS.Driver.TPlinkSmartPlug:  { name: "TP-Link smart plug" }
+    !u ACS.Driver.External:         { name: "External driver" }
   !u Edge.App.DriverDef:
     !u ACS.Driver.REST:
       internal:
@@ -106,6 +108,8 @@ configs:
       image:
         registry: ghcr.io/amrc-factoryplus
         repository: edge-tplink-smartplug
+    !u ACS.Driver.External:
+      external: true
 ---
 service: !u UUIDs.Service.Authentication
 version: 1

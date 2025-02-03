@@ -15,10 +15,13 @@ use App\Domain\Support\ManagerUUIDs;
 use App\Exceptions\ActionFailException;
 use App\Exceptions\ActionForbiddenException;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 use function func_get_args;
 
-function aget ($array, $key, $def) {
+function aget ($array, $key, $def = null) {
+    if (is_null($array))
+        return $def;
     return array_key_exists($key, $array) ? $array[$key] : $def;
 }
 
@@ -27,6 +30,41 @@ function image_tag ($img) {
         aget($img, "registry", ""),
         aget($img, "repository", ""),
         aget($img, "tag", ""));
+}
+
+# This is awful. But I can't see how to create a constant lookup table
+# in PHP...
+function internal_driver ($connType) {
+    switch ($connType) {
+    case "REST":
+        return ["uuid" => ManagerUUIDs::REST, "details" => "RESTConnDetails"];
+    case "MTConnect": 
+        return ["uuid" => ManagerUUIDs::MTConnect, "details" => "MTConnectConnDetails"];
+    case "EtherNet/IP": 
+        return ["uuid" => ManagerUUIDs::EtherNetIP, "details" => "EtherNetIPConnDetails"];
+    case "S7": 
+        return ["uuid" => ManagerUUIDs::S7, "details" => "s7ConnDetails"];
+    case "OPC UA": 
+        return ["uuid" => ManagerUUIDs::OPCUA, "details" => "OPCUAConnDetails"];
+    case "MQTT": 
+        return ["uuid" => ManagerUUIDs::MQTT, "details" => "MQTTConnDetails"];
+    case "Websocket": 
+        return ["uuid" => ManagerUUIDs::Websocket, "details" => "WebsocketConnDetails"];
+    case "UDP": 
+        return ["uuid" => ManagerUUIDs::UDP, "details" => "UDPConnDetails"];
+    default:
+        throw sprintf("Unknown internal connType %s", $connType);
+    }
+}
+
+function stock_driver ($img) {
+    switch ($img) {
+    case "bacnet":              return ManagerUUIDs::Bacnet;
+    case "modbus":              return ManagerUUIDs::Modbus;
+    case "test":                return ManagerUUIDs::Test;
+    case "tplink-smartplug":    return ManagerUUIDs::TPlinkSmartPlug;
+    default:                    return null;
+    }
 }
 
 class RegisterConnections
@@ -42,8 +80,10 @@ class RegisterConnections
 
         Log::info("Locating Edge Deployments...");
         $this->find_deployments();
-        Log::info("Registering Drivers...");
+        Log::info("Locating/registering Drivers...");
         $this->register_drivers();
+        Log::info("Registering Connections...");
+        $this->register_connections();
 
         Log::info("Finished exporting Connections");
         return action_success();
@@ -97,6 +137,68 @@ class RegisterConnections
         }
 
         $this->drivers = $drivers;
+    }
+
+    private function find_driver ($conn, $dep)
+    {
+        if ($conn["connType"] != "Driver")
+            return internal_driver($conn["connType"]);
+
+        # If we can't find deployment info, assume this is a
+        # cluster-external driver.
+        $ext = ["uuid" => ManagerUUIDs::ExternalDriver, "details" => "DriverDetails"];
+        $img = aget(aget(aget($dep, "drivers"), $conn["name"]), "image");
+        if (is_null($img))
+            return $ext;
+
+        $image = aget(aget($dep, "image"), $img);
+        if (is_null($image)) {
+            $stock = stock_image($img);
+            if (is_null($stock))
+                return $ext;
+            else
+                return ["uuid" => $stock, "details" => "DriverDetails"];
+        }
+
+        $tag = image_tag($image);
+        $driver = aget($this->drivers, $tag, ManagerUUIDs::ExternalDriver);
+        return ["uuid" => $driver, "details" => "DriverDetails"];
+    }
+
+    private function register_connections ()
+    {
+        foreach (DeviceConnection::all() as $dconn) {
+            $node = Node::find($dconn->node_id);
+
+            if (is_null($node) || is_null($dconn->file)) {
+                Log::info(sprintf("Connection %s of %s is incomplete, skipping",
+                    $dconn->name, $node ? $node->uuid : "???"));
+                continue;
+            }
+            Log::info(sprintf("Registering Connection %s of %s",
+                $dconn->name, $node->uuid));
+
+            $conn = json_decode(
+                Storage::disk('device-connections')->get($dconn->file), 
+                true, 512, JSON_THROW_ON_ERROR);
+            $dep = aget($this->deployments, $node->uuid);
+
+            $driver = $this->find_driver($conn, $dep);
+            $cconf = [
+                "driver"        => $driver["uuid"],
+                "edgeAgent"     => $node->uuid,
+                "topology"      => [
+                    "cluster"       => $node->cluster,
+                    "hostname"      => aget($dep, "hostname"),
+                ],
+                "deployment"    => aget($dep, "values"),
+                "config"        => aget($conn, $driver["details"]),
+                "source"        => [
+                    "payloadFormat" => aget($conn, "payloadFormat"),
+                ],
+            ];
+            Log::info("Conn config", ["config" => $cconf]);
+        }
     }
 
     /**

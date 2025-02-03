@@ -185,6 +185,35 @@ class RegisterConnections
         return $deployment;
     }
 
+    private function connection_config ($dconn, $node)
+    {
+        $conn = json_decode(
+            Storage::disk('device-connections')->get($dconn->file), 
+            true, 512, JSON_THROW_ON_ERROR);
+
+        $dep = aget($this->deployments, $node->uuid);
+        $values = aget($dep, "values");
+        $dvals = aget(aget($values, "drivers"), $dconn->name);
+
+        $driver = $this->find_driver($conn, $values, $dvals);
+        $deployment = $this->deployment_config($values, $dvals);
+
+        $topo = ["cluster" => $node->cluster];
+        if (!is_null($dep) && array_key_exists("hostname", $dep))
+            $topo["hostname"] = $dep["hostname"];
+
+        return [
+            "driver"        => $driver["uuid"],
+            "edgeAgent"     => $node->uuid,
+            "topology"      => $topo,
+            "deployment"    => $deployment,
+            "config"        => aget($conn, $driver["details"], new \stdClass()),
+            "source"        => [
+                "payloadFormat" => aget($conn, "payloadFormat"),
+            ],
+        ];
+    }
+
     private function register_connections ()
     {
         foreach (DeviceConnection::all() as $dconn) {
@@ -198,32 +227,7 @@ class RegisterConnections
             Log::info(sprintf("Registering Connection %s of %s",
                 $dconn->name, $node->uuid));
 
-            $conn = json_decode(
-                Storage::disk('device-connections')->get($dconn->file), 
-                true, 512, JSON_THROW_ON_ERROR);
-
-            $dep = aget($this->deployments, $node->uuid);
-            $values = aget($dep, "values");
-            $dvals = aget(aget($values, "drivers"), $dconn->name);
-
-            $driver = $this->find_driver($conn, $values, $dvals);
-            $deployment = $this->deployment_config($values, $dvals);
-
-            $topo = ["cluster" => $node->cluster];
-            if (!is_null($dep) && array_key_exists("hostname", $dep))
-                $topo["hostname"] = $dep["hostname"];
-
-            $cconf = [
-                "driver"        => $driver["uuid"],
-                "edgeAgent"     => $node->uuid,
-                "topology"      => $topo,
-                "deployment"    => $deployment,
-                "config"        => aget($conn, $driver["details"], new \stdClass()),
-                "source"        => [
-                    "payloadFormat" => aget($conn, "payloadFormat"),
-                ],
-            ];
-            Log::info("Conn config", ["config" => $cconf]);
+            $cconf = $this->connection_config($dconn, $node);
         }
     }
 

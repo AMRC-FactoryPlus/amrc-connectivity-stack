@@ -72,9 +72,22 @@ spec:
             - /bin/sh
             - -c
             - |
-              echo "Restarting MQTT..."
-              kubectl rollout restart deployment mqtt -n factory-plus
-              echo "Complete!"
+              DEPLOYMENT_NAME=mqtt
+              NAMESPACE={{.Release.Namespace}}
+
+              echo "Attempting to restart deployment: $DEPLOYMENT_NAME"
+
+              # Try to rollout restart the deployment
+              kubectl rollout restart deployment/$DEPLOYMENT_NAME -n $NAMESPACE
+
+              # Wait and check rollout status
+              if kubectl rollout status deployment/$DEPLOYMENT_NAME -n $NAMESPACE --timeout=60s; then
+                echo "Deployment restarted successfully!"
+                exit 0  # Exit successfully, no pod restart needed
+              else
+                echo "Deployment restart failed, retrying..."
+                exit 1  # Exit with error, pod will restart
+              fi
 ---
 
 apiVersion: v1

@@ -223,7 +223,12 @@ class RegisterConnections
 
     private function register_connections ()
     {
+        $cdb = $this->cdb;
+
         foreach (DeviceConnection::all() as $dconn) {
+            if (!is_null($dconn->uuid))
+                continue;
+
             $node = Node::find($dconn->node_id);
 
             if (is_null($node) || is_null($dconn->file)) {
@@ -231,7 +236,7 @@ class RegisterConnections
                     $dconn->name, $node ? $node->uuid : "???"));
                 continue;
             }
-            Log::info(sprintf("Registering Connection %s of %s",
+            Log::info(sprintf("Registering Connection %s of Node %s",
                 $dconn->name, $node->uuid));
 
             $cconf = $this->connection_config($dconn, $node);
@@ -239,6 +244,13 @@ class RegisterConnections
                 "driver"        => $cconf["driver"],
                 "deployment"    => json_encode($cconf["deployment"]),
             ]);
+
+            $cobj = $cdb->createObject(ManagerUUIDs::Connection, null, $dconn->name);
+            $uuid = $cobj["uuid"];
+            $cdb->putConfig(ManagerUUIDs::ConnConfig, $uuid, $cconf);
+            $dconn->uuid = $uuid;
+            $dconn->save();
+            Log::info(sprintf("Registered as %s", $uuid));
         }
     }
 

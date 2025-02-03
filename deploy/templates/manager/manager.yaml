@@ -84,7 +84,7 @@ spec:
                 name: manager-config
             - secretRef:
                 name: manager-secrets
-          command: [ 'sh', '-c', 'php artisan migrate --force' ]
+          command: [ 'sh', '-c', 'while true; do sleep 5; done' ]
         - name: create-admin-user
           image: "{{ include "amrc-connectivity-stack.image-name" (list . .Values.manager ) }}-backend"
           imagePullPolicy: {{ coalesce .Values.manager.image.pullPolicy .Values.acs.defaultPullPolicy }}

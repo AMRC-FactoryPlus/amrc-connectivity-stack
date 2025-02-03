@@ -65,10 +65,6 @@ spec:
             - name: GIT_REPO_PATH
               value: {{ .Values.edgeHelm.repoPath }}
       containers:
-        # We need a do-nothing container to keep k8s happy
-        - name: done
-{{ include "amrc-connectivity-stack.image" (list . .Values.shell) | indent 10 }}
-          command: [ "/bin/true" ]
         - name: restart-mqtt
           image: bitnami/kubectl:latest
           command:

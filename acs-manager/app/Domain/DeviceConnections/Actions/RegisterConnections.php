@@ -139,7 +139,7 @@ class RegisterConnections
         $this->drivers = $drivers;
     }
 
-    private function find_driver ($conn, $dep)
+    private function find_driver ($conn, $values, $dvals)
     {
         if ($conn["connType"] != "Driver")
             return internal_driver($conn["connType"]);
@@ -147,13 +147,13 @@ class RegisterConnections
         # If we can't find deployment info, assume this is a
         # cluster-external driver.
         $ext = ["uuid" => ManagerUUIDs::ExternalDriver, "details" => "DriverDetails"];
-        $img = aget(aget(aget($dep, "drivers"), $conn["name"]), "image");
+        $img = aget($dvals, "image");
         if (is_null($img))
             return $ext;
 
-        $image = aget(aget($dep, "image"), $img);
+        $image = aget(aget($values, "image"), $img);
         if (is_null($image)) {
-            $stock = stock_image($img);
+            $stock = stock_driver($img);
             if (is_null($stock))
                 return $ext;
             else
@@ -163,6 +163,26 @@ class RegisterConnections
         $tag = image_tag($image);
         $driver = aget($this->drivers, $tag, ManagerUUIDs::ExternalDriver);
         return ["uuid" => $driver, "details" => "DriverDetails"];
+    }
+
+    private function deployment_config ($values, $dvals)
+    {
+        # This is the only way to get an empty JSON object...
+        $deployment = new \stdClass();
+        $ddevs = aget($values, "driverDevices");
+        $dmnts = aget($dvals, "deviceMounts");
+        
+        if (!is_null($ddevs) && !is_null($dmnts)) {
+            $dmap = [];
+            foreach ($dmnts as $tag => $cdev) {
+                $hdev = aget($ddevs, $tag);
+                if (is_null($hdev)) continue;
+                $dmap[] = ["source" => $hdev, "mount" => $cdev];
+            }
+            $deployment->devices = $dmap;
+        }
+
+        return $deployment;
     }
 
     private function register_connections ()
@@ -181,18 +201,24 @@ class RegisterConnections
             $conn = json_decode(
                 Storage::disk('device-connections')->get($dconn->file), 
                 true, 512, JSON_THROW_ON_ERROR);
-            $dep = aget($this->deployments, $node->uuid);
 
-            $driver = $this->find_driver($conn, $dep);
+            $dep = aget($this->deployments, $node->uuid);
+            $values = aget($dep, "values");
+            $dvals = aget(aget($values, "drivers"), $dconn->name);
+
+            $driver = $this->find_driver($conn, $values, $dvals);
+            $deployment = $this->deployment_config($values, $dvals);
+
+            $topo = ["cluster" => $node->cluster];
+            if (!is_null($dep) && array_key_exists("hostname", $dep))
+                $topo["hostname"] = $dep["hostname"];
+
             $cconf = [
                 "driver"        => $driver["uuid"],
                 "edgeAgent"     => $node->uuid,
-                "topology"      => [
-                    "cluster"       => $node->cluster,
-                    "hostname"      => aget($dep, "hostname"),
-                ],
-                "deployment"    => aget($dep, "values"),
-                "config"        => aget($conn, $driver["details"]),
+                "topology"      => $topo,
+                "deployment"    => $deployment,
+                "config"        => aget($conn, $driver["details"], new \stdClass()),
                 "source"        => [
                     "payloadFormat" => aget($conn, "payloadFormat"),
                 ],

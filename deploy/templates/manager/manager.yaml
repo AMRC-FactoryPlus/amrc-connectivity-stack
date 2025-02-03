@@ -84,7 +84,15 @@ spec:
                 name: manager-config
             - secretRef:
                 name: manager-secrets
-          command: [ 'sh', '-c', 'while true; do sleep 5; done' ]
+          command: 
+            - sh
+            - '-c'
+            - |
+              while php artisan migrate:status --pending --no-ansi | grep -q Pending
+              do
+                echo "Waiting for service-setup to complete database migration"
+                sleep 5
+              done
         - name: create-admin-user
           image: "{{ include "amrc-connectivity-stack.image-name" (list . .Values.manager ) }}-backend"
           imagePullPolicy: {{ coalesce .Values.manager.image.pullPolicy .Values.acs.defaultPullPolicy }}

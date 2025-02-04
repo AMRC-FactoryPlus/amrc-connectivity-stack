@@ -47,6 +47,13 @@ export default {
     }
   },
 
+  provide () {
+    return {
+      permissionMembershipUpdated: this.updateData,
+      objectClicked: (object) => {this.$emit('objectClick', object)},
+    }
+  },
+
   watch: {
     permission: {
       handler (val) {
@@ -129,6 +136,7 @@ export default {
           }
         }
 
+        newEntry.permission = this.permission
         rv.push(newEntry)
       }
 

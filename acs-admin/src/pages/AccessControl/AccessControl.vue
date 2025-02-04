@@ -25,7 +25,7 @@
           Permissions
         </TabsTrigger>
       </TabsList>
-      <LinkUserDialog v-if="currentTab"/>
+      <LinkUserDialog v-if="currentTab==='principals'"/>
     </div>
     <TabsContent value="principals">
       <PrincipalList @rowClick="e => objectClicked(e.original)"/>

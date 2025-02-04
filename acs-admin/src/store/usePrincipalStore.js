@@ -12,10 +12,10 @@ export const usePrincipalStore = defineStore('principal', {
     loading: false,
   }),
   actions: {
-
-    fetch () {
+    async fetch () {
       this.loading = true
-      useServiceClientStore().client.Auth.fetch('authz/principal').then(async (principalResponse) => {
+      try {
+        const principalResponse = await useServiceClientStore().client.Auth.fetch('authz/principal')
 
         if (!Array.isArray(principalResponse[1])) {
           this.loading = false
@@ -74,9 +74,9 @@ export const usePrincipalStore = defineStore('principal', {
         }))
 
         this.loading = false
-      }).catch((err) => {
+      } catch(err) {
         console.error(`Can't read principals`, err)
-      })
+      }
     },
   },
 })

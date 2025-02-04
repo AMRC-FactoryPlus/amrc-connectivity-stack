@@ -29,7 +29,7 @@ export const usePrincipalStore = defineStore('principal', {
             return {
               uuid: p.uuid,
               kerberos: p.kerberos,
-              name: principalObjectResponse.name
+              name: principalObjectResponse?.name ?? "UNKNOWN"
             }
           } catch(err) {
             console.error(`Can't read principal details`, err)
@@ -45,6 +45,15 @@ export const usePrincipalStore = defineStore('principal', {
         this.data = await Promise.all(principalsWithNames.map(async (existingPrincipal) => {
           try {
             let principalObjectResponse = await useServiceClientStore().client.ConfigDB.get_config(UUIDs.App.Registration, existingPrincipal.uuid);
+            if (!principalObjectResponse) {
+              console.error(`Can't read principal class details for:`, existingPrincipal.uuid)
+              return {
+                ...existingPrincipal,
+                class: {
+                  name: "UNKNOWN"
+                }
+              }
+            }
             let classUUID = principalObjectResponse.class
             try {
               let classObjectResponse = await useServiceClientStore().client.ConfigDB.get_config(UUIDs.App.Info, classUUID);
@@ -57,18 +66,21 @@ export const usePrincipalStore = defineStore('principal', {
                 }
               }
             } catch (err) {
-              console.error(`Can't read principal class details`, err)
+              console.error(`Can't read principal class details for:`, existingPrincipal.uuid, err)
               return {
                 ...existingPrincipal,
-                class: {}
+                class: {
+                  name: "UNKNOWN"
+                }
               }
             }
           } catch(err) {
-            console.error(`Can't read principal details`, err)
+            console.error(`Can't read principal class details for:`, existingPrincipal.uuid, err)
             return {
               ...existingPrincipal,
-              name: "",
-              class: {}
+              class: {
+                name: "UNKNOWN"
+              }
             }
           }
         }))

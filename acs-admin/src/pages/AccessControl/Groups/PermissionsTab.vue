@@ -42,6 +42,13 @@ export default {
     }
   },
 
+  provide () {
+    return {
+      permissionMembershipUpdated: this.updateData,
+      objectClicked: (object) => {this.$emit('objectClick', object)},
+    }
+  },
+
   components: {
     DataTable,
     Skeleton,
@@ -64,14 +71,14 @@ export default {
           return
         }
 
-        this.fetchSpecificPermissions(val.uuid)
+        this.fetchSpecificPermissions()
       },
       immediate: true,
     },
   },
 
   methods: {
-    async fetchSpecificPermissions (uuid) {
+    async fetchSpecificPermissions() {
       this.loading = true
 
       const res = await this.s.client.Auth.fetch(`/authz/ace`)
@@ -79,7 +86,7 @@ export default {
         return;
       }
       const fullList = res[1];
-      const filteredList = fullList.filter(e => e.principal === uuid)
+      const filteredList = fullList.filter(e => e.principal === this.group.uuid)
 
       const info = o => this.s.client.ConfigDB.get_config(UUIDs.App.Info, o)
       const name = o => info(o).then(v => v?.name)
@@ -98,11 +105,17 @@ export default {
             uuid: entry.target,
             name: targetName,
           },
+          group: this.group,
         })
       }
 
       this.permissions = rv
       this.loading     = false
+    },
+    async updateData () {
+      this.s.client.Fetch.cache = 'reload'
+      await this.fetchSpecificPermissions()
+      this.s.client.Fetch.cache = 'default'
     },
   },
 

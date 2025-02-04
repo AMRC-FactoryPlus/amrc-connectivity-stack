@@ -6,7 +6,7 @@ import type {ColumnDef} from '@tanstack/vue-table'
 import {h} from 'vue'
 
 import DataTableColumnHeader from '@/components/ui/data-table/DataTableColumnHeader.vue'
-import GroupDropdown from '../Principals/GroupDropdown.vue'
+import PrincipalDropdown from './PrincipalDropdown.vue'
 
 export interface Permission {
     principal: {
@@ -24,6 +24,10 @@ export interface Permission {
             uuid: string
             name: string
         }
+    }
+    permission: {
+        uuid: string
+        name: string
     }
 }
 
@@ -66,5 +70,5 @@ export const columns: ColumnDef<Permission>[] = [
     },
     {
         id: 'actions',
-        cell: ({row}) => h(GroupDropdown, {row}),
+        cell: ({row}) => h(PrincipalDropdown, {row}),
     }]

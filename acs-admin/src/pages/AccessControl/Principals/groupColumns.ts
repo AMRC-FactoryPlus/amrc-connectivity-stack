@@ -12,6 +12,11 @@ export interface Group {
     uuid: string
     name: string
     members: string[]
+    principal: {
+        uuid: string
+        name: string
+        kerberos: string
+    }
 }
 
 export const columns: ColumnDef<Group>[] = [
@@ -19,7 +24,7 @@ export const columns: ColumnDef<Group>[] = [
         accessorKey: 'name',
         header: ({column}) => h(DataTableColumnHeader, {
             column,
-            title: 'Name'
+            title: 'Group Name'
         }),
 
         cell: ({row}) => {

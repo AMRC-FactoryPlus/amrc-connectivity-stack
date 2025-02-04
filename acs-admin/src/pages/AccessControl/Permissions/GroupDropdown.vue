@@ -4,19 +4,16 @@
 
 <script setup lang="ts">
 import type {Row} from '@tanstack/vue-table'
-import type {Group} from './groupColumns'
+import type {Alert} from './columns'
 
 import {Button} from '@/components/ui/button'
 import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuGroup} from '@/components/ui/dropdown-menu'
 import {toast} from "vue-sonner";
 import {useDialog} from '@/composables/useDialog';
 import {useServiceClientStore} from '@store/serviceClientStore.js'
-import { inject } from 'vue'
-
-const groupMembershipUpdated = inject('groupMembershipUpdated')
 
 interface DataTableRowActionsProps {
-    row: Row<Group>
+    row: Row<Alert>
 }
 
 const s = useServiceClientStore()
@@ -31,18 +28,15 @@ function copy(id: string) {
 function handleDelete() {
     useDialog({
         title: 'Remove from group?',
-        message: `Are you sure that you want to remove ${props.row.original.principal.name} from ${props.row.original.name}? The user will lose all permissions associated with the group.`,
+        message: `Are you sure that you want to remove ${props.row.original.principal.kerberos} from the ${props.row.original.name} group? The user will lose all permissions associated with the group.`,
         confirmText: 'Remove from Group',
         onConfirm: () => {
-            s.client.Auth.remove_from_group(props.row.original.uuid, props.row.original.principal.uuid).then(async () => {
-              toast.success(`${props.row.original.principal.name} has been removed from ${props.row.original.name}`)
-              s.client.Fetch.cache = "reload"
-              // Jetbrains doesn't understand this, but it works
-              await groupMembershipUpdated()
-              s.client.Fetch.cache = "default"
+            console.log(props.row.original.principal);
+            s.client.Auth.remove_from_group(props.row.original.uuid, props.row.original.principal.uuid).then(() => {
+                toast.success(`${props.row.original.principal.kerberos} has been removed from the ${props.row.original.name} group`)
             }).catch((err) => {
-              toast.error(`Unable to remove ${props.row.original.principal.name} from ${props.row.original.name}`)
-              console.error(`Unable to remove ${props.row.original.principal.name} from ${props.row.original.name}`, err)
+                toast.error(`Unable to remove ${props.row.original.principal.kerberos} from ${props.row.original.name}`)
+                console.error(`Unable to remove ${props.row.original.principal.kerberos} from ${props.row.original.name}`, err)
             })
         }
     });
@@ -63,9 +57,9 @@ function handleDelete() {
         </Button>
       </DropdownMenuTrigger>
     </div>
-    <DropdownMenuContent align="end" class="w-[250px]">
+    <DropdownMenuContent align="end" class="w-[160px]">
       <DropdownMenuGroup>
-        <DropdownMenuItem @click="copy(props.row.original.uuid)" class="cursor-pointer">
+        <DropdownMenuItem @click="copy(props.row.original.uuid)">
           <div class="flex items-center justify-center gap-2">
             <i class="fa-solid fa-fw fa-tag"></i>
             Copy UUID
@@ -74,10 +68,10 @@ function handleDelete() {
       </DropdownMenuGroup>
       <DropdownMenuSeparator/>
       <DropdownMenuGroup>
-        <DropdownMenuItem @click="handleDelete" class="cursor-pointer">
+        <DropdownMenuItem @click="handleDelete">
           <div class="flex items-center justify-center gap-2">
             <i class="fa-solid fa-fw fa-trash text-red-500"></i>
-            Remove from Group
+            Remove
           </div>
         </DropdownMenuItem>
       </DropdownMenuGroup>

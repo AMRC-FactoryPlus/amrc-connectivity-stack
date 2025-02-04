@@ -4,22 +4,24 @@
 
 <script setup lang="ts">
 import type {Row} from '@tanstack/vue-table'
-import type {Group} from './groupColumns'
+import type {Principal} from './membersColumns'
 
 import {Button} from '@/components/ui/button'
 import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuGroup} from '@/components/ui/dropdown-menu'
 import {toast} from "vue-sonner";
 import {useDialog} from '@/composables/useDialog';
 import {useServiceClientStore} from '@store/serviceClientStore.js'
+import {useGroupStore} from '@store/useGroupStore.js'
 import { inject } from 'vue'
 
-const groupMembershipUpdated = inject('groupMembershipUpdated')
+const groupMembersUpdated = inject('groupMembersUpdated')
 
 interface DataTableRowActionsProps {
-    row: Row<Group>
+    row: Row<Principal>
 }
 
 const s = useServiceClientStore()
+const g = useGroupStore()
 
 const props = defineProps<DataTableRowActionsProps>()
 
@@ -31,18 +33,18 @@ function copy(id: string) {
 function handleDelete() {
     useDialog({
         title: 'Remove from group?',
-        message: `Are you sure that you want to remove ${props.row.original.principal.name} from ${props.row.original.name}? The user will lose all permissions associated with the group.`,
+        message: `Are you sure that you want to remove ${props.row.original.name} from ${props.row.original.group.name}? The user will lose all permissions associated with the group.`,
         confirmText: 'Remove from Group',
         onConfirm: () => {
-            s.client.Auth.remove_from_group(props.row.original.uuid, props.row.original.principal.uuid).then(async () => {
-              toast.success(`${props.row.original.principal.name} has been removed from ${props.row.original.name}`)
-              s.client.Fetch.cache = "reload"
-              // Jetbrains doesn't understand this, but it works
-              await groupMembershipUpdated()
-              s.client.Fetch.cache = "default"
+            s.client.Auth.remove_from_group(props.row.original.group.uuid, props.row.original.uuid).then(async () => {
+                toast.success(`${props.row.original.name} has been removed from ${props.row.original.group.name}`)
+                s.client.Fetch.cache = "reload"
+                // Jetbrains doesn't understand this, but it works
+                await groupMembersUpdated()
+                s.client.Fetch.cache = "default"
             }).catch((err) => {
-              toast.error(`Unable to remove ${props.row.original.principal.name} from ${props.row.original.name}`)
-              console.error(`Unable to remove ${props.row.original.principal.name} from ${props.row.original.name}`, err)
+                toast.error(`Unable to remove ${props.row.original.name} from ${props.row.original.group.name}`)
+                console.error(`Unable to remove ${props.row.original.name} from ${props.row.original.group.name}`, err)
             })
         }
     });

@@ -5,6 +5,7 @@
 <template>
   <SheetContent v-if="principal" class="gap-6 flex flex-col overflow-auto">
     <SheetHeader>
+      <SheetTitle>{{ principal.class.name ?? "Principal" }}</SheetTitle>
       <SheetTitle>{{principal.name}}</SheetTitle>
       <SheetDescription>
         {{principal.kerberos}}
@@ -19,7 +20,7 @@
           <TabsTrigger value="groups">
             Groups
           </TabsTrigger>
-          <TabsTrigger disabled value="permissions">
+          <TabsTrigger value="permissions">
             Permissions
           </TabsTrigger>
           <TabsTrigger value="effective">
@@ -27,13 +28,13 @@
           </TabsTrigger>
         </TabsList>
         <TabsContent value="groups">
-          <GroupsTab :principal/>
+          <GroupsTab :principal @objectClick="e => $emit('objectClick', e)" />
         </TabsContent>
         <TabsContent value="permissions">
-          Permissions
+          <PermissionsTab :principal @objectClick="e => $emit('objectClick', e)" />
         </TabsContent>
         <TabsContent value="effective">
-          <EffectivePermissionsTab :principal/>
+          <EffectivePermissionsTab :principal @objectClick="e => $emit('objectClick', e)" />
         </TabsContent>
       </Tabs>
     </div>
@@ -45,12 +46,16 @@ import { SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@compon
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import EffectivePermissionsTab from './EffectivePermissionsTab.vue'
 import GroupsTab from './GroupsTab.vue'
+import PermissionsTab from './PermissionsTab.vue'
+import MembersTab from "@pages/AccessControl/Groups/MembersTab.vue";
 
 export default {
-
   name: 'PrincipalManagementSidebar',
 
+  emits: ['objectClick'],
+
   components: {
+    MembersTab,
     SheetHeader,
     SheetTitle,
     SheetContent,
@@ -61,6 +66,7 @@ export default {
     TabsContent,
     EffectivePermissionsTab,
     GroupsTab,
+    PermissionsTab,
   },
 
   props: {

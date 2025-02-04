@@ -8,13 +8,13 @@
         property: 'name',
         options: filterOptions.names,
       }, {
-        name: 'Principal',
-        property: 'kerberos',
-        options: filterOptions.principals,
-      }, {
         name: 'Account Type',
         property: 'class',
         options: filterOptions.class,
+      }, {
+        name: 'Principal',
+        property: 'kerberos',
+        options: filterOptions.principals,
       }, {
         name: 'UUID',
         property: 'uuid',

@@ -6,24 +6,20 @@ import type {ColumnDef} from '@tanstack/vue-table'
 import {h} from 'vue'
 
 import DataTableColumnHeader from '@/components/ui/data-table/DataTableColumnHeader.vue'
-import MembersDropdown from './MembersDropdown.vue'
+import GroupDropdown from './GroupDropdown.vue'
 
-export interface Principal {
+export interface Group {
     uuid: string
     name: string
-    kerberos: string
-    group: {
-        uuid: string
-        name: string
-    }
+    members: string[]
 }
 
-export const columns: ColumnDef<Principal>[] = [
+export const columns: ColumnDef<Group>[] = [
     {
         accessorKey: 'name',
         header: ({column}) => h(DataTableColumnHeader, {
             column,
-            title: 'Name'
+            title: 'Group Name'
         }),
 
         cell: ({row}) => {
@@ -49,5 +45,5 @@ export const columns: ColumnDef<Principal>[] = [
     },
     {
         id: 'actions',
-        cell: ({row}) => h(MembersDropdown, {row}),
+        cell: ({row}) => h(GroupDropdown, {row}),
     }]

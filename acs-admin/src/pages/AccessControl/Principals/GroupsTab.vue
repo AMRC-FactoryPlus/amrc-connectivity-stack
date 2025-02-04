@@ -4,7 +4,7 @@
 
 <template>
   <Skeleton v-if="g.loading || loading" v-for="i in 10" class="h-16 rounded-lg mb-2"/>
-  <DataTable v-else :data="this.groups" :columns="columns" :filters="[]">
+  <DataTable v-else :data="this.groups" :columns="columns" :filters="[]" @row-click="e => $emit('objectClick', e)">
     <template #toolbar-left>
       <Alert class="mr-6">
         <div class="flex items-start gap-3">
@@ -18,6 +18,20 @@
         </div>
       </Alert>
     </template>
+    <template #below-toolbar>
+      <ObjectSelector
+          v-model="groupsToAddTo"
+          :store-data="g.data.filter(group => !group.members.includes(principal.uuid))"
+          title="Select Groups"
+          subtitle="Select groups which which user should be added to"
+          detail-header="UUID"
+          detail-key="uuid"
+          title-header="Name"
+          title-key="name"
+      >
+        <Button>Add to Group</Button>
+      </ObjectSelector>
+    </template>
   </DataTable>
 </template>
 
@@ -27,21 +41,41 @@ import { Skeleton } from '@components/ui/skeleton/index.js'
 import { columns } from './groupColumns.ts'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { useGroupStore } from '@store/useGroupStore.js'
+import {Button} from "@components/ui/button/index.js";
+import {Dialog, DialogFooter, DialogHeader, DialogTrigger, DialogClose, DialogContent, DialogTitle} from "@components/ui/dialog/index.js";
+import {Input} from "@components/ui/input/index.js";
+import {toast} from "vue-sonner";
+import {Label} from "@components/ui/label/index.js";
+import {useServiceClientStore} from "@store/serviceClientStore.js";
+import {defineAsyncComponent} from "vue";
 
 export default {
   setup () {
     return {
       columns,
       g: useGroupStore(),
+      s: useServiceClientStore()
     }
   },
 
+  provide () {
+    return {
+      groupMembershipUpdated: this.updateData
+    }
+  },
+
+  emits: ['objectClick'],
+
   components: {
+    Label,
+    DialogHeader, Input, DialogFooter, Dialog, Button,
+    DialogTrigger, DialogClose, DialogContent, DialogTitle,
     DataTable,
     Skeleton,
     Alert,
     AlertTitle,
     AlertDescription,
+    ObjectSelector: defineAsyncComponent(() => import('@components/ObjectSelector/ObjectSelector.vue')),
   },
 
   props: {
@@ -49,6 +83,36 @@ export default {
       type: Object,
       required: true,
     },
+  },
+
+  watch: {
+    groupsToAddTo: async function(val, oldVal) {
+      if (!val.length) {
+        return
+      }
+
+      for (const group of val) {
+        await this.addToGroup(group.uuid)
+      }
+      await this.updateData()
+    }
+  },
+
+  methods: {
+    async addToGroup (groupUuid) {
+      try {
+        await this.s.client.Auth.add_to_group(groupUuid, this.principal.uuid)
+        toast.success(`${this.principal.name} has been added to ${groupUuid}`)
+      } catch (err) {
+        toast.error(`Unable to add ${this.principal.name} to ${groupUuid}`)
+        console.error(`Unable to add ${this.principal.name} to ${groupUuid}`, err)
+      }
+    },
+    async updateData() {
+      this.s.client.Fetch.cache = "reload"
+      await this.g.fetch()
+      this.s.client.Fetch.cache = "default"
+    }
   },
 
   computed: {
@@ -61,6 +125,8 @@ export default {
 
       return this.g.data.filter(group => {
         return group.members.includes(this.principal.uuid)
+      }).map(group => {
+        return { ...group, principal: this.principal }
       })
     },
   },
@@ -68,6 +134,7 @@ export default {
   data () {
     return {
       loading: false,
+      groupsToAddTo: []
     }
   },
 

@@ -21,6 +21,7 @@
     <template #below-toolbar>
       <ObjectSelector
           v-model="permissionsToAdd"
+          v-model:open="isPermissionSelectorOpen"
           :store-data="p.data"
           title="Select Permissions"
           subtitle="Select permissions which the principal should be granted, targets can be selected next"
@@ -47,7 +48,7 @@
       title-key="name"
   >
     <template #actions>
-      PLACEHOLDER
+      <Button @click="isTargetSelectorOpen = false; isPermissionSelectorOpen = true"><i class="fa-solid fa-arrow-left-long"></i> &nbsp; Return to Permissions</Button>
     </template>
   </ObjectSelector>
 </template>
@@ -214,6 +215,7 @@ export default {
       permissions: [],
       permissionsToAdd: [],
       targetsToAdd: [],
+      isPermissionSelectorOpen: false,
       isTargetSelectorOpen: false,
     }
   },

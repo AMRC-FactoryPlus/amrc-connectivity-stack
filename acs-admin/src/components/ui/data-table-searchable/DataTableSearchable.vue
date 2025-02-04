@@ -23,6 +23,7 @@ interface DataTableProps<T> {
     limitHeight: boolean,
     filters: { name: string; property: string }[]
     defaultSort?: SortingState,
+    selectedObjects: [],
     empty?: string
 }
 
@@ -69,6 +70,13 @@ const table = useVueTable({
     },
 })
 
+const existingSelection = {}
+props.selectedObjects.forEach(s => {
+  existingSelection[s.metaRowId] = true
+})
+
+valueUpdater(existingSelection, rowSelection)
+
 const limitHeight = props.limitHeight
 </script>
 
@@ -82,7 +90,7 @@ const limitHeight = props.limitHeight
           @update:model-value="table.getColumn(props.searchKey)?.setFilterValue($event)"
       />
       <div>
-        <slot :selected-objects="table.getSelectedRowModel().rows.map(r => r.original)"></slot>
+        <slot :selected-objects="table.getSelectedRowModel().rows.map(r => {return {...r.original, metaRowId: r.id}})"></slot>
       </div>
     </div>
     <div class="rounded-md border" :class="{'max-h-[50vh] overflow-auto': limitHeight}">

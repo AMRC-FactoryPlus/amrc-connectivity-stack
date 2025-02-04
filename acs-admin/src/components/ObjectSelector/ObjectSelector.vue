@@ -9,19 +9,13 @@
     </DialogTrigger>
     <DialogContent class="sm:max-w-[80vw]">
       <DialogHeader>
-        <VisuallyHidden>
-          <DialogTitle>Hello</DialogTitle>
-        </VisuallyHidden>
-        <VisuallyHidden>
-          <DialogDescription></DialogDescription>
-        </VisuallyHidden>
         <div class="flex flex-col">
-          <h1 class="font-semibold">{{title}}</h1>
-          <h3 class="text-xs text-gray-400 -mt-0.5">{{subtitle}}</h3>
+          <DialogTitle>{{title}}</DialogTitle>
+          <DialogDescription>{{subtitle}}</DialogDescription>
         </div>
       </DialogHeader>
       <div class="flex flex-col justify-center gap-6 overflow-auto flex-1 fix-inset">
-        <DataTableSearchable :selectedObjects="modelValue" v-if="columns" :data="storeData" :search-key="titleKey" :columns="columns" :limit-height="true" :filters="[]">
+        <DataTableSearchable :selected-objects="modelValue" v-if="columns" :data="storeData" :search-key="titleKey" :columns="columns" :limit-height="true" :filters="[]">
           <template #default="slotProps">
             <div class="flex items-center justify-center gap-2">
               <slot name="actions"></slot>

@@ -15,6 +15,7 @@ export const ACS = {
     },
     App: {
         SchemaIcon:         "65c0ccba-151d-48d3-97b4-d0026a811900",
+        MQTTPermTemplate:   "1266ddf1-156c-4266-9808-d6949418b185",
     },
     /* XXX These should probably be deployment-specific */
     Group: {

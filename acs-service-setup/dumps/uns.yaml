@@ -7,6 +7,8 @@ service: !u UUIDs.Service.ConfigDB
 version: 1
 overwrite: true
 objects:
+  !u UUIDs.Class.App:
+    - !u ACS.App.MQTTPermTemplate
   !u ACS.Class.Permission:
     - !u ACS.Perm.MQTT.WriteToEntireUNS
     - !u ACS.Perm.MQTT.ReadEntireUNS
@@ -19,7 +21,7 @@ configs:
     !u ACS.Perm.MQTT.ReadEntireUNS: { name: "MQTT: Read entire UNS" }
     !u ACS.Group.SparkplugIngesters: { name: "Sparkplug Ingesters" }
     !u ACS.Group.HistorianUNS: { name: "Historian UNS" }
-  !u UUIDs.App.MQTTPermissionTemplate:
+  !u ACS.App.MQTTPermTemplate:
     !u ACS.Perm.MQTT.WriteToEntireUNS:
       UNS/v1/#: w
     !u ACS.Perm.MQTT.ReadEntireUNS:

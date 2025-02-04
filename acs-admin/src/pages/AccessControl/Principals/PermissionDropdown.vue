@@ -89,13 +89,13 @@ function handleDelete() {
       <DropdownMenuGroup>
         <DropdownMenuItem @click="manage(props.row.original.permission)" class="cursor-pointer">
           <div class="flex items-center justify-center gap-2">
-            <i class="fa-solid fa-fw fa-tag"></i>
+            <i class="fa-solid fa-fw fa-pencil"></i>
             Manage Permission
           </div>
         </DropdownMenuItem>
         <DropdownMenuItem v-if="props.row.original.target.uuid !== UUIDs.Special.Null" @click="manage(props.row.original.target)" class="cursor-pointer">
           <div class="flex items-center justify-center gap-2">
-            <i class="fa-solid fa-fw fa-tag"></i>
+            <i class="fa-solid fa-fw fa-pencil"></i>
             Manage Target
           </div>
         </DropdownMenuItem>

@@ -6,6 +6,7 @@ import type {ColumnDef} from '@tanstack/vue-table'
 import {h} from 'vue'
 import {useServiceClientStore} from "@store/serviceClientStore.js";
 import {usePrincipalStore} from "@store/usePrincipalStore.js"
+import {useDialog} from '@/composables/useDialog';
 
 import DataTableColumnHeader from '@/components/ui/data-table/DataTableColumnHeader.vue'
 import {toast} from "vue-sonner";
@@ -78,17 +79,22 @@ export const columns: ColumnDef<PrincipalMapping>[] = [{
     cell: ({row}) => {
         return h('div', {onClick: async (e) => {
             e.stopPropagation()
-            if (confirm(`Are you sure you want to delete the principal mapping for ${row.getValue('uuid')}`)) {
-                try {
-                    await useServiceClientStore().client.Auth.delete_principal(row.getValue('uuid'))
-                    toast.success(`${row.getValue('uuid')} has been deleted`)
-                    useServiceClientStore().client.Fetch.cache = "reload"
-                    await usePrincipalStore().fetch()
-                    useServiceClientStore().client.Fetch.cache = "default"
-                } catch (err) {
-                    toast.error(`Unable to delete ${row.getValue('uuid')}`)
+            useDialog({
+                title: 'Remove Principal Mapping?',
+                message: `Are you sure you want to delete the principal mapping for ${row.getValue('uuid')}`,
+                confirmText: 'Remove',
+                onConfirm: async () => {
+                    try {
+                        await useServiceClientStore().client.Auth.delete_principal(row.getValue('uuid'))
+                        toast.success(`${row.getValue('uuid')} has been deleted`)
+                        useServiceClientStore().client.Fetch.cache = "reload"
+                        await usePrincipalStore().fetch()
+                        useServiceClientStore().client.Fetch.cache = "default"
+                    } catch (err) {
+                        toast.error(`Unable to delete ${row.getValue('uuid')}`)
+                    }
                 }
-            }
+            });
         }, class: ''}, [
             h('i', {class: 'fa-solid fa-fw fa-trash text-red-500'})
         ])

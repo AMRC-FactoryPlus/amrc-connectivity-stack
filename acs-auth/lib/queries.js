@@ -103,7 +103,7 @@ export default class Queries {
                         left join group_members perm on perm.parent = a.permission
                         left join group_members targ on targ.parent = a.target),
                 full_acl as (
-                    select u.id principal, a.permission, 
+                    select u.id princid, a.principal, a.permission, 
                         case a.target 
                             when '5855a1cc-46d8-4b16-84f8-ab3916ecb230'::uuid
                                 then a.principal
@@ -114,7 +114,7 @@ export default class Queries {
             select a.principal, a.permission, a.target
             from full_acl a
                 left join group_members g on g.child = a.permission
-            where a.principal = $1 and g.parent = $2
+            where a.princid = $1 and g.parent = $2
         `, [princ_id, permission]);
 
         return dbr.rows;

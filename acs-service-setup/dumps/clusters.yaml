@@ -342,10 +342,7 @@ configs:
               name: self-link
 ---
 service: !u UUIDs.Service.Authentication
-version: 1
-# This grants permissions in terms of Service Requirement UUIDs. These
-# need to be populated as groups in the Auth service with the
-# appropriate objects.
+version: 2
 aces:
   - principal: !u Clusters.Requirement.ServiceAccount
     permission: !u UUIDs.Permission.Directory.AdvertiseService 
@@ -354,6 +351,7 @@ aces:
   - principal: !u Clusters.Requirement.ServiceAccount
     permission: !u UUIDs.Permission.Auth.ReadACL
     target: !u Clusters.Perm.All
+    plural: true
 
   # XXX This is nearly root-equivalent.
   - principal: !u Clusters.Requirement.ServiceAccount
@@ -377,6 +375,7 @@ aces:
   # XXX This should be per-deployment but it's not clear how to acheive
   # that. The notify/v1 proposal would dynamically grant Sparkplug
   # permissions based on some other set of change-notify permissions.
+  # XXX The cluster-manager should use notify/v2 instead.
   - principal: !u Clusters.Requirement.ServiceAccount
     permission: !u ACS.Role.EdgeNodeConsumer
     target: !u ACS.Device.ConfigDB
@@ -432,10 +431,14 @@ aces:
   - principal: !u Clusters.Requirement.ServiceAccount
     permission: !u Git.Perm.Pull
     target: !u Clusters.Requirement.EdgeRepos
+    plural: true
   - principal: !u Clusters.Requirement.ServiceAccount
     permission: !u Git.Perm.Push
     target: !u Clusters.Requirement.EdgeRepos
+    plural: true
 
+# XXX Do we still need this? KrbKeys sealed to edge clusters have been
+# replaced with krbkeys generated on the edge.
   - principal: !u ACS.ServiceAccount.KrbKeys
     permission: !u Clusters.Perm.Secrets
     target: !u UUIDs.Special.Null

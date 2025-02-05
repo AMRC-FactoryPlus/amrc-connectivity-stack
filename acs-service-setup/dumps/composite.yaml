@@ -35,8 +35,9 @@ objects:
         - !u UUIDs.Permission.CmdEsc.Rebirth
 ---
 service: !u UUIDs.Service.Authentication
-version: 1
+version: 2
 aces:
+# XXX These should be replaced with individual grants.
   - principal: !u ACS.ServiceAccount.CmdEsc
     permission: !u ACS.Perm.Composite.CmdEsc
     target: !u UUIDs.Special.Null

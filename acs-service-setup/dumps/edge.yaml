@@ -31,7 +31,7 @@ objects:
     !u Edge.App.Deployment:         { name: "Edge deployment" }
 ---
 service: !u UUIDs.Service.Authentication
-version: 1
+version: 2
 aces:
   - principal: !u ACS.Group.CentralMonitor
     permission: !u ACS.Role.EdgeNodeConsumer

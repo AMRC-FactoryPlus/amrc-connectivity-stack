@@ -42,7 +42,7 @@ configs:
       UNS/v1/#: rs
 ---
 service: !u UUIDs.Service.Authentication
-version: 1
+version: 2
 aces:
   - principal: !u UNS.Group.Reader
     permission: !u UNS.Perm.ReadEntireUNS

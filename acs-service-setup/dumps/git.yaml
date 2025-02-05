@@ -40,7 +40,7 @@ configs:
         path: { type: string }
 ---
 service: !u UUIDs.Service.Authentication
-version: 1
+version: 2
 aces:
   - principal: !u Git.Requirement.ServiceAccount
     permission: !u UUIDs.Permission.Directory.AdvertiseService
@@ -49,6 +49,7 @@ aces:
   - principal: !u Git.Requirement.ServiceAccount
     permission: !u UUIDs.Permission.Auth.ReadACL
     target: !u Git.Perm.All
+    plural: true
 
   - principal: !u Git.Requirement.ServiceAccount
     permission: !u UUIDs.Permission.ConfigDB.ReadConfig

@@ -33,8 +33,7 @@ objects:
     !u Edge.App.AgentConfig:      { name: "Edge Agent config" }
 ---
 service: !u UUIDs.Service.Authentication
-version: 1
-principals:
+version: 2
 aces:
   - principal: !u ACS.Group.SparkplugNode
     permission: !u ACS.Perm.MQTT.ParticipateAsNode

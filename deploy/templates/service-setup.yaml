@@ -106,7 +106,7 @@ metadata:
 rules:
   - apiGroups: [ "apps" ]
     resources: [ "deployments" ]
-    verbs: [ "get", "patch", "update" ]
+    verbs: [ "get", "patch", "update", "list", "watch" ]
 
 ---
 

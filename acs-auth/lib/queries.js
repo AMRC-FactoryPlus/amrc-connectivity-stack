@@ -252,25 +252,26 @@ export default class Queries {
 
     async principal_get_all () {
         const dbr = await this.query(`
-            select p.uuid, p.kerberos from principal p
+            select u.uuid, i.name kerberos
+            from identity i
+                join uuid u on u.id = i.principal
         `);
         return dbr.rows;
     }
 
-    async principal_list () {
-        const dbr = await this.query(`
-            select kerberos from principal 
-        `);
-        return dbr.rows.map(r => r.kerberos);
+    principal_list () {
+        return this.principal_get_all()
+            .then(rs => rs.map(r => r.kerberos));
     }
 
     async principal_add (princ) {
+        const id = await this.uuid_find(princ.uuid);
         const dbr = await this.query(`
-            insert into principal (uuid, kerberos)
-            values ($1, $2)
+            insert into identity (principal, kind, name)
+            values ($1, ${IDs.Kerberos}, $2)
             on conflict do nothing
             returning 1 ok
-        `, [princ.uuid, princ.kerberos]);
+        `, [id, princ.kerberos]);
         return dbr.rows[0]?.ok ? 204 : 409;
     }
 
@@ -286,8 +287,10 @@ export default class Queries {
 
     async principal_delete (uuid) {
         const dbr = await this.query(`
-            delete from principal
-            where uuid = $1
+            delete from identity i
+            using uuid u
+            where i.principal = u.id
+                and u.uuid = $1
             returning 1 ok
         `, [uuid]);
         return dbr.rows[0]?.ok ? 204 : 404;

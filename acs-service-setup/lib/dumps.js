@@ -15,6 +15,7 @@ import * as local_UUIDs from "./uuids.js";
 const Paths = new Map([
     [UUIDs.Service.Authentication,  "/authz/load"],
     [UUIDs.Service.ConfigDB,        "/v1/load"],
+    [UUIDs.Service.Directory,       "/v1/load"],
 ]);
 
 const UUID_SOURCES = { UUIDs, ...local_UUIDs };
@@ -39,15 +40,19 @@ const yamlOpts = {
     ],
 };
 
-export async function load_yaml (f) {
-    const y = await fsp.readFile(`dumps/${f}`, { encoding: "utf8" });
-    const ds = yaml.parseAllDocuments(y, yamlOpts)
-        .map(d => {
-            if (d.errors.length)
-                throw new Error(`YAML error in ${f}`, { cause: d.errors });
-            return d.toJS();
+/**
+ * Parses and converts yaml file to JSON.
+ * @param file Yaml file to parse.
+ * @return {Promise<any[]>} An JSON array of the parsed yaml files.
+ */
+export async function load_yaml (file) {
+    const yamlString = await fsp.readFile(`dumps/${file}`, { encoding: "utf8" });
+    return yaml.parseAllDocuments(yamlString, yamlOpts)
+        .map(document => {
+            if (document.errors.length)
+                throw new Error(`YAML error in ${file}`, {cause: document.errors});
+            return document.toJS();
         });
-    return ds;
 }
 
 async function load_dump (fplus, dump) {
@@ -61,7 +66,6 @@ async function load_dump (fplus, dump) {
     const query = service == UUIDs.Service.ConfigDB
         ? { overwrite: dump.overwrite ? "true" : "false" }
         : {};
-
     const res = await fplus.Fetch.fetch({
         service, url, query,
         method:         "POST",
@@ -71,21 +75,22 @@ async function load_dump (fplus, dump) {
     return res.status;
 }
 
-export async function load_dumps (ss) {
-    const { fplus } = ss;
+export async function load_dumps (serviceSetup) {
+    // service client
+    const { fplus } = serviceSetup;
 
     const files = await fsp.readdir("dumps");
     files.sort();
 
-    for (const f of files) {
-        if (!f.endsWith(".yaml")) continue;
-        ss.log("== %s", f);
-        const ds = await load_yaml(f);
-        for (const d of ds) {
-            ss.log("=== %s", d.service);
-            const st = await load_dump(fplus, d);
-            if (st > 300)
-                throw new Error(`Service dump ${f} failed: ${st}`);
+    for (const file of files) {
+        if (!file.endsWith(".yaml")) continue;
+        serviceSetup.log("== %s", file);
+        const documents = await load_yaml(file);
+        for (const document of documents) {
+            serviceSetup.log("=== %s", document.service);
+            const status = await load_dump(fplus, document);
+            if (status > 300)
+                throw new Error(`Service dump ${file} failed: ${status}`);
         }
     }
 }

@@ -109,6 +109,10 @@ export default class Model extends Queries {
         await this.txn(q => q.record_death(time, addr));
     }
 
+    async load_dump() {
+        console.log("load dumps!")
+    }
+
     /* ALERTS */
 
     update_alerts (updates) {

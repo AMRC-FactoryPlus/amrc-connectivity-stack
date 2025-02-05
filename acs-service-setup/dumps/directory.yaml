@@ -53,3 +53,9 @@ groups:
     - !u Directory.Perm.ReadDeviceAlerts
     - !u Directory.Perm.ReadLinkRelation
     - !u Directory.Perm.ReadDeviceLinks
+
+---
+service: !u UUIDs.Service.Directory
+version: 1
+Register:
+  !u ACS.Service.Manager: "test"

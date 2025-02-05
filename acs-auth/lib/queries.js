@@ -322,6 +322,19 @@ export default class Queries {
         return 204;
     }
 
+    group_list () {
+        return this.q_list(`
+            select distinct parent from old_member
+        `);
+    }
+
+    group_get (group) {
+        return this.q_list(`
+            select child from old_member
+            where parent = $1
+        `, [group]);
+    }
+
     async effective_get (principal) {
         const dbr = await this.query(`
             select p.kerberos, a.principal, a.permission,

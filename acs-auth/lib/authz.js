@@ -70,6 +70,8 @@ export default class AuthZ {
          * reason for this not happening would be if groups were not
          * correctly registered in the ConfigDB. */
         api.get("/group/all", this.group_all.bind(this));
+        api.get("/group", this.group_get.bind(this));
+        api.get("/group/:group", this.group_get.bind(this));
         api.delete("/group/:group/:member", this.group_delete.bind(this));
 
         api.get("/effective", this.effective_list.bind(this));
@@ -205,6 +207,19 @@ export default class AuthZ {
 
         const groups = await this.model.group_all();
         return res.status(200).json(groups);
+    }
+
+    async group_get (req, res) {
+        const { group } = req.params;
+
+        const ok = await this.model.check_acl(
+            req.auth, Perm.Manage_Group, UUIDs.Null, false);
+        if (!ok) return res.status(403).end();
+
+        const rv = group
+            ? await this.model.group_get(group)
+            : await this.model.group_list();
+        return res.status(200).json(rv);
     }
 
     async group_delete(req, res) {

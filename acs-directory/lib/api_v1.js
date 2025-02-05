@@ -62,6 +62,8 @@ export default class API {
         api.get("/service", this.services.bind(this));
         api.get("/service/:service", this.service_providers.bind(this));
 
+        api.post("/load", this.load_dump.bind(this))
+
         api.route("/service/:service/advertisment")
             .get(this.service_advert_get.bind(this))
             .put(this.service_advert_put.bind(this));
@@ -97,6 +99,12 @@ export default class API {
     async search(req, res) {
         let list = await this.model.search(req.query);
         res.status(200).json(list);
+    }
+
+    async load_dump(req, res) {
+        console.log("called dump!");
+        await this.model.load_dump();
+        res.status(200).json({result: "It worked!"});
     }
 
     async devices(req, res) {

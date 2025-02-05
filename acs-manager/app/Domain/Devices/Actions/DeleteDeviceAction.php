@@ -1,7 +1,6 @@
 <?php
 /*
- *  Factory+ / AMRC Connectivity Stack (ACS) Manager component
- *  Copyright 2023 AMRC
+ * Copyright (c) University of Sheffield AMRC 2025.
  */
 
 namespace App\Domain\Devices\Actions;
@@ -11,6 +10,7 @@ use App\Domain\Nodes\Actions\UpdateEdgeAgentConfigurationForNodeAction;
 use App\Exceptions\ActionFailException;
 use App\Exceptions\ActionForbiddenException;
 use Illuminate\Support\Facades\Log;
+
 use function func_get_args;
 
 class DeleteDeviceAction
@@ -37,8 +37,6 @@ class DeleteDeviceAction
 
         $device->originMaps()->delete();
         $device->delete();
-
-        Log::info('Device deleted', ['device' => $device]);
 
         try {
             (new UpdateEdgeAgentConfigurationForNodeAction())->execute($device->node);

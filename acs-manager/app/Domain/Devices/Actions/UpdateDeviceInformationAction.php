@@ -1,7 +1,6 @@
 <?php
 /*
- *  Factory+ / AMRC Connectivity Stack (ACS) Manager component
- *  Copyright 2023 AMRC
+ * Copyright (c) University of Sheffield AMRC 2025.
  */
 
 namespace App\Domain\Devices\Actions;
@@ -20,7 +19,7 @@ class UpdateDeviceInformationAction
      * - The user must have access to the node that the device is attached to
      */
 
-    public function execute(Device $device, $deviceId, $pubInterval)
+    public function execute(Device $device, $deviceId, $pubInterval = 0)
     {
         if (! auth()->user()->administrator && ! auth()->user()->accessibleNodes->contains($device->node)) {
             throw new ActionFailException('You do not have permission to update this device.', 401);

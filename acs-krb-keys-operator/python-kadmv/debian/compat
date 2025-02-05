@@ -1,0 +1,14 @@
+Source: python-kadmv
+Section: python
+Priority: extra
+Maintainer: Russell Jancewicz <russell.jancewicz@gmail.com>
+Uploaders: xianglei <xianglei@horseman@163.com>
+Build-Depends: debhelper (>= 9), dh-python, python-all, python-dev
+               bison, krb5-multidev
+Standards-Version: 0.1.4
+
+Package: python-kadmv
+Architecture: all
+Depends: python, ${misc:Depends}, libkadm5clnt-mit9, libkrb5-3
+Description: Python module for kerberos admin (kadm5)
+  .

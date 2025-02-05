@@ -5,17 +5,17 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   namespace: {{ .Release.Namespace }}
-  name: service-setup
-#  annotations:
-#    helm.sh/hook: post-install, post-upgrade
+  # Give the job a random id so helm reruns it on helm upgrade.
+  name: service-setup-{{ randAlphaNum 8 | lower }}
 spec:
   backoffLimit: 9999
   template:
     spec:
+      serviceAccountName: service-setup
       restartPolicy: OnFailure
       volumes:
         - name: git-checkouts
-          emptyDir:
+          emptyDir: { }
       initContainers:
         - name: service-setup
 {{ include "amrc-connectivity-stack.image" (list . .Values.serviceSetup) | indent 10 }}
@@ -65,7 +65,60 @@ spec:
             - name: GIT_REPO_PATH
               value: {{ .Values.edgeHelm.repoPath }}
       containers:
-        # We need a do-nothing container to keep k8s happy
-        - name: done
-{{ include "amrc-connectivity-stack.image" (list . .Values.shell) | indent 10 }}
-          command: ["/bin/true"]
+        - name: restart-mqtt
+          image: bitnami/kubectl:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              DEPLOYMENT_NAME=mqtt
+              NAMESPACE={{.Release.Namespace}}
+
+              echo "Attempting to restart deployment: $DEPLOYMENT_NAME"
+
+              # Try to rollout restart the deployment
+              kubectl rollout restart deployment/$DEPLOYMENT_NAME -n $NAMESPACE
+
+              # Wait and check rollout status
+              if kubectl rollout status deployment/$DEPLOYMENT_NAME -n $NAMESPACE --timeout=60s; then
+                echo "Deployment restarted successfully!"
+                exit 0  # Exit successfully, no pod restart needed
+              else
+                echo "Deployment restart failed, retrying..."
+                exit 1  # Exit with error, pod will restart
+              fi
+---
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: service-setup
+  namespace: {{ .Release.Namespace }}
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: service-setup-role
+  namespace: {{ .Release.Namespace }}
+rules:
+  - apiGroups: [ "apps" ]
+    resources: [ "deployments" ]
+    verbs: [ "get", "patch", "update" ]
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: service-setup-binding
+  namespace: {{ .Release.Namespace }}
+subjects:
+  - kind: ServiceAccount
+    name: service-setup
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: Role
+  name: service-setup-role
+  apiGroup: rbac.authorization.k8s.io

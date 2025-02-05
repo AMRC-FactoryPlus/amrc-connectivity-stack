@@ -137,6 +137,13 @@ export async function setup_helm (ss) {
                 uuid:       "{{uuid}}",
                 hostname:   "{{hostname}}",
         } }],
+        ["mqtt", "Edge MQTT broker", {
+            chart:  "mqtt-broker",
+            values: {
+                name:       "{{name}}",
+                uuid:       "{{uuid}}",
+                hostname:   "{{hostname}}",
+        } }],
     );
 
     return await conf.finish();

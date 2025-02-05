@@ -2,6 +2,7 @@ service: !u UUIDs.Service.ConfigDB
 version: 1
 classes:
   - !u Clusters.Class.HelmChart
+  - !u ACS.Class.EdgeDeployment
 objects:
   !u UUIDs.Class.App:
     - !u Clusters.App.HelmRelease
@@ -11,6 +12,7 @@ objects:
 configs:
   !u UUIDs.App.Info:
     !u Clusters.Class.HelmChart:    { name: "Helm chart" }
+    !u ACS.Class.EdgeDeployment:    { name: "Edge deployment" }
     !u Clusters.App.HelmRelease:    { name: "HelmRelease template" }
     !u Clusters.App.HelmTemplate:   { name: "Helm chart template" }
   !u UUIDs.App.ConfigSchema:

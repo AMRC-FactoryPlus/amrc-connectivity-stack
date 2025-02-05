@@ -84,17 +84,31 @@ class Keytab (KeyOps):
 
             principals = set(str(kte.principal) for kte in entries)
             for princ in principals:
-                mine    = [kte for kte in entries if str(kte.principal) == princ]
-                ckvno   = max((kte.kvno for kte in mine), default=-1)
-                atrisk  = [kte for kte in mine if kte.kvno < ckvno]
-                expired = [kte for kte in atrisk if kte.timestamp < since]
+                # Find keytab entries for current principle.
+                mine   = [kte for kte in entries if str(kte.principal) == princ]
+                # Sort entries by KVNO, then timestamp (oldest to newest).
+                mine.sort(key=lambda kte: (kte.kvno, kte.timestamp))
+                # For each KVNO, find the creation timestamp of the next highest KVNO.
+                # If no higher KVNO exists, the key is "active"
+                replacement_times = {
+                    kte.kvno: min(
+                        (next_kte.timestamp for next_kte in mine if next_kte.kvno > kte.kvno),
+                        default=float('inf')
+                    )
+                    for kte in mine
+                }
+                expired = [kte for kte in mine if replacement_times[kte.kvno] < since]
 
                 for kte in expired:
                     log(f"Removing {kte.principal} kvno {kte.kvno}")
                     krb5.kt_remove_entry(ctx, kth, kte)
 
                 changed |= bool(expired)
-                more |= len(expired) < len(atrisk)
+                # Set to True if at least one old key exists that has a replacement but isn't expired yet.
+                more |= any(
+                    float('inf') > replacement_times[kte.kvno] >= since
+                    for kte in mine
+                )
 
         return KeyOpStatus(
             secret=kt.contents if changed else None,

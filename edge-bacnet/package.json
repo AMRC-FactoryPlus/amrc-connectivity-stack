@@ -14,7 +14,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "node-bacnet": "^0.2.4",
-    "@amrc-factoryplus/edge-driver": "^0.0.4"
+    "@amrc-factoryplus/edge-driver": "^0.0.5",
+    "node-bacnet": "^0.2.4"
   }
 }

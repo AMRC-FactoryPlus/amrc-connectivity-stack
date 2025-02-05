@@ -1,0 +1,38 @@
+@startuml
+
+actor "Admin user" as admin
+actor "Consumer" as consumer
+node "Device" as device
+
+rectangle "Central cluster" {
+    agent "Manager" as manager
+    agent "MQTT" as mqtt
+    agent "Auth" as auth
+
+    database "ConfigDB" as configdb {
+        file "Edge deployment" as deployment
+        file "Edge Agent config" as config
+    }
+}
+
+rectangle "Edge cluster" {
+    agent "Edge Sync" as sync
+    agent "Edge Agent" as agent
+}
+
+admin -> manager        : [1]
+manager ==> deployment  : [2]
+manager ==> config      : [2]
+
+deployment --> sync     : [3]
+sync => agent           : [3]
+config --> agent        : [4]
+
+device -> agent         : [5]
+agent -> mqtt           : [5]
+
+admin --> auth          : [6]
+auth --> mqtt           : [6]
+mqtt --> consumer     : [6]
+
+@enduml

@@ -5,7 +5,7 @@
 
 export const ACS = {
     Class: {
-        ClientRole:         "1c567e3c-5519-4418-8682-6086f22fbc13",
+        EdgeDeployment:     "e6f6a6e6-f6b2-422a-bc86-2dcb417a362a",
     },
     App: {
         SchemaIcon:         "65c0ccba-151d-48d3-97b4-d0026a811900",

@@ -1,19 +1,13 @@
 import process from "process";
 import util from "util";
 
-import Ajv from "ajv/dist/2020.js";
-import ajv_formats from "ajv-formats";
-
 import { UUIDs } from "@amrc-factoryplus/service-client";
 
 import { read_all_files, parse_yaml } from "../lib/dumps.js";
 
-const ajv = new Ajv();
-ajv_formats(ajv);
-
 function load_schema (dir) {
     return import(`../../${dir}/lib/dump-schema.js`)
-        .then(sch => ajv.compile(sch.dump_schema))
+        .then(sch => sch.dump_schema)
         .catch(e => {
             console.log("!!! Cannot load dump schema for %s: %s", dir, e);
             return () => true;

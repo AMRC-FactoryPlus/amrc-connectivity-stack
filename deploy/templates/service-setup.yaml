@@ -39,6 +39,8 @@ spec:
                   key: password
             - name: VERBOSE
               value: ALL,!token,!service
+            - name: NAMESPACE
+              value: {{.Release.Namespace}}
             - name: GIT_CHECKOUTS
               value: /data
             - name: SS_CONFIG

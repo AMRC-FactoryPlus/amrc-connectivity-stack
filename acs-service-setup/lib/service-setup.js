@@ -16,6 +16,7 @@ export class ServiceSetup {
         this.config = JSON.parse(opts.env.SS_CONFIG);
         this.acs_config = JSON.parse(opts.env.ACS_CONFIG);
         this.checkouts = opts.env.GIT_CHECKOUTS;
+        this.namespace = opts.env.NAMESPACE;
 
         this.fplus = new ServiceClient({ env: opts.env });
         this.log = this.fplus.debug.bound("setup");

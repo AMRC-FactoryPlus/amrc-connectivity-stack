@@ -41,6 +41,21 @@ const yamlOpts = {
 };
 
 /**
+ * Uses the base path from the yaml file to build the cluster URL.
+ * @param serviceUrls Directory json object parsed from the input yaml.
+ * @param serviceSetup Instance of service setup.
+ * @return {*} The directory JSON object containing the build URLs.
+ */
+function buildURLs (serviceUrls, serviceSetup) {
+    const resolvedUrls = {};
+    Object.entries(serviceUrls.urls).forEach(([serviceId, baseUrl])=> {
+        resolvedUrls[serviceId] = `http://${baseUrl.base}.${serviceSetup.namespace}.svc.cluster.local`
+    })
+    serviceUrls.urls = resolvedUrls;
+    return serviceUrls;
+}
+
+/**
  * Parses and converts yaml file to JSON.
  * @param file Yaml file to parse.
  * @return {Promise<any[]>} An JSON array of the parsed yaml files.
@@ -86,8 +101,12 @@ export async function load_dumps (serviceSetup) {
         if (!file.endsWith(".yaml")) continue;
         serviceSetup.log("== %s", file);
         const documents = await load_yaml(file);
-        for (const document of documents) {
+        for (let document of documents) {
             serviceSetup.log("=== %s", document.service);
+            // If we have directory services, resolve the url with the correct deployment namespace.
+            document = document.service === UUIDs.Service.Directory
+                ? buildURLs(document, serviceSetup)
+                : document
             const status = await load_dump(fplus, document);
             if (status > 300)
                 throw new Error(`Service dump ${file} failed: ${status}`);

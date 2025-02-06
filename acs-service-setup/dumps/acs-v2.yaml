@@ -1,0 +1,279 @@
+# These are migrated in from ../deploy/templates/dumps.yaml, from the
+# original ACS v2 release. They need picking through and separating out.
+# REQUIRE: auth
+---
+service: !u UUIDs.Service.ConfigDB
+version: 2
+objects:
+  !u UUIDs.Class.App:
+    !u UUIDs.App.SparkplugAddress:    { name: "Sparkplug address" }
+    !u MQTT.App.PermTemplate:         { name: "MQTT permission template" }
+    !u CmdEsc.App.CmdDef:             { name: "Command definition" }
+
+  # XXX I think these should be classes, with the service accounts
+  # (representing the actual running services) as members. Or possibly
+  # the account should be a different object from the service (physical
+  # object) itself? There is already some confusion between the client
+  # and server sides of a service; e.g. the ConfigDB UUID is used for
+  # both the sv1configdb account and also to locate the Sparkplug
+  # service interface. The only other possibility I can see is that
+  # these service function UUIDs are names of some kind.
+  !u UUIDs.Class.Service:
+    !u UUIDs.Service.Directory:           { name: "Directory" }
+    !u UUIDs.Service.ConfigDB:            { name: "ConfigDB" }
+    !u UUIDs.Service.Authentication:      { name: "Authentication" }
+    !u UUIDs.Service.Command_Escalation:  { name: "Command escalation" }
+    !u UUIDs.Service.MQTT:                { name: "MQTT" }
+    !u UUIDs.Service.Git:                 { name: "Git hosting" }
+    !u UUIDs.Service.Clusters:            { name: "Cluster manager" }
+    !u ACS.Service.Manager:               { name: "Factory+ Manager" }
+
+  !u ACS.PermGroup.Auth:
+    !u Auth.Perm.ManageKerberos:      { name: "Manage Kerberos mappings" }
+    !u Auth.Perm.ReadEffective:       { name: "Read effective permissions" }
+    !u Auth.Perm.ManageACL:           { name: "Manage ACLs" }
+    !u Auth.Perm.ReadACL:             { name: "Read ACLs" }
+    !u Auth.Perm.ManageGroup:         { name: "Manage group" }
+    !u Auth.Perm.ReadKerberos:        { name: "Read Kerberos mappings" }
+
+  # Directory perms are in directory.yaml
+
+  !u ACS.PermGroup.ConfigDB:
+    !u ConfigDB.Perm.ReadConfig:      { name: "Read config for app" }
+    !u ConfigDB.Perm.WriteConfig:     { name: "Write config for app" }
+    !u ConfigDB.Perm.ManageAppSchema: { name: "Manage application schema" }
+    !u ConfigDB.Perm.ManageObjects:   { name: "Manage objects" }
+    !u ConfigDB.Perm.DeleteObjects:   { name: "Delete objects" }
+
+  !u ACS.PermGroup.MQTT:
+    !u MQTT.Perm.ReadNode:            { name: "Read Node" }
+    !u MQTT.Perm.SubscribeWholeNamespace:
+      name: "Subscribe to whole Sparkplug namespace"
+    !u MQTT.Perm.IssueCommands:       { name: "Issue CMDs" }
+    !u MQTT.Perm.PublishAllFromGroup: { name: "Publish all from Group" }
+    !u MQTT.Perm.ReadWholeNamespace:  { name: "Read whole Sparkplug namespace" }
+    !u MQTT.Perm.ReadAllStates:       { name: "Read all STATEs" }
+    !u MQTT.Perm.WriteGroupState:     { name: "Write Group STATE" }
+    !u MQTT.Perm.ParticipateAsNode:   { name: "Participate as Node" }
+    !u MQTT.Perm.WriteOwnState:       { name: "Write own STATE" }
+    !u MQTT.Perm.IssueGroupCommands:  { name: "Issue Group CMDs" }
+    !u MQTT.Perm.ReadOwnGroup:        { name: "Read own Group" }
+    !u MQTT.Perm.RepresentDevices:    { name: "Represent Devices" }
+    !u MQTT.Perm.ReadAllBirths:       { name: "Read all BIRTHs" }
+
+  !u ACS.PermGroup.CmdEsc:
+    !u CmdEsc.Perm.Rebirth:           { name: "Rebirth" }
+    !u CmdEsc.Perm.ReloadEdgeAgentConfig:
+      name: "Reload Edge Agent config"
+
+  # XXX These should be created dynamically by krbkeys. But there are
+  # some bootstrap issues, especially with KrbKeys itself.
+  !u Auth.Class.CentralService:
+    !u ACS.ServiceAccount.Auth:
+      name: "Authorisation"
+    !u ACS.ServiceAccount.CmdEsc:
+      name: "Command escalation"
+      memberOf:
+        - !u ACS.Group.SparkplugNode
+    !u ACS.ServiceAccount.ConfigDB:
+      name: "ConfigDB"
+      memberOf:
+        - !u ACS.Group.SparkplugNode
+    !u ACS.ServiceAccount.Directory:
+      name: "Directory"
+      memberOf:
+        - !u ACS.Group.SparkplugNode
+    !u ACS.ServiceAccount.KrbKeys:
+      name: "Kerberos keys operator"
+    !u ACS.ServiceAccount.Manager:
+      name: "Manager"
+    !u ACS.ServiceAccount.MQTT:
+      name: "MQTT broker"
+    !u ACS.ServiceAccount.Warehouse:
+      name: "Sparkplug historian ingester"
+
+configs:
+  !u MQTT.App.PermTemplate:
+    !u MQTT.Perm.ReadNode:
+      spBv1.0/%g/NDATA/%n: rs
+      spBv1.0/DDEATH/%n/+: rs
+      spBv1.0/%g/NBIRTH/%n: rs
+      spBv1.0/%g/NDEATH/%n: rs
+      spBv1.0/%g/DDATA/%n/+: rs
+      spBv1.0/%g/DBIRTH/%n/+: rs
+    !u MQTT.Perm.SubscribeWholeNamespace:
+      spBv1.0/#: s
+    !u MQTT.Perm.IssueCommands:
+      spBv1.0/+/NCMD/+: w
+      spBv1.0/+/DCMD/+/+: w
+    !u MQTT.Perm.PublishAllFromGroup:
+      spBv1.0/%g/#: w
+    !u MQTT.Perm.ReadWholeNamespace:
+      spBv1.0/#: rs
+    !u MQTT.Perm.ReadAllStates:
+      STATE/+: rs
+    !u MQTT.Perm.WriteGroupState:
+      STATE/%g: w
+    !u MQTT.Perm.ParticipateAsNode:
+      spBv1.0/%g/NDATA/%n: w
+      spBv1.0/%g/NBIRTH/%n: w
+      spBv1.0/%g/NCMD/%n/#: rs
+      spBv1.0/%g/NDEATH/%n: w
+    !u MQTT.Perm.WriteOwnState:
+      STATE/%n: w
+    !u MQTT.Perm.IssueGroupCommands:
+      spBv1.0/%g/NCMD/+: w
+      spBv1.0/%g/DCMD/+/+: w
+    !u MQTT.Perm.ReadOwnGroup:
+      spBv1.0/%g/#: rs
+    !u MQTT.Perm.RepresentDevices:
+      spBv1.0/%g/DCMD/%n/+: rs
+      spBv1.0/%g/DDATA/%n/+: w
+      spBv1.0/%g/DBIRTH/%n/+: w
+      spBv1.0/%g/DDEATH/%n/+: w
+    !u MQTT.Perm.ReadAllBirths:
+      spBv1.0/+/NBIRTH/+: rs
+      spBv1.0/+/DBIRTH/+/+: rs
+
+  !u CmdEsc.App.CmdDef:
+    !u CmdEsc.Perm.Rebirth:
+      - name: Node Control/Rebirth
+        type: Boolean
+      - name: Device Control/Rebirth
+        type: Boolean
+    !u CmdEsc.Perm.ReloadEdgeAgentConfig:
+      - name: Node Control/Reload Edge Agent Config
+        type: Boolean
+---
+service: !u UUIDs.Service.Authentication
+version: 2
+identities:
+  !u ACS.ServiceAccount.Directory:
+    kerberos: sv1directory
+  !u ACS.ServiceAccount.Auth:
+    kerberos: sv1auth
+  !u ACS.ServiceAccount.ConfigDB:
+    kerberos: sv1configdb
+  !u ACS.ServiceAccount.Manager:
+    kerberos: sv1manager
+  !u ACS.ServiceAccount.CmdEsc:
+    kerberos: sv1cmdesc
+  !u ACS.ServiceAccount.MQTT:
+    kerberos: sv1mqtt
+  !u ACS.ServiceAccount.Warehouse:
+    kerberos: sv1warehouse
+  !u ACS.ServiceAccount.KrbKeys:
+    kerberos: op1krbkeys
+grants:
+  - principal: !u ACS.ServiceAccount.Directory
+    permission: !u MQTT.Perm.ReadWholeNamespace
+    target: !u UUIDs.Special.Null
+  - principal: !u ACS.ServiceAccount.Directory
+    permission: !u UUIDs.Permission.Auth.ReadACL
+    target: !u ACS.PermGroup.Directory
+  - principal: !u ACS.ServiceAccount.Directory
+    permission: !u Auth.Perm.ReadKerberos
+    target: !u UUIDs.Special.Null
+  - principal: !u ACS.ServiceAccount.Directory
+    permission: !u UUIDs.Permission.CmdEsc.Rebirth
+    target: !u UUIDs.Special.Null
+
+  - principal: !u ACS.ServiceAccount.MQTT
+    permission: !u UUIDs.Permission.Auth.ReadACL
+    target: !u ACS.PermGroup.MQTT
+  - principal: !u ACS.ServiceAccount.MQTT
+    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
+    target: !u ACS.App.MQTTPermTemplate
+  - principal: !u ACS.ServiceAccount.MQTT
+    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
+    target: !u UUIDs.App.SparkplugAddress
+
+  - principal: !u ACS.ServiceAccount.ConfigDB
+    permission: !u UUIDs.Permission.Auth.ReadACL
+    target: !u ACS.PermGroup.ConfigDB
+
+  - principal: !u ACS.ServiceAccount.KrbKeys
+    permission: !u Auth.Perm.ReadKerberos
+    target: !u UUIDs.Special.Null
+  - principal: !u ACS.ServiceAccount.KrbKeys
+    permission: !u Auth.Perm.ManageKerberos
+    target: !u UUIDs.Special.Null
+  - principal: !u ACS.ServiceAccount.KrbKeys
+    permission: !u Auth.Perm.ManageACL
+    target: !u UUIDs.Special.Null
+  - principal: !u ACS.ServiceAccount.KrbKeys
+    permission: !u Auth.Perm.ManageGroup
+    target: !u UUIDs.Special.Null
+  - principal: !u ACS.ServiceAccount.KrbKeys
+    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
+    target: !u UUIDs.App.Info
+  - principal: !u ACS.ServiceAccount.KrbKeys
+    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
+    target: !u UUIDs.App.SparkplugAddress
+  - principal: !u ACS.ServiceAccount.KrbKeys
+    permission: !u ConfigDB.Perm.WriteConfig
+    target: !u UUIDs.App.Info
+  - principal: !u ACS.ServiceAccount.KrbKeys
+    permission: !u ConfigDB.Perm.WriteConfig
+    target: !u UUIDs.App.SparkplugAddress
+  - principal: !u ACS.ServiceAccount.KrbKeys
+    permission: !u ConfigDB.Perm.ManageObjects
+    target: !u UUIDs.Special.Null
+
+  - principal: !u ACS.ServiceAccount.Manager
+    permission: !u ConfigDB.Perm.ManageObjects
+    target: !u Clusters.Class.Cluster
+  - principal: !u ACS.ServiceAccount.Manager
+    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
+    target: !u UUIDs.App.ServiceConfig
+  - principal: !u ACS.ServiceAccount.Manager
+    permission: !u ConfigDB.Perm.ManageObjects
+    target: !u Auth.Class.EdgeAgent
+  - principal: !u ACS.ServiceAccount.Manager
+    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
+    target: !u UUIDs.App.Info
+  - principal: !u ACS.ServiceAccount.Manager
+    permission: !u ConfigDB.Perm.WriteConfig
+    target: !u UUIDs.App.Info
+  - principal: !u ACS.ServiceAccount.Manager
+    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
+    target: !u Clusters.App.EdgeStatus
+  - principal: !u ACS.ServiceAccount.Manager
+    permission: !u ConfigDB.Perm.WriteConfig
+    target: !u Edge.App.Deployment
+  - principal: !u ACS.ServiceAccount.Manager
+    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
+    target: !u Clusters.App.Cluster
+  - principal: !u ACS.ServiceAccount.Manager
+    permission: !u ConfigDB.Perm.WriteConfig
+    target: !u Clusters.App.Cluster
+  - principal: !u ACS.ServiceAccount.Manager
+    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
+    target: !u Clusters.App.HelmChart
+  - principal: !u ACS.ServiceAccount.Manager
+    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
+    target: !u UUIDs.App.ServiceConfig
+  - principal: !u ACS.ServiceAccount.Manager
+    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
+    target: !u Edge.App.AgentConfig
+  - principal: !u ACS.ServiceAccount.Manager
+    permission: !u ConfigDB.Perm.WriteConfig
+    target: !u Edge.App.AgentConfig
+  - principal: !u ACS.ServiceAccount.Manager
+    permission: !u ConfigDB.Perm.WriteConfig
+    target: !u UUIDs.App.SparkplugAddress
+  - principal: !u ACS.ServiceAccount.Manager
+    permission: !u Clusters.Perm.Clusters
+    target: !u UUIDs.Special.Null
+  - principal: !u ACS.ServiceAccount.CmdEsc
+    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
+    target: !u CmdEsc.App.CmdDef
+  - principal: !u ACS.ServiceAccount.CmdEsc
+    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
+    target: !u UUIDs.App.SparkplugAddress
+  - principal: !u ACS.ServiceAccount.CmdEsc
+    permission: !u UUIDs.Permission.Auth.ReadACL
+    target: !u ACS.PermGroup.CmdEsc
+  - principal: !u ACS.ServiceAccount.MQTT
+    permission: !u Directory.Perm.AdvertiseService
+    target: !u UUIDs.Service.MQTT

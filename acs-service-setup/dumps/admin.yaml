@@ -88,7 +88,7 @@ objects:
 ---
 service: !u UUIDs.Service.Authentication
 version: 2
-aces:
+grants:
   - principal: !u ACS.Group.Administrator
     permission: !u ACS.PermGroup.Auth
     target: !u UUIDs.Special.Null

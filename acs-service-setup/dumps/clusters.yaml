@@ -343,7 +343,7 @@ configs:
 ---
 service: !u UUIDs.Service.Authentication
 version: 2
-aces:
+grants:
   - principal: !u Clusters.Requirement.ServiceAccount
     permission: !u UUIDs.Permission.Directory.AdvertiseService 
     target: !u Clusters.Service.ClusterManager

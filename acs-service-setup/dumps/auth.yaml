@@ -89,10 +89,3 @@ objects:
       name: "MQTT"
       subclassOf:
         - !u UUIDs.Class.Permission
-
-# Composite permissions are still created in the legacy dumps for now.
-# I'm not sure how to handle them in v2 dumps as it isn't possible to
-# list their members. There's only actually one composite permission
-# that deserves the name: _Edge Node consumer_. _Edge Monitor for Agent_
-# is not used any more (we have one monitor per cluster) and the others
-# are always granted to Wildcard and should be multiple plain grants.

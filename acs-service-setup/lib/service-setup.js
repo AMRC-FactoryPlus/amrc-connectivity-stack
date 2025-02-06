@@ -11,6 +11,7 @@ import { load_dumps }           from "./dumps.js";
 import { fixups }               from "./fixups.js";
 import { setup_helm }           from "./helm.js";
 import { setup_manager }        from "./manager.js";
+import { service_sp_addrs }     from "./sp-addrs.js";
 
 export class ServiceSetup {
     constructor (opts) {
@@ -39,6 +40,9 @@ export class ServiceSetup {
 
         this.log("Loading service dump files");
         await load_dumps(this);
+
+        this.log("Setting legacy service Sparkplug addresses");
+        await service_sp_addrs(this);
 
         this.log("Migrating legacy Auth groups");
         await migrate_auth_groups(this);

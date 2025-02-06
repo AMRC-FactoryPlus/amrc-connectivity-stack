@@ -36,7 +36,7 @@ objects:
 ---
 service: !u UUIDs.Service.Authentication
 version: 2
-aces:
+grants:
 # XXX These should be replaced with individual grants.
   - principal: !u ACS.ServiceAccount.CmdEsc
     permission: !u ACS.Perm.Composite.CmdEsc

@@ -43,7 +43,7 @@ configs:
 ---
 service: !u UUIDs.Service.Authentication
 version: 2
-aces:
+grants:
   - principal: !u UNS.Group.Reader
     permission: !u UNS.Perm.ReadEntireUNS
     target: !u UUIDs.Special.Null

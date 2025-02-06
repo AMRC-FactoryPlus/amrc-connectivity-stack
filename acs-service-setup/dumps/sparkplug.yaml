@@ -34,7 +34,7 @@ objects:
 ---
 service: !u UUIDs.Service.Authentication
 version: 2
-aces:
+grants:
   - principal: !u ACS.Group.SparkplugNode
     permission: !u ACS.Perm.MQTT.ParticipateAsNode
     target: !u UUIDs.Special.Self

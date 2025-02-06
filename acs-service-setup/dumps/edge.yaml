@@ -32,7 +32,7 @@ objects:
 ---
 service: !u UUIDs.Service.Authentication
 version: 2
-aces:
+grants:
   - principal: !u ACS.Group.CentralMonitor
     permission: !u ACS.Role.EdgeNodeConsumer
     target: !u ACS.Device.ConfigDB

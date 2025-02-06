@@ -41,7 +41,7 @@ configs:
 ---
 service: !u UUIDs.Service.Authentication
 version: 2
-aces:
+grants:
   - principal: !u Git.Requirement.ServiceAccount
     permission: !u UUIDs.Permission.Directory.AdvertiseService
     target: !u Git.Service.Git

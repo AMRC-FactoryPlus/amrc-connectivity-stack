@@ -108,14 +108,17 @@ export default class Model extends Queries {
     /* The dump must be valid. We will get database errors (at best) if
      * it is not. */
     dump_load(dump) {
+        const grants = dump.grants ?? [];
+        const identities = dump.identities ?? {};
+
         const uuids = new Set([
-            ...dump.grants.map(g => g.principal),
-            ...dump.grants.map(g => g.permission),
-            ...dump.grants.map(g => g.target),
-            ...Object.keys(dump.identities),
+            ...grants.map(g => g.principal),
+            ...grants.map(g => g.permission),
+            ...grants.map(g => g.target),
+            ...Object.keys(identities),
         ]);
         const realm = this.realm;
-        const krbs = Object.entries(dump.identies)
+        const krbs = Object.entries(identities)
             .map(([uuid, { upn }]) => ({
                 uuid,
                 kerberos:   /@/.test(upn) ? upn : `${upn}@${realm}`,
@@ -155,7 +158,7 @@ export default class Model extends Queries {
                     join uuid p on p.uuid::text = g.g->>'permission'
                     join uuid t on p.uuid::text = g.g->>'target'
                 on conflict do nothing
-            `, [dump.grants]);
+            `, [grants]);
 
             return 204;
         });

@@ -22,6 +22,7 @@ export default class Model extends Queries {
         super(db.query.bind(db))
 
         this.debug = opts.debug;
+        this.log = opts.debug.bound("model");
 
         this.db = db;
         this.acl_cache_age = opts.acl_cache * 1000;
@@ -119,22 +120,24 @@ export default class Model extends Queries {
         ]);
         const realm = this.realm;
         const krbs = Object.entries(identities)
-            .map(([uuid, { upn }]) => ({
+            .map(([uuid, { kerberos: upn }]) => ({
                 uuid,
                 kerberos:   /@/.test(upn) ? upn : `${upn}@${realm}`,
             }));
         return this.txn(async q => {
+            this.log("Inserting UUIDs: %o", uuids);
             await q.query(`
                 insert into uuid (uuid)
                 select u.uuid
                 from unnest($1::uuid[]) u(uuid)
                 on conflict do nothing
-            `, [uuids]);
+            `, [[...uuids]]);
 
+            this.log("Inserting identities: %o", krbs);
             const idok = await q.query(`
                 insert into identity (principal, kind, name)
                 select u.id, 1, i.i->>'kerberos'
-                from jsonb_array_elements($1) i(i)
+                from unnest($1::jsonb[]) i(i)
                     join uuid u on u.uuid::text = i.i->>'uuid'
             `, [krbs])
                 .then(() => true)
@@ -149,14 +152,15 @@ export default class Model extends Queries {
              * new dumps clears old data from that source. Moving the
              * grants into the ConfigDB would make it easier to solve
              * this in general. */
+            this.log("Inserting grants: %o", grants);
             await q.query(`
-                insert into grant (principal, permission, target, plural)
+                insert into ace (principal, permission, target, plural)
                 select u.id, p.id, t.id, 
                     coalesce((g.g->'plural')::boolean, false)
-                from jsonb_array_elements($1) g(g)
+                from unnest($1::jsonb[]) g(g)
                     join uuid u on u.uuid::text = g.g->>'principal'
                     join uuid p on p.uuid::text = g.g->>'permission'
-                    join uuid t on p.uuid::text = g.g->>'target'
+                    join uuid t on t.uuid::text = g.g->>'target'
                 on conflict do nothing
             `, [grants]);
 

@@ -8,15 +8,22 @@ import { UUIDs } from "@amrc-factoryplus/service-client";
 
 import { read_all_files, parse_yaml } from "../lib/dumps.js";
 
-const { dump_schema } = await import("../../acs-configdb/lib/dump-schema.js")
-    .catch(e => null);
-if (!dump_schema)
-    console.log("!!! Cannot load ConfigDB dump schema");
-
 const ajv = new Ajv();
 ajv_formats(ajv);
 
-const cdb_validate = dump_schema ? ajv.compile(dump_schema) : () => true;
+function load_schema (dir) {
+    return import(`../../${dir}/lib/dump-schema.js`)
+        .then(sch => ajv.compile(sch.dump_schema))
+        .catch(e => {
+            console.log("!!! Cannot load dump schema for %s: %s", dir, e);
+            return () => true;
+        });
+}
+
+const schemas = [
+    [UUIDs.Service.ConfigDB, "ConfigDB", await load_schema("acs-configdb")],
+    [UUIDs.Service.Authentication, "Auth", await load_schema("acs-auth")],
+];
 
 const files = await read_all_files();
 let exit = 0;
@@ -30,13 +37,14 @@ for (const f of files) {
         const ds = parse_yaml(f);
         ds.filter(d => !d.service || !d.version)
             .forEach(d => fail(null, "Missing service or version"));
-        ds.filter(d => d.service == UUIDs.Service.ConfigDB)
-            .forEach(d => {
-                if (!cdb_validate(d)) {
-                    fail(cdb_validate.errors.map(util.inspect),
-                        "Schema validation failed");
-                }
-            });
+        for (const [srv, name, validate] of schemas) {
+            ds.filter(d => d.service == srv)
+                .forEach(d => {
+                    if (!validate(d))
+                        fail(validate.errors.map(util.inspect),
+                            `${name} schema validation failed`);
+                });
+        }
     } 
     catch (e) {
         exit = 1;

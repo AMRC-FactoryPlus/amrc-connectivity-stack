@@ -7,6 +7,7 @@
 import { UUIDs} from "@amrc-factoryplus/service-client";
 import { DB } from "@amrc-factoryplus/pg-client";
 
+import { dump_schema } from "./dump-schema.js";
 import Queries from "./queries.js";
 import {Perm} from "./uuids.js";
 import { has_wild } from "./validate.js";
@@ -25,6 +26,7 @@ export default class Model extends Queries {
         this.db = db;
         this.acl_cache_age = opts.acl_cache * 1000;
         this.root_principal = opts.root_principal;
+        this.realm = opts.realm;
 
         this.acl_cache = new Map();
     }
@@ -103,53 +105,82 @@ export default class Model extends Queries {
         });
     }
 
-    dump_validate(dump) {
-        /* Parens essential due to stupid JS parsing magic (semicolon
-         * insertion grrr) */
-        return (
-            dump.service == UUIDs.Service.Authentication
-            && dump.version == 1
-        );
-    }
-
     dump_load(dump) {
-        if (!this.dump_validate(dump))
-            return 400;
+        if (!dump_schema(dump))
+            this.log("Dump failed validation: %o", dump_schema.errors);
+            return 422;
+        }
 
-        return 204;
+        const uuids = new Set([
+            ...dump.grants.map(g => g.principal),
+            ...dump.grants.map(g => g.permission),
+            ...dump.grants.map(g => g.target),
+            ...Object.keys(dump.identities),
+        ]);
+        const realm = this.realm;
+        const krbs = Object.entries(dump.identies)
+            .map(([uuid, { upn }]) => {
+                uuid,
+                kerberos:   /@/.test(upn) ? upn : `${upn}@${realm}`,
+            });
         return this.txn(async q => {
-            for (const ace of dump.aces ?? []) {
-                await q.ace_add(ace);
-            }
-            for (const [grp, mems] of Object.entries(dump.groups ?? {})) {
-                for (const mem of mems) {
-                    await q.group_add(grp, mem);
-                }
-            }
-            for (const pri of dump.principals ?? []) {
-                await q.principal_add(pri);
-            }
+            await q.query(`
+                insert into uuid (uuid)
+                select u.uuid
+                from unnest($1::uuid[]) u(uuid)
+                on conflict do nothing
+            `, [uuids]);
+
+            const idok = await q.query(`
+                insert into identity (principal, kind, name)
+                select u.id, 1, i.i->>'kerberos'
+                from jsonb_array_elements($1) i(i)
+                    join lateral uuid u on u.uuid::text = i.i->>'uuid'
+            `, [ids])
+                .then(() => true)
+                .catch(e => e?.code == "23505" ? false : Promise.reject(e));
+            if (!idok) return 409;
+                    
+            /* XXX This form of loading gives no way for a revised
+             * version of a dump to remove old grants. This is a problem
+             * across the board with our dump loading logic but is more
+             * important here. I think the only solution that works is
+             * to introduce a 'source' for these entries such that loading a
+             * new dumps clears old data from that source. Moving the
+             * grants into the ConfigDB would make it easier to solve
+             * this in general. */
+            await q.query(`
+                insert into grant (principal, permission, target, plural)
+                select u.id, p.id, t.id, 
+                    coalesce((g.g->'plural')::boolean, false)
+                from jsonb_array_elements($1) g(g)
+                    join lateral uuid u on u.uuid::text = g.g->>'principal'
+                    join lateral uuid p on p.uuid::text = g.g->>'permission'
+                    join lateral uuid t on p.uuid::text = g.g->>'target'
+                on conflict do nothing
+            `, [dump.grants]);
 
             return 204;
         });
     }
 
     dump_save() {
-        return this.txn(async q => {
-            const aces = await q.ace_get_all();
-            const parents = await q.group_list();
-            const groups = Object.fromEntries(
-                await Promise.all(
-                    parents.map(p =>
-                        q.group_get(p)
-                            .then(ms => [p, ms]))));
-            const principals = await q.principal_get_all();
-
-            return {
-                service: UUIDs.Service.Authentication,
-                version: 1,
-                aces, groups, principals,
-            };
-        });
+        return 404;
+//        return this.txn(async q => {
+//            const aces = await q.ace_get_all();
+//            const parents = await q.group_list();
+//            const groups = Object.fromEntries(
+//                await Promise.all(
+//                    parents.map(p =>
+//                        q.group_get(p)
+//                            .then(ms => [p, ms]))));
+//            const principals = await q.principal_get_all();
+//
+//            return {
+//                service: UUIDs.Service.Authentication,
+//                version: 1,
+//                aces, groups, principals,
+//            };
+//        });
     }
 }

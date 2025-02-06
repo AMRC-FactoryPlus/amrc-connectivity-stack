@@ -29,6 +29,7 @@ const model  = await new Model({
     debug,
     acl_cache:          process.env.ACL_CACHE ?? 5,
     root_principal:     process.env.ROOT_PRINCIPAL,
+    realm:              process.env.REALM,
 }).init();
 const data = new DataFlow({ fplus, model });
 

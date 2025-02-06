@@ -105,12 +105,9 @@ export default class Model extends Queries {
         });
     }
 
+    /* The dump must be valid. We will get database errors (at best) if
+     * it is not. */
     dump_load(dump) {
-        if (!dump_schema(dump)) {
-            this.log("Dump failed validation: %o", dump_schema.errors);
-            return 422;
-        }
-
         const uuids = new Set([
             ...dump.grants.map(g => g.principal),
             ...dump.grants.map(g => g.permission),

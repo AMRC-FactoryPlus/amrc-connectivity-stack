@@ -32,7 +32,7 @@ const columns = computed(() => props.table.getAllColumns()
       <Button
         variant="outline"
         size="sm"
-        class="ml-auto hidden h-8 lg:flex items-center justify-center gap-1.5"
+        class="ml-auto hidden h-8 lg:flex items-center justify-center gap-1.5 dark:text-slate-50 dark:bg-slate-800"
       >
         <i class="fa-solid fa-sliders"></i>
         View

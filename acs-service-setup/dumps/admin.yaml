@@ -89,22 +89,15 @@ objects:
 service: !u UUIDs.Service.Authentication
 version: 2
 grants:
-  - principal: !u ACS.Group.Administrator
-    permission: !u ACS.PermGroup.Auth
-    target: !u UUIDs.Special.Null
-  - principal: !u ACS.Group.Administrator
-    permission: !u ACS.PermGroup.Clusters
-    target: !u UUIDs.Special.Null
-  - principal: !u ACS.Group.Administrator
-    permission: !u ACS.PermGroup.CmdEsc
-    target: !u UUIDs.Special.Null
-  - principal: !u ACS.Group.Administrator
-    permission: !u ACS.PermGroup.ConfigDB
-    target: !u UUIDs.Special.Null
-  - principal: !u ACS.Group.Administrator
-    permission: !u ACS.PermGroup.Directory
-    target: !u UUIDs.Special.Null
-  - principal: !u ACS.Group.Administrator
-    permission: !u ACS.PermGroup.Git
-    target: !u UUIDs.Special.Null
+  # XXX I'm not sure these are appropriate; we are relying on the old
+  # permission group expansion semantics, but these are not composite
+  # permissions. For now all perm groups are expanded, but possibly
+  # these should be individual grants?
+  !u ACS.Group.Administrator:
+    !u ACS.PermGroup.Auth: null
+    !u ACS.PermGroup.Clusters: null
+    !u ACS.PermGroup.CmdEsc: null
+    !u ACS.PermGroup.ConfigDB: null
+    !u ACS.PermGroup.Directory: null
+    !u ACS.PermGroup.Git: null
 

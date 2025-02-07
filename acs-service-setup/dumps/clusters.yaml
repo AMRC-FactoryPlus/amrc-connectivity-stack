@@ -344,101 +344,60 @@ configs:
 service: !u UUIDs.Service.Authentication
 version: 2
 grants:
-  - principal: !u Clusters.Requirement.ServiceAccount
-    permission: !u UUIDs.Permission.Directory.AdvertiseService 
-    target: !u Clusters.Service.ClusterManager
+  !u Clusters.Requirement.ServiceAccount:
+    !u UUIDs.Permission.Directory.AdvertiseService:
+      !u Clusters.Service.ClusterManager: false
+    !u UUIDs.Permission.Auth.ReadACL:
+      !u Clusters.Perm.All: true
 
-  - principal: !u Clusters.Requirement.ServiceAccount
-    permission: !u UUIDs.Permission.Auth.ReadACL
-    target: !u Clusters.Perm.All
-    plural: true
+    # XXX This is nearly root-equivalent.
+    !u UUIDs.Permission.Auth.ManageKerberos: null
 
-  # XXX This is nearly root-equivalent.
-  - principal: !u Clusters.Requirement.ServiceAccount
-    permission: !u UUIDs.Permission.Auth.ManageKerberos
-    target: !u UUIDs.Null
+    # XXX This is a very broad grant; it is very nearly root-equivalent.
+    # But currently any grant of ManageGroup will be equivalent to this,
+    # as groups are expanded recursively and we can just add a victim
+    # group to one of our target groups. We have an Clusters.Requirement.Groups,
+    # but it is not set up properly by service-setup, and using it won't
+    # improve security until the Auth groups are fixed.
+    !u UUIDs.Permission.Auth.ManageGroup: null
 
-  - principal: !u Clusters.Requirement.ServiceAccount
-    permission: !u UUIDs.Permission.Auth.ManageACL
-    target: !u Git.Perm.Pull
+    !u UUIDs.Permission.Auth.ManageACL:
+      !u Git.Perm.Pull: false
 
-  # XXX This is a very broad grant; it is very nearly root-equivalent.
-  # But currently any grant of ManageGroup will be equivalent to this,
-  # as groups are expanded recursively and we can just add a victim
-  # group to one of our target groups. We have an Clusters.Requirement.Groups,
-  # but it is not set up properly by service-setup, and using it won't
-  # improve security until the Auth groups are fixed.
-  - principal: !u Clusters.Requirement.ServiceAccount
-    permission: !u UUIDs.Permission.Auth.ManageGroup
-    target: !u UUIDs.Null
+    # XXX This should be per-deployment but it's not clear how to acheive
+    # that. The notify/v1 proposal would dynamically grant Sparkplug
+    # permissions based on some other set of change-notify permissions.
+    # XXX The cluster-manager should use notify/v2 instead.
+    !u ACS.Role.EdgeNodeConsumer:
+      !u ACS.Device.ConfigDB: false
 
-  # XXX This should be per-deployment but it's not clear how to acheive
-  # that. The notify/v1 proposal would dynamically grant Sparkplug
-  # permissions based on some other set of change-notify permissions.
-  # XXX The cluster-manager should use notify/v2 instead.
-  - principal: !u Clusters.Requirement.ServiceAccount
-    permission: !u ACS.Role.EdgeNodeConsumer
-    target: !u ACS.Device.ConfigDB
+    !u UUIDs.Permission.ConfigDB.ReadConfig:
+      !u UUIDs.App.Info: false
+      !u UUIDs.App.ServiceConfig: false
+      !u Clusters.App.Cluster: false
+      !u Clusters.App.Status: false
+      !u Clusters.App.EdgeStatus: false
+      !u Clusters.App.Flux: false
+      !u Clusters.App.HelmChart: false
+      !u Clusters.App.HelmRelease: false
+      !u Clusters.App.Bootstrap: false
+      !u UUIDs.App.SparkplugAddress: false
 
-  - principal: !u Clusters.Requirement.ServiceAccount
-    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
-    target: !u UUIDs.App.Info
-  - principal: !u Clusters.Requirement.ServiceAccount
-    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
-    target: !u UUIDs.App.ServiceConfig
-  - principal: !u Clusters.Requirement.ServiceAccount
-    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
-    target: !u Clusters.App.Cluster
-  - principal: !u Clusters.Requirement.ServiceAccount
-    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
-    target: !u Clusters.App.Status
-  - principal: !u Clusters.Requirement.ServiceAccount
-    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
-    target: !u Clusters.App.EdgeStatus
-  - principal: !u Clusters.Requirement.ServiceAccount
-    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
-    target: !u Clusters.App.Flux
-  - principal: !u Clusters.Requirement.ServiceAccount
-    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
-    target: !u Clusters.App.HelmChart
-  - principal: !u Clusters.Requirement.ServiceAccount
-    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
-    target: !u Clusters.App.HelmRelease
-  - principal: !u Clusters.Requirement.ServiceAccount
-    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
-    target: !u Clusters.App.Bootstrap
-  - principal: !u Clusters.Requirement.ServiceAccount
-    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
-    target: !u UUIDs.App.SparkplugAddress
+    !u UUIDs.Permission.ConfigDB.WriteConfig:
+      !u UUIDs.App.Info: false
+      !u Clusters.App.Status: false
+      !u Git.App.Config: false
+      !u UUIDs.App.SparkplugAddress: false
 
-  - principal: !u Clusters.Requirement.ServiceAccount
-    permission: !u UUIDs.Permission.ConfigDB.WriteConfig
-    target: !u UUIDs.App.Info
-  - principal: !u Clusters.Requirement.ServiceAccount
-    permission: !u UUIDs.Permission.ConfigDB.WriteConfig
-    target: !u Clusters.App.Status
-  - principal: !u Clusters.Requirement.ServiceAccount
-    permission: !u UUIDs.Permission.ConfigDB.WriteConfig
-    target: !u Git.App.Config
-  - principal: !u Clusters.Requirement.ServiceAccount
-    permission: !u UUIDs.Permission.ConfigDB.WriteConfig
-    target: !u UUIDs.App.SparkplugAddress
+    !u UUIDs.Permission.ConfigDB.ManageObjects:
+      !u Clusters.Class.Account: false
 
-  - principal: !u Clusters.Requirement.ServiceAccount
-    permission: !u UUIDs.Permission.ConfigDB.ManageObjects
-    target: !u Clusters.Class.Account
+    !u Git.Perm.Pull:
+      !u Clusters.Requirement.EdgeRepos: true
+    !u Git.Perm.Push:
+      !u Clusters.Requirement.EdgeRepos: true
 
-  - principal: !u Clusters.Requirement.ServiceAccount
-    permission: !u Git.Perm.Pull
-    target: !u Clusters.Requirement.EdgeRepos
-    plural: true
-  - principal: !u Clusters.Requirement.ServiceAccount
-    permission: !u Git.Perm.Push
-    target: !u Clusters.Requirement.EdgeRepos
-    plural: true
-
-# XXX Do we still need this? KrbKeys sealed to edge clusters have been
-# replaced with krbkeys generated on the edge.
-  - principal: !u ACS.ServiceAccount.KrbKeys
-    permission: !u Clusters.Perm.Secrets
-    target: !u UUIDs.Special.Null
+  # XXX Do we still need this? KrbKeys sealed to edge clusters have been
+  # replaced with krbkeys generated on the edge.
+  !u ACS.ServiceAccount.KrbKeys:
+    !u Clusters.Perm.Secrets: null

@@ -168,115 +168,61 @@ identities:
   !u ACS.ServiceAccount.KrbKeys:
     kerberos: op1krbkeys
 grants:
-  - principal: !u ACS.ServiceAccount.Directory
-    permission: !u MQTT.Perm.ReadWholeNamespace
-    target: !u UUIDs.Special.Null
-  - principal: !u ACS.ServiceAccount.Directory
-    permission: !u UUIDs.Permission.Auth.ReadACL
-    target: !u ACS.PermGroup.Directory
-  - principal: !u ACS.ServiceAccount.Directory
-    permission: !u Auth.Perm.ReadKerberos
-    target: !u UUIDs.Special.Null
-  - principal: !u ACS.ServiceAccount.Directory
-    permission: !u UUIDs.Permission.CmdEsc.Rebirth
-    target: !u UUIDs.Special.Null
+  !u ACS.ServiceAccount.Directory:
+    !u MQTT.Perm.ReadWholeNamespace: null
+    !u UUIDs.Permission.Auth.ReadACL:
+      !u ACS.PermGroup.Directory: true
+    !u Auth.Perm.ReadKerberos: null
+    !u UUIDs.Permission.CmdEsc.Rebirth: null
 
-  - principal: !u ACS.ServiceAccount.MQTT
-    permission: !u UUIDs.Permission.Auth.ReadACL
-    target: !u ACS.PermGroup.MQTT
-  - principal: !u ACS.ServiceAccount.MQTT
-    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
-    target: !u ACS.App.MQTTPermTemplate
-  - principal: !u ACS.ServiceAccount.MQTT
-    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
-    target: !u UUIDs.App.SparkplugAddress
+  !u ACS.ServiceAccount.MQTT:
+    !u UUIDs.Permission.Auth.ReadACL:
+      !u ACS.PermGroup.MQTT: true
+    !u UUIDs.Permission.ConfigDB.ReadConfig:
+      !u ACS.App.MQTTPermTemplate: false
+      !u UUIDs.App.SparkplugAddress: false
+    !u Directory.Perm.AdvertiseService:
+      !u UUIDs.Service.MQTT: false
 
-  - principal: !u ACS.ServiceAccount.ConfigDB
-    permission: !u UUIDs.Permission.Auth.ReadACL
-    target: !u ACS.PermGroup.ConfigDB
+  !u ACS.ServiceAccount.ConfigDB:
+    !u UUIDs.Permission.Auth.ReadACL:
+      !u ACS.PermGroup.ConfigDB: true
 
-  - principal: !u ACS.ServiceAccount.KrbKeys
-    permission: !u Auth.Perm.ReadKerberos
-    target: !u UUIDs.Special.Null
-  - principal: !u ACS.ServiceAccount.KrbKeys
-    permission: !u Auth.Perm.ManageKerberos
-    target: !u UUIDs.Special.Null
-  - principal: !u ACS.ServiceAccount.KrbKeys
-    permission: !u Auth.Perm.ManageACL
-    target: !u UUIDs.Special.Null
-  - principal: !u ACS.ServiceAccount.KrbKeys
-    permission: !u Auth.Perm.ManageGroup
-    target: !u UUIDs.Special.Null
-  - principal: !u ACS.ServiceAccount.KrbKeys
-    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
-    target: !u UUIDs.App.Info
-  - principal: !u ACS.ServiceAccount.KrbKeys
-    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
-    target: !u UUIDs.App.SparkplugAddress
-  - principal: !u ACS.ServiceAccount.KrbKeys
-    permission: !u ConfigDB.Perm.WriteConfig
-    target: !u UUIDs.App.Info
-  - principal: !u ACS.ServiceAccount.KrbKeys
-    permission: !u ConfigDB.Perm.WriteConfig
-    target: !u UUIDs.App.SparkplugAddress
-  - principal: !u ACS.ServiceAccount.KrbKeys
-    permission: !u ConfigDB.Perm.ManageObjects
-    target: !u UUIDs.Special.Null
+  !u ACS.ServiceAccount.KrbKeys:
+    !u Auth.Perm.ReadKerberos: null
+    !u Auth.Perm.ManageKerberos: null
+    !u Auth.Perm.ManageACL: null
+    !u Auth.Perm.ManageGroup: null
+    !u UUIDs.Permission.ConfigDB.ReadConfig:
+      !u UUIDs.App.Info: false
+      !u UUIDs.App.SparkplugAddress: false
+    !u ConfigDB.Perm.WriteConfig:
+      !u UUIDs.App.Info: false
+      !u UUIDs.App.SparkplugAddress: false
+    !u ConfigDB.Perm.ManageObjects: null
 
-  - principal: !u ACS.ServiceAccount.Manager
-    permission: !u ConfigDB.Perm.ManageObjects
-    target: !u Clusters.Class.Cluster
-  - principal: !u ACS.ServiceAccount.Manager
-    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
-    target: !u UUIDs.App.ServiceConfig
-  - principal: !u ACS.ServiceAccount.Manager
-    permission: !u ConfigDB.Perm.ManageObjects
-    target: !u Auth.Class.EdgeAgent
-  - principal: !u ACS.ServiceAccount.Manager
-    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
-    target: !u UUIDs.App.Info
-  - principal: !u ACS.ServiceAccount.Manager
-    permission: !u ConfigDB.Perm.WriteConfig
-    target: !u UUIDs.App.Info
-  - principal: !u ACS.ServiceAccount.Manager
-    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
-    target: !u Clusters.App.EdgeStatus
-  - principal: !u ACS.ServiceAccount.Manager
-    permission: !u ConfigDB.Perm.WriteConfig
-    target: !u Edge.App.Deployment
-  - principal: !u ACS.ServiceAccount.Manager
-    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
-    target: !u Clusters.App.Cluster
-  - principal: !u ACS.ServiceAccount.Manager
-    permission: !u ConfigDB.Perm.WriteConfig
-    target: !u Clusters.App.Cluster
-  - principal: !u ACS.ServiceAccount.Manager
-    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
-    target: !u Clusters.App.HelmChart
-  - principal: !u ACS.ServiceAccount.Manager
-    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
-    target: !u UUIDs.App.ServiceConfig
-  - principal: !u ACS.ServiceAccount.Manager
-    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
-    target: !u Edge.App.AgentConfig
-  - principal: !u ACS.ServiceAccount.Manager
-    permission: !u ConfigDB.Perm.WriteConfig
-    target: !u Edge.App.AgentConfig
-  - principal: !u ACS.ServiceAccount.Manager
-    permission: !u ConfigDB.Perm.WriteConfig
-    target: !u UUIDs.App.SparkplugAddress
-  - principal: !u ACS.ServiceAccount.Manager
-    permission: !u Clusters.Perm.Clusters
-    target: !u UUIDs.Special.Null
-  - principal: !u ACS.ServiceAccount.CmdEsc
-    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
-    target: !u CmdEsc.App.CmdDef
-  - principal: !u ACS.ServiceAccount.CmdEsc
-    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
-    target: !u UUIDs.App.SparkplugAddress
-  - principal: !u ACS.ServiceAccount.CmdEsc
-    permission: !u UUIDs.Permission.Auth.ReadACL
-    target: !u ACS.PermGroup.CmdEsc
-  - principal: !u ACS.ServiceAccount.MQTT
-    permission: !u Directory.Perm.AdvertiseService
-    target: !u UUIDs.Service.MQTT
+  !u ACS.ServiceAccount.Manager:
+    !u ConfigDB.Perm.ManageObjects:
+      !u Clusters.Class.Cluster: false
+      !u Auth.Class.EdgeAgent: false
+    !u ConfigDB.Perm.ReadConfig:
+      !u UUIDs.App.ServiceConfig: false
+      !u UUIDs.App.Info: false
+      !u Clusters.App.EdgeStatus: false
+      !u Clusters.App.Cluster: false
+      !u Clusters.App.HelmChart: false
+      !u Edge.App.AgentConfig: false
+    !u ConfigDB.Perm.WriteConfig:
+      !u Clusters.App.Cluster: false
+      !u Edge.App.Deployment: false
+      !u Edge.App.AgentConfig: false
+      !u UUIDs.App.Info: false
+      !u UUIDs.App.SparkplugAddress: false
+    !u Clusters.Perm.Clusters: null
+
+  !u ACS.ServiceAccount.CmdEsc:
+    !u UUIDs.Permission.ConfigDB.ReadConfig:
+      !u CmdEsc.App.CmdDef: false
+      !u UUIDs.App.SparkplugAddress: false
+    !u UUIDs.Permission.Auth.ReadACL:
+      !u ACS.PermGroup.CmdEsc: false

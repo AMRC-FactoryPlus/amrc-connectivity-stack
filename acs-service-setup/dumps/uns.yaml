@@ -44,9 +44,7 @@ configs:
 service: !u UUIDs.Service.Authentication
 version: 2
 grants:
-  - principal: !u UNS.Group.Reader
-    permission: !u UNS.Perm.ReadEntireUNS
-    target: !u UUIDs.Special.Null
-  - principal: !u UNS.Group.Ingester
-    permission: !u UNS.Perm.WriteToEntireUNS
-    target: !u UUIDs.Special.Null
+  !u UNS.Group.Reader:
+    !u UNS.Perm.ReadEntireUNS: null
+  !u UNS.Group.Ingester:
+    !u UNS.Perm.WriteToEntireUNS: null

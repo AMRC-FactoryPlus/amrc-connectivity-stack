@@ -134,11 +134,14 @@ export default class Model extends Queries {
             `, [[...uuids]]);
 
             this.log("Inserting identities: %o", krbs);
+            /* We want entirely duplicate entries to be silently
+             * ignored, but mismatches to fail the dump. */
             const idok = await q.query(`
                 insert into identity (principal, kind, name)
                 select u.id, 1, i.i->>'kerberos'
                 from unnest($1::jsonb[]) i(i)
                     join uuid u on u.uuid::text = i.i->>'uuid'
+                except select principal, kind, name from identity
             `, [krbs])
                 .then(() => true)
                 .catch(e => e?.code == "23505" ? false : Promise.reject(e));

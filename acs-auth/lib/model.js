@@ -164,7 +164,9 @@ export default class Model extends Queries {
                     join uuid u on u.uuid::text = g.g->>'principal'
                     join uuid p on p.uuid::text = g.g->>'permission'
                     join uuid t on t.uuid::text = g.g->>'target'
-                on conflict do nothing
+                on conflict (principal, permission, target) do update
+                    set plural = excluded.plural
+                    where ace.plural != excluded.plural
             `, [grants]);
 
             return 204;

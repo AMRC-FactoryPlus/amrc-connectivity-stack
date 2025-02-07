@@ -37,8 +37,8 @@ export class EdgeDeploy {
     }
 
     async init () {
-        await this.fplus.Directory.register_service_url(
-            Edge.Service.EdgeDeployment, this.http_url);
+        //await this.fplus.Directory.register_service_url(
+        //    Edge.Service.EdgeDeployment, this.http_url);
 
         const app = this.routes;
         app.get("/cluster/:cluster/bootstrap", this.wrap(this.bootstrap));

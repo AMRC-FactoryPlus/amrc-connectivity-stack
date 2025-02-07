@@ -102,11 +102,13 @@ export default class API {
     }
 
     async load_dump(req, res) {
-        const dump = req.body;
-        const owner = req.params.owner
-           ?? await this.fplus.resolve_principal({kerberos: req.auth});
-        const status = await this.model.load_dump(dump, owner);
-        res.status(status).end();
+        try{
+            const info = await this.model.load_dump(req);
+            res.status(info).end();
+        }catch (e) {
+            console.log(e);
+            res.status(500).json({error: e.message});
+        }
     }
 
     async devices(req, res) {

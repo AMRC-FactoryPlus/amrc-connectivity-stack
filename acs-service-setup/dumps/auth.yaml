@@ -70,22 +70,19 @@ objects:
 
   !u Auth.Class.ServicePerms:
     !u ACS.PermGroup.Auth:
-      name: "Auth"
+      name: "Auth permission"
       subclassOf:
         - !u UUIDs.Class.Permission
     !u ACS.PermGroup.CmdEsc:
-      name: "Command Escalation"
+      name: "CmdEsc permission"
       subclassOf:
         - !u UUIDs.Class.Permission
     !u ACS.PermGroup.ConfigDB:
-      name: "ConfigDB"
+      name: "ConfigDB permission"
       subclassOf:
         - !u UUIDs.Class.Permission
-    !u ACS.PermGroup.Directory:
-      name: "Directory"
-      subclassOf:
-        - !u UUIDs.Class.Permission
+    # Directory in directory.yaml
     !u ACS.PermGroup.MQTT:
-      name: "MQTT"
+      name: "MQTT permission"
       subclassOf:
         - !u UUIDs.Class.Permission

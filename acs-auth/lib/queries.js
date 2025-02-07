@@ -348,5 +348,52 @@ export default class Queries {
         `, [principal]);
         return dbr.rows;
     }
+
+    dump_load_uuids (uuids) {
+        return this.q_list(`
+            insert into uuid (uuid)
+            select u.uuid
+            from unnest($1::uuid[]) u(uuid)
+            on conflict do nothing
+            returning uuid
+        `, [[...uuids]]);
+    }
+
+    dump_load_krbs (krbs) {
+        return this.q_list(`
+            insert into identity (principal, kind, name)
+            select u.id, 1, i.i->>'kerberos'
+            from unnest($1::jsonb[]) i(i)
+                join uuid u on u.uuid::text = i.i->>'uuid'
+            except select principal, kind, name from identity
+            returning name
+        `, [krbs]);
+    }
+
+    /* XXX This form of loading gives no way for a revised version of a
+     * dump to remove old grants. This is a problem across the board
+     * with our dump loading logic but is more important here. I think
+     * the only solution that works is to introduce a 'source' for these
+     * entries such that loading a new dumps clears old data from that
+     * source. Moving the grants into the ConfigDB would make it easier
+     * to solve this in general. */
+    dump_load_aces (aces) {
+        return this.q_rows(`
+            insert into ace (principal, permission, target, plural)
+            select u.id, p.id, t.id, 
+                coalesce((g.g->'plural')::boolean, false)
+            from unnest($1::jsonb[]) g(g)
+                join uuid u on u.uuid::text = g.g->>'principal'
+                join uuid p on p.uuid::text = g.g->>'permission'
+                join uuid t on t.uuid::text = g.g->>'target'
+            on conflict (principal, permission, target) do update
+                set plural = excluded.plural
+                where ace.plural != excluded.plural
+            returning principal, permission, target
+        `, [aces]);
+    }
+
+    async do_dump_load (uuids, krbs, grants) {
+    }
 }
 

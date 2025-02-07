@@ -27,13 +27,14 @@ oneOf:
           properties:
             kerberos: { type: string }
       grants:
-        type: array
-        items:
+        type: object
+        propertyNames: { format: uuid }
+        additionalProperties: 
           type: object
-          additionalProperties: false
-          required: [principal, permission, target]
-          properties:
-            principal: { type: string, format: uuid }
-            permission: { type: string, format: uuid }
-            target: { type: string, format: uuid }
-            plural: { type: boolean }
+          propertyNames: { format: uuid }
+          additionalProperties:
+            oneOf:
+              - type: "null"
+              - type: object
+                propertyNames: { format: uuid }
+                additionalProperties: { type: boolean }

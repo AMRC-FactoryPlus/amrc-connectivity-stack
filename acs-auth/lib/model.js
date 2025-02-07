@@ -109,68 +109,41 @@ export default class Model extends Queries {
     /* The dump must be valid. We will get database errors (at best) if
      * it is not. */
     dump_load(dump) {
-        const grants = dump.grants ?? [];
-        const identities = dump.identities ?? {};
-
-        const uuids = new Set([
-            ...grants.map(g => g.principal),
-            ...grants.map(g => g.permission),
-            ...grants.map(g => g.target),
-            ...Object.keys(identities),
-        ]);
         const realm = this.realm;
-        const krbs = Object.entries(identities)
+        const krbs = Object.entries(dump.identities ?? {})
             .map(([uuid, { kerberos: upn }]) => ({
                 uuid,
                 kerberos:   /@/.test(upn) ? upn : `${upn}@${realm}`,
             }));
+        const aces = Object.entries(dump.grants ?? {})
+            .flatMap(([principal, perms]) => 
+                Object.entries(perms)
+                    .map(([p, t]) => [p, t ?? { [UUIDs.Special.Null]: false }])
+                    .flatMap(([permission, targs]) =>
+                        Object.entries(targs)
+                            .flatMap(([target, plural]) =>
+                                ({ principal, permission, target, plural }))));
+        const uuids = new Set([
+            ...aces.map(g => g.principal),
+            ...aces.map(g => g.permission),
+            ...aces.map(g => g.target),
+            ...krbs.map(k => k.uuid),
+        ]);
+
         return this.txn(async q => {
-            const n_uuid = await q.q_list(`
-                insert into uuid (uuid)
-                select u.uuid
-                from unnest($1::uuid[]) u(uuid)
-                on conflict do nothing
-                returning uuid
-            `, [[...uuids]]);
+            const n_uuid = await q.dump_load_uuids(uuids);
             if (n_uuid.length)
                 this.log("Inserted new UUIDs: %o", n_uuid);
 
             /* We want entirely duplicate entries to be silently
              * ignored, but mismatches to fail the dump. */
-            const n_id = await q.q_list(`
-                insert into identity (principal, kind, name)
-                select u.id, 1, i.i->>'kerberos'
-                from unnest($1::jsonb[]) i(i)
-                    join uuid u on u.uuid::text = i.i->>'uuid'
-                except select principal, kind, name from identity
-                returning name
-            `, [krbs])
+            const n_id = await q.dump_load_krbs(krbs)
                 .catch(e => e?.code == "23505" ? null : Promise.reject(e));
             if (!n_id) return 409;
             if (n_id.length)
                 this.log("Updated identity for %o", n_id);
                     
-            /* XXX This form of loading gives no way for a revised
-             * version of a dump to remove old grants. This is a problem
-             * across the board with our dump loading logic but is more
-             * important here. I think the only solution that works is
-             * to introduce a 'source' for these entries such that loading a
-             * new dumps clears old data from that source. Moving the
-             * grants into the ConfigDB would make it easier to solve
-             * this in general. */
-            const n_grant = await q.q_rows(`
-                insert into ace (principal, permission, target, plural)
-                select u.id, p.id, t.id, 
-                    coalesce((g.g->'plural')::boolean, false)
-                from unnest($1::jsonb[]) g(g)
-                    join uuid u on u.uuid::text = g.g->>'principal'
-                    join uuid p on p.uuid::text = g.g->>'permission'
-                    join uuid t on t.uuid::text = g.g->>'target'
-                on conflict (principal, permission, target) do update
-                    set plural = excluded.plural
-                    where ace.plural != excluded.plural
-                returning principal, permission, target
-            `, [grants]);
+            const n_grant = await q.dump_load_aces(aces);
             if (n_grant.length)
                 this.log("Updated grants: %o", n_grant);
 

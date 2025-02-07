@@ -23,4 +23,9 @@ export default [
                 
         },
     },
+
+    {
+        /* Generated file, fails linting */
+        ignores: [ "lib/dump-schema.js" ],
+    },
 ];

@@ -106,7 +106,7 @@ export default class Model extends Queries {
     }
 
     dump_load(dump) {
-        if (!dump_schema(dump))
+        if (!dump_schema(dump)) {
             this.log("Dump failed validation: %o", dump_schema.errors);
             return 422;
         }
@@ -119,10 +119,10 @@ export default class Model extends Queries {
         ]);
         const realm = this.realm;
         const krbs = Object.entries(dump.identies)
-            .map(([uuid, { upn }]) => {
+            .map(([uuid, { upn }]) => ({
                 uuid,
                 kerberos:   /@/.test(upn) ? upn : `${upn}@${realm}`,
-            });
+            }));
         return this.txn(async q => {
             await q.query(`
                 insert into uuid (uuid)

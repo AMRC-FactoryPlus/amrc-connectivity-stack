@@ -110,7 +110,7 @@ export default class Model extends Queries {
         await this.txn(q => q.record_death(time, addr));
     }
 
-    async dump_validate(dump){
+    dump_validate(dump){
         if (typeof (dump) != "object") {
             console.log("Dump not an object");
             return false;
@@ -123,27 +123,32 @@ export default class Model extends Queries {
             console.log("Dump should be version 1");
             return false;
         }
+        if(dump.advertisements.length === 0){
+            console.log("Dump doesn't contain urls to register")
+            return false;
+        }
         return true;
     }
 
-    async load_dump(dump, owner) {
+    async load_dump(req) {
+        const dump = req.body;
         if (!this.dump_validate(dump)){
             return 400;
         }
-        const { urls } = dump;
-        if(!owner){
-            return 400;
-        }
-        Object.entries(urls).forEach(([service, url]) => {
-            try{
-                this.record_service({
-                    service, url,
-                    device: owner,
-                })
-            }catch (e){
-                console.log(`Error registering service ${service}: ${e.message}`)
+        for (const advertisement of dump.advertisements) {
+            const owner = advertisement.owner
+                ?? await this.fplus.resolve_principal({kerberos: req.auth});
+
+            if(!owner){
+                continue;
             }
-        })
+
+            await this.record_service({
+                service: advertisement.service,
+                url: advertisement.url,
+                device: owner,
+            })
+        }
         return 200;
     }
 

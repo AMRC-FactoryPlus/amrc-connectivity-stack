@@ -58,6 +58,7 @@ export const ACS = {
     },
     Service: {
         Manager:                "619eecab-742d-4824-8b97-bcae472e5c04",
+        ClusterManager:               "2706aa43-a826-441e-9cec-cd3d4ce623c2",
     },
     Role: {
         EdgeNodeConsumer:       "17a64293-b82d-4db4-af4d-63359bb62934",

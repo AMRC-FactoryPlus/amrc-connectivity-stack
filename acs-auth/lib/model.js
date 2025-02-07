@@ -135,8 +135,8 @@ export default class Model extends Queries {
                 insert into identity (principal, kind, name)
                 select u.id, 1, i.i->>'kerberos'
                 from jsonb_array_elements($1) i(i)
-                    join lateral uuid u on u.uuid::text = i.i->>'uuid'
-            `, [ids])
+                    join uuid u on u.uuid::text = i.i->>'uuid'
+            `, [krbs])
                 .then(() => true)
                 .catch(e => e?.code == "23505" ? false : Promise.reject(e));
             if (!idok) return 409;
@@ -154,9 +154,9 @@ export default class Model extends Queries {
                 select u.id, p.id, t.id, 
                     coalesce((g.g->'plural')::boolean, false)
                 from jsonb_array_elements($1) g(g)
-                    join lateral uuid u on u.uuid::text = g.g->>'principal'
-                    join lateral uuid p on p.uuid::text = g.g->>'permission'
-                    join lateral uuid t on p.uuid::text = g.g->>'target'
+                    join uuid u on u.uuid::text = g.g->>'principal'
+                    join uuid p on p.uuid::text = g.g->>'permission'
+                    join uuid t on p.uuid::text = g.g->>'target'
                 on conflict do nothing
             `, [dump.grants]);
 

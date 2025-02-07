@@ -1,9 +1,0 @@
-service: !u UUIDs.Service.Directory
-version: 1
-advertisements:
-  - service: !u ACS.Service.ClusterManager
-    baseUrl: "clusters"
-    owner: !u ACS.ServiceAccount.ClusterManager
-  - service: !u UUIDs.Service.Directory
-    baseUrl: "directory"
-    owner: !u ACS.ServiceAccount.Directory

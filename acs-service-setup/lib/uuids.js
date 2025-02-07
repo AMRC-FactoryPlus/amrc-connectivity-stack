@@ -58,7 +58,8 @@ export const ACS = {
     },
     Service: {
         Manager:                "619eecab-742d-4824-8b97-bcae472e5c04",
-        ClusterManager:               "2706aa43-a826-441e-9cec-cd3d4ce623c2",
+        ClusterManager:         "2706aa43-a826-441e-9cec-cd3d4ce623c2",
+        ConfigDB:               "af15f175-78a0-4e05-97c0-2a0bb82b9f3b",
     },
     Role: {
         EdgeNodeConsumer:       "17a64293-b82d-4db4-af4d-63359bb62934",
@@ -70,14 +71,14 @@ export const ACS = {
      * changing to be per-deployment. */
     Device: {
         ConfigDB:               "36861e8d-9152-40c4-8f08-f51c2d7e3c25",
+        ClusterManager:         "127cde3c-773a-4f61-b0ba-7412a2695253",
+        Directory:              "5cc3b068-938f-4bb2-8ceb-64338a02fbeb",
     },
     /* XXX These should not be fixed. They should be replaced by
      * per-deployment accounts created by krbkeys, and
      * ServiceRequirement groups to grant them permissions. */
     ServiceAccount: {
         KrbKeys:                "a04b4195-7db4-4480-b3f3-4d22c08b96ea",
-        ClusterManager:         "127cde3c-773a-4f61-b0ba-7412a2695253",
-        Directory:              "5cc3b068-938f-4bb2-8ceb-64338a02fbeb",
     },
     Driver: {
         /* Edge Agent internal drivers */

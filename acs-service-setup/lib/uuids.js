@@ -76,6 +76,8 @@ export const ACS = {
      * ServiceRequirement groups to grant them permissions. */
     ServiceAccount: {
         KrbKeys:                "a04b4195-7db4-4480-b3f3-4d22c08b96ea",
+        ClusterManager:         "127cde3c-773a-4f61-b0ba-7412a2695253",
+        Directory:              "5cc3b068-938f-4bb2-8ceb-64338a02fbeb",
     },
     Driver: {
         /* Edge Agent internal drivers */

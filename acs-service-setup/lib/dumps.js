@@ -47,11 +47,12 @@ const yamlOpts = {
  * @return {*} The directory JSON object containing the build URLs.
  */
 function buildURLs (serviceUrls, serviceSetup) {
-    const resolvedUrls = {};
-    Object.entries(serviceUrls.urls).forEach(([serviceId, baseUrl])=> {
-        resolvedUrls[serviceId] = `http://${baseUrl.base}.${serviceSetup.namespace}.svc.cluster.local`
+    const resolvedUrls = [];
+    serviceUrls.advertisements.forEach((advertisement)=> {
+        advertisement.url = `http://${advertisement.baseUrl}.${serviceSetup.namespace}.svc.cluster.local`;
+        resolvedUrls.push(advertisement);
     })
-    serviceUrls.urls = resolvedUrls;
+    serviceUrls.advertisements = resolvedUrls;
     return serviceUrls;
 }
 

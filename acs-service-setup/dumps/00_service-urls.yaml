@@ -6,7 +6,7 @@ advertisements:
     owner: !u ACS.Device.ClusterManager
   - service: !u UUIDs.Service.Directory
     baseUrl: "directory"
-    owner: !u ACS.ServiceAccount.Directory    owner: !u ACS.Device.Directory
+    owner: !u ACS.Device.Directory
   - service: !u ACS.Service.ConfigDB
     baseUrl: "configdb"
     owner: !u ACS.Device.ConfigDB

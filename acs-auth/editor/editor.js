@@ -412,7 +412,7 @@ function EffPrinc (props) {
 
     useEffect(async () => {
         const e_princ = encodeURIComponent(princ);
-        const list = await fetch_json("auth", `v2/acl/kerberos/${princ}`);
+        const list = await fetch_json("auth", `v2/acl/kerberos/${e_princ}`);
         sort_acl(list);
         set_eff(list);
     }, []);

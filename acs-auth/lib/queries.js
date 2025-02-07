@@ -204,31 +204,11 @@ export default class Queries {
     }
 
     async ace_add (ace) {
-        await this.query(`
-            insert into uuid (uuid)
-            select uuid
-            from unnest($1::uuid[]) n(uuid)
-            on conflict (uuid) do nothing
-        `, [[ace.principal, ace.permission, ace.target]]);
-        await this.query(`
-            insert into ace (principal, permission, target, plural)
-            select u.id, p.id, t.id, $4
-            from uuid u, uuid p, uuid t
-            where u.uuid = $1 and p.uuid = $2 and t.uuid = $3
-            on conflict do nothing
-        `, [ace.principal, ace.permission, ace.target, ace.plural ?? false]);
-        return 204;
+        throw "unimplemented";
     }
 
     async ace_delete (ace) {
         throw "unimplemented";
-        await this.query(`
-            delete from ace
-            where principal = $1
-                and permission = $2
-                and target = $3
-        `, [ace.principal, ace.permission, ace.target]);
-        return 204;
     }
 
     /* This returns an ID. */

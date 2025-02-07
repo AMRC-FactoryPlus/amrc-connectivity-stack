@@ -7,7 +7,6 @@
 import { UUIDs} from "@amrc-factoryplus/service-client";
 import { DB } from "@amrc-factoryplus/pg-client";
 
-import { dump_schema } from "./dump-schema.js";
 import Queries from "./queries.js";
 import {Perm} from "./uuids.js";
 import { has_wild } from "./validate.js";

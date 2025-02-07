@@ -6,7 +6,7 @@
 import { UUIDs }            from "@amrc-factoryplus/service-client";
 
 import { ServiceConfig }    from "./service-config.js";
-import { ACS, Auth, Clusters, Edge, Git }
+import { Auth, Clusters, Edge, Git }
                             from "./uuids.js";
 
 class ClustersConfig extends ServiceConfig {
@@ -35,7 +35,7 @@ class ClustersConfig extends ServiceConfig {
     }
 
     async setup_repo (name, spec) {
-        const { Auth, CDB } = this;
+        const { CDB } = this;
 
         const uuid = await this.create_repo(name);
 

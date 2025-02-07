@@ -74,14 +74,17 @@ objects:
     !u ACS.ServiceAccount.CmdEsc:
       name: "Command escalation"
       memberOf:
+        - !u Auth.Class.CentralService
         - !u ACS.Group.SparkplugNode
     !u ACS.ServiceAccount.ConfigDB:
       name: "ConfigDB"
       memberOf:
+        - !u Auth.Class.CentralService
         - !u ACS.Group.SparkplugNode
     !u ACS.ServiceAccount.Directory:
       name: "Directory"
       memberOf:
+        - !u Auth.Class.CentralService
         - !u ACS.Group.SparkplugNode
     !u ACS.ServiceAccount.KrbKeys:
       name: "Kerberos keys operator"

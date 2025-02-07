@@ -14,6 +14,7 @@ import { APIv2 } from "../lib/api_v2.js";
 import AuthN from "../lib/authn.js";
 import AuthZ from "../lib/authz.js";
 import { DataFlow } from "../lib/dataflow.js";
+import { Loader } from "../lib/loader.js";
 import Model from "../lib/model.js";
 import Editor from "../lib/editor.js";
 
@@ -29,12 +30,14 @@ const model  = await new Model({
     debug,
     acl_cache:          process.env.ACL_CACHE ?? 5,
     root_principal:     process.env.ROOT_PRINCIPAL,
+    realm:              process.env.REALM,
 }).init();
 const data = new DataFlow({ fplus, model });
 
 const authn = await new AuthN({ }).init();
 const authz = await new AuthZ({ debug, model });
 const apiv2 = new APIv2({ data, debug, model });
+const loader = new Loader({ debug, model });
 
 const editor = await new Editor({
     services: {
@@ -63,6 +66,7 @@ const api = await new WebAPI({
     routes: app => {
         app.use("/authn", authn.routes);
         app.use("/authz", authz.routes);
+        app.use("/load", loader.routes);
         app.use("/v2", apiv2.routes);
         app.use("/editor", editor.routes);
     },

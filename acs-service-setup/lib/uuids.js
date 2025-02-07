@@ -10,6 +10,14 @@ export const ACS = {
     App: {
         SchemaIcon:         "65c0ccba-151d-48d3-97b4-d0026a811900",
         MQTTPermTemplate:   "1266ddf1-156c-4266-9808-d6949418b185",
+
+    },
+    /* XXX These might really be Applications? For now they are
+     * well-known to the Auth service; they are perhaps 'classes of
+     * name'. */
+    Identity: {
+        Kerberos:           "75556036-ce98-11ef-9534-637ef5d37456",
+        Sparkplug:          "7c51a61a-ce98-11ef-834a-976fb7c5dd4c",
     },
     /* XXX These should probably be deployment-specific */
     Group: {
@@ -26,6 +34,10 @@ export const ACS = {
             EdgeNodeConsumer:   "17a64293-b82d-4db4-af4d-63359bb62934",
             PrimaryApp:         "c0d17bcf-2a90-40e5-b244-07bf631f7417",
             Warehouse:          "6958c812-fbe2-4e6c-b997-6f850b89f679",
+        },
+        Auth: {
+            ReadIdentity:       "e8c9c0f7-0d54-4db2-b8d6-cd80c45f6a5c",
+            ManageIdentity:     "327c4cc8-9c46-4e1e-bb6b-257ace37b0f6",
         },
         MQTT: {
             IssueCommands:      "50f1e694-7e18-4930-aa59-97cc90a6a1ec",
@@ -73,15 +85,15 @@ export const ACS = {
      * ServiceRequirement groups to grant them permissions. */
     ServiceAccount: {
         Auth:                   "1e1989ab-14e4-42bd-8171-495230acc406",
+        ClusterManager:         "127cde3c-773a-4f61-b0ba-7412a2695253",
         CmdEsc:                 "23d4e8f9-76c0-49d5-addc-00b6ac05ee58",
         ConfigDB:               "36861e8d-9152-40c4-8f08-f51c2d7e3c25",
-        Warehouse:              "388ddbdc-4eb4-4ae8-bbd0-9be32f3c31e8",
         Directory:              "5cc3b068-938f-4bb2-8ceb-64338a02fbeb",
+        Git:                    "626df296-8156-4c67-8aed-aac70161aa8b",
+        KrbKeys:                "a04b4195-7db4-4480-b3f3-4d22c08b96ea",
         Manager:                "2340e706-1280-420c-84a6-016547b55e95",
         MQTT:                   "2f42daeb-4521-4522-8e19-85dfb73db88e",
-        KrbKeys:                "a04b4195-7db4-4480-b3f3-4d22c08b96ea",
-        Git:                    "626df296-8156-4c67-8aed-aac70161aa8b",
-        ClusterManager:         "127cde3c-773a-4f61-b0ba-7412a2695253",
+        Warehouse:              "388ddbdc-4eb4-4ae8-bbd0-9be32f3c31e8",
     },
 };
 
@@ -108,6 +120,13 @@ export const ConfigDB = {
         Self:               "5855a1cc-46d8-4b16-84f8-ab3916ecb230",
         Unowned:            "091e796a-65c0-4080-adff-c3ce01a65b2e",
     },
+    Perm: {
+        ReadConfig: "4a339562-cd57-408d-9d1a-6529a383ea4b",
+        WriteConfig: "6c799ccb-d2ad-4715-a2a7-3c8728d6c0bf",
+        ManageAppSchema: "95c7cbcb-ce60-49ed-aa81-2fe3eec4559d",
+        ManageObjects: "f0b7917b-d475-4888-9d5a-2af96b3c26b6",
+        DeleteObjects: "6957174b-7b08-45ca-ac5c-c03ab6928a6e",
+    }
 };
 
 export const Auth = {
@@ -141,7 +160,46 @@ export const Auth = {
         /* Unused; for future use */
         Template:           "2760634a-b6d7-11ef-b5f5-cfe88d82bd26",
     },
+    Perm: {
+        ManageKerberos: "327c4cc8-9c46-4e1e-bb6b-257ace37b0f6",
+        ReadEffective: "35252562-51e5-4dd8-84cd-ba0fafa62669",
+        ManageACL: "3a41f5ce-fc08-4669-9762-ec9e71061168",
+        ReadACL: "ba566181-0e8a-405b-b16e-3fb89130fbee",
+        ManageGroup: "be9b6d47-c845-49b2-b9d5-d87b83f11c3b",
+        ReadKerberos: "e8c9c0f7-0d54-4db2-b8d6-cd80c45f6a5c",
+    },
 };
+
+export const MQTT = {
+    App: {
+        PermTemplate:       "1266ddf1-156c-4266-9808-d6949418b185",
+    },
+    Perm: {
+        ReadNode: "046d6603-fa62-4208-9400-65d61f8b1ec4",
+        SubscribeWholeNamespace: "21000098-3a53-48da-8d3e-cc0650603d8e",
+        ReadWholeNamespace: "81833dbb-1150-4078-b1db-978c646ba73e",
+        IssueCommands: "50f1e694-7e18-4930-aa59-97cc90a6a1ec",
+        PublishAllFromGroup: "64c019f8-6754-4270-8917-6659a5628b86",
+        ReadAllStates: "8790cf3d-b793-423c-b373-8cfcf9f63529",
+        WriteGroupState: "9a32f195-a8cc-4562-a87a-d4653279474f",
+        ParticipateAsNode: "a1314953-8226-44f4-8a3e-e87b09310579",
+        WriteOwnState: "bdc96a3e-d6fb-48ed-b790-0aa95cf826f0",
+        IssueGroupCommands: "cff45682-f2f0-4c72-91f3-7dda20d43509",
+        ReadOwnGroup: "d617e37c-3908-41b1-8820-d3f8d41a4280",
+        RepresentDevices: "e82456b3-a7d9-4971-9d8c-fd0be4545ab4",
+        ReadAllBirths: "67dc4dd0-0939-42b1-b1f9-9049f4d91d40",
+    },
+};
+
+export const CmdEsc = {
+    App: {
+        CmdDef: "60e99f28-67fe-4344-a6ab-b1edb8b8e810",
+    },
+    Perm: {
+        Rebirth: "fbb9c25d-386d-4966-a325-f16471d9f7be",
+        ReloadEdgeAgentConfig: "6335f100-e68e-4e4d-b46d-85b42f85a036",
+    },
+}
 
 export const Clusters = {
     App: {

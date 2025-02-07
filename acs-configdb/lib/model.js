@@ -16,7 +16,6 @@ import { DB } from "@amrc-factoryplus/pg-client";
 
 import {App, Class, Service, SpecialObj} from "./constants.js";
 import { SpecialApps } from "./special.js";
-import { dump_schema } from "./dump-schema.js";
 
 const DB_Version = 10;
 
@@ -87,7 +86,6 @@ export default class Model extends EventEmitter {
 
         this.schemas = new Map();
         this.special = new Map();
-        this.dump_validate = this.ajv.compile(dump_schema);
 
         /* { app, obj, etag, config }
          * config is undefined for a delete entry */
@@ -896,7 +894,7 @@ export default class Model extends EventEmitter {
         const st = await (
             v == 1 ? this._dump_load_obj_v1(dump)
             : v == 2 ? this._dump_load_obj_v2(dump)
-            : 400);
+            : 422);
         if (st > 299) return st;
 
         for (const [app, objs] of Object.entries(dump.configs ?? {})) {

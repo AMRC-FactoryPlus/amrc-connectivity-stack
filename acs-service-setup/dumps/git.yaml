@@ -40,20 +40,14 @@ configs:
         path: { type: string }
 ---
 service: !u UUIDs.Service.Authentication
-version: 1
-aces:
-  - principal: !u Git.Requirement.ServiceAccount
-    permission: !u UUIDs.Permission.Directory.AdvertiseService
-    target: !u Git.Service.Git
-
-  - principal: !u Git.Requirement.ServiceAccount
-    permission: !u UUIDs.Permission.Auth.ReadACL
-    target: !u Git.Perm.All
-
-  - principal: !u Git.Requirement.ServiceAccount
-    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
-    target: !u Git.App.Config
-
-  - principal: !u Git.Requirement.ServiceAccount
-    permission: !u ACS.Role.EdgeNodeConsumer
-    target: !u ACS.Device.ConfigDB
+version: 2
+grants:
+  !u Git.Requirement.ServiceAccount:
+    !u UUIDs.Permission.Directory.AdvertiseService:
+      !u Git.Service.Git: false
+    !u UUIDs.Permission.Auth.ReadACL:
+      !u Git.Perm.All: true
+    !u UUIDs.Permission.ConfigDB.ReadConfig:
+      !u Git.App.Config: false
+    !u ACS.Role.EdgeNodeConsumer:
+      !u ACS.Device.ConfigDB: false

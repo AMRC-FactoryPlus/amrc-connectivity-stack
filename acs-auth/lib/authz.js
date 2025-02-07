@@ -70,13 +70,12 @@ export default class AuthZ {
          * reason for this not happening would be if groups were not
          * correctly registered in the ConfigDB. */
         api.get("/group/all", this.group_all.bind(this));
+        api.get("/group", this.group_get.bind(this));
+        api.get("/group/:group", this.group_get.bind(this));
         api.delete("/group/:group/:member", this.group_delete.bind(this));
 
         api.get("/effective", this.effective_list.bind(this));
         api.get("/effective/:principal", this.effective_get.bind(this));
-
-        api.post("/load", this.dump_load.bind(this));
-        api.get("/save", this.dump_save.bind(this));
 
         return api;
     }
@@ -207,6 +206,19 @@ export default class AuthZ {
         return res.status(200).json(groups);
     }
 
+    async group_get (req, res) {
+        const { group } = req.params;
+
+        const ok = await this.model.check_acl(
+            req.auth, Perm.Manage_Group, UUIDs.Null, false);
+        if (!ok) return res.status(403).end();
+
+        const rv = group
+            ? await this.model.group_get(group)
+            : await this.model.group_list();
+        return res.status(200).json(rv);
+    }
+
     async group_delete(req, res) {
         const {group, member} = req.params;
 
@@ -235,47 +247,5 @@ export default class AuthZ {
         const {principal} = req.params;
         const eff = await this.model.effective_get(principal);
         return res.status(200).json(eff);
-    }
-
-    async dump_load(req, res) {
-        const dump = req.body;
-
-        if (!this.model.dump_validate(dump)) {
-            this.debug.log("dump", "Dump failed initial validation");
-            return res.status(400).end();
-        }
-
-        const perms = {
-            aces: Perm.Manage_ACL,
-            groups: Perm.Manage_Group,
-            principals: Perm.Manage_Krb,
-        };
-        for (const [key, perm] of Object.entries(perms)) {
-            if (key in dump) {
-                const ok = await this.model.check_acl(
-                    req.auth, perm, UUIDs.Null, false);
-                if (!ok) {
-                    this.debug.log("dump", "Refusing dump: %s needs permission to set %s",
-                        req.auth, key);
-                    return res.status(403).end();
-                }
-            }
-        }
-
-        const st = await this.model.dump_load(dump);
-        return res.status(st).end();
-    }
-
-    async dump_save(req, res) {
-        const ckperm = async p =>
-            await this.model.check_acl(req.auth, p, UUIDs.Null, false);
-        const ok = await ckperm(Perm.Manage_ACL)
-            && await ckperm(Perm.Manage_Group)
-            && await ckperm(Perm.Manage_Krb);
-        if (!ok)
-            return res.status(403).end();
-
-        const rv = await this.model.dump_save();
-        return res.status(200).json(rv);
     }
 }

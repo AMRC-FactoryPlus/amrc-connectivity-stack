@@ -21,10 +21,12 @@ export default class Model extends Queries {
         super(db.query.bind(db))
 
         this.debug = opts.debug;
+        this.log = opts.debug.bound("model");
 
         this.db = db;
         this.acl_cache_age = opts.acl_cache * 1000;
         this.root_principal = opts.root_principal;
+        this.realm = opts.realm;
 
         this.acl_cache = new Map();
     }
@@ -103,53 +105,68 @@ export default class Model extends Queries {
         });
     }
 
-    dump_validate(dump) {
-        /* Parens essential due to stupid JS parsing magic (semicolon
-         * insertion grrr) */
-        return (
-            dump.service == UUIDs.Service.Authentication
-            && dump.version == 1
-        );
-    }
-
+    /* The dump must be valid. We will get database errors (at best) if
+     * it is not. */
     dump_load(dump) {
-        if (!this.dump_validate(dump))
-            return 400;
+        const realm = this.realm;
+        const krbs = Object.entries(dump.identities ?? {})
+            .map(([uuid, { kerberos: upn }]) => ({
+                uuid,
+                kerberos:   /@/.test(upn) ? upn : `${upn}@${realm}`,
+            }));
+        const aces = Object.entries(dump.grants ?? {})
+            .flatMap(([principal, perms]) => 
+                Object.entries(perms)
+                    .map(([p, t]) => [p, t ?? { [UUIDs.Special.Null]: false }])
+                    .flatMap(([permission, targs]) =>
+                        Object.entries(targs)
+                            .flatMap(([target, plural]) =>
+                                ({ principal, permission, target, plural }))));
+        const uuids = new Set([
+            ...aces.map(g => g.principal),
+            ...aces.map(g => g.permission),
+            ...aces.map(g => g.target),
+            ...krbs.map(k => k.uuid),
+        ]);
 
-        return 204;
         return this.txn(async q => {
-            for (const ace of dump.aces ?? []) {
-                await q.ace_add(ace);
-            }
-            for (const [grp, mems] of Object.entries(dump.groups ?? {})) {
-                for (const mem of mems) {
-                    await q.group_add(grp, mem);
-                }
-            }
-            for (const pri of dump.principals ?? []) {
-                await q.principal_add(pri);
-            }
+            const n_uuid = await q.dump_load_uuids(uuids);
+            if (n_uuid.length)
+                this.log("Inserted new UUIDs: %o", n_uuid);
+
+            /* We want entirely duplicate entries to be silently
+             * ignored, but mismatches to fail the dump. */
+            const n_id = await q.dump_load_krbs(krbs)
+                .catch(e => e?.code == "23505" ? null : Promise.reject(e));
+            if (!n_id) return 409;
+            if (n_id.length)
+                this.log("Updated identity for %o", n_id);
+                    
+            const n_grant = await q.dump_load_aces(aces);
+            if (n_grant.length)
+                this.log("Updated grants: %o", n_grant);
 
             return 204;
         });
     }
 
     dump_save() {
-        return this.txn(async q => {
-            const aces = await q.ace_get_all();
-            const parents = await q.group_list();
-            const groups = Object.fromEntries(
-                await Promise.all(
-                    parents.map(p =>
-                        q.group_get(p)
-                            .then(ms => [p, ms]))));
-            const principals = await q.principal_get_all();
-
-            return {
-                service: UUIDs.Service.Authentication,
-                version: 1,
-                aces, groups, principals,
-            };
-        });
+        return 404;
+//        return this.txn(async q => {
+//            const aces = await q.ace_get_all();
+//            const parents = await q.group_list();
+//            const groups = Object.fromEntries(
+//                await Promise.all(
+//                    parents.map(p =>
+//                        q.group_get(p)
+//                            .then(ms => [p, ms]))));
+//            const principals = await q.principal_get_all();
+//
+//            return {
+//                service: UUIDs.Service.Authentication,
+//                version: 1,
+//                aces, groups, principals,
+//            };
+//        });
     }
 }

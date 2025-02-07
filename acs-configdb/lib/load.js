@@ -7,6 +7,7 @@
 import { UUIDs } from "@amrc-factoryplus/service-client";
 
 import { Perm } from "./constants.js";
+import { dump_schema } from "./dump-schema.js";
 
 export class Loader {
     constructor (opts) {
@@ -21,10 +22,10 @@ export class Loader {
     async load(req, res) {
         const dump = req.body;
 
-        if (!this.model.dump_validate(dump)) {
+        if (!dump_schema(dump)) {
             /* XXX this is an awful API */
-            this.log("Dump failed validation: %o", this.model.dump_validate.errors);
-            return res.status(400).end();
+            this.log("Dump failed validation: %o", dump_schema.errors);
+            return res.status(422).end();
         }
 
         const perms = {

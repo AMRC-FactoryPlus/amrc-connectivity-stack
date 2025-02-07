@@ -103,7 +103,7 @@ export default class Queries {
                         left join group_members perm on perm.parent = a.permission
                         left join group_members targ on targ.parent = a.target),
                 full_acl as (
-                    select u.id principal, a.permission, 
+                    select u.id princid, a.principal, a.permission, 
                         case a.target 
                             when '5855a1cc-46d8-4b16-84f8-ab3916ecb230'::uuid
                                 then a.principal
@@ -114,7 +114,7 @@ export default class Queries {
             select a.principal, a.permission, a.target
             from full_acl a
                 left join group_members g on g.child = a.permission
-            where a.principal = $1 and g.parent = $2
+            where a.princid = $1 and g.parent = $2
         `, [princ_id, permission]);
 
         return dbr.rows;
@@ -204,31 +204,11 @@ export default class Queries {
     }
 
     async ace_add (ace) {
-        await this.query(`
-            insert into uuid (uuid)
-            select uuid
-            from unnest($1::uuid[]) n(uuid)
-            on conflict (uuid) do nothing
-        `, [[ace.principal, ace.permission, ace.target]]);
-        await this.query(`
-            insert into ace (principal, permission, target, plural)
-            select u.id, p.id, t.id, $4
-            from uuid u, uuid p, uuid t
-            where u.uuid = $1 and p.uuid = $2 and t.uuid = $3
-            on conflict do nothing
-        `, [ace.principal, ace.permission, ace.target, ace.plural ?? false]);
-        return 204;
+        throw "unimplemented";
     }
 
     async ace_delete (ace) {
         throw "unimplemented";
-        await this.query(`
-            delete from ace
-            where principal = $1
-                and permission = $2
-                and target = $3
-        `, [ace.principal, ace.permission, ace.target]);
-        return 204;
     }
 
     /* This returns an ID. */
@@ -252,25 +232,26 @@ export default class Queries {
 
     async principal_get_all () {
         const dbr = await this.query(`
-            select p.uuid, p.kerberos from principal p
+            select u.uuid, i.name kerberos
+            from identity i
+                join uuid u on u.id = i.principal
         `);
         return dbr.rows;
     }
 
-    async principal_list () {
-        const dbr = await this.query(`
-            select kerberos from principal 
-        `);
-        return dbr.rows.map(r => r.kerberos);
+    principal_list () {
+        return this.principal_get_all()
+            .then(rs => rs.map(r => r.kerberos));
     }
 
     async principal_add (princ) {
+        const id = await this.uuid_find(princ.uuid);
         const dbr = await this.query(`
-            insert into principal (uuid, kerberos)
-            values ($1, $2)
+            insert into identity (principal, kind, name)
+            values ($1, ${IDs.Kerberos}, $2)
             on conflict do nothing
             returning 1 ok
-        `, [princ.uuid, princ.kerberos]);
+        `, [id, princ.kerberos]);
         return dbr.rows[0]?.ok ? 204 : 409;
     }
 
@@ -286,8 +267,10 @@ export default class Queries {
 
     async principal_delete (uuid) {
         const dbr = await this.query(`
-            delete from principal
-            where uuid = $1
+            delete from identity i
+            using uuid u
+            where i.principal = u.id
+                and u.uuid = $1
             returning 1 ok
         `, [uuid]);
         return dbr.rows[0]?.ok ? 204 : 404;
@@ -319,6 +302,19 @@ export default class Queries {
         return 204;
     }
 
+    group_list () {
+        return this.q_list(`
+            select distinct parent from old_member
+        `);
+    }
+
+    group_get (group) {
+        return this.q_list(`
+            select child from old_member
+            where parent = $1
+        `, [group]);
+    }
+
     async effective_get (principal) {
         const dbr = await this.query(`
             select p.kerberos, a.principal, a.permission,
@@ -331,6 +327,53 @@ export default class Queries {
             where p.kerberos = $1
         `, [principal]);
         return dbr.rows;
+    }
+
+    dump_load_uuids (uuids) {
+        return this.q_list(`
+            insert into uuid (uuid)
+            select u.uuid
+            from unnest($1::uuid[]) u(uuid)
+            on conflict do nothing
+            returning uuid
+        `, [[...uuids]]);
+    }
+
+    dump_load_krbs (krbs) {
+        return this.q_list(`
+            insert into identity (principal, kind, name)
+            select u.id, 1, i.i->>'kerberos'
+            from unnest($1::jsonb[]) i(i)
+                join uuid u on u.uuid::text = i.i->>'uuid'
+            except select principal, kind, name from identity
+            returning name
+        `, [krbs]);
+    }
+
+    /* XXX This form of loading gives no way for a revised version of a
+     * dump to remove old grants. This is a problem across the board
+     * with our dump loading logic but is more important here. I think
+     * the only solution that works is to introduce a 'source' for these
+     * entries such that loading a new dumps clears old data from that
+     * source. Moving the grants into the ConfigDB would make it easier
+     * to solve this in general. */
+    dump_load_aces (aces) {
+        return this.q_rows(`
+            insert into ace (principal, permission, target, plural)
+            select u.id, p.id, t.id, 
+                coalesce((g.g->'plural')::boolean, false)
+            from unnest($1::jsonb[]) g(g)
+                join uuid u on u.uuid::text = g.g->>'principal'
+                join uuid p on p.uuid::text = g.g->>'permission'
+                join uuid t on t.uuid::text = g.g->>'target'
+            on conflict (principal, permission, target) do update
+                set plural = excluded.plural
+                where ace.plural != excluded.plural
+            returning principal, permission, target
+        `, [aces]);
+    }
+
+    async do_dump_load (uuids, krbs, grants) {
     }
 }
 

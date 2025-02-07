@@ -33,25 +33,17 @@ objects:
     !u Edge.App.AgentConfig:      { name: "Edge Agent config" }
 ---
 service: !u UUIDs.Service.Authentication
-version: 1
-principals:
-aces:
-  - principal: !u ACS.Group.SparkplugNode
-    permission: !u ACS.Perm.MQTT.ParticipateAsNode
-    target: !u UUIDs.Special.Self
-  - principal: !u ACS.Group.SparkplugNode
-    permission: !u ACS.Perm.MQTT.RepresentDevices
-    target: !u UUIDs.Special.Self
-  - principal: !u ACS.Group.SparkplugNode
-    permission: !u ACS.Perm.MQTT.ReadAllStates
-    target: !u UUIDs.Special.Null
-  - principal: !u ACS.Group.SparkplugNode
-    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
-    target: !u UUIDs.App.SparkplugAddress
+version: 2
+grants:
+  !u ACS.Group.SparkplugNode:
+    !u ACS.Perm.MQTT.ParticipateAsNode:
+      !u UUIDs.Special.Self: false
+    !u ACS.Perm.MQTT.RepresentDevices:
+      !u UUIDs.Special.Self: false
+    !u ACS.Perm.MQTT.ReadAllStates: null
+    !u UUIDs.Permission.ConfigDB.ReadConfig:
+      !u UUIDs.App.SparkplugAddress: false
 
-  - principal: !u ACS.Group.SparkplugReader
-    permission: !u ACS.Perm.MQTT.ReadWholeNamespace
-    target: !u UUIDs.Special.Null
-  - principal: !u ACS.Group.SparkplugReader
-    permission: !u UUIDs.Permission.CmdEsc.Rebirth
-    target: !u UUIDs.Special.Null
+  !u ACS.Group.SparkplugReader:
+    !u ACS.Perm.MQTT.ReadWholeNamespace: null
+    !u UUIDs.Permission.CmdEsc.Rebirth: null

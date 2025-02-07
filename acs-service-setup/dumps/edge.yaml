@@ -31,14 +31,11 @@ objects:
     !u Edge.App.Deployment:         { name: "Edge deployment" }
 ---
 service: !u UUIDs.Service.Authentication
-version: 1
-aces:
-  - principal: !u ACS.Group.CentralMonitor
-    permission: !u ACS.Role.EdgeNodeConsumer
-    target: !u ACS.Device.ConfigDB
-  - principal: !u ACS.Group.CentralMonitor
-    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
-    target: !u Edge.App.ClusterStatus
-  - principal: !u ACS.Group.CentralMonitor
-    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
-    target: !u UUIDs.App.SparkplugAddress
+version: 2
+grants:
+  !u ACS.Group.CentralMonitor:
+    !u ACS.Role.EdgeNodeConsumer:
+      !u ACS.Device.ConfigDB: false
+    !u UUIDs.Permission.ConfigDB.ReadConfig:
+      !u Edge.App.ClusterStatus: false
+      !u UUIDs.App.SparkplugAddress: false

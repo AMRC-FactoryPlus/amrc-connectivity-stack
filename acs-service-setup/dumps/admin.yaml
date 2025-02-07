@@ -65,52 +65,39 @@ objects:
 #      principal: !u ACS.Group.Administrator
 #      permission: !u ACS.PermGroup.Auth
 #      target: !u UUIDs.Special.Null
-#      plural: false
 #    316db19a-cea0-11ef-8c3e-d7c765a7946f:
 #      principal: !u ACS.Group.Administrator
 #      permission: !u ACS.PermGroup.Clusters
 #      target: !u UUIDs.Special.Null
-#      plural: false
 #    330473fe-cea0-11ef-a977-63ee98241d38:
 #      principal: !u ACS.Group.Administrator
 #      permission: !u ACS.PermGroup.CmdEsc
 #      target: !u UUIDs.Special.Null
-#      plural: false
 #    345f24ba-cea0-11ef-8a1b-bf4371864be2:
 #      principal: !u ACS.Group.Administrator
 #      permission: !u ACS.PermGroup.ConfigDB
 #      target: !u UUIDs.Special.Null
-#      plural: false
 #    359e7cf4-cea0-11ef-86dd-1bb279cadc72:
 #      principal: !u ACS.Group.Administrator
 #      permission: !u ACS.PermGroup.Directory
 #      target: !u UUIDs.Special.Null
-#      plural: false
 #    378e11fa-cea0-11ef-a0f7-37fda7fa7e32:
 #      principal: !u ACS.Group.Administrator
 #      permission: !u ACS.PermGroup.Git
 #      target: !u UUIDs.Special.Null
-#      plural: false
 ---
 service: !u UUIDs.Service.Authentication
-version: 1
-aces:
-  - principal: !u ACS.Group.Administrator
-    permission: !u ACS.PermGroup.Auth
-    target: !u UUIDs.Special.Null
-  - principal: !u ACS.Group.Administrator
-    permission: !u ACS.PermGroup.Clusters
-    target: !u UUIDs.Special.Null
-  - principal: !u ACS.Group.Administrator
-    permission: !u ACS.PermGroup.CmdEsc
-    target: !u UUIDs.Special.Null
-  - principal: !u ACS.Group.Administrator
-    permission: !u ACS.PermGroup.ConfigDB
-    target: !u UUIDs.Special.Null
-  - principal: !u ACS.Group.Administrator
-    permission: !u ACS.PermGroup.Directory
-    target: !u UUIDs.Special.Null
-  - principal: !u ACS.Group.Administrator
-    permission: !u ACS.PermGroup.Git
-    target: !u UUIDs.Special.Null
+version: 2
+grants:
+  # XXX I'm not sure these are appropriate; we are relying on the old
+  # permission group expansion semantics, but these are not composite
+  # permissions. For now all perm groups are expanded, but possibly
+  # these should be individual grants?
+  !u ACS.Group.Administrator:
+    !u ACS.PermGroup.Auth: null
+    !u ACS.PermGroup.Clusters: null
+    !u ACS.PermGroup.CmdEsc: null
+    !u ACS.PermGroup.ConfigDB: null
+    !u ACS.PermGroup.Directory: null
+    !u ACS.PermGroup.Git: null
 

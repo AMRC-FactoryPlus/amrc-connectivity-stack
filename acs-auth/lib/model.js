@@ -125,27 +125,30 @@ export default class Model extends Queries {
                 kerberos:   /@/.test(upn) ? upn : `${upn}@${realm}`,
             }));
         return this.txn(async q => {
-            this.log("Inserting UUIDs: %o", uuids);
-            await q.query(`
+            const n_uuid = await q.q_list(`
                 insert into uuid (uuid)
                 select u.uuid
                 from unnest($1::uuid[]) u(uuid)
                 on conflict do nothing
+                returning uuid
             `, [[...uuids]]);
+            if (n_uuid.length)
+                this.log("Inserted new UUIDs: %o", n_uuid);
 
-            this.log("Inserting identities: %o", krbs);
             /* We want entirely duplicate entries to be silently
              * ignored, but mismatches to fail the dump. */
-            const idok = await q.query(`
+            const n_id = await q.q_list(`
                 insert into identity (principal, kind, name)
                 select u.id, 1, i.i->>'kerberos'
                 from unnest($1::jsonb[]) i(i)
                     join uuid u on u.uuid::text = i.i->>'uuid'
                 except select principal, kind, name from identity
+                returning name
             `, [krbs])
-                .then(() => true)
-                .catch(e => e?.code == "23505" ? false : Promise.reject(e));
-            if (!idok) return 409;
+                .catch(e => e?.code == "23505" ? null : Promise.reject(e));
+            if (!n_id) return 409;
+            if (n_id.length)
+                this.log("Updated identity for %o", n_id);
                     
             /* XXX This form of loading gives no way for a revised
              * version of a dump to remove old grants. This is a problem
@@ -155,8 +158,7 @@ export default class Model extends Queries {
              * new dumps clears old data from that source. Moving the
              * grants into the ConfigDB would make it easier to solve
              * this in general. */
-            this.log("Inserting grants: %o", grants);
-            await q.query(`
+            const n_grant = await q.q_rows(`
                 insert into ace (principal, permission, target, plural)
                 select u.id, p.id, t.id, 
                     coalesce((g.g->'plural')::boolean, false)
@@ -167,7 +169,10 @@ export default class Model extends Queries {
                 on conflict (principal, permission, target) do update
                     set plural = excluded.plural
                     where ace.plural != excluded.plural
+                returning principal, permission, target
             `, [grants]);
+            if (n_grant.length)
+                this.log("Updated grants: %o", n_grant);
 
             return 204;
         });

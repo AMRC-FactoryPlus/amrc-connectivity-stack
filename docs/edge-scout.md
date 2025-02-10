@@ -14,8 +14,7 @@ This feature will be implemented by extending the existing Edge Agent source cod
 
 If Scout mode is enabled, the Edge Agent will trigger the scouting method for each supported connection type (OPC UA, MQTT, etc.). Once the list of addresses is received, the Edge Agent will send it to the ACS Config Service to be stored within a new object.
 
-[Diagram goes here]
-
+![High Level Diagram](https://github.com/AMRC-FactoryPlus/amrc-connectivity-stack/blob/za/edge_agent_scout_mode/docs/assets/edge-agent-scout/acs-edge-scout-high-level-diagram.png?raw=true)
 
 ## Implementation
 

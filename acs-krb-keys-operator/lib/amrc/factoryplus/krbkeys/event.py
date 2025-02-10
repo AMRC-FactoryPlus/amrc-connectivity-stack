@@ -80,7 +80,9 @@ class AccUuid (KrbKeyEvent):
     def __init__ (self, args):
         super().__init__(args)
 
-        self.account = args["spec"].get("account")
+        spec = args["spec"]
+        self.account = spec.get("account")
+        selc.principal = spec["principal"]
 
     def process (self):
         if self.reason == "delete":
@@ -106,7 +108,11 @@ class AccUuid (KrbKeyEvent):
             log(f"Account is unmanaged. Using UUID {spec}.")
             p_annot[key] = spec
         elif annot is None:
-            # We are managing this object. We need to make sure that if
+            # We are managing this object but it's new. Start by
+            # checking the Auth service for a principal mapping.
+            log(f"Checking Auth service for existing account for {self.principal}")
+
+            # We need to make sure that if
             # the object creation succeeds, the annotation will be
             # recorded. Otherwise we keep creating ConfigDB objects.
             log(f"Creating new account in class {klass}")

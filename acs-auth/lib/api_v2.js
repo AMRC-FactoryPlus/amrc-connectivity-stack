@@ -43,6 +43,9 @@ export class APIv2 {
             .put(this.grant_put.bind(this))
             .delete(this.grant_put.bind(this));
 
+        api.get("/principal/find", this.principal_find.bind(this));
+        api.get("/principal/find/kerberos/:upn", this.principal_find.bind(this));
+
         return api;
     }
 
@@ -144,5 +147,27 @@ export class APIv2 {
 
         const rv = await this.data.request({ kind: "grant", uuid, grant, permitted });
         return res.status(rv.status).end();
+    }
+
+    /* This endpoint may change in future to allow searching for
+     * principals by other criteria, e.g. Node address. */
+    async principal_find (req, res) {
+        const kerberos = req.params?.upn ?? req.auth;
+        if (!valid_krb(kerberos))
+            return res.status(410).end();
+
+        const uuid = await this.model.principal_find_by_krb(kerberos);
+        if (uuid == null)
+            return res.status(404).end();
+
+        /* We have to check permissions against the returned UUID. This
+         * means that we must return 404 instead of 403 if the check
+         * fails. Principals are always allowed to look up their own
+         * information. */
+        const ok = req.auth == kerberos
+            || await this.model.check_acl(req.auth, Perm.Read_Krb, uuid, true)
+        if (!ok) return res.status(404).end();
+
+        return res.status(200).json(uuid);
     }
 }

@@ -7,6 +7,7 @@
 import express from "express";
 
 import { UUIDs } from "@amrc-factoryplus/service-client";
+import { forward } from "@amrc-factoryplus/service-api";
 
 import {Perm} from "./uuids.js";
 import { booleans, valid_krb, valid_uuid } from "./validate.js";
@@ -178,23 +179,11 @@ export default class AuthZ {
     /* This endpoint may change in future to allow searching for
      * principals by other criteria, e.g. Node address. */
     async principal_find(req, res) {
-        const kerberos = req.query?.kerberos ?? req.auth;
-        if (!valid_krb(kerberos))
-            return res.status(400).end();
-
-        const uuid = await this.model.principal_find_by_krb(kerberos);
-        if (uuid == null)
-            return res.status(404).end();
-
-        /* We have to check permissions against the returned UUID. This
-         * means that we must return 404 instead of 403 if the check
-         * fails. Principals are always allowed to look up their own
-         * information. */
-        const ok = req.auth == kerberos
-            || await this.model.check_acl(req.auth, Perm.Read_Krb, uuid, true)
-        if (!ok) return res.status(404).end();
-
-        return res.status(200).json(uuid);
+        const kerberos = req.query?.kerberos;
+        return forward(
+            kerberos == null    ? "/v2/principal/find"
+            : `/v2/principal/find/kerberos/${kerberos}`
+        )(req, res);
     }
 
     async group_all(req, res) {

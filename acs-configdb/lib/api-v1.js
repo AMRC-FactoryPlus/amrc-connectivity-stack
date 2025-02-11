@@ -8,6 +8,7 @@ import express from "express";
 import { UUIDs } from "@amrc-factoryplus/service-client";
 
 import {App, Class, Perm} from "./constants.js";
+import { dump_schema } from "./dump-schema.js";
 
 export class APIv1 {
     constructor(opts) {
@@ -183,15 +184,15 @@ export class APIv1 {
 
         const overwrite = booleans[req.query.overwrite];
         if (overwrite == undefined)
-            return res.status(400).end();
+            return res.status(410).end();
 
-        if (!this.model.dump_validate(dump)) {
+        if (!dump_schema(dump)) {
             this.log("Dump failed to validate: %o", this.model.dump_validate.errors);
-            return res.status(400).end();
+            return res.status(422).end();
         }
         if (dump.version != 1) {
             this.log("/v1/load can only load version 1 dumps");
-            return res.status(400).end();
+            return res.status(422).end();
         }
 
         const perms = {

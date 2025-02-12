@@ -25,8 +25,12 @@ sealedSecrets:
 image:
   # Values under default: will be used if not overridden per-image
   default:
-    registry: ghcr.io/amrc-factoryplus
+    registry: %%REGISTRY%%
+    {{- if regexMatch "^v[0-9]" "%%TAG%%" }}
     pullPolicy: IfNotPresent
+    {{- else }}
+    pullPolicy: Always
+    {{- end }}
     tag: %%TAG%%
   edgeSync:
     repository: acs-edge-sync

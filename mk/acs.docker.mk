@@ -13,6 +13,7 @@ image=${registry}/${repo}:${tag}
 platform?=	linux/amd64
 
 build_args+=	--build-arg revision="${git.tag} (${git.sha})"
+build_args+=	--build-arg registry="${registry}"
 build_args+=	--build-arg tag="${tag}"
 
 # `git rev-parse HEAD:directory` gives a SHA for the contents of that

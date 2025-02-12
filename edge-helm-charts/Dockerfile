@@ -6,6 +6,7 @@ ARG base_prefix=ghcr.io/amrc-factoryplus/acs-base
 FROM ${base_prefix}-js-build:${base_version} AS build
 ARG acs_npm=NO
 ARG revision=unknown
+ARG registry=ghcr.io/amrc-factoryplus
 ARG tag=latest
 
 USER root
@@ -29,7 +30,7 @@ COPY --chown=node . .
 RUN sh -x <<'SHELL'
     echo "export const GIT_VERSION=\"$revision\";" > ./lib/git-version.js
 
-    sed -i -e"s/%%TAG%%/${tag}/g" \
+    sed -i -e"s!%%TAG%%!${tag}!g;s!%%REGISTRY%%!%{registry}!g" \
         charts/edge-agent/values.yaml \
         charts/edge-cluster/values.yaml \
 

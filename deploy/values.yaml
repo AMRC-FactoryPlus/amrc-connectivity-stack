@@ -232,7 +232,6 @@ admin:
 shell:
   image:
     repository: acs-krb-utils
-    tag: v0.0.1
 
 # XXX This should probably be included in acs-krb-utils
 curl: 

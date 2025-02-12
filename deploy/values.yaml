@@ -20,11 +20,16 @@ acs:
   cacheMaxAge: 300
   # -- Image pull secrets for container images
   imagePullSecrets: []
+  # The default registry for ACS images. This can be overridden for
+  # individual images if necessary.
+  defaultRegistry: ghcr.io/amrc-factoryplus
   # -- An optional tag that will force images to use this version
   # regardless of the version in the Helm chart. Each component can
   # further override this value by setting the `tag` property in its
   # own section. Deployments from a Git checkout must set this value.
   #defaultTag: ''
+  # The default pullPolicy.
+  defaultPullPolicy: IfNotPresent
 
 identity:
   # -- Whether or not to enable the Identity component
@@ -46,11 +51,8 @@ identity:
   #       - myotherrealm.net
   identity:
     image:
-      # -- The registry of the Identity component
-      registry: ghcr.io/amrc-factoryplus
       # -- The repository of the Identity component
       repository: acs-identity
-      pullPolicy: IfNotPresent
     # If this is set to true, the kdb-init container will not set up the
     # KDB but will sit and wait. This can be used to halt startup of the
     # KDC until a restore from backup can be performed. Be aware that
@@ -62,50 +64,36 @@ identity:
     namespaces: ""
 
     image:
-      # -- The registry of the KerberosKey Operator
-      registry: ghcr.io/amrc-factoryplus
       # -- The repository of the KerberosKey Operator
       repository: acs-krb-keys-operator
-      pullPolicy: IfNotPresent
 
 auth:
   # -- Whether or not to enable the Authorisation component
   enabled: true
   image:
-    # -- The registry of the Authorisation component
-    registry: ghcr.io/amrc-factoryplus
     # -- The repository of the Authorisation component
     repository: acs-auth
-    pullPolicy: IfNotPresent
   verbosity: "ALL,!service,!token,!query"
 
 directory:
   # -- Whether or not to enable the Directory component
   enabled: true
   image:
-    # -- The registry of the Directory component
-    registry: ghcr.io/amrc-factoryplus
     # -- The repository of the Directory component
     repository: acs-directory
-    pullPolicy: IfNotPresent
 
 configdb:
   # -- Whether or not to enable the Configuration Store component
   enabled: true
   image:
-    # -- The registry of the Configuration Store component
-    registry: ghcr.io/amrc-factoryplus
     # -- The repository of the Configuration Store component
     repository: acs-configdb
-    pullPolicy: IfNotPresent
   bodyLimit: 100kb
 
 monitor:
   enabled: true
   image:
-    registry: ghcr.io/amrc-factoryplus
     repository: acs-monitor
-    pullPolicy: IfNotPresent
   verbosity: "ALL,!service,!token"
 
 # -- The service-setup component loads ACS-specific configuration into
@@ -113,9 +101,7 @@ monitor:
 serviceSetup:
   enabled: true
   image:
-    registry: ghcr.io/amrc-factoryplus
     repository: acs-service-setup
-    pullPolicy: IfNotPresent
   # This section overrides the classes etc. installed into the ConfigDB
   config:
     # Git repos to create in the on-prem server. These may be
@@ -134,20 +120,15 @@ serviceSetup:
 edgeHelm:
   enabled: true
   image:
-    registry: ghcr.io/amrc-factoryplus
     repository: edge-helm-charts
-    pullPolicy: IfNotPresent
   repoPath: shared/helm
 
 mqtt:
   # -- Whether or not to enable the MQTT component
   enabled: true
   image:
-    # -- The registry of the MQTT component
-    registry: ghcr.io/amrc-factoryplus
     # -- The repository of the MQTT component
     repository: acs-mqtt
-    pullPolicy: IfNotPresent
   # -- Possible values are either 1 to enable all possible debugging, or a comma-separated list of debug tags (the tags printed before the log lines). No logging is specified as an empty string.
   verbosity: 0
 
@@ -155,11 +136,8 @@ unsIngesters:
   sparkplug:
     enabled: true
     image:
-      # -- The registry of the MQTT component
-      registry: ghcr.io/amrc-factoryplus
       # -- The repository of the MQTT component
       repository: uns-ingester-sparkplug
-      pullPolicy: IfNotPresent
     # -- The minimum log level that the historian will log messages at (One of 'fatal', 'error', 'warn', 'info', 'debug', 'trace' or 'silent'.)
     logLevel: info
     verbosity: 0
@@ -167,24 +145,16 @@ unsIngesters:
 visualiser:
   enabled: true
   image:
-    # -- The registry of the MQTT component
-    registry: ghcr.io/amrc-factoryplus
     # -- The repository of the MQTT component
     repository: acs-visualiser
-    pullPolicy: IfNotPresent
 
 manager:
   # -- Whether or not to enable the Manager component
   enabled: true
   image:
-    # -- The registry of the Manager component
-    registry: ghcr.io/amrc-factoryplus
     # -- The repository of the Manager component
     repository: acs-manager
-    pullPolicy: IfNotPresent
   edge:
-    # -- The registry of the Edge Agent component
-    registry: ghcr.io/amrc-factoryplus
     # -- The repository of the Edge Agent component
     repository: acs-edge
   meilisearch:
@@ -194,7 +164,6 @@ manager:
       registry: docker.io
       repository: getmeili/meilisearch
       tag: v0.30.0
-      pullPolicy: IfNotPresent
   # -- A string used to customise the branding of the manager
   name: Factory+ Manager
   # -- The environment that the manager is running in
@@ -208,11 +177,8 @@ cmdesc:
   # -- Whether or not to enable the Commands component
   enabled: true
   image:
-    # -- The registry of the Commands component
-    registry: ghcr.io/amrc-factoryplus
     # -- The repository of the Commands component
     repository: acs-cmdesc
-    pullPolicy: IfNotPresent
   # -- Possible values are either 1 to enable all possible debugging, or a comma-separated list of debug tags (the tags printed before the log lines). No logging is specified as an empty string.
   verbosity: 1
 
@@ -226,11 +192,8 @@ historians:
     # -- Send all buffered messages after this amount of time has elapsed if the buffer is not full (in milliseconds)
     flushInterval: 10000
     image:
-      # -- The registry of the Warehouse component
-      registry: ghcr.io/amrc-factoryplus
       # -- The repository of the UNS Historian component
       repository: historian-uns
-      pullPolicy: IfNotPresent
   sparkplug:
     enabled: true
     # -- The minimum log level that the historian will log messages at (One of 'fatal', 'error', 'warn', 'info', 'debug', 'trace' or 'silent'.)
@@ -240,20 +203,14 @@ historians:
     # -- Send all buffered messages after this amount of time has elapsed if the buffer is not full (in milliseconds)
     flushInterval: 10000
     image:
-      # -- The registry of the Warehouse component
-      registry: ghcr.io/amrc-factoryplus
       # -- The repository of the Warehouse component
       repository: historian-sparkplug
-      pullPolicy: IfNotPresent
 git:
   # -- Whether or not to enable the Git component
   enabled: true
   image:
-    # -- The registry of the Git component
-    registry: ghcr.io/amrc-factoryplus
     # -- The repository of the Git component
     repository: acs-git
-    pullPolicy: IfNotPresent
   # -- Possible values are either 1 to enable all possible debugging, or a comma-separated list of debug tags (the tags printed before the log lines). No logging is specified as an empty string.
   verbosity: "ALL,!service,!token"
 
@@ -261,29 +218,20 @@ clusterManager:
   # -- Whether or not to enable the Cluster Manager component
   enabled: true
   image:
-    # -- The registry of the Clusters component
-    registry: ghcr.io/amrc-factoryplus
     # -- The repository of the Clusters component
     repository: acs-cluster-manager
-    pullPolicy: IfNotPresent
   verbosity: "ALL,!service,!token"
 
 admin:
   # -- Whether or not to enable the Admin component
   enabled: true
   image:
-    # -- The registry of the Admin component
-    registry: ghcr.io/amrc-factoryplus
     # -- The repository of the Admin component
     repository: acs-admin
-    pullPolicy: IfNotPresent
 
 shell:
   image:
-    registry: ghcr.io/amrc-factoryplus
     repository: acs-krb-utils
-    tag: v0.0.1
-    pullPolicy: IfNotPresent
 
 # XXX This should probably be included in acs-krb-utils
 curl: 
@@ -291,7 +239,6 @@ curl:
     registry: docker.io
     repository: appropriate/curl
     tag: latest
-    pullPolicy: IfNotPresent
 
 minio:
   # -- Whether or not to enable MinIO
@@ -318,13 +265,11 @@ kubegres:
       registry: gcr.io
       repository: kubebuilder/kube-rbac-proxy
       tag: v0.13.0
-      pullPolicy: IfNotPresent
   kubegres:
     image:
       registry: docker.io
       repository: reactivetechio/kubegres
       tag: 1.16
-      pullPolicy: IfNotPresent
 
 traefik:
   enabled: true

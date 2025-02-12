@@ -8,6 +8,9 @@ env:
 on:
   release:
     types: [ published ]
+  push:
+    branches:
+      - 'testing/**'
 
 jobs:
   build-base-js:

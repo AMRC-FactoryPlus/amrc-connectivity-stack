@@ -30,7 +30,7 @@ COPY --chown=node . .
 RUN sh -x <<'SHELL'
     echo "export const GIT_VERSION=\"$revision\";" > ./lib/git-version.js
 
-    sed -i -e"s!%%TAG%%!${tag}!g;s!%%REGISTRY%%!%{registry}!g" \
+    sed -i -e"s!%%TAG%%!${tag}!g;s!%%REGISTRY%%!${registry}!g" \
         charts/edge-agent/values.yaml \
         charts/edge-cluster/values.yaml \
 

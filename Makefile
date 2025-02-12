@@ -25,6 +25,7 @@ subdirs+= acs-monitor
 subdirs+= acs-mqtt
 subdirs+= acs-service-setup
 subdirs+= acs-visualiser
+subdirs+= deploy
 subdirs+= edge-bacnet
 subdirs+= edge-helm-charts
 subdirs+= edge-modbus

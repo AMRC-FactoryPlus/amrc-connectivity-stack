@@ -53,7 +53,7 @@ spec:
               name: manager-ccache-storage
         - name: migrate-database
           image: "{{ include "amrc-connectivity-stack.image-name" (list . .Values.manager ) }}-backend"
-          imagePullPolicy: {{ .Values.manager.image.pullPolicy }}
+          imagePullPolicy: {{ colesce .Values.manager.image.pullPolicy .Values.acs.defaultPullPolicy }}
           env:
             - name: DB_PASSWORD
               valueFrom:
@@ -78,7 +78,7 @@ spec:
           command: [ 'sh', '-c', 'php artisan migrate --force' ]
         - name: create-admin-user
           image: "{{ include "amrc-connectivity-stack.image-name" (list . .Values.manager ) }}-backend"
-          imagePullPolicy: {{ .Values.manager.image.pullPolicy }}
+          imagePullPolicy: {{ colesce .Values.manager.image.pullPolicy .Values.acs.defaultPullPolicy }}
           env:
             - name: DB_PASSWORD
               valueFrom:
@@ -98,7 +98,7 @@ spec:
       containers:
         - name: backend
           image: "{{ include "amrc-connectivity-stack.image-name" (list . .Values.manager ) }}-backend"
-          imagePullPolicy: {{ .Values.manager.image.pullPolicy }}
+          imagePullPolicy: {{ colesce .Values.manager.image.pullPolicy .Values.acs.defaultPullPolicy }}
           env:
             - name: KRB5_CONFIG
               value: /config/krb5-conf/krb5.conf
@@ -131,7 +131,7 @@ spec:
               name: manager-ccache-storage
         - name: frontend
           image: "{{ include "amrc-connectivity-stack.image-name" (list . .Values.manager ) }}-frontend"
-          imagePullPolicy: {{ .Values.manager.image.pullPolicy }}
+          imagePullPolicy: {{ colesce .Values.manager.image.pullPolicy .Values.acs.defaultPullPolicy }}
 ---
 kind: PersistentVolumeClaim
 apiVersion: v1

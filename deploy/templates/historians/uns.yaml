@@ -53,10 +53,9 @@ spec:
               fi
       containers:
         - name: historian-uns
-          image: "{{ include "amrc-connectivity-stack.image-name" (list . .Values.historians.uns) }}"
+{{ include "amrc-connectivity-stack.image" (list . .Values.historians.uns) | indent 10 }}
           command: [ "/usr/bin/k5start", "-Uf", "/keytabs/client" ]
           args: [ "node", "--es-module-specifier-resolution=node", "app.js" ]
-          imagePullPolicy: {{ .Values.historians.uns.image.pullPolicy }}
           env:
             - name: KRB5_CONFIG
               value: /config/krb5-conf/krb5.conf

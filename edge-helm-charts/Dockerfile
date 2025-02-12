@@ -8,6 +8,7 @@ ARG acs_npm=NO
 ARG revision=unknown
 ARG registry=ghcr.io/amrc-factoryplus
 ARG tag=latest
+ARG pullpolicy=IfNotPresent
 
 USER root
 RUN sh -x <<'SHELL'
@@ -30,7 +31,9 @@ COPY --chown=node . .
 RUN sh -x <<'SHELL'
     echo "export const GIT_VERSION=\"$revision\";" > ./lib/git-version.js
 
-    sed -i -e"s!%%TAG%%!${tag}!g;s!%%REGISTRY%%!${registry}!g" \
+    sed -i -e"s!%%TAG%%!${tag}!g" \
+        -e"s!%%REGISTRY%%!${registry}!g" \
+        -e"s!%%PULLPOLICY%%!${pullpolicy}!g" \
         charts/edge-agent/values.yaml \
         charts/edge-cluster/values.yaml \
 

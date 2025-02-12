@@ -26,12 +26,8 @@ image:
   # Values under default: will be used if not overridden per-image
   default:
     registry: %%REGISTRY%%
-    {{- if regexMatch "^v[0-9]" "%%TAG%%" }}
-    pullPolicy: IfNotPresent
-    {{- else }}
-    pullPolicy: Always
-    {{- end }}
     tag: %%TAG%%
+    pullPolicy: %%PULLPOLICY%%
   edgeSync:
     repository: acs-edge-sync
     #tag: ''

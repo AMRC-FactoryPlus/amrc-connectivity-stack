@@ -3,11 +3,7 @@ image:
   default:
     registry: %%REGISTRY%%
     tag: %%TAG%%
-    {{- if regexMatch "^v[0-9]" "%%TAG%%" }}
-    pullPolicy: IfNotPresent
-    {{- else }}
-    pullPolicy: Always
-    {{- end }}
+    pullPolicy: %%PULLPOLICY%%
   # Edge Agent image to pull
   edgeAgent:
     repository: acs-edge

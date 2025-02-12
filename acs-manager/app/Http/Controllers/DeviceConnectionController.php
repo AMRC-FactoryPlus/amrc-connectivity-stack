@@ -10,6 +10,7 @@ use App\DeviceConnection;
 use App\Domain\DeviceConnections\Actions\AssignConnectionToDeviceAction;
 use App\Domain\DeviceConnections\Actions\GetDeviceConnectionDetailsAction;
 use App\Domain\DeviceConnections\Actions\GetDeviceConnectionsAction;
+use App\Domain\DeviceConnections\Actions\RegisterConnections;
 use App\Domain\Devices\Actions\ConfigureDeviceConnectionAction;
 use App\Domain\Devices\Actions\CreateDeviceConnectionAction;
 use App\Domain\Devices\Models\Device;

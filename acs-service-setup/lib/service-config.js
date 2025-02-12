@@ -3,7 +3,7 @@
  * Copyright 2023 AMRC
  */
 
-import { UUIDs }    from "@amrc-factoryplus/utilities";
+import { UUIDs }    from "@amrc-factoryplus/service-client";
 
 export class ServiceConfig {
     constructor (opts) {

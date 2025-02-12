@@ -3,7 +3,7 @@
  * Copyright 2023 AMRC
  */
 
-import { UUIDs }            from "@amrc-factoryplus/utilities";
+import { UUIDs }            from "@amrc-factoryplus/service-client";
 
 import { ServiceConfig }    from "./service-config.js";
 import { ACS, Clusters, Git }

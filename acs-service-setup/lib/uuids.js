@@ -76,6 +76,26 @@ export const ACS = {
     ServiceAccount: {
         KrbKeys:                "a04b4195-7db4-4480-b3f3-4d22c08b96ea",
     },
+    Driver: {
+        /* Edge Agent internal drivers */
+        REST:                   "c9f5c6ac-de4d-11ef-befa-ef66bbfc8926",
+        MTConnect:              "e8c74c90-de4d-11ef-ad96-6b885f1e8b5d",
+        EtherNetIP:             "eefce570-de4d-11ef-95e6-379190194ffa",
+        S7:                     "f171a296-de4d-11ef-aef4-cf4e4ac2bfc6",
+        OPCUA:                  "f32fed40-de4d-11ef-a011-1711bd498427",
+        MQTT:                   "f4789ae4-de4d-11ef-9de4-ab74010e5ff5",
+        Websocket:              "f5fa94ee-de4d-11ef-882f-a7f7c2ad5273",
+        UDP:                    "f76120f0-de4d-11ef-baeb-4b617561ae1d",
+
+        /* Stock in-cluster drivers */
+        Bacnet:                 "bdc64178-de4c-11ef-b15e-3711aef7cf9b",
+        Modbus:                 "c355a44e-de4c-11ef-8a5a-e31f3872ed79",
+        Test:                   "c8798cba-de4c-11ef-8a43-8766e8683af8",
+        TPlinkSmartPlug:        "d46e1374-de4c-11ef-b469-c388a038fd5c",
+
+        /* External driver */
+        External:               "eb669a2c-e213-11ef-998e-a7fc6f4817b5",
+    },
 };
 
 /* XXX All the UUIDs below here are copied in from elsewhere in ACS.
@@ -136,12 +156,16 @@ export const Directory = {
 export const Edge = {
     Class: {
         Alert:              "ddb853fc-262a-4a10-888a-816a961d37c5",
+        Connection:         "f371cbfc-de3e-11ef-b361-7b31622bc42f",
+        Driver:             "3874e06c-de4a-11ef-a68c-0f1c2d4d555c",
         LinkRelation:       "2bce9142-6b5b-4a5e-8e2f-f8a8d51d6c15",
     },
     App: {
         AgentConfig:        "aac6f843-cfee-4683-b121-6943bfdf9173",
         ClusterStatus:      "747a62c9-1b66-4a2e-8dd9-0b70a91b6b75",
+        ConnConfig:         "fa8b429c-de3e-11ef-87fd-6382f0eac944",
         Deployment:         "f2b9417a-ef7f-421f-b387-bb8183a48cdb",
+        DriverDef:          "454e5bec-de4a-11ef-bfea-4bc400f636a5",
     },
     Perm: {
         ReloadConfig:       "6335f100-e68e-4e4d-b46d-85b42f85a036",

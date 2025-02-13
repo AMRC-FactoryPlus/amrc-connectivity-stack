@@ -71,10 +71,6 @@ class RegisterConnections
 {
     public function execute()
     {
-        // No auth, we run from the console
-        //$this->authorise(...func_get_args());
-        //$this->validate(...func_get_args());
-
         $fplus = resolve(ServiceClient::class);
         $this->cdb = $fplus->getConfigDB();
 
@@ -252,28 +248,5 @@ class RegisterConnections
             $dconn->save();
             Log::info(sprintf("Registered as %s", $uuid));
         }
-    }
-
-    /**
-     * This action sets the connection for a specific device
-     **/
-    private function authorise()
-    {
-        if ((! auth()->user()->administrator) && ! in_array(
-            $deviceConnection->node->id,
-            auth()
-                ->user()
-                ->accessibleNodes()
-                ->get()
-                ->pluck('id')
-            ->all(),
-            true
-        )) {
-            throw new ActionForbiddenException('Must be admin');
-        }
-    }
-
-    private function validate()
-    {
     }
 }

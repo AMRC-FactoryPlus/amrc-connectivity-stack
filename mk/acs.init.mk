@@ -4,6 +4,7 @@ ifndef .acs.init.mk
 .acs.init.mk=
 
 mk=${top}/mk
+tools=${mk}/tools
 
 -include ${top}/config.mk
 -include config.mk

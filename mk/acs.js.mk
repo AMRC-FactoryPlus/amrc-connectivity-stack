@@ -20,7 +20,7 @@ build: lint
 setup: js.npminstall
 
 js.npminstall:
-	npm install
+	npm install --no-save
 
 ifdef eslint
 lint: js.eslint

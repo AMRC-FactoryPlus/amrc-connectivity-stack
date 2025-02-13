@@ -1,7 +1,6 @@
 <?php
 /*
- *  Factory+ / AMRC Connectivity Stack (ACS) Manager component
- *  Copyright 2023 AMRC
+ * Copyright (c) University of Sheffield AMRC 2025.
  */
 
 namespace App\Domain\DeviceConnections\Actions;
@@ -9,15 +8,11 @@ namespace App\Domain\DeviceConnections\Actions;
 use AMRCFactoryPlus\ServiceClient;
 use AMRCFactoryPlus\UUIDs;
 use App\DeviceConnection;
-use App\Domain\Devices\Models\Device;
 use App\Domain\Nodes\Models\Node;
 use App\Domain\Support\ManagerUUIDs;
-use App\Exceptions\ActionFailException;
-use App\Exceptions\ActionForbiddenException;
+use App\Exceptions\ActionErrorException;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
-
-use function func_get_args;
 
 function aget ($array, $key, $def = null) {
     if (is_null($array))
@@ -53,7 +48,7 @@ function internal_driver ($connType) {
     case "UDP": 
         return ["uuid" => ManagerUUIDs::UDP, "details" => "UDPConnDetails"];
     default:
-        throw sprintf("Unknown internal connType %s", $connType);
+        throw new ActionErrorException("Unknown internal connType $connType");
     }
 }
 

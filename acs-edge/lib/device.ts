@@ -21,6 +21,7 @@ import {
 } from "./helpers/typeHandler.js";
 import {EventEmitter} from "events";
 import Long from "long";
+import { scoutDetails } from "./scout.js";
 
 /**
  * Define structure of device options object which is passed to the Device class constructor
@@ -45,6 +46,7 @@ type Timer = ReturnType<typeof setTimeout> | null | undefined;
  */
 export abstract class DeviceConnection extends EventEmitter {
     _type: string
+
     #intHandles: {
         [index: string]: ReturnType<typeof setInterval>
     }
@@ -59,6 +61,9 @@ export abstract class DeviceConnection extends EventEmitter {
         super();
         // Assign type to class attribute
         this._type = type;
+        
+
+
         // Define object of polling interval handles for each device
         this.#intHandles = {};
         // Collection of subscription handles
@@ -100,6 +105,17 @@ export abstract class DeviceConnection extends EventEmitter {
         // Call the writeCallback when complete, setting the error if necessary
         writeCallback(err);
     }
+
+    
+    /**
+     * Request devices to return a list of available addresses (tags, topics, etc.)
+     */
+    public async scoutAddresses(scoutDetails: scoutDetails) : Promise<string[]>{
+
+        // should be implmented by subclasses for each type of connection depending on the specific protocol (OPC UA, MQTT, etc.)
+        throw new Error('Scouting not supported for this device connection type.');
+    }
+
 
     /**
      * Perform any setup needed to read from certain addresses, e.g. set
@@ -150,6 +166,7 @@ export abstract class DeviceConnection extends EventEmitter {
         this.#subHandles.delete(deviceId);
         stopSubCallback();
     }
+
 
     /**
      * Close the device connection. Must emit a 'close' event.

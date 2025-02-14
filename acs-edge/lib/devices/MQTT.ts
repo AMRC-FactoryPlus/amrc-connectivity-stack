@@ -7,6 +7,8 @@ import {log} from "../helpers/log.js";
 import {Metrics, writeValuesToPayload} from "../helpers/typeHandler.js";
 import * as mqtt from "mqtt";
 import {v4 as uuidv4} from 'uuid';
+import { mqttScoutDetails } from "../scout.js";
+
 
 export default interface mqttConnDetails {
     clientId: string,
@@ -87,6 +89,26 @@ export class MQTTConnection extends DeviceConnection {
         // inactive broker. It is run at the `Polling Interval (ms)` value of the connection.
 
         this.emit('data', {});
+    }
+
+     
+    public async scoutAddresses(scoutDetails: mqttScoutDetails): Promise<string[]> {
+        const {topic, duration} = scoutDetails;
+
+        return new Promise<string[]>((resolve, reject) => {
+            const discoveredTopics: Set<string> = new Set();
+            
+            this.#client.subscribe(topic, (err) => {
+                if(err){
+                    reject(err);
+                    return;
+                }
+                this.#client.on('message', (topic, message) => {
+                    discoveredTopics.add(topic);
+                });
+                setTimeout(() => resolve(Array.from(discoveredTopics)), duration);
+            });
+        });
     }
 
     async subscribe (addresses: string[]) {

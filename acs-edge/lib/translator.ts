@@ -34,6 +34,8 @@ import {WebsocketConnection} from "./devices/websocket.js";
 import {MTConnectConnection} from "./devices/MTConnect.js";
 import {EtherNetIPConnection} from "./devices/EtherNetIP.js";
 import {DriverConnection} from "./devices/driver.js";
+import { Scout } from "./scout.js";
+
 
 /**
  * Translator class basically turns config file into instantiated classes
@@ -66,6 +68,7 @@ export class Translator extends EventEmitter {
     devices: {
         [index: string]: any
     }
+
 
     constructor(fplus: ServiceClient, pollInt: number, broker: DriverBroker) {
         super();
@@ -101,7 +104,7 @@ export class Translator extends EventEmitter {
             // Create a new device connection for each type listed in config file
             log('Building up connections and devices...');
             conf?.deviceConnections?.forEach(c => this.setupConnection(c));
-
+            
             // Setup Sparkplug node handlers
             this.setupSparkplug();
 
@@ -197,6 +200,27 @@ export class Translator extends EventEmitter {
              * later. */
             connection.name,
             this.broker);
+
+        if (connection.scout){
+            const newScout = new Scout(newConn, connection);
+            newScout.on('scoutComplete', (addresses: string[]) => {
+                //console.log(`Discovered addresses for connection ${connection.name}:`, addresses);
+                const directory = './scout';
+                if (!fs.existsSync(directory)) {
+                    fs.mkdirSync(directory, { recursive: true });
+                }
+                const fileContent = addresses.join('\n');
+                const filePath = `${directory}/${connection.name}.txt`;
+                console.log(filePath);
+                try {
+                    fs.writeFileSync(filePath, fileContent, 'utf8');
+                    console.log(`File saved successfully to ${filePath}`);
+                } catch (error) {
+                    console.error('Error writing to file:', error);
+                }
+            });
+            newScout.performScouting();
+        }
 
         connection.devices?.forEach((devConf: deviceOptions) => {
             this.devices[devConf.deviceId] = new Device(
@@ -375,4 +399,5 @@ Trying again in ${interval} seconds...`);
             await timers.setTimeout(interval * 1000);
         }
     }
+
 }

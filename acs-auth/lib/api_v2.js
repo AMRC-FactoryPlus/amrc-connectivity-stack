@@ -277,7 +277,7 @@ export class APIv2 {
         const acc = await this._identities(i =>
             i.kind == "kerberos" && i.name == req.auth);
         if (!acc.length) fail(404);
-        return acc.uuid;
+        return acc[0].uuid;
     }
 
     async id_whoami (req, res) {

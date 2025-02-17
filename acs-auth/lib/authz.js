@@ -147,22 +147,11 @@ export default class AuthZ {
     }
 
     async principal_get(req, res) {
-        return res.status(500).end();
         const {uuid} = req.params;
         if (!valid_uuid(uuid))
-            return res.status(400).end();
+            return res.status(410).end();
 
-        const ids = await this.model.principal_get(uuid);
-
-        /* We can return 403 here as long as we don't return 404 until
-         * we've checked the permissions. */
-        const ok = req.auth == ids?.kerberos
-            || await this.model.check_acl(req.auth, Perm.Read_Krb, uuid, true);
-        if (!ok) return res.status(403).end();
-
-        if (ids == null)
-            return res.status(404).end();
-        return res.status(200).json(ids);
+        return forward(`/v2/principal/${uuid}`)(req, res);
     }
 
     async principal_delete(req, res) {

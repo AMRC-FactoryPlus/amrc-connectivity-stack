@@ -237,7 +237,7 @@ export default class Queries {
 
     identity_get_all () {
         return this.q_rows(`
-            select u.uuid principal, k.kind, i.name
+            select u.uuid, k.kind, i.name
             from identity i
                 join uuid u on u.id = i.principal
                 join idkind k on k.id = i.kind

@@ -63,7 +63,7 @@ export class APIv2 {
     }
 
     async fetch_acl (principal) {
-        const acl = rx.firstValueFrom(
+        const acl = await rx.firstValueFrom(
             this.data.acl_for(principal));
         this.log("Fetched ACL for %s: %o", principal, acl);
         return acl;
@@ -72,6 +72,10 @@ export class APIv2 {
     async permitted (req, perm) {
         const permitted = await this._identities(i => 
                 i.kind == "kerberos" && i.name == req.auth)
+            .then(ps => {
+                this.log("PERMITTED: ids %o", ps);
+                return ps;
+            })
             .then(ps => ps.length ? this.fetch_acl(ps[0].uuid) : [])
             .then(acl => imm.Seq(acl)
                 .filter(e => e.permission == perm)

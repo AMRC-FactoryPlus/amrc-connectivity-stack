@@ -41,19 +41,17 @@ const yamlOpts = {
 };
 
 /**
- * Uses the base path from the yaml file to build the cluster URL.
- * @param serviceUrls Directory json object parsed from the input yaml.
+ * Resolves the namespace in the yaml url with the ACS namespace.
+ * @param directoryDump Directory json object parsed from the input yaml.
  * @param serviceSetup Instance of service setup.
- * @return {*} The directory JSON object containing the build URLs.
+ * @return {*} The directory dump with resolved URLs.
  */
-function buildURLs (serviceUrls, serviceSetup) {
-    const resolvedUrls = [];
-    serviceUrls.advertisements.forEach((advertisement)=> {
-        advertisement.url = `http://${advertisement.baseUrl}.${serviceSetup.namespace}.svc.cluster.local`;
-        resolvedUrls.push(advertisement);
-    })
-    serviceUrls.advertisements = resolvedUrls;
-    return serviceUrls;
+function resolveNamespace (directoryDump, serviceSetup) {
+    directoryDump.advertisements = directoryDump.advertisements.map((advertisement)=> {
+        advertisement.url = advertisement.url.replace(/\$\{(\w+)\}/g, serviceSetup.namespace);
+        return advertisement;
+    });
+    return directoryDump;
 }
 
 /**
@@ -106,8 +104,8 @@ export async function load_dumps (serviceSetup) {
             serviceSetup.log("=== %s", document.service);
             // If we have directory services, resolve the url with the correct deployment namespace.
             document = document.service === UUIDs.Service.Directory
-                ? buildURLs(document, serviceSetup)
-                : document
+                ? resolveNamespace(document, serviceSetup)
+                : document;
             const status = await load_dump(fplus, document);
             if (status > 300)
                 throw new Error(`Service dump ${file} failed: ${status}`);

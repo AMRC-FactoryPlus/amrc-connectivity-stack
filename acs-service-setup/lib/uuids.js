@@ -78,6 +78,7 @@ export const ACS = {
         CmdEsc:                 "23d4e8f9-76c0-49d5-addc-00b6ac05ee58",
         MQTT:                   "2f42daeb-4521-4522-8e19-85dfb73db88e",
         Git:                    "626df296-8156-4c67-8aed-aac70161aa8b",
+        Authentication:         "127cde3c-773a-4f61-b0ba-7412a2695253",
     },
     /* XXX These should not be fixed. They should be replaced by
      * per-deployment accounts created by krbkeys, and

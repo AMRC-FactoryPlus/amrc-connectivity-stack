@@ -167,8 +167,11 @@ export class APIv2 {
 
     async _identities (cond) {
         const ids = await rx.firstValueFrom(this.data.identities);
+        this.log("_IDENTITIES: full list %o", ids);
         if (!cond) return ids;
-        return ids.filter(cond);
+        const rv = ids.filter(cond);
+        this.log("_IDENTITIES: filtered %o", rv);
+        return rv;
     }
 
     async id_list (req, res) {
@@ -282,24 +285,6 @@ export class APIv2 {
 
     async id_whoami_uuid (req, res) {
         const uuid = await this._whoami(req);
-        return res.status(200).json(uuid);
-    }
-
-    /* This endpoint may change in future to allow searching for
-     * principals by other criteria, e.g. Node address. */
-    async principal_find (req, res) {
-        const kerberos = req.params?.upn ?? req.auth;
-        if (!valid_krb(kerberos))
-            return res.status(410).end();
-
-        const uuid = await this.model.principal_find_by_krb(kerberos);
-        if (uuid == null)
-            return res.status(404).end();
-
-        const ok = req.auth == kerberos
-            || await this.model.check_acl(req.auth, Perm.Read_Krb, uuid, true)
-        if (!ok) return res.status(404).end();
-
         return res.status(200).json(uuid);
     }
 }

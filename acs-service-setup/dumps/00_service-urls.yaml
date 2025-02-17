@@ -16,3 +16,6 @@ advertisements:
   - service: !u ACS.Service.Git
     url: "http://git.amrc-fpd-rdb.shef.ac.uk"
     owner: !u ACS.Device.Git
+  - service: !u UUIDs.Service.MQTT
+    url: "mqtt://mqtt.${namespace}.svc.cluster.local"
+    owner: !u ACS.Device.MQTT

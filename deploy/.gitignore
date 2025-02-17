@@ -4,5 +4,6 @@
 *.pem
 *.key
 *.swp
+*.tgz
 /.idea
 /charts/*

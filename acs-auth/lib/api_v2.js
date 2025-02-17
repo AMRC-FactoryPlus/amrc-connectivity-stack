@@ -88,13 +88,21 @@ export class APIv2 {
         fail(403);
     }
 
+    async permitted_wild (req, perm) {
+        const targs = await this.permitted(req, perm);
+        if (!targs.size)
+            fail(403);
+        if (targs.has(Wildcard))
+            return { has: () => true };
+        return targs;
+    }
+
     async _get_acl (req, res, principal) {
         const acl = await this.fetch_acl(principal);
         if (!acl) fail(404);
 
-        const permitted = await this.permitted(req, Perm.ReadACL);
-        const rv = permitted.has(Wildcard) ? acl
-            : acl.filter(e => permitted.has(e.permission));
+        const targs = await this.permitted_wild(req, Perm.ReadACL);
+        const rv = acl.filter(e => targs.has(e.permission));
         this.log("Returning ACL %o", rv);
 
         return res.status(200).json(rv);
@@ -120,12 +128,10 @@ export class APIv2 {
     }
 
     async grant_list (req, res) {
-        /* XXX I'm not sure this is right, but we generally allow
-         * listing UUIDs of objects which can't be read. */
-        const targs = await this.permitted(req, Perm.WriteACL);
-        if (!targs.size) fail(403);
+        const targs = await this.permitted_wild(req, Perm.WriteACL);
 
         const uuids = await this.model.grant_list();
+        const rv = uuids.filter(u => targs.has(u));
         return res.status(200).json(uuids);
     }
 
@@ -167,16 +173,13 @@ export class APIv2 {
 
     async _identities (cond) {
         const ids = await rx.firstValueFrom(this.data.identities);
-        this.log("_IDENTITIES: full list %o", ids);
         if (!cond) return ids;
         const rv = ids.filter(cond);
-        this.log("_IDENTITIES: filtered %o", rv);
         return rv;
     }
 
     async id_list (req, res) {
-        const targs = await this.permitted(req, Perm.ReadKrb);
-        if (!targs.size) fail(403);
+        const targs = await this.permitted_wild(req, Perm.ReadKrb);
 
         const ids = await this._identities(i => targs.has(i.uuid));
         const rv = [...new Set(ids.map(i => i.uuid))];
@@ -242,12 +245,12 @@ export class APIv2 {
     async id_list_kind (req, res) {
         const { kind } = req.params;
 
-        const targs = await this.permitted(req, Perm.ReadKrb);
-        if (!targs.size) fail(403);
+        const targs = await this.permitted_wild(req, Perm.ReadKrb);
         
         const ids = await this._identities(i => i.kind == kind);
         if (!ids.length) fail(404);
 
+        this.log("ID LIST: permitted: %o", targs);
         const rv = ids
             .filter(i => targs.has(i.uuid))
             .map(i => i.name);
@@ -258,8 +261,7 @@ export class APIv2 {
     async id_find (req, res) {
         const { kind, name } = req.params;
 
-        const targs = await this.permitted(req, Perm.ReadKrb);
-        if (!targs.size) fail(403);
+        const targs = await this.permitted_wild(req, Perm.ReadKrb);
 
         const ids = await this._identities(i => 
             i.kind == kind && i.name == name && targs.has(i.uuid));

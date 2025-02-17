@@ -2,14 +2,14 @@ service: !u UUIDs.Service.Directory
 version: 1
 advertisements:
   - service: !u ACS.Service.ClusterManager
-    baseUrl: "clusters"
+    url: "http://clusters.${namespace}.svc.cluster.local"
     owner: !u ACS.Device.ClusterManager
   - service: !u UUIDs.Service.Directory
-    baseUrl: "directory"
+    url: "http://directory.${namespace}.svc.cluster.local"
     owner: !u ACS.Device.Directory
   - service: !u ACS.Service.ConfigDB
-    baseUrl: "configdb"
+    url: "http://configdb.${namespace}.svc.cluster.local"
     owner: !u ACS.Device.ConfigDB
   - service: !u ACS.Service.CmdEsc
-    baseUrl: "cmdesc"
+    url: "http://cmdesc.${namespace}.svc.cluster.local"
     owner: !u ACS.Device.CmdEsc

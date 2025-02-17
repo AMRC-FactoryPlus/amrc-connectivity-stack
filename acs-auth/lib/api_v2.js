@@ -70,13 +70,8 @@ export class APIv2 {
     }
 
     async permitted (req, perm) {
-        const permitted = await this._identities(i => 
-                i.kind == "kerberos" && i.name == req.auth)
-            .then(ps => {
-                this.log("PERMITTED: ids %o", ps);
-                return ps;
-            })
-            .then(ps => ps.length ? this.fetch_acl(ps[0].uuid) : [])
+        const permitted = await this.model.principal_find_by_krb(req.auth)
+            .then(p => p ? this.fetch_acl(p) : [])
             .then(acl => imm.Seq(acl)
                 .filter(e => e.permission == perm)
                 .map(e => e.target)

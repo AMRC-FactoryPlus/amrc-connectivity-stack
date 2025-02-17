@@ -19,6 +19,9 @@ function fail (status) {
     throw { status };
 }
 
+/* XXX This code is inconsistent about use of native JS vs Rx vs
+ * immutable. It could do with tidying up a bit in that respect. */
+
 export class APIv2 {
     constructor(opts) {
         this.model = opts.model;
@@ -67,8 +70,9 @@ export class APIv2 {
     }
 
     async permitted (req, perm) {
-        const permitted = await this.model.principal_find_by_krb(req.auth)
-            .then(p => p ? this.fetch_acl(p) : [])
+        const permitted = await this._identities(i => 
+                i.kind == "kerberos" && i.name == req.auth)
+            .then(ps => ps.length ? this.fetch_acl(ps[0].uuid) : [])
             .then(acl => imm.Seq(acl)
                 .filter(e => e.permission == perm)
                 .map(e => e.target)

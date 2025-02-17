@@ -58,6 +58,7 @@ export class APIv2 {
         api.get("/identity/:kind/:name", this.id_find.bind(this));
 
         api.get("/whoami", this.id_whoami.bind(this));
+        api.get("/whoami/uuid", this.id_whoami_uuid.bind(this));
     
         return api;
     }
@@ -267,12 +268,21 @@ export class APIv2 {
     /* There is no auth check here; any authenticated user can look up
      * their own identities. This will only look up based on Kerberos
      * auth identity. */
-    async id_whoami (req, res) {
+    async _whoami (req) {
         const acc = await this._identities(i =>
             i.kind == "kerberos" && i.name == req.auth);
         if (!acc.length) fail(404);
+        return acc.uuid;
+    }
 
-        return this._id_get_all(acc.uuid, res);
+    async id_whoami (req, res) {
+        const uuid = await this._whoami(req);
+        return this._id_get_all(uuid, res);
+    }
+
+    async id_whoami_uuid (req, res) {
+        const uuid = await this._whoami(req);
+        return res.status(200).json(uuid);
     }
 
     /* This endpoint may change in future to allow searching for

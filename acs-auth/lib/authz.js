@@ -81,6 +81,8 @@ export default class AuthZ {
         return api;
     }
 
+    /* This accepts a `permission` QS for compatibility but ignores it.
+     * Now we always return all permissions the client can read. */
     async get_acl(req, res) {
         const { principal, permission } = req.query;
         const by_uuid = booleans[req.query["by-uuid"]];
@@ -91,15 +93,11 @@ export default class AuthZ {
         const princ_valid = by_uuid
             ? valid_uuid(principal) : valid_krb(principal);
         if (!princ_valid || !valid_uuid(permission))
-            return res.status(400).end();
+            return res.status(410).end();
 
-        const ok = await this.model.check_acl(
-            req.auth, Perm.Read_ACL, permission, true)
-        if (!ok)
-            return res.status(403).end();
-
-        const acl = await this.model.get_acl(principal, permission, by_uuid);
-        return res.status(200).json(acl);
+        const url = by_uuid ? `/v2/acl/${principal}`
+            : `/v2/acl/kerberos/${encodeURIComponent(principal)}`;
+        return forward(url)(req, res);
     }
 
     async ace_get(req, res) {
@@ -112,6 +110,7 @@ export default class AuthZ {
     }
 
     async ace_post(req, res) {
+        return res.status(500).end();
         const ace = req.body;
 
         const ok = await this.model.check_acl(
@@ -126,6 +125,7 @@ export default class AuthZ {
     }
 
     async principal_list(req, res) {
+        return res.status(500).end();
         const ok = await this.model.check_acl(
             req.auth, Perm.Read_Krb, UUIDs.Null, false);
         if (!ok) return res.status(403).end();
@@ -135,6 +135,7 @@ export default class AuthZ {
     }
 
     async principal_add(req, res) {
+        return res.status(500).end();
         const princ = req.body;
 
         const ok = await this.model.check_acl(
@@ -146,6 +147,7 @@ export default class AuthZ {
     }
 
     async principal_get(req, res) {
+        return res.status(500).end();
         const {uuid} = req.params;
         if (!valid_uuid(uuid))
             return res.status(400).end();
@@ -164,6 +166,7 @@ export default class AuthZ {
     }
 
     async principal_delete(req, res) {
+        return res.status(500).end();
         const {uuid} = req.params;
         if (!valid_uuid(uuid))
             return res.status(400).end();
@@ -180,10 +183,9 @@ export default class AuthZ {
      * principals by other criteria, e.g. Node address. */
     async principal_find(req, res) {
         const kerberos = req.query?.kerberos;
-        return forward(
-            kerberos == null    ? "/v2/principal/find"
-            : `/v2/principal/find/kerberos/${kerberos}`
-        )(req, res);
+        const url = kerberos == null ? "/v2/whoami/uuid"
+            : `/v2/identity/kerberos/${kerberos}`;
+        return forward(url)(req, res);
     }
 
     async group_all(req, res) {
@@ -220,6 +222,7 @@ export default class AuthZ {
     }
 
     async effective_list(req, res) {
+        return res.status(500).end();
         const ok = await this.model.check_acl(
             req.auth, Perm.Read_Eff, UUIDs.Null, false);
         if (!ok) return res.status(403).end();
@@ -229,6 +232,7 @@ export default class AuthZ {
     }
 
     async effective_get(req, res) {
+        return res.status(500).end();
         const ok = await this.model.check_acl(
             req.auth, Perm.Read_Eff, UUIDs.Null, false);
         if (!ok) return res.status(403).end();

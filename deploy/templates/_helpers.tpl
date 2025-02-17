@@ -41,20 +41,22 @@ Define the image for a container.
 {{- define "amrc-connectivity-stack.image-name" -}}
 {{- $top := index . 0 }}
 {{- $context := index . 1 }}
-{{- $defaultTag := coalesce 
+{{- $tag := coalesce 
         $context.image.tag 
         $top.Values.acs.defaultTag 
         (printf "v%s" $top.Chart.Version) }}
-{{- $context.image.registry }}/{{ $context.image.repository }}:{{ $defaultTag }}
+{{- $registry := coalesce $context.image.registry $top.Values.acs.defaultRegistry }}
+{{- $registry }}/{{ $context.image.repository }}:{{ $tag }}
 {{- end }}
 
 {{- define "amrc-connectivity-stack.image" -}}
 {{- $top := index . 0 }}
 {{- $context := index . 1 }}
+{{- $pullp := coalesce $context.image.pullPolicy $top.Values.acs.defaultPullPolicy }}
 image: {{ list $top $context 
     | include "amrc-connectivity-stack.image-name"
     | quote }}
-imagePullPolicy: {{ $context.image.pullPolicy }}
+imagePullPolicy: {{ $pullp }}
 {{- end }}
 
 {{/* Go templates are just awful grrr */}}

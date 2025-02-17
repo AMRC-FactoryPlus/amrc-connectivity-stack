@@ -61,6 +61,7 @@ export const ACS = {
         ClusterManager:         "2706aa43-a826-441e-9cec-cd3d4ce623c2",
         ConfigDB:               "af15f175-78a0-4e05-97c0-2a0bb82b9f3b",
         CmdEsc:                 "78ea7071-24ac-4916-8351-aa3e549d8ccd",
+        Git:                    "7adf4db0-2e7b-4a68-ab9d-376f4c5ce14b",
     },
     Role: {
         EdgeNodeConsumer:       "17a64293-b82d-4db4-af4d-63359bb62934",
@@ -74,7 +75,9 @@ export const ACS = {
         ConfigDB:               "36861e8d-9152-40c4-8f08-f51c2d7e3c25",
         ClusterManager:         "127cde3c-773a-4f61-b0ba-7412a2695253",
         Directory:              "5cc3b068-938f-4bb2-8ceb-64338a02fbeb",
-        CmdEsc:                 "23d4e8f9-76c0-49d5-addc-00b6ac05ee58"
+        CmdEsc:                 "23d4e8f9-76c0-49d5-addc-00b6ac05ee58",
+        MQTT:                   "2f42daeb-4521-4522-8e19-85dfb73db88e",
+        Git:                    "626df296-8156-4c67-8aed-aac70161aa8b",
     },
     /* XXX These should not be fixed. They should be replaced by
      * per-deployment accounts created by krbkeys, and

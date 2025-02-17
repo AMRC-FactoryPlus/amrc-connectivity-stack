@@ -13,3 +13,6 @@ advertisements:
   - service: !u ACS.Service.CmdEsc
     url: "http://cmdesc.${namespace}.svc.cluster.local"
     owner: !u ACS.Device.CmdEsc
+  - service: !u ACS.Service.Git
+    url: "http://git.amrc-fpd-rdb.shef.ac.uk"
+    owner: !u ACS.Device.Git

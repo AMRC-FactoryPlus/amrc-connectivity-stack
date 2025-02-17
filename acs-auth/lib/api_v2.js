@@ -136,7 +136,7 @@ export class APIv2 {
         const g = await this.model.grant_get(uuid);
         if (!g) fail(404);
 
-        await this.check_acl(req, Perm.Manage_ACL, g.permission, true);
+        await this.check_acl(req, Perm.WriteACL, g.permission, true);
 
         return res.status(200).json(g);
     }
@@ -144,7 +144,7 @@ export class APIv2 {
     async grant_new (req, res) {
         const grant = req.body;
 
-        const permitted = await this.permitted(req, Perm.Manage_ACL);
+        const permitted = await this.permitted(req, Perm.WriteACL);
         const rv = await this.data.request({ type: "grant", grant, permitted });
         if (rv.status != 201)
             fail(rv.status);
@@ -157,7 +157,7 @@ export class APIv2 {
         if (!valid_uuid(uuid)) fail(410);
 
         const grant = req.method == "PUT" ? req.body : null;
-        const permitted = await this.permitted(req, Perm.Manage_ACL);
+        const permitted = await this.permitted(req, Perm.WriteACL);
 
         const rv = await this.data.request({ type: "grant", uuid, grant, permitted });
         return res.status(rv.status).end();

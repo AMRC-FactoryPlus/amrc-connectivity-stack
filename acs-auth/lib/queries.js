@@ -230,60 +230,41 @@ export default class Queries {
         return dbr.rows[0].id;
     }
 
-    async principal_get_all () {
-        const dbr = await this.query(`
-            select u.uuid, i.name kerberos
+    idkind_find (kind) {
+        return this.q_single(
+            `select id from idkind where kind = $1`, [kind]);
+    }
+
+    identity_get_all () {
+        return this.q_rows(`
+            select u.uuid principal, k.kind, i.name
             from identity i
                 join uuid u on u.id = i.principal
+                join idkind k on k.id = i.kind
         `);
-        return dbr.rows;
     }
 
-    principal_list () {
-        return this.principal_get_all()
-            .then(rs => rs.map(r => r.kerberos));
-    }
-
-    async principal_add (princ) {
-        const id = await this.uuid_find(princ.uuid);
+    async identity_add (pid, kid, name) {
         const dbr = await this.query(`
             insert into identity (principal, kind, name)
-            values ($1, ${IDs.Kerberos}, $2)
+            values ($1, $2, $3)
             on conflict do nothing
             returning 1 ok
-        `, [id, princ.kerberos]);
+        `, [pid, kid, name]);
         return dbr.rows[0]?.ok ? 204 : 409;
     }
 
-    async principal_get (uuid) {
-        const dbr = await this.query(`
-            select u.uuid, i.name kerberos
-            from identity i
-                join uuid u on u.id = i.principal
-            where i.kind = ${IDs.Kerberos} and u.uuid = $1
-        `, [uuid]);
-        return dbr.rows[0];
-    }
-
-    async principal_delete (uuid) {
+    async identity_delete (uuid, kind) {
         const dbr = await this.query(`
             delete from identity i
-            using uuid u
+            using uuid u, idkind k
             where i.principal = u.id
+                and i.kind = k.id
                 and u.uuid = $1
+                and k.kind = $2
             returning 1 ok
-        `, [uuid]);
+        `, [uuid, kind]);
         return dbr.rows[0]?.ok ? 204 : 404;
-    }
-
-    async principal_find_by_krb (kerberos) {
-        const dbr = await this.query(`
-            select u.uuid
-            from identity i
-                join uuid u on u.id = i.principal
-            where i.kind = ${IDs.Kerberos} and i.name = $1
-        `, [kerberos]);
-        return dbr.rows[0]?.uuid;
     }
 
     async group_all () {

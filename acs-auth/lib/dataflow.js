@@ -26,33 +26,49 @@ export class DataFlow {
         /* Responses to these requests */
         this.responses = this._build_responses();
 
+        this.identities = this._build_identities();
         this.grants = this._build_grants();
         this.groups = this._build_groups();
     }
 
     _build_responses () {
         const { model } = this;
+
+        const updaters = {
+            grant:      model.grant_request,
+            identity:   model.identity_request,
+        };
+
         return rxx.rx(this.requests,
             rx.mergeMap(r => {
-                const updater = 
-                    r.kind == "grant"   ? model.grant_request
-                    : async () => ({ status: 500 });
+                const updater = updaters[r.type]
+                    ?? (async () => ({ status: 500 }));
 
                 return updater.call(model, r)
-                    .then(rv => ({ ...rv, kind: r.kind, request: r.request }));
+                    .then(rv => ({ ...rv, type: r.type, request: r.request }));
             }));
     }
 
     /* XXX This is not the best way to do this; we refetch the entire
      * grant list every time. We should be able to track the changes
      * made without going back to the database. */
-    _build_grants () {
+    _track_model (type, fetch) {
         return rxx.rx(
             this.responses,
-            rx.filter(r => r.kind == "grant" && r.status < 300),
+            rx.filter(r => r.type == type && r.status < 300),
             rx.startWith(null),
-            rx.switchMap(() => this.model.grant_get_all()),
+            rx.switchMap(fetch),
             rx.shareReplay(1));
+    }
+
+    _build_grants () {
+        return this._track_model("grant",
+            () => this.model.grant_get_all());
+    }
+
+    _build_identities () {
+        return this._track_model("identity",
+            () => this.model.identity_get_all());
     }
 
     _build_groups () {

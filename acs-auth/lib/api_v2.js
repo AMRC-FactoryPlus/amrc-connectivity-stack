@@ -43,9 +43,19 @@ export class APIv2 {
             .put(this.grant_put.bind(this))
             .delete(this.grant_put.bind(this));
 
-        api.get("/principal/find", this.principal_find.bind(this));
-        api.get("/principal/find/kerberos/:upn", this.principal_find.bind(this));
+        api.get("/principal", this.id_list.bind(this));
+        api.get("/principal/:uuid", this.id_get_all.bind(this));
+        api.route("/principal/:uuid/:kind")
+            .get(this.id_get.bind(this))
+            .put(this.id_put.bind(this))
+            .delete(this.id_del.bind(this));
 
+        api.get("/identity", this.id_kinds.bind(this));
+        api.get("/identity/:kind", this.id_list_kind.bind(this));
+        api.get("/identity/:kind/:name", this.id_find.bind(this));
+
+        api.get("/whoami", this.id_whoami.bind(this));
+    
         return api;
     }
 
@@ -78,7 +88,7 @@ export class APIv2 {
         const acl = await this.fetch_acl(principal);
         if (!acl) fail(404);
 
-        const permitted = await this.permitted(req, Perm.Read_ACL);
+        const permitted = await this.permitted(req, Perm.ReadACL);
         const rv = permitted.has(Wildcard) ? acl
             : acl.filter(e => permitted.has(e.permission));
         this.log("Returning ACL %o", rv);
@@ -108,7 +118,7 @@ export class APIv2 {
     async grant_list (req, res) {
         /* XXX I'm not sure this is right, but we generally allow
          * listing UUIDs of objects which can't be read. */
-        const targs = await this.permitted(req, Perm.Manage_ACL);
+        const targs = await this.permitted(req, Perm.WriteACL);
         if (!targs.size) fail(403);
 
         const uuids = await this.model.grant_list();
@@ -131,7 +141,7 @@ export class APIv2 {
         const grant = req.body;
 
         const permitted = await this.permitted(req, Perm.Manage_ACL);
-        const rv = await this.data.request({ kind: "grant", grant, permitted });
+        const rv = await this.data.request({ type: "grant", grant, permitted });
         if (rv.status != 201)
             fail(rv.status);
 
@@ -145,8 +155,121 @@ export class APIv2 {
         const grant = req.method == "PUT" ? req.body : null;
         const permitted = await this.permitted(req, Perm.Manage_ACL);
 
-        const rv = await this.data.request({ kind: "grant", uuid, grant, permitted });
+        const rv = await this.data.request({ type: "grant", uuid, grant, permitted });
         return res.status(rv.status).end();
+    }
+
+    /* XXX The permissions here only handle Kerberos identities. */
+
+    async _identities (cond) {
+        const ids = await rx.firstValueFrom(this.data.identities);
+        if (!cond) return ids;
+        return ids.filter(cond);
+    }
+
+    async id_list (req, res) {
+        const targs = await this.permitted(req, Perm.ReadKrb);
+        if (!targs.size) fail(403);
+
+        const ids = await this._identities(i => targs.has(i.uuid));
+        const rv = [...new Set(ids.map(i => i.uuid))];
+
+        return res.status(200).json(rv);
+    }
+
+    async _id_get_all (uuid, res) {
+        const ids = await this._identities(i => i.uuid == uuid);
+        if (!ids.length) fail(404);
+
+        const rv = Object.fromEntries(
+            ids.map(i => [i.kind, i.name])
+                .concat([["uuid", uuid]]));
+        return res.status(200).json(rv);
+    }
+
+    async id_get_all (req, res) {
+        const { uuid } = req.params;
+
+        const ok = await this.check_acl(req, Perm.ReadKrb, uuid, true);
+        if (!ok) fail(403);
+
+        return this._id_get_all(uuid, res);
+    }
+
+    async id_get (req, res) {
+        const { uuid, kind } = req.params;
+
+        const ok = await this.check_acl(req, Perm.ReadKrb, uuid, true);
+        if (!ok) fail(403);
+
+        const id = await this._identities(i => i.uuid == uuid && i.kind == kind);
+        if (!id.length) fail(404);
+
+        return res.status(200).json(id[0].name);
+    }
+
+    async _id_put (name, req, res) {
+        const { uuid, kind } = req.params;
+
+        const ok = await this.check_acl(req, Perm.WriteKrb, uuid, true);
+        if (!ok) fail(403);
+
+        const rv = await this.data.request({ type: "identity", uuid, kind, name });
+        return res.status(rv.status).end();
+    }
+
+    id_put (req, res) {
+        return this._id_put(req.body, req, res);
+    }
+
+    id_del (req, res) {
+        return this._id_put(null, req, res);
+    }
+
+    async id_kinds (req, res) {
+        const ids = await this._identities();
+        const rv = [...new Set(ids.map(i => i.kind))]
+        return res.status(200).json(rv);
+    }
+
+    async id_list_kind (req, res) {
+        const { kind } = req.params;
+
+        const targs = await this.permitted(req, Perm.ReadKrb);
+        if (!targs.size) fail(403);
+        
+        const ids = await this._identities(i => i.kind == kind);
+        if (!ids.length) fail(404);
+
+        const rv = ids
+            .filter(i => targs.has(i.uuid))
+            .map(i => i.name);
+
+        return res.status(200).json(rv);
+    }
+
+    async id_find (req, res) {
+        const { kind, name } = req.params;
+
+        const targs = await this.permitted(req, Perm.ReadKrb);
+        if (!targs.size) fail(403);
+
+        const ids = await this._identities(i => 
+            i.kind == kind && i.name == name && targs.has(i.uuid));
+        if (!ids.length) fail(404);
+
+        return res.status(200).json(ids[0].uuid);
+    }
+
+    /* There is no auth check here; any authenticated user can look up
+     * their own identities. This will only look up based on Kerberos
+     * auth identity. */
+    async id_whoami (req, res) {
+        const acc = await this._identities(i =>
+            i.kind == "kerberos" && i.name == req.auth);
+        if (!acc.length) fail(404);
+
+        return this._id_get_all(acc.uuid, res);
     }
 
     /* This endpoint may change in future to allow searching for
@@ -160,10 +283,6 @@ export class APIv2 {
         if (uuid == null)
             return res.status(404).end();
 
-        /* We have to check permissions against the returned UUID. This
-         * means that we must return 404 instead of 403 if the check
-         * fails. Principals are always allowed to look up their own
-         * information. */
         const ok = req.auth == kerberos
             || await this.model.check_acl(req.auth, Perm.Read_Krb, uuid, true)
         if (!ok) return res.status(404).end();

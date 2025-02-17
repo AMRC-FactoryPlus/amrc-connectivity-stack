@@ -86,6 +86,10 @@ export default class Model extends Queries {
             : 400;
     }
 
+    /* The request structure here includes r.permitted, the set of
+     * ManageACL permissions the user is granted. This is because we
+     * must make some permission checks inside the txn; deleting an
+     * existing grant requires ManageACL on that entry's perm. */
     async grant_request (r) {
         if (r.grant && !has_wild(r.permitted, r.grant.permission))
             return { status: 403 };
@@ -102,6 +106,20 @@ export default class Model extends Queries {
             else
                 await q.grant_update(id, r.grant);
             return { status: 204 };
+        });
+    }
+
+    /* This request does not check permissions. */
+    identity_request (r) {
+        if (r.name == null)
+            return this.identity_delete(r.uuid, r.kind);
+
+        return this.txn(async q => {
+            const pid = await q.uuid_find(r.uuid);
+            const kid = await q.idkind_find(r.kind);
+            if (!kid) return 404;
+
+            return q.identity_add(pid, kid, r.name);
         });
     }
 

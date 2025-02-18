@@ -174,23 +174,25 @@ export class DataFlow {
         return acc[0].uuid;
     }
 
-    permitted (upn, perm) {
-        const permitted = rxx.rx(
+    find_kerberos (upn) {
+        return rx.firstValueFrom(rxx.rx(
             this.identities,
             rx.first(),
-            rx.map(ids => imm.Seq(ids)
+            rx.mergeMap(ids => ids
                 .filter(i => i.kind == "kerberos" && i.name == upn)
-                .map(i => i.uuid)
-                .first()),
+                .map(i => i.uuid))));
+    }
+
+    permitted (upn, perm) {
+        return rx.firstValueFrom(rxx.rx(
+            this.find_kerberos(upn),
             rx.mergeMap(p => p ? this.acl_for(p) : rx.of([])),
             rx.map(acl => imm.Seq(acl)
                 .filter(e => e.permission == perm)
                 .map(e => e.target)
                 .toSet()),
             rx.tap(ptd => 
-                this.log("Permitted %s for %s: %o", perm, upn, ptd.toJS())));
-
-        return rx.firstValueFrom(permitted);
+                this.log("Permitted %s for %s: %o", perm, upn, ptd.toJS()))));
     }
 
     async check_targ_wild (upn, perm) {

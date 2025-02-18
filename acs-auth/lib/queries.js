@@ -230,16 +230,6 @@ export default class Queries {
         return dbr.rows[0].id;
     } 
 
-    async principal_find_by_krb (kerberos) {
-        const dbr = await this.query(`
-            select u.uuid
-            from identity i
-                join uuid u on u.id = i.principal
-            where i.kind = ${IDs.Kerberos} and i.name = $1
-        `, [kerberos]);
-        return dbr.rows[0]?.uuid;
-    }
-
     idkind_find (kind) {
         return this.q_single(
             `select id from idkind where kind = $1`, [kind]);

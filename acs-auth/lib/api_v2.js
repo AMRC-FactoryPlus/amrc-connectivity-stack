@@ -98,7 +98,7 @@ export class APIv2 {
         const { upn } = req.params;
         if (!valid_krb(upn)) fail(410);
         
-        const principal = await this.model.principal_find_by_krb(upn);
+        const principal = await this.data.find_kerberos(upn);
         /* Don't return 404, we haven't checked ACLs */
         if (!principal)
             return res.status(200).json([]);
@@ -173,6 +173,7 @@ export class APIv2 {
 
     async id_get_all (req, res) {
         const { uuid } = req.params;
+        if (!valid_uuid(uuid)) fail(410);
 
         await this.check_acl(req, Perm.ReadKrb, uuid);
 
@@ -181,6 +182,7 @@ export class APIv2 {
 
     async id_get (req, res) {
         const { uuid, kind } = req.params;
+        if (!valid_uuid(uuid)) fail(410);
 
         await this.check_acl(req, Perm.ReadKrb, uuid);
 
@@ -192,6 +194,7 @@ export class APIv2 {
 
     async _id_put (name, req, res) {
         const { uuid, kind } = req.params;
+        if (!valid_uuid(uuid)) fail(410);
 
         await this.check_acl(req, Perm.WriteKrb, uuid);
 

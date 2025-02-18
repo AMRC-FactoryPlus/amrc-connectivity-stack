@@ -174,15 +174,23 @@ export class DataFlow {
         return acc[0].uuid;
     }
 
-    async permitted (upn, perm) {
-        const permitted = await this.model.principal_find_by_krb(upn)
-            .then(p => p ? rx.firstValueFrom(this.acl_for(p)) : [])
-            .then(acl => imm.Seq(acl)
+    permitted (upn, perm) {
+        const permitted = rxx.rx(
+            this.identities,
+            rx.first(),
+            rx.map(ids => imm.Seq(ids)
+                .filter(i => i.kind == "kerberos" && i.name == upn)
+                .map(i => i.uuid)
+                .first()),
+            rx.mergeMap(p => p ? this.acl_for(p) : rx.of([])),
+            rx.map(acl => imm.Seq(acl)
                 .filter(e => e.permission == perm)
                 .map(e => e.target)
-                .toSet());
-        this.log("Permitted %s for %s: %o", perm, upn, permitted.toJS());
-        return permitted;
+                .toSet()),
+            rx.tap(ptd => 
+                this.log("Permitted %s for %s: %o", perm, upn, ptd.toJS())));
+
+        return rx.firstValueFrom(permitted);
     }
 
     async check_targ_wild (upn, perm) {

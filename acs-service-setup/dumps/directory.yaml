@@ -8,6 +8,8 @@ objects:
   !u Auth.Class.ServicePerms:
     !u Directory.Perm.All:
       name: "Directory permission"
+      subclassOf:
+        - !u UUIDs.Class.Permission
   !u Directory.Perm.All:
     !u Directory.Perm.AdvertiseService:
       name: "Advertise service"

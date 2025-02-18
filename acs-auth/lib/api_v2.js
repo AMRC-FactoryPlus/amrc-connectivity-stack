@@ -70,11 +70,9 @@ export class APIv2 {
         return acl;
     }
 
-    async check_acl (req, perm, targ, wild) {
-        const targs = await this.data.permitted(req.auth, perm);
-        if (targs.has(targ)) return;
-        if (wild && targs.has(Wildcard)) return;
-        fail(403);
+    async check_acl (req, perm, targ) {
+        const tok = await this.data.check_targ_wild(req.auth, perm);
+        if (!tok(targ)) fail(403);
     }
 
     async _get_acl (req, res, principal) {
@@ -124,7 +122,7 @@ export class APIv2 {
         const g = await this.model.grant_get(uuid);
         if (!g) fail(404);
 
-        await this.check_acl(req, Perm.WriteACL, g.permission, true);
+        await this.check_acl(req, Perm.WriteACL, g.permission);
 
         return res.status(200).json(g);
     }
@@ -176,8 +174,7 @@ export class APIv2 {
     async id_get_all (req, res) {
         const { uuid } = req.params;
 
-        const ok = await this.check_acl(req, Perm.ReadKrb, uuid, true);
-        if (!ok) fail(403);
+        await this.check_acl(req, Perm.ReadKrb, uuid);
 
         return this._id_get_all(uuid, res);
     }
@@ -185,8 +182,7 @@ export class APIv2 {
     async id_get (req, res) {
         const { uuid, kind } = req.params;
 
-        const ok = await this.check_acl(req, Perm.ReadKrb, uuid, true);
-        if (!ok) fail(403);
+        await this.check_acl(req, Perm.ReadKrb, uuid);
 
         const id = await this.data.find_identities(i => i.uuid == uuid && i.kind == kind);
         if (!id.length) fail(404);
@@ -197,8 +193,7 @@ export class APIv2 {
     async _id_put (name, req, res) {
         const { uuid, kind } = req.params;
 
-        const ok = await this.check_acl(req, Perm.WriteKrb, uuid, true);
-        if (!ok) fail(403);
+        await this.check_acl(req, Perm.WriteKrb, uuid);
 
         const rv = await this.data.request({ type: "identity", uuid, kind, name });
         return res.status(rv.status).end();

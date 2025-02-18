@@ -138,7 +138,7 @@ export default class AuthZ {
         const kerberos = id[0]?.name;
 
         /* The permissions here are odd for historical reasons. If the
-         * principal turns out to be the clients they can look up
+         * principal turns out to be the client's they can look up
          * regardless. */
         const tok = await this.data.check_targ_wild(req.auth, Perm.ReadKrb);
         if (!(kerberos == req.auth || tok?.(uuid)))

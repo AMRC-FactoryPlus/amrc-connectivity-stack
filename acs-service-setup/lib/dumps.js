@@ -47,8 +47,14 @@ const yamlOpts = {
  * @return {*} The directory dump with resolved URLs.
  */
 function resolveNamespace (directoryDump, serviceSetup) {
+    const replacements = {
+        namespace: serviceSetup.namespace,
+        domain: serviceSetup.acs_config.domain,
+    }
     directoryDump.advertisements = directoryDump.advertisements.map((advertisement)=> {
-        advertisement.url = advertisement.url.replace(/\$\{(\w+)\}/g, serviceSetup.namespace);
+        advertisement.url = advertisement.url.replace(/\${(.*?)}/g, (match, key) => {
+            return replacements[key] || match; // Replace if key exists, otherwise keep original placeholder
+        });
         return advertisement;
     });
     return directoryDump;
@@ -101,14 +107,29 @@ export async function load_dumps (serviceSetup) {
         serviceSetup.log("== %s", file);
         const documents = await load_yaml(file);
         for (let document of documents) {
+            if(document.service === UUIDs.Service.Directory){
+                continue;
+            }
             serviceSetup.log("=== %s", document.service);
-            // If we have directory services, resolve the url with the correct deployment namespace.
-            document = document.service === UUIDs.Service.Directory
-                ? resolveNamespace(document, serviceSetup)
-                : document;
             const status = await load_dump(fplus, document);
             if (status > 300)
                 throw new Error(`Service dump ${file} failed: ${status}`);
         }
+    }
+}
+
+export async function load_directory_dump (serviceSetup) {
+    // service client
+    const { fplus } = serviceSetup;
+    const documents = await load_yaml("00_service-urls.yaml");
+    for (let document of documents) {
+        serviceSetup.log("=== %s", document.service);
+        if(document.service !== UUIDs.Service.Directory){
+            continue;
+        }
+        document = resolveNamespace(document, serviceSetup);
+        const status = await load_dump(fplus, document);
+        if (status > 300)
+            throw new Error(`Service dump failed: ${status}`);
     }
 }

@@ -107,6 +107,23 @@ export class OpenProtocolHandler {
 
   }
 
+  async cmd (address, data) {
+
+    // address: selectPset
+    // BufferX.to(data): { pSet: 14 }
+
+    // BEFORE CLOSE -
+    // - Make library subscribe to cmds
+    // - Implement BufferX.from...
+
+    this.log('CMD', address, data)
+    switch (address) {
+      case 'selectPset':
+        const parameterSetID = BufferX.fromUInt8(data);
+        this.client.command('selectPset', { payload: { parameterSetID } })
+    }
+  }
+
   async close () {
 
   }

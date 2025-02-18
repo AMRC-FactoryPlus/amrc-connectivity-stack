@@ -6,7 +6,7 @@
 import * as util from "util";
 import Long from "long";
 
-import { Metrics, serialisationType } from "../helpers/typeHandler.js";
+import {Metrics, serialisationType, writeValToBuffer} from "../helpers/typeHandler.js";
 import { log } from "../helpers/log.js";
 
 import { DriverBroker } from "../driverBroker.js";
@@ -61,7 +61,7 @@ export class DriverConnection extends DeviceConnection {
         this.emit("close");
     }
 
-    
+
 
     readMetrics(metrics: Metrics, payloadFormat?: string, delimiter?: string) {
         const poll = metrics.addresses
@@ -76,9 +76,24 @@ export class DriverConnection extends DeviceConnection {
     }
 
     writeMetrics(metrics: Metrics, writeCallback: Function, payloadFormat: serialisationType, delimiter?: string) {
-        let err = null;
-        // Do whatever connection specific stuff you need to in order to
-        // write to the device
+        let err;
+
+        metrics.array.forEach(m => {
+            // @ts-ignore
+            const addr = this.addrs.get(m.properties.address);
+            if (!addr) {
+                // @ts-ignore
+                err = new Error(`Address ${m.properties.address} not found`);
+                return;
+            }
+
+            this.broker.publish({
+                id:         this.id,
+                msg:        "cmd",
+                data:       addr,
+                payload:    writeValToBuffer(m),
+            });
+        });
 
         // Call the writeCallback when complete, setting the error if
         // necessary
@@ -122,7 +137,7 @@ export class DriverConnection extends DeviceConnection {
      */
     //async stopSubscription(deviceId: string, stopSubCallback: Function) {
     //}
-    
+
     #newTopic () {
         while (true) {
             const dt = Math.floor(Math.random() * 100000).toString();

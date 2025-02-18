@@ -24,27 +24,27 @@ export default class AuthZ {
     setup_routes() {
         let api = express.Router();
 
-        /* Validate against the spec */
-        //const spec = url.fileURLToPath(new URL("openapi.yaml", import.meta.url));
-        //api.use(OpenApiValidator.middleware({
-        //    apiSpec: spec,
-        //}));
-
-        //api.use(this.authz.bind(this));
+        const gone = (req, res) => res.status(410).end();
         
+        /* These are all removed. */
+        api.route("/principal")
+            .get(gone)
+            .post(gone);
+        api.get("/ace", gone);
+        api.post("/ace", gone);
+        api.get("/effective", gone);
+        api.get("/effective/:principal", gone);
+
+        /* This will be used by other services until they are all
+         * updated. */
         api.get("/acl", this.get_acl.bind(this));
 
-        api.get("/ace", this.ace_get.bind(this));
-        api.post("/ace", this.ace_post.bind(this));
-
-        api.route("/principal")
-            .get(this.principal_list.bind(this))
-            .post(this.principal_add.bind(this));
+        /* These are used by the service-client library to find
+         * Sparkplug addresses; in particular by the Edge Agent. */
         api.get("/principal/find", this.principal_find.bind(this));
         api.route("/principal/:uuid")
             .get(this.principal_get.bind(this))
-            //.put(this.principal_update.bind(this))
-            .delete(this.principal_delete.bind(this));
+            .delete(gone);
 
         /* These endpoints are for migration only. PUT has been removed
          * so group members can only be deleted. Normally all groups
@@ -54,10 +54,9 @@ export default class AuthZ {
         api.get("/group/all", this.group_all.bind(this));
         api.get("/group", this.group_get.bind(this));
         api.get("/group/:group", this.group_get.bind(this));
-        api.delete("/group/:group/:member", this.group_delete.bind(this));
-
-        api.get("/effective", this.effective_list.bind(this));
-        api.get("/effective/:principal", this.effective_get.bind(this));
+        api.route("/group/:group/:member")
+            .put(gone)
+            .delete(this.group_delete.bind(this));
 
         return api;
     }
@@ -81,52 +80,6 @@ export default class AuthZ {
         return forward(url)(req, res);
     }
 
-    async ace_get(req, res) {
-        const ok = await this.model.check_acl(
-            req.auth, Perm.Manage_ACL, UUIDs.Null, false);
-        if (!ok) return res.status(403).end();
-
-        const aces = await this.model.grant_get_all();
-        return res.status(200).json(aces);
-    }
-
-    async ace_post(req, res) {
-        return res.status(500).end();
-        const ace = req.body;
-
-        const ok = await this.model.check_acl(
-            req.auth, Perm.Manage_ACL, ace.permission, true);
-        if (!ok) return res.status(403).end();
-
-        const st = await this.model.action_invoke(
-            {add: "ace_add", delete: "ace_delete",},
-            ace.action, ace);
-
-        return res.status(st).end();
-    }
-
-    async principal_list(req, res) {
-        return res.status(500).end();
-        const ok = await this.model.check_acl(
-            req.auth, Perm.Read_Krb, UUIDs.Null, false);
-        if (!ok) return res.status(403).end();
-
-        const princs = await this.model.principal_get_all();
-        return res.status(200).json(princs);
-    }
-
-    async principal_add(req, res) {
-        return res.status(403).end();
-        const princ = req.body;
-
-        const ok = await this.model.check_acl(
-            req.auth, Perm.Manage_Krb, UUIDs.Null, false);
-        if (!ok) return res.status(403).end();
-
-        const st = await this.model.principal_add(princ);
-        return res.status(st).end();
-    }
-
     async principal_get(req, res) {
         const {uuid} = req.params;
         if (!valid_uuid(uuid))
@@ -146,20 +99,6 @@ export default class AuthZ {
 
         if (!kerberos) return res.status(404).end();
         return res.status(200).json({ uuid, kerberos });
-    }
-
-    async principal_delete(req, res) {
-        return res.status(403).end();
-        const {uuid} = req.params;
-        if (!valid_uuid(uuid))
-            return res.status(400).end();
-
-        const ok = await this.model.check_acl(
-            req.auth, Perm.Manage_Krb, uuid, true);
-        if (!ok) return res.status(403).end();
-
-        const st = await this.model.principal_delete(uuid);
-        return res.status(st).end();
     }
 
     /* XXX This also used to allow by-name lookup of the client's own
@@ -202,26 +141,5 @@ export default class AuthZ {
 
         const st = await this.model.group_delete(group, member);
         return res.status(st).end();
-    }
-
-    async effective_list(req, res) {
-        return res.status(500).end();
-        const ok = await this.model.check_acl(
-            req.auth, Perm.Read_Eff, UUIDs.Null, false);
-        if (!ok) return res.status(403).end();
-
-        const princs = await this.model.principal_list();
-        return res.status(200).json(princs);
-    }
-
-    async effective_get(req, res) {
-        return res.status(500).end();
-        const ok = await this.model.check_acl(
-            req.auth, Perm.Read_Eff, UUIDs.Null, false);
-        if (!ok) return res.status(403).end();
-
-        const {principal} = req.params;
-        const eff = await this.model.effective_get(principal);
-        return res.status(200).json(eff);
     }
 }

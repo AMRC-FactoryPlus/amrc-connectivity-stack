@@ -22,7 +22,7 @@ export async function service_sp_addrs (ss) {
     const group_id = `${org}-Service-Core`;
     const addrs = [
         [SA.Directory,  "Directory"],
-        [SA.ConfigDB,   "ConfigDB"],
+        [SA.ConfigDB,   "Config_DB"],
         [SA.CmdEsc,     "Command_Escalation"],
     ];
 

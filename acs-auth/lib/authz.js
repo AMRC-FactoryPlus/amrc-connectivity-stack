@@ -16,6 +16,7 @@ export default class AuthZ {
     constructor(opts) {
         this.debug  = opts.debug;
         this.model = opts.model;
+        this.data = opts.data;
 
         this.routes = this.setup_routes();
     }
@@ -31,26 +32,6 @@ export default class AuthZ {
 
         //api.use(this.authz.bind(this));
         
-        /* v1 API:
-         *
-         * GET acl/:uuid
-         * GET acl/identity/:type/:name
-         *
-         * GET ace # Lists all ACEs we can read?
-         * PUT ace/:principal/:permission/:target # Boolean body?
-         * DELETE ace/:principal/:permission/:target
-         *
-         * OR: ACEs get their own UUIDs. (This moves towards treating a
-         * Permission as a set of grants.) Then:
-         *
-         * GET ace
-         * POST ace
-         * GET ace/:ace
-         * PUT ace/:ace
-         * DELETE ace/:ace
-         * 
-         */
-
         api.get("/acl", this.get_acl.bind(this));
 
         api.get("/ace", this.ace_get.bind(this));
@@ -135,7 +116,7 @@ export default class AuthZ {
     }
 
     async principal_add(req, res) {
-        return res.status(500).end();
+        return res.status(403).end();
         const princ = req.body;
 
         const ok = await this.model.check_acl(
@@ -151,11 +132,24 @@ export default class AuthZ {
         if (!valid_uuid(uuid))
             return res.status(410).end();
 
-        return forward(`/v2/principal/${uuid}`)(req, res);
+        /* This API only ever returns Kerberos identities */
+        const id = await this.data.find_identities(i => 
+            i.uuid == uuid && i.kind == "kerberos");
+        const kerberos = id[0]?.name;
+
+        /* The permissions here are odd for historical reasons. If the
+         * principal turns out to be the clients they can look up
+         * regardless. */
+        const tok = await this.data.check_targ_wild(req.auth, Perm.ReadKrb);
+        if (!(kerberos == req.auth || tok?.(uuid)))
+            return res.status(403).end();
+
+        if (!kerberos) return res.status(404).end();
+        return res.status(200).json({ uuid, kerberos });
     }
 
     async principal_delete(req, res) {
-        return res.status(500).end();
+        return res.status(403).end();
         const {uuid} = req.params;
         if (!valid_uuid(uuid))
             return res.status(400).end();
@@ -168,8 +162,8 @@ export default class AuthZ {
         return res.status(st).end();
     }
 
-    /* This endpoint may change in future to allow searching for
-     * principals by other criteria, e.g. Node address. */
+    /* XXX This also used to allow by-name lookup of the client's own
+     * identity, but I don't think that's used anywhere. */
     async principal_find(req, res) {
         const kerberos = req.query?.kerberos;
         const url = kerberos == null ? "/v2/whoami/uuid"

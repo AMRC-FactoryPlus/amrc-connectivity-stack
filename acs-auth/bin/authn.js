@@ -35,7 +35,7 @@ const model  = await new Model({
 const data = new DataFlow({ fplus, model });
 
 const authn = await new AuthN({ }).init();
-const authz = await new AuthZ({ debug, model });
+const authz = await new AuthZ({ data, debug, model });
 const apiv2 = new APIv2({ data, debug, model });
 const loader = new Loader({ debug, model });
 

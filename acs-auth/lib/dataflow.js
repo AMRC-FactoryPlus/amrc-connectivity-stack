@@ -159,4 +159,38 @@ export class DataFlow {
         replay:     true,
         timeout:    1800000,
     });
+
+    async find_identities (cond) {
+        const ids = await rx.firstValueFrom(this.identities);
+        if (!cond) return ids;
+        const rv = ids.filter(cond);
+        return rv;
+    }
+
+    async whoami (upn) {
+        const acc = await this.find_identities(i =>
+            i.kind == "kerberos" && i.name == upn);
+        if (!acc.length) return;
+        return acc[0].uuid;
+    }
+
+    async permitted (upn, perm) {
+        const permitted = await this.model.principal_find_by_krb(upn)
+            .then(p => p ? rx.firstValueFrom(this.acl_for(p)) : [])
+            .then(acl => imm.Seq(acl)
+                .filter(e => e.permission == perm)
+                .map(e => e.target)
+                .toSet());
+        this.log("Permitted %s for %s: %o", perm, upn, permitted.toJS());
+        return permitted;
+    }
+
+    async check_targ_wild (upn, perm) {
+        const targs = await this.permitted(upn, perm);
+        if (!targs.size)
+            return;
+        if (targs.has(Special.Wildcard))
+            return () => true;
+        return i => targs.has(i);
+    }
 }

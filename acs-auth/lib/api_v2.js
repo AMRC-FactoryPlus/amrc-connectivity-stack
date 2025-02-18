@@ -70,39 +70,20 @@ export class APIv2 {
         return acl;
     }
 
-    async permitted (req, perm) {
-        const permitted = await this.model.principal_find_by_krb(req.auth)
-            .then(p => p ? this.fetch_acl(p) : [])
-            .then(acl => imm.Seq(acl)
-                .filter(e => e.permission == perm)
-                .map(e => e.target)
-                .toSet());
-        this.log("Permitted %s for %s: %o", perm, req.auth, permitted.toJS());
-        return permitted;
-    }
-
     async check_acl (req, perm, targ, wild) {
-        const targs = await this.permitted(req, perm);
+        const targs = await this.data.permitted(req.auth, perm);
         if (targs.has(targ)) return;
         if (wild && targs.has(Wildcard)) return;
         fail(403);
-    }
-
-    async permitted_wild (req, perm) {
-        const targs = await this.permitted(req, perm);
-        if (!targs.size)
-            fail(403);
-        if (targs.has(Wildcard))
-            return { has: () => true };
-        return targs;
     }
 
     async _get_acl (req, res, principal) {
         const acl = await this.fetch_acl(principal);
         if (!acl) fail(404);
 
-        const targs = await this.permitted_wild(req, Perm.ReadACL);
-        const rv = acl.filter(e => targs.has(e.permission));
+        const tok = await this.data.check_targ_wild(req.auth, Perm.ReadACL);
+        if (!tok) fail(403);
+        const rv = acl.filter(e => tok(e.permission));
         this.log("Returning ACL %o", rv);
 
         return res.status(200).json(rv);
@@ -128,11 +109,12 @@ export class APIv2 {
     }
 
     async grant_list (req, res) {
-        const targs = await this.permitted_wild(req, Perm.WriteACL);
+        const tok = await this.data.check_targ_wild(req.auth, Perm.WriteACL);
+        if (!tok) fail(403);
 
         const uuids = await this.model.grant_list();
-        const rv = uuids.filter(u => targs.has(u));
-        return res.status(200).json(uuids);
+        const rv = uuids.filter(tok);
+        return res.status(200).json(rv);
     }
 
     async grant_get (req, res) {
@@ -150,7 +132,7 @@ export class APIv2 {
     async grant_new (req, res) {
         const grant = req.body;
 
-        const permitted = await this.permitted(req, Perm.WriteACL);
+        const permitted = await this.data.permitted(req.auth, Perm.WriteACL);
         const rv = await this.data.request({ type: "grant", grant, permitted });
         if (rv.status != 201)
             fail(rv.status);
@@ -163,7 +145,7 @@ export class APIv2 {
         if (!valid_uuid(uuid)) fail(410);
 
         const grant = req.method == "PUT" ? req.body : null;
-        const permitted = await this.permitted(req, Perm.WriteACL);
+        const permitted = await this.data.permitted(req.auth, Perm.WriteACL);
 
         const rv = await this.data.request({ type: "grant", uuid, grant, permitted });
         return res.status(rv.status).end();
@@ -171,24 +153,18 @@ export class APIv2 {
 
     /* XXX The permissions here only handle Kerberos identities. */
 
-    async _identities (cond) {
-        const ids = await rx.firstValueFrom(this.data.identities);
-        if (!cond) return ids;
-        const rv = ids.filter(cond);
-        return rv;
-    }
-
     async id_list (req, res) {
-        const targs = await this.permitted_wild(req, Perm.ReadKrb);
+        const tok = await this.data.check_targ_wild(req.auth, Perm.ReadKrb);
+        if (!tok) fail(403);
 
-        const ids = await this._identities(i => targs.has(i.uuid));
+        const ids = await this.data.find_identities(i => tok(i.uuid));
         const rv = [...new Set(ids.map(i => i.uuid))];
 
         return res.status(200).json(rv);
     }
 
     async _id_get_all (uuid, res) {
-        const ids = await this._identities(i => i.uuid == uuid);
+        const ids = await this.data.find_identities(i => i.uuid == uuid);
         if (!ids.length) fail(404);
 
         const rv = Object.fromEntries(
@@ -212,7 +188,7 @@ export class APIv2 {
         const ok = await this.check_acl(req, Perm.ReadKrb, uuid, true);
         if (!ok) fail(403);
 
-        const id = await this._identities(i => i.uuid == uuid && i.kind == kind);
+        const id = await this.data.find_identities(i => i.uuid == uuid && i.kind == kind);
         if (!id.length) fail(404);
 
         return res.status(200).json(id[0].name);
@@ -237,7 +213,7 @@ export class APIv2 {
     }
 
     async id_kinds (req, res) {
-        const ids = await this._identities();
+        const ids = await this.data.find_identities();
         const rv = [...new Set(ids.map(i => i.kind))]
         return res.status(200).json(rv);
     }
@@ -245,14 +221,14 @@ export class APIv2 {
     async id_list_kind (req, res) {
         const { kind } = req.params;
 
-        const targs = await this.permitted_wild(req, Perm.ReadKrb);
+        const tok = await this.data.check_targ_wild(req.auth, Perm.ReadKrb);
+        if (!tok) fail(403);
         
-        const ids = await this._identities(i => i.kind == kind);
+        const ids = await this.data.find_identities(i => i.kind == kind);
         if (!ids.length) fail(404);
 
-        this.log("ID LIST: permitted: %o", targs);
         const rv = ids
-            .filter(i => targs.has(i.uuid))
+            .filter(i => tok(i.uuid))
             .map(i => i.name);
 
         return res.status(200).json(rv);
@@ -261,10 +237,11 @@ export class APIv2 {
     async id_find (req, res) {
         const { kind, name } = req.params;
 
-        const targs = await this.permitted_wild(req, Perm.ReadKrb);
+        const tok = await this.data.check_targ_wild(req.auth, Perm.ReadKrb);
+        if (!tok) fail(403);
 
-        const ids = await this._identities(i => 
-            i.kind == kind && i.name == name && targs.has(i.uuid));
+        const ids = await this.data.find_identities(i => 
+            i.kind == kind && i.name == name && tok(i.uuid));
         if (!ids.length) fail(404);
 
         return res.status(200).json(ids[0].uuid);
@@ -273,20 +250,16 @@ export class APIv2 {
     /* There is no auth check here; any authenticated user can look up
      * their own identities. This will only look up based on Kerberos
      * auth identity. */
-    async _whoami (req) {
-        const acc = await this._identities(i =>
-            i.kind == "kerberos" && i.name == req.auth);
-        if (!acc.length) fail(404);
-        return acc[0].uuid;
-    }
 
     async id_whoami (req, res) {
-        const uuid = await this._whoami(req);
+        const uuid = await this.data.whoami(req.auth);
+        if (!uuid) fail(404);
         return this._id_get_all(uuid, res);
     }
 
     async id_whoami_uuid (req, res) {
-        const uuid = await this._whoami(req);
+        const uuid = await this.data.whoami(req.auth);
+        if (!uuid) fail(404);
         return res.status(200).json(uuid);
     }
 }

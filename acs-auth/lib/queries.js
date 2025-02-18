@@ -73,53 +73,6 @@ export default class Queries {
         return dbr.rows.map(r => r[0]);
     }
 
-    /* This takes a principal id. Right now this is a UUID, but it
-     * should change to a DB unique ID soon... Don't rely on it, just
-     * use principal_by_krb or principal_by_uuid and pass back what you get. */
-    async acl_get (princ_id, permission) {
-        /* This is a mess to keep authz/acl working for now. This
-         * expands all groups regardless as before. This goes
-         * round-the-houses from IDs to UUIDs and back. */
-        const dbr = await this.query(`
-            with recursive
-                aceu as (
-                    select u.uuid principal, p.uuid permission, t.uuid target, e.plural
-                    from ace e
-                        join uuid u on u.id = e.principal
-                        join uuid p on p.id = e.permission
-                        join uuid t on t.id = e.target),
-                group_members as (
-                    select m.parent, m.parent child
-                        from old_member m
-                    union select g.parent, m.child
-                        from group_members g
-                            join old_member m on m.parent = g.child),
-                resolved_ace as (
-                    select coalesce(princ.child, a.principal) principal, 
-                        coalesce(perm.child, a.permission) permission,
-                        coalesce(targ.child, a.target) target
-                    from aceu a
-                        left join group_members princ on princ.parent = a.principal
-                        left join group_members perm on perm.parent = a.permission
-                        left join group_members targ on targ.parent = a.target),
-                full_acl as (
-                    select u.id princid, a.principal, a.permission, 
-                        case a.target 
-                            when '5855a1cc-46d8-4b16-84f8-ab3916ecb230'::uuid
-                                then a.principal
-                            else a.target
-                        end target
-                    from resolved_ace a
-                        join uuid u on u.uuid = a.principal)
-            select a.principal, a.permission, a.target
-            from full_acl a
-                left join group_members g on g.child = a.permission
-            where a.princid = $1 and g.parent = $2
-        `, [princ_id, permission]);
-
-        return dbr.rows;
-    }
-
     async uuid_find (uuid) {
         return await this.q_single(
                 `select id from uuid where uuid = $1`,
@@ -137,7 +90,7 @@ export default class Queries {
             where e.uuid = $1
         `, [uuid]);
         if (!g) return [404];
-        if (!has_wild(permitted, g.permission)) return [403];
+        if (!permitted(g.permission)) return [403];
         return [200, g.id];
     }
 
@@ -210,25 +163,6 @@ export default class Queries {
     async ace_delete (ace) {
         throw "unimplemented";
     }
-
-    /* This returns an ID. */
-    async principal_by_krb (principal) {
-        const dbr = await this.query(`
-            select i.principal 
-            from identity i
-            where i.kind = ${IDs.Kerberos} and i.name = $1
-        `, [principal]);
-        return dbr.rows[0]?.principal;
-    }
-
-    /* This returns an ID. */
-    async principal_by_uuid (uuid) {
-        /* I am allowing any object to be a principal at this point. */
-        const dbr = await this.query(`
-            select id from uuid where uuid = $1
-        `, [uuid]);
-        return dbr.rows[0].id;
-    } 
 
     idkind_find (kind) {
         return this.q_single(

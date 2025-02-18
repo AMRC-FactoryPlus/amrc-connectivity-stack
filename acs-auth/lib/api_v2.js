@@ -8,12 +8,8 @@ import express from "express";
 import * as imm from "immutable";
 import * as rx from "rxjs";
 
-import { UUIDs } from "@amrc-factoryplus/service-client";
-
-import {Perm} from "./uuids.js";
+import { Perm } from "./uuids.js";
 import { valid_krb, valid_uuid } from "./validate.js";
-
-const Wildcard = UUIDs.Special.Null;
 
 function fail (status) {
     throw { status };
@@ -71,15 +67,15 @@ export class APIv2 {
     }
 
     async check_acl (req, perm, targ) {
-        const tok = await this.data.check_targ_wild(req.auth, perm);
-        if (!tok(targ)) fail(403);
+        const tok = await this.data.check_targ(req.auth, perm, true);
+        if (!tok?.(targ)) fail(403);
     }
 
     async _get_acl (req, res, principal) {
         const acl = await this.fetch_acl(principal);
         if (!acl) fail(404);
 
-        const tok = await this.data.check_targ_wild(req.auth, Perm.ReadACL);
+        const tok = await this.data.check_targ(req.auth, Perm.ReadACL, true);
         if (!tok) fail(403);
         const rv = acl.filter(e => tok(e.permission));
         this.log("Returning ACL %o", rv);
@@ -107,7 +103,7 @@ export class APIv2 {
     }
 
     async grant_list (req, res) {
-        const tok = await this.data.check_targ_wild(req.auth, Perm.WriteACL);
+        const tok = await this.data.check_targ(req.auth, Perm.WriteACL, true);
         if (!tok) fail(403);
 
         const uuids = await this.model.grant_list();
@@ -130,7 +126,7 @@ export class APIv2 {
     async grant_new (req, res) {
         const grant = req.body;
 
-        const permitted = await this.data.permitted(req.auth, Perm.WriteACL);
+        const permitted = await this.data.check_targ(req.auth, Perm.WriteACL);
         const rv = await this.data.request({ type: "grant", grant, permitted });
         if (rv.status != 201)
             fail(rv.status);
@@ -143,7 +139,7 @@ export class APIv2 {
         if (!valid_uuid(uuid)) fail(410);
 
         const grant = req.method == "PUT" ? req.body : null;
-        const permitted = await this.data.permitted(req.auth, Perm.WriteACL);
+        const permitted = await this.data.check_targ(req.auth, Perm.WriteACL);
 
         const rv = await this.data.request({ type: "grant", uuid, grant, permitted });
         return res.status(rv.status).end();
@@ -152,7 +148,7 @@ export class APIv2 {
     /* XXX The permissions here only handle Kerberos identities. */
 
     async id_list (req, res) {
-        const tok = await this.data.check_targ_wild(req.auth, Perm.ReadKrb);
+        const tok = await this.data.check_targ(req.auth, Perm.ReadKrb, true);
         if (!tok) fail(403);
 
         const ids = await this.data.find_identities(i => tok(i.uuid));
@@ -219,7 +215,7 @@ export class APIv2 {
     async id_list_kind (req, res) {
         const { kind } = req.params;
 
-        const tok = await this.data.check_targ_wild(req.auth, Perm.ReadKrb);
+        const tok = await this.data.check_targ(req.auth, Perm.ReadKrb, true);
         if (!tok) fail(403);
         
         const ids = await this.data.find_identities(i => i.kind == kind);
@@ -235,7 +231,7 @@ export class APIv2 {
     async id_find (req, res) {
         const { kind, name } = req.params;
 
-        const tok = await this.data.check_targ_wild(req.auth, Perm.ReadKrb);
+        const tok = await this.data.check_targ(req.auth, Perm.ReadKrb, true);
         if (!tok) fail(403);
 
         const ids = await this.data.find_identities(i => 

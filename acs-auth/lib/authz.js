@@ -6,10 +6,9 @@
 
 import express from "express";
 
-import { UUIDs } from "@amrc-factoryplus/service-client";
 import { forward } from "@amrc-factoryplus/service-api";
 
-import {Perm} from "./uuids.js";
+import {Perm, Special} from "./uuids.js";
 import { booleans, valid_krb, valid_uuid } from "./validate.js";
 
 export default class AuthZ {
@@ -93,7 +92,7 @@ export default class AuthZ {
         /* The permissions here are odd for historical reasons. If the
          * principal turns out to be the client's they can look up
          * regardless. */
-        const tok = await this.data.check_targ_wild(req.auth, Perm.ReadKrb);
+        const tok = await this.data.check_targ(req.auth, Perm.ReadKrb, true);
         if (!(kerberos == req.auth || tok?.(uuid)))
             return res.status(403).end();
 
@@ -110,21 +109,23 @@ export default class AuthZ {
         return forward(url)(req, res);
     }
 
+    /* These all now require wildcard ManageGroup. This is a change from
+     * before but this is meant to be an admin-only interface now. */
     async group_all(req, res) {
-        const ok = await this.model.check_acl(
-            req.auth, Perm.Manage_Group, UUIDs.Null, false);
-        if (!ok) return res.status(403).end();
+        const tok = await this.data.check_targ(req.auth, Perm.ManageGroup, false);
+        if (tok?.(Special.Wildcard))
+            return res.status(403).end();
 
         const groups = await this.model.group_all();
         return res.status(200).json(groups);
     }
 
     async group_get (req, res) {
-        const { group } = req.params;
+        const tok = await this.data.check_targ(req.auth, Perm.ManageGroup, false);
+        if (tok?.(Special.Wildcard))
+            return res.status(403).end();
 
-        const ok = await this.model.check_acl(
-            req.auth, Perm.Manage_Group, UUIDs.Null, false);
-        if (!ok) return res.status(403).end();
+        const { group } = req.params;
 
         const rv = group
             ? await this.model.group_get(group)
@@ -133,11 +134,11 @@ export default class AuthZ {
     }
 
     async group_delete(req, res) {
-        const {group, member} = req.params;
+        const tok = await this.data.check_targ(req.auth, Perm.ManageGroup, false);
+        if (tok?.(Special.Wildcard))
+            return res.status(403).end();
 
-        const ok = await this.model.check_acl(
-            req.auth, Perm.Manage_Group, group, true);
-        if (!ok) return res.status(403).end();
+        const {group, member} = req.params;
 
         const st = await this.model.group_delete(group, member);
         return res.status(st).end();

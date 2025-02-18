@@ -17,6 +17,7 @@ export class DataFlow {
         const { fplus } = opts;
 
         this.model = opts.model;
+        this.root = opts.root_principal;
 
         this.log = fplus.debug.bound("data");
         this.cdb = fplus.ConfigDB;
@@ -195,11 +196,13 @@ export class DataFlow {
                 this.log("Permitted %s for %s: %o", perm, upn, ptd.toJS()))));
     }
 
-    async check_targ_wild (upn, perm) {
+    async check_targ (upn, perm, wild) {
+        if (upn == this.root)
+            return () => true;
         const targs = await this.permitted(upn, perm);
         if (!targs.size)
             return;
-        if (targs.has(Special.Wildcard))
+        if (wild && targs.has(Special.Wildcard))
             return () => true;
         return i => targs.has(i);
     }

@@ -18,6 +18,9 @@ export const Perm = {
      * permissions for each ID type. For now only support Kerberos. */
     ReadKrb:        "e8c9c0f7-0d54-4db2-b8d6-cd80c45f6a5c",
     WriteKrb:       "327c4cc8-9c46-4e1e-bb6b-257ace37b0f6",
+
+    /* This is only for migration */
+    ManageGroup:    "be9b6d47-c845-49b2-b9d5-d87b83f11c3b",
 };
 
 export const Special = {

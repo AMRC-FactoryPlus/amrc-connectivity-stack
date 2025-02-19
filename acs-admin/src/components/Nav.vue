@@ -23,12 +23,6 @@ const sidebarNavItems: Item[] = [
         auth: false
     },
     {
-        title: 'Edge Devices & Clusters',
-        href: '/devices',
-        icon: 'microchip',
-        auth: true
-    },
-    {
         title: 'Live Activity',
         href: '/activity',
         icon: 'table-cells',

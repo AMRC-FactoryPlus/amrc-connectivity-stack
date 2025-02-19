@@ -51,6 +51,10 @@ coredns:
   traefikRedirect:
     enabled: false
 
+k3s:
+  traefikRedirect:
+    enabled: true
+
 identity:
   # -- Whether or not to enable the Identity component
   enabled: true

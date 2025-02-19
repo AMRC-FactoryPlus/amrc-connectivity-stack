@@ -66,9 +66,10 @@ export default class Model extends Queries {
         return this.txn(async q => {
             const pid = await q.uuid_find(r.uuid);
             const kid = await q.idkind_find(r.kind);
-            if (!kid) return 404;
+            if (!kid) return { status: 404 };
 
-            return q.identity_add(pid, kid, r.name);
+            const status = await q.identity_add(pid, kid, r.name);
+            return { status };
         });
     }
 

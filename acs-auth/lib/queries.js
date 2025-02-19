@@ -6,20 +6,6 @@
 
 import util from "util";
 
-import { Special } from "./uuids.js";
-import { has_wild } from "./validate.js";
-
-/* This must match the \sets in sql/v2.sql */
-const IDs = {
-    Kerberos:           1,
-    Sparkplug:          2,
-    Principal:          3,
-    PrincipalGroup:     4,
-    Permission:         5,
-    PermissionGroup:    6,
-    Self:               7,
-};
-
 class QueryError extends Error {
     constructor (sql, bind, msg, ...args) {
         super(util.format(msg, ...args));

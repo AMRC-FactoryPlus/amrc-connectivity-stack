@@ -5,7 +5,6 @@
  */
 
 import express from "express";
-import * as imm from "immutable";
 import * as rx from "rxjs";
 
 import { Perm } from "./uuids.js";

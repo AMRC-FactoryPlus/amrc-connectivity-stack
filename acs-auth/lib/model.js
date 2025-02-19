@@ -8,8 +8,6 @@ import { UUIDs} from "@amrc-factoryplus/service-client";
 import { DB } from "@amrc-factoryplus/pg-client";
 
 import Queries from "./queries.js";
-import {Perm} from "./uuids.js";
-import { has_wild } from "./validate.js";
 
 export default class Model extends Queries {
     constructor(opts) {

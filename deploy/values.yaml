@@ -26,6 +26,10 @@ acs:
   # own section. Deployments from a Git checkout must set this value.
   #defaultTag: ''
 
+k3s:
+  traefikRedirect:
+    enabled: true
+
 identity:
   # -- Whether or not to enable the Identity component
   enabled: true

@@ -1,7 +1,3 @@
-/*
- * Copyright (c) University of Sheffield AMRC 2025.
- */
-
 import './assets/main.css'
 
 import { createApp } from 'vue'
@@ -14,7 +10,6 @@ import Home from '@pages/Home.vue'
 import Activity from '@pages/Activity.vue'
 import Alerts from '@pages/Alerts/Alerts.vue'
 import AccessControl from '@pages/AccessControl/AccessControl.vue'
-import EdgeDevicesAndClusters from '@pages/EdgeDevicesAndClusters/EdgeDevicesAndClusters.vue'
 
 const routes = [
   {
@@ -24,16 +19,7 @@ const routes = [
       name: 'Home',
       icon: 'house'
     },
-  },
-  {
-    path: '/devices',
-    component: EdgeDevicesAndClusters,
-    meta: {
-      name: 'Edge Devices & Clusters',
-      icon: 'microchip'
-    },
-  },
-  {
+  }, {
     path: '/activity',
     component: Activity,
     meta: {

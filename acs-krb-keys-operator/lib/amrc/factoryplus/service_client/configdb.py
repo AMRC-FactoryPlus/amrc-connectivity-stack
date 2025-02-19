@@ -92,9 +92,9 @@ class ConfigDB (ServiceInterface):
         url = f"v2/class/{klass}/{rel}/{obj}"
         st, _ = self.fetch(url)
         if st == 204:
-            return true
+            return True
         if st == 404:
-            return false
+            return False
         self.error(f"Can't check {rel} for {klass}", st)
 
     def class_has_member (self, klass, obj):

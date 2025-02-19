@@ -82,7 +82,7 @@ class AccUuid (KrbKeyEvent):
 
         spec = args["spec"]
         self.account = spec.get("account")
-        selc.principal = spec["principal"]
+        self.principal = spec["principal"]
 
     def process (self):
         if self.reason == "delete":
@@ -98,6 +98,8 @@ class AccUuid (KrbKeyEvent):
         spec = self.account.get("uuid")
         klass = self.account.get("class")
 
+        fplus = kk_ctx().fplus;
+
         # If you do this it's your problem to sort out the mess.
         if annot is not None and spec is not None and annot != spec:
             log(f"Account UUID has changed: {annot} -> {spec}",
@@ -111,14 +113,17 @@ class AccUuid (KrbKeyEvent):
             # We are managing this object but it's new. Start by
             # checking the Auth service for a principal mapping.
             log(f"Checking Auth service for existing account for {self.principal}")
+            uuid = fplus.auth.find_principal("kerberos", self.principal);
 
-            # We need to make sure that if
-            # the object creation succeeds, the annotation will be
-            # recorded. Otherwise we keep creating ConfigDB objects.
-            log(f"Creating new account in class {klass}")
-            cdb = kk_ctx().fplus.configdb
-            uuid = cdb.create_object(klass, spec)
-            log(f"Created new account {uuid}")
+            # Otherwise, create a new object in the ConfigDB.
+            if uuid is None:
+                log(f"Creating new account in class {klass}")
+                uuid = fplus.configdb.create_object(klass, spec)
+                log(f"Created new account {uuid}")
+
+            # We need to make sure that if the object creation succeeds,
+            # the annotation will be recorded. Otherwise we keep
+            # creating ConfigDB objects.
             p_annot[key] = str(uuid)
         elif spec is not None and annot != spec:
             # This should not normally happen. Probably someone has

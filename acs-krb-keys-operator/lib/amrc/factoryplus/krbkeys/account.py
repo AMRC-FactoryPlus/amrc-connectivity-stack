@@ -2,6 +2,7 @@
 # Internal spec class
 # Copyright 2023 AMRC
 
+import  logging
 import  typing
 from    uuid        import UUID
 
@@ -58,8 +59,9 @@ class FPAccount:
         groups = spec.get("groups", []);
         self.groups = set(UUID(g) for g in groups)
 
-        aces = spec.get("aces", []);
-        self.aces = set(ACE.of(a) for a in aces)
+        #aces = spec.get("aces", [])
+        #self.aces = set(ACE.of(a) for a in aces)
+        self.aces = "aces" in spec
 
         self.sparkplug = SparkplugAddress.of(spec.get("sparkplug", None))
 
@@ -81,9 +83,12 @@ class FPAccount:
     def reconcile_configdb (self):
         cdb = kk_ctx().fplus.configdb
 
-        # If we don't have a class we aren't managing this object in the
-        # ConfigDB. Someone else (the manager perhaps) is doing that.
-        if self.klass is not None and self.name is not None:
+        # Always set the object live
+        cdb.patch_config(uuids.App.Registration, self.uuid,
+            { "deleted": False });
+
+        # We set whatever information we are given.
+        if self.name is not None:
             cdb.patch_config(uuids.App.Info, self.uuid,
                 { "name": self.name, "deleted": None })
 
@@ -99,27 +104,30 @@ class FPAccount:
             log(f"Giving {self.uuid} address {addr}")
             cdb.put_config(uuids.App.SparkplugAddress, self.uuid, addr);
 
+        # Groups are now ConfigDB class memberships.
+        for grp in self.groups:
+            log(f"Adding {self.uuid} to class {grp}")
+            cdb.class_add_member(grp, self.uuid)
+
     def reconcile_auth (self):
         auth = kk_ctx().fplus.auth
 
-        # XXX This is not atomic, but this is unavoidable with the
-        # current auth service API.
-        ids = auth.get_principal(self.uuid)
-        if ids is not None and ids["kerberos"] == self.principal:
-            log(f"Principal is already correct in auth service")
-        else:
-            log(f"Updating auth principal mapping for {self.uuid} to {self.principal}")
-            if ids is not None:
-                auth.delete_principal(self.uuid)
-            auth.add_principal(self.uuid, kerberos=self.principal)
+        # This will silently succeed if the identity is already correct.
+        # If there is a conflict we will throw 409 (and kopf will
+        # retry). I think this is the best behaviour...
+        auth.add_identity(self.uuid, "kerberos", self.principal)
 
-        for grp in self.groups:
-            log(f"Adding {self.uuid} to group {grp}")
-            auth.add_to_group(grp, self.uuid)
+        # I don't want to allow this; it will be much better to use
+        # group membership and appropriate grants. But some explicit
+        # grants are still necessary, so this may need reintroducing in
+        # the future.
+        if self.aces:
+            log(f"Granting explicit ACEs is no longer supported",
+                level=logging.WARNING)
 
-        for ace in self.aces:
-            log(f"Granting {self.uuid} ACE {ace}")
-            auth.add_ace(self.uuid, ace.permission, ace.target)
+        #for ace in self.aces:
+        #    log(f"Granting {self.uuid} ACE {ace}")
+        #    auth.add_ace(self.uuid, ace.permission, ace.target)
 
     def remove (self, new):
         if new is None:
@@ -130,20 +138,23 @@ class FPAccount:
         if self.uuid != new.uuid:
             log(f"Removing principal mapping for {self.uuid}")
             ServiceError.catch((404,), lambda:
-                fp.auth.delete_principal(self.uuid))
+                fp.auth.delete_identity(self.uuid, "kerberos"))
 
             if self.klass is not None:
                 ServiceError.catch((404,), lambda:
-                    fp.configdb.patch_config(uuids.App.Info, self.uuid,
+                    fp.configdb.patch_config(uuids.App.Registration, self.uuid,
                         { "deleted": True }))
             
+        # This does not guarantee the account is no longer a member of
+        # these groups; it may have derived membership. But that's not
+        # our business.
         for grp in self.groups - new.groups:
             log(f"Removing {self.uuid} from group {grp}")
-            fp.auth.remove_from_group(grp, self.uuid)
+            fp.configdb.class_remove_member(grp, self.uuid)
 
-        for ace in self.aces - new.aces:
-            log(f"Revoking {self.uuid} ACE {ace}")
-            fp.auth.delete_ace(self.uuid, ace.permission, ace.target)
+#        for ace in self.aces - new.aces:
+#            log(f"Revoking {self.uuid} ACE {ace}")
+#            fp.auth.delete_ace(self.uuid, ace.permission, ace.target)
 
         if self.sparkplug != new.sparkplug:
             log(f"Removing {self.uuid} address {self.sparkplug}")

@@ -51,6 +51,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits);
     <DialogContent
       :class="cn(sheetVariants({ side }), props.class)"
       v-bind="{ ...forwarded, ...$attrs }"
+      @close-auto-focus.stop.prevent
     >
       <slot />
 

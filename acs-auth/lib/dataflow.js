@@ -47,7 +47,8 @@ export class DataFlow {
 
                 return updater.call(model, r)
                     .then(rv => ({ ...rv, type: r.type, request: r.request }));
-            }));
+            }),
+            rx.share());
     }
 
     /* XXX This is not the best way to do this; we refetch the entire

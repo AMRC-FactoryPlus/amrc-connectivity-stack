@@ -140,17 +140,17 @@ export default class Queries {
     }
 
     async identity_add (pid, kid, name) {
-        const dbr = await this.query(`
+        const ok = await this.q_single(`
             insert into identity (principal, kind, name)
             values ($1, $2, $3)
             on conflict do nothing
             returning 1 ok
         `, [pid, kid, name]);
-        return dbr.rows[0]?.ok ? 204 : 409;
+        return ok ? 204 : 409;
     }
 
     async identity_delete (uuid, kind) {
-        const dbr = await this.query(`
+        const ok = await this.q_single(`
             delete from identity i
             using uuid u, idkind k
             where i.principal = u.id
@@ -159,7 +159,7 @@ export default class Queries {
                 and k.kind = $2
             returning 1 ok
         `, [uuid, kind]);
-        return dbr.rows[0]?.ok ? 204 : 404;
+        return ok ? 204 : 404;
     }
 
     async group_all () {

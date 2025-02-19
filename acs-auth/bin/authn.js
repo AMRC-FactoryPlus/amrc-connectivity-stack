@@ -37,7 +37,7 @@ const data = new DataFlow({
 
 const authn = await new AuthN({ }).init();
 const authz = await new AuthZ({ data, debug, model });
-const apiv2 = new APIv2({ data, debug, model });
+const apiv2 = new APIv2({ data, debug });
 const loader = new Loader({ debug, model });
 
 const editor = await new Editor({

@@ -94,23 +94,6 @@ export default class Queries {
         return [200, g.id];
     }
 
-    grant_list () {
-        return this.q_list(`select uuid from ace`);
-    }
-
-    grant_get (uuid) {
-        /* XXX I don't like this duplication */
-        return this.q_row(`
-            select e.uuid, u.uuid principal, p.uuid permission, t.uuid target,
-                e.plural
-            from ace e
-                join uuid u on u.id = e.principal
-                join uuid p on p.id = e.permission
-                join uuid t on t.id = e.target
-            where e.uuid = $1
-        `, [uuid]);
-    }
-
     grant_get_all () {
         return this.q_rows(`
             select e.uuid, u.uuid principal, p.uuid permission, t.uuid target,
@@ -154,14 +137,6 @@ export default class Queries {
             where id = $1
             returning 1 ok
         `, [id, ...ids, g.plural]);
-    }
-
-    async ace_add (ace) {
-        throw "unimplemented";
-    }
-
-    async ace_delete (ace) {
-        throw "unimplemented";
     }
 
     idkind_find (kind) {
@@ -230,20 +205,6 @@ export default class Queries {
         `, [group]);
     }
 
-    async effective_get (principal) {
-        const dbr = await this.query(`
-            select p.kerberos, a.principal, a.permission,
-                case a.target
-                    when '${Special.Self}'::uuid then a.principal
-                    else a.target
-                end target
-            from resolved_ace a
-                join principal p on a.principal = p.uuid
-            where p.kerberos = $1
-        `, [principal]);
-        return dbr.rows;
-    }
-
     dump_load_uuids (uuids) {
         return this.q_list(`
             insert into uuid (uuid)
@@ -286,9 +247,6 @@ export default class Queries {
                 where ace.plural != excluded.plural
             returning principal, permission, target
         `, [aces]);
-    }
-
-    async do_dump_load (uuids, krbs, grants) {
     }
 }
 

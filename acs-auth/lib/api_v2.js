@@ -20,7 +20,6 @@ function fail (status) {
 
 export class APIv2 {
     constructor(opts) {
-        this.model = opts.model;
         this.data = opts.data;
 
         this.log = opts.debug.bound("apiv2");
@@ -106,8 +105,8 @@ export class APIv2 {
         const tok = await this.data.check_targ(req.auth, Perm.WriteACL, true);
         if (!tok) fail(403);
 
-        const uuids = await this.model.grant_list();
-        const rv = uuids.filter(tok);
+        const grants = await rx.firstValueFrom(this.data.grants);
+        const rv = grants.map(g => g.uuid).filter(tok);
         return res.status(200).json(rv);
     }
 
@@ -115,7 +114,8 @@ export class APIv2 {
         const { uuid } = req.params;
         if (!valid_uuid(uuid)) fail(410);
 
-        const g = await this.model.grant_get(uuid);
+        const grants = await rx.firstValueFrom(this.data.grants);
+        const g = grants.find(g => g.uuid == uuid);
         if (!g) fail(404);
 
         await this.check_acl(req, Perm.WriteACL, g.permission);

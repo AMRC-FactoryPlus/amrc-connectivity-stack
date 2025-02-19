@@ -36,12 +36,6 @@ export default class Model extends Queries {
         return this.db.txn({}, q => work(new Queries(q)));
     }
 
-    action_invoke(actions, key, ...args) {
-        return key in actions
-            ? this[actions[key]](...args)
-            : 400;
-    }
-
     /* The request structure here includes r.permitted, the set of
      * ManageACL permissions the user is granted. This is because we
      * must make some permission checks inside the txn; deleting an
@@ -123,25 +117,5 @@ export default class Model extends Queries {
 
             return 204;
         });
-    }
-
-    dump_save() {
-        return 404;
-//        return this.txn(async q => {
-//            const aces = await q.ace_get_all();
-//            const parents = await q.group_list();
-//            const groups = Object.fromEntries(
-//                await Promise.all(
-//                    parents.map(p =>
-//                        q.group_get(p)
-//                            .then(ms => [p, ms]))));
-//            const principals = await q.principal_get_all();
-//
-//            return {
-//                service: UUIDs.Service.Authentication,
-//                version: 1,
-//                aces, groups, principals,
-//            };
-//        });
     }
 }

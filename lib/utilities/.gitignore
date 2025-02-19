@@ -1,0 +1,16 @@
+# Vim swap
+*.swp
+
+# Environment
+.env
+
+# Secrets
+/keytabs/
+/volumes/
+
+# IDE
+.idea/
+
+# Node
+/node_modules/
+package-lock.json

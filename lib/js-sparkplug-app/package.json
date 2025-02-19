@@ -1,0 +1,19 @@
+{
+  "name": "@amrc-factoryplus/sparkplug-app",
+  "version": "0.0.6",
+  "description": "A Javascript library providing Sparkplug Application functionality",
+  "main": "lib/index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "AMRC",
+  "license": "MIT",
+  "dependencies": {
+    "@amrc-factoryplus/rx-util": "^0.0.3",
+    "@amrc-factoryplus/service-client": "../js-service-client",
+    "mqtt-match": "^3.0.0",
+    "rxjs": "^7.8.1"
+  }
+}

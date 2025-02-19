@@ -1,0 +1,52 @@
+{
+  "name": "@amrc-factoryplus/utilities",
+  "version": "2.0.0",
+  "description": "A collection of NodeJS utilities for developing components for Factory+",
+  "author": "AMRC",
+  "license": "MIT",
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "./types/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./lib/index.js",
+      "require": "./lib/index.js",
+      "types": "./types/index.d.ts"
+    }
+  },
+  "directories": {
+    "doc": "docs",
+    "lib": "lib"
+  },
+  "scripts": {},
+  "dependencies": {
+    "@amrc-factoryplus/service-client": "^1.3.4",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "find-package-json": "^1.2.0",
+    "http-errors": "^2.0.0",
+    "path-to-regexp": "^6.2.1",
+    "pg": "^8.11.3",
+    "semver": "^7.5.4"
+  },
+  "optionalDependencies": {
+    "pg-native": "^3.0.1"
+  },
+  "keywords": [
+    "amrc",
+    "factory-plus",
+    "factoryplus",
+    "acs",
+    "amrc-connectivity-stack",
+    "mqtt",
+    "sparkplug"
+  ],
+  "devDependencies": {
+    "@types/express": "^4.17.20",
+    "@types/long": "^4.0.2",
+    "@types/node": "^20.8.10",
+    "eslint": "^8.52.0",
+    "typescript": "^4.9.5"
+  },
+  "bin": {}
+}

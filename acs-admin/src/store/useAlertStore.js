@@ -1,10 +1,11 @@
 /*
- * Copyright (c) University of Sheffield AMRC 2024.
+ * Copyright (c) University of Sheffield AMRC 2025.
  */
 
 import { defineStore } from 'pinia'
 import { UUIDs } from '@amrc-factoryplus/service-client'
 import * as rx from 'rxjs'
+import { storeReady } from '@store/useStoreReady.js'
 
 export const useAlertStore = defineStore('alert', {
   state: () => ({
@@ -12,6 +13,10 @@ export const useAlertStore = defineStore('alert', {
   }),
   actions: {
     async fetchAlerts (fplus) {
+
+      // Wait until the store is ready before attempting to fetch data
+      await storeReady();
+
       const res = await fplus.Directory.fetch({
         url: 'v1/alert/active',
         cache: 'reload',

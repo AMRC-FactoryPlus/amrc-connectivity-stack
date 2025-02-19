@@ -1,10 +1,11 @@
 /*
- * Copyright (c) University of Sheffield AMRC 2024.
+ * Copyright (c) University of Sheffield AMRC 2025.
  */
 
 import { defineStore } from 'pinia'
 import { useServiceClientStore } from '@/store/serviceClientStore.js'
-import { UUIDs } from "@amrc-factoryplus/service-client";
+import { UUIDs } from '@amrc-factoryplus/service-client'
+import { storeReady } from '@store/useStoreReady.js'
 
 export const useGroupStore = defineStore('group', {
   state: () => ({
@@ -12,7 +13,12 @@ export const useGroupStore = defineStore('group', {
     loading: false,
   }),
   actions: {
+
     async getMembers (group) {
+
+      // Wait until the store is ready before attempting to fetch data
+      await storeReady();
+
       // Let's get the list of group members
       try {
         let groupMembersResponse = await useServiceClientStore().client.Auth.fetch(`authz/group/${group.uuid}`)
@@ -24,6 +30,10 @@ export const useGroupStore = defineStore('group', {
 
     async fetch () {
       this.loading = true
+
+      // Wait until the store is ready before attempting to fetch data
+      await storeReady();
+
       this.data = []
       try {
         let groupListResponse = await useServiceClientStore().client.Auth.fetch('authz/group')

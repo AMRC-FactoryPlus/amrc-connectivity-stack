@@ -39,8 +39,6 @@ spec:
                   key: password
             - name: VERBOSE
               value: ALL,!token,!service
-            - name: NAMESPACE
-              value: {{.Release.Namespace}}
             - name: GIT_CHECKOUTS
               value: /data
             - name: SS_CONFIG
@@ -49,6 +47,7 @@ spec:
               value: {{
                 dict
                   "organisation"    .Values.acs.organisation
+                  "namespace"       .Release.Namespace
                   "domain"          .Values.acs.baseUrl
                   "realm"           .Values.identity.realm
                   "directory"

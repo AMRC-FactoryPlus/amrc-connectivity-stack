@@ -48,7 +48,7 @@ const yamlOpts = {
  */
 function resolveNamespace (directoryDump, serviceSetup) {
     const replacements = {
-        namespace: serviceSetup.namespace,
+        namespace: serviceSetup.acs_config.namespace,
         domain: serviceSetup.acs_config.domain,
     }
     directoryDump.advertisements = directoryDump.advertisements.map((advertisement)=> {

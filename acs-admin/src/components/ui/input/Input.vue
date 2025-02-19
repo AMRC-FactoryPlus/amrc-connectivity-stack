@@ -31,6 +31,11 @@ const props = defineProps({
     type: String,
     required: false,
   },
+  type: {
+    type: String,
+    required: false,
+    default: 'text',
+  },
 })
 
 const emits = defineEmits(['update:modelValue'])
@@ -52,6 +57,7 @@ const modelValue = useVModel(props, 'modelValue', emits, {
     <input
         :name="title"
         v-model="modelValue"
+        :type="props.type"
         :placeholder
         :class="
       cn(

@@ -57,5 +57,8 @@ const sidebarNavItems: Item[] = [
         </div>
       </Button>
     </RouterLink>
+
+    <!-- Clusters, Nodes and Devices -->
+
   </nav>
 </template>

@@ -7,22 +7,30 @@ objects:
   !u Auth.Class.CompositePerm:
     !u ACS.Perm.Composite.CmdEsc:
       name: "Command Escalation service"
+      subclassOf:
+        - !u UUIDs.Class.Permission
       enum:
         - !u ACS.Perm.MQTT.IssueCommands
         - !u ACS.Perm.MQTT.ReadWholeNamespace
     !u ACS.Perm.Composite.EdgeNode:
       name: "Edge Node"
+      subclassOf:
+        - !u UUIDs.Class.Permission
       enum:
         - !u ACS.Perm.MQTT.ReadAllStates
         - !u ACS.Perm.MQTT.ParticipateAsNode
         - !u ACS.Perm.MQTT.RepresentDevices
     !u ACS.Perm.Composite.EdgeNodeConsumer:
       name: "Edge Node consumer"
+      subclassOf:
+        - !u UUIDs.Class.Permission
       enum:
         - !u ACS.Perm.MQTT.ReadNode
         - !u UUIDs.Permission.CmdEsc.Rebirth
     !u ACS.Perm.Composite.PrimaryApp:
       name: "Global Primary App"
+      subclassOf:
+        - !u UUIDs.Class.Permission
       enum:
         - !u ACS.Perm.MQTT.IssueCommands
         - !u ACS.Perm.MQTT.ReadWholeNamespace
@@ -30,6 +38,8 @@ objects:
         - !u ACS.Perm.MQTT.UpdateOwnState
     !u ACS.Perm.Composite.Warehouse:
       name: "Warehouse"
+      subclassOf:
+        - !u UUIDs.Class.Permission
       enum:
         - !u ACS.Perm.MQTT.ReadWholeNamespace
         - !u UUIDs.Permission.CmdEsc.Rebirth

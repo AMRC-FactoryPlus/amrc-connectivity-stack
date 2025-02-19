@@ -17,6 +17,7 @@ export class DataFlow {
         const { fplus } = opts;
 
         this.model = opts.model;
+        this.root = opts.root_principal;
 
         this.log = fplus.debug.bound("data");
         this.cdb = fplus.ConfigDB;
@@ -26,33 +27,49 @@ export class DataFlow {
         /* Responses to these requests */
         this.responses = this._build_responses();
 
+        this.identities = this._build_identities();
         this.grants = this._build_grants();
         this.groups = this._build_groups();
     }
 
     _build_responses () {
         const { model } = this;
+
+        const updaters = {
+            grant:      model.grant_request,
+            identity:   model.identity_request,
+        };
+
         return rxx.rx(this.requests,
             rx.mergeMap(r => {
-                const updater = 
-                    r.kind == "grant"   ? model.grant_request
-                    : async () => ({ status: 500 });
+                const updater = updaters[r.type]
+                    ?? (async () => ({ status: 500 }));
 
                 return updater.call(model, r)
-                    .then(rv => ({ ...rv, kind: r.kind, request: r.request }));
+                    .then(rv => ({ ...rv, type: r.type, request: r.request }));
             }));
     }
 
     /* XXX This is not the best way to do this; we refetch the entire
      * grant list every time. We should be able to track the changes
      * made without going back to the database. */
-    _build_grants () {
+    _track_model (type, fetch) {
         return rxx.rx(
             this.responses,
-            rx.filter(r => r.kind == "grant" && r.status < 300),
+            rx.filter(r => r.type == type && r.status < 300),
             rx.startWith(null),
-            rx.switchMap(() => this.model.grant_get_all()),
+            rx.switchMap(fetch),
             rx.shareReplay(1));
+    }
+
+    _build_grants () {
+        return this._track_model("grant",
+            () => this.model.grant_get_all());
+    }
+
+    _build_identities () {
+        return this._track_model("identity",
+            () => this.model.identity_get_all());
     }
 
     _build_groups () {
@@ -143,4 +160,50 @@ export class DataFlow {
         replay:     true,
         timeout:    1800000,
     });
+
+    async find_identities (cond) {
+        const ids = await rx.firstValueFrom(this.identities);
+        if (!cond) return ids;
+        const rv = ids.filter(cond);
+        return rv;
+    }
+
+    async whoami (upn) {
+        const acc = await this.find_identities(i =>
+            i.kind == "kerberos" && i.name == upn);
+        if (!acc.length) return;
+        return acc[0].uuid;
+    }
+
+    find_kerberos (upn) {
+        return rx.firstValueFrom(rxx.rx(
+            this.identities,
+            rx.first(),
+            rx.mergeMap(ids => ids
+                .filter(i => i.kind == "kerberos" && i.name == upn)
+                .map(i => i.uuid))));
+    }
+
+    permitted (upn, perm) {
+        return rx.firstValueFrom(rxx.rx(
+            this.find_kerberos(upn),
+            rx.mergeMap(p => p ? this.acl_for(p) : rx.of([])),
+            rx.map(acl => imm.Seq(acl)
+                .filter(e => e.permission == perm)
+                .map(e => e.target)
+                .toSet()),
+            rx.tap(ptd => 
+                this.log("Permitted %s for %s: %o", perm, upn, ptd.toJS()))));
+    }
+
+    async check_targ (upn, perm, wild) {
+        if (upn == this.root)
+            return () => true;
+        const targs = await this.permitted(upn, perm);
+        if (!targs.size)
+            return;
+        if (wild && targs.has(Special.Wildcard))
+            return () => true;
+        return i => targs.has(i);
+    }
 }

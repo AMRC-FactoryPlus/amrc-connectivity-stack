@@ -225,4 +225,4 @@ grants:
       !u CmdEsc.App.CmdDef: false
       !u UUIDs.App.SparkplugAddress: false
     !u UUIDs.Permission.Auth.ReadACL:
-      !u ACS.PermGroup.CmdEsc: false
+      !u ACS.PermGroup.CmdEsc: true

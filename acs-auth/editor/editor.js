@@ -189,7 +189,9 @@ function ACEs (props) {
     const [msg, set_msg] = useState("");
 
     const update_aces = async () => {
-        const list = await fetch_json("auth", "/authz/ace");
+        const list = await fetch_json("auth", "/v2/grant")
+            .then(es => Promise.all(es.map(e =>
+                fetch_json("auth", `/v2/grant/${e}`))));
         sort_acl(list);
         set_aces(list);
     };

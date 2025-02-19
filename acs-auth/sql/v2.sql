@@ -36,10 +36,16 @@ select version < 2 need_update from version \gset
         id serial primary key,
         uuid uuid unique not null
     );
+    -- XXX This is probably a mistake. But for now at least I want
+    -- keyword access to these name types.
+    create table idkind (
+        id integer primary key references uuid on update cascade,
+        kind text unique not null
+    );
     create table identity (
         id serial primary key,
         principal integer not null references uuid on update cascade,
-        kind integer not null references uuid on update cascade,
+        kind integer not null references idkind on update cascade,
         name text,
         unique (principal, kind),
         unique (kind, name)
@@ -67,6 +73,9 @@ select version < 2 need_update from version \gset
     -- Reserve some IDs
     alter sequence uuid_id_seq restart with 100;
 
+    -- These well-known UUIDs are only used by the authz compat code.
+    -- But it's probably worth continuing to include them anyway; the
+    -- idkinds must be included as we have a FK enforcing this.
     insert into uuid (id, uuid)
     values 
         (:id_Kerberos,          '75556036-ce98-11ef-9534-637ef5d37456'),
@@ -76,6 +85,9 @@ select version < 2 need_update from version \gset
         (:id_Permission,        '8ae784bb-c4b5-4995-9bf6-799b3c7f21ad'),
         (:id_PermissionGroup,   'ac0d5288-6136-4ced-a372-325fbbcdd70d'),
         (:id_Self,              '5855a1cc-46d8-4b16-84f8-ab3916ecb230');
+    insert into idkind (id, kind)
+    values (:id_Kerberos, 'kerberos'),
+        (:id_Sparkplug, 'sparkplug');
 
     insert into uuid (uuid)
     select uuid from principal
@@ -107,60 +119,6 @@ select version < 2 need_update from version \gset
     from old_member m
         join uuid c on c.uuid = m.parent
         join uuid o on o.uuid = m.child;
-
-    create view principal_lookup as
-    select m.child match, m.child result
-        from member m
-        where m.parent = :id_Principal
-    union all select m.parent, m.child
-        from member m
-            join member p on p.child = m.parent
-        where p.parent = :id_PrincipalGroup;
-
-    -- This duplication is not ideal; with a proper powerset
-    -- implementation it could perhaps be avoided.
-    create view permission_lookup as
-    select m.child match, m.child result
-        from member m
-        where m.parent = :id_Principal
-    union all select m.parent, m.child
-        from member m
-            join member p on p.child = m.parent
-        where p.parent = :id_PrincipalGroup;
-
---    create table powerset (id integer, class integer);
---    create view powerset_lookup as
---    select p.id, l.match, l.result
---    from powerset p
---        cross join lateral (
---            select m.child match, m.child result
---                from member m
---                where m.parent = p.id
---            union all select m.parent, m.child
---                from member m
---                    join member n on n.child = m.parent
---                where n.parent = p.class
---        ) l;
-
-    create view resolved_ace as
-    select u.result id, pu.uuid permission, tu.uuid target
-    from ace e
-        join principal_lookup u on u.match = e.principal
-        join permission_lookup p on p.match = e.permission
-        cross join lateral (
-            select child
-                from member
-                where parent = e.target
-                    and e.plural
-            union all select e.target
-                where not e.plural
-        ) t(target)
-        join uuid pu on pu.id = p.result
-        join uuid tu on tu.id = 
-            case t.target
-                when 5 then u.result
-                else t.target
-            end;
 
     update version set version = 2;
 \endif

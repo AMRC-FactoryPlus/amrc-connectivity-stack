@@ -10,7 +10,7 @@ revoke all on schema public from public;
 grant connect on database :"db" to :"role";
 grant usage on schema public to :"role";
 grant select on
-    version
+    version, idkind
 to :"role";
 grant select, insert, update, delete on
     ace, identity, member, uuid

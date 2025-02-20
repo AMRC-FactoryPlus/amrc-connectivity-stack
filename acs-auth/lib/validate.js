@@ -28,3 +28,10 @@ export function valid_krb(krb) {
     //debug.log("debug", `Ignoring invalid principal [${krb}]`);
     return false;
 }
+
+export function valid_grant (grant) {
+    if (!valid_uuid(grant.principal)) return false;
+    if (!valid_uuid(grant.permission)) return false;
+    if (!valid_uuid(grant.target)) return false;
+    return (grant.plural === true || grant.plural === false);
+}

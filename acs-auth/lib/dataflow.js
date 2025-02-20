@@ -47,7 +47,8 @@ export class DataFlow {
 
                 return updater.call(model, r)
                     .then(rv => ({ ...rv, type: r.type, request: r.request }));
-            }));
+            }),
+            rx.share());
     }
 
     /* XXX This is not the best way to do this; we refetch the entire
@@ -181,7 +182,8 @@ export class DataFlow {
             rx.first(),
             rx.mergeMap(ids => ids
                 .filter(i => i.kind == "kerberos" && i.name == upn)
-                .map(i => i.uuid))));
+                .map(i => i.uuid)),
+            rx.defaultIfEmpty(null)));
     }
 
     permitted (upn, perm) {

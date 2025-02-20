@@ -8,7 +8,7 @@ import express from "express";
 import * as rx from "rxjs";
 
 import { Perm } from "./uuids.js";
-import { valid_krb, valid_uuid } from "./validate.js";
+import { valid_grant, valid_krb, valid_uuid } from "./validate.js";
 
 function fail (status) {
     throw { status };
@@ -124,8 +124,10 @@ export class APIv2 {
 
     async grant_new (req, res) {
         const grant = req.body;
+        if (!valid_grant(grant))
+            fail(422);
 
-        const permitted = await this.data.check_targ(req.auth, Perm.WriteACL);
+        const permitted = await this.data.check_targ(req.auth, Perm.WriteACL, true);
         const rv = await this.data.request({ type: "grant", grant, permitted });
         if (rv.status != 201)
             fail(rv.status);
@@ -138,7 +140,8 @@ export class APIv2 {
         if (!valid_uuid(uuid)) fail(410);
 
         const grant = req.method == "PUT" ? req.body : null;
-        const permitted = await this.data.check_targ(req.auth, Perm.WriteACL);
+        if (!valid_grant(grant)) fail(422);
+        const permitted = await this.data.check_targ(req.auth, Perm.WriteACL, true);
 
         const rv = await this.data.request({ type: "grant", uuid, grant, permitted });
         return res.status(rv.status).end();

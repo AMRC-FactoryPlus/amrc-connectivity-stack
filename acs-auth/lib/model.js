@@ -59,7 +59,7 @@ export default class Model extends Queries {
     }
 
     /* This request does not check permissions. */
-    identity_request (r) {
+    _identity_request (r) {
         if (r.name == null)
             return this.identity_delete(r.uuid, r.kind);
 
@@ -70,6 +70,11 @@ export default class Model extends Queries {
 
             return q.identity_add(pid, kid, r.name);
         });
+    }
+
+    async identity_request (r) {
+        const status = await this._identity_request(r);
+        return { status };
     }
 
     /* The dump must be valid. We will get database errors (at best) if

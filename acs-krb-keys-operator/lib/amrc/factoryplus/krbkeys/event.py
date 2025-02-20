@@ -35,7 +35,7 @@ class Rekey (KrbKeyEvent):
             return True
 
         if self.reason != "resume":
-            log("No change")
+            log("No change to spec, skipping rekey")
             return False
 
         if not self.new.can_verify():
@@ -93,6 +93,9 @@ class AccUuid (KrbKeyEvent):
 
         key = Identifiers.ACCOUNT_UUID
         p_annot = self.patch.metadata.annotations
+        def set_annot (uuid):
+            log(f"Setting account annotation to {uuid}")
+            p_annot[key] = uuid
 
         annot = self.annotations.get(key)
         spec = self.account.get("uuid")
@@ -108,7 +111,7 @@ class AccUuid (KrbKeyEvent):
         if klass is None:
             # We are not managing this object.
             log(f"Account is unmanaged. Using UUID {spec}.")
-            p_annot[key] = spec
+            set_annot(spec)
         elif annot is None:
             # We are managing this object but it's new. Start by
             # checking the Auth service for a principal mapping.
@@ -124,14 +127,14 @@ class AccUuid (KrbKeyEvent):
             # We need to make sure that if the object creation succeeds,
             # the annotation will be recorded. Otherwise we keep
             # creating ConfigDB objects.
-            p_annot[key] = str(uuid)
+            set_annot(str(uuid))
         elif spec is not None and annot != spec:
             # This should not normally happen. Probably someone has
             # added an explicit uuid field to an object with a class.
             # Perhaps I should just forbid explicit uuids if we are
             # managing the object?
             log(f"Annotation exists but is overridden to {spec}")
-            p_annot[key] = spec
+            set_annot(spec)
         else:
             log(f"Annotation should be correct: {annot}")
 

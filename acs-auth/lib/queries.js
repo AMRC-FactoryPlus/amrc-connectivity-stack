@@ -139,14 +139,14 @@ export default class Queries {
         `);
     }
 
-    async identity_add (pid, kid, name) {
-        const ok = await this.q_single(`
+    identity_add (pid, kid, name) {
+        return this.query(`
             insert into identity (principal, kind, name)
-            values ($1, $2, $3)
-            on conflict do nothing
-            returning 1 ok
-        `, [pid, kid, name]);
-        return ok ? 204 : 409;
+            values ($1::integer, $2::integer, $3::text)
+            except select principal, kind, name from identity
+        `, [pid, kid, name])
+            .then(() => 204)
+            .catch(e => e?.code == "23505" ? 409 : Promise.reject(e));
     }
 
     async identity_delete (uuid, kind) {

@@ -182,7 +182,8 @@ export class DataFlow {
             rx.first(),
             rx.mergeMap(ids => ids
                 .filter(i => i.kind == "kerberos" && i.name == upn)
-                .map(i => i.uuid))));
+                .map(i => i.uuid)),
+            rx.defaultIfEmpty(null)));
     }
 
     permitted (upn, perm) {

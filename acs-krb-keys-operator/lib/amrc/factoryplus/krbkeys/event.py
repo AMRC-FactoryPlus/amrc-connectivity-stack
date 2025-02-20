@@ -116,9 +116,11 @@ class AccUuid (KrbKeyEvent):
             set_annot(spec)
         elif annot is None:
             # We are managing this object but it's new. Start by
-            # checking the Auth service for a principal mapping.
+            # checking the Auth service for a principal mapping. Make
+            # sure to bust the cache.
             log(f"Checking Auth service for existing account for {self.principal}")
-            uuid = fplus.auth.find_principal("kerberos", self.principal);
+            uuid = fplus.auth.with_fetch_opts(force_refresh=True) \
+                .find_principal("kerberos", self.principal);
 
             # Otherwise, create a new object in the ConfigDB.
             if uuid is None:

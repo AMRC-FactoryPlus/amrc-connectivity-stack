@@ -18,11 +18,18 @@ def content_type (res):
 class ServiceInterface:
     def __init__ (self, fplus, **opts):
         self.fplus = fplus
+        self.fetch_opts = {}
 
     def error (self, msg, status=None):
         raise ServiceError(msg, service=self.service, status=status)
 
-    def fetch (self, url, **opts):
+    def with_fetch_opts (self, **opts):
+        rv = type(self)(self.fplus)
+        rv.fetch_opts = self.fetch_opts | opts;
+        return rv
+
+    def fetch (self, url, **kw):
+        opts = self.fetch_opts | kw;
         method = opts.pop("method", "GET")
 
         headers = opts.pop("headers", {})

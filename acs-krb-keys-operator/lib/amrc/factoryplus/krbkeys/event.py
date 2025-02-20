@@ -16,6 +16,8 @@ class KrbKeyEvent:
         self.ns, self.name, self.reason = dslice(args, "namespace", "name", "reason")
         self.annotations, self.patch = dslice(args, "annotations", "patch")
 
+        self.suspended = Identifiers.SUSPEND in self.annotations
+
     def process (self):
         raise NotImplementedError()
 

@@ -58,6 +58,9 @@ class KrbKeys:
         def handler (**kw):
             with Context(self, kw):
                 ev = event(kw)
+                if ev.suspended:
+                    log("Resource suspended, skipping")
+                    return
                 return ev.process()
         return handler
 

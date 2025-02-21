@@ -27,15 +27,15 @@ export class ServiceSetup {
     async init () {
         const { fplus } = this;
 
-        // register service URL's
-        await load_directory_dump(this);
-
         await fplus.init();
 
         return this;
     }
 
     async run () {
+        this.log("Loading directory dump");
+        await load_directory_dump(this);
+
         this.log("Running fixups");
         await fixups(this);
 

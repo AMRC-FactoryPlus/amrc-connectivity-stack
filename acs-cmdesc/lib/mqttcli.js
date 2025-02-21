@@ -4,7 +4,7 @@
  * Copyright 2022 AMRC
  */
 
-import {Address, MetricBuilder, SpB, Topic, UUIDs} from "@amrc-factoryplus/utilities";
+import {Address, MetricBuilder, SpB, Topic, UUIDs} from "@amrc-factoryplus/service-client";
 
 const Valid = {
     Name: /^[A-Za-z0-9_-]+$/,

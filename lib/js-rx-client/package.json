@@ -1,0 +1,27 @@
+{
+  "name": "@amrc-factoryplus/rx-client",
+  "version": "v0.0.1-bmz.1",
+  "description": "",
+  "main": "./lib/index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@amrc-factoryplus/rx-util": "0.0.4-bmz.1",
+    "@amrc-factoryplus/service-client": "1.4.0-bmz.3",
+    "immutable": "^5.0.0-rc.2",
+    "rxjs": "^7.8.1",
+    "uuid": "^11.0.2"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.1.0",
+    "@eslint/js": "^9.14.0",
+    "eslint": "^9.14.0",
+    "globals": "^15.12.0",
+    "jsdoc": "^4.0.4"
+  }
+}

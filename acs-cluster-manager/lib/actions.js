@@ -8,7 +8,7 @@ import jmp from "json-merge-patch";
 import rx from "rxjs";
 import yaml from "yaml";
 
-import { UUIDs, ServiceError }  from "@amrc-factoryplus/utilities";
+import { UUIDs, ServiceError }  from "@amrc-factoryplus/service-client";
 
 import { Checkout }     from "./checkout.js";
 import { Git, Edge }    from "./uuids.js";

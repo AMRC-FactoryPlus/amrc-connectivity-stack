@@ -13,11 +13,9 @@ import git from "isomorphic-git";
 import http from "isomorphic-git/http/node/index.js";
 import yaml from "yaml";
 
-import { Debug, UUIDs } from "@amrc-factoryplus/utilities";
+import { UUIDs } from "@amrc-factoryplus/service-client";
 
 import * as manifests from "./manifests.js";
-
-const debug = new Debug();
 
 function manifest_path (namespace, kind, name) {
     return path.join(
@@ -32,7 +30,7 @@ export class Checkout {
 
         this.prefix = path.join(this.fplus.opts.git_checkouts, "wd-");
         this.git_email = this.fplus.opts.git_email;
-        this.log = debug.log.bind(debug, "git");
+        this.log = this.fplus.debug.bound("git");
     }
 
     async _setup () {

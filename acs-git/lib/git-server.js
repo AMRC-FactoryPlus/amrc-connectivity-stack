@@ -50,8 +50,6 @@ export class GitServer {
     }
 
     async init () { 
-        await this.fplus.Directory.register_service_url(
-            Git.Service.Git, this.http_url);
 
         this.fplus.Fetch.cache = "reload";
 

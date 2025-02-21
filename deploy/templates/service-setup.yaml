@@ -47,6 +47,7 @@ spec:
               value: {{
                 dict
                   "organisation"    .Values.acs.organisation
+                  "namespace"       .Release.Namespace
                   "domain"          .Values.acs.baseUrl
                   "realm"           .Values.identity.realm
                   "directory"

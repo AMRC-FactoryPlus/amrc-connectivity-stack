@@ -10,24 +10,20 @@ ARG acs_run=${base_prefix}-js-run:${base_version}
 FROM ${acs_build} as ts-compiler
 # This ARG must go here, in the image that uses it, or it isn't
 # available to the shell scripts. Don't ask me why...
-ARG acs_npm=NO
 ARG revision=unknown
 
 USER root
 RUN <<'SHELL'
-    install -d -o node /home/node /usr/app
+    install -d -o node /home/node/app
+    mkdir /home/node/lib
 SHELL
+COPY --from=lib . /home/node/lib/
 USER node
-WORKDIR /usr/app
+WORKDIR /home/node/app
 COPY --chown=node . ./
 RUN <<'SHELL'
     touch /home/node/.npmrc
-    if [ "${acs_npm}" != NO ]
-    then
-        echo "SETTING NPM REGISTRY TO ${acs_npm}" >&2
-        npm config set @amrc-factoryplus:registry "${acs_npm}"
-    fi
-    npm install --save=false
+    npm install --save=false --install-links
 
     echo "export const GIT_VERSION=\"$revision\";" > ./lib/git-version.js
 
@@ -43,14 +39,16 @@ RUN <<'SHELL'
     apk upgrade --update-cache --available
     apk add openssl
     rm -rf /var/cache/apk/*
-    install -d -o node /home/node /usr/app
+    install -d -o node /home/node/app
+    mkdir /home/node/lib
 SHELL
+COPY --from=lib . /home/node/lib/
 USER node
-WORKDIR /usr/app
-COPY --chown=node --from=ts-compiler /usr/app/package*.json ./
-COPY --chown=node --from=ts-compiler /usr/app/dist ./
+WORKDIR /home/node/app
+COPY --chown=node --from=ts-compiler /home/node/app/package*.json ./
+COPY --chown=node --from=ts-compiler /home/node/app/dist ./
 COPY --chown=node --from=ts-compiler /home/node/.npmrc /home/node
-RUN npm install --save=false --only=production
+RUN npm install --save=false --only=production --install-links
 
 FROM ${acs_run}
 USER root
@@ -59,9 +57,9 @@ RUN <<'SHELL'
     apk add openssl
     rm -rf /var/cache/apk/*
 SHELL
-WORKDIR /usr/app
+WORKDIR /home/node/app
 # This copy leaves the app files owned as root, i.e. read-only to the
 # running application. This is a Good Thing.
-COPY --from=util-build /usr/app ./
+COPY --from=util-build /home/node/app ./
 USER node
-CMD [ "node", "--es-module-specifier-resolution=node", "bin/ingester.js" ]
+CMD [ "node", "bin/ingester.js" ]

@@ -18,7 +18,7 @@ import path from "path";
 
 import yaml from "yaml";
 
-import { UUIDs } from "@amrc-factoryplus/utilities";
+import { UUIDs } from "@amrc-factoryplus/service-client";
 import { Git } from "../lib/uuids.js";
 
 const UUID_SOURCES = { FP: UUIDs, G: Git };

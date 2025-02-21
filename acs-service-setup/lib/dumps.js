@@ -4,10 +4,10 @@
  */
 
 import fsp from "fs/promises";
-
 import yaml from "yaml";
 
 import { UUIDs } from "@amrc-factoryplus/service-client";
+import process from "process";
 
 import * as local_UUIDs from "./uuids.js";
 
@@ -31,34 +31,34 @@ function resolve (str) {
     return it;
 }
 
+/**
+ * Resolves the namespace in the yaml string with the ACS namespace or domain.
+ * @param str The string to resolve.
+ * @return {*} The resolved URL.
+ */
+function resolveNamespace (str) {
+    const config = JSON.parse(process.env.ACS_CONFIG);
+    const replacements = {
+        namespace: config.namespace,
+        domain: config.domain,
+    }
+    return str.replace(/\${(.*?)}/g, (match, key) => {
+        return replacements[key] || match; // Replace if key exists, otherwise keep original placeholder
+    });
+}
+
 const yamlOpts = {
     customTags: [
         {
             tag:        "!u",
             resolve:    str => resolve(str),
         },
+        {
+            tag:        "!url",
+            resolve:    str => resolveNamespace(str),
+        },
     ],
 };
-
-/**
- * Resolves the namespace in the yaml url with the ACS namespace.
- * @param directoryDump Directory json object parsed from the input yaml.
- * @param serviceSetup Instance of service setup.
- * @return {*} The directory dump with resolved URLs.
- */
-function resolveNamespace (directoryDump, serviceSetup) {
-    const replacements = {
-        namespace: serviceSetup.acs_config.namespace,
-        domain: serviceSetup.acs_config.domain,
-    }
-    directoryDump.advertisements = directoryDump.advertisements.map((advertisement)=> {
-        advertisement.url = advertisement.url.replace(/\${(.*?)}/g, (match, key) => {
-            return replacements[key] || match; // Replace if key exists, otherwise keep original placeholder
-        });
-        return advertisement;
-    });
-    return directoryDump;
-}
 
 /**
  * Parses and converts yaml file to JSON.
@@ -95,7 +95,7 @@ async function load_dump (fplus, dump) {
     return res.status;
 }
 
-export async function load_dumps (serviceSetup) {
+export async function load_dumps (serviceSetup, early) {
     // service client
     const { fplus } = serviceSetup;
 
@@ -107,7 +107,8 @@ export async function load_dumps (serviceSetup) {
         serviceSetup.log("== %s", file);
         const documents = await load_yaml(file);
         for (let document of documents) {
-            if(document.service === UUIDs.Service.Directory){
+            if(document.service !== UUIDs.Service.Directory && early ||
+                document.service === UUIDs.Service.Directory && !early){
                 continue;
             }
             serviceSetup.log("=== %s", document.service);
@@ -115,21 +116,5 @@ export async function load_dumps (serviceSetup) {
             if (status > 300)
                 throw new Error(`Service dump ${file} failed: ${status}`);
         }
-    }
-}
-
-export async function load_directory_dump (serviceSetup) {
-    // service client
-    const { fplus } = serviceSetup;
-    const documents = await load_yaml("00_service-urls.yaml");
-    for (let document of documents) {
-        serviceSetup.log("=== %s", document.service);
-        if(document.service !== UUIDs.Service.Directory){
-            continue;
-        }
-        document = resolveNamespace(document, serviceSetup);
-        const status = await load_dump(fplus, document);
-        if (status > 300)
-            throw new Error(`Service dump failed: ${status}`);
     }
 }

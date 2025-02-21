@@ -6,7 +6,7 @@
 import { ServiceClient } from "@amrc-factoryplus/service-client";
 
 import { setup_clusters }       from "./clusters.js";
-import {load_directory_dump, load_dumps} from "./dumps.js";
+import {load_dumps}             from "./dumps.js";
 import { fixups }               from "./fixups.js";
 import { setup_helm }           from "./helm.js";
 import { setup_manager }        from "./manager.js";
@@ -34,7 +34,7 @@ export class ServiceSetup {
 
     async run () {
         this.log("Loading directory dump");
-        await load_directory_dump(this);
+        await load_dumps(this, true);
 
         this.log("Running fixups");
         await fixups(this);

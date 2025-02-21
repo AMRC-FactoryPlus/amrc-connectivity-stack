@@ -27,8 +27,11 @@ acs:
   #defaultTag: ''
 
 k3s:
+  # -- An option to enable redirecting all external URLs back to the
+  # internal Traefik service. ACS deployments without external DNS
+  # should enable this.
   traefikRedirect:
-    enabled: true
+    enabled: false
 
 identity:
   # -- Whether or not to enable the Identity component

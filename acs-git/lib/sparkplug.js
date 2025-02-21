@@ -7,7 +7,7 @@
 import imm          from "immutable";
 import rx           from "rxjs";
 
-import { UUIDs }    from "@amrc-factoryplus/utilities";
+import { UUIDs }    from "@amrc-factoryplus/service-client";
 import * as rxx     from "@amrc-factoryplus/rx-util";
 
 import { Git }      from "./uuids.js";

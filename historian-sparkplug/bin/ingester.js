@@ -1,4 +1,4 @@
-import { Debug, ServiceClient } from "@amrc-factoryplus/utilities";
+import { ServiceClient } from "@amrc-factoryplus/service-client";
 import MQTTClient from "../lib/mqttclient";
 const deviceUUID = process.env.DEVICE_UUID;
 const MQTTURL = process.env.MQTT_URL;
@@ -12,7 +12,6 @@ if (!MQTTURL) {
 if (!sparkplugAddress) {
     throw new Error("Sparkplug Address not set");
 }
-const debug = new Debug();
 const client = await new ServiceClient({
     directory_url: process.env.DIRECTORY_URL,
     root_principal: process.env.ROOT_PRINCIPAL,

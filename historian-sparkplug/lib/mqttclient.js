@@ -1,5 +1,4 @@
-import { Address, Debug, MetricBuilder, SpB, Topic } from "@amrc-factoryplus/utilities";
-const debug = new Debug();
+import { Address, MetricBuilder, SpB, Topic } from "@amrc-factoryplus/service-client";
 export default class MQTTClient {
     serviceClient;
     deviceUUID;
@@ -13,6 +12,7 @@ export default class MQTTClient {
         this.url = e.url;
         this.address = Address.parse(e.sparkplugAddress);
         this.seq = 0;
+        this.log = e.serviceClient.debug.bound("mqtt");
     }
     async init() {
         return this;
@@ -58,7 +58,7 @@ export default class MQTTClient {
     // }
     // publish(kind, metrics, with_uuid) {
     //     if (!this.mqtt) {
-    //         debug.log("mqtt", "Can't publish without an MQTT connection.");
+    //         this.log("mqtt", "Can't publish without an MQTT connection.");
     //         return;
     //     }
     //
@@ -68,7 +68,7 @@ export default class MQTTClient {
     //     this.mqtt.publish(topic, payload);
     // }
     on_connect() {
-        debug.log("mqtt", "Connected to MQTT broker.");
+        this.log("Connected to MQTT broker.");
         // this.rebirth();
     }
     // rebirth() {
@@ -91,7 +91,7 @@ export default class MQTTClient {
     //         Object.values(Changed).map(v =>
     //             ({name: `Last_Changed/${v}`, type: "UUID", value: ""})));
     //
-    //     debug.log("mqtt", `Publishing birth certificate`);
+    //     this.log(`Publishing birth certificate`);
     //     this.publish("BIRTH", metrics, true);
     // }
     // publish_changed(changes) {
@@ -108,12 +108,12 @@ export default class MQTTClient {
     //     this.publish("DATA", metrics);
     // }
     on_error(error) {
-        debug.log("mqtt", "MQTT error: %o", error);
+        this.log("MQTT error: %o", error);
     }
     async on_message(topicString, message) {
         let topic = Topic.parse(topicString);
         if (!topic) {
-            debug.log("mqtt", `Bad topic: ${topicString}`);
+            this.log(`Bad topic: ${topicString}`);
             return;
         }
         let address = topic.address;
@@ -123,7 +123,7 @@ export default class MQTTClient {
             payload = SpB.decodePayload(message);
         }
         catch {
-            debug.log("mqtt", `Bad payload on topic ${topicString}`);
+            this.log(`Bad payload on topic ${topicString}`);
             return;
         }
         switch (topic.type) {
@@ -140,12 +140,12 @@ export default class MQTTClient {
                 await this.on_command(address, payload);
                 break;
             default:
-                debug.log("mqtt", `Unknown Sparkplug message type ${topic.type}!`);
+                this.log(`Unknown Sparkplug message type ${topic.type}!`);
         }
     }
     async on_data(addr, payload) {
         if (!payload.metrics) {
-            debug.log("mqtt", `Received DATA with no metrics!`);
+            this.log(`Received DATA with no metrics!`);
             return;
         }
         // for (let m of payload.metrics) {
@@ -154,7 +154,7 @@ export default class MQTTClient {
         //         //     await this.rebirth();
         //         //     break;
         //         default:
-        //             debug.log("mqtt", `Received unknown CMD: ${m.name}`);
+        //             this.log(`Received unknown CMD: ${m.name}`);
         //         /* Ignore for now */
         //     }
         // }
@@ -165,7 +165,7 @@ export default class MQTTClient {
             return;
         }
         if (!payload.metrics) {
-            debug.log("mqtt", `Received CMD with no metrics!`);
+            this.log(`Received CMD with no metrics!`);
             return;
         }
         for (let m of payload.metrics) {
@@ -174,7 +174,7 @@ export default class MQTTClient {
                 //     await this.rebirth();
                 //     break;
                 default:
-                    debug.log("mqtt", `Received unknown CMD: ${m.name}`);
+                    this.log(`Received unknown CMD: ${m.name}`);
                 /* Ignore for now */
             }
         }

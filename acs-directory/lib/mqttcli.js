@@ -9,10 +9,10 @@ import async from "async";
 import Long from "long";
 
 import {
-    Address, Debug, 
+    Address, 
     MetricBranch, MetricBuilder, MetricTree, 
     SpB, Topic, UUIDs
-} from "@amrc-factoryplus/utilities";
+} from "@amrc-factoryplus/service-client";
 import { Device_Info } from "./constants.js";
 import { Schema } from "./uuids.js";
 
@@ -181,7 +181,6 @@ export default class MQTTCli {
         this.seq = 0;
         const Birth = MetricBuilder.birth;
         const metrics = Birth.node([]);
-        Birth.command_escalation(metrics);
         metrics.push.apply(metrics, [
             {name: "Device_Information/Schema_UUID", type: "UUID", value: UUIDs.Schema.Device_Information},
             {name: "Device_Information/Manufacturer", type: "String", value: Device_Info.Manufacturer},
@@ -518,12 +517,7 @@ export default class MQTTCli {
         const node = addr.parent_node();
 
         this.log("rebirth", `Sending (escalated) rebirth request to ${node}`);
-        const metrics = MetricBuilder.data.command_escalation(
-            //addr, 
-            //(addr.isDevice() ? "Device Control/Rebirth" : "Node Control/Rebirth"),
-            node, "Node Control/Rebirth", "true",
-        );
-        this.publish("DATA", metrics);
+        await this.fplus.CmdEsc.rebirth(node);
     }
 
     /* We don't want to attempt rebirth too often (Ignition may be doing

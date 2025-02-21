@@ -9,6 +9,13 @@ objects:
       subclassOf:
         - !u Auth.Class.EdgeRole
 
+  !u ConfigDB.Class.R1Class:
+    !u Edge.Class.Connection:
+      name: "Edge Agent SB connection"
+    # XXX I'm not certain a Driver shouldn't be a class of connections?
+    !u Edge.Class.Driver:
+      name: "Edge Agent driver"
+
   # Not currently used. This would be difficult to implement with the
   # current implementation of composite perms as classes; we don't
   # support multi-rank classes yet.
@@ -28,7 +35,77 @@ objects:
 
   !u UUIDs.Class.App:
     !u Edge.App.ClusterStatus:      { name: "Edge cluster status" }
+    !u Edge.App.ConnConfig:         { name: "Connection config" }
     !u Edge.App.Deployment:         { name: "Edge deployment" }
+    !u Edge.App.DriverDef:          { name: "Driver definition" }
+
+  !u Edge.Class.Driver:
+    !u ACS.Driver.REST:             { name: "REST" }
+    !u ACS.Driver.MTConnect:        { name: "MTConnect" }
+    !u ACS.Driver.EtherNetIP:       { name: "EtherNet/IP" }
+    !u ACS.Driver.S7:               { name: "S7" }
+    !u ACS.Driver.OPCUA:            { name: "OPC-UA" }
+    !u ACS.Driver.MQTT:             { name: "MQTT" }
+    !u ACS.Driver.Websocket:        { name: "Websocket" }
+    !u ACS.Driver.UDP:              { name: "UDP" }
+    !u ACS.Driver.Bacnet:           { name: "Bacnet" }
+    !u ACS.Driver.Modbus:           { name: "Modbus" }
+    !u ACS.Driver.Test:             { name: "Test" }
+    !u ACS.Driver.TPlinkSmartPlug:  { name: "TP-Link smart plug" }
+    !u ACS.Driver.External:         { name: "External driver" }
+
+configs:
+  !u Edge.App.DriverDef:
+    !u ACS.Driver.REST:
+      internal:
+        connType: REST
+        details: RESTConnDetails
+    !u ACS.Driver.MTConnect:
+      internal:
+        connType: MTConnect
+        details: MTConnectConnDetails
+    !u ACS.Driver.EtherNetIP:
+      internal:
+        connType: EtherNet/IP
+        details: EtherNetIPConnDetails
+    !u ACS.Driver.S7:
+      internal:
+        connType: S7
+        details: s7ConnDetails
+    !u ACS.Driver.OPCUA:
+      internal:
+        connType: OPC UA
+        details: OPCUAConnDetails
+    !u ACS.Driver.MQTT:
+      internal:
+        connType: MQTT
+        details: MQTTConnDetails
+    !u ACS.Driver.Websocket:
+      internal:
+        connType: Websocket
+        details: WebsocketConnDetails
+    !u ACS.Driver.UDP:
+      internal:
+        connType: UDP
+        details: UDPConnDetails
+    !u ACS.Driver.Bacnet:
+      image:
+        registry: ghcr.io/amrc-factoryplus
+        repository: edge-bacnet
+    !u ACS.Driver.Modbus:
+      image:
+        registry: ghcr.io/amrc-factoryplus
+        repository: edge-modbus
+    !u ACS.Driver.Test:
+      image:
+        registry: ghcr.io/amrc-factoryplus
+        repository: edge-test
+    !u ACS.Driver.TPlinkSmartPlug:
+      image:
+        registry: ghcr.io/amrc-factoryplus
+        repository: edge-tplink-smartplug
+    !u ACS.Driver.External:
+      external: true
 ---
 service: !u UUIDs.Service.Authentication
 version: 2

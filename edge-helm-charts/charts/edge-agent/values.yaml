@@ -1,9 +1,9 @@
 image:
   # Default image parameters. These can be overidden per-image.
   default:
-    registry: ghcr.io/amrc-factoryplus
+    registry: %%REGISTRY%%
     tag: %%TAG%%
-    pullPolicy: IfNotPresent
+    pullPolicy: %%PULLPOLICY%%
   # Edge Agent image to pull
   edgeAgent:
     repository: acs-edge

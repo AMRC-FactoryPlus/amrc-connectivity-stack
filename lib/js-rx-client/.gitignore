@@ -1,0 +1,4 @@
+config.mk
+docs
+env.sh
+node_modules

@@ -12,7 +12,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@amrc-factoryplus/service-client": "1.4.0-bmz.3",
+    "@amrc-factoryplus/service-client": "file:../lib/js-service-client",
     "tsort": "^0.0.1",
     "yaml": "^2.3.4"
   },

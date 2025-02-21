@@ -3,16 +3,10 @@
 ifndef .acs.docker.mk
 .acs.docker.mk=1
 
-version?=${git.tag}
-registry?=ghcr.io/amrc-factoryplus
-suffix?=
-
-tag=${version}${suffix}
-image=${registry}/${repo}:${tag}
-
 platform?=	linux/amd64
 
 build_args+=	--build-arg revision="${git.tag} (${git.sha})"
+build_args+=	--build-arg registry="${registry}"
 build_args+=	--build-arg tag="${tag}"
 
 # `git rev-parse HEAD:directory` gives a SHA for the contents of that
@@ -36,5 +30,6 @@ run: pull
 
 include ${mk}/acs.git.mk
 include ${mk}/acs.k8s.mk
+include ${mk}/acs.oci.mk
 
 endif

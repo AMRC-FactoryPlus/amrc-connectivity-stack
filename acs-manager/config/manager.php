@@ -14,4 +14,6 @@ return [
     'tgt_lifetime' => 3600,
     'keytab_path' => env('KEYTAB_PATH', '/config/keytab/client-keytab'),
     'tkt_life' => env('TKT_LIFE', 21600),
+    'service_username' => env('SERVICE_USERNAME', null),
+    'service_password' => env('SERVICE_PASSWORD', null),
 ];

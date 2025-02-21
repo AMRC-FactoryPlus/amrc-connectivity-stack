@@ -1,0 +1,5 @@
+config.mk
+node_modules
+.env
+.idea
+.vscode

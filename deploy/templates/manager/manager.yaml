@@ -35,6 +35,15 @@ spec:
           persistentVolumeClaim:
             claimName: manager-ccache-storage
       initContainers:
+        - name: register-with-directory
+{{ include "amrc-connectivity-stack.image" (list . .Values.curl) | indent 10 }}
+          env:
+            - name: PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: admin-password
+                  key: password
+          command: [ 'sh', '-c', 'until curl -X PUT -o /dev/null -w "%{http_code}" -u "admin:${PASSWORD}" -H "Content-Type: application/json" --data-raw "{ \"url\": \"http://manager.{{.Release.Namespace}}.svc.cluster.local\" }" http://directory.{{.Release.Namespace}}.svc.cluster.local/v1/service/619eecab-742d-4824-8b97-bcae472e5c04/advertisment/2340e706-1280-420c-84a6-016547b55e95 | grep -E "2[0-9]{2}" > /dev/null; do sleep 10; done' ]
         # Do as little work as possible as root... We need to chown the storage
         # as the default permissions will not be correct.
         - name: chown-storage
@@ -75,7 +84,15 @@ spec:
                 name: manager-config
             - secretRef:
                 name: manager-secrets
-          command: [ 'sh', '-c', 'php artisan migrate --force' ]
+          command: 
+            - sh
+            - '-c'
+            - |
+              while php artisan migrate:status --pending --no-ansi | grep -q Pending
+              do
+                echo "Waiting for service-setup to complete database migration"
+                sleep 5
+              done
         - name: create-admin-user
           image: "{{ include "amrc-connectivity-stack.image-name" (list . .Values.manager ) }}-backend"
           imagePullPolicy: {{ coalesce .Values.manager.image.pullPolicy .Values.acs.defaultPullPolicy }}

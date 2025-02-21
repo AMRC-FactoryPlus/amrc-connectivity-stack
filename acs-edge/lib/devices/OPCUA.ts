@@ -3,10 +3,10 @@
  *  Copyright 2023 AMRC
  */
 
-import {SparkplugNode} from "../sparkplugNode.js";
-import {Device, DeviceConnection, deviceOptions} from "../device.js";
-import {log} from "../helpers/log.js";
-import {getOpcSecurityMode, getOpcSecurityPolicy, Metrics, OPCUADataType} from "../helpers/typeHandler.js";
+import { SparkplugNode } from "../sparkplugNode.js";
+import { Device, DeviceConnection, deviceOptions } from "../device.js";
+import { log } from "../helpers/log.js";
+import { getOpcSecurityMode, getOpcSecurityPolicy, Metrics, OPCUADataType } from "../helpers/typeHandler.js";
 
 import {
     AttributeIds,
@@ -21,8 +21,14 @@ import {
     TimestampsToReturn,
     UserIdentityInfo,
     UserTokenType,
-    WriteValueOptions
+    WriteValueOptions,
+    BrowseResult,
+    NodeId,
+    NodeIdType,
+    ReferenceDescription,
+    NodeClass
 } from "node-opcua";
+import { opcuaScoutDetails } from "../scout.js";
 
 // Example here: https://github.com/node-opcua/node-opcua/blob/v2.1.3/documentation/sample_client.js
 
@@ -82,6 +88,7 @@ export class OPCUAConnection extends DeviceConnection {
             securityPolicy: getOpcSecurityPolicy(connDetails.securityPolicy),
             endpointMustExist: false
         };
+
         this.#client = OPCUAClient.create(this.#options);
         this.#endpointUrl = connDetails.endpoint;
 
@@ -108,6 +115,73 @@ export class OPCUAConnection extends DeviceConnection {
             console.log(e);
         }
 
+    }
+
+    public async scoutAddresses(scoutDetails: opcuaScoutDetails): Promise<string[]> {
+        const clientForScout = OPCUAClient.create(this.#options);
+
+        try {
+            await clientForScout.connect(this.#endpointUrl);
+            log(`Scout connected to OPC UA server at ${this.#endpointUrl}`)
+
+            const sessionForScout = await clientForScout.createSession(this.#credentials);
+            log(`Scout session created for OPC UA node discovery.`);;
+
+            const RootFolderNodeID = new NodeId(NodeIdType.NUMERIC, 85, 0);
+
+            const discoveredReferences: ReferenceDescription[] = await this.browseOPCUANodes(sessionForScout, RootFolderNodeID);
+
+            const discoveredAddresses: string[] = new Array;
+            discoveredReferences.forEach(reference => discoveredAddresses.push(this.getReferenceNodeString(reference)));
+
+            await sessionForScout.close();
+            await clientForScout.disconnect();
+
+            return discoveredAddresses
+        } catch (err) {
+            log(`Error during OPC UA Scouting ${(err as Error).message}`);
+            await clientForScout.disconnect();
+            return [];
+        }
+    }
+
+    async browseOPCUANodes(session, nodeId: NodeId): Promise<ReferenceDescription[]> {
+        try {
+            const browseResult: BrowseResult = await session.browse(nodeId);
+
+            // If no references found, just return an empty array
+            if (!browseResult || !browseResult.references || browseResult.references.length === 0) {
+                log(`No child nodes found for: ${nodeId.toString()}`);
+                return [];
+            }
+
+            const variableNodes: Set<ReferenceDescription> = new Set();
+
+            // Iterate through each reference found during browsing
+            for (const reference of browseResult.references) {
+                if (reference.nodeClass === 2) {
+                    variableNodes.add(reference);
+                }
+                // Object = 1, ObjectType = 8, and ReferenceType = 32 can have child nodes 
+                else if (reference.nodeClass === 1 || reference.nodeClass === 8 || reference.nodeClass === 32) {
+                    // Recursively browse the child nodes
+                    const childNodes = await this.browseOPCUANodes(session, reference.nodeId);
+                    childNodes.forEach(childNode => variableNodes.add(childNode));
+                }
+
+            }
+
+            return Array.from(variableNodes);
+
+        } catch (err) {
+            log(`Error when browsing for OPCUA nodes for ${nodeId} with error ${(err as Error).message}`);
+            return [];
+        }
+    }
+
+
+    getReferenceNodeString(reference: ReferenceDescription): string {
+        return `NodeId: ${reference.nodeId.toString()} Name: ${reference.browseName.toString()} Class: ${reference.nodeClass} - ${NodeClass[reference.nodeClass]}`
     }
 
     readMetrics(metrics: Metrics, payloadFormat?: string) {
@@ -238,6 +312,8 @@ export class OPCUAConnection extends DeviceConnection {
             log(`Subscription created for ${metrics.length} tags on ${this._type}`);
         }
     }
+
+
 
     async close() {
         try {

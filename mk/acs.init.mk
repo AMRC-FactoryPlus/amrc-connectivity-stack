@@ -15,4 +15,14 @@ tools=${mk}/tools
 # Make sure it stays first.
 all:
 
+# Define do-nothing standard targets.
+
+.PHONY: build lint setup
+
+build:
+
+lint:
+
+setup:
+
 endif

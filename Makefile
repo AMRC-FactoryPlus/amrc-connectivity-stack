@@ -61,7 +61,12 @@ subdirs+= historian-sparkplug
 subdirs+= historian-uns
 subdirs+= uns-ingester-sparkplug
 
+recurse=	env MAKE="${MAKE}" ${tools}/recurse
+
 all: git.check-committed
-	env MAKE="${MAKE}" ${tools}/recurse all ${subdirs}
+	+${recurse} all ${subdirs}
+
+setup: git.check-committed
+	+${recurse} setup ${subdirs}
 
 include ${mk}/acs.git.mk

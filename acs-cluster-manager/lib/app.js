@@ -4,7 +4,8 @@
  * Copyright 2023 AMRC
  */
 
-import { ServiceClient, WebAPI } from "@amrc-factoryplus/utilities";
+import { ServiceClient }    from "@amrc-factoryplus/service-client";
+import { WebAPI }           from "@amrc-factoryplus/service-api";      
 
 import { Clusters }     from "./clusters.js";
 import { GIT_VERSION }  from "./git-version.js";
@@ -39,6 +40,7 @@ export class App {
             realm:      env.REALM,
             hostname:   env.HOSTNAME,
             keytab:     env.SERVER_KEYTAB,
+            debug:      fplus.debug,
 
             ping: {
                 service:    Edge.Service.EdgeDeployment,

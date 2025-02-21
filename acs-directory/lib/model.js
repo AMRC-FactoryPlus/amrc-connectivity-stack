@@ -4,7 +4,7 @@
  * Copyright 2021 AMRC
  */
 
-import {DB, Pg} from "@amrc-factoryplus/utilities";
+import {DB, Pg} from "@amrc-factoryplus/pg-client";
 import Queries from "./queries.js";
 
 export default class Model extends Queries {
@@ -13,7 +13,7 @@ export default class Model extends Queries {
             version: Queries.DBVersion,
             isolation: "read committed",
             readonly: !!opts.readonly,
-            verbose: !!opts.verbose,
+            debug: opts.debug,
         });
 
         super(db.query.bind(db))

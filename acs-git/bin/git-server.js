@@ -9,7 +9,8 @@
 import fs from "fs";
 import process from "process";
 
-import { ServiceClient, WebAPI } from "@amrc-factoryplus/utilities";
+import { ServiceClient }    from "@amrc-factoryplus/service-client";
+import { WebAPI }           from "@amrc-factoryplus/service-api";        
 
 import { GIT_VERSION }      from "../lib/git-version.js";
 import { GitServer }        from "../lib/git-server.js";
@@ -49,6 +50,7 @@ const api = await new WebAPI({
     realm:      process.env.REALM,
     hostname:   process.env.HOSTNAME,
     keytab:     process.env.SERVER_KEYTAB,
+    debug:      fplus.debug,
 
     ping: {
         service: Git.Service.Git,

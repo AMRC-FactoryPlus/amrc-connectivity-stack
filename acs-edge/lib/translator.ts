@@ -3,37 +3,37 @@
  *  Copyright 2023 AMRC
  */
 
-import {EventEmitter} from "events";
+import { EventEmitter } from "events";
 import fs from "fs";
 import timers from "timers/promises";
 import util from "util";
 
-import type {Identity} from "@amrc-factoryplus/utilities";
-import {ServiceClient} from "@amrc-factoryplus/utilities";
+import type { Identity } from "@amrc-factoryplus/utilities";
+import { ServiceClient } from "@amrc-factoryplus/utilities";
 
 /* XXX These need to be incorporated into the main codebase. The config
  * rehashing just needs to go: the code which uses the config needs
  * adapting to accept the correct format. */
-import {validateConfig} from '../utils/CentralConfig.js';
-import {reHashConf} from "../utils/FormatConfig.js";
+import { validateConfig } from '../utils/CentralConfig.js';
+import { reHashConf } from "../utils/FormatConfig.js";
 
-import {Device, deviceOptions} from "./device.js";
-import {DriverBroker} from "./driverBroker.js";
-import {SparkplugNode} from "./sparkplugNode.js";
+import { Device, deviceOptions } from "./device.js";
+import { DriverBroker } from "./driverBroker.js";
+import { SparkplugNode } from "./sparkplugNode.js";
 import * as UUIDs from "./uuids.js";
 
-import {log} from "./helpers/log.js";
-import {sparkplugConfig,} from "./helpers/typeHandler.js";
+import { log } from "./helpers/log.js";
+import { sparkplugConfig, } from "./helpers/typeHandler.js";
 
-import {RestConnection} from "./devices/REST.js";
-import {S7Connection} from "./devices/S7.js";
-import {OPCUAConnection} from "./devices/OPCUA.js";
-import {MQTTConnection} from "./devices/MQTT.js";
-import {UDPConnection} from "./devices/UDP.js";
-import {WebsocketConnection} from "./devices/websocket.js";
-import {MTConnectConnection} from "./devices/MTConnect.js";
-import {EtherNetIPConnection} from "./devices/EtherNetIP.js";
-import {DriverConnection} from "./devices/driver.js";
+import { RestConnection } from "./devices/REST.js";
+import { S7Connection } from "./devices/S7.js";
+import { OPCUAConnection } from "./devices/OPCUA.js";
+import { MQTTConnection } from "./devices/MQTT.js";
+import { UDPConnection } from "./devices/UDP.js";
+import { WebsocketConnection } from "./devices/websocket.js";
+import { MTConnectConnection } from "./devices/MTConnect.js";
+import { EtherNetIPConnection } from "./devices/EtherNetIP.js";
+import { DriverConnection } from "./devices/driver.js";
 import { Scout } from "./scout.js";
 
 
@@ -69,6 +69,9 @@ export class Translator extends EventEmitter {
         [index: string]: any
     }
 
+    scouts: {
+        [index: string]: any
+    }
 
     constructor(fplus: ServiceClient, pollInt: number, broker: DriverBroker) {
         super();
@@ -78,6 +81,7 @@ export class Translator extends EventEmitter {
         this.pollInt = pollInt;
         this.connections = {};
         this.devices = {};
+        this.scouts = {};
     }
 
     /**
@@ -104,7 +108,7 @@ export class Translator extends EventEmitter {
             // Create a new device connection for each type listed in config file
             log('Building up connections and devices...');
             conf?.deviceConnections?.forEach(c => this.setupConnection(c));
-            
+
             // Setup Sparkplug node handlers
             this.setupSparkplug();
 
@@ -201,10 +205,10 @@ export class Translator extends EventEmitter {
             connection.name,
             this.broker);
 
-        if (connection.scout){
-            const newScout = new Scout(newConn, connection);
+        if (connection.scout) {
+            const newScout = this.scouts[cType] = new Scout(newConn, connection);
             newScout.on('scoutComplete', (addresses: string[]) => {
-                //console.log(`Discovered addresses for connection ${connection.name}:`, addresses);
+                // console.log(`Discovered addresses for connection ${connection.name}:`, addresses);
                 const directory = './scout';
                 if (!fs.existsSync(directory)) {
                     fs.mkdirSync(directory, { recursive: true });
@@ -220,35 +224,35 @@ export class Translator extends EventEmitter {
                 }
             });
             newScout.performScouting();
+        } else {
+            connection.devices?.forEach((devConf: deviceOptions) => {
+                this.devices[devConf.deviceId] = new Device(
+                    this.sparkplugNode, newConn, devConf);
+            });
+
+            // What to do when the connection is open
+            newConn.on('open', () => {
+                connection.devices?.forEach((devConf: deviceOptions) => {
+                    this.devices[devConf.deviceId]?._deviceConnected();
+                })
+            });
+
+            // What to do when the device connection has new data from a device
+            newConn.on('data', (obj: { [index: string]: any }, parseVals = true) => {
+                //log(util.format("Received data for %s: (%s) %O",
+                //    connection.name, parseVals, obj));
+                connection.devices?.forEach((devConf: deviceOptions) => {
+                    this.devices[devConf.deviceId]?._handleData(obj, parseVals);
+                })
+            })
+
+            // What to do when device connection dies
+            newConn.on('close', () => {
+                connection.devices?.forEach((devConf: deviceOptions) => {
+                    this.devices[devConf.deviceId]?._deviceDisconnected();
+                })
+            });
         }
-
-        connection.devices?.forEach((devConf: deviceOptions) => {
-            this.devices[devConf.deviceId] = new Device(
-                this.sparkplugNode, newConn, devConf);
-        });
-
-        // What to do when the connection is open
-        newConn.on('open', () => {
-            connection.devices?.forEach((devConf: deviceOptions) => {
-                this.devices[devConf.deviceId]?._deviceConnected();
-            })
-        });
-
-        // What to do when the device connection has new data from a device
-        newConn.on('data', (obj: { [index: string]: any }, parseVals = true) => {
-            //log(util.format("Received data for %s: (%s) %O",
-            //    connection.name, parseVals, obj));
-            connection.devices?.forEach((devConf: deviceOptions) => {
-                this.devices[devConf.deviceId]?._handleData(obj, parseVals);
-            })
-        })
-
-        // What to do when device connection dies
-        newConn.on('close', () => {
-            connection.devices?.forEach((devConf: deviceOptions) => {
-                this.devices[devConf.deviceId]?._deviceDisconnected();
-            })
-        });
 
         // Open the connection
         newConn.open();
@@ -399,5 +403,10 @@ Trying again in ${interval} seconds...`);
             await timers.setTimeout(interval * 1000);
         }
     }
+
+    // async put_to_config(addresses){
+    //     const configRes = this.fplus.ConfigDB.put_config(UUIDs.App.HermesScout, UUIDs.ScoutUUID.ScoutAddresses, addresses);
+    //     console.log(`After Config put ${configRes}`);
+    // }
 
 }

@@ -129,10 +129,10 @@ export class APIv2 {
 
         const permitted = await this.data.check_targ(req.auth, Perm.WriteACL, true);
         const rv = await this.data.request({ type: "grant", grant, permitted });
-        if (rv.status != 201)
+        if (rv.status > 299)
             fail(rv.status);
 
-        return res.status(201).json({ uuid: rv.uuid });
+        return res.status(rv.status).json({ uuid: rv.uuid });
     }
 
     async grant_put (req, res) {

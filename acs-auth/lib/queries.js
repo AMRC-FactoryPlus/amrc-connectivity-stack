@@ -99,14 +99,32 @@ export default class Queries {
                 .map(u => this.uuid_find(u)));
     }
 
+    /* This returns 201 for a new grant, 200 for an exact duplicate, and
+     * 409 otherwise. There is a slight risk here of one client
+     * 'stealing' another's grant; I think the only solution would be
+     * ownership of grants. */
+    /* XXX This logic should be in model. */
     async grant_new (g) {
         const ids = await this.grant_resolve_uuids(g);
+        const bind = [...ids, g.plural];
+
+        const existing = await this.q_single(`
+            select uuid
+            from ace
+            where principal = $1
+                and permission = $2
+                and target = $3
+                and plural = $4
+        `, bind);
+        if (existing) return { status: 200, uuid: existing };
+
         const uuid = await this.q_single(`
             insert into ace (principal, permission, target, plural)
             values ($1, $2, $3, $4)
             on conflict do nothing
             returning uuid
-        `, [...ids, g.plural]);
+        `, bind);
+
         if (!uuid) return { status: 409 };
         return { status: 201, uuid };
     }

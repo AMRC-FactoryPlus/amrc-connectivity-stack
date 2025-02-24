@@ -6,7 +6,7 @@
 
 import express from "express";
 
-import { UUIDs } from "@amrc-factoryplus/utilities";
+import { UUIDs } from "@amrc-factoryplus/service-client";
 
 //import { Clusters }         from "./clusters.js";
 import { SealedSecrets }    from "./secrets.js";

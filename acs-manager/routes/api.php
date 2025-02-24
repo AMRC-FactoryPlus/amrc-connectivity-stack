@@ -96,4 +96,3 @@ Route::middleware('auth:api')->get('/device-schemas/{schema}/versions', [DeviceS
 
 // ------ Sensitive Information ------ //
 Route::middleware('auth:api')->post('/sensitive-information', [SensitiveInformationController::class, 'create']);
-

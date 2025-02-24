@@ -3,7 +3,7 @@
  * Copyright "2024" AMRC
  */
 
-import {ServiceClient, SpB, Topic, UUIDs} from "@amrc-factoryplus/utilities";
+import {ServiceClient, SpB, Topic, UUIDs} from "@amrc-factoryplus/service-client";
 import {Reader} from "protobufjs";
 import {logger} from "../bin/ingester.js";
 import Long from "long";

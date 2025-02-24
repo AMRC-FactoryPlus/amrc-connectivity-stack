@@ -1,0 +1,78 @@
+# ACS ConfigDB
+# Schema for dump files
+# Copyright 2024 University of Sheffield AMRC
+#
+# Compile this with `node bin/compile-schema.js`.
+
+type: object
+required: [service, version]
+properties: 
+  service:  { const: af15f175-78a0-4e05-97c0-2a0bb82b9f3b }
+  version:  { type: integer }
+oneOf:
+  - type: object
+    required: [version]
+    additionalProperties: false
+    properties: 
+      service: true
+      version: { const: 1 }
+      # This is ignored but we need to accept it from s-s
+      overwrite: { type: boolean }
+      classes: 
+        type: array
+        items: { type: string, format: uuid }
+      objects: 
+        type: object
+        propertyNames: { format: uuid }
+        properties: 
+          # Class.Class
+          04a1c90d-2295-4cbe-b33a-74eded62cbf1: false
+        additionalProperties: 
+          type: array
+          items: { type: string, format: uuid }
+      configs: 
+        type: object
+        properties: 
+          # App.Registration
+          cb40bed5-49ad-4443-a7f5-08c75009da8f: false
+        propertyNames: { format: uuid }
+        additionalProperties: 
+          type: object
+          propertyNames: { format: uuid }
+          additionalProperties: true
+  - type: object
+    required: [version]
+    additionalProperties: false
+    properties: 
+      service: true
+      version: { const: 2 }
+      objects: 
+        type: object
+        propertyNames: { format: uuid }
+        additionalProperties: 
+          type: object
+          propertyNames: { format: uuid }
+          additionalProperties: 
+            type: object
+            additionalProperties: false
+            properties: 
+              name: { type: string }
+              memberOf: 
+                type: array
+                items: { type: string, format: uuid }
+              subclassOf: 
+                type: array
+                items: { type: string, format: uuid }
+              enum: 
+                type: array
+                items: { type: string, format: uuid }
+      configs: 
+        type: object
+        properties: 
+          # App.Registration
+          cb40bed5-49ad-4443-a7f5-08c75009da8f: false
+        propertyNames: { format: uuid }
+        additionalProperties: 
+          type: object
+          propertyNames: { format: uuid }
+          additionalProperties: true

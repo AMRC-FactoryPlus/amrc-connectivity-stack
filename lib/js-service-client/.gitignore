@@ -1,0 +1,5 @@
+config.mk
+node_modules
+package-lock.json
+/.idea
+/tmp

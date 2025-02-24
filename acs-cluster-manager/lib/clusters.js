@@ -14,7 +14,7 @@ import JMP      from "json-merge-patch";
 import rx       from "rxjs";
 import Template from "json-templates";
 
-import { Debug, UUIDs }         from "@amrc-factoryplus/utilities";
+import { UUIDs }         from "@amrc-factoryplus/service-client";
 
 import { Update, Delete }       from "./actions.js";
 import { Checkout }             from "./checkout.js";

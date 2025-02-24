@@ -102,6 +102,10 @@ export default class API {
     }
 
     async load_dump(req, res) {
+        if(req.auth !== this.fplus.opts.root_principal){
+            res.status(401).end();
+        }
+
         try{
             const info = await this.model.load_dump(req);
             res.status(info).end();

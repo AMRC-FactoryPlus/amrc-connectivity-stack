@@ -110,10 +110,17 @@ export class Update extends Action {
 
         if (!status.flux) {
             const flux = await cdb.create_object(Edge.Class.Account);
+            /* XXX We should record this UUID at this point, but we need
+             * to know we haven't finished with it. */
             this.log("Creating op1flux/%s as %s", name, flux);
             await cdb.put_config(UUIDs.App.Info, flux, 
                 { name: `Edge flux: ${name}` });
-            await auth.add_ace(flux, Git.Perm.Pull, uuid);
+            await auth.add_grant({
+                principal:  flux,
+                permission: Git.Perm.Pull,
+                target:     uuid,
+                plural:     false,
+            });
             await auth.add_to_group(group.flux.uuid, flux);
             await auth.add_principal(flux, this.principal("op1flux"));
             this.update({ flux });

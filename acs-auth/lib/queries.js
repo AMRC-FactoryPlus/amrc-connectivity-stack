@@ -104,8 +104,10 @@ export default class Queries {
         const uuid = await this.q_single(`
             insert into ace (principal, permission, target, plural)
             values ($1, $2, $3, $4)
+            on conflict do nothing
             returning uuid
         `, [...ids, g.plural]);
+        if (!uuid) return { status: 409 };
         return { status: 201, uuid };
     }
 

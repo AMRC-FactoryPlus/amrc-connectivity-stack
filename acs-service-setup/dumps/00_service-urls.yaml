@@ -3,22 +3,22 @@ version: 1
 advertisements:
   - service: !u ACS.Service.ClusterManager
     url: !url "http://clusters.${namespace}.svc.cluster.local"
-    owner: !u ACS.Device.ClusterManager
+    device: !u ACS.Device.ClusterManager
   - service: !u UUIDs.Service.Directory
     url: !url "http://directory.${namespace}.svc.cluster.local"
-    owner: !u ACS.Device.Directory
+    device: !u ACS.Device.Directory
   - service: !u ACS.Service.ConfigDB
     url: !url "http://configdb.${namespace}.svc.cluster.local"
-    owner: !u ACS.Device.ConfigDB
+    device: !u ACS.Device.ConfigDB
   - service: !u ACS.Service.CmdEsc
     url: !url "http://cmdesc.${namespace}.svc.cluster.local"
-    owner: !u ACS.Device.CmdEsc
+    device: !u ACS.Device.CmdEsc
   - service: !u ACS.Service.Git
     url: !url "http://git.${domain}"
-    owner: !u ACS.Device.Git
+    device: !u ACS.Device.Git
   - service: !u UUIDs.Service.MQTT
     url: !url "mqtt://mqtt.${namespace}.svc.cluster.local"
-    owner: !u ACS.Device.MQTT
+    device: !u ACS.Device.MQTT
   - service: !u UUIDs.Service.Authentication
     url: !url "http://auth.${namespace}.svc.cluster.local"
-    owner: !u ACS.Device.Authentication
+    device: !u ACS.Device.Authentication

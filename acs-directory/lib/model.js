@@ -136,17 +136,13 @@ export default class Model extends Queries {
             return 400;
         }
         for (const advertisement of dump.advertisements) {
-            const owner = advertisement.owner
-                ?? await this.fplus.resolve_principal({kerberos: req.auth});
-
-            if(!owner){
+            if(!advertisement.device){
                 continue;
             }
-
             await this.record_service({
                 service: advertisement.service,
                 url: advertisement.url,
-                device: owner,
+                device: advertisement.device,
             })
         }
         return 200;

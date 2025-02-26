@@ -15,7 +15,7 @@ import * as local_UUIDs from "./uuids.js";
 const Paths = new Map([
     [UUIDs.Service.Authentication,  "/authz/load"],
     [UUIDs.Service.ConfigDB,        "/v1/load"],
-    [UUIDs.Service.Directory,       "/v1/load"],
+    [UUIDs.Service.Directory,       "/load"],
 ]);
 
 const UUID_SOURCES = { UUIDs, ...local_UUIDs };

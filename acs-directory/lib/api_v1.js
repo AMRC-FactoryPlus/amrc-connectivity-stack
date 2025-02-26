@@ -62,8 +62,6 @@ export default class API {
         api.get("/service", this.services.bind(this));
         api.get("/service/:service", this.service_providers.bind(this));
 
-        api.post("/load", this.load_dump.bind(this))
-
         api.route("/service/:service/advertisment")
             .get((req,res) => res.status(403))
             .put((req,res) => res.status(403));
@@ -99,20 +97,6 @@ export default class API {
     async search(req, res) {
         let list = await this.model.search(req.query);
         res.status(200).json(list);
-    }
-
-    async load_dump(req, res) {
-        if(req.auth !== this.fplus.opts.root_principal){
-            res.status(401).end();
-        }
-
-        try{
-            const info = await this.model.load_dump(req);
-            res.status(info).end();
-        }catch (e) {
-            console.log(e);
-            res.status(500).json({error: e.message});
-        }
     }
 
     async devices(req, res) {

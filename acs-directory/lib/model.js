@@ -123,7 +123,7 @@ export default class Model extends Queries {
         return true;
     }
 
-    async load_dump(req) {
+    async dump_load(req) {
         const dump = req.body;
         if (!this.dump_validate(dump)){
             return 400;

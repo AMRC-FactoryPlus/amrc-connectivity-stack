@@ -11,6 +11,7 @@ import { WebAPI }               from "@amrc-factoryplus/service-api";
 
 import Model from "../lib/model.js";
 import APIv1 from "../lib/api_v1.js";
+import { Loader } from "../lib/loader.js";
 import { Perm } from "../lib/uuids.js";
 import { GIT_VERSION } from "../lib/git-version.js";
 
@@ -33,6 +34,10 @@ const api = await new APIv1({
     fplus,
     internal_hostname:  process.env.HOSTNAME,
 }).init();
+const loader = new Loader({
+    model,
+    fplus,
+});
 
 const app = await new WebAPI({
     ping:       {
@@ -61,6 +66,7 @@ const app = await new WebAPI({
 
     routes: app => {
         app.use("/v1", api.routes);
+        app.use("/load",loader.routes)
     },
 }).init();
 

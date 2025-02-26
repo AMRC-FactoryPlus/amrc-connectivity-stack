@@ -12,7 +12,7 @@ const Valid = {
 };
 
 /* Currently we are a Sparkplug Node; this is only so we can advertise
- * ourself to the Directory over MQTT. Should we instead push a service
+ * ourselves to the Directory over MQTT. Should we instead push a service
  * advert to the Directory over HTTP, and then we don't need node
  * credentials? */
 
@@ -65,10 +65,8 @@ export default class MqttCli {
 
     on_connect() {
         this.log("mqtt", "Connected to MQTT.");
-        this.mqtt.subscribe(this.address.topic("CMD"));
         this.mqtt.subscribe("spBv1.0/+/NDATA/+");
         this.mqtt.subscribe("spBv1.0/+/DDATA/+/+");
-        this.rebirth();
     }
 
     on_error(error) {
@@ -102,28 +100,10 @@ export default class MqttCli {
                 this.on_data(addr, payload);
                 break;
             case "CMD":
-                this.on_command(addr, payload);
+                // this.on_command(addr, payload);
                 break;
             default:
                 this.log("mqtt", `Unknown Sparkplug message type ${topic.type}!`);
-        }
-    }
-
-    on_command(addr, payload) {
-        if (!addr.equals(this.address)) {
-            //console.log(`Received CMD for ${addr}`);
-            return;
-        }
-
-        for (let m of payload.metrics) {
-            switch (m.name) {
-                case "Node Control/Rebirth":
-                    this.rebirth();
-                    break;
-                default:
-                    this.log("mqtt", `Received unknown CMD: ${m.name}`);
-                /* Ignore for now */
-            }
         }
     }
 
@@ -135,27 +115,6 @@ export default class MqttCli {
                     break;
             }
         }
-    }
-
-    rebirth() {
-        this.seq = 0;
-        const Birth = MetricBuilder.birth;
-        const metrics = Birth.node([]);
-        //Birth.command_escalation(metrics);
-        metrics.push.apply(metrics, [
-            //{ name: "Device_Information/Manufacturer", type: "String", value: Device_Info.Manufacturer },
-            //{ name: "Device_Information/Model", type: "String", value: Device_Info.Model },
-            //{ name: "Device_Information/Serial", type: "String", value: Device_Info.Serial },
-        ]);
-        //metrics.push.apply(metrics, 
-        //    Object.values(Changed).map(v =>
-        //        ({ name: `Last_Changed/${v}`, type: "UUID", value: "" })));
-
-        this.publish({
-            address:    this.address,
-            type:       "BIRTH",
-            metrics,
-        });
     }
 
     decode_request(metric) {

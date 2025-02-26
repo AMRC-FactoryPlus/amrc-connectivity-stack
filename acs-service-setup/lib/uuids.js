@@ -75,7 +75,7 @@ export const ACS = {
         ConfigDB:               "36861e8d-9152-40c4-8f08-f51c2d7e3c25",
         ClusterManager:         "00000000-0000-0000-0000-000000000000",
         Directory:              "5cc3b068-938f-4bb2-8ceb-64338a02fbeb",
-        CmdEsc:                 "23d4e8f9-76c0-49d5-addc-00b6ac05ee58",
+        CmdEsc:                 "00000000-0000-0000-0000-000000000000",
         MQTT:                   "2f42daeb-4521-4522-8e19-85dfb73db88e",
         Git:                    "626df296-8156-4c67-8aed-aac70161aa8b",
         Authentication:         "127cde3c-773a-4f61-b0ba-7412a2695253",

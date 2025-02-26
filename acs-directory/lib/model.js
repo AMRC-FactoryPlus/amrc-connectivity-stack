@@ -90,13 +90,6 @@ export default class Model extends Queries {
             await q.record_stale_alerts(devid,
                 Object.values(opts.alerts).map(a => a.uuid));
 
-            if (opts.service) {
-                await q.record_service({
-                    service: opts.service.uuid,
-                    device: uuid,
-                    url: opts.service.url,
-                });
-            }
         });
     }
 

@@ -23,5 +23,5 @@ advertisements:
     url: !url "http://auth.${namespace}.svc.cluster.local"
     device: !u ACS.Device.Authentication
   - service: !u ACS.Service.Manager
-    url: !url "http://manager.{namespace}.svc.cluster.local"
+    url: !url "http://manager.${namespace}.svc.cluster.local"
     device: !u ACS.Device.Manager

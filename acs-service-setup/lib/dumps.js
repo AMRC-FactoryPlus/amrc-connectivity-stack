@@ -17,6 +17,7 @@ const Paths = new Map([
     [UUIDs.Service.ConfigDB,        "/v1/load"],
     [UUIDs.Service.Directory,       "/load"],
 ]);
+const config = JSON.parse(process.env.ACS_CONFIG);
 
 const UUID_SOURCES = { UUIDs, ...local_UUIDs };
 
@@ -37,7 +38,6 @@ function resolve (str) {
  * @return {*} The resolved URL.
  */
 function resolveNamespace (str) {
-    const config = JSON.parse(process.env.ACS_CONFIG);
     const replacements = {
         namespace: config.namespace,
         domain: config.domain,

@@ -65,14 +65,14 @@ export default class API {
         api.post("/load", this.load_dump.bind(this))
 
         api.route("/service/:service/advertisment")
-            .get(this.service_advert_get.bind(this))
-            .put(this.service_advert_put.bind(this));
+            .get((req,res) => res.status(403))
+            .put((req,res) => res.status(403));
         /* Delete unimplemented for now. */
         //    .delete(this.service_advert_del.bind(this));
 
         api.route("/service/:service/advertisment/:owner")
-            .get(this.service_advert_get.bind(this))
-            .put(this.service_advert_put.bind(this));
+            .get((req,res) => res.status(403))
+            .put((req,res) => res.status(403));
         /* Delete unimplemented for now. */
         //    .delete(this.service_advert_del.bind(this));
         
@@ -191,73 +191,6 @@ export default class API {
         }
 
         res.status(200).json(devs);
-    }
-
-    async service_advert_get(req, res) {
-        const {service} = req.params;
-
-        const requester = await this.fplus.resolve_principal(
-            {kerberos: req.auth});
-        const owner = req.params.owner ?? requester;
-
-        const ok = requester == owner
-            || await this.fplus.check_acl(
-                req.auth, Perm.Manage_Service, owner, true);
-        if (!ok)
-            return res.status(403).end();
-
-        const advert = await this.model.service_advert(service, owner);
-
-        if (advert == null)
-            return res.status(404).end();
-        return res.status(200).json(advert);
-    }
-
-    async service_advert_put(req, res) {
-        const {service} = req.params;
-        const {device, url} = req.body;
-
-        /* A bootstrap request comes from root_principal and has owner
-         * specified. It is important in this case that we do no network
-         * lookups, as we haven't got service URLs yet. */
-
-        const setid = "owner" in req.params;
-        const owner = req.params.owner
-            ?? await this.fplus.resolve_principal({kerberos: req.auth});
-        if (owner == null) return res.status(400).end();
-
-        /* Specifying a device is for back-compat only. This version
-         * only supports principals which are also Sparkplug Nodes
-         * registering their own URLs. */
-        if (device != undefined && device != owner)
-            return res.status(403).end();
-
-        const ckown = (p, t) => {
-            console.log(`Checking ACL: ${owner}, ${p}, ${t}`);
-            return this.fplus.check_acl({uuid: owner}, p, t, true);
-        };
-        const ckreq = (p, t) => {
-            console.log(`Checking ACL: ${req.auth}, ${p}, ${t}`);
-            return this.fplus.check_acl({kerberos: req.auth}, p, t, true);
-        };
-
-        const owner_ok = !setid || await ckreq(Perm.Manage_Service, owner);
-        const override_ok = setid 
-            && await ckreq(Perm.Override_Service, service);
-        const service_ok = override_ok
-            || await ckown(Perm.Advertise_Service, service);
-        const ok = owner_ok && service_ok;
-
-        if (!ok) return res.status(403).end();
-
-        const st = await this.model.record_service({ 
-            service, url,
-            device: owner,
-        });
-
-        if (st == null)
-            return res.status(400).end();
-        return res.status(204).end();
     }
 
     async addr_groups(req, res) {

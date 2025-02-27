@@ -48,7 +48,8 @@ spec:
                 dict
                   "organisation"    .Values.acs.organisation
                   "namespace"       .Release.Namespace
-                  "domain"          .Values.acs.baseUrl
+                  "base_url"        .Values.acs.baseUrl
+                  "url_protocol"    (.Values.acs.secure | ternary "https" "http")
                   "realm"           .Values.identity.realm
                   "directory"
                     (include "amrc-connectivity-stack.external-url" 

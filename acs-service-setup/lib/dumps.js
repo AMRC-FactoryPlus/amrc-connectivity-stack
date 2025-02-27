@@ -39,8 +39,9 @@ function resolve (str) {
  */
 function resolveNamespace (str) {
     const replacements = {
-        namespace: config.namespace,
-        domain: config.domain,
+        NAMESPACE: config.namespace,
+        BASE_URL: config.base_url,
+        PROTOCOL: config.url_protocol,
     }
     return str.replace(/\${(.*?)}/g, (match, key) => {
         return replacements[key] || match; // Replace if key exists, otherwise keep original placeholder

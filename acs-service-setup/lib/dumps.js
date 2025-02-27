@@ -4,10 +4,10 @@
  */
 
 import fsp from "fs/promises";
-
 import yaml from "yaml";
 
 import { UUIDs } from "@amrc-factoryplus/service-client";
+import process from "process";
 
 import * as local_UUIDs from "./uuids.js";
 
@@ -15,7 +15,9 @@ import * as local_UUIDs from "./uuids.js";
 const Paths = new Map([
     [UUIDs.Service.Authentication,  "/authz/load"],
     [UUIDs.Service.ConfigDB,        "/v1/load"],
+    [UUIDs.Service.Directory,       "/load"],
 ]);
+const config = JSON.parse(process.env.ACS_CONFIG);
 
 const UUID_SOURCES = { UUIDs, ...local_UUIDs };
 
@@ -30,24 +32,48 @@ function resolve (str) {
     return it;
 }
 
+/**
+ * Resolves the namespace in the yaml string with the ACS namespace or domain.
+ * @param str The string to resolve.
+ * @return {*} The resolved URL.
+ */
+function resolveNamespace (str) {
+    const replacements = {
+        NAMESPACE: config.namespace,
+        BASE_URL: config.base_url,
+        PROTOCOL: config.url_protocol,
+    }
+    return str.replace(/\${(.*?)}/g, (match, key) => {
+        return replacements[key] || match; // Replace if key exists, otherwise keep original placeholder
+    });
+}
+
 const yamlOpts = {
     customTags: [
         {
             tag:        "!u",
             resolve:    str => resolve(str),
         },
+        {
+            tag:        "!url",
+            resolve:    str => resolveNamespace(str),
+        },
     ],
 };
 
-export async function load_yaml (f) {
-    const y = await fsp.readFile(`dumps/${f}`, { encoding: "utf8" });
-    const ds = yaml.parseAllDocuments(y, yamlOpts)
-        .map(d => {
-            if (d.errors.length)
-                throw new Error(`YAML error in ${f}`, { cause: d.errors });
-            return d.toJS();
+/**
+ * Parses and converts yaml file to JSON.
+ * @param file Yaml file to parse.
+ * @return {Promise<any[]>} An JSON array of the parsed yaml files.
+ */
+export async function load_yaml (file) {
+    const yamlString = await fsp.readFile(`dumps/${file}`, { encoding: "utf8" });
+    return yaml.parseAllDocuments(yamlString, yamlOpts)
+        .map(document => {
+            if (document.errors.length)
+                throw new Error(`YAML error in ${file}`, {cause: document.errors});
+            return document.toJS();
         });
-    return ds;
 }
 
 async function load_dump (fplus, dump) {
@@ -61,7 +87,6 @@ async function load_dump (fplus, dump) {
     const query = service == UUIDs.Service.ConfigDB
         ? { overwrite: dump.overwrite ? "true" : "false" }
         : {};
-
     const res = await fplus.Fetch.fetch({
         service, url, query,
         method:         "POST",
@@ -71,21 +96,26 @@ async function load_dump (fplus, dump) {
     return res.status;
 }
 
-export async function load_dumps (ss) {
-    const { fplus } = ss;
+export async function load_dumps (serviceSetup, early) {
+    // service client
+    const { fplus } = serviceSetup;
 
     const files = await fsp.readdir("dumps");
     files.sort();
 
-    for (const f of files) {
-        if (!f.endsWith(".yaml")) continue;
-        ss.log("== %s", f);
-        const ds = await load_yaml(f);
-        for (const d of ds) {
-            ss.log("=== %s", d.service);
-            const st = await load_dump(fplus, d);
-            if (st > 300)
-                throw new Error(`Service dump ${f} failed: ${st}`);
+    for (const file of files) {
+        if (!file.endsWith(".yaml")) continue;
+        serviceSetup.log("== %s", file);
+        const documents = await load_yaml(file);
+        for (let document of documents) {
+            if(document.service !== UUIDs.Service.Directory && early ||
+                document.service === UUIDs.Service.Directory && !early){
+                continue;
+            }
+            serviceSetup.log("=== %s", document.service);
+            const status = await load_dump(fplus, document);
+            if (status > 300)
+                throw new Error(`Service dump ${file} failed: ${status}`);
         }
     }
 }

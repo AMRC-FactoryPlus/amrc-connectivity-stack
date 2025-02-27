@@ -6,6 +6,7 @@
 
 import {DB, Pg} from "@amrc-factoryplus/pg-client";
 import Queries from "./queries.js";
+import {Service_UUID} from "./constants.js";
 
 export default class Model extends Queries {
     constructor(opts) {
@@ -89,13 +90,6 @@ export default class Model extends Queries {
             await q.record_stale_alerts(devid,
                 Object.values(opts.alerts).map(a => a.uuid));
 
-            if (opts.service) {
-                await q.record_service({
-                    service: opts.service.uuid,
-                    device: uuid,
-                    url: opts.service.url,
-                });
-            }
         });
     }
 
@@ -107,6 +101,44 @@ export default class Model extends Queries {
         const time = opts.time;
 
         await this.txn(q => q.record_death(time, addr));
+    }
+
+    dump_validate(dump){
+        if (typeof (dump) != "object") {
+            console.log("Dump not an object");
+            return false;
+        }
+        if (dump.service != Service_UUID) {
+            console.log("Dump not for Directory");
+            return false;
+        }
+        if (dump.version != 1) {
+            console.log("Dump should be version 1");
+            return false;
+        }
+        if(dump.advertisements.length === 0){
+            console.log("Dump doesn't contain urls to register")
+            return false;
+        }
+        return true;
+    }
+
+    async dump_load(req) {
+        const dump = req.body;
+        if (!this.dump_validate(dump)){
+            return 422;
+        }
+        for (const advertisement of dump.advertisements) {
+            if(!advertisement.device){
+                continue;
+            }
+            await this.record_service({
+                service: advertisement.service,
+                url: advertisement.url,
+                device: advertisement.device,
+            })
+        }
+        return 200;
     }
 
     /* ALERTS */

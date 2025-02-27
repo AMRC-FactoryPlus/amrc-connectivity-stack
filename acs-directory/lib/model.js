@@ -126,7 +126,7 @@ export default class Model extends Queries {
     async dump_load(req) {
         const dump = req.body;
         if (!this.dump_validate(dump)){
-            return 400;
+            return 422;
         }
         for (const advertisement of dump.advertisements) {
             if(!advertisement.device){

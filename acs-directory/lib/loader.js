@@ -13,7 +13,7 @@ export class Loader {
 
     async load(req, res) {
         if(req.auth !== this.fplus.opts.root_principal){
-            res.status(401).end();
+            res.status(403).end();
         }
 
         try{

@@ -45,11 +45,13 @@ public class FPKrbAuth implements EnhancedAuthenticator {
     static class AuthResult {
         public byte[] gssToken;
         public List<TopicPermission> acl;
+        public String user;
 
-        public AuthResult (byte[] tok, List<TopicPermission> acl)
+        public AuthResult (byte[] tok, List<TopicPermission> acl, String user)
         {
             this.gssToken = tok;
             this.acl = acl;
+            this.user = user;
         }
 
         public void applyACL (EnhancedAuthOutput output)
@@ -124,6 +126,7 @@ public class FPKrbAuth implements EnhancedAuthenticator {
             .subscribe(
                 rv -> {
                     rv.applyACL(output);
+                    ClientSessionStore.storeUsername(conn.getClientId(), rv.user);
                     output.authenticateSuccessfully(rv.gssToken);
                 },
                 e -> {
@@ -182,6 +185,7 @@ public class FPKrbAuth implements EnhancedAuthenticator {
                     opt.ifPresentOrElse(
                         rv -> {
                             rv.applyACL(output);
+                            ClientSessionStore.storeUsername(conn.getClientId(), user);
                             output.authenticateSuccessfully();
                         },
                         () -> output.failAuthentication());
@@ -218,7 +222,7 @@ public class FPKrbAuth implements EnhancedAuthenticator {
                 String client_name = ctx.getSrcName().toString();
                 log.info("Authenticated client {}", client_name);
                 return provider.getACLforPrincipal(client_name)
-                    .map(acl -> new AuthResult(out_buf, acl))
+                    .map(acl -> new AuthResult(out_buf, acl, client_name))
                     .doOnSuccess(rv -> log.info("MQTT ACL [{}]: {}", 
                         client_name, rv.showACL()));
             });

@@ -39,6 +39,7 @@ export class APIv2 {
             .get(this.grant_get.bind(this))
             .put(this.grant_put.bind(this))
             .delete(this.grant_put.bind(this));
+        api.post("/grant/find", this.grant_find.bind(this));
 
         api.get("/principal", this.id_list.bind(this));
         api.get("/principal/:uuid", this.id_get_all.bind(this));
@@ -145,6 +146,31 @@ export class APIv2 {
 
         const rv = await this.data.request({ type: "grant", uuid, grant, permitted });
         return res.status(rv.status).end();
+    }
+
+    async grant_find (req, res) {
+        const { principal, permission, target, plural } = req.body;
+
+        for (const u of [principal, permission, target]) {
+            if (!(u == null || valid_uuid(u)))
+                fail(422);
+        }
+        if (!(plural == null || typeof(plural) == "boolean"))
+            fail(422);
+
+        const tok = await this.data.check_targ(req.auth, Perm.WriteACL, true);
+        if (!tok) fail(403);
+
+        const grants = await rx.firstValueFrom(this.data.grants);
+        const maybe = (got, want) => want == null || got == want;
+        const rv = grants.filter(g =>
+                maybe(g.principal, principal) &&
+                maybe(g.permission, permission) &&
+                maybe(g.target, target) &&
+                maybe(g.plural, plural))
+            .map(g => g.uuid)
+            .filter(tok);
+        return res.status(200).json(rv);
     }
 
     /* XXX The permissions here only handle Kerberos identities. */

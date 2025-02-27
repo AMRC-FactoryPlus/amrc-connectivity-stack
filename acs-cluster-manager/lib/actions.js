@@ -131,12 +131,16 @@ export class Update extends Action {
         const name = this.name();
 
         const do_acc = async (role, perm) => {
-            if (status[role]?.done) return;
+            const st = status[role];
+            if (st?.done) return;
 
             const upn = `op1${role}`;
 
-            const uuid = await cdb.create_object(Edge.Class.Account);
-            this.update({ [role]: { uuid } });
+            let uuid = st?.uuid;
+            if (!uuid) {
+                uuid = await cdb.create_object(Edge.Class.Account);
+                this.update({ [role]: { uuid } });
+            }
             this.log("Created %s/%s as %s", upn, name, uuid);
 
             await cdb.put_config(UUIDs.App.Info, uuid,

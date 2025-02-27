@@ -54,16 +54,9 @@ public class FPKrbAuthProvider implements EnhancedAuthenticatorProvider
 
     private FPServiceClient fplus;
 
-    public FPKrbAuthProvider ()
+    public FPKrbAuthProvider (FPServiceClient serviceClient)
     {
-        fplus = new FPServiceClient();
-    }
-
-    public FPKrbAuthProvider start ()
-    {
-        fplus.http().start();
-        
-        return this;
+        fplus = serviceClient;
     }
 
     @Override

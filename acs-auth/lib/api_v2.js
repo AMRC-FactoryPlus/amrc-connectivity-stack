@@ -141,7 +141,7 @@ export class APIv2 {
         if (!valid_uuid(uuid)) fail(410);
 
         const grant = req.method == "PUT" ? req.body : null;
-        if (!valid_grant(grant)) fail(422);
+        if (grant && !valid_grant(grant)) fail(422);
         const permitted = await this.data.check_targ(req.auth, Perm.WriteACL, true);
 
         const rv = await this.data.request({ type: "grant", uuid, grant, permitted });

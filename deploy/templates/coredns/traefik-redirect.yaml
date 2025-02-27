@@ -1,0 +1,10 @@
+{{ if .Values.coredns.traefikRedirect.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: coredns-custom
+  namespace: kube-system
+data:
+  rewrite.override: |
+    rewrite stop name regex .*\.{{.Values.acs.baseUrl}} acs-traefik.{{.Release.Namespace}}.svc.cluster.local answer auto
+{{ end }}

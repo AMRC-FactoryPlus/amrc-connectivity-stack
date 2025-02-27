@@ -26,7 +26,7 @@ acs:
   # own section. Deployments from a Git checkout must set this value.
   #defaultTag: ''
 
-coreDNS:
+coredns:
   # -- An option to enable the redirecting of external URL's back
   # to the internal Traefik service. This is done through a config map
   # override to coredns in the kube-system namespace. The override rewrites

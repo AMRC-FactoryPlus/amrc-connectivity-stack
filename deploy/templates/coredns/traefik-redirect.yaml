@@ -1,4 +1,4 @@
-{{ if .Values.coreDNS.traefikRedirect.enabled }}
+{{ if .Values.coredns.traefikRedirect.enabled }}
 apiVersion: v1
 kind: ConfigMap
 metadata:

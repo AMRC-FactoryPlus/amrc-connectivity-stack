@@ -24,6 +24,14 @@
 
       <SidebarContent>
         <Nav/>
+        <SidebarGroup>
+          <SidebarGroupLabel class="mb-2">Edge Clusters & Devices</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <EdgeClusterList/>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
         <div class="mt-auto p-4">
           <Card>
             <CardHeader class="p-2 pt-0 md:p-4">
@@ -74,7 +82,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
-import Nav from '@/components/Nav.vue'
+import Nav from '@/components/Nav/Nav.vue'
+import EdgeClusterList from '@/components/Nav/EdgeClusterList.vue'
 import { useServiceClientStore } from '@/store/serviceClientStore.js'
 import { useLayoutStore } from '@/store/layoutStore.js'
 import { useMagicKeys } from '@vueuse/core'
@@ -127,6 +136,7 @@ export default {
     SheetContent,
     SheetTrigger,
     Nav,
+    EdgeClusterList,
     Toaster,
   },
 
@@ -151,6 +161,10 @@ export default {
         this.l.toggleFullscreen(this.$route.query.fullscreen === 'true')
       }
     })
+  },
+
+  data () {
+    return {}
   },
 }
 </script>

@@ -1,0 +1,79 @@
+<!--
+  - Copyright (c) University of Sheffield AMRC 2025.
+  -->
+
+<template>
+  <SidebarMenuItem v-for="cluster in clusters" :key="cluster.uuid" v-if="clusters.length">
+    <Collapsible :defaultOpen="false" class="group/collapsible-cluster">
+      <!-- TODO: This should navigate to the cluster page when clicked -->
+      <!-- TODO: Ctrl+Click should expand instead of click -->
+      <Button
+          title="View cluster"
+          size="sm"
+          variant="ghost"
+          class="w-full text-left justify-start"
+      >
+        <div class="flex items-center justify-center gap-2">
+          <CollapsibleTrigger as-child>
+            <div title="Show nodes for this cluster" @click.stop.prevent class="flex items-center justify-center size-5 group/collapsible-trigger">
+              <i class="group-hover/collapsible-trigger:text-gray-900 text-gray-500 fa-solid fa-chevron-right text-xs transition-transform duration-75 group-data-[state=open]/collapsible-cluster:rotate-90"></i>
+            </div>
+          </CollapsibleTrigger>
+          <i :class="`fa-solid fa-circle-nodes`"></i>
+          <span>{{cluster.name}}</span>
+        </div>
+      </Button>
+      <CollapsibleContent>
+        <SidebarMenuSub>
+          <NodeList :cluster/>
+        </SidebarMenuSub>
+      </CollapsibleContent>
+    </Collapsible>
+  </SidebarMenuItem>
+</template>
+
+<script>
+
+import { SidebarGroup, SidebarGroupContent, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarMenuSub } from '@/components/ui/sidebar'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { Button } from '@components/ui/button'
+import { useEdgeClusterStore } from '@store/useEdgeClusterStore.js'
+import NodeList from './NodeList.vue'
+
+export default {
+
+  setup () {
+    return {
+      s: useEdgeClusterStore(),
+    }
+  },
+
+  components: {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+    SidebarGroup,
+    SidebarGroupContent,
+    SidebarMenu,
+    SidebarMenuItem,
+    SidebarMenuButton,
+    SidebarMenuSub,
+    Button,
+    NodeList,
+  },
+
+  computed: {
+    clusters () {
+      return this.s.data
+    },
+
+    clustersLoading () {
+      return this.s.loading
+    },
+  },
+
+  async mounted () {
+    await this.s.fetch()
+  },
+}
+</script>

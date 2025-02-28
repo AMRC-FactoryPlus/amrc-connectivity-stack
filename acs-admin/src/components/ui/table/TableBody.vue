@@ -7,7 +7,7 @@ const props = defineProps({
 </script>
 
 <template>
-  <tbody :class="cn('[&_tr:last-child]:border-0', props.class)">
+  <tbody :class="cn('[&_tr:last-child]:border-0 dark:border-slate-800', props.class)">
     <slot />
   </tbody>
 </template>

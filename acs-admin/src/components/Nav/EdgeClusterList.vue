@@ -7,22 +7,24 @@
     <Collapsible :defaultOpen="false" class="group/collapsible-cluster">
       <!-- TODO: This should navigate to the cluster page when clicked -->
       <!-- TODO: Ctrl+Click should expand instead of click -->
-      <Button
-          title="View cluster"
-          size="sm"
-          variant="ghost"
-          class="w-full text-left justify-start"
-      >
-        <div class="flex items-center justify-center gap-2">
-          <CollapsibleTrigger as-child>
-            <div title="Show nodes for this cluster" @click.stop.prevent class="flex items-center justify-center size-5 group/collapsible-trigger">
-              <i class="group-hover/collapsible-trigger:text-gray-900 text-gray-500 fa-solid fa-chevron-right text-xs transition-transform duration-75 group-data-[state=open]/collapsible-cluster:rotate-90"></i>
-            </div>
-          </CollapsibleTrigger>
-          <i :class="`fa-solid fa-circle-nodes`"></i>
-          <span>{{cluster.name}}</span>
-        </div>
-      </Button>
+      <RouterLink :to="`/edge-cluster/${cluster.uuid}`">
+        <Button
+            title="View cluster"
+            size="sm"
+            variant="ghost"
+            class="w-full text-left justify-start"
+        >
+          <div class="flex items-center justify-center gap-2">
+            <CollapsibleTrigger as-child>
+              <div title="Show nodes for this cluster" @click.stop.prevent class="flex items-center justify-center size-5 group/collapsible-trigger">
+                <i class="group-hover/collapsible-trigger:text-gray-900 text-gray-500 fa-solid fa-chevron-right text-xs transition-transform duration-75 group-data-[state=open]/collapsible-cluster:rotate-90"></i>
+              </div>
+            </CollapsibleTrigger>
+            <i :class="`fa-solid fa-circle-nodes`"></i>
+            <span>{{cluster.name}}</span>
+          </div>
+        </Button>
+      </RouterLink>
       <CollapsibleContent>
         <SidebarMenuSub>
           <NodeList :cluster/>
@@ -30,6 +32,10 @@
       </CollapsibleContent>
     </Collapsible>
   </SidebarMenuItem>
+  <Button disabled class="flex items-center justify-center gap-1 text-gray-400 my-1" variant="ghost" size="sm">
+    <i class="fa-solid fa-plus"></i>
+    <span>New Cluster</span>
+  </Button>
 </template>
 
 <script>

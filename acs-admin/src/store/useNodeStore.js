@@ -11,10 +11,23 @@ export const useNodeStore = defineStore('node', {
   state: () => ({
     data: {},
     loading: false,
+    loaded: false,
   }),
   actions: {
 
-    async fetch () {
+    // A convenience method to refresh the data
+    async refresh () {
+      await this.fetch(true)
+    },
+
+    async fetch (fresh = false) {
+
+      // If we have already loaded the data, don't fetch it again unless
+      // the fresh flag is set to true
+      if (this.loaded && !fresh) {
+        return
+      }
+
       this.loading = true
 
       // Wait until the store is ready before attempting to fetch data
@@ -30,15 +43,13 @@ export const useNodeStore = defineStore('node', {
           return
         }
 
-        <!-- Rebase on v4-dev amrcimg.slack.com/archives/D022ZMQETA8/p1739970136775339 -->
-
         // Hydrate the node details from the UUIDs provided from the response
         this.data = await Promise.all(payload.map(async (edgeAgentUUID) => {
           try {
-            let edgeAgentObjectResponse = await useServiceClientStore().client.ConfigDB.get_config(UUIDs.App.Info, edgeAgentUUID)
+            let edgeDeployment = await useServiceClientStore().client.ConfigDB.get_config(UUIDs.App.EdgeAgentDeployment, edgeAgentUUID)
             return {
+              ...edgeDeployment,
               uuid: edgeAgentUUID,
-              name: edgeAgentObjectResponse.name,
             }
           }
           catch (err) {
@@ -50,6 +61,7 @@ export const useNodeStore = defineStore('node', {
           }
         }))
 
+        this.loaded = true
         this.loading = false
       }).catch((err) => {
         console.error(`Can't fetch nodes`, err)

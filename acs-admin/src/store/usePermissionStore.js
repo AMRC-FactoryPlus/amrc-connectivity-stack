@@ -8,12 +8,13 @@ import { UUIDs } from '@amrc-factoryplus/service-client'
 import { storeReady } from '@store/useStoreReady.js'
 
 export const usePermissionStore = defineStore('permission', {
+
   state: () => ({
     data: [],
     loading: false,
   }),
-  actions: {
 
+  actions: {
     async fetch () {
       this.loading = true
 

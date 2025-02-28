@@ -18,13 +18,13 @@
               <i class="group-hover/collapsible-trigger:text-gray-500 fa-solid fa-chevron-right text-xs transition-transform duration-75 group-data-[state=open]/collapsible:rotate-90"></i>
             </div>
           </CollapsibleTrigger>
-          <i :class="`fa-solid fa-microchip`"></i>
+          <i :class="`fa-solid fa-cube`"></i>
           <span>{{node.name}}</span>
         </div>
       </Button>
       <CollapsibleContent>
         <SidebarMenuSub>
-<!--          <NodeList :cluster/>-->
+          <!--          <NodeList :cluster/>-->
         </SidebarMenuSub>
       </CollapsibleContent>
     </Collapsible>
@@ -62,14 +62,12 @@ export default {
   props: {
     cluster: {
       type: Object,
-    }
+    },
   },
 
   computed: {
     nodes () {
-      // > BEFORE CLOSE - Filter these to only show nodes that are part
-      // of the cluster and that are edge agents
-      return this.s.data
+      return Array.isArray(this.s.data) ? this.s.data.filter(e => e.cluster === this.cluster.uuid) : []
     },
 
     nodesLoading () {

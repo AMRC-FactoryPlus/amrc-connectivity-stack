@@ -10,7 +10,7 @@ export const Special = {
 };
 export const App = {
     AgentConfig:    "aac6f843-cfee-4683-b121-6943bfdf9173",
-    HermesScout:    "4d921c53-2270-482b-b52a-90a59d93637c"
+    ScoutConfig:    "4d921c53-2270-482b-b52a-90a59d93637c"
 };
 export const Schema = {
     EdgeAgent:      "15360868-2f35-4b52-990b-49329fb246fe",
@@ -21,7 +21,3 @@ export const Alert = {
     ConfigInvalid:      "99c54cb2-2bb9-45c8-88f9-c1a0f792cfd6",
     Connection:         "633a7da3-ea2a-4e3f-8e84-35691a07465f",
 };
-
-export const ScoutUUID = {
-    ScoutAddresses: "1d9cbc0b-d651-4f1f-a1ef-1280eff13a12",
-}

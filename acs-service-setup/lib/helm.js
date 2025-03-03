@@ -68,8 +68,8 @@ async function setup_perms (auth, group) {
         [group.monitor.uuid,    ReloadConfig,   UUIDs.Special.Null,         false],
     ];
 
-    for (const a of aces) {
-        auth.fplus.debug.log("helm", "Adding ACE %s", a.join(", "));
+    for (const ace of aces) {
+        auth.fplus.debug.log("helm", "Adding ACE %s", ace.join(", "));
         await auth.add_grant({
             principal:  ace[0],
             permission: ace[1],

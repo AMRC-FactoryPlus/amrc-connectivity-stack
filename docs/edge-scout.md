@@ -1,20 +1,90 @@
 # Edge Agent Scout Mode (Draft)
 
 ## Objective
-Currently, the Edge Agent receives a configuration containing manually set addresses for data sources, which are defined in the ACS config service and then sent to the Edge Agent to retrieve data.
+The Edge Agent receives a configuration containing manually set addresses for data sources, which are defined in the ACS Config Service and then sent to the Edge Agent to retrieve data.
 
-The challenge with this approach is that the addresses must be known in advance, typically provided by manufacturers per device. However, these addresses can be incorrect or vary between devices.
+The challenge with this approach is that addresses must be known in advance, typically provided by manufacturers for each device. However, these addresses may be incorrect or vary between devices.
 
-The goal of this new feature is to develop an MVP to explore whether this manual process can be reversed. Instead of predefining addresses, the Edge Agent would run in scout mode, actively requesting devices to provide their actual list of available addresses. This functionality would need to be implemented for each supported communication protocol, such as OPC UA, MQTT, and others.
-Once the Edge Agent receives the list of data sources from the devices, it should store this information in the ACS config service.
+The scouting feature reverses this manual process. Instead of predefining addresses, the Edge Agent, when run in scout mode, requests devices to provide their actual list of available addresses. This functionality is implemented for each communication protocol that supports address discovery, such as OPC UA, MQTT, and others.
 
+The discovered addresses are then stored in the ACS Config Service under the Scout application, mapped to each device connection.
 
-## Architecture
-This feature will extend the existing Edge Agent source code. The ACS Config Service configuration will be updated to specify whether the Edge Agent should run in Scout mode and may include additional connection-specific configurations if needed.
+![High Level Diagram](./assets/edge-agent-scout/acs-edge-scout-high-level-diagram.png?raw=true)
 
-If Scout mode is enabled, the Edge Agent will trigger the scouting method for each supported connection type (OPC UA, MQTT, etc.). Once the list of addresses is received, the Edge Agent will send it to the ACS Config Service to be stored within a new object.
+## Edge Agent Configuration (ACS Config Server)
+The ACS Config Service stores the **Edge Agent** configuration for all connections created in the ACS Manager and migrated into the ACS Config Service.
 
-![High Level Diagram](https://github.com/AMRC-FactoryPlus/amrc-connectivity-stack/blob/za/edge_agent_scout_mode/docs/assets/edge-agent-scout/acs-edge-scout-high-level-diagram.png?raw=true)
+Each configuration includes a list of device connections (`deviceConnections`) managed in the ACS Manager. These configurations contain connection details such as the connection type, connection UUID, necessary scouting entries, and other details that are not relevant to the scouting feature.
+
+When a **scout** entry is present, the **Edge Agent** requests addresses from devices associated with that connection.
+
+```
+deviceConnections:
+    - OPCUAConnDetails:
+        connType: OPC UA
+        name: OPC_UA_Connection
+        uuid: 05e11cd5-07d2-4a37-88c9-fb74b3f4638f
+        scout:
+            NodeIdType: NUMERIC
+            Identifier: 85
+            NamespaceIndex: 0
+    - MQTTConnDetails:
+        connType: MQTT
+        name: MQTT_Connection
+        uuid: 2107c3d2-3b92-455c-8401-ff717f4e4a10
+        scout:
+            topic: '#'
+            duration: 10000
+```
+
+The `scout` section of the configuration differs for each device connection, as it contains protocol-specific configuration values. 
+
+#### Scout configuration for OPC UA connection type
+<!-- Todo: explain each entry, add table with schema  -->
+Example:
+```
+scout:
+    NodeIdType: NUMERIC
+    Identifier: 85
+    NamespaceIndex: 0
+```
+
+#### Scout configuration for MQTT connection type
+<!-- Todo: explain each entry, add table with schema  -->
+Example:
+```
+scout:
+    topic: '#'
+    duration: 10000
+```
+
+## Scout Application Configuration (ACS Config Service)
+The Scout application consists of configurations identified by UUIDs, each corresponding to a device connection. Once scouting is performed, the discovered addresses are stored as key-value pairs, where the key is the address and the value is an object containing additional information. The format of this object varies depending on the type of data available for the protocol. These configurations are mapped to their respective device connections.
+
+4d921c53-2270-482b-b52a-90a59d93637c Scout application:
+- 05e11cd5-07d2-4a37-88c9-fb74b3f4638f OPC_UA_Connection
+```
+{
+  "ns=0;i=2254": {
+    "name": "ServerArray",
+    "nodeClassID": 2,
+    "nodeClassName": "Variable"
+  },
+  "ns=0;i=2255": {
+    "name": "NamespaceArray",
+    "nodeClassID": 2,
+    "nodeClassName": "Variable"
+  }
+}
+```
+- 2107c3d2-3b92-455c-8401-ff717f4e4a10 F2050_mqtt_connection
+```
+{
+  "AMRC/PressFacility/PowerMonitoring/shellypro3em-34987a685d24/online": {},
+  "AMRC/PressFacility/PowerMonitoring/shellypro3em-34987a687798/online": {},
+}
+```
+
 
 ## Implementation
 ### Translator Class (Changes for Scouting Feature)

@@ -4,6 +4,8 @@
  * Copyright 2022 AMRC
  */
 
+import * as timers from "timers/promises";
+
 import { 
     Address, MetricBuilder, SpB, Topic, UUIDs
 } from "@amrc-factoryplus/service-client";
@@ -65,12 +67,18 @@ export default class MQTTCli {
         if (this.silent)
             this.log("Running in monitor-only mode.");
 
-        const mqtt = await this.fplus.mqtt_client({
-            verbose: true,
-            will: this.will(),
-        });
-        this.mqtt = mqtt;
+        for (;;) {
+            this.mqtt = await this.fplus.mqtt_client({
+                verbose: true,
+                will: this.will(),
+            });
+            if (this.mqtt) break;
 
+            this.log("Cannot connect to MQTT, retrying in 30s");
+            await timers.setTimeout(30000);
+        }
+
+        const { mqtt } = this;
         mqtt.on("gssconnect", this.on_connect.bind(this));
         mqtt.on("error", this.on_error.bind(this));
         mqtt.on("message", this.on_message.bind(this));

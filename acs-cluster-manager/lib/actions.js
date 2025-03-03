@@ -155,7 +155,6 @@ export class Update extends Action {
                     target:     cluster,
                     plural:     false,
                 });
-                this.update({ [role]: { grant } });
             }
 
             await cdb.class_add_member(group[role].uuid, uuid);
@@ -239,12 +238,14 @@ export class Delete extends Action {
 
         const rm_acc = async key => {
             const st = status[key];
-            if (!st) return;
+            if (!st?.uuid) return;
+            this.update({ [key]: { done: false } });
 
             this.log("Removing op1%s/%s (%s)", key, name, st.uuid);
-            if (st.grant) {
-                await auth.delete_grant(st.grant);
-                this.update({ [key]: { grant: null } });
+            const grants = await auth.find_grants({ principal: st.uuid });
+            for (const g of grants) {
+                await auth.delete_grant(g)
+                    .catch(svc_catch(403, 404));
             }
             await auth.delete_identity(st.uuid, "kerberos")
                 .catch(svc_catch(404));

@@ -84,22 +84,74 @@ public class FPKrbAuthorizer implements SubscriptionAuthorizer, PublishAuthorize
         }
     }
 
-    public static Single<List<TopicPermission>> getAllowedPublishPermissions(Single<List<TopicPermission>> permissions, TopicPermission.MqttActivity mqttActivity) {
+    public static Single<List<TopicPermission>> getAllowedPublishPermissions(
+            Single<List<TopicPermission>> permissions,
+            TopicPermission.MqttActivity mqttActivity
+    ) {
         return permissions.map(permissionList -> permissionList.stream()
-                .filter(permission -> permission.getActivity() == mqttActivity) // Keep only PUBLISH permissions
+                .filter(permission -> permission.getActivity() == mqttActivity)
                 .filter(permission -> permission.getType() == TopicPermission.PermissionType.ALLOW) // Ensure ALLOWED permissions
                 .collect(Collectors.toList()));
     }
 
-    public static Single<Boolean> isPermissionAllowed(Single<List<TopicPermission>> permissions, String targetPermission, TopicPermission.MqttActivity mqttActivity) {
+    public static Single<Boolean> isPermissionAllowed(
+            Single<List<TopicPermission>> permissions,
+            String targetPermission,
+            TopicPermission.MqttActivity mqttActivity
+    ) {
         return getAllowedPublishPermissions(permissions, mqttActivity)
                 .map(filteredPermissions -> filteredPermissions.stream()
-                        .anyMatch(permission -> matchesPermission(permission, targetPermission)) // Compare with target permission
+                        .anyMatch(permission -> matchesPermission(permission.getTopicFilter(), targetPermission))
                 );
     }
 
-    private static boolean matchesPermission(TopicPermission existing, String target) {
-        return existing.getTopicFilter().equals(target); // Modify this comparison as needed
+    private static boolean matchesPermission(String existing, String target) {
+        // Split topics into parts
+        String[] subParts = existing.split("/");
+        String[] pubParts = target.split("/");
+
+        // Handle # wildcard
+        for (int i = 0; i < subParts.length - 1; i++) {
+            if (subParts[i].equals("#")) {
+                // Invalid use of # (not at the end)
+                return false;
+            }
+        }
+
+        if (subParts[subParts.length - 1].equals("#")) {
+            // Check if all parts before # match
+            int prefixLength = subParts.length - 1;
+
+            // If published topic has fewer levels than the prefix, it can't match
+            if (pubParts.length < prefixLength) {
+                return false;
+            }
+
+            // Check if prefix matches
+            for (int i = 0; i < prefixLength; i++) {
+                if (!subParts[i].equals("+") && !subParts[i].equals(pubParts[i])) {
+                    return false;
+                }
+            }
+
+            // If we get here, the prefix matches and # takes care of the rest
+            return true;
+        }
+
+        // If lengths don't match (and there's no # wildcard), they can't match
+        if (subParts.length != pubParts.length) {
+            return false;
+        }
+
+        // Check each level
+        for (int i = 0; i < subParts.length; i++) {
+            // + matches any single level
+            if (!subParts[i].equals("+") && !subParts[i].equals(pubParts[i])) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
 
@@ -136,6 +188,5 @@ public class FPKrbAuthorizer implements SubscriptionAuthorizer, PublishAuthorize
                 .map(m_ace -> m_ace.toTopicPermission())
                 .collect(Collectors.toList());
     }
-
 }
 

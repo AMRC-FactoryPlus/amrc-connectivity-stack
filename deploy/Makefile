@@ -20,3 +20,7 @@ package:
 push:
 	helm push ${helm.package} oci://${registry}
 
+lint: helm.lint
+
+helm.lint:
+	helm lint .

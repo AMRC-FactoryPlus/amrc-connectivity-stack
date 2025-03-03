@@ -28,7 +28,7 @@ function sym_diff(one, two) {
  * the database directly, and sometimes we need to query using a query
  * function for a transaction. The model inherits from this class. */
 export default class Queries {
-    static DBVersion = 11;
+    static DBVersion = 12;
 
     constructor(query) {
         this.query = query;
@@ -330,7 +330,7 @@ export default class Queries {
         const ins = await this.query(`
             insert into service_provider as prv (service, device, url)
             values ($1, $2, $3)
-            on conflict (service, device) do update 
+            on conflict (service) do update 
                 set url = $3
             where prv.device is distinct from $2
                 or prv.url is distinct from $3

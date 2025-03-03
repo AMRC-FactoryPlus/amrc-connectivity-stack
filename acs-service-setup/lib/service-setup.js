@@ -6,7 +6,7 @@
 import { ServiceClient } from "@amrc-factoryplus/service-client";
 
 import { setup_clusters }       from "./clusters.js";
-import { load_dumps }           from "./dumps.js";
+import { DumpLoader }           from "./dumps.js";
 import { fixups }               from "./fixups.js";
 import { setup_helm }           from "./helm.js";
 import { setup_manager }        from "./manager.js";
@@ -19,6 +19,12 @@ export class ServiceSetup {
 
         this.fplus = new ServiceClient({ env: opts.env });
         this.log = this.fplus.debug.bound("setup");
+        this.dumps = new DumpLoader({
+            fplus:      this.fplus,
+            acs_config: this.acs_config,
+            dumps:      "dumps",
+            log:        this.fplus.debug.bound("dump"),
+        });
 
         this.log("Service setup config: %o", this.config);
         this.log("ACS config: %o", this.acs_config);
@@ -33,11 +39,14 @@ export class ServiceSetup {
     }
 
     async run () {
+        this.log("Loading directory dump");
+        await this.dumps.load_dumps(true);
+
         this.log("Running fixups");
         await fixups(this);
 
         this.log("Loading service dump files");
-        await load_dumps(this);
+        await this.dumps.load_dumps(false);
 
         this.log("Creating Helm chart templates");
         const helm = await setup_helm(this);

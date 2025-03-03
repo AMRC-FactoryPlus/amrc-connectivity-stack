@@ -190,7 +190,6 @@ export default class MQTTCli {
             {name: "Schema_UUID", type: "UUID", value: UUIDs.Schema.Service},
             {name: "Instance_UUID", type: "UUID", value: this.device_uuid},
             {name: "Service_UUID", type: "UUID", value: UUIDs.Service.Directory},
-            {name: "Service_URL", type: "String", value: this.url},
 
             {name: "Last_Changed/Device_UUID", type: "UUID", value: ""},
             {name: "Last_Changed/Device_Address", type: "String", value: ""},

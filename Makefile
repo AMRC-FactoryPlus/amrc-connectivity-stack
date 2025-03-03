@@ -69,4 +69,7 @@ all: git.check-committed
 setup: git.check-committed
 	+${recurse} setup ${subdirs}
 
+lint: git.check-committed
+	+${recurse} lint ${subdirs}
+
 include ${mk}/acs.git.mk

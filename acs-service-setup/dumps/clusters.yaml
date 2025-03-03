@@ -353,14 +353,6 @@ grants:
     # XXX This is nearly root-equivalent.
     !u UUIDs.Permission.Auth.ManageKerberos: null
 
-    # XXX This is a very broad grant; it is very nearly root-equivalent.
-    # But currently any grant of ManageGroup will be equivalent to this,
-    # as groups are expanded recursively and we can just add a victim
-    # group to one of our target groups. We have an Clusters.Requirement.Groups,
-    # but it is not set up properly by service-setup, and using it won't
-    # improve security until the Auth groups are fixed.
-    !u UUIDs.Permission.Auth.ManageGroup: null
-
     !u UUIDs.Permission.Auth.ManageACL:
       !u Git.Perm.Pull: false
 
@@ -391,6 +383,7 @@ grants:
 
     !u UUIDs.Permission.ConfigDB.ManageObjects:
       !u Clusters.Class.Account: false
+      !u Clusters.Class.ClusterGroups: true
 
     !u Git.Perm.Pull:
       !u Clusters.Requirement.EdgeRepos: true

@@ -6,15 +6,17 @@
 import { EventEmitter } from "events";
 import fs from "fs";
 import timers from "timers/promises";
-import util from "util";
 
 import type { Identity } from "@amrc-factoryplus/utilities";
 import { ServiceClient } from "@amrc-factoryplus/utilities";
+// import { ServiceClient as NewServiceClient } from "@amrc-factoryplus/service-client";
+
+import { ConfigDB } from "@amrc-factoryplus/service-client/lib/interfaces.js";
 
 /* XXX These need to be incorporated into the main codebase. The config
  * rehashing just needs to go: the code which uses the config needs
  * adapting to accept the correct format. */
-import { validateConfig } from '../utils/CentralConfig.js';
+
 import { reHashConf } from "../utils/FormatConfig.js";
 
 import { Device, deviceOptions } from "./device.js";
@@ -35,6 +37,8 @@ import { MTConnectConnection } from "./devices/MTConnect.js";
 import { EtherNetIPConnection } from "./devices/EtherNetIP.js";
 import { DriverConnection } from "./devices/driver.js";
 import { Scout } from "./scout.js";
+import { UniqueDictionary } from "./helpers/uniquedictionary.js";
+
 
 
 /**
@@ -59,6 +63,7 @@ export class Translator extends EventEmitter {
      */
     sparkplugNode!: SparkplugNode
     fplus: ServiceClient
+    // newFplus: NewServiceClient
     broker: DriverBroker
     pollInt: number
 
@@ -73,7 +78,11 @@ export class Translator extends EventEmitter {
         [index: string]: any
     }
 
-    constructor(fplus: ServiceClient, pollInt: number, broker: DriverBroker) {
+    newConfigDb: ConfigDB;
+
+
+
+    constructor(fplus: ServiceClient, pollInt: number, broker: DriverBroker, newConfigDB: ConfigDB) {
         super();
 
         this.fplus = fplus;
@@ -82,6 +91,7 @@ export class Translator extends EventEmitter {
         this.connections = {};
         this.devices = {};
         this.scouts = {};
+        this.newConfigDb = newConfigDB;
     }
 
     /**
@@ -186,7 +196,7 @@ export class Translator extends EventEmitter {
         })
     }
 
-    setupConnection(connection: any): void {
+    async setupConnection(connection: any): Promise<void> {
         const cType = connection.connType;
         const deviceInfo = this.chooseDeviceInfo(cType);
 
@@ -206,25 +216,22 @@ export class Translator extends EventEmitter {
             this.broker);
 
         if (connection.scout) {
+            log(`Edge-Agent to be run in Scout Mode for ${connection.name}`);
             const newScout = this.scouts[cType] = new Scout(newConn, connection);
-            newScout.on('scoutComplete', (addresses: string[]) => {
-                // console.log(`Discovered addresses for connection ${connection.name}:`, addresses);
-                const directory = './scout';
-                if (!fs.existsSync(directory)) {
-                    fs.mkdirSync(directory, { recursive: true });
-                }
-                const fileContent = addresses.join('\n');
-                const filePath = `${directory}/${connection.name}.txt`;
-                console.log(filePath);
+            newScout.on('scoutComplete', async (addresses: UniqueDictionary<string, object>) => {
+
                 try {
-                    fs.writeFileSync(filePath, fileContent, 'utf8');
-                    console.log(`File saved successfully to ${filePath}`);
-                } catch (error) {
-                    console.error('Error writing to file:', error);
+                    await this.save_to_file(addresses.toJSON(), './scout', connection.name, 'json');
+                    await this.put_to_config(UUIDs.App.ScoutConfig, connection.uuid, addresses);
                 }
+                catch (err) {
+                    console.error('Error when trying to put to config db: ', (err as Error).message);
+                }
+
             });
             newScout.performScouting();
-        } else {
+        }
+        else {
             connection.devices?.forEach((devConf: deviceOptions) => {
                 this.devices[devConf.deviceId] = new Device(
                     this.sparkplugNode, newConn, devConf);
@@ -252,10 +259,9 @@ export class Translator extends EventEmitter {
                     this.devices[devConf.deviceId]?._deviceDisconnected();
                 })
             });
+            // Open the connection
+            newConn.open();
         }
-
-        // Open the connection
-        newConn.open();
     }
 
     /* There is a better way to do this. At minimum this should be in a
@@ -404,9 +410,27 @@ Trying again in ${interval} seconds...`);
         }
     }
 
-    // async put_to_config(addresses){
-    //     const configRes = this.fplus.ConfigDB.put_config(UUIDs.App.HermesScout, UUIDs.ScoutUUID.ScoutAddresses, addresses);
-    //     console.log(`After Config put ${configRes}`);
-    // }
+    async put_to_config(app_uuid: string, obj_uuid: string, json_content: UniqueDictionary<string, object>): Promise<void> {
+        try {
+            await this.newConfigDb.put_config(app_uuid, obj_uuid, json_content.toJSON());
+            log(`Putting to config db complete`);
+        } catch (err) {
+            console.error('Error when trying to put to config ', err);
+        }
+    }
+
+    async save_to_file(content, directory: string, filename: string, extension: string) {
+        if (!fs.existsSync(directory)) {
+            fs.mkdirSync(directory, { recursive: true });
+        }
+        const filePath = `${directory}/${filename}.${extension}`;
+
+        try {
+            fs.writeFileSync(filePath, content);
+            log(`File saved successfully to ${filePath}`);
+        } catch (error) {
+            console.error('Error writing to file:', error);
+        }
+    }
 
 }

@@ -29,6 +29,7 @@ import {
     NodeClass
 } from "node-opcua";
 import { opcuaScoutDetails } from "../scout.js";
+import { UniqueDictionary } from "../helpers/uniquedictionary.js";
 
 // Example here: https://github.com/node-opcua/node-opcua/blob/v2.1.3/documentation/sample_client.js
 
@@ -114,11 +115,11 @@ export class OPCUAConnection extends DeviceConnection {
         } catch (e) {
             console.log(e);
         }
-
     }
 
-    public async scoutAddresses(scoutDetails: opcuaScoutDetails): Promise<string[]> {
+    public async scoutAddresses(scoutDetails: opcuaScoutDetails): Promise<UniqueDictionary<string, object>> {
         const clientForScout = OPCUAClient.create(this.#options);
+        const discoveredAddresses: UniqueDictionary<string, object> = new UniqueDictionary<string, object>();
 
         try {
             await clientForScout.connect(this.#endpointUrl);
@@ -127,12 +128,11 @@ export class OPCUAConnection extends DeviceConnection {
             const sessionForScout = await clientForScout.createSession(this.#credentials);
             log(`Scout session created for OPC UA node discovery.`);;
 
-            const RootFolderNodeID = new NodeId(NodeIdType.NUMERIC, 85, 0);
+            const NodeIDToStartSearchFrom = new NodeId(scoutDetails.NodeIdType, scoutDetails.Identifier, scoutDetails.NamespaceIndex);
+            
+            const discoveredReferences: ReferenceDescription[] = await this.browseOPCUANodes(sessionForScout, NodeIDToStartSearchFrom);
 
-            const discoveredReferences: ReferenceDescription[] = await this.browseOPCUANodes(sessionForScout, RootFolderNodeID);
-
-            const discoveredAddresses: string[] = new Array;
-            discoveredReferences.forEach(reference => discoveredAddresses.push(this.getReferenceNodeString(reference)));
+            discoveredReferences.forEach(reference => discoveredAddresses.add(...this.getAddressObject(reference)));
 
             await sessionForScout.close();
             await clientForScout.disconnect();
@@ -141,7 +141,7 @@ export class OPCUAConnection extends DeviceConnection {
         } catch (err) {
             log(`Error during OPC UA Scouting ${(err as Error).message}`);
             await clientForScout.disconnect();
-            return [];
+            return discoveredAddresses;
         }
     }
 
@@ -179,9 +179,15 @@ export class OPCUAConnection extends DeviceConnection {
         }
     }
 
-
-    getReferenceNodeString(reference: ReferenceDescription): string {
-        return `NodeId: ${reference.nodeId.toString()} Name: ${reference.browseName.toString()} Class: ${reference.nodeClass} - ${NodeClass[reference.nodeClass]}`
+    getAddressObject(reference: ReferenceDescription): [string, object]{
+        return [
+            reference.nodeId.toString(),
+            {
+                name: reference.browseName.toString(),
+                nodeClassID: reference.nodeClass,
+                nodeClassName: NodeClass[reference.nodeClass]
+            }
+        ]
     }
 
     readMetrics(metrics: Metrics, payloadFormat?: string) {

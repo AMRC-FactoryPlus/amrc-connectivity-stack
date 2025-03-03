@@ -110,7 +110,7 @@ export abstract class DeviceConnection extends EventEmitter {
     /**
      * Request devices to return a list of available addresses (tags, topics, etc.)
      */
-    public async scoutAddresses(scoutDetails: scoutDetails) : Promise<string[]>{
+    public async scoutAddresses(scoutDetails: scoutDetails) : Promise<object>{
 
         // should be implmented by subclasses for each type of connection depending on the specific protocol (OPC UA, MQTT, etc.)
         throw new Error('Scouting not supported for this device connection type.');

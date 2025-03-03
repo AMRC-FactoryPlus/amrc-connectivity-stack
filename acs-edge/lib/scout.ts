@@ -1,23 +1,20 @@
-
-// this class will be updated in the future to handle a more detailed configuration for scouting mode. E.g., if the device connection protocol is MQTT then for how long the Scouting mode should listen for topics, what topic to listen to, etc.
-
 import { EventEmitter } from "events";
 import { DeviceConnection } from "./device.js";
 import { log } from "./helpers/log.js";
+import { NodeIdType } from "node-opcua";
 
-export interface scoutDetails {
-
-}
+export interface scoutDetails { }
 
 export interface mqttScoutDetails extends scoutDetails {
-    duration: number
-    topic: string
+    duration: number;
+    topic: string;
 }
 
 export class opcuaScoutDetails implements scoutDetails {
+    NodeIdType: NodeIdType = NodeIdType.NUMERIC;
+    Identifier: number | string = 0;
+    NamespaceIndex: number = 0;
 }
-
-
 
 export class Scout extends EventEmitter {
     private deviceConnection: DeviceConnection;
@@ -30,33 +27,70 @@ export class Scout extends EventEmitter {
     }
 
     private extractScoutConfig(config: any): scoutDetails {
-        if (this.deviceConnection._type === 'MQTT') {
-            const mqttScoutConfig: mqttScoutDetails = {
+        if (this.deviceConnection._type === "MQTT") {
+            return {
                 duration: config.scout?.duration ?? 10000,
-                topic: config.scout?.topic ?? '#',
+                topic: config.scout?.topic ?? "#",
+            } as mqttScoutDetails;
+        } else if (this.deviceConnection._type === "OPC UA") {
+            const nodeIdTypeConf = config.scout?.NodeIdType?.toUpperCase() ?? "NUMERIC";
+            let opcuaScoutConfig: opcuaScoutDetails = {
+                NodeIdType: NodeIdType.NUMERIC,
+                Identifier: 0,
+                NamespaceIndex: 0,
             };
-            return mqttScoutConfig;
-        }
-        else if (this.deviceConnection._type === 'OPC UA') {
-            const opcuaScoutConfig: opcuaScoutDetails = {
 
+            switch (nodeIdTypeConf) {
+                case "NUMERIC":
+                    opcuaScoutConfig = {
+                        NodeIdType: NodeIdType.NUMERIC,
+                        Identifier: Number(config.scout?.Identifier) || 0,
+                        NamespaceIndex: Number(config.scout?.NamespaceIndex) || 0,
+                    };
+                    break;
+                case "STRING":
+                    opcuaScoutConfig = {
+                        NodeIdType: NodeIdType.STRING,
+                        Identifier: String(config.scout?.Identifier) || "RootFolder",
+                        NamespaceIndex: Number(config.scout?.NamespaceIndex) || 0,
+                    };
+                    break;
+                case "GUID":
+                    opcuaScoutConfig = {
+                        NodeIdType: NodeIdType.GUID,
+                        Identifier: String(config.scout?.Identifier) || "",
+                        NamespaceIndex: Number(config.scout?.NamespaceIndex) || 0,
+                    };
+                    break;
+                case "BYTESTRING":
+                    opcuaScoutConfig = {
+                        NodeIdType: NodeIdType.BYTESTRING,
+                        Identifier: String(config.scout?.Identifier) || "",
+                        NamespaceIndex: Number(config.scout?.NamespaceIndex) || 0,
+                    };
+                    break;
+                default:
+                    opcuaScoutConfig = {
+                        NodeIdType: NodeIdType.NUMERIC,
+                        Identifier: 85,
+                        NamespaceIndex: 0,
+                    };
+                    break;
             }
             return opcuaScoutConfig;
-        }
-        else {
-            // todo: add other types of scoutDetails: opcua, etc.,
-            throw new Error('Scouting not supported for this device connection type.');
+        } else {
+            throw new Error("Scouting not supported for this device connection type.");
         }
     }
 
     public async performScouting() {
-        if (typeof this.deviceConnection.scoutAddresses !== 'function') {
-            throw new Error('The provided DeviceConnection does not support scouting.');
+        if (typeof this.deviceConnection.scoutAddresses !== "function") {
+            throw new Error("The provided DeviceConnection does not support scouting.");
         }
-        log(`Starting scouting for ${this.deviceConnection._type}`)
+        log(`Starting scouting for ${this.deviceConnection._type}`);
         const addresses = await this.deviceConnection.scoutAddresses(this.scoutDetails);
         console.log(`Stopped scouting for ${this.deviceConnection._type}`);
 
-        this.emit('scoutComplete', addresses);
+        this.emit("scoutComplete", addresses);
     }
 }

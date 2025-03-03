@@ -8,6 +8,7 @@ import { Metrics, writeValuesToPayload } from "../helpers/typeHandler.js";
 import * as mqtt from "mqtt";
 import { v4 as uuidv4 } from 'uuid';
 import { mqttScoutDetails } from "../scout.js";
+import { UniqueDictionary } from "../helpers/uniquedictionary.js";
 
 
 export default interface mqttConnDetails {
@@ -92,14 +93,14 @@ export class MQTTConnection extends DeviceConnection {
     }
 
 
-    public async scoutAddresses(scoutDetails: mqttScoutDetails): Promise<string[]> {
+    public async scoutAddresses(scoutDetails: mqttScoutDetails): Promise<UniqueDictionary<string, object>> {
         const { topic, duration } = scoutDetails;
 
-        const discoveredTopics: Set<string> = new Set();
+        const discoveredAddresses: UniqueDictionary<string, object> = new UniqueDictionary<string, object>();
         const clientForScout = mqtt.connect(this.#connStr, this.#options);
         let scoutTimeout: NodeJS.Timeout;
 
-        return new Promise<string[]>((resolve, reject) => {
+        return new Promise<UniqueDictionary<string, object>>((resolve, reject) => {
             clientForScout.on('connect', () => {
                 log(`Scout client for MQTTConnection connected to broker ${this.#connStr}.`);
 
@@ -111,12 +112,12 @@ export class MQTTConnection extends DeviceConnection {
                         return;
                     }
                     clientForScout.on('message', (topic, message) => {
-                        discoveredTopics.add(topic);
+                        discoveredAddresses.add(topic, {});
                     });
                     scoutTimeout = setTimeout(() => {
                         log(`Scout client for MQTTConnection completed`)
                         clientForScout.end();
-                        resolve(Array.from(discoveredTopics));
+                        resolve(discoveredAddresses);
                     }, duration);
                 });
             });

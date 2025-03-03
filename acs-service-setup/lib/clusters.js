@@ -95,25 +95,31 @@ async function setup_perms (auth, group) {
     const ReadKerberos = "e8c9c0f7-0d54-4db2-b8d6-cd80c45f6a5c";
 
     const aces = [
-        [account_req,           Git.Perm.Pull,      group.shared.uuid],
-        [account_req,           Git.Perm.Pull,      group.cluster.uuid],
-        [account_req,           Git.Perm.Push,      group.cluster.uuid],
-        [group.flux.uuid,       Git.Perm.Pull,      group.shared.uuid],
-        [group.krbkeys.uuid,    ManageObjects,      Auth.Class.EdgeService],
-        [group.krbkeys.uuid,    ReadConfig,         UUIDs.App.Info],
-        [group.krbkeys.uuid,    WriteConfig,        UUIDs.App.Info],
-        [group.krbkeys.uuid,    ReadConfig,         UUIDs.App.SparkplugAddress],
-        [group.krbkeys.uuid,    WriteConfig,        UUIDs.App.SparkplugAddress],
+        [account_req,           Git.Perm.Pull,      group.shared.uuid,          true],
+        [account_req,           Git.Perm.Pull,      group.cluster.uuid,         true],
+        [account_req,           Git.Perm.Push,      group.cluster.uuid,         true],
+        [group.flux.uuid,       Git.Perm.Pull,      group.shared.uuid,          true],
+        [group.krbkeys.uuid,    ManageObjects,      Auth.Class.EdgeService,     false],
+        [group.krbkeys.uuid,    ReadConfig,         UUIDs.App.Info,             false],
+        [group.krbkeys.uuid,    WriteConfig,        UUIDs.App.Info,             false],
+        [group.krbkeys.uuid,    ReadConfig,         UUIDs.App.SparkplugAddress, false],
+        [group.krbkeys.uuid,    WriteConfig,        UUIDs.App.SparkplugAddress, false],
         /* XXX This is root-equivalent */
-        [group.krbkeys.uuid,    ManageKerberos,     UUIDs.Special.Null],
-        [group.krbkeys.uuid,    ReadKerberos,       UUIDs.Special.Null],
-        /* XXX This is root-equivalent due to lack of group member quoting */
-        [group.krbkeys.uuid,    ManageGroup,        Edge.Group.EdgeGroup],
-        [group.krbkeys.uuid,    ManageACL,          Edge.Group.EdgePermission],
+        [group.krbkeys.uuid,    ManageKerberos,     UUIDs.Special.Null,         false],
+        [group.krbkeys.uuid,    ReadKerberos,       UUIDs.Special.Null,         false],
+        [group.krbkeys.uuid,    ManageGroup,        Edge.Group.EdgeGroup,       true],
+        /* XXX Not much use at present due to pure ranks. Composite
+         * perms are a rank higher than ordinary perms. Unused. */
+        [group.krbkeys.uuid,    ManageACL,          Edge.Group.EdgePermission,  true],
     ];
     for (const ace of aces) {
         auth.fplus.debug.log("clusters", "Adding %o", ace);
-        await auth.add_ace(...ace);
+        await auth.add_grant({
+            principal:  ace[0],
+            permission: ace[1],
+            target:     ace[2],
+            plural:     ace[3],
+        });
     }
 }
 

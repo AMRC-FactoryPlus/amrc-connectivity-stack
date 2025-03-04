@@ -32,12 +32,12 @@ import uk.co.amrc.factoryplus.FPServiceClient;
 
 import static uk.co.amrc.factoryplus.utils.Auth.getACLforPrincipal;
 
-public class FPKrbAuth implements EnhancedAuthenticator {
+public class FPKrbAuthenticator implements EnhancedAuthenticator {
 
-    private static final @NotNull Logger log = LoggerFactory.getLogger(FPKrbAuth.class);
+    private static final @NotNull Logger log = LoggerFactory.getLogger(FPKrbAuthenticator.class);
     private FPServiceClient fplus;
 
-    private FPKrbAuthProvider provider;
+    private FPKrbAuthenticatorProvider provider;
 
     static class AuthResult {
         public byte[] gssToken;
@@ -67,7 +67,7 @@ public class FPKrbAuth implements EnhancedAuthenticator {
         }
     }
 
-    public FPKrbAuth (FPKrbAuthProvider prov)
+    public FPKrbAuthenticator(FPKrbAuthenticatorProvider prov)
     {
         provider = prov;
         fplus = prov.fplus;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) University of Sheffield AMRC 2024.
+ * Copyright (c) University of Sheffield AMRC 2025.
  */
 
 import pkg from 'node-open-protocol-desoutter'
@@ -84,6 +84,13 @@ export class OpenProtocolHandler {
 
     const promises = specs.map(addressFromManager => new Promise((resolve, reject) => {
 
+      // If the address is not in the valid addresses, skip it
+      if (!OpenProtocolHandler.validAddresses.has(addressFromManager)) {
+        this.log('Invalid address', addressFromManager)
+        resolve()
+        return
+      }
+
       this.client.subscribe(addressFromManager, (err, data) => {
         if (err) {
           this.log('Error subscribing to Open Protocol', err)
@@ -107,20 +114,26 @@ export class OpenProtocolHandler {
 
   }
 
-  async cmd (address, data) {
+  async cmd (commandName, data) {
 
-    // address: selectPset
-    // BufferX.to(data): { pSet: 14 }
-
-    // BEFORE CLOSE -
-    // - Make library subscribe to cmds
-    // - Implement BufferX.from...
-
-    this.log('CMD', address, data)
-    switch (address) {
-      case 'selectPset':
-        const parameterSetID = BufferX.fromUInt8(data);
-        this.client.command('selectPset', { payload: { parameterSetID } })
+    switch (commandName) {
+    case 'selectPset':
+      const parameterSetID = BufferX.toUInt8(data)
+      this.client.command('selectPset', { payload: { parameterSetID } })
+      break
+    case 'enableTool':
+      const value = BufferX.toUInt8(data)
+      if (value === 1) {
+        this.client.command('enableTool')
+      }
+      else {
+        this.client.command('disableTool')
+      }
+      break
+    default:
+      // Throw error
+      this.log(`The ${commandName} command is not supported in this version of the driver`)
+      break
     }
   }
 

@@ -250,8 +250,11 @@ export class Delete extends Action {
             await auth.delete_identity(st.uuid, "kerberos")
                 .catch(svc_catch(404));
             await cdb.class_remove_member(group[key].uuid, st.uuid);
+            /* I haven't worked out how to grant permission for this
+             * yet. Currently this is a PATCH to Registration, and we
+             * don't have support for fine-grained ACLs. */
             await cdb.mark_object_deleted(st.uuid)
-                .catch(svc_catch(404));
+                .catch(svc_catch(403, 404));
             this.update({ [key]: null });
         };
 

@@ -113,7 +113,7 @@ export async function setup_helm (ss) {
                 krb5: { realm: acs.realm },
                 uuid: {
                     class: {
-                        edgeAccount:    ACS.Class.EdgeAccount,
+                        edgeAccount:    Auth.Class.EdgeService,
                     },
                     group: {
                         edgeSync:       group.sync.uuid,

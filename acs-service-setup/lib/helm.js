@@ -56,21 +56,26 @@ async function setup_perms (auth, group) {
      * UUID for group access. */
 
     const aces = [
-        [group.agent.uuid,      ReadConfig,     Edge.App.AgentConfig],
-        [group.sync.uuid,       ReadConfig,     Clusters.App.HelmRelease],
-        [group.sync.uuid,       ReadConfig,     Clusters.App.HelmTemplate],
-        [group.sync.uuid,       ReadConfig,     Edge.App.Deployment],
-        [group.sync.uuid,       ReadConfig,     Edge.App.ClusterStatus],
-        [group.sync.uuid,       WriteConfig,    Edge.App.ClusterStatus],
-        [group.sync.uuid,       EdgeNodeConsumer, ACS.Device.ConfigDB],
-        [group.monitor.uuid,    ReadConfig,     Edge.App.AgentConfig],
-        [group.monitor.uuid,    EdgeNodeConsumer, ACS.Device.ConfigDB],
-        [group.monitor.uuid,    ReloadConfig,   UUIDs.Special.Null],
+        [group.agent.uuid,      ReadConfig,     Edge.App.AgentConfig,       false],
+        [group.sync.uuid,       ReadConfig,     Clusters.App.HelmRelease,   false],
+        [group.sync.uuid,       ReadConfig,     Clusters.App.HelmTemplate,  false],
+        [group.sync.uuid,       ReadConfig,     Edge.App.Deployment,        false],
+        [group.sync.uuid,       ReadConfig,     Edge.App.ClusterStatus,     false],
+        [group.sync.uuid,       WriteConfig,    Edge.App.ClusterStatus,     false],
+        [group.sync.uuid,       EdgeNodeConsumer, ACS.Device.ConfigDB,      false],
+        [group.monitor.uuid,    ReadConfig,     Edge.App.AgentConfig,       false],
+        [group.monitor.uuid,    EdgeNodeConsumer, ACS.Device.ConfigDB,      false],
+        [group.monitor.uuid,    ReloadConfig,   UUIDs.Special.Null,         false],
     ];
 
-    for (const a of aces) {
-        auth.fplus.debug.log("helm", "Adding ACE %s", a.join(", "));
-        await auth.add_ace(...a);
+    for (const ace of aces) {
+        auth.fplus.debug.log("helm", "Adding ACE %s", ace.join(", "));
+        await auth.add_grant({
+            principal:  ace[0],
+            permission: ace[1],
+            target:     ace[2],
+            plural:     ace[3],
+        });
     }
 }
 

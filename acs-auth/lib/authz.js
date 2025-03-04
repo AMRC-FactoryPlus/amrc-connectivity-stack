@@ -113,7 +113,7 @@ export default class AuthZ {
      * before but this is meant to be an admin-only interface now. */
     async group_all(req, res) {
         const tok = await this.data.check_targ(req.auth, Perm.ManageGroup, false);
-        if (tok?.(Special.Wildcard))
+        if (!tok?.(Special.Wildcard))
             return res.status(403).end();
 
         const groups = await this.model.group_all();
@@ -122,7 +122,7 @@ export default class AuthZ {
 
     async group_get (req, res) {
         const tok = await this.data.check_targ(req.auth, Perm.ManageGroup, false);
-        if (tok?.(Special.Wildcard))
+        if (!tok?.(Special.Wildcard))
             return res.status(403).end();
 
         const { group } = req.params;
@@ -135,7 +135,7 @@ export default class AuthZ {
 
     async group_delete(req, res) {
         const tok = await this.data.check_targ(req.auth, Perm.ManageGroup, false);
-        if (tok?.(Special.Wildcard))
+        if (!tok?.(Special.Wildcard))
             return res.status(403).end();
 
         const {group, member} = req.params;

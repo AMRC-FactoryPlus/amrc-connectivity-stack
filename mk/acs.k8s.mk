@@ -33,7 +33,7 @@ restart:
 	sleep 2
 
 logs:
-	${_kubectl} logs -f ${_cont} ${_dep}
+	${_kubectl} logs --since=5m -f ${_cont} ${_dep}
 
 alllogs:
 	${_kubectl} logs -f --all-containers --ignore-errors ${_dep}

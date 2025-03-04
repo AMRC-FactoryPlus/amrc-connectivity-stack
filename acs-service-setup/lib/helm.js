@@ -84,7 +84,7 @@ export async function setup_helm (ss) {
         ss,
     }).init();
 
-    const { EdgeRole } = Auth.Class;
+    const { EdgeRole, EdgeService, EdgeAgent } = Auth.Class;
     const { SparkplugNode, SparkplugReader } = ACS.Group;
     const { EdgeGroup } = Edge.Group;
     await conf.setup_groups(
@@ -93,6 +93,8 @@ export async function setup_helm (ss) {
         ["monitor", EdgeRole,  "Edge monitor"],
     );
     await conf.setup_subgroups(
+        [EdgeAgent,         "agent"],
+        [EdgeService,       "monitor", "sync"],
         [SparkplugNode,     "agent", "monitor"],
         [SparkplugReader,   "monitor"],
     );

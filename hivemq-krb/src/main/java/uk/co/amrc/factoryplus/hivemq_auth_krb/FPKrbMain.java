@@ -26,7 +26,7 @@ public class FPKrbMain implements ExtensionMain {
 
         var fplus = startServiceClient();
 
-        final FPKrbAuthProvider authn = new FPKrbAuthProvider(fplus);
+        final FPKrbAuthenticatorProvider authn = new FPKrbAuthenticatorProvider(fplus);
         final FPKrbAuthorizerProvider authorizer = new FPKrbAuthorizerProvider(fplus);
 
         Services.securityRegistry().setEnhancedAuthenticatorProvider(authn);

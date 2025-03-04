@@ -16,7 +16,7 @@ import static uk.co.amrc.factoryplus.utils.Auth.getACLforPrincipal;
 
 public class FPKrbAuthorizer implements SubscriptionAuthorizer, PublishAuthorizer {
     private FPServiceClient fplus;
-    private static final @NotNull Logger log = LoggerFactory.getLogger(FPKrbAuth.class);
+    private static final @NotNull Logger log = LoggerFactory.getLogger(FPKrbAuthenticator.class);
 
     public FPKrbAuthorizer(FPKrbAuthorizerProvider authorizerProvider) {
         fplus = authorizerProvider.fplus;

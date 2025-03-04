@@ -49,12 +49,15 @@ export class Nodes {
                     ?.filter(t => t.key == LABELS.specialised)
                     ?.map(t => t.value)
                     ?.[0];
+                const ready = obj.status.conditions
+                    ?.some(c => c.type == "Ready" && c.status == "True");
                 return {
                     hostname:       meta.labels[LABELS.host],
                     arch:           info.architecture,
                     k8s_version:    info.kubeletVersion,
                     control_plane:  meta.labels[LABELS.control] == "true",
-                    specialised,
+                    os_version:     info.osImage,
+                    ready, specialised,
                 };
             },
             equal:      deep_equal,

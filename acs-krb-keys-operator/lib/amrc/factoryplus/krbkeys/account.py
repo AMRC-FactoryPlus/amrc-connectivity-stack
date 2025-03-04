@@ -83,9 +83,11 @@ class FPAccount:
     def reconcile_configdb (self):
         cdb = kk_ctx().fplus.configdb
 
-        # Always set the object live
-        cdb.patch_config(uuids.App.Registration, self.uuid,
-            { "deleted": False });
+        # Always set the object live. Allow this to fail as we may not
+        # have permission to patch Registration.
+        ServiceError.catch((403,), lambda:
+            cdb.patch_config(uuids.App.Registration, self.uuid,
+                { "deleted": False }));
 
         # We set whatever information we are given.
         if self.name is not None:
@@ -141,7 +143,9 @@ class FPAccount:
                 fp.auth.delete_identity(self.uuid, "kerberos"))
 
             if self.klass is not None:
-                ServiceError.catch((404,), lambda:
+                # Allow this to fail with 403; currently I haven't
+                # worked out how to grant PATCH to Registration securely.
+                ServiceError.catch((403, 404,), lambda:
                     fp.configdb.patch_config(uuids.App.Registration, self.uuid,
                         { "deleted": True }))
             

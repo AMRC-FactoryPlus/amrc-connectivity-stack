@@ -91,7 +91,7 @@ async function setup_config (ss, chart) {
 async function setup_perms (auth, group) {
     const account_req = Clusters.Requirement.ServiceAccount;
     const { ManageObjects, ReadConfig, WriteConfig } = UUIDs.Permission.ConfigDB;
-    const { ManageKerberos, ManageGroup, ManageACL } = UUIDs.Permission.Auth;
+    const { ManageKerberos, ManageACL } = UUIDs.Permission.Auth;
     const ReadKerberos = "e8c9c0f7-0d54-4db2-b8d6-cd80c45f6a5c";
 
     const aces = [
@@ -107,7 +107,7 @@ async function setup_perms (auth, group) {
         /* XXX This is root-equivalent */
         [group.krbkeys.uuid,    ManageKerberos,     UUIDs.Special.Null,         false],
         [group.krbkeys.uuid,    ReadKerberos,       UUIDs.Special.Null,         false],
-        [group.krbkeys.uuid,    ManageGroup,        Edge.Group.EdgeGroup,       true],
+        [group.krbkeys.uuid,    ManageObjects,      Edge.Group.EdgeGroup,       true],
         /* XXX Not much use at present due to pure ranks. Composite
          * perms are a rank higher than ordinary perms. Unused. */
         [group.krbkeys.uuid,    ManageACL,          Edge.Group.EdgePermission,  true],

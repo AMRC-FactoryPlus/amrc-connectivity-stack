@@ -34,21 +34,28 @@ export class ServiceConfig {
         return this.config;
     }
 
-    async setup_group (path, klass, name) {
+    async setup_object (type, config, key, klass) {
         const { CDB } = this;
-        const group = this.config.group ??= {};
 
-        const have = group[path];
+        const have = config[key];
         if (have && have.uuid) {
-            this.log("Using existing group %s: %s", path, have.uuid);
-            return;
+            this.log("Using existing %s %s: %s", type, key, have.uuid);
+            return have.uuid;
         }
 
-        this.log("Creating group %s", path);
+        this.log("Creating %s %s", type, key);
         const uuid = await CDB.create_object(klass);
-        this.log("Created group %s: %s", path, uuid);
+
+        this.log("Created %s %s: %s", type, key, uuid);
+        config[key] = { uuid };
+        return uuid;
+    }
+
+    async setup_group (path, klass, name) {
+        const { CDB } = this;
+
+        const uuid = await this.setup_object("group", this.config.group, path, klass);
         await CDB.put_config(UUIDs.App.Info, uuid, { name });
-        group[path] = { uuid };
     }
 
     async setup_groups (...groups) {

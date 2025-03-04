@@ -8,12 +8,12 @@ import com.hivemq.extension.sdk.api.services.auth.provider.AuthorizerProvider;
 import uk.co.amrc.factoryplus.FPServiceClient;
 
 public class FPKrbAuthorizerProvider implements AuthorizerProvider {
-    private final FPServiceClient fpServiceClient;
+    public final FPServiceClient fplus;
     public FPKrbAuthorizerProvider(FPServiceClient serviceClient) {
-        fpServiceClient = serviceClient;
+        fplus = serviceClient;
     }
 
     public @Nullable Authorizer getAuthorizer(@NotNull AuthorizerProviderInput authorizerProviderInput) {
-        return new FPKrbAuthorizer(fpServiceClient);
+        return new FPKrbAuthorizer(this);
     }
 }

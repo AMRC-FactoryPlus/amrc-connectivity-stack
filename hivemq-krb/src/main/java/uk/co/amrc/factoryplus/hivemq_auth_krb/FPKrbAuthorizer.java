@@ -4,32 +4,22 @@ import com.hivemq.extension.sdk.api.annotations.NotNull;
 import com.hivemq.extension.sdk.api.auth.PublishAuthorizer;
 import com.hivemq.extension.sdk.api.auth.SubscriptionAuthorizer;
 import com.hivemq.extension.sdk.api.auth.parameter.*;
-import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.core.Single;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import uk.co.amrc.factoryplus.FPServiceClient;
 
 import java.util.List;
-import java.util.Map;
-import java.util.UUID;
 import java.util.stream.Collectors;
+
+import static uk.co.amrc.factoryplus.utils.Auth.getACLforPrincipal;
 
 public class FPKrbAuthorizer implements SubscriptionAuthorizer, PublishAuthorizer {
     private FPServiceClient fplus;
     private static final @NotNull Logger log = LoggerFactory.getLogger(FPKrbAuth.class);
 
-    //TODO: move this to uuid class
-    private static final UUID PERMGRP_UUID = UUID.fromString(
-            "a637134a-d06b-41e7-ad86-4bf62fde914a");
-    private static final UUID TEMPLATE_UUID = UUID.fromString(
-            "1266ddf1-156c-4266-9808-d6949418b185");
-    private static final UUID ADDR_UUID = UUID.fromString(
-            "8e32801b-f35a-4cbf-a5c3-2af64d3debd7");
-
-    public FPKrbAuthorizer(FPServiceClient fpServiceClient) {
-        fplus = fpServiceClient;
+    public FPKrbAuthorizer(FPKrbAuthorizerProvider authorizerProvider) {
+        fplus = authorizerProvider.fplus;
     }
 
     @Override
@@ -41,7 +31,7 @@ public class FPKrbAuthorizer implements SubscriptionAuthorizer, PublishAuthorize
         var clientUsername = ClientSessionStore.getUsername(clientId);
         var topic = publishAuthorizerInput.getPublishPacket().getTopic();
         try{
-            isPermissionAllowed(getACLforPrincipal(clientUsername), topic, TopicPermission.MqttActivity.PUBLISH)
+            isPermissionAllowed(getACLforPrincipal(clientUsername, fplus), topic, TopicPermission.MqttActivity.PUBLISH)
                     .subscribe(result -> {
                         if(result){
                             publishAuthorizerOutput.authorizeSuccessfully();
@@ -67,7 +57,7 @@ public class FPKrbAuthorizer implements SubscriptionAuthorizer, PublishAuthorize
         var clientUsername = ClientSessionStore.getUsername(clientId);
         var topic = subscriptionAuthorizerInput.getSubscription().getTopicFilter();
         try{
-            isPermissionAllowed(getACLforPrincipal(clientUsername), topic, TopicPermission.MqttActivity.SUBSCRIBE)
+            isPermissionAllowed(getACLforPrincipal(clientUsername, fplus), topic, TopicPermission.MqttActivity.SUBSCRIBE)
                     .subscribe(result -> {
                         if(result){
                             log.info("Successfully authorized subscription client {} for topic {}.", clientUsername, topic);
@@ -84,27 +74,46 @@ public class FPKrbAuthorizer implements SubscriptionAuthorizer, PublishAuthorize
         }
     }
 
-    public static Single<List<TopicPermission>> getAllowedPublishPermissions(
+    /**
+     * Gets the permissions for a mqtt activity from a principles permission list.
+     * @param permissions All mqtt topic permissions from a principle.
+     * @param mqttActivity The type of mqtt activity to filter for.
+     * @return Topic permissions for a mqtt activity.
+     */
+    private static Single<List<TopicPermission>> getAllowedPermissions(
             Single<List<TopicPermission>> permissions,
             TopicPermission.MqttActivity mqttActivity
     ) {
         return permissions.map(permissionList -> permissionList.stream()
                 .filter(permission -> permission.getActivity() == mqttActivity)
-                .filter(permission -> permission.getType() == TopicPermission.PermissionType.ALLOW) // Ensure ALLOWED permissions
+                .filter(permission -> permission.getType() == TopicPermission.PermissionType.ALLOW)
                 .collect(Collectors.toList()));
     }
 
-    public static Single<Boolean> isPermissionAllowed(
+    /**
+     * Checks if the topic being published or subscribed to is allowed based on the principles acl.
+     * @param permissions The principle's permission.
+     * @param targetPermission The Permission to check.
+     * @param mqttActivity The MQTT activity (publish or subscribe).
+     * @return If the MQTT action for the target permission is allowed.
+     */
+    private static Single<Boolean> isPermissionAllowed(
             Single<List<TopicPermission>> permissions,
             String targetPermission,
             TopicPermission.MqttActivity mqttActivity
     ) {
-        return getAllowedPublishPermissions(permissions, mqttActivity)
+        return getAllowedPermissions(permissions, mqttActivity)
                 .map(filteredPermissions -> filteredPermissions.stream()
                         .anyMatch(permission -> matchesPermission(permission.getTopicFilter(), targetPermission))
                 );
     }
 
+    /**
+     * Check if an MQTT topic matches a topic from the principles acl.
+     * @param existing The topic filter someone has subscribed or published to (may contain wildcards)
+     * @param target The actual topic a message was subscribed or published to (no wildcards)
+     * @return true if the topics match, false otherwise
+     */
     private static boolean matchesPermission(String existing, String target) {
         // Split topics into parts
         String[] subParts = existing.split("/");
@@ -152,41 +161,6 @@ public class FPKrbAuthorizer implements SubscriptionAuthorizer, PublishAuthorize
         }
 
         return true;
-    }
-
-
-    public Single<List<TopicPermission>> getACLforPrincipal (String principal)
-    {
-        class TemplateUse {
-            public Map<String, Object> template;
-            public UUID target;
-
-            public TemplateUse (JSONObject tmpl, String targ)
-            {
-                this.template = tmpl.toMap();
-                this.target = UUID.fromString(targ);
-            }
-        }
-
-        return fplus.auth().getACL(principal, PERMGRP_UUID)
-                .flatMapObservable(Observable::fromStream)
-                .flatMapSingle(ace -> {
-                    String perm = (String)ace.get("permission");
-                    String targid = (String)ace.get("target");
-
-                    return fplus.configdb()
-                            .getConfig(TEMPLATE_UUID, UUID.fromString(perm))
-                            .map(tmpl -> new TemplateUse(tmpl, targid));
-                })
-                .flatMapStream(ace -> {
-                    Single<JSONObject> target = fplus.configdb()
-                            .getConfig(ADDR_UUID, ace.target);
-                    return ace.template.entrySet().stream()
-                            .map(e -> MqttAce.expandEntry(e, target));
-                })
-                .flatMap(Observable::fromMaybe)
-                .map(m_ace -> m_ace.toTopicPermission())
-                .collect(Collectors.toList());
     }
 }
 

@@ -45,14 +45,7 @@ public class FPKrbAuthProvider implements EnhancedAuthenticatorProvider
 {
     private static final Logger log = LoggerFactory.getLogger(FPKrbAuth.class);
 
-    private static final UUID PERMGRP_UUID = UUID.fromString(
-        "a637134a-d06b-41e7-ad86-4bf62fde914a");
-    private static final UUID TEMPLATE_UUID = UUID.fromString(
-        "1266ddf1-156c-4266-9808-d6949418b185");
-    private static final UUID ADDR_UUID = UUID.fromString(
-        "8e32801b-f35a-4cbf-a5c3-2af64d3debd7");
-
-    private FPServiceClient fplus;
+    public FPServiceClient fplus;
 
     public FPKrbAuthProvider (FPServiceClient serviceClient)
     {
@@ -76,39 +69,5 @@ public class FPKrbAuthProvider implements EnhancedAuthenticatorProvider
         return fplus.gss()
             .clientWithPassword(user, passwd)
             .createContext(srv);
-    }
-
-    public Single<List<TopicPermission>> getACLforPrincipal (String principal)
-    {
-        class TemplateUse {
-            public Map<String, Object> template;
-            public UUID target;
-
-            public TemplateUse (JSONObject tmpl, String targ)
-            {
-                this.template = tmpl.toMap();
-                this.target = UUID.fromString(targ);
-            }
-        }
-
-        return fplus.auth().getACL(principal, PERMGRP_UUID)
-            .flatMapObservable(Observable::fromStream)
-            .flatMapSingle(ace -> {
-                String perm = (String)ace.get("permission");
-                String targid = (String)ace.get("target");
-
-                return fplus.configdb()
-                    .getConfig(TEMPLATE_UUID, UUID.fromString(perm))
-                    .map(tmpl -> new TemplateUse(tmpl, targid));
-            })
-            .flatMapStream(ace -> {
-                Single<JSONObject> target = fplus.configdb()
-                    .getConfig(ADDR_UUID, ace.target);
-                return ace.template.entrySet().stream()
-                    .map(e -> MqttAce.expandEntry(e, target));
-            })
-            .flatMap(Observable::fromMaybe)
-            .map(m_ace -> m_ace.toTopicPermission())
-            .collect(Collectors.toList());
     }
 }

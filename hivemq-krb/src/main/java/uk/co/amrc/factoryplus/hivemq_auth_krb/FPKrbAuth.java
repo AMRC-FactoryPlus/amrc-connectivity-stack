@@ -5,19 +5,13 @@
 
 package uk.co.amrc.factoryplus.hivemq_auth_krb;
 
-import java.lang.Runnable;
-import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.charset.StandardCharsets;
-import java.security.PrivilegedAction;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
-import org.ietf.jgss.*;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,7 +19,6 @@ import org.slf4j.LoggerFactory;
 import io.reactivex.rxjava3.core.*;
 
 import com.hivemq.extension.sdk.api.async.*;
-import com.hivemq.extension.sdk.api.client.parameter.Listener;
 import com.hivemq.extension.sdk.api.annotations.NotNull;
 import com.hivemq.extension.sdk.api.auth.EnhancedAuthenticator;
 import com.hivemq.extension.sdk.api.auth.parameter.*;
@@ -35,10 +28,14 @@ import com.hivemq.extension.sdk.api.packets.general.*;
 import com.hivemq.extension.sdk.api.services.Services;
 
 import uk.co.amrc.factoryplus.Attempt;
+import uk.co.amrc.factoryplus.FPServiceClient;
+
+import static uk.co.amrc.factoryplus.utils.Auth.getACLforPrincipal;
 
 public class FPKrbAuth implements EnhancedAuthenticator {
 
     private static final @NotNull Logger log = LoggerFactory.getLogger(FPKrbAuth.class);
+    private FPServiceClient fplus;
 
     private FPKrbAuthProvider provider;
 
@@ -73,6 +70,7 @@ public class FPKrbAuth implements EnhancedAuthenticator {
     public FPKrbAuth (FPKrbAuthProvider prov)
     {
         provider = prov;
+        fplus = prov.fplus;
     }
 
     @Override
@@ -221,7 +219,7 @@ public class FPKrbAuth implements EnhancedAuthenticator {
 
                 String client_name = ctx.getSrcName().toString();
                 log.info("Authenticated client {}", client_name);
-                return provider.getACLforPrincipal(client_name)
+                return getACLforPrincipal(client_name, fplus)
                     .map(acl -> new AuthResult(out_buf, acl, client_name))
                     .doOnSuccess(rv -> log.info("MQTT ACL [{}]: {}", 
                         client_name, rv.showACL()));

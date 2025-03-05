@@ -689,6 +689,7 @@ export function writeValToBuffer(metric: sparkplugMetric): Buffer {
     try {
         switch (metric.type) {
             case sparkplugDataType.boolean:
+                len = buf.writeUInt8(metric.value ? 1 : 0);
                 break;
             case sparkplugDataType.int8:
                 len = buf.writeInt8(metric.value as number);

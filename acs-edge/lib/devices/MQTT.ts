@@ -7,9 +7,8 @@ import { log } from "../helpers/log.js";
 import { Metrics, writeValuesToPayload } from "../helpers/typeHandler.js";
 import * as mqtt from "mqtt";
 import { v4 as uuidv4 } from 'uuid';
-import { mqttScoutDetails } from "../scout.js";
 import { UniqueDictionary } from "../helpers/uniquedictionary.js";
-
+import { ScoutDriverDetails } from "../scout.js";
 
 export default interface mqttConnDetails {
     clientId: string,
@@ -22,6 +21,11 @@ export default interface mqttConnDetails {
     keepalive?: number
     cleanSession: boolean,
     keepAlive: number
+}
+
+interface MqttScoutDetails extends ScoutDriverDetails {
+    duration: number,
+    topic: string
 }
 
 export class MQTTConnection extends DeviceConnection {
@@ -93,44 +97,81 @@ export class MQTTConnection extends DeviceConnection {
     }
 
 
-    public async scoutAddresses(scoutDetails: mqttScoutDetails): Promise<UniqueDictionary<string, object>> {
-        const { topic, duration } = scoutDetails;
+    public async scoutAddresses(driverDetails: ScoutDriverDetails): Promise<object> {
+        try {
 
-        const discoveredAddresses: UniqueDictionary<string, object> = new UniqueDictionary<string, object>();
-        const clientForScout = mqtt.connect(this.#connStr, this.#options);
-        let scoutTimeout: NodeJS.Timeout;
+            const { topic, duration }: MqttScoutDetails = await this.validateConfigDetails(driverDetails);
+            const discoveredAddresses: UniqueDictionary<string, object> = new UniqueDictionary<string, object>();
 
-        return new Promise<UniqueDictionary<string, object>>((resolve, reject) => {
-            clientForScout.on('connect', () => {
-                log(`Scout client for MQTTConnection connected to broker ${this.#connStr}.`);
 
-                clientForScout.subscribe(topic, (err) => {
-                    if (err) {
-                        log(`Scout client for MQTTConnection couldn't subscribe with error: ${err.message}`);
+            const clientForScout = mqtt.connect(this.#connStr, this.#options);
+
+
+            return await new Promise<object>((resolve, reject) => {
+                let scoutTimeout: NodeJS.Timeout;
+
+                clientForScout.on('connect', async () => {
+                    try {
+                        log(`Scout client connected to broker ${this.#connStr}.`);
+
+                        clientForScout.subscribe(topic, (err) => {
+                            if (err) {
+                                throw new Error(`Subscription failed: ${err.message}`);
+                            }
+
+                            log(`Subscribed to topic: ${topic}`);
+
+
+                            clientForScout.on('message', (topic, message) => {
+                                discoveredAddresses.add(topic, {});
+                            });
+
+
+                            scoutTimeout = setTimeout(() => {
+                                log(`Scout completed.`);
+                                clientForScout.end();
+                                resolve(discoveredAddresses.toPlainObject());
+                            }, duration);
+                        });
+                    } catch (err) {
+                        log(`Scout client error: ${(err as Error).message}`);
                         clientForScout.end();
                         reject(err);
-                        return;
                     }
-                    clientForScout.on('message', (topic, message) => {
-                        discoveredAddresses.add(topic, {});
-                    });
-                    scoutTimeout = setTimeout(() => {
-                        log(`Scout client for MQTTConnection completed`)
-                        clientForScout.end();
-                        resolve(discoveredAddresses);
-                    }, duration);
+                });
+
+                clientForScout.on('error', (err) => {
+                    log(`MQTT client error: ${err.message}`);
+                    if (scoutTimeout) clearTimeout(scoutTimeout);
+                    clientForScout.end();
+                    reject(err);
                 });
             });
 
-            clientForScout.on('error', (err) => {
-                log(`Scout client for MQTTConnection error: ${err.message}`);
-                if (scoutTimeout) {
-                    clearTimeout(scoutTimeout);
-                }
-                clientForScout.end();
-                reject(err);
-            })
-        });
+        } catch (err) {
+            log(`Error during MQTT scouting: ${(err as Error).message}`);
+            throw err;
+        }
+    }
+
+
+    async validateConfigDetails(driverDetails: any): Promise<MqttScoutDetails> {
+        const duration = (driverDetails.duration && typeof driverDetails.duration === 'number' && driverDetails.duration > 0)
+            ? driverDetails.duration
+            : 10000; // Default to 10s
+
+
+        const topic = (driverDetails.topic && typeof driverDetails.topic === 'string' && driverDetails.topic.trim() !== '')
+            ? driverDetails.topic
+            : "#"; // Default to "#"
+
+
+        const mqttDriverDetails: MqttScoutDetails = {
+            duration: duration,
+            topic: topic
+        };
+
+        return mqttDriverDetails;
     }
 
     async subscribe(addresses: string[]) {
@@ -169,7 +210,6 @@ export class MQTTConnection extends DeviceConnection {
             } else {
                 err = new Error("Value error");
             }
-
         })
         writeCallback(err);
     }

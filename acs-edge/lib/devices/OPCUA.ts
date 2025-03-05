@@ -26,10 +26,12 @@ import {
     NodeId,
     NodeIdType,
     ReferenceDescription,
-    NodeClass
+    NodeClass,
+    DataValue
 } from "node-opcua";
-import { opcuaScoutDetails } from "../scout.js";
+
 import { UniqueDictionary } from "../helpers/uniquedictionary.js";
+import { ScoutDriverDetails } from "../scout.js";
 
 // Example here: https://github.com/node-opcua/node-opcua/blob/v2.1.3/documentation/sample_client.js
 
@@ -117,27 +119,44 @@ export class OPCUAConnection extends DeviceConnection {
         }
     }
 
-    public async scoutAddresses(scoutDetails: opcuaScoutDetails): Promise<UniqueDictionary<string, object>> {
+    public async scoutAddresses(driverDetails: ScoutDriverDetails): Promise<object> {
         const clientForScout = OPCUAClient.create(this.#options);
         const discoveredAddresses: UniqueDictionary<string, object> = new UniqueDictionary<string, object>();
 
         try {
             await clientForScout.connect(this.#endpointUrl);
-            log(`Scout connected to OPC UA server at ${this.#endpointUrl}`)
+            log(`Scout connected to OPC UA server at ${this.#endpointUrl}`);
 
             const sessionForScout = await clientForScout.createSession(this.#credentials);
-            log(`Scout session created for OPC UA node discovery.`);;
+            log(`Scout session created for OPC UA node discovery.`);
 
-            const NodeIDToStartSearchFrom = new NodeId(scoutDetails.NodeIdType, scoutDetails.Identifier, scoutDetails.NamespaceIndex);
-            
-            const discoveredReferences: ReferenceDescription[] = await this.browseOPCUANodes(sessionForScout, NodeIDToStartSearchFrom);
+            // Read NamespaceArray (i=2255) to get all available namespaces
+            const namespaceArrayNodeId = new NodeId(NodeIdType.NUMERIC, 2255, 0);
 
-            discoveredReferences.forEach(reference => discoveredAddresses.add(...this.getAddressObject(reference)));
+            const dataValues: DataValue[] = await sessionForScout.read(
+                [
+                    {
+                        nodeId: namespaceArrayNodeId,
+                        attributeId: AttributeIds.Value
+                    }
+                ]
+            );
+            const namespaceArray: string[] = dataValues[0].value.value;
+            log(`Discovered Namespaces: ${namespaceArray.join(', ')}`);
+
+            // Start browsing from the Root Node (ns=0;i=84)
+            const NodeIDToStartSearchFrom = new NodeId(NodeIdType.NUMERIC, 84, 0);
+            const discoveredReferences = await this.browseOPCUANodes(sessionForScout, NodeIDToStartSearchFrom);
+
+            // Add discovered nodes to the unique dictionary
+            discoveredReferences.forEach(reference => {
+                discoveredAddresses.add(...this.getAddressObject(reference, namespaceArray));
+            });
 
             await sessionForScout.close();
             await clientForScout.disconnect();
 
-            return discoveredAddresses
+            return discoveredAddresses.toPlainObject();
         } catch (err) {
             log(`Error during OPC UA Scouting ${(err as Error).message}`);
             await clientForScout.disconnect();
@@ -149,7 +168,6 @@ export class OPCUAConnection extends DeviceConnection {
         try {
             const browseResult: BrowseResult = await session.browse(nodeId);
 
-            // If no references found, just return an empty array
             if (!browseResult || !browseResult.references || browseResult.references.length === 0) {
                 log(`No child nodes found for: ${nodeId.toString()}`);
                 return [];
@@ -159,36 +177,40 @@ export class OPCUAConnection extends DeviceConnection {
 
             // Iterate through each reference found during browsing
             for (const reference of browseResult.references) {
+                // const nsIndex = reference.nodeId.namespace;
+                // log(`Browsing Node: ${reference.nodeId.toString()} in Namespace ${nsIndex}`);
+
+                // If it's a variable node, store it
                 if (reference.nodeClass === 2) {
                     variableNodes.add(reference);
                 }
-                // Object = 1, ObjectType = 8, and ReferenceType = 32 can have child nodes 
+                // If it's an Object, ObjectType, or ReferenceType, recurse into child nodes
                 else if (reference.nodeClass === 1 || reference.nodeClass === 8 || reference.nodeClass === 32) {
-                    // Recursively browse the child nodes
                     const childNodes = await this.browseOPCUANodes(session, reference.nodeId);
                     childNodes.forEach(childNode => variableNodes.add(childNode));
                 }
-
             }
 
             return Array.from(variableNodes);
-
         } catch (err) {
-            log(`Error when browsing for OPCUA nodes for ${nodeId} with error ${(err as Error).message}`);
+            log(`Error when browsing OPC UA nodes for ${nodeId} with error ${(err as Error).message}`);
             return [];
         }
     }
 
-    getAddressObject(reference: ReferenceDescription): [string, object]{
+    getAddressObject(reference: ReferenceDescription, namespaceArray: string[]): [string, object] {
         return [
             reference.nodeId.toString(),
             {
                 name: reference.browseName.toString(),
                 nodeClassID: reference.nodeClass,
-                nodeClassName: NodeClass[reference.nodeClass]
+                nodeClassName: NodeClass[reference.nodeClass],
+                namespace: reference.nodeId.namespace,
+                namespaceURI: namespaceArray[reference.nodeId.namespace]
             }
-        ]
+        ];
     }
+
 
     readMetrics(metrics: Metrics, payloadFormat?: string) {
         const oldVals: any[] = [];

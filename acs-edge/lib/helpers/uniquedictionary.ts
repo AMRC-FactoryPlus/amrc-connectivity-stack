@@ -17,7 +17,7 @@ export class UniqueDictionary<K, V extends object> {
         return newDict;
     }
 
-    toJSON(): string {
-        return JSON.stringify(Object.fromEntries(this.map));
+    toPlainObject(): object {
+        return Object.fromEntries(this.map);
     }
 }

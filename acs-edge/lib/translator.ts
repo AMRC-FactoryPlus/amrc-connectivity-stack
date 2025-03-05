@@ -9,7 +9,6 @@ import timers from "timers/promises";
 
 import type { Identity } from "@amrc-factoryplus/utilities";
 import { ServiceClient } from "@amrc-factoryplus/utilities";
-// import { ServiceClient as NewServiceClient } from "@amrc-factoryplus/service-client";
 
 import { ConfigDB } from "@amrc-factoryplus/service-client/lib/interfaces.js";
 
@@ -36,10 +35,7 @@ import { WebsocketConnection } from "./devices/websocket.js";
 import { MTConnectConnection } from "./devices/MTConnect.js";
 import { EtherNetIPConnection } from "./devices/EtherNetIP.js";
 import { DriverConnection } from "./devices/driver.js";
-import { Scout } from "./scout.js";
-import { UniqueDictionary } from "./helpers/uniquedictionary.js";
-
-
+import { Scout, ScoutResult } from "./scout.js";
 
 /**
  * Translator class basically turns config file into instantiated classes
@@ -63,7 +59,6 @@ export class Translator extends EventEmitter {
      */
     sparkplugNode!: SparkplugNode
     fplus: ServiceClient
-    // newFplus: NewServiceClient
     broker: DriverBroker
     pollInt: number
 
@@ -215,14 +210,13 @@ export class Translator extends EventEmitter {
             connection.name,
             this.broker);
 
-        if (connection.scout) {
+        if (connection.scout?.scoutDetails?.isEnabled) {
             log(`Edge-Agent to be run in Scout Mode for ${connection.name}`);
-            const newScout = this.scouts[cType] = new Scout(newConn, connection);
-            newScout.on('scoutComplete', async (addresses: UniqueDictionary<string, object>) => {
-
+            const newScout = this.scouts[cType] = new Scout(newConn, connection.scout);
+            newScout.on('scoutComplete', async (scoutResult: ScoutResult) => {
                 try {
-                    await this.save_to_file(addresses.toJSON(), './scout', connection.name, 'json');
-                    await this.put_to_config(UUIDs.App.ScoutConfig, connection.uuid, addresses);
+                    await this.save_to_file(JSON.stringify(scoutResult), './scout', connection.name, 'json');
+                    await this.put_to_config(UUIDs.App.EdgeScoutResults, connection.uuid, JSON.stringify(scoutResult));
                 }
                 catch (err) {
                     console.error('Error when trying to put to config db: ', (err as Error).message);
@@ -410,9 +404,9 @@ Trying again in ${interval} seconds...`);
         }
     }
 
-    async put_to_config(app_uuid: string, obj_uuid: string, json_content: UniqueDictionary<string, object>): Promise<void> {
+    async put_to_config(app_uuid: string, obj_uuid: string, json_content: string): Promise<void> {
         try {
-            await this.newConfigDb.put_config(app_uuid, obj_uuid, json_content.toJSON());
+            await this.newConfigDb.put_config(app_uuid, obj_uuid, json_content);
             log(`Putting to config db complete`);
         } catch (err) {
             console.error('Error when trying to put to config ', err);

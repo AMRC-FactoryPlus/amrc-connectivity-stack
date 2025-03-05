@@ -1,96 +1,73 @@
 import { EventEmitter } from "events";
 import { DeviceConnection } from "./device.js";
 import { log } from "./helpers/log.js";
-import { NodeIdType } from "node-opcua";
 
-export interface scoutDetails { }
-
-export interface mqttScoutDetails extends scoutDetails {
-    duration: number;
-    topic: string;
+export interface ScoutDetails {
+    isEnabled: boolean
 }
 
-export class opcuaScoutDetails implements scoutDetails {
-    NodeIdType: NodeIdType = NodeIdType.NUMERIC;
-    Identifier: number | string = 0;
-    NamespaceIndex: number = 0;
+export interface ScoutDriverDetails {
+
+}
+
+export interface ScoutResult {
+    addresses: object | null,
+    success: boolean
 }
 
 export class Scout extends EventEmitter {
     private deviceConnection: DeviceConnection;
-    private scoutDetails: scoutDetails;
+    private scoutDetails: ScoutDetails | null;
+    private driverDetails: any | null;
 
-    constructor(deviceConnection: DeviceConnection, scoutConfig: any) {
+
+    constructor(deviceConnection: DeviceConnection, scoutFullConfig: any) {
         super();
         this.deviceConnection = deviceConnection;
-        this.scoutDetails = this.extractScoutConfig(scoutConfig);
+        this.scoutDetails = this.validateScoutConfig(scoutFullConfig.scoutDetails);
+        this.driverDetails = scoutFullConfig.driverDetails;
     }
 
-    private extractScoutConfig(config: any): scoutDetails {
-        if (this.deviceConnection._type === "MQTT") {
-            return {
-                duration: config.scout?.duration ?? 10000,
-                topic: config.scout?.topic ?? "#",
-            } as mqttScoutDetails;
-        } else if (this.deviceConnection._type === "OPC UA") {
-            const nodeIdTypeConf = config.scout?.NodeIdType?.toUpperCase() ?? "NUMERIC";
-            let opcuaScoutConfig: opcuaScoutDetails = {
-                NodeIdType: NodeIdType.NUMERIC,
-                Identifier: 0,
-                NamespaceIndex: 0,
-            };
 
-            switch (nodeIdTypeConf) {
-                case "NUMERIC":
-                    opcuaScoutConfig = {
-                        NodeIdType: NodeIdType.NUMERIC,
-                        Identifier: Number(config.scout?.Identifier) || 0,
-                        NamespaceIndex: Number(config.scout?.NamespaceIndex) || 0,
-                    };
-                    break;
-                case "STRING":
-                    opcuaScoutConfig = {
-                        NodeIdType: NodeIdType.STRING,
-                        Identifier: String(config.scout?.Identifier) || "RootFolder",
-                        NamespaceIndex: Number(config.scout?.NamespaceIndex) || 0,
-                    };
-                    break;
-                case "GUID":
-                    opcuaScoutConfig = {
-                        NodeIdType: NodeIdType.GUID,
-                        Identifier: String(config.scout?.Identifier) || "",
-                        NamespaceIndex: Number(config.scout?.NamespaceIndex) || 0,
-                    };
-                    break;
-                case "BYTESTRING":
-                    opcuaScoutConfig = {
-                        NodeIdType: NodeIdType.BYTESTRING,
-                        Identifier: String(config.scout?.Identifier) || "",
-                        NamespaceIndex: Number(config.scout?.NamespaceIndex) || 0,
-                    };
-                    break;
-                default:
-                    opcuaScoutConfig = {
-                        NodeIdType: NodeIdType.NUMERIC,
-                        Identifier: 85,
-                        NamespaceIndex: 0,
-                    };
-                    break;
+    public async performScouting(): Promise<void> {
+        let scoutResult: ScoutResult = { addresses: null, success: true };
+        try {
+            if (this.scoutDetails?.isEnabled === false) {
+                log(`Scouting isEnabled is False, so you cannot perform scouting for ${this.deviceConnection._type}`);
+                scoutResult.success = false;
             }
-            return opcuaScoutConfig;
-        } else {
-            throw new Error("Scouting not supported for this device connection type.");
+            else if (typeof this.deviceConnection.scoutAddresses !== "function") {
+                throw new Error("The provided DeviceConnection does not support scouting.");
+            }
+            else {
+                log(`Starting scouting for ${this.deviceConnection._type}`);
+                const addresses: object = await this.deviceConnection.scoutAddresses(this.driverDetails);
+
+                scoutResult = {
+                    addresses: addresses,
+                    success: true
+                };
+
+                console.log(`Stopped scouting for ${this.deviceConnection._type}`);
+            }
+        }
+        catch (err) {
+            log(`Error during scouting: ${(err as Error).message}`);
+            scoutResult.success = false;
+        }
+        finally {
+            this.emit("scoutComplete", scoutResult);
         }
     }
 
-    public async performScouting() {
-        if (typeof this.deviceConnection.scoutAddresses !== "function") {
-            throw new Error("The provided DeviceConnection does not support scouting.");
+    private validateScoutConfig(scoutDetails: any): ScoutDetails {
+        if (!scoutDetails) {
+            log('scoutDetails passed from Edge Agent is null or undefined.')
+            return { isEnabled: false };
+        } else {
+            return {
+                isEnabled: typeof scoutDetails.isEnabled === 'boolean' ? scoutDetails.isEnabled : false
+            }
         }
-        log(`Starting scouting for ${this.deviceConnection._type}`);
-        const addresses = await this.deviceConnection.scoutAddresses(this.scoutDetails);
-        console.log(`Stopped scouting for ${this.deviceConnection._type}`);
-
-        this.emit("scoutComplete", addresses);
     }
 }

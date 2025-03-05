@@ -7,7 +7,7 @@ import {
     log, logf
 } from "./helpers/log.js";
 import * as fs from "fs";
-import {SparkplugNode} from "./sparkplugNode.js";
+import { SparkplugNode } from "./sparkplugNode.js";
 import {
     Metrics,
     parseTimeStampFromPayload,
@@ -19,9 +19,11 @@ import {
     sparkplugTemplate,
     sparkplugValue
 } from "./helpers/typeHandler.js";
-import {EventEmitter} from "events";
+import { EventEmitter } from "events";
 import Long from "long";
-import { scoutDetails } from "./scout.js";
+import { ScoutDriverDetails } from "./scout.js";
+// import { ScoutDetails } from "./scout.js";
+// import { UniqueDictionary } from "./helpers/uniquedictionary.js";
 
 /**
  * Define structure of device options object which is passed to the Device class constructor
@@ -33,7 +35,7 @@ export interface deviceOptions {
     templates: sparkplugMetric[],     // An array of Sparkplug templates to be used by this device
     metrics: sparkplugMetric[],       // An array of metrics to be used by this device
     payloadFormat: serialisationType, // The format of the payloads produced by this device. Must be one of
-                                      // serialisationType
+    // serialisationType
     delimiter?: string                // An optional delimiter character if the payload is a delimited string type
 }
 
@@ -61,7 +63,7 @@ export abstract class DeviceConnection extends EventEmitter {
         super();
         // Assign type to class attribute
         this._type = type;
-        
+
 
 
         // Define object of polling interval handles for each device
@@ -106,14 +108,21 @@ export abstract class DeviceConnection extends EventEmitter {
         writeCallback(err);
     }
 
-    
+
     /**
      * Request devices to return a list of available addresses (tags, topics, etc.)
      */
-    public async scoutAddresses(scoutDetails: scoutDetails) : Promise<object>{
+    public async scoutAddresses(driverDetails: ScoutDriverDetails): Promise<object> {
 
         // should be implmented by subclasses for each type of connection depending on the specific protocol (OPC UA, MQTT, etc.)
         throw new Error('Scouting not supported for this device connection type.');
+    }
+
+    /**
+     * Receives driverDetails config part of the scout, validates it and formats
+     */
+    async validateConfigDetails(driverDetails: ScoutDriverDetails): Promise<ScoutDriverDetails> {
+        throw new Error('Validate Config Details for Scouting not supported for this device connection type.');
     }
 
 
@@ -123,7 +132,7 @@ export abstract class DeviceConnection extends EventEmitter {
      * requests.
      * @param addresses Addresses to start watching
      */
-    async subscribe (addresses: string[]): Promise<any> {
+    async subscribe(addresses: string[]): Promise<any> {
         return null;
     }
 
@@ -131,7 +140,7 @@ export abstract class DeviceConnection extends EventEmitter {
      * Undo any setup performed by `subscribe`.
      * @param addresses Addresses to stop watching
      */
-    async unsubscribe (handle: any): Promise<void> {
+    async unsubscribe(handle: any): Promise<void> {
         return;
     }
 
@@ -145,7 +154,7 @@ export abstract class DeviceConnection extends EventEmitter {
      * @param subscriptionStartCallback A function to call once the subscription has been setup
      */
     async startSubscription(metrics: Metrics, payloadFormat: serialisationType, delimiter: string, interval: number, deviceId: string, subscriptionStartCallback: Function) {
-        this.#subHandles.set(deviceId, 
+        this.#subHandles.set(deviceId,
             await this.subscribe(metrics.addresses));
         this.#intHandles[deviceId] = setInterval(() => {
             this.readMetrics(metrics, payloadFormat, delimiter);
@@ -195,7 +204,7 @@ export class Device {
     #pubTimer: Timer                                // Batch timer
     #pubBuffer: sparkplugMetric[]                   // Batch buffer
     //#deathTimer: ReturnType<typeof setTimeout>      // A "dead mans handle" or "watchdog" timer which triggers a DDEATH
-                                                    // if allowed to time out
+    // if allowed to time out
     _payloadFormat: serialisationType               // The format of the payloads produced by this device
     _delimiter: string                              // String specifying the delimiter character if needed
 
@@ -382,10 +391,12 @@ export class Device {
                             );
 
                             // Update the metric value and push it to the array of changed metrics
-                            changedMetrics.push({...(this._metrics.setValueByAddrPath(addr,
+                            changedMetrics.push({
+                                ...(this._metrics.setValueByAddrPath(addr,
                                     path,
                                     newVal,
-                                    timestamp))});
+                                    timestamp))
+                            });
                         }
                     }
                 }

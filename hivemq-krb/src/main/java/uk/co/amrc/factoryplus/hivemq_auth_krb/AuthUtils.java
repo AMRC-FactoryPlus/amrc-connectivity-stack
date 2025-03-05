@@ -1,18 +1,22 @@
-package uk.co.amrc.factoryplus.utils;
+/* Factory+ HiveMQ auth plugin.
+ * Authentication utilities.
+ * Copyright 2025 AMRC.
+ */
+
+package uk.co.amrc.factoryplus.hivemq_auth_krb;
 
 import com.hivemq.extension.sdk.api.auth.parameter.TopicPermission;
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.core.Single;
 import org.json.JSONObject;
 import uk.co.amrc.factoryplus.FPServiceClient;
-import uk.co.amrc.factoryplus.hivemq_auth_krb.MqttAce;
 
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-public class Auth {
+public class AuthUtils {
     private static final UUID PERMGRP_UUID = UUID.fromString(
             "a637134a-d06b-41e7-ad86-4bf62fde914a");
     private static final UUID TEMPLATE_UUID = UUID.fromString(

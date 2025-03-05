@@ -10,9 +10,12 @@ import java.nio.CharBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
+import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,7 +33,7 @@ import com.hivemq.extension.sdk.api.services.Services;
 import uk.co.amrc.factoryplus.Attempt;
 import uk.co.amrc.factoryplus.FPServiceClient;
 
-import static uk.co.amrc.factoryplus.utils.Auth.getACLforPrincipal;
+import static uk.co.amrc.factoryplus.hivemq_auth_krb.AuthUtils.getACLforPrincipal;
 
 public class FPKrbAuthenticator implements EnhancedAuthenticator {
 
@@ -137,7 +140,6 @@ public class FPKrbAuthenticator implements EnhancedAuthenticator {
     {
         String user = conn.getUserName().orElse(null);
         ByteBuffer passwd = conn.getPassword().orElse(null);
-
         if (user == null || passwd == null) {
             log.error("Null username/password, failing auth");
             output.failAuthentication();
@@ -183,7 +185,7 @@ public class FPKrbAuthenticator implements EnhancedAuthenticator {
                     opt.ifPresentOrElse(
                         rv -> {
                             rv.applyACL(output);
-                            ClientSessionStore.storeUsername(conn.getClientId(), user);
+                            ClientSessionStore.storeUsername(conn.getClientId(), rv.user);
                             output.authenticateSuccessfully();
                         },
                         () -> output.failAuthentication());

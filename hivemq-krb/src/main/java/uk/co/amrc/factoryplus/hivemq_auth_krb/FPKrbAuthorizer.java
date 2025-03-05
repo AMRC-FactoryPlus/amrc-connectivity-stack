@@ -1,3 +1,8 @@
+/* Factory+ HiveMQ auth plugin.
+ * Authorizer.
+ * Copyright 2025 AMRC.
+ */
+
 package uk.co.amrc.factoryplus.hivemq_auth_krb;
 
 import com.hivemq.extension.sdk.api.annotations.NotNull;
@@ -12,10 +17,10 @@ import uk.co.amrc.factoryplus.FPServiceClient;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import static uk.co.amrc.factoryplus.utils.Auth.getACLforPrincipal;
+import static uk.co.amrc.factoryplus.hivemq_auth_krb.AuthUtils.getACLforPrincipal;
 
 public class FPKrbAuthorizer implements SubscriptionAuthorizer, PublishAuthorizer {
-    private FPServiceClient fplus;
+    private final FPServiceClient fplus;
     private static final @NotNull Logger log = LoggerFactory.getLogger(FPKrbAuthenticator.class);
 
     public FPKrbAuthorizer(FPKrbAuthorizerProvider authorizerProvider) {
@@ -29,6 +34,7 @@ public class FPKrbAuthorizer implements SubscriptionAuthorizer, PublishAuthorize
     ) {
         var clientId = publishAuthorizerInput.getClientInformation().getClientId();
         var clientUsername = ClientSessionStore.getUsername(clientId);
+        log.info("Client username is: {}", clientUsername);
         var topic = publishAuthorizerInput.getPublishPacket().getTopic();
         try{
             isPermissionAllowed(getACLforPrincipal(clientUsername, fplus), topic, TopicPermission.MqttActivity.PUBLISH)
@@ -40,7 +46,8 @@ public class FPKrbAuthorizer implements SubscriptionAuthorizer, PublishAuthorize
                             log.info("Publish permission denied for user {} topic {}",clientUsername, topic);
                             publishAuthorizerOutput.failAuthorization();
                         }
-                    });
+                    },
+                            error ->  log.error("Error occurred: {}", error.getMessage()));
         }
         catch(Exception e){
             log.info("Error {} Publish permission denied for topic {}",e.getMessage(), topic);
@@ -55,18 +62,20 @@ public class FPKrbAuthorizer implements SubscriptionAuthorizer, PublishAuthorize
     ) {
         var clientId = subscriptionAuthorizerInput.getClientInformation().getClientId();
         var clientUsername = ClientSessionStore.getUsername(clientId);
+        log.info("Client username is: {}", clientUsername);
         var topic = subscriptionAuthorizerInput.getSubscription().getTopicFilter();
         try{
             isPermissionAllowed(getACLforPrincipal(clientUsername, fplus), topic, TopicPermission.MqttActivity.SUBSCRIBE)
                     .subscribe(result -> {
-                        if(result){
+                        if (result) {
                             log.info("Successfully authorized subscription client {} for topic {}.", clientUsername, topic);
                             subscriptionAuthorizerOutput.authorizeSuccessfully();
-                        }else{
+                        } else {
                             log.info("Subscription permission denied for user {} topic {}", clientUsername, topic);
                             subscriptionAuthorizerOutput.failAuthorization();
                         }
-                    });
+                    },
+                            error -> log.error("Error occurred: {}", error.getMessage()));
         }
         catch(Exception e){
             log.info("Error {} Subscription permission denied for topic {}",e.getMessage(), topic);

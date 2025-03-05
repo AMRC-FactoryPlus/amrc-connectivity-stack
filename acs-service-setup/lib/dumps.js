@@ -28,7 +28,7 @@ export class DumpLoader {
         const acs = opts.acs_config;
         this.url_replacements = {
             NAMESPACE: acs.namespace,
-            BASE_URL: acs.base_url,
+            DOMAIN: acs.domain,
             PROTOCOL: acs.url_protocol,
         };
 

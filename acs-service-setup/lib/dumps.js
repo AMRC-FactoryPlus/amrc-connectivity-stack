@@ -14,99 +14,145 @@ import * as local_UUIDs from "./uuids.js";
 
 const UUID_SOURCES = { UUIDs, ...local_UUIDs };
 
-function resolve (str) {
-    const cpts = str.split(".");
-    let it = UUID_SOURCES;
-    for (const c of cpts) {
-        if (!(c in it))
-            throw new Error(`UUID ref ${str} not found`);
-        it = it[c];
+export class DumpLoader {
+    constructor (opts) {
+        this.dumps  = opts.dumps;
+        this.fplus  = opts.fplus;
+        this.log    = opts.log || console.log;
+        
+        const acs = opts.acs_config;
+        this.url_replacements = {
+            NAMESPACE: acs.namespace,
+            DOMAIN: acs.domain,
+            PROTOCOL: acs.url_protocol,
+        };
+
+        this.yamlOpts = {
+            customTags: [
+                ["u",   this.resolveUUID],
+                ["url", this.resolveURL],
+            ].map(([t, f]) => ({ tag: `!${t}`, resolve: f.bind(this) })),
+        };
     }
-    return it;
-}
 
-const yamlOpts = {
-    customTags: [
-        {
-            tag:        "!u",
-            resolve:    str => resolve(str),
-        },
-    ],
-};
+    /** Resolve a well-known name to a UUID.
+     * This uses the uuids defined in service-client and also those
+     * defined for service-setup. */
+    resolveUUID (str) {
+        const cpts = str.split(".");
+        let it = UUID_SOURCES;
+        for (const c of cpts) {
+            if (!(c in it))
+                throw new Error(`UUID ref ${str} not found`);
+            it = it[c];
+        }
+        return it;
+    }
 
-export function parse_yaml (f) {
-    const ds = yaml.parseAllDocuments(f.yaml, yamlOpts)
-        .map(d => {
-            if (d.errors.length)
-                throw new Error(`YAML error in ${f.file}`, { cause: d.errors });
-            return d.toJS();
+
+    /**
+     * Resolves the namespace in the yaml string with the ACS namespace or domain.
+     * @param str The string to resolve.
+     * @return {*} The resolved URL.
+     */
+    resolveURL (str) {
+        const { url_replacements } = this;
+        return str.replace(/\${(.*?)}/g, (match, key) => {
+            if (!(key in url_replacements))
+                throw new Error(`URL substitution ${key} not found`);
+            return url_replacements[key];
         });
-    return ds;
-}
+    }
 
-export async function read_all_files () {
-    const yamls = await fsp.readdir("dumps")
-        .then(l => l
-            .filter(f => f.endsWith(".yaml"))
-            .map(f => fsp.readFile(`dumps/${f}`, { encoding: "utf8" })
-                .then(c => [f, c])))
-        .then(ps => Promise.all(ps))
-        .then(es => new Map(es));
+    /**
+     * Parses and converts yaml file to JSON.
+     * @param yaml The YAML string to parse.
+     * @param file The filename, for error messages.
+     * @return A JSON array of the parsed yaml files.
+     */
+    parse_yaml (text, file) {
+        const { yamlOpts } = this;
+        return yaml.parseAllDocuments(text, yamlOpts)
+            .map(document => {
+                if (document.errors.length)
+                    throw new Error(`YAML error in ${file}`, {cause: document.errors});
+                return document.toJS();
+            });
+    }
 
-    const graph = tsort();
-    [...yamls.entries()]
-        .map(([f, t]) => [f, t.match(/^# REQUIRE:\s+(.*)/m)?.[1]])
-        .filter(m => m[1])
-        .flatMap(([f, m]) => m.split(/\s+/)
-            .map(d => [`${d}.yaml`, f]))
-        .forEach(e => graph.add(e));
-    [...yamls.keys()]
-        .forEach(f => graph.add(f));
+    /** Read all YAML files.
+     * Reads all YAML files from the dumps dir. Filters based on the
+     * supplied condition.
+     * @param filter A condition applied to the file contents.
+     * @returns A Map from filename to contents.
+     */
+    read_files (filter) {
+        const { dumps } = this;
+        return fsp.readdir(dumps)
+            .then(l => l
+                .filter(f => f.endsWith(".yaml"))
+                .map(f => fsp.readFile(`${dumps}/${f}`, { encoding: "utf8" })
+                    .then(c => [f, c])))
+            .then(ps => Promise.all(ps))
+            .then(es => es.filter(([f, t]) => filter(t)))
+            .then(es => new Map(es));
+    }
 
-    return graph.sort()
-        .map(file => ({ file, yaml: yamls.get(file) }));
-}
+    /** Select and sort YAML files.
+     * Reads all YAML files. Selects files based on `early` and `EARLY`
+     * comments. Sorts based on `REQUIRE` comments.
+     * @param early Include `EARLY`, or not-`EARLY`?
+     * @returns A list of {file, yaml} objects.
+     */
+    async sort_files (early) {
+        const yamls = await this.read_files(t => /^# EARLY/m.test(t) == early);
 
-export async function load_dump (fplus, dump) {
-    const { service, version } = dump;
-    const { Authentication, ConfigDB } = UUIDs.Service;
+        const graph = tsort();
+        [...yamls.entries()]
+            .map(([f, t]) => [f, t.match(/^# REQUIRE:\s+(.*)/m)?.[1]])
+            .filter(m => m[1])
+            .flatMap(([f, m]) => m.split(/\s+/)
+                .map(d => [`${d}.yaml`, f]))
+            .forEach(e => graph.add(e));
+        [...yamls.keys()]
+            .forEach(f => graph.add(f));
 
-    if (!service || !version)
-        throw new Error("Dump is missing service or version!");
+        return graph.sort()
+            .map(file => ({ file, yaml: yamls.get(file) }));
+    }
 
-    /* I am standardising a new /load endpoint. Legacy dumps need to
-     * be loaded via the legacy endpoints. */
-    const url = 
-        service == Authentication && version == 1   ? "/authz/load"
-        : service == ConfigDB && version == 1       ? "/v1/load"
-        : "/load";
+    /** Load a dump into the appropriate service.
+     * We only support service versions which use the `/load` endpoint.
+     */
+    async load_dump (dump) {
+        const { fplus } = this;
+        const { service } = dump;
 
-    const query = service == ConfigDB && version == 1
-        ? { overwrite: dump.overwrite ? "true" : "false" }
-        : {};
+        if (!service)
+            throw new Error("Dump is missing service!");
 
-    const res = await fplus.Fetch.fetch({
-        service, url, query,
-        method:         "POST",
-        body:           JSON.stringify(dump),
-        headers:        { "Content-Type": "application/json" },
-    });
-    return res.status;
-}
+        const res = await fplus.Fetch.fetch({
+            service,
+            method:         "POST",
+            url:            "/load",
+            body:           JSON.stringify(dump),
+            headers:        { "Content-Type": "application/json" },
+        });
+        return res.status;
+    }
 
-export async function load_dumps (ss) {
-    const { fplus } = ss;
+    async load_dumps (early) {
+        const files = await this.sort_files(early);
 
-    const files = await read_all_files();
-
-    for (const f of files) {
-        ss.log("== %s", f.file);
-        const ds = parse_yaml(f);
-        for (const d of ds) {
-            ss.log("=== %s", d.service);
-            const st = await load_dump(fplus, d);
-            if (st > 300)
-                throw new Error(`Service dump ${f.file} failed: ${st}`);
+        for (const f of files) {
+            this.log("== %s", f.file);
+            const ds = this.parse_yaml(f.yaml, f.file);
+            for (const d of ds) {
+                this.log("=== %s", d.service);
+                const st = await this.load_dump(d);
+                if (st > 300)
+                    throw new Error(`Service dump ${f.file} failed: ${st}`);
+            }
         }
     }
 }

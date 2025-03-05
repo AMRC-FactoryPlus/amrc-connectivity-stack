@@ -3,7 +3,7 @@ import util from "util";
 
 import { UUIDs } from "@amrc-factoryplus/service-client";
 
-import { read_all_files, parse_yaml } from "../lib/dumps.js";
+import { DumpLoader } from "../lib/dumps.js";
 
 function load_schema (dir) {
     return import(`../../${dir}/lib/dump-schema.js`)
@@ -19,16 +19,24 @@ const schemas = [
     [UUIDs.Service.Authentication, "Auth", await load_schema("acs-auth")],
 ];
 
-const files = await read_all_files();
+const dumps = new DumpLoader({
+    dumps:      "dumps",
+    acs_config: {
+        namespace:      "factory-plus",
+        url_protocol:   "https",
+        domain:         "my.domain",
+    }});
+
+const files = await dumps.read_files(() => true);
 let exit = 0;
 
-for (const f of files) {
+for (const [file, text] of files.entries()) {
     const fail = (cause, ...args) => {
-        throw new Error(`${f.file}: ` + util.format(...args), { cause });
+        throw new Error(`${file}: ` + util.format(...args), { cause });
     };
 
     try { 
-        const ds = parse_yaml(f);
+        const ds = dumps.parse_yaml(text, file);
         ds.filter(d => !d.service || !d.version)
             .forEach(d => fail(null, "Missing service or version"));
         for (const [srv, name, validate] of schemas) {

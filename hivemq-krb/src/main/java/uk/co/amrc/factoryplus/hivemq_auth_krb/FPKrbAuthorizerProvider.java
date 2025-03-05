@@ -1,3 +1,8 @@
+/* Factory+ HiveMQ auth plugin.
+ * Authorizer Provider.
+ * Copyright 2025 AMRC.
+ */
+
 package uk.co.amrc.factoryplus.hivemq_auth_krb;
 
 import com.hivemq.extension.sdk.api.annotations.NotNull;

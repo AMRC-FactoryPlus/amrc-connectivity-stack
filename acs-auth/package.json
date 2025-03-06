@@ -21,12 +21,11 @@
   "author": "AMRC",
   "license": "MIT",
   "dependencies": {
-    "@amrc-factoryplus/pg-client": "^0.0.1",
-    "@amrc-factoryplus/rx-client": "0.0.1-bmz.9",
-    "@amrc-factoryplus/rx-util": "0.0.4-bmz.1",
-    "@amrc-factoryplus/service-api": "^0.1.0-bmz.4",
-    "@amrc-factoryplus/service-client": "^1.4.0-bmz.2",
-    "express": "^5.0.1",
+    "@amrc-factoryplus/pg-client": "file:../lib/js-pg-client",
+    "@amrc-factoryplus/rx-client": "file:../lib/js-rx-client",
+    "@amrc-factoryplus/rx-util": "file:../lib/js-rx-util",
+    "@amrc-factoryplus/service-api": "file:../lib/js-service-api",
+    "@amrc-factoryplus/service-client": "file:../lib/js-service-client",
     "uuid": "^11.0.5"
   },
   "devDependencies": {

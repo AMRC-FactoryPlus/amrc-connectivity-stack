@@ -1,4 +1,8 @@
-import { cva } from "class-variance-authority";
+/*
+ * Copyright (c) University of Sheffield AMRC 2025.
+ */
+
+import { cva } from 'class-variance-authority'
 
 export { default as Button } from "./Button.vue";
 
@@ -20,7 +24,7 @@ export const buttonVariants = cva(
         link: "text-slate-900 underline-offset-4 hover:underline dark:text-slate-50",
       },
       size: {
-        noPadding: "-ml-4 h-10 px-4 py-2",
+        plain: "",
         default: "h-10 px-4 py-2",
         sm: "h-9 rounded-md px-3",
         lg: "h-11 rounded-md px-8",

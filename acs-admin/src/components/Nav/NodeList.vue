@@ -24,7 +24,7 @@
       </Button>
       <CollapsibleContent>
         <SidebarMenuSub>
-          <!--          <NodeList :cluster/>-->
+          <!-- <DeviceList :node/>-->
         </SidebarMenuSub>
       </CollapsibleContent>
     </Collapsible>

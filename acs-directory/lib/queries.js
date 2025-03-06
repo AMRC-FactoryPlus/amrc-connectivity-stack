@@ -411,18 +411,20 @@ export default class Queries {
         /* This session replaces old sessions for this device/address. */
         await this.query(`
             update session
-            set next_for_device = $1
+            set next_for_device = $1,
+                finish = coalesce(finish, $3)
             where device = $2
               and next_for_device is null
               and id != $1
-        `, [sess, opts.devid]);
+        `, [sess, opts.devid, opts.time]);
         await this.query(`
             update session
-            set next_for_address = $1
+            set next_for_address = $1,
+                finish = coalesce(finish, $3)
             where address = $2
               and next_for_address is null
               and id != $1
-        `, [sess, opts.addrid]);
+        `, [sess, opts.addrid, opts.time]);
 
         return sess;
     }

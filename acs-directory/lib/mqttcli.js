@@ -122,6 +122,11 @@ export default class MQTTCli {
         if (this.silent)
             this.log("mqtt", "Running in monitor-only mode.");
 
+        /* We have just started. Any open Sparkplug sessions must be
+         * closed, as we may have missed a DEATH while we were offline.
+         */
+        this.model.close_all_sessions(new Date());
+
         const mqtt = await this.fplus.mqtt_client({
             verbose: true,
             will: this.will(),

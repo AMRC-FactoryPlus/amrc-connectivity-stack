@@ -145,6 +145,14 @@ export default class Queries {
 //        return dbr.rows;
     }
 
+    async close_all_sessions (timestamp) {
+        await this.query(`
+            update session
+            set finish = $1
+            where finish is null
+        `, [timestamp]);
+    }
+
     /* Schema */
 
     async find_schema_changes(sessid) {
@@ -422,6 +430,8 @@ export default class Queries {
     /* This will close all child device sessions when closing a node
      * session. */
     async record_death(time, addr) {
+        if (!time)
+            throw new Error("Recording DEATH with null timestamp");
         return await this.query(`
             update session ses
             set finish = $1 from device dev, address adr

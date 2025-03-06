@@ -22,7 +22,7 @@ The **scout** entry consists of two main parts: **scoutDetails** and **driverDet
   - MQTT driverDetails: Specifies **topic** and **duration**. The Edge Agent listens for messages within the specified **topic** for the given **duration** and returns any discovered addresses. 
   - driverDetails for OPC UA: 
 
-**Example**: Partial Edge Agent configuration YAML file showing only scouting-related entries.
+#### Example: Partial Edge Agent configuration YAML file showing only scouting-related entries
 ```
 deviceConnections:
     - OPCUAConnDetails:
@@ -46,33 +46,23 @@ deviceConnections:
             duration: 10000
 ```
 ## Edge Scout Results Application (ACS Config Service)
+The Edge Scout Results application consists of configurations identified by UUIDs, each corresponding to a device connection. Once scouting is performed, the discovered addresses are stored within addresses property as key-value pairs, where the key is the address and the value is an object containing additional information. The format of this object varies depending on the type of data available for the protocol. These configurations are mapped to their respective device connections by the device connection's **uuid** ([See `uuid` property of deviceConnection in Edge Agent Configuration](#example-partial-edge-agent-configuration-yaml-file-showing-only-scouting-related-entries)).
 
+#### Example: Discovered addresses stored in ACS Config Service
+The discovered addresses are stored in JSON format against their device connection within the Edge Scout Results application with UUID **f8c1b13b-ebaf-45c9-b712-9cd712695513**
+- **2b047ab0-b7b3-4bf3-a2d4-f98059c424f0** - UUID for OPC UA Device Connection
+```
 
-
-## Scout Application Configuration (ACS Config Service)
-The Scout application consists of configurations identified by UUIDs, each corresponding to a device connection. Once scouting is performed, the discovered addresses are stored as key-value pairs, where the key is the address and the value is an object containing additional information. The format of this object varies depending on the type of data available for the protocol. These configurations are mapped to their respective device connections.
-
-4d921c53-2270-482b-b52a-90a59d93637c Scout application:
-- 05e11cd5-07d2-4a37-88c9-fb74b3f4638f OPC_UA_Connection
+```
+- **1ef0e3aa-bc6d-4ff0-af94-972772ac8126** - UUID for MQTT Device Connection
 ```
 {
-  "ns=0;i=2254": {
-    "name": "ServerArray",
-    "nodeClassID": 2,
-    "nodeClassName": "Variable"
+  "addresses": {
+    "AMRC/F2050/PowerMonitoring/amrc-tplink-02/Status":{},
+    "AMRC/F2050/PowerMonitoring/amrc-tplink-46/Status":{},
+    "AMRC/F2050/PowerMonitoring/amrc-tplink-112/Status":{},
   },
-  "ns=0;i=2255": {
-    "name": "NamespaceArray",
-    "nodeClassID": 2,
-    "nodeClassName": "Variable"
-  }
-}
-```
-- 2107c3d2-3b92-455c-8401-ff717f4e4a10 F2050_mqtt_connection
-```
-{
-  "AMRC/PressFacility/PowerMonitoring/shellypro3em-34987a685d24/online": {},
-  "AMRC/PressFacility/PowerMonitoring/shellypro3em-34987a687798/online": {},
+  "success":true
 }
 ```
 

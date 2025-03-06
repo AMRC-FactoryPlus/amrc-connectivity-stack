@@ -3,19 +3,23 @@
   -->
 
 <template>
-  <div v-if="loadingDetails">LOADING</div>
-  <div v-else>
-    <div>Edge Cluster: {{cluster}}</div>
-    <div>Nodes: {{nodes}}</div>
-  </div>
+  <EdgeContainer>
+      <div v-if="loadingDetails">LOADING</div>
+      <div v-else>
+        <div>Edge Cluster: {{cluster}}</div>
+        <div>Nodes: {{nodes}}</div>
+      </div>
+  </EdgeContainer>
 </template>
 
 <script>
 import { useServiceClientStore } from '@store/serviceClientStore.js'
 import { UUIDs } from '@amrc-factoryplus/service-client'
 import { useNodeStore } from '@store/useNodeStore.js'
+import EdgeContainer from '@components/Containers/EdgeContainer.vue'
 
 export default {
+  components: { EdgeContainer },
 
   setup () {
     return {
@@ -29,6 +33,14 @@ export default {
       await this.getClusterDetails(newUuid)
 
     },
+
+    test: {
+      handler (newVal, oldVal) {
+        console.log('test', newVal)
+      },
+      deep: true,
+      immediate: true,
+    }
   },
 
   mounted () {
@@ -38,20 +50,16 @@ export default {
   methods: {
     async getClusterDetails (uuid) {
       this.loadingDetails = true
+
       // Get the cluster details here and merge them with the cluster
       // object. We need:
       // - Name & Deployed Helm Chart (we get this from bdb13634-0b3d-4e38-a065-9d88c12ee78d Edge cluster configuration)
       // - The hosts that are assigned to this cluster and their details (we get this from 747a62c9-1b66-4a2e-8dd9-0b70a91b6b75 Edge cluster status)
       // - The Nodes in this cluster, their name, status and\ other information (we get this from useNodeStore)
 
-      this.cluster = {
-        uuid: uuid,
-      }
+      this.cluster.uuid = uuid;
 
-      const edgeClusterConfigResponse = await useServiceClientStore().
-        client.
-        ConfigDB.
-        fetch(`/v1/app/${UUIDs.App.EdgeClusterConfiguration}/object/${this.cluster.uuid}`)
+      const edgeClusterConfigResponse = await useServiceClientStore().client.ConfigDB.fetch(`/v1/app/${UUIDs.App.EdgeClusterConfiguration}/object/${this.cluster.uuid}`)
 
       const edgeClusterConfig = edgeClusterConfigResponse[1]
       this.cluster.name       = edgeClusterConfig.name
@@ -100,6 +108,7 @@ export default {
     return {
       loadingDetails: true,
       cluster: {},
+      test: [],
     }
   },
 }

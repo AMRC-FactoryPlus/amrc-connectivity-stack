@@ -119,11 +119,9 @@ export default class MQTTCli {
             {name: "Device_Information/Manufacturer", type: "String", value: Device_Info.Manufacturer},
             {name: "Device_Information/Model", type: "String", value: Device_Info.Model},
             {name: "Device_Information/Serial", type: "String", value: Device_Info.Serial},
-
             {name: "Schema_UUID", type: "UUID", value: Schema.Service},
             {name: "Instance_UUID", type: "UUID", value: this.device_uuid},
             {name: "Service_UUID", type: "UUID", value: Service.Registry},
-            {name: "Service_URL", type: "String", value: this.url},
         ]);
         metrics.push.apply(metrics,
             Object.values(Changed).map(v =>

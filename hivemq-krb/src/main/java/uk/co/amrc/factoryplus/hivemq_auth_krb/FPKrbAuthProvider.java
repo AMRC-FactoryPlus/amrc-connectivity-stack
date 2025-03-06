@@ -62,21 +62,7 @@ public class FPKrbAuthProvider implements EnhancedAuthenticatorProvider
     public FPKrbAuthProvider start ()
     {
         fplus.http().start();
-
-         var url = fplus.getUriConf("mqtt_url");
-
-        fplus.directory()
-            .registerServiceURL(FPUuid.Service.MQTT, url)
-            .retryWhen(errs -> errs
-                .doOnNext(e -> {
-                    log.error("Service registration failed: {}", e.toString());
-                    log.info("Retrying registration in 5 seconds.");
-                })
-                .delay(5, TimeUnit.SECONDS))
-            .subscribe(() -> log.info("Registered service successfully"),
-                e -> log.error("Failed to register service: {}", 
-                    e.toString()));
-
+        
         return this;
     }
 

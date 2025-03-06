@@ -11,13 +11,18 @@ The discovered addresses are then stored in the ACS Config Service under the Sco
 
 ![High Level Diagram](./assets/edge-agent-scout/acs-edge-scout-high-level-diagram.png?raw=true)
 
-## Edge Agent Configuration (ACS Config Server)
+## Edge Agent Configuration (ACS Config Service)
 The ACS Config Service stores the **Edge Agent** configuration for all connections created in the ACS Manager and migrated into the ACS Config Service.
 
 Each configuration includes a list of device connections (`deviceConnections`) managed in the ACS Manager. These configurations contain connection details such as the connection type, connection UUID, necessary scouting entries, and other details that are not relevant to the scouting feature.
 
-When a **scout** entry is present, the **Edge Agent** requests addresses from devices associated with that connection.
+The **scout** entry consists of two main parts: **scoutDetails** and **driverDetails**.
+- **scoutDetails**: This part is standard across all device connections. The boolean property **isEnabled** specifies whether Edge Agent should run in scouting mode, allowing to request addresses from devices associated with that deviceConnection. 
+- **driverDetails**: This part is protocol-specific. Ideally, scouting should not rely on predefined configurations and should retrieve all addresses automatically. However, if a protocol does not natively support address discovery, manual configuaration may be required.  
+  - MQTT driverDetails: Specifies **topic** and **duration**. The Edge Agent listens for messages within the specified **topic** for the given **duration** and returns any discovered addresses. 
+  - driverDetails for OPC UA: 
 
+**Example**: Partial Edge Agent configuration YAML file showing only scouting-related entries.
 ```
 deviceConnections:
     - OPCUAConnDetails:
@@ -25,38 +30,24 @@ deviceConnections:
         name: OPC_UA_Connection
         uuid: 05e11cd5-07d2-4a37-88c9-fb74b3f4638f
         scout:
-            NodeIdType: NUMERIC
-            Identifier: 85
-            NamespaceIndex: 0
+          scoutDetails:
+            isEnabled: true
+          driverDetails:
+      
     - MQTTConnDetails:
         connType: MQTT
         name: MQTT_Connection
         uuid: 2107c3d2-3b92-455c-8401-ff717f4e4a10
         scout:
+          scoutDetails:
+            isEnabled: true
+          driverDetails:
             topic: '#'
             duration: 10000
 ```
+## Edge Scout Results Application (ACS Config Service)
 
-The `scout` section of the configuration differs for each device connection, as it contains protocol-specific configuration values. 
 
-#### Scout configuration for OPC UA connection type
-<!-- Todo: explain each entry, add table with schema  -->
-Example:
-```
-scout:
-    NodeIdType: NUMERIC
-    Identifier: 85
-    NamespaceIndex: 0
-```
-
-#### Scout configuration for MQTT connection type
-<!-- Todo: explain each entry, add table with schema  -->
-Example:
-```
-scout:
-    topic: '#'
-    duration: 10000
-```
 
 ## Scout Application Configuration (ACS Config Service)
 The Scout application consists of configurations identified by UUIDs, each corresponding to a device connection. Once scouting is performed, the discovered addresses are stored as key-value pairs, where the key is the address and the value is an object containing additional information. The format of this object varies depending on the type of data available for the protocol. These configurations are mapped to their respective device connections.
@@ -137,3 +128,41 @@ OPCUAConnection implements the `public async scoutAddresses(scoutDetails: ScoutD
     - View (128)
 
 - Nodes of the Variable class (2) are stored in a list of unique values and returned to the Scout class.
+
+`new NodeId(scoutDetails.NodeIdType, scoutDetails.Identifier, scoutDetails.NamespaceIndex);`
+
+`async browseOPCUANodes(session, nodeId: NodeId): Promise<ReferenceDescription[]>`
+```
+import {
+    AttributeIds,
+    ClientSession,
+    ClientSubscription,
+    CreateSubscriptionRequestLike,
+    MonitoredItemNotification,
+    OPCUAClient,
+    OPCUAClientOptions,
+    ReadValueIdOptions,
+    resolveNodeId,
+    TimestampsToReturn,
+    UserIdentityInfo,
+    UserTokenType,
+    WriteValueOptions,
+    BrowseResult,
+    NodeId,
+    NodeIdType,
+    ReferenceDescription,
+    NodeClass
+} from "node-opcua";
+```
+
+# OPCUA doc from NodeOPCUA reference doc
+## Enumeration NodeIdType
+`NodeIdType` is an enumeration that specifies the possible types of a `NodeId` value.
+Enumeration members:
+- BYTESTRING
+- GUID
+- NUMERIC
+- STRING
+
+
+## 

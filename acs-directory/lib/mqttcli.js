@@ -34,11 +34,6 @@ function map_get_or_create(map, key, factory) {
     return rv;
 }
 
-function ts_date (ts) {
-    const val = Long.isLong(ts) ? ts.toNumber() : ts;
-    return new Date(val);
-}
-
 function for_each_metric(tree, action) {
     for (const [name, metric] of Object.entries(tree)) {
         if (metric instanceof MetricBranch) {
@@ -214,11 +209,13 @@ export default class MQTTCli {
 
         let payload;
         try {
-            payload = SpB.decodePayload(message);
+            payload = SpB.decodeToNative(message);
         } catch {
             this.log("mqtt", `Bad payload on topic ${topicstr}`);
             return;
         }
+        /* Default the payload timestamp here. */
+        payload.timestamp ??= new Date();
 
         /* Push messages to a queue so they are processed serially. I
          * think this is stricter than is necessary: probably messages
@@ -371,7 +368,7 @@ export default class MQTTCli {
                 metric: active.name,
                 active: active.value,
                 alias:  active.alias,
-                stamp:  ts_date(active.timestamp ?? timestamp),
+                stamp:  active.timestamp,
             });
         });
 
@@ -389,8 +386,8 @@ export default class MQTTCli {
         for (const alrt of alerts.values()) {
             metrics.name.set(alrt.metric, alrt.uuid);
             if (alrt.alias != undefined) {
-                /* We must stringify the alias as it is a Long */
-                metrics.alias.set(alrt.alias.toString(), alrt.uuid);
+                /* Aliases are BigInts now which can be Map keys */
+                metrics.alias.set(alrt.alias, alrt.uuid);
             }
         }
         this.log("alerts", "Recorded aliases for %s: %o", address, metrics);
@@ -404,10 +401,10 @@ export default class MQTTCli {
 
         const updates = payload.metrics.flatMap(m => {
             const uuid = "alias" in m 
-                ? alerts.alias.get(m.alias.toString()) 
+                ? alerts.alias.get(m.alias) 
                 : alerts.name.get(m.name);
             if (!uuid) return [];
-            const stamp = ts_date(m.timestamp ?? payload.timestamp);
+            const stamp = m.timestamp ?? payload.timestamp;
             return [[uuid, m.value, stamp]];
         });
         this.log("alerts", "Updates: %o", updates);
@@ -458,7 +455,7 @@ export default class MQTTCli {
         this.record_alert_metrics(address, alerts);
 
         await this.model.birth({
-            time: ts_date(payload.timestamp ?? 0),
+            time: payload.timestamp,
             address,
             uuid: tree.Instance_UUID?.value,
             top_schema: tree.Schema_UUID?.value,
@@ -472,7 +469,7 @@ export default class MQTTCli {
     }
 
     async on_death(address, payload) {
-        const time =  ts_date(payload.timestamp ?? 0);
+        const time = payload.timestamp;
 
         this.log("device", `Registering DEATH for ${address}`);
 

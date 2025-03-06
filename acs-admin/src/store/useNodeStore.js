@@ -64,6 +64,7 @@ export const useNodeStore = defineStore('node', {
         this.loaded = true
         this.loading = false
       }).catch((err) => {
+        this.loading = false
         console.error(`Can't fetch nodes`, err)
       })
     },

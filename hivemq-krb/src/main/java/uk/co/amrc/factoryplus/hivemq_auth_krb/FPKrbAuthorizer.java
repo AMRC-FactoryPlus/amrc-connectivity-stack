@@ -1,0 +1,175 @@
+/* Factory+ HiveMQ auth plugin.
+ * Authorizer.
+ * Copyright 2025 AMRC.
+ */
+
+package uk.co.amrc.factoryplus.hivemq_auth_krb;
+
+import com.hivemq.extension.sdk.api.annotations.NotNull;
+import com.hivemq.extension.sdk.api.auth.PublishAuthorizer;
+import com.hivemq.extension.sdk.api.auth.SubscriptionAuthorizer;
+import com.hivemq.extension.sdk.api.auth.parameter.*;
+import io.reactivex.rxjava3.core.Single;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import uk.co.amrc.factoryplus.FPServiceClient;
+
+import java.util.List;
+import java.util.stream.Collectors;
+
+import static uk.co.amrc.factoryplus.hivemq_auth_krb.AuthUtils.getACLforPrincipal;
+
+public class FPKrbAuthorizer implements SubscriptionAuthorizer, PublishAuthorizer {
+    private final FPServiceClient fplus;
+    private static final @NotNull Logger log = LoggerFactory.getLogger(FPKrbAuthenticator.class);
+
+    public FPKrbAuthorizer(FPKrbAuthorizerProvider authorizerProvider) {
+        fplus = authorizerProvider.fplus;
+    }
+
+    @Override
+    public void authorizePublish(
+            @NotNull PublishAuthorizerInput publishAuthorizerInput,
+            @NotNull PublishAuthorizerOutput publishAuthorizerOutput
+    ) {
+        var clientId = publishAuthorizerInput.getClientInformation().getClientId();
+        var clientUsername = ClientSessionStore.getUsername(clientId);
+        log.info("Client username is: {}", clientUsername);
+        var topic = publishAuthorizerInput.getPublishPacket().getTopic();
+        try{
+            isPermissionAllowed(getACLforPrincipal(clientUsername, fplus), topic, TopicPermission.MqttActivity.PUBLISH)
+                    .subscribe(result -> {
+                        if(result){
+                            publishAuthorizerOutput.authorizeSuccessfully();
+                            log.info("Successfully authorized publish client {} for topic {}", clientUsername, topic);
+                        }else{
+                            log.info("Publish permission denied for user {} topic {}",clientUsername, topic);
+                            publishAuthorizerOutput.failAuthorization();
+                        }
+                    },
+                            error ->  log.error("Error occurred: {}", error.getMessage()));
+        }
+        catch(Exception e){
+            log.info("Error {} Publish permission denied for topic {}",e.getMessage(), topic);
+            publishAuthorizerOutput.failAuthorization();
+        }
+    }
+
+    @Override
+    public void authorizeSubscribe(
+            @NotNull SubscriptionAuthorizerInput subscriptionAuthorizerInput,
+            @NotNull SubscriptionAuthorizerOutput subscriptionAuthorizerOutput
+    ) {
+        var clientId = subscriptionAuthorizerInput.getClientInformation().getClientId();
+        var clientUsername = ClientSessionStore.getUsername(clientId);
+        log.info("Client username is: {}", clientUsername);
+        var topic = subscriptionAuthorizerInput.getSubscription().getTopicFilter();
+        try{
+            isPermissionAllowed(getACLforPrincipal(clientUsername, fplus), topic, TopicPermission.MqttActivity.SUBSCRIBE)
+                    .subscribe(result -> {
+                        if (result) {
+                            log.info("Successfully authorized subscription client {} for topic {}.", clientUsername, topic);
+                            subscriptionAuthorizerOutput.authorizeSuccessfully();
+                        } else {
+                            log.info("Subscription permission denied for user {} topic {}", clientUsername, topic);
+                            subscriptionAuthorizerOutput.failAuthorization();
+                        }
+                    },
+                            error -> log.error("Error occurred: {}", error.getMessage()));
+        }
+        catch(Exception e){
+            log.info("Error {} Subscription permission denied for topic {}",e.getMessage(), topic);
+            subscriptionAuthorizerOutput.failAuthorization();
+        }
+    }
+
+    /**
+     * Gets the permissions for a mqtt activity from a principles permission list.
+     * @param permissions All mqtt topic permissions from a principle.
+     * @param mqttActivity The type of mqtt activity to filter for.
+     * @return Topic permissions for a mqtt activity.
+     */
+    private static Single<List<TopicPermission>> getAllowedPermissions(
+            Single<List<TopicPermission>> permissions,
+            TopicPermission.MqttActivity mqttActivity
+    ) {
+        return permissions.map(permissionList -> permissionList.stream()
+                .filter(permission -> permission.getActivity() == mqttActivity)
+                .filter(permission -> permission.getType() == TopicPermission.PermissionType.ALLOW)
+                .collect(Collectors.toList()));
+    }
+
+    /**
+     * Checks if the topic being published or subscribed to is allowed based on the principles acl.
+     * @param permissions The principle's permission.
+     * @param targetPermission The Permission to check.
+     * @param mqttActivity The MQTT activity (publish or subscribe).
+     * @return If the MQTT action for the target permission is allowed.
+     */
+    private static Single<Boolean> isPermissionAllowed(
+            Single<List<TopicPermission>> permissions,
+            String targetPermission,
+            TopicPermission.MqttActivity mqttActivity
+    ) {
+        return getAllowedPermissions(permissions, mqttActivity)
+                .map(filteredPermissions -> filteredPermissions.stream()
+                        .anyMatch(permission -> matchesPermission(permission.getTopicFilter(), targetPermission))
+                );
+    }
+
+    /**
+     * Check if an MQTT topic matches a topic from the principles acl.
+     * @param existing The topic filter someone has subscribed or published to (may contain wildcards)
+     * @param target The actual topic a message was subscribed or published to (no wildcards)
+     * @return true if the topics match, false otherwise
+     */
+    private static boolean matchesPermission(String existing, String target) {
+        // Split topics into parts
+        String[] subParts = existing.split("/");
+        String[] pubParts = target.split("/");
+
+        // Handle # wildcard
+        for (int i = 0; i < subParts.length - 1; i++) {
+            if (subParts[i].equals("#")) {
+                // Invalid use of # (not at the end)
+                return false;
+            }
+        }
+
+        if (subParts[subParts.length - 1].equals("#")) {
+            // Check if all parts before # match
+            int prefixLength = subParts.length - 1;
+
+            // If published topic has fewer levels than the prefix, it can't match
+            if (pubParts.length < prefixLength) {
+                return false;
+            }
+
+            // Check if prefix matches
+            for (int i = 0; i < prefixLength; i++) {
+                if (!subParts[i].equals("+") && !subParts[i].equals(pubParts[i])) {
+                    return false;
+                }
+            }
+
+            // If we get here, the prefix matches and # takes care of the rest
+            return true;
+        }
+
+        // If lengths don't match (and there's no # wildcard), they can't match
+        if (subParts.length != pubParts.length) {
+            return false;
+        }
+
+        // Check each level
+        for (int i = 0; i < subParts.length; i++) {
+            // + matches any single level
+            if (!subParts[i].equals("+") && !subParts[i].equals(pubParts[i])) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+}
+

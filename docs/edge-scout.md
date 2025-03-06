@@ -46,13 +46,13 @@ deviceConnections:
             duration: 10000
 ```
 ## Edge Scout Results Application (ACS Config Service)
-The Edge Scout Results application consists of configurations identified by UUIDs, each corresponding to a device connection. Once scouting is performed, the discovered addresses are stored within addresses property as key-value pairs, where the key is the address and the value is an object containing additional information. The format of this object varies depending on the type of data available for the protocol. These configurations are mapped to their respective device connections by the device connection's **uuid** ([See `uuid` property of deviceConnection in Edge Agent Configuration](#example-partial-edge-agent-configuration-yaml-file-showing-only-scouting-related-entries)).
+The Edge Scout Results Application (UUID **f8c1b13b-ebaf-45c9-b712-9cd712695513**) was created in ACS Config Service to store discovered addresses. It consists of configurations identified by UUIDs, each corresponding to a device connection.
 
-
-The scouting results are stored as key-value objects in JSON format, mapped to their device connections within the Edge Scout Results application (UUID **f8c1b13b-ebaf-45c9-b712-9cd712695513**). 
-- The keys in addresses section always represent the actual addresses.
-- The values are objects containing additional information if provided by the protocol.
-- The format of tje value varies depending on the protocol.
+Once scouting is performed, the discovered addresses are stored in the `addresses` property as **key-value pairs**, where
+- The **keys** in addresses section always represent the actual addresses.
+- The **values** are objects containing additional information, with the format varying based on protocol and available data.
+ 
+These configurations are mapped to their respective **device connections** using the **UUID** of each connection ([See `uuid` property of `deviceConnection` in Edge Agent Configuration](#example-partial-edge-agent-configuration-yaml-file-showing-only-scouting-related-entries)).
 
 #### Example: Discovered addresses stored in ACS Config Service
  **f8c1b13b-ebaf-45c9-b712-9cd712695513** - UUID for Edge Scout Results Application

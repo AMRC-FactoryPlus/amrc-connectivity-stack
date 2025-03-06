@@ -11,10 +11,23 @@ export const useEdgeClusterStore = defineStore('edge-cluster', {
   state: () => ({
     data: [],
     loading: false,
+    loaded: false,
   }),
   actions: {
 
-    async fetch () {
+    // A convenience method to refresh the data
+    async refresh () {
+      await this.fetch(true)
+    },
+
+    async fetch (fresh = false) {
+
+      // If we have already loaded the data, don't fetch it again unless
+      // the fresh flag is set to true
+      if (this.loaded && !fresh) {
+        return
+      }
+
       this.loading = true
 
       // Wait until the store is ready before attempting to fetch data
@@ -48,8 +61,10 @@ export const useEdgeClusterStore = defineStore('edge-cluster', {
           }
         }))
 
+        this.loaded = true
         this.loading = false
       }).catch((err) => {
+        this.loading = false
         console.error(`Can't fetch edge clusters`, err)
       })
     },

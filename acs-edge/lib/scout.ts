@@ -12,7 +12,8 @@ export interface ScoutDriverDetails {
 
 export interface ScoutResult {
     addresses: object | null,
-    success: boolean
+    timestamp: number | null,
+    success: boolean,
 }
 
 export class Scout extends EventEmitter {
@@ -30,7 +31,7 @@ export class Scout extends EventEmitter {
 
 
     public async performScouting(): Promise<void> {
-        let scoutResult: ScoutResult = { addresses: null, success: true };
+        let scoutResult: ScoutResult = { addresses: null, success: true, timestamp: null };
         try {
             if (this.scoutDetails?.isEnabled === false) {
                 log(`Scouting isEnabled is False, so you cannot perform scouting for ${this.deviceConnection._type}`);
@@ -45,6 +46,7 @@ export class Scout extends EventEmitter {
 
                 scoutResult = {
                     addresses: addresses,
+                    timestamp: Date.now(),
                     success: true
                 };
 
@@ -56,7 +58,7 @@ export class Scout extends EventEmitter {
             scoutResult.success = false;
         }
         finally {
-            this.emit("scoutComplete", scoutResult);
+            this.emit("scoutResults", scoutResult);
         }
     }
 

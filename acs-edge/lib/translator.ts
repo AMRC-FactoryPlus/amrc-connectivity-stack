@@ -213,10 +213,12 @@ export class Translator extends EventEmitter {
         if (connection.scout?.scoutDetails?.isEnabled) {
             log(`Edge-Agent to be run in Scout Mode for ${connection.name}`);
             const newScout = this.scouts[cType] = new Scout(newConn, connection.scout);
-            newScout.on('scoutComplete', async (scoutResult: ScoutResult) => {
+            newScout.on('scoutResults', async (scoutResult: ScoutResult) => {
                 try {
-                    await this.save_to_file(JSON.stringify(scoutResult), './scout', connection.name, 'json');
-                    await this.put_to_config(UUIDs.App.EdgeScoutResults, connection.uuid, JSON.stringify(scoutResult));
+                    if (scoutResult.success) {
+                        await this.save_to_file(JSON.stringify(scoutResult), './scout', connection.name, 'json');
+                        await this.put_to_config(UUIDs.App.EdgeScoutResults, connection.uuid, JSON.stringify(scoutResult));
+                    }
                 }
                 catch (err) {
                     console.error('Error when trying to put to config db: ', (err as Error).message);

@@ -23,11 +23,17 @@
         <div>
           <div>
             <label for="clusterName" class="font-semibold">Cluster Name</label>
-            <Input disabled name="clusterName" :default-value="cluster.name" />
+            <div class="flex items-center gap-2">
+              <Input disabled name="clusterName" :default-value="cluster.name" />
+              <Button variant="ghost" @click="() => copy(cluster.name)">Copy</Button>
+            </div>
           </div>
           <div class="mt-4">
             <label for="helmChart" class="font-semibold">Helm Chart</label>
-            <Input disabled name="helmChart" :default-value="cluster.helmChart.chart" />
+            <div class="flex items-center gap-2">
+              <Input disabled name="helmChart" :default-value="cluster.helmChart.chart" />
+              <Button variant="ghost" @click="() => copy(cluster.helmChart.chart)">Copy</Button>
+            </div>
           </div>
         </div>
         <div v-if="nodes.length > 0" class="mt-8">
@@ -75,6 +81,7 @@ import DataTable from "@components/ui/data-table/DataTable.vue";
 import { hostColumns } from './hostColumns.ts'
 import { nodeColumns } from './nodeColumns.ts'
 import {Alert, AlertDescription, AlertTitle} from "@components/ui/alert/index.js";
+import {toast} from "vue-sonner";
 
 export default {
   components: {
@@ -125,6 +132,10 @@ export default {
   },
 
   methods: {
+    copy (text) {
+      navigator.clipboard.writeText(text)
+      toast.success('Text copied to clipboard')
+    },
     async getClusterDetails (uuid) {
       this.loadingDetails = true
 

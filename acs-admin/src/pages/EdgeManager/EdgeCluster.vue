@@ -57,7 +57,7 @@
     <template #header>
       <div class="flex bg-white items-center justify-between gap-2">
         <Button>Status</Button>
-        <Button>Copy Bootstrap</Button>
+        <Button @click="copyBootstrap">Copy Bootstrap</Button>
       </div>
     </template>
   </EdgeContainer>
@@ -135,6 +135,25 @@ export default {
     copy (text) {
       navigator.clipboard.writeText(text)
       toast.success('Text copied to clipboard')
+    },
+    async copyBootstrap() {
+      try {
+        const bootstrapResponse = await useServiceClientStore()
+            .client.Fetch.fetch(
+                {
+                  service: UUIDs.Service.Clusters,
+                  url: `/cluster/${this.$route.params.clusteruuid}/bootstrap-url`
+                })
+        console.log(bootstrapResponse)
+        const bootstrap = bootstrapResponse[1];
+        if (bootstrap.data) {
+          this.copy(`curl ${bootstrap.data} | sh -`)
+        } else {
+          toast.error('The bootstrap script is not ready yet. Please wait a few moments and try again.')
+        }
+      } catch {
+        toast.error('The bootstrap script is not ready yet. Please wait a few moments and try again.')
+      }
     },
     async getClusterDetails (uuid) {
       this.loadingDetails = true

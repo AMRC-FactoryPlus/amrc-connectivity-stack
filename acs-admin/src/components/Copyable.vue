@@ -3,20 +3,15 @@
   -->
 
 <template>
-  <div class="hover:underline hover:cursor-pointer flex items-center gap-2 group" @click="copy">
+  <div title="Click to copy" class="hover:underline hover:cursor-pointer flex items-center gap-2 group" @click="copy">
     <slot/>
     <i class="fa-solid text-xl fa-copy !hidden group-hover:!inline"></i>
-  </div>
-  <div v-if="copied" class="text-xs text-green-700">
-    Copied!
-  </div>
-  <div v-else class="text-xs text-muted-foreground">
-    Click to copy
   </div>
 </template>
 
 <script>
 import { useClipboard } from '@vueuse/core'
+import { toast } from 'vue-sonner'
 
 export default {
 
@@ -38,6 +33,7 @@ export default {
       const { copy } = useClipboard()
       copy(this.text)
       this.copied = true
+      toast.success('Text copied to clipboard')
     },
   },
 

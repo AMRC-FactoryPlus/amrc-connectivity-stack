@@ -86,7 +86,6 @@ These configurations are mapped to their respective **device connections** using
 }
 ```
 - **1ef0e3aa-bc6d-4ff0-af94-972772ac8126** - UUID for MQTT Device Connection
-
 ```
 {
   "addresses": {
@@ -98,93 +97,140 @@ These configurations are mapped to their respective **device connections** using
 }
 ```
 
-
 ## Implementation
-### Translator Class (Changes for Scouting Feature)
-The scouting feature is embedded into the Edge Agent's Translator class.
-- The Translator class checks if the connection configuration includes a scout entry.
-- If the current connection is configured to run in scout mode, the Translator creates an instance of the Scout class for this connection, passing the DeviceConnection instance and scoutConfig as arguments to the constructor:
-`constructor(deviceConnection: DeviceConnection, scoutConfig: any)`
-- Upon creating the Scout instance, the Translator subscribes to the **scoutComplete** event, which returns a list of discovered addresses. The Translator then sends this list back to the ACS Config Service.
-- Finally, the Translator calls the Scout instance's `performScouting()` method to perform scouting.
-  
-### Scout Class (New Component)
-- The Scout class receives the DeviceConnection instance and scoutConfig.
-- The Scout class understands the expected configuration format for each type of DeviceConnection and converts it accordingly (e.g., MQTT, OPC UA, etc.).
-- The `performScouting()` method invokes the relevant method of the DeviceConnection to perform scouting.
-- Once the DeviceConnection completes scouting, `performScouting()` receives a list of discovered addresses.
-- Finally, the method triggers the **scoutComplete** event with the list of discovered addresses.
+### DeviceConnection abstract class (Changes for Scouting Feature)
+Two new methods are added to the abstract **DeviceConnection** class:
+```
+public async scoutAddresses(driverDetails: ScoutDriverDetails): Promise<object>
+```
+- This method **must be implemented** in its subclasses (MQTTConnection, OPCUAConnection), as the process for retrieving available addresses differs based on the protocol.
+- It accepts `driverDetails` part of the scout configuration. 
+- It returns the scouting results as an `object`. 
 
-### DeviceConnection (Changes for Scouting Feature)
-- A new method is added to the abstract DeviceConnection class:
-`public async scoutAddresses(scoutDetails: ScoutDetails): Promise<string[]>`
-- This method must be implemented in its subclasses (MQTTConnection, OPCUAConnection), as the process for retrieving available addresses varies based on the protocol.
+```
+async validateConfigDetails(driverDetails: ScoutDriverDetails): Promise<ScoutDriverDetails>
+```
+- This method **must be implemented** in its subclasses (MQTTConnection, OPCUAConnection), as the process for interpreting `driverDetails` part of the scout configuration varies by protocol.
+- It accepts `driverDetails` part of the scout configuration. 
+- It performs validation for `driverDetails`, converts it to correct format, and returns the validated configuration in an appropriate type, which extends the `ScoutDriverDetails` type. 
 
 ### MQTTConnection (Changes for Scouting Feature)
-MQTTConnection implements the `public async scoutAddresses(scoutDetails: ScoutDetails): Promise<string[]>` of its superclass DeviceConnection. 
-- The `scoutAddresses` method for MQTTConnection retrieves the topic and duration from its configuration.
-These parameters define:
-  - Topic: The topic to listen to (e.g., #).
-  - Duration: The length of time to listen (e.g., 5 minutes).
+MQTTConnection implements the two methods for scouting of its superclass, [DeviceConnection](#deviceconnection-abstract-class-changes-for-scouting-feature)
 
-- The MQTTConnection creates a dedicated MQTT client for scouting, which:
-    - Subscribes to the specified topic.
-    - Listens for the given duration.
-    - Collects all topics received during this period.
-    - Returns the list of discovered topics to the Scout class.
-    - Shuts down the MQTT client after scouting is complete.
-  
+
+`validateConfigDetails` **Method**
+
+```
+interface MqttScoutDetails extends ScoutDriverDetails {
+    duration: number,
+    topic: string
+}
+
+async validateConfigDetails(driverDetails: any): Promise<MqttScoutDetails>{
+  ...
+}
+```
+- This method receives `driverDetails` part of the scout configuration.
+- It validates the `driverDetails` against the `MqttScoutDetails` format.
+- If `driverDetails` match the format, it converts them into `MqttScoutDetails` and returns the result.
+- Otherwise, it returns the **default** configuration for MQTTConnection scouting.
+
+
+
+`scoutAddresses` **Method**
+```
+public async scoutAddresses(driverDetails: ScoutDriverDetails): Promise<object>{
+  ...
+}
+```
+- This method receives `driverDetails` part of the scout configuration and passes it to the `validateConfigDetails(driverDetails: any): Promise<MqttScoutDetails>` method for validation.
+- It then receives the validated and formatted `MqttScoutDetails`.
+- It creates a new MQTT client and connects to the provided MQTT broker.
+- It client listens to the `driverDetails.topic` for the specified `driverDetails.duration`.
+- Once the duration passes, it closes the MQTT connection.
+- Finally, it returns the object where MQTT topics are stored as keys within `addresses` entry.
+
+
 ### OPCUAConnection (Changes for Scouting Feature)
-OPCUAConnection implements the `public async scoutAddresses(scoutDetails: ScoutDetails): Promise<string[]>` of its superclass DeviceConnection.
-- The OPCUAConnection creates an OPC UA client and a session that recursively searches for all nodes within the provided OPCUA server starting from the RootNode.
-- Certain Node Classes can contain child nodes, so their children are also checked. These classes include:
-    - Object (1)
-    - ObjectType (8)
-    - ReferenceType (32)
 
-- If a node belongs to a leaf node class, it is not further traversed. Leaf node classes include:
-    - Variable (2)
-    - VariableType (16)
-    - Method (4)
-    - DataType (64)
-    - View (128)
+The **OPC UA** protocol can handle address discovery natively and does not require manual configuration, therefore the `driverDetails` for OPC UA connections are empty.
+The `OPCUAConnection` subclass implements the `public async scoutAddresses(driverDetails: ScoutDriverDetails): Promise<object>` from its superclass `DeviceConnection`.
 
-- Nodes of the Variable class (2) are stored in a list of unique values and returned to the Scout class.
-
-`new NodeId(scoutDetails.NodeIdType, scoutDetails.Identifier, scoutDetails.NamespaceIndex);`
-
-`async browseOPCUANodes(session, nodeId: NodeId): Promise<ReferenceDescription[]>`
 ```
-import {
-    AttributeIds,
-    ClientSession,
-    ClientSubscription,
-    CreateSubscriptionRequestLike,
-    MonitoredItemNotification,
-    OPCUAClient,
-    OPCUAClientOptions,
-    ReadValueIdOptions,
-    resolveNodeId,
-    TimestampsToReturn,
-    UserIdentityInfo,
-    UserTokenType,
-    WriteValueOptions,
-    BrowseResult,
-    NodeId,
-    NodeIdType,
-    ReferenceDescription,
-    NodeClass
-} from "node-opcua";
+public async scoutAddresses(driverDetails: ScoutDriverDetails): Promise<object>{
+  ...
+}
+```
+- This method creates a new OPC UA client and connects to the provided OPC UA server.
+- It browses through all nodes and namespaces starting from the root folder, recursively checking all non-leaf nodes.
+- The leaf-nodes of **Variable** class, which store actual values, are saved as discovered addresses. 
+- It closes the OPC UA connection once the browsing is complete.
+- Finally, it returns the object where OPC UA node addresses are stored as keys and additional node metadata is stored as value objects within `addresses` entry.
+
+
+### Scout Class (New Component)
+```
+export interface ScoutDetails {
+    isEnabled: boolean
+}
+
+export interface ScoutResult {
+    addresses: object | null,
+    success: boolean
+}
+
+export class Scout extends EventEmitter {
+    constructor(deviceConnection: DeviceConnection, scoutFullConfig: any) {
+        super();
+        this.deviceConnection = deviceConnection;
+        this.scoutDetails = this.validateScoutConfig(scoutFullConfig.scoutDetails);
+        this.driverDetails = scoutFullConfig.driverDetails;
+    }
+
+
+    public async performScouting(): Promise<void> {
+      ...
+    }
+
+    private validateScoutConfig(scoutDetails: any): ScoutDetails {
+      ...
+    }
+}
 ```
 
-# OPCUA doc from NodeOPCUA reference doc
-## Enumeration NodeIdType
-`NodeIdType` is an enumeration that specifies the possible types of a `NodeId` value.
-Enumeration members:
-- BYTESTRING
-- GUID
-- NUMERIC
-- STRING
+- The Scout class receives the `DeviceConnection` instance `deviceConnection` and a full scout configuration `scoutFullConfig` through its `constructor`.
+- The `constructor` splits the scout configuration into `scoutDetails` and `driverDetails`.
+- The `scoutDetails` part is validated in the `validateScoutConfig` method against the `ScoutDetails` type.
+- The `performScouting` method, when called checks whether the `scoutDetails.isEnabled` is set to `true`. If the `isEnabled` is `true`, the method calls the `scoutAddresses(driverDetails)` on `deviceConnection` and passes the `driverDetails` part of the scout configuration. The validation for `driverDetails` is handled by each `DeviceConnection` subclass depending on the protocol.
+- Once the `scoutAddresses` method returns the list of `addresses`, the `performScouting()` method creates a `scoutResult` object of type `ScoutResult`, containing the discovered `addresses` and a `success` status.
+- Finally, the `performScouting()` method triggers the **scoutResults** event with the `scoutResult`.
 
+### Translator Class (Changes for Scouting Feature)
+The `async setupConnection(connection: any): Promise<void>` method of the `Translator` class was modified to instantiate a `Scout` class alongside each device connection when it is created. The method checks whether `scoutDetails.isEnabled` is set to `true`. If so, it runs the `DeviceConnection` in scout mode by instantiating the `Scout` class and passing the `DeviceConnection` instance to it. Otherwise, it runs the `DeviceConnection` in default mode, as per the standard Edge Agent functionality.
 
-## 
+Upon creating the `Scout` instance (`newScout`), the `Translator` subscribes to the `scoutResults` event, which returns the `scoutResult`. When the `scoutResults` event is triggered, the `success` status of `scoutResult` is checked. If `success` is true, the `scoutResult` is sent to the ACS Config Service to be stored in the **Edge Scout Results** application under the corresponding device connection. This is achieved by calling the ConfigDB API `put_config(app, obj, json)`, where the provided parameters are:
+- `app` - UUID for the Edge Scout Results application
+- `obj` - UUID for the Device Connection
+- `json` - Content in JSON format
+Finally, after creating `newScout` and subscribing to its `scoutResults` event, the `Translator` calls the `performScouting()` method on `newScout`.
+```
+async setupConnection(connection: any): Promise<void> {
+  ...
+  const newConn = new deviceInfo.connection(
+      connection.connType,
+      connection[deviceInfo.connectionDetails],
+      connection.name,
+      this.broker);
+
+  if (connection.scout?.scoutDetails?.isEnabled) {
+      const newScout = new Scout(newConn, connection.scout);
+      newScout.on('scoutResults', async (scoutResult: ScoutResult) => {
+        if(scoutResult.success){
+          await this.put_to_config(UUIDs.App.EdgeScoutResults, connection.uuid, JSON.stringify(scoutResult));
+        }
+      });
+      newScout.performScouting();
+  }
+  ...
+}
+```

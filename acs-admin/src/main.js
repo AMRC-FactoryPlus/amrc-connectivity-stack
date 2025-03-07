@@ -14,7 +14,7 @@ import Home from '@pages/Home.vue'
 import Activity from '@pages/Activity.vue'
 import Alerts from '@pages/Alerts/Alerts.vue'
 import AccessControl from '@pages/AccessControl/AccessControl.vue'
-import EdgeCluster from '@pages/EdgeCluster.vue'
+import EdgeCluster from '@pages/EdgeManager/EdgeCluster.vue'
 
 const routes = [
   {

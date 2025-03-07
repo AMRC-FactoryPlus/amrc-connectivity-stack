@@ -33,9 +33,9 @@ export const useNodeStore = defineStore('node', {
       // Wait until the store is ready before attempting to fetch data
       await storeReady()
 
-      useServiceClientStore().client.ConfigDB.fetch(`/v1/class/${UUIDs.Class.EdgeAgent}`).then(async (edgeAgentUUIDS) => {
+      useServiceClientStore().client.ConfigDB.fetch(`/v1/class/${UUIDs.Class.EdgeAgent}`).then(async (nodeUUIDs) => {
 
-        const payload = edgeAgentUUIDS[1]
+        const payload = nodeUUIDs[1]
 
         // We expect an array here, so if it isn't, we can't continue
         if (!Array.isArray(payload)) {
@@ -44,18 +44,18 @@ export const useNodeStore = defineStore('node', {
         }
 
         // Hydrate the node details from the UUIDs provided from the response
-        this.data = await Promise.all(payload.map(async (edgeAgentUUID) => {
+        this.data = await Promise.all(payload.map(async (nodeUUID) => {
           try {
-            let edgeDeployment = await useServiceClientStore().client.ConfigDB.get_config(UUIDs.App.EdgeAgentDeployment, edgeAgentUUID)
+            let edgeDeployment = await useServiceClientStore().client.ConfigDB.get_config(UUIDs.App.EdgeAgentDeployment, nodeUUID)
             return {
               ...edgeDeployment,
-              uuid: edgeAgentUUID,
+              uuid: nodeUUID,
             }
           }
           catch (err) {
             console.error(`Can't read node details`, err)
             return {
-              uuid: edgeAgentUUID,
+              uuid: nodeUUID,
               name: 'Unknown',
             }
           }

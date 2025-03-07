@@ -4,11 +4,56 @@
 
 <template>
   <EdgeContainer>
-      <div v-if="loadingDetails">LOADING</div>
-      <div v-else>
-        <div>Edge Cluster: {{cluster}}</div>
-        <div>Nodes: {{nodes}}</div>
+    <div v-if="loadingDetails">LOADING</div>
+    <Tabs v-else default-value="details">
+      <div class="flex items-center justify-between gap-2">
+        <TabsList class="mb-6">
+          <TabsTrigger value="details">
+            Details
+          </TabsTrigger>
+          <TabsTrigger value="deployments" disabled>
+            Deployments
+          </TabsTrigger>
+          <TabsTrigger value="hosts" :disabled="cluster.hosts.length === 0">
+            {{cluster.hosts.length ? `${cluster.hosts.length} Host${cluster.hosts.length > 1 ? "s" : ""}` : "No Hosts"}}
+          </TabsTrigger>
+        </TabsList>
       </div>
+      <TabsContent value="details">
+        <div>
+          <div>
+            <label for="clusterName" class="font-semibold">Cluster Name</label>
+            <Input disabled name="clusterName" :default-value="cluster.name" />
+          </div>
+          <div class="mt-4">
+            <label for="helmChart" class="font-semibold">Helm Chart</label>
+            <Input disabled name="helmChart" :default-value="cluster.helmChart.chart" />
+          </div>
+        </div>
+        <div v-if="nodes.length > 0" class="mt-8">
+          <DataTable :data="nodes" :columns="nodeColumns" :filters="[]">
+            <template #toolbar-left>
+              <div class="text-xl font-semibold">{{`${nodes.length} Node${nodes.length > 1 ? "s" : ""}`}}</div>
+            </template>
+          </DataTable>
+        </div>
+      </TabsContent>
+      <TabsContent value="deployments">
+      </TabsContent>
+      <TabsContent value="hosts">
+        <DataTable :data="cluster.hosts" :columns="hostColumns" :filters="[]">
+          <template #toolbar-left>
+            <div class="text-xl font-semibold">{{`${cluster.hosts.length} Host${cluster.hosts.length > 1 ? "s" : ""}`}}</div>
+          </template>
+        </DataTable>
+      </TabsContent>
+    </Tabs>
+    <template #header>
+      <div class="flex items-center justify-between gap-2">
+        <Button>Status</Button>
+        <Button>Copy Bootstrap</Button>
+      </div>
+    </template>
   </EdgeContainer>
 </template>
 
@@ -17,18 +62,50 @@ import { useServiceClientStore } from '@store/serviceClientStore.js'
 import { UUIDs } from '@amrc-factoryplus/service-client'
 import { useNodeStore } from '@store/useNodeStore.js'
 import EdgeContainer from '@components/Containers/EdgeContainer.vue'
+import PermissionList from "@pages/AccessControl/Permissions/PermissionList.vue";
+import PrincipalList from "@pages/AccessControl/PrincipalList.vue";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import LinkUserDialog from "@pages/AccessControl/LinkUserDialog.vue";
+import GroupList from "@pages/AccessControl/GroupList.vue";
+import {Label} from "@components/ui/label/index.js";
+import {Input} from "@components/ui/input/index.js";
+import {Card, CardContent} from "@components/ui/card/index.js";
+import {Button} from "@components/ui/button/index.js";
+import DataTable from "@components/ui/data-table/DataTable.vue";
+import { hostColumns } from './hostColumns.ts'
+import { nodeColumns } from './nodeColumns.ts'
+import {Alert, AlertDescription, AlertTitle} from "@components/ui/alert/index.js";
 
 export default {
-  components: { EdgeContainer },
+  components: {
+    AlertDescription, Alert, AlertTitle,
+    DataTable,
+    Button,
+    CardContent,
+    Card,
+    Input,
+    Label,
+    GroupList,
+    LinkUserDialog,
+    Tabs,
+    TabsContent,
+    TabsList,
+    TabsTrigger,
+    PrincipalList,
+    PermissionList,
+    EdgeContainer
+  },
 
   setup () {
     return {
       s: useNodeStore(),
+      hostColumns,
+      nodeColumns,
     }
   },
 
   watch: {
-    async '$route.params.uuid' (newUuid) {
+    async '$route.params.clusteruuid' (newUuid) {
 
       await this.getClusterDetails(newUuid)
 
@@ -36,7 +113,7 @@ export default {
 
     test: {
       handler (newVal, oldVal) {
-        console.log('test', newVal)
+        // console.log('test', newVal)
       },
       deep: true,
       immediate: true,
@@ -44,7 +121,7 @@ export default {
   },
 
   mounted () {
-    this.getClusterDetails(this.$route.params.uuid)
+    this.getClusterDetails(this.$route.params.clusteruuid)
   },
 
   methods: {

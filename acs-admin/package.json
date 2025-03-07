@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@amrc-factoryplus/service-client": "^1.4.0",
+    "@amrc-factoryplus/service-client": "^1.5.0",
     "@amrc-factoryplus/sparkplug-app": "^0.0.6",
     "@import-meta-env/cli": "^0.6.9",
     "@import-meta-env/unplugin": "^0.5.2",

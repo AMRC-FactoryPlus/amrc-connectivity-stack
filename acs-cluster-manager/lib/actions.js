@@ -75,11 +75,14 @@ export class Update extends Action {
     async apply () {
         const { cdb, status, uuid } = this;
 
+        this.fixup_account_status();
+
         this.spec = await cdb.get_config(Edge.App.Cluster, uuid);
         if (!this.spec) {
             this.log("Cluster %s has disappeared!", uuid);
             return;
         }
+
         if (status.ready) {
             this.log("Cluster %s is already set up", uuid);
             return;
@@ -94,6 +97,25 @@ export class Update extends Action {
         this.log("Cluster %s is ready", this.name());
     }
 
+    fixup_account_status () {
+        const { status } = this;
+
+        const changes = new Map();
+
+        for (const acc of ["flux", "krbkeys"]) {
+            const uuid = status[acc];
+            if (typeof uuid != "string") continue;
+            changes.set("ready", false);
+            changes.set(acc, { uuid });
+        }
+
+        if (!changes.size) return;
+        const patch = Object.fromEntries(m.entries());
+        this.update(patch);
+        /* this.status is not live */
+        jmp.apply(status, patch);
+    }
+
     async address () {
         const { cdb, uuid, spec, prefix } = this;
         const name = this.name();
@@ -104,29 +126,44 @@ export class Update extends Action {
     }
 
     async accounts () {
-        const { auth, cdb, uuid, spec, status } = this;
+        const { auth, cdb, uuid: cluster, spec, status } = this;
         const group = this.config.group;
         const name = this.name();
 
-        if (!status.flux) {
-            const flux = await cdb.create_object(Edge.Class.Account);
-            this.log("Creating op1flux/%s as %s", name, flux);
-            await cdb.put_config(UUIDs.App.Info, flux, 
-                { name: `Edge flux: ${name}` });
-            await auth.add_ace(flux, Git.Perm.Pull, uuid);
-            await auth.add_to_group(group.flux.uuid, flux);
-            await auth.add_principal(flux, this.principal("op1flux"));
-            this.update({ flux });
-        }
-        if (!status.krbkeys) {
-            const krbkeys = await cdb.create_object(Edge.Class.Account);
-            this.log("Creating op1krbkeys/%s as %s", name, krbkeys);
-            await cdb.put_config(UUIDs.App.Info, krbkeys,
-                { name: `Edge krbkeys: ${name}` });
-            await auth.add_to_group(group.krbkeys.uuid, krbkeys);
-            await auth.add_principal(krbkeys, this.principal("op1krbkeys"));
-            this.update({ krbkeys });
-        }
+        const do_acc = async (role, perm) => {
+            const st = status[role];
+            if (st?.done) return;
+
+            const upn = `op1${role}`;
+
+            let uuid = st?.uuid;
+            if (!uuid) {
+                uuid = await cdb.create_object(Edge.Class.Account);
+                this.update({ [role]: { uuid } });
+            }
+            this.log("Created %s/%s as %s", upn, name, uuid);
+
+            await cdb.put_config(UUIDs.App.Info, uuid,
+                { name: `Edge ${role}: ${name}` });
+
+            if (perm) {
+                /* This will succeed if we add a duplicate. This is
+                 * important for migration. */
+                const grant = await auth.add_grant({
+                    principal:  uuid,
+                    permission: perm,
+                    target:     cluster,
+                    plural:     false,
+                });
+            }
+
+            await cdb.class_add_member(group[role].uuid, uuid);
+            await auth.add_identity(uuid, "kerberos", this.principal(upn));
+            this.update({ [role]: { done: true } });
+        };
+
+        await do_acc("flux", Git.Perm.Pull);
+        await do_acc("krbkeys");
     }
 
     async repo () {
@@ -137,7 +174,7 @@ export class Update extends Action {
 
         this.log("Creating repo for %s", name);
         await this.cdb.put_config(Git.App.Config, uuid, { path });
-        await this.auth.add_to_group(group.uuid, uuid);
+        await this.cdb.class_add_member(group.uuid, uuid);
 
         const flux = await this.flux();
 
@@ -199,24 +236,30 @@ export class Delete extends Action {
 
         this.log("Removing cluster %s", name);
 
-        const { flux, krbkeys } = status;
-        if (flux) {
-            this.log("Removing op1flux/%s (%s)", name, flux);
-            await auth.delete_principal(flux)
+        const rm_acc = async key => {
+            const st = status[key];
+            if (!st?.uuid) return;
+            this.update({ [key]: { done: false } });
+
+            this.log("Removing op1%s/%s (%s)", key, name, st.uuid);
+            const grants = await auth.find_grants({ principal: st.uuid });
+            for (const g of grants) {
+                await auth.delete_grant(g)
+                    .catch(svc_catch(403, 404));
+            }
+            await auth.delete_identity(st.uuid, "kerberos")
                 .catch(svc_catch(404));
-            await auth.remove_from_group(group.flux.uuid, flux);
-            await auth.delete_ace(flux, Git.Perm.Pull, uuid);
-            await cdb.mark_object_deleted(flux)
-                .catch(svc_catch(404));
-        }
-        if (krbkeys) {
-            this.log("Removing op1krbkeys/%s (%s)", name, krbkeys);
-            await auth.delete_principal(krbkeys)
-                .catch(svc_catch(404));
-            await auth.remove_from_group(group.krbkeys.uuid, krbkeys);
-            await cdb.mark_object_deleted(krbkeys)
-                .catch(svc_catch(404));
-        }
+            await cdb.class_remove_member(group[key].uuid, st.uuid);
+            /* I haven't worked out how to grant permission for this
+             * yet. Currently this is a PATCH to Registration, and we
+             * don't have support for fine-grained ACLs. */
+            await cdb.mark_object_deleted(st.uuid)
+                .catch(svc_catch(403, 404));
+            this.update({ [key]: null });
+        };
+
+        await rm_acc("flux");
+        await rm_acc("krbkeys");
 
         this.log("Removing repo for %s", name);
         await cdb.delete_config(Git.App.Config, uuid)

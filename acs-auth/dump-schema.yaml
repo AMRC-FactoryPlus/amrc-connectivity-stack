@@ -1,0 +1,40 @@
+# Schema for Auth dump files.
+#
+# Compile with `node bin/compile-schema.js`.
+#
+# This schema only support version 2, as the Auth service can only
+# support version 2 dumps. Version 1 dumps are ambiguous about plural
+# targets.
+
+type: object
+required: [service, version]
+properties:
+  service: { const: cab2642a-f7d9-42e5-8845-8f35affe1fd4 }
+  version: { type: integer }
+oneOf:
+  - type: object
+    required: [version]
+    additionalProperties: false
+    properties:
+      service: true
+      version: { const: 2 }
+      identities:
+        type: object
+        propertyNames: { format: uuid }
+        additionalProperties:
+          type: object
+          additionalProperties: false
+          properties:
+            kerberos: { type: string }
+      grants:
+        type: object
+        propertyNames: { format: uuid }
+        additionalProperties: 
+          type: object
+          propertyNames: { format: uuid }
+          additionalProperties:
+            oneOf:
+              - type: "null"
+              - type: object
+                propertyNames: { format: uuid }
+                additionalProperties: { type: boolean }

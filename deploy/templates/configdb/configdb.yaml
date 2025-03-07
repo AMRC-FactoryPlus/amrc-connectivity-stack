@@ -125,7 +125,10 @@ spec:
 {{ include "amrc-connectivity-stack.cache-max-age" (list . "configdb") | indent 12 }}
             - name: BODY_LIMIT
               value: "{{ .Values.configdb.bodyLimit }}"
-            # If this is set it names a principal which overrides all ACLs. This should be turned off in production.
+            - name: BOOTSTRAP_ACL
+              value: |
+                sv1auth@{{ .Values.identity.realm }}:Perm.Read_App:App.SparkplugAddress
+                sv1auth@{{ .Values.identity.realm }}:Perm.Manage_Obj:SpecialObj.Wildcard
             - name: ROOT_PRINCIPAL
               value: admin@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
             # This is the value published via MQTT. The CDB editor does

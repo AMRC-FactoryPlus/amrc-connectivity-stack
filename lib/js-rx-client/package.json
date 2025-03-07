@@ -11,8 +11,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@amrc-factoryplus/rx-util": "0.0.4-bmz.1",
-    "@amrc-factoryplus/service-client": "1.4.0-bmz.3",
+    "@amrc-factoryplus/rx-util": "file:../js-rx-util",
+    "@amrc-factoryplus/service-client": "file:../js-service-client",
     "immutable": "^5.0.0-rc.2",
     "rxjs": "^7.8.1",
     "uuid": "^11.0.2"

@@ -16,6 +16,8 @@ class KrbKeyEvent:
         self.ns, self.name, self.reason = dslice(args, "namespace", "name", "reason")
         self.annotations, self.patch = dslice(args, "annotations", "patch")
 
+        self.suspended = Identifiers.SUSPEND in self.annotations
+
     def process (self):
         raise NotImplementedError()
 
@@ -35,7 +37,7 @@ class Rekey (KrbKeyEvent):
             return True
 
         if self.reason != "resume":
-            log("No change")
+            log("No change to spec, skipping rekey")
             return False
 
         if not self.new.can_verify():
@@ -80,7 +82,9 @@ class AccUuid (KrbKeyEvent):
     def __init__ (self, args):
         super().__init__(args)
 
-        self.account = args["spec"].get("account")
+        spec = args["spec"]
+        self.account = spec.get("account")
+        self.principal = spec["principal"]
 
     def process (self):
         if self.reason == "delete":
@@ -91,10 +95,15 @@ class AccUuid (KrbKeyEvent):
 
         key = Identifiers.ACCOUNT_UUID
         p_annot = self.patch.metadata.annotations
+        def set_annot (uuid):
+            log(f"Setting account annotation to {uuid}")
+            p_annot[key] = uuid
 
         annot = self.annotations.get(key)
         spec = self.account.get("uuid")
         klass = self.account.get("class")
+
+        fplus = kk_ctx().fplus;
 
         # If you do this it's your problem to sort out the mess.
         if annot is not None and spec is not None and annot != spec:
@@ -104,23 +113,32 @@ class AccUuid (KrbKeyEvent):
         if klass is None:
             # We are not managing this object.
             log(f"Account is unmanaged. Using UUID {spec}.")
-            p_annot[key] = spec
+            set_annot(spec)
         elif annot is None:
-            # We are managing this object. We need to make sure that if
-            # the object creation succeeds, the annotation will be
-            # recorded. Otherwise we keep creating ConfigDB objects.
-            log(f"Creating new account in class {klass}")
-            cdb = kk_ctx().fplus.configdb
-            uuid = cdb.create_object(klass, spec)
-            log(f"Created new account {uuid}")
-            p_annot[key] = str(uuid)
+            # We are managing this object but it's new. Start by
+            # checking the Auth service for a principal mapping. Make
+            # sure to bust the cache.
+            log(f"Checking Auth service for existing account for {self.principal}")
+            uuid = fplus.auth.with_fetch_opts(force_refresh=True) \
+                .find_principal("kerberos", self.principal);
+
+            # Otherwise, create a new object in the ConfigDB.
+            if uuid is None:
+                log(f"Creating new account in class {klass}")
+                uuid = fplus.configdb.create_object(klass, spec)
+                log(f"Created new account {uuid}")
+
+            # We need to make sure that if the object creation succeeds,
+            # the annotation will be recorded. Otherwise we keep
+            # creating ConfigDB objects.
+            set_annot(str(uuid))
         elif spec is not None and annot != spec:
             # This should not normally happen. Probably someone has
             # added an explicit uuid field to an object with a class.
             # Perhaps I should just forbid explicit uuids if we are
             # managing the object?
             log(f"Annotation exists but is overridden to {spec}")
-            p_annot[key] = spec
+            set_annot(spec)
         else:
             log(f"Annotation should be correct: {annot}")
 

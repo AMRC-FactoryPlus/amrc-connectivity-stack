@@ -1,0 +1,137 @@
+#   Comment
+⊃   Subclass
+∋   Class member
+𝒫   Power set (not implemented)
+*   New object
+%   Dynamic (per-install) object
+[]  Renamed object
+
+R1Class [Class definition]
+    ⊃ *Principal group
+        𝒫 Principal
+        ⊃ *Principal type
+            ∋ Human user
+            ∋ Central service
+            ∋ Edge service
+            ∋ Edge Agent
+            ∋ Application account
+            ∋ Special account
+        ⊃ Role [User group]
+            ⊃ Service role [Service requirement]
+                ∋ Central monitor
+                ∋ Cluster manager
+                ∋ Git server
+                ∋ UNS Sparkplug ingester
+            ⊃ *Edge role
+                ⊃ Clusters-managed group
+                    ∋ %Edge flux
+                    ∋ %Edge krbkeys
+                    ∋ %Edge cluster repo
+                ⊃ Edge-managed group
+                    ∋ %Active Edge Agent
+                    ∋ %Edge monitor
+                    ∋ %Edge sync
+            ⊃ *Client role
+                ∋ Administrator
+                ∋ Sparkplug Node
+                ∋ Sparkplug global reader
+                ∋ UNS global reader
+    ⊃ Permission group
+        𝒫 Permission.
+        ⊃ *Service permission set
+            ∋ Auth
+            ∋ MQTT
+            ∋ ⋮
+        ⊃ Composite permission [Client role]
+            ∋ Edge Node consumer
+            ∋ Edge monitor for agent
+            ∋ Warehouse
+            ∋ Edge Node
+            ∋ Global Primary Application
+            ∋ Command Escalation service
+    ⊃ Git repository group
+        𝒫 Git repository
+        ∋ %Shared repo
+        ∋ %Edge cluster repo
+
+Individual
+    ⊃ Application
+        ⊃ *Identity type
+            ∋ *Kerberos
+            ∋ *Sparkplug
+    ⊃ *Principal
+        ⊃ Human user [User account]
+        ⊃ Central service [Service account]
+            ⊃ Cluster manager
+                ∋ %sv1clustermanager
+            ⊃ UNS Sparkplug ingester
+                ∋ %sv1sparkplugingester
+            ⊃ Central monitor
+                ∋ %sv1monitor
+            ⊃ Git servers
+                ∋ %sv1git
+            ⊃ UNS historian
+                ∋ %sv1historianuns
+            ∋ sv1auth
+            ∋ sv1cmdesc
+            ∋ sv1configdb
+            ∋ ⋮
+        ⊃ Edge service [Edge cluster account]
+            ⊃ %Edge flux
+            ⊃ %Edge krbkeys
+            ⊃ %Edge sync
+            ⊃ %Edge monitor
+        ⊃ Edge Agent [Cell Gateway]
+            ⊃ %Active Edge Agent
+        ⊃ *Application account
+        ⊃ *Special account
+            ∋ %Admin account
+            ∋ *%Root account
+        ⊃ Sparkplug Node
+            ⊃ Edge Agent
+            ⊃ Edge monitor
+            ∋ sv1cmdesc
+            ∋ sv1configdb
+            ∋ sv1directory
+            ∋ sv1git
+        ⊃ Sparkplug global reader [MQTT global debugger]
+            ⊃ Administrator
+                ∋ Admin account
+            ⊃ Central monitor
+            ⊃ Edge monitor
+            ⊃ UNS Sparkplug ingester
+        ⊃ *UNS ingester
+            ⊃ UNS Sparkplug ingester
+        ⊃ *UNS global reader
+            ⊃ Administrator
+            ⊃ UNS historian
+    ⊃ Permission
+        ⊃ Auth
+        ⊃ MQTT
+        ⊃ ⋮
+        ⊃ Edge Node consumer
+            ∋ Subscribe and read Node
+            ∋ Rebirth
+        ⊃ Edge monitor for agent
+            ∋ Read Node
+            ∋ Reload Edge Agent config
+            ∋ Rebirth
+        # These are not composite permissions
+        ⊃ Warehouse
+            ∋ Subscribe and read whole namespace
+            ∋ Rebirth
+        ⊃ Command Escalation service
+            ∋ Issue global commands
+            ∋ Subscribe and read whole namespace
+        ⊃ Global debugger
+            ∋ Subscribe and read whole namespace
+        # These are obsolete and unused
+        ⊃ Edge Node
+            ∋ Subscribe and read STATE
+            ∋ Participate as Node
+            ∋ Represent Devices
+        ⊃ Global Primary Application
+    ⊃ Git repository
+        ⊃ %Shared repo
+           ∋ %Edge Helm charts
+        ⊃ %Edge cluster repo

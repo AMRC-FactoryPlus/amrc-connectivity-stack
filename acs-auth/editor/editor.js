@@ -4,6 +4,9 @@
  * Copyright 2022 AMRC
  */
 
+/* Tell ESLint this is DOM code. */
+/* global document */
+
 import { h, render } from "https://unpkg.com/preact@latest?module";
 import { useState, useEffect, useRef } from "https://unpkg.com/preact@latest/hooks/dist/hooks.module.js?module";
 import htm from "https://unpkg.com/htm?module";
@@ -186,7 +189,9 @@ function ACEs (props) {
     const [msg, set_msg] = useState("");
 
     const update_aces = async () => {
-        const list = await fetch_json("auth", "/authz/ace");
+        const list = await fetch_json("auth", "/v2/grant")
+            .then(es => Promise.all(es.map(e =>
+                fetch_json("auth", `/v2/grant/${e}`))));
         sort_acl(list);
         set_aces(list);
     };
@@ -227,12 +232,13 @@ function ACEs (props) {
 
     return html`
         <table>
-            <tr><th>Principal</th><th>Permission</th><th>Target</th></tr>
+            <tr><th>Principal</th><th>Permission</th><th>Target</th><th>Plural</th></tr>
             ${ aces.map(a => html`
             <tr key=${`${a.principal}/${a.permission}/${a.target}`}>
                 <td><${Obj} obj=${a.principal}/></td>
                 <td><${Obj} obj=${a.permission}/></td>
                 <td><${Obj} obj=${a.target}/></td>
+                <td>${ a.plural ? "🗸" : "🗴" }</td>
                 <td><button onClick=${() => del_ace(a)}>Delete ACE</button></td>
             </tr>
             `) }
@@ -408,7 +414,7 @@ function EffPrinc (props) {
 
     useEffect(async () => {
         const e_princ = encodeURIComponent(princ);
-        const list = await fetch_json("auth", `/authz/effective/${e_princ}`);
+        const list = await fetch_json("auth", `v2/acl/kerberos/${e_princ}`);
         sort_acl(list);
         set_eff(list);
     }, []);

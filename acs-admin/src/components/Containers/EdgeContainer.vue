@@ -4,14 +4,11 @@
 
 <template>
   <div class="flex flex-col -m-4">
-    <div class="flex justify-between">
+    <div class="flex justify-between bg-white sticky top-[-1rem] border-b mb-4 z-10">
       <EdgeBreadcrumbs/>
-      <div>
-        <slot name="header"></slot>
-      </div>
+      <slot name="header"></slot>
     </div>
-    <hr>
-    <div class="m-4">
+    <div class="m-4 ">
       <slot></slot>
     </div>
   </div>

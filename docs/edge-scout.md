@@ -82,6 +82,7 @@ These configurations are mapped to their respective **device connections** using
       "namespaceURI": "http://opcfoundation.org/UA/"
     },
   },
+  "timestamp": 1741375743932,
   "success": true
 }
 ```
@@ -93,6 +94,7 @@ These configurations are mapped to their respective **device connections** using
     "AMRC/F2050/PowerMonitoring/amrc-tplink-46/Status":{},
     "AMRC/F2050/PowerMonitoring/amrc-tplink-112/Status":{},
   },
+  "timestamp": 1741375743934,
   "success":true
 }
 ```
@@ -176,6 +178,7 @@ export interface ScoutDetails {
 
 export interface ScoutResult {
     addresses: object | null,
+    timestamp: number | null,
     success: boolean
 }
 
@@ -202,7 +205,7 @@ export class Scout extends EventEmitter {
 - The `constructor` splits the scout configuration into `scoutDetails` and `driverDetails`.
 - The `scoutDetails` part is validated in the `validateScoutConfig` method against the `ScoutDetails` type.
 - The `performScouting` method, when called checks whether the `scoutDetails.isEnabled` is set to `true`. If the `isEnabled` is `true`, the method calls the `scoutAddresses(driverDetails)` on `deviceConnection` and passes the `driverDetails` part of the scout configuration. The validation for `driverDetails` is handled by each `DeviceConnection` subclass depending on the protocol.
-- Once the `scoutAddresses` method returns the list of `addresses`, the `performScouting()` method creates a `scoutResult` object of type `ScoutResult`, containing the discovered `addresses` and a `success` status.
+- Once the `scoutAddresses` method returns the list of `addresses`, the `performScouting()` method creates a `scoutResult` object of type `ScoutResult`, containing the discovered `addresses`, `timestamp` and a `success` status.
 - Finally, the `performScouting()` method triggers the **scoutResults** event with the `scoutResult`.
 
 ### Translator Class (Changes for Scouting Feature)

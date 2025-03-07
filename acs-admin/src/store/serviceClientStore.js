@@ -34,7 +34,11 @@ export const useServiceClientStore = defineStore('service-client', {
         client.service_urls(UUIDs.Service.MQTT).then((urls) => {
           this.urls.mqtt = urls
         })
+
+        client.Fetch.cache = 'reload';
+
       })
+
     },
 
     logout () {

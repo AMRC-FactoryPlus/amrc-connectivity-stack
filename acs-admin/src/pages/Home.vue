@@ -5,7 +5,7 @@
 <template>
   <div v-if="s.loaded" class="flex flex-col gap-4">
       <Card>
-        <CardHeader class="pb-2">
+        <CardHeader>
           <CardDescription>MQTT Server</CardDescription>
           <Copyable :text="mqttUrl">
             <CardTitle class="text-4xl">

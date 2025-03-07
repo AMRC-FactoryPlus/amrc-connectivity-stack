@@ -76,7 +76,7 @@ const table = useVueTable({
 </script>
 
 <template>
-  <div class="space-y-4">
+  <div class="space-y-2">
     <DataTableToolbar v-if="!l.fullscreen" :filters="filters" :table="table">
       <template #left>
         <slot name="toolbar-left" :table="table"></slot>

@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from "vue";
-import { ComboboxRoot, useForwardPropsEmits } from "radix-vue";
+import { ComboboxRoot, useForwardPropsEmits } from "reka-ui";
 import { cn } from "@/lib/utils";
 
 const props = defineProps({

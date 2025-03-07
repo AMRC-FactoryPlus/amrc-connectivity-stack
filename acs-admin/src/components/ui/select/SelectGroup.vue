@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from "vue";
-import { SelectGroup } from "radix-vue";
+import { SelectGroup } from "reka-ui";
 import { cn } from "@/lib/utils";
 
 const props = defineProps({

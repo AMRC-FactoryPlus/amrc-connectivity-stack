@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from "vue";
-import { Separator } from "radix-vue";
+import { Separator } from "reka-ui";
 import { cn } from "@/lib/utils";
 
 const props = defineProps({

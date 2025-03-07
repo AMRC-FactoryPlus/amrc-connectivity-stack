@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from "vue";
-import { SelectScrollUpButton, useForwardProps } from "radix-vue";
+import { SelectScrollUpButton, useForwardProps } from "reka-ui";
 import { ChevronUp } from "lucide-vue-next";
 import { cn } from "@/lib/utils";
 

@@ -1,5 +1,5 @@
 <script setup>
-import { Primitive } from "radix-vue";
+import { Primitive } from "reka-ui";
 import { buttonVariants } from ".";
 import { cn } from "@/lib/utils";
 

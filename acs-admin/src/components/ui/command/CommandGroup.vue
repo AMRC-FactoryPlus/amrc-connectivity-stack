@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from "vue";
-import { ComboboxGroup, ComboboxLabel } from "radix-vue";
+import { ComboboxGroup, ComboboxLabel } from "reka-ui";
 import { cn } from "@/lib/utils";
 
 const props = defineProps({

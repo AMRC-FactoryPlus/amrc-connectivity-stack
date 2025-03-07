@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from "vue";
-import { TooltipContent, TooltipPortal, useForwardPropsEmits } from "radix-vue";
+import { TooltipContent, TooltipPortal, useForwardPropsEmits } from "reka-ui";
 import { cn } from "@/lib/utils";
 
 defineOptions({

@@ -1,5 +1,5 @@
 <script setup>
-import { useForwardPropsEmits } from "radix-vue";
+import { useForwardPropsEmits } from "reka-ui";
 import Command from "./Command.vue";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 

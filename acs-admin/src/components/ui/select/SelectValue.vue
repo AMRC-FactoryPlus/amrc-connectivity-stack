@@ -1,5 +1,5 @@
 <script setup>
-import { SelectValue } from "radix-vue";
+import { SelectValue } from "reka-ui";
 
 const props = defineProps({
   placeholder: { type: String, required: false },

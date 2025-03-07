@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from "vue";
-import { DialogTitle } from "radix-vue";
+import { DialogTitle } from "reka-ui";
 import { cn } from "@/lib/utils";
 
 const props = defineProps({

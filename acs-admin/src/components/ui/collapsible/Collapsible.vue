@@ -3,7 +3,7 @@
   -->
 
 <script setup>
-import { CollapsibleRoot, useForwardPropsEmits } from 'radix-vue'
+import { CollapsibleRoot, useForwardPropsEmits } from 'reka-ui'
 
 const props = defineProps({
   defaultOpen: { type: Boolean, required: false },

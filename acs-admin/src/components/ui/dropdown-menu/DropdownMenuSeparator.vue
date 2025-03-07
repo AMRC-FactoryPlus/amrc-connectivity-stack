@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from "vue";
-import { DropdownMenuSeparator } from "radix-vue";
+import { DropdownMenuSeparator } from "reka-ui";
 import { cn } from "@/lib/utils";
 
 const props = defineProps({

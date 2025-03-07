@@ -4,7 +4,7 @@
 
 <script setup>
 import { cn } from '@/lib/utils'
-import { AlertDialogDescription } from 'radix-vue'
+import { AlertDialogDescription } from 'reka-ui'
 import { computed } from 'vue'
 
 const props = defineProps({

@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from "vue";
-import { SelectScrollDownButton, useForwardProps } from "radix-vue";
+import { SelectScrollDownButton, useForwardProps } from "reka-ui";
 import { ChevronDown } from "lucide-vue-next";
 import { cn } from "@/lib/utils";
 

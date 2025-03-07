@@ -5,7 +5,7 @@ import {
   SelectItemIndicator,
   SelectItemText,
   useForwardProps,
-} from "radix-vue";
+} from "reka-ui";
 import { Check } from "lucide-vue-next";
 import { cn } from "@/lib/utils";
 

@@ -3,7 +3,7 @@
   -->
 
 <script setup>
-import { CollapsibleContent } from 'radix-vue'
+import { CollapsibleContent } from 'reka-ui'
 
 const props = defineProps({
   forceMount: { type: Boolean, required: false },

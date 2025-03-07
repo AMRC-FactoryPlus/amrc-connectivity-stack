@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from "vue";
-import { ComboboxEmpty } from "radix-vue";
+import { ComboboxEmpty } from "reka-ui";
 import { cn } from "@/lib/utils";
 
 const props = defineProps({

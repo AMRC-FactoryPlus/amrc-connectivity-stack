@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from "vue";
 import { Search } from "lucide-vue-next";
-import { ComboboxInput, useForwardProps } from "radix-vue";
+import { ComboboxInput, useForwardProps } from "reka-ui";
 import { cn } from "@/lib/utils";
 
 defineOptions({

@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from "vue";
-import { ComboboxSeparator } from "radix-vue";
+import { ComboboxSeparator } from "reka-ui";
 import { cn } from "@/lib/utils";
 
 const props = defineProps({

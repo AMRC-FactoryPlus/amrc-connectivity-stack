@@ -3,7 +3,7 @@
   -->
 
 <script setup>
-import { AlertDialogTrigger } from 'radix-vue'
+import { AlertDialogTrigger } from 'reka-ui'
 
 const props = defineProps({
   asChild: { type: Boolean, required: false },

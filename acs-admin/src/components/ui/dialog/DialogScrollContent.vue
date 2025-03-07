@@ -6,7 +6,7 @@ import {
   DialogOverlay,
   DialogPortal,
   useForwardPropsEmits,
-} from "radix-vue";
+} from "reka-ui";
 import { X } from "lucide-vue-next";
 import { cn } from "@/lib/utils";
 

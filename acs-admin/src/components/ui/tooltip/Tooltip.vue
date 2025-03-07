@@ -1,5 +1,5 @@
 <script setup>
-import { TooltipRoot, useForwardPropsEmits } from "radix-vue";
+import { TooltipRoot, useForwardPropsEmits } from "reka-ui";
 
 const props = defineProps({
   defaultOpen: { type: Boolean, required: false },

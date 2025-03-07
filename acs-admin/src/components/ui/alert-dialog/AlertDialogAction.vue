@@ -5,7 +5,7 @@
 <script setup>
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { AlertDialogAction } from 'radix-vue'
+import { AlertDialogAction } from 'reka-ui'
 import { computed } from 'vue'
 
 const props = defineProps({

@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from "vue";
-import { Label } from "radix-vue";
+import { Label } from "reka-ui";
 import { cn } from "@/lib/utils";
 
 const props = defineProps({

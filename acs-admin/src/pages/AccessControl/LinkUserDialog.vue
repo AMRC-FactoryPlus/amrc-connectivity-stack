@@ -52,7 +52,7 @@
 <script>
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@components/ui/dialog'
 import { Button } from '@components/ui/button'
-import { VisuallyHidden } from 'radix-vue'
+import { VisuallyHidden } from 'reka-ui'
 import { Input } from '@/components/ui/input'
 import useVuelidate from '@vuelidate/core'
 import { required } from '@vuelidate/validators'

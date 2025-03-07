@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from "vue";
-import { DropdownMenuSubContent, useForwardPropsEmits } from "radix-vue";
+import { DropdownMenuSubContent, useForwardPropsEmits } from "reka-ui";
 import { cn } from "@/lib/utils";
 
 const props = defineProps({

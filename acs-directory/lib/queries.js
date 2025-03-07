@@ -145,6 +145,14 @@ export default class Queries {
 //        return dbr.rows;
     }
 
+    async close_all_sessions (timestamp) {
+        await this.query(`
+            update session
+            set finish = $1
+            where finish is null
+        `, [timestamp]);
+    }
+
     /* Schema */
 
     async find_schema_changes(sessid) {
@@ -403,18 +411,20 @@ export default class Queries {
         /* This session replaces old sessions for this device/address. */
         await this.query(`
             update session
-            set next_for_device = $1
+            set next_for_device = $1,
+                finish = coalesce(finish, $3)
             where device = $2
               and next_for_device is null
               and id != $1
-        `, [sess, opts.devid]);
+        `, [sess, opts.devid, opts.time]);
         await this.query(`
             update session
-            set next_for_address = $1
+            set next_for_address = $1,
+                finish = coalesce(finish, $3)
             where address = $2
               and next_for_address is null
               and id != $1
-        `, [sess, opts.addrid]);
+        `, [sess, opts.addrid, opts.time]);
 
         return sess;
     }
@@ -422,6 +432,8 @@ export default class Queries {
     /* This will close all child device sessions when closing a node
      * session. */
     async record_death(time, addr) {
+        if (!time)
+            throw new Error("Recording DEATH with null timestamp");
         return await this.query(`
             update session ses
             set finish = $1 from device dev, address adr

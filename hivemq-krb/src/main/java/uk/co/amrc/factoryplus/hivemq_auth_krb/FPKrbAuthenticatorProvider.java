@@ -21,10 +21,12 @@ public class FPKrbAuthenticatorProvider implements EnhancedAuthenticatorProvider
     private static final Logger log = LoggerFactory.getLogger(FPKrbAuthenticator.class);
 
     public FPServiceClient fplus;
+    public FPKrbContext context;
 
-    public FPKrbAuthenticatorProvider(FPServiceClient serviceClient)
+    public FPKrbAuthenticatorProvider(FPKrbContext context)
     {
-        fplus = serviceClient;
+        this.fplus = context.fplus;
+        this.context = context;
     }
 
     @Override

@@ -11,10 +11,6 @@ import com.hivemq.extension.sdk.api.parameter.*;
 import com.hivemq.extension.sdk.api.services.Services;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import uk.co.amrc.factoryplus.FPServiceClient;
-import uk.co.amrc.factoryplus.FPUuid;
-
-import java.util.concurrent.TimeUnit;
 
 public class FPKrbMain implements ExtensionMain {
 
@@ -23,11 +19,11 @@ public class FPKrbMain implements ExtensionMain {
     public void extensionStart(final @NotNull ExtensionStartInput extensionStartInput, final @NotNull ExtensionStartOutput extensionStartOutput) {
         final ExtensionInformation extensionInformation = extensionStartInput.getExtensionInformation();
         log.info("Started " + extensionInformation.getName() + ":" + extensionInformation.getVersion());
+        var context = new FPKrbContext();
+        context.start();
 
-        var fplus = startServiceClient();
-
-        final FPKrbAuthenticatorProvider authn = new FPKrbAuthenticatorProvider(fplus);
-        final FPKrbAuthorizerProvider authorizer = new FPKrbAuthorizerProvider(fplus);
+        final FPKrbAuthenticatorProvider authn = new FPKrbAuthenticatorProvider(context);
+        final FPKrbAuthorizerProvider authorizer = new FPKrbAuthorizerProvider(context);
 
         Services.securityRegistry().setEnhancedAuthenticatorProvider(authn);
         Services.securityRegistry().setAuthorizerProvider(authorizer);
@@ -40,26 +36,4 @@ public class FPKrbMain implements ExtensionMain {
         log.info("Stopped " + extensionInformation.getName() + ":" + extensionInformation.getVersion());
 
     }
-
-    public FPServiceClient startServiceClient ()
-    {
-        var fplus = new FPServiceClient();
-        fplus.http().start();
-
-        var url = fplus.getUriConf("mqtt_url");
-
-        fplus.directory()
-                .registerServiceURL(FPUuid.Service.MQTT, url)
-                .retryWhen(errs -> errs
-                        .doOnNext(e -> {
-                            log.error("Service registration failed: {}", e.toString());
-                            log.info("Retrying registration in 5 seconds.");
-                        })
-                        .delay(5, TimeUnit.SECONDS))
-                .subscribe(() -> log.info("Registered service successfully"),
-                        e -> log.error("Failed to register service: {}",
-                                e.toString()));
-        return fplus;
-    }
-
 }

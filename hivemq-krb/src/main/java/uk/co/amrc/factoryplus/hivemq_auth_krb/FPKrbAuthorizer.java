@@ -20,11 +20,11 @@ import java.util.stream.Collectors;
 import static uk.co.amrc.factoryplus.hivemq_auth_krb.AuthUtils.getACLforPrincipal;
 
 public class FPKrbAuthorizer implements SubscriptionAuthorizer, PublishAuthorizer {
-    private final FPServiceClient fplus;
+    private FPKrbAuthorizerProvider provider;
     private static final @NotNull Logger log = LoggerFactory.getLogger(FPKrbAuthenticator.class);
 
     public FPKrbAuthorizer(FPKrbAuthorizerProvider authorizerProvider) {
-        fplus = authorizerProvider.fplus;
+        provider = authorizerProvider;
     }
 
     @Override
@@ -33,26 +33,22 @@ public class FPKrbAuthorizer implements SubscriptionAuthorizer, PublishAuthorize
             @NotNull PublishAuthorizerOutput publishAuthorizerOutput
     ) {
         var clientId = publishAuthorizerInput.getClientInformation().getClientId();
-        var clientUsername = ClientSessionStore.getUsername(clientId);
-        log.info("Client username is: {}", clientUsername);
+        var clientUsername = provider.context.getUsername(clientId);
         var topic = publishAuthorizerInput.getPublishPacket().getTopic();
-        try{
-            isPermissionAllowed(getACLforPrincipal(clientUsername, fplus), topic, TopicPermission.MqttActivity.PUBLISH)
-                    .subscribe(result -> {
-                        if(result){
-                            publishAuthorizerOutput.authorizeSuccessfully();
-                            log.info("Successfully authorized publish client {} for topic {}", clientUsername, topic);
-                        }else{
-                            log.info("Publish permission denied for user {} topic {}",clientUsername, topic);
+        isPermissionAllowed(getACLforPrincipal(clientUsername, provider.fplus), topic, TopicPermission.MqttActivity.PUBLISH)
+                .subscribe(result -> {
+                    if(result){
+                        publishAuthorizerOutput.authorizeSuccessfully();
+                        log.info("Successfully authorized publish client {} for topic {}", clientUsername, topic);
+                    }else{
+                        log.info("Publish permission denied for user {} topic {}",clientUsername, topic);
+                        publishAuthorizerOutput.failAuthorization();
+                    }
+                },
+                        error ->  {
+                            log.error("Error occurred: {}", error.getMessage());
                             publishAuthorizerOutput.failAuthorization();
-                        }
-                    },
-                            error ->  log.error("Error occurred: {}", error.getMessage()));
-        }
-        catch(Exception e){
-            log.info("Error {} Publish permission denied for topic {}",e.getMessage(), topic);
-            publishAuthorizerOutput.failAuthorization();
-        }
+                        });
     }
 
     @Override
@@ -61,26 +57,22 @@ public class FPKrbAuthorizer implements SubscriptionAuthorizer, PublishAuthorize
             @NotNull SubscriptionAuthorizerOutput subscriptionAuthorizerOutput
     ) {
         var clientId = subscriptionAuthorizerInput.getClientInformation().getClientId();
-        var clientUsername = ClientSessionStore.getUsername(clientId);
-        log.info("Client username is: {}", clientUsername);
+        var clientUsername = provider.context.getUsername(clientId);
         var topic = subscriptionAuthorizerInput.getSubscription().getTopicFilter();
-        try{
-            isPermissionAllowed(getACLforPrincipal(clientUsername, fplus), topic, TopicPermission.MqttActivity.SUBSCRIBE)
-                    .subscribe(result -> {
-                        if (result) {
-                            log.info("Successfully authorized subscription client {} for topic {}.", clientUsername, topic);
-                            subscriptionAuthorizerOutput.authorizeSuccessfully();
-                        } else {
-                            log.info("Subscription permission denied for user {} topic {}", clientUsername, topic);
+        isPermissionAllowed(getACLforPrincipal(clientUsername, provider.fplus), topic, TopicPermission.MqttActivity.SUBSCRIBE)
+                .subscribe(result -> {
+                    if (result) {
+                        log.info("Successfully authorized subscription client {} for topic {}.", clientUsername, topic);
+                        subscriptionAuthorizerOutput.authorizeSuccessfully();
+                    } else {
+                        log.info("Subscription permission denied for user {} topic {}", clientUsername, topic);
+                        subscriptionAuthorizerOutput.failAuthorization();
+                    }
+                },
+                        error ->  {
+                            log.error("Error occurred: {}", error.getMessage());
                             subscriptionAuthorizerOutput.failAuthorization();
-                        }
-                    },
-                            error -> log.error("Error occurred: {}", error.getMessage()));
-        }
-        catch(Exception e){
-            log.info("Error {} Subscription permission denied for topic {}",e.getMessage(), topic);
-            subscriptionAuthorizerOutput.failAuthorization();
-        }
+                        });
     }
 
     /**

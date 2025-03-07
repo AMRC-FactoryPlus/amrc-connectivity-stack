@@ -14,8 +14,10 @@ import uk.co.amrc.factoryplus.FPServiceClient;
 
 public class FPKrbAuthorizerProvider implements AuthorizerProvider {
     public final FPServiceClient fplus;
-    public FPKrbAuthorizerProvider(FPServiceClient serviceClient) {
-        fplus = serviceClient;
+    public FPKrbContext context;
+    public FPKrbAuthorizerProvider(FPKrbContext context) {
+        this.context = context;
+        this.fplus = context.fplus;
     }
 
     public @Nullable Authorizer getAuthorizer(@NotNull AuthorizerProviderInput authorizerProviderInput) {

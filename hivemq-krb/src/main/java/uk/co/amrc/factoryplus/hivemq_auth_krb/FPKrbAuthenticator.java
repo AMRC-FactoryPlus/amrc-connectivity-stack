@@ -10,12 +10,9 @@ import java.nio.CharBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -127,7 +124,7 @@ public class FPKrbAuthenticator implements EnhancedAuthenticator {
             .subscribe(
                 rv -> {
                     rv.applyACL(output);
-                    ClientSessionStore.storeUsername(conn.getClientId(), rv.user);
+                    provider.context.storeUsername(conn.getClientId(), rv.user);
                     output.authenticateSuccessfully(rv.gssToken);
                 },
                 e -> {
@@ -185,7 +182,7 @@ public class FPKrbAuthenticator implements EnhancedAuthenticator {
                     opt.ifPresentOrElse(
                         rv -> {
                             rv.applyACL(output);
-                            ClientSessionStore.storeUsername(conn.getClientId(), rv.user);
+                            provider.context.storeUsername(conn.getClientId(), rv.user);
                             output.authenticateSuccessfully();
                         },
                         () -> output.failAuthentication());

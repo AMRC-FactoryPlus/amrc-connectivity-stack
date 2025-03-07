@@ -46,9 +46,9 @@ export const useNodeStore = defineStore('node', {
         // Hydrate the node details from the UUIDs provided from the response
         this.data = await Promise.all(payload.map(async (nodeUUID) => {
           try {
-            let edgeDeployment = await useServiceClientStore().client.ConfigDB.get_config(UUIDs.App.EdgeAgentDeployment, nodeUUID)
+            let node = await useServiceClientStore().client.ConfigDB.get_config(UUIDs.App.EdgeAgentDeployment, nodeUUID)
             return {
-              ...edgeDeployment,
+              ...node,
               uuid: nodeUUID,
             }
           }

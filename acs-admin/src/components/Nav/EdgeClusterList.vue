@@ -9,7 +9,7 @@
       <!-- TODO: Ctrl+Click should expand instead of click -->
       <RouterLink :to="`/edge-cluster/${cluster.uuid}`">
         <Button
-            title="View cluster"
+            title="View Cluster"
             size="sm"
             variant="ghost"
             class="w-full text-left justify-start"

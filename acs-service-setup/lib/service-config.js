@@ -54,7 +54,8 @@ export class ServiceConfig {
     async setup_group (path, klass, name) {
         const { CDB } = this;
 
-        const uuid = await this.setup_object("group", this.config.group, path, klass);
+        const groups = this.config.group ??= {};
+        const uuid = await this.setup_object("group", groups, path, klass);
         await CDB.put_config(UUIDs.App.Info, uuid, { name });
     }
 

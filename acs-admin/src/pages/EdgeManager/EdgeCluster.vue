@@ -55,7 +55,7 @@
       </TabsContent>
     </Tabs>
     <template #header>
-      <div class="flex items-center justify-between gap-2">
+      <div class="flex bg-white items-center justify-between gap-2">
         <Button>Status</Button>
         <Button>Copy Bootstrap</Button>
       </div>

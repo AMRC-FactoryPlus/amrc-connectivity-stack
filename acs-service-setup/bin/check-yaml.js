@@ -27,34 +27,42 @@ const dumps = new DumpLoader({
         domain:         "my.domain",
     }});
 
-const files = await dumps.read_files(() => true);
+/* XXX */
 let exit = 0;
 
-for (const [file, text] of files.entries()) {
-    const fail = (cause, ...args) => {
-        throw new Error(`${file}: ` + util.format(...args), { cause });
-    };
+function check_files (msg, files) {
+    console.log("=> Checking %s dumps", msg);
 
-    try { 
-        const ds = dumps.parse_yaml(text, file);
-        ds.filter(d => !d.service || !d.version)
-            .forEach(d => fail(null, "Missing service or version"));
-        for (const [srv, name, validate] of schemas) {
-            ds.filter(d => d.service == srv)
-                .forEach(d => {
-                    if (!validate(d))
-                        fail(validate.errors.map(util.inspect),
-                            `${name} schema validation failed`);
-                });
+    for (const f of files) {
+        const fail = (cause, ...args) => {
+            throw new Error(`${f.file}: ` + util.format(...args), { cause });
+        };
+
+        console.log("==> Checking %s", f.file);
+        try { 
+            const ds = dumps.parse_yaml(f.yaml, f.file);
+            ds.filter(d => !d.service || !d.version)
+                .forEach(d => fail(null, "Missing service or version"));
+            for (const [srv, name, validate] of schemas) {
+                ds.filter(d => d.service == srv)
+                    .forEach(d => {
+                        if (!validate(d))
+                            fail(validate.errors.map(util.inspect),
+                                `${name} schema validation failed`);
+                    });
+            }
+        } 
+        catch (e) {
+            exit = 1;
+            const detail = Array.isArray(e.cause)
+                ? ":\n\n" + e.cause.map(c => c.toString()).join("\n")
+                : "";
+            console.error("===> %s%s", e.message, detail);
         }
-    } 
-    catch (e) {
-        exit = 1;
-        const detail = Array.isArray(e.cause)
-            ? ":\n\n" + e.cause.map(c => c.toString()).join("\n")
-            : "";
-        console.error("===> %s%s", e.message, detail);
     }
 }
+
+check_files("early", await dumps.sort_files(true));
+check_files("late", await dumps.sort_files(false));
 
 process.exit(exit);

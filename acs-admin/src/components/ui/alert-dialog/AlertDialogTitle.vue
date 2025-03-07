@@ -1,10 +1,10 @@
 <!--
-  - Copyright (c) University of Sheffield AMRC 2024.
+  - Copyright (c) University of Sheffield AMRC 2025.
   -->
 
 <script setup>
 import { cn } from '@/lib/utils'
-import { AlertDialogTitle } from 'radix-vue'
+import { AlertDialogTitle } from 'reka-ui'
 import { computed } from 'vue'
 
 const props = defineProps({

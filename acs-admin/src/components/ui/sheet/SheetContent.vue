@@ -1,15 +1,13 @@
+<!--
+  - Copyright (c) University of Sheffield AMRC 2025.
+  -->
+
 <script setup>
-import { computed } from "vue";
-import {
-  DialogClose,
-  DialogContent,
-  DialogOverlay,
-  DialogPortal,
-  useForwardPropsEmits,
-} from "radix-vue";
-import { X } from "lucide-vue-next";
-import { sheetVariants } from ".";
-import { cn } from "@/lib/utils";
+import { computed } from 'vue'
+import { DialogClose, DialogContent, DialogOverlay, DialogPortal, useForwardPropsEmits } from 'reka-ui'
+import { X } from 'lucide-vue-next'
+import { sheetVariants } from '.'
+import { cn } from '@/lib/utils'
 
 defineOptions({
   inheritAttrs: false,

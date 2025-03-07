@@ -3,21 +3,22 @@
   -->
 
 <script setup>
-import { SelectLabel } from 'reka-ui'
 import { cn } from '@/lib/utils'
+import { Primitive } from 'reka-ui'
 
 const props = defineProps({
-  for: { type: String, required: false },
   asChild: { type: Boolean, required: false },
-  as: { type: null, required: false },
+  as: { type: null, required: false, default: 'a' },
   class: { type: null, required: false },
 });
 </script>
 
 <template>
-  <SelectLabel
-    :class="cn('py-1.5 pl-8 pr-2 text-sm font-semibold', props.class)"
+  <Primitive
+    :as="as"
+    :as-child="asChild"
+    :class="cn('transition-colors hover:text-slate-950 dark:hover:text-slate-50', props.class)"
   >
     <slot />
-  </SelectLabel>
+  </Primitive>
 </template>

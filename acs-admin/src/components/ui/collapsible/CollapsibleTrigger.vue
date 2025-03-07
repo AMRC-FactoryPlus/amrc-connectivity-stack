@@ -3,7 +3,7 @@
   -->
 
 <script setup>
-import { AlertDialogTrigger } from 'reka-ui'
+import { CollapsibleTrigger } from 'reka-ui'
 
 const props = defineProps({
   asChild: { type: Boolean, required: false },
@@ -12,7 +12,7 @@ const props = defineProps({
 </script>
 
 <template>
-  <AlertDialogTrigger v-bind="props">
+  <CollapsibleTrigger v-bind="props">
     <slot />
-  </AlertDialogTrigger>
+  </CollapsibleTrigger>
 </template>

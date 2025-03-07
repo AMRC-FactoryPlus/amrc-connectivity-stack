@@ -1,11 +1,11 @@
 <!--
-  - Copyright (c) University of Sheffield AMRC 2024.
+  - Copyright (c) University of Sheffield AMRC 2025.
   -->
 
 <script setup>
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { AlertDialogCancel } from 'radix-vue'
+import { AlertDialogCancel } from 'reka-ui'
 import { computed } from 'vue'
 
 const props = defineProps({

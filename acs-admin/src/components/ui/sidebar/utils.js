@@ -2,7 +2,7 @@
  * Copyright (c) University of Sheffield AMRC 2025.
  */
 
-import { createContext } from 'radix-vue'
+import { createContext } from 'reka-ui'
 
 export const SIDEBAR_COOKIE_NAME = 'sidebar:state';
 export const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;

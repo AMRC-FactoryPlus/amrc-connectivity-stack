@@ -1,9 +1,9 @@
 <!--
-  - Copyright (c) University of Sheffield AMRC 2024.
+  - Copyright (c) University of Sheffield AMRC 2025.
   -->
 
 <script setup>
-import { AlertDialogRoot, useForwardPropsEmits } from 'radix-vue'
+import { AlertDialogRoot, useForwardPropsEmits } from 'reka-ui'
 
 const props = defineProps({
   open: { type: Boolean, required: false },

@@ -1,9 +1,9 @@
 <!--
-  - Copyright (c) University of Sheffield AMRC 2024.
+  - Copyright (c) University of Sheffield AMRC 2025.
   -->
 
 <script setup>
-import { TabsRoot, useForwardPropsEmits } from 'radix-vue'
+import { TabsRoot, useForwardPropsEmits } from 'reka-ui'
 
 const props = defineProps({
   defaultValue: { type: null, required: false },

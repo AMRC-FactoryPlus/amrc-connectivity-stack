@@ -1,5 +1,9 @@
+<!--
+  - Copyright (c) University of Sheffield AMRC 2025.
+  -->
+
 <script setup>
-import { DialogTrigger } from "radix-vue";
+import { DialogTrigger } from 'reka-ui'
 
 const props = defineProps({
   asChild: { type: Boolean, required: false },

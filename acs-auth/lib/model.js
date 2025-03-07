@@ -4,7 +4,6 @@
  * Copyright 2022 AMRC
  */
 
-import { UUIDs} from "@amrc-factoryplus/service-client";
 import { DB } from "@amrc-factoryplus/pg-client";
 
 import Queries from "./queries.js";
@@ -22,7 +21,6 @@ export default class Model extends Queries {
         this.log = opts.debug.bound("model");
 
         this.db = db;
-        this.realm = opts.realm;
     }
 
     async init() {
@@ -77,48 +75,25 @@ export default class Model extends Queries {
         return { status };
     }
 
-    /* The dump must be valid. We will get database errors (at best) if
-     * it is not. */
-    dump_load(dump) {
-        const realm = this.realm;
-        const krbs = Object.entries(dump.identities ?? {})
-            .map(([uuid, { kerberos: upn }]) => ({
-                uuid,
-                kerberos:   /@/.test(upn) ? upn : `${upn}@${realm}`,
-            }));
-        const aces = Object.entries(dump.grants ?? {})
-            .flatMap(([principal, perms]) => 
-                Object.entries(perms)
-                    .map(([p, t]) => [p, t ?? { [UUIDs.Special.Null]: false }])
-                    .flatMap(([permission, targs]) =>
-                        Object.entries(targs)
-                            .flatMap(([target, plural]) =>
-                                ({ principal, permission, target, plural }))));
-        const uuids = new Set([
-            ...aces.map(g => g.principal),
-            ...aces.map(g => g.permission),
-            ...aces.map(g => g.target),
-            ...krbs.map(k => k.uuid),
-        ]);
-
+    dump_request (r) {
         return this.txn(async q => {
-            const n_uuid = await q.dump_load_uuids(uuids);
+            const n_uuid = await q.dump_load_uuids(r.uuids);
             if (n_uuid.length)
                 this.log("Inserted new UUIDs: %o", n_uuid);
 
             /* We want entirely duplicate entries to be silently
              * ignored, but mismatches to fail the dump. */
-            const n_id = await q.dump_load_krbs(krbs)
+            const n_id = await q.dump_load_krbs(r.krbs)
                 .catch(e => e?.code == "23505" ? null : Promise.reject(e));
-            if (!n_id) return 409;
+            if (!n_id) return { status: 409 };
             if (n_id.length)
                 this.log("Updated identity for %o", n_id);
                     
-            const n_grant = await q.dump_load_aces(aces);
+            const n_grant = await q.dump_load_aces(r.grants);
             if (n_grant.length)
                 this.log("Updated grants: %o", n_grant);
 
-            return 204;
+            return { status: 204 };
         });
     }
 }

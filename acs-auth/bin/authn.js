@@ -26,10 +26,7 @@ const Version = "2.0.0";
 const fplus = new RxClient({ env: process.env });
 const debug = fplus.debug;
 
-const model  = await new Model({
-    debug,
-    realm:              process.env.REALM,
-}).init();
+const model  = await new Model({ debug, }).init();
 const data = new DataFlow({
     fplus, model,
     root_principal:     process.env.ROOT_PRINCIPAL,
@@ -38,7 +35,10 @@ const data = new DataFlow({
 const authn = await new AuthN({ }).init();
 const authz = await new AuthZ({ data, debug, model });
 const apiv2 = new APIv2({ data, debug });
-const loader = new Loader({ debug, model });
+const loader = new Loader({ 
+    data, debug, model,
+    realm:              process.env.REALM,
+});
 
 const editor = await new Editor({
     services: {

@@ -36,6 +36,7 @@ export class DataFlow {
         const { model } = this;
 
         const updaters = {
+            dump:       model.dump_request,
             grant:      model.grant_request,
             identity:   model.identity_request,
         };
@@ -54,22 +55,24 @@ export class DataFlow {
     /* XXX This is not the best way to do this; we refetch the entire
      * grant list every time. We should be able to track the changes
      * made without going back to the database. */
-    _track_model (type, fetch) {
+    _track_model (types, fetch) {
         return rxx.rx(
             this.responses,
-            rx.filter(r => r.type == type && r.status < 300),
+            rx.filter(r => types.includes(r.type) && r.status < 300),
             rx.startWith(null),
             rx.switchMap(fetch),
             rx.shareReplay(1));
     }
 
     _build_grants () {
-        return this._track_model("grant",
+        return this._track_model(
+            ["grant", "dump"],
             () => this.model.grant_get_all());
     }
 
     _build_identities () {
-        return this._track_model("identity",
+        return this._track_model(
+            ["identity", "dump"],
             () => this.model.identity_get_all());
     }
 

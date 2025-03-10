@@ -12,7 +12,7 @@ The discovered addresses are then stored in the ACS Config Service under the Sco
 ![High Level Diagram](./assets/edge-agent-scout/acs-edge-scout-high-level-diagram.png?raw=true)
 
 ## Edge Agent Configuration (ACS Config Service)
-The ACS Config Service stores the **Edge Agent** configuration for all connections created in the ACS Manager and migrated into the ACS Config Service.
+The ACS Config Service stores the **Edge Agent** configuration with all connections created in the ACS Manager and migrated into the ACS Config Service.
 
 Each configuration includes a list of device connections (`deviceConnections`) managed in the ACS Manager. These configurations contain connection details such as the connection type, connection UUID, necessary scouting entries, and other details that are not relevant to the scouting feature.
 
@@ -105,14 +105,14 @@ Two new methods are added to the abstract **DeviceConnection** class:
 ```
 public async scoutAddresses(driverDetails: ScoutDriverDetails): Promise<object>
 ```
-- This method **must be implemented** in its subclasses (MQTTConnection, OPCUAConnection), as the process for retrieving available addresses differs based on the protocol.
+- This method **must be implemented** in its subclasses (MQTTConnection, OPCUAConnection, etc.), as the process for retrieving available addresses differs based on the protocol.
 - It accepts `driverDetails` part of the scout configuration. 
 - It returns the scouting results as an `object`. 
 
 ```
 async validateConfigDetails(driverDetails: ScoutDriverDetails): Promise<ScoutDriverDetails>
 ```
-- This method **must be implemented** in its subclasses (MQTTConnection, OPCUAConnection), as the process for interpreting `driverDetails` part of the scout configuration varies by protocol.
+- This method **must be implemented** in its subclasses (MQTTConnection, OPCUAConnection, etc.), as the process for interpreting `driverDetails` part of the scout configuration varies by protocol.
 - It accepts `driverDetails` part of the scout configuration. 
 - It performs validation for `driverDetails`, converts it to correct format, and returns the validated configuration in an appropriate type, which extends the `ScoutDriverDetails` type. 
 
@@ -148,7 +148,7 @@ public async scoutAddresses(driverDetails: ScoutDriverDetails): Promise<object>{
 - This method receives `driverDetails` part of the scout configuration and passes it to the `validateConfigDetails(driverDetails: any): Promise<MqttScoutDetails>` method for validation.
 - It then receives the validated and formatted `MqttScoutDetails`.
 - It creates a new MQTT client and connects to the provided MQTT broker.
-- It client listens to the `driverDetails.topic` for the specified `driverDetails.duration`.
+- It's client listens to the `driverDetails.topic` for the specified `driverDetails.duration`.
 - Once the duration passes, it closes the MQTT connection.
 - Finally, it returns the object where MQTT topics are stored as keys within `addresses` entry.
 
@@ -164,8 +164,8 @@ public async scoutAddresses(driverDetails: ScoutDriverDetails): Promise<object>{
 }
 ```
 - This method creates a new OPC UA client and connects to the provided OPC UA server.
-- It browses through all nodes and namespaces starting from the root folder, recursively checking all non-leaf nodes.
-- The leaf-nodes of **Variable** class, which store actual values, are saved as discovered addresses. 
+- It browses through all nodes and namespaces starting from the root folder, recursively checking all child nodes.
+- All nodes are saved as discovered addresses. 
 - It closes the OPC UA connection once the browsing is complete.
 - Finally, it returns the object where OPC UA node addresses are stored as keys and additional node metadata is stored as value objects within `addresses` entry.
 
@@ -215,6 +215,8 @@ Upon creating the `Scout` instance (`newScout`), the `Translator` subscribes to 
 - `app` - UUID for the Edge Scout Results application
 - `obj` - UUID for the Device Connection
 - `json` - Content in JSON format
+
+
 Finally, after creating `newScout` and subscribing to its `scoutResults` event, the `Translator` calls the `performScouting()` method on `newScout`.
 ```
 async setupConnection(connection: any): Promise<void> {

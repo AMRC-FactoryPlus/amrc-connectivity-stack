@@ -5,7 +5,7 @@
 
 import { UUIDs }            from "@amrc-factoryplus/service-client";
 
-import { ACS, Clusters, Git }    from "./uuids.js";
+import { ACS, Auth, Clusters, Git }    from "./uuids.js";
 
 const { ServiceConfig } = UUIDs.App;
 
@@ -34,7 +34,7 @@ class LocalUUIDs {
     async create_by_name (name, klass, ...keys) {
         const config = this.local[name] ??= {};
 
-        for (const key of ...keys) {
+        for (const key of keys) {
             if (config[key]) {
                 this.log("Using existing %s %s: %s", name, key, config[key]);
                 continue;

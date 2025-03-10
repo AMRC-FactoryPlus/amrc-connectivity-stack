@@ -3,9 +3,6 @@
 ---
 service: !u UUIDs.Service.ConfigDB
 version: 2
-classes:
-  - !u Clusters.Class.HelmChart
-  - !u ACS.Class.EdgeDeployment
 objects:
   !u ConfigDB.Class.R1Class:
     !u Clusters.Class.HelmChart:
@@ -175,8 +172,8 @@ grants:
       !u Edge.App.AgentConfig: false
   !u Local.Role.EdgeSync:
     !u ConfigDB.Perm.ReadConfig:
-      !u Cluster.App.HelmRelease: false
-      !u Cluster.App.HelmTemplate: false
+      !u Clusters.App.HelmRelease: false
+      !u Clusters.App.HelmTemplate: false
       !u Edge.App.Deployment: false
       !u Edge.App.ClusterStatus: false
     !u ConfigDB.Perm.WriteConfig:

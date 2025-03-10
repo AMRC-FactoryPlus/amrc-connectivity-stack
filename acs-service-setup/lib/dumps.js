@@ -18,6 +18,7 @@ export class DumpLoader {
         this.dumps  = opts.dumps;
         this.fplus  = opts.fplus;
         this.log    = opts.log || console.log;
+        this.local  = opts.local;
         
         this.acs_config = opts.acs_config;
 
@@ -35,6 +36,11 @@ export class DumpLoader {
      * defined for service-setup. */
     resolveUUID (str) {
         const cpts = str.split(".");
+
+        /* Override Local UUIDs for linting */
+        if (cpts[0] == "Local" && this.local)
+            return this.local(str);
+
         let it = this.uuid_sources;
         for (const c of cpts) {
             if (!(c in it))
@@ -51,7 +57,7 @@ export class DumpLoader {
      * @param str The string to expand.
      * @return {*} The expanded string.
      */
-    resolveURL (str) {
+    resolveACS (str) {
         const { acs_config } = this;
         return str.replace(/\${(.*?)}/g, (match, key) => {
             if (!(key in acs_config))

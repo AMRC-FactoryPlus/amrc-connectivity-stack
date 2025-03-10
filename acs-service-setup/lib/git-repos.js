@@ -42,7 +42,7 @@ class GitRepos {
     }
 
     async setup_repos () {
-        const { cdb, repos } = this;
+        const { repos } = this;
 
         for (const [name, repo] of Object.entries(repos)) {
             await this.setup_repo(name, repo);

@@ -1,6 +1,8 @@
 import process from "process";
 import util from "util";
 
+import { v4 as uuidv4 } from "uuid";
+
 import { UUIDs } from "@amrc-factoryplus/service-client";
 
 import { DumpLoader } from "../lib/dumps.js";
@@ -19,13 +21,21 @@ const schemas = [
     [UUIDs.Service.Authentication, "Auth", await load_schema("acs-auth")],
 ];
 
+const local = {};
+
 const dumps = new DumpLoader({
     dumps:      "dumps",
     acs_config: {
+        organisation:   "ORG",
         namespace:      "factory-plus",
-        url_protocol:   "https",
+        secure:         "s",
         domain:         "my.domain",
-    }});
+        k8sdomain:      "cluster.local",
+        directory:      "https://directory.my.domain",
+        realm:          "MY.DOMAIN",
+    },
+    local:      str => local[str] ??= uuidv4(),
+});
 
 /* XXX */
 let exit = 0;

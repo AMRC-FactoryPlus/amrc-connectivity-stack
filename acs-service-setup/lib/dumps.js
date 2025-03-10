@@ -10,9 +10,8 @@ import yaml from "yaml";
 
 import { UUIDs } from "@amrc-factoryplus/service-client";
 
-import * as local_UUIDs from "./uuids.js";
+import * as ss_UUIDs from "./uuids.js";
 
-const UUID_SOURCES = { UUIDs, ...local_UUIDs };
 
 export class DumpLoader {
     constructor (opts) {
@@ -22,6 +21,7 @@ export class DumpLoader {
         
         this.acs_config = opts.acs_config;
 
+        this.uuid_sources = { UUIDs, ...ss_UUIDs };
         this.yamlOpts = {
             customTags: [
                 ["u",   this.resolveUUID],
@@ -35,7 +35,7 @@ export class DumpLoader {
      * defined for service-setup. */
     resolveUUID (str) {
         const cpts = str.split(".");
-        let it = UUID_SOURCES;
+        let it = this.uuid_sources;
         for (const c of cpts) {
             if (!(c in it))
                 throw new Error(`UUID ref ${str} not found`);
@@ -58,6 +58,14 @@ export class DumpLoader {
                 throw new Error(`ACS config key ${key} not found`);
             return acs_config[key];
         });
+    }
+
+    /** Update our local UUIDs.
+     * Set the object used to resolve `Local` UUIDs.
+     * @param uuids The `Local` UUIDs.
+     */
+    set_local_uuids (uuids) {
+        this.uuid_sources.Local = uuids;
     }
 
     /**
@@ -137,18 +145,21 @@ export class DumpLoader {
         return res.status;
     }
 
+    async load_from_file (yaml, name) {
+        this.log("== %s", name);
+        const ds = this.parse_yaml(yaml, name);
+        for (const d of ds) {
+            this.log("=== %s", d.service);
+            const st = await this.load_dump(d);
+            if (st > 300)
+                throw new Error(`Service dump ${name} failed: ${st}`);
+        }
+    }
+
     async load_dumps (early) {
         const files = await this.sort_files(early);
 
-        for (const f of files) {
-            this.log("== %s", f.file);
-            const ds = this.parse_yaml(f.yaml, f.file);
-            for (const d of ds) {
-                this.log("=== %s", d.service);
-                const st = await this.load_dump(d);
-                if (st > 300)
-                    throw new Error(`Service dump ${f.file} failed: ${st}`);
-            }
-        }
+        for (const f of files)
+            await this.load_from_file(f.yaml, f.name);
     }
 }

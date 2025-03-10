@@ -5,9 +5,11 @@
 <template>
   <div class="flex items-center">
     <div v-if="currentEdgeCluster" class="flex items-center p-3">
-      <i class="fa-solid fa-circle-nodes mr-2"></i>
       <RouterLink :to="`/edge-cluster/${currentEdgeCluster?.uuid}`">
-        <Button title="Go to cluster" variant="ghost" size="plain" class="p-2">{{currentEdgeCluster?.name}}</Button>
+        <Button title="Go to cluster" variant="ghost" size="sm">
+          <i class="fa-solid fa-circle-nodes mr-2"></i>
+          {{currentEdgeCluster?.name}}
+        </Button>
       </RouterLink>
       <DropdownMenu>
         <DropdownMenuTrigger>

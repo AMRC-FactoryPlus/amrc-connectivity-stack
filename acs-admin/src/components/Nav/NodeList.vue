@@ -8,6 +8,7 @@
       <!-- TODO: This should navigate to the cluster page when clicked -->
       <!-- TODO: Ctrl+Click should expand instead of click -->
       <Button
+          title="View Node"
           size="sm"
           variant="ghost"
           class="w-full text-left justify-start"
@@ -24,7 +25,7 @@
       </Button>
       <CollapsibleContent>
         <SidebarMenuSub>
-          <!-- <DeviceList :node/>-->
+           <DeviceList :node/>
         </SidebarMenuSub>
       </CollapsibleContent>
     </Collapsible>
@@ -41,6 +42,7 @@ import { SidebarGroup, SidebarGroupContent, SidebarMenu, SidebarMenuButton, Side
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Button } from '@components/ui/button'
 import { useNodeStore } from '@store/useNodeStore.js'
+import DeviceList from '@/components/Nav/DeviceList.vue'
 
 export default {
 
@@ -61,6 +63,7 @@ export default {
     SidebarMenuButton,
     SidebarMenuSub,
     Button,
+    DeviceList,
   },
 
   props: {

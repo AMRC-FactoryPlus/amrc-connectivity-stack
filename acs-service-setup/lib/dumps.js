@@ -20,17 +20,12 @@ export class DumpLoader {
         this.fplus  = opts.fplus;
         this.log    = opts.log || console.log;
         
-        const acs = opts.acs_config;
-        this.url_replacements = {
-            NAMESPACE: acs.namespace,
-            DOMAIN: acs.domain,
-            PROTOCOL: acs.url_protocol,
-        };
+        this.acs_config = opts.acs_config;
 
         this.yamlOpts = {
             customTags: [
                 ["u",   this.resolveUUID],
-                ["url", this.resolveURL],
+                ["acs", this.resolveACS],
             ].map(([t, f]) => ({ tag: `!${t}`, resolve: f.bind(this) })),
         };
     }
@@ -50,17 +45,18 @@ export class DumpLoader {
     }
 
 
-    /**
-     * Resolves the namespace in the yaml string with the ACS namespace or domain.
-     * @param str The string to resolve.
-     * @return {*} The resolved URL.
+    /** Expand parameters from the ACS config.
+     * Substitutions of the form `${x}` will be expanded from our ACS
+     * config.
+     * @param str The string to expand.
+     * @return {*} The expanded string.
      */
     resolveURL (str) {
-        const { url_replacements } = this;
+        const { acs_config } = this;
         return str.replace(/\${(.*?)}/g, (match, key) => {
-            if (!(key in url_replacements))
-                throw new Error(`URL substitution ${key} not found`);
-            return url_replacements[key];
+            if (!(key in acs_config))
+                throw new Error(`ACS config key ${key} not found`);
+            return acs_config[key];
         });
     }
 

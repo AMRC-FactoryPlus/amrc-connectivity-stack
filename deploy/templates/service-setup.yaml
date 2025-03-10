@@ -49,7 +49,8 @@ spec:
                   "organisation"    .Values.acs.organisation
                   "namespace"       .Release.Namespace
                   "domain"          .Values.acs.baseUrl
-                  "url_protocol"    (.Values.acs.secure | ternary "https" "http")
+                  "k8sdomain"       "cluster.local"
+                  "secure"          (.Values.acs.secure | ternary "s" "")
                   "realm"           .Values.identity.realm
                   "directory"
                     (include "amrc-connectivity-stack.external-url" 

@@ -57,4 +57,57 @@ public class AuthUtils {
                 .map(MqttAce::toTopicPermission)
                 .collect(Collectors.toList());
     }
+
+    /**
+     * Check if an MQTT topic matches a topic from the principles acl.
+     * @param existing The topic filter someone has subscribed or published to (may contain wildcards)
+     * @param target The actual topic a message was subscribed or published to (no wildcards)
+     * @return true if the topics match, false otherwise
+     */
+    public static boolean matchesPermission(String existing, String target) {
+        // Split topics into parts
+        String[] subParts = existing.split("/");
+        String[] pubParts = target.split("/");
+
+        // Handle special case where the subscription is just "#"
+        if (existing.equals("#")) {
+            return true;
+        }
+
+        // Ensure '#' is only used at the end
+        for (int i = 0; i < subParts.length - 1; i++) {
+            if (subParts[i].equals("#")) {
+                return false; // Invalid use of '#'
+            }
+        }
+
+        // Handle '#' wildcard
+        if (subParts[subParts.length - 1].equals("#")) {
+            int prefixLength = subParts.length - 1;
+
+            // Check if the topic has at least as many levels as the prefix
+            for (int i = 0; i < prefixLength; i++) {
+                if (!subParts[i].equals("+") && !subParts[i].equals(pubParts[i])) {
+                    return false;
+                }
+            }
+
+            // If prefix matches, # covers the rest
+            return true;
+        }
+
+        // Lengths must match for an exact match (no # wildcard)
+        if (subParts.length != pubParts.length) {
+            return false;
+        }
+
+        // Check each level
+        for (int i = 0; i < subParts.length; i++) {
+            if (!subParts[i].equals("+") && !subParts[i].equals(pubParts[i])) {
+                return false;
+            }
+        }
+
+        return true;
+    }
 }

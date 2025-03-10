@@ -22,9 +22,10 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import static uk.co.amrc.factoryplus.hivemq_auth_krb.AuthUtils.getACLforPrincipal;
+import static uk.co.amrc.factoryplus.hivemq_auth_krb.AuthUtils.matchesPermission;
 
 public class FPKrbAuthorizer implements SubscriptionAuthorizer, PublishAuthorizer {
-    private FPKrbAuthorizerProvider provider;
+    private final FPKrbAuthorizerProvider provider;
     private static final @NotNull Logger log = LoggerFactory.getLogger(FPKrbAuthenticator.class);
 
     public FPKrbAuthorizer(FPKrbAuthorizerProvider authorizerProvider) {
@@ -84,6 +85,7 @@ public class FPKrbAuthorizer implements SubscriptionAuthorizer, PublishAuthorize
                     .subscribe(result -> {
                                 if (result) {
                                     log.info("Successfully authorized subscription client {} for topic {}.", clientUsername, topic);
+                                    provider.context.storeTopicMapping(clientUsername, topic);
                                     output.authorizeSuccessfully();
                                 } else {
                                     log.info("Subscription permission denied for user {} topic {}", clientUsername, topic);
@@ -133,59 +135,5 @@ public class FPKrbAuthorizer implements SubscriptionAuthorizer, PublishAuthorize
                 );
     }
 
-    /**
-     * Check if an MQTT topic matches a topic from the principles acl.
-     * @param existing The topic filter someone has subscribed or published to (may contain wildcards)
-     * @param target The actual topic a message was subscribed or published to (no wildcards)
-     * @return true if the topics match, false otherwise
-     */
-    private static boolean matchesPermission(String existing, String target) {
-        // Split topics into parts
-        String[] subParts = existing.split("/");
-        String[] pubParts = target.split("/");
-
-        // Handle # wildcard
-        for (int i = 0; i < subParts.length - 1; i++) {
-            if (subParts[i].equals("#")) {
-                // Invalid use of # (not at the end)
-                return false;
-            }
-        }
-
-        if (subParts[subParts.length - 1].equals("#")) {
-            // Check if all parts before # match
-            int prefixLength = subParts.length - 1;
-
-            // If published topic has fewer levels than the prefix, it can't match
-            if (pubParts.length < prefixLength) {
-                return false;
-            }
-
-            // Check if prefix matches
-            for (int i = 0; i < prefixLength; i++) {
-                if (!subParts[i].equals("+") && !subParts[i].equals(pubParts[i])) {
-                    return false;
-                }
-            }
-
-            // If we get here, the prefix matches and # takes care of the rest
-            return true;
-        }
-
-        // If lengths don't match (and there's no # wildcard), they can't match
-        if (subParts.length != pubParts.length) {
-            return false;
-        }
-
-        // Check each level
-        for (int i = 0; i < subParts.length; i++) {
-            // + matches any single level
-            if (!subParts[i].equals("+") && !subParts[i].equals(pubParts[i])) {
-                return false;
-            }
-        }
-
-        return true;
-    }
 }
 

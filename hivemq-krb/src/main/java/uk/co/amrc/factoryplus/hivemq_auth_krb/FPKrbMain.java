@@ -11,6 +11,7 @@ import com.hivemq.extension.sdk.api.parameter.*;
 import com.hivemq.extension.sdk.api.services.Services;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import uk.co.amrc.factoryplus.hivemq_auth_krb.interceptors.FPKrbClientInitializer;
 
 public class FPKrbMain implements ExtensionMain {
 
@@ -24,9 +25,11 @@ public class FPKrbMain implements ExtensionMain {
 
         final FPKrbAuthenticatorProvider authn = new FPKrbAuthenticatorProvider(context);
         final FPKrbAuthorizerProvider authorizer = new FPKrbAuthorizerProvider(context);
+        final FPKrbClientInitializer clientInitializer = new FPKrbClientInitializer(context);
 
         Services.securityRegistry().setEnhancedAuthenticatorProvider(authn);
         Services.securityRegistry().setAuthorizerProvider(authorizer);
+        Services.initializerRegistry().setClientInitializer(clientInitializer);
     }
 
     @Override

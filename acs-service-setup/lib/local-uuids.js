@@ -35,7 +35,7 @@ class LocalUUIDs {
         const config = this.local[name] ??= {};
 
         for (const key of ...keys) {
-            if (key in config) {
+            if (config[key]) {
                 this.log("Using existing %s %s: %s", name, key, config[key]);
                 continue;
             }
@@ -52,22 +52,40 @@ class LocalUUIDs {
             await this.create_by_name(...s);
     }
 
-    async setup_uuids () {
-        /* The master list of local UUIDs lives in the app config. */
-        this.local = await this.get_conf(ServiceConfig);
+    /* We have to check the legacy configs for migration. If we have a
+     * new-style entry it overrides the old entries. */
+    async fetch_local_uuids () {
+        const local = await this.get_conf(ServiceConfig);
+        if (local) return local;
 
-        await this.create_objects(
-            ["Chart", Clusters.Class.HelmChart,
-                "EdgeAgent", "Cluster", "ModbusRest", "MQTT"],
-            ["Repo", Git.Class.Repo, "HelmCharts"],
-            ["RepoGroup", Git.Class.Group,
-                "Cluster", "Shared"],
-            ["Role", Auth.Class.EdgeRole,
-                "EdgeAgent", "EdgeFlux", "EdgeKrbkeys", "EdgeMonitor", "EdgeSync"],
-        );
+        this.log("Fetching legacy configs for migration");
+        const clusters = await this.get_conf(UUIDs.Service.Clusters);
+        const helm = await this.get_conf(Clusters.App.HelmTemplate);
 
-        await this.put_conf(ServiceConfig, this.local);
+        return {
+            Chart: {
+                EdgeAgent:      helm?.helm?.agent,
+                Cluster:        helm?.helm?.cluster,
+                ModbusRest:     helm?.helm?.modbus,
+                MQTT:           helm?.helm?.mqtt,
+            },
+            Repo: {
+                HelmCharts:     clusters?.repo?.helm?.uuid,
+            },
+            RepoGroup: {
+                Cluster:        clusters?.group?.cluster?.uuid,
+                Shared:         clusters?.group?.shared?.uuid,
+            },
+            Role: {
+                EdgeAgent:      helm?.group?.agent?.uuid,
+                EdgeFlux:       clusters?.group?.flux?.uuid,
+                EdgeKrbkeys:    clusters?.group?.krbkeys?.uuid,
+                EdgeSync:       helm?.group?.sync?.uuid,
+            },
+        };
+    }
 
+    async put_service_configs () {
         /* Generate the other ServiceConfig entries from this. Probably
          * the services should just all use the master list. */
         const { local } = this;
@@ -93,8 +111,26 @@ class LocalUUIDs {
 
         /* Remove redundant ServiceConfig entry. */
         await this.cdb.delete_config(ServiceConfig, Clusters.App.HelmTemplate);
+    }
 
-        return local;
+    async setup_uuids () {
+        /* The master list of local UUIDs lives in the app config. */
+        this.local = await this.fetch_local_uuids();
+
+        await this.create_objects(
+            ["Chart", Clusters.Class.HelmChart,
+                "EdgeAgent", "Cluster", "ModbusRest", "MQTT"],
+            ["Repo", Git.Class.Repo, "HelmCharts"],
+            ["RepoGroup", Git.Class.Group,
+                "Cluster", "Shared"],
+            ["Role", Auth.Class.EdgeRole,
+                "EdgeAgent", "EdgeFlux", "EdgeKrbkeys", "EdgeMonitor", "EdgeSync"],
+        );
+
+        await this.put_conf(ServiceConfig, this.local);
+        await this.put_service_configs();
+
+        return this.local;
     }
 }
 

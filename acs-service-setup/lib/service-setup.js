@@ -56,9 +56,6 @@ export class ServiceSetup {
         this.log("Creating shared git repositories");
         await setup_git_repos(this, local);
 
-        this.log("Setting legacy service Sparkplug addresses");
-        await service_sp_addrs(this);
-
         this.log("Migrating legacy Auth groups");
         await migrate_auth_groups(this);
 

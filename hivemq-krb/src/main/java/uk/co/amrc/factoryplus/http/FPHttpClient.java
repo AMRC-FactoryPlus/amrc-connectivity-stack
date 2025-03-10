@@ -166,9 +166,6 @@ public class FPHttpClient {
                             String uri = "???";
                             try { uri = req.getUri().toString(); }
                             catch (Exception e) { }
-                            log.info("Cache {} ({}) for {}",
-                                context.getCacheResponseStatus(),
-                                res.getCode(), uri);
                             obs.onSuccess(res);
                         }
 

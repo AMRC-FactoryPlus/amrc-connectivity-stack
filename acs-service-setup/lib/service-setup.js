@@ -9,8 +9,7 @@ import { migrate_auth_groups }  from "./auth-group.js";
 import { setup_clusters }       from "./clusters.js";
 import { DumpLoader }           from "./dumps.js";
 import { fixups }               from "./fixups.js";
-import { setup_helm }           from "./helm.js";
-import { setup_manager }        from "./manager.js";
+import { setup_local_uuids }    from "./local-uuids.js";
 import { service_sp_addrs }     from "./sp-addrs.js";
 
 export class ServiceSetup {
@@ -47,6 +46,10 @@ export class ServiceSetup {
         this.log("Running fixups");
         await fixups(this);
 
+        this.log("Creating local UUIDs");
+        const local = await setup_local_uuids(this);
+        dumps.set_local_uuids(local);
+
         this.log("Loading service dump files");
         await this.dumps.load_dumps(false);
 
@@ -56,14 +59,8 @@ export class ServiceSetup {
         this.log("Migrating legacy Auth groups");
         await migrate_auth_groups(this);
 
-        this.log("Creating Helm chart templates");
-        const helm = await setup_helm(this);
-
         this.log("Creating edge cluster objects");
-        await setup_clusters(this, helm);
-
-        this.log("Creating Manager config");
-        await setup_manager(this, helm);
+        await setup_clusters(this, local);
 
         this.log("Finished setup");
     }

@@ -1,20 +1,67 @@
+# Set up for the edge-sync Helm deployments
+# REQUIRE: auth edge sparkplug
+---
 service: !u UUIDs.Service.ConfigDB
-version: 1
+version: 2
 classes:
   - !u Clusters.Class.HelmChart
   - !u ACS.Class.EdgeDeployment
 objects:
+  !u ConfigDB.Class.R1Class:
+    !u Clusters.Class.HelmChart:
+      name: "Helm chart"
+    !u ACS.Class.EdgeDeployment:
+      name: "Edge deployment"
+
   !u UUIDs.Class.App:
-    - !u Clusters.App.HelmRelease
-    - !u Clusters.App.HelmTemplate
-    # XXX Needed for now
-    - !u UUIDs.App.ConfigSchema
+    !u Clusters.App.HelmRelease:
+      name: "HelmRelease template"
+    !u Clusters.App.HelmTemplate:
+      name: "Helm chart template"
+
+  !u Auth.Class.EdgeRole:
+    !u Local.Role.EdgeAgent:
+      name: "Active Edge Agent"
+      memberOf:
+        - !u Auth.Class.EdgeRole
+        - !u Edge.Group.EdgeGroup
+      subclassOf:
+        - !u Auth.Class.EdgeAgent
+        - !u ACS.Group.SparkplugNode
+    !u Local.Role.EdgeMonitor:
+      name: "Edge monitor"
+      memberOf:
+        - !u Auth.Class.EdgeRole
+        - !u Edge.Group.EdgeGroup
+      subclassOf:
+        - !u Auth.Class.EdgeService
+        - !u ACS.Group.SparkplugNode
+        # XXX Until we can resolve the issues with dynamic MQTT ACLs,
+        # just grant the Monitors the very big hammer of full
+        # read/rebirth/reload rights. If we settled on SpGroup ==
+        # Cluster we could reduce this to per-Group rights; this would
+        # involve either a per-monitor explicit ACE or a new reflexive
+        # UUID for group access.
+        - !u ACS.Group.SparkplugReader
+    !u Local.Role.EdgeSync:
+      name: "Edge sync"
+      memberOf:
+        - !u Auth.Class.EdgeRole
+        - !u Edge.Group.EdgeGroup
+      subclassOf:
+        - !u Auth.Class.EdgeService
+
+  !u Clusters.Class.HelmChart:
+    !u Local.Chart.EdgeAgent:
+      name: "Edge Agent"
+    !u Local.Chart.Cluster:
+      name: "Edge cluster"
+    !u Local.Chart.ModbusRest:
+      name: "Modbus-REST adapter"
+    !u Local.Chart.MQTT:
+      name: "Edge MQTT broker"
+
 configs:
-  !u UUIDs.App.Info:
-    !u Clusters.Class.HelmChart:    { name: "Helm chart" }
-    !u ACS.Class.EdgeDeployment:    { name: "Edge deployment" }
-    !u Clusters.App.HelmRelease:    { name: "HelmRelease template" }
-    !u Clusters.App.HelmTemplate:   { name: "Helm chart template" }
   !u UUIDs.App.ConfigSchema:
     !u Clusters.App.HelmTemplate:
       title: Helm chart template
@@ -52,6 +99,7 @@ configs:
             properties:
               apiVersion: { type: string }
               kind: { type: string }
+
   # XXX These single-object configs don't give the user any opportunity
   # to override the configuration. But where is an override specified?
   !u Clusters.App.HelmRelease:
@@ -79,3 +127,67 @@ configs:
           interval: 2m0s
           maxHistory: 1
           values: "{{values}}"
+
+  !u Clusters.App.HelmTemplate:
+    !u Local.Chart.Cluster:
+      chart:  "edge-cluster"
+      source: "helm-charts"
+      values:
+        krb5: { realm: !acs "${realm}" }
+        uuid:
+          class:
+            edgeAccount: !u Auth.Class.EdgeService
+          group:
+            edgeSync: !u Local.Role.EdgeSync
+            edgeMonitor: !u Local.Role.EdgeMonitor
+        cluster:
+          name: "{{name}}"
+          uuid: "{{uuid}}"
+          domain: !acs "${domain}"
+          directory: !acs "${directory}"
+    !u Local.Chart.EdgeAgent:
+      chart:  "edge-agent"
+      source: "helm-charts"
+      values:
+        name:   "{{name}}"
+        uuid:   "{{uuid}}"
+        hostname: "{{hostname}}"
+        authGroup:
+          edgeAgent: !u Local.Role.EdgeAgent
+    !u Local.Chart.ModbusRest:
+      chart:  "modbus-rest"
+      values:
+        name:   "{{name}}"
+        uuid:   "{{uuid}}"
+        hostname: "{{hostname}}"
+    !u Local.Chart.MQTT:
+      chart:  "mqtt-broker"
+      values:
+        name:   "{{name}}"
+        uuid:   "{{uuid}}"
+        hostname: "{{hostname}}"
+---
+service: !u UUIDs.Service.Authentication
+version: 2
+grants:
+  !u Local.Role.EdgeAgent:
+    !u ConfigDB.Perm.ReadConfig:
+      !u Edge.App.AgentConfig: false
+  !u Local.Role.EdgeSync:
+    !u ConfigDB.Perm.ReadConfig:
+      !u Cluster.App.HelmRelease: false
+      !u Cluster.App.HelmTemplate: false
+      !u Edge.App.Deployment: false
+      !u Edge.App.ClusterStatus: false
+    !u ConfigDB.Perm.WriteConfig:
+      !u Edge.App.ClusterStatus: false
+    !u ACS.Perm.Composite.EdgeNodeConsumer:
+      !u ACS.Device.ConfigDB: false
+  !u Local.Role.EdgeMonitor:
+    !u ConfigDB.Perm.ReadConfig:
+      !u Edge.App.AgentConfig: false
+    !u ACS.Perm.Composite.EdgeNodeConsumer:
+      !u ACS.Device.ConfigDB: false
+    # XXX See above; this is very broad.
+    !u Edge.Perm.ReloadConfig: null
+

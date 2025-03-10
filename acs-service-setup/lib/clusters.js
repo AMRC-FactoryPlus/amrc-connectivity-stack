@@ -123,8 +123,8 @@ async function setup_perms (auth, group) {
     }
 }
 
-export async function setup_clusters (ss, helm) {
-    const chart = ss.config.helmChart ?? helm.helm.cluster;
+export async function setup_clusters (ss, local) {
+    const chart = ss.config.helmChart ?? local.Chart.Cluster;
     const config = await setup_config(ss, chart);
 
     await setup_perms(ss.fplus.Auth, config.group);

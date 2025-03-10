@@ -10,7 +10,6 @@ import { DumpLoader }           from "./dumps.js";
 import { fixups }               from "./fixups.js";
 import { setup_git_repos }      from "./git-repos.js";
 import { setup_local_uuids }    from "./local-uuids.js";
-import { service_sp_addrs }     from "./sp-addrs.js";
 
 export class ServiceSetup {
     constructor (opts) {
@@ -48,7 +47,7 @@ export class ServiceSetup {
 
         this.log("Creating local UUIDs");
         const local = await setup_local_uuids(this);
-        dumps.set_local_uuids(local);
+        this.dumps.set_local_uuids(local);
 
         this.log("Loading service dump files");
         await this.dumps.load_dumps(false);

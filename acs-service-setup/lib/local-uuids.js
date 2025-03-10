@@ -3,9 +3,9 @@
  * Copyright 2025 University of Sheffield AMRC
  */
 
-import { UUIDs }        from "@amrc-factoryplus/service-client";
+import { UUIDs }            from "@amrc-factoryplus/service-client";
 
-import { Clusters }     from "./uuids.js";
+import { ACS, Clusters, Git }    from "./uuids.js";
 
 const { ServiceConfig } = UUIDs.App;
 
@@ -28,6 +28,9 @@ class LocalUUIDs {
         this.log("Installed new config for %s: %o", srv, conf);
     }
 
+    /* XXX This method is not atomic, and it should be. If service-setup
+     * fails between creating the object and recoding the new local
+     * UUIDs list then we will leave behind orphaned objects. */
     async create_by_name (name, klass, ...keys) {
         const config = this.local[name] ??= {};
 
@@ -54,10 +57,13 @@ class LocalUUIDs {
         this.local = await this.get_conf(ServiceConfig);
 
         await this.create_objects(
-            ["Role", Auth.Class.EdgeRole,
-                "EdgeAgent", "EdgeSync", "EdgeMonitor"],
             ["Chart", Clusters.Class.HelmChart,
                 "EdgeAgent", "Cluster", "ModbusRest", "MQTT"],
+            ["Repo", Git.Class.Repo, "HelmCharts"],
+            ["RepoGroup", Git.Class.Group,
+                "Cluster", "Shared"],
+            ["Role", Auth.Class.EdgeRole,
+                "EdgeAgent", "EdgeFlux", "EdgeKrbkeys", "EdgeMonitor", "EdgeSync"],
         );
 
         await this.put_conf(ServiceConfig, this.local);
@@ -65,6 +71,19 @@ class LocalUUIDs {
         /* Generate the other ServiceConfig entries from this. Probably
          * the services should just all use the master list. */
         const { local } = this;
+        await this.put_conf(UUIDs.Service.Clusters, {
+            group: {
+                cluster: {
+                    path: "cluster",
+                    uuid: local.RepoGroup.Cluster,
+                },
+                flux:       { uuid: local.Role.EdgeFlux },
+                krbkeys:    { uuid: local.Role.EdgeKrbkeys },
+                shared:     { uuid: local.RepoGroup.Shared },
+            },
+            helm: { cluster: local.Chart.Cluster },
+            repo: { helm: { uuid: local.Repo.HelmCharts } },
+        });
         await this.put_conf(ACS.Service.Manager, {
             helm: {
                 agent:      local.Chart.EdgeAgent,

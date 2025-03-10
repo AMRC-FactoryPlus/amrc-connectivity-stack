@@ -6,9 +6,9 @@
 import { ServiceClient } from "@amrc-factoryplus/service-client";
 
 import { migrate_auth_groups }  from "./auth-group.js";
-import { setup_clusters }       from "./clusters.js";
 import { DumpLoader }           from "./dumps.js";
 import { fixups }               from "./fixups.js";
+import { setup_git_repos }      from "./git-repos.js";
 import { setup_local_uuids }    from "./local-uuids.js";
 import { service_sp_addrs }     from "./sp-addrs.js";
 
@@ -53,14 +53,14 @@ export class ServiceSetup {
         this.log("Loading service dump files");
         await this.dumps.load_dumps(false);
 
+        this.log("Creating shared git repositories");
+        await setup_git_repos(this, local);
+
         this.log("Setting legacy service Sparkplug addresses");
         await service_sp_addrs(this);
 
         this.log("Migrating legacy Auth groups");
         await migrate_auth_groups(this);
-
-        this.log("Creating edge cluster objects");
-        await setup_clusters(this, local);
 
         this.log("Finished setup");
     }

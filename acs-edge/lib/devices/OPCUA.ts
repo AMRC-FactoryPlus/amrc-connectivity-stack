@@ -173,30 +173,28 @@ export class OPCUAConnection extends DeviceConnection {
                 return [];
             }
 
-            const variableNodes: Set<ReferenceDescription> = new Set();
+            const allNodes: Set<ReferenceDescription> = new Set();
 
             // Iterate through each reference found during browsing
             for (const reference of browseResult.references) {
-                // const nsIndex = reference.nodeId.namespace;
-                // log(`Browsing Node: ${reference.nodeId.toString()} in Namespace ${nsIndex}`);
+                allNodes.add(reference); // Store all nodes
 
-                // If it's a variable node, store it
-                if (reference.nodeClass === 2) {
-                    variableNodes.add(reference);
-                }
-                // If it's an Object, ObjectType, or ReferenceType, recurse into child nodes
-                else if (reference.nodeClass === 1 || reference.nodeClass === 8 || reference.nodeClass === 32) {
+                // Perform a shallow browse on this node to check if it has children
+                const childBrowseResult: BrowseResult = await session.browse(reference.nodeId);
+                if (childBrowseResult.references && childBrowseResult.references.length > 0) {
+                    // Recursively browse child nodes
                     const childNodes = await this.browseOPCUANodes(session, reference.nodeId);
-                    childNodes.forEach(childNode => variableNodes.add(childNode));
+                    childNodes.forEach(childNode => allNodes.add(childNode));
                 }
             }
 
-            return Array.from(variableNodes);
+            return Array.from(allNodes);
         } catch (err) {
             log(`Error when browsing OPC UA nodes for ${nodeId} with error ${(err as Error).message}`);
             return [];
         }
     }
+
 
     getAddressObject(reference: ReferenceDescription, namespaceArray: string[]): [string, object] {
         return [

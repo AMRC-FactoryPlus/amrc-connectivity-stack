@@ -32,3 +32,5 @@ build/
 *.js.*
 /lib/git-version.ts
 local_secrets
+
+edge_agent_config.yaml

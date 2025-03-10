@@ -110,4 +110,38 @@ public class AuthUtils {
 
         return true;
     }
+
+    /**
+     * Gets the permissions for a mqtt activity from a principles permission list.
+     * @param permissions All mqtt topic permissions from a principle.
+     * @param mqttActivity The type of mqtt activity to filter for.
+     * @return Topic permissions for a mqtt activity.
+     */
+    private static Single<List<TopicPermission>> getAllowedPermissions(
+            Single<List<TopicPermission>> permissions,
+            TopicPermission.MqttActivity mqttActivity
+    ) {
+        return permissions.map(permissionList -> permissionList.stream()
+                .filter(permission -> permission.getActivity() == mqttActivity)
+                .filter(permission -> permission.getType() == TopicPermission.PermissionType.ALLOW)
+                .collect(Collectors.toList()));
+    }
+
+    /**
+     * Checks if the topic being published or subscribed to is allowed based on the principles acl.
+     * @param permissions The principle's permission.
+     * @param targetPermission The Permission to check.
+     * @param mqttActivity The MQTT activity (publish or subscribe).
+     * @return If the MQTT action for the target permission is allowed.
+     */
+    public static Single<Boolean> isPermissionAllowed(
+            Single<List<TopicPermission>> permissions,
+            String targetPermission,
+            TopicPermission.MqttActivity mqttActivity
+    ) {
+        return getAllowedPermissions(permissions, mqttActivity)
+                .map(filteredPermissions -> filteredPermissions.stream()
+                        .anyMatch(permission -> matchesPermission(permission.getTopicFilter(), targetPermission))
+                );
+    }
 }

@@ -5,10 +5,13 @@
 
 import { UUIDs }    from "@amrc-factoryplus/service-client";
 
+import { DumpLoader }   from "./dumps.js";
+
 export class ServiceConfig {
     constructor (opts) {
-        this.ss = opts.ss;
-        this.service = opts.service;
+        this.ss         = opts.ss;
+        this.name       = opts.name;
+        this.service    = opts.service;
 
         this.fplus = opts.ss.fplus;
         this.Auth = this.fplus.Auth;
@@ -34,21 +37,33 @@ export class ServiceConfig {
         return this.config;
     }
 
-    async setup_object (type, config, key, klass) {
+    /* XXX This is not atomic. If s-s crashes we will leave behind
+     * orphaned objects. */
+    async setup_object (msg, config, key, klass) {
         const { CDB } = this;
 
         const have = config[key];
         if (have && have.uuid) {
-            this.log("Using existing %s %s: %s", type, key, have.uuid);
+            this.log("Using existing %s %s: %s", msg, key, have.uuid);
             return have.uuid;
         }
 
-        this.log("Creating %s %s", type, key);
+        this.log("Creating %s %s", msg, key);
         const uuid = await CDB.create_object(klass);
 
-        this.log("Created %s %s: %s", type, key, uuid);
+        this.log("Created %s %s: %s", msg, key, uuid);
         config[key] = { uuid };
         return uuid;
+    }
+
+    async setup_objects (type, klass, ...keys) {
+        const config = this.config[type] ??= {};
+        for (const k of keys) {
+            await this.setup_object(type, config, klass, k);
+        }
+        return Object.fromEntries(
+            Object.entries(config)
+                .map(([k, { uuid }]) => [k, uuid]));
     }
 
     async setup_group (path, klass, name) {
@@ -89,5 +104,16 @@ export class ServiceConfig {
                 await CDB.class_add_member(parent, obj);
             }
         }
+    }
+
+    async load_dumps (uuids, yaml) {
+        const loader = new DumpLoader({
+            fplus:      this.fplus,
+            log:        this.log,
+            acs_config: this.ss.acs_config,
+            uuids,
+        });
+
+        await loader.load_from_file(yaml, `(${this.name}.js)`);
     }
 }

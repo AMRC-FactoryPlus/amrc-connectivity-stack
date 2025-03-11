@@ -1,3 +1,4 @@
+# EARLY
 service: !u UUIDs.Service.Directory
 version: 1
 advertisements:
@@ -17,7 +18,7 @@ advertisements:
     #The Git repository is configured with an external URL. We need to use the appropriate
     #protocol (HTTP/HTTPS) based on whether the application is running in a secure or
     #insecure deployment.
-    url: !url "${PROTOCOL}://git.${BASE_URL}"
+    url: !url "${PROTOCOL}://git.${DOMAIN}"
     device: !u ACS.Device.Git
   - service: !u UUIDs.Service.MQTT
     url: !url "mqtt://mqtt.${NAMESPACE}.svc.cluster.local"

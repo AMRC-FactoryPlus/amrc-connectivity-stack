@@ -7,6 +7,9 @@
 # Random temp files
 tmp/
 
+# Python venv
+venv/
+
 # Local build config
 config.mk
 

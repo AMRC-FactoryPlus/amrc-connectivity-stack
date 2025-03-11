@@ -21,10 +21,19 @@
   "author": "AMRC",
   "license": "MIT",
   "dependencies": {
-    "@amrc-factoryplus/utilities": "^2.0.0",
-    "express": "^4.18.1",
-    "express-basic-auth": "^1.2.1",
-    "http-errors": "^2.0.0",
-    "timers-promises": "^1.0.1"
+    "@amrc-factoryplus/pg-client": "file:../lib/js-pg-client",
+    "@amrc-factoryplus/rx-client": "file:../lib/js-rx-client",
+    "@amrc-factoryplus/rx-util": "file:../lib/js-rx-util",
+    "@amrc-factoryplus/service-api": "file:../lib/js-service-api",
+    "@amrc-factoryplus/service-client": "file:../lib/js-service-client",
+    "uuid": "^11.0.5"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.18.0",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
+    "eslint": "^9.18.0",
+    "globals": "^15.14.0",
+    "yaml": "^2.7.0"
   }
 }

@@ -146,12 +146,20 @@ export class OPCUAConnection extends DeviceConnection {
 
             // Start browsing from the Root Node (ns=0;i=84)
             const NodeIDToStartSearchFrom = new NodeId(NodeIdType.NUMERIC, 84, 0);
+
+            log('Starting to browse OPC UA nodes');
+            const startTime = Date.now();
             const discoveredReferences = await this.browseOPCUANodes(sessionForScout, NodeIDToStartSearchFrom);
+            const endTime = Date.now();
+            log(`Browsing completed in ${(endTime - startTime) / 1000} seconds`);
 
             // Add discovered nodes to the unique dictionary
+            log('Starting to format OPC UA reference into objects');
             discoveredReferences.forEach(reference => {
                 discoveredAddresses.add(...this.getAddressObject(reference, namespaceArray));
             });
+            log('Done formatting OPC UA reference into objects');
+
 
             await sessionForScout.close();
             await clientForScout.disconnect();
@@ -177,15 +185,36 @@ export class OPCUAConnection extends DeviceConnection {
 
             // Iterate through each reference found during browsing
             for (const reference of browseResult.references) {
-                allNodes.add(reference); // Store all nodes
+                /***
+                 * 
+                 * Unspecified - 0 No value is specified.
+                 * Object - 1 The Node is an Object.
+                 * Variable - 2 The Node is a Variable.
+                 * Method - 4 The Node is a Method.
+                 * ObjectType - 8 The Node is an ObjectType.
+                 * VariableType - 16 The Node is a VariableType.
+                 * ReferenceType - 32 The Node is a ReferenceType.
+                 * DataType - 64 The Node is a DataType.
+                 * View - 128 The Node is a View.
+                 * ***/
 
-                // Perform a shallow browse on this node to check if it has children
-                const childBrowseResult: BrowseResult = await session.browse(reference.nodeId);
-                if (childBrowseResult.references && childBrowseResult.references.length > 0) {
-                    // Recursively browse child nodes
-                    const childNodes = await this.browseOPCUANodes(session, reference.nodeId);
-                    childNodes.forEach(childNode => allNodes.add(childNode));
+                if ([4, 8, 16, 32, 64].includes(reference.nodeClass)) {
+                    continue;
                 }
+
+                // Browse on this node to check if it has children (skip Variable class as it's a Leaf node)
+                if (reference.nodeClass !== 2) {
+                    const childBrowseResult: BrowseResult = await session.browse(reference.nodeId);
+                    if (childBrowseResult.references && childBrowseResult.references.length > 0) {
+                        // Recursively browse child nodes
+                        const childNodes = await this.browseOPCUANodes(session, reference.nodeId);
+                        childNodes.forEach(childNode => allNodes.add(childNode));
+                    }
+                }
+                allNodes.add(reference);
+
+
+                // }
             }
 
             return Array.from(allNodes);

@@ -1,8 +1,29 @@
+# Service config needed for service-setup itself to run.
+#-EARLY
+#-REQUIRE: service-urls
+---
 service: !u UUIDs.Service.ConfigDB
-version: 1
+version: 2
 objects:
+  !u ConfigDB.Class.R2Class:
+    !u Auth.Class.PrincipalGroup:
+      name: "Principal group"
+    !u Auth.Class.Role:
+      name: "Role"
+      subclassOf:
+        - !u Auth.Class.PrincipalGroup
+    !u Auth.Class.EdgeRole:
+      name: "Edge role"
+      subclassOf:
+        - !u Auth.Class.Role
+
+  !u ConfigDB.Class.R1Class:
+    !u Clusters.Class.HelmChart:
+      name: "Helm chart"
+
   !u UUIDs.Class.App:
-    - !u UUIDs.App.ServiceConfig
-configs:
-  !u UUIDs.App.Info:
-    !u UUIDs.App.ServiceConfig:   { name: "Service setup" }
+    !u UUIDs.App.ServiceConfig:
+      name: "Service setup"
+    !u Git.Class.Repo:
+      name: "Git repository"
+

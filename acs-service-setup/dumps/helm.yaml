@@ -5,8 +5,9 @@ service: !u UUIDs.Service.ConfigDB
 version: 2
 objects:
   !u ConfigDB.Class.R1Class:
-    !u Clusters.Class.HelmChart:
-      name: "Helm chart"
+    # In service-setup
+    #!u Clusters.Class.HelmChart:
+    #  name: "Helm chart"
     !u ACS.Class.EdgeDeployment:
       name: "Edge deployment"
 

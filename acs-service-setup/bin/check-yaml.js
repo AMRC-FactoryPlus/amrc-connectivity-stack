@@ -45,12 +45,12 @@ function check_files (msg, files) {
 
     for (const f of files) {
         const fail = (cause, ...args) => {
-            throw new Error(`${f.file}: ` + util.format(...args), { cause });
+            throw new Error(`${f.name}: ` + util.format(...args), { cause });
         };
 
-        console.log("==> Checking %s", f.file);
+        console.log("==> Checking %s", f.name);
         try { 
-            const ds = dumps.parse_yaml(f.yaml, f.file);
+            const ds = dumps.parse_yaml(f.yaml, f.name);
             ds.filter(d => !d.service || !d.version)
                 .forEach(d => fail(null, "Missing service or version"));
             for (const [srv, name, validate] of schemas) {

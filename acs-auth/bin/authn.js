@@ -16,6 +16,7 @@ import AuthZ from "../lib/authz.js";
 import { DataFlow } from "../lib/dataflow.js";
 import { Loader } from "../lib/loader.js";
 import Model from "../lib/model.js";
+import { AuthNotify } from "../lib/notify.js";
 import Editor from "../lib/editor.js";
 
 import { GIT_VERSION } from "../lib/git-version.js";
@@ -73,5 +74,11 @@ const api = await new WebAPI({
     },
 }).init();
     
+const notify = new AuthNotify({
+    api, data,
+    log:    fplus.debug.bound("notify"),
+});
+
 data.run();
 api.run();
+notify.run();

@@ -65,21 +65,24 @@ These configurations are mapped to their respective **device connections** using
       "nodeClassID": 2,
       "nodeClassName": "Variable",
       "namespace": 0,
-      "namespaceURI": "http://opcfoundation.org/UA/"
+      "namespaceURI": "http://opcfoundation.org/UA/",
+      "dataType": "String"
     },
     "ns=0;i=2255": {
       "name": "NamespaceArray",
       "nodeClassID": 2,
       "nodeClassName": "Variable",
       "namespace": 0,
-      "namespaceURI": "http://opcfoundation.org/UA/"
+      "namespaceURI": "http://opcfoundation.org/UA/",
+      "dataType": "String"
     },
     "ns=0;i=2256": {
       "name": "ServerStatus",
       "nodeClassID": 2,
       "nodeClassName": "Variable",
       "namespace": 0,
-      "namespaceURI": "http://opcfoundation.org/UA/"
+      "namespaceURI": "http://opcfoundation.org/UA/",
+      "dataType": "ServerStatusDataType"
     },
   },
   "timestamp": 1741375743932,
@@ -165,7 +168,17 @@ public async scoutAddresses(driverDetails: ScoutDriverDetails): Promise<object>{
 ```
 - This method creates a new OPC UA client and connects to the provided OPC UA server.
 - It browses through all nodes and namespaces starting from the root folder, recursively checking all child nodes.
-- All nodes are saved as discovered addresses. 
+- It skips metadata or structural nodes that does not represent actual values. Those nodes belong to following node classes of [4, 8, 16, 32, 64] where:
+  - 0 is Unspecified
+  - 1 is Object 
+  - 2 is Variable
+  - 4 is Method 
+  - 8 is ObjectType
+  - 16 is VariableType
+  - 32 is ReferenceType
+  - 64 is DataType
+  - 128 is View
+- It saves the rest of the nodes as discovered addresses. 
 - It closes the OPC UA connection once the browsing is complete.
 - Finally, it returns the object where OPC UA node addresses are stored as keys and additional node metadata is stored as value objects within `addresses` entry.
 

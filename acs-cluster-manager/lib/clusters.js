@@ -156,6 +156,10 @@ export class Clusters {
     }
 
     _init_cluster_updates (clusters) {
+        /* XXX Currently `clusters` will refetch every 10 minutes and
+         * will emit a new value every time. This means the catch on the
+         * action below will not prevent clusters from reconciling.
+         * If/when this changes we will need retry-failed logic here. */
         return clusters.pipe(
             rx.withLatestFrom(this.status),
             rx.mergeMap(([clusters, status]) => {
@@ -182,7 +186,8 @@ export class Clusters {
              * parallel per-cluster with groupBy but we need to ensure
              * that delete/create on a single cluster are not handled at
              * the same time. */
-            rx.concatMap(act => act.apply()),
+            rx.concatMap(act => act.apply()
+                .catch(e => this.log("Cluster update failed: %s", e))),
         );
     }
 

@@ -1,3 +1,4 @@
+# EARLY
 service: !u UUIDs.Service.Directory
 version: 1
 advertisements:

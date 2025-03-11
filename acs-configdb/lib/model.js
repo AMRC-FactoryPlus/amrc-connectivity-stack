@@ -495,7 +495,7 @@ export default class Model extends EventEmitter {
                 join object o on o.id = r.id
             where c.uuid = $1 and o.uuid = $2
         `, [klass, obj]);
-        return !!dbr.rows;
+        return !!dbr.rows.length;
     }
 
     async _class_relation (klass, obj, perform) {

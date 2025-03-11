@@ -2,27 +2,21 @@
 -- DB migration logic.
 -- Copyright 2022 AMRC.
 
--- Create the version table.
-create table if not exists version (
-    version integer not null
-);
+do language plpgsql $do$
+    declare
+        v_rows integer;
+    begin
+        -- Create the version table.
+        create table if not exists version (
+            version integer not null
+        );
 
--- Create a procedure to perform a migration.
-create or replace procedure migrate_to (newvers integer, sql text)
-    language plpgsql
-    as $$
-        declare
-            curvers integer;
-        begin
-            select version into curvers from version;
-            if curvers is null or curvers < newvers then
-                raise notice 'Migrating database schema to version %', newvers;
-                execute sql;
-            end if;
-            if curvers is null then
-                insert into version (version) values (newvers);
-            else
-                update version set version = newvers;
-            end if;
-        end;
-    $$;
+        select count(*) into v_rows from version;
+
+        if v_rows = 0 then
+            insert into version (version) values (0);
+        elsif v_rows > 1 then
+            raise exception 'Version table has % rows', v_rows;
+        end if;
+    end;
+$do$;

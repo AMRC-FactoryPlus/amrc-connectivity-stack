@@ -6,7 +6,7 @@
 import { UUIDs }            from "@amrc-factoryplus/service-client";
 
 import { ServiceConfig }    from "./service-config.js";
-import { ACS, Clusters, Git }
+import { Auth, Clusters, Edge, Git }
                             from "./uuids.js";
 
 class ClustersConfig extends ServiceConfig {
@@ -15,8 +15,6 @@ class ClustersConfig extends ServiceConfig {
             name: "clusters",
             service: UUIDs.Service.Clusters,
         });
-
-        this.group = opts.group;
     }
 
     async create_repo (name) {
@@ -30,38 +28,49 @@ class ClustersConfig extends ServiceConfig {
         }
 
         this.log("Creating repo %s", name);
-        const uuid = await CDB.create_object(Git.Class.Repo);
+        const uuid = await CDB.create_object(UUIDs.Class.GitRepo);
         this.log("Created repo %s: %s", name, uuid);
         repo[name] = { uuid };
         return uuid;
     }
 
     async setup_repo (name, spec) {
-        const { Auth, CDB } = this;
+        const { CDB } = this;
 
         const uuid = await this.create_repo(name);
 
         await CDB.patch_config(UUIDs.App.Info, uuid, "merge", 
             { name: spec.name });
         await CDB.put_config(Git.App.Config, uuid, {
-            path:   `${this.group}/${name}`,
+            path:   `shared/${name}`,
             pull:   spec.pull,
         });
-        await Auth.add_to_group(this.config.group[this.group].uuid, uuid);
+        const shared = this.config.group.shared.uuid;
+        this.log("Adding %s ∈ %s", uuid, shared);
+        await CDB.class_add_member(shared, uuid);
     }
 }    
 
 async function setup_config (ss, chart) {
     const conf = await new ClustersConfig({
         ss,
-        group:  "shared",
     }).init();
 
+    const { GitRepo, GitRepoGroup } = UUIDs.Class;
+    const { EdgeService, EdgeRole } = Auth.Class;
+    const { ClusterGroups } = Clusters.Class;
     await conf.setup_groups(
-        ["shared",  UUIDs.Class.GitRepoGroup,   "Shared repositories"],
-        ["cluster", UUIDs.Class.GitRepoGroup,   "Edge cluster repositories"],
-        ["krbkeys", ACS.Class.UserGroup,        "Edge krbkeys accounts"],
-        ["flux",    ACS.Class.UserGroup,        "Edge flux accounts"],
+        ["shared",  GitRepoGroup,   "Shared repo"],
+        ["cluster", GitRepoGroup,   "Edge cluster repo"],
+        ["krbkeys", EdgeRole,       "Edge krbkeys account"],
+        ["flux",    EdgeRole,       "Edge flux account"],
+    );
+    await conf.setup_subgroups(
+        [GitRepo,       "shared", "cluster"],
+        [EdgeService,   "krbkeys", "flux"],
+    );
+    await conf.setup_members(
+        [ClusterGroups, "flux", "krbkeys", "cluster"],
     );
 
     /* This is probably not the best place for this, but for now the EDO
@@ -79,36 +88,38 @@ async function setup_config (ss, chart) {
     return await conf.finish();
 }
 
-async function setup_perms (auth, group, edge) {
+async function setup_perms (auth, group) {
     const account_req = Clusters.Requirement.ServiceAccount;
     const { ManageObjects, ReadConfig, WriteConfig } = UUIDs.Permission.ConfigDB;
-    const { ManageKerberos, ManageGroup, ManageACL } = UUIDs.Permission.Auth;
+    const { ManageKerberos, ManageACL } = UUIDs.Permission.Auth;
     const ReadKerberos = "e8c9c0f7-0d54-4db2-b8d6-cd80c45f6a5c";
 
     const aces = [
-        [account_req,           Git.Perm.Pull,      group.shared.uuid],
-        [account_req,           Git.Perm.Pull,      group.cluster.uuid],
-        [account_req,           Git.Perm.Push,      group.cluster.uuid],
-        [group.flux.uuid,       Git.Perm.Pull,      group.shared.uuid],
-        [group.krbkeys.uuid,    ManageObjects,      ACS.Class.EdgeAccount],
-        [group.krbkeys.uuid,    ReadConfig,         UUIDs.App.Info],
-        [group.krbkeys.uuid,    WriteConfig,        UUIDs.App.Info],
-        [group.krbkeys.uuid,    ReadConfig,         UUIDs.App.SparkplugAddress],
-        [group.krbkeys.uuid,    WriteConfig,        UUIDs.App.SparkplugAddress],
+        [account_req,           Git.Perm.Pull,      group.shared.uuid,          true],
+        [account_req,           Git.Perm.Pull,      group.cluster.uuid,         true],
+        [account_req,           Git.Perm.Push,      group.cluster.uuid,         true],
+        [group.flux.uuid,       Git.Perm.Pull,      group.shared.uuid,          true],
+        [group.krbkeys.uuid,    ManageObjects,      Auth.Class.EdgeService,     false],
+        [group.krbkeys.uuid,    ReadConfig,         UUIDs.App.Info,             false],
+        [group.krbkeys.uuid,    WriteConfig,        UUIDs.App.Info,             false],
+        [group.krbkeys.uuid,    ReadConfig,         UUIDs.App.SparkplugAddress, false],
+        [group.krbkeys.uuid,    WriteConfig,        UUIDs.App.SparkplugAddress, false],
         /* XXX This is root-equivalent */
-        [group.krbkeys.uuid,    ManageKerberos,     UUIDs.Special.Null],
-        [group.krbkeys.uuid,    ReadKerberos,       UUIDs.Special.Null],
-        /* XXX This is root-equivalent due to lack of group member quoting */
-        [group.krbkeys.uuid,    ManageGroup,        ACS.Group.EdgeGroups],
-        [group.krbkeys.uuid,    ManageACL,          ACS.Group.EdgePermissions],
+        [group.krbkeys.uuid,    ManageKerberos,     UUIDs.Special.Null,         false],
+        [group.krbkeys.uuid,    ReadKerberos,       UUIDs.Special.Null,         false],
+        [group.krbkeys.uuid,    ManageObjects,      Edge.Group.EdgeGroup,       true],
+        /* XXX Not much use at present due to pure ranks. Composite
+         * perms are a rank higher than ordinary perms. Unused. */
+        [group.krbkeys.uuid,    ManageACL,          Edge.Group.EdgePermission,  true],
     ];
     for (const ace of aces) {
         auth.fplus.debug.log("clusters", "Adding %o", ace);
-        await auth.add_ace(...ace);
-    }
-
-    for (const e of edge) {
-        await auth.add_to_group(ACS.Group.EdgeGroups, e);
+        await auth.add_grant({
+            principal:  ace[0],
+            permission: ace[1],
+            target:     ace[2],
+            plural:     ace[3],
+        });
     }
 }
 
@@ -116,8 +127,7 @@ export async function setup_clusters (ss, helm) {
     const chart = ss.config.helmChart ?? helm.helm.cluster;
     const config = await setup_config(ss, chart);
 
-    const edge = Object.values(helm.group).map(g => g.uuid);
-    await setup_perms(ss.fplus.Auth, config.group, edge);
+    await setup_perms(ss.fplus.Auth, config.group);
 
     return config;
 }

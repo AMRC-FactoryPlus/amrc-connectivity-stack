@@ -30,7 +30,8 @@
             <div class="flex bg-white items-center justify-between gap-2">
               <Button size="sm" class="flex items-center justify-center gap-2" @click="copyBootstrap">
                 <span class="hidden md:inline">Bootstrap</span>
-                <i class="fa-solid fa-rocket"></i>
+                <i v-if="copyingBootstrap" class="fa-solid fa-circle-notch animate-spin"></i>
+                <i v-else class="fa-solid fa-rocket"></i>
               </Button>
             </div>
           </div>
@@ -65,10 +66,6 @@
           </DataTable>
         </TabsContent>
       </Tabs>
-    <template #header>
-      <div class="flex bg-white items-center justify-between gap-2">
-        <Button>Status</Button>
-        <Button @click="copyBootstrap">Copy Bootstrap</Button>
     </div>
   </EdgeContainer>
 </template>
@@ -154,22 +151,26 @@ export default {
       navigator.clipboard.writeText(text)
       toast.success('Text copied to clipboard')
     },
-    async copyBootstrap() {
+    async copyBootstrap () {
+      this.copyingBootstrap = true
       try {
-        const bootstrapResponse = await useServiceClientStore()
-            .client.Fetch.fetch(
-                {
-                  service: UUIDs.Service.Clusters,
-                  url: `v1/cluster/${this.$route.params.clusteruuid}/bootstrap-url`
-                })
+        const bootstrapResponse = await useServiceClientStore().client.Fetch.fetch({
+          service: UUIDs.Service.Clusters,
+          url: `v1/cluster/${this.$route.params.clusteruuid}/bootstrap-url`,
+        })
         console.log(bootstrapResponse)
-        const bootstrap = bootstrapResponse[1];
+        const bootstrap = bootstrapResponse[1]
         if (bootstrap.data) {
+          this.copyingBootstrap = false
           this.copy(`curl ${bootstrap.data} | sh -`)
-        } else {
+        }
+        else {
+          this.copyingBootstrap = false
           toast.error('The bootstrap script is not ready yet. Please wait a few moments and try again.')
         }
-      } catch {
+      }
+      catch {
+        this.copyingBootstrap = false
         toast.error('The bootstrap script is not ready yet. Please wait a few moments and try again.')
       }
     },
@@ -234,6 +235,7 @@ export default {
 
   data () {
     return {
+      copyingBootstrap: false,
       loadingDetails: true,
       cluster: {},
       test: [],

@@ -16,6 +16,8 @@ objects:
       name: "Edge role"
       subclassOf:
         - !u Auth.Class.Role
+    !u Git.Class.Group:
+        name: "Git repository group"
 
   !u ConfigDB.Class.R1Class:
     !u Clusters.Class.HelmChart:

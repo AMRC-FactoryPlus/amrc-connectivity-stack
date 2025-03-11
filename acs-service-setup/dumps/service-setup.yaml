@@ -20,10 +20,10 @@ objects:
   !u ConfigDB.Class.R1Class:
     !u Clusters.Class.HelmChart:
       name: "Helm chart"
+    !u Git.Class.Repo:
+      name: "Git repository"
 
   !u UUIDs.Class.App:
     !u UUIDs.App.ServiceConfig:
       name: "Service setup"
-    !u Git.Class.Repo:
-      name: "Git repository"
 

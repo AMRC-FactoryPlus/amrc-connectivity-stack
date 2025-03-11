@@ -39,7 +39,7 @@ export class ServiceSetup {
     }
 
     async run () {
-        this.log("Loading directory dump");
+        this.log("Loading early dumps");
         await this.dumps.load_dumps(true);
 
         this.log("Running fixups");

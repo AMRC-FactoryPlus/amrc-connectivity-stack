@@ -3,7 +3,7 @@
  * Copyright 2025 University of Sheffield AMRC
  */
 
-import { UUIDs }            from "@amrc-factoryplus/service-client";
+import { ServiceError, UUIDs }         from "@amrc-factoryplus/service-client";
 
 import { ACS, Auth, Clusters, Git }    from "./uuids.js";
 
@@ -111,7 +111,8 @@ class LocalUUIDs {
         });
 
         /* Remove redundant ServiceConfig entry. */
-        await this.cdb.delete_config(ServiceConfig, Clusters.App.HelmTemplate);
+        await this.cdb.delete_config(ServiceConfig, Clusters.App.HelmTemplate)
+            .catch(ServiceError.check(404));
     }
 
     async setup_uuids () {

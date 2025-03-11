@@ -157,7 +157,7 @@ export class DumpLoader {
         for (const d of ds) {
             this.log("=== %s", d.service);
             const st = await this.load_dump(d);
-            if (st > 300)
+            if (st != 204)
                 throw new Error(`Service dump ${name} failed: ${st}`);
         }
     }

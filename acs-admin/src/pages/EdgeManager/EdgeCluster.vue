@@ -28,7 +28,7 @@
               </Copyable>
             </div>
             <div class="flex bg-white items-center justify-between gap-2">
-              <Button size="sm" class="flex items-center justify-center gap-2">
+              <Button size="sm" class="flex items-center justify-center gap-2" @click="copyBootstrap">
                 <span class="hidden md:inline">Bootstrap</span>
                 <i class="fa-solid fa-rocket"></i>
               </Button>
@@ -160,7 +160,7 @@ export default {
             .client.Fetch.fetch(
                 {
                   service: UUIDs.Service.Clusters,
-                  url: `/cluster/${this.$route.params.clusteruuid}/bootstrap-url`
+                  url: `v1/cluster/${this.$route.params.clusteruuid}/bootstrap-url`
                 })
         console.log(bootstrapResponse)
         const bootstrap = bootstrapResponse[1];

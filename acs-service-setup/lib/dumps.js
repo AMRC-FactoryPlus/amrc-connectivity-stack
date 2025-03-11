@@ -128,7 +128,7 @@ export class DumpLoader {
             .forEach(f => graph.add(f));
 
         return graph.sort()
-            .map(file => ({ file, yaml: yamls.get(file) }));
+            .map(name => ({ name, yaml: yamls.get(name) }));
     }
 
     /** Load a dump into the appropriate service.

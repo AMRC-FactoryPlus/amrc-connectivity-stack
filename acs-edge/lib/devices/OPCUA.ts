@@ -155,9 +155,12 @@ export class OPCUAConnection extends DeviceConnection {
 
             // Add discovered nodes to the unique dictionary
             log('Starting to format OPC UA reference into objects');
-            discoveredReferences.forEach(reference => {
-                discoveredAddresses.add(...this.getAddressObject(reference, namespaceArray));
-            });
+            const addressObjects = await Promise.all(
+                discoveredReferences.map(reference => this.getAddressObject(reference, namespaceArray, sessionForScout))
+            );
+
+            addressObjects.forEach(([key, value]) => discoveredAddresses.add(key, value));
+
             log('Done formatting OPC UA reference into objects');
 
 
@@ -212,9 +215,6 @@ export class OPCUAConnection extends DeviceConnection {
                     }
                 }
                 allNodes.add(reference);
-
-
-                // }
             }
 
             return Array.from(allNodes);
@@ -225,18 +225,75 @@ export class OPCUAConnection extends DeviceConnection {
     }
 
 
-    getAddressObject(reference: ReferenceDescription, namespaceArray: string[]): [string, object] {
-        return [
-            reference.nodeId.toString(),
-            {
-                name: reference.browseName.toString(),
-                nodeClassID: reference.nodeClass,
-                nodeClassName: NodeClass[reference.nodeClass],
-                namespace: reference.nodeId.namespace,
-                namespaceURI: namespaceArray[reference.nodeId.namespace]
-            }
-        ];
+    async getAddressObject(reference: ReferenceDescription, namespaceArray: string[], session): Promise<[string, object]> {
+        try {
+            // Try to get DataType if available
+            const dataType = await this.getDataType(reference.nodeId, session);
+
+            // Validate namespace index
+            const namespaceURI = namespaceArray[reference.nodeId.namespace] || "Unknown Namespace";
+
+            return [
+                reference.nodeId.toString(),
+                {
+                    name: reference.browseName.toString(),
+                    nodeClassID: reference.nodeClass,
+                    nodeClassName: NodeClass[reference.nodeClass],
+                    namespace: reference.nodeId.namespace,
+                    namespaceURI: namespaceURI,
+                    ...(dataType ? { dataType } : {}) // Include dataType only if available
+                }
+            ];
+        } catch (err) {
+            log(`Error retrieving address object for ${reference.nodeId.toString()}: ${(err as Error).message}`);
+            return [
+                reference.nodeId.toString(),
+                {
+                    name: reference.browseName.toString(),
+                    nodeClassID: reference.nodeClass,
+                    nodeClassName: NodeClass[reference.nodeClass],
+                    namespace: reference.nodeId.namespace,
+                    namespaceURI: namespaceArray[reference.nodeId.namespace] || "Unknown Namespace",
+                }
+            ];
+        }
     }
+
+
+    async getDataType(nodeId: NodeId, session): Promise<string | null> {
+        try {
+            // Read the DataType attribute of the node
+            const resDataTypeNodeId = await session.read({
+                nodeId: nodeId,
+                attributeId: AttributeIds.DataType,
+            });
+
+            // Validate response
+            if (!resDataTypeNodeId?.value?.value) {
+                return null;
+            }
+
+            const dataTypeNodeId = resDataTypeNodeId.value.value;
+
+            // Read the DisplayName of the DataType node
+            const resDataTypeDisplayName = await session.read({
+                nodeId: dataTypeNodeId,
+                attributeId: AttributeIds.DisplayName,
+            });
+
+            // Validate display name response
+            if (!resDataTypeDisplayName?.value?.value?.text) {
+                return null; // Return null if display name is missing
+            }
+
+            // Return the extracted display name
+            return resDataTypeDisplayName.value.value.text;
+        } catch (err) {
+            log(`Error retrieving data type for ${nodeId.toString()}: ${(err as Error).message}`);
+            return "";
+        }
+    }
+
 
 
     readMetrics(metrics: Metrics, payloadFormat?: string) {

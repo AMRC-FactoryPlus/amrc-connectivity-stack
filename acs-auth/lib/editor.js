@@ -8,7 +8,7 @@ import url from "node:url";
 
 import express from "express";
 
-import {Debug} from "@amrc-factoryplus/utilities";
+import {Debug} from "@amrc-factoryplus/service-client";
 
 const debug = new Debug();
 

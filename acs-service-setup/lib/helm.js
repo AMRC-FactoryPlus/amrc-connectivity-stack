@@ -6,7 +6,7 @@
 import { UUIDs } from "@amrc-factoryplus/service-client";
 
 import { ServiceConfig }    from "./service-config.js";
-import { ACS, Clusters, Edge }    
+import { ACS, Auth, Clusters, Edge }    
                             from "./uuids.js";
 
 class HelmConfig extends ServiceConfig {
@@ -55,31 +55,27 @@ async function setup_perms (auth, group) {
      * involve either a per-monitor explicit ACE or a new reflexive
      * UUID for group access. */
 
-    const members = [
-        [ACS.Group.SparkplugNode,       group.agent.uuid],
-        [ACS.Group.SparkplugNode,       group.monitor.uuid],
-        [ACS.Group.GlobalDebuggers,     group.monitor.uuid],
-    ];
     const aces = [
-        [group.agent.uuid,      ReadConfig,     Edge.App.AgentConfig],
-        [group.sync.uuid,       ReadConfig,     Clusters.App.HelmRelease],
-        [group.sync.uuid,       ReadConfig,     Clusters.App.HelmTemplate],
-        [group.sync.uuid,       ReadConfig,     Edge.App.Deployment],
-        [group.sync.uuid,       ReadConfig,     Edge.App.ClusterStatus],
-        [group.sync.uuid,       WriteConfig,    Edge.App.ClusterStatus],
-        [group.sync.uuid,       EdgeNodeConsumer, ACS.Device.ConfigDB],
-        [group.monitor.uuid,    ReadConfig,     Edge.App.AgentConfig],
-        [group.monitor.uuid,    EdgeNodeConsumer, ACS.Device.ConfigDB],
-        [group.monitor.uuid,    ReloadConfig,   UUIDs.Special.Null],
+        [group.agent.uuid,      ReadConfig,     Edge.App.AgentConfig,       false],
+        [group.sync.uuid,       ReadConfig,     Clusters.App.HelmRelease,   false],
+        [group.sync.uuid,       ReadConfig,     Clusters.App.HelmTemplate,  false],
+        [group.sync.uuid,       ReadConfig,     Edge.App.Deployment,        false],
+        [group.sync.uuid,       ReadConfig,     Edge.App.ClusterStatus,     false],
+        [group.sync.uuid,       WriteConfig,    Edge.App.ClusterStatus,     false],
+        [group.sync.uuid,       EdgeNodeConsumer, ACS.Device.ConfigDB,      false],
+        [group.monitor.uuid,    ReadConfig,     Edge.App.AgentConfig,       false],
+        [group.monitor.uuid,    EdgeNodeConsumer, ACS.Device.ConfigDB,      false],
+        [group.monitor.uuid,    ReloadConfig,   UUIDs.Special.Null,         false],
     ];
 
-    for (const m of members) {
-        auth.fplus.debug.log("helm", "Adding member %s", m.join(", "));
-        await auth.add_to_group(...m);
-    }
-    for (const a of aces) {
-        auth.fplus.debug.log("helm", "Adding ACE %s", a.join(", "));
-        await auth.add_ace(...a);
+    for (const ace of aces) {
+        auth.fplus.debug.log("helm", "Adding ACE %s", ace.join(", "));
+        await auth.add_grant({
+            principal:  ace[0],
+            permission: ace[1],
+            target:     ace[2],
+            plural:     ace[3],
+        });
     }
 }
 
@@ -88,10 +84,22 @@ export async function setup_helm (ss) {
         ss,
     }).init();
 
+    const { EdgeRole, EdgeService, EdgeAgent } = Auth.Class;
+    const { SparkplugNode, SparkplugReader } = ACS.Group;
+    const { EdgeGroup } = Edge.Group;
     await conf.setup_groups(
-        ["agent",   ACS.Class.UserGroup,    "Edge Agent"],
-        ["sync",    ACS.Class.UserGroup,    "Edge Sync account"],
-        ["monitor", ACS.Class.UserGroup,    "Edge Monitor account"],
+        ["agent",   EdgeRole,  "Active Edge Agent"],
+        ["sync",    EdgeRole,  "Edge sync"],
+        ["monitor", EdgeRole,  "Edge monitor"],
+    );
+    await conf.setup_subgroups(
+        [EdgeAgent,         "agent"],
+        [EdgeService,       "monitor", "sync"],
+        [SparkplugNode,     "agent", "monitor"],
+        [SparkplugReader,   "monitor"],
+    );
+    await conf.setup_members(
+        [EdgeGroup,     "agent", "sync", "monitor"],
     );
 
     const acs = ss.acs_config;
@@ -107,7 +115,7 @@ export async function setup_helm (ss) {
                 krb5: { realm: acs.realm },
                 uuid: {
                     class: {
-                        edgeAccount:    ACS.Class.EdgeAccount,
+                        edgeAccount:    Auth.Class.EdgeService,
                     },
                     group: {
                         edgeSync:       group.sync.uuid,

@@ -18,7 +18,7 @@ class LocalUUIDs {
     }
 
     async get_conf (srv) {
-        const conf = this.cdb.get_config(ServiceConfig, srv);
+        const conf = await this.cdb.get_config(ServiceConfig, srv);
         this.log("Fetched existing config for %s: %o", srv, conf);
         return conf;
     }
@@ -80,6 +80,7 @@ class LocalUUIDs {
                 EdgeAgent:      helm?.group?.agent?.uuid,
                 EdgeFlux:       clusters?.group?.flux?.uuid,
                 EdgeKrbkeys:    clusters?.group?.krbkeys?.uuid,
+                EdgeMonitor:    helm?.group?.monitor?.uuid,
                 EdgeSync:       helm?.group?.sync?.uuid,
             },
         };

@@ -1,4 +1,7 @@
-# EARLY
+# This dump is loaded first of all. It registers the other services with
+# the Directory; until this is done we can't contact any other service.
+# All other EARLY dumps need to REQUIRE this one.
+#-EARLY
 service: !u UUIDs.Service.Directory
 version: 1
 advertisements:

@@ -1,6 +1,6 @@
 # These are migrated in from ../deploy/templates/dumps.yaml, from the
 # original ACS v2 release. They need picking through and separating out.
-# REQUIRE: auth
+#-REQUIRE: auth
 ---
 service: !u UUIDs.Service.ConfigDB
 version: 2

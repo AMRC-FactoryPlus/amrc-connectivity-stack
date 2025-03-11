@@ -115,11 +115,11 @@ export class DumpLoader {
      * @returns A list of {file, yaml} objects.
      */
     async sort_files (early) {
-        const yamls = await this.read_files(t => /^# EARLY/m.test(t) == early);
+        const yamls = await this.read_files(t => /^#-EARLY/m.test(t) == early);
 
         const graph = tsort();
         [...yamls.entries()]
-            .map(([f, t]) => [f, t.match(/^# REQUIRE:\s+(.*)/m)?.[1]])
+            .map(([f, t]) => [f, t.match(/^#-REQUIRE:\s+(.*)/m)?.[1]])
             .filter(m => m[1])
             .flatMap(([f, m]) => m.split(/\s+/)
                 .map(d => [`${d}.yaml`, f]))

@@ -1,5 +1,5 @@
 # Set up for the edge-sync Helm deployments
-# REQUIRE: auth edge sparkplug
+#-REQUIRE: auth edge sparkplug
 ---
 service: !u UUIDs.Service.ConfigDB
 version: 2

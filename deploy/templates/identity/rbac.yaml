@@ -18,6 +18,9 @@ rules:
   -   apiGroups: [factoryplus.app.amrc.co.uk]
       resources: [kerberos-keys/status]
       verbs: [list, get, create, update, delete, watch, patch]
+  -   apiGroups: [factoryplus.app.amrc.co.uk]
+      resources: [localsecrets]
+      verbs: [list,watch]
   -   apiGroups: [""]
       resources: [secrets]
       verbs: [get, create, update, delete, patch]
@@ -29,10 +32,13 @@ rules:
       verbs: [get]
   -   apiGroups: [""]
       resources: [namespaces]
-      verbs: [get,list]
+      verbs: [get,list,watch]
   -   apiGroups: [""]
       resources: [events]
       verbs: [create]
+  -   apiGroups: [apiextensions.k8s.io]
+      resources: [customresourcedefinitions]
+      verbs: [list,watch]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

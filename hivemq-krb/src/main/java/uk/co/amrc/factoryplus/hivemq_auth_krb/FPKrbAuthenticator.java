@@ -5,19 +5,13 @@
 
 package uk.co.amrc.factoryplus.hivemq_auth_krb;
 
-import java.lang.Runnable;
-import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.charset.StandardCharsets;
-import java.security.PrivilegedAction;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
-import org.ietf.jgss.*;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,7 +19,6 @@ import org.slf4j.LoggerFactory;
 import io.reactivex.rxjava3.core.*;
 
 import com.hivemq.extension.sdk.api.async.*;
-import com.hivemq.extension.sdk.api.client.parameter.Listener;
 import com.hivemq.extension.sdk.api.annotations.NotNull;
 import com.hivemq.extension.sdk.api.auth.EnhancedAuthenticator;
 import com.hivemq.extension.sdk.api.auth.parameter.*;
@@ -35,21 +28,27 @@ import com.hivemq.extension.sdk.api.packets.general.*;
 import com.hivemq.extension.sdk.api.services.Services;
 
 import uk.co.amrc.factoryplus.Attempt;
+import uk.co.amrc.factoryplus.FPServiceClient;
 
-public class FPKrbAuth implements EnhancedAuthenticator {
+import static uk.co.amrc.factoryplus.hivemq_auth_krb.AuthUtils.getACLforPrincipal;
 
-    private static final @NotNull Logger log = LoggerFactory.getLogger(FPKrbAuth.class);
+public class FPKrbAuthenticator implements EnhancedAuthenticator {
 
-    private FPKrbAuthProvider provider;
+    private static final @NotNull Logger log = LoggerFactory.getLogger(FPKrbAuthenticator.class);
+    private FPServiceClient fplus;
+
+    private FPKrbAuthenticatorProvider provider;
 
     static class AuthResult {
         public byte[] gssToken;
         public List<TopicPermission> acl;
+        public String user;
 
-        public AuthResult (byte[] tok, List<TopicPermission> acl)
+        public AuthResult (byte[] tok, List<TopicPermission> acl, String user)
         {
             this.gssToken = tok;
             this.acl = acl;
+            this.user = user;
         }
 
         public void applyACL (EnhancedAuthOutput output)
@@ -68,9 +67,10 @@ public class FPKrbAuth implements EnhancedAuthenticator {
         }
     }
 
-    public FPKrbAuth (FPKrbAuthProvider prov)
+    public FPKrbAuthenticator(FPKrbAuthenticatorProvider prov)
     {
         provider = prov;
+        fplus = prov.fplus;
     }
 
     @Override
@@ -124,6 +124,7 @@ public class FPKrbAuth implements EnhancedAuthenticator {
             .subscribe(
                 rv -> {
                     rv.applyACL(output);
+                    provider.context.storeUsername(conn.getClientId(), rv.user);
                     output.authenticateSuccessfully(rv.gssToken);
                 },
                 e -> {
@@ -136,7 +137,6 @@ public class FPKrbAuth implements EnhancedAuthenticator {
     {
         String user = conn.getUserName().orElse(null);
         ByteBuffer passwd = conn.getPassword().orElse(null);
-
         if (user == null || passwd == null) {
             log.error("Null username/password, failing auth");
             output.failAuthentication();
@@ -182,6 +182,7 @@ public class FPKrbAuth implements EnhancedAuthenticator {
                     opt.ifPresentOrElse(
                         rv -> {
                             rv.applyACL(output);
+                            provider.context.storeUsername(conn.getClientId(), rv.user);
                             output.authenticateSuccessfully();
                         },
                         () -> output.failAuthentication());
@@ -217,8 +218,8 @@ public class FPKrbAuth implements EnhancedAuthenticator {
 
                 String client_name = ctx.getSrcName().toString();
                 log.info("Authenticated client {}", client_name);
-                return provider.getACLforPrincipal(client_name)
-                    .map(acl -> new AuthResult(out_buf, acl))
+                return getACLforPrincipal(client_name, fplus)
+                    .map(acl -> new AuthResult(out_buf, acl, client_name))
                     .doOnSuccess(rv -> log.info("MQTT ACL [{}]: {}", 
                         client_name, rv.showACL()));
             });

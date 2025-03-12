@@ -56,7 +56,7 @@ const api = await new WebAPI({
 
 const notify = new CDBNotify({
     auth, api, model,
-    log:    fplus.debug.bound("notify"),
+    debug:  fplus.debug,
 });
 
 mqtt?.run();

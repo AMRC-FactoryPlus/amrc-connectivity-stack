@@ -2,24 +2,25 @@ service: !u UUIDs.Service.ConfigDB
 version: 2
 objects:
   !u ConfigDB.Class.R2Class:
-    !u Auth.Class.PrincipalGroup:
-      name: "Principal group"
+    # Some of these are in service-setup
+    #!u Auth.Class.PrincipalGroup:
+    #  name: "Principal group"
     !u Auth.Class.PrincipalType:
       name: "Principal type"
       subclassOf:
         - !u Auth.Class.PrincipalGroup
-    !u Auth.Class.Role:
-      name: "Role"
-      subclassOf:
-        - !u Auth.Class.PrincipalGroup
+    #!u Auth.Class.Role:
+    #  name: "Role"
+    #  subclassOf:
+    #    - !u Auth.Class.PrincipalGroup
     !u Auth.Class.ServiceRole:
       name: "Service role"
       subclassOf:
         - !u Auth.Class.Role
-    !u Auth.Class.EdgeRole:
-      name: "Edge role"
-      subclassOf:
-        - !u Auth.Class.Role
+    #!u Auth.Class.EdgeRole:
+    #  name: "Edge role"
+    #  subclassOf:
+    #    - !u Auth.Class.Role
     !u Auth.Class.ClientRole:
       name: "Client role"
       subclassOf:

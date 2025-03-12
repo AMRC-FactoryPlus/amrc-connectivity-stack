@@ -1,8 +1,50 @@
+# Service config needed for service-setup itself to run.
+#-EARLY
+#-REQUIRE: service-urls
+---
 service: !u UUIDs.Service.ConfigDB
-version: 1
+version: 2
 objects:
+  !u ConfigDB.Class.R2Class:
+    !u Auth.Class.PrincipalGroup:
+      name: "Principal group"
+    !u Auth.Class.Role:
+      name: "Role"
+      subclassOf:
+        - !u Auth.Class.PrincipalGroup
+    !u Auth.Class.EdgeRole:
+      name: "Edge role"
+      subclassOf:
+        - !u Auth.Class.Role
+    !u Git.Class.Group:
+        name: "Git repository group"
+
+  !u ConfigDB.Class.R1Class:
+    !u Clusters.Class.HelmChart:
+      name: "Helm chart"
+    !u Git.Class.Repo:
+      name: "Git repository"
+
   !u UUIDs.Class.App:
-    - !u UUIDs.App.ServiceConfig
-configs:
-  !u UUIDs.App.Info:
-    !u UUIDs.App.ServiceConfig:   { name: "Service setup" }
+    !u UUIDs.App.ServiceConfig:
+      name: "Service setup"
+
+  # Register all the service function UUIDs here, it's simpler.
+  # XXX I think these should be classes, with the service accounts
+  # (representing the actual running services) as members. Or possibly
+  # the account should be a different object from the service (physical
+  # object) itself? There is already some confusion between the client
+  # and server sides of a service; e.g. the ConfigDB UUID is used for
+  # both the sv1configdb account and also to locate the Sparkplug
+  # service interface. The only other possibility I can see is that
+  # these service function UUIDs are names of some kind.
+  !u UUIDs.Class.Service:
+    !u UUIDs.Service.Directory:           { name: "Directory" }
+    !u UUIDs.Service.ConfigDB:            { name: "ConfigDB" }
+    !u UUIDs.Service.Authentication:      { name: "Authentication" }
+    !u UUIDs.Service.Command_Escalation:  { name: "Command escalation" }
+    !u UUIDs.Service.MQTT:                { name: "MQTT" }
+    !u UUIDs.Service.Git:                 { name: "Git hosting" }
+    !u UUIDs.Service.Clusters:            { name: "Cluster manager" }
+    !u ACS.Service.Manager:               { name: "Factory+ Manager" }
+

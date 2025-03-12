@@ -1,4 +1,4 @@
-# REQUIRE: auth
+#-REQUIRE: auth
 service: !u UUIDs.Service.ConfigDB
 version: 2
 objects:
@@ -15,11 +15,11 @@ objects:
       subclassOf:
         - !u UUIDs.Class.Permission
 
-  !u ConfigDB.Class.R2Class:
-    !u Git.Class.Group: { name: "Git repository group" }
-
-  !u ConfigDB.Class.R1Class:
-    !u Git.Class.Repo: { name: "Git repository" }
+  # In service-setup
+  #!u ConfigDB.Class.R2Class:
+  #  !u Git.Class.Group: { name: "Git repository group" }
+  #!u ConfigDB.Class.R1Class:
+  #  !u Git.Class.Repo: { name: "Git repository" }
 
   !u UUIDs.Class.Service:
     !u Git.Service.Git: { name: "Git hosting" }

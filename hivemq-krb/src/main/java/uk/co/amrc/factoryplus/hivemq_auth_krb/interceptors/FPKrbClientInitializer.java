@@ -18,8 +18,8 @@ public class FPKrbClientInitializer implements ClientInitializer {
 
     @Override
     public void initialize(@NotNull InitializerInput initializerInput, @NotNull ClientContext clientContext) {
-        clientContext.addPublishInboundInterceptor(new FPKrbInboundPublishInterceptor(this));
         clientContext.addUnsubscribeInboundInterceptor(new FPKrbUnsubscribeInboundInterceptor(this));
         clientContext.addDisconnectInboundInterceptor(new FPKrbDisconnectInboundInterceptor(this));
+        clientContext.addPublishOutboundInterceptor(new FPKrbOutboundPublishInterceptor(this));
     }
 }

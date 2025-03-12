@@ -16,7 +16,6 @@ import static uk.co.amrc.factoryplus.hivemq_auth_krb.AuthUtils.matchesPermission
 
 public class FPKrbContext {
     private final ConcurrentHashMap<String, String> sessionMap = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, Set<String>> topicToSubscribers = new ConcurrentHashMap<>();
     private static final @NotNull Logger log = LoggerFactory.getLogger(FPKrbMain.class);
     public  FPServiceClient fplus;
 
@@ -53,48 +52,6 @@ public class FPKrbContext {
      */
     public void removeClientUserNameMapping(String clientId) {
         sessionMap.remove(clientId);
-    }
-
-    /**
-     *
-     * @param clientId
-     * @param topic
-     */
-    public void storeTopicMapping(String clientId,String topic) {
-        topicToSubscribers
-                .computeIfAbsent(topic, k -> ConcurrentHashMap.newKeySet())
-                .add(clientId);
-    }
-
-    /**
-     *
-     * @param topic
-     * @return
-     */
-    public Set<String> getTopicMapping(String topic){
-        Set<String> subscribers = new HashSet<>();
-
-        topicToSubscribers.forEachKey(1, k-> {
-            if(matchesPermission(k, topic)){
-                // Exact match subscribers
-                Set<String> exactSubscribers = topicToSubscribers.get(k);
-                if (exactSubscribers != null) {
-                    subscribers.addAll(exactSubscribers);
-                }
-            }
-        });
-
-        return subscribers;
-    }
-
-    /**
-     *
-     * @param clientId
-     */
-    public void removeClientFromTopicMapping(String clientId){
-        for (Set<String> subscribers : topicToSubscribers.values()) {
-            subscribers.remove(clientId);
-        }
     }
 
     private FPServiceClient startServiceClient ()

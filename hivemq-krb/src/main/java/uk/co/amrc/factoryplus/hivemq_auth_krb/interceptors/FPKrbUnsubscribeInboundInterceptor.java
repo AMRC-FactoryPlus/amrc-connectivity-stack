@@ -30,8 +30,7 @@ public class FPKrbUnsubscribeInboundInterceptor implements UnsubscribeInboundInt
             try {
                 // Remove the client from our context storage.
                 log.info("Unsubscribe from {}", clientId);
-                initializer.context.removeClientUserNameMapping(initializer.context.getUsername(clientId));
-                initializer.context.removeClientFromTopicMapping(initializer.context.getUsername(clientId));
+                initializer.context.removeClientUserNameMapping(clientId);
             } catch (final Exception e) {
                 log.info("Unsubscribe inbound interception failed:", e);
             }

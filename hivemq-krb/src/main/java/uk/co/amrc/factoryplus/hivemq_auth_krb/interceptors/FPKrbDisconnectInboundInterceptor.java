@@ -29,8 +29,7 @@ public class FPKrbDisconnectInboundInterceptor implements DisconnectInboundInter
         final CompletableFuture<?> taskFuture = Services.extensionExecutorService().submit(() -> {
             try {
                 var clientId = disconnectInboundInput.getClientInformation().getClientId();
-                initializer.context.removeClientUserNameMapping(initializer.context.getUsername(clientId));
-                initializer.context.removeClientFromTopicMapping(initializer.context.getUsername(clientId));
+                initializer.context.removeClientUserNameMapping(clientId);
             } catch (final Exception e) {
                 log.error("Disconnect inbound interception failed:", e);
             }

@@ -84,7 +84,6 @@ public class FPKrbAuthorizer implements SubscriptionAuthorizer, PublishAuthorize
                     .subscribe(result -> {
                                 if (result) {
                                     log.info("Successfully authorized subscription client {} for topic {}.", clientUsername, topic);
-                                    provider.context.storeTopicMapping(clientUsername, topic);
                                     output.authorizeSuccessfully();
                                 } else {
                                     log.info("Subscription permission denied for user {} topic {}", clientUsername, topic);

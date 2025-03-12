@@ -10,15 +10,13 @@ import timers from "timers/promises";
 import type { Identity } from "@amrc-factoryplus/utilities";
 import { ServiceClient } from "@amrc-factoryplus/utilities";
 
-import { ConfigDB } from "@amrc-factoryplus/service-client/lib/interfaces.js";
-
 /* XXX These need to be incorporated into the main codebase. The config
  * rehashing just needs to go: the code which uses the config needs
  * adapting to accept the correct format. */
 
 import { reHashConf } from "../utils/FormatConfig.js";
 
-import { Device, deviceOptions } from "./device.js";
+import { Device, DeviceConnection, deviceOptions } from "./device.js";
 import { DriverBroker } from "./driverBroker.js";
 import { SparkplugNode } from "./sparkplugNode.js";
 import * as UUIDs from "./uuids.js";
@@ -69,15 +67,7 @@ export class Translator extends EventEmitter {
         [index: string]: any
     }
 
-    scouts: {
-        [index: string]: any
-    }
-
-    newConfigDb: ConfigDB;
-
-
-
-    constructor(fplus: ServiceClient, pollInt: number, broker: DriverBroker, newConfigDB: ConfigDB) {
+    constructor(fplus: ServiceClient, pollInt: number, broker: DriverBroker) {
         super();
 
         this.fplus = fplus;
@@ -85,8 +75,6 @@ export class Translator extends EventEmitter {
         this.pollInt = pollInt;
         this.connections = {};
         this.devices = {};
-        this.scouts = {};
-        this.newConfigDb = newConfigDB;
     }
 
     /**
@@ -211,35 +199,54 @@ export class Translator extends EventEmitter {
             this.broker);
 
         if (connection.scout?.scoutDetails?.isEnabled) {
+            this.runScout(connection, newConn);
+        }
+        else {
+            this.runDevices(connection, newConn);
+        }
+    }
+
+    runScout(connection: any, newConn: DeviceConnection){
+        try{
             log(`Edge-Agent to be run in Scout Mode for ${connection.name}`);
-            const newScout = this.scouts[cType] = new Scout(newConn, connection.scout);
+            const newScout = new Scout(newConn, connection.scout);
             newScout.on('scoutResults', async (scoutResult: ScoutResult) => {
                 try {
                     if (scoutResult.success) {
-                        await this.save_to_file(JSON.stringify(scoutResult), './scout', connection.name, 'json');
-                        await this.put_to_config(UUIDs.App.EdgeScoutResults, connection.uuid, JSON.stringify(scoutResult));
+                        await this.fplus.ConfigDB.put_config(UUIDs.App.EdgeScoutResults, connection.uuid, scoutResult);
+                        log(`Putting to ConfigDB for ${connection.name} should be done.`);
+                    }else{
+                        log(`Scouting for ${connection.name} was not successful.`);
                     }
                 }
                 catch (err) {
-                    console.error('Error when trying to put to config db: ', (err as Error).message);
+                    log(`Error when trying to put to config in scout mode ${(err as Error).message}`);
                 }
-
             });
+
             newScout.performScouting();
         }
-        else {
+        catch(err){
+            log(`Error when trying to run in scout mode ${(err as Error).message}`)
+        }
+    }
+
+    runDevices(connection: any, newConn: DeviceConnection, ){
+        log(`Edge-Agent to be run in Default Mode for ${connection.name}`);
+
+        try{
             connection.devices?.forEach((devConf: deviceOptions) => {
                 this.devices[devConf.deviceId] = new Device(
                     this.sparkplugNode, newConn, devConf);
             });
-
+    
             // What to do when the connection is open
             newConn.on('open', () => {
                 connection.devices?.forEach((devConf: deviceOptions) => {
                     this.devices[devConf.deviceId]?._deviceConnected();
                 })
             });
-
+    
             // What to do when the device connection has new data from a device
             newConn.on('data', (obj: { [index: string]: any }, parseVals = true) => {
                 //log(util.format("Received data for %s: (%s) %O",
@@ -248,7 +255,7 @@ export class Translator extends EventEmitter {
                     this.devices[devConf.deviceId]?._handleData(obj, parseVals);
                 })
             })
-
+    
             // What to do when device connection dies
             newConn.on('close', () => {
                 connection.devices?.forEach((devConf: deviceOptions) => {
@@ -257,6 +264,9 @@ export class Translator extends EventEmitter {
             });
             // Open the connection
             newConn.open();
+        }
+        catch(err){
+            log(`Error when trying to create devices ${(err as Error).message}`)
         }
     }
 
@@ -405,28 +415,4 @@ Trying again in ${interval} seconds...`);
             await timers.setTimeout(interval * 1000);
         }
     }
-
-    async put_to_config(app_uuid: string, obj_uuid: string, json_content: string): Promise<void> {
-        try {
-            await this.newConfigDb.put_config(app_uuid, obj_uuid, json_content);
-            log(`Putting to config db complete`);
-        } catch (err) {
-            console.error('Error when trying to put to config ', err);
-        }
-    }
-
-    async save_to_file(content, directory: string, filename: string, extension: string) {
-        if (!fs.existsSync(directory)) {
-            fs.mkdirSync(directory, { recursive: true });
-        }
-        const filePath = `${directory}/${filename}.${extension}`;
-
-        try {
-            fs.writeFileSync(filePath, content);
-            log(`File saved successfully to ${filePath}`);
-        } catch (error) {
-            console.error('Error writing to file:', error);
-        }
-    }
-
 }

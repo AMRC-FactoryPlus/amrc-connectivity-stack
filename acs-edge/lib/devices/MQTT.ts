@@ -7,7 +7,6 @@ import { log } from "../helpers/log.js";
 import { Metrics, writeValuesToPayload } from "../helpers/typeHandler.js";
 import * as mqtt from "mqtt";
 import { v4 as uuidv4 } from 'uuid';
-import { UniqueDictionary } from "../helpers/uniquedictionary.js";
 import { ScoutDriverDetails } from "../scout.js";
 
 export default interface mqttConnDetails {
@@ -98,81 +97,70 @@ export class MQTTConnection extends DeviceConnection {
 
 
     public async scoutAddresses(driverDetails: ScoutDriverDetails): Promise<object> {
+        const clientForScout = mqtt.connect(this.#connStr, this.#options);
+        let scoutTimeout: NodeJS.Timeout | null = null; // Track timeout
+    
         try {
-
             const { topic, duration }: MqttScoutDetails = await this.validateConfigDetails(driverDetails);
-            const discoveredAddresses: UniqueDictionary<string, object> = new UniqueDictionary<string, object>();
-
-
-            const clientForScout = mqtt.connect(this.#connStr, this.#options);
-
-
+            const discoveredAddresses: Map<string, object | null> = new Map<string, object | null>();
+    
             return await new Promise<object>((resolve, reject) => {
-                let scoutTimeout: NodeJS.Timeout;
-
-                clientForScout.on('connect', async () => {
-                    try {
-                        log(`Scout client connected to broker ${this.#connStr}.`);
-
-                        clientForScout.subscribe(topic, (err) => {
-                            if (err) {
-                                throw new Error(`Subscription failed: ${err.message}`);
+                clientForScout.on("connect", () => {
+                    log(`Scout client connected to broker ${this.#connStr}.`);
+    
+                    clientForScout.subscribe(topic, (err) => {
+                        if (err) {
+                            log(`Subscription failed: ${err.message}`);
+                            reject(new Error(`Subscription failed: ${err.message}`));
+                            return;
+                        }
+    
+                        log(`Subscribed to topic: ${topic}`);
+    
+                        clientForScout.on("message", (topic, message) => {
+                            if (!discoveredAddresses.has(topic)) {
+                                discoveredAddresses.set(topic, null);
                             }
-
-                            log(`Subscribed to topic: ${topic}`);
-
-
-                            clientForScout.on('message', (topic, message) => {
-                                discoveredAddresses.add(topic, {});
-                            });
-
-
-                            scoutTimeout = setTimeout(() => {
-                                log(`Scout completed.`);
-                                clientForScout.end();
-                                resolve(discoveredAddresses.toPlainObject());
-                            }, duration);
                         });
-                    } catch (err) {
-                        log(`Scout client error: ${(err as Error).message}`);
-                        clientForScout.end();
-                        reject(err);
-                    }
+    
+                        scoutTimeout = setTimeout(() => {
+                            log(`Scout completed.`);
+                            resolve(Object.fromEntries(discoveredAddresses));
+                        }, duration);
+                    });
                 });
-
-                clientForScout.on('error', (err) => {
+    
+                clientForScout.on("error", (err) => {
                     log(`MQTT client error: ${err.message}`);
-                    if (scoutTimeout) clearTimeout(scoutTimeout);
-                    clientForScout.end();
                     reject(err);
                 });
             });
-
         } catch (err) {
             log(`Error during MQTT scouting: ${(err as Error).message}`);
             throw err;
+        } finally {
+            if (scoutTimeout) clearTimeout(scoutTimeout);
+            clientForScout.end();
         }
     }
+    
 
-
+    
     async validateConfigDetails(driverDetails: any): Promise<MqttScoutDetails> {
-        const duration = (driverDetails.duration && typeof driverDetails.duration === 'number' && driverDetails.duration > 0)
-            ? driverDetails.duration
-            : 10000; // Default to 10s
-
-
-        const topic = (driverDetails.topic && typeof driverDetails.topic === 'string' && driverDetails.topic.trim() !== '')
-            ? driverDetails.topic
-            : "#"; // Default to "#"
-
-
-        const mqttDriverDetails: MqttScoutDetails = {
-            duration: duration,
-            topic: topic
+        if (!driverDetails.duration || !Number.isFinite(driverDetails.duration) || driverDetails.duration <= 0) {
+            throw new Error("Error: driverDetails.duration in MQTT Config is invalid.");
+        }
+    
+        if (!driverDetails.topic || typeof driverDetails.topic !== "string" || driverDetails.topic.trim() === "") {
+            throw new Error("Error: driverDetails.topic in MQTT Config is invalid.");
+        }
+    
+        return {
+            duration: driverDetails.duration,
+            topic: driverDetails.topic.trim(),
         };
-
-        return mqttDriverDetails;
     }
+    
 
     async subscribe(addresses: string[]) {
         const topics = addresses.filter(t => t);

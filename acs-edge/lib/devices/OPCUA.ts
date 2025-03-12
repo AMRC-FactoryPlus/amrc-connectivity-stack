@@ -30,7 +30,6 @@ import {
     DataValue
 } from "node-opcua";
 
-import { UniqueDictionary } from "../helpers/uniquedictionary.js";
 import { ScoutDriverDetails } from "../scout.js";
 
 // Example here: https://github.com/node-opcua/node-opcua/blob/v2.1.3/documentation/sample_client.js
@@ -121,59 +120,58 @@ export class OPCUAConnection extends DeviceConnection {
 
     public async scoutAddresses(driverDetails: ScoutDriverDetails): Promise<object> {
         const clientForScout = OPCUAClient.create(this.#options);
-        const discoveredAddresses: UniqueDictionary<string, object> = new UniqueDictionary<string, object>();
-
+        const discoveredAddresses: Map<string, object> = new Map<string, object>();
+        let sessionForScout: ClientSession | null = null; // Track session
+    
         try {
+            // Connect to OPC UA Server
             await clientForScout.connect(this.#endpointUrl);
             log(`Scout connected to OPC UA server at ${this.#endpointUrl}`);
-
-            const sessionForScout = await clientForScout.createSession(this.#credentials);
+    
+            // Create Session
+            sessionForScout = await clientForScout.createSession(this.#credentials);
             log(`Scout session created for OPC UA node discovery.`);
-
+    
             // Read NamespaceArray (i=2255) to get all available namespaces
             const namespaceArrayNodeId = new NodeId(NodeIdType.NUMERIC, 2255, 0);
-
-            const dataValues: DataValue[] = await sessionForScout.read(
-                [
-                    {
-                        nodeId: namespaceArrayNodeId,
-                        attributeId: AttributeIds.Value
-                    }
-                ]
-            );
+            const dataValues: DataValue[] = await sessionForScout.read([
+                {
+                    nodeId: namespaceArrayNodeId,
+                    attributeId: AttributeIds.Value
+                }
+            ]);
             const namespaceArray: string[] = dataValues[0].value.value;
             log(`Discovered Namespaces: ${namespaceArray.join(', ')}`);
-
+    
             // Start browsing from the Root Node (ns=0;i=84)
             const NodeIDToStartSearchFrom = new NodeId(NodeIdType.NUMERIC, 84, 0);
-
+    
             log('Starting to browse OPC UA nodes');
             const startTime = Date.now();
             const discoveredReferences = await this.browseOPCUANodes(sessionForScout, NodeIDToStartSearchFrom);
             const endTime = Date.now();
             log(`Browsing completed in ${(endTime - startTime) / 1000} seconds`);
-
-            // Add discovered nodes to the unique dictionary
+    
             log('Starting to format OPC UA reference into objects');
             const addressObjects = await Promise.all(
                 discoveredReferences.map(reference => this.getAddressObject(reference, namespaceArray, sessionForScout))
             );
-
-            addressObjects.forEach(([key, value]) => discoveredAddresses.add(key, value));
-
+    
+            addressObjects.forEach(([key, value]) => discoveredAddresses.set(key, value));
             log('Done formatting OPC UA reference into objects');
-
-
-            await sessionForScout.close();
-            await clientForScout.disconnect();
-
-            return discoveredAddresses.toPlainObject();
+    
+            return Object.fromEntries(discoveredAddresses);
         } catch (err) {
-            log(`Error during OPC UA Scouting ${(err as Error).message}`);
-            await clientForScout.disconnect();
-            return discoveredAddresses;
+            log(`Error during OPC UA Scouting: ${(err as Error).message}`);
+            throw err;
+        } finally {
+            if (sessionForScout) {
+                await sessionForScout.close().catch(err => log(`Error closing session: ${err.message}`));
+            }
+            await clientForScout.disconnect().catch(err => log(`Error disconnecting client: ${err.message}`));
         }
     }
+    
 
     async browseOPCUANodes(session, nodeId: NodeId): Promise<ReferenceDescription[]> {
         try {

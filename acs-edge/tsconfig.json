@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
+    "moduleResolution": "Node",
     "target": "ES6",
     "allowJs": true,
-    "moduleResolution": "Node",
     "noImplicitAny": false,
     "removeComments": true,
     "preserveConstEnums": true,
@@ -13,11 +13,5 @@
     //"types": ["node", "jest"],
     "strict": true
   },
-  "exclude": [
-    "**/__mocks__/*", 
-    "../../node_modules", 
-    "build", 
-    "split",
-    "tests"
-  ]
+  "exclude": ["**/__mocks__/*", "../../node_modules", "build", "split", "tests"]
 }

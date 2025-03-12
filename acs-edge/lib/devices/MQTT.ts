@@ -146,7 +146,7 @@ export class MQTTConnection extends DeviceConnection {
     
 
     
-    async validateConfigDetails(driverDetails: any): Promise<MqttScoutDetails> {
+    private async validateConfigDetails(driverDetails: any): Promise<MqttScoutDetails> {
         if (!driverDetails.duration || !Number.isFinite(driverDetails.duration) || driverDetails.duration <= 0) {
             throw new Error("Error: driverDetails.duration in MQTT Config is invalid.");
         }

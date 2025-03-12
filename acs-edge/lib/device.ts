@@ -119,14 +119,6 @@ export abstract class DeviceConnection extends EventEmitter {
     }
 
     /**
-     * Receives driverDetails config part of the scout, validates it and formats
-     */
-    async validateConfigDetails(driverDetails: ScoutDriverDetails): Promise<ScoutDriverDetails> {
-        throw new Error('Validate Config Details for Scouting not supported for this device connection type.');
-    }
-
-
-    /**
      * Perform any setup needed to read from certain addresses, e.g. set
      * up MQTT subscriptions. This does not attempt to detect duplicate
      * requests.

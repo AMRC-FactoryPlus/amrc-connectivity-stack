@@ -15,28 +15,44 @@ export const usePrincipalStore = defineStore('principal', {
     async fetch () {
       this.loading = true
       try {
-        const principalResponse = await useServiceClientStore().client.Auth.fetch('authz/principal')
+        const principalResponse = await useServiceClientStore().client.Auth.fetch('v2/principal')
 
         if (!Array.isArray(principalResponse[1])) {
           this.loading = false
           return
         }
 
-        // Fill in the principal names
-        let principalsWithNames = await Promise.all(principalResponse[1].map(async (p) => {
+        // Get the kerberos principal
+        let principalsWithKerberos = await Promise.all(principalResponse[1].map(async (p) => {
           try {
-            let principalObjectResponse = await useServiceClientStore().client.ConfigDB.get_config(UUIDs.App.Info, p.uuid);
+            const principalKerberosObjectResponse = await useServiceClientStore().client.Auth.fetch(`v2/principal/${p}`)
+            const principalKerberosObject = principalKerberosObjectResponse[1]
             return {
-              uuid: p.uuid,
-              kerberos: p.kerberos,
+              uuid: p,
+              kerberos: principalKerberosObject.kerberos,
+            }
+          } catch(err) {
+            console.error(`Can't read principal details`, err)
+            return {
+              uuid: p,
+              kerberos: "UNKNOWN",
+            }
+          }
+        }))
+
+        // Fill in the principal names
+        let principalsWithNames = await Promise.all(principalsWithKerberos.map(async (p) => {
+          try {
+            const principalObjectResponse = await useServiceClientStore().client.ConfigDB.get_config(UUIDs.App.Info, p.uuid);
+            return {
+              ...p,
               name: principalObjectResponse?.name ?? "UNKNOWN"
             }
           } catch(err) {
             console.error(`Can't read principal details`, err)
             return {
-              uuid: p.uuid,
-              kerberos: p.kerberos,
-              name: ""
+              ...p,
+              name: "UNKNOWN"
             }
           }
         }))

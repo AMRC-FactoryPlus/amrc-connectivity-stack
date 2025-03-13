@@ -17,8 +17,6 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 public class AuthUtils {
-    private static final UUID PERMGRP_UUID = UUID.fromString(
-            "a637134a-d06b-41e7-ad86-4bf62fde914a");
     private static final UUID TEMPLATE_UUID = UUID.fromString(
             "1266ddf1-156c-4266-9808-d6949418b185");
     private static final UUID ADDR_UUID = UUID.fromString(
@@ -37,12 +35,11 @@ public class AuthUtils {
             }
         }
 
-        return fplus.auth().getACL(principal, PERMGRP_UUID)
+        return fplus.auth().getACL(principal)
                 .flatMapObservable(Observable::fromStream)
                 .flatMapSingle(ace -> {
                     String perm = (String)ace.get("permission");
                     String targid = (String)ace.get("target");
-
                     return fplus.configdb()
                             .getConfig(TEMPLATE_UUID, UUID.fromString(perm))
                             .map(tmpl -> new TemplateUse(tmpl, targid));

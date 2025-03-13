@@ -53,17 +53,14 @@ public class FPAuth {
      * permission group.
      *
      * @param princ The principal to fetch permissions for.
-     * @param perms The permission group to fetch.
      * @return A stream of maps represnting the granted permissions.
      */
-    public Single<Stream<Map>> getACL (String princ, UUID perms)
+    public Single<Stream<Map>> getACL (String princ)
     {
         //FPThreadUtil.logId("fetching acl");
         return fplus.http().request(SERVICE, "GET")
             .withURIBuilder(b -> b
-                .appendPath("authz/acl")
-                .setParameter("principal", princ)
-                .setParameter("permission", perms.toString()))
+                .appendPath("v2/acl/kerberos/" + princ))
             .fetch()
             .map(res -> res.ifOk()
                 .flatMap(r -> r.getBodyArray())

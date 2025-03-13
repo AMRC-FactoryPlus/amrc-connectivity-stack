@@ -241,7 +241,7 @@ shell:
     repository: acs-krb-utils
 
 # XXX This should probably be included in acs-krb-utils
-curl: 
+curl:
   image:
     registry: docker.io
     repository: appropriate/curl
@@ -394,6 +394,14 @@ influxdb2:
         influx v1 dbrp create --bucket-id ${DOCKER_INFLUXDB_INIT_BUCKET_ID} --db default --rp default --default --org ${DOCKER_INFLUXDB_INIT_ORG}
   pdb:
     create: false
+
+openid:
+  enabled: true
+  replicas: 1
+  image:
+    repository: quay.io/keycloak/keycloak
+    tag: 26.1.1
+    pullPolicy: IfNotPresent
 
 cert-manager:
   fullnameOverride: "cert-manager"

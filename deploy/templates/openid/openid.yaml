@@ -1,0 +1,64 @@
+{{ if .Values.openid.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openid
+  namespace: {{ .Release.Namespace }}
+  labels:
+    component: openid
+spec:
+  replicas: {{ .Values.openid.replicas | default 1 }}
+  selector:
+    matchLabels:
+      component: openid
+  template:
+    metadata:
+      labels:
+        component: openid
+        factory-plus.service: openid
+    spec:
+      {{- with .Values.acs.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: openid
+          image: "{{ .Values.openid.image.repository }}:{{ .Values.openid.image.tag }}"
+          imagePullPolicy: {{ .Values.openid.image.pullPolicy }}
+          args: ["start-dev"]
+          env:
+            - name: KEYCLOAK_ADMIN
+              valueFrom:
+                secretKeyRef:
+                  name: openid-admin-user
+                  key: username
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: openid-admin-user
+                  key: password
+            - name: KC_PROXY
+              value: "edge"
+            - name: KC_HEALTH_ENABLED
+              value: "true"
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 9000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: openid
+  namespace: {{ .Release.Namespace }}
+spec:
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+  selector:
+    factory-plus.service: openid
+{{- end }}

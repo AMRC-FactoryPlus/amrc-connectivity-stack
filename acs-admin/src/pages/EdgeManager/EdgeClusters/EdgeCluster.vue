@@ -230,7 +230,6 @@ export default {
       copyingBootstrap: false,
       loadingDetails: true,
       cluster: {},
-      test: [],
     }
   },
 }

@@ -57,7 +57,7 @@ const routes = [
       icon: 'user-shield',
     },
   }, {
-    path: '/edge-cluster/:clusteruuid',
+    path: '/edge-clusters/:clusteruuid',
     component: EdgeCluster,
     meta: {
       name: 'Edge Cluster',

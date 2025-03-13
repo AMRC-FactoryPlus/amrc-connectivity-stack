@@ -5,7 +5,7 @@
 <template>
   <div class="flex items-center">
     <div v-if="currentEdgeCluster" class="flex items-center p-3">
-      <RouterLink :to="`/edge-cluster/${currentEdgeCluster?.uuid}`">
+      <RouterLink :to="`/edge-clusters/${currentEdgeCluster?.uuid}`">
         <Button title="Go to cluster" variant="ghost" size="sm">
           <i class="fa-solid fa-circle-nodes mr-2"></i>
           {{currentEdgeCluster?.name}}
@@ -23,7 +23,7 @@
         <DropdownMenuContent>
           <DropdownMenuLabel>Edge Clusters</DropdownMenuLabel>
           <DropdownMenuSeparator/>
-          <RouterLink :key="edgeCluster.uuid" v-for="edgeCluster in otherEdgeClusters" :to="`/edge-cluster/${edgeCluster.uuid}`">
+          <RouterLink :key="edgeCluster.uuid" v-for="edgeCluster in otherEdgeClusters" :to="`/edge-clusters/${edgeCluster.uuid}`">
             <DropdownMenuItem class="cursor-pointer">{{edgeCluster.name}}</DropdownMenuItem>
           </RouterLink>
         </DropdownMenuContent>
@@ -33,7 +33,7 @@
     <div v-if="currentEdgeNode" class="flex items-center">
       <span class="mr-4">/</span>
       <i class="fa-solid fa-cube mr-2"></i>
-      <RouterLink :to="`/edge-cluster/${currentEdgeCluster?.uuid}`">
+      <RouterLink :to="`/edge-clusters/${currentEdgeCluster?.uuid}`">
         <Button title="Go to cluster" variant="ghost" size="plain" class="p-2">{{currentEdgeCluster?.name}}</Button>
       </RouterLink>
       <DropdownMenu>
@@ -48,7 +48,7 @@
         <DropdownMenuContent>
           <DropdownMenuLabel>Edge Clusters</DropdownMenuLabel>
           <DropdownMenuSeparator/>
-          <RouterLink :key="edgeCluster.uuid" v-for="edgeCluster in otherEdgeClusters" :to="`/edge-cluster/${edgeCluster.uuid}`">
+          <RouterLink :key="edgeCluster.uuid" v-for="edgeCluster in otherEdgeClusters" :to="`/edge-clusters/${edgeCluster.uuid}`">
             <DropdownMenuItem class="cursor-pointer">{{edgeCluster.name}}</DropdownMenuItem>
           </RouterLink>
         </DropdownMenuContent>
@@ -58,7 +58,7 @@
     <div v-if="currentEdgeDevice" class="flex items-center">
       <span class="mr-4">/</span>
       <i class="fa-solid fa-plug mr-2"></i>
-      <RouterLink :to="`/edge-cluster/${currentEdgeCluster?.uuid}`">
+      <RouterLink :to="`/edge-clusters/${currentEdgeCluster?.uuid}`">
         <Button title="Go to cluster" variant="ghost" size="plain" class="p-2">{{currentEdgeCluster?.name}}</Button>
       </RouterLink>
       <DropdownMenu>
@@ -73,7 +73,7 @@
         <DropdownMenuContent>
           <DropdownMenuLabel>Edge Clusters</DropdownMenuLabel>
           <DropdownMenuSeparator/>
-          <RouterLink :key="edgeCluster.uuid" v-for="edgeCluster in otherEdgeClusters" :to="`/edge-cluster/${edgeCluster.uuid}`">
+          <RouterLink :key="edgeCluster.uuid" v-for="edgeCluster in otherEdgeClusters" :to="`/edge-clusters/${edgeCluster.uuid}`">
             <DropdownMenuItem class="cursor-pointer">{{edgeCluster.name}}</DropdownMenuItem>
           </RouterLink>
         </DropdownMenuContent>

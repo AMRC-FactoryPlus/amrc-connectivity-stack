@@ -98,15 +98,17 @@ export default {
         case UUIDs.Class.PermGroup:
         case UUIDs.Class.GitRepoGroup:
         case "f1fabdd1-de90-4399-b3da-ccf6c2b2c08b": // User Group
-        case "1c567e3c-5519-4418-8682-6086f22fbc13": // Client Role
-        case "b419cbc2-ab0f-4311-bd9e-f0591f7e88cb": // Service Requirement
+        case "b2053a3e-bdf8-11ef-9423-771a19e4a8a4": // Client role
+        case "b419cbc2-ab0f-4311-bd9e-f0591f7e88cb": // Service role
+        case "3ba1d68e-ccf5-11ef-82d9-ef32470538b1": // Edge role
+        case "1c567e3c-5519-4418-8682-6086f22fbc13": // Composite permission
           if (!object.members) {
             object.members = await this.g.getMembers(object)
           }
           this.selectGroup(object)
           break;
-        case "e463b4ae-a322-46cc-8976-4ba76838e908": // Service Account
-        case "8b3e8f35-78e5-4f93-bf21-7238bcb2ba9d": // User Account
+        case "e463b4ae-a322-46cc-8976-4ba76838e908": // Central service
+        case "8b3e8f35-78e5-4f93-bf21-7238bcb2ba9d": // Human user
         case "97756c9a-38e6-4238-b78c-3df6f227a6c9": // Edge Cluster Account
         case "00da3c0b-f62b-4761-a689-39ad0c33f864": // Cell Gateway
           this.selectPrincipal(object)

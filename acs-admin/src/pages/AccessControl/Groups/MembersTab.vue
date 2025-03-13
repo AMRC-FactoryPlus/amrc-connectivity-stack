@@ -118,7 +118,7 @@ export default {
       this.loading = true
       // Make sure we have the latest set of members
       this.s.client.Fetch.cache = "reload"
-      let groupMembersResponse = await this.s.client.Auth.fetch(`authz/group/${this.group.uuid}`)
+      const groupMembersResponse = await this.s.client.ConfigDB.fetch(`v2/class/${this.group.uuid}/member`)
       this.s.client.Fetch.cache = "default"
       let members = groupMembersResponse[1]
       this.members = await Promise.all(members.map(async (memberUUID) => {

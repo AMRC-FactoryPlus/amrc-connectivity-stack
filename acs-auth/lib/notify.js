@@ -26,7 +26,10 @@ export class AuthNotify {
         this.notify = this.build_notify(opts.api);
     }
 
-    run () { this.notify.run(); }
+    run () {
+        this.log("Running notify server");
+        this.notify.run();
+    }
 
     build_notify (api) {
         const notify = new Notify({

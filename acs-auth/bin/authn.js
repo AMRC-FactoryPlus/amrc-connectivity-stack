@@ -79,6 +79,9 @@ const notify = new AuthNotify({
     debug:      fplus.debug,
 });
 
+debug.log("app", "Running data");
 data.run();
+debug.log("app", "Running notify");
 notify.run();
+debug.log("app", "Running api");
 api.run();

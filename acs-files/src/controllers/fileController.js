@@ -1,5 +1,4 @@
 import fs from 'node:fs';
-import axios from 'axios';
 import * as dotenv from "dotenv";
 import { ServiceClient } from '@amrc-factoryplus/service-client';
 import { ConfigDB } from '@amrc-factoryplus/service-client/lib/interfaces.js';
@@ -8,29 +7,29 @@ dotenv.config({});
 const sc = await new ServiceClient({ env: process.env }).init();
 const configDBObj = new ConfigDB(sc); //Setup configDB object for adding/editing file uuid entries
 
-export const getFilesByType = async(req, res) => {
-  const file_uuid = req.params.file_type;
-  let fileObj;
+// export const getFilesByType = async(req, res) => {
+//   const file_uuid = req.params.file_type;
+//   let fileObj;
 
-  if(file_uuid == process.env.TXT_TYPE_UUID)
-  {
-    fileObj = await configDBObj.class_members(process.env.TXT_TYPE_UUID);
-  }else if(file_uuid == process.env.PDF_TYPE_UUID)
-  {
-    fileObj = await configDBObj.class_members(process.env.PDF_TYPE_UUID);
-  } else if(file_uuid == process.env.CAD_TYPE_UUID)
-  {
-    fileObj = await configDBObj.class_members(process.env.CAD_TYPE_UUID);
-  } else
-  {
-    return res(404).json({message: "No file type was found"});
-  }
+//   if(file_uuid == process.env.TXT_TYPE_UUID)
+//   {
+//     fileObj = await configDBObj.class_members(process.env.TXT_TYPE_UUID);
+//   }else if(file_uuid == process.env.PDF_TYPE_UUID)
+//   {
+//     fileObj = await configDBObj.class_members(process.env.PDF_TYPE_UUID);
+//   } else if(file_uuid == process.env.CAD_TYPE_UUID)
+//   {
+//     fileObj = await configDBObj.class_members(process.env.CAD_TYPE_UUID);
+//   } else
+//   {
+//     return res(404).json({message: "No file type was found"});
+//   }
 
-  console.log(fileObj);
+//   console.log(fileObj);
 
-  return res.status(201).json({fileObj}); //returns array of file uuids of that type
+//   return res.status(201).json({fileObj}); //returns array of file uuids of that type
 
-}
+// }
 
 export const getFile = async (req, res) => {
   const file_uuid = req.params.file_uuid;

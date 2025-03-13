@@ -1,10 +1,9 @@
 /*
- * Factory+ / AMRC Connectivity Stack (ACS) Command Escalation component
- * MQTT client
- * Copyright 2022 AMRC
+ * Copyright (c) University of Sheffield AMRC 2025.
  */
 
-import {Address, MetricBuilder, SpB, Topic, UUIDs} from "@amrc-factoryplus/utilities";
+import { Address, SpB, Topic, UUIDs } from '@amrc-factoryplus/utilities'
+import { MetricBuilder } from '@amrc-factoryplus/service-client'
 
 const Valid = {
     Name: /^[A-Za-z0-9_-]+$/,

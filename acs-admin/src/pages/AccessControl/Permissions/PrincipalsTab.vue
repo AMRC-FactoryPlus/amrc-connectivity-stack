@@ -71,11 +71,17 @@ export default {
     async updateData () {
       this.loading = true
 
-      const res = await this.s.client.Auth.fetch(`/authz/ace`)
-      if (!Array.isArray(res[1])) {
-        return;
+      const grantUUIDsResponse = await this.s.client.Auth.fetch(`v2/grant`)
+      if (!Array.isArray(grantUUIDsResponse[1])) {
+        return
       }
-      const fullList = res[1];
+      const grantUUIDs = grantUUIDsResponse[1]
+      const fullList = await Promise.all(
+          grantUUIDs.map(async uuid => {
+            const grantResponse = await this.s.client.Auth.fetch(`v2/grant/${uuid}`)
+            return grantResponse[1];
+          })
+      )
       const filteredList = fullList.filter(e => e.permission === this.permission.uuid)
 
       const info = o => this.s.client.ConfigDB.get_config(UUIDs.App.Info, o)

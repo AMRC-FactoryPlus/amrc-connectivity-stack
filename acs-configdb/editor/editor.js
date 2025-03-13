@@ -21,10 +21,6 @@ const AppUuid = {
     Registration: "cb40bed5-49ad-4443-a7f5-08c75009da8f",
     General_Info: "64a8bfa9-7772-45c4-9d1a-9e6290690957",
 };
-const Class = {
-    Rank:       "1f2ee062-6782-48c8-926b-904f56bd18b1",
-    Individual: "33343846-8c14-4cb0-8027-989071a20724",
-};
 
 let Token = null;
 

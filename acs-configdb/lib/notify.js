@@ -8,10 +8,8 @@ import deep_equal from "deep-equal";
 import * as imm from "immutable";
 import * as rx from "rxjs";
 
-import * as rxx                 from "@amrc-factoryplus/rx-util";
-import { 
-    Notify, WatchFilter, SearchFilter
-}  from "@amrc-factoryplus/service-api";
+import * as rxx         from "@amrc-factoryplus/rx-util";
+import { Notify }       from "@amrc-factoryplus/service-api";
 
 import { Perm } from "./constants.js";
 import * as rxu from "./rx-util.js";
@@ -200,11 +198,9 @@ export class CDBNotify {
     }
 
     config_search (session, filter, app) {
-        const { model } = this;
-
         const ck_acl = this.acl_checker(session, Perm.Read_App, app, true);
 
-        const search = rxx.rx(
+        return rxx.rx(
             this.config_updates,
             rx.filter(u => u.app == app),
             rx.map(entry => ({
@@ -235,7 +231,7 @@ export class CDBNotify {
         const ck_acl = this.acl_checker(session, Perm.Manage_Obj, klass, true);
 
         return rxx.rx(
-            model.config_updates,
+            this.config_updates,
             rx.filter(u => u.type == "class"),
             rx.tap(v => model.log("CLASS UPDATE: %s %s", rel, klass)),
             set_contents(() => model.class_lookup(klass, rel)),

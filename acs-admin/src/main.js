@@ -16,7 +16,7 @@ import Alerts from '@pages/Alerts/Alerts.vue'
 import AccessControl from '@pages/AccessControl/AccessControl.vue'
 import {useServiceClientStore} from "@store/serviceClientStore.js";
 import Login from "@pages/Login.vue";
-import EdgeCluster from '@pages/EdgeManager/EdgeCluster.vue'
+import EdgeCluster from '@pages/EdgeManager/EdgeClusters/EdgeCluster.vue'
 
 const routes = [
   {

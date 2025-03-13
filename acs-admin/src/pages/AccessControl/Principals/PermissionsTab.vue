@@ -3,7 +3,7 @@
   -->
 
 <template>
-  <Skeleton v-if="loading || p.loading" v-for="i in 10" class="h-16 rounded-lg mb-2"/>
+  <Skeleton v-if="p.loading || pr.loading || grants.loading || loading" v-for="i in 10" class="h-16 rounded-lg mb-2"/>
   <DataTable v-else :data="this.permissions" :columns="columns" :filters="[]">
     <template #toolbar-left>
       <Alert class="mr-6">
@@ -65,6 +65,7 @@ import { Button } from '@components/ui/button/index.js'
 import { defineAsyncComponent } from 'vue'
 import { usePrincipalStore } from '@store/usePrincipalStore.js'
 import { toast } from 'vue-sonner'
+import {useGrantStore} from "@store/useGrantStore.js";
 
 export default {
   emits: ['objectClick'],
@@ -75,6 +76,7 @@ export default {
       p: usePermissionStore(),
       s: useServiceClientStore(),
       pr: usePrincipalStore(),
+      grants: useGrantStore()
     }
   },
 
@@ -148,17 +150,7 @@ export default {
     async fetchSpecificPermissions () {
       this.loading = true
 
-      const grantUUIDsResponse = await this.s.client.Auth.fetch(`v2/grant`)
-      if (!Array.isArray(grantUUIDsResponse[1])) {
-        return
-      }
-      const grantUUIDs = grantUUIDsResponse[1]
-      const fullList = await Promise.all(
-        grantUUIDs.map(async uuid => {
-          const grantResponse = await this.s.client.Auth.fetch(`v2/grant/${uuid}`)
-          return grantResponse[1];
-        })
-      )
+      const fullList = this.grants.data
       const filteredList = fullList.filter(e => e.principal === this.principal.uuid)
 
       const info     = o => this.s.client.ConfigDB.get_config(UUIDs.App.Info, o)

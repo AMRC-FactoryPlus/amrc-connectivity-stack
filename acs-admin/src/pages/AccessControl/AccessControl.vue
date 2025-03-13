@@ -52,6 +52,7 @@ import PermissionList from '@pages/AccessControl/Permissions/PermissionList.vue'
 import { usePermissionStore } from '@store/usePermissionStore.js'
 import { UUIDs } from '@amrc-factoryplus/service-client'
 import LinkUserDialog from '@pages/AccessControl/LinkUserDialog.vue'
+import {useGrantStore} from "@store/useGrantStore.js";
 
 export default {
   name: 'AccessControl',
@@ -62,6 +63,7 @@ export default {
       p: usePrincipalStore(),
       ps: usePermissionStore(),
       g: useGroupStore(),
+      grants: useGrantStore(),
     }
   },
 
@@ -156,6 +158,7 @@ export default {
     this.p.fetch()
     this.g.fetch()
     this.ps.fetch()
+    this.grants.fetch()
   },
 
   data () {

@@ -3,7 +3,7 @@
   -->
 
 <template>
-  <Skeleton v-if="g.loading || loading" v-for="i in 10" class="h-16 rounded-lg mb-2"/>
+  <Skeleton v-if="g.loading || p.loading || grants.loading || loading" v-for="i in 10" class="h-16 rounded-lg mb-2"/>
   <!-- Need to check whether the click is on a permission or a principal -->
 <!--  <DataTable v-else :data="this.entries" :columns="columns" :filters="[]" @row-click="e => $emit('objectClick', e)">-->
   <DataTable v-else :data="this.entries" :columns="columns" :filters="[]">
@@ -32,6 +32,7 @@ import { useGroupStore } from '@store/useGroupStore.js'
 import { usePrincipalStore } from "@store/usePrincipalStore.js";
 import { useServiceClientStore } from "@store/serviceClientStore.js";
 import { UUIDs } from "@amrc-factoryplus/service-client";
+import {useGrantStore} from "@store/useGrantStore.js";
 
 export default {
   name: 'Principals',
@@ -43,7 +44,8 @@ export default {
       columns,
       p: usePrincipalStore(),
       g: useGroupStore(),
-      s: useServiceClientStore()
+      s: useServiceClientStore(),
+      grants: useGrantStore()
     }
   },
 
@@ -71,17 +73,7 @@ export default {
     async updateData () {
       this.loading = true
 
-      const grantUUIDsResponse = await this.s.client.Auth.fetch(`v2/grant`)
-      if (!Array.isArray(grantUUIDsResponse[1])) {
-        return
-      }
-      const grantUUIDs = grantUUIDsResponse[1]
-      const fullList = await Promise.all(
-          grantUUIDs.map(async uuid => {
-            const grantResponse = await this.s.client.Auth.fetch(`v2/grant/${uuid}`)
-            return grantResponse[1];
-          })
-      )
+      const fullList = this.grants.data
       const filteredList = fullList.filter(e => e.permission === this.permission.uuid)
 
       const info = o => this.s.client.ConfigDB.get_config(UUIDs.App.Info, o)

@@ -3,7 +3,7 @@
   -->
 
 <template>
-  <Skeleton v-if="loading || p.loading" v-for="i in 10" class="h-16 rounded-lg mb-2"/>
+  <Skeleton v-if="p.loading || grants.loading || loading" v-for="i in 10" class="h-16 rounded-lg mb-2"/>
 <!--  <DataTable v-else :data="this.permissions" :columns="columns" :filters="[]" @row-click="e => $emit('objectClick', e)">-->
   <DataTable v-else :data="this.permissions" :columns="columns" :filters="[]">
     <template #toolbar-left>
@@ -30,6 +30,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { usePermissionStore } from "@store/usePermissionStore.js";
 import { UUIDs } from "@amrc-factoryplus/service-client";
 import { useServiceClientStore } from "@store/serviceClientStore.js";
+import {useGrantStore} from "@store/useGrantStore.js";
 
 export default {
   emits: ['objectClick'],
@@ -39,6 +40,7 @@ export default {
       columns,
       p: usePermissionStore(),
       s: useServiceClientStore(),
+      grants: useGrantStore()
     }
   },
 
@@ -81,17 +83,7 @@ export default {
     async fetchSpecificPermissions() {
       this.loading = true
 
-      const grantUUIDsResponse = await this.s.client.Auth.fetch(`v2/grant`)
-      if (!Array.isArray(grantUUIDsResponse[1])) {
-        return;
-      }
-      const grantUUIDs = grantUUIDsResponse[1]
-      const fullList = await Promise.all(
-          grantUUIDs.map(async uuid => {
-            const grantResponse = await this.s.client.Auth.fetch(`v2/grant/${uuid}`)
-            return grantResponse[1];
-          })
-      )
+      const fullList = this.grants.data
       const filteredList = fullList.filter(e => e.principal === this.group.uuid)
 
       const info = o => this.s.client.ConfigDB.get_config(UUIDs.App.Info, o)

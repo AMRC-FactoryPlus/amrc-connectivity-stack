@@ -92,9 +92,18 @@ export default {
       }
 
       switch (classUUID) {
+        // TODO: Check if the uuid is a subclass of UUIDs.Class.Permission
         case UUIDs.Class.Permission:
+        case "a637134a-d06b-41e7-ad86-4bf62fde914a": // MQTT
+        case "9e07fd33-6400-4662-92c4-4dff1f61f990": // Cluster manager
+        case "c0c55c78-116e-4526-8ff4-e4595251f76c": // Git
+        case "50b727d4-3faa-40dc-b347-01c99a226c58": // Auth
+        case "58b5da47-d098-44f7-8c1d-6e4bd800e718": // Directory
+        case "9584ee09-a35a-4278-bc13-21a8be1f007c": // CmdEsc
+        case "c43c7157-a50b-4d2a-ac1a-86ff8e8e88c1": // ConfigDB
           this.selectPermission(object)
           break;
+        // TODO: Check if the uuid is a subclass of Role or Composite Permission
         case UUIDs.Class.PermGroup:
         case UUIDs.Class.GitRepoGroup:
         case "f1fabdd1-de90-4399-b3da-ccf6c2b2c08b": // User Group
@@ -107,6 +116,7 @@ export default {
           }
           this.selectGroup(object)
           break;
+        // TODO: Check if the uuid is a subclass of Principal
         case "e463b4ae-a322-46cc-8976-4ba76838e908": // Central service
         case "8b3e8f35-78e5-4f93-bf21-7238bcb2ba9d": // Human user
         case "97756c9a-38e6-4238-b78c-3df6f227a6c9": // Edge Cluster Account

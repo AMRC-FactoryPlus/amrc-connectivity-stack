@@ -7,7 +7,7 @@
     <Collapsible :defaultOpen="false" class="group/collapsible-cluster">
       <!-- TODO: This should navigate to the cluster page when clicked -->
       <!-- TODO: Ctrl+Click should expand instead of click -->
-      <RouterLink :to="`/edge-cluster/${cluster.uuid}`">
+      <RouterLink :to="`/edge-clusters/${cluster.uuid}`">
         <Button
             title="View Cluster"
             size="sm"

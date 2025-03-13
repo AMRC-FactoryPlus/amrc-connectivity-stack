@@ -2,8 +2,7 @@
  * Copyright (c) University of Sheffield AMRC 2025.
  */
 
-import { Address, SpB, Topic, UUIDs } from '@amrc-factoryplus/utilities'
-import { MetricBuilder } from '@amrc-factoryplus/service-client'
+import { Address, MetricBuilder, SpB, Topic, UUIDs } from '@amrc-factoryplus/utilities'
 
 const Valid = {
     Name: /^[A-Za-z0-9_-]+$/,

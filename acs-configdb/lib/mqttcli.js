@@ -2,8 +2,7 @@
  * Copyright (c) University of Sheffield AMRC 2025.
  */
 
-import { Address, Debug, SpB, Topic, UUIDs } from '@amrc-factoryplus/utilities'
-import { MetricBuilder } from '@amrc-factoryplus/service-client'
+import { Address, Debug, MetricBuilder, SpB, Topic, UUIDs } from '@amrc-factoryplus/utilities'
 
 import { Device_Info, Schema, Service } from './constants.js'
 

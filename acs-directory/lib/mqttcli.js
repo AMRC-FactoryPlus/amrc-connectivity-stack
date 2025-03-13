@@ -6,9 +6,7 @@ import timers from 'timers/promises'
 import async from 'async'
 import Long from 'long'
 
-import { Address, SpB, Topic, UUIDs } from '@amrc-factoryplus/utilities'
-import { MetricBranch, MetricBuilder, MetricTree } from '@amrc-factoryplus/service-client'
-
+import { Address, MetricBranch, MetricBuilder, MetricTree, SpB, Topic, UUIDs } from '@amrc-factoryplus/utilities'
 import { Device_Info } from './constants.js'
 import { Schema } from './uuids.js'
 

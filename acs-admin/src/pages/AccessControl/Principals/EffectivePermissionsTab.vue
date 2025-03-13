@@ -64,7 +64,7 @@ export default {
           return
         }
 
-        this.fetchEffectivePermissions(val.kerberos)
+        this.fetchEffectivePermissions(val.uuid)
       },
       immediate: true,
     },
@@ -75,7 +75,7 @@ export default {
 
       this.loading = true
 
-      const res = await this.s.client.Auth.fetch(`/authz/effective/${principal}`)
+      const res = await this.s.client.Auth.fetch(`/v2/acl/${principal}`)
 
       const info = o => this.s.client.ConfigDB.get_config(UUIDs.App.Info, o)
       const name = o => info(o).then(v => v?.name)

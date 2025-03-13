@@ -232,7 +232,7 @@ function ObjMenu (props) {
 }
 
 function MenuButton (props) {
-    const { title, items } = props;
+    const { items } = props;
     const id = useId();
 
     const buttons = items.map(item => {

@@ -233,9 +233,11 @@ export class CDBNotify {
         return rxx.rx(
             this.config_updates,
             rx.filter(u => u.type == "class"),
-            rx.tap(v => model.log("CLASS UPDATE: %s %s", rel, klass)),
+            /* This line opens a txn per update per watcher. This is not
+             * good. Perhaps have a shared seq querying the full
+             * relation set on every update? Or just track changes
+             * properly... */
             set_contents(() => model.class_lookup(klass, rel)),
-            ck_acl,
-            rx.tap(l => model.log("SENDING CLASS UPDATE: %s %s: %o", rel, klass, l)));
+            ck_acl);
     }
 }

@@ -802,7 +802,7 @@ export default class Model extends EventEmitter {
     }
 
     async _do_config_search(query, klass, app, where, select) {
-        const k_join = klass ? `join all_membership m on m.id = c.id` : "";
+        const k_join = klass ? `join all_membership m on m.id = o.id` : "";
         const k_whre = klass ? `and m.class = $4` : "";
         const bind = [app, where, select];
         if (klass) bind.push(klass);

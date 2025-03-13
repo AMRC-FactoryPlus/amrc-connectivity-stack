@@ -185,11 +185,69 @@ export class DataFlow {
         timeout:    1800000,
     });
 
-    async find_identities (cond) {
-        const ids = await rx.firstValueFrom(this.identities);
-        if (!cond) return ids;
-        const rv = ids.filter(cond);
-        return rv;
+    /** Track the targets for a given principal and permission.
+     * @param upn A principal's UPN
+     * @param perm A permission UUID
+     * @returns A seq of iSets of targets
+     */
+    track_targets (upn, perm) {
+        return rxx.rx(
+            this.find_kerberos(upn),
+            rx.mergeMap(p => p ? this.acl_for(p) : rx.of([])),
+            rx.map(acl => imm.Seq(acl)
+                .filter(e => e.permission == perm)
+                .map(e => e.target)
+                .toSet()),
+            rx.tap(ptd => 
+                this.log("Permitted %s for %s: %o", perm, upn, ptd.toJS())));
+    }
+
+    /** Track a permission, including wildcards.
+     * Returns a seq of functions. When the user does not have the given
+     * permission at all, emits null. Otherwise emits a function from
+     * target to boolean.
+     * @param upn The principal UPN
+     * @param perm The permission UUID
+     * @param wild Whether to treat Special.Wilcard as matching any target
+     */
+    permitted (upn, perm, wild) {
+        if (upn == this.root)
+            return rx.of(() => true);
+
+        return rxx.rx(
+            this.track_targets(upn, perm),
+            rx.map(targs =>
+                !targs.size ? null
+                : wild && targs.has(Special.Wildcard) ? () => true
+                : i => targs.has(i)));
+    }
+    
+    check_targ (upn, perm, wild) {
+        return rx.firstValueFrom(this.permitted(upn, perm, wild));
+    }
+
+    /** Create a filtered seq of identities.
+     * Searches for identity records matching a given condition. Filters
+     * the list for a given requesting principal. If the principal has
+     * no permissions at all, null is emitted; if there are no matching
+     * entries the empty list is emitted.
+     *
+     * @param upn The requesting principal UPN
+     * @param cond A filter to apply to the identity records
+     */
+    track_identities (upn, cond) {
+        return rxx.rx(
+            rx.combineLatest({
+                filtered:   rxx.rx(this.identities, rx.map(ids => ids.filter(cond))),
+                permitted:  this.permitted(upn, cond),
+            }),
+            rx.map(e => e.permitted
+                ? e.filtered.filter(e.permitted)
+                : null));
+    }
+
+    find_identities (upn, cond) {
+        return rx.firstValueFrom(this.track_identities(upn, cond));
     }
 
     async whoami (upn) {
@@ -209,26 +267,4 @@ export class DataFlow {
             rx.defaultIfEmpty(null)));
     }
 
-    permitted (upn, perm) {
-        return rx.firstValueFrom(rxx.rx(
-            this.find_kerberos(upn),
-            rx.mergeMap(p => p ? this.acl_for(p) : rx.of([])),
-            rx.map(acl => imm.Seq(acl)
-                .filter(e => e.permission == perm)
-                .map(e => e.target)
-                .toSet()),
-            rx.tap(ptd => 
-                this.log("Permitted %s for %s: %o", perm, upn, ptd.toJS()))));
-    }
-
-    async check_targ (upn, perm, wild) {
-        if (upn == this.root)
-            return () => true;
-        const targs = await this.permitted(upn, perm);
-        if (!targs.size)
-            return;
-        if (wild && targs.has(Special.Wildcard))
-            return () => true;
-        return i => targs.has(i);
-    }
 }

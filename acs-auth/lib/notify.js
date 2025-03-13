@@ -3,43 +3,47 @@
  * Copyright 2025 University of Sheffield AMRC
  */
 
-import deep_equal from "deep-equal";
-import * as imm from "immutable";
 import * as rx from "rxjs";
 
-import * as rxx                 from "@amrc-factoryplus/rx-util";
-import { 
-    Notify, WatchFilter, SearchFilter
-}  from "@amrc-factoryplus/service-api";
+import * as rxx     from "@amrc-factoryplus/rx-util";
+import { Notify }   from "@amrc-factoryplus/service-api";
 
-export class AuthNotify extends Notify {
+function to_update (response, ix) {
+    return { status: ix ? 200 : 201, response };
+}
+
+function set_response (items) {
+    if (!items)
+        return { status: 403 };
+    return { status: 200, body: [...new Set(items)] };
+}
+
+export class AuthNotify {
     constructor (opts) {
-        super(opts);
-        this.data = opts.data;
+        this.data   = opts.data;
+        this.log    = opts.debug.bound("notify");
+
+        this.notify = this.build_notify(opts.api);
     }
 
-    build_handlers () {
-        return [
-            new WatchFilter({
-                path:       "v2/principal/",
-                handler:    s => this.principal_list(s),
-            }),
-        ];
-//            new SearchFilter({
-//                path:       `${vers}/app/:app/object/`,
-//                handler:    (s, f, a) => new ConfigWatch(s, a).config_search(f),
-//            }),
+    run () { this.notify.run(); }
+
+    build_notify (api) {
+        const notify = new Notify({
+            api,
+            log:    this.log,
+        });
+
+        notify.watch("v2/principal/", this.principal_list.bind(this));
+
+        return notify;
     }
 
     principal_list (sess) {
         return rxx.rx(
-            this.data.identities,
-            rx.map(is => imm.Seq(is)
-                .map(i => i.uuid)
-                .toSet().toJS()),
-            rx.map(body => ({
-                status:     200, 
-                response:   { status: 200, body },
-            })));
+            this.data.track_identities(sess.principal, () => true),
+            rx.map(ids => ids?.map(i => i.uuid)),
+            rx.map(set_response),
+            rx.map(to_update));
     }
 }

@@ -8,7 +8,7 @@
         title="View Device"
         size="sm"
         variant="ghost"
-        class="w-full text-left justify-start"
+        class="w-full text-left justify-start ml-4"
     >
       <div class="flex items-center justify-center gap-2">
         <i :class="`fa-solid fa-microchip`"></i>

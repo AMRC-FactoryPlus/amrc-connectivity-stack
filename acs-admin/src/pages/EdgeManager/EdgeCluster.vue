@@ -12,7 +12,7 @@
             <div class="flex flex-col gap-1">
               <div class="flex mb-2">
                 <div class="px-1.5 py-0.5 rounded-md bg-green-600 text-sm font-bold uppercase tracking-wide text-white">
-                  Online
+                  TBI
                 </div>
               </div>
               <Copyable :text="cluster.name">

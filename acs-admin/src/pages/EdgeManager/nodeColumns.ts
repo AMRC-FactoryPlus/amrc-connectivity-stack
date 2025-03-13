@@ -1,10 +1,9 @@
 /*
- * Copyright (c) University of Sheffield AMRC 2024.
+ * Copyright (c) University of Sheffield AMRC 2025.
  */
 
 import type {ColumnDef} from '@tanstack/vue-table'
 import {h} from 'vue'
-import {Badge} from '@/components/ui/badge'
 
 import DataTableColumnHeader from '@/components/ui/data-table/DataTableColumnHeader.vue'
 
@@ -59,8 +58,8 @@ export const nodeColumns: ColumnDef<Host>[] = [
         }),
 
         cell: ({row}) => {
-            return h('div', {class: 'max-w-[500px] truncate'}, [
-                h('div', {class: 'max-w-[500px] truncate'}, "Online")
+            return h('div', {class:ÎÎ 'max-w-[500px] truncate'}, [
+                h('div', {class: 'max-w-[500px] truncate'}, "TBI")
             ])
         },
         filterFn: (row, id, value) => {

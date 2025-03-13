@@ -12,6 +12,7 @@ export const useNodeStore = defineStore('node', {
     data: {},
     loading: false,
     loaded: false,
+    ready: false,
   }),
   actions: {
 
@@ -31,7 +32,7 @@ export const useNodeStore = defineStore('node', {
       this.loading = true
 
       // Wait until the store is ready before attempting to fetch data
-      await storeReady()
+      await storeReady(useServiceClientStore())
 
       useServiceClientStore().client.ConfigDB.fetch(`/v1/class/${UUIDs.Class.EdgeAgent}`).then(async (nodeUUIDs) => {
 
@@ -63,8 +64,11 @@ export const useNodeStore = defineStore('node', {
 
         this.loaded = true
         this.loading = false
+        this.ready = true
       }).catch((err) => {
         this.loading = false
+        this.loaded = false
+        this.ready = false
         console.error(`Can't fetch nodes`, err)
       })
     },

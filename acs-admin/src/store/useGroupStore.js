@@ -15,13 +15,12 @@ export const useGroupStore = defineStore('group', {
   actions: {
 
     async getMembers (group) {
-
       // Wait until the store is ready before attempting to fetch data
       await storeReady();
 
       // Let's get the list of group members
       try {
-        let groupMembersResponse = await useServiceClientStore().client.Auth.fetch(`authz/group/${group.uuid}`)
+        const groupMembersResponse = await useServiceClientStore().client.ConfigDB.fetch(`v2/class/${group.uuid}/member`)
         return groupMembersResponse[1]
       } catch(err) {
         console.error(`Can't read group members`, err)
@@ -36,17 +35,25 @@ export const useGroupStore = defineStore('group', {
 
       this.data = []
       try {
-        let groupListResponse = await useServiceClientStore().client.Auth.fetch('authz/group')
-
+        const roleResponse = await useServiceClientStore().client.ConfigDB.fetch(`v2/class/f1fabdd1-de90-4399-b3da-ccf6c2b2c08b/member`)
+        const roles = roleResponse[1]
         // Check if the return object is an array and if not, return
-        if (!Array.isArray(groupListResponse[1])) {
+        if (!Array.isArray(roles)) {
           this.loading = false
           return
         }
+        const compositePermissionResponse = await useServiceClientStore().client.ConfigDB.fetch(`v2/class/1c567e3c-5519-4418-8682-6086f22fbc13/member`)
+        const compositePermissions = compositePermissionResponse[1]
+        // Check if the return object is an array and if not, return
+        if (!Array.isArray(compositePermissions)) {
+          this.loading = false
+          return
+        }
+        const allGroups = roles.concat(compositePermissions)
 
         // Make a fetch call for each group to get details, and then one
         // to get all members of the group
-        for (const uuid of groupListResponse[1]) {
+        for (const uuid of allGroups) {
           let groupDetails = {
             uuid: uuid,
           }

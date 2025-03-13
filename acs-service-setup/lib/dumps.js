@@ -10,27 +10,23 @@ import yaml from "yaml";
 
 import { UUIDs } from "@amrc-factoryplus/service-client";
 
-import * as local_UUIDs from "./uuids.js";
+import * as ss_UUIDs from "./uuids.js";
 
-const UUID_SOURCES = { UUIDs, ...local_UUIDs };
 
 export class DumpLoader {
     constructor (opts) {
         this.dumps  = opts.dumps;
         this.fplus  = opts.fplus;
         this.log    = opts.log || console.log;
+        this.local  = opts.local;
         
-        const acs = opts.acs_config;
-        this.url_replacements = {
-            NAMESPACE: acs.namespace,
-            DOMAIN: acs.domain,
-            PROTOCOL: acs.url_protocol,
-        };
+        this.acs_config = opts.acs_config;
 
+        this.uuid_sources = { UUIDs, ...ss_UUIDs };
         this.yamlOpts = {
             customTags: [
                 ["u",   this.resolveUUID],
-                ["url", this.resolveURL],
+                ["acs", this.resolveACS],
             ].map(([t, f]) => ({ tag: `!${t}`, resolve: f.bind(this) })),
         };
     }
@@ -40,7 +36,12 @@ export class DumpLoader {
      * defined for service-setup. */
     resolveUUID (str) {
         const cpts = str.split(".");
-        let it = UUID_SOURCES;
+
+        /* Override Local UUIDs for linting */
+        if (cpts[0] == "Local" && this.local)
+            return this.local(str);
+
+        let it = this.uuid_sources;
         for (const c of cpts) {
             if (!(c in it))
                 throw new Error(`UUID ref ${str} not found`);
@@ -50,18 +51,27 @@ export class DumpLoader {
     }
 
 
-    /**
-     * Resolves the namespace in the yaml string with the ACS namespace or domain.
-     * @param str The string to resolve.
-     * @return {*} The resolved URL.
+    /** Expand parameters from the ACS config.
+     * Substitutions of the form `${x}` will be expanded from our ACS
+     * config.
+     * @param str The string to expand.
+     * @return {*} The expanded string.
      */
-    resolveURL (str) {
-        const { url_replacements } = this;
+    resolveACS (str) {
+        const { acs_config } = this;
         return str.replace(/\${(.*?)}/g, (match, key) => {
-            if (!(key in url_replacements))
-                throw new Error(`URL substitution ${key} not found`);
-            return url_replacements[key];
+            if (!(key in acs_config))
+                throw new Error(`ACS config key ${key} not found`);
+            return acs_config[key];
         });
+    }
+
+    /** Update our local UUIDs.
+     * Set the object used to resolve `Local` UUIDs.
+     * @param uuids The `Local` UUIDs.
+     */
+    set_local_uuids (uuids) {
+        this.uuid_sources.Local = uuids;
     }
 
     /**
@@ -105,11 +115,11 @@ export class DumpLoader {
      * @returns A list of {file, yaml} objects.
      */
     async sort_files (early) {
-        const yamls = await this.read_files(t => /^# EARLY/m.test(t) == early);
+        const yamls = await this.read_files(t => /^#-EARLY/m.test(t) == early);
 
         const graph = tsort();
         [...yamls.entries()]
-            .map(([f, t]) => [f, t.match(/^# REQUIRE:\s+(.*)/m)?.[1]])
+            .map(([f, t]) => [f, t.match(/^#-REQUIRE:\s+(.*)/m)?.[1]])
             .filter(m => m[1])
             .flatMap(([f, m]) => m.split(/\s+/)
                 .map(d => [`${d}.yaml`, f]))
@@ -118,7 +128,7 @@ export class DumpLoader {
             .forEach(f => graph.add(f));
 
         return graph.sort()
-            .map(file => ({ file, yaml: yamls.get(file) }));
+            .map(name => ({ name, yaml: yamls.get(name) }));
     }
 
     /** Load a dump into the appropriate service.
@@ -141,18 +151,21 @@ export class DumpLoader {
         return res.status;
     }
 
+    async load_from_file (yaml, name) {
+        this.log("== %s", name);
+        const ds = this.parse_yaml(yaml, name);
+        for (const d of ds) {
+            this.log("=== %s", d.service);
+            const st = await this.load_dump(d);
+            if (st != 204)
+                throw new Error(`Service dump ${name} failed: ${st}`);
+        }
+    }
+
     async load_dumps (early) {
         const files = await this.sort_files(early);
 
-        for (const f of files) {
-            this.log("== %s", f.file);
-            const ds = this.parse_yaml(f.yaml, f.file);
-            for (const d of ds) {
-                this.log("=== %s", d.service);
-                const st = await this.load_dump(d);
-                if (st > 300)
-                    throw new Error(`Service dump ${f.file} failed: ${st}`);
-            }
-        }
+        for (const f of files)
+            await this.load_from_file(f.yaml, f.name);
     }
 }

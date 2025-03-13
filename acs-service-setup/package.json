@@ -14,6 +14,7 @@
   "dependencies": {
     "@amrc-factoryplus/service-client": "file:../lib/js-service-client",
     "tsort": "^0.0.1",
+    "uuid": "^11.1.0",
     "yaml": "^2.3.4"
   },
   "devDependencies": {

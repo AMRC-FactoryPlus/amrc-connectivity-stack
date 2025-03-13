@@ -25,7 +25,7 @@ js.npminstall:
 ifdef eslint
 lint: js.eslint
 
-js.eslint: js.npminstall
+js.eslint:
 	npx eslint ${eslint}
 endif
 

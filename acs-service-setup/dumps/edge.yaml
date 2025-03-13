@@ -1,4 +1,4 @@
-# REQUIRE: auth sparkplug
+#-REQUIRE: auth sparkplug
 ---
 service: !u UUIDs.Service.ConfigDB
 version: 2

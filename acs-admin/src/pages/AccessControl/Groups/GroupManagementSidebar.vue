@@ -3,12 +3,12 @@
   -->
 
 <template>
-  <SheetContent v-if="group" class="gap-6 flex flex-col overflow-auto">
+  <SheetContent v-if="groupDetails" class="gap-6 flex flex-col overflow-auto">
     <SheetHeader>
-      <SheetTitle>{{ group.class?.name ?? "Group" }}</SheetTitle>
-      <SheetTitle>{{group.name}}</SheetTitle>
+      <SheetTitle title="Group Class">{{ groupDetails.class?.name ?? "Group" }}</SheetTitle>
+      <SheetTitle title="Name">{{groupDetails.name}}</SheetTitle>
       <SheetDescription>
-        {{group.uuid}}
+        <Copyable :text="groupDetails.uuid">{{groupDetails.uuid}}</Copyable>
       </SheetDescription>
     </SheetHeader>
     <div>
@@ -22,10 +22,10 @@
           </TabsTrigger>
         </TabsList>
         <TabsContent value="members">
-          <MembersTab :group @objectClick="e => $emit('objectClick', e)" />
+          <MembersTab :group="groupDetails" @objectClick="e => $emit('objectClick', e)" />
         </TabsContent>
         <TabsContent value="permissions">
-          <PermissionsTab :group @objectClick="e => $emit('objectClick', e)" />
+          <PermissionsTab :group="groupDetails" @objectClick="e => $emit('objectClick', e)" />
         </TabsContent>
       </Tabs>
     </div>
@@ -38,13 +38,22 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@components/ui/tabs/in
 import MembersTab from './MembersTab.vue'
 import PermissionsTab from './PermissionsTab.vue'
 import DataTable from "@components/ui/data-table/DataTable.vue";
+import {useGroupStore} from "@store/useGroupStore.js";
+import Copyable from "@components/Copyable.vue";
 
 export default {
   name: 'GroupManagementSidebar',
 
+  setup () {
+    return {
+      g: useGroupStore(),
+    }
+  },
+
   emits: ['objectClick'],
 
   components: {
+    Copyable,
     DataTable,
     SheetHeader,
     SheetTitle,
@@ -56,6 +65,12 @@ export default {
     TabsContent,
     MembersTab,
     PermissionsTab,
+  },
+
+  computed: {
+    groupDetails () {
+      return this.group ? this.g.data.find(item => item.uuid === this.group.uuid) : null
+    }
   },
 
   props: {

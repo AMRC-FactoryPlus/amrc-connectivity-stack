@@ -3,12 +3,12 @@
   -->
 
 <template>
-  <SheetContent v-if="permission" class="gap-6 flex flex-col overflow-auto">
+  <SheetContent v-if="permissionDetails" class="gap-6 flex flex-col overflow-auto">
     <SheetHeader>
-      <SheetTitle>Permission</SheetTitle>
-      <SheetTitle>{{ permission.name }}</SheetTitle>
+      <SheetTitle title="Permission Class">{{ permissionDetails.class?.name ?? "Permission" }}</SheetTitle>
+      <SheetTitle title="Name">{{ permissionDetails.name }}</SheetTitle>
       <SheetDescription>
-        {{ permission.uuid }}
+        <Copyable :text="permissionDetails.uuid">{{permissionDetails.uuid}}</Copyable>
       </SheetDescription>
     </SheetHeader>
     <div>
@@ -22,10 +22,10 @@
           </TabsTrigger>
         </TabsList>
         <TabsContent value="principals">
-          <PrincipalsTab :permission @objectClick="e => $emit('objectClick', e)" />
+          <PrincipalsTab :permission="permissionDetails" @objectClick="e => $emit('objectClick', e)" />
         </TabsContent>
         <TabsContent value="groups">
-          <GroupsTab :permission @objectClick="e => $emit('objectClick', e)" />
+          <GroupsTab :permission="permissionDetails" @objectClick="e => $emit('objectClick', e)" />
         </TabsContent>
       </Tabs>
     </div>
@@ -37,13 +37,22 @@ import { SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@compon
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import PrincipalsTab from './PrincipalsTab.vue'
 import GroupsTab from "./GroupsTab.vue";
+import {usePermissionStore} from "@store/usePermissionStore.js";
+import Copyable from "@components/Copyable.vue";
 
 export default {
   name: 'PermissionManagementSidebar',
 
+  setup () {
+    return {
+      p: usePermissionStore(),
+    }
+  },
+
   emits: ['objectClick'],
 
   components: {
+    Copyable,
     SheetHeader,
     SheetTitle,
     SheetContent,
@@ -54,6 +63,12 @@ export default {
     TabsContent,
     PrincipalsTab,
     GroupsTab
+  },
+
+  computed: {
+    permissionDetails () {
+      return this.permission ? this.p.data.find(item => item.uuid === this.permission.uuid) : null
+    }
   },
 
   props: {

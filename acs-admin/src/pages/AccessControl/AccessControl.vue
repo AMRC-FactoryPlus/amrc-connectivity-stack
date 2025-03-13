@@ -3,13 +3,13 @@
   -->
 
 <template>
-  <Sheet :open="selectedPrincipal !== null" @update:open="e => !e ? selectedPrincipal = null : null">
+  <Sheet :open="selectedPrincipal !== null" @update:open="e => !e ? objectClicked({}) : null">
     <PrincipalManagementSidebar :principal="selectedPrincipal" @objectClick="e => objectClicked(e.original)"></PrincipalManagementSidebar>
   </Sheet>
-  <Sheet :open="selectedGroup !== null" @update:open="e => !e ? selectedGroup = null : null">
+  <Sheet :open="selectedGroup !== null" @update:open="e => !e ? objectClicked({}) : null">
     <GroupManagementSidebar :group="selectedGroup" @objectClick="e => objectClicked(e.original)"></GroupManagementSidebar>
   </Sheet>
-  <Sheet :open="selectedPermission !== null" @update:open="e => !e ? selectedPermission = null : null">
+  <Sheet :open="selectedPermission !== null" @update:open="e => !e ? objectClicked({}) : null">
     <PermissionManagementSidebar :permission="selectedPermission" @objectClick="e => objectClicked(e.original)"></PermissionManagementSidebar>
   </Sheet>
   <Tabs @update:modelValue="changeTab" :default-value="activeTab">
@@ -25,7 +25,7 @@
           Permissions
         </TabsTrigger>
       </TabsList>
-      <LinkUserDialog v-if="currentTab==='principals'"/>
+      <LinkUserDialog v-if="activeTab==='principals'"/>
     </div>
     <TabsContent value="principals">
       <PrincipalList @rowClick="e => objectClicked(e.original)"/>
@@ -54,6 +54,7 @@ import { UUIDs } from '@amrc-factoryplus/service-client'
 import LinkUserDialog from '@pages/AccessControl/LinkUserDialog.vue'
 import {useGrantStore} from "@store/useGrantStore.js";
 import {useRoute, useRouter} from "vue-router";
+import {storeReady} from "@store/useStoreReady.js";
 
 export default {
   name: 'AccessControl',
@@ -87,6 +88,17 @@ export default {
 
   methods: {
     async objectClicked (object) {
+      if (object.uuid) {
+        this.router.push({ path: `/access-control/${this.activeTab}/${object.uuid}` })
+      } else {
+        this.router.push({ path: `/access-control/${this.activeTab}` })
+      }
+    },
+    async uuidSelected (uuid) {
+      await storeReady()
+      await this.objectSelected({uuid})
+    },
+    async objectSelected (object) {
       // Get type of object
       let classUUID = "";
       if (object.class) {
@@ -97,7 +109,7 @@ export default {
       }
 
       switch (classUUID) {
-        // TODO: Check if the uuid is a subclass of UUIDs.Class.Permission
+          // TODO: Check if the uuid is a subclass of UUIDs.Class.Permission
         case UUIDs.Class.Permission:
         case "a637134a-d06b-41e7-ad86-4bf62fde914a": // MQTT
         case "9e07fd33-6400-4662-92c4-4dff1f61f990": // Cluster manager
@@ -108,7 +120,7 @@ export default {
         case "c43c7157-a50b-4d2a-ac1a-86ff8e8e88c1": // ConfigDB
           this.selectPermission(object)
           break;
-        // TODO: Check if the uuid is a subclass of Role or Composite Permission
+          // TODO: Check if the uuid is a subclass of Role or Composite Permission
         case UUIDs.Class.PermGroup:
         case UUIDs.Class.GitRepoGroup:
         case "f1fabdd1-de90-4399-b3da-ccf6c2b2c08b": // User Group
@@ -122,14 +134,14 @@ export default {
           }
           this.selectGroup(object)
           break;
-        // TODO: Check if the uuid is a subclass of Principal
+          // TODO: Check if the uuid is a subclass of Principal
         case "e463b4ae-a322-46cc-8976-4ba76838e908": // Central service
         case "8b3e8f35-78e5-4f93-bf21-7238bcb2ba9d": // Human user
         case "97756c9a-38e6-4238-b78c-3df6f227a6c9": // Edge Cluster Account
         case "00da3c0b-f62b-4761-a689-39ad0c33f864": // Cell Gateway
           this.selectPrincipal(object)
           break;
-        // TODO: Likely some missing UUIDs here. Git Repo??
+          // TODO: Likely some missing UUIDs here. Git Repo??
       }
     },
     selectPrincipal (principal) {
@@ -152,13 +164,12 @@ export default {
       this.selectedPermission = permission
     },
     changeTab (newTab) {
-      this.currentTab = newTab
       this.router.push({ path: `/access-control/${newTab}` })
     },
   },
 
   watch: {
-    routeTab: {
+    activeTab: {
       handler (newTab) {
         if (!newTab) {
           this.router.replace({path: `/access-control/principals`})
@@ -166,14 +177,27 @@ export default {
       },
       immediate: true,
     },
+    activeSelection: {
+      handler (newSelection) {
+        if (!newSelection) {
+          this.selectedPrincipal = null;
+          this.selectedGroup = null;
+          this.selectedPermission = null;
+          // this.router.replace({path: `/access-control/principals`})
+          return;
+        }
+        this.uuidSelected(newSelection)
+      },
+      immediate: true,
+    },
   },
 
   computed: {
-    routeTab () {
-      return this.route.params.tab
-    },
     activeTab () {
       return this.route.params.tab || 'principals'
+    },
+    activeSelection () {
+      return this.route.params.selected || null
     }
   },
 
@@ -191,7 +215,6 @@ export default {
 
   data () {
     return {
-      currentTab: this.activeTab,
       selectedPrincipal: null,
       selectedGroup: null,
       selectedPermission: null,

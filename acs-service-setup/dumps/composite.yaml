@@ -1,6 +1,6 @@
 # Composite permission definitions
 #
-# REQUIRE: auth
+#-REQUIRE: auth
 service: !u UUIDs.Service.ConfigDB
 version: 2
 objects:

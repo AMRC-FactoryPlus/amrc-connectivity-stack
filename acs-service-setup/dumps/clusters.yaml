@@ -1,4 +1,4 @@
-# REQUIRE: auth git
+#-REQUIRE: auth git
 ---
 service: !u UUIDs.Service.ConfigDB
 version: 2
@@ -6,8 +6,6 @@ objects:
   !u ConfigDB.Class.R2Class:
     !u Clusters.Class.ClusterGroups:
       name: "Clusters-managed group"
-      subclassOf:
-        - !u Auth.Class.EdgeRole
 
   !u Auth.Class.ServiceRole:
     !u Clusters.Requirement.ServiceAccount:
@@ -19,15 +17,43 @@ objects:
       name: "Cluster manager permission"
       subclassOf:
         - !u UUIDs.Class.Permission
-
-  !u UUIDs.Class.Class:
-    !u Clusters.Class.Cluster: { name: "Edge cluster" }
+  !u Auth.Class.EdgeRole:
+    !u Local.Role.EdgeFlux:
+      name: "Edge flux"
+      memberOf:
+        - !u Auth.Class.EdgeRole
+        - !u Clusters.Class.ClusterGroups
+      subclassOf:
+        - !u Auth.Class.EdgeService
+    !u Local.Role.EdgeKrbkeys:
+      name: "Edge krbkeys"
+      memberOf:
+        - !u Auth.Class.EdgeRole
+        - !u Clusters.Class.ClusterGroups
+      subclassOf:
+        - !u Auth.Class.EdgeService
 
   !u Git.Class.Group:
+    # XXX This is redundant. It was used for a permission grant which
+    # never functioned; we grant the dynamic target directly.
     !u Clusters.Requirement.EdgeRepos:
-        name: "Edge cluster repositories"
-        subclassOf:
-          - !u Git.Class.Repo
+      name: "Edge cluster repositories"
+      subclassOf:
+        - !u Git.Class.Repo
+    !u Local.RepoGroup.Shared:
+      name: "Shared repo"
+      subclassOf:
+        - !u Git.Class.Repo
+    !u Local.RepoGroup.Cluster:
+      name: "Edge cluster repo"
+      memberOf:
+        - !u Git.Class.Group
+        - !u Clusters.Class.ClusterGroups
+      subclassOf:
+        - !u Git.Class.Repo
+
+  !u ConfigDB.Class.R1Class:
+    !u Clusters.Class.Cluster: { name: "Edge cluster" }
 
   !u UUIDs.Class.App:
     !u Clusters.App.Bootstrap:      { name: "Bootstrap script" }
@@ -41,7 +67,16 @@ objects:
   !u Clusters.Perm.All:
     !u Clusters.Perm.Clusters: { name: "Manage clusters" }
     !u Clusters.Perm.Secrets: { name: "Manage secrets" }
+
+  !u Local.RepoGroup.Shared:
+    !u Local.Repo.HelmCharts:
+      name: "Edge Helm charts"
+
 configs:
+  !u Git.App.Config:
+    !u Local.Repo.HelmCharts:
+      path: "shared/helm"
+
   !u UUIDs.App.ConfigSchema:
     !u Clusters.App.Bootstrap:
       title: Edge cluster bootstrap script template
@@ -386,11 +421,40 @@ grants:
       !u Clusters.Class.ClusterGroups: true
 
     !u Git.Perm.Pull:
+      # XXX This does nothing; the Req has no members.
       !u Clusters.Requirement.EdgeRepos: true
+      !u Local.RepoGroup.Shared: true
+      !u Local.RepoGroup.Cluster: true
     !u Git.Perm.Push:
+      # XXX as above
       !u Clusters.Requirement.EdgeRepos: true
+      !u Local.RepoGroup.Cluster: true
 
   # XXX Do we still need this? KrbKeys sealed to edge clusters have been
   # replaced with krbkeys generated on the edge.
   !u ACS.ServiceAccount.KrbKeys:
     !u Clusters.Perm.Secrets: null
+
+  !u Local.Role.EdgeFlux:
+    !u Git.Perm.Pull:
+      !u Local.RepoGroup.Shared: true
+
+  !u Local.Role.EdgeKrbkeys:
+    !u ConfigDB.Perm.ManageObjects:
+      # XXX Should this be removed? Or should these two be for different
+      # permissions?
+      !u Auth.Class.EdgeService: false
+      !u Edge.Group.EdgeGroup: true
+    !u ConfigDB.Perm.ReadConfig:
+      !u UUIDs.App.Info: false
+      !u UUIDs.App.SparkplugAddress: false
+    !u ConfigDB.Perm.WriteConfig:
+      !u UUIDs.App.Info: false
+      !u UUIDs.App.SparkplugAddress: false
+    !u Auth.Perm.ReadKerberos: null
+    # XXX This is root-equivalent
+    !u Auth.Perm.ManageKerberos: null
+    # XXX Not much use at present due to strict ranks. Composite perms
+    # are a rank higher than ordinary perms. Unused.
+    !u Auth.Perm.ManageACL:
+      !u Edge.Group.EdgePermission: true

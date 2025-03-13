@@ -1,5 +1,5 @@
 # ACS-specific deployment decisions
-# REQUIRE: auth
+#-REQUIRE: auth
 ---
 service: !u UUIDs.Service.ConfigDB
 version: 2

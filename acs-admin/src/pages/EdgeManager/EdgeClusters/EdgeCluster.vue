@@ -132,14 +132,6 @@ export default {
       await this.getClusterDetails(newUuid)
 
     },
-
-    test: {
-      handler (newVal, oldVal) {
-        // console.log('test', newVal)
-      },
-      deep: true,
-      immediate: true,
-    },
   },
 
   mounted () {

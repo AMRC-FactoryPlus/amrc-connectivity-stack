@@ -12,6 +12,7 @@ export const useEdgeClusterStore = defineStore('edge-cluster', {
     data: [],
     loading: false,
     loaded: false,
+    ready: false,
   }),
   actions: {
 
@@ -31,7 +32,7 @@ export const useEdgeClusterStore = defineStore('edge-cluster', {
       this.loading = true
 
       // Wait until the store is ready before attempting to fetch data
-      await storeReady();
+      await storeReady(useServiceClientStore())
 
       useServiceClientStore().client.ConfigDB.fetch(`/v1/app/${UUIDs.App.EdgeClusterConfiguration}/object`).then(async (edgeClusterResponse) => {
 
@@ -62,6 +63,7 @@ export const useEdgeClusterStore = defineStore('edge-cluster', {
         }))
 
         this.loaded = true
+        this.ready = true
         this.loading = false
       }).catch((err) => {
         this.loading = false

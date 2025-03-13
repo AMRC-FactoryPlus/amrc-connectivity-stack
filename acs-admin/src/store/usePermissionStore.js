@@ -12,6 +12,7 @@ export const usePermissionStore = defineStore('permission', {
   state: () => ({
     data: [],
     loading: false,
+    ready: false,
   }),
 
   actions: {
@@ -19,7 +20,7 @@ export const usePermissionStore = defineStore('permission', {
       this.loading = true
 
       // Wait until the store is ready before attempting to fetch data
-      await storeReady();
+      await storeReady(useServiceClientStore())
 
       useServiceClientStore().client.ConfigDB.fetch(`/v1/class/${UUIDs.Class.Permission}`).then(async (permissionListResponse) => {
 
@@ -47,8 +48,11 @@ export const usePermissionStore = defineStore('permission', {
         }))
 
         this.loading = false
+        this.ready = true
       }).catch((err) => {
         console.error(`Can't read principals`, err)
+        this.loading = false
+        this.ready = false
       })
     },
   },

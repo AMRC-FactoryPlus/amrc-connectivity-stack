@@ -1,15 +1,16 @@
 /*
- * Copyright (c) University of Sheffield AMRC 2024.
+ * Copyright (c) University of Sheffield AMRC 2025.
  */
 
 import { defineStore } from 'pinia'
 import { useServiceClientStore } from '@/store/serviceClientStore.js'
-import {UUIDs} from "@amrc-factoryplus/service-client";
+import { UUIDs } from '@amrc-factoryplus/service-client'
 
 export const usePrincipalStore = defineStore('principal', {
   state: () => ({
     data: [],
     loading: false,
+    ready: false,
   }),
   actions: {
     async fetch () {
@@ -86,8 +87,11 @@ export const usePrincipalStore = defineStore('principal', {
         }))
 
         this.loading = false
+        this.ready = true
       } catch(err) {
         console.error(`Can't read principals`, err)
+        this.loading = false
+        this.ready = false
       }
     },
   },

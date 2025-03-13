@@ -6,16 +6,18 @@ import { defineStore } from 'pinia'
 import { UUIDs } from '@amrc-factoryplus/service-client'
 import * as rx from 'rxjs'
 import { storeReady } from '@store/useStoreReady.js'
+import { useServiceClientStore } from '@store/serviceClientStore.js'
 
 export const useAlertStore = defineStore('alert', {
   state: () => ({
     alerts: [],
+    ready: false,
   }),
   actions: {
     async fetchAlerts (fplus) {
 
       // Wait until the store is ready before attempting to fetch data
-      await storeReady();
+      await storeReady(useServiceClientStore())
 
       const res = await fplus.Directory.fetch({
         url: 'v1/alert/active',
@@ -60,6 +62,7 @@ export const useAlertStore = defineStore('alert', {
           links,
         })
       }
+      this.ready = true
       return rv
     },
 

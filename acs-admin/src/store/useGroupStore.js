@@ -11,13 +11,14 @@ export const useGroupStore = defineStore('group', {
   state: () => ({
     data: [],
     loading: false,
+    ready: false,
   }),
   actions: {
 
     async getMembers (group) {
 
       // Wait until the store is ready before attempting to fetch data
-      await storeReady();
+      await storeReady(useServiceClientStore())
 
       // Let's get the list of group members
       try {
@@ -32,7 +33,7 @@ export const useGroupStore = defineStore('group', {
       this.loading = true
 
       // Wait until the store is ready before attempting to fetch data
-      await storeReady();
+      await storeReady(useServiceClientStore())
 
       this.data = []
       try {
@@ -91,9 +92,12 @@ export const useGroupStore = defineStore('group', {
         }
 
         this.loading = false
+        this.ready = true
 
       } catch (err){
         console.error(`Can't read groups`, err)
+        this.loading = false
+        this.ready = false
       }
     },
   },

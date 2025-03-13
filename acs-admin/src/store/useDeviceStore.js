@@ -12,6 +12,7 @@ export const useDeviceStore = defineStore('device', {
     data: {},
     loading: false,
     loaded: false,
+    ready: false,
   }),
   actions: {
 
@@ -31,13 +32,11 @@ export const useDeviceStore = defineStore('device', {
       this.loading = true
 
       // Wait until the store is ready before attempting to fetch data
-      await storeReady()
+      await storeReady(useServiceClientStore())
 
       useServiceClientStore().client.ConfigDB.fetch(`/v1/class/${UUIDs.Class.Device}`).then(async (deviceUUIDs) => {
 
         const payload = deviceUUIDs[1]
-
-        console.log(`Device UUIDs`, payload)
 
         // We expect an array here, so if it isn't, we can't continue
         if (!Array.isArray(payload)) {
@@ -64,8 +63,10 @@ export const useDeviceStore = defineStore('device', {
 
         this.loaded = true
         this.loading = false
+        this.ready = true
       }).catch((err) => {
         this.loading = false
+        this.ready = false
         console.error(`Can't fetch devices`, err)
       })
     },

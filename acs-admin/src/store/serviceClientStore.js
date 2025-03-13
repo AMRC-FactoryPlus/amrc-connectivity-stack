@@ -14,6 +14,7 @@ export const useServiceClientStore = defineStore('service-client', {
       scheme: null,
       baseUrl: null,
       urls: {},
+      ready: false,
     }
   },
   actions: {
@@ -36,6 +37,8 @@ export const useServiceClientStore = defineStore('service-client', {
         })
 
         client.Fetch.cache = 'reload';
+
+        this.ready = true
 
       })
 

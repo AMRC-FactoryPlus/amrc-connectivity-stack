@@ -12,7 +12,7 @@
   <Sheet :open="selectedPermission !== null" @update:open="e => !e ? selectedPermission = null : null">
     <PermissionManagementSidebar :permission="selectedPermission" @objectClick="e => objectClicked(e.original)"></PermissionManagementSidebar>
   </Sheet>
-  <Tabs @update:modelValue="e => currentTab = e" :default-value="defaultTab">
+  <Tabs @update:modelValue="changeTab" :default-value="activeTab">
     <div class="flex items-center justify-between gap-2">
       <TabsList class="mb-6">
         <TabsTrigger value="principals">
@@ -53,6 +53,7 @@ import { usePermissionStore } from '@store/usePermissionStore.js'
 import { UUIDs } from '@amrc-factoryplus/service-client'
 import LinkUserDialog from '@pages/AccessControl/LinkUserDialog.vue'
 import {useGrantStore} from "@store/useGrantStore.js";
+import {useRoute, useRouter} from "vue-router";
 
 export default {
   name: 'AccessControl',
@@ -64,6 +65,8 @@ export default {
       ps: usePermissionStore(),
       g: useGroupStore(),
       grants: useGrantStore(),
+      router: useRouter(),
+      route: useRoute()
     }
   },
 
@@ -147,6 +150,30 @@ export default {
       this.selectedPrincipal = null
       this.selectedGroup = null
       this.selectedPermission = permission
+    },
+    changeTab (newTab) {
+      this.currentTab = newTab
+      this.router.push({ path: `/access-control/${newTab}` })
+    },
+  },
+
+  watch: {
+    routeTab: {
+      handler (newTab) {
+        if (!newTab) {
+          this.router.replace({path: `/access-control/principals`})
+        }
+      },
+      immediate: true,
+    },
+  },
+
+  computed: {
+    routeTab () {
+      return this.route.params.tab
+    },
+    activeTab () {
+      return this.route.params.tab || 'principals'
     }
   },
 
@@ -163,12 +190,8 @@ export default {
   },
 
   data () {
-
-    const defaultTab = 'principals'
-
     return {
-      defaultTab: defaultTab,
-      currentTab: defaultTab,
+      currentTab: this.activeTab,
       selectedPrincipal: null,
       selectedGroup: null,
       selectedPermission: null,

@@ -36,7 +36,7 @@ const routes = [
     },
   },
   {
-    path: '/access-control',
+    path: '/access-control/:tab?/:selected?',
     component: AccessControl,
     meta: {
       name: 'Access Control',

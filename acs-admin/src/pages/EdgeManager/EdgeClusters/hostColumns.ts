@@ -1,10 +1,9 @@
 /*
- * Copyright (c) University of Sheffield AMRC 2024.
+ * Copyright (c) University of Sheffield AMRC 2025.
  */
 
 import type {ColumnDef} from '@tanstack/vue-table'
 import {h} from 'vue'
-import {Badge} from '@/components/ui/badge'
 
 import DataTableColumnHeader from '@/components/ui/data-table/DataTableColumnHeader.vue'
 

@@ -37,6 +37,9 @@ spec:
     - grafana.{{ .Values.acs.baseUrl}}
     - manager.{{ .Values.acs.baseUrl}}
     - mqtt.{{ .Values.acs.baseUrl}}
+    {{- range .Values.acs.letsEncrypt.additionalDnsNames }}
+    - {{ . }}
+    {{- end }}
   issuerRef:
     name: letsencrypt
     kind: Issuer

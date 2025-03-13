@@ -4,7 +4,7 @@
 
 <template>
   <EdgeContainer>
-    <div v-if="loadingDetails">LOADING</div>
+    <EdgePageSkeleton v-if="loadingDetails"/>
     <div v-else class="flex flex-col gap-4">
       <Card>
         <CardHeader>
@@ -75,6 +75,7 @@ import { useServiceClientStore } from '@store/serviceClientStore.js'
 import { UUIDs } from '@amrc-factoryplus/service-client'
 import { useNodeStore } from '@store/useNodeStore.js'
 import EdgeContainer from '@components/Containers/EdgeContainer.vue'
+import EdgePageSkeleton from '@components/EdgeManager/EdgePageSkeleton.vue'
 import PermissionList from '@pages/AccessControl/Permissions/PermissionList.vue'
 import PrincipalList from '@pages/AccessControl/PrincipalList.vue'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -116,6 +117,7 @@ export default {
     CardTitle,
     CardHeader,
     Copyable,
+    EdgePageSkeleton
   },
 
   setup () {

@@ -113,6 +113,7 @@ export default {
         case "b419cbc2-ab0f-4311-bd9e-f0591f7e88cb": // Service role
         case "3ba1d68e-ccf5-11ef-82d9-ef32470538b1": // Edge role
         case "1c567e3c-5519-4418-8682-6086f22fbc13": // Composite permission
+        case "b7f0c2f4-ccf5-11ef-be77-777cd4e8cb41": // Service permission set
           if (!object.members) {
             object.members = await this.g.getMembers(object)
           }

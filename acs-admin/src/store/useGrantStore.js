@@ -13,20 +13,6 @@ export const useGrantStore = defineStore('grant', {
     loading: false,
   }),
   actions: {
-
-    async getMembers (group) {
-      // Wait until the store is ready before attempting to fetch data
-      await storeReady();
-
-      // Let's get the list of group members
-      try {
-        const groupMembersResponse = await useServiceClientStore().client.ConfigDB.fetch(`v2/class/${group.uuid}/member`)
-        return groupMembersResponse[1]
-      } catch(err) {
-        console.error(`Can't read group members`, err)
-      }
-    },
-
     async fetch () {
       this.loading = true
 

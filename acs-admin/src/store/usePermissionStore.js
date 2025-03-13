@@ -13,6 +13,50 @@ export const usePermissionStore = defineStore('permission', {
     loading: false,
   }),
   actions: {
+    async getPermission (uuid) {
+      const existingPermission = this.data.find(item => item.uuid === uuid) ?? null
+      if (existingPermission) return existingPermission
+
+      const permission = {
+        uuid
+      }
+      try {
+        let permissionObjectResponse = await useServiceClientStore().client.ConfigDB.get_config(UUIDs.App.Info, uuid);
+        permission.name = permissionObjectResponse.name
+      }
+      catch (err) {
+        console.error(`Can't read permission details`, err)
+      }
+      try {
+        let permissionObjectResponse = await useServiceClientStore().client.ConfigDB.get_config(UUIDs.App.Registration, uuid);
+        if (!permissionObjectResponse) {
+          console.error(`Can't read permission class details for:`, uuid)
+          permission.class = {
+            name: "UNKNOWN"
+          }
+        }
+        let classUUID = permissionObjectResponse.class
+        try {
+          let classObjectResponse = await useServiceClientStore().client.ConfigDB.get_config(UUIDs.App.Info, classUUID);
+          let className = classObjectResponse.name
+          permission.class = {
+            uuid: classUUID,
+            name: className
+          }
+        } catch (err) {
+          console.error(`Can't read permission class details for:`, uuid, err)
+          permission.class = {
+            name: "UNKNOWN"
+          }
+        }
+      } catch(err) {
+        console.error(`Can't read permission class details for:`, uuid, err)
+        permission.class = {
+          name: "UNKNOWN"
+        }
+      }
+      return permission
+    },
 
     async fetch () {
       this.loading = true
@@ -28,66 +72,7 @@ export const usePermissionStore = defineStore('permission', {
         }
 
         // Fill in the permission names
-        const permissionsWithNames = await Promise.all(permissionListResponse[1].map(async (permissionsUUID) => {
-          try {
-            let permissionObjectResponse = await useServiceClientStore().client.ConfigDB.get_config(UUIDs.App.Info, permissionsUUID);
-            return {
-              uuid: permissionsUUID,
-              name: permissionObjectResponse.name
-            }
-          }
-          catch (err) {
-            console.error(`Can't read permission details`, err)
-            return {
-              uuid: permissionsUUID,
-              name: ""
-            }
-          }
-        }))
-
-        // Fill in the permission classes
-        this.data = await Promise.all(permissionsWithNames.map(async (existingPermission) => {
-          try {
-            let permissionObjectResponse = await useServiceClientStore().client.ConfigDB.get_config(UUIDs.App.Registration, existingPermission.uuid);
-            if (!permissionObjectResponse) {
-              console.error(`Can't read permission class details for:`, existingPermission.uuid)
-              return {
-                ...existingPermission,
-                class: {
-                  name: "UNKNOWN"
-                }
-              }
-            }
-            let classUUID = permissionObjectResponse.class
-            try {
-              let classObjectResponse = await useServiceClientStore().client.ConfigDB.get_config(UUIDs.App.Info, classUUID);
-              let className = classObjectResponse.name
-              return {
-                ...existingPermission,
-                class: {
-                  uuid: classUUID,
-                  name: className
-                }
-              }
-            } catch (err) {
-              console.error(`Can't read permission class details for:`, existingPermission.uuid, err)
-              return {
-                ...existingPermission,
-                class: {
-                  name: "UNKNOWN"
-                }
-              }
-            }
-          } catch(err) {
-            console.error(`Can't read permission class details for:`, existingPermission.uuid, err)
-            return {
-              ...existingPermission,
-              class: {
-                name: "UNKNOWN"
-              }
-            }
-          }
-        }))
+        this.data = await Promise.all(permissionListResponse[1].map(async (permissionUUID) => this.getPermission(permissionUUID)))
 
         this.loading = false
       }).catch((err) => {

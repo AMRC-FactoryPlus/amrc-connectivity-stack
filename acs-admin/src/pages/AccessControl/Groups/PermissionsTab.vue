@@ -91,14 +91,12 @@ export default {
 
       const rv = []
       for (const entry of filteredList) {
+        const permission = await this.p.getPermission(entry.permission)
         const permissionName = this.p.data.find(v => v.uuid === entry.permission)?.name ?? await name(entry.permission)
         const targetName     = await name(entry.target)
 
         rv.push({
-          permission: {
-            uuid: entry.permission,
-            name: permissionName,
-          },
+          permission,
           target: {
             uuid: entry.target,
             name: targetName,

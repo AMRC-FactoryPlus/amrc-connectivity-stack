@@ -49,7 +49,14 @@ export const useGroupStore = defineStore('group', {
           this.loading = false
           return
         }
-        const allGroups = roles.concat(compositePermissions)
+        const servicePermissionSetResponse = await useServiceClientStore().client.ConfigDB.fetch(`v2/class/b7f0c2f4-ccf5-11ef-be77-777cd4e8cb41/member`)
+        const servicePermissionSet = servicePermissionSetResponse[1]
+        // Check if the return object is an array and if not, return
+        if (!Array.isArray(servicePermissionSet)) {
+          this.loading = false
+          return
+        }
+        const allGroups = roles.concat(compositePermissions).concat(servicePermissionSet)
 
         // Make a fetch call for each group to get details, and then one
         // to get all members of the group

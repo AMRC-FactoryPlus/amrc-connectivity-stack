@@ -76,9 +76,9 @@ const api = await new WebAPI({
     
 const notify = new AuthNotify({
     api, data,
-    log:    fplus.debug.bound("notify"),
+    debug:      fplus.debug,
 });
 
 data.run();
-api.run();
 notify.run();
+api.run();

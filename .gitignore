@@ -2,5 +2,6 @@
 config.mk
 */config.mk
 */.npm_install_done
-.vscode
+.vscode/
 node_modules/
+.prettierrc

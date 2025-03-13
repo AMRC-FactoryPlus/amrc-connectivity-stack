@@ -27,7 +27,7 @@
   "dependencies": {
     "@influxdata/influxdb-client": "^1.33.2",
     "@influxdata/influxdb-client-apis": "^1.33.2",
-    "@amrc-factoryplus/service-client": "^1.3.6",
+    "@amrc-factoryplus/service-client": "1.3.6",
     "gssapi.js": "^2.0.1",
     "async": "^3.2.4",
     "long": "^5.2.3",

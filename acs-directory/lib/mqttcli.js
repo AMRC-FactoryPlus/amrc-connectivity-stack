@@ -1,20 +1,16 @@
 /*
- * Factory+ / AMRC Connectivity Stack (ACS) Directory component service
- * MQTT client connection
- * Copyright 2021 AMRC
+ * Copyright (c) University of Sheffield AMRC 2025.
  */
 
-import timers from "timers/promises";
-import async from "async";
-import Long from "long";
+import timers from 'timers/promises'
+import async from 'async'
+import Long from 'long'
 
-import {
-    Address, Debug, 
-    MetricBranch, MetricBuilder, MetricTree, 
-    SpB, Topic, UUIDs
-} from "@amrc-factoryplus/utilities";
-import { Device_Info } from "./constants.js";
-import { Schema } from "./uuids.js";
+import { Address, SpB, Topic, UUIDs } from '@amrc-factoryplus/utilities'
+import { MetricBranch, MetricBuilder } from '@amrc-factoryplus/service-client'
+
+import { Device_Info } from './constants.js'
+import { Schema } from './uuids.js'
 
 function sym_diff(one, two) {
     const diff = new Set(one);

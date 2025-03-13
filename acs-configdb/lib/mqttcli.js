@@ -1,12 +1,11 @@
 /*
- * Factory+ / AMRC Connectivity Stack (ACS) Config Store component
- * MQTT client connection
- * Copyright 2022 AMRC
+ * Copyright (c) University of Sheffield AMRC 2025.
  */
 
-import {Address, Debug, MetricBuilder, SpB, Topic, UUIDs} from "@amrc-factoryplus/utilities";
+import { Address, Debug, SpB, Topic, UUIDs } from '@amrc-factoryplus/utilities'
+import { MetricBuilder } from '@amrc-factoryplus/service-client'
 
-import {Device_Info, Schema, Service} from "./constants.js";
+import { Device_Info, Schema, Service } from './constants.js'
 
 const Changed = {
     app: "Application",

@@ -166,6 +166,7 @@ export default {
         const targetClass      = await classGet(entry.target)
 
         rv.push({
+          uuid: entry.uuid,
           permission: {
             uuid: entry.permission,
             name: permissionName,
@@ -192,12 +193,23 @@ export default {
     },
     async updateData () {
       this.s.client.Fetch.cache = 'reload'
+      await this.grants.fetch()
       await this.fetchSpecificPermissions()
       this.s.client.Fetch.cache = 'default'
     },
     async addEntry (principal, permission, target) {
       try {
-        await this.s.client.Auth.add_ace(principal.uuid, permission.uuid, target.uuid)
+        // await this.s.client.Auth.add_ace(principal.uuid, permission.uuid, target.uuid)
+        await this.s.client.Auth.fetch({
+          method: "POST",
+          url: "v2/grant",
+          body: {
+            principal: principal.uuid,
+            permission: permission.uuid,
+            target: target.uuid,
+            plural: false
+          }
+        })
         toast.success(`${this.principal.name} has been granted ${permission.name} on ${target.name}`)
       }
       catch (err) {

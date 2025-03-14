@@ -10,6 +10,7 @@ import DataTableColumnHeader from '@/components/ui/data-table/DataTableColumnHea
 import PermissionDropdown from "./PermissionDropdown.vue";
 
 export interface Permission {
+    uuid: string,
     permission: {
         uuid: string,
         name: string,

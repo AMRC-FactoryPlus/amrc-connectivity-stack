@@ -5,7 +5,7 @@
 import { defineStore } from 'pinia'
 import { useServiceClientStore } from '@/store/serviceClientStore.js'
 import { UUIDs } from '@amrc-factoryplus/service-client'
-import { storeReady } from '@store/useStoreReady.js'
+import { serviceClientReady } from '@store/useServiceClientReady.js'
 
 export const useGrantStore = defineStore('grant', {
   state: () => ({
@@ -17,7 +17,7 @@ export const useGrantStore = defineStore('grant', {
       this.loading = true
 
       // Wait until the store is ready before attempting to fetch data
-      await storeReady();
+      await serviceClientReady();
 
       this.data = []
       try {

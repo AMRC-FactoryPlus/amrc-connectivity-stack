@@ -5,7 +5,7 @@
 import { defineStore } from 'pinia'
 import { useServiceClientStore } from '@/store/serviceClientStore.js'
 import { UUIDs } from '@amrc-factoryplus/service-client'
-import { storeReady } from '@store/useStoreReady.js'
+import { serviceClientReady } from '@store/useServiceClientReady.js'
 
 export const useGroupStore = defineStore('group', {
   state: () => ({
@@ -16,7 +16,7 @@ export const useGroupStore = defineStore('group', {
 
     async getMembers (group) {
       // Wait until the store is ready before attempting to fetch data
-      await storeReady();
+      await serviceClientReady();
 
       // Let's get the list of group members
       try {
@@ -31,7 +31,7 @@ export const useGroupStore = defineStore('group', {
       this.loading = true
 
       // Wait until the store is ready before attempting to fetch data
-      await storeReady();
+      await serviceClientReady();
 
       this.data = []
       try {

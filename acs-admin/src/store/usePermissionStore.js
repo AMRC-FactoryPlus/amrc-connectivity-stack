@@ -5,7 +5,7 @@
 import { defineStore } from 'pinia'
 import { useServiceClientStore } from '@/store/serviceClientStore.js'
 import { UUIDs } from '@amrc-factoryplus/service-client'
-import { storeReady } from '@store/useStoreReady.js'
+import { serviceClientReady } from '@store/useServiceClientReady.js'
 
 export const usePermissionStore = defineStore('permission', {
   state: () => ({
@@ -62,7 +62,7 @@ export const usePermissionStore = defineStore('permission', {
       this.loading = true
 
       // Wait until the store is ready before attempting to fetch data
-      await storeReady();
+      await serviceClientReady();
 
       useServiceClientStore().client.ConfigDB.fetch(`/v1/class/${UUIDs.Class.Permission}`).then(async (permissionListResponse) => {
 

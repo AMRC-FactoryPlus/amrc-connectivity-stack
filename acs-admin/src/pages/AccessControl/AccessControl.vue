@@ -54,7 +54,7 @@ import { UUIDs } from '@amrc-factoryplus/service-client'
 import LinkUserDialog from '@pages/AccessControl/LinkUserDialog.vue'
 import {useGrantStore} from "@store/useGrantStore.js";
 import {useRoute, useRouter} from "vue-router";
-import {storeReady} from "@store/useStoreReady.js";
+import {serviceClientReady} from "@store/useServiceClientReady.js";
 
 export default {
   name: 'AccessControl',
@@ -95,7 +95,7 @@ export default {
       }
     },
     async uuidSelected (uuid) {
-      await storeReady()
+      await serviceClientReady()
       await this.objectSelected({uuid})
     },
     async objectSelected (object) {

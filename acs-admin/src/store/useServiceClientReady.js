@@ -4,7 +4,7 @@
 
 import { useServiceClientStore } from '@/store/serviceClientStore.js'
 
-export const storeReady = async () => {
+export const serviceClientReady = async () => {
   const serviceClientStore = useServiceClientStore();
 
   while (!serviceClientStore.client) {

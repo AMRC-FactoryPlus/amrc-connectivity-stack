@@ -18,6 +18,7 @@
         <DataTableSearchable :selected-objects="modelValue" v-if="columns" :data="storeData" :search-key="titleKey" :columns="columns" :limit-height="true" :filters="[]">
           <template #default="slotProps">
             <div class="flex items-center justify-center gap-2">
+              <div class="whitespace-nowrap mr-4">{{slotProps.selectedObjects.length}} of {{storeData.length}} selected</div>
               <slot name="actions"></slot>
               <Button :disabled="!slotProps.selectedObjects.length"
                   @click="() => {$emit('update:modelValue', slotProps.selectedObjects); updateOpen(false)}">

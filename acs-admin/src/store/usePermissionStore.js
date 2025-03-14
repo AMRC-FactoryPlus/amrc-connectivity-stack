@@ -86,20 +86,30 @@ export const usePermissionStore = defineStore('permission', {
       // Wait until the store is ready before attempting to fetch data
       await serviceClientReady();
 
-      useServiceClientStore().client.ConfigDB.fetch(`/v1/class/${UUIDs.Class.Permission}`).then(async (permissionListResponse) => {
-
-        if (!Array.isArray(permissionListResponse[1])) {
+      try {
+        const permissionResponse = await useServiceClientStore().client.ConfigDB.fetch(`/v1/class/${UUIDs.Class.Permission}`)
+        const permissions = permissionResponse[1]
+        // Check if the return object is an array and if not, return
+        if (!Array.isArray(permissions)) {
           this.loading = false
           return
         }
+        const servicePermissionSetResponse = await useServiceClientStore().client.ConfigDB.fetch(`v2/class/b7f0c2f4-ccf5-11ef-be77-777cd4e8cb41/member`)
+        const servicePermissionSet = servicePermissionSetResponse[1]
+        // Check if the return object is an array and if not, return
+        if (!Array.isArray(servicePermissionSet)) {
+          this.loading = false
+          return
+        }
+        const allPermissions = permissions.concat(servicePermissionSet)
 
         // Fill in the permission names
-        this.data = await Promise.all(permissionListResponse[1].map(async (permissionUUID) => this.fetchPermission(permissionUUID)))
+        this.data = await Promise.all(allPermissions.map(async (permissionUUID) => this.fetchPermission(permissionUUID)))
 
         this.loading = false
-      }).catch((err) => {
-        console.error(`Can't read principals`, err)
-      })
+      } catch (err) {
+        console.error(`Can't read permissions`, err)
+      }
     },
   },
 })

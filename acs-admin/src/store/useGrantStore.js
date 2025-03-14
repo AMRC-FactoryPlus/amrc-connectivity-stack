@@ -55,7 +55,7 @@ export const useGrantStore = defineStore('grant', {
 
         this.loading = false
       } catch (err){
-        console.error(`Can't read groups`, err)
+        console.error(`Can't read grants`, err)
       }
     },
   },

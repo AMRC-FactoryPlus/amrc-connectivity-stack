@@ -13,18 +13,21 @@
     <PermissionManagementSidebar :permission="selectedPermission" @objectClick="e => objectClicked(e.original)"></PermissionManagementSidebar>
   </Sheet>
   <Tabs @update:modelValue="changeTab" :default-value="activeTab">
-    <div class="flex items-center justify-between gap-2">
-      <TabsList class="mb-6">
-        <TabsTrigger value="principals">
-          Principals
-        </TabsTrigger>
-        <TabsTrigger value="groups">
-          Groups
-        </TabsTrigger>
-        <TabsTrigger value="permissions">
-          Permissions
-        </TabsTrigger>
-      </TabsList>
+    <div class="flex items-center justify-between gap-2 mb-6">
+      <div class="flex gap-2 items-center">
+        <TabsList>
+          <TabsTrigger value="principals">
+            Principals
+          </TabsTrigger>
+          <TabsTrigger value="groups">
+            Groups
+          </TabsTrigger>
+          <TabsTrigger value="permissions">
+            Permissions
+          </TabsTrigger>
+        </TabsList>
+        <div v-if="p.loading || ps.loading || g.loading || grants.loading"><i class="fa-solid fa-circle-notch animate-spin"></i></div>
+      </div>
       <LinkUserDialog v-if="activeTab==='principals'"/>
     </div>
     <TabsContent value="principals">

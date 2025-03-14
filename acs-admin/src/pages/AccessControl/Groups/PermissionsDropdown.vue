@@ -49,14 +49,14 @@ function handleDelete() {
           method: "DELETE",
           url: `v2/grant/${props.row.original.uuid}`
         })
-        toast.success(`${props.row.original.permission.name} on ${props.row.original.target.name} has been revoked from ${props.row.original.principal.name}`)
+        toast.success(`${props.row.original.permission.name} on ${props.row.original.target.name} has been revoked from ${props.row.original.group.name}`)
         s.client.Fetch.cache = "reload"
         // Jetbrains doesn't understand this, but it works
         await permissionMembershipUpdated()
         s.client.Fetch.cache = "default"
       } catch(err) {
-        toast.error(`Unable to revoke ${props.row.original.permission.name} on ${props.row.original.target.name} from ${props.row.original.principal.name}`)
-        console.error(`Unable to revoke ${props.row.original.permission.name} on ${props.row.original.target.name} from ${props.row.original.principal.name}`, err)
+        toast.error(`Unable to revoke ${props.row.original.permission.name} on ${props.row.original.target.name} from ${props.row.original.group.name}`)
+        console.error(`Unable to revoke ${props.row.original.permission.name} on ${props.row.original.target.name} from ${props.row.original.group.name}`, err)
       }
     }
   });

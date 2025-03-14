@@ -19,7 +19,39 @@
         </div>
       </Alert>
     </template>
+    <template #below-toolbar>
+      <ObjectSelector
+          v-model="permissionsToAdd"
+          v-model:open="isPermissionSelectorOpen"
+          :store-data="p.data"
+          title="Select Permissions"
+          subtitle="Select permissions which the group should be granted, targets can be selected next"
+          detail-header="UUID"
+          detail-key="uuid"
+          title-header="Name"
+          title-key="name"
+          confirm-text="Choose Targets"
+          confirm-icon="arrow-right-long"
+      >
+        <Button>Grant Permissions</Button>
+      </ObjectSelector>
+    </template>
   </DataTable>
+  <ObjectSelector
+      v-model:open="isTargetSelectorOpen"
+      v-model="targetsToAdd"
+      :store-data="g.data"
+      title="Select Targets"
+      :subtitle="targetsSubtitle"
+      detail-header="UUID"
+      detail-key="uuid"
+      title-header="Name"
+      title-key="name"
+  >
+    <template #actions>
+      <Button @click="isTargetSelectorOpen = false; isPermissionSelectorOpen = true"><i class="fa-solid fa-arrow-left-long"></i> &nbsp; Return to Permissions</Button>
+    </template>
+  </ObjectSelector>
 </template>
 
 <script>
@@ -31,6 +63,10 @@ import { usePermissionStore } from "@store/usePermissionStore.js";
 import { UUIDs } from "@amrc-factoryplus/service-client";
 import { useServiceClientStore } from "@store/serviceClientStore.js";
 import {useGrantStore} from "@store/useGrantStore.js";
+import {Button} from "@components/ui/button/index.js";
+import {defineAsyncComponent} from "vue";
+import {toast} from "vue-sonner";
+import {useGroupStore} from "@store/useGroupStore.js";
 
 export default {
   emits: ['objectClick'],
@@ -38,8 +74,9 @@ export default {
   setup () {
     return {
       columns,
-      p: usePermissionStore(),
       s: useServiceClientStore(),
+      p: usePermissionStore(),
+      g: useGroupStore(),
       grants: useGrantStore()
     }
   },
@@ -52,11 +89,13 @@ export default {
   },
 
   components: {
+    Button,
     DataTable,
     Skeleton,
     Alert,
     AlertTitle,
     AlertDescription,
+    ObjectSelector: defineAsyncComponent(() => import('@components/ObjectSelector/ObjectSelector.vue')),
   },
 
   props: {
@@ -77,6 +116,37 @@ export default {
       },
       immediate: true,
     },
+
+    permissionsToAdd: async function (val, oldVal) {
+      if (!val.length) {
+        this.isTargetSelectorOpen = false
+        return
+      }
+
+      this.isTargetSelectorOpen = true
+    },
+
+    targetsToAdd: async function (val, oldVal) {
+      if (!val.length) {
+        this.permissionsToAdd = []
+        return
+      }
+
+      console.log(this.permissionsToAdd)
+      console.log(val)
+      for (const permission of this.permissionsToAdd) {
+        for (const target of val) {
+          await this.addEntry(this.group, permission, target)
+        }
+      }
+      await this.updateData()
+    },
+  },
+
+  computed: {
+    targetsSubtitle () {
+      return `Select targets for which the selected permission should be granted: ${this.permissionsToAdd.map(p => p.name).join(', ')}`
+    },
   },
 
   methods: {
@@ -95,6 +165,7 @@ export default {
         const targetName     = await name(entry.target)
 
         rv.push({
+          uuid: entry.uuid,
           permission,
           target: {
             uuid: entry.target,
@@ -113,12 +184,36 @@ export default {
       await this.fetchSpecificPermissions()
       this.s.client.Fetch.cache = 'default'
     },
+    async addEntry (group, permission, target) {
+      try {
+        // await this.s.client.Auth.add_ace(group.uuid, permission.uuid, target.uuid)
+        await this.s.client.Auth.fetch({
+          method: "POST",
+          url: "v2/grant",
+          body: {
+            principal: group.uuid,
+            permission: permission.uuid,
+            target: target.uuid,
+            plural: true
+          }
+        })
+        toast.success(`${this.group.name} has been granted ${permission.name} on ${target.name}`)
+      }
+      catch (err) {
+        toast.error(`Unable to grant ${permission.name} to ${this.group.name} on ${target.name}`)
+        console.error(`Unable to grant ${permission.name} to ${this.group.name} on ${target.name}`, err)
+      }
+    },
   },
 
   data () {
     return {
       loading: false,
-      permissions: []
+      permissions: [],
+      permissionsToAdd: [],
+      targetsToAdd: [],
+      isPermissionSelectorOpen: false,
+      isTargetSelectorOpen: false,
     }
   },
 

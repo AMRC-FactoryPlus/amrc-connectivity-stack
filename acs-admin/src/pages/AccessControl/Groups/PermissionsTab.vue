@@ -109,6 +109,7 @@ export default {
     },
     async updateData () {
       this.s.client.Fetch.cache = 'reload'
+      await this.grants.fetch()
       await this.fetchSpecificPermissions()
       this.s.client.Fetch.cache = 'default'
     },

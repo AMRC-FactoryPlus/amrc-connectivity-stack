@@ -5,6 +5,7 @@
 import { defineStore } from 'pinia'
 import { useServiceClientStore } from '@/store/serviceClientStore.js'
 import {UUIDs} from "@amrc-factoryplus/service-client";
+import {serviceClientReady} from "@store/useServiceClientReady.js";
 
 export const usePrincipalStore = defineStore('principal', {
   state: () => ({
@@ -14,6 +15,10 @@ export const usePrincipalStore = defineStore('principal', {
   actions: {
     async fetch () {
       this.loading = true
+
+      // Wait until the store is ready before attempting to fetch data
+      await serviceClientReady();
+
       try {
         const principalResponse = await useServiceClientStore().client.Auth.fetch('v2/principal')
 

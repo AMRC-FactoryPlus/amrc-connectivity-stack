@@ -104,7 +104,7 @@ export default {
       if (object.class) {
         classUUID = object.class.uuid
       } else {
-        let principalObjectResponse = await this.s.client.ConfigDB.get_config(UUIDs.App.Registration, object.uuid);
+        const principalObjectResponse = await this.s.client.ConfigDB.get_config(UUIDs.App.Registration, object.uuid);
         classUUID = principalObjectResponse.class
       }
 
@@ -130,7 +130,7 @@ export default {
         case "1c567e3c-5519-4418-8682-6086f22fbc13": // Composite permission
         case "b7f0c2f4-ccf5-11ef-be77-777cd4e8cb41": // Service permission set
           if (!object.members) {
-            object.members = await this.g.getMembers(object)
+            object.members = await this.g.fetchMembers(object)
           }
           this.selectGroup(object)
           break;
@@ -144,13 +144,13 @@ export default {
           // TODO: Likely some missing UUIDs here. Git Repo??
       }
     },
-    selectPrincipal (principal) {
+    async selectPrincipal (principal) {
       this.selectedGroup = null
       this.selectedPermission = null
       if (principal.kerberos) {
         this.selectedPrincipal = principal
       } else {
-        this.selectedPrincipal = this.p.data.find(p => p.uuid === principal.uuid)
+        this.selectedPrincipal = await this.p.getPrincipal(principal.uuid)
       }
     },
     selectGroup (group) {

@@ -4,7 +4,6 @@
 
 import { defineStore } from 'pinia'
 import { useServiceClientStore } from '@/store/serviceClientStore.js'
-import { UUIDs } from '@amrc-factoryplus/service-client'
 import { serviceClientReady } from '@store/useServiceClientReady.js'
 
 export const useGrantStore = defineStore('grant', {
@@ -13,6 +12,32 @@ export const useGrantStore = defineStore('grant', {
     loading: false,
   }),
   actions: {
+    async storeReady () {
+      await serviceClientReady()
+
+      while (this.loading) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    },
+    /* Only meant to be internal */
+    async fetchGrant(uuid) {
+      const grantResponse = await useServiceClientStore().client.Auth.fetch(`v2/grant/${uuid}`)
+      return grantResponse[1];
+    },
+    async getGrant(uuid) {
+      await this.storeReady()
+
+      const existingGrant = this.data.find(item => item.uuid === uuid) ?? null
+      if (existingGrant) return existingGrant
+
+      useServiceClientStore().client.Fetch.cache = 'reload'
+      await this.fetch()
+      useServiceClientStore().client.Fetch.cache = 'reload'
+
+      // Give it another try
+      const existingGrant2 = this.data.find(item => item.uuid === uuid) ?? null
+      if (existingGrant2) return existingGrant2
+    },
     async fetch () {
       this.loading = true
 
@@ -26,12 +51,7 @@ export const useGrantStore = defineStore('grant', {
           return
         }
         const grantUUIDs = grantUUIDsResponse[1]
-        this.data = await Promise.all(
-            grantUUIDs.map(async uuid => {
-              const grantResponse = await useServiceClientStore().client.Auth.fetch(`v2/grant/${uuid}`)
-              return grantResponse[1];
-            })
-        )
+        this.data = await Promise.all(grantUUIDs.map(async uuid => this.fetchGrant(uuid)))
 
         this.loading = false
       } catch (err){

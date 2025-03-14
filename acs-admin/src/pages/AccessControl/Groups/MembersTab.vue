@@ -122,7 +122,7 @@ export default {
       this.s.client.Fetch.cache = "default"
       let members = groupMembersResponse[1]
       this.members = await Promise.all(members.map(async (memberUUID) => {
-        let obj = this.p.data.find(v => v.uuid === memberUUID)
+        let obj = await this.p.getPrincipal(memberUUID)
         if (obj && (obj.name || obj.kerberos)) {
           return {
             uuid: memberUUID,

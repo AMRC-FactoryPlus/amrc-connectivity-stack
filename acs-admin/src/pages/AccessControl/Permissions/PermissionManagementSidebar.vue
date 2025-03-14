@@ -65,10 +65,17 @@ export default {
     GroupsTab
   },
 
-  computed: {
-    permissionDetails () {
-      return this.permission ? this.p.data.find(item => item.uuid === this.permission.uuid) : null
-    }
+  watch: {
+    permission: {
+      async handler(newPermission) {
+        if (!newPermission) {
+          this.permissionDetails = null
+          return;
+        }
+        this.permissionDetails = await this.p.getPermission(this.permission.uuid)
+      },
+      immediate: true,
+    },
   },
 
   props: {
@@ -77,5 +84,11 @@ export default {
       default: null,
     },
   },
+
+  data() {
+    return {
+      permissionDetails: null,
+    }
+  }
 }
 </script>

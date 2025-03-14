@@ -13,8 +13,58 @@ export const useGroupStore = defineStore('group', {
     loading: false,
   }),
   actions: {
+    async storeReady () {
+      await serviceClientReady()
 
-    async getMembers (group) {
+      while (this.loading) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    },
+    /* Only meant to be internal */
+    async fetchGroup(uuid) {
+      let groupDetails = {
+        uuid,
+      }
+
+      // Let's get the name of the group
+      try {
+        let groupObjectResponse = await useServiceClientStore().client.ConfigDB.get_config(UUIDs.App.Info, uuid)
+        groupDetails.name = groupObjectResponse.name
+      } catch (err) {
+        console.error(`Can't read group details`, err)
+      }
+
+      // Let's get the class of the group
+      try {
+        let groupRegistrationResponse = await useServiceClientStore().client.ConfigDB.get_config(UUIDs.App.Registration, uuid);
+        let classUUID = groupRegistrationResponse.class
+        try {
+          let classObjectResponse = await useServiceClientStore().client.ConfigDB.get_config(UUIDs.App.Info, classUUID);
+          let className = classObjectResponse.name
+          groupDetails.class = {
+            uuid: classUUID,
+            name: className
+          }
+        } catch (err) {
+          console.error(`Can't read group class details`, err)
+          groupDetails.class = {
+            uuid: classUUID
+          }
+        }
+      } catch(err) {
+        console.error(`Can't read group class details`, err)
+      }
+
+      // Let's get the list of group members
+      try {
+        groupDetails.members = await this.fetchMembers(groupDetails)
+      } catch(err) {
+        console.error(`Can't read group members`, err)
+      }
+
+      return groupDetails
+    },
+    async fetchMembers (group) {
       // Wait until the store is ready before attempting to fetch data
       await serviceClientReady();
 
@@ -26,7 +76,20 @@ export const useGroupStore = defineStore('group', {
         console.error(`Can't read group members`, err)
       }
     },
+    async getGroup(uuid) {
+      await this.storeReady()
 
+      const existingGroup = this.data.find(item => item.uuid === uuid) ?? null
+      if (existingGroup) return existingGroup
+
+      useServiceClientStore().client.Fetch.cache = 'reload'
+      await this.fetch()
+      useServiceClientStore().client.Fetch.cache = 'reload'
+
+      // Give it another try
+      const existingGroup2 = this.data.find(item => item.uuid === uuid) ?? null
+      if (existingGroup2) return existingGroup2
+    },
     async fetch () {
       this.loading = true
 
@@ -61,46 +124,7 @@ export const useGroupStore = defineStore('group', {
         // Make a fetch call for each group to get details, and then one
         // to get all members of the group
         for (const uuid of allGroups) {
-          let groupDetails = {
-            uuid: uuid,
-          }
-
-          // Let's get the name of the group
-          try {
-            let groupObjectResponse = await useServiceClientStore().client.ConfigDB.get_config(UUIDs.App.Info, uuid)
-            groupDetails.name = groupObjectResponse.name
-          } catch (err) {
-            console.error(`Can't read group details`, err)
-          }
-
-          // Let's get the class of the group
-          try {
-            let groupRegistrationResponse = await useServiceClientStore().client.ConfigDB.get_config(UUIDs.App.Registration, uuid);
-            let classUUID = groupRegistrationResponse.class
-            try {
-              let classObjectResponse = await useServiceClientStore().client.ConfigDB.get_config(UUIDs.App.Info, classUUID);
-              let className = classObjectResponse.name
-              groupDetails.class = {
-                uuid: classUUID,
-                name: className
-              }
-            } catch (err) {
-              console.error(`Can't read group class details`, err)
-              groupDetails.class = {
-                uuid: classUUID
-              }
-            }
-          } catch(err) {
-            console.error(`Can't read group class details`, err)
-          }
-
-          // Let's get the list of group members
-          try {
-            groupDetails.members = await this.getMembers(groupDetails)
-          } catch(err) {
-            console.error(`Can't read group members`, err)
-          }
-
+          const groupDetails = await this.fetchGroup(uuid)
           this.data.push(groupDetails)
         }
 

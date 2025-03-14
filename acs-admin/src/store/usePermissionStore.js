@@ -13,10 +13,15 @@ export const usePermissionStore = defineStore('permission', {
     loading: false,
   }),
   actions: {
-    async getPermission (uuid) {
-      const existingPermission = this.data.find(item => item.uuid === uuid) ?? null
-      if (existingPermission) return existingPermission
+    async storeReady () {
+      await serviceClientReady()
 
+      while (this.loading) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    },
+    /* Only meant to be internal */
+    async fetchPermission (uuid) {
       const permission = {
         uuid
       }
@@ -57,7 +62,24 @@ export const usePermissionStore = defineStore('permission', {
       }
       return permission
     },
+    async getPermission (uuid) {
+      await this.storeReady()
 
+      const existingPermission = this.data.find(item => item.uuid === uuid) ?? null
+      if (existingPermission) return existingPermission
+
+      useServiceClientStore().client.Fetch.cache = 'reload'
+      await this.fetch()
+      useServiceClientStore().client.Fetch.cache = 'reload'
+
+      const existingPermission2 = this.data.find(item => item.uuid === uuid) ?? null
+      if (existingPermission2) return existingPermission2
+
+      return {
+        uuid,
+        name: "UNKNOWN"
+      }
+    },
     async fetch () {
       this.loading = true
 
@@ -72,7 +94,7 @@ export const usePermissionStore = defineStore('permission', {
         }
 
         // Fill in the permission names
-        this.data = await Promise.all(permissionListResponse[1].map(async (permissionUUID) => this.getPermission(permissionUUID)))
+        this.data = await Promise.all(permissionListResponse[1].map(async (permissionUUID) => this.fetchPermission(permissionUUID)))
 
         this.loading = false
       }).catch((err) => {

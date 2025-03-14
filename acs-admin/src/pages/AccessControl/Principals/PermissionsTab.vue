@@ -159,9 +159,9 @@ export default {
 
       const rv = []
       for (const entry of filteredList) {
-        const permissionLookup = this.p.data.find(v => v.uuid === entry.permission)
-        const permissionName   = permissionLookup?.name ?? await name(entry.permission)
-        const permissionClass  = permissionLookup?.class?.uuid ?? await classGet(entry.permission)
+        const permissionLookup = await this.p.getPermission(entry.permission)
+        const permissionName   = permissionLookup?.name ?? "UNKNOWN"
+        const permissionClass  = permissionLookup?.class?.uuid ?? "UNKNOWN CLASS"
         const targetName       = await name(entry.target)
         const targetClass      = await classGet(entry.target)
 

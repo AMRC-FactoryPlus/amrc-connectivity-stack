@@ -27,12 +27,13 @@ export function buildColumns(valueKey, titleKey, titleHeader, detailKey, detailH
         {
             id: 'select',
             header: ({table}) => h(Checkbox, {
-                'checked': table.getIsAllPageRowsSelected() || (table.getIsSomePageRowsSelected() && 'indeterminate'),
-                'onUpdate:checked': value => table.toggleAllPageRowsSelected(!!value),
+                'modelValue': table.getIsAllPageRowsSelected(),
+                'onUpdate:modelValue': (value: boolean) => table.toggleAllPageRowsSelected(!!value),
                 'ariaLabel': 'Select all',
             }),
             cell: ({row}) => h(Checkbox, {
-                'checked': row.getIsSelected(),
+                'modelValue': row.getIsSelected(),
+                'onUpdate:modelValue': (value: boolean) => row.toggleSelected(!!value),
                 'ariaLabel': 'Select row',
             }),
             enableSorting: false,

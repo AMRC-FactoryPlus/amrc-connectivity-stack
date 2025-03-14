@@ -29,6 +29,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits);
 
 <template>
   <CheckboxRoot
+    @click.stop
     v-bind="forwarded"
     :class="
       cn(

@@ -1,8 +1,9 @@
 import fs from 'node:fs';
 import axios from 'axios';
+import * as dotenv from "dotenv";
 import express from 'express';
-
 import { App, Class, FileTypes, Perm } from './constants.js';
+dotenv.config({});
 
 const Valid = {
   uuid: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
@@ -45,7 +46,7 @@ export class APIv1 {
 
     if (!ok) return res.status(403).end();
 
-
+    this.retrieveFileFromStorage(req, res);
     
 
     return res.status(200).json({ authForDownload: true });
@@ -61,103 +62,94 @@ export class APIv1 {
 
     if (!ok) return res.status(403).end();
 
+    this.upload_file_to_storage(req, res);
+
     return res.status(200).json({ authForUpload: true });
   };
 
-  retrieveFileFromStorage = async () => {
-    // const file_uuid = req.params.file_uuid;
-    // let url =
-    //   process.env.CONFIGDB +
-    //   '/v1/app/' +
-    //   process.env.GENOBJINFO_APP +
-    //   '/object/' +
-    //   process.env.FILE_CLASS_UUID;
-    // console.log('Endpoint: ' + url);
-    // console.log(
-    //   'Username: ' + process.env.UNAME + '  Password:' + process.env.PASSWORD
-    // );
-    // //Testing that I can get uuids from configDB
-    // axios
-    //   .get(url, {
-    //     auth: {
-    //       username: process.env.UNAME,
-    //       password: process.env.PASSWORD,
-    //     },
-    //   })
-    //   .then(function (response) {
-    //     // handle success
-    //     console.log('axios success');
-    //     if (response.data.name == 'File') {
-    //     }
-    //   })
-    //   .catch(function (error) {
-    //     console.log('THis is an error.');
-    //     // handle error
-    //     console.log(error);
-    //   });
-    // //If file uuid is found, return file
-    // fs.readFile('./uploads/' + file_uuid + '.txt', 'utf-8', (err, data) => {
-    //   if (err) {
-    //     console.error(err);
-    //     return;
-    //   }
-    //   console.log(req.params);
-    //   console.log('File is: ');
-    //   console.log(data);
-    //   //return res.json({ uuid: req.params.uuid, file: data });
-    // });
-    // //Defaulting to text files for testing
-    // return res.download('./uploads/' + file_uuid + '.txt', (err) => {
-    //   if (err) {
-    //     console.error('File download failed:', err);
-    //   } else {
-    //     console.log('File downloaded successfully.');
-    //   }
-    // });
+  retrieveFileFromStorage = async (req,res) => {
+    const file_uuid = req.params.file_uuid;
+  
+    let fileObj = await this.configDBObj.get_config(process.env.FILE_SERVICE_APP_UUID, file_uuid);
+    
+    if (!fileObj.file) {
+      // no file uuid means no file was found
+      return res.status(404).json({ message: 'No file was found' })
+    }
+    else{
+      let resFileType;
+      //Set file extension to make it easier to download in the correct format later
+      if(fileObj.file_type == process.env.TXT_TYPE_UUID)
+      {
+        resFileType = ".txt";
+      }else if(fileObj.file_type == process.env.PDF_TYPE_UUID)
+      {
+        resFileType = ".pdf";
+      }else if(fileObj.file_type == process.env.CAD_TYPE_UUID)
+      {
+        resFileType = ".cad";
+      }
+      
+
+      return res.status(200).download(process.env.FILES_STORAGE + '/' + file_uuid, (err) => {
+        if (err) {
+          console.error('File download failed:', err);
+        } else {
+          console.log('File downloaded successfully.');
+        }
+      });
+    }
+   
   };
 
-  upload_file_to_storage = async () => {
-    // const file_type_uuid = req.params.file_type_uuid;
-    // //Check for File Type
-    // console.log(req);
-    // //return;
-    // console.log('file type uuid: ', file_type_uuid);
-    // if (!req.file) {
-    //   return res.status(400).json({ message: 'No file uploaded' });
-    // }
-    // res.json({
-    //   message: 'File uploaded successfully',
-    //   filename: req.file.filename + '.txt',
-    // });
-    // // upload file to storage
-    // // capture current datetime
-    // // create object with FileSchema
-    // // store the object in ACS Config Service
-    // let url = process.env.CONFIGDB + '/v1/object';
-    // axios
-    //   .post(
-    //     url,
-    //     {
-    //       class: process.env.TXT_TYPE_UUID,
-    //       uuid: req.file.filename,
-    //       name: req.file.originalname,
-    //     },
-    //     {
-    //       auth: {
-    //         username: process.env.UNAME,
-    //         password: process.env.PASSWORD,
-    //       },
-    //     }
-    //   )
-    //   .then(function (response) {
-    //     // handle success
-    //     console.log('Post to configDB successful!');
-    //     console.log(response);
-    //   })
-    //   .catch(function (error) {
-    //     console.log('THis is an error.');
-    //     // handle error
-    //     console.log(error);
-    //   });
+  upload_file_to_storage = async (req, res) => {
+    const file_type_uuid = req.query.file_type_uuid; //Get File type based on UUID 
+
+    /*
+    Store the file object in config db as follows:
+
+      file uuid
+      file type uuid
+      date uploaded
+      user who uploaded
+      file size ?
+      application uuid 
+    */
+    let fileJSON = {
+      "name": req.file.originalname,
+      "file": req.file.filename,
+      "file_type": req.params.file_type_uuid,
+      "date_uploaded": new Date(),
+      "uploader": process.env.USER_ACCOUNT_UUID
+    };
+
+    //Check for File Type
+
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded' });
+    }
+
+    if(file_type_uuid == process.env.TXT_TYPE_UUID)
+    {
+      let fileObj = await this.configDb.create_object(process.env.TXT_TYPE_UUID, req.file.filename); 
+
+      console.log("fileObj");
+      console.log(fileObj);
+
+    }else if (file_type_uuid == process.env.PDF_TYPE_UUID)
+    {
+      let fileObj = await this.configDb.create_object(process.env.PDF_TYPE_UUID, req.file.filename); 
+
+      console.log("fileObj");
+      console.log(fileObj);
+    }else
+    {
+      return res.status(400).json({message: 'File type is unsupported'});
+    }
+
+    let fileConfig = await this.configDb.put_config(process.env.FILE_SERVICE_APP_UUID, req.file.filename, fileJSON);
+
+    return res.status(201).json({message:'File uploaded successfully'});
+    
   };
 }

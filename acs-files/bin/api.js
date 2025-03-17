@@ -3,15 +3,7 @@
 import { ServiceClient } from '@amrc-factoryplus/service-client';
 import { WebAPI } from '@amrc-factoryplus/service-api';
 import { Auth } from '../lib/auth.js';
-import { ConfigDB } from '@amrc-factoryplus/service-client/interface.js';
-
-// import { GIT_VERSION } from "../lib/git-version.js";
-// import { Service, Version } from "../lib/constants.js";
-
-// import { BootstrapUUIDs } from "../lib/constants.js";
-// import Model from "../lib/model.js";
-// import MQTTCli from "../lib/mqttcli.js";
-// import { CDBNotify } from "../lib/notify.js";
+import { ConfigDB, Auth } from '@amrc-factoryplus/service-client/interface.js';
 import { routes } from '../lib/routes.js';
 import multer from 'multer';
 import { multer_storage } from '../config/multer.js';
@@ -23,7 +15,7 @@ const fplus = await new ServiceClient({
 }).init();
 
 const configDb = await new ConfigDB(fplus);
-const auth = new Auth({ fplus });
+const auth = await new Auth(fplus);
 
 multer({ storage: multer_storage });
 

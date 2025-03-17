@@ -101,7 +101,7 @@ export default {
   methods: {
     async addToGroup (groupUuid) {
       try {
-        await this.s.client.Auth.add_to_group(groupUuid, this.principal.uuid)
+        await this.s.client.ConfigDB.class_add_member(groupUuid, this.principal.uuid)
         toast.success(`${this.principal.name} has been added to ${groupUuid}`)
       } catch (err) {
         toast.error(`Unable to add ${this.principal.name} to ${groupUuid}`)

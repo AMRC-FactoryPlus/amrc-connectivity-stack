@@ -25,7 +25,7 @@ spec:
         - name: openid
           image: "{{ .Values.openid.image.repository }}:{{ .Values.openid.image.tag }}"
           imagePullPolicy: {{ .Values.openid.image.pullPolicy }}
-          args: ["start-dev"]
+          args: ["start-dev", "--import-realm"]
           env:
             - name: KEYCLOAK_ADMIN
               valueFrom:
@@ -41,6 +41,8 @@ spec:
               value: "edge"
             - name: KC_HEALTH_ENABLED
               value: "true"
+            - name: KRB5_CONFIG
+              value: /config/krb5-conf/krb5.conf
           ports:
             - name: http
               containerPort: 8080
@@ -48,6 +50,27 @@ spec:
             httpGet:
               path: /health/ready
               port: 9000
+          volumeMounts:
+            - name: realm-config
+              mountPath: /opt/keycloak/data/import
+              readOnly: true
+            - name: krb5-conf
+              mountPath: /config/krb5-conf
+      volumes:
+        - name: realm-config
+          configMap:
+            name: keycloak-realm-config
+        - name: krb5-conf
+          configMap:
+            name: krb5-conf
+        - name: krb5-keytabs
+          secret:
+            secretName: krb5-keytabs
+            items:
+              - path: client
+                key: sv1openid
+              - path: server
+                key: http.openid
 ---
 apiVersion: v1
 kind: Service

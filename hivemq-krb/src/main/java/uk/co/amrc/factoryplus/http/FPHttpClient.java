@@ -6,54 +6,28 @@
 package uk.co.amrc.factoryplus.http;
 
 import java.net.*;
-import java.util.Base64;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
 import java.util.ServiceConfigurationError;
 import java.util.UUID;
-import java.util.stream.Stream;
-import java.util.stream.Collectors;
-
-import org.ietf.jgss.*;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.commons.lang3.tuple.Pair;
-
-import org.apache.hc.client5.http.HttpResponseException;
-import org.apache.hc.client5.http.fluent.Request;
-import org.apache.hc.client5.http.fluent.Response;
 import org.apache.hc.client5.http.impl.cache.CacheConfig;
 import org.apache.hc.client5.http.impl.cache.CachingHttpClients;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
-import org.apache.hc.core5.http.ContentType;
-import org.apache.hc.core5.net.URIBuilder;
 
 import org.apache.hc.client5.http.async.methods.SimpleHttpRequest;
 import org.apache.hc.client5.http.async.methods.SimpleHttpResponse;
-import org.apache.hc.client5.http.async.methods.SimpleRequestBuilder;
-import org.apache.hc.client5.http.async.methods.SimpleRequestProducer;
-import org.apache.hc.client5.http.async.methods.SimpleResponseConsumer;
 import org.apache.hc.client5.http.cache.HttpCacheContext;
 import org.apache.hc.client5.http.impl.async.CloseableHttpAsyncClient;
 import org.apache.hc.client5.http.impl.cache.CachingHttpAsyncClients;
 import org.apache.hc.core5.concurrent.FutureCallback;
-import org.apache.hc.core5.http.HttpHost;
-import org.apache.hc.core5.http.message.StatusLine;
-import org.apache.hc.core5.io.CloseMode;
 import org.apache.hc.core5.reactor.IOReactorConfig;
 import org.apache.hc.core5.util.Timeout;
-
-import org.json.*;
 
 import io.reactivex.rxjava3.core.Single;
 
 import uk.co.amrc.factoryplus.*;
-import uk.co.amrc.factoryplus.gss.*;
 
 /** HTTP (REST) client.
  */
@@ -123,7 +97,7 @@ public class FPHttpClient {
         //FPThreadUtil.logId("execute called");
         return discovery
             .get(fpr.service)
-            .flatMap(base -> tokens.get(base)
+            .flatMap(base -> tokens.getOrFetch(base)
                 .map(tok -> fpr.resolveWith(base, tok)))
             .flatMap(rrq -> fetch(rrq.buildRequest())
                 .flatMap(res -> rrq.handleResponse(res)))

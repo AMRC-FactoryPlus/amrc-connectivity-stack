@@ -1,70 +1,90 @@
-/* Factory+ Java client library.
- * Generic request cache.
- * Copyright 2023 AMRC.
- */
-
-/* This is used to cache HTTP bearer tokens and to cache service URL
- * lookups. */
-
 package uk.co.amrc.factoryplus;
 
-import java.net.URI;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Function;
-
+import io.reactivex.rxjava3.core.Single;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.json.JSONObject;
+import java.util.concurrent.*;
+import java.util.function.Function;
 
-import io.reactivex.rxjava3.core.Single;
-
-/** Internal. */
-public class RequestCache<Key, Value>
-{
-    private static final Logger log = LoggerFactory.getLogger(RequestCache.class);
-
-    private Function<Key, Single<Value>> source;
-    private ConcurrentHashMap<Key, Value> cache;
+public class RequestCache<Key, Value> {
+    private final ConcurrentHashMap<Key, Value> cache ;
     private ConcurrentHashMap<Key, Single<Value>> inFlight;
+    private final Function<Key, Single<Value>> source;
+    private final ConcurrentHashMap<Key, Long> timestamps;
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    private static final Logger log = LoggerFactory.getLogger(RequestCache.class);
+    private long expiryTimeMillis = 0;
 
-    public RequestCache (Function<Key, Single<Value>> tokenSource)
-    {
-        source = tokenSource;
-        cache = new ConcurrentHashMap<Key, Value>();
-        inFlight = new ConcurrentHashMap<Key, Single<Value>>();
+    public RequestCache(Function<Key, Single<Value>> tokenSource) {
+        this.cache = new ConcurrentHashMap<>();
+        this.timestamps = new ConcurrentHashMap<>();
+        this.inFlight = new ConcurrentHashMap<>();
+        this.source = tokenSource;
     }
 
-    public Single<Value> get (Key key)
-    {
-        var existing = cache.get(key);
-        if (existing != null)
-            return Single.just(existing);
+    public RequestCache(long expiryTimeMinutes, Function<Key, Single<Value>> tokenSource) {
+        this(tokenSource);
+        this.expiryTimeMillis = expiryTimeMinutes * 60 * 1000;
+        startCacheCleanupTask();
+    }
 
+    public Single<Value> getOrFetch(Key key) {
+        var cachedValue = get(key);
+        if (cachedValue != null){
+            log.info("Cached value found for key " + key);
+            return Single.just(cachedValue);
+        }
+        log.info("No cached value found for key " + key);
         return inFlight.computeIfAbsent(key, k -> {
             var promise = source.apply(key).cache();
-            //log.info("In-flight: add {} {}", key, promise);
-
+            log.info("In-flight: add {} {}", key, promise);
             promise
-                .doAfterTerminate(() -> {
-                    //log.info("In-flight: remove {} {}", key, promise);
-                    inFlight.remove(key, promise);
-                })
-                .subscribe(rv -> cache.put(key, rv), e -> {});
+                    .doAfterTerminate(() -> {
+                        log.info("In-flight: remove {} {}", key, promise);
+                        inFlight.remove(key, promise);
+                    })
+                    .subscribe(rv -> put(key, rv), e -> {});
             return promise;
         });
     }
 
-    public void put (Key key, Value value)
-    {
-        /* XXX If we have an in-flight request we need to cancel it, and
-         * arrange for the get() call to return this value instead.
-         * Otherwise it will overwrite the value we set here. */
+    public void put(Key key, Value value) {
         cache.put(key, value);
+        timestamps.put(key, System.currentTimeMillis());
     }
 
-    public void remove (Key service, Value token)
-    {
-        cache.remove(service, token);
+    private Value get(Key key) {
+        if (expiryTimeMillis > 0 && isExpired(key)) {
+            remove(key);
+            return null;
+        }
+        return cache.get(key);
+    }
+
+    public void remove(Key key) {
+        cache.remove(key);
+        timestamps.remove(key);
+    }
+
+    private boolean isExpired(Key key) {
+        Long storedTime = timestamps.get(key);
+        return storedTime == null || (System.currentTimeMillis() - storedTime) > expiryTimeMillis;
+    }
+
+    private void startCacheCleanupTask() {
+        scheduler.scheduleAtFixedRate(() -> {
+            long now = System.currentTimeMillis();
+            for (Key key : timestamps.keySet()) {
+                if (now - timestamps.get(key) > expiryTimeMillis) {
+                    log.info("Removing key from cache: {}", key);
+                    remove(key);
+                }
+            }
+        }, 1, 1, TimeUnit.MINUTES);
+    }
+
+    public void shutdown() {
+        scheduler.shutdown();
     }
 }

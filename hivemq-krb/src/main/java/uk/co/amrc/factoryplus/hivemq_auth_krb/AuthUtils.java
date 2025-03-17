@@ -35,7 +35,7 @@ public class AuthUtils {
             }
         }
 
-        return fplus.auth().getACL(principal)
+        return fplus.auth().getOrFetchAcl(principal)
                 .flatMapObservable(Observable::fromStream)
                 .flatMapSingle(ace -> {
                     String perm = (String)ace.get("permission");

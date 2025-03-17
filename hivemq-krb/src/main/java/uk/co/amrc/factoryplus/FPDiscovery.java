@@ -6,20 +6,13 @@
 package uk.co.amrc.factoryplus;
 
 import java.net.URI;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.json.*;
-
 import io.reactivex.rxjava3.core.*;
-
-import uk.co.amrc.factoryplus.http.*;
 
 /* XXX The JS client performs a (cached) fetch every time, with a Map of
  * overrides. This client caches the responses from the Directory
@@ -73,7 +66,7 @@ public class FPDiscovery {
      */
     public Single<Set<URI>> lookup (UUID service)
     {
-        return cache.get(service);
+        return cache.getOrFetch(service);
     }
 
     /** Gets the most suitable URL to use for a service.

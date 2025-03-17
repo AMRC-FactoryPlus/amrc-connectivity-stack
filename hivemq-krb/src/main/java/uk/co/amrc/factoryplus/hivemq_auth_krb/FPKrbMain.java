@@ -16,6 +16,7 @@ import uk.co.amrc.factoryplus.hivemq_auth_krb.interceptors.FPKrbClientInitialize
 public class FPKrbMain implements ExtensionMain {
 
     private static final @NotNull Logger log = LoggerFactory.getLogger(FPKrbMain.class);
+
     @Override
     public void extensionStart(final @NotNull ExtensionStartInput extensionStartInput, final @NotNull ExtensionStartOutput extensionStartOutput) {
         final ExtensionInformation extensionInformation = extensionStartInput.getExtensionInformation();
@@ -36,6 +37,7 @@ public class FPKrbMain implements ExtensionMain {
     public void extensionStop(final @NotNull ExtensionStopInput extensionStopInput, final @NotNull ExtensionStopOutput extensionStopOutput) {
 
         final ExtensionInformation extensionInformation = extensionStopInput.getExtensionInformation();
+
         log.info("Stopped " + extensionInformation.getName() + ":" + extensionInformation.getVersion());
 
     }

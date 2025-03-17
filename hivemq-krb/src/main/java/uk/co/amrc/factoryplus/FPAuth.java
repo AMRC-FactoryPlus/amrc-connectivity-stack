@@ -6,23 +6,15 @@
 
 package uk.co.amrc.factoryplus;
 
-import java.net.*;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Stream;
-import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.json.*;
 
-import io.reactivex.rxjava3.schedulers.Schedulers;
 import io.reactivex.rxjava3.core.*;
-
-import uk.co.amrc.factoryplus.http.*;
 
 /**
  * Authentication service.
@@ -34,12 +26,19 @@ import uk.co.amrc.factoryplus.http.*;
 public class FPAuth {
     private static final Logger log = LoggerFactory.getLogger(FPAuth.class);
     private static final UUID SERVICE = FPUuid.Service.Authentication;
-
-    private FPServiceClient fplus;
-
+    private final FPServiceClient fplus;
+    private final RequestCache<String, JSONArray> cache;
     public FPAuth (FPServiceClient fplus)
     {
         this.fplus = fplus;
+        this.cache = new RequestCache<>(5, this::getACL);
+    }
+
+    public Single<Stream<Map>> getOrFetchAcl(String principal){
+        return this.cache.getOrFetch(principal)
+                .map(acl -> acl.toList().stream()
+                .filter(o -> o instanceof Map)
+                .map(o -> (Map)o));
     }
 
     /**
@@ -53,9 +52,9 @@ public class FPAuth {
      * permission group.
      *
      * @param princ The principal to fetch permissions for.
-     * @return A stream of maps represnting the granted permissions.
+     * @return A stream of maps representing the granted permissions.
      */
-    public Single<Stream<Map>> getACL (String princ)
+    public Single<JSONArray> getACL (String princ)
     {
         //FPThreadUtil.logId("fetching acl");
         return fplus.http().request(SERVICE, "GET")
@@ -66,9 +65,6 @@ public class FPAuth {
                 .flatMap(r -> r.getBodyArray())
                 .orElseThrow(() -> new FPServiceException(SERVICE, 
                     res.getCode(), "Can't fetch ACL")))
-            .doOnSuccess(acl -> log.info("F+ ACL [{}]: {}", princ, acl))
-            .map(acl -> acl.toList().stream()
-                .filter(o -> o instanceof Map)
-                .map(o -> (Map)o));
+            .doOnSuccess(acl -> log.info("F+ ACL [{}]: {}", princ, acl));
     }
 }

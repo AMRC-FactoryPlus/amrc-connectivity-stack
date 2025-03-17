@@ -57,6 +57,7 @@ export default defineConfig({
       'gssapi.js': EMPTY,
       '@amrc-factoryplus/sparkplug-app': EMPTY,
       'rxjs': EMPTY,
-    }
+    },
+    preserveSymlinks: true,
   }
 })

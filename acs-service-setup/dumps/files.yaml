@@ -8,7 +8,6 @@ objects:
       name: "Files Service server"
       subclassOf:
         - !u Auth.Class.CentralService
-        - !u ACS.Group.SparkplugNode
 
   !u Auth.Class.ServicePerms:
     !u Files.Perm.All:
@@ -26,21 +25,33 @@ objects:
 
   !u ConfigDB.Class.R1Class:
     !u Files.Class.File: { name: "File" }
-    !u Files.Class.FileType: { name: "File Type" }
+
+  !u ConfigDB.Class.R2Class:
+    !u Files.Class.FileType:
+      name: "File Type"
+      subclassOf:
+        - !u Files.Class.File
 
   !u Files.Class.FileType:
-    !u Files.FileType.PDF: { name: "PDF" }
-    !u Files.FileType.CSV: { name: "CSV" }
-    !u Files.FileType.CAD: { name: "CAD" }
+    !u Files.FileType.PDF:
+      name: "PDF"
+      subclassOf:
+        - !u Files.Class.File
+    !u Files.FileType.CSV:
+      name: "CSV"
+      subclassOf:
+        - !u Files.Class.File
+    !u Files.FileType.CAD:
+      name: "CAD"
+      subclassOf:
+        - !u Files.Class.File
 
 ---
 service: !u UUIDs.Service.Authentication
 version: 2
 grants:
   !u Files.Requirement.ServiceAccount:
-    !u Files.Perm.All:
-      !u Files.Service.Files: false
-
+    !u Auth.Perm.ReadACL:
+      !u Files.Perm.All: true
   !u ACS.Group.Administrator:
-    !u Files.Perm.All:
-      !u Files.Service.Files: false
+    !u Files.Perm.All: null

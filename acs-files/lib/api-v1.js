@@ -46,8 +46,7 @@ export class APIv1 {
 
     if (!ok) return res.status(403).end();
 
-    this.retrieveFileFromStorage(req, res);
-    
+    let fileRes = await this.retrieveFileFromStorage(req, res);
 
     return res.status(200).json({ authForDownload: true });
   };
@@ -62,7 +61,7 @@ export class APIv1 {
 
     if (!ok) return res.status(403).end();
 
-    this.upload_file_to_storage(req, res);
+    let fileRes = await this.upload_file_to_storage(req, res);
 
     return res.status(200).json({ authForUpload: true });
   };
@@ -70,40 +69,54 @@ export class APIv1 {
   retrieveFileFromStorage = async (req,res) => {
     const file_uuid = req.params.file_uuid;
   
-    let fileObj = await this.configDBObj.get_config(process.env.FILE_SERVICE_APP_UUID, file_uuid);
-    
-    if (!fileObj.file) {
-      // no file uuid means no file was found
-      return res.status(404).json({ message: 'No file was found' })
-    }
-    else{
-      let resFileType;
-      //Set file extension to make it easier to download in the correct format later
-      if(fileObj.file_type == process.env.TXT_TYPE_UUID)
-      {
-        resFileType = ".txt";
-      }else if(fileObj.file_type == process.env.PDF_TYPE_UUID)
-      {
-        resFileType = ".pdf";
-      }else if(fileObj.file_type == process.env.CAD_TYPE_UUID)
-      {
-        resFileType = ".cad";
-      }
-      
+    try{
+      let fileObj = await this.configDb.get_config(App.FilesService, file_uuid);
 
-      return res.status(200).download(process.env.FILES_STORAGE + '/' + file_uuid, (err) => {
-        if (err) {
-          console.error('File download failed:', err);
-        } else {
-          console.log('File downloaded successfully.');
+      if (!fileObj.file) {
+        // no file uuid means no file was found
+        return res.status(404).json({ message: 'No file was found' })
+      }
+      else{
+        let resFileType;
+        //Set file extension to make it easier to download in the correct format later
+        if(fileObj.file_type == FileTypes.TXT)
+        {
+          resFileType = ".txt";
+        }else if(fileObj.file_type == FileTypes.PDF)
+        {
+          resFileType = ".pdf";
+        }else if(fileObj.file_type == FileTypes.CAD)
+        {
+          resFileType = ".cad";
         }
-      });
+        
+  
+        return res.status(200).download(process.env.FILES_STORAGE + '/' + file_uuid, (err) => {
+          if (err) {
+            console.error('File download failed:', err);
+          } else {
+            console.log('File downloaded successfully.');
+          }
+        });
+      }
     }
+    catch(e)
+    {
+      throw e;
+    }
+    
+    
    
   };
 
   upload_file_to_storage = async (req, res) => {
-    const file_type_uuid = req.query.file_type_uuid; //Get File type based on UUID 
+    const file_type_uuid = req.params.file_type_uuid; //Get File type based on UUID 
+
+    //Check for File Type
+
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded' });
+    }
 
     /*
     Store the file object in config db as follows:
@@ -116,40 +129,54 @@ export class APIv1 {
       application uuid 
     */
     let fileJSON = {
-      "name": req.file.originalname,
-      "file": req.file.filename,
-      "file_type": req.params.file_type_uuid,
-      "date_uploaded": new Date(),
-      "uploader": process.env.USER_ACCOUNT_UUID
-    };
+        "file_uuid": req.file.filename,
+        "file_type_uuid": req.params.file_type_uuid,
+        "date_uploaded": new Date(),
+        "user_who_uploaded": process.env.USER_ACCOUNT_UUID,
+        "file_size": req.file.size,
+        "application_uuid": App.FilesService
+      };
 
-    //Check for File Type
+    if(file_type_uuid == FileTypes.TXT)
+    {
+      
+      let fileObj = await create_file_object_entry(FileTypes.TXT, req.file.filename); 
 
-    if (!req.file) {
-      return res.status(400).json({ message: 'No file uploaded' });
+    }else if (file_type_uuid == FileTypes.PDF)
+    {
+      let fileObj = await create_file_object_entry(FileTypes.PDF, req.file.filename);
+
+    }else if (file_type_uuid == FileTypes.CAD)
+    {
+      let fileObj = await create_file_object_entry(FileTypes.CAD, req.file.filename); 
+  
     }
-
-    if(file_type_uuid == process.env.TXT_TYPE_UUID)
-    {
-      let fileObj = await this.configDb.create_object(process.env.TXT_TYPE_UUID, req.file.filename); 
-
-      console.log("fileObj");
-      console.log(fileObj);
-
-    }else if (file_type_uuid == process.env.PDF_TYPE_UUID)
-    {
-      let fileObj = await this.configDb.create_object(process.env.PDF_TYPE_UUID, req.file.filename); 
-
-      console.log("fileObj");
-      console.log(fileObj);
-    }else
+    else
     {
       return res.status(400).json({message: 'File type is unsupported'});
     }
 
-    let fileConfig = await this.configDb.put_config(process.env.FILE_SERVICE_APP_UUID, req.file.filename, fileJSON);
+
+    try{
+      let fileConfig = await this.configDb.put_config(process.env.FILE_SERVICE_APP_UUID, req.file.filename, fileJSON);
+    }
+    catch(e){
+      throw e;
+    }
 
     return res.status(201).json({message:'File uploaded successfully'});
     
   };
+}
+
+create_file_object_entry = async (filetype_uuid, file_uuid) =>
+{
+  try{
+    let file_obj_entry = await this.configDb.create_object(filetype_uuid, file_uuid);
+  }
+  catch (e) {
+    throw e;
+  }
+
+  return file_obj_entry;
 }

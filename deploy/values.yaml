@@ -345,6 +345,16 @@ grafana:
       header_name: X-Auth-Principal
       header_property: username
       auto_sign_up: true
+    auth.generic_oauth:
+      enabled: true
+      name: Keycloak
+      allow_sign_up: true
+      client_id: grafana-oauth
+      client_secret: {{ (lookup "v1" "Secret" .Release.Namespace "keycloak-grafana-client").data.client-secret | b64dec }}
+      scopes: openid profile email
+      auth_url: {{ .Values.acs.secure | ternary "https://" "http://" }}openid.{{.Values.acs.baseUrl}}/realms/factory_plus/protocol/openid-connect/auth
+      token_url: {{ .Values.acs.secure | ternary "https://" "http://" }}openid.{{.Values.acs.baseUrl}}/realms/factory_plus/protocol/openid-connect/token
+      api_url: {{ .Values.acs.secure | ternary "https://" "http://" }}openid.{{.Values.acs.baseUrl}}/realms/factory_plus/protocol/openid-connect/userinfo
   sidecar:
     datasources:
       enabled: true

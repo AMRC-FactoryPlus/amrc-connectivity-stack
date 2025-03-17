@@ -2,17 +2,17 @@
 FROM oven/bun:1.2.0 AS builder
 
 # Set working directory
-WORKDIR /app
+WORKDIR /app/acs-admin
 
 # Copy package.json and install dependencies
-COPY package.json bun.lockb ./
-RUN bun install --production
+COPY package.json bun.lock* ./
+RUN --mount=type=bind,from=lib,dst=/app/lib bun install --production
 
 # Copy the rest of the application code
 COPY . .
 
 # Build the application
-RUN bun run build
+RUN --mount=type=bind,from=lib,dst=/app/lib bun run build
 
 # Stage 2: Serve with Nginx
 FROM nginx:alpine
@@ -24,7 +24,7 @@ COPY import-meta-env-alpine import-meta-env-alpine
 RUN chmod +x import-meta-env-alpine
 
 # Copy built files from the builder stage
-COPY --from=builder /app/dist /usr/share/nginx/html
+COPY --from=builder /app/acs-admin/dist /usr/share/nginx/html
 
 # Copy custom Nginx configuration file
 COPY .docker/nginx.conf /etc/nginx/conf.d/default.conf

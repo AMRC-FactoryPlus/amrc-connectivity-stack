@@ -12,6 +12,10 @@ import process from 'process'
 import inject from '@rollup/plugin-inject'
 import path from 'node:path'
 
+// XXX I'm not sure why we're mixing __dirname and import.meta here?
+const EMPTY = path.resolve(__dirname, './emptyModule.js');
+const src = d => fileURLToPath(new URL(`./src/${d}`, import.meta.url));
+
 // https://vitejs.dev/config/
 export default defineConfig({
   define: {
@@ -37,20 +41,21 @@ export default defineConfig({
       Buffer: ['buffer', 'Buffer'],
     }),
     importMetaEnv.vite({
-      env: ".env",
-      example: ".env.example",
+      env: '.env',
+      example: '.env.example',
     }),
   ],
   resolve: {
     alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url)),
-      '@components': fileURLToPath(new URL('./src/components', import.meta.url)),
-      '@composables': fileURLToPath(new URL('./src/composables', import.meta.url)),
-      '@pages': fileURLToPath(new URL('./src/pages', import.meta.url)),
-      '@store': fileURLToPath(new URL('./src/store', import.meta.url)),
-      got: path.resolve(__dirname, './emptyModule.js'),
-      ["got-fetch"]: path.resolve(__dirname, './emptyModule.js'),
-      ["gssapi.js"]: path.resolve(__dirname, './emptyModule.js'),
-    }
+      '@': src(''),
+      '@components': src('components'),
+      '@composables': src('composables'),
+      '@pages': src('pages'),
+      '@store': src('store'),
+      'got': EMPTY,
+      'got-fetch': EMPTY,
+      'gssapi.js': EMPTY,
+    },
+    preserveSymlinks: true,
   }
 })

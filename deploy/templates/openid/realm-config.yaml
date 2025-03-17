@@ -1994,7 +1994,7 @@ data:
                 "false"
               ],
               "keyTab": [
-                "/etc/krb5.keytab"
+                "/etc/keytabs/krb5.keytab"
               ],
               "cachePolicy": [
                 "DEFAULT"

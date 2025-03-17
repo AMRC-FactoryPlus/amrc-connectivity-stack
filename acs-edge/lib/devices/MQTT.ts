@@ -2,11 +2,12 @@
  * Copyright (c) University of Sheffield AMRC 2025.
  */
 
-import {DeviceConnection} from "../device.js";
-import {log} from "../helpers/log.js";
-import {Metrics, writeValuesToPayload} from "../helpers/typeHandler.js";
+import { DeviceConnection } from "../device.js";
+import { log } from "../helpers/log.js";
+import { Metrics, writeValuesToPayload } from "../helpers/typeHandler.js";
 import * as mqtt from "mqtt";
-import {v4 as uuidv4} from 'uuid';
+import { v4 as uuidv4 } from 'uuid';
+import { ScoutDriverDetails } from "../scout.js";
 
 export default interface mqttConnDetails {
     clientId: string,
@@ -19,6 +20,11 @@ export default interface mqttConnDetails {
     keepalive?: number
     cleanSession: boolean,
     keepAlive: number
+}
+
+interface MqttScoutDetails extends ScoutDriverDetails {
+    duration: number,
+    topic: string
 }
 
 export class MQTTConnection extends DeviceConnection {
@@ -89,7 +95,74 @@ export class MQTTConnection extends DeviceConnection {
         this.emit('data', {});
     }
 
-    async subscribe (addresses: string[]) {
+
+    public async scoutAddresses(driverDetails: ScoutDriverDetails): Promise<object> {
+        const clientForScout = mqtt.connect(this.#connStr, this.#options);
+        let scoutTimeout: NodeJS.Timeout | null = null; // Track timeout
+    
+        try {
+            const { topic, duration }: MqttScoutDetails = await this.validateConfigDetails(driverDetails);
+            const discoveredAddresses: Map<string, object | null> = new Map<string, object | null>();
+    
+            return await new Promise<object>((resolve, reject) => {
+                clientForScout.on("connect", () => {
+                    log(`Scout client connected to broker ${this.#connStr}.`);
+    
+                    clientForScout.subscribe(topic, (err) => {
+                        if (err) {
+                            log(`Subscription failed: ${err.message}`);
+                            reject(new Error(`Subscription failed: ${err.message}`));
+                            return;
+                        }
+    
+                        log(`Subscribed to topic: ${topic}`);
+    
+                        clientForScout.on("message", (topic, message) => {
+                            if (!discoveredAddresses.has(topic)) {
+                                discoveredAddresses.set(topic, null);
+                            }
+                        });
+    
+                        scoutTimeout = setTimeout(() => {
+                            log(`Scout completed.`);
+                            resolve(Object.fromEntries(discoveredAddresses));
+                        }, duration);
+                    });
+                });
+    
+                clientForScout.on("error", (err) => {
+                    log(`MQTT client error: ${err.message}`);
+                    reject(err);
+                });
+            });
+        } catch (err) {
+            log(`Error during MQTT scouting: ${(err as Error).message}`);
+            throw err;
+        } finally {
+            if (scoutTimeout) clearTimeout(scoutTimeout);
+            clientForScout.end();
+        }
+    }
+    
+
+    
+    private async validateConfigDetails(driverDetails: any): Promise<MqttScoutDetails> {
+        if (!driverDetails.duration || !Number.isFinite(driverDetails.duration) || driverDetails.duration <= 0) {
+            throw new Error("Error: driverDetails.duration in MQTT Config is invalid.");
+        }
+    
+        if (!driverDetails.topic || typeof driverDetails.topic !== "string" || driverDetails.topic.trim() === "") {
+            throw new Error("Error: driverDetails.topic in MQTT Config is invalid.");
+        }
+    
+        return {
+            duration: driverDetails.duration,
+            topic: driverDetails.topic.trim(),
+        };
+    }
+    
+
+    async subscribe(addresses: string[]) {
         const topics = addresses.filter(t => t);
         const granted = await this.#client.subscribeAsync(topics);
         const failed = granted
@@ -104,7 +177,7 @@ export class MQTTConnection extends DeviceConnection {
     }
 
     /* This accepts the return value from `subscribe`. */
-    async unsubscribe (handle: any) {
+    async unsubscribe(handle: any) {
         const topics = handle as string[];
         await this.#client.unsubscribeAsync(topics);
     }
@@ -117,7 +190,7 @@ export class MQTTConnection extends DeviceConnection {
      * @param delimiter
      */
     writeMetrics(metrics: Metrics, writeCallback: Function, payloadFormat?: string, delimiter?: string) {
-        let err: Error|null = null;
+        let err: Error | null = null;
         metrics.addresses.forEach((addr) => {
             let payload = writeValuesToPayload(metrics.getByAddress(addr), payloadFormat || "");
             if (payload && payload.length) {
@@ -125,7 +198,6 @@ export class MQTTConnection extends DeviceConnection {
             } else {
                 err = new Error("Value error");
             }
-
         })
         writeCallback(err);
     }

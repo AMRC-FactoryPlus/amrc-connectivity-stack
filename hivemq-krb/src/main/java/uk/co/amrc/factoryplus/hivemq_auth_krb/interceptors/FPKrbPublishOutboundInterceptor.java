@@ -17,11 +17,11 @@ import java.time.Duration;
 import static uk.co.amrc.factoryplus.hivemq_auth_krb.AuthUtils.getACLforPrincipal;
 import static uk.co.amrc.factoryplus.hivemq_auth_krb.AuthUtils.isPermissionAllowed;
 
-public class FPKrbOutboundPublishInterceptor implements PublishOutboundInterceptor {
+public class FPKrbPublishOutboundInterceptor implements PublishOutboundInterceptor {
     private FPKrbClientInitializer initializer;
     private static final @NotNull Logger log = LoggerFactory.getLogger(FPKrbAuthenticator.class);
 
-    public FPKrbOutboundPublishInterceptor(FPKrbClientInitializer initializer) {
+    public FPKrbPublishOutboundInterceptor(FPKrbClientInitializer initializer) {
         this.initializer = initializer;
     }
 

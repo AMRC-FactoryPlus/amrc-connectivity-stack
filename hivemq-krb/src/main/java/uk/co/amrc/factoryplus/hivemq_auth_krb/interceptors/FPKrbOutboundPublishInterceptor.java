@@ -39,6 +39,7 @@ public class FPKrbOutboundPublishInterceptor implements PublishOutboundIntercept
                                     output.preventPublishDelivery();
                                     // Clean up.
                                     initializer.context.removeClientUserNameMapping(clientId);
+                                    Services.clientService().disconnectClient(clientId);
                                     System.out.println("Client " + username + " was kicked due to policy violation.");
                                 }
                                 async.resume();

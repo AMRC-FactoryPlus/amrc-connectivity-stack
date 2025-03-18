@@ -93,16 +93,24 @@ export const usePermissionStore = defineStore('permission', {
           this.loading = false
           return
         }
+        const permissionClasses = await useServiceClientStore().client.ConfigDB.class_subclasses(UUIDs.Class.Permission)
+        // Check if the return object is an array and if not, return
+        if (!Array.isArray(permissionClasses)) {
+          this.loading = false
+          return
+        }
         const servicePermissionSet = await useServiceClientStore().client.ConfigDB.class_members('b7f0c2f4-ccf5-11ef-be77-777cd4e8cb41')
         // Check if the return object is an array and if not, return
         if (!Array.isArray(servicePermissionSet)) {
           this.loading = false
           return
         }
-        const allPermissions = permissions.concat(servicePermissionSet)
+        const allPermissions = permissions.concat(servicePermissionSet).concat(permissionClasses)
+        const uniquePermissions = [...new Set(allPermissions)]
+        const filteredPermissions = uniquePermissions.filter(item => item !== UUIDs.Class.Permission)
 
         // Fill in the permission names
-        this.data = await Promise.all(allPermissions.map(async (permissionUUID) => this.fetchPermission(permissionUUID)))
+        this.data = await Promise.all(filteredPermissions.map(async (permissionUUID) => this.fetchPermission(permissionUUID)))
 
         this.loading = false
       } catch (err) {

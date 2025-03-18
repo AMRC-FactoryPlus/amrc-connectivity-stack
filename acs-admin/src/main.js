@@ -18,6 +18,7 @@ import AccessControl from '@pages/AccessControl/AccessControl.vue'
 import {useServiceClientStore} from "@store/serviceClientStore.js";
 import Login from "@pages/Login.vue";
 import EdgeCluster from '@pages/EdgeManager/EdgeClusters/EdgeCluster.vue'
+import Node from '@pages/EdgeManager/Nodes/Node.vue'
 import ConfigDB from "@pages/ConfigDB/ConfigDB.vue";
 import ApplicationEditor from "@pages/ConfigDB/Applications/ApplicationEditor.vue";
 import ApplicationObjectEditor from "@pages/ConfigDB/Applications/ApplicationObjectEditor.vue";
@@ -62,10 +63,18 @@ const routes = [
       icon: 'user-shield',
     },
   }, {
+    name: 'Cluster',
     path: '/edge-clusters/:clusteruuid',
     component: EdgeCluster,
     meta: {
       name: 'Edge Cluster',
+    },
+  }, {
+    name: 'Node',
+    path: '/edge-clusters/:clusteruuid/nodes/:nodeuuid',
+    component: Node,
+    meta: {
+      name: 'Node',
     },
   },
   {

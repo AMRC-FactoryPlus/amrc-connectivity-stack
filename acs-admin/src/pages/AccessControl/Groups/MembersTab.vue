@@ -118,9 +118,8 @@ export default {
       this.loading = true
       // Make sure we have the latest set of members
       this.s.client.Fetch.cache = "reload"
-      const groupMembersResponse = await this.s.client.ConfigDB.fetch(`v2/class/${this.group.uuid}/member`)
+      const members = await this.s.client.ConfigDB.class_members(this.group.uuid)
       this.s.client.Fetch.cache = "default"
-      let members = groupMembersResponse[1]
       this.members = await Promise.all(members.map(async (memberUUID) => {
         let obj = await this.p.getPrincipal(memberUUID)
         if (obj && (obj.name || obj.kerberos)) {

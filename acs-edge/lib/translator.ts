@@ -3,37 +3,37 @@
  *  Copyright 2023 AMRC
  */
 
-import {EventEmitter} from "events";
+import { EventEmitter } from "events";
 import fs from "fs";
 import timers from "timers/promises";
-import util from "util";
 
-import type {Identity} from "@amrc-factoryplus/utilities";
-import {ServiceClient} from "@amrc-factoryplus/utilities";
+import type { Identity } from "@amrc-factoryplus/utilities";
+import { ServiceClient } from "@amrc-factoryplus/utilities";
 
 /* XXX These need to be incorporated into the main codebase. The config
  * rehashing just needs to go: the code which uses the config needs
  * adapting to accept the correct format. */
-import {validateConfig} from '../utils/CentralConfig.js';
-import {reHashConf} from "../utils/FormatConfig.js";
 
-import {Device, deviceOptions} from "./device.js";
-import {DriverBroker} from "./driverBroker.js";
-import {SparkplugNode} from "./sparkplugNode.js";
+import { reHashConf } from "../utils/FormatConfig.js";
+
+import { Device, DeviceConnection, deviceOptions } from "./device.js";
+import { DriverBroker } from "./driverBroker.js";
+import { SparkplugNode } from "./sparkplugNode.js";
 import * as UUIDs from "./uuids.js";
 
-import {log} from "./helpers/log.js";
-import {sparkplugConfig,} from "./helpers/typeHandler.js";
+import { log } from "./helpers/log.js";
+import { sparkplugConfig, } from "./helpers/typeHandler.js";
 
-import {RestConnection} from "./devices/REST.js";
-import {S7Connection} from "./devices/S7.js";
-import {OPCUAConnection} from "./devices/OPCUA.js";
-import {MQTTConnection} from "./devices/MQTT.js";
-import {UDPConnection} from "./devices/UDP.js";
-import {WebsocketConnection} from "./devices/websocket.js";
-import {MTConnectConnection} from "./devices/MTConnect.js";
-import {EtherNetIPConnection} from "./devices/EtherNetIP.js";
-import {DriverConnection} from "./devices/driver.js";
+import { RestConnection } from "./devices/REST.js";
+import { S7Connection } from "./devices/S7.js";
+import { OPCUAConnection } from "./devices/OPCUA.js";
+import { MQTTConnection } from "./devices/MQTT.js";
+import { UDPConnection } from "./devices/UDP.js";
+import { WebsocketConnection } from "./devices/websocket.js";
+import { MTConnectConnection } from "./devices/MTConnect.js";
+import { EtherNetIPConnection } from "./devices/EtherNetIP.js";
+import { DriverConnection } from "./devices/driver.js";
+import { Scout, ScoutResult } from "./scout.js";
 
 /**
  * Translator class basically turns config file into instantiated classes
@@ -179,7 +179,7 @@ export class Translator extends EventEmitter {
         })
     }
 
-    setupConnection(connection: any): void {
+    async setupConnection(connection: any): Promise<void> {
         const cType = connection.connType;
         const deviceInfo = this.chooseDeviceInfo(cType);
 
@@ -198,36 +198,76 @@ export class Translator extends EventEmitter {
             connection.name,
             this.broker);
 
-        connection.devices?.forEach((devConf: deviceOptions) => {
-            this.devices[devConf.deviceId] = new Device(
-                this.sparkplugNode, newConn, devConf);
-        });
+        if (connection.scout?.scoutDetails?.isEnabled) {
+            this.runScout(connection, newConn);
+        }
+        else {
+            this.runDevices(connection, newConn);
+        }
+    }
 
-        // What to do when the connection is open
-        newConn.on('open', () => {
+    runScout(connection: any, newConn: DeviceConnection){
+        try{
+            log(`Edge-Agent to be run in Scout Mode for ${connection.name}`);
+            const newScout = new Scout(newConn, connection.scout);
+            newScout.on('scoutResults', async (scoutResult: ScoutResult) => {
+                try {
+                    if (scoutResult.success) {
+                        await this.fplus.ConfigDB.put_config(UUIDs.App.EdgeScoutResults, connection.uuid, scoutResult);
+                        log(`Putting to ConfigDB for ${connection.name} should be done.`);
+                    }else{
+                        log(`Scouting for ${connection.name} was not successful.`);
+                    }
+                }
+                catch (err) {
+                    log(`Error when trying to put to config in scout mode ${(err as Error).message}`);
+                }
+            });
+
+            newScout.performScouting();
+        }
+        catch(err){
+            log(`Error when trying to run in scout mode ${(err as Error).message}`)
+        }
+    }
+
+    runDevices(connection: any, newConn: DeviceConnection, ){
+        log(`Edge-Agent to be run in Default Mode for ${connection.name}`);
+
+        try{
             connection.devices?.forEach((devConf: deviceOptions) => {
-                this.devices[devConf.deviceId]?._deviceConnected();
+                this.devices[devConf.deviceId] = new Device(
+                    this.sparkplugNode, newConn, devConf);
+            });
+    
+            // What to do when the connection is open
+            newConn.on('open', () => {
+                connection.devices?.forEach((devConf: deviceOptions) => {
+                    this.devices[devConf.deviceId]?._deviceConnected();
+                })
+            });
+    
+            // What to do when the device connection has new data from a device
+            newConn.on('data', (obj: { [index: string]: any }, parseVals = true) => {
+                //log(util.format("Received data for %s: (%s) %O",
+                //    connection.name, parseVals, obj));
+                connection.devices?.forEach((devConf: deviceOptions) => {
+                    this.devices[devConf.deviceId]?._handleData(obj, parseVals);
+                })
             })
-        });
-
-        // What to do when the device connection has new data from a device
-        newConn.on('data', (obj: { [index: string]: any }, parseVals = true) => {
-            //log(util.format("Received data for %s: (%s) %O",
-            //    connection.name, parseVals, obj));
-            connection.devices?.forEach((devConf: deviceOptions) => {
-                this.devices[devConf.deviceId]?._handleData(obj, parseVals);
-            })
-        })
-
-        // What to do when device connection dies
-        newConn.on('close', () => {
-            connection.devices?.forEach((devConf: deviceOptions) => {
-                this.devices[devConf.deviceId]?._deviceDisconnected();
-            })
-        });
-
-        // Open the connection
-        newConn.open();
+    
+            // What to do when device connection dies
+            newConn.on('close', () => {
+                connection.devices?.forEach((devConf: deviceOptions) => {
+                    this.devices[devConf.deviceId]?._deviceDisconnected();
+                })
+            });
+            // Open the connection
+            newConn.open();
+        }
+        catch(err){
+            log(`Error when trying to create devices ${(err as Error).message}`)
+        }
     }
 
     /* There is a better way to do this. At minimum this should be in a

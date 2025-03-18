@@ -36,7 +36,7 @@ export class APIv1 {
 
       // Check auth permission
       // Todo: disable wildcard in the future
-      // Todo: update Target to be individaul File, at the moment it checks if Principal has Download permission to the whole FileType object under which all Files are stored.
+      // Todo: update Target to be individual File, at the moment it checks if Principal has Download permission to the whole FileType object under which all Files are stored.
       const ok = await this.auth.check_acl(
         req.auth,
         Perm.Download,
@@ -110,7 +110,7 @@ export class APIv1 {
 
       if (created_uuid !== file_uuid) {
         console.error(
-          `CofngiDb ignored the provided file_uuid [${file_uuid}] and created a new one [${created_uuid}]`
+          `ConfigDb ignored the provided file_uuid [${file_uuid}] and created a new one [${created_uuid}]`
         );
         return res.status(500).json({
           message:

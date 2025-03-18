@@ -334,6 +334,32 @@ export const Fixup = {
     },
 };
 
+export const Files = {
+    App: {
+        Config: "731cb924-71bb-49fa-8cb8-1584bd1ebad3"
+    },
+    Class: {
+        File: "b8fae5ab-678e-4d35-802f-2dd8ee3b5b02",
+        FileType: "923801b3-c97a-48d8-8af9-da97dc13fe2d",
+    },
+    Service: {
+        Files: "2a6efc5-9793-4486-9fd9-7caf9e3b5451"
+    },
+    FileTypes: {
+        PDF: "f86b3e35-4fb0-4d7d-aaa0-5af52d742553",
+        CSV: "4f7f7931-c2fa-49ec-a837-b846cfd1f40d",
+        CAD: "3f1350a2-80ca-43a9-ac05-4f3358276d7a",
+    },
+    Perm: {
+        All: "09cce2eb-dc82-4a5a-b2ec-bca12f456ab8",
+        Upload: "81ed0b6c-7305-4f51-85c5-5c66bdac7920",
+        Download: "3b436260-2100-454b-aea5-8f933a1ed7e5"
+    },
+    Requirement: {
+        ServiceAccount: "1356e8b9-c953-42ac-9ffc-ae26edb88e42"
+    }
+};
+
 export const Git = {
     App: {
         Config:     "38d62a93-b6b4-4f63-bad4-d433e3eaff29",

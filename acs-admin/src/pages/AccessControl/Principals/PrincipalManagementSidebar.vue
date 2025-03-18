@@ -5,8 +5,8 @@
 <template>
   <SheetContent v-if="principal" class="gap-6 flex flex-col overflow-auto">
     <SheetHeader>
-      <SheetTitle title="Principal Class">{{ principal.class.name ?? "Principal" }}</SheetTitle>
       <SheetTitle title="Name">{{principal.name}}</SheetTitle>
+      <SheetTitle title="Principal Class" class="text-gray-500">{{ principal.class.name ?? "Principal" }} - Principal</SheetTitle>
       <SheetDescription>
         <Copyable :text="principal.kerberos">{{principal.kerberos}}</Copyable>
       </SheetDescription>

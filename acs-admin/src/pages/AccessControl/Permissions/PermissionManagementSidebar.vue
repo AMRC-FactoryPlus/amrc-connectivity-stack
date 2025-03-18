@@ -5,8 +5,8 @@
 <template>
   <SheetContent v-if="permissionDetails" class="gap-6 flex flex-col overflow-auto">
     <SheetHeader>
-      <SheetTitle title="Permission Class">{{ permissionDetails.class?.name ?? "Permission" }}</SheetTitle>
       <SheetTitle title="Name">{{ permissionDetails.name }}</SheetTitle>
+      <SheetTitle title="Permission Class" class="text-gray-500">{{ permissionDetails.class?.name ?? "Permission" }} - Permission</SheetTitle>
       <SheetDescription>
         <Copyable :text="permissionDetails.uuid">{{permissionDetails.uuid}}</Copyable>
       </SheetDescription>

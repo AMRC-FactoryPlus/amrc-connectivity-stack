@@ -5,8 +5,8 @@
 <template>
   <SheetContent v-if="groupDetails" class="gap-6 flex flex-col overflow-auto">
     <SheetHeader>
-      <SheetTitle title="Group Class">{{ groupDetails.class?.name ?? "Group" }}</SheetTitle>
       <SheetTitle title="Name">{{groupDetails.name}}</SheetTitle>
+      <SheetTitle title="Group Class" class="text-gray-500">{{ groupDetails.class?.name ?? "Group" }} - Group</SheetTitle>
       <SheetDescription>
         <Copyable :text="groupDetails.uuid">{{groupDetails.uuid}}</Copyable>
       </SheetDescription>

@@ -21,10 +21,8 @@ import com.hivemq.extension.sdk.api.services.builder.Builders;
 
 import uk.co.amrc.factoryplus.*;
 
-class MqttAce {
+public class MqttAce {
     private static final Logger log = LoggerFactory.getLogger(MqttAce.class);
-
-
     private String topic;
     private TopicPermission.MqttActivity activity;
 

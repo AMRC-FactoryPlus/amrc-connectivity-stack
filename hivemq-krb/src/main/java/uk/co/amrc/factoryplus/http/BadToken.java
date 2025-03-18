@@ -32,7 +32,7 @@ class BadToken extends Exception
     {
         log.info("Retrying; bad token {} for {}",
             token.substring(0, 5), base);
-        tokens.remove(base, token);
+        tokens.remove(base);
         return true;
     }
 }

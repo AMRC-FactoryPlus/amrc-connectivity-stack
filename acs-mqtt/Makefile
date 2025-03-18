@@ -23,5 +23,5 @@ include ${mk}/acs.docker.mk
 build: build-plugin
 
 build-plugin: git.prepare
-	cd ${src} && ${env} ${mvn} -B package
+	cd ${src} && ${env} ${mvn} -B clean package
 	cp ${src}/target/${zip} .

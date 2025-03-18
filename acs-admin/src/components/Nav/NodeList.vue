@@ -7,25 +7,27 @@
     <Collapsible :defaultOpen="false" class="group/collapsible">
       <!-- TODO: This should navigate to the cluster page when clicked -->
       <!-- TODO: Ctrl+Click should expand instead of click -->
-      <Button
-          title="View Node"
-          size="sm"
-          variant="ghost"
-          class="w-full text-left justify-start"
-      >
-        <div class="flex items-center justify-center gap-2">
-          <CollapsibleTrigger as-child>
-            <div @click.stop.prevent class="flex items-center justify-center size-5 group/collapsible-trigger">
-              <i class="group-hover/collapsible-trigger:text-gray-500 fa-solid fa-chevron-right text-xs transition-transform duration-75 group-data-[state=open]/collapsible:rotate-90"></i>
-            </div>
-          </CollapsibleTrigger>
-          <i :class="`fa-solid fa-cube`"></i>
-          <span>{{node.name}}</span>
-        </div>
-      </Button>
+      <RouterLink :to="`/edge-clusters/${cluster.uuid}/nodes/${node.uuid}`">
+        <Button
+            title="View Node"
+            size="sm"
+            variant="ghost"
+            class="w-full text-left justify-start"
+        >
+          <div class="flex items-center justify-center gap-2">
+            <CollapsibleTrigger as-child>
+              <div @click.stop.prevent class="flex items-center justify-center size-5 group/collapsible-trigger">
+                <i class="group-hover/collapsible-trigger:text-gray-500 fa-solid fa-chevron-right text-xs transition-transform duration-75 group-data-[state=open]/collapsible:rotate-90"></i>
+              </div>
+            </CollapsibleTrigger>
+            <i :class="`fa-solid fa-cube`"></i>
+            <span>{{node.name}}</span>
+          </div>
+        </Button>
+      </RouterLink>
       <CollapsibleContent>
         <SidebarMenuSub>
-           <DeviceList :node/>
+          <DeviceList :node/>
         </SidebarMenuSub>
       </CollapsibleContent>
     </Collapsible>
@@ -80,10 +82,6 @@ export default {
     nodesLoading () {
       return this.s.loading
     },
-  },
-
-  async mounted () {
-    await this.s.fetch()
   },
 }
 </script>

@@ -89,12 +89,7 @@ export default {
       if (!isFormCorrect) return
 
       try {
-        // await this.s.client.Auth.add_principal(this.user, this.principal)
-        await this.s.client.Auth.fetch({
-          method:     "PUT",
-          url:        `v2/principal/${this.user}/kerberos`,
-          body:       this.principal,
-        })
+        await this.s.client.Auth.add_principal(this.user, this.principal)
         toast.success(`${this.principal} has been added`)
         this.dialogOpen = false
         this.s.client.Fetch.cache = "reload"

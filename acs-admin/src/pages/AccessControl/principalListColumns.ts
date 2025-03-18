@@ -85,11 +85,7 @@ export const columns: ColumnDef<PrincipalMapping>[] = [{
                 confirmText: 'Remove',
                 onConfirm: async () => {
                     try {
-                        // await useServiceClientStore().client.Auth.delete_principal(row.getValue('uuid'))
-                        await useServiceClientStore().client.Auth.fetch({
-                            method:     "DELETE",
-                            url:        `v2/principal/${row.getValue('uuid')}/kerberos`
-                        })
+                        await useServiceClientStore().client.Auth.delete_principal(row.getValue('uuid'))
                         toast.success(`${row.getValue('uuid')} has been deleted`)
                         useServiceClientStore().client.Fetch.cache = "reload"
                         await usePrincipalStore().fetch()

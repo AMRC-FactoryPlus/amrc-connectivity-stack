@@ -199,17 +199,13 @@ export default {
     },
     async addEntry (principal, permission, target) {
       try {
-        // await this.s.client.Auth.add_ace(principal.uuid, permission.uuid, target.uuid)
-        await this.s.client.Auth.fetch({
-          method: "POST",
-          url: "v2/grant",
-          body: {
-            principal: principal.uuid,
-            permission: permission.uuid,
-            target: target.uuid,
-            plural: false
-          }
-        })
+        const grant = {
+          principal: principal.uuid,
+          permission: permission.uuid,
+          target: target.uuid,
+          plural: false
+        }
+        await this.s.client.Auth.add_grant(grant)
         toast.success(`${this.principal.name} has been granted ${permission.name} on ${target.name}`)
       }
       catch (err) {

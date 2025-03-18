@@ -12,7 +12,7 @@
             <div class="flex flex-col gap-1">
               <div class="flex mb-2">
                 <div class="px-1.5 py-0.5 rounded-md bg-green-600 text-sm font-bold uppercase tracking-wide text-white">
-                  TBI
+                  INOP
                 </div>
               </div>
               <Copyable :text="cluster.name">
@@ -53,7 +53,7 @@
         </div>
         <TabsContent value="nodes">
           <div v-if="nodes.length > 0">
-            <DataTable :data="nodes" :columns="nodeColumns" :filters="[]"/>
+            <DataTable :data="nodes" :columns="nodeColumns" :filters="[]" @rowClick="selectNode"/>
           </div>
         </TabsContent>
         <TabsContent value="deployments">
@@ -141,6 +141,15 @@ export default {
   },
 
   methods: {
+    selectNode(e) {
+      this.$router.push({
+        name: 'Node',
+        params: {
+          nodeuuid: e.original.uuid,
+          clusteruuid: e.original.cluster
+        },
+      })
+    },
     copy (text) {
       navigator.clipboard.writeText(text)
       toast.success('Text copied to clipboard')

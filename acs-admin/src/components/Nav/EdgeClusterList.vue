@@ -44,13 +44,17 @@ import { SidebarGroup, SidebarGroupContent, SidebarMenu, SidebarMenuButton, Side
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Button } from '@components/ui/button'
 import { useEdgeClusterStore } from '@store/useEdgeClusterStore.js'
+import { useNodeStore } from '@store/useNodeStore.js'
+import { useDeviceStore } from '@store/useDeviceStore.js'
 import NodeList from './NodeList.vue'
 
 export default {
 
   setup () {
     return {
-      s: useEdgeClusterStore(),
+      c: useEdgeClusterStore(),
+      n: useNodeStore(),
+      d: useDeviceStore(),
     }
   },
 
@@ -70,16 +74,18 @@ export default {
 
   computed: {
     clusters () {
-      return this.s.data
+      return this.c.data
     },
 
     clustersLoading () {
-      return this.s.loading
+      return this.c.loading
     },
   },
 
   async mounted () {
-    await this.s.fetch()
+    await this.c.fetch()
+    await this.n.fetch()
+    await this.d.fetch()
   },
 }
 </script>

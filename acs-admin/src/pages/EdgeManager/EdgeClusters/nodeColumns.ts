@@ -59,7 +59,7 @@ export const nodeColumns: ColumnDef<Host>[] = [
 
         cell: ({row}) => {
             return h('div', {class: 'max-w-[500px] truncate'}, [
-                h('div', {class: 'max-w-[500px] truncate'}, "TBI")
+                h('div', {class: 'max-w-[500px] truncate'}, "INOP")
             ])
         },
         filterFn: (row, id, value) => {

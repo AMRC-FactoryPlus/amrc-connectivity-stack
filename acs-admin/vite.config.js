@@ -1,5 +1,5 @@
 /*
- * Copyright (c) University of Sheffield AMRC 2024.
+ * Copyright (c) University of Sheffield AMRC 2025.
  */
 
 import { fileURLToPath, URL } from 'node:url'
@@ -45,6 +45,7 @@ export default defineConfig({
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
       '@components': fileURLToPath(new URL('./src/components', import.meta.url)),
+      '@utils': fileURLToPath(new URL('./src/utils', import.meta.url)),
       '@composables': fileURLToPath(new URL('./src/composables', import.meta.url)),
       '@pages': fileURLToPath(new URL('./src/pages', import.meta.url)),
       '@store': fileURLToPath(new URL('./src/store', import.meta.url)),

@@ -5,7 +5,7 @@
 <template>
   <Toaster rich-colors/>
   <SidebarProvider>
-    <Sidebar v-if="!l.fullscreen">
+    <Sidebar v-if="!l.fullscreen" class="bg-white dark:bg-slate-800 z-20">
       <SidebarHeader class="border-b h-16">
         <SidebarMenu>
           <SidebarMenuItem>

@@ -157,12 +157,15 @@ export default {
       const filteredList = fullList.filter(e => e.principal === this.group.uuid)
 
       const info = o => this.s.client.ConfigDB.get_config(UUIDs.App.Info, o)
+      const classGet = o => this.s.client.ConfigDB.get_config(UUIDs.App.Registration, o).then(v => v?.class)
       const name = o => info(o).then(v => v?.name)
 
       const rv = []
       for (const entry of filteredList) {
-        const permission = await this.p.getPermission(entry.permission)
-        const targetName     = await name(entry.target)
+        const permission       = await this.p.getPermission(entry.permission)
+        const targetName       = await name(entry.target)
+        const targetClass      = await classGet(entry.target)
+        const targetClassName  = await name(targetClass)
 
         rv.push({
           uuid: entry.uuid,
@@ -170,6 +173,10 @@ export default {
           target: {
             uuid: entry.target,
             name: targetName,
+            class: {
+              uuid: targetClass,
+              name: targetClassName
+            },
           },
           group: this.group,
         })

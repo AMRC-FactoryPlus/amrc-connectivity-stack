@@ -8,14 +8,23 @@ import {Badge} from '@/components/ui/badge'
 
 import DataTableColumnHeader from '@/components/ui/data-table/DataTableColumnHeader.vue'
 
-interface Object {
-    uuid: string,
-    name: string,
-}
-
 export interface EffectivePermission {
-    permission: Object,
-    target: Object,
+    permission: {
+        uuid: string,
+        name: string,
+        class: {
+            uuid: string
+            name: string
+        }
+    },
+    target: {
+        uuid: string,
+        name: string,
+        class: {
+            uuid: string
+            name: string
+        }
+    },
 }
 
 export const columns: ColumnDef<EffectivePermission>[] = [{
@@ -28,7 +37,7 @@ export const columns: ColumnDef<EffectivePermission>[] = [{
     cell: ({row}) => {
         return h('div', {class: 'max-w-[500px] truncate'}, [
             h('div', {class: 'max-w-[500px] truncate font-medium'}, row.getValue('permission')),
-            h('div', {class: 'max-w-[500px] truncate text-gray-400'}, row.original.permission.uuid)
+            h('div', {class: 'max-w-[500px] truncate text-gray-400'}, row.original.permission?.class?.name ?? "UNKNOWN")
         ])
     },
 }, {
@@ -47,7 +56,7 @@ export const columns: ColumnDef<EffectivePermission>[] = [{
         }
         return h('div', {class: 'max-w-[500px] truncate'}, [
             h('div', {class: 'max-w-[500px] truncate font-medium'}, row.getValue('target')),
-            h('div', {class: 'max-w-[500px] truncate text-gray-400'}, row.original.target.uuid)
+            h('div', {class: 'max-w-[500px] truncate text-gray-400'}, row.original.target?.class?.name ?? "UNKNOWN")
         ])
     },
 }]

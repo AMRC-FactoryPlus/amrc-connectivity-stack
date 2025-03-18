@@ -66,6 +66,7 @@ import { defineAsyncComponent } from 'vue'
 import { usePrincipalStore } from '@store/usePrincipalStore.js'
 import { toast } from 'vue-sonner'
 import {useGrantStore} from "@store/useGrantStore.js";
+import {useGroupStore} from "@store/useGroupStore.js";
 
 export default {
   emits: ['objectClick'],
@@ -76,6 +77,7 @@ export default {
       p: usePermissionStore(),
       s: useServiceClientStore(),
       pr: usePrincipalStore(),
+      g: useGroupStore(),
       grants: useGrantStore()
     }
   },
@@ -160,25 +162,19 @@ export default {
       const rv = []
       for (const entry of filteredList) {
         const permissionLookup = await this.p.getPermission(entry.permission)
-        const permissionName   = permissionLookup?.name ?? "UNKNOWN"
-        const permissionClass  = permissionLookup?.class?.uuid ?? "UNKNOWN CLASS"
         const targetName       = await name(entry.target)
         const targetClass      = await classGet(entry.target)
+        const targetClassName  = await name(targetClass)
 
         rv.push({
           uuid: entry.uuid,
-          permission: {
-            uuid: entry.permission,
-            name: permissionName,
-            class: {
-              uuid: permissionClass,
-            },
-          },
+          permission: permissionLookup,
           target: {
             uuid: entry.target,
             name: targetName,
             class: {
               uuid: targetClass,
+              name: targetClassName
             },
           },
           principal: {

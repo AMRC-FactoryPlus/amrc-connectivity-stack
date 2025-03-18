@@ -10,6 +10,10 @@ import DataTableColumnHeader from '@/components/ui/data-table/DataTableColumnHea
 export interface Permission {
     uuid: string
     name: string
+    class: {
+        uuid: string
+        name: string
+    }
 }
 
 export const columns: ColumnDef<Permission>[] = [
@@ -22,6 +26,21 @@ export const columns: ColumnDef<Permission>[] = [
 
         cell: ({row}) => {
             return h('span', {class: 'max-w-[500px] truncate font-medium'}, row.getValue('name'))
+        },
+        filterFn: (row, id, value) => {
+            return value.includes(row.getValue(id))
+        },
+    },
+    {
+        accessorKey: 'class',
+        accessorFn: (row) => row.class.name,
+        header: ({column}) => h(DataTableColumnHeader, {
+            column,
+            title: 'Group Type'
+        }),
+
+        cell: ({row}) => {
+            return h('span', {class: 'max-w-[500px] truncate text-gray-500'}, row.getValue('class'))
         },
         filterFn: (row, id, value) => {
             return value.includes(row.getValue(id))
@@ -41,10 +60,4 @@ export const columns: ColumnDef<Permission>[] = [
             return value.includes(row.getValue(id))
         },
     },
-    // {
-    //     id: 'actions',
-    //     cell: ({row}) => {
-    //         return h('i', {class: 'fa-solid fa-chevron-right'})
-    //     },
-    // }
     ]

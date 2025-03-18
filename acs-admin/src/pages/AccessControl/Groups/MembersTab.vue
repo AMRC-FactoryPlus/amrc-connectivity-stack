@@ -124,8 +124,7 @@ export default {
         let obj = await this.p.getPrincipal(memberUUID)
         if (obj && (obj.name || obj.kerberos)) {
           return {
-            uuid: memberUUID,
-            name: obj.name ?? obj.kerberos,
+            ...obj,
             group: this.group
           }
         }

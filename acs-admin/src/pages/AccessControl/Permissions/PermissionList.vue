@@ -43,6 +43,15 @@ export default {
             }
           }),
         }, {
+          name: 'Permission Type',
+          property: 'class',
+          options: this.p.data.map((g) => g.class.name).filter((v, i, a) => a.indexOf(v) === i).map((g) => {
+            return {
+              label: g,
+              value: g,
+            }
+          }),
+        }, {
           name: 'UUID',
           property: 'uuid',
           options: this.p.data.map((g) => g.uuid).filter((v, i, a) => a.indexOf(v) === i).map((g) => {

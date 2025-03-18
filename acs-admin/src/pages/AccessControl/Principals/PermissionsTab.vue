@@ -39,7 +39,7 @@
   <ObjectSelector
       v-model:open="isTargetSelectorOpen"
       v-model="targetsToAdd"
-      :store-data="pr.data"
+      :store-data="availableTargets"
       title="Select Targets"
       :subtitle="targetsSubtitle"
       detail-header="UUID"
@@ -146,6 +146,13 @@ export default {
     targetsSubtitle () {
       return `Select targets for which the selected permission should be granted: ${this.permissionsToAdd.map(p => p.name).join(', ')}`
     },
+    availableTargets () {
+      const wildcard = [{
+        uuid: UUIDs.Special.Null,
+        name: 'Wildcard'
+      }]
+      return wildcard.concat(this.pr.data).concat(this.g.data)
+    }
   },
 
   methods: {

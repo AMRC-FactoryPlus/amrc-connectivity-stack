@@ -40,7 +40,7 @@
   <ObjectSelector
       v-model:open="isTargetSelectorOpen"
       v-model="targetsToAdd"
-      :store-data="g.data"
+      :store-data="availableTargets"
       title="Select Targets"
       :subtitle="targetsSubtitle"
       detail-header="UUID"
@@ -67,6 +67,7 @@ import {Button} from "@components/ui/button/index.js";
 import {defineAsyncComponent} from "vue";
 import {toast} from "vue-sonner";
 import {useGroupStore} from "@store/useGroupStore.js";
+import {usePrincipalStore} from "@store/usePrincipalStore.js";
 
 export default {
   emits: ['objectClick'],
@@ -77,7 +78,8 @@ export default {
       s: useServiceClientStore(),
       p: usePermissionStore(),
       g: useGroupStore(),
-      grants: useGrantStore()
+      grants: useGrantStore(),
+      pr: usePrincipalStore()
     }
   },
 
@@ -147,6 +149,13 @@ export default {
     targetsSubtitle () {
       return `Select targets for which the selected permission should be granted: ${this.permissionsToAdd.map(p => p.name).join(', ')}`
     },
+    availableTargets () {
+      const wildcard = [{
+        uuid: UUIDs.Special.Null,
+        name: 'Wildcard'
+      }]
+      return wildcard.concat(this.pr.data).concat(this.g.data)
+    }
   },
 
   methods: {

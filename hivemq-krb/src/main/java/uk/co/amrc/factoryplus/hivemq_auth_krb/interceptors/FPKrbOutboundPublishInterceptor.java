@@ -34,9 +34,7 @@ public class FPKrbOutboundPublishInterceptor implements PublishOutboundIntercept
             final String topic = input.getPublishPacket().getTopic();
             isPermissionAllowed(getACLforPrincipal(username, initializer.fplus), topic, TopicPermission.MqttActivity.SUBSCRIBE)
                     .subscribe(result -> {
-                                if (result) {
-                                    log.info("Successfully intercepted outbound subscription client {} for topic {}.", username, topic);
-                                } else {
+                                if (!result) {
                                     log.info("Subscription outbound intercepted! permission denied for user {} topic {}", username, topic);
                                     output.preventPublishDelivery();
                                     // Clean up.

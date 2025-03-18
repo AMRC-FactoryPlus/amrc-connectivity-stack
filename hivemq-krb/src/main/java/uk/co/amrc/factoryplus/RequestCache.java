@@ -47,16 +47,16 @@ public class RequestCache<Key, Value> {
     public Single<Value> getOrFetch(Key key) {
         var cachedValue = get(key);
         if (cachedValue != null) {
-            log.info("Cached value found for key " + key);
+            //log.info("Cached value found for key " + key);
             return Single.just(cachedValue);
         }
-        log.info("No cached value found for key " + key);
+        //log.info("No cached value found for key " + key);
         return inFlight.computeIfAbsent(key, k -> {
             var promise = source.apply(key).cache();
-            log.info("In-flight: add {} {}", key, promise);
+            //log.info("In-flight: add {} {}", key, promise);
             promise
                     .doAfterTerminate(() -> {
-                        log.info("In-flight: remove {} {}", key, promise);
+                        //log.info("In-flight: remove {} {}", key, promise);
                         inFlight.remove(key, promise);
                     })
                     .subscribe(rv -> put(key, rv), e -> {});
@@ -92,7 +92,7 @@ public class RequestCache<Key, Value> {
             long now = System.currentTimeMillis();
             for (Key key : timestamps.keySet()) {
                 if (now - timestamps.get(key) > expiryTimeMillis) {
-                    log.info("Removing key from cache: {}", key);
+                    //log.info("Removing key from cache: {}", key);
                     remove(key);
                 }
             }

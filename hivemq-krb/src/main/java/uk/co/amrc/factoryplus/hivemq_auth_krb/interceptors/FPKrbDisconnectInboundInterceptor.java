@@ -26,7 +26,7 @@ public class FPKrbDisconnectInboundInterceptor implements DisconnectInboundInter
         //make output object async with a duration of 10 seconds
         final Async<DisconnectInboundOutput> async = disconnectInboundOutput.async(Duration.ofSeconds(10));
 
-        final CompletableFuture<?> taskFuture = Services.extensionExecutorService().submit(() -> {
+        Services.extensionExecutorService().submit(() -> {
             try {
                 var clientId = disconnectInboundInput.getClientInformation().getClientId();
                 initializer.context.removeClientUserNameMapping(clientId);

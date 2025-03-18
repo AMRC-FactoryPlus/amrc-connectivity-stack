@@ -25,7 +25,7 @@ public class FPKrbUnsubscribeInboundInterceptor implements UnsubscribeInboundInt
         //make output object async with a duration of 10 seconds
         final Async<UnsubscribeInboundOutput> async = unsubscribeInboundOutput.async(Duration.ofSeconds(10));
 
-        final CompletableFuture<?> taskFuture = Services.extensionExecutorService().submit(() -> {
+        Services.extensionExecutorService().submit(() -> {
             var clientId = unsubscribeInboundInput.getClientInformation().getClientId();
             try {
                 // Remove the client from our context storage.

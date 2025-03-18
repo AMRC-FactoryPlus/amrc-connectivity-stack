@@ -87,15 +87,13 @@ export const usePermissionStore = defineStore('permission', {
       await serviceClientReady();
 
       try {
-        const permissionResponse = await useServiceClientStore().client.ConfigDB.fetch(`/v1/class/${UUIDs.Class.Permission}`)
-        const permissions = permissionResponse[1]
+        const permissions = await useServiceClientStore().client.ConfigDB.class_members(UUIDs.Class.Permission)
         // Check if the return object is an array and if not, return
         if (!Array.isArray(permissions)) {
           this.loading = false
           return
         }
-        const servicePermissionSetResponse = await useServiceClientStore().client.ConfigDB.fetch(`v2/class/b7f0c2f4-ccf5-11ef-be77-777cd4e8cb41/member`)
-        const servicePermissionSet = servicePermissionSetResponse[1]
+        const servicePermissionSet = await useServiceClientStore().client.ConfigDB.class_members('b7f0c2f4-ccf5-11ef-be77-777cd4e8cb41')
         // Check if the return object is an array and if not, return
         if (!Array.isArray(servicePermissionSet)) {
           this.loading = false

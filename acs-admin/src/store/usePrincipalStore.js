@@ -28,8 +28,7 @@ export const usePrincipalStore = defineStore('principal', {
 
       // Get the kerberos principal
       try {
-        const principalKerberosObjectResponse = await useServiceClientStore().client.Auth.fetch(`v2/principal/${uuid}`)
-        const principalKerberosObject = principalKerberosObjectResponse[1]
+        const principalKerberosObject = await useServiceClientStore().client.Auth.find_principal('uuid', uuid)
         principal.kerberos = principalKerberosObject.kerberos
       } catch(err) {
         console.error(`Can't read principal details`, err)

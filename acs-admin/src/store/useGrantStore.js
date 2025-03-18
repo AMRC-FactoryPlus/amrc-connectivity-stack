@@ -21,8 +21,7 @@ export const useGrantStore = defineStore('grant', {
     },
     /* Only meant to be internal */
     async fetchGrant(uuid) {
-      const grantResponse = await useServiceClientStore().client.Auth.fetch(`v2/grant/${uuid}`)
-      return grantResponse[1];
+      return await useServiceClientStore().client.Auth.get_grant(uuid)
     },
     async getGrant(uuid) {
       await this.storeReady()
@@ -46,11 +45,10 @@ export const useGrantStore = defineStore('grant', {
 
       this.data = []
       try {
-        const grantUUIDsResponse = await useServiceClientStore().client.Auth.fetch(`v2/grant`)
-        if (!Array.isArray(grantUUIDsResponse[1])) {
+        const grantUUIDs = await useServiceClientStore().client.Auth.list_grants()
+        if (!Array.isArray(grantUUIDs)) {
           return
         }
-        const grantUUIDs = grantUUIDsResponse[1]
         this.data = await Promise.all(grantUUIDs.map(async uuid => this.fetchGrant(uuid)))
 
         this.loading = false

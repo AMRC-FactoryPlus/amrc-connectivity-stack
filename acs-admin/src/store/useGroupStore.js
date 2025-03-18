@@ -70,8 +70,7 @@ export const useGroupStore = defineStore('group', {
 
       // Let's get the list of group members
       try {
-        const groupMembersResponse = await useServiceClientStore().client.ConfigDB.fetch(`v2/class/${group.uuid}/member`)
-        return groupMembersResponse[1]
+        return await useServiceClientStore().client.ConfigDB.class_members(group.uuid)
       } catch(err) {
         console.error(`Can't read group members`, err)
       }
@@ -98,22 +97,19 @@ export const useGroupStore = defineStore('group', {
 
       this.data = []
       try {
-        const roleResponse = await useServiceClientStore().client.ConfigDB.fetch(`v2/class/f1fabdd1-de90-4399-b3da-ccf6c2b2c08b/member`)
-        const roles = roleResponse[1]
+        const roles = await useServiceClientStore().client.ConfigDB.class_members(`f1fabdd1-de90-4399-b3da-ccf6c2b2c08b`)
         // Check if the return object is an array and if not, return
         if (!Array.isArray(roles)) {
           this.loading = false
           return
         }
-        const compositePermissionResponse = await useServiceClientStore().client.ConfigDB.fetch(`v2/class/1c567e3c-5519-4418-8682-6086f22fbc13/member`)
-        const compositePermissions = compositePermissionResponse[1]
+        const compositePermissions = await useServiceClientStore().client.ConfigDB.class_members(`1c567e3c-5519-4418-8682-6086f22fbc13`)
         // Check if the return object is an array and if not, return
         if (!Array.isArray(compositePermissions)) {
           this.loading = false
           return
         }
-        const servicePermissionSetResponse = await useServiceClientStore().client.ConfigDB.fetch(`v2/class/b7f0c2f4-ccf5-11ef-be77-777cd4e8cb41/member`)
-        const servicePermissionSet = servicePermissionSetResponse[1]
+        const servicePermissionSet = await useServiceClientStore().client.ConfigDB.class_members(`b7f0c2f4-ccf5-11ef-be77-777cd4e8cb41`)
         // Check if the return object is an array and if not, return
         if (!Array.isArray(servicePermissionSet)) {
           this.loading = false

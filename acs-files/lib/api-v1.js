@@ -1,26 +1,19 @@
-import fs from 'node:fs';
-import axios from 'axios';
-import * as dotenv from "dotenv";
+import * as dotenv from 'dotenv';
 import express from 'express';
 import { App, Class, FileTypes, Perm } from './constants.js';
+
 dotenv.config({});
 
 const Valid = {
   uuid: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
 };
 
-//using axios to test F+ endpoints while running this code locally.
-//Once this is integrated with fpd-bender this will likely be refactored
-
 export class APIv1 {
   constructor(opts) {
     this.configDb = opts.configDb;
     this.auth = opts.auth;
-
     this.multer = opts.multer;
-
     this.routes = express.Router();
-
     this.setup_routes();
   }
 
@@ -30,153 +23,128 @@ export class APIv1 {
     api.get('/:file_uuid', this.getFile.bind(this));
     api.post(
       '/:file_type_uuid',
-      upload.single('file'),
+      this.multer.single('file'),
       this.postFile.bind(this)
     );
   }
 
   getFile = async (req, res) => {
-    // Check for Download permission
-    const ok = await this.auth.check_acl(
-      req.auth,
-      Perm.Download,
-      Class.FileType,
-      true
-    );
+    try {
+      const file_uuid = req.params.file_uuid;
 
-    if (!ok) return res.status(403).end();
+      if (!Valid.uuid.test(file_uuid)) return res.status(410).end();
 
-    let fileRes = await this.retrieveFileFromStorage(req, res);
+      // Check auth permission
+      // Todo: disable wildcard in the future
+      // Todo: update Target to be individaul File, at the moment it checks if Principal has Download permission to the whole FileType object under which all Files are stored.
+      const ok = await this.auth.check_acl(
+        req.auth,
+        Perm.Download,
+        Class.FileType,
+        true
+      );
 
-    return res.status(200).json({ authForDownload: true });
-  };
+      if (!ok) return res.status(403).end();
 
-  postFile = async (req, res) => {
-    const ok = await this.auth.check_acl(
-      req.auth,
-      Perm.Upload,
-      FileTypes.PDF,
-      true
-    );
+      const fileObj = await this.configDb.get_config(App.Config, file_uuid);
 
-    if (!ok) return res.status(403).end();
-
-    let fileRes = await this.upload_file_to_storage(req, res);
-
-    return res.status(200).json({ authForUpload: true });
-  };
-
-  retrieveFileFromStorage = async (req,res) => {
-    const file_uuid = req.params.file_uuid;
-  
-    try{
-      let fileObj = await this.configDb.get_config(App.FilesService, file_uuid);
-
-      if (!fileObj.file) {
-        // no file uuid means no file was found
-        return res.status(404).json({ message: 'No file was found' })
+      // File not found in ConfigDb
+      if (!fileObj || !fileObj.file_uuid) {
+        return res.status(404).json({ message: 'File not found in ConfigDb' });
       }
-      else{
-        let resFileType;
-        //Set file extension to make it easier to download in the correct format later
-        if(fileObj.file_type == FileTypes.TXT)
-        {
-          resFileType = ".txt";
-        }else if(fileObj.file_type == FileTypes.PDF)
-        {
-          resFileType = ".pdf";
-        }else if(fileObj.file_type == FileTypes.CAD)
-        {
-          resFileType = ".cad";
-        }
-        
-  
-        return res.status(200).download(process.env.FILES_STORAGE + '/' + file_uuid, (err) => {
+
+      return res
+        .status(200)
+        .download(process.env.FILES_STORAGE + '/' + file_uuid, (err) => {
           if (err) {
-            console.error('File download failed:', err);
+            console.error('Error: File download failed:', err);
           } else {
             console.log('File downloaded successfully.');
           }
         });
-      }
+    } catch (err) {
+      console.error('Error when getting file: ', err.message);
+      res.status(500).end();
     }
-    catch(e)
-    {
-      throw e;
-    }
-    
-    
-   
   };
 
-  upload_file_to_storage = async (req, res) => {
-    const file_type_uuid = req.params.file_type_uuid; //Get File type based on UUID 
+  postFile = async (req, res) => {
+    try {
+      const file_type_uuid = req.params.file_type_uuid;
+      if (!Valid.uuid.test(file_type_uuid))
+        return res.status(410).json({ message: 'file type uuid is invalid' });
 
-    //Check for File Type
+      if (!this.isFileTypeSupported(file_type_uuid)) {
+        return res.status(400).json({ message: 'File Type is not supported.' });
+      }
 
-    if (!req.file) {
-      return res.status(400).json({ message: 'No file uploaded' });
-    }
+      if (!req.file) {
+        return res.status(400).json({ message: 'No file uploaded' });
+      }
 
-    /*
-    Store the file object in config db as follows:
+      const file_uuid = req.file.filename;
+      console.log('File uploaded to storage with filename: ', file_uuid);
 
-      file uuid
-      file type uuid
-      date uploaded
-      user who uploaded
-      file size ?
-      application uuid 
-    */
-    let fileJSON = {
-        "file_uuid": req.file.filename,
-        "file_type_uuid": req.params.file_type_uuid,
-        "date_uploaded": new Date(),
-        "user_who_uploaded": process.env.USER_ACCOUNT_UUID,
-        "file_size": req.file.size,
-        "application_uuid": App.FilesService
+      if (!Valid.uuid.test(file_uuid))
+        return res
+          .status(410)
+          .json({ message: 'filename is not a valid uuid.' });
+
+      // Todo: disable wildcard in the future.
+      // Check ACL exists for the Principal to Upload to FileType. This means that the uploaded file objects will be stored under FileType (Rank2) object.
+      const ok = await this.auth.check_acl(
+        req.auth,
+        Perm.Upload,
+        Class.FileType,
+        true
+      );
+
+      if (!ok) return res.status(403).end();
+
+      // Create File object of File class with UUID generated during file upload
+      const created_uuid = await this.configDb.create_object(
+        Class.File,
+        file_uuid,
+        true
+      );
+
+      if (created_uuid !== file_uuid) {
+        console.error(
+          `CofngiDb ignored the provided file_uuid [${file_uuid}] and created a new one [${created_uuid}]`
+        );
+        return res.status(500).json({
+          message:
+            "Newly created file object's uuid is not the same as provided.",
+        });
+      }
+
+      const currDate = new Date();
+
+      let fileJSON = {
+        file_uuid: file_uuid,
+        file_type_uuid: file_type_uuid,
+        date_uploaded: currDate,
+        user_who_uploaded: process.env.USER_ACCOUNT_UUID,
+        file_size: req.file.size,
+        application_uuid: App.Config,
       };
 
-    if(file_type_uuid == FileTypes.TXT)
-    {
-      
-      let fileObj = await create_file_object_entry(FileTypes.TXT, req.file.filename); 
-
-    }else if (file_type_uuid == FileTypes.PDF)
-    {
-      let fileObj = await create_file_object_entry(FileTypes.PDF, req.file.filename);
-
-    }else if (file_type_uuid == FileTypes.CAD)
-    {
-      let fileObj = await create_file_object_entry(FileTypes.CAD, req.file.filename); 
-  
+      // Store the file config under App 'Files Configuration'
+      await this.configDb.put_config(App.Config, file_uuid, fileJSON);
+      console.log('Put to config completed.');
+      return res.status(201).json({ message: 'File uploaded successfully' });
+    } catch (err) {
+      console.error('Error when posting file: ', err.message);
+      res.status(500).end();
     }
-    else
-    {
-      return res.status(400).json({message: 'File type is unsupported'});
-    }
-
-
-    try{
-      let fileConfig = await this.configDb.put_config(process.env.FILE_SERVICE_APP_UUID, req.file.filename, fileJSON);
-    }
-    catch(e){
-      throw e;
-    }
-
-    return res.status(201).json({message:'File uploaded successfully'});
-    
   };
-}
 
-create_file_object_entry = async (filetype_uuid, file_uuid) =>
-{
-  try{
-    let file_obj_entry = await this.configDb.create_object(filetype_uuid, file_uuid);
+  isFileTypeSupported(file_type_uuid) {
+    return (
+      file_type_uuid === FileTypes.TXT ||
+      file_type_uuid === FileTypes.CSV ||
+      file_type_uuid === FileTypes.PDF ||
+      file_type_uuid === FileTypes.CAD
+    );
   }
-  catch (e) {
-    throw e;
-  }
-
-  return file_obj_entry;
 }

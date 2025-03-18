@@ -341,10 +341,10 @@ export const Files = {
   Class: {
     File: 'b8fae5ab-678e-4d35-802f-2dd8ee3b5b02',
     FileType: '923801b3-c97a-48d8-8af9-da97dc13fe2d',
-    FileGroup: "cd5b941e-f952-4cba-9db5-323b1db80d23"
+    FileGroup: 'cd5b941e-f952-4cba-9db5-323b1db80d23',
   },
   Service: {
-    Files: '2a6efc5-9793-4486-9fd9-7caf9e3b5451',
+    Files: 'a2a6efc5-9793-4486-9fd9-7caf9e3b5451',
   },
   FileType: {
     PDF: '291aa8d4-b743-46b2-a883-0fa1c94e419a',

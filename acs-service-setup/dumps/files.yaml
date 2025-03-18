@@ -17,41 +17,39 @@ objects:
 
   !u UUIDs.Class.Service:
     !u Files.Service.Files: { name: "Files hosting service" }
+
   !u UUIDs.Class.App:
     !u Files.App.Config: { name: "Files Configuration" }
+
   !u Files.Perm.All:
     !u Files.Perm.Upload: { name: "Upload" }
     !u Files.Perm.Download: { name: "Download" }
 
-  !u ConfigDB.Class.R1Class:
-    !u Files.Class.File: { name: "File" }
-
   !u ConfigDB.Class.R2Class:
-    !u Files.Class.FileGroup:
-      name: "File Group"
-
+    !u Files.Class.FileGroup: {name: "File Group"}
     !u Files.Class.FileType:
       name: "File Type"
       subclassOf:
         - !u Files.Class.FileGroup
 
-  !u Files.Class.FileType:
+  !u ConfigDB.Class.R1Class:
+    !u Files.Class.File: { name: "File" }
     !u Files.FileType.PDF:
-      name: "PDF"
-      subclassOf:
-        - !u Files.Class.File
+        name: "PDF"
+        subclassOf:
+          - !u Files.Class.File
     !u Files.FileType.CSV:
-      name: "CSV"
-      subclassOf:
-        - !u Files.Class.File
+        name: "CSV"
+        subclassOf:
+          - !u Files.Class.File
     !u Files.FileType.CAD:
-      name: "CAD"
-      subclassOf:
-        - !u Files.Class.File
+        name: "CAD"
+        subclassOf:
+          - !u Files.Class.File
     !u Files.FileType.TXT:
-      name: "TXT"
-      subclassOf:
-        - !u Files.Class.File
+        name: "TXT"
+        subclassOf:
+          - !u Files.Class.File
 
 ---
 service: !u UUIDs.Service.Authentication

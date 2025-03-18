@@ -2,7 +2,6 @@
 
 import { ServiceClient } from '@amrc-factoryplus/service-client';
 import { WebAPI } from '@amrc-factoryplus/service-api';
-import { Auth } from '../lib/auth.js';
 import { ConfigDB, Auth } from '@amrc-factoryplus/service-client/interface.js';
 import { routes } from '../lib/routes.js';
 import multer from 'multer';

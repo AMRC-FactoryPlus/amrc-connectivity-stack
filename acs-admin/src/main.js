@@ -8,6 +8,7 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import piniaPersist from 'pinia-plugin-persist'
 import { createRouter, createWebHashHistory } from 'vue-router'
+import mitt from 'mitt'
 
 import App from './App.vue'
 
@@ -24,6 +25,9 @@ import ConfigDB from "@pages/ConfigDB/ConfigDB.vue";
 import ApplicationEditor from "@pages/ConfigDB/Applications/ApplicationEditor.vue";
 import ApplicationObjectEditor from "@pages/ConfigDB/Applications/ApplicationObjectEditor.vue";
 import ObjectPage from "@pages/ConfigDB/Objects/ObjectPage.vue";
+
+// Create an event bus
+window.events = mitt()
 
 const routes = [
   {

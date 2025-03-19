@@ -42,3 +42,7 @@ dependencies:
     repository: https://charts.jetstack.io
     version: v1.14.4
     condition: acs.letsEncrypt.enabled
+  - name: spark-operator
+    version: 2.1.0
+    repository: https://kubeflow.github.io/spark-operator
+    condition: spark-operator.enabled

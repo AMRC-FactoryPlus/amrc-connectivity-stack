@@ -17,5 +17,8 @@ dependencies:
 - name: cert-manager
   repository: https://charts.jetstack.io
   version: v1.14.4
-digest: sha256:5e6b7a20a96c54dba427cd3913ff2f8246e6a1125b82e2cafd6eb710b722d77d
-generated: "2024-04-19T12:00:46.600094+01:00"
+- name: spark-operator
+  repository: https://kubeflow.github.io/spark-operator
+  version: 2.1.0
+digest: sha256:9e2a4491519a27df52a6d623c42d00d0282cf9547b4d879d9bfb8672e1ec2349
+generated: "2025-03-19T13:40:47.2785559Z"

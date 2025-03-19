@@ -71,13 +71,9 @@
 <script>
 import { useNodeStore } from '@store/useNodeStore.js'
 import EdgeContainer from '@components/Containers/EdgeContainer.vue'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import LinkUserDialog from '@pages/AccessControl/LinkUserDialog.vue'
 import { Label } from '@components/ui/label/index.js'
 import { Input } from '@components/ui/input/index.js'
 import { Button } from '@components/ui/button/index.js'
-import DataTable from '@components/ui/data-table/DataTable.vue'
-import { Alert, AlertDescription, AlertTitle } from '@components/ui/alert/index.js'
 import { toast } from 'vue-sonner'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card/index.js'
 import Copyable from '@components/Copyable.vue'
@@ -88,25 +84,15 @@ import { UUIDs } from '@amrc-factoryplus/service-client'
 import { useDeviceStore } from '@store/useDeviceStore.js'
 import EdgePageSkeleton from '@components/EdgeManager/EdgePageSkeleton.vue'
 import { inop } from '@utils/inop.js'
-import { deviceColumns } from './deviceColumns.ts'
 
 export default {
   components: {
     EdgePageSkeleton,
-    AlertDescription,
-    Alert,
-    AlertTitle,
-    DataTable,
     Button,
     CardContent,
     Card,
     Input,
     Label,
-    LinkUserDialog,
-    Tabs,
-    TabsContent,
-    TabsList,
-    TabsTrigger,
     EdgeContainer,
     CardDescription,
     CardFooter,
@@ -121,7 +107,6 @@ export default {
       n: useNodeStore(),
       d: useDeviceStore(),
       inop,
-      deviceColumns
     }
   },
 
@@ -137,9 +122,7 @@ export default {
   },
 
   methods: {
-    deviceColumns () {
-      return deviceColumns
-    },
+
     async getNodeDetails (uuid) {
 
       this.loadingDetails = true

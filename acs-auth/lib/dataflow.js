@@ -241,7 +241,7 @@ export class DataFlow {
 
         return Optional.of(rxx.rx(
             rx.combineLatest(filtered, permitted),
-            rx.map((ids, perm) => cond.uuid
+            rx.map(([ids, perm]) => cond.uuid
                 ? perm?.(cond.uuid)
                     ? Response.ok(ids)
                     : Response.of(403)

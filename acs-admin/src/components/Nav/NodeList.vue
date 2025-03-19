@@ -27,7 +27,7 @@
       </RouterLink>
       <CollapsibleContent>
         <SidebarMenuSub>
-          <DeviceList :node/>
+          <DeviceList :node :cluster/>
         </SidebarMenuSub>
       </CollapsibleContent>
     </Collapsible>

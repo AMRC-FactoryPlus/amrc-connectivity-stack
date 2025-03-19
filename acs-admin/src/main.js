@@ -16,6 +16,7 @@ import Alerts from '@pages/Alerts/Alerts.vue'
 import AccessControl from '@pages/AccessControl/AccessControl.vue'
 import EdgeCluster from '@pages/EdgeManager/EdgeClusters/EdgeCluster.vue'
 import Node from '@pages/EdgeManager/Nodes/Node.vue'
+import Device from '@pages/EdgeManager/Devices/Device.vue'
 
 const routes = [
   {
@@ -59,6 +60,13 @@ const routes = [
     component: Node,
     meta: {
       name: 'Node',
+    },
+  }, {
+    name: 'Device',
+    path: '/edge-clusters/:clusteruuid/nodes/:nodeuuid/devices/:deviceuuid',
+    component: Device,
+    meta: {
+      name: 'Device',
     },
   },
 ]

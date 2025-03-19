@@ -84,14 +84,15 @@ export default class AuthZ {
         if (!valid_uuid(uuid))
             return res.status(410).end();
 
-        /* This API only ever returns Kerberos identities */
-        const id = await this.data.find_identities(i => 
-            i.uuid == uuid && i.kind == "kerberos");
-        const kerberos = id[0]?.name;
-
         /* The permissions here are odd for historical reasons. If the
          * principal turns out to be the client's they can look up
          * regardless. */
+
+        /* This API only ever returns Kerberos identities */
+        const idr = await this.data.find_identities(
+            this.data.root, { uuid, kind: "kerberos" });
+        const kerberos = idr.single().map(id => id.name);
+
         const tok = await this.data.check_targ(req.auth, Perm.ReadKrb, true);
         if (!(kerberos == req.auth || tok?.(uuid)))
             return res.status(403).end();

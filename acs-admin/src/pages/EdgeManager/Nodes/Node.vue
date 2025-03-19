@@ -29,11 +29,11 @@
             detail-tooltip="The cluster that this host is part of"
         />
       </div>
-      <DataTable :data="node.devices" :columns="deviceColumns" :filters="[]">
+<!--      <DataTable :data="node.devices" :columns="deviceColumns" :filters="[]">-->
 <!--        <template #toolbar-left>-->
 <!--          <div class="text-xl font-semibold">{{`${node.devices.length} Device${node.devices.length > 1 ? 's' : ''}`}}</div>-->
 <!--        </template>-->
-      </DataTable>
+<!--      </DataTable>-->
     </div>
   </EdgeContainer>
 </template>

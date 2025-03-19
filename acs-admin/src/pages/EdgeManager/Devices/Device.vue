@@ -9,34 +9,22 @@
       <div class="flex items-center gap-2">
         <DetailCard
             class="w-1/3 flex items-center justify-center"
-            title="Details"
-            title-icon="id-badge"
-            text="[Name]"
+            :text="device.name"
             text-tooltip="The name of the device"
-            detail="[Instance_UUID]"
-            detail-icon="hashtag"
-            detail-tooltip="The Instance_UUID of the device"
-            :action="inop"
-            action-tooltip="Change the device name"
-            action-icon="edit"
+            :detail="device.sparkplugName"
+            detail-icon="bolt-lightning"
+            detail-tooltip="The Sparkplug name of the device"
         />
         <DetailCard
             class="w-1/3 flex items-center justify-center"
-            title="Schema"
-            title-icon="code"
             text="[Schema Type]"
             text-tooltip="The schema that the device is using"
             detail="[Version]"
             detail-icon="square-v"
             detail-tooltip="The version of the schema that this device is using"
-            :action="inop"
-            action-tooltip="Change the schema name"
-            action-icon="edit"
         />
         <DetailCard
             class="w-1/3 flex items-center justify-center"
-            title="Device Connection"
-            title-icon="ethernet"
         >
           [Dropdown here to show connections]
         </DetailCard>

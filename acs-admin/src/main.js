@@ -7,6 +7,7 @@ import './assets/main.css'
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import { createRouter, createWebHashHistory } from 'vue-router'
+import mitt from 'mitt'
 
 import App from './App.vue'
 
@@ -19,6 +20,9 @@ import Login from "@pages/Login.vue";
 import EdgeCluster from '@pages/EdgeManager/EdgeClusters/EdgeCluster.vue'
 import Node from '@pages/EdgeManager/Nodes/Node.vue'
 import Device from '@pages/EdgeManager/Devices/Device.vue'
+
+// Create an event bus
+window.events = mitt()
 
 const routes = [
   {

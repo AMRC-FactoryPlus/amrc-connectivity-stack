@@ -8,16 +8,6 @@ import * as rx from "rxjs";
 import * as rxx     from "@amrc-factoryplus/rx-util";
 import { Notify }   from "@amrc-factoryplus/service-api";
 
-function to_update (response, ix) {
-    return { status: ix ? 200 : 201, response };
-}
-
-function set_response (items) {
-    if (!items)
-        return { status: 403 };
-    return { status: 200, body: [...new Set(items)] };
-}
-
 export class AuthNotify {
     constructor (opts) {
         this.data   = opts.data;
@@ -43,10 +33,12 @@ export class AuthNotify {
     }
 
     principal_list (sess) {
+        const idt = this.data.track_identities(sess.principal);
+        if (!idt.isPresent) return { status: 404 };
+
         return rxx.rx(
-            this.data.track_identities(sess.principal, () => true),
-            rx.map(ids => ids?.map(i => i.uuid)),
-            rx.map(set_response),
-            rx.map(to_update));
+            idt.get(),
+            rx.map(idr => idr.uniq(i => i.uuid)),
+            rx.map((res, ix) => res.toUpdate(ix)));
     }
 }

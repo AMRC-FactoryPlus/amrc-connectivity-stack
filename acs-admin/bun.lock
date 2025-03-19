@@ -23,6 +23,7 @@
         "dayjs": "^1.11.13",
         "immutable": "^5.0.3",
         "lucide-vue-next": "^0.479.0",
+        "mitt": "^3.0.1",
         "numeral": "^2.0.6",
         "pinia": "^2.3.1",
         "postcss": "^8.5.1",

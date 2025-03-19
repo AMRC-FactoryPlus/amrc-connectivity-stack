@@ -18,7 +18,7 @@
       </Button>
     </RouterLink>
   </SidebarMenuItem>
-  <Button disabled class="flex items-center justify-center gap-1 text-gray-400 my-1" variant="ghost" size="sm">
+  <Button @click="newDevice" class="flex items-center justify-center gap-1 text-gray-400 my-1" variant="ghost" size="sm">
     <i class="fa-solid fa-plus"></i>
     <span>New Device</span>
   </Button>
@@ -29,6 +29,7 @@
 import { SidebarGroup, SidebarGroupContent, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarMenuSub } from '@/components/ui/sidebar'
 import { Button } from '@components/ui/button'
 import { useDeviceStore } from '@store/useDeviceStore.js'
+import NewDeviceDialog from '@/components/EdgeManager/Devices/NewDeviceDialog.vue'
 
 export default {
 
@@ -46,6 +47,7 @@ export default {
     SidebarMenuButton,
     SidebarMenuSub,
     Button,
+    NewDeviceDialog
   },
 
   props: {
@@ -69,6 +71,12 @@ export default {
 
   async mounted () {
     await this.s.fetch()
+  },
+
+  methods: {
+    newDevice () {
+      window.events.emit('show-new-device-dialog-for-node', this.node);
+    },
   },
 }
 </script>

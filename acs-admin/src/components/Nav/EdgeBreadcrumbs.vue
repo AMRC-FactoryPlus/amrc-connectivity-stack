@@ -27,8 +27,8 @@
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
-    <div v-if="currentNode" class="flex items-center">
-      <span class="mr-4">/</span>
+    <span v-if="currentNode">/</span>
+    <div v-if="currentNode" class="flex items-center p-3">
       <RouterLink :to="`/edge-clusters/${currentEdgeCluster?.uuid}/nodes/${currentNode?.uuid}`">
         <Button title="Go to node" variant="ghost" size="sm">
           <i class="fa-solid fa-cube mr-2"></i>
@@ -51,12 +51,13 @@
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
-    <!--    TODO: Implement device lookup-->
-    <div v-if="currentDevice" class="flex items-center">
-      <span class="mr-4">/</span>
-      <i class="fa-solid fa-plug mr-2"></i>
-      <RouterLink :to="`/edge-clusters/${currentEdgeCluster?.uuid}`">
-        <Button title="Go to cluster" variant="ghost" size="plain" class="p-2">{{currentEdgeCluster?.name}}</Button>
+    <span v-if="currentDevice">/</span>
+    <div v-if="currentDevice" class="flex items-center p-3">
+      <RouterLink :to="`/edge-clusters/${currentEdgeCluster?.uuid}/nodes/${currentNode?.uuid}/devices/${currentDevice?.uuid}`">
+        <Button title="Go to device" variant="ghost" size="sm">
+          <i class="fa-solid fa-plug mr-2"></i>
+          {{currentDevice?.name}}
+        </Button>
       </RouterLink>
       <DropdownMenu>
         <DropdownMenuTrigger>
@@ -68,8 +69,10 @@
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent>
-          <RouterLink :key="edgeCluster.uuid" v-for="edgeCluster in edgeClusters" :to="`/edge-clusters/${edgeCluster.uuid}`">
-            <DropdownMenuItem class="cursor-pointer">{{edgeCluster.name}}</DropdownMenuItem>
+          <RouterLink :key="device.uuid"
+              v-for="device in devices"
+              :to="`/edge-clusters/${currentEdgeCluster?.uuid}/nodes/${currentNode?.uuid}/devices/${device?.uuid}`">
+            <DropdownMenuItem class="cursor-pointer">{{device.name}}</DropdownMenuItem>
           </RouterLink>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -80,6 +83,7 @@
 
 import { useEdgeClusterStore } from '@store/useEdgeClusterStore.js'
 import { useNodeStore } from '@store/useNodeStore.js'
+import { useDeviceStore } from '@store/useDeviceStore.js'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Button } from '@components/ui/button/index.js'
 
@@ -100,6 +104,7 @@ export default {
     return {
       useEdgeClusterStore,
       useNodeStore,
+      useDeviceStore,
     }
   },
 
@@ -130,8 +135,13 @@ export default {
 
     // ║  Devices  ║
     // ╚═══════════╝
+    devices () {
+      return useDeviceStore().data.filter((device) => device.node === this.$route.params.nodeuuid)
+    },
     currentDevice () {
-      return null
+      if (useDeviceStore().data instanceof Array) {
+        return useDeviceStore().data.find((device) => device.uuid === this.$route.params.deviceuuid)
+      }
     },
   },
 }

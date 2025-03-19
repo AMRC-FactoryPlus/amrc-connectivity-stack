@@ -25,6 +25,9 @@ objects:
     !u Files.Perm.Upload: { name: "Upload" }
     !u Files.Perm.Download: { name: "Download" }
 
+  !u ConfigDB.Class.R1Class:
+    !u Files.Class.File: { name: "File" }
+
   !u ConfigDB.Class.R2Class:
     !u Files.Class.FileGroup: {name: "File Group"}
     !u Files.Class.FileType:
@@ -32,8 +35,7 @@ objects:
       subclassOf:
         - !u Files.Class.FileGroup
 
-  !u ConfigDB.Class.R1Class:
-    !u Files.Class.File: { name: "File" }
+  !u Files.Class.FileType:
     !u Files.FileType.PDF:
         name: "PDF"
         subclassOf:

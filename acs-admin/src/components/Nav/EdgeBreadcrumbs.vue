@@ -8,7 +8,7 @@
       <RouterLink :to="`/edge-clusters/${currentEdgeCluster?.uuid}`">
         <Button title="Go to cluster" variant="ghost" size="sm">
           <i class="fa-solid fa-circle-nodes mr-2"></i>
-          {{currentEdgeCluster?.name}}
+          <div :class="!currentNode ? '!font-bold' : ''">{{currentEdgeCluster?.name}}</div>
         </Button>
       </RouterLink>
       <DropdownMenu>
@@ -32,7 +32,7 @@
       <RouterLink :to="`/edge-clusters/${currentEdgeCluster?.uuid}/nodes/${currentNode?.uuid}`">
         <Button title="Go to node" variant="ghost" size="sm">
           <i class="fa-solid fa-cube mr-2"></i>
-          {{currentNode?.name}}
+          <div :class="!currentDevice ? '!font-bold' : ''">{{currentNode?.name}}</div>
         </Button>
       </RouterLink>
       <DropdownMenu>
@@ -56,7 +56,7 @@
       <RouterLink :to="`/edge-clusters/${currentEdgeCluster?.uuid}/nodes/${currentNode?.uuid}/devices/${currentDevice?.uuid}`">
         <Button title="Go to device" variant="ghost" size="sm">
           <i class="fa-solid fa-plug mr-2"></i>
-          {{currentDevice?.name}}
+          <div class="!font-bold">{{currentDevice?.name}}</div>
         </Button>
       </RouterLink>
       <DropdownMenu>

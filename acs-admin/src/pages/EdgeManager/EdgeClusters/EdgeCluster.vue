@@ -76,11 +76,8 @@ import { UUIDs } from '@amrc-factoryplus/service-client'
 import { useNodeStore } from '@store/useNodeStore.js'
 import EdgeContainer from '@components/Containers/EdgeContainer.vue'
 import EdgePageSkeleton from '@components/EdgeManager/EdgePageSkeleton.vue'
-import PermissionList from '@pages/AccessControl/Permissions/PermissionList.vue'
-import PrincipalList from '@pages/AccessControl/PrincipalList.vue'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import LinkUserDialog from '@pages/AccessControl/LinkUserDialog.vue'
-import GroupList from '@pages/AccessControl/GroupList.vue'
 import { Label } from '@components/ui/label/index.js'
 import { Input } from '@components/ui/input/index.js'
 import { Button } from '@components/ui/button/index.js'
@@ -103,14 +100,11 @@ export default {
     Card,
     Input,
     Label,
-    GroupList,
     LinkUserDialog,
     Tabs,
     TabsContent,
     TabsList,
     TabsTrigger,
-    PrincipalList,
-    PermissionList,
     EdgeContainer,
     CardDescription,
     CardFooter,

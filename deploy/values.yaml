@@ -384,6 +384,7 @@ tenant:
       - name: "device-configurations"
       - name: "device-connections"
       - name: "edge-agent-configs"
+      - name: "delta-lake"
     ## List of secret names to use for generating MinIO users during tenant provisioning
     users:
       - name: "manager-minio-secret"
@@ -405,3 +406,18 @@ influxdb2:
 
 cert-manager:
   fullnameOverride: "cert-manager"
+
+spark:
+  enabled: true
+  controller:
+    uiIngress:
+      enable: true
+      urlFormat: "spark-console.factoryplus.app.amrc.co.uk/{{$appNamespace}}/{{$appName}}"
+      ingressClassName: "acs-traefik"
+    serviceAccount:
+      name: "spark-operator"
+  spark:
+    jobNamespaces:
+      - factory-plus
+    serviceAccount:
+      name: "spark-application"

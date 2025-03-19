@@ -77,7 +77,6 @@ import { useNodeStore } from '@store/useNodeStore.js'
 import EdgeContainer from '@components/Containers/EdgeContainer.vue'
 import EdgePageSkeleton from '@components/EdgeManager/EdgePageSkeleton.vue'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import LinkUserDialog from '@pages/AccessControl/LinkUserDialog.vue'
 import { Label } from '@components/ui/label/index.js'
 import { Input } from '@components/ui/input/index.js'
 import { Button } from '@components/ui/button/index.js'
@@ -100,7 +99,6 @@ export default {
     Card,
     Input,
     Label,
-    LinkUserDialog,
     Tabs,
     TabsContent,
     TabsList,

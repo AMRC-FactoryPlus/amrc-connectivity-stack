@@ -28,7 +28,7 @@ export class APIv1 {
     );
   }
 
-  getFile = async (req, res) => {
+  async getFile(req, res) {
     try {
       const file_uuid = req.params.file_uuid;
 
@@ -63,9 +63,9 @@ export class APIv1 {
     } catch (err) {
       return res.status(500).json(err.message);
     }
-  };
+  }
 
-  postFile = async (req, res) => {
+  async postFile(req, res) {
     try {
       const file_type_uuid = req.params.file_type_uuid;
 
@@ -143,7 +143,7 @@ export class APIv1 {
     } catch (err) {
       res.status(500).json({ message: err.message });
     }
-  };
+  }
 
   isFileTypeSupported(file_type_uuid) {
     return (

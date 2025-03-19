@@ -7,62 +7,27 @@
     <EdgePageSkeleton v-if="loadingDetails"/>
     <div v-else class="flex flex-col gap-4">
       <div class="flex items-center justify-center gap-2">
-        <Card class="w-3/5 h-36">
-          <CardHeader>
-            <div class="flex items-center justify-between gap-1">
-              <div class="flex flex-col gap-1">
-                <div class="flex mb-2">
-                  <div class="px-1.5 py-0.5 rounded-md bg-gray-500 text-sm font-bold uppercase tracking-wide text-white">
-                    INOP
-                  </div>
-                </div>
-                <Copyable :text="node.name">
-                  <CardTitle title="Node friendly name" class="text-2xl">
-                    {{node.name}}
-                  </CardTitle>
-                </Copyable>
-                <Copyable :text="node.name">
-                  <div title="Sparkplug Node ID"
-                      class="flex items-center justify-center gap-1 text-sm text-gray-600 hover:text-gray-950 bg-gray-100 px-1.5 py-0.5 rounded-md">
-                    <i class="fa-solid fa-bolt-lightning"></i>
-                    <div>{{node.sparkplug.node_id}}</div>
-                  </div>
-                </Copyable>
-              </div>
-            </div>
-          </CardHeader>
-        </Card>
-        <Card class="w-2/5 h-36">
-          <CardHeader>
-            <div class="flex items-center justify-between gap-1">
-              <div class="flex flex-col gap-1">
-                <h3 class="text-gray-500 text-sm">
-                  <i class="fa-solid fa-server text-xs"></i>
-                  Host
-                </h3>
-                <Copyable :text="node.name">
-                  <CardTitle title="Node friendly name" class="text-2xl">
-                    {{node.hostname}}
-                  </CardTitle>
-                </Copyable>
-                <Copyable :text="node.clusterDetails.name">
-                  <div title="Edge cluster"
-                      class="flex items-center justify-center gap-1 text-sm text-gray-600 hover:text-gray-950 bg-gray-100 px-1.5 py-0.5 rounded-md">
-                    <i class="fa-solid fa-circle-nodes"></i>
-                    <div>{{node.clusterDetails.name}}</div>
-                  </div>
-                </Copyable>
-              </div>
-              <Button @click="inop()"
-                  title="Change the host or cluster that this node is physically deployed on"
-                  variant="ghost"
-                  class="flex items-center gap-2">
-                <i class="fa-solid fa-arrow-right-arrow-left"></i>
-                Move
-              </Button>
-            </div>
-          </CardHeader>
-        </Card>
+        <DetailCard
+            class="w-3/5 flex items-center justify-center"
+            :text="node.name"
+            text-tooltip="The name of the node"
+            :detail="node.sparkplug.node_id"
+            detail-icon="bolt-lightning"
+            detail-tooltip="The Sparkplug name of the Node"
+            :second-detail="node.uuid"
+            second-detail-icon="hashtag"
+            second-detail-tooltip="The UUID of the Node"
+        />
+        <DetailCard
+            class="w-2/5 flex items-center justify-center"
+            titleIcon="server"
+            title="Host"
+            :text="node.hostname"
+            text-tooltip="The physical name of the host that this node is running on"
+            :detail="node.clusterDetails.name"
+            detail-icon="circle-nodes"
+            detail-tooltip="The cluster that this host is part of"
+        />
       </div>
     </div>
   </EdgeContainer>
@@ -84,9 +49,11 @@ import { UUIDs } from '@amrc-factoryplus/service-client'
 import { useDeviceStore } from '@store/useDeviceStore.js'
 import EdgePageSkeleton from '@components/EdgeManager/EdgePageSkeleton.vue'
 import { inop } from '@utils/inop.js'
+import DetailCard from '@components/DetailCard.vue'
 
 export default {
   components: {
+    DetailCard,
     EdgePageSkeleton,
     Button,
     CardContent,

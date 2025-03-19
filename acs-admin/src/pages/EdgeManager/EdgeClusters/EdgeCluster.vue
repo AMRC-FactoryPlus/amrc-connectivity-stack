@@ -6,37 +6,22 @@
   <EdgeContainer>
     <EdgePageSkeleton v-if="loadingDetails"/>
     <div v-else class="flex flex-col gap-4">
-      <Card>
-        <CardHeader>
-          <div class="flex items-center justify-between gap-1">
-            <div class="flex flex-col gap-1">
-              <div class="flex mb-2">
-                <div class="px-1.5 py-0.5 rounded-md bg-green-600 text-sm font-bold uppercase tracking-wide text-white">
-                  INOP
-                </div>
-              </div>
-              <Copyable :text="cluster.name">
-                <CardTitle class="text-2xl">
-                  {{cluster.name}}
-                </CardTitle>
-              </Copyable>
-              <Copyable :text="cluster.name">
-                <div class="flex items-center justify-center gap-1 text-sm text-gray-600 hover:text-gray-950 bg-gray-100 px-1.5 py-0.5 rounded-md">
-                  <i class="fa-solid fa-dharmachakra"></i>
-                  <div>{{cluster.helmChart.chart}}</div>
-                </div>
-              </Copyable>
-            </div>
-            <div class="flex bg-white items-center justify-between gap-2">
-              <Button size="sm" class="flex items-center justify-center gap-2" @click="copyBootstrap">
-                <span class="hidden md:inline">Bootstrap</span>
-                <i v-if="copyingBootstrap" class="fa-solid fa-circle-notch animate-spin"></i>
-                <i v-else class="fa-solid fa-rocket"></i>
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-      </Card>
+      <DetailCard
+          badge="Status?"
+          :text="cluster.name"
+          text-tooltip="The name of the cluster"
+          :detail="cluster.helmChart.chart"
+          detail-icon="dharmachakra"
+          detail-tooltip="The deployed Helm Chart"
+      >
+        <template #action>
+          <Button size="sm" class="flex items-center justify-center gap-2" @click="copyBootstrap">
+            <span class="hidden md:inline">Bootstrap</span>
+            <i v-if="copyingBootstrap" class="fa-solid fa-circle-notch animate-spin"></i>
+            <i v-else class="fa-solid fa-rocket"></i>
+          </Button>
+        </template>
+      </DetailCard>
       <Tabs default-value="nodes" class="flex flex-col">
         <div class="flex items-center justify-between gap-2">
           <TabsList>
@@ -87,9 +72,11 @@ import { Alert, AlertDescription, AlertTitle } from '@components/ui/alert/index.
 import { toast } from 'vue-sonner'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card/index.js'
 import Copyable from '@components/Copyable.vue'
+import DetailCard from '@components/DetailCard.vue'
 
 export default {
   components: {
+    DetailCard,
     AlertDescription,
     Alert,
     AlertTitle,

@@ -58,5 +58,9 @@ grants:
   !u Files.Requirement.ServiceAccount:
     !u Auth.Perm.ReadACL:
       !u Files.Perm.All: true
+    !u ConfigDB.Perm.WriteConfig:
+      !u Files.App.Config: true
+    !u ConfigDB.Perm.ManageObjects:
+      !u Files.Class.File: true
   !u ACS.Group.Administrator:
     !u Files.Perm.All: null

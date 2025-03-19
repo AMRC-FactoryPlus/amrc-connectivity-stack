@@ -32,7 +32,11 @@ export class APIv1 {
     try {
       const file_uuid = req.params.file_uuid;
 
-      if (!Valid.uuid.test(file_uuid)) return res.status(410).end();
+      if (!file_uuid)
+        return res.status(400).json({ message: 'file_uuid not provided.' });
+
+      if (!Valid.uuid.test(file_uuid))
+        return res.status(410).json({ message: 'file_uuid is invalid' });
 
       // Check auth permission
       // Todo: disable wildcard in the future
@@ -40,37 +44,36 @@ export class APIv1 {
       const ok = await this.auth.check_acl(
         req.auth,
         Perm.Download,
-        Class.FileType,
+        App.Config,
         true
       );
 
-      if (!ok) return res.status(403).end();
-
-      const fileObj = await this.configDb.get_config(App.Config, file_uuid);
-
-      // File not found in ConfigDb
-      if (!fileObj || !fileObj.file_uuid) {
-        return res.status(404).json({ message: 'File not found in ConfigDb' });
-      }
+      if (!ok)
+        return res
+          .status(403)
+          .json({ message: 'Do not have Download permission' });
 
       return res
         .status(200)
         .download(process.env.FILES_STORAGE + '/' + file_uuid, (err) => {
           if (err) {
-            console.error('Error: File download failed:', err);
-          } else {
-            console.log('File downloaded successfully.');
+            throw err;
           }
         });
     } catch (err) {
-      console.error('Error when getting file: ', err.message);
-      res.status(500).end();
+      return res.status(500).json(err.message);
     }
   };
 
   postFile = async (req, res) => {
     try {
       const file_type_uuid = req.params.file_type_uuid;
+
+      if (!file_type_uuid)
+        return res
+          .status(400)
+          .json({ message: 'File type uuid is not provided.' });
+
       if (!Valid.uuid.test(file_type_uuid))
         return res.status(410).json({ message: 'file type uuid is invalid' });
 
@@ -83,7 +86,6 @@ export class APIv1 {
       }
 
       const file_uuid = req.file.filename;
-      console.log('File uploaded to storage with filename: ', file_uuid);
 
       if (!Valid.uuid.test(file_uuid))
         return res
@@ -92,16 +94,22 @@ export class APIv1 {
 
       // Todo: disable wildcard in the future.
       // Check ACL exists for the Principal to Upload to FileType. This means that the uploaded file objects will be stored under FileType (Rank2) object.
+
       const ok = await this.auth.check_acl(
         req.auth,
         Perm.Upload,
-        Class.FileType,
+        App.Config,
         true
       );
 
-      if (!ok) return res.status(403).end();
+      if (!ok) {
+        return res.status(403).json({
+          message: 'Does not have permission to Upload',
+        });
+      }
 
-      // Create File object of File class with UUID generated during file upload
+      // Create File object of File class with UUID generated during file upload, True means fail if object already exists
+
       const created_uuid = await this.configDb.create_object(
         Class.File,
         file_uuid,
@@ -109,9 +117,6 @@ export class APIv1 {
       );
 
       if (created_uuid !== file_uuid) {
-        console.error(
-          `ConfigDb ignored the provided file_uuid [${file_uuid}] and created a new one [${created_uuid}]`
-        );
         return res.status(500).json({
           message:
             "Newly created file object's uuid is not the same as provided.",
@@ -131,11 +136,12 @@ export class APIv1 {
 
       // Store the file config under App 'Files Configuration'
       await this.configDb.put_config(App.Config, file_uuid, fileJSON);
-      console.log('Put to config completed.');
-      return res.status(201).json({ message: 'File uploaded successfully' });
+
+      return res.status(201).json({
+        message: 'File uploaded successfully and its metadata put to ConfigDB.',
+      });
     } catch (err) {
-      console.error('Error when posting file: ', err.message);
-      res.status(500).end();
+      res.status(500).json({ message: err.message });
     }
   };
 

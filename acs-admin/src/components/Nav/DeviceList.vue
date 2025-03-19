@@ -4,17 +4,19 @@
 
 <template>
   <SidebarMenuItem v-for="device in devices" :key="device.uuid" v-if="devices.length">
-    <Button
-        title="View Device"
-        size="sm"
-        variant="ghost"
-        class="w-full text-left justify-start ml-4"
-    >
-      <div class="flex items-center justify-center gap-2">
-        <i :class="`fa-solid fa-microchip`"></i>
-        <span>{{device.name}}</span>
-      </div>
-    </Button>
+    <RouterLink :to="`/edge-clusters/${cluster.uuid}/nodes/${node.uuid}/devices/${device.uuid}`">
+      <Button
+          title="View Device"
+          size="sm"
+          variant="ghost"
+          class="w-full text-left justify-start ml-4"
+      >
+        <div class="flex items-center justify-center gap-2">
+          <i :class="`fa-solid fa-microchip`"></i>
+          <span>{{device.name}}</span>
+        </div>
+      </Button>
+    </RouterLink>
   </SidebarMenuItem>
   <Button disabled class="flex items-center justify-center gap-1 text-gray-400 my-1" variant="ghost" size="sm">
     <i class="fa-solid fa-plus"></i>
@@ -47,6 +49,9 @@ export default {
   },
 
   props: {
+    cluster: {
+      type: Object,
+    },
     node: {
       type: Object,
     },

@@ -1,6 +1,6 @@
 import * as dotenv from 'dotenv';
 import express from 'express';
-import { App, Class, FileTypes, Perm } from './constants.js';
+import { App, Class, FileType, Perm } from './constants.js';
 
 dotenv.config({});
 
@@ -12,7 +12,7 @@ export class APIv1 {
   constructor(opts) {
     this.configDb = opts.configDb;
     this.auth = opts.auth;
-    this.multer = opts.multer;
+    this.upload = opts.upload;
     this.routes = express.Router();
     this.setup_routes();
   }
@@ -23,7 +23,7 @@ export class APIv1 {
     api.get('/:file_uuid', this.getFile.bind(this));
     api.post(
       '/:file_type_uuid',
-      this.multer.single('file'),
+      this.upload.single('file'),
       this.postFile.bind(this)
     );
   }
@@ -141,10 +141,10 @@ export class APIv1 {
 
   isFileTypeSupported(file_type_uuid) {
     return (
-      file_type_uuid === FileTypes.TXT ||
-      file_type_uuid === FileTypes.CSV ||
-      file_type_uuid === FileTypes.PDF ||
-      file_type_uuid === FileTypes.CAD
+      file_type_uuid === FileType.TXT ||
+      file_type_uuid === FileType.CSV ||
+      file_type_uuid === FileType.PDF ||
+      file_type_uuid === FileType.CAD
     );
   }
 }

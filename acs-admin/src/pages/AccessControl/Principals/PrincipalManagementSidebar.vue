@@ -5,13 +5,13 @@
 <template>
   <SheetContent v-if="principal" class="gap-6 flex flex-col overflow-auto">
     <SheetHeader>
-      <SheetTitle>{{ principal.class.name ?? "Principal" }}</SheetTitle>
-      <SheetTitle>{{principal.name}}</SheetTitle>
+      <SheetTitle title="Name">{{principal.name}}</SheetTitle>
+      <SheetTitle title="Principal Class" class="text-gray-500">{{ principal.class.name ?? "Principal" }} - Principal</SheetTitle>
       <SheetDescription>
-        {{principal.kerberos}}
+        <Copyable :text="principal.kerberos">{{principal.kerberos}}</Copyable>
       </SheetDescription>
       <SheetDescription>
-        {{principal.uuid}}
+        <Copyable :text="principal.uuid">{{principal.uuid}}</Copyable>
       </SheetDescription>
     </SheetHeader>
     <div>
@@ -48,6 +48,7 @@ import EffectivePermissionsTab from './EffectivePermissionsTab.vue'
 import GroupsTab from './GroupsTab.vue'
 import PermissionsTab from './PermissionsTab.vue'
 import MembersTab from "@pages/AccessControl/Groups/MembersTab.vue";
+import Copyable from "@components/Copyable.vue";
 
 export default {
   name: 'PrincipalManagementSidebar',
@@ -55,6 +56,7 @@ export default {
   emits: ['objectClick'],
 
   components: {
+    Copyable,
     MembersTab,
     SheetHeader,
     SheetTitle,

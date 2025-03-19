@@ -40,17 +40,18 @@ function handleDelete() {
         title: 'Revoke this permission?',
         message: `Are you sure that you want to revoke ${props.row.original.permission.name} on ${props.row.original.target.name} from ${props.row.original.principal.name}?`,
         confirmText: 'Revoke Permission',
-        onConfirm: () => {
-            s.client.Auth.delete_ace (props.row.original.principal.uuid, props.row.original.permission.uuid, props.row.original.target.uuid).then(async () => {
-              toast.success(`${props.row.original.permission.name} on ${props.row.original.target.name} has been revoked from ${props.row.original.principal.name}`)
-              s.client.Fetch.cache = "reload"
-              // Jetbrains doesn't understand this, but it works
-              await permissionMembershipUpdated()
-              s.client.Fetch.cache = "default"
-            }).catch((err) => {
-              toast.error(`Unable to revoke ${props.row.original.permission.name} on ${props.row.original.target.name} from ${props.row.original.principal.name}`)
-              console.error(`Unable to revoke ${props.row.original.permission.name} on ${props.row.original.target.name} from ${props.row.original.principal.name}`, err)
-            })
+        onConfirm: async () => {
+          try {
+            await s.client.Auth.delete_grant(props.row.original.uuid)
+            toast.success(`${props.row.original.permission.name} on ${props.row.original.target.name} has been revoked from ${props.row.original.principal.name}`)
+            s.client.Fetch.cache = "reload"
+            // Jetbrains doesn't understand this, but it works
+            await permissionMembershipUpdated()
+            s.client.Fetch.cache = "default"
+          } catch(err) {
+            toast.error(`Unable to revoke ${props.row.original.permission.name} on ${props.row.original.target.name} from ${props.row.original.principal.name}`)
+            console.error(`Unable to revoke ${props.row.original.permission.name} on ${props.row.original.target.name} from ${props.row.original.principal.name}`, err)
+          }
         }
     });
 }

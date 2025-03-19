@@ -3,7 +3,7 @@
   -->
 
 <template>
-  <Skeleton v-if="g.loading || loading" v-for="i in 10" class="h-16 rounded-lg mb-2"/>
+  <Skeleton v-if="g.loading || ps.loading || p.loading || loading" v-for="i in 10" class="h-16 rounded-lg mb-2"/>
   <DataTable v-else :data="this.members" :columns="columns" :filters="[]" @row-click="e => $emit('objectClick', e)">
     <template #toolbar-left>
       <Alert class="mr-6">
@@ -58,6 +58,7 @@ import {Label} from "@components/ui/label/index.js";
 import {Input} from "@components/ui/input/index.js";
 import {toast} from "vue-sonner";
 import {defineAsyncComponent, provide} from "vue";
+import {usePermissionStore} from "@store/usePermissionStore.js";
 
 export default {
   name: 'GroupMembership',
@@ -69,7 +70,8 @@ export default {
       columns,
       p: usePrincipalStore(),
       g: useGroupStore(),
-      s: useServiceClientStore()
+      s: useServiceClientStore(),
+      ps: usePermissionStore()
     }
   },
 
@@ -118,15 +120,13 @@ export default {
       this.loading = true
       // Make sure we have the latest set of members
       this.s.client.Fetch.cache = "reload"
-      let groupMembersResponse = await this.s.client.Auth.fetch(`authz/group/${this.group.uuid}`)
+      const members = await this.s.client.ConfigDB.class_members(this.group.uuid)
       this.s.client.Fetch.cache = "default"
-      let members = groupMembersResponse[1]
       this.members = await Promise.all(members.map(async (memberUUID) => {
-        let obj = this.p.data.find(v => v.uuid === memberUUID)
+        let obj = await this.p.getPrincipal(memberUUID) || await this.ps.getPermission(memberUUID)
         if (obj && (obj.name || obj.kerberos)) {
           return {
-            uuid: memberUUID,
-            name: obj.name ?? obj.kerberos,
+            ...obj,
             group: this.group
           }
         }
@@ -150,7 +150,7 @@ export default {
     },
     async addMember (userUuid) {
       try {
-        await this.s.client.Auth.add_to_group(this.group.uuid, userUuid)
+        await this.s.client.ConfigDB.class_add_member(this.group.uuid, userUuid)
         toast.success(`${userUuid} has been added to ${this.group.name}`)
       } catch (err) {
         toast.error(`Unable to add ${userUuid} to ${this.group.name}`)

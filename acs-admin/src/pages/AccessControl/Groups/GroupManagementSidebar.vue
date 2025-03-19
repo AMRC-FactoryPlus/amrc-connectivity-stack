@@ -3,12 +3,12 @@
   -->
 
 <template>
-  <SheetContent v-if="group" class="gap-6 flex flex-col overflow-auto">
+  <SheetContent v-if="groupDetails" class="gap-6 flex flex-col overflow-auto">
     <SheetHeader>
-      <SheetTitle>{{ group.class?.name ?? "Group" }}</SheetTitle>
-      <SheetTitle>{{group.name}}</SheetTitle>
+      <SheetTitle title="Name">{{groupDetails.name}}</SheetTitle>
+      <SheetTitle title="Group Class" class="text-gray-500">{{ groupDetails.class?.name ?? "Group" }} - Group</SheetTitle>
       <SheetDescription>
-        {{group.uuid}}
+        <Copyable :text="groupDetails.uuid">{{groupDetails.uuid}}</Copyable>
       </SheetDescription>
     </SheetHeader>
     <div>
@@ -22,10 +22,10 @@
           </TabsTrigger>
         </TabsList>
         <TabsContent value="members">
-          <MembersTab :group @objectClick="e => $emit('objectClick', e)" />
+          <MembersTab :group="groupDetails" @objectClick="e => $emit('objectClick', e)" />
         </TabsContent>
         <TabsContent value="permissions">
-          <PermissionsTab :group @objectClick="e => $emit('objectClick', e)" />
+          <PermissionsTab :group="groupDetails" @objectClick="e => $emit('objectClick', e)" />
         </TabsContent>
       </Tabs>
     </div>
@@ -38,13 +38,22 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@components/ui/tabs/in
 import MembersTab from './MembersTab.vue'
 import PermissionsTab from './PermissionsTab.vue'
 import DataTable from "@components/ui/data-table/DataTable.vue";
+import {useGroupStore} from "@store/useGroupStore.js";
+import Copyable from "@components/Copyable.vue";
 
 export default {
   name: 'GroupManagementSidebar',
 
+  setup () {
+    return {
+      g: useGroupStore(),
+    }
+  },
+
   emits: ['objectClick'],
 
   components: {
+    Copyable,
     DataTable,
     SheetHeader,
     SheetTitle,
@@ -58,11 +67,30 @@ export default {
     PermissionsTab,
   },
 
+  watch: {
+    group: {
+      async handler(newGroup) {
+        if (!newGroup) {
+          this.groupDetails = null
+          return;
+        }
+        this.groupDetails = await this.g.getGroup(this.group.uuid)
+      },
+      immediate: true,
+    },
+  },
+
   props: {
     group: {
       type: Object,
       default: null,
     },
   },
+
+  data() {
+    return {
+      groupDetails: null,
+    }
+  }
 }
 </script>

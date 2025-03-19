@@ -3,12 +3,12 @@
   -->
 
 <template>
-  <SheetContent v-if="permission" class="gap-6 flex flex-col overflow-auto">
+  <SheetContent v-if="permissionDetails" class="gap-6 flex flex-col overflow-auto">
     <SheetHeader>
-      <SheetTitle>Permission</SheetTitle>
-      <SheetTitle>{{ permission.name }}</SheetTitle>
+      <SheetTitle title="Name">{{ permissionDetails.name }}</SheetTitle>
+      <SheetTitle title="Permission Class" class="text-gray-500">{{ permissionDetails.class?.name ?? "Permission" }} - Permission</SheetTitle>
       <SheetDescription>
-        {{ permission.uuid }}
+        <Copyable :text="permissionDetails.uuid">{{permissionDetails.uuid}}</Copyable>
       </SheetDescription>
     </SheetHeader>
     <div>
@@ -22,10 +22,10 @@
           </TabsTrigger>
         </TabsList>
         <TabsContent value="principals">
-          <PrincipalsTab :permission @objectClick="e => $emit('objectClick', e)" />
+          <PrincipalsTab :permission="permissionDetails" @objectClick="e => $emit('objectClick', e)" />
         </TabsContent>
         <TabsContent value="groups">
-          <GroupsTab :permission @objectClick="e => $emit('objectClick', e)" />
+          <GroupsTab :permission="permissionDetails" @objectClick="e => $emit('objectClick', e)" />
         </TabsContent>
       </Tabs>
     </div>
@@ -37,13 +37,22 @@ import { SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@compon
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import PrincipalsTab from './PrincipalsTab.vue'
 import GroupsTab from "./GroupsTab.vue";
+import {usePermissionStore} from "@store/usePermissionStore.js";
+import Copyable from "@components/Copyable.vue";
 
 export default {
   name: 'PermissionManagementSidebar',
 
+  setup () {
+    return {
+      p: usePermissionStore(),
+    }
+  },
+
   emits: ['objectClick'],
 
   components: {
+    Copyable,
     SheetHeader,
     SheetTitle,
     SheetContent,
@@ -56,11 +65,30 @@ export default {
     GroupsTab
   },
 
+  watch: {
+    permission: {
+      async handler(newPermission) {
+        if (!newPermission) {
+          this.permissionDetails = null
+          return;
+        }
+        this.permissionDetails = await this.p.getPermission(this.permission.uuid)
+      },
+      immediate: true,
+    },
+  },
+
   props: {
     permission: {
       type: Object,
       default: null,
     },
   },
+
+  data() {
+    return {
+      permissionDetails: null,
+    }
+  }
 }
 </script>

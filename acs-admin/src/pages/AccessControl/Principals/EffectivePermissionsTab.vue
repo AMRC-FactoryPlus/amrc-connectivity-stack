@@ -29,6 +29,7 @@ import { columns } from './effectivePermissionsColumns.ts'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { UUIDs } from '@amrc-factoryplus/service-client'
 import { useServiceClientStore } from '@/store/serviceClientStore.js'
+import {usePermissionStore} from "@store/usePermissionStore.js";
 
 export default {
   name: 'EffectivePermissions',
@@ -39,6 +40,7 @@ export default {
     return {
       columns,
       s: useServiceClientStore(),
+      p: usePermissionStore()
     }
   },
 
@@ -64,7 +66,7 @@ export default {
           return
         }
 
-        this.fetchEffectivePermissions(val.kerberos)
+        this.fetchEffectivePermissions(val.uuid)
       },
       immediate: true,
     },
@@ -75,25 +77,29 @@ export default {
 
       this.loading = true
 
-      const res = await this.s.client.Auth.fetch(`/authz/effective/${principal}`)
+      const res = await this.s.client.Auth.fetch(`/v2/acl/${principal}`)
 
       const info = o => this.s.client.ConfigDB.get_config(UUIDs.App.Info, o)
+      const classGet = o => this.s.client.ConfigDB.get_config(UUIDs.App.Registration, o).then(v => v?.class)
       const name = o => info(o).then(v => v?.name)
 
       const rv = []
       if (Array.isArray(res[1])) {
         for (const effective of res[1]) {
-          const permissionName = await name(effective.permission)
-          const targetName     = await name(effective.target)
+          const permissionLookup = await this.p.getPermission(effective.permission)
+          const targetName       = await name(effective.target)
+          const targetClass      = await classGet(effective.target)
+          const targetClassName  = await name(effective.target)
 
           rv.push({
-            permission: {
-              uuid: effective.permission,
-              name: permissionName,
-            },
+            permission: permissionLookup,
             target: {
               uuid: effective.target,
               name: targetName,
+              class: {
+                uuid: targetClass,
+                name: targetClassName
+              },
             },
           })
         }

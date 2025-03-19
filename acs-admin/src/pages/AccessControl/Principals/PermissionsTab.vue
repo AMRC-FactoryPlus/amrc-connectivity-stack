@@ -3,7 +3,7 @@
   -->
 
 <template>
-  <Skeleton v-if="loading || p.loading" v-for="i in 10" class="h-16 rounded-lg mb-2"/>
+  <Skeleton v-if="p.loading || pr.loading || grants.loading || loading" v-for="i in 10" class="h-16 rounded-lg mb-2"/>
   <DataTable v-else :data="this.permissions" :columns="columns" :filters="[]">
     <template #toolbar-left>
       <Alert class="mr-6">
@@ -65,6 +65,8 @@ import { Button } from '@components/ui/button/index.js'
 import { defineAsyncComponent } from 'vue'
 import { usePrincipalStore } from '@store/usePrincipalStore.js'
 import { toast } from 'vue-sonner'
+import {useGrantStore} from "@store/useGrantStore.js";
+import {useGroupStore} from "@store/useGroupStore.js";
 
 export default {
   emits: ['objectClick'],
@@ -75,6 +77,8 @@ export default {
       p: usePermissionStore(),
       s: useServiceClientStore(),
       pr: usePrincipalStore(),
+      g: useGroupStore(),
+      grants: useGrantStore()
     }
   },
 
@@ -148,11 +152,7 @@ export default {
     async fetchSpecificPermissions () {
       this.loading = true
 
-      const res = await this.s.client.Auth.fetch(`/authz/ace`)
-      if (!Array.isArray(res[1])) {
-        return
-      }
-      const fullList     = res[1]
+      const fullList = this.grants.data
       const filteredList = fullList.filter(e => e.principal === this.principal.uuid)
 
       const info     = o => this.s.client.ConfigDB.get_config(UUIDs.App.Info, o)
@@ -161,25 +161,20 @@ export default {
 
       const rv = []
       for (const entry of filteredList) {
-        const permissionLookup = this.p.data.find(v => v.uuid === entry.permission)
-        const permissionName   = permissionLookup?.name ?? await name(entry.permission)
-        const permissionClass  = permissionLookup?.class?.uuid ?? await classGet(entry.permission)
+        const permissionLookup = await this.p.getPermission(entry.permission)
         const targetName       = await name(entry.target)
         const targetClass      = await classGet(entry.target)
+        const targetClassName  = await name(targetClass)
 
         rv.push({
-          permission: {
-            uuid: entry.permission,
-            name: permissionName,
-            class: {
-              uuid: permissionClass,
-            },
-          },
+          uuid: entry.uuid,
+          permission: permissionLookup,
           target: {
             uuid: entry.target,
             name: targetName,
             class: {
               uuid: targetClass,
+              name: targetClassName
             },
           },
           principal: {
@@ -194,12 +189,19 @@ export default {
     },
     async updateData () {
       this.s.client.Fetch.cache = 'reload'
+      await this.grants.fetch()
       await this.fetchSpecificPermissions()
       this.s.client.Fetch.cache = 'default'
     },
     async addEntry (principal, permission, target) {
       try {
-        await this.s.client.Auth.add_ace(principal.uuid, permission.uuid, target.uuid)
+        const grant = {
+          principal: principal.uuid,
+          permission: permission.uuid,
+          target: target.uuid,
+          plural: false
+        }
+        await this.s.client.Auth.add_grant(grant)
         toast.success(`${this.principal.name} has been granted ${permission.name} on ${target.name}`)
       }
       catch (err) {

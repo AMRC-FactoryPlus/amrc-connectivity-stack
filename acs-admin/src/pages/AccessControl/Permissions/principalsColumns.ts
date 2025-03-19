@@ -44,7 +44,7 @@ export const columns: ColumnDef<Permission>[] = [
         cell: ({row}) => {
             return h('div', {class: 'max-w-[500px] truncate'}, [
                 h('div', {class: 'max-w-[500px] truncate font-medium'}, row.getValue('principal')),
-                h('div', {class: 'max-w-[500px] truncate text-gray-400'}, row.original.principal.class.name)
+                h('div', {class: 'max-w-[500px] truncate text-gray-400'}, row.original.principal?.class?.name ?? "UNKNOWN")
             ])
         },
         filterFn: (row, id, value) => {
@@ -67,7 +67,7 @@ export const columns: ColumnDef<Permission>[] = [
             }
             return h('div', {class: 'max-w-[500px] truncate'}, [
                 h('div', {class: 'max-w-[500px] truncate font-medium'}, row.getValue('target')),
-                h('div', {class: 'max-w-[500px] truncate text-gray-400'}, row.original.target.uuid)
+                h('div', {class: 'max-w-[500px] truncate text-gray-400'}, row.original.target?.class?.name ?? "UNKNOWN")
             ])
         },
         filterFn: (row, id, value) => {

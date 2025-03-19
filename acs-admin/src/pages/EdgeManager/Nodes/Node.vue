@@ -64,38 +64,6 @@
           </CardHeader>
         </Card>
       </div>
-      <div v-if="node.devices.length > 0">
-        <DataTable :data="node.devices" :columns="deviceColumns" :filters="[]"/>
-      </div>
-      <!--      <Tabs default-value="nodes" class="flex flex-col">-->
-      <!--        <div class="flex items-center justify-between gap-2">-->
-      <!--          <TabsList>-->
-      <!--            <TabsTrigger value="nodes">-->
-      <!--              {{nodes.length ? `${nodes.length}  Node${nodes.length > 1 ? 's' : ''}` : 'No Nodes'}}-->
-      <!--            </TabsTrigger>-->
-      <!--            <TabsTrigger value="deployments" disabled>-->
-      <!--              Deployments-->
-      <!--            </TabsTrigger>-->
-      <!--            <TabsTrigger value="hosts" :disabled="cluster.hosts.length === 0">-->
-      <!--              {{cluster.hosts.length ? `${cluster.hosts.length} Host${cluster.hosts.length > 1 ? 's' : ''}` : 'No Hosts'}}-->
-      <!--            </TabsTrigger>-->
-      <!--          </TabsList>-->
-      <!--        </div>-->
-      <!--        <TabsContent value="nodes">-->
-      <!--          <div v-if="nodes.length > 0">-->
-      <!--            <DataTable :data="nodes" :columns="nodeColumns" :filters="[]"/>-->
-      <!--          </div>-->
-      <!--        </TabsContent>-->
-      <!--        <TabsContent value="deployments">-->
-      <!--        </TabsContent>-->
-      <!--        <TabsContent value="hosts">-->
-      <!--          <DataTable :data="cluster.hosts" :columns="hostColumns" :filters="[]">-->
-      <!--            <template #toolbar-left>-->
-      <!--              <div class="text-xl font-semibold">{{`${cluster.hosts.length} Host${cluster.hosts.length > 1 ? 's' : ''}`}}</div>-->
-      <!--            </template>-->
-      <!--          </DataTable>-->
-      <!--        </TabsContent>-->
-      <!--      </Tabs>-->
     </div>
   </EdgeContainer>
 </template>

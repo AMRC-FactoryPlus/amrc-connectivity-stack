@@ -47,9 +47,12 @@ export const useDeviceStore = defineStore('device', {
         // Hydrate the device details from the UUIDs provided from the response
         this.data = await Promise.all(payload.map(async (deviceUUID) => {
           try {
+
+            // Get the friendly name from the Info App
             return {
-              ...await useServiceClientStore().client.ConfigDB.get_config(UUIDs.App.DeviceInformation, deviceUUID),
               uuid: deviceUUID,
+              name: (await useServiceClientStore().client.ConfigDB.get_config(UUIDs.App.Info, deviceUUID))?.name,
+              ...await useServiceClientStore().client.ConfigDB.get_config(UUIDs.App.DeviceInformation, deviceUUID),
             }
           }
           catch (err) {

@@ -29,6 +29,9 @@ import ObjectPage from "@pages/ConfigDB/Objects/ObjectPage.vue";
 // Create an event bus
 window.events = mitt()
 
+// Create an event bus
+window.events = mitt()
+
 const routes = [
   {
     path: '/',

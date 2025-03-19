@@ -7,23 +7,14 @@ import {h} from 'vue'
 
 import DataTableColumnHeader from '@/components/ui/data-table/DataTableColumnHeader.vue'
 
-interface Schema {
-    uuid: string,
-    name: string,
-    version: string,
-}
-
-interface DeviceConfiguration {
-    schema: Schema,
-    originMap: Object
-}
-
 export interface Device {
     uuid: string,
     name: string,
+    sparkplugName: string,
     node: string,
     connection: string,
-    configuration: DeviceConfiguration,
+    schema: string,
+    originMap: string
 }
 
 export const deviceColumns: ColumnDef<Device>[] = [
@@ -41,32 +32,32 @@ export const deviceColumns: ColumnDef<Device>[] = [
             return value.includes(row.getValue(id))
         },
     },
-    {
-        accessorKey: 'schema',
-        accessorFn: (row) => row.configuration.schema.name,
-        header: ({column}) => h(DataTableColumnHeader, {
-            column,
-            title: 'Schema'
-        }),
-        cell: ({row}) => {
-            return h('div', {class: 'max-w-[500px] truncate'}, row.original.configuration.schema.name)
-        },
-        filterFn: (row, id, value) => {
-            return value.includes(row.getValue(id))
-        },
-    },
-    {
-        accessorKey: 'version',
-        accessorFn: (row) => row.configuration.schema.version,
-        header: ({column}) => h(DataTableColumnHeader, {
-            column,
-            title: 'Version'
-        }),
-        cell: ({row}) => {
-            return h('div', {class: 'max-w-[500px] truncate'}, row.original.configuration.schema.version)
-        },
-        filterFn: (row, id, value) => {
-            return value.includes(row.getValue(id))
-        },
-    }
+    // {
+    //     accessorKey: 'schema',
+    //     accessorFn: (row) => row.configuration.schema.name,
+    //     header: ({column}) => h(DataTableColumnHeader, {
+    //         column,
+    //         title: 'Schema'
+    //     }),
+    //     cell: ({row}) => {
+    //         return h('div', {class: 'max-w-[500px] truncate'}, row.original.configuration.schema.name)
+    //     },
+    //     filterFn: (row, id, value) => {
+    //         return value.includes(row.getValue(id))
+    //     },
+    // },
+    // {
+    //     accessorKey: 'version',
+    //     accessorFn: (row) => row.configuration.schema.version,
+    //     header: ({column}) => h(DataTableColumnHeader, {
+    //         column,
+    //         title: 'Version'
+    //     }),
+    //     cell: ({row}) => {
+    //         return h('div', {class: 'max-w-[500px] truncate'}, row.original.configuration.schema.version)
+    //     },
+    //     filterFn: (row, id, value) => {
+    //         return value.includes(row.getValue(id))
+    //     },
+    // }
     ]

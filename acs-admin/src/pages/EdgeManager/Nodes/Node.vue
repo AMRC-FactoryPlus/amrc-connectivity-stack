@@ -29,6 +29,11 @@
             detail-tooltip="The cluster that this host is part of"
         />
       </div>
+      <DataTable :data="node.devices" :columns="deviceColumns" :filters="[]">
+<!--        <template #toolbar-left>-->
+<!--          <div class="text-xl font-semibold">{{`${node.devices.length} Device${node.devices.length > 1 ? 's' : ''}`}}</div>-->
+<!--        </template>-->
+      </DataTable>
     </div>
   </EdgeContainer>
 </template>
@@ -50,9 +55,12 @@ import { useDeviceStore } from '@store/useDeviceStore.js'
 import EdgePageSkeleton from '@components/EdgeManager/EdgePageSkeleton.vue'
 import { inop } from '@utils/inop.js'
 import DetailCard from '@components/DetailCard.vue'
+import DataTable from '@components/ui/data-table/DataTable.vue'
+import { deviceColumns } from './deviceColumns.ts'
 
 export default {
   components: {
+    DataTable,
     DetailCard,
     EdgePageSkeleton,
     Button,
@@ -74,6 +82,7 @@ export default {
       n: useNodeStore(),
       d: useDeviceStore(),
       inop,
+      deviceColumns,
     }
   },
 
@@ -89,6 +98,9 @@ export default {
   },
 
   methods: {
+    deviceColumns () {
+      return deviceColumns
+    },
 
     async getNodeDetails (uuid) {
 

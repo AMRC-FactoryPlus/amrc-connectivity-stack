@@ -31,6 +31,14 @@ acs:
   # The default pullPolicy.
   defaultPullPolicy: IfNotPresent
 
+  # -- Configure which schemas are loaded into the ConfigDB
+  schemas:
+    load: true
+    image:
+      registry: gcr.io
+      repository: amrc-factoryplus/acs-schemas
+      tag: v1.0.0
+
 identity:
   # -- Whether or not to enable the Identity component
   enabled: true

@@ -1,5 +1,5 @@
 # Grant appropriate permissions to the Administrator group
-# REQUIRE: auth sparkplug uns
+#-REQUIRE: auth sparkplug uns
 ---
 service: !u UUIDs.Service.ConfigDB
 version: 2

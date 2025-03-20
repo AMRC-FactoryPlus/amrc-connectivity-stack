@@ -138,7 +138,7 @@ export default class Model extends Queries {
                 device: advertisement.device,
             })
         }
-        return 200;
+        return 204;
     }
 
     /* ALERTS */

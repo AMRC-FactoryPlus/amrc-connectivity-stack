@@ -3,7 +3,7 @@
 # It also adds the ReadEntireUNS permission to the Warehouse role so
 # that the UNS historian can use it and has permission to read the UNS.
 #
-# REQUIRE: auth sparkplug
+#-REQUIRE: auth sparkplug
 ---
 service: !u UUIDs.Service.ConfigDB
 version: 2

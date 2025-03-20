@@ -13,9 +13,10 @@ import { booleans, valid_krb, valid_uuid } from "./validate.js";
 
 export default class AuthZ {
     constructor(opts) {
-        this.debug  = opts.debug;
         this.model = opts.model;
         this.data = opts.data;
+
+        this.log = opts.debug.bound("authz");
 
         this.routes = this.setup_routes();
     }
@@ -92,10 +93,16 @@ export default class AuthZ {
         const idr = await this.data.find_identities(
             this.data.root, { uuid, kind: "kerberos" });
         const kerberos = idr.single().map(id => id.name);
+        this.log("Fetched krb %s", kerberos);
 
-        const tok = await this.data.check_targ(req.auth, Perm.ReadKrb, true);
-        if (!(kerberos == req.auth || tok?.(uuid)))
-            return res.status(403).end();
+        if (kerberos == req.auth) {
+            this.log("Permitting legacy exception for %s", req.auth);
+        }
+        else {
+            const tok = await this.data.check_targ(req.auth, Perm.ReadKrb, true);
+            if (!tok?.(uuid))
+                return res.status(403).end();
+        }
 
         if (!kerberos) return res.status(404).end();
         return res.status(200).json({ uuid, kerberos });

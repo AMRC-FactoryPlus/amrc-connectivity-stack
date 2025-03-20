@@ -1,8 +1,5 @@
-import * as dotenv from 'dotenv';
 import express from 'express';
 import { App, Class, FileType, Perm } from './constants.js';
-
-dotenv.config({});
 
 const Valid = {
   uuid: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,

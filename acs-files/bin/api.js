@@ -2,10 +2,8 @@
 
 import { ServiceClient } from '@amrc-factoryplus/service-client';
 import { WebAPI } from '@amrc-factoryplus/service-api';
-import { ConfigDB, Auth } from '@amrc-factoryplus/service-client/interface.js';
 import { routes } from '../lib/routes.js';
-import multer from 'multer';
-import { multer_storage } from '../config/multer.js';
+import { Version, Service } from '../lib/constants.js';
 
 const { env } = process;
 
@@ -13,20 +11,15 @@ const fplus = await new ServiceClient({
   env,
 }).init();
 
-const configDb = await new ConfigDB(fplus);
-const auth = await new Auth(fplus);
-
-multer({ storage: multer_storage });
+const uploadPath = env.FILES_STORAGE;
 
 const api = await new WebAPI({
   ping: {
     version: Version,
-    service: Service.Registry,
-    device: env.DEVICE_UUID,
+    service: Service.Files,
     software: {
       vendor: 'AMRC',
       application: 'acs-files',
-      revision: GIT_VERSION,
     },
   },
   debug: fplus.debug,
@@ -37,7 +30,11 @@ const api = await new WebAPI({
   max_age: env.CACHE_MAX_AGE,
   body_limit: env.BODY_LIMIT,
 
-  routes: routes({ auth, configDb, multer }),
+  routes: routes({
+    auth: fplus.Auth,
+    configDb: fplus.ConfigDB,
+    uploadPath: uploadPath,
+  }),
 }).init();
 
 api.run();

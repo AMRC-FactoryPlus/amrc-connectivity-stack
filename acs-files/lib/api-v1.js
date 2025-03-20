@@ -1,8 +1,7 @@
-import * as dotenv from 'dotenv';
 import express from 'express';
-import { App, Class, FileTypes, Perm } from './constants.js';
-
-dotenv.config({});
+import { App, Class, Perm } from './constants.js';
+import fs from 'fs';
+import path from 'path';
 
 const Valid = {
   uuid: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
@@ -12,7 +11,7 @@ export class APIv1 {
   constructor(opts) {
     this.configDb = opts.configDb;
     this.auth = opts.auth;
-    this.multer = opts.multer;
+    this.uploadPath = opts.uploadPath;
     this.routes = express.Router();
     this.setup_routes();
   }
@@ -20,131 +19,123 @@ export class APIv1 {
   setup_routes() {
     let api = this.routes;
 
-    api.get('/:file_uuid', this.getFile.bind(this));
-    api.post(
-      '/:file_type_uuid',
-      this.multer.single('file'),
-      this.postFile.bind(this)
-    );
+    api.get('/:uuid', this.getFileByUuid.bind(this));
+    api.get('/', this.getFiles.bind(this));
+    api.post('/', this.postFile.bind(this));
   }
 
-  getFile = async (req, res) => {
-    try {
-      const file_uuid = req.params.file_uuid;
+  async getFiles(req, res) {
+    // Only for admins
+    const ok = await this.auth.check_acl(req.auth, Perm.All, App.Config, true);
+    if (!ok)
+      return res.status(403).json({ message: 'FAILED: Not authorised.' });
 
-      if (!Valid.uuid.test(file_uuid)) return res.status(410).end();
+    // return list of files from storage
 
-      // Check auth permission
-      // Todo: disable wildcard in the future
-      // Todo: update Target to be individual File, at the moment it checks if Principal has Download permission to the whole FileType object under which all Files are stored.
-      const ok = await this.auth.check_acl(
-        req.auth,
-        Perm.Download,
-        Class.FileType,
-        true
-      );
-
-      if (!ok) return res.status(403).end();
-
-      const fileObj = await this.configDb.get_config(App.Config, file_uuid);
-
-      // File not found in ConfigDb
-      if (!fileObj || !fileObj.file_uuid) {
-        return res.status(404).json({ message: 'File not found in ConfigDb' });
-      }
-
-      return res
-        .status(200)
-        .download(process.env.FILES_STORAGE + '/' + file_uuid, (err) => {
-          if (err) {
-            console.error('Error: File download failed:', err);
-          } else {
-            console.log('File downloaded successfully.');
-          }
-        });
-    } catch (err) {
-      console.error('Error when getting file: ', err.message);
-      res.status(500).end();
-    }
-  };
-
-  postFile = async (req, res) => {
-    try {
-      const file_type_uuid = req.params.file_type_uuid;
-      if (!Valid.uuid.test(file_type_uuid))
-        return res.status(410).json({ message: 'file type uuid is invalid' });
-
-      if (!this.isFileTypeSupported(file_type_uuid)) {
-        return res.status(400).json({ message: 'File Type is not supported.' });
-      }
-
-      if (!req.file) {
-        return res.status(400).json({ message: 'No file uploaded' });
-      }
-
-      const file_uuid = req.file.filename;
-      console.log('File uploaded to storage with filename: ', file_uuid);
-
-      if (!Valid.uuid.test(file_uuid))
+    fs.readdir(this.uploadPath, (err, files) => {
+      if (err) {
         return res
-          .status(410)
-          .json({ message: 'filename is not a valid uuid.' });
-
-      // Todo: disable wildcard in the future.
-      // Check ACL exists for the Principal to Upload to FileType. This means that the uploaded file objects will be stored under FileType (Rank2) object.
-      const ok = await this.auth.check_acl(
-        req.auth,
-        Perm.Upload,
-        Class.FileType,
-        true
-      );
-
-      if (!ok) return res.status(403).end();
-
-      // Create File object of File class with UUID generated during file upload
-      const created_uuid = await this.configDb.create_object(
-        Class.File,
-        file_uuid,
-        true
-      );
-
-      if (created_uuid !== file_uuid) {
-        console.error(
-          `ConfigDb ignored the provided file_uuid [${file_uuid}] and created a new one [${created_uuid}]`
-        );
-        return res.status(500).json({
-          message:
-            "Newly created file object's uuid is not the same as provided.",
-        });
+          .status(500)
+          .json({ message: 'FAILED: Error accessing files' });
       }
+
+      return res.json({ files }); // Return list of file names
+    });
+  }
+
+  async getFileByUuid(req, res) {
+    const file_uuid = req.params.uuid;
+
+    if (!file_uuid)
+      return res
+        .status(400)
+        .json({ message: 'FAILED: File Uuid not provided.' });
+
+    if (!Valid.uuid.test(file_uuid))
+      return res.status(410).json({ message: 'FAILED: File Uuid is invalid' });
+
+    // Check auth permission
+    // Todo: disable wildcard in the future
+    // Todo: update Target to be individual File, at the moment it checks if Principal has Download permission to the whole FileType object under which all Files are stored.
+    const ok = await this.auth.check_acl(
+      req.auth,
+      Perm.Download,
+      App.Config,
+      true
+    );
+
+    if (!ok)
+      return res
+        .status(403)
+        .json({ message: 'FAILED: No Download permission' });
+
+    const filePath = path.join(this.uploadPath, file_uuid);
+
+    // Check if file exists
+    fs.access(filePath, fs.constants.F_OK, (err) => {
+      if (err) {
+        return res.status(404).json({ message: 'FAILED: File not found' });
+      }
+
+      // File exists, proceed with download
+      return res.status(200).download(filePath, (err) => {
+        if (err) {
+          res.status(500).json({ message: 'FAILED: Error downloading file' });
+        }
+      });
+    });
+  }
+
+  async postFile(req, res) {
+    // Todo: disable wildcard in the future.
+    // Check ACL exists for the Principal to Upload to FileType. This means that the uploaded file objects will be stored under FileType (Rank2) object.
+
+    const ok = await this.auth.check_acl(
+      req.auth,
+      Perm.Upload,
+      App.Config,
+      true
+    );
+
+    if (!ok) {
+      return res.status(403).json({
+        message: 'FAILED: No Upload permission',
+      });
+    }
+
+    // Create object in ConfigDB of Class File
+    const created_uuid = await this.configDb.create_object(Class.File);
+
+    // Upload file to Storage
+
+    fs.mkdirSync(this.uploadPath, { recursive: true });
+    const file_path = path.join(this.uploadPath, created_uuid);
+
+    fs.writeFile(file_path, req.body, async (err) => {
+      if (err) {
+        res.status(500).json({ message: 'FAILED: File upload failed.' });
+      }
+
+      const stats = fs.statSync(file_path); // to get file size
 
       const currDate = new Date();
+      const original_file_name = req.headers['x-filename'] || null;
 
       let fileJSON = {
-        file_uuid: file_uuid,
-        file_type_uuid: file_type_uuid,
+        file_uuid: created_uuid,
         date_uploaded: currDate,
-        user_who_uploaded: process.env.USER_ACCOUNT_UUID,
-        file_size: req.file.size,
+        user_who_uploaded: req.auth,
+        file_size: stats.size,
         application_uuid: App.Config,
+        original_file_name: original_file_name,
       };
 
       // Store the file config under App 'Files Configuration'
       await this.configDb.put_config(App.Config, file_uuid, fileJSON);
-      console.log('Put to config completed.');
-      return res.status(201).json({ message: 'File uploaded successfully' });
-    } catch (err) {
-      console.error('Error when posting file: ', err.message);
-      res.status(500).end();
-    }
-  };
 
-  isFileTypeSupported(file_type_uuid) {
-    return (
-      file_type_uuid === FileTypes.TXT ||
-      file_type_uuid === FileTypes.CSV ||
-      file_type_uuid === FileTypes.PDF ||
-      file_type_uuid === FileTypes.CAD
-    );
+      return res.status(201).json({
+        message: 'OK. File uploaded to storage and its metadata to ConfigDB.',
+      });
+    });
   }
 }

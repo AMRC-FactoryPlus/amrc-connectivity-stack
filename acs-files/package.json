@@ -10,12 +10,10 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@amrc-factoryplus/service-client": "file:../lib/js-service-client", 
-    "axios": "^1.7.9",
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.7",
+    "@amrc-factoryplus/service-client": "file:../lib/js-service-client",
+    "@amrc-factoryplus/service-api": "file:../lib/js-service-api",
+    "@dotenvx/dotenvx": "^1.39.0",
     "express": "^4.21.2",
-    "multer": "^1.4.5-lts.1",
     "uuid": "^11.0.5"
   }
 }

@@ -1,23 +1,35 @@
-# Use an official Node.js runtime as a parent image
-FROM node:18
+# syntax=docker/dockerfile:1
 
-# Set environment variables
-ENV NODE_ENV=production
-ENV PORT=3000
+ARG base_version
+ARG base_prefix=ghcr.io/amrc-factoryplus/acs-base
+
+FROM ${base_prefix}-js-build:${base_version} AS build
+ARG revision=unknown
+
+USER root
+RUN sh -ex <<'SHELL'
+    install -d -o node -g node /home/node/app
+    mkdir /home/node/lib
+SHELL
+COPY --from=lib . /home/node/lib/
+
+WORKDIR /home/node/app
+USER node
+COPY --chown=node package*.json ./
+RUN sh -ex <<'SHELL'
+    touch /home/node/.npmrc
+    npm install --save=false --omit=dev --install-links
+SHELL
+COPY --chown=node . .
 
 
-# Set the working directory inside the container
-WORKDIR /app
+FROM ${base_prefix}-js-run:${base_version} AS run
 
-# Copy package.json and install dependencies
-COPY package.json package-lock.json ./
-RUN npm install --production
+# Copy across from the build container.
+WORKDIR /home/node
+COPY --from=build /home/node/app ./app/
 
-# Copy the rest of the application files
-COPY . .
 
-# Expose the application port
-EXPOSE 3000
-
-# Command to run the app
-CMD ["npm", "start"]
+USER node
+WORKDIR /home/node/app
+CMD node bin/api.js

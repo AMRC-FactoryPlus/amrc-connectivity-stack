@@ -146,7 +146,10 @@ export default {
         const targetLookup     = entry.target === UUIDs.Special.Null ? {
           uuid: UUIDs.Special.Null,
           name: 'Wildcard'
-        } : this.pr.data.find(e => e.uuid === entry.target) ?? this.g.data.find(e => e.uuid === entry.target)
+        } : this.pr.data.find(e => e.uuid === entry.target) ?? this.g.data.find(e => e.uuid === entry.target) ?? {
+          uuid: entry.target,
+          name: "UNKNOWN"
+        }
 
         rv.push({
           uuid: entry.uuid,

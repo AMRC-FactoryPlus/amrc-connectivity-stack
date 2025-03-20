@@ -144,7 +144,7 @@ export default {
 
   computed: {
     targetsSubtitle () {
-      return `Select targets for which the selected permission should be granted: ${this.permissionsToAdd.map(p => p.name).join(', ')}`
+      return `Select targets for which the selected permission(s) should be granted: ${this.permissionsToAdd.map(p => p.name).join(', ')}`
     },
     availableTargets () {
       const wildcard = [{
@@ -209,11 +209,11 @@ export default {
           plural: false
         }
         await this.s.client.Auth.add_grant(grant)
-        toast.success(`${this.principal.name} has been granted ${permission.name} on ${target.name}`)
+        toast.success(`${principal.name} has been granted ${permission.name} on ${target.name}`)
       }
       catch (err) {
-        toast.error(`Unable to grant ${permission.name} to ${this.principal.name} on ${target.name}`)
-        console.error(`Unable to grant ${permission.name} to ${this.principal.name} on ${target.name}`, err)
+        toast.error(`Unable to grant ${permission.name} to ${principal.name} on ${target.name}`)
+        console.error(`Unable to grant ${permission.name} to ${principal.name} on ${target.name}`, err)
       }
     },
   },

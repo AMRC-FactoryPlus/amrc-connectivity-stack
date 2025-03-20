@@ -12,10 +12,40 @@
       </SheetDescription>
     </SheetHeader>
     <div>
-      <Tabs default-value="principals">
+      <ObjectSelector
+          v-model="principalsToAdd"
+          v-model:open="isPrincipalSelectorOpen"
+          :store-data="availablePrincipals"
+          title="Select Principals"
+          subtitle="Select principals or groups for which the permission should be granted, targets can be selected next"
+          detail-header="UUID"
+          detail-key="uuid"
+          title-header="Name"
+          title-key="name"
+          confirm-text="Choose Targets"
+          confirm-icon="arrow-right-long"
+      >
+        <Button>Grant this Permission</Button>
+      </ObjectSelector>
+      <ObjectSelector
+          v-model:open="isTargetSelectorOpen"
+          v-model="targetsToAdd"
+          :store-data="availableTargets"
+          title="Select Targets"
+          :subtitle="targetsSubtitle"
+          detail-header="UUID"
+          detail-key="uuid"
+          title-header="Name"
+          title-key="name"
+      >
+        <template #actions>
+          <Button @click="isTargetSelectorOpen = false; isPermissionSelectorOpen = true"><i class="fa-solid fa-arrow-left-long"></i> &nbsp; Return to Permissions</Button>
+        </template>
+      </ObjectSelector>
+      <Tabs default-value="principals" class="mt-6">
         <TabsList class="mb-2">
           <TabsTrigger value="principals">
-            Principals
+            Entries
           </TabsTrigger>
           <TabsTrigger value="groups">
             Groups
@@ -39,19 +69,32 @@ import PrincipalsTab from './PrincipalsTab.vue'
 import GroupsTab from "./GroupsTab.vue";
 import {usePermissionStore} from "@store/usePermissionStore.js";
 import Copyable from "@components/Copyable.vue";
+import {Button} from "@components/ui/button/index.js";
+import {defineAsyncComponent} from "vue";
+import {usePrincipalStore} from "@store/usePrincipalStore.js";
+import {UUIDs} from "@amrc-factoryplus/service-client";
+import {useGroupStore} from "@store/useGroupStore.js";
+import {toast} from "vue-sonner";
+import {useGrantStore} from "@store/useGrantStore.js";
+import {useServiceClientStore} from "@store/serviceClientStore.js";
 
 export default {
   name: 'PermissionManagementSidebar',
 
   setup () {
     return {
+      s: useServiceClientStore(),
       p: usePermissionStore(),
+      pr: usePrincipalStore(),
+      g: useGroupStore(),
+      grants: useGrantStore(),
     }
   },
 
   emits: ['objectClick'],
 
   components: {
+    Button,
     Copyable,
     SheetHeader,
     SheetTitle,
@@ -62,7 +105,8 @@ export default {
     TabsTrigger,
     TabsContent,
     PrincipalsTab,
-    GroupsTab
+    GroupsTab,
+    ObjectSelector: defineAsyncComponent(() => import('@components/ObjectSelector/ObjectSelector.vue')),
   },
 
   watch: {
@@ -76,6 +120,29 @@ export default {
       },
       immediate: true,
     },
+
+    principalsToAdd: async function (val, oldVal) {
+      if (!val.length) {
+        this.isTargetSelectorOpen = false
+        return
+      }
+
+      this.isTargetSelectorOpen = true
+    },
+
+    targetsToAdd: async function (val, oldVal) {
+      if (!val.length) {
+        this.principalsToAdd = []
+        return
+      }
+
+      for (const principal of this.principalsToAdd) {
+        for (const target of val) {
+          await this.addEntry(principal, this.permissionDetails, target)
+        }
+      }
+      await this.updateData()
+    },
   },
 
   props: {
@@ -85,9 +152,53 @@ export default {
     },
   },
 
+  computed: {
+    targetsSubtitle () {
+      return `Select targets for which the selected principals should be granted this permission: ${this.principalsToAdd.map(p => p.name).join(', ')}`
+    },
+    availablePrincipals () {
+      return this.pr.data.concat(this.g.data)
+    },
+    availableTargets () {
+      const wildcard = [{
+        uuid: UUIDs.Special.Null,
+        name: 'Wildcard'
+      }]
+      return wildcard.concat(this.pr.data).concat(this.g.data)
+    }
+  },
+
+  methods: {
+    async updateData () {
+      this.s.client.Fetch.cache = 'reload'
+      await this.grants.fetch()
+      this.s.client.Fetch.cache = 'default'
+    },
+    async addEntry (principal, permission, target) {
+      try {
+        const grant = {
+          principal: principal.uuid,
+          permission: permission.uuid,
+          target: target.uuid,
+          plural: false
+        }
+        await this.s.client.Auth.add_grant(grant)
+        toast.success(`${principal.name} has been granted ${permission.name} on ${target.name}`)
+      }
+      catch (err) {
+        toast.error(`Unable to grant ${permission.name} to ${principal.name} on ${target.name}`)
+        console.error(`Unable to grant ${permission.name} to ${principal.name} on ${target.name}`, err)
+      }
+    },
+  },
+
   data() {
     return {
       permissionDetails: null,
+      principalsToAdd: [],
+      isPrincipalSelectorOpen: false,
+      targetsToAdd: [],
+      isTargetSelectorOpen: false,
     }
   }
 }

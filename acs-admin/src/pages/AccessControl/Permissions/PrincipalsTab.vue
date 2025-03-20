@@ -4,17 +4,15 @@
 
 <template>
   <Skeleton v-if="g.loading || p.loading || grants.loading || loading" v-for="i in 10" class="h-16 rounded-lg mb-2"/>
-  <!-- Need to check whether the click is on a permission or a principal -->
-<!--  <DataTable v-else :data="this.entries" :columns="columns" :filters="[]" @row-click="e => $emit('objectClick', e)">-->
   <DataTable v-else :data="this.entries" :columns="columns" :filters="[]">
     <template #toolbar-left>
       <Alert class="mr-6">
         <div class="flex items-start gap-3">
           <i class="fa-solid fa-circle-info mt-1"></i>
           <div class="flex flex-col">
-            <AlertTitle>Principal Entries</AlertTitle>
+            <AlertTitle>Entries</AlertTitle>
             <AlertDescription>
-              Manage the entries that link this permission to principals.
+              Manage the entries that link this permission to principals and groups.
             </AlertDescription>
           </div>
         </div>
@@ -63,14 +61,14 @@ export default {
           return
         }
 
-        this.updateData()
+        this.getSpecificGrants()
       },
       immediate: true,
     },
   },
 
   methods: {
-    async updateData () {
+    async getSpecificGrants() {
       this.loading = true
 
       const fullList = this.grants.data
@@ -82,7 +80,9 @@ export default {
 
       const rv = []
       for (const entry of filteredList) {
-        const newEntry = {}
+        const newEntry = {
+          uuid: entry.uuid
+        }
 
         // Get data for the Target
         if (entry.target === UUIDs.Special.Null) {
@@ -140,6 +140,12 @@ export default {
 
       this.entries = rv
       this.loading = false
+    },
+    async updateData () {
+      this.s.client.Fetch.cache = 'reload'
+      await this.grants.fetch()
+      await this.getSpecificGrants()
+      this.s.client.Fetch.cache = 'default'
     }
   },
 

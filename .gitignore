@@ -2,6 +2,5 @@
 config.mk
 */config.mk
 */.npm_install_done
-.vscode/
-node_modules/
-.prettierrc
+.vscode
+.DS_Store

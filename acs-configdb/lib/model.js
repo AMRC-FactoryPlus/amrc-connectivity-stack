@@ -1,21 +1,19 @@
 /*
- * Factory+ / AMRC Connectivity Stack (ACS) Config Store component
- * API v1 model
- * Copyright 2021 AMRC
+ * Copyright (c) University of Sheffield AMRC 2025.
  */
 
-import EventEmitter from "node:events";
+import EventEmitter from 'node:events'
 
-import Ajv from "ajv/dist/2020.js";
-import ajv_formats from "ajv-formats";
-import deep_equal from "deep-equal";
-import merge_patch from "json-merge-patch";
-import rx from "rxjs";
+import Ajv from 'ajv/dist/2020.js'
+import ajv_formats from 'ajv-formats'
+import deep_equal from 'deep-equal'
+import merge_patch from 'json-merge-patch'
+import rx from 'rxjs'
 
-import { DB } from "@amrc-factoryplus/pg-client";
+import { DB } from '@amrc-factoryplus/pg-client'
 
-import {App, Class, Service, SpecialObj} from "./constants.js";
-import { SpecialApps } from "./special.js";
+import { App, Class, Service, SpecialObj } from './constants.js'
+import { SpecialApps } from './special.js'
 
 const DB_Version = 10;
 
@@ -400,7 +398,8 @@ export default class Model extends EventEmitter {
             if (id) {
                 const st = await this.update_registration(q, id, 
                     { ...spec, deleted: false });
-                return [st, id];
+
+                return [(st === 204 ? 200 : st), id];
             }
         }
 

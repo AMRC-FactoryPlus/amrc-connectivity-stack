@@ -21,7 +21,7 @@
     <template #below-toolbar>
       <ObjectSelector
           v-model="membersToAdd"
-          :store-data="p.data.filter(principal => !memberUuids.includes(principal.uuid))"
+          :store-data="availableMembers"
           title="Select Members"
           subtitle="Select principals which should be added to this group"
           column1-header="Name"
@@ -107,6 +107,12 @@ export default {
       })
       this.loading = false
       return rv
+    },
+    availableMembers () {
+      const principals = this.p.data.filter(principal => !this.memberUuids.includes(principal.uuid))
+      const permissions = this.ps.data.filter(permission => !this.memberUuids.includes(permission.uuid))
+      // TODO: Are groups able to be part of other groups?
+      return principals.concat(permissions)
     }
   },
 

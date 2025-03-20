@@ -10,9 +10,9 @@
           badge="Status?"
           :text="cluster.name"
           text-tooltip="The name of the cluster"
-          :detail="cluster.helmChart.chart"
-          detail-icon="dharmachakra"
-          detail-tooltip="The deployed Helm Chart"
+          :detail="cluster.sparkplug"
+          detail-icon="bolt-lightning"
+          detail-tooltip="The Sparkplug name of the cluster"
       >
         <template #action>
           <Button size="sm" class="flex items-center justify-center gap-2" @click="copyBootstrap">
@@ -57,8 +57,9 @@
 
 <script>
 import { useServiceClientStore } from '@store/serviceClientStore.js'
-import { UUIDs } from '@amrc-factoryplus/service-client'
+import { useEdgeClusterStore } from '@store/useEdgeClusterStore.js'
 import { useNodeStore } from '@store/useNodeStore.js'
+import { UUIDs } from '@amrc-factoryplus/service-client'
 import EdgeContainer from '@components/Containers/EdgeContainer.vue'
 import EdgePageSkeleton from '@components/EdgeManager/EdgePageSkeleton.vue'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -101,6 +102,7 @@ export default {
 
   setup () {
     return {
+      e: useEdgeClusterStore(),
       s: useNodeStore(),
       hostColumns,
       nodeColumns,
@@ -166,6 +168,7 @@ export default {
       // - The Nodes in this cluster, their name, status and\ other information (we get this from useNodeStore)
 
       this.cluster.uuid = uuid
+      this.cluster.name = this.e.data.find(e => e.uuid === uuid)?.name ?? ''
 
       const edgeClusterConfigResponse = await useServiceClientStore().
         client.
@@ -173,7 +176,7 @@ export default {
         fetch(`/v1/app/${UUIDs.App.EdgeClusterConfiguration}/object/${this.cluster.uuid}`)
 
       const edgeClusterConfig = edgeClusterConfigResponse[1]
-      this.cluster.name       = edgeClusterConfig.name
+      this.cluster.sparkplug       = edgeClusterConfig.name
       this.cluster.namespace  = edgeClusterConfig.namespace
 
       // Get the name of the deployed helm chart from its UUID using the
@@ -199,7 +202,7 @@ export default {
 
       const edgeClusterStatus = edgeClusterStatusResponse[1]
 
-      this.cluster.hosts = edgeClusterStatus.hosts
+      this.cluster.hosts = edgeClusterStatus?.hosts ?? []
 
       await this.s.fetch()
 

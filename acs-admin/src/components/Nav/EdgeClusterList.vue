@@ -5,8 +5,6 @@
 <template>
   <SidebarMenuItem v-for="cluster in clusters" :key="cluster.uuid" v-if="clusters.length">
     <Collapsible :defaultOpen="false" class="group/collapsible-cluster">
-      <!-- TODO: This should navigate to the cluster page when clicked -->
-      <!-- TODO: Ctrl+Click should expand instead of click -->
       <RouterLink :to="`/edge-clusters/${cluster.uuid}`">
         <Button
             title="View Cluster"
@@ -32,7 +30,7 @@
       </CollapsibleContent>
     </Collapsible>
   </SidebarMenuItem>
-  <Button disabled class="flex items-center justify-center gap-1 text-gray-400 my-1" variant="ghost" size="sm">
+  <Button @click="newCluster" class="flex items-center justify-center gap-1 text-gray-400 my-1" variant="ghost" size="sm">
     <i class="fa-solid fa-plus"></i>
     <span>New Cluster</span>
   </Button>
@@ -87,5 +85,11 @@ export default {
     await this.n.fetch()
     await this.d.fetch()
   },
+
+  methods: {
+    newCluster() {
+      window.events.emit('show-new-cluster-dialog');
+    }
+  }
 }
 </script>

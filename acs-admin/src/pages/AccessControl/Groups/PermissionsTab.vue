@@ -108,17 +108,6 @@ export default {
   },
 
   watch: {
-    group: {
-      handler (val) {
-        if (val == null) {
-          return
-        }
-
-        this.fetchSpecificPermissions()
-      },
-      immediate: true,
-    },
-
     permissionsToAdd: async function (val, oldVal) {
       if (!val.length) {
         this.isTargetSelectorOpen = false
@@ -134,18 +123,42 @@ export default {
         return
       }
 
-      console.log(this.permissionsToAdd)
-      console.log(val)
       for (const permission of this.permissionsToAdd) {
         for (const target of val) {
           await this.addEntry(this.group, permission, target)
         }
       }
       await this.updateData()
+      this.targetsToAdd = []
     },
   },
 
   computed: {
+    permissions () {
+      this.loading = true
+
+      const fullList = this.grants.data
+      const filteredList = fullList.filter(e => e.principal === this.group.uuid)
+
+      const rv = []
+      for (const entry of filteredList) {
+        const permissionLookup = this.p.data.find(e => e.uuid === entry.permission)
+        const targetLookup     = entry.target === UUIDs.Special.Null ? {
+          uuid: UUIDs.Special.Null,
+          name: 'Wildcard'
+        } : this.pr.data.find(e => e.uuid === entry.target) ?? this.g.data.find(e => e.uuid === entry.target)
+
+        rv.push({
+          uuid: entry.uuid,
+          permission: permissionLookup,
+          target: targetLookup,
+          group: this.group,
+        })
+      }
+
+      this.loading     = false
+      return rv
+    },
     targetsSubtitle () {
       return `Select targets for which the selected permission should be granted: ${this.permissionsToAdd.map(p => p.name).join(', ')}`
     },
@@ -159,45 +172,9 @@ export default {
   },
 
   methods: {
-    async fetchSpecificPermissions() {
-      this.loading = true
-
-      const fullList = this.grants.data
-      const filteredList = fullList.filter(e => e.principal === this.group.uuid)
-
-      const info = o => this.s.client.ConfigDB.get_config(UUIDs.App.Info, o)
-      const classGet = o => this.s.client.ConfigDB.get_config(UUIDs.App.Registration, o).then(v => v?.class)
-      const name = o => info(o).then(v => v?.name)
-
-      const rv = []
-      for (const entry of filteredList) {
-        const permission       = await this.p.getPermission(entry.permission)
-        const targetName       = await name(entry.target)
-        const targetClass      = await classGet(entry.target)
-        const targetClassName  = await name(targetClass)
-
-        rv.push({
-          uuid: entry.uuid,
-          permission,
-          target: {
-            uuid: entry.target,
-            name: targetName,
-            class: {
-              uuid: targetClass,
-              name: targetClassName
-            },
-          },
-          group: this.group,
-        })
-      }
-
-      this.permissions = rv
-      this.loading     = false
-    },
     async updateData () {
       this.s.client.Fetch.cache = 'reload'
       await this.grants.fetch()
-      await this.fetchSpecificPermissions()
       this.s.client.Fetch.cache = 'default'
     },
     async addEntry (group, permission, target) {
@@ -221,7 +198,6 @@ export default {
   data () {
     return {
       loading: false,
-      permissions: [],
       permissionsToAdd: [],
       targetsToAdd: [],
       isPermissionSelectorOpen: false,

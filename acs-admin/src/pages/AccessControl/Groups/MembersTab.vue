@@ -61,8 +61,6 @@ import {defineAsyncComponent, provide} from "vue";
 import {usePermissionStore} from "@store/usePermissionStore.js";
 
 export default {
-  name: 'GroupMembership',
-
   emits: ['objectClick'],
 
   setup () {
@@ -88,6 +86,26 @@ export default {
       }
 
       return this.members.map(m => m.uuid)
+    },
+    members () {
+      // Fill in the member details
+      this.loading = true
+      const memberList = this.group.members
+      const rv = memberList.map((memberUUID) => {
+        const lookup = this.p.data.find(e => e.uuid === memberUUID) ?? this.ps.data.find(e => e.uuid === memberUUID)
+        if (lookup && (lookup.name || lookup.kerberos)) {
+          return {
+            ...lookup,
+            group: this.group
+          }
+        }
+        return {
+          name: "UNKNOWN",
+          group: this.group
+        }
+      })
+      this.loading = false
+      return rv
     }
   },
 
@@ -101,52 +119,15 @@ export default {
         await this.addMember(user.uuid)
       }
       await this.updateData()
-    },
-    group: {
-      handler (val) {
-        if (val == null) {
-          return
-        }
-
-        this.updateData()
-      },
-      immediate: true,
-    },
+    }
   },
 
   methods: {
     async updateData () {
-      // Fill in the member details
-      this.loading = true
       // Make sure we have the latest set of members
       this.s.client.Fetch.cache = "reload"
-      const members = await this.s.client.ConfigDB.class_members(this.group.uuid)
+      await this.g.fetch()
       this.s.client.Fetch.cache = "default"
-      this.members = await Promise.all(members.map(async (memberUUID) => {
-        let obj = await this.p.getPrincipal(memberUUID) || await this.ps.getPermission(memberUUID)
-        if (obj && (obj.name || obj.kerberos)) {
-          return {
-            ...obj,
-            group: this.group
-          }
-        }
-        try {
-          let objectResponse = await useServiceClientStore().client.ConfigDB.get_config(UUIDs.App.Info, memberUUID);
-          let memberName = objectResponse.name
-          return {
-            uuid: memberUUID,
-            name: memberName,
-            group: this.group
-          }
-        } catch (err) {
-          console.error(`Can't read member details`, err)
-          return {
-            uuid: memberUUID,
-            group: this.group
-          }
-        }
-      }))
-      this.loading = false
     },
     async addMember (userUuid) {
       try {
@@ -157,9 +138,6 @@ export default {
         console.error(`Unable to add ${userUuid} to ${this.group.name}`, err)
       }
     },
-  },
-
-  async created() {
   },
 
   components: {
@@ -191,7 +169,6 @@ export default {
   data () {
     return {
       loading: false,
-      members: [],
       membersToAdd: [],
       addMemberDialogOpen: false
     }

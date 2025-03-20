@@ -3,7 +3,6 @@
   -->
 
 <template>
-  <NewDeviceDialog/>
   <div class="flex flex-col -m-4">
     <div class="flex justify-between bg-white sticky top-[-1rem] border-b z-10">
       <EdgeBreadcrumbs/>
@@ -17,13 +16,11 @@
 
 <script>
 import EdgeBreadcrumbs from '@components/Nav/EdgeBreadcrumbs.vue'
-import NewDeviceDialog from '@components/EdgeManager/Devices/NewDeviceDialog.vue'
 
 export default {
 
   name: 'EdgeContainer',
   components: {
-    NewDeviceDialog,
     EdgeBreadcrumbs,
   },
 

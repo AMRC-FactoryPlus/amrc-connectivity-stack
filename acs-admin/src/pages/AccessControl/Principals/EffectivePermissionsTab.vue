@@ -30,6 +30,9 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { UUIDs } from '@amrc-factoryplus/service-client'
 import { useServiceClientStore } from '@/store/serviceClientStore.js'
 import {usePermissionStore} from "@store/usePermissionStore.js";
+import {useObjectStore} from "@store/useObjectStore.js";
+import {usePrincipalStore} from "@store/usePrincipalStore.js";
+import {useGroupStore} from "@store/useGroupStore.js";
 
 export default {
   name: 'EffectivePermissions',
@@ -40,7 +43,10 @@ export default {
     return {
       columns,
       s: useServiceClientStore(),
-      p: usePermissionStore()
+      p: usePermissionStore(),
+      pr: usePrincipalStore(),
+      g: useGroupStore(),
+      obj: useObjectStore(),
     }
   },
 
@@ -86,21 +92,19 @@ export default {
       const rv = []
       if (Array.isArray(res[1])) {
         for (const effective of res[1]) {
-          const permissionLookup = await this.p.getPermission(effective.permission)
-          const targetName       = await name(effective.target)
-          const targetClass      = await classGet(effective.target)
-          const targetClassName  = await name(effective.target)
+          const permissionLookup = this.p.data.find(e => e.uuid === effective.permission)
+          const targetLookup     = effective.target === UUIDs.Special.Null ? { uuid: UUIDs.Special.Null, name: 'Wildcard'} :
+              this.pr.data.find(e => e.uuid === effective.target) ??
+              this.g.data.find(e => e.uuid === effective.target) ??
+              this.obj.data.find(e => e.uuid === effective.target) ??
+              {
+                uuid: effective.target,
+                name: "UNKNOWN"
+              }
 
           rv.push({
             permission: permissionLookup,
-            target: {
-              uuid: effective.target,
-              name: targetName,
-              class: {
-                uuid: targetClass,
-                name: targetClassName
-              },
-            },
+            target: targetLookup,
           })
         }
       }

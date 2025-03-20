@@ -31,6 +31,7 @@ import {usePrincipalStore} from "@store/usePrincipalStore.js";
 import {useServiceClientStore} from "@store/serviceClientStore.js";
 import {UUIDs} from "@amrc-factoryplus/service-client";
 import {useGrantStore} from "@store/useGrantStore.js";
+import {useObjectStore} from "@store/useObjectStore.js";
 
 export default {
   name: 'Principals',
@@ -43,7 +44,8 @@ export default {
       p: usePrincipalStore(),
       g: useGroupStore(),
       s: useServiceClientStore(),
-      grants: useGrantStore()
+      grants: useGrantStore(),
+      obj: useObjectStore(),
     }
   },
 
@@ -68,18 +70,14 @@ export default {
         }
 
         // Get data for the Target
-        if (entry.target === UUIDs.Special.Null) {
-          newEntry.target = {
-            uuid: entry.target,
-            name: "Wildcard",
-            class: {
+        newEntry.target = entry.target === UUIDs.Special.Null ? {uuid: UUIDs.Special.Null, name: 'Wildcard'} :
+            this.p.data.find(e => e.uuid === entry.target) ??
+            this.g.data.find(e => e.uuid === entry.target) ??
+            this.obj.data.find(e => e.uuid === entry.target) ??
+            {
               uuid: entry.target,
-              name: "Wildcard"
+              name: "UNKNOWN"
             }
-          }
-        }
-
-        newEntry.target = this.p.data.find(e => e.uuid === entry.target) ?? this.g.data.find(e => e.uuid === entry.target)
 
         // Get data for the Principal
         if (entry.principal === UUIDs.Special.Null) {

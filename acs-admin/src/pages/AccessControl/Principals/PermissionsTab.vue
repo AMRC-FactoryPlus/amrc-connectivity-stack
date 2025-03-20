@@ -67,6 +67,7 @@ import { usePrincipalStore } from '@store/usePrincipalStore.js'
 import { toast } from 'vue-sonner'
 import {useGrantStore} from "@store/useGrantStore.js";
 import {useGroupStore} from "@store/useGroupStore.js";
+import {useObjectStore} from "@store/useObjectStore.js";
 
 export default {
   emits: ['objectClick'],
@@ -78,7 +79,8 @@ export default {
       s: useServiceClientStore(),
       pr: usePrincipalStore(),
       g: useGroupStore(),
-      grants: useGrantStore()
+      grants: useGrantStore(),
+      obj: useObjectStore(),
     }
   },
 
@@ -142,13 +144,14 @@ export default {
       const rv = []
       for (const entry of filteredList) {
         const permissionLookup = this.p.data.find(e => e.uuid === entry.permission)
-        const targetLookup     = entry.target === UUIDs.Special.Null ? {
-          uuid: UUIDs.Special.Null,
-          name: 'Wildcard'
-        } : this.pr.data.find(e => e.uuid === entry.target) ?? this.g.data.find(e => e.uuid === entry.target) ?? {
-          uuid: entry.target,
-          name: "UNKNOWN"
-        }
+        const targetLookup     = entry.target === UUIDs.Special.Null ? { uuid: UUIDs.Special.Null, name: 'Wildcard'} :
+            this.pr.data.find(e => e.uuid === entry.target) ??
+            this.g.data.find(e => e.uuid === entry.target) ??
+            this.obj.data.find(e => e.uuid === entry.target) ??
+            {
+              uuid: entry.target,
+              name: "UNKNOWN"
+            }
 
         rv.push({
           uuid: entry.uuid,
@@ -172,7 +175,7 @@ export default {
         uuid: UUIDs.Special.Null,
         name: 'Wildcard'
       }]
-      return wildcard.concat(this.pr.data).concat(this.g.data)
+      return wildcard.concat(this.obj.data)
     }
   },
 

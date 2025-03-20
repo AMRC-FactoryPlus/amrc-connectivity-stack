@@ -77,6 +77,7 @@ import {useGroupStore} from "@store/useGroupStore.js";
 import {toast} from "vue-sonner";
 import {useGrantStore} from "@store/useGrantStore.js";
 import {useServiceClientStore} from "@store/serviceClientStore.js";
+import {useObjectStore} from "@store/useObjectStore.js";
 
 export default {
   name: 'PermissionManagementSidebar',
@@ -88,6 +89,7 @@ export default {
       pr: usePrincipalStore(),
       g: useGroupStore(),
       grants: useGrantStore(),
+      obj: useObjectStore(),
     }
   },
 
@@ -165,7 +167,7 @@ export default {
         uuid: UUIDs.Special.Null,
         name: 'Wildcard'
       }]
-      return wildcard.concat(this.pr.data).concat(this.g.data)
+      return wildcard.concat(this.obj.data)
     }
   },
 

@@ -138,7 +138,7 @@ spec:
                   key: password
             - name: VERBOSE
               value: ALL,!token,!service
-{{- end -}}
+{{ end }}
       containers:
         - name: restart-mqtt
           image: bitnami/kubectl:latest

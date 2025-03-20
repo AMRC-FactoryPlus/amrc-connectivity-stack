@@ -409,5 +409,7 @@ spark-operator:
     serviceAccount:
       name: "spark-operator"
   spark:
+    jobNamespaces:
+      - factory-plus
     serviceAccount:
       name: "spark-application"

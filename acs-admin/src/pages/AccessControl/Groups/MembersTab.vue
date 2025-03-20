@@ -26,7 +26,7 @@
           subtitle="Select principals which should be added to this group"
           column1-header="Name"
           column1-main-key="name"
-          column1-sub-key="uuid"
+          column1-sub-key="class.name"
           column2-header="Principal"
           column2-main-key="kerberos"
       >

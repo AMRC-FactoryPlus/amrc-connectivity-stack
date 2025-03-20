@@ -31,6 +31,14 @@ acs:
   # The default pullPolicy.
   defaultPullPolicy: IfNotPresent
 
+  # -- Configure which schemas are loaded into the ConfigDB
+  schemas:
+    load: true
+    image:
+      registry: gcr.io
+      repository: amrc-factoryplus/acs-schemas
+      tag: v1.0.0
+
 identity:
   # -- Whether or not to enable the Identity component
   enabled: true
@@ -89,6 +97,13 @@ configdb:
     # -- The repository of the Configuration Store component
     repository: acs-configdb
   bodyLimit: 100kb
+
+files:
+  enabled: true
+  image:
+    repository: acs-files
+  bodyLimit: 500kb
+  storage: 20Gi
 
 monitor:
   enabled: true

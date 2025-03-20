@@ -9,13 +9,14 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@amrc-factoryplus/rx-util": "file:../lib/js-rx-util",
     "@amrc-factoryplus/service-client": "file:../lib/js-service-client",
     "@amrc-factoryplus/sparkplug-app": "file:../lib/js-sparkplug-app",
-    "@amrc-factoryplus/rx-util": "file:../lib/js-rx-util",
     "@import-meta-env/cli": "^0.6.9",
     "@import-meta-env/unplugin": "^0.5.2",
     "@rollup/plugin-inject": "^5.0.5",
     "@tanstack/vue-table": "^8.20.5",
+    "@types/lodash": "^4.17.16",
     "@types/node": "^20.17.16",
     "@vitejs/plugin-vue": "^5.2.1",
     "@vuelidate/core": "^2.0.3",
@@ -27,6 +28,7 @@
     "clsx": "^2.1.1",
     "dayjs": "^1.11.13",
     "immutable": "^5.0.3",
+    "lodash": "^4.17.21",
     "lucide-vue-next": "^0.479.0",
     "numeral": "^2.0.6",
     "pinia": "^2.3.1",

@@ -7,22 +7,11 @@ import {h} from 'vue'
 
 import DataTableColumnHeader from '@/components/ui/data-table/DataTableColumnHeader.vue'
 import {Checkbox} from '@/components/ui/checkbox'
-import dayjs from "dayjs";
-import relativeTime from "dayjs/plugin/relativeTime";
+import {get} from 'lodash'
 
-export interface Alert {
-    uuid: string
-    device: string
-    type: string
-    since: string
-    links: Array<{
-        relation: string; target: string;
-    }>;
-}
+export interface GenericObject {}
 
-dayjs.extend(relativeTime);
-
-export function buildColumns(valueKey, titleKey, titleHeader, detailKey, detailHeader): ColumnDef<Alert>[] {
+export function buildColumns(column1Header, column1MainKey, column1SubKey, column2Header, column2MainKey, column2SubKey): ColumnDef<GenericObject>[] {
     return [
         {
             id: 'select',
@@ -40,20 +29,38 @@ export function buildColumns(valueKey, titleKey, titleHeader, detailKey, detailH
             enableHiding: false,
         },
         {
-            accessorKey: titleKey,
+            accessorKey: column1MainKey,
             header: ({column}) => h(DataTableColumnHeader, {
                 column,
-                title: titleHeader
+                title: column1Header
             }),
-            cell: ({row}) => h('span', {class: 'max-w-[500px] truncate font-medium'}, row.getValue(titleKey)),
+            cell: ({row}) => {
+                if (column1SubKey) {
+                    return h('div', {class: 'max-w-[500px] truncate'}, [
+                        h('div', {class: 'max-w-[500px] truncate font-medium'}, get(row.original, column1MainKey, "Unknown")),
+                        h('div', {class: 'max-w-[500px] truncate text-gray-400'}, get(row.original, column1SubKey, "Unknown"))
+                    ])
+                } else {
+                    return h('span', {class: 'max-w-[500px] truncate font-medium'}, get(row.original, column1MainKey, "Unknown"))
+                }
+            },
         },
         {
-            accessorKey: detailKey,
+            accessorKey: column2MainKey,
             header: ({column}) => h(DataTableColumnHeader, {
                 column,
-                title: detailHeader
+                title: column2Header
             }),
-            cell: ({row}) => h('span', {class: 'max-w-[500px] truncate text-gray-600'}, row.getValue(detailKey)),
+            cell: ({row}) => {
+                if (column2SubKey) {
+                    return h('div', {class: 'max-w-[500px] truncate'}, [
+                        h('div', {class: 'max-w-[500px] truncate font-medium'}, get(row.original, column2MainKey, "Unknown")),
+                        h('div', {class: 'max-w-[500px] truncate text-gray-400'}, get(row.original, column2SubKey, "Unknown"))
+                    ])
+                } else {
+                    return h('span', {class: 'max-w-[500px] truncate font-medium'}, get(row.original, column2MainKey, "Unknown"))
+                }
+            },
         }
     ]
 

@@ -11,6 +11,7 @@
         "@import-meta-env/unplugin": "^0.5.2",
         "@rollup/plugin-inject": "^5.0.5",
         "@tanstack/vue-table": "^8.20.5",
+        "@types/lodash": "^4.17.16",
         "@types/node": "^20.17.16",
         "@vitejs/plugin-vue": "^5.2.1",
         "@vuelidate/core": "^2.0.3",
@@ -22,6 +23,7 @@
         "clsx": "^2.1.1",
         "dayjs": "^1.11.13",
         "immutable": "^5.0.3",
+        "lodash": "^4.17.21",
         "lucide-vue-next": "^0.479.0",
         "numeral": "^2.0.6",
         "pinia": "^2.3.1",
@@ -309,6 +311,8 @@
     "@types/http-cache-semantics": ["@types/http-cache-semantics@4.0.4", "", {}, "sha512-1m0bIFVc7eJWyve9S0RnuRgcQqF/Xd5QsUZAZeQFr1Q3/p9JWoQQEqmVy+DPTNpGXwhgIetAoYF8JSc33q29QA=="],
 
     "@types/json-schema": ["@types/json-schema@7.0.15", "", {}, "sha512-5+fP8P8MFNC+AyZCDxrB2pkZFPGzqQWUzpSeuuVLvm8VMcorNYavBqoFcxK8bQz4Qsbn4oUEEem4wDLfcysGHA=="],
+
+    "@types/lodash": ["@types/lodash@4.17.16", "", {}, "sha512-HX7Em5NYQAXKW+1T+FiuG27NGwzJfCX3s1GjOa7ujxZa52kjJLOr4FUxT+giF6Tgxv1e+/czV/iTtBw27WTU9g=="],
 
     "@types/long": ["@types/long@4.0.2", "", {}, "sha512-MqTGEo5bj5t157U6fA/BiDynNkn0YknVdh48CMPkTSpFTVmvao5UQmm7uEF6xBEo7qIMAlY/JSleYaE6VOdpaA=="],
 

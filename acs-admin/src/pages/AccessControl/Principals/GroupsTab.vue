@@ -24,10 +24,12 @@
           :store-data="g.data.filter(group => !group.members.includes(principal.uuid))"
           title="Select Groups"
           subtitle="Select groups which which user should be added to"
-          detail-header="UUID"
-          detail-key="uuid"
-          title-header="Name"
-          title-key="name"
+          column1-header="Name"
+          column1-main-key="name"
+          column1-sub-key="uuid"
+          column2-header="Class"
+          column2-main-key="class.name"
+          column2-sub-key="class.uuid"
       >
         <Button>Add to Group</Button>
       </ObjectSelector>

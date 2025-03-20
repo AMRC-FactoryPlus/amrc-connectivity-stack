@@ -26,10 +26,12 @@
           :store-data="p.data"
           title="Select Permissions"
           subtitle="Select permissions which the group should be granted, targets can be selected next"
-          detail-header="UUID"
-          detail-key="uuid"
-          title-header="Name"
-          title-key="name"
+          column1-header="Name"
+          column1-main-key="name"
+          column1-sub-key="uuid"
+          column2-header="Class"
+          column2-main-key="class.name"
+          column2-sub-key="class.uuid"
           confirm-text="Choose Targets"
           confirm-icon="arrow-right-long"
       >
@@ -43,10 +45,12 @@
       :store-data="availableTargets"
       title="Select Targets"
       :subtitle="targetsSubtitle"
-      detail-header="UUID"
-      detail-key="uuid"
-      title-header="Name"
-      title-key="name"
+      column1-header="Name"
+      column1-main-key="name"
+      column1-sub-key="uuid"
+      column2-header="Class"
+      column2-main-key="class.name"
+      column2-sub-key="class.uuid"
   >
     <template #actions>
       <Button @click="isTargetSelectorOpen = false; isPermissionSelectorOpen = true"><i class="fa-solid fa-arrow-left-long"></i> &nbsp; Return to Permissions</Button>

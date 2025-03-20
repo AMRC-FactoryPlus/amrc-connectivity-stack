@@ -24,10 +24,11 @@
           :store-data="p.data.filter(principal => !memberUuids.includes(principal.uuid))"
           title="Select Members"
           subtitle="Select principals which should be added to this group"
-          detail-header="Principal"
-          detail-key="kerberos"
-          title-header="Name"
-          title-key="name"
+          column1-header="Name"
+          column1-main-key="name"
+          column1-sub-key="uuid"
+          column2-header="Principal"
+          column2-main-key="kerberos"
       >
         <Button>Add Members</Button>
       </ObjectSelector>

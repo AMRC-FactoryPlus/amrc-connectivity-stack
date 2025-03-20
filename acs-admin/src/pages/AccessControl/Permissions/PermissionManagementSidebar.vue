@@ -39,7 +39,7 @@
           title-key="name"
       >
         <template #actions>
-          <Button @click="isTargetSelectorOpen = false; isPermissionSelectorOpen = true"><i class="fa-solid fa-arrow-left-long"></i> &nbsp; Return to Permissions</Button>
+          <Button @click="isTargetSelectorOpen = false; isPrincipalSelectorOpen = true"><i class="fa-solid fa-arrow-left-long"></i> &nbsp; Return to Permissions</Button>
         </template>
       </ObjectSelector>
       <Tabs default-value="principals" class="mt-6">
@@ -142,6 +142,7 @@ export default {
         }
       }
       await this.updateData()
+      this.targetsToAdd = []
     },
   },
 

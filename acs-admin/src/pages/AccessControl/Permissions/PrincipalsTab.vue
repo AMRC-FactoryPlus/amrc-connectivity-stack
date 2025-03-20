@@ -23,13 +23,13 @@
 
 <script>
 import DataTable from '@components/ui/data-table/DataTable.vue'
-import { Skeleton } from '@components/ui/skeleton/index.js'
-import { columns } from './principalsColumns.ts'
-import { Alert, AlertDescription, AlertTitle } from '@components/ui/alert/index.js'
-import { useGroupStore } from '@store/useGroupStore.js'
-import { usePrincipalStore } from "@store/usePrincipalStore.js";
-import { useServiceClientStore } from "@store/serviceClientStore.js";
-import { UUIDs } from "@amrc-factoryplus/service-client";
+import {Skeleton} from '@components/ui/skeleton/index.js'
+import {columns} from './principalsColumns.ts'
+import {Alert, AlertDescription, AlertTitle} from '@components/ui/alert/index.js'
+import {useGroupStore} from '@store/useGroupStore.js'
+import {usePrincipalStore} from "@store/usePrincipalStore.js";
+import {useServiceClientStore} from "@store/serviceClientStore.js";
+import {UUIDs} from "@amrc-factoryplus/service-client";
 import {useGrantStore} from "@store/useGrantStore.js";
 
 export default {
@@ -54,29 +54,12 @@ export default {
     }
   },
 
-  watch: {
-    permission: {
-      handler (val) {
-        if (val == null) {
-          return
-        }
-
-        this.getSpecificGrants()
-      },
-      immediate: true,
-    },
-  },
-
-  methods: {
-    async getSpecificGrants() {
+  computed: {
+    entries() {
       this.loading = true
 
       const fullList = this.grants.data
       const filteredList = fullList.filter(e => e.permission === this.permission.uuid)
-
-      const info = o => this.s.client.ConfigDB.get_config(UUIDs.App.Info, o)
-      const classUuid = o => this.s.client.ConfigDB.get_config(UUIDs.App.Registration, o)
-      const name = o => info(o).then(v => v?.name)
 
       const rv = []
       for (const entry of filteredList) {
@@ -96,18 +79,7 @@ export default {
           }
         }
 
-        const targetClass = (await classUuid(entry.target)).class
-        const targetClassName = await name(targetClass)
-        const targetName     = await name(entry.target)
-
-        newEntry.target = {
-          uuid: entry.target,
-          name: targetName,
-          class: {
-            uuid: targetClass,
-            name: targetClassName
-          }
-        }
+        newEntry.target = this.p.data.find(e => e.uuid === entry.target) ?? this.g.data.find(e => e.uuid === entry.target)
 
         // Get data for the Principal
         if (entry.principal === UUIDs.Special.Null) {
@@ -121,30 +93,21 @@ export default {
           }
         }
 
-        const principalClass = (await classUuid(entry.principal)).class
-        const principalClassName = await name(principalClass)
-        const principalName     = await name(entry.principal)
-
-        newEntry.principal = {
-          uuid: entry.principal,
-          name: principalName,
-          class: {
-            uuid: principalClass,
-            name: principalClassName
-          }
-        }
+        newEntry.principal = this.p.data.find(e => e.uuid === entry.principal) ?? this.g.data.find(e => e.uuid === entry.principal)
 
         newEntry.permission = this.permission
         rv.push(newEntry)
       }
 
-      this.entries = rv
       this.loading = false
-    },
+      return rv
+    }
+  },
+
+  methods: {
     async updateData () {
       this.s.client.Fetch.cache = 'reload'
       await this.grants.fetch()
-      await this.getSpecificGrants()
       this.s.client.Fetch.cache = 'default'
     }
   },
@@ -169,8 +132,7 @@ export default {
 
   data () {
     return {
-      loading: false,
-      entries: []
+      loading: false
     }
   },
 

@@ -58,6 +58,7 @@ import LinkUserDialog from '@pages/AccessControl/LinkUserDialog.vue'
 import {useGrantStore} from "@store/useGrantStore.js";
 import {useRoute, useRouter} from "vue-router";
 import {serviceClientReady} from "@store/useServiceClientReady.js";
+import {useObjectStore} from "@store/useObjectStore.js";
 
 export default {
   name: 'AccessControl',
@@ -69,6 +70,7 @@ export default {
       ps: usePermissionStore(),
       g: useGroupStore(),
       grants: useGrantStore(),
+      obj: useObjectStore(),
       router: useRouter(),
       route: useRoute()
     }
@@ -214,6 +216,7 @@ export default {
     this.g.fetch()
     this.ps.fetch()
     this.grants.fetch()
+    this.obj.fetch()
   },
 
   data () {

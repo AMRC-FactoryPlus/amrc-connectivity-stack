@@ -3,8 +3,6 @@
 import { ServiceClient } from '@amrc-factoryplus/service-client';
 import { WebAPI } from '@amrc-factoryplus/service-api';
 import { routes } from '../lib/routes.js';
-import multer from 'multer';
-import { multer_storage } from '../config/multer.js';
 import { Version, Service } from '../lib/constants.js';
 
 const { env } = process;
@@ -13,7 +11,7 @@ const fplus = await new ServiceClient({
   env,
 }).init();
 
-const upload = multer({ storage: multer_storage });
+const uploadPath = env.FILES_STORAGE;
 
 const api = await new WebAPI({
   ping: {
@@ -35,7 +33,7 @@ const api = await new WebAPI({
   routes: routes({
     auth: fplus.Auth,
     configDb: fplus.ConfigDB,
-    upload: upload,
+    uploadPath: uploadPath,
   }),
 }).init();
 

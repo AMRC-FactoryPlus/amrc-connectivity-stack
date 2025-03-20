@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - main
+      - testing/v4
 
 jobs:
   lint:

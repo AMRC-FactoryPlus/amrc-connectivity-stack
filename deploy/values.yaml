@@ -35,7 +35,7 @@ acs:
   schemas:
     load: true
     image:
-      registry: gcr.io
+      registry: ghcr.io
       repository: amrc-factoryplus/acs-schemas
       tag: v1.0.0
 

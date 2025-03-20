@@ -41,7 +41,7 @@ function handleDelete() {
     message: `Are you sure that you want to revoke ${props.row.original.permission.name} on ${props.row.original.target.name} from ${props.row.original.principal.name}?`,
     confirmText: 'Revoke Permission',
     onConfirm: () => {
-      s.client.Auth.delete_ace (props.row.original.principal.uuid, props.row.original.permission.uuid, props.row.original.target.uuid).then(async () => {
+      s.client.Auth.delete_grant(props.row.original.uuid).then(async () => {
         toast.success(`${props.row.original.permission.name} on ${props.row.original.target.name} has been revoked from ${props.row.original.principal.name}`)
         s.client.Fetch.cache = "reload"
         // Jetbrains doesn't understand this, but it works

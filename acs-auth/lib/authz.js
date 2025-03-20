@@ -92,7 +92,7 @@ export default class AuthZ {
         /* This API only ever returns Kerberos identities */
         const idr = await this.data.find_identities(
             this.data.root, { uuid, kind: "kerberos" });
-        const kerberos = idr.single().map(id => id.name);
+        const kerberos = idr.single().map(id => id.name).get();
         this.log("Fetched krb %s", kerberos);
 
         if (kerberos == req.auth) {

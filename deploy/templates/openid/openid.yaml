@@ -28,14 +28,11 @@ spec:
           args: ["start-dev", "--import-realm"]
           env:
             - name: KEYCLOAK_ADMIN
-              valueFrom:
-                secretKeyRef:
-                  name: openid-admin-user
-                  key: username
+              value: "admin"
             - name: KEYCLOAK_ADMIN_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: openid-admin-user
+                  name: admin-password
                   key: password
             - name: KC_PROXY
               value: "edge"
@@ -65,7 +62,7 @@ spec:
         - name: krb5-conf
           configMap:
             name: krb5-conf
-        - name: krb5-keytabs
+        - name: krb5-keytab
           secret:
             secretName: krb5-keytabs
             items:

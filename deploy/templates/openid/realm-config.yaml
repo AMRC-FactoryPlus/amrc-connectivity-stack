@@ -944,7 +944,7 @@ data:
           "enabled": true,
           "alwaysDisplayInConsole": false,
           "clientAuthenticatorType": "client-secret",
-          "secret": "{{ (lookup "v1" "Secret" .Release.Namespace "keycloak-grafana-client").data.client-secret | b64dec }}",
+          "secret": "$__file{/etc/secrets/auth_generic_oauth/client_secret",
           "redirectUris": [
             "{{ .Values.acs.secure | ternary "https://" "http://" }}grafana.{{.Values.acs.baseUrl}}/login/generic_oauth"
           ],

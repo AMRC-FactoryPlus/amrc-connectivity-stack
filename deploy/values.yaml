@@ -350,11 +350,28 @@ grafana:
       name: Keycloak
       allow_sign_up: true
       client_id: grafana-oauth
-      client_secret: {{ (lookup "v1" "Secret" .Release.Namespace "keycloak-grafana-client").data.client-secret | b64dec }}
+      client_secret: $__file{/etc/secrets/auth_generic_oauth/client_secret}
       scopes: openid profile email
-      auth_url: {{ .Values.acs.secure | ternary "https://" "http://" }}openid.{{.Values.acs.baseUrl}}/realms/factory_plus/protocol/openid-connect/auth
-      token_url: {{ .Values.acs.secure | ternary "https://" "http://" }}openid.{{.Values.acs.baseUrl}}/realms/factory_plus/protocol/openid-connect/token
-      api_url: {{ .Values.acs.secure | ternary "https://" "http://" }}openid.{{.Values.acs.baseUrl}}/realms/factory_plus/protocol/openid-connect/userinfo
+      auth_url: $__file{/etc/acs-config/data/auth_url}
+      token_url: $__file{/etc/acs-config/data/token_url}
+      api_url: $__file{/etc/acs-config/data/api_url}
+  extraConfigmapMounts:
+    - name: ini-config
+      mountPath: /etc/acs-config/
+      configMap: acs-grafana-config
+      readOnly: true
+      optional: false
+
+  extraSecretMounts:
+    - name: keycloak-grafana-client
+      secretName: keycloak-grafana-client
+      defaultMode: 0440
+      mountPath: /etc/secrets/auth_generic_oauth
+      readOnly: true
+  extraInitContainers:
+    - name: mountsecret
+      image: busybox:latest
+      command: [ ]
   sidecar:
     datasources:
       enabled: true

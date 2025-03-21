@@ -2,8 +2,10 @@
  * Copyright (c) University of Sheffield AMRC 2024.
  */
 
+import * as imm from "immutable";
 import { defineStore } from 'pinia'
 import * as rx from 'rxjs'
+
 import * as rxu from '@amrc-factoryplus/rx-util'
 import { useServiceClientStore } from '@/store/serviceClientStore.js'
 import {UUIDs} from "@amrc-factoryplus/service-client";
@@ -11,14 +13,15 @@ import {serviceClientReady} from "@store/useServiceClientReady.js";
 
 export const useObjectStore = defineStore('object', {
   state: () => ({
+    ready: false,
+    maps: null,
     data: [],
-    loading: true,
     rxsub: null,
   }),
   actions: {
-    async storeReady () {
-      if (!this.loading)
-        return;
+    async start () {
+      if (this.rxsub)
+        throw new Error("Object store start() called twice!");
 
       await serviceClientReady();
       const cdb = useServiceClientStore().client.ConfigDB;
@@ -26,8 +29,9 @@ export const useObjectStore = defineStore('object', {
       const info = cdb.search_app(UUIDs.App.Info);
       const registration = cdb.search_app(UUIDs.App.Registration);
 
-      /* XXX We never unsubscribe this subscription. */
-      this.rxsub = rxu.rx(
+      /* Create an Observable of Seq objects from which we can build
+       * either an array or a map as needed. */
+      const seq = rxu.rx(
         rx.combineLatest(info, registration),
         rx.map(([infos, regs]) => {
           const name_of = u => infos.get(u)?.name ?? "UNKNOWN";
@@ -40,14 +44,35 @@ export const useObjectStore = defineStore('object', {
                 uuid: reg.class,
                 name: name_of(uuid),
               },
-            }))
-            .toArray();
+            }));
         }),
-      ).subscribe(list => {
-        this.loading = false;
-        this.data = list;
+        /* Allow multiple consumers without duplicating work */
+        rx.share(),
+      );
+
+      /* Expose the object info as an Observable of Maps */
+      this.maps = rxu.rx(
+        seq,
+        rx.map(seq => seq
+          .map(inf => [inf.uuid, inf])
+          .toMap()),
+        rx.share(),
+      );
+
+      /* Update our data */
+      seq.subscribe(seq => {
+        this.data = seq.toArray();
+        this.ready = true;
       });
     },
+
+    stop () {
+      if (this.rxsub) {
+        this.rxsub.unsubscribe();
+        this.rxsub = null;
+      }
+    },
+
 //    /* Only meant to be internal */
 //    async fetchObject(uuid) {
 //      const object = {

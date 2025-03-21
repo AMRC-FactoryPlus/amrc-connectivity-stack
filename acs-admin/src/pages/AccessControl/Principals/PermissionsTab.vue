@@ -53,6 +53,7 @@
   >
     <template #actions>
       <Button @click="isTargetSelectorOpen = false; isPermissionSelectorOpen = true"><i class="fa-solid fa-arrow-left-long"></i> &nbsp; Return to Permissions</Button>
+      <Button variant="outline" @click="() => {targetPlural = !targetPlural}"><Checkbox :model-value="targetPlural" @click="() => {targetPlural = !targetPlural}"></Checkbox> &nbsp; Plural</Button>
     </template>
   </ObjectSelector>
 </template>
@@ -72,6 +73,7 @@ import { toast } from 'vue-sonner'
 import {useGrantStore} from "@store/useGrantStore.js";
 import {useGroupStore} from "@store/useGroupStore.js";
 import {useObjectStore} from "@store/useObjectStore.js";
+import {Checkbox} from "@components/ui/checkbox/index.js";
 
 export default {
   emits: ['objectClick'],
@@ -96,6 +98,7 @@ export default {
   },
 
   components: {
+    Checkbox,
     Button,
     DataTable,
     Skeleton,
@@ -135,6 +138,7 @@ export default {
       }
       await this.updateData()
       this.targetsToAdd = []
+      this.targetPlural = false
     },
   },
 
@@ -175,11 +179,8 @@ export default {
       return `Select targets for which the selected permission(s) should be granted: ${this.permissionsToAdd.map(p => p.name).join(', ')}`
     },
     availableTargets () {
-      const wildcard = [{
-        uuid: UUIDs.Special.Null,
-        name: 'Wildcard'
-      }]
-      return wildcard.concat(this.obj.data)
+      // Wildcard already included
+      return this.obj.data
     }
   },
 
@@ -195,7 +196,7 @@ export default {
           principal: principal.uuid,
           permission: permission.uuid,
           target: target.uuid,
-          plural: false
+          plural: this.targetPlural
         }
         await this.s.client.Auth.add_grant(grant)
         toast.success(`${principal.name} has been granted ${permission.name} on ${target.name}`)
@@ -214,6 +215,7 @@ export default {
       targetsToAdd: [],
       isPermissionSelectorOpen: false,
       isTargetSelectorOpen: false,
+      targetPlural: false,
     }
   },
 

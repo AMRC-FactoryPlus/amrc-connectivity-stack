@@ -44,6 +44,7 @@
       >
         <template #actions>
           <Button @click="isTargetSelectorOpen = false; isPrincipalSelectorOpen = true"><i class="fa-solid fa-arrow-left-long"></i> &nbsp; Return to Permissions</Button>
+          <Button variant="outline" @click="() => {targetPlural = !targetPlural}"><Checkbox :model-value="targetPlural" @click="() => {targetPlural = !targetPlural}"></Checkbox> &nbsp; Plural</Button>
         </template>
       </ObjectSelector>
       <Tabs default-value="principals" class="mt-6">
@@ -82,6 +83,7 @@ import {toast} from "vue-sonner";
 import {useGrantStore} from "@store/useGrantStore.js";
 import {useServiceClientStore} from "@store/serviceClientStore.js";
 import {useObjectStore} from "@store/useObjectStore.js";
+import {Checkbox} from "@components/ui/checkbox/index.js";
 
 export default {
   name: 'PermissionManagementSidebar',
@@ -100,6 +102,7 @@ export default {
   emits: ['objectClick'],
 
   components: {
+    Checkbox,
     Button,
     Copyable,
     SheetHeader,
@@ -149,6 +152,7 @@ export default {
       }
       await this.updateData()
       this.targetsToAdd = []
+      this.targetPlural = false
     },
   },
 
@@ -167,11 +171,8 @@ export default {
       return this.pr.data.concat(this.g.data)
     },
     availableTargets () {
-      const wildcard = [{
-        uuid: UUIDs.Special.Null,
-        name: 'Wildcard'
-      }]
-      return wildcard.concat(this.obj.data)
+      // Wildcard already included
+      return this.obj.data
     }
   },
 
@@ -187,7 +188,7 @@ export default {
           principal: principal.uuid,
           permission: permission.uuid,
           target: target.uuid,
-          plural: false
+          plural: this.targetPlural
         }
         await this.s.client.Auth.add_grant(grant)
         toast.success(`${principal.name} has been granted ${permission.name} on ${target.name}`)
@@ -206,6 +207,7 @@ export default {
       isPrincipalSelectorOpen: false,
       targetsToAdd: [],
       isTargetSelectorOpen: false,
+      targetPlural: false,
     }
   }
 }

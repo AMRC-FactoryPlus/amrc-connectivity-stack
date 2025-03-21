@@ -167,6 +167,7 @@ export default {
           permission: permissionLookup,
           target: targetLookup,
           group: this.group,
+          plural: entry.plural,
         })
       }
 

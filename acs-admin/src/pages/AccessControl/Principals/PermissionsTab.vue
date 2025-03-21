@@ -169,6 +169,7 @@ export default {
             uuid: this.principal.uuid,
             name: this.principal.name,
           },
+          plural: entry.plural,
         })
       }
 

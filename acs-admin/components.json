@@ -6,11 +6,15 @@
     "config": "tailwind.config.js",
     "css": "src/assets/main.css",
     "baseColor": "slate",
-    "cssVariables": false
+    "cssVariables": false,
+    "prefix": ""
   },
-  "framework": "vite",
   "aliases": {
     "components": "@/components",
-    "utils": "@/lib/utils"
-  }
+    "composables": "@/composables",
+    "utils": "@/lib/utils",
+    "ui": "@/components/ui",
+    "lib": "@/lib"
+  },
+  "iconLibrary": "lucide"
 }

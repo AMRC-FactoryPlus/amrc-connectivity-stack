@@ -1,7 +1,11 @@
+<!--
+  - Copyright (c) University of Sheffield AMRC 2025.
+  -->
+
 <script setup>
-import { computed } from "vue";
-import { Separator } from "radix-vue";
-import { cn } from "@/lib/utils";
+import { computed } from 'vue'
+import { Separator } from 'reka-ui'
+import { cn } from '@/lib/utils'
 
 const props = defineProps({
   orientation: { type: String, required: false },

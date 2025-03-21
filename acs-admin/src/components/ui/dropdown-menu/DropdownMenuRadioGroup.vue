@@ -1,5 +1,9 @@
+<!--
+  - Copyright (c) University of Sheffield AMRC 2025.
+  -->
+
 <script setup>
-import { DropdownMenuRadioGroup, useForwardPropsEmits } from "radix-vue";
+import { DropdownMenuRadioGroup, useForwardPropsEmits } from 'reka-ui'
 
 const props = defineProps({
   modelValue: { type: String, required: false },

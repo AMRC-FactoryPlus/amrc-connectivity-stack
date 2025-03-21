@@ -375,6 +375,7 @@ tenant:
       - name: device-configurations
       - name: device-connections
       - name: edge-agent-configs
+      - name: deltalake
     users:
       - name: manager-minio-secret
   ingress:

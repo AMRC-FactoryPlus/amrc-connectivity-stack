@@ -12,13 +12,12 @@ import {serviceClientReady} from "@store/useServiceClientReady.js";
 export const useObjectStore = defineStore('object', {
   state: () => ({
     data: [],
-    loading: true,
     rxsub: null,
   }),
   actions: {
-    async storeReady () {
-      if (!this.loading)
-        return;
+    async start () {
+      if (this.rxsub)
+        throw new Error("Object store start() called twice!");
 
       await serviceClientReady();
       const cdb = useServiceClientStore().client.ConfigDB;
@@ -26,7 +25,6 @@ export const useObjectStore = defineStore('object', {
       const info = cdb.search_app(UUIDs.App.Info);
       const registration = cdb.search_app(UUIDs.App.Registration);
 
-      /* XXX We never unsubscribe this subscription. */
       this.rxsub = rxu.rx(
         rx.combineLatest(info, registration),
         rx.map(([infos, regs]) => {
@@ -44,9 +42,15 @@ export const useObjectStore = defineStore('object', {
             .toArray();
         }),
       ).subscribe(list => {
-        this.loading = false;
         this.data = list;
       });
+    },
+
+    stop () {
+      if (this.rxsub) {
+        this.rxsub.unsubscribe();
+        this.rxsub = null;
+      }
     },
 //    /* Only meant to be internal */
 //    async fetchObject(uuid) {

@@ -203,7 +203,13 @@ export default {
     this.g.fetch()
     this.ps.fetch()
     this.grants.fetch()
-    this.obj.fetch()
+
+    // Start a reactive fetch via the notify interface
+    this.obj.start()
+  },
+
+  unmounted () {
+    this.obj.stop()
   },
 
   data () {

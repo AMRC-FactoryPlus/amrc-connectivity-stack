@@ -1,4 +1,4 @@
-# AI-24-477-ACS-File-Service Design Spec DRAFT
+# ACS-Files Design Spec (DRAFT)
 
 ## Objectives
 This service enables the storage of non-primitive data types, such as PDFs, CSVs, CAD models, and other files. It allows these files to be associated with objects in the **ACS ConfigDB**. The service facilitates file upload, download, and listing of files.

@@ -83,4 +83,31 @@ spec:
       targetPort: 8080
   selector:
     factory-plus.service: openid
+
+---
+
+apiVersion: factoryplus.app.amrc.co.uk/v1
+kind: KerberosKey
+metadata:
+  name: sv1openid
+  namespace: {{ .Release.Namespace }}
+spec:
+  type: Random
+  principal: sv1openid@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+  secret: openid-keytabs/client
+
+
+---
+
+apiVersion: factoryplus.app.amrc.co.uk/v1
+kind: KerberosKey
+metadata:
+  name: http.openid
+  namespace: {{ .Release.Namespace }}
+spec:
+  type: Random
+  principal: HTTP/openid.{{ .Release.Namespace }}.svc.cluster.local@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+  additionalPrincipals:
+    - HTTP/openid.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+  secret: openid-keytabs/server
 {{- end }}

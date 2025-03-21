@@ -352,26 +352,22 @@ grafana:
       client_id: grafana-oauth
       client_secret: $__file{/etc/secrets/auth_generic_oauth/client_secret}
       scopes: openid profile email
-      auth_url: $__file{/etc/acs-config/data/auth_url}
-      token_url: $__file{/etc/acs-config/data/token_url}
-      api_url: $__file{/etc/acs-config/data/api_url}
+      auth_url: $__file{/etc/acs-config/auth_url}
+      token_url: $__file{/etc/acs-config/token_url}
+      api_url: $__file{/etc/acs-config/api_url}
   extraConfigmapMounts:
     - name: ini-config
-      mountPath: /etc/acs-config/
+      mountPath: /etc/acs-config
       configMap: acs-grafana-config
+      subPath: ""
       readOnly: true
       optional: false
-
   extraSecretMounts:
-    - name: keycloak-grafana-client
+    - name: keycloak-grafana-client-mount
       secretName: keycloak-grafana-client
       defaultMode: 0440
       mountPath: /etc/secrets/auth_generic_oauth
       readOnly: true
-  extraInitContainers:
-    - name: mountsecret
-      image: busybox:latest
-      command: [ ]
   sidecar:
     datasources:
       enabled: true

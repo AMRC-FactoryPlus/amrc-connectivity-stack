@@ -3,7 +3,7 @@
  */
 
 import { defineStore } from 'pinia'
-import { ServiceClient, UUIDs } from '@amrc-factoryplus/service-client'
+import { RxClient, UUIDs } from '@amrc-factoryplus/rx-client'
 
 export const useServiceClientStore = defineStore('service-client', {
   state: () => {
@@ -20,25 +20,22 @@ export const useServiceClientStore = defineStore('service-client', {
     // since we rely on `this`, we cannot use an arrow function
     login (opts) {
 
-      (new ServiceClient(opts)).init().then((client) => {
+      const client = new RxClient(opts);
 
-        // save opts to local storage
-        localStorage.setItem('opts', JSON.stringify(opts))
+      // save opts to local storage
+      localStorage.setItem('opts', JSON.stringify(opts))
 
-        this.username = opts.username
-        this.client  = client
-        this.loaded  = true
-        this.scheme  = import.meta.env.SCHEME
-        this.baseUrl = import.meta.env.BASEURL
+      this.username = opts.username
+      this.client  = client
+      this.loaded  = true
+      this.scheme  = import.meta.env.SCHEME
+      this.baseUrl = import.meta.env.BASEURL
 
-        client.service_urls(UUIDs.Service.MQTT).then((urls) => {
-          this.urls.mqtt = urls
-        })
-
-        client.Fetch.cache = 'reload';
-
+      client.service_urls(UUIDs.Service.MQTT).then((urls) => {
+        this.urls.mqtt = urls
       })
 
+      client.Fetch.cache = 'reload';
     },
 
     logout () {

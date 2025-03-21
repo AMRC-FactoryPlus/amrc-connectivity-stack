@@ -104,59 +104,46 @@ export default {
       await this.objectSelected({uuid})
     },
     async objectSelected (object) {
-      // Get type of object
-      let classUUID = "";
-      if (object.class) {
-        classUUID = object.class.uuid
-      } else {
-        const principalObjectResponse = await this.s.client.ConfigDB.get_config(UUIDs.App.Registration, object.uuid);
-        classUUID = principalObjectResponse.class
-      }
-
-      switch (classUUID) {
-          // TODO: Check if the uuid is a subclass of UUIDs.Class.Permission
-        case UUIDs.Class.Permission:
-        case "a637134a-d06b-41e7-ad86-4bf62fde914a": // MQTT
-        case "9e07fd33-6400-4662-92c4-4dff1f61f990": // Cluster manager
-        case "c0c55c78-116e-4526-8ff4-e4595251f76c": // Git
-        case "50b727d4-3faa-40dc-b347-01c99a226c58": // Auth
-        case "58b5da47-d098-44f7-8c1d-6e4bd800e718": // Directory
-        case "9584ee09-a35a-4278-bc13-21a8be1f007c": // CmdEsc
-        case "c43c7157-a50b-4d2a-ac1a-86ff8e8e88c1": // ConfigDB
-          this.selectPermission(object)
-          break;
-          // TODO: Check if the uuid is a subclass of Role or Composite Permission
-        case UUIDs.Class.PermGroup:
-        case UUIDs.Class.GitRepoGroup:
-        case "f1fabdd1-de90-4399-b3da-ccf6c2b2c08b": // User Group
-        case "b2053a3e-bdf8-11ef-9423-771a19e4a8a4": // Client role
-        case "b419cbc2-ab0f-4311-bd9e-f0591f7e88cb": // Service role
-        case "3ba1d68e-ccf5-11ef-82d9-ef32470538b1": // Edge role
-        case "1c567e3c-5519-4418-8682-6086f22fbc13": // Composite permission
-        case "b7f0c2f4-ccf5-11ef-be77-777cd4e8cb41": // Service permission set
-          if (!object.members) {
-            object.members = await this.g.fetchMembers(object)
-          }
-          this.selectGroup(object)
-          break;
-          // TODO: Check if the uuid is a subclass of Principal
-        case "e463b4ae-a322-46cc-8976-4ba76838e908": // Central service
-        case "8b3e8f35-78e5-4f93-bf21-7238bcb2ba9d": // Human user
-        case "97756c9a-38e6-4238-b78c-3df6f227a6c9": // Edge Cluster Account
-        case "00da3c0b-f62b-4761-a689-39ad0c33f864": // Cell Gateway
-          this.selectPrincipal(object)
-          break;
-          // TODO: Likely some missing UUIDs here. Git Repo??
+      if (await this.s.client.ConfigDB.class_has_member("ac0d5288-6136-4ced-a372-325fbbcdd70d", object.uuid) ||
+          await this.s.client.ConfigDB.class_has_member("c0157038-ccff-11ef-a4db-63c6212e998f", object.uuid)
+      ) {
+        // Permission Group
+        // Principal Group
+        // Treat this as a group
+        const group = this.g.data.find(g => g.uuid === object.uuid)
+        if (!group) {
+          console.error("Group not found in the store", object.uuid)
+          this.objectDeselect()
+          return
+        }
+        this.selectGroup(group)
+      } else if (await this.s.client.ConfigDB.class_has_member(UUIDs.Class.Permission, object.uuid)) {
+        // Permission
+        const permission = this.ps.data.find(p => p.uuid === object.uuid)
+        if (!permission) {
+          console.error("Permission not found in the store", object.uuid)
+          this.objectDeselect()
+          return
+        }
+        this.selectPermission(permission)
+      } else if (await this.s.client.ConfigDB.class_has_member("11614546-b6d7-11ef-aebd-8fbb45451d7c", object.uuid)) {
+        // Principal
+        const principal = this.p.data.find(p => p.uuid === object.uuid)
+        if (!principal) {
+          console.error("Principal not found in the store", object.uuid)
+          this.objectDeselect()
+          return
+        }
+        this.selectPrincipal(principal)
       }
     },
-    async selectPrincipal (principal) {
+    objectDeselect() {
+      this.router.push({ path: `/access-control/${this.activeTab}` })
+    },
+    selectPrincipal (principal) {
       this.selectedGroup = null
       this.selectedPermission = null
-      if (principal.kerberos) {
-        this.selectedPrincipal = principal
-      } else {
-        this.selectedPrincipal = await this.p.getPrincipal(principal.uuid)
-      }
+      this.selectedPrincipal = principal
     },
     selectGroup (group) {
       this.selectedPrincipal = null

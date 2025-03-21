@@ -48,8 +48,9 @@ spec:
                 dict
                   "organisation"    .Values.acs.organisation
                   "namespace"       .Release.Namespace
-                  "base_url"        .Values.acs.baseUrl
-                  "url_protocol"    (.Values.acs.secure | ternary "https" "http")
+                  "domain"          .Values.acs.baseUrl
+                  "k8sdomain"       "cluster.local"
+                  "secure"          (.Values.acs.secure | ternary "s" "")
                   "realm"           .Values.identity.realm
                   "directory"
                     (include "amrc-connectivity-stack.external-url" 
@@ -122,6 +123,22 @@ spec:
               name: krb5-conf
             - mountPath: /app/storage/ccache
               name: manager-ccache-storage
+{{ if .Values.acs.schemas.load }}
+        - name: load-schemas
+{{ include "amrc-connectivity-stack.image" (list . .Values.acs.schemas) | indent 10 }}
+          env:
+            - name: DIRECTORY_URL
+              value: http://directory.{{ $.Release.Namespace }}.svc.cluster.local
+            - name: SERVICE_USERNAME
+              value: admin
+            - name: SERVICE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: admin-password
+                  key: password
+            - name: VERBOSE
+              value: ALL,!token,!service
+{{ end }}
       containers:
         - name: restart-mqtt
           image: bitnami/kubectl:latest

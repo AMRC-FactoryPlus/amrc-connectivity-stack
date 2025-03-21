@@ -1,55 +1,29 @@
+#-REQUIRE: auth
 service: !u UUIDs.Service.ConfigDB
-version: 1
-classes:
-  - !u UUIDs.Class.Service
-  - !u UUIDs.Class.Permission
-  - !u UUIDs.Class.PermGroup
+version: 2
 objects:
   !u UUIDs.Class.Service:
-    - !u UUIDs.Service.Directory
-  !u UUIDs.Class.PermGroup:
-    - !u Directory.Perm.All
-  !u UUIDs.Class.Permission:
-    - !u Directory.Perm.AdvertiseService
-    - !u Directory.Perm.ManageService
-    - !u Directory.Perm.OverrideService
-    - !u Directory.Perm.ReadAlertType
-    - !u Directory.Perm.PublishAlertType
-    - !u Directory.Perm.ReadDeviceAlerts
-    - !u Directory.Perm.ReadLinkRelation
-    - !u Directory.Perm.ReadDeviceLinks
-configs:
-  !u UUIDs.App.Info:
     !u UUIDs.Service.Directory:
       name: "Directory service"
+  !u Auth.Class.ServicePerms:
     !u Directory.Perm.All:
-      name: "Directory permissions"
-    !u Directory.Perm.AdvertiseService:
-      name: "Directory: Advertise service"
-    !u Directory.Perm.ManageService:
-      name: "Directory: Manage service advert for owner"
-    !u Directory.Perm.OverrideService:
-      name: "Directory: Override service advert permissions"
-    !u Directory.Perm.ReadAlertType:
-      name: "Directory: Read alerts of type"
-    !u Directory.Perm.PublishAlertType:
-      name: "Directory: Publish alerts of type"
-    !u Directory.Perm.ReadDeviceAlerts:
-      name: "Directory: Read alerts from device"
-    !u Directory.Perm.ReadLinkRelation:
-      name: "Directory: Read Links by relation"
-    !u Directory.Perm.ReadDeviceLinks:
-      name: "Directory: Read Links from device"
----
-service: !u UUIDs.Service.Authentication
-version: 1
-groups:
+      name: "Directory permission"
+      subclassOf:
+        - !u UUIDs.Class.Permission
   !u Directory.Perm.All:
-    - !u Directory.Perm.AdvertiseService
-    - !u Directory.Perm.ManageService
-    - !u Directory.Perm.OverrideService
-    - !u Directory.Perm.ReadAlertType
-    - !u Directory.Perm.PublishAlertType
-    - !u Directory.Perm.ReadDeviceAlerts
-    - !u Directory.Perm.ReadLinkRelation
-    - !u Directory.Perm.ReadDeviceLinks
+    !u Directory.Perm.AdvertiseService:
+      name: "Advertise service"
+    !u Directory.Perm.ManageService:
+      name: "Manage service advert for owner"
+    !u Directory.Perm.OverrideService:
+      name: "Override service advert permissions"
+    !u Directory.Perm.ReadAlertType:
+      name: "Read alerts of type"
+    !u Directory.Perm.PublishAlertType:
+      name: "Publish alerts of type"
+    !u Directory.Perm.ReadDeviceAlerts:
+      name: "Read alerts from device"
+    !u Directory.Perm.ReadLinkRelation:
+      name: "Read Links by relation"
+    !u Directory.Perm.ReadDeviceLinks:
+      name: "Read Links from device"

@@ -1,21 +1,19 @@
 /*
- * Factory+ / AMRC Connectivity Stack (ACS) Config Store component
- * API v1 model
- * Copyright 2021 AMRC
+ * Copyright (c) University of Sheffield AMRC 2025.
  */
 
-import EventEmitter from "node:events";
+import EventEmitter from 'node:events'
 
-import Ajv from "ajv/dist/2020.js";
-import ajv_formats from "ajv-formats";
-import deep_equal from "deep-equal";
-import merge_patch from "json-merge-patch";
-import rx from "rxjs";
+import Ajv from 'ajv/dist/2020.js'
+import ajv_formats from 'ajv-formats'
+import deep_equal from 'deep-equal'
+import merge_patch from 'json-merge-patch'
+import rx from 'rxjs'
 
-import { DB } from "@amrc-factoryplus/pg-client";
+import { DB } from '@amrc-factoryplus/pg-client'
 
-import {App, Class, Service, SpecialObj} from "./constants.js";
-import { SpecialApps } from "./special.js";
+import { App, Class, Service, SpecialObj } from './constants.js'
+import { SpecialApps } from './special.js'
 
 const DB_Version = 10;
 
@@ -400,7 +398,8 @@ export default class Model extends EventEmitter {
             if (id) {
                 const st = await this.update_registration(q, id, 
                     { ...spec, deleted: false });
-                return [st, id];
+
+                return [(st === 204 ? 200 : st), id];
             }
         }
 
@@ -495,7 +494,7 @@ export default class Model extends EventEmitter {
                 join object o on o.id = r.id
             where c.uuid = $1 and o.uuid = $2
         `, [klass, obj]);
-        return !!dbr.rows;
+        return !!dbr.rows.length;
     }
 
     async _class_relation (klass, obj, perform) {
@@ -802,7 +801,7 @@ export default class Model extends EventEmitter {
     }
 
     async _do_config_search(query, klass, app, where, select) {
-        const k_join = klass ? `join all_membership m on m.id = c.id` : "";
+        const k_join = klass ? `join all_membership m on m.id = o.id` : "";
         const k_whre = klass ? `and m.class = $4` : "";
         const bind = [app, where, select];
         if (klass) bind.push(klass);

@@ -6,17 +6,22 @@ ARG revision=unknown
 
 FROM ${base_prefix}-pg-build:${base_version} AS build
 
-
 # Install the node application on the build container where we can
 # compile the native modules.
 USER root
 RUN <<'SHELL'
     install -d -o node -g node /home/node/app
+    mkdir /home/node/lib
 SHELL
+COPY --from=lib . /home/node/lib/
+
 WORKDIR /home/node/app
 USER node
 COPY package*.json ./
-RUN npm install --save=false
+RUN <<'SHELL'
+    touch /home/node/.npmrc
+    npm install --save=false --install-links
+SHELL
 COPY --chown=node . .
 RUN <<'SHELL'
     echo "export const GIT_VERSION=\"$revision\";" > ./lib/git-version.js

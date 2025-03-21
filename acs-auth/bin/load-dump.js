@@ -10,7 +10,7 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 
-import { UUIDs } from "@amrc-factoryplus/utilities";
+import { Debug, UUIDs } from "@amrc-factoryplus/service-client";
 
 import Model from "../lib/model.js";
 
@@ -39,7 +39,8 @@ const dumps = process.argv.slice(2)
     .map(f => [f, loadJSONobj(f)])
     .filter(([f, d]) => d.service == UUIDs.Service.Authentication);
 
-const model = await new Model({ verbose: process.env.VERBOSE }).init();
+const debug = new Debug({ verbose: process.env.VERBOSE });
+const model = await new Model({ debug }).init();
 
 for (const [file, dump] of dumps) {
     console.log(`Loading dump ${file}...`);

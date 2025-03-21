@@ -1,51 +1,45 @@
+#-REQUIRE: auth sparkplug
+---
 service: !u UUIDs.Service.ConfigDB
-version: 1
-classes:
-  - !u UUIDs.Class.PermGroup
-  - !u ACS.Class.UserGroup
-  - !u Edge.Class.Connection
-  - !u Edge.Class.Driver
+version: 2
 objects:
-  !u UUIDs.Class.App:
-    - !u Edge.App.ConnConfig
-    - !u Edge.App.ClusterStatus
-    - !u Edge.App.Deployment
-    - !u Edge.App.DriverDef
-  !u UUIDs.Class.PermGroup:
-    # XXX Properly this is not a permission group, but a group of
-    # groups. Since we don't have quoting for group membership grant
-    # here will be much too large; the grant of ManageGroup to the edge
-    # krbkeys is root-equivalent.
-    - !u ACS.Group.EdgeGroups
-    - !u ACS.Group.EdgePermissions
-  !u ACS.Class.UserGroup:
-    - !u ACS.Group.CentralMonitor
-  !u Edge.Class.Driver:
-    - !u ACS.Driver.REST
-    - !u ACS.Driver.MTConnect
-    - !u ACS.Driver.EtherNetIP
-    - !u ACS.Driver.S7
-    - !u ACS.Driver.OPCUA
-    - !u ACS.Driver.MQTT
-    - !u ACS.Driver.Websocket
-    - !u ACS.Driver.UDP
-    - !u ACS.Driver.Bacnet
-    - !u ACS.Driver.Modbus
-    - !u ACS.Driver.Test
-    - !u ACS.Driver.TPlinkSmartPlug
-    - !u ACS.Driver.External
-configs:
-  !u UUIDs.App.Info:
-    !u Edge.Class.Connection:       { name: "Edge Agent SB connection" }
-    !u Edge.Class.Driver:           { name: "Edge Agent driver" }
-    !u Edge.App.ConnConfig:         { name: "Connection config" }
-    !u Edge.App.DriverDef:          { name: "Driver definition" }
-    !u ACS.Group.EdgeGroups:        { name: "Edge-managed groups" }
-    !u ACS.Group.EdgePermissions:   { name: "Edge-managed permissions" }
-    !u ACS.Group.CentralMonitor:    { name: "Central Monitors" }
-    !u Edge.App.ClusterStatus:      { name: "Edge cluster status" }
-    !u Edge.App.Deployment:         { name: "Edge deployment" }
+  !u ConfigDB.Class.R2Class:
+    !u Edge.Group.EdgeGroup:
+      name: "Edge-managed group"
+      subclassOf:
+        - !u Auth.Class.EdgeRole
 
+  !u ConfigDB.Class.R1Class:
+    !u Edge.Class.Connection:
+      name: "Edge Agent SB connection"
+    # XXX I'm not certain a Driver shouldn't be a class of connections?
+    !u Edge.Class.Driver:
+      name: "Edge Agent driver"
+
+  # Not currently used. This would be difficult to implement with the
+  # current implementation of composite perms as classes; we don't
+  # support multi-rank classes yet.
+  !u Auth.Class.PermissionGroup:
+    !u Edge.Group.EdgePermission:
+      name: "Edge-managed permissions"
+      subclassOf:
+        - !u Auth.Class.Permission
+
+  !u Auth.Class.ServiceRole:
+    !u ACS.Group.CentralMonitor:
+      name: "Central monitor"
+      subclassOf:
+        - !u Auth.Class.CentralService
+        - !u ACS.Group.SparkplugNode
+        - !u ACS.Group.SparkplugReader
+
+  !u UUIDs.Class.App:
+    !u Edge.App.ClusterStatus:      { name: "Edge cluster status" }
+    !u Edge.App.ConnConfig:         { name: "Connection config" }
+    !u Edge.App.Deployment:         { name: "Edge deployment" }
+    !u Edge.App.DriverDef:          { name: "Driver definition" }
+
+  !u Edge.Class.Driver:
     !u ACS.Driver.REST:             { name: "REST" }
     !u ACS.Driver.MTConnect:        { name: "MTConnect" }
     !u ACS.Driver.EtherNetIP:       { name: "EtherNet/IP" }
@@ -59,6 +53,8 @@ configs:
     !u ACS.Driver.Test:             { name: "Test" }
     !u ACS.Driver.TPlinkSmartPlug:  { name: "TP-Link smart plug" }
     !u ACS.Driver.External:         { name: "External driver" }
+
+configs:
   !u Edge.App.DriverDef:
     !u ACS.Driver.REST:
       internal:
@@ -112,24 +108,11 @@ configs:
       external: true
 ---
 service: !u UUIDs.Service.Authentication
-version: 1
-#groups:
-#     These are all granted dynamically
-#  !u ACS.Group.EdgeGroups
-#     We currently don't need any explicit ACEs granted at the edge
-#  !u ACS.Group.EdgePermissions:
-groups:
-  !u ACS.Group.SparkplugNode:
-    - !u ACS.Group.CentralMonitor
-  !u ACS.Group.GlobalDebuggers:
-    - !u ACS.Group.CentralMonitor
-aces:
-  - principal: !u ACS.Group.CentralMonitor
-    permission: !u ACS.Role.EdgeNodeConsumer
-    target: !u ACS.Device.ConfigDB
-  - principal: !u ACS.Group.CentralMonitor
-    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
-    target: !u Edge.App.ClusterStatus
-  - principal: !u ACS.Group.CentralMonitor
-    permission: !u UUIDs.Permission.ConfigDB.ReadConfig
-    target: !u UUIDs.App.SparkplugAddress
+version: 2
+grants:
+  !u ACS.Group.CentralMonitor:
+    !u ACS.Role.EdgeNodeConsumer:
+      !u ACS.Device.ConfigDB: false
+    !u UUIDs.Permission.ConfigDB.ReadConfig:
+      !u Edge.App.ClusterStatus: false
+      !u UUIDs.App.SparkplugAddress: false

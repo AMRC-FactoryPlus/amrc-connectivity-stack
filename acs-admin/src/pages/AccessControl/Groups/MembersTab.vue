@@ -111,8 +111,8 @@ export default {
     availableMembers () {
       const principals = this.p.data.filter(principal => !this.memberUuids.includes(principal.uuid))
       const permissions = this.ps.data.filter(permission => !this.memberUuids.includes(permission.uuid))
-      // TODO: Are groups able to be part of other groups?
-      return principals.concat(permissions)
+      const groups = this.g.data.filter(group => !this.memberUuids.includes(group.uuid))
+      return principals.concat(permissions).concat(groups)
     }
   },
 

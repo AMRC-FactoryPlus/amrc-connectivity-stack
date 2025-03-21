@@ -24,15 +24,15 @@ dependencies:
     version: 6.52.4
     repository: https://grafana.github.io/helm-charts
     condition: grafana.enabled
-    # This pulls from my personal repository because the official helm chart doesn't have CRDs in the `crds` directory
-    # https://github.com/minio/operator/pull/1564
+  # This pulls from our patched operator chart because the official helm chart doesn't have CRDs in the `crds` directory
+  # https://github.com/minio/operator/pull/1564
   - name: operator
-    repository: https://alexgodbehere.github.io/helm-repository
-    version: 5.0.4
+    repository: file://../patched-charts/operator/
+    version: 7.0.0
     condition: minio.enabled
   - name: tenant
     repository: https://operator.min.io
-    version: 5.0.3
+    version: 7.0.0
     condition: minio.enabled
   - name: influxdb2
     version: 2.1.1

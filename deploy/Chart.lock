@@ -6,11 +6,11 @@ dependencies:
   repository: https://grafana.github.io/helm-charts
   version: 6.52.4
 - name: operator
-  repository: https://alexgodbehere.github.io/helm-repository
-  version: 5.0.4
+  repository: file://../patched-charts/operator/
+  version: 7.0.0
 - name: tenant
   repository: https://operator.min.io
-  version: 5.0.3
+  version: 7.0.0
 - name: influxdb2
   repository: https://helm.influxdata.com/
   version: 2.1.1
@@ -20,5 +20,5 @@ dependencies:
 - name: spark-operator
   repository: https://kubeflow.github.io/spark-operator
   version: 2.1.0
-digest: sha256:9e2a4491519a27df52a6d623c42d00d0282cf9547b4d879d9bfb8672e1ec2349
-generated: "2025-03-19T13:40:47.2785559Z"
+digest: sha256:f74f7782ba1d2509362aff7e46af67f73b987070b03defcf02d88b4bcd790fe1
+generated: "2025-03-20T17:48:11.7152847Z"

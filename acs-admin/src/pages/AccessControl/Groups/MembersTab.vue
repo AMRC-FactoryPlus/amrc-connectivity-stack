@@ -60,6 +60,7 @@ import {Input} from "@components/ui/input/index.js";
 import {toast} from "vue-sonner";
 import {defineAsyncComponent, provide} from "vue";
 import {usePermissionStore} from "@store/usePermissionStore.js";
+import {useObjectStore} from "@store/useObjectStore.js";
 
 export default {
   emits: ['objectClick'],
@@ -70,7 +71,8 @@ export default {
       p: usePrincipalStore(),
       g: useGroupStore(),
       s: useServiceClientStore(),
-      ps: usePermissionStore()
+      ps: usePermissionStore(),
+      obj: useObjectStore(),
     }
   },
 
@@ -109,9 +111,16 @@ export default {
       return rv
     },
     availableMembers () {
-      const principals = this.p.data.filter(principal => !this.memberUuids.includes(principal.uuid))
-      const permissions = this.ps.data.filter(permission => !this.memberUuids.includes(permission.uuid))
-      const groups = this.g.data.filter(group => !this.memberUuids.includes(group.uuid))
+      // Get the group rank
+      let groupRank = this.obj.data.find(obj => obj.uuid === this.group.uuid).rank
+      // Get all objects that are a rank lower than the group
+      const possibleObjectUUIDs = this.obj.data.filter(obj => obj.rank === groupRank-1).map(obj => obj.uuid)
+      // Get all principals which are the right rank and aren't already a member
+      const principals = this.p.data.filter(principal => possibleObjectUUIDs.includes(principal.uuid) && !this.memberUuids.includes(principal.uuid))
+      // Get all permissions which are the right rank and aren't already a member
+      const permissions = this.ps.data.filter(permission => possibleObjectUUIDs.includes(permission.uuid) && !this.memberUuids.includes(permission.uuid))
+      // Get all groups which are the right rank and aren't already a member
+      const groups = this.g.data.filter(group => possibleObjectUUIDs.includes(group.uuid) && !this.memberUuids.includes(group.uuid))
       return principals.concat(permissions).concat(groups)
     }
   },

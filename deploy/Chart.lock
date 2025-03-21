@@ -20,5 +20,8 @@ dependencies:
 - name: spark-operator
   repository: https://kubeflow.github.io/spark-operator
   version: 2.1.0
-digest: sha256:f74f7782ba1d2509362aff7e46af67f73b987070b03defcf02d88b4bcd790fe1
-generated: "2025-03-20T17:48:11.7152847Z"
+- name: kafka
+  repository: oci://registry-1.docker.io/bitnamicharts
+  version: 31.5.0
+digest: sha256:692e988329975b18480d5fd556385013081ba471e6b965cd813320c83f27082c
+generated: "2025-03-21T13:09:57.074248Z"

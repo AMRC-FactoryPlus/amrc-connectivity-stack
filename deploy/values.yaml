@@ -261,7 +261,6 @@ minio:
   # -- Whether or not to expose the MinIO console outside of the cluster
   exposeConsole: false
 
-
 postgres:
   # -- Whether or not to enable Postgres
   enabled: true
@@ -428,3 +427,24 @@ spark:
       - factory-plus
     serviceAccount:
       name: "spark-application"
+
+kafka:
+  enabled: true
+  listeners:
+    client:
+      protocol: PLAINTEXT
+    controller:
+      protocol: PLAINTEXT
+    interbroker:
+      protocol: PLAINTEXT
+    external:
+      protocol: PLAINTEXT
+  controller:  
+    replicaCount: 1
+  provisioning:
+    enabled: true
+    topics:
+      - name: mqtt_data
+        partitions: 1
+        replicationFactor: 1
+

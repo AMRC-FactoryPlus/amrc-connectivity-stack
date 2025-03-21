@@ -46,3 +46,8 @@ dependencies:
     version: 2.1.0
     repository: https://kubeflow.github.io/spark-operator
     condition: spark-operator.enabled
+  - name: kafka
+    repository: oci://registry-1.docker.io/bitnamicharts
+    version: 31.5.0
+    condition: kafka.enabled
+

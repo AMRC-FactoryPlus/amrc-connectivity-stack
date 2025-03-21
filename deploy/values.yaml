@@ -368,26 +368,32 @@ grafana:
 tenant:
   tenant:
     name: fplus-minio-core
-    # Disable TLS on the MinIO level because we terminate TLS at Traefik
     certificate:
-      externalCaCertSecret: { }
-      externalCertSecret: { }
       requestAutoCert: false
-      certConfig: { }
+    configuration:
+      name: minio-tenant-config
+    configSecret:
+      name: minio-tenant-config
     pools:
-      - servers: 1
+      - servers: 4
         name: pool-0
-        volumesPerServer: 1
+        volumesPerServer: 2
         size: 20Gi
-    ## List of bucket names to create during tenant provisioning
     buckets:
-      - name: "device-configurations"
-      - name: "device-connections"
-      - name: "edge-agent-configs"
-      - name: "delta-lake"
-    ## List of secret names to use for generating MinIO users during tenant provisioning
+      - name: device-configurations
+      - name: device-connections
+      - name: edge-agent-configs
     users:
-      - name: "manager-minio-secret"
+      - name: manager-minio-secret
+  ingress:
+    api:
+      enabled: true
+      ingressClassName: acs-traefik
+      host: minio-tenant-api.factoryplus.app.amrc.co.uk
+    console:
+      enabled: true
+      ingressClassName: acs-traefik
+      host: minio-tenant.factoryplus.app.amrc.co.uk
 
 influxdb2:
   enabled: true

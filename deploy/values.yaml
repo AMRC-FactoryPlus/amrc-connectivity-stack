@@ -249,7 +249,7 @@ shell:
     repository: acs-krb-utils
 
 # XXX This should probably be included in acs-krb-utils
-curl: 
+curl:
   image:
     registry: docker.io
     repository: appropriate/curl
@@ -353,6 +353,16 @@ grafana:
       header_name: X-Auth-Principal
       header_property: username
       auto_sign_up: true
+    auth.generic_oauth:
+      enabled: true
+      name: Keycloak
+      allow_sign_up: true
+      client_id: grafana-oauth
+      client_secret: {{ (lookup "v1" "Secret" .Release.Namespace "keycloak-grafana-client").data.client-secret | b64dec }}
+      scopes: openid profile email
+      auth_url: {{ .Values.acs.secure | ternary "https://" "http://" }}openid.{{.Values.acs.baseUrl}}/realms/factory_plus/protocol/openid-connect/auth
+      token_url: {{ .Values.acs.secure | ternary "https://" "http://" }}openid.{{.Values.acs.baseUrl}}/realms/factory_plus/protocol/openid-connect/token
+      api_url: {{ .Values.acs.secure | ternary "https://" "http://" }}openid.{{.Values.acs.baseUrl}}/realms/factory_plus/protocol/openid-connect/userinfo
   sidecar:
     datasources:
       enabled: true
@@ -402,6 +412,14 @@ influxdb2:
         influx v1 dbrp create --bucket-id ${DOCKER_INFLUXDB_INIT_BUCKET_ID} --db default --rp default --default --org ${DOCKER_INFLUXDB_INIT_ORG}
   pdb:
     create: false
+
+openid:
+  enabled: true
+  replicas: 1
+  image:
+    repository: quay.io/keycloak/keycloak
+    tag: 26.1.1
+    pullPolicy: IfNotPresent
 
 cert-manager:
   fullnameOverride: "cert-manager"

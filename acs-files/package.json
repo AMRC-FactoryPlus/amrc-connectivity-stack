@@ -1,0 +1,19 @@
+{
+  "name": "acs-file-service",
+  "version": "1.0.0",
+  "description": "This service aims to store non-primitive files in a storage and keep records in ACS Config Service",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@amrc-factoryplus/service-client": "file:../lib/js-service-client",
+    "@amrc-factoryplus/service-api": "file:../lib/js-service-api",
+    "@dotenvx/dotenvx": "^1.39.0",
+    "express": "^4.21.2",
+    "uuid": "^11.0.5"
+  }
+}

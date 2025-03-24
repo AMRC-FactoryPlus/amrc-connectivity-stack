@@ -3,14 +3,21 @@
  */
 
 import { defineStore } from 'pinia'
+import * as rx from 'rxjs'
+
+import {UUIDs, ServiceError} from "@amrc-factoryplus/service-client";
+import * as rxu from "@amrc-factoryplus/rx-util";
+
 import { useServiceClientStore } from '@/store/serviceClientStore.js'
-import {UUIDs} from "@amrc-factoryplus/service-client";
 import {serviceClientReady} from "@store/useServiceClientReady.js";
+import {useObjectStore} from "@store/useObjectStore.js";
 
 export const usePrincipalStore = defineStore('principal', {
   state: () => ({
     data: [],
     loading: false,
+    fetchTrigger: null,
+    rxsub: null,
   }),
   actions: {
     async storeReady () {
@@ -20,96 +27,73 @@ export const usePrincipalStore = defineStore('principal', {
         await new Promise(resolve => setTimeout(resolve, 100));
       }
     },
-    /* Only meant to be internal */
-    async fetchPrincipal(uuid) {
-      const principal = {
-        uuid
-      }
-
-      // Get the kerberos principal
-      try {
-        const principalKerberosObject = await useServiceClientStore().client.Auth.find_principal('uuid', uuid)
-        principal.kerberos = principalKerberosObject.kerberos
-      } catch(err) {
-        console.error(`Can't read principal details`, err)
-        principal.kerberos = "UNKNOWN"
-      }
-
-      // Fill in the principal names
-      try {
-        const principalObjectResponse = await useServiceClientStore().client.ConfigDB.get_config(UUIDs.App.Info, uuid);
-        principal.name = principalObjectResponse?.name ?? "UNKNOWN"
-      } catch(err) {
-        console.error(`Can't read principal details`, err)
-        principal.name = "UNKNOWN"
-      }
-
-      // Fill in the principal classes
-      try {
-        let principalObjectResponse = await useServiceClientStore().client.ConfigDB.get_config(UUIDs.App.Registration, uuid);
-        if (!principalObjectResponse) {
-          console.error(`Can't read principal class details for:`, uuid)
-          principal.class = {
-            name: "UNKNOWN"
-          }
-        }
-        let classUUID = principalObjectResponse.class
-        try {
-          let classObjectResponse = await useServiceClientStore().client.ConfigDB.get_config(UUIDs.App.Info, classUUID);
-          let className = classObjectResponse.name
-          principal.class = {
-            uuid: classUUID,
-            name: className
-          }
-        } catch (err) {
-          console.error(`Can't read principal class details for:`, uuid, err)
-          principal.class = {
-            name: "UNKNOWN"
-          }
-        }
-      } catch(err) {
-        console.error(`Can't read principal class details for:`, uuid, err)
-        principal.class = {
-          name: "UNKNOWN"
-        }
-      }
-
-      return principal
-    },
-    async getPrincipal(uuid) {
-      await this.storeReady()
-
-      const existingPrincipal = this.data.find(item => item.uuid === uuid) ?? null
-      if (existingPrincipal) return existingPrincipal
-
-      useServiceClientStore().client.Fetch.cache = 'reload'
-      await this.fetch()
-      useServiceClientStore().client.Fetch.cache = 'reload'
-
-      // Give it another try
-      const existingPrincipal2 = this.data.find(item => item.uuid === uuid) ?? null
-      if (existingPrincipal2) return existingPrincipal2
-    },
-    async fetch () {
-      this.loading = true
+    async start () {
+      // Create a Subject we can use to trigger an Auth fetch.
+      // This is to work around the lack of notify interface.
+      const trigger = this.fetchTrigger = new rx.Subject();
 
       // Wait until the store is ready before attempting to fetch data
       await serviceClientReady();
 
-      try {
-        const principalResponse = await useServiceClientStore().client.Auth.fetch('v2/principal')
+      const client = useServiceClientStore().client;
+      const auth = client.Auth;
+      const fetch = client.Fetch;
+      const objs = useObjectStore().maps;
 
-        if (!Array.isArray(principalResponse[1])) {
-          this.loading = false
-          return
-        }
+      // Create a sequence tracking the principals.
+      const krbs = rxu.rx(
+        trigger,
+        // Do an initial fetch immediately.
+        rx.startWith(null),
+        // switchMap means we abort an in-progress fetch if we get a new trigger.
+        rx.switchMap(async () => {
+          /* XXX This is stateful and will be unreliable */
+          this.loading = true;
+          /* XXX This API needs fixing */
+          fetch.cache = "reload";
+          const princs = await auth.list_principals();
+          const rv = Promise.all(princs.map(uuid =>
+            auth.get_identity(uuid, "kerberos")
+              .catch(ServiceError.check(403, 404))
+              .then(krb => [uuid, krb ?? "UNKNOWN"])));
+          fetch.cache = "default";
+          return rv;
+        }),
+        // Retry with delay on error
+        rx.retry({
+          delay: (err, n) => {
+            console.log("Principals fetch failed (%s attempts): %o", n, err);
+            return rx.timer(5000);
+          },
+          resetOnSuccess: true,
+        }),
+      );
 
-        this.data = await Promise.all(principalResponse[1].map(async (p) => this.fetchPrincipal(p)))
+      const seq = rxu.rx(
+        rx.combineLatest(objs, krbs),
+        rx.map(([objs, krbs]) => 
+          krbs.map(([uuid, kerberos]) => ({
+            ...objs.get(uuid, { name: "UNKNOWN", class: { name: "UNKNOWN" }}),
+            uuid, kerberos,
+          }))),
+      );
 
-        this.loading = false
-      } catch(err) {
-        console.error(`Can't read principals`, err)
-      }
+      this.rxsub = seq.subscribe(princs => {
+        console.log("PRINCIPALS UPDATE");
+        this.data = princs;
+        this.loading = false;
+      });
+    },
+
+    stop () {
+      this.rxsub?.unsubscribe();
+      this.rxsub = null;
+    },
+
+    // This just pushes a notification down the trigger sequence.
+    fetch () { 
+      // If start() hasn't been called yet we will fetch when it is.
+      this.fetchTrigger?.next(null);
     },
   },
 })

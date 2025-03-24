@@ -81,7 +81,7 @@ export const columns: ColumnDef<Permission>[] = [
         accessorFn: (row) => row.plural,
         header: ({column}) => h(DataTableColumnHeader, {
             column,
-            title: 'Plural grant'
+            title: 'Plural target'
         }),
 
         cell: ({row}) => {

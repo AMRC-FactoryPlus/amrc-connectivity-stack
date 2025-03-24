@@ -42,8 +42,6 @@ import {useGroupStore} from "@store/useGroupStore.js";
 import Copyable from "@components/Copyable.vue";
 
 export default {
-  name: 'GroupManagementSidebar',
-
   setup () {
     return {
       g: useGroupStore(),
@@ -67,17 +65,12 @@ export default {
     PermissionsTab,
   },
 
-  watch: {
-    group: {
-      async handler(newGroup) {
-        if (!newGroup) {
-          this.groupDetails = null
-          return;
-        }
-        this.groupDetails = await this.g.getGroup(this.group.uuid)
-      },
-      immediate: true,
-    },
+  computed: {
+    groupDetails () {
+      if (!this.group) return null
+
+      return this.g.data.find(item => item.uuid === this.group.uuid)
+    }
   },
 
   props: {
@@ -86,11 +79,5 @@ export default {
       default: null,
     },
   },
-
-  data() {
-    return {
-      groupDetails: null,
-    }
-  }
 }
 </script>

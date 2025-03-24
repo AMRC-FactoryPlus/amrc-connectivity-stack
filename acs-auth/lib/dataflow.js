@@ -79,12 +79,13 @@ export class DataFlow {
     _build_groups () {
         const { cdb, grants } = this;
 
-        const target_groups = rxx.rx(
+        const targ_grp = rxx.rx(
             grants,
             rx.map(es => imm.Seq(es)
                 .filter(e => e.plural)
                 .map(e => e.target)
-                .toSet()));
+                .toSet()),
+            cdb.expand_members());
 
         return rxx.rx(
             rx.combineLatest({
@@ -92,7 +93,7 @@ export class DataFlow {
                 princ_grp:  cdb.watch_powerset(Class.Principal),
                 perm:       cdb.watch_members(Class.Permission),
                 perm_grp:   cdb.watch_powerset(Class.Permission),
-                targ_grp:   cdb.expand_members(target_groups),
+                targ_grp,
             }),
             rx.shareReplay(1));
     }

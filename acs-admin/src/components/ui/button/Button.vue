@@ -1,7 +1,11 @@
+<!--
+  - Copyright (c) University of Sheffield AMRC 2025.
+  -->
+
 <script setup>
-import { Primitive } from "radix-vue";
-import { buttonVariants } from ".";
-import { cn } from "@/lib/utils";
+import { Primitive } from 'reka-ui'
+import { buttonVariants } from '.'
+import { cn } from '@/lib/utils'
 
 const props = defineProps({
   variant: { type: null, required: false },

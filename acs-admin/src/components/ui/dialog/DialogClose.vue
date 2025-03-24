@@ -1,5 +1,9 @@
+<!--
+  - Copyright (c) University of Sheffield AMRC 2025.
+  -->
+
 <script setup>
-import { DialogClose } from "radix-vue";
+import { DialogClose } from 'reka-ui'
 
 const props = defineProps({
   asChild: { type: Boolean, required: false },

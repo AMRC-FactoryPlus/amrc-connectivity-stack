@@ -1,13 +1,12 @@
+<!--
+  - Copyright (c) University of Sheffield AMRC 2025.
+  -->
+
 <script setup>
-import { computed } from "vue";
-import {
-  SelectItem,
-  SelectItemIndicator,
-  SelectItemText,
-  useForwardProps,
-} from "radix-vue";
-import { Check } from "lucide-vue-next";
-import { cn } from "@/lib/utils";
+import { computed } from 'vue'
+import { SelectItem, SelectItemIndicator, SelectItemText, useForwardProps } from 'reka-ui'
+import { Check } from 'lucide-vue-next'
+import { cn } from '@/lib/utils'
 
 const props = defineProps({
   value: { type: String, required: true },

@@ -69,10 +69,7 @@ export default {
     groupDetails () {
       if (!this.group) return null
 
-      const groupDetails = this.g.data.find(item => item.uuid === this.group.uuid)
-      console.log(this.group)
-      console.log(groupDetails)
-      return groupDetails
+      return this.g.data.find(item => item.uuid === this.group.uuid)
     }
   },
 

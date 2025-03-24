@@ -77,7 +77,6 @@ import Copyable from "@components/Copyable.vue";
 import {Button} from "@components/ui/button/index.js";
 import {defineAsyncComponent} from "vue";
 import {usePrincipalStore} from "@store/usePrincipalStore.js";
-import {UUIDs} from "@amrc-factoryplus/service-client";
 import {useGroupStore} from "@store/useGroupStore.js";
 import {toast} from "vue-sonner";
 import {useGrantStore} from "@store/useGrantStore.js";
@@ -86,8 +85,6 @@ import {useObjectStore} from "@store/useObjectStore.js";
 import {Checkbox} from "@components/ui/checkbox/index.js";
 
 export default {
-  name: 'PermissionManagementSidebar',
-
   setup () {
     return {
       s: useServiceClientStore(),
@@ -119,17 +116,6 @@ export default {
   },
 
   watch: {
-    permission: {
-      async handler(newPermission) {
-        if (!newPermission) {
-          this.permissionDetails = null
-          return;
-        }
-        this.permissionDetails = await this.p.getPermission(this.permission.uuid)
-      },
-      immediate: true,
-    },
-
     principalsToAdd: async function (val, oldVal) {
       if (!val.length) {
         this.isTargetSelectorOpen = false
@@ -138,7 +124,6 @@ export default {
 
       this.isTargetSelectorOpen = true
     },
-
     targetsToAdd: async function (val, oldVal) {
       if (!val.length) {
         this.principalsToAdd = []
@@ -164,6 +149,13 @@ export default {
   },
 
   computed: {
+    permissionDetails() {
+      if (!this.permission) {
+        return
+      }
+
+      return this.p.data.find(item => item.uuid === this.permission.uuid)
+    },
     targetsSubtitle () {
       return `Select targets for which the selected principals should be granted this permission: ${this.principalsToAdd.map(p => p.name).join(', ')}`
     },
@@ -202,7 +194,6 @@ export default {
 
   data() {
     return {
-      permissionDetails: null,
       principalsToAdd: [],
       isPrincipalSelectorOpen: false,
       targetsToAdd: [],

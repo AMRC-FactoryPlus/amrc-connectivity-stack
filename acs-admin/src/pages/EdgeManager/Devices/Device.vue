@@ -14,6 +14,9 @@
             :detail="device.sparkplugName"
             detail-icon="bolt-lightning"
             detail-tooltip="The Sparkplug name of the device"
+            :second-detail="device.uuid"
+            second-detail-icon="key"
+            second-detail-tooltip="The device's UUID"
         />
         <DetailCard
             class="w-1/3 flex items-center justify-center"

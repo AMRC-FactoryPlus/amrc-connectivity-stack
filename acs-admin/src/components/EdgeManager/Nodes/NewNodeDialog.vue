@@ -22,7 +22,7 @@
           <Select name="host" v-model="hostname">
             <SelectTrigger>
               <SelectValue>
-                {{hostname ?? 'Select a host...'}}
+                {{hostname ?? 'Floating'}}
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
@@ -168,7 +168,10 @@ export default {
     },
 
     hosts () {
-      return this.cluster.status.hosts
+      return [
+        { hostname: 'Floating', arch: 'any' },
+        ...this.cluster.status.hosts
+      ]
     },
 
     // helmCharts () {
@@ -210,12 +213,19 @@ export default {
 
         const managerConfig = await this.s.client.ConfigDB.get_config(UUIDs.App.ServiceConfig, UUIDs.Service.Manager)
 
-        this.s.client.ConfigDB.put_config(UUIDs.App.EdgeAgentDeployment, nodeUUID, {
+        let payload = {
+          createdAt: new Date().toISOString(),
           name: this.sparkplugName,
           cluster: this.cluster.uuid,
           hostname: this.hostname,
           chart: managerConfig.helm.agent,
-        })
+        };
+
+        if (this.hostname === null || this.hostname === 'Floating') {
+          delete payload.hostname
+        }
+
+        this.s.client.ConfigDB.put_config(UUIDs.App.EdgeAgentDeployment, nodeUUID, payload)
 
         toast.success(`${this.name} has been created!`)
         this.cluster = null

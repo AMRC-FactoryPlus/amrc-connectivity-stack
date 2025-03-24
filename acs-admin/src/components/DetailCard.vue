@@ -6,7 +6,7 @@
   <Card>
     <CardHeader class="w-full">
       <div class="flex items-center justify-between gap-1">
-        <div class="flex flex-col gap-1">
+        <div class="flex flex-col items-start gap-1">
           <div v-if="badge" class="flex mb-2">
             <div class="px-1.5 py-0.5 rounded-md bg-green-600 text-sm font-bold uppercase tracking-wide text-white">
               {{badge}}
@@ -17,28 +17,31 @@
             <div>{{title}}</div>
           </h3>
           <slot></slot>
-          <Copyable v-if="text" :text="text">
-            <CardTitle :title="textTooltip">
-              <div v-if="text" class="flex justify-center items-center gap-2">
-                <i v-if="icon" :class="`fa-solid fa-${icon} text-sm mt-1`"></i>
-                <div class="text-2xl">{{text}}</div>
-              </div>
-            </CardTitle>
-          </Copyable>
-          <Copyable v-if="detail" :text="detail">
+          <template v-if="text">
+            <component :is="copyable ? 'Copyable' : 'div'" :text="text">
+              <CardTitle :title="textTooltip">
+                <div class="flex justify-center items-center gap-2">
+                  <i v-if="icon" :class="`fa-solid fa-${icon} text-sm mt-1`"></i>
+                  <div class="text-2xl">{{text}}</div>
+                </div>
+              </CardTitle>
+            </component>
+          </template>
+          <div v-if="subtitle" class="text-gray-500 text-sm max-w-xl">{{subtitle}}</div>
+          <component :is="copyable ? 'Copyable' : 'div'" v-if="detail" :text="detail" class="flex items-center">
             <div :title="detailTooltip"
                 class="flex items-center justify-center gap-1 text-xs text-gray-950 bg-gray-100 px-1.5 py-0.5 rounded-md opacity-60 hover:opacity-100">
               <i v-if="detailIcon" :class="`fa-solid fa-${detailIcon}`"></i>
               <div>{{detail}}</div>
             </div>
-          </Copyable>
-          <Copyable v-if="secondDetail" :text="secondDetail">
+          </component>
+          <component :is="copyable ? 'Copyable' : 'div'" v-if="secondDetail" :text="secondDetail" class="flex items-center">
             <div :title="secondDetailTooltip"
                 class="flex items-center justify-center gap-1 text-xs text-gray-950 bg-gray-100 px-1.5 py-0.5 rounded-md opacity-60 hover:opacity-100">
               <i v-if="secondDetailIcon" :class="`fa-solid fa-${secondDetailIcon}`"></i>
               <div>{{secondDetail}}</div>
             </div>
-          </Copyable>
+          </component>
         </div>
         <slot name="action"></slot>
         <Button
@@ -78,6 +81,7 @@ export default {
   props: {
     badge: String,
     title: String,
+    subtitle: String,
     titleIcon: String,
     icon: String,
     text: String,
@@ -92,6 +96,10 @@ export default {
     actionText: String,
     actionTooltip: String,
     actionIcon: String,
+    copyable: {
+      type: Boolean,
+      default: true
+    }
   }
 }
 </script>

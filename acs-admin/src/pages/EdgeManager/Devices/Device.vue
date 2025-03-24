@@ -5,32 +5,58 @@
 <template>
   <EdgeContainer>
     <EdgePageSkeleton v-if="loadingDetails"/>
-    <div v-else class="flex flex-col gap-4">
-      <div class="flex items-center gap-2">
-        <DetailCard
-            class="w-1/3 flex items-center justify-center"
-            :text="device.name"
-            text-tooltip="The name of the device"
-            :detail="device.sparkplugName"
-            detail-icon="bolt-lightning"
-            detail-tooltip="The Sparkplug name of the device"
-            :second-detail="device.uuid"
-            second-detail-icon="key"
-            second-detail-tooltip="The device's UUID"
-        />
-        <DetailCard
-            class="w-1/3 flex items-center justify-center"
-            text="[Schema Type]"
-            text-tooltip="The schema that the device is using"
-            detail="[Version]"
-            detail-icon="square-v"
-            detail-tooltip="The version of the schema that this device is using"
-        />
-        <DetailCard
-            class="w-1/3 flex items-center justify-center"
-        >
-          [Dropdown here to show connections]
-        </DetailCard>
+    <div v-else class="flex h-full">
+      <!-- Main content -->
+      <div class="flex-1 flex flex-col gap-4 pr-4">
+
+      </div>
+
+      <!-- Sidebar -->
+      <div class="w-96 border-l border-border -my-4 -mr-4">
+        <div class="flex items-center justify-start gap-2 p-4 border-b">
+          <i :class="`fa-fw fa-solid fa-microchip`"></i>
+          <div class="font-semibold text-xl">{{device.name}}</div>
+        </div>
+        <div class="space-y-4 p-4">
+          <SidebarDetail
+              icon="fas fa-key"
+              label="Device UUID"
+              :value="device.uuid"
+          />
+          <SidebarDetail
+              icon="fas fa-bolt-lightning"
+              label="Sparkplug Device ID"
+              :value="device.sparkplugName"
+          />
+          <SidebarDetail
+              v-if="device.createdAt"
+              :title="device.createdAt"
+              icon="clock"
+              label="Created"
+              :value="moment(device.createdAt).fromNow()"
+          />
+        </div>
+        <div class="font-semibold text-lg p-4 border-b">Schema</div>
+        <div class="space-y-4 p-4">
+          <SidebarDetail
+              icon="fas fa-code"
+              label="Schema Type"
+              :value="device.schemaType"
+          />
+          <SidebarDetail
+              icon="fas fa-square-v"
+              label="Schema Version"
+              :value="device.schemaVersion"
+          />
+        </div>
+        <div class="font-semibold text-lg p-4 border-b">Connection</div>
+        <div class="space-y-4 p-4">
+          <SidebarDetail
+              icon="fas fa-plug"
+              label="Connection"
+              :value="device.connection"
+          />
+        </div>
       </div>
     </div>
   </EdgeContainer>
@@ -48,6 +74,8 @@ import { storeReady } from '@store/useStoreReady.js'
 import { useDeviceStore } from '@store/useDeviceStore.js'
 import EdgePageSkeleton from '@components/EdgeManager/EdgePageSkeleton.vue'
 import { inop } from '@utils/inop.js'
+import SidebarDetail from '@/components/SidebarDetail.vue'
+import moment from 'moment'
 
 export default {
   components: {
@@ -62,6 +90,7 @@ export default {
     CardHeader,
     Copyable,
     DetailCard,
+    SidebarDetail,
   },
 
   setup () {
@@ -69,13 +98,13 @@ export default {
       n: useNodeStore(),
       d: useDeviceStore(),
       inop,
+      moment,
     }
   },
 
   watch: {
     async '$route.params.deviceuuid' (newUuid) {
       await this.getDeviceDetails(newUuid)
-
     },
   },
 
@@ -85,7 +114,6 @@ export default {
 
   methods: {
     async getDeviceDetails (uuid) {
-
       this.loadingDetails = true
 
       await storeReady(this.d)
@@ -93,7 +121,6 @@ export default {
       // Instantiate the device object as the information that we
       // already have
       this.device = this.d.data.find(e => e.uuid === uuid)
-
 
       if (!this.device) {
         toast.error('Device not found')

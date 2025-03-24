@@ -5,60 +5,80 @@
 <template>
   <EdgeContainer>
     <EdgePageSkeleton v-if="clusterLoading"/>
-    <div v-else class="flex flex-col gap-4 flex-1 h-full">
-      <DetailCard
-          :text="cluster.name"
-          text-tooltip="The name of the cluster"
-          :detail="cluster.sparkplug"
-          detail-icon="bolt-lightning"
-          detail-tooltip="The Sparkplug name of the cluster"
-      >
-        <template #action>
-          <Button size="sm" class="flex items-center justify-center gap-2" @click="copyBootstrap" :variant="bootstrapped ? 'ghost' : 'default'">
-            <span v-if="bootstrapped" class="hidden md:inline text-gray-400">Re-Bootstrap</span>
-            <span v-else class="hidden md:inline">Bootstrap</span>
-            <i v-if="copyingBootstrap" class="fa-solid fa-circle-notch animate-spin" :class="bootstrapped ? 'text-gray-400' : ''"></i>
-            <i v-else-if="bootstrapped" class="fa-solid fa-refresh text-gray-400"></i>
-            <i v-else class="fa-solid fa-rocket"></i>
-          </Button>
-        </template>
-      </DetailCard>
-      <Tabs default-value="nodes" class="flex flex-col flex-1">
-        <div class="flex items-center justify-between gap-2">
-          <TabsList>
-            <TabsTrigger value="nodes">
-              {{nodes.length ? `${nodes.length}  Node${nodes.length > 1 ? 's' : ''}` : 'No Nodes'}}
-            </TabsTrigger>
-            <TabsTrigger value="deployments" disabled>
-              Deployments
-            </TabsTrigger>
-            <TabsTrigger value="hosts" :disabled="hosts.length === 0">
-              {{hosts.length ? `${hosts.length} Host${hosts.length > 1 ? 's' : ''}` : 'No Hosts'}}
-            </TabsTrigger>
-          </TabsList>
-        </div>
-        <TabsContent value="nodes" class="flex-1 ">
-          <div v-if="nodes.length > 0">
-            <DataTable :data="nodes" :columns="nodeColumns" :filters="[]" @rowClick="selectNode"/>
+    <div v-else class="flex h-full">
+      <div class="flex-1 flex flex-col gap-4 pr-4">
+        <EmptyState
+            v-if="!bootstrapped"
+            :title="`Bootstrap Required for ${cluster.name}`"
+            description="This edge cluster needs to be bootstrapped before it can be used. Click the button below to copy the bootstrap command to run on the Linux host of first node in the cluster."
+            :button-text="`Bootstrap`"
+            button-icon="rocket"
+            @button-click="copyBootstrap"/>
+        <Tabs v-else default-value="nodes" class="flex flex-col flex-1">
+          <div class="flex items-center justify-between gap-2">
+            <TabsList>
+              <TabsTrigger value="nodes">
+                {{nodes.length ? `${nodes.length}  Node${nodes.length > 1 ? 's' : ''}` : 'No Nodes'}}
+              </TabsTrigger>
+              <TabsTrigger value="deployments" disabled>
+                Deployments
+              </TabsTrigger>
+              <TabsTrigger value="hosts" :disabled="hosts.length === 0">
+                {{hosts.length ? `${hosts.length} Host${hosts.length > 1 ? 's' : ''}` : 'No Hosts'}}
+              </TabsTrigger>
+            </TabsList>
           </div>
-          <EmptyState
-              v-else
-              :title="`No nodes found for ${cluster.name}`"
-              :description="`No nodes have been added to the ${cluster.name} cluster yet.`"
-              :button-text="`Add Node`"
-              button-icon="plus"
-              @button-click="newNode"/>
-        </TabsContent>
-        <TabsContent value="deployments">
-        </TabsContent>
-        <TabsContent value="hosts">
-          <DataTable :data="hosts" :columns="hostColumns" :filters="[]">
-            <template #toolbar-left>
-              <div class="text-xl font-semibold">{{`${hosts.length} Host${hosts.length > 1 ? 's' : ''}`}}</div>
-            </template>
-          </DataTable>
-        </TabsContent>
-      </Tabs>
+          <TabsContent value="nodes" class="flex-1 ">
+            <div v-if="nodes.length > 0">
+              <DataTable :data="nodes" :columns="nodeColumns" :filters="[]" @rowClick="selectNode"/>
+            </div>
+            <EmptyState
+                v-else
+                :title="`No nodes found for ${cluster.name}`"
+                :description="`No nodes have been added to the ${cluster.name} cluster yet.`"
+                :button-text="`Add Node`"
+                button-icon="plus"
+                @button-click="newNode"/>
+          </TabsContent>
+          <TabsContent value="deployments">
+          </TabsContent>
+          <TabsContent value="hosts">
+            <DataTable :data="hosts" :columns="hostColumns" :filters="[]"/>
+          </TabsContent>
+        </Tabs>
+      </div>
+
+      <div class="w-96 border-l border-border -my-4 -mr-4">
+        <div class="flex items-center justify-between gap-2 w-full p-4 border-b">
+          <div class="flex items-center justify-center gap-2">
+            <i class="fa-fw fa-solid fa-circle-nodes"></i>
+            <div class="font-semibold text-xl">{{cluster.name}}</div>
+          </div>
+          <Button v-if="bootstrapped" title="Re-Bootstrap" size="xs" class="flex items-center justify-center gap-2 mr-1" @click="copyBootstrap" variant="ghost">
+            <i v-if="copyingBootstrap" class="fa-solid fa-circle-notch animate-spin text-gray-400"></i>
+            <i v-else class="fa-solid fa-refresh text-gray-400"></i>
+          </Button>
+        </div>
+        <div class="space-y-4 p-4">
+          <SidebarDetail
+              icon="key"
+              label="Edge Cluster UUID"
+              :value="cluster.uuid"
+          />
+          <SidebarDetail
+              icon="bolt-lightning"
+              label="Sparkplug Group ID"
+              :value="cluster.sparkplug"
+          />
+          <SidebarDetail
+              v-if="cluster.createdAt"
+              :title="cluster.createdAt"
+              icon="clock"
+              label="Created"
+              :value="moment(cluster.createdAt).fromNow()"
+          />
+        </div>
+      </div>
     </div>
   </EdgeContainer>
 </template>
@@ -83,6 +103,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import Copyable from '@components/Copyable.vue'
 import DetailCard from '@components/DetailCard.vue'
 import EmptyState from '@components/EmptyState.vue'
+import SidebarDetail from '@components/SidebarDetail.vue'
+import moment from 'moment'
 
 export default {
   components: {
@@ -107,7 +129,8 @@ export default {
     CardTitle,
     CardHeader,
     Copyable,
-    EdgePageSkeleton
+    EdgePageSkeleton,
+    SidebarDetail,
   },
 
   setup () {
@@ -116,6 +139,7 @@ export default {
       n: useNodeStore(),
       hostColumns,
       nodeColumns,
+      moment
     }
   },
 
@@ -147,15 +171,16 @@ export default {
       window.events.emit('show-new-node-dialog-for-cluster', this.cluster)
     },
 
-    selectNode(e) {
+    selectNode: function (e) {
       this.$router.push({
         name: 'Node',
         params: {
           nodeuuid: e.original.uuid,
-          clusteruuid: e.original.cluster
+          clusteruuid: e.original.cluster,
         },
       })
     },
+
     copy (text, confirmation = 'Text copied to clipboard') {
       navigator.clipboard.writeText(text)
       toast.success(confirmation)

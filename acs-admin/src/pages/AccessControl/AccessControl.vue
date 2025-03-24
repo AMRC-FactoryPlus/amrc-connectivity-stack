@@ -61,8 +61,6 @@ import {serviceClientReady} from "@store/useServiceClientReady.js";
 import {useObjectStore} from "@store/useObjectStore.js";
 
 export default {
-  name: 'AccessControl',
-
   setup () {
     return {
       s: useServiceClientStore(),
@@ -92,6 +90,12 @@ export default {
   },
 
   methods: {
+    async storesReady () {
+      await this.g.storeReady()
+      await this.p.storeReady()
+      await this.ps.storeReady()
+      await this.grants.storeReady()
+    },
     async objectClicked (object) {
       if (object.uuid) {
         this.router.push({ path: `/access-control/${this.activeTab}/${object.uuid}` })
@@ -101,6 +105,7 @@ export default {
     },
     async uuidSelected (uuid) {
       await serviceClientReady()
+      await this.storesReady()
       await this.objectSelected({uuid})
     },
     async objectSelected (object) {

@@ -7,9 +7,9 @@ import { useServiceClientStore } from '@/store/serviceClientStore.js'
 import { UUIDs } from '@amrc-factoryplus/service-client'
 import { storeReady } from '@store/useStoreReady.js'
 
-export const useDeviceStore = defineStore('device', {
+export const useHelmChartTemplateStore = defineStore('helm-chart-template', {
   state: () => ({
-    data: {},
+    data: [],
     loading: false,
     loaded: false,
     ready: false,
@@ -21,7 +21,7 @@ export const useDeviceStore = defineStore('device', {
       await this.fetch(true)
     },
 
-    async fetch (fresh = false) {
+    async fetch (fresh = false, includePrivate = false) {
 
       // If we have already loaded the data, don't fetch it again unless
       // the fresh flag is set to true
@@ -34,9 +34,16 @@ export const useDeviceStore = defineStore('device', {
       // Wait until the store is ready before attempting to fetch data
       await storeReady(useServiceClientStore())
 
-      useServiceClientStore().client.ConfigDB.fetch(`/v1/class/${UUIDs.Class.Device}`).then(async (deviceUUIDs) => {
+      useServiceClientStore().client.ConfigDB.fetch(`/v1/app/${UUIDs.App.HelmChartTemplate}/object`).then(async (helmChartTemplateResponse) => {
 
-        const payload = deviceUUIDs[1]
+        let payload = helmChartTemplateResponse[1]
+
+        if (!includePrivate) {
+          // Filter out private Helm chart templates
+          payload = payload.filter((helmChartTemplate) => {
+            return !['7bee50ba-7cdf-4203-8d6b-74740fe87ec3', 'f077417f-60d5-455e-be90-ef2827ce5b16'].includes(helmChartTemplate)
+          })
+        }
 
         // We expect an array here, so if it isn't, we can't continue
         if (!Array.isArray(payload)) {
@@ -44,35 +51,30 @@ export const useDeviceStore = defineStore('device', {
           return
         }
 
-        // Hydrate the device details from the UUIDs provided from the response
-        this.data = await Promise.all(payload.map(async (deviceUUID) => {
+        // Hydrate the edge cluster details from the UUIDs provided from the response
+        this.data = await Promise.all(payload.map(async (helmChartTemplateUUID) => {
           try {
 
-            console.log(`Fetching device details for ${deviceUUID}`)
-
-            // Get the friendly name from the Info App
             return {
-              uuid: deviceUUID,
-              name: (await useServiceClientStore().client.ConfigDB.get_config(UUIDs.App.Info, deviceUUID))?.name,
-              ...await useServiceClientStore().client.ConfigDB.get_config(UUIDs.App.DeviceInformation, deviceUUID),
+              uuid: helmChartTemplateUUID,
+              name: (await useServiceClientStore().client.ConfigDB.get_config(UUIDs.App.Info, helmChartTemplateUUID)).name,
             }
           }
           catch (err) {
-            console.error(`Can't read device details`, err)
+            console.error(`Can't read Helm chart template details`, err)
             return {
-              uuid: deviceUUID,
+              uuid: helmChartTemplateUUID,
               name: 'Unknown',
             }
           }
         }))
 
-        this.loaded = true
+        this.loaded  = true
+        this.ready   = true
         this.loading = false
-        this.ready = true
       }).catch((err) => {
         this.loading = false
-        this.ready = false
-        console.error(`Can't fetch devices`, err)
+        console.error(`Can't fetch Helm chart template list`, err)
       })
     },
   },

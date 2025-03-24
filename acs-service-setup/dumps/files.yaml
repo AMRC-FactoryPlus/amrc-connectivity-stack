@@ -16,7 +16,7 @@ objects:
         - !u UUIDs.Class.Permission
 
   !u UUIDs.Class.Service:
-    !u Files.Service.Files: { name: "Files Hosting Service" }
+    !u Files.Service.Files: { name: "Files Hosting" }
 
   !u UUIDs.Class.App:
     !u Files.App.Config: { name: "Files Configuration" }
@@ -63,5 +63,10 @@ grants:
       !u Files.App.Config: true
     !u ConfigDB.Perm.ManageObjects:
       !u Files.Class.File: true
+
   !u ACS.Group.Administrator:
     !u Files.Perm.All: null
+    !u Files.Perm.Upload: null
+    !u Files.Perm.Download: null
+    !u Files.Perm.ListStorage: null
+

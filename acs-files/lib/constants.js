@@ -28,6 +28,7 @@ export const Perm = {
   All: '09cce2eb-dc82-4a5a-b2ec-bca12f456ab8',
   Upload: '81ed0b6c-7305-4f51-85c5-5c66bdac7920',
   Download: '3b436260-2100-454b-aea5-8f933a1ed7e5',
+  ListStorage: 'c9dc7146-3f55-4721-8638-0ab8c7834e72',
 };
 export const Requirement = {
   ServiceAccount: '1356e8b9-c953-42ac-9ffc-ae26edb88e42',

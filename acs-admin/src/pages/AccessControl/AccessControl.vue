@@ -104,38 +104,28 @@ export default {
       await this.objectSelected({uuid})
     },
     async objectSelected (object) {
-      if (await this.s.client.ConfigDB.class_has_member("ac0d5288-6136-4ced-a372-325fbbcdd70d", object.uuid) ||
-          await this.s.client.ConfigDB.class_has_member("c0157038-ccff-11ef-a4db-63c6212e998f", object.uuid)
-      ) {
-        // Permission Group
-        // Principal Group
-        // Treat this as a group
-        const group = this.g.data.find(g => g.uuid === object.uuid)
-        if (!group) {
-          console.error("Group not found in the store", object.uuid)
-          this.objectDeselect()
-          return
-        }
+      // Decide how to handle this object
+      
+      const group = this.g.data.find(g => g.uuid === object.uuid)
+      if (group) {
         this.selectGroup(group)
-      } else if (await this.s.client.ConfigDB.class_has_member(UUIDs.Class.Permission, object.uuid)) {
-        // Permission
-        const permission = this.ps.data.find(p => p.uuid === object.uuid)
-        if (!permission) {
-          console.error("Permission not found in the store", object.uuid)
-          this.objectDeselect()
-          return
-        }
-        this.selectPermission(permission)
-      } else if (await this.s.client.ConfigDB.class_has_member("11614546-b6d7-11ef-aebd-8fbb45451d7c", object.uuid)) {
-        // Principal
-        const principal = this.p.data.find(p => p.uuid === object.uuid)
-        if (!principal) {
-          console.error("Principal not found in the store", object.uuid)
-          this.objectDeselect()
-          return
-        }
-        this.selectPrincipal(principal)
+        return
       }
+
+      const permission = this.ps.data.find(p => p.uuid === object.uuid)
+      if (permission) {
+        this.selectPermission(permission)
+        return
+      }
+
+      const principal = this.p.data.find(p => p.uuid === object.uuid)
+      if (principal) {
+        this.selectPrincipal(principal)
+        return;
+      }
+
+      console.error("Object not found in any store", object.uuid);
+      this.objectDeselect()
     },
     objectDeselect() {
       this.router.push({ path: `/access-control/${this.activeTab}` })

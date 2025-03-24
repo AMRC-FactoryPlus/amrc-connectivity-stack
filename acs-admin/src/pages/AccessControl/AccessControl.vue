@@ -199,16 +199,17 @@ export default {
     // to lazy load these when the table that is displaying them is
     // loaded, but they (especially in the case of groups) may be needed
     // in other tables so this is cleaner.
-    this.g.fetch()
     this.ps.fetch()
     this.grants.fetch()
 
     // Start a reactive fetch via the notify interface
     this.obj.start()
     this.p.start()
+    this.g.start()
   },
 
   unmounted () {
+    this.g.stop()
     this.p.stop()
     this.obj.stop()
   },

@@ -5,7 +5,7 @@
 <template>
   <EdgeContainer>
     <EdgePageSkeleton v-if="nodeLoading"/>
-    <div v-else class="flex flex-col gap-4">
+    <div v-else class="flex flex-col gap-4 flex-1 h-full">
       <div class="flex items-center justify-center gap-2">
         <DetailCard
             class="w-3/5 flex items-center justify-center"
@@ -29,11 +29,20 @@
             detail-tooltip="The cluster that this host is part of"
         />
       </div>
-<!--      <DataTable :data="devices" :columns="deviceColumns" :filters="[]">-->
-<!--        <template #toolbar-left>-->
-<!--          <div class="text-xl font-semibold">{{`${devices.length} Device${devices.length > 1 ? 's' : ''}`}}</div>-->
-<!--        </template>-->
-<!--      </DataTable>-->
+      <div class="flex-1">
+        <DataTable v-if="devices.length > 0" :data="devices" :columns="deviceColumns" :filters="[]"/>
+<!--          <template #toolbar-left>-->
+<!--            <div class="text-xl font-semibold">{{`${devices.length} Device${devices.length > 1 ? 's' : ''}`}}</div>-->
+<!--          </template>-->
+<!--        </DataTable>-->
+        <EmptyState
+            v-else
+            :title="`No devices found for ${node.name}`"
+            :description="`No devices have been added to the ${node.name} node yet.`"
+            :button-text="`Add Device`"
+            button-icon="plus"
+            @button-click="newDevice"/>
+      </div>
     </div>
   </EdgeContainer>
 </template>
@@ -53,6 +62,7 @@ import { inop } from '@utils/inop.js'
 import DetailCard from '@components/DetailCard.vue'
 import DataTable from '@components/ui/data-table/DataTable.vue'
 import { deviceColumns } from './deviceColumns.ts'
+import EmptyState from '@/components/EmptyState.vue'
 
 export default {
   components: {
@@ -70,6 +80,7 @@ export default {
     CardTitle,
     CardHeader,
     Copyable,
+    EmptyState,
   },
 
   setup () {
@@ -105,8 +116,8 @@ export default {
   },
 
   methods: {
-    deviceColumns () {
-      return deviceColumns
+    newDevice () {
+      window.events.emit('show-new-device-dialog-for-node', this.node)
     },
   },
 }

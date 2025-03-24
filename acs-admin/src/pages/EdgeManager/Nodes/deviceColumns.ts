@@ -31,7 +31,7 @@ export const deviceColumns: ColumnDef<Device>[] = [
         filterFn: (row, id, value) => {
             return value.includes(row.getValue(id))
         },
-    },
+    }
     // {
     //     accessorKey: 'schema',
     //     accessorFn: (row) => row.configuration.schema.name,

@@ -4,10 +4,9 @@
 
 <template>
   <EdgeContainer>
-    <EdgePageSkeleton v-if="loadingDetails"/>
-    <div v-else class="flex flex-col gap-4">
+    <EdgePageSkeleton v-if="clusterLoading"/>
+    <div v-else class="flex flex-col gap-4 flex-1 h-full">
       <DetailCard
-          badge="Status?"
           :text="cluster.name"
           text-tooltip="The name of the cluster"
           :detail="cluster.sparkplug"
@@ -15,14 +14,16 @@
           detail-tooltip="The Sparkplug name of the cluster"
       >
         <template #action>
-          <Button size="sm" class="flex items-center justify-center gap-2" @click="copyBootstrap">
-            <span class="hidden md:inline">Bootstrap</span>
-            <i v-if="copyingBootstrap" class="fa-solid fa-circle-notch animate-spin"></i>
+          <Button size="sm" class="flex items-center justify-center gap-2" @click="copyBootstrap" :variant="bootstrapped ? 'ghost' : 'default'">
+            <span v-if="bootstrapped" class="hidden md:inline text-gray-400">Re-Bootstrap</span>
+            <span v-else class="hidden md:inline">Bootstrap</span>
+            <i v-if="copyingBootstrap" class="fa-solid fa-circle-notch animate-spin" :class="bootstrapped ? 'text-gray-400' : ''"></i>
+            <i v-else-if="bootstrapped" class="fa-solid fa-refresh text-gray-400"></i>
             <i v-else class="fa-solid fa-rocket"></i>
           </Button>
         </template>
       </DetailCard>
-      <Tabs default-value="nodes" class="flex flex-col">
+      <Tabs default-value="nodes" class="flex flex-col flex-1">
         <div class="flex items-center justify-between gap-2">
           <TabsList>
             <TabsTrigger value="nodes">
@@ -31,22 +32,29 @@
             <TabsTrigger value="deployments" disabled>
               Deployments
             </TabsTrigger>
-            <TabsTrigger value="hosts" :disabled="cluster.hosts.length === 0">
-              {{cluster.hosts.length ? `${cluster.hosts.length} Host${cluster.hosts.length > 1 ? 's' : ''}` : 'No Hosts'}}
+            <TabsTrigger value="hosts" :disabled="hosts.length === 0">
+              {{hosts.length ? `${hosts.length} Host${hosts.length > 1 ? 's' : ''}` : 'No Hosts'}}
             </TabsTrigger>
           </TabsList>
         </div>
-        <TabsContent value="nodes">
+        <TabsContent value="nodes" class="flex-1 ">
           <div v-if="nodes.length > 0">
             <DataTable :data="nodes" :columns="nodeColumns" :filters="[]" @rowClick="selectNode"/>
           </div>
+          <EmptyState
+              v-else
+              :title="`No nodes found for ${cluster.name}`"
+              :description="`No nodes have been added to the ${cluster.name} cluster yet.`"
+              :button-text="`Add Node`"
+              button-icon="plus"
+              @button-click="newNode"/>
         </TabsContent>
         <TabsContent value="deployments">
         </TabsContent>
         <TabsContent value="hosts">
-          <DataTable :data="cluster.hosts" :columns="hostColumns" :filters="[]">
+          <DataTable :data="hosts" :columns="hostColumns" :filters="[]">
             <template #toolbar-left>
-              <div class="text-xl font-semibold">{{`${cluster.hosts.length} Host${cluster.hosts.length > 1 ? 's' : ''}`}}</div>
+              <div class="text-xl font-semibold">{{`${hosts.length} Host${hosts.length > 1 ? 's' : ''}`}}</div>
             </template>
           </DataTable>
         </TabsContent>
@@ -74,9 +82,11 @@ import { toast } from 'vue-sonner'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card/index.js'
 import Copyable from '@components/Copyable.vue'
 import DetailCard from '@components/DetailCard.vue'
+import EmptyState from '@components/EmptyState.vue'
 
 export default {
   components: {
+    EmptyState,
     DetailCard,
     AlertDescription,
     Alert,
@@ -103,25 +113,40 @@ export default {
   setup () {
     return {
       e: useEdgeClusterStore(),
-      s: useNodeStore(),
+      n: useNodeStore(),
       hostColumns,
       nodeColumns,
     }
   },
 
-  watch: {
-    async '$route.params.clusteruuid' (newUuid) {
+  computed: {
+    cluster () {
+      return this.e.data.find(e => e.uuid === this.$route.params.clusteruuid)
+    },
 
-      await this.getClusterDetails(newUuid)
+    clusterLoading () {
+      return !this.e.ready || this.e.loading
+    },
 
+    nodes () {
+      return Array.isArray(this.n.data) ? this.n.data.filter(e => e.cluster === this.cluster.uuid) : []
+    },
+
+    hosts () {
+      return this.cluster.status.hosts
+    },
+
+    bootstrapped () {
+      return this.hosts.length > 0
     },
   },
 
-  mounted () {
-    this.getClusterDetails(this.$route.params.clusteruuid)
-  },
-
   methods: {
+
+    newNode () {
+      window.events.emit('show-new-node-dialog-for-cluster', this.cluster)
+    },
+
     selectNode(e) {
       this.$router.push({
         name: 'Node',
@@ -131,22 +156,26 @@ export default {
         },
       })
     },
-    copy (text) {
+    copy (text, confirmation = 'Text copied to clipboard') {
       navigator.clipboard.writeText(text)
-      toast.success('Text copied to clipboard')
+      toast.success(confirmation)
     },
     async copyBootstrap () {
       this.copyingBootstrap = true
       try {
+
         const bootstrapResponse = await useServiceClientStore().client.Fetch.fetch({
           service: UUIDs.Service.Clusters,
           url: `v1/cluster/${this.$route.params.clusteruuid}/bootstrap-url`,
+          method: 'POST',
         })
-        console.log(bootstrapResponse)
-        const bootstrap = bootstrapResponse[1]
-        if (bootstrap.data) {
+
+        const responseJson = await bootstrapResponse.json()
+
+        if (bootstrapResponse.status) {
           this.copyingBootstrap = false
-          this.copy(`curl ${bootstrap.data} | sh -`)
+          this.copy(`curl ${responseJson} | sh -`,
+            'The bootstrap script has been copied to clipboard! Run this on the edge node to bootstrap the first node of the cluster.')
         }
         else {
           this.copyingBootstrap = false
@@ -158,71 +187,11 @@ export default {
         toast.error('The bootstrap script is not ready yet. Please wait a few moments and try again.')
       }
     },
-    async getClusterDetails (uuid) {
-      this.loadingDetails = true
-
-      // Get the cluster details here and merge them with the cluster
-      // object. We need:
-      // - Name & Deployed Helm Chart (we get this from bdb13634-0b3d-4e38-a065-9d88c12ee78d Edge cluster configuration)
-      // - The hosts that are assigned to this cluster and their details (we get this from 747a62c9-1b66-4a2e-8dd9-0b70a91b6b75 Edge cluster status)
-      // - The Nodes in this cluster, their name, status and\ other information (we get this from useNodeStore)
-
-      this.cluster.uuid = uuid
-      this.cluster.name = this.e.data.find(e => e.uuid === uuid)?.name ?? ''
-
-      const edgeClusterConfigResponse = await useServiceClientStore().
-        client.
-        ConfigDB.
-        fetch(`/v1/app/${UUIDs.App.EdgeClusterConfiguration}/object/${this.cluster.uuid}`)
-
-      const edgeClusterConfig = edgeClusterConfigResponse[1]
-      this.cluster.sparkplug       = edgeClusterConfig.name
-      this.cluster.namespace  = edgeClusterConfig.namespace
-
-      // Get the name of the deployed helm chart from its UUID using the
-      // Helm Chart Template App
-      const helmChartTemplateAppResponse = await useServiceClientStore().
-        client.
-        ConfigDB.
-        fetch(`/v1/app/${UUIDs.App.HelmChartTemplate}/object/${edgeClusterConfig.chart}`)
-
-      const helmChartTemplate = helmChartTemplateAppResponse[1]
-
-      this.cluster.helmChart = {
-        chart: helmChartTemplate.chart,
-        source: helmChartTemplate.source,
-      }
-
-      // Get the hosts assigned to this cluster and their details using
-      // the Edge cluster status app
-      const edgeClusterStatusResponse = await useServiceClientStore().
-        client.
-        ConfigDB.
-        fetch(`/v1/app/${UUIDs.App.EdgeClusterStatus}/object/${this.cluster.uuid}`)
-
-      const edgeClusterStatus = edgeClusterStatusResponse[1]
-
-      this.cluster.hosts = edgeClusterStatus?.hosts ?? []
-
-      await this.s.fetch()
-
-      // this.cluster.nodes = this.s.data.filter(e => e.cluster === this.cluster.uuid) ?? []
-
-      this.loadingDetails = false
-    },
-  },
-
-  computed: {
-    nodes () {
-      return Array.isArray(this.s.data) ? this.s.data.filter(e => e.cluster === this.cluster.uuid) : []
-    },
   },
 
   data () {
     return {
       copyingBootstrap: false,
-      loadingDetails: true,
-      cluster: {},
     }
   },
 }

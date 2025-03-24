@@ -39,7 +39,7 @@ export const nodeColumns: ColumnDef<Host>[] = [
         accessorFn: (row) => row.hostname,
         header: ({column}) => h(DataTableColumnHeader, {
             column,
-            title: 'Hostname'
+            title: 'Host'
         }),
 
         cell: ({row}) => {

@@ -130,8 +130,10 @@ export default {
           name: this.name,
         })
 
+        const managerConfig = await this.s.client.ConfigDB.get_config(UUIDs.App.ServiceConfig, UUIDs.Service.Manager);
+
         let config = {
-          chart: '7bee50ba-7cdf-4203-8d6b-74740fe87ec3', // Hard coded to edge cluster for now
+          chart: managerConfig.helm.cluster,
           name: this.sparkplugName,
           namespace: 'fplus-edge',
         };

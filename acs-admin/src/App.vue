@@ -4,14 +4,14 @@
 
 <template>
   <Toaster rich-colors/>
-  <SidebarProvider>
-    <Sidebar v-if="!l.fullscreen" class="bg-white dark:bg-slate-800 z-20">
-      <SidebarHeader class="border-b h-16">
+  <SidebarProvider class="dark:text-slate-50">
+    <Sidebar v-if="!l.fullscreen" class="bg-white dark:bg-slate-950 z-20">
+      <SidebarHeader class="border-b dark:border-slate-800 h-16">
         <SidebarMenu>
           <SidebarMenuItem>
             <div class="flex items-center gap-2.5 h-12 pl-2">
               <div class="flex aspect-square size-6 items-center justify-center">
-                <img src="/favicon.svg">
+                <img class="dark:invert" src="/favicon.svg">
               </div>
               <div class="flex flex-col gap-0.5 leading-none">
                 <h1 class="font-bold text-base h-4">ACS</h1>
@@ -48,7 +48,7 @@
 
     <SidebarInset>
       <header v-if="!l.fullscreen"
-          class="flex justify-between items-center border-b px-4 h-16 flex-shrink-0 lg:px-6 sticky top-0 bg-white z-10">
+          class="flex justify-between items-center border-b dark:border-slate-800 px-4 h-16 flex-shrink-0 lg:px-6 sticky top-0 bg-white dark:bg-slate-950 z-10">
         <div class="flex items-center justify-center gap-2">
           <i :class="`fa-solid fa-${$route.meta.icon}`"></i>
           <h3 class="text-lg font-bold tracking-tight">{{$route.meta.name}}</h3>

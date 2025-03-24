@@ -83,7 +83,7 @@ const table = useVueTable({
       </template>
     </DataTableToolbar>
     <slot name="below-toolbar"></slot>
-    <div class="rounded-md border">
+    <div class="rounded-md border dark:border-slate-800">
       <Table>
         <TableHeader>
           <TableRow v-for="headerGroup in table.getHeaderGroups()" :key="headerGroup.id">

@@ -93,7 +93,7 @@ const limitHeight = props.limitHeight
         <slot :selected-objects="table.getSelectedRowModel().rows.map(r => {return {...r.original, metaRowId: r.id}})"></slot>
       </div>
     </div>
-    <div class="rounded-md border" :class="{'max-h-[50vh] overflow-auto': limitHeight}">
+    <div class="rounded-md border dark:border-slate-800" :class="{'max-h-[50vh] overflow-auto': limitHeight}">
       <Table>
         <TableHeader>
           <TableRow v-for="headerGroup in table.getHeaderGroups()" :key="headerGroup.id">

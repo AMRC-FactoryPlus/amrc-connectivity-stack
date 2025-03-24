@@ -43,7 +43,7 @@ export class APIv1 {
     });
   }
 
-  async getFileByUuid(req, res) {
+  async getFileByUuid(req, res, next) {
     const file_uuid = req.params.uuid;
 
     if (!file_uuid)
@@ -71,18 +71,19 @@ export class APIv1 {
 
     const filePath = path.join(this.uploadPath, file_uuid);
 
-    // Check if file exists
-    fs.access(filePath, fs.constants.F_OK, (err) => {
-      if (err) {
-        return res.status(404).json({ message: 'FAILED: File not found' });
+    const options = {
+      headers: {
+        'Content-Type':'application/octet-stream',
+        'x-timestamp': Date.now(),
+        'x-sent': true
       }
+    }
 
-      // File exists, proceed with download
-      return res.status(200).download(filePath, (err) => {
-        if (err) {
-          res.status(500).json({ message: 'FAILED: Error downloading file' });
-        }
-      });
+     // Try to download file, return an error if unsuccessful
+     return res.sendFile(filePath, options, function (err) {
+      if (err) {
+        next(err);
+      }
     });
   }
 

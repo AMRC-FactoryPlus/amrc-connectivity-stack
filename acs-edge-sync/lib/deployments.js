@@ -47,15 +47,19 @@ class Reconciliation {
                 if (!deep_equal(old.spec, man.spec)) {
                     // Create a patch that only updates the spec
                     const patch = {
-                        spec: man.spec
+                        apiVersion: "helm.toolkit.fluxcd.io/v2beta1",
+                        kind: "HelmRelease",
+                        spec: man.spec,
+                        metadata: {
+                            name,
+                            namespace: this.deploy.namespace
+                        }
                     };
                     this.log("PATCH: %o", patch);
                     await this.check(this.objs.patch(
-                        name,
-                        this.resource.apiVersion,
-                        this.resource.kind,
-                        this.deploy.namespace,
                         patch,
+                        undefined,
+                        undefined,
                         undefined,
                         undefined,
                         { headers: { 'Content-Type': 'application/merge-patch+json' } }

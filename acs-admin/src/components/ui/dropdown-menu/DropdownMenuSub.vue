@@ -1,5 +1,9 @@
+<!--
+  - Copyright (c) University of Sheffield AMRC 2025.
+  -->
+
 <script setup>
-import { DropdownMenuSub, useForwardPropsEmits } from "radix-vue";
+import { DropdownMenuSub, useForwardPropsEmits } from 'reka-ui'
 
 const props = defineProps({
   defaultOpen: { type: Boolean, required: false },

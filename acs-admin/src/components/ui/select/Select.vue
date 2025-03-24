@@ -1,5 +1,9 @@
+<!--
+  - Copyright (c) University of Sheffield AMRC 2025.
+  -->
+
 <script setup>
-import { SelectRoot, useForwardPropsEmits } from "radix-vue";
+import { SelectRoot, useForwardPropsEmits } from 'reka-ui'
 
 const props = defineProps({
   open: { type: Boolean, required: false },

@@ -1,7 +1,11 @@
+<!--
+  - Copyright (c) University of Sheffield AMRC 2025.
+  -->
+
 <script setup>
-import { computed } from "vue";
-import { TooltipContent, TooltipPortal, useForwardPropsEmits } from "radix-vue";
-import { cn } from "@/lib/utils";
+import { computed } from 'vue'
+import { TooltipContent, TooltipPortal, useForwardPropsEmits } from 'reka-ui'
+import { cn } from '@/lib/utils'
 
 defineOptions({
   inheritAttrs: false,

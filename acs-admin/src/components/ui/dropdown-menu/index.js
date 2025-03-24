@@ -1,4 +1,8 @@
-export { DropdownMenuPortal } from "radix-vue";
+/*
+ * Copyright (c) University of Sheffield AMRC 2025.
+ */
+
+export { DropdownMenuPortal } from "reka-ui";
 
 export { default as DropdownMenu } from "./DropdownMenu.vue";
 export { default as DropdownMenuTrigger } from "./DropdownMenuTrigger.vue";

@@ -1,11 +1,11 @@
+<!--
+  - Copyright (c) University of Sheffield AMRC 2025.
+  -->
+
 <script setup>
-import { computed } from "vue";
-import {
-  DropdownMenuContent,
-  DropdownMenuPortal,
-  useForwardPropsEmits,
-} from "radix-vue";
-import { cn } from "@/lib/utils";
+import { computed } from 'vue'
+import { DropdownMenuContent, DropdownMenuPortal, useForwardPropsEmits } from 'reka-ui'
+import { cn } from '@/lib/utils'
 
 const props = defineProps({
   forceMount: { type: Boolean, required: false },

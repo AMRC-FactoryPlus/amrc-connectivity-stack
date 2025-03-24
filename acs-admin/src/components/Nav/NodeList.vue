@@ -32,7 +32,7 @@
       </CollapsibleContent>
     </Collapsible>
   </SidebarMenuItem>
-  <Button disabled class="flex items-center justify-center gap-1 text-gray-400 my-1" variant="ghost" size="sm">
+  <Button @click="newNode" class="flex items-center justify-center gap-1 text-gray-400 my-1" variant="ghost" size="sm">
     <i class="fa-solid fa-plus"></i>
     <span>New Node</span>
   </Button>

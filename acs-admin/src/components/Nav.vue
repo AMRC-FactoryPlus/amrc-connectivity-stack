@@ -35,10 +35,16 @@ const sidebarNavItems: Item[] = [
         auth: true
     },
     {
-        title: 'Access Control',
-        href: '/access-control',
-        icon: 'user-shield',
-        auth: true
+      title: 'Access Control',
+      href: '/access-control',
+      icon: 'user-shield',
+      auth: true
+    },
+    {
+      title: 'ConfigDB',
+      href: '/configdb',
+      icon: 'gears',
+      auth: true
     }
 ]
 </script>

@@ -12,6 +12,8 @@ import Alerts from '@pages/Alerts/Alerts.vue'
 import AccessControl from '@pages/AccessControl/AccessControl.vue'
 import {useServiceClientStore} from "@store/serviceClientStore.js";
 import Login from "@pages/Login.vue";
+import ConfigDB from "@pages/ConfigDB/ConfigDB.vue";
+import ApplicationEditor from "@pages/ConfigDB/Applications/ApplicationEditor.vue";
 
 const routes = [
   {
@@ -53,6 +55,33 @@ const routes = [
       name: 'Access Control',
       icon: 'user-shield'
     },
+  },
+  {
+    path: '/configdb/:tab?',
+    component: ConfigDB,
+    meta: {
+      name: 'ConfigDB',
+      icon: 'gears'
+    },
+    children: [
+      {path: '/:selected?', component: ConfigDB, meta: {}}
+    ]
+  },
+  {
+    path: '/configdb/applications/:application',
+    component: ApplicationEditor,
+    meta: {
+      name: 'ConfigDB',
+      icon: 'gears'
+    }
+  },
+  {
+    path: '/configdb/applications/:application/:object',
+    component: ApplicationEditor,
+    meta: {
+      name: 'ConfigDB',
+      icon: 'gears'
+    }
   },
 ]
 

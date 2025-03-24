@@ -43,26 +43,10 @@ export const nodeColumns: ColumnDef<Host>[] = [
         }),
 
         cell: ({row}) => {
-            return h('div', {class: 'max-w-[500px] truncate'}, row.getValue('hostname'))
+            return h('div', {class: `max-w-[500px] truncate ${(row.getValue('hostname') == null || row.getValue('hostname') === 'Floating') ? 'text-gray-400' : ''}`}, row.getValue('hostname') ?? "Floating")
         },
         filterFn: (row, id, value) => {
             return value.includes(row.getValue(id))
         },
-    },
-    {
-        accessorKey: 'status',
-        accessorFn: (row) => row.status,
-        header: ({column}) => h(DataTableColumnHeader, {
-            column,
-            title: 'Status'
-        }),
-
-        cell: ({row}) => {
-            return h('div', {class: 'max-w-[500px] truncate'}, [
-                h('div', {class: 'max-w-[500px] truncate'}, "INOP")
-            ])
-        },
-        filterFn: (row, id, value) => {
-            return value.includes(row.getValue(id))
-        },
-    }]
+    }
+]

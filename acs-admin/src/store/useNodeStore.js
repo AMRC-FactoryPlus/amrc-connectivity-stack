@@ -47,11 +47,21 @@ export const useNodeStore = defineStore('node', {
         // Hydrate the node details from the UUIDs provided from the response
         this.data = await Promise.all(payload.map(async (nodeUUID) => {
           try {
-            let node = await useServiceClientStore().client.ConfigDB.get_config(UUIDs.App.EdgeAgentDeployment, nodeUUID)
+
+            let deployment = await useServiceClientStore().client.ConfigDB.get_config(UUIDs.App.EdgeAgentDeployment, nodeUUID)
+
+            console.log(deployment)
+
+            // Change the `name` key in deployment to sparkplug
+            deployment.sparkplug = deployment.name
+            delete deployment.name
+
             return {
-              ...node,
               uuid: nodeUUID,
+              name: (await useServiceClientStore().client.ConfigDB.get_config(UUIDs.App.Info, nodeUUID)).name,
+              ...deployment,
             }
+
           }
           catch (err) {
             console.error(`Can't read node details`, err)

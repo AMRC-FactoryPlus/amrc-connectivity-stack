@@ -105,7 +105,8 @@ export default {
           schema: null,
           connection: null,
           node: this.node.uuid,
-          originMap: null
+          originMap: null,
+          createdAt: new Date().toISOString(),
         })
 
         toast.success(`${this.name} has been created!`)

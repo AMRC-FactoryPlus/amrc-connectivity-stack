@@ -5,43 +5,76 @@
 <template>
   <EdgeContainer>
     <EdgePageSkeleton v-if="nodeLoading"/>
-    <div v-else class="flex flex-col gap-4 flex-1 h-full">
-      <div class="flex items-center justify-center gap-2">
-        <DetailCard
-            class="w-3/5 flex items-center justify-center"
-            :text="node.name"
-            text-tooltip="The name of the node"
-            :detail="node.sparkplug?.node_id"
-            detail-icon="bolt-lightning"
-            detail-tooltip="The Sparkplug name of the Node"
-            :second-detail="node.uuid"
-            second-detail-icon="hashtag"
-            second-detail-tooltip="The UUID of the Node"
-        />
-        <DetailCard
-            class="w-2/5 flex items-center justify-center"
-            titleIcon="server"
-            title="Host"
-            :text="hostname"
-            text-tooltip="The physical name of the host that this node is running on"
-            :detail="cluster"
-            detail-icon="circle-nodes"
-            detail-tooltip="The cluster that this host is part of"
-        />
+    <div v-else class="flex h-full">
+      <!-- Main content -->
+      <div class="flex-1 flex flex-col gap-4 pr-4">
+        <div class="flex-1">
+          <Tabs v-if="!nodeLoading" default-value="devices" class="flex flex-col flex-1">
+            <div class="flex items-center justify-between gap-2">
+              <TabsList>
+                <TabsTrigger value="devices">
+                  {{devices.length ? `${devices.length}  Device${devices.length > 1 ? 's' : ''}` : 'No Devices'}}
+                </TabsTrigger>
+                <TabsTrigger value="connections" disabled>
+                  Connections
+                </TabsTrigger>
+              </TabsList>
+            </div>
+            <TabsContent value="devices" class="flex-1 ">
+              <div v-if="devices.length > 0">
+                <DataTable v-if="devices.length > 0" :data="devices" :columns="deviceColumns" :filters="[]" @rowClick="selectDevice"/>
+              </div>
+              <EmptyState
+                  v-else
+                  :title="`No devices found for ${node.name}`"
+                  :description="`No devices have been added to the ${node.name} node yet.`"
+                  :button-text="`Add Device`"
+                  button-icon="plus"
+                  @button-click="newDevice"/>
+            </TabsContent>
+          </Tabs>
+        </div>
       </div>
-      <div class="flex-1">
-        <DataTable v-if="devices.length > 0" :data="devices" :columns="deviceColumns" :filters="[]"/>
-<!--          <template #toolbar-left>-->
-<!--            <div class="text-xl font-semibold">{{`${devices.length} Device${devices.length > 1 ? 's' : ''}`}}</div>-->
-<!--          </template>-->
-<!--        </DataTable>-->
-        <EmptyState
-            v-else
-            :title="`No devices found for ${node.name}`"
-            :description="`No devices have been added to the ${node.name} node yet.`"
-            :button-text="`Add Device`"
-            button-icon="plus"
-            @button-click="newDevice"/>
+
+      <!-- Sidebar -->
+      <div class="w-96 border-l border-border -my-4 -mr-4">
+        <div class="flex items-center justify-start gap-2 p-4 border-b">
+          <i :class="`fa-fw fa-solid fa-cube`"></i>
+          <div class="font-semibold text-xl">{{ node.name }}</div>
+        </div>
+        <div class="space-y-4 p-4">
+          <SidebarDetail
+              icon="key"
+              label="Node UUID"
+              :value="node.uuid"
+          />
+          <SidebarDetail
+              icon="bolt-lightning"
+              label="Sparkplug Node ID"
+              :value="node.sparkplug"
+          />
+          <SidebarDetail
+              v-if="node.createdAt"
+              :title="node.createdAt"
+              icon="clock"
+              label="Created"
+              :value="moment(node.createdAt).fromNow()"
+          />
+        </div>
+        <div class="font-semibold text-lg p-4 border-b">Cluster Details</div>
+        <div class="space-y-4 p-4">
+          <SidebarDetail
+              icon="circle-nodes"
+              label="Cluster"
+              :value="cluster"
+          />
+          <SidebarDetail
+              icon="server"
+              label="Host"
+              :value="hostname"
+          />
+
+        </div>
       </div>
     </div>
   </EdgeContainer>
@@ -54,6 +87,7 @@ import { Label } from '@components/ui/label/index.js'
 import { Input } from '@components/ui/input/index.js'
 import { Button } from '@components/ui/button/index.js'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card/index.js'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import Copyable from '@components/Copyable.vue'
 import { useEdgeClusterStore } from '@store/useEdgeClusterStore.js'
 import { useDeviceStore } from '@store/useDeviceStore.js'
@@ -63,9 +97,14 @@ import DetailCard from '@components/DetailCard.vue'
 import DataTable from '@components/ui/data-table/DataTable.vue'
 import { deviceColumns } from './deviceColumns.ts'
 import EmptyState from '@/components/EmptyState.vue'
+import SidebarDetail from '@/components/SidebarDetail.vue'
+import moment from 'moment'
+import { toast } from 'vue-sonner'
 
 export default {
   components: {
+    Tabs,
+    SidebarDetail,
     DataTable,
     DetailCard,
     EdgePageSkeleton,
@@ -81,6 +120,9 @@ export default {
     CardHeader,
     Copyable,
     EmptyState,
+    TabsContent,
+    TabsList,
+    TabsTrigger,
   },
 
   setup () {
@@ -90,6 +132,7 @@ export default {
       d: useDeviceStore(),
       inop,
       deviceColumns,
+      moment,
     }
   },
 
@@ -118,6 +161,24 @@ export default {
   methods: {
     newDevice () {
       window.events.emit('show-new-device-dialog-for-node', this.node)
+    },
+
+    selectDevice(e) {
+      const cluster = this.n.data?.find(f => f.uuid === e.original.node)?.cluster;
+
+      if (!cluster) {
+        toast.error('Device has no cluster')
+        return
+      }
+
+      this.$router.push({
+        name: 'Device',
+        params: {
+          clusteruuid: cluster,
+          nodeuuid: e.original.node,
+          deviceuuid: e.original.uuid,
+        },
+      })
     },
   },
 }

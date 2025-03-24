@@ -94,6 +94,7 @@ export default {
         newEntry.principal = this.p.data.find(e => e.uuid === entry.principal) ?? this.g.data.find(e => e.uuid === entry.principal)
 
         newEntry.permission = this.permission
+        newEntry.plural = entry.plural;
         rv.push(newEntry)
       }
 

@@ -31,6 +31,7 @@ export interface Permission {
         uuid: string
         name: string
     }
+    plural: boolean
 }
 
 export const columns: ColumnDef<Permission>[] = [
@@ -70,6 +71,22 @@ export const columns: ColumnDef<Permission>[] = [
                 h('div', {class: 'max-w-[500px] truncate font-medium'}, row.getValue('target')),
                 h('div', {class: 'max-w-[500px] truncate text-gray-400'}, row.original.target?.class?.name ?? "UNKNOWN")
             ])
+        },
+        filterFn: (row, id, value) => {
+            return value.includes(row.getValue(id))
+        },
+    },
+    {
+        accessorKey: 'plural',
+        accessorFn: (row) => row.plural,
+        header: ({column}) => h(DataTableColumnHeader, {
+            column,
+            title: 'Plural target'
+        }),
+
+        cell: ({row}) => {
+            return h('div', {class: 'max-w-[500px] truncate font-medium'},
+                row.original.plural ? '🗸' : '🗴')
         },
         filterFn: (row, id, value) => {
             return value.includes(row.getValue(id))

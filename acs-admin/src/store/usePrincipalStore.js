@@ -17,6 +17,7 @@ export const usePrincipalStore = defineStore('principal', {
     data: [],
     loading: false,
     fetchTrigger: null,
+    rxsub: null,
   }),
   actions: {
     async storeReady () {
@@ -140,24 +141,29 @@ export const usePrincipalStore = defineStore('principal', {
 
       const seq = rxu.rx(
         rx.combineLatest(objs, krbs),
-        rx.map(([objs, krbs]) =>
+        rx.map(([objs, krbs]) => 
           krbs.map(([uuid, kerberos]) => ({
-            ...objs.get(uuid, {}),
+            ...objs.get(uuid, { name: "UNKNOWN", class: { name: "UNKNOWN" }}),
             uuid, kerberos,
           }))),
       );
 
-      seq.subscribe(princs => {
+      this.rxsub = seq.subscribe(princs => {
         console.log("PRINCIPALS UPDATE");
         this.data = princs;
         this.loading = false;
       });
     },
 
+    stop () {
+      this.rxsub?.unsubscribe();
+      this.rxsub = null;
+    },
+
     // This just pushes a notification down the trigger sequence.
     fetch () { 
       // If start() hasn't been called yet we will fetch when it is.
       this.fetchTrigger?.next(null);
-    }
+    },
   },
 })

@@ -29,20 +29,19 @@ export const useObjectStore = defineStore('object', {
       const info = cdb.search_app(UUIDs.App.Info);
       const registration = cdb.search_app(UUIDs.App.Registration);
 
-      /* Create an Observable of Seq objects from which we can build
-       * either an array or a map as needed. */
-      const seq = rxu.rx(
+      /* Create an Observable of Maps from UUID to name info */
+      const maps = this.maps = rxu.rx(
         rx.combineLatest(info, registration),
         rx.map(([infos, regs]) => {
           const name_of = u => infos.get(u)?.name ?? "UNKNOWN";
-          return regs.entrySeq()
-            .map(([uuid, reg]) => ({
+          return regs
+            .map((reg, uuid) => ({
               uuid,
               name: name_of(uuid),
               rank: reg.rank,
               class: {
                 uuid: reg.class,
-                name: name_of(uuid),
+                name: name_of(reg.class),
               },
             }));
         }),
@@ -50,18 +49,9 @@ export const useObjectStore = defineStore('object', {
         rx.share(),
       );
 
-      /* Expose the object info as an Observable of Maps */
-      this.maps = rxu.rx(
-        seq,
-        rx.map(seq => seq
-          .map(inf => [inf.uuid, inf])
-          .toMap()),
-        rx.share(),
-      );
-
       /* Update our data */
-      seq.subscribe(seq => {
-        this.data = seq.toArray();
+      maps.subscribe(map => {
+        this.data = map.valueSeq().toArray();
         this.ready = true;
       });
     },

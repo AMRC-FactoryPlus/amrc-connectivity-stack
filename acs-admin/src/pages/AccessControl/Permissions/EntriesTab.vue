@@ -24,7 +24,7 @@
 <script>
 import DataTable from '@components/ui/data-table/DataTable.vue'
 import {Skeleton} from '@components/ui/skeleton/index.js'
-import {columns} from './principalsColumns.ts'
+import {columns} from './entriesColumns.ts'
 import {Alert, AlertDescription, AlertTitle} from '@components/ui/alert/index.js'
 import {useGroupStore} from '@store/useGroupStore.js'
 import {usePrincipalStore} from "@store/usePrincipalStore.js";

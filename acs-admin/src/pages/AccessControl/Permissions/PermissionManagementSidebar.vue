@@ -70,7 +70,7 @@
 <script>
 import { SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@components/ui/sheet/index.js'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import PrincipalsTab from './PrincipalsTab.vue'
+import EntriesTab from './EntriesTab.vue'
 import GroupsTab from "./GroupsTab.vue";
 import {usePermissionStore} from "@store/usePermissionStore.js";
 import Copyable from "@components/Copyable.vue";
@@ -110,7 +110,7 @@ export default {
     TabsList,
     TabsTrigger,
     TabsContent,
-    PrincipalsTab,
+    PrincipalsTab: EntriesTab,
     GroupsTab,
     ObjectSelector: defineAsyncComponent(() => import('@components/ObjectSelector/ObjectSelector.vue')),
   },

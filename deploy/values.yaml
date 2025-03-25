@@ -126,11 +126,10 @@ serviceSetup:
     openidClients:
       grafana:
         enabled: true
-        clientId: "Grafana"
+        clientId: "grafana"
         name: "Grafana"
         redirectHost: "grafana"
         redirectPath: "/login/generic_oauth"
-        secret: $__file{/etc/secrets/auth_generic_oauth/client_secret}
         roles:
           - name: "viewer"
           - name: "editor"

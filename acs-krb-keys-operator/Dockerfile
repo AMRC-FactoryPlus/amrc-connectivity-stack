@@ -5,8 +5,10 @@ FROM alpine AS build
 ARG kubeseal_ver=0.19.5
 
 WORKDIR /root
+# We can't use a bind mount here, pip does in-tree builds
+COPY --from=lib . /acs-lib
 COPY requirements.txt .
-RUN --mount=type=bind,from=lib,dst=/acs-lib /bin/sh <<SHELL
+RUN /bin/sh <<SHELL
     set -e
 
     apk add bison curl python3 py3-pip python3-dev gcc musl-dev krb5 krb5-dev

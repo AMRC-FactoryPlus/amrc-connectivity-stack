@@ -27,6 +27,8 @@ const Version = "2.0.0";
 const fplus = new RxClient({ env: process.env });
 const debug = fplus.debug;
 
+debug.log("app", "Starting acs-auth revision %s", GIT_VERSION);
+
 const model  = await new Model({ debug, }).init();
 const data = new DataFlow({
     fplus, model,

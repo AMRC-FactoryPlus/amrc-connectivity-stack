@@ -14,27 +14,40 @@
             :button-text="`Bootstrap`"
             button-icon="rocket"
             @button-click="copyBootstrap"/>
-        <Tabs v-else default-value="nodes" class="flex flex-col flex-1">
-          <div class="flex items-center justify-between gap-2">
-            <TabsList>
-              <TabsTrigger value="nodes">
-                {{nodes.length ? `${nodes.length}  Node${nodes.length > 1 ? 's' : ''}` : 'No Nodes'}}
-              </TabsTrigger>
-              <TabsTrigger value="deployments" disabled>
-                Deployments
-              </TabsTrigger>
-              <TabsTrigger value="hosts" :disabled="hosts.length === 0">
-                {{hosts.length ? `${hosts.length} Host${hosts.length > 1 ? 's' : ''}` : 'No Hosts'}}
-              </TabsTrigger>
-            </TabsList>
-          </div>
+        <Tabs v-else default-value="nodes" class="flex flex-col flex-1 z-50">
           <TabsContent value="nodes" class="flex-1 ">
             <div v-if="nodes.length > 0">
-              <DataTable :data="nodes" :columns="nodeColumns" :filters="[]" @rowClick="selectNode"/>
+              <DataTable :data="nodes" :columns="nodeColumns" :filters="[]" @rowClick="selectNode">
+                <template #toolbar-left>
+                  <div class="flex items-center justify-between gap-2">
+                    <TabsList>
+                      <TabsTrigger value="nodes">
+                        {{nodes.length ? `${nodes.length}  Node${nodes.length > 1 ? 's' : ''}` : 'No Nodes'}}
+                      </TabsTrigger>
+                      <TabsTrigger value="deployments" disabled>
+                        Deployments
+                      </TabsTrigger>
+                      <TabsTrigger value="hosts" :disabled="hosts.length === 0">
+                        {{hosts.length ? `${hosts.length} Host${hosts.length > 1 ? 's' : ''}` : 'No Hosts'}}
+                      </TabsTrigger>
+                    </TabsList>
+                  </div>
+                </template>
+                <template #toolbar-right>
+                  <Button
+                      @click="newNode"
+                      size="sm"
+                      class="ml-auto hidden lg:flex items-center justify-center gap-1.5"
+                  >
+                    <i class="fa-solid fa-plus"></i>
+                    Add Node
+                  </Button>
+                </template>
+              </DataTable>
             </div>
             <EmptyState
                 v-else
-                :title="`No nodes found for ${cluster.name}`"
+                title="No Nodes"
                 :description="`No nodes have been added to the ${cluster.name} cluster yet.`"
                 :button-text="`Add Node`"
                 button-icon="plus"
@@ -43,7 +56,23 @@
           <TabsContent value="deployments">
           </TabsContent>
           <TabsContent value="hosts">
-            <DataTable :data="hosts" :columns="hostColumns" :filters="[]"/>
+            <DataTable :data="hosts" :columns="hostColumns" :filters="[]">
+              <template #toolbar-left>
+                <div class="flex items-center justify-between gap-2">
+                  <TabsList>
+                    <TabsTrigger value="nodes">
+                      {{nodes.length ? `${nodes.length}  Node${nodes.length > 1 ? 's' : ''}` : 'No Nodes'}}
+                    </TabsTrigger>
+                    <TabsTrigger value="deployments" disabled>
+                      Deployments
+                    </TabsTrigger>
+                    <TabsTrigger value="hosts" :disabled="hosts.length === 0">
+                      {{hosts.length ? `${hosts.length} Host${hosts.length > 1 ? 's' : ''}` : 'No Hosts'}}
+                    </TabsTrigger>
+                  </TabsList>
+                </div>
+              </template>
+            </DataTable>
           </TabsContent>
         </Tabs>
       </div>

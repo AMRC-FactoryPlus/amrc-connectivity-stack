@@ -9,28 +9,75 @@
       <!-- Main content -->
       <div class="flex-1 flex flex-col gap-4 pr-4">
         <div class="flex-1">
-          <Tabs v-if="!nodeLoading" default-value="devices" class="flex flex-col flex-1">
-            <div class="flex items-center justify-between gap-2">
-              <TabsList>
-                <TabsTrigger value="devices">
-                  {{devices.length ? `${devices.length}  Device${devices.length > 1 ? 's' : ''}` : 'No Devices'}}
-                </TabsTrigger>
-                <TabsTrigger value="connections" disabled>
-                  Connections
-                </TabsTrigger>
-              </TabsList>
-            </div>
-            <TabsContent value="devices" class="flex-1 ">
+          <Tabs v-if="!nodeLoading" default-value="devices" class="flex flex-col flex-1 h-full">
+            <TabsContent value="devices" class="flex-1">
               <div v-if="devices.length > 0">
-                <DataTable v-if="devices.length > 0" :data="devices" :columns="deviceColumns" :filters="[]" @rowClick="selectDevice"/>
+                <DataTable v-if="devices.length > 0" :data="devices" :columns="deviceColumns" :filters="[]" @rowClick="selectDevice">
+                  <template #toolbar-left>
+                    <div class="flex items-center justify-between gap-2">
+                      <TabsList>
+                        <TabsTrigger value="devices">
+                          {{devices.length ? `${devices.length}  Device${devices.length > 1 ? 's' : ''}` : 'No Devices'}}
+                        </TabsTrigger>
+                        <TabsTrigger value="connections">
+                          {{connections.length ? `${connections.length}  Connection${connections.length > 1 ? 's' : ''}` : 'No Connections'}}
+                        </TabsTrigger>
+                      </TabsList>
+                    </div>
+                  </template>
+                  <template #toolbar-right>
+                    <Button
+                        @click="newDevice"
+                        size="sm"
+                        class="ml-auto hidden lg:flex items-center justify-center gap-1.5"
+                    >
+                      <i class="fa-solid fa-plus"></i>
+                      Add Device
+                    </Button>
+                  </template>
+                </DataTable>
               </div>
               <EmptyState
                   v-else
-                  :title="`No devices found for ${node.name}`"
+                  title="No Devices"
                   :description="`No devices have been added to the ${node.name} node yet.`"
                   :button-text="`Add Device`"
                   button-icon="plus"
                   @button-click="newDevice"/>
+            </TabsContent>
+            <TabsContent value="connections" class="flex-1">
+              <DataTable :data="connections" :columns="connectionColumns" :filters="[]" @rowClick="selectConnection">
+                <template #empty>
+                  <EmptyState
+                      title="No Connections"
+                      :description="`No connections have been added to the ${node.name} node yet.`"
+                      :button-text="`Add Connection`"
+                      button-icon="plus"
+                      @button-click="newConnection"/>
+                </template>
+                <template #toolbar-left>
+                  <div class="flex items-center justify-between gap-2">
+                    <TabsList>
+                      <TabsTrigger value="devices">
+                        {{devices.length ? `${devices.length}  Device${devices.length > 1 ? 's' : ''}` : 'No Devices'}}
+                      </TabsTrigger>
+                      <TabsTrigger value="connections">
+                        {{connections.length ? `${connections.length}  Connection${connections.length > 1 ? 's' : ''}` : 'No Connections'}}
+                      </TabsTrigger>
+                    </TabsList>
+                  </div>
+                </template>
+                <template #toolbar-right>
+                  <Button
+                      @click="newConnection"
+                      size="sm"
+                      class="ml-auto hidden lg:flex items-center justify-center gap-1.5"
+                  >
+                    <i class="fa-solid fa-plus"></i>
+                    Add Connection
+                  </Button>
+                </template>
+              </DataTable>
             </TabsContent>
           </Tabs>
         </div>
@@ -82,6 +129,9 @@
 
 <script>
 import { useNodeStore } from '@store/useNodeStore.js'
+import { useEdgeClusterStore } from '@store/useEdgeClusterStore.js'
+import { useDeviceStore } from '@store/useDeviceStore.js'
+import { useConnectionStore } from '@store/useConnectionStore.js'
 import EdgeContainer from '@components/Containers/EdgeContainer.vue'
 import { Label } from '@components/ui/label/index.js'
 import { Input } from '@components/ui/input/index.js'
@@ -89,17 +139,18 @@ import { Button } from '@components/ui/button/index.js'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card/index.js'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import Copyable from '@components/Copyable.vue'
-import { useEdgeClusterStore } from '@store/useEdgeClusterStore.js'
-import { useDeviceStore } from '@store/useDeviceStore.js'
 import EdgePageSkeleton from '@components/EdgeManager/EdgePageSkeleton.vue'
 import { inop } from '@utils/inop.js'
 import DetailCard from '@components/DetailCard.vue'
 import DataTable from '@components/ui/data-table/DataTable.vue'
 import { deviceColumns } from './deviceColumns.ts'
+import { connectionColumns } from './connectionColumns.ts'
 import EmptyState from '@/components/EmptyState.vue'
 import SidebarDetail from '@/components/SidebarDetail.vue'
 import moment from 'moment'
 import { toast } from 'vue-sonner'
+import { useStore } from '@store/useStore.js'
+import { UUIDs } from '@amrc-factoryplus/service-client'
 
 export default {
   components: {
@@ -130,10 +181,16 @@ export default {
       c: useEdgeClusterStore(),
       n: useNodeStore(),
       d: useDeviceStore(),
+      cn: useConnectionStore(),
       inop,
       deviceColumns,
+      connectionColumns,
       moment,
     }
+  },
+
+  mounted () {
+    this.cn.start();
   },
 
   computed: {
@@ -153,6 +210,13 @@ export default {
       return Array.isArray(this.d.data) ? this.d.data.filter(e => e.node === this.node.uuid) : []
     },
 
+    connections () {
+      return Array.isArray(this.cn.data) 
+        ? this.cn.data
+            .filter(e => e.configuration?.edgeAgent === this.node.uuid)
+        : []
+    },
+
     hostname() {
       return this.node.hostname ?? 'Floating'
     },
@@ -161,6 +225,10 @@ export default {
   methods: {
     newDevice () {
       window.events.emit('show-new-device-dialog-for-node', this.node)
+    },
+
+    newConnection () {
+      window.events.emit('show-new-connection-dialog-for-node', this.node)
     },
 
     selectDevice(e) {
@@ -180,6 +248,8 @@ export default {
         },
       })
     },
+
+    selectConnection(e) {},
   },
 }
 </script>

@@ -1,4 +1,6 @@
 import crypto from "crypto";
+import fs from "fs/promises";
+import path from "path";
 import { URLSearchParams } from "url";
 
 /**
@@ -129,6 +131,13 @@ class RealmSetup {
    * @returns {Promise<void>} Resolves when the client is created.
    */
   async create_client(client_representation, is_retry) {
+    const secret_path = path.join(
+      "/etc/secret",
+      client_representation.redirectHost,
+    );
+    const content = await fs.readFile(secret_path, "utf8");
+    const client_secret = content.trim();
+
     const client = {
       id: crypto.randomUUID(),
       clientId: client_representation.clientId,
@@ -137,7 +146,7 @@ class RealmSetup {
       adminUrl: `http${this.secure}://${client_representation.redirectHost}.${this.base_url}`,
       baseUrl: `http${this.secure}://${client_representation.redirectHost}.${this.base_url}`,
       enabled: true,
-      secret: client_representation.secret,
+      secret: client_secret,
       redirectUris: [
         `http${this.secure}://${client_representation.redirectHost}.${this.base_url}${client_representation.redirectPath}`,
       ],
@@ -146,8 +155,6 @@ class RealmSetup {
     const client_url = `http${this.secure}://openid.${this.base_url}/admin/realms/${this.realm}/clients`;
 
     this.log(`Attempting client creation at: ${client_url}`);
-
-    this.log(`Client: ${client}`);
 
     try {
       const response = await fetch(client_url, {

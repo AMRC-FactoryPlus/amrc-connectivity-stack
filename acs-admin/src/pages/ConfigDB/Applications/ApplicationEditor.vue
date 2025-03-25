@@ -2,9 +2,12 @@
   - Copyright (c) University of Sheffield AMRC 2024.
   -->
 <template>
-  {{application?.name}}
+  <div class="flex justify-between">
+    <span>{{application?.name}}</span>
+    <Button>Add Entry</Button>
+  </div>
   <Skeleton v-if="loading || app.loading" v-for="i in 10" class="h-16 rounded-lg mb-2"/>
-  <DataTable v-else :data="data" :default-sort="initialSort" :columns="columns" :filters="[]" @row-click="e => objectClick(e.original)"/>
+  <DataTable v-else :data="data" :default-sort="initialSort" :columns="columns" :filters="[]" @row-click="e => objectClick(e.original)" />
 </template>
 
 <script>
@@ -21,6 +24,7 @@ import {UUIDs} from "@amrc-factoryplus/service-client";
 import * as rxu from "@amrc-factoryplus/rx-util";
 import * as rx from "rxjs";
 import * as imm from "immutable";
+import {Button} from "@components/ui/button/index.js";
 
 export default {
   emits: ['rowClick'],
@@ -45,6 +49,7 @@ export default {
   },
 
   components: {
+    Button,
     Card,
     Skeleton,
     DataTable,
@@ -59,7 +64,7 @@ export default {
     },
     application () {
       return this.app.data.find(a => a.uuid === this.route.params.application)
-    }
+    },
   },
 
   methods: {

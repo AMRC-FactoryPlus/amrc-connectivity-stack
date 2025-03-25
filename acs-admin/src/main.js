@@ -14,6 +14,7 @@ import {useServiceClientStore} from "@store/serviceClientStore.js";
 import Login from "@pages/Login.vue";
 import ConfigDB from "@pages/ConfigDB/ConfigDB.vue";
 import ApplicationEditor from "@pages/ConfigDB/Applications/ApplicationEditor.vue";
+import ApplicationObjectEditor from "@pages/ConfigDB/Applications/ApplicationObjectEditor.vue";
 
 const routes = [
   {
@@ -77,7 +78,7 @@ const routes = [
   },
   {
     path: '/configdb/applications/:application/:object',
-    component: ApplicationEditor,
+    component: ApplicationObjectEditor,
     meta: {
       name: 'ConfigDB',
       icon: 'gears'

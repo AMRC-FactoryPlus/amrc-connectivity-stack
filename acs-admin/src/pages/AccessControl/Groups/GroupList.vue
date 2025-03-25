@@ -3,7 +3,7 @@
   -->
 <template>
   <Skeleton v-if="g.loading" v-for="i in 10" class="h-16 rounded-lg mb-2"/>
-  <DataTable v-else :data="g.data" :columns="columns" :filters="[{
+  <DataTable v-else :data="g.data" :default-sort="initialSort" :columns="columns" :filters="[{
         name: 'Name',
         property: 'name',
         options: filterOptions.names
@@ -30,8 +30,6 @@ import { useGroupStore } from '@store/useGroupStore.js'
 import { columns } from './groupListColumns.ts'
 
 export default {
-  name: 'GroupList',
-
   emits: ['rowClick'],
 
   setup () {
@@ -48,6 +46,12 @@ export default {
   },
 
   computed: {
+    initialSort () {
+      return [{
+        id: 'name',
+        desc: false
+      }]
+    },
     filterOptions () {
       return {
         names: this.g.data.map((g) => g.name).filter((v, i, a) => a.indexOf(v) === i).map((g) => {

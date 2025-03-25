@@ -17,7 +17,7 @@
             JSON Dumps
           </TabsTrigger>
         </TabsList>
-        <div v-if="p.loading || ps.loading || g.loading || grants.loading"><i class="fa-solid fa-circle-notch animate-spin"></i></div>
+        <div v-if="!obj.ready || app.loading"><i class="fa-solid fa-circle-notch animate-spin"></i></div>
       </div>
       <Button v-if="activeTab==='applications'">Add Application</Button>
       <Button v-if="activeTab==='objects'">Add Object</Button>
@@ -52,18 +52,16 @@ import {serviceClientReady} from "@store/useServiceClientReady.js";
 import {useObjectStore} from "@store/useObjectStore.js";
 import ApplicationList from "@pages/ConfigDB/Applications/ApplicationList.vue";
 import PrincipalList from "@pages/AccessControl/Principals/PrincipalList.vue";
+import {useApplicationStore} from "@store/useApplicationStore.js";
 
 export default {
   setup () {
     return {
       s: useServiceClientStore(),
-      p: usePrincipalStore(),
-      ps: usePermissionStore(),
-      g: useGroupStore(),
-      grants: useGrantStore(),
       obj: useObjectStore(),
+      app: useApplicationStore(),
       router: useRouter(),
-      route: useRoute()
+      route: useRoute(),
     }
   },
 
@@ -183,16 +181,14 @@ export default {
   },
 
   async mounted () {
-    // Load the principals and the groups - we need them almost
-    // everywhere and pretty much immediately. An alternative would be
-    // to lazy load these when the table that is displaying them is
-    // loaded, but they (especially in the case of groups) may be needed
-    // in other tables so this is cleaner.
-    this.p.fetch()
-    this.g.fetch()
-    this.ps.fetch()
-    this.grants.fetch()
-    this.obj.fetch()
+    // Start a reactive fetch via the notify interface
+    this.obj.start()
+    this.app.start()
+  },
+
+  unmounted () {
+    this.obj.stop()
+    this.app.stop()
   },
 
   data () {

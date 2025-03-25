@@ -28,7 +28,6 @@ export const columns: ColumnDef<ApplicationMapping>[] = [{
         column,
         title: 'Name'
     }),
-
     cell: ({row}) => {
         return h('div', {class: 'max-w-[500px] truncate'}, [
             h('div', {class: 'max-w-[500px] truncate font-medium'}, row.getValue('name')),
@@ -40,12 +39,11 @@ export const columns: ColumnDef<ApplicationMapping>[] = [{
     },
 }, {
     accessorKey: 'entries',
-    accessorFn: (row) => row.objects.length,
+    accessorFn: (row) => row.objects ? row.objects.length : 0,
     header: ({column}) => h(DataTableColumnHeader, {
         column,
         title: 'Config Entries'
     }),
-
     cell: ({row}) => {
         return h('span', {class: 'max-w-[500px] truncate font-medium'}, row.getValue('entries'))
     },

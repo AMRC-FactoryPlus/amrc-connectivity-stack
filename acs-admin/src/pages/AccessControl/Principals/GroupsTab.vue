@@ -4,7 +4,7 @@
 
 <template>
   <Skeleton v-if="g.loading || loading" v-for="i in 10" class="h-16 rounded-lg mb-2"/>
-  <DataTable v-else :data="this.groups" :columns="columns" :filters="[]" @row-click="e => $emit('objectClick', e)">
+  <DataTable v-else :data="this.groups" :default-sort="initialSort" :columns="columns" :filters="[]" @row-click="e => $emit('objectClick', e)">
     <template #toolbar-left>
       <Alert class="mr-6">
         <div class="flex items-start gap-3">
@@ -118,6 +118,12 @@ export default {
   },
 
   computed: {
+    initialSort () {
+      return [{
+        id: 'name',
+        desc: false
+      }]
+    },
     groups () {
       if (this.g.loading) {
         return []

@@ -10,6 +10,7 @@ import { DumpLoader }           from "./dumps.js";
 import { fixups }               from "./fixups.js";
 import { setup_git_repos }      from "./git-repos.js";
 import { setup_local_uuids }    from "./local-uuids.js";
+import { create_openid_realm }  from "./openid-realm.js";
 
 export class ServiceSetup {
     constructor (opts) {
@@ -57,6 +58,9 @@ export class ServiceSetup {
 
         this.log("Migrating legacy Auth groups");
         await migrate_auth_groups(this);
+
+        this.log("Creating OpenID realm");
+        await create_openid_realm(this);
 
         this.log("Finished setup");
     }

@@ -8,6 +8,7 @@ platform?=	linux/amd64
 build_args+=	--build-arg revision="${git.tag} (${git.sha})"
 build_args+=	--build-arg registry="${registry}"
 build_args+=	--build-arg tag="${tag}"
+build_args+=	--build-context lib=../lib
 
 # `git rev-parse HEAD:directory` gives a SHA for the contents of that
 # directory. In particular, it changes only when changes are made to

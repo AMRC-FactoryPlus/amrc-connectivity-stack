@@ -9,7 +9,7 @@ import { URLSearchParams } from "url";
  * @returns {Promise<void>} Resolves when the realm creation process finishes.
  */
 export async function create_openid_realm(service_setup) {
-  new RealmSetup(service_setup).run();
+  await new RealmSetup(service_setup).run();
 }
 
 class RealmSetup {
@@ -20,10 +20,11 @@ class RealmSetup {
     this.username = fplus.opts.username;
     this.password = fplus.opts.password;
     this.realm = "factory_plus";
-    this.base_url = fplus.acs_config.domain;
-    this.secure = fplus.acs_config.secure;
+    this.base_url = service_setup.acs_config.domain;
+    this.secure = service_setup.acs_config.secure;
     this.access_token = "";
     this.refresh_token = "";
+    this.config = service_setup.config;
   }
 
   /**
@@ -54,7 +55,7 @@ class RealmSetup {
               ],
               allowPasswordAuthentication: ["false"],
               debug: ["true"],
-              keyTab: ["/etc/keytabs/krb5.keytab"],
+              keyTab: ["/etc/keytabs/server"],
               cachePolicy: ["DEFAULT"],
               updateProfileFirstLogin: ["false"],
               kerberosRealm: [this.base_url.toUpperCase()],
@@ -68,10 +69,13 @@ class RealmSetup {
     await this.get_initial_access_token();
     await this.create_basic_realm(base_realm, false);
 
-    const client_configs = Object.values(fplus.config.openidClients);
-    client_configs
-      .filter((client) => client.enabled === true)
-      .forEach((client) => this.create_client(client, false));
+    const client_configs = Object.values(this.config.openidClients);
+    const enabled_clients = client_configs.filter(
+      (client) => client.enabled === true,
+    );
+    for (const client of enabled_clients) {
+      await this.create_client(client, false);
+    }
   }
 
   /**
@@ -83,7 +87,9 @@ class RealmSetup {
    * @returns {Promise<void>} Resolves when the realm is created.
    */
   async create_basic_realm(realm_representation, is_retry) {
-    const realm_url = `${this.secure}://openid.${this.base_url}/admin/realms`;
+    const realm_url = `http${this.secure}://openid.${this.base_url}/admin/realms`;
+
+    this.log(`Attempting basic realm creation at: ${realm_url}`);
 
     try {
       const response = await fetch(realm_url, {
@@ -96,11 +102,14 @@ class RealmSetup {
       });
 
       if (!response.ok) {
-        const status = response.status();
+        const status = response.status;
 
         if (status == 401 && !is_retry) {
           await this.get_initial_access_token(this.refresh_token);
-          await this.create_basic_realm(client_representation, true);
+          await this.create_basic_realm(realm_representation, true);
+        } else if (status == 503) {
+          await this.wait(10000);
+          await this.create_basic_realm(realm_representation, false);
         } else {
           const error = await response.text();
           throw new Error(`${status}: ${error}`);
@@ -124,15 +133,21 @@ class RealmSetup {
       id: crypto.randomUUID(),
       clientId: client_representation.clientId,
       name: client_representation.name,
-      rootUrl: `${this.secure}://${client_representation.redirectHost}.${this.base_url}`,
-      adminUrl: `${this.secure}://${client_representation.redirectHost}.${this.base_url}`,
-      baseUrl: `${this.secure}://${client_representation.redirectHost}.${this.base_url}`,
+      rootUrl: `http${this.secure}://${client_representation.redirectHost}.${this.base_url}`,
+      adminUrl: `http${this.secure}://${client_representation.redirectHost}.${this.base_url}`,
+      baseUrl: `http${this.secure}://${client_representation.redirectHost}.${this.base_url}`,
       enabled: true,
       secret: client_representation.secret,
-      redirectUris: [`${this.secure}://${client_representation.name}.${this.base_url}${client.redirectPath}`],
-    }
+      redirectUris: [
+        `http${this.secure}://${client_representation.redirectHost}.${this.base_url}${client_representation.redirectPath}`,
+      ],
+    };
 
-    const client_url = `${this.secure}://openid.${this.base_url}/admin/realms/${this.realm}/clients`;
+    const client_url = `http${this.secure}://openid.${this.base_url}/admin/realms/${this.realm}/clients`;
+
+    this.log(`Attempting client creation at: ${client_url}`);
+
+    this.log(`Client: ${client}`);
 
     try {
       const response = await fetch(client_url, {
@@ -145,11 +160,14 @@ class RealmSetup {
       });
 
       if (!response.ok) {
-        const status = response.status();
+        const status = response.status;
 
         if (status == 401 && !is_retry) {
           await this.get_initial_access_token(this.refresh_token);
           await this.create_client(client_representation, true);
+        } else if (status == 503) {
+          await this.wait(10000);
+          await this.create_client(client_representation, false);
         } else {
           const error = await response.text();
           throw new Error(`${status}: ${error}`);
@@ -170,7 +188,9 @@ class RealmSetup {
    * @returns {Promise<[string, string]} Resolves to an access token and a refresh token.
    */
   async get_initial_access_token(refresh_token) {
-    const token_url = `${this.secure}://openid.${this.base_url}/realms/${this.realm}/protocol/openid-connect/token`;
+    const token_url = `http${this.secure}://openid.${this.base_url}/realms/master/protocol/openid-connect/token`;
+
+    this.log(`Attempting token request at: ${token_url}`);
 
     const params = new URLSearchParams();
     if (refresh_token != undefined) {
@@ -194,13 +214,16 @@ class RealmSetup {
       });
 
       if (response.ok) {
-        data = await response.json();
+        const data = await response.json();
         this.access_token = data.access_token;
         this.refresh_token = data.refresh_token;
 
         return [data.access_token, data.refresh_token];
+      } else if (response.status == 503) {
+        await this.wait(10000);
+        this.get_initial_access_token();
       } else {
-        const status = response.status();
+        const status = response.status;
         const error = await response.text();
         throw new Error(`${status}: ${error}`);
       }
@@ -209,5 +232,9 @@ class RealmSetup {
         `Couldn't get an initial access token for realm setup: ${error}`,
       );
     }
+  }
+
+  async wait(milliseconds) {
+    return new Promise((resolve) => setTimeout(resolve, milliseconds));
   }
 }

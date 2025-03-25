@@ -4,16 +4,12 @@ FROM alpine AS build
 
 ARG kubeseal_ver=0.19.5
 
-COPY ./python-kadmv /tmp/python-kadmv
-
-
-RUN /bin/sh <<SHELL
+WORKDIR /root
+COPY requirements.txt .
+RUN --mount=type=bind,from=lib,dst=/acs-lib /bin/sh <<SHELL
     apk add bison curl python3 py3-pip python3-dev gcc musl-dev krb5 krb5-dev
 
-    pip install -t /usr/local/python krb5 kubernetes kopf \
-        "optional.py<2.0" \
-        requests requests-cache requests-kerberos
-    pip install -t /usr/local/python /tmp/python-kadmv
+    pip install -t /usr/local/python -r requirements.txt
 
     curl -L https://github.com/bitnami-labs/sealed-secrets/releases/download/v${kubeseal_ver}/kubeseal-${kubeseal_ver}-linux-amd64.tar.gz \
         | tar -xzvf - -C /usr/local/bin kubeseal

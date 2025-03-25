@@ -1,7 +1,5 @@
 /*
- * Factory+ / AMRC Connectivity Stack (ACS) Edge Sync Op
- * Deployment operator
- * Copyright 2023 AMRC
+ * Copyright (c) University of Sheffield AMRC 2025.
  */
 
 import deep_equal       from "deep-equal";
@@ -15,7 +13,7 @@ import { Edge }             from "./uuids.js";
 import { LABELS }           from "./metadata.js";
 
 const Resource = imm.Record({ apiVersion: null, kind: null });
-Resource.prototype.toString = function () { 
+Resource.prototype.toString = function () {
     return `${this.apiVersion}/${this.kind}`;
 };
 
@@ -45,12 +43,29 @@ class Reconciliation {
         for (const [name, man] of this.want) {
             const old = this.have.get(name);
             if (old) {
-                const rv = old.metadata.resourceVersion;
-                const update = jmp.merge(man, 
-                    { metadata: { resourceVersion: rv } });
-                this.log("REPLACE: %o", update);
-                await this.check(this.objs.replace(update));
-                this.log("Finished replace");
+                // Only compare and update the spec
+                if (!deep_equal(old.spec, man.spec)) {
+                    // Create a patch that only updates the spec
+                    const patch = {
+                        apiVersion: "helm.toolkit.fluxcd.io/v2beta1",
+                        kind: "HelmRelease",
+                        spec: man.spec,
+                        metadata: {
+                            name,
+                            namespace: this.deploy.namespace
+                        }
+                    };
+                    this.log("PATCH: %o", patch);
+                    await this.check(this.objs.patch(
+                        patch,
+                        undefined,
+                        undefined,
+                        undefined,
+                        undefined,
+                        { headers: { 'Content-Type': 'application/merge-patch+json' } }
+                    ));
+                    this.log("Finished patch");
+                }
             }
             else {
                 this.log("CREATE: %o", man);
@@ -79,7 +94,7 @@ class Reconciliation {
 
     async get_resources () {
         const { response, body } = await this.objs.list(
-            this.resource.apiVersion, this.resource.kind, 
+            this.resource.apiVersion, this.resource.kind,
             this.deploy.namespace,
             /*pretty*/null, /*exact*/null, /*exportt*/null,
             /*fieldSelector*/null,
@@ -89,7 +104,7 @@ class Reconciliation {
             throw `Can't list ${this.resource}: ${response.statusCode}`;
         return imm.List(body.items);
     }
-} 
+}
 
 export class Deployments {
     constructor (opts) {
@@ -98,7 +113,7 @@ export class Deployments {
         this.kc = opts.kubeconfig;
         this.namespace = opts.namespace;
         this.values = opts.values;
-       
+
         this.log = opts.fplus.debug.log.bind(opts.fplus.debug, "deploy");
     }
 
@@ -111,7 +126,7 @@ export class Deployments {
     }
 
     run () {
-        this.manifests.subscribe(ms => 
+        this.manifests.subscribe(ms =>
             this.reconcile_manifests(ms));
     }
 
@@ -155,7 +170,7 @@ export class Deployments {
                 .then(spec => ({ uuid: agent, spec }))),
             rx.map(dep => {
                 const { spec } = dep;
-                const charts = 
+                const charts =
                     spec.chart ? rx.of(spec.chart) : rx.from(spec.charts);
                 return [dep, charts];
             }),
@@ -180,7 +195,7 @@ export class Deployments {
                 resources: opts.config.resources,
                 manifests: this.create_manifests(opts),
             })),
-            rx.tap(o => this.log("Resources: %s, Manifests: %o", 
+            rx.tap(o => this.log("Resources: %s, Manifests: %o",
                 o.resources.toJS(), o.manifests.toJS())),
             rx.tap({ error: e => this.log("Error: %s", e) }),
             rx.retry({ delay: 5000 }),

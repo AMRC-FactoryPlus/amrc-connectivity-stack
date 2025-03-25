@@ -1,0 +1,20 @@
+FROM bitnami/spark:3.5.3
+
+USER root
+
+WORKDIR /app
+RUN pip install pyspark==3.5.3
+
+# Delta Lake jars
+ADD https://repo1.maven.org/maven2/io/delta/delta-spark_2.12/3.3.0/delta-spark_2.12-3.3.0.jar /opt/bitnami/spark/jars/
+ADD https://repo1.maven.org/maven2/io/delta/delta-standalone_2.12/3.3.0/delta-standalone_2.12-3.3.0.jar /opt/bitnami/spark/jars/
+ADD https://repo1.maven.org/maven2/io/delta/delta-storage/3.3.0/delta-storage-3.3.0.jar /opt/bitnami/spark/jars/
+
+# Kafka jars
+ADD https://repo1.maven.org/maven2/org/apache/spark/spark-sql-kafka-0-10_2.12/3.5.3/spark-sql-kafka-0-10_2.12-3.5.3.jar /opt/bitnami/spark/jars/
+ADD https://repo1.maven.org/maven2/org/apache/kafka/kafka-clients/4.0.0/kafka-clients-4.0.0.jar /opt/bitnami/spark/jars/
+ADD https://repo1.maven.org/maven2/org/apache/spark/spark-streaming-kafka-0-10-assembly_2.12/3.5.3/spark-streaming-kafka-0-10-assembly_2.12-3.5.3.jar /opt/bitnami/spark/jars/
+ADD https://repo1.maven.org/maven2/org/apache/spark/spark-token-provider-kafka-0-10_2.12/3.5.3/spark-token-provider-kafka-0-10_2.12-3.5.3.jar /opt/bitnami/spark/jars/
+
+# Apache jars
+ADD https://repo1.maven.org/maven2/org/apache/commons/commons-pool2/2.12.1/commons-pool2-2.12.1.jar /opt/bitnami/spark/jars/

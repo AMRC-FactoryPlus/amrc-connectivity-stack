@@ -53,7 +53,7 @@ spec:
               readOnly: true
             - name: krb5-conf
               mountPath: /config/krb5-conf
-            - name: krb5-keytab
+            - name: openid-keytabs
               mountPath: /etc/keytabs
       volumes:
         - name: realm-config
@@ -62,14 +62,14 @@ spec:
         - name: krb5-conf
           configMap:
             name: krb5-conf
-        - name: krb5-keytab
+        - name: openid-keytabs
           secret:
-            secretName: krb5-keytabs
+            secretName: openid-keytabs
             items:
               - path: client
-                key: sv1openid
+                key: client
               - path: server
-                key: http.openid
+                key: server
 ---
 apiVersion: v1
 kind: Service

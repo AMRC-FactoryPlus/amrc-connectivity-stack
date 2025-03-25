@@ -123,6 +123,25 @@ serviceSetup:
     helmChart:
       # Chart to deploy an edge cluster
       #cluster: null
+    openidClients:
+      grafana:
+        enabled: true
+        clientId: "Grafana"
+        name: "Grafana"
+        redirectHost: "grafana"
+        redirectPath: "/login/generic_oauth"
+        secret: $__file{/etc/secrets/auth_generic_oauth/client_secret}
+        roles:
+          - name: "viewer"
+          - name: "editor"
+          - name: "admin"
+  extraSecretMounts:
+    - name: keycloak-grafana-client-mount
+      secretName: keycloak-grafana-client
+      defaultMode: 0440
+      mountPath: /etc/secrets/auth_generic_oauth
+      readOnly: true
+
 
 edgeHelm:
   enabled: true

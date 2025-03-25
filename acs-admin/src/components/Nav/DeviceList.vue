@@ -18,10 +18,6 @@
       </Button>
     </RouterLink>
   </SidebarMenuItem>
-  <Button @click="newDevice" class="flex items-center justify-center gap-1 text-gray-400 my-1" variant="ghost" size="sm">
-    <i class="fa-solid fa-plus"></i>
-    <span>New Device</span>
-  </Button>
 </template>
 
 <script>

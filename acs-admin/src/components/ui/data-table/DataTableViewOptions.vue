@@ -1,3 +1,7 @@
+<!--
+  - Copyright (c) University of Sheffield AMRC 2025.
+  -->
+
 <script setup lang="ts">
 import type { Table } from '@tanstack/vue-table'
 import { computed } from 'vue'
@@ -32,7 +36,7 @@ const columns = computed(() => props.table.getAllColumns()
       <Button
         variant="outline"
         size="sm"
-        class="ml-auto hidden h-8 lg:flex items-center justify-center gap-1.5"
+        class="flex items-center justify-center gap-1.5"
       >
         <i class="fa-solid fa-sliders"></i>
         View

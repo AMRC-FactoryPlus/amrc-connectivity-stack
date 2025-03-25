@@ -1,5 +1,5 @@
 <!--
-  - Copyright (c) University of Sheffield AMRC 2024.
+  - Copyright (c) University of Sheffield AMRC 2025.
   -->
 
 <script setup lang="ts">
@@ -31,7 +31,6 @@ function handleDelete() {
         message: `Are you sure that you want to remove ${props.row.original.principal.kerberos} from the ${props.row.original.name} group? The user will lose all permissions associated with the group.`,
         confirmText: 'Remove from Group',
         onConfirm: () => {
-            console.log(props.row.original.principal);
             s.client.Auth.remove_from_group(props.row.original.uuid, props.row.original.principal.uuid).then(() => {
                 toast.success(`${props.row.original.principal.kerberos} has been removed from the ${props.row.original.name} group`)
             }).catch((err) => {

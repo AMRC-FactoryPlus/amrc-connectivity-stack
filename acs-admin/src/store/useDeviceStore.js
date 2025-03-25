@@ -48,7 +48,7 @@ export const useDeviceStore = defineStore('device', {
         this.data = await Promise.all(payload.map(async (deviceUUID) => {
           try {
 
-            console.log(`Fetching device details for ${deviceUUID}`)
+            console.debug(`Fetching device details for ${deviceUUID}`)
 
             // Get the friendly name from the Info App
             return {

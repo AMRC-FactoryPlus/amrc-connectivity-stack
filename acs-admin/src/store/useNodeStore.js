@@ -50,16 +50,15 @@ export const useNodeStore = defineStore('node', {
 
             let deployment = await useServiceClientStore().client.ConfigDB.get_config(UUIDs.App.EdgeAgentDeployment, nodeUUID)
 
-            console.log(deployment)
-
             // Change the `name` key in deployment to sparkplug
-            deployment.sparkplug = deployment.name
+            if (deployment) {
+              deployment.sparkplug = deployment?.name
             delete deployment.name
+            }
 
             return {
               uuid: nodeUUID,
-              name: (await useServiceClientStore().client.ConfigDB.get_config(UUIDs.App.Info, nodeUUID)).name,
-              ...deployment,
+              name: (await useServiceClientStore().client.ConfigDB.get_config(UUIDs.App.Info, nodeUUID)).name, ...deployment ?? {},
             }
 
           }

@@ -45,14 +45,19 @@ import { useEdgeClusterStore } from '@store/useEdgeClusterStore.js'
 import { useNodeStore } from '@store/useNodeStore.js'
 import { useDeviceStore } from '@store/useDeviceStore.js'
 import NodeList from './NodeList.vue'
+import { useObjectStore } from '@store/useObjectStore.js'
+import { useDriverStore } from '@store/useDriverStore.js'
+import { UUIDs } from '@amrc-factoryplus/service-client'
 
 export default {
 
   setup () {
     return {
+      obj: useObjectStore(),
       c: useEdgeClusterStore(),
       n: useNodeStore(),
       d: useDeviceStore(),
+      dr: useDriverStore()
     }
   },
 
@@ -84,6 +89,7 @@ export default {
     await this.c.fetch()
     await this.n.fetch()
     await this.d.fetch()
+    await this.dr.start()
   },
 
   methods: {

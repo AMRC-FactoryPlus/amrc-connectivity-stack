@@ -5,7 +5,7 @@
 export const storeReady = async (store) => {
 
   while (!store.ready) {
-    console.log('Waiting for store to be ready...');
+    console.debug('Waiting for store to be ready...');
     await new Promise(resolve => setTimeout(resolve, 100));
   }
 };

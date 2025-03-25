@@ -1,5 +1,5 @@
 <!--
-  - Copyright (c) University of Sheffield AMRC 2024.
+  - Copyright (c) University of Sheffield AMRC 2025.
   -->
 
 <script setup lang="ts">
@@ -41,13 +41,17 @@ const a = useAlertStore();
       <Button
           v-if="isFiltered"
           variant="ghost"
-          class="h-8 px-2 lg:px-3 gap-1.5 flex items-center justify-center"
+          size="sm"
+          class="gap-1.5 flex items-center justify-center"
           @click="table.resetColumnFilters()"
       >
         Reset
         <i class="fa-solid fa-times"></i>
       </Button>
     </div>
-    <DataTableViewOptions :table="table"/>
+    <div class="flex items-center justify-center gap-2">
+      <DataTableViewOptions :table="table"/>
+      <slot name="right"/>
+    </div>
   </div>
 </template>

@@ -72,6 +72,7 @@
         <NewClusterDialog/>
         <NewNodeDialog/>
         <NewDeviceDialog/>
+        <NewConnectionDialog/>
         <RouterView/>
       </main>
     </SidebarInset>
@@ -94,6 +95,7 @@ import { Toaster } from '@/components/ui/sonner'
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarInput, SidebarInset, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarRail, SidebarTrigger } from '@/components/ui/sidebar'
 import NewClusterDialog from '@components/EdgeManager/EdgeClusters/NewClusterDialog.vue'
 import NewNodeDialog from '@components/EdgeManager/Nodes/NewNodeDialog.vue'
+import NewConnectionDialog from '@components/EdgeManager/Connections/NewConnectionDialog.vue'
 import NewDeviceDialog from '@components/EdgeManager/Devices/NewDeviceDialog.vue'
 
 export default {
@@ -147,6 +149,7 @@ export default {
     Nav,
     EdgeClusterList,
     Toaster,
+    NewConnectionDialog,
   },
 
   watch: {

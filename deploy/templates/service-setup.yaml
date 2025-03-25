@@ -24,6 +24,9 @@ spec:
             name: krb5-conf
         - name: manager-ccache-storage
           emptyDir: { }
+        - name: grafana-client-secret
+          secret:
+            secretName: keycloak-grafana-client
       initContainers:
         - name: service-setup
 {{ include "amrc-connectivity-stack.image" (list . .Values.serviceSetup) | indent 10 }}
@@ -53,12 +56,15 @@ spec:
                   "secure"          (.Values.acs.secure | ternary "s" "")
                   "realm"           .Values.identity.realm
                   "directory"
-                    (include "amrc-connectivity-stack.external-url" 
+                    (include "amrc-connectivity-stack.external-url"
                       (list . "directory"))
                 | toRawJson | quote }}
           volumeMounts:
             - mountPath: /data
               name: git-checkouts
+            - name: grafana-client-secret
+              mountPath: /etc/secret
+              readOnly: true
         - name: edge-helm-charts
 {{ include "amrc-connectivity-stack.image" (list . .Values.edgeHelm) | indent 10 }}
           env:
@@ -78,7 +84,7 @@ spec:
         - name: manager
           image: "{{ include "amrc-connectivity-stack.image-name" (list . .Values.manager ) }}-backend"
           imagePullPolicy: {{ .Values.manager.image.pullPolicy }}
-          command: 
+          command:
               - /bin/sh
               - "-c"
               - |

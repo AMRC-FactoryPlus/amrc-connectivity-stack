@@ -135,12 +135,6 @@ serviceSetup:
           - name: "viewer"
           - name: "editor"
           - name: "admin"
-  extraSecretMounts:
-    - name: keycloak-grafana-client-mount
-      secretName: keycloak-grafana-client
-      defaultMode: 0440
-      mountPath: /etc/secrets/auth_generic_oauth
-      readOnly: true
 
 
 edgeHelm:

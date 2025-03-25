@@ -25,7 +25,7 @@ spec:
         - name: openid
           image: "{{ .Values.openid.image.repository }}:{{ .Values.openid.image.tag }}"
           imagePullPolicy: {{ .Values.openid.image.pullPolicy }}
-          args: ["start-dev", "--import-realm"]
+          args: ["start-dev"]
           env:
             - name: KEYCLOAK_ADMIN
               value: "admin"
@@ -48,17 +48,11 @@ spec:
               path: /health/ready
               port: 9000
           volumeMounts:
-            - name: realm-config
-              mountPath: /opt/keycloak/data/import
-              readOnly: true
             - name: krb5-conf
               mountPath: /config/krb5-conf
             - name: openid-keytabs
               mountPath: /etc/keytabs
       volumes:
-        - name: realm-config
-          configMap:
-            name: keycloak-realm-config
         - name: krb5-conf
           configMap:
             name: krb5-conf

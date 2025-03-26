@@ -4,7 +4,7 @@
 
 <template>
   <Skeleton v-if="g.loading || p.loading || grants.loading || loading" v-for="i in 10" class="h-16 rounded-lg mb-2"/>
-  <DataTable v-else :data="this.entries" :columns="columns" :filters="[]">
+  <DataTable v-else :data="this.entries" :default-sort="initialSort" :columns="columns" :filters="[]">
     <template #toolbar-left>
       <Alert class="mr-6">
         <div class="flex items-start gap-3">
@@ -24,7 +24,7 @@
 <script>
 import DataTable from '@components/ui/data-table/DataTable.vue'
 import {Skeleton} from '@components/ui/skeleton/index.js'
-import {columns} from './principalsColumns.ts'
+import {columns} from './entriesColumns.ts'
 import {Alert, AlertDescription, AlertTitle} from '@components/ui/alert/index.js'
 import {useGroupStore} from '@store/useGroupStore.js'
 import {usePrincipalStore} from "@store/usePrincipalStore.js";
@@ -57,6 +57,12 @@ export default {
   },
 
   computed: {
+    initialSort () {
+      return [{
+        id: 'principal',
+        desc: false
+      }]
+    },
     entries() {
       this.loading = true
 
@@ -94,6 +100,7 @@ export default {
         newEntry.principal = this.p.data.find(e => e.uuid === entry.principal) ?? this.g.data.find(e => e.uuid === entry.principal)
 
         newEntry.permission = this.permission
+        newEntry.plural = entry.plural;
         rv.push(newEntry)
       }
 

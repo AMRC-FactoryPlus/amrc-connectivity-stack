@@ -4,7 +4,7 @@
 
 <script setup lang="ts">
 import type {Row} from '@tanstack/vue-table'
-import type {Permission} from './principalsColumns'
+import type {Permission} from './entriesColumns'
 
 import {Button} from '@/components/ui/button'
 import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuGroup} from '@/components/ui/dropdown-menu'

@@ -17,10 +17,10 @@ The ACS Config Service stores the **Edge Agent** configuration with all connecti
 Each configuration includes a list of device connections (`deviceConnections`) managed in the ACS Manager. These configurations contain connection details such as the connection type, connection UUID, necessary scouting entries, and other details that are not relevant to the scouting feature.
 
 The **scout** entry consists of two main parts: **scoutDetails** and **driverDetails**.
-- **scoutDetails**: This part is standard across all device connections. The boolean property **isEnabled** specifies whether Edge Agent should run in scouting mode, allowing to request addresses from devices associated with that deviceConnection. 
-- **driverDetails**: This part is protocol-specific. Ideally, scouting should not rely on predefined configurations and should retrieve all addresses automatically. However, if a protocol does not natively support address discovery, manual configuaration may be required.  
-  - MQTT driverDetails: Specifies **topic** and **duration**. The Edge Agent listens for messages within the specified **topic** for the given **duration** and returns any discovered addresses. 
-  - driverDetails for OPC UA: 
+- **scoutDetails**: This part is standard across all device connections. The boolean property **isEnabled** specifies whether Edge Agent should run in scouting mode, allowing to request addresses from devices associated with that deviceConnection.
+- **driverDetails**: This part is protocol-specific. Ideally, scouting should not rely on predefined configurations and should retrieve all addresses automatically. However, if a protocol does not natively support address discovery, manual configuaration may be required.
+  - MQTT driverDetails: Specifies **topic** and **duration**. The Edge Agent listens for messages within the specified **topic** for the given **duration** and returns any discovered addresses.
+  - driverDetails for OPC UA:
 
 #### Example: Partial Edge Agent configuration YAML file showing only scouting-related entries
 ```
@@ -33,7 +33,7 @@ deviceConnections:
           scoutDetails:
             isEnabled: true
           driverDetails:
-      
+
     - MQTTConnDetails:
         connType: MQTT
         name: MQTT_Connection
@@ -51,7 +51,7 @@ The Edge Scout Results Application (UUID **f8c1b13b-ebaf-45c9-b712-9cd712695513*
 Once scouting is performed, the discovered addresses are stored in the `addresses` property as **key-value pairs**, where
 - The **keys** in addresses section always represent the actual addresses.
 - The **values** are objects containing additional information, with the format varying based on protocol and available data.
- 
+
 These configurations are mapped to their respective **device connections** using the **UUID** of each connection ([See `uuid` property of `deviceConnection` in Edge Agent Configuration](#example-partial-edge-agent-configuration-yaml-file-showing-only-scouting-related-entries)).
 
 #### Example: Discovered addresses stored in ACS Config Service
@@ -104,26 +104,18 @@ These configurations are mapped to their respective **device connections** using
 
 ## Implementation
 ### DeviceConnection abstract class (Changes for Scouting Feature)
-Two new methods are added to the abstract **DeviceConnection** class:
+A new method is added to the abstract **DeviceConnection** class:
 ```
 public async scoutAddresses(driverDetails: ScoutDriverDetails): Promise<object>
 ```
 - This method **must be implemented** in its subclasses (MQTTConnection, OPCUAConnection, etc.), as the process for retrieving available addresses differs based on the protocol.
-- It accepts `driverDetails` part of the scout configuration. 
-- It returns the scouting results as an `object`. 
+- It accepts `driverDetails` part of the scout configuration.
+- It returns the scouting results as an `object`.
 
-```
-async validateConfigDetails(driverDetails: ScoutDriverDetails): Promise<ScoutDriverDetails>
-```
-- This method **must be implemented** in its subclasses (MQTTConnection, OPCUAConnection, etc.), as the process for interpreting `driverDetails` part of the scout configuration varies by protocol.
-- It accepts `driverDetails` part of the scout configuration. 
-- It performs validation for `driverDetails`, converts it to correct format, and returns the validated configuration in an appropriate type, which extends the `ScoutDriverDetails` type. 
 
 ### MQTTConnection (Changes for Scouting Feature)
-MQTTConnection implements the two methods for scouting of its superclass, [DeviceConnection](#deviceconnection-abstract-class-changes-for-scouting-feature)
+MQTTConnection implements the the `scoutAddresses` method of its superclass, [DeviceConnection](#deviceconnection-abstract-class-changes-for-scouting-feature).
 
-
-`validateConfigDetails` **Method**
 
 ```
 interface MqttScoutDetails extends ScoutDriverDetails {
@@ -134,16 +126,7 @@ interface MqttScoutDetails extends ScoutDriverDetails {
 async validateConfigDetails(driverDetails: any): Promise<MqttScoutDetails>{
   ...
 }
-```
-- This method receives `driverDetails` part of the scout configuration.
-- It validates the `driverDetails` against the `MqttScoutDetails` format.
-- If `driverDetails` match the format, it converts them into `MqttScoutDetails` and returns the result.
-- Otherwise, it returns the **default** configuration for MQTTConnection scouting.
 
-
-
-`scoutAddresses` **Method**
-```
 public async scoutAddresses(driverDetails: ScoutDriverDetails): Promise<object>{
   ...
 }
@@ -170,15 +153,15 @@ public async scoutAddresses(driverDetails: ScoutDriverDetails): Promise<object>{
 - It browses through all nodes and namespaces starting from the root folder, recursively checking all child nodes.
 - It skips metadata or structural nodes that does not represent actual values. Those nodes belong to following node classes of [4, 8, 16, 32, 64] where:
   - 0 is Unspecified
-  - 1 is Object 
+  - 1 is Object
   - 2 is Variable
-  - 4 is Method 
+  - 4 is Method
   - 8 is ObjectType
   - 16 is VariableType
   - 32 is ReferenceType
   - 64 is DataType
   - 128 is View
-- It saves the rest of the nodes as discovered addresses. 
+- It saves the rest of the nodes as discovered addresses.
 - It closes the OPC UA connection once the browsing is complete.
 - Finally, it returns the object where OPC UA node addresses are stored as keys and additional node metadata is stored as value objects within `addresses` entry.
 
@@ -217,7 +200,7 @@ export class Scout extends EventEmitter {
 - The Scout class receives the `DeviceConnection` instance `deviceConnection` and a full scout configuration `scoutFullConfig` through its `constructor`.
 - The `constructor` splits the scout configuration into `scoutDetails` and `driverDetails`.
 - The `scoutDetails` part is validated in the `validateScoutConfig` method against the `ScoutDetails` type.
-- The `performScouting` method, when called checks whether the `scoutDetails.isEnabled` is set to `true`. If the `isEnabled` is `true`, the method calls the `scoutAddresses(driverDetails)` on `deviceConnection` and passes the `driverDetails` part of the scout configuration. The validation for `driverDetails` is handled by each `DeviceConnection` subclass depending on the protocol.
+- The `performScouting` method, when called, checks whether the `scoutDetails.isEnabled` is set to `true`. If the `isEnabled` is `true`, the method calls the `scoutAddresses(driverDetails)` on `deviceConnection` and passes the `driverDetails` part of the scout configuration. The validation for `driverDetails` is handled by each `DeviceConnection` subclass depending on the protocol.
 - Once the `scoutAddresses` method returns the list of `addresses`, the `performScouting()` method creates a `scoutResult` object of type `ScoutResult`, containing the discovered `addresses`, `timestamp` and a `success` status.
 - Finally, the `performScouting()` method triggers the **scoutResults** event with the `scoutResult`.
 

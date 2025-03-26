@@ -3,7 +3,7 @@
   -->
 <template>
   <Skeleton v-if="p.loading" v-for="i in 10" class="h-16 rounded-lg mb-2"/>
-  <DataTable v-else :data="p.data" :columns="columns" :filters="[{
+  <DataTable v-else :data="p.data" :default-sort="initialSort" :columns="columns" :filters="[{
         name: 'Name',
         property: 'name',
         options: filterOptions.names,
@@ -46,7 +46,12 @@ export default {
   },
 
   computed: {
-
+    initialSort () {
+      return [{
+        id: 'name',
+        desc: false
+      }]
+    },
     filterOptions () {
       return {
         names: this.p.data.map((p) => p.name).filter((v, i, a) => a.indexOf(v) === i).map((p) => {

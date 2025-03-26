@@ -60,13 +60,10 @@ grants:
     !u Auth.Perm.ReadACL:
       !u Files.Perm.All: true
     !u ConfigDB.Perm.WriteConfig:
-      !u Files.App.Config: true
+      !u Files.App.Config: false
     !u ConfigDB.Perm.ManageObjects:
-      !u Files.Class.File: true
+      !u Files.Class.File: false
 
   !u ACS.Group.Administrator:
     !u Files.Perm.All: null
-    !u Files.Perm.Upload: null
-    !u Files.Perm.Download: null
-    !u Files.Perm.ListStorage: null
 

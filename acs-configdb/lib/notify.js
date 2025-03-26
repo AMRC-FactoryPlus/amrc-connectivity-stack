@@ -60,35 +60,6 @@ function jmp_match (cand, filter) {
     return true;
 }
 
-/* XXX This should be part of service-api */
-function search_filter (filter) {
-    if (filter === undefined)
-        return rx.identity;
-
-    const want = r => r.status < 300 && jmp_match(r.body, filter);
-    return rx.pipe(
-        rxu.withState(imm.Set(), (okids, u) => {
-            if (!u.child) {
-                /* Don't touch no-access updates */
-                if (!u.children)
-                    return [imm.Set(), rx.of(u)];
-                const entries = imm.Seq(u.children).filter(want);
-                return [
-                    entries.keySeq().toSet(),
-                    rx.of({ ...u, children: entries.toJS() }),
-                ];
-            }
-            const child = u.child;
-            const nkids = want(u.response) ? okids.add(child) : okids.delete(child);
-            const nu = nkids.has(child) ? rx.of(u)
-                : okids.has(child)
-                    ? rx.of({ status: 200, child, response: { status: 412 } })
-                : rx.EMPTY;
-            return [nkids, nu];
-        }),
-        rx.mergeAll());
-}
-
 export class CDBNotify {
     constructor (opts) {
         this.auth   = opts.auth;
@@ -198,28 +169,20 @@ export class CDBNotify {
         };
     }
 
-    config_search (session, filter, app) {
-        const ck_acl = this.acl_checker(session, Perm.Read_App, app, true);
+    config_search (session, app) {
+        const acl = this.acl_checker(session, Perm.Read_App, app, true);
 
-        return rxx.rx(
+        const full = () => this.search_full(app);
+        const updates = rxx.rx(
             this.config_updates,
             rx.filter(u => u.app == app),
             rx.map(entry => ({
                 status:     200,
                 child:      entry.object,
                 response:   entry_response(entry),
-            })),
-            /* This will always be replaced with a full update */
-            rx.startWith({ status: 201, child: true }),
-            /* This will send a parent 403 if the ACL check fails */
-            ck_acl,
-            rxu.asyncState(false, async (child_ok, u) => {
-                const rv = u.child && !child_ok
-                    ? await this.search_full(app, u.status)
-                    : u;
-                return [rv.child || rv.children, rv];
-            }),
-            search_filter(filter));
+            })));
+
+        return { acl, full, updates };
     }
 
     /* XXX This is not ideal. There is a race between the update and the

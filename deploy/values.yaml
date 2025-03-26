@@ -361,7 +361,7 @@ grafana:
       enabled: true
       name: Keycloak
       allow_sign_up: true
-      client_id: grafana-oauth
+      client_id: grafana
       client_secret: $__file{/etc/secrets/auth_generic_oauth/client_secret}
       scopes: openid profile email
       auth_url: $__file{/etc/acs-config/auth_url}

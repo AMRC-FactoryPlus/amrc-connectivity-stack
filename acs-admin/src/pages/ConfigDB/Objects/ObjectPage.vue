@@ -28,6 +28,7 @@
         </CardContent>
       </Card>
     </div>
+    <Button class="mt-2" disabled>Add Object of Class</Button>
     <DataTable class="mt-4" :data="isSubclassOf" :default-sort="initialSort" :columns="subclassOfColumns" :filters="[]" @row-click="e => objectClicked(e.original)">
       <template #toolbar-left>
         <div class="flex justify-between items-end flex-grow mr-4">
@@ -39,7 +40,7 @@
     <DataTable class="mt-4" :data="isMemberOf" :default-sort="initialSort" :columns="memberOfColumns" :filters="[]" @row-click="e => objectClicked(e.original)">
       <template #toolbar-left>
         <div class="flex justify-between items-end flex-grow mr-4">
-          <div class="font-semibold">Is object is a direct member of:</div>
+          <div class="font-semibold">Is object is a member of:</div>
           <Button disabled>Add Membership</Button>
         </div>
       </template>
@@ -129,8 +130,24 @@ export default {
       return subclassOf
     },
     isMemberOf () {
-      const memberships = this.r.data.filter(group => group.directMembers.includes(this.object.uuid))
-      return memberships.map(membership => this.obj.data.find(o => o.uuid === membership.uuid))
+      const directMemberships = this.r.data.filter(group => group.directMembers.includes(this.object.uuid)).map(m => m.uuid)
+      const directMembershipObjs = directMemberships.map(membership => {
+        const obj = this.obj.data.find(o => o.uuid === membership)
+        return {
+          ...obj,
+          direct: "Direct"
+        }
+      })
+      // TODO: This is incomplete as group store is not exhaustive list of members
+      const indirectMemberships = this.g.data.filter(group => group.members.includes(this.object.uuid) && !directMemberships.includes(group.uuid)).map(m => m.uuid)
+      const indirectMembershipObjs = indirectMemberships.map(membership => {
+        const obj = this.obj.data.find(o => o.uuid === membership)
+        return {
+          ...obj,
+          direct: "Indirect"
+        }
+      })
+      return directMembershipObjs.concat(indirectMembershipObjs)
     },
     members () {
       const directMembers = this.relationships?.directMembers ?? []

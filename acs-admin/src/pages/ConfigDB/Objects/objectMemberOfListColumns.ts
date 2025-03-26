@@ -18,6 +18,7 @@ export interface ApplicationMapping {
         uuid: string
         name: string
     }
+    direct: string
 }
 
 export const memberOfColumns: ColumnDef<ApplicationMapping>[] = [{
@@ -50,5 +51,44 @@ export const memberOfColumns: ColumnDef<ApplicationMapping>[] = [{
     },
     filterFn: (row, id, value) => {
         return value.includes(row.getValue(id))
+    },
+}, {
+    accessorKey: 'direct',
+    accessorFn: (item) => item.direct,
+    header: ({column}) => h(DataTableColumnHeader, {
+        column,
+        title: 'Direct'
+    }),
+    cell: ({row}) => {
+        return h('div', {class: 'max-w-[500px] truncate font-medium'}, row.getValue('direct'))
+    },
+    filterFn: (row, id, value) => {
+        return value.includes(row.getValue(id))
+    },
+},{
+    id: 'actions',
+    cell: ({row}) => {
+        return h('div', {onClick: async (e) => {
+                e.stopPropagation()
+                useDialog({
+                    title: 'Remove Classification?',
+                    message: `Are you sure you want to remove the classification of ${row.getValue('name')}`,
+                    confirmText: 'Remove',
+                    onConfirm: async () => {
+                        try {
+                            // TODO: Implement
+                            // await useServiceClientStore().client.Auth.delete_principal(row.getValue('uuid'))
+                            // toast.success(`${row.getValue('uuid')} has been deleted`)
+                            // useServiceClientStore().client.Fetch.cache = "reload"
+                            // await usePrincipalStore().fetch()
+                            // useServiceClientStore().client.Fetch.cache = "default"
+                        } catch (err) {
+                            toast.error(`Unable to delete ${row.getValue('uuid')}`)
+                        }
+                    }
+                });
+            }, class: ''}, [
+            h('i', {class: 'fa-solid fa-fw fa-trash text-red-500'})
+        ])
     },
 }]

@@ -245,6 +245,14 @@ export class CDBNotify extends Notify {
                 path:       "v2/class/:class/subclass/",
                 handler:    class_watch.bind(null, "all_subclass"),
             }),
+            new WatchFilter({
+                path:       "v2/class/:class/direct/member/",
+                handler:    class_watch.bind(null, "membership"),
+            }),
+            new WatchFilter({
+                path:       "v2/class/:class/direct/subclass/",
+                handler:    class_watch.bind(null, "subclass"),
+            }),
         ];
     }
     

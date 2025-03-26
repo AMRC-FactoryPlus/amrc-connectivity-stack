@@ -5,27 +5,24 @@
   <Skeleton v-if="loading" v-for="i in 10" class="h-16 rounded-lg mb-2"/>
   <div v-else>
     <div>
-      <RouterLink to="./">{{application.name}}</RouterLink> - {{object.name}}
+      <RouterLink to="./">{{application?.name}}</RouterLink> - {{object?.name}}
     </div>
-    <textarea>
-      {{data}}
-    </textarea>
+    <MonacoEditor v-if="code" class="editor h-[40em] w-full" v-model="code" language="javascript" :value="code" />
   </div>
 </template>
 
 <script>
 import { Skeleton } from '@components/ui/skeleton'
-import DataTable from '@components/ui/data-table/DataTable.vue'
 import { columns } from './applicationListColumns.ts'
 import {Card} from "@components/ui/card/index.js";
 import {useServiceClientStore} from "@store/serviceClientStore.js";
 import {useRoute, useRouter} from "vue-router";
 import {serviceClientReady} from "@store/useServiceClientReady.js";
-import * as rxu from "@amrc-factoryplus/rx-util";
-import * as rx from "rxjs";
-import * as imm from "immutable";
 import {useApplicationStore} from "@store/useApplicationStore.js";
 import {useObjectStore} from "@store/useObjectStore.js";
+import MonacoEditor from "vue-monaco";
+import { h } from 'vue'
+MonacoEditor.render = () => h('div')
 
 export default {
   emits: ['rowClick'],
@@ -43,6 +40,7 @@ export default {
 
   data() {
     return {
+      code: null,
       data: [],
       loading: false,
       rxsub: null,
@@ -52,7 +50,7 @@ export default {
   components: {
     Card,
     Skeleton,
-    DataTable,
+    MonacoEditor,
   },
 
   computed: {
@@ -81,6 +79,7 @@ export default {
       this.rxsub = object.subscribe(aObj => {
         console.log("OBJ UPDATE: %o", aObj);
         this.data = aObj;
+        this.code = JSON.stringify(aObj);
         this.loading = false;
       });
     },

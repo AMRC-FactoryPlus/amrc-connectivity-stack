@@ -78,6 +78,7 @@ import {useRoute, useRouter} from "vue-router";
 import {useDirectRelationshipStore} from "@store/useDirectRelationshipStore.js";
 import {Button} from "@components/ui/button/index.js";
 import Copyable from "@components/Copyable.vue";
+import {useMemberStore} from "@store/useMemberStore.js";
 
 export default {
   emits: ['rowClick'],
@@ -91,6 +92,7 @@ export default {
       obj: useObjectStore(),
       g: useGroupStore(),
       r: useDirectRelationshipStore(),
+      m: useMemberStore(),
       route: useRoute(),
       router: useRouter(),
     }
@@ -139,7 +141,8 @@ export default {
         }
       })
       // TODO: This is incomplete as group store is not exhaustive list of members
-      const indirectMemberships = this.g.data.filter(group => group.members.includes(this.object.uuid) && !directMemberships.includes(group.uuid)).map(m => m.uuid)
+      // We can create a group store
+      const indirectMemberships = this.m.data.filter(group => group.members.includes(this.object.uuid) && !directMemberships.includes(group.uuid)).map(m => m.uuid)
       const indirectMembershipObjs = indirectMemberships.map(membership => {
         const obj = this.obj.data.find(o => o.uuid === membership)
         return {
@@ -158,7 +161,8 @@ export default {
           direct: "Direct"
         }
       })
-      const indirectMembers = this.g.data.find(g => g.uuid === this.object.uuid)?.members.filter(mUUID => !directMembers.includes(mUUID)) ?? []
+      // TODO: This can be refactored to subscribe to the current member entries within this component, rather than going to the group store
+      const indirectMembers = this.m.data.find(g => g.uuid === this.object.uuid)?.members.filter(mUUID => !directMembers.includes(mUUID)) ?? []
       const imObjects = indirectMembers.map(mUUID => {
         const obj = this.obj.data.find(o => o.uuid === mUUID)
         return {
@@ -192,6 +196,7 @@ export default {
   async mounted () {
     this.obj.start()
     this.g.start()
+    this.m.start()
 
     this.r.fetch()
   },
@@ -199,6 +204,7 @@ export default {
   unmounted () {
     this.obj.stop()
     this.g.stop()
+    this.m.stop()
   },
 }
 </script>

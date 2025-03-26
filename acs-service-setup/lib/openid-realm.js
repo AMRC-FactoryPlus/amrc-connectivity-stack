@@ -175,7 +175,7 @@ class RealmSetup {
           await this.get_initial_access_token(this.refresh_token);
           await this.create_client(client_representation, true);
         } else if (status == 503) {
-          await setTimeout(milliseconds);
+          await setTimeout(10000);
           await this.create_client(client_representation, false);
         } else {
           const error = await response.text();
@@ -229,7 +229,7 @@ class RealmSetup {
 
         return [data.access_token, data.refresh_token];
       } else if (response.status == 503) {
-        await setTimeout(milliseconds);
+        await setTimeout(10000);
         this.get_initial_access_token();
       } else {
         const status = response.status;

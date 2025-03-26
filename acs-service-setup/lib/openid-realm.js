@@ -2,6 +2,7 @@ import crypto from "crypto";
 import fs from "fs/promises";
 import path from "path";
 import { URLSearchParams } from "url";
+import { setTimeout } from "timers/promises";
 
 /**
  * Create the startup OpenID realm `factory_plus`.
@@ -174,7 +175,7 @@ class RealmSetup {
           await this.get_initial_access_token(this.refresh_token);
           await this.create_client(client_representation, true);
         } else if (status == 503) {
-          await this.wait(10000);
+          await setTimeout(milliseconds);
           await this.create_client(client_representation, false);
         } else {
           const error = await response.text();
@@ -228,7 +229,7 @@ class RealmSetup {
 
         return [data.access_token, data.refresh_token];
       } else if (response.status == 503) {
-        await this.wait(10000);
+        await setTimeout(milliseconds);
         this.get_initial_access_token();
       } else {
         const status = response.status;
@@ -240,9 +241,5 @@ class RealmSetup {
         `Couldn't get an initial access token for realm setup: ${error}`,
       );
     }
-  }
-
-  async wait(milliseconds) {
-    return new Promise((resolve) => setTimeout(resolve, milliseconds));
   }
 }

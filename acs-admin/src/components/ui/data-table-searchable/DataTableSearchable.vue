@@ -10,12 +10,6 @@ import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow,} from '@/
 import {valueUpdater} from '@/lib/utils'
 import {ref} from 'vue'
 
-const sorting = ref<SortingState>([])
-const columnFilters = ref<ColumnFiltersState>([])
-const columnVisibility = ref<VisibilityState>({})
-const rowSelection = ref({})
-const expanded = ref<ExpandedState>({})
-
 interface DataTableProps<T> {
     columns: ColumnDef<T, any>[]
     data: T[],
@@ -24,15 +18,32 @@ interface DataTableProps<T> {
     filters: { name: string; property: string }[]
     defaultSort?: SortingState,
     selectedObjects: [],
-    empty?: string
-}
-
-// Write a method to toggle the expanded state of a row
-const toggle = (row: any) => {
-    row.toggleSelected()
+    empty?: string,
+    clickable?: boolean,
 }
 
 const props = defineProps<DataTableProps<any>>()
+
+const sorting = ref<SortingState>(props.defaultSort || [])
+const columnFilters = ref<ColumnFiltersState>([])
+const columnVisibility = ref<VisibilityState>({})
+const rowSelection = ref({})
+const expanded = ref<ExpandedState>({})
+
+// Write a method to toggle the expanded state of a row
+const toggle = (row: any) => {
+  row.toggleSelected()
+}
+
+const emit = defineEmits(['row-click'])
+
+const rowClick = function(row: any) {
+  if (props.clickable) {
+    emit('row-click', row)
+  } else {
+    toggle(row)
+  }
+}
 
 const table = useVueTable({
     get data() {
@@ -105,7 +116,7 @@ const limitHeight = props.limitHeight
         <TableBody>
           <template v-if="table.getRowModel().rows?.length">
             <template v-for="row in table.getRowModel().rows" :key="row.id">
-              <TableRow class="cursor-pointer" :data-state="row.getIsSelected() && 'selected'" @click="() => {toggle(row)}">
+              <TableRow class="cursor-pointer" :data-state="row.getIsSelected() && 'selected'" @click="() => {rowClick(row)}">
                 <TableCell v-for="cell in row.getVisibleCells()" :key="cell.id">
                   <FlexRender :render="cell.column.columnDef.cell" :props="cell.getContext()"/>
                 </TableCell>

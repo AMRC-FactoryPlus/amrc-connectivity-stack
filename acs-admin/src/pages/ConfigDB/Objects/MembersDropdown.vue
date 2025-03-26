@@ -4,7 +4,7 @@
 
 <script setup lang="ts">
 import type {Row} from '@tanstack/vue-table'
-import type {ObjectMembership} from './objectMemberOfListColumns'
+import type {MembersMapping} from './objectMembersListColumns'
 
 import {Button} from '@/components/ui/button'
 import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuGroup} from '@/components/ui/dropdown-menu'
@@ -16,7 +16,7 @@ import {useServiceClientStore} from '@store/serviceClientStore.js'
 // const groupMembershipUpdated = inject('groupMembershipUpdated')
 
 interface DataTableRowActionsProps {
-    row: Row<ObjectMembership>
+    row: Row<MembersMapping>
 }
 
 const s = useServiceClientStore()

@@ -7,7 +7,7 @@ import {h} from 'vue'
 import DataTableColumnHeader from '@/components/ui/data-table/DataTableColumnHeader.vue'
 import MemberOfDropdown from "@pages/ConfigDB/Objects/MemberOfDropdown.vue";
 
-export interface ObjectMembership {
+export interface MemberOfMapping {
     uuid: string
     name: string
     class: {
@@ -25,7 +25,7 @@ export interface ObjectMembership {
     }
 }
 
-export const memberOfColumns: ColumnDef<ObjectMembership>[] = [{
+export const memberOfColumns: ColumnDef<MemberOfMapping>[] = [{
     accessorKey: 'name',
     header: ({column}) => h(DataTableColumnHeader, {
         column,

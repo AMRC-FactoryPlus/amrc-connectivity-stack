@@ -7,7 +7,7 @@ import {h} from 'vue'
 import DataTableColumnHeader from '@/components/ui/data-table/DataTableColumnHeader.vue'
 import SubclassesDropdown from "@pages/ConfigDB/Objects/SubclassesDropdown.vue";
 
-export interface ApplicationMapping {
+export interface SubclassMapping {
     uuid: string
     name: string
     class: {
@@ -16,7 +16,7 @@ export interface ApplicationMapping {
     }
 }
 
-export const subclassColumns: ColumnDef<ApplicationMapping>[] = [{
+export const subclassColumns: ColumnDef<SubclassMapping>[] = [{
     accessorKey: 'name',
     header: ({column}) => h(DataTableColumnHeader, {
         column,

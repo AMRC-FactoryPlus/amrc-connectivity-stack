@@ -58,7 +58,7 @@ const sidebarNavItems: Item[] = [
             <Button
                 v-if="!item.auth || (item.auth && useServiceClientStore().loaded)"
                 :key="item.title"
-                :variant="$route.path === item.href ? 'default' : 'ghost'"
+                :variant="$route.path === item.href || $route.meta.name === item.title ? 'default' : 'ghost'"
                 class="w-full text-left justify-start"
             >
               <div class="flex items-center justify-center gap-2">

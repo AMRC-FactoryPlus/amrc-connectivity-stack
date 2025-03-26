@@ -68,11 +68,6 @@ export const useGroupStore = defineStore('group', {
       this.rxsub = null;
     },
 
-    async getGroup (uuid) {
-      const grps = rx.firstValueFrom(this.groups);
-
-    },
-
     /* This is called in lots of places but now does nothing */
     fetch () {},
 
@@ -82,14 +77,6 @@ export const useGroupStore = defineStore('group', {
       while (this.loading) {
         await new Promise(resolve => setTimeout(resolve, 100));
       }
-    },
-
-    /* XXX This could be done better with rx.firstValueFrom */
-    async getGroup(uuid) {
-      /* This will now not return until we've got an update */
-      await this.storeReady()
-
-      return this.data.find(item => item.uuid === uuid);
     },
   },
 })

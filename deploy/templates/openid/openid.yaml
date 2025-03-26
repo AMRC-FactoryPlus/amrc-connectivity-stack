@@ -83,19 +83,6 @@ spec:
 apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey
 metadata:
-  name: sv1openid
-  namespace: {{ .Release.Namespace }}
-spec:
-  type: Random
-  principal: sv1openid@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
-  secret: openid-keytabs/client
-
-
----
-
-apiVersion: factoryplus.app.amrc.co.uk/v1
-kind: KerberosKey
-metadata:
   name: http.openid
   namespace: {{ .Release.Namespace }}
 spec:

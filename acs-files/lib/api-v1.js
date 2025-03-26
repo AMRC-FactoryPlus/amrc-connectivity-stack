@@ -113,8 +113,7 @@ export class APIv1 {
       file_uuid: created_uuid,
       date_uploaded: curr_date,
       user_who_uploaded: req.auth,
-      file_size: `${stats.size} bytes`,
-      application_uuid: App.Config,
+      file_size: stats.size,
       original_file_name: original_file_name,
     };
 

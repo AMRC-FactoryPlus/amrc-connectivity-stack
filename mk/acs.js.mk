@@ -7,7 +7,6 @@ base_image?=	ghcr.io/amrc-factoryplus/acs-base-js-build
 base_version?=	${git.tag}
 
 build_args+=	--build-arg base_version="${base_version}"
-build_args+=	--build-context lib=../lib
 
 ifdef acs_npm
 build_args+=	--build-arg acs_npm="${acs_npm}"

@@ -3,7 +3,7 @@
   -->
 <template>
   <Skeleton v-if="p.loading" v-for="i in 10" class="h-16 rounded-lg mb-2"/>
-  <DataTable v-else :data="p.data" :columns="columns" :filters="filters" @row-click="e => $emit('rowClick', e)"/>
+  <DataTable v-else :data="p.data" :default-sort="initialSort" :columns="columns" :filters="filters" @row-click="e => $emit('rowClick', e)"/>
 </template>
 
 <script>
@@ -30,7 +30,12 @@ export default {
   },
 
   computed: {
-
+    initialSort () {
+      return [{
+        id: 'name',
+        desc: false
+      }]
+    },
     filters () {
       return [
         {

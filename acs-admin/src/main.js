@@ -15,6 +15,7 @@ import Login from "@pages/Login.vue";
 import ConfigDB from "@pages/ConfigDB/ConfigDB.vue";
 import ApplicationEditor from "@pages/ConfigDB/Applications/ApplicationEditor.vue";
 import ApplicationObjectEditor from "@pages/ConfigDB/Applications/ApplicationObjectEditor.vue";
+import ObjectPage from "@pages/ConfigDB/Objects/ObjectPage.vue";
 
 const routes = [
   {
@@ -79,6 +80,14 @@ const routes = [
   {
     path: '/configdb/applications/:application/:object',
     component: ApplicationObjectEditor,
+    meta: {
+      name: 'ConfigDB',
+      icon: 'gears'
+    }
+  },
+  {
+    path: '/configdb/objects/:object',
+    component: ObjectPage,
     meta: {
       name: 'ConfigDB',
       icon: 'gears'

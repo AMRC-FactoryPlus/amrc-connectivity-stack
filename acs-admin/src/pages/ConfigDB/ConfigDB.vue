@@ -19,14 +19,14 @@
         </TabsList>
         <div v-if="!obj.ready || app.loading"><i class="fa-solid fa-circle-notch animate-spin"></i></div>
       </div>
-      <Button v-if="activeTab==='applications'">Add Application</Button>
-      <Button v-if="activeTab==='objects'">Add Object</Button>
+      <Button disabled v-if="activeTab==='applications'">Add Application</Button>
+      <Button disabled v-if="activeTab==='objects'">Add Object</Button>
     </div>
     <TabsContent value="applications">
       <ApplicationList @rowClick="e => objectClicked(e.original)"></ApplicationList>
     </TabsContent>
     <TabsContent value="objects">
-      Objects
+      <ObjectList @rowClick="e => objectClicked(e.original)"></ObjectList>
     </TabsContent>
     <TabsContent value="json">
       JSON
@@ -39,18 +39,14 @@ import { useServiceClientStore } from '@/store/serviceClientStore.js'
 import { Sheet } from '@/components/ui/sheet'
 import { Button } from '@components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { defineAsyncComponent } from 'vue'
-import { usePrincipalStore } from '@store/usePrincipalStore.js'
-import { useGroupStore } from '@store/useGroupStore.js'
 import PermissionList from '@pages/AccessControl/Permissions/PermissionList.vue'
-import { usePermissionStore } from '@store/usePermissionStore.js'
 import { UUIDs } from '@amrc-factoryplus/service-client'
 import LinkUserDialog from '@pages/AccessControl/LinkUserDialog.vue'
-import {useGrantStore} from "@store/useGrantStore.js";
 import {useRoute, useRouter} from "vue-router";
 import {serviceClientReady} from "@store/useServiceClientReady.js";
 import {useObjectStore} from "@store/useObjectStore.js";
 import ApplicationList from "@pages/ConfigDB/Applications/ApplicationList.vue";
+import ObjectList from "@pages/ConfigDB/Objects/ObjectList.vue";
 import PrincipalList from "@pages/AccessControl/Principals/PrincipalList.vue";
 import {useApplicationStore} from "@store/useApplicationStore.js";
 
@@ -68,6 +64,7 @@ export default {
   components: {
     PrincipalList,
     ApplicationList,
+    ObjectList,
     LinkUserDialog,
     PermissionList,
     Sheet,

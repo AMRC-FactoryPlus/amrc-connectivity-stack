@@ -1,5 +1,5 @@
 import express from 'express';
-import { App, Class, Perm } from './constants.js';
+import { App, Class, Perm, Special } from './constants.js';
 import { promises as fs } from 'fs';
 import path from 'path';
 
@@ -18,13 +18,12 @@ export class APIv1 {
 
   setup_routes() {
     let api = this.routes;
-
-    api.get('/:uuid', this.getFileByUuid.bind(this));
-    api.get('/', this.listStorage.bind(this));
-    api.post('/', this.postFile.bind(this));
+    api.get('/:uuid', this.get_file_by_uuid.bind(this));
+    api.get('/', this.list_storage.bind(this));
+    api.post('/', this.post_file.bind(this));
   }
 
-  async listStorage(req, res) {
+  async list_storage(req, res) {
     const ok = await this.auth.check_acl(
       req.auth,
       Perm.ListStorage,
@@ -42,7 +41,7 @@ export class APIv1 {
     return res.json({ files });
   }
 
-  async getFileByUuid(req, res, next) {
+  async get_file_by_uuid(req, res, next) {
     const file_uuid = req.params.uuid;
 
     if (!file_uuid)
@@ -65,7 +64,7 @@ export class APIv1 {
         .status(403)
         .json({ message: 'FAILED: No Download permission' });
 
-    const filePath = path.resolve(this.uploadPath, file_uuid);
+    const file_path = path.resolve(this.uploadPath, file_uuid);
 
     const options = {
       headers: {
@@ -75,7 +74,7 @@ export class APIv1 {
       },
     };
 
-    return res.sendFile(filePath, options, function (err) {
+    return res.sendFile(file_path, options, function (err) {
       if (err) {
         if (err.code === 'ENOENT') {
           return res.status(404).json({ message: 'File not found' });
@@ -85,7 +84,7 @@ export class APIv1 {
     });
   }
 
-  async postFile(req, res) {
+  async post_file(req, res) {
     const ok = await this.auth.check_acl(
       req.auth,
       Perm.Upload,
@@ -99,7 +98,6 @@ export class APIv1 {
 
     const created_uuid = await this.configDb.create_object(Class.File);
 
-    // Ensure uploadPath exists
     await fs.mkdir(this.uploadPath, { recursive: true });
 
     const file_path = path.resolve(this.uploadPath, created_uuid);
@@ -108,20 +106,20 @@ export class APIv1 {
 
     const stats = await fs.stat(file_path);
 
-    const currDate = new Date();
-    const original_file_name = req.headers['x-filename'] || null;
+    const curr_date = new Date();
+    const original_file_name = req.headers['original-filename'] || null;
 
-    let fileJSON = {
+    let file_JSON = {
       file_uuid: created_uuid,
-      date_uploaded: currDate,
+      date_uploaded: curr_date,
       user_who_uploaded: req.auth,
-      file_size: stats.size,
+      file_size: `${stats.size} bytes`,
       application_uuid: App.Config,
       original_file_name: original_file_name,
     };
 
     // Store the file config under App 'Files Configuration'
-    await this.configDb.put_config(App.Config, created_uuid, fileJSON);
+    await this.configDb.put_config(App.Config, created_uuid, file_JSON);
 
     return res.status(201).json({
       message: 'OK. File uploaded to storage and its metadata to ConfigDB.',

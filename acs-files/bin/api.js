@@ -29,6 +29,7 @@ const api = await new WebAPI({
   http_port: env.PORT,
   max_age: env.CACHE_MAX_AGE,
   body_limit: env.BODY_LIMIT,
+  body_type: 'raw',
 
   routes: routes({
     auth: fplus.Auth,

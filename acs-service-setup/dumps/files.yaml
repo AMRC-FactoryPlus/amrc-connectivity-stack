@@ -5,18 +5,18 @@ version: 2
 objects:
   !u Auth.Class.ServiceRole:
     !u Files.Requirement.ServiceAccount:
-      name: "Files Service server"
+      name: "Files Service Server"
       subclassOf:
         - !u Auth.Class.CentralService
 
   !u Auth.Class.ServicePerms:
     !u Files.Perm.All:
-      name: "Files permission"
+      name: "Files Permission"
       subclassOf:
         - !u UUIDs.Class.Permission
 
   !u UUIDs.Class.Service:
-    !u Files.Service.Files: { name: "Files hosting service" }
+    !u Files.Service.Files: { name: "Files Hosting" }
 
   !u UUIDs.Class.App:
     !u Files.App.Config: { name: "Files Configuration" }
@@ -24,6 +24,7 @@ objects:
   !u Files.Perm.All:
     !u Files.Perm.Upload: { name: "Upload" }
     !u Files.Perm.Download: { name: "Download" }
+    !u Files.Perm.ListStorage: { name: "List Storage" }
 
   !u ConfigDB.Class.R2Class:
     !u Files.Class.FileGroup: {name: "File Group"}
@@ -59,8 +60,10 @@ grants:
     !u Auth.Perm.ReadACL:
       !u Files.Perm.All: true
     !u ConfigDB.Perm.WriteConfig:
-      !u Files.App.Config: true
+      !u Files.App.Config: false
     !u ConfigDB.Perm.ManageObjects:
-      !u Files.Class.File: true
+      !u Files.Class.File: false
+
   !u ACS.Group.Administrator:
     !u Files.Perm.All: null
+

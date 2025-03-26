@@ -24,6 +24,7 @@ class RealmSetup {
     this.realm = "factory_plus";
     this.base_url = service_setup.acs_config.domain;
     this.secure = service_setup.acs_config.secure;
+    this.acs_realm = service_setup.acs_config.realm;
     this.access_token = "";
     this.refresh_token = "";
     this.config = service_setup.config;
@@ -53,14 +54,14 @@ class RealmSetup {
             subComponents: {},
             config: {
               serverPrincipal: [
-                `HTTP/openid.${this.base_url}@${this.base_url.toUpperCase()}`,
+                `HTTP/openid.${this.base_url}@${this.acs_realm}`,
               ],
               allowPasswordAuthentication: ["false"],
               debug: ["true"],
               keyTab: ["/etc/keytabs/server"],
               cachePolicy: ["DEFAULT"],
               updateProfileFirstLogin: ["false"],
-              kerberosRealm: [this.base_url.toUpperCase()],
+              kerberosRealm: [this.acs_realm],
               enabled: ["true"],
             },
           },

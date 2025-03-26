@@ -3,12 +3,20 @@
   -->
 <template>
   <Skeleton v-if="app.loading" v-for="i in 10" class="h-16 rounded-lg mb-2"/>
-  <DataTableSearchable v-else :data="app.data" :default-sort="initialSort" :columns="columns" :selected-objects="[]" :clickable="true" :search-key="'name'" :limit-height="false" :filters="[]" @row-click="e => $emit('rowClick', e)"/>
+  <DataTableSearchable v-else
+                       :data="app.data"
+                       :default-sort="initialSort"
+                       :columns="columns"
+                       :filters="[]"
+                       :selected-objects="[]"
+                       :clickable="true"
+                       :search-key="'name'"
+                       :limit-height="false"
+                       @row-click="e => $emit('rowClick', e)"/>
 </template>
 
 <script>
 import { Skeleton } from '@components/ui/skeleton'
-import DataTable from '@components/ui/data-table/DataTable.vue'
 import { columns } from './applicationListColumns.ts'
 import {Card} from "@components/ui/card/index.js";
 import {useApplicationStore} from "@store/useApplicationStore.js";
@@ -28,7 +36,6 @@ export default {
     DataTableSearchable,
     Card,
     Skeleton,
-    DataTable,
   },
 
   computed: {

@@ -13,7 +13,7 @@ import {ref} from 'vue'
 interface DataTableProps<T> {
     columns: ColumnDef<T, any>[]
     data: T[],
-    searchKey: string,
+    searchKey?: string,
     limitHeight: boolean,
     filters: { name: string; property: string }[]
     defaultSort?: SortingState,
@@ -94,12 +94,17 @@ const limitHeight = props.limitHeight
 <template>
   <div class="w-full">
     <div class="flex gap-2 items-center justify-between py-4">
-      <Input
-          class="max-w-sm"
-          placeholder="Filter..."
-          :model-value="table.getColumn(props.searchKey)?.getFilterValue() as string"
-          @update:model-value="table.getColumn(props.searchKey)?.setFilterValue($event)"
-      />
+      <div class="flex gap-2 items-center">
+        <Input
+            class="max-w-sm"
+            placeholder="Filter..."
+            :model-value="props.searchKey ? table.getColumn(props.searchKey)?.getFilterValue() as string : table.getState().globalFilter"
+            @update:model-value="props.searchKey ? table.getColumn(props.searchKey)?.setFilterValue($event) : table.setGlobalFilter(String($event))"
+        />
+        <div class="text-slate-500 whitespace-nowrap">
+          Showing {{table.getFilteredRowModel().rows.length}}
+        </div>
+      </div>
       <div>
         <slot :selected-objects="table.getSelectedRowModel().rows.map(r => {return {...r.original, metaRowId: r.id}})"></slot>
       </div>

@@ -3,15 +3,24 @@
   -->
 <template>
   <Skeleton v-if="!obj.ready" v-for="i in 10" class="h-16 rounded-lg mb-2"/>
-  <DataTable v-else :data="obj.data" :default-sort="initialSort" :columns="columns" :filters="[]" @row-click="e => $emit('rowClick', e)"/>
+  <DataTableSearchable v-else
+                       :data="obj.data"
+                       :default-sort="initialSort"
+                       :columns="columns"
+                       :filters="[]"
+                       :selected-objects="[]"
+                       :clickable="true"
+                       :search-key="null"
+                       :limit-height="false"
+                       @row-click="e => $emit('rowClick', e)"/>
 </template>
 
 <script>
 import { Skeleton } from '@components/ui/skeleton'
-import DataTable from '@components/ui/data-table/DataTable.vue'
 import { columns } from './objectListColumns.ts'
 import {Card} from "@components/ui/card/index.js";
 import {useObjectStore} from "@store/useObjectStore.js";
+import DataTableSearchable from "@components/ui/data-table-searchable/DataTableSearchable.vue";
 
 export default {
   emits: ['rowClick'],
@@ -26,7 +35,7 @@ export default {
   components: {
     Card,
     Skeleton,
-    DataTable,
+    DataTableSearchable,
   },
 
   computed: {

@@ -150,7 +150,7 @@ export default {
           direct: "Indirect"
         }
       })
-      return directMembershipObjs.concat(indirectMembershipObjs)
+      return directMembershipObjs.concat(indirectMembershipObjs).map(o => ({...o, originalObject: this.object}))
     },
     members () {
       const directMembers = this.relationships?.directMembers ?? []

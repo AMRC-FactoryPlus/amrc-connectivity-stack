@@ -10,8 +10,9 @@ import {useDialog} from '@/composables/useDialog';
 
 import DataTableColumnHeader from '@/components/ui/data-table/DataTableColumnHeader.vue'
 import {toast} from "vue-sonner";
+import MemberOfDropdown from "@pages/ConfigDB/Objects/MemberOfDropdown.vue";
 
-export interface ApplicationMapping {
+export interface ObjectMembership {
     uuid: string
     name: string
     class: {
@@ -19,9 +20,17 @@ export interface ApplicationMapping {
         name: string
     }
     direct: string
+    originalObject: {
+        uuid: string
+        name: string
+        class: {
+            uuid: string
+            name: string
+        }
+    }
 }
 
-export const memberOfColumns: ColumnDef<ApplicationMapping>[] = [{
+export const memberOfColumns: ColumnDef<ObjectMembership>[] = [{
     accessorKey: 'name',
     header: ({column}) => h(DataTableColumnHeader, {
         column,
@@ -45,7 +54,7 @@ export const memberOfColumns: ColumnDef<ApplicationMapping>[] = [{
     }),
     cell: ({row}) => {
         return h('div', {class: 'max-w-[500px] truncate'}, [
-            h('div', {class: 'max-w-[500px] truncate font-medium'}, row.getValue('class')),
+            h('div', {class: 'max-w-[500px] truncate'}, row.getValue('class')),
             h('div', {class: 'max-w-[500px] truncate text-gray-400'}, row.original.class?.uuid ?? "UNKNOWN")
         ])
     },
@@ -65,30 +74,8 @@ export const memberOfColumns: ColumnDef<ApplicationMapping>[] = [{
     filterFn: (row, id, value) => {
         return value.includes(row.getValue(id))
     },
-},{
+},
+{
     id: 'actions',
-    cell: ({row}) => {
-        return h('div', {onClick: async (e) => {
-                e.stopPropagation()
-                useDialog({
-                    title: 'Remove Classification?',
-                    message: `Are you sure you want to remove the classification of ${row.getValue('name')}`,
-                    confirmText: 'Remove',
-                    onConfirm: async () => {
-                        try {
-                            // TODO: Implement
-                            // await useServiceClientStore().client.Auth.delete_principal(row.getValue('uuid'))
-                            // toast.success(`${row.getValue('uuid')} has been deleted`)
-                            // useServiceClientStore().client.Fetch.cache = "reload"
-                            // await usePrincipalStore().fetch()
-                            // useServiceClientStore().client.Fetch.cache = "default"
-                        } catch (err) {
-                            toast.error(`Unable to delete ${row.getValue('uuid')}`)
-                        }
-                    }
-                });
-            }, class: ''}, [
-            h('i', {class: 'fa-solid fa-fw fa-trash text-red-500'})
-        ])
-    },
+    cell: ({row}) => h(MemberOfDropdown, {row}),
 }]

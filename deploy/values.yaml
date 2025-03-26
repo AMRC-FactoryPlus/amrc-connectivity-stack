@@ -375,11 +375,14 @@ grafana:
       readOnly: true
       optional: false
   extraSecretMounts:
-    - name: keycloak-grafana-client-mount
-      secretName: keycloak-grafana-client
+    - name: keycloak-client-mount
+      secretName: keycloak-clients
       defaultMode: 0440
       mountPath: /etc/secrets/auth_generic_oauth
       readOnly: true
+      items:
+        - key: grafana
+          path: grafana
   sidecar:
     datasources:
       enabled: true

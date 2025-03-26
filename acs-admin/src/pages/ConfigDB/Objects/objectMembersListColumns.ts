@@ -4,12 +4,8 @@
 
 import type {ColumnDef} from '@tanstack/vue-table'
 import {h} from 'vue'
-import {useServiceClientStore} from "@store/serviceClientStore.js";
-import {usePrincipalStore} from "@store/usePrincipalStore.js"
-import {useDialog} from '@/composables/useDialog';
-
+import MembersDropdown from "@pages/ConfigDB/Objects/MembersDropdown.vue";
 import DataTableColumnHeader from '@/components/ui/data-table/DataTableColumnHeader.vue'
-import {toast} from "vue-sonner";
 
 export interface ApplicationMapping {
     uuid: string
@@ -65,4 +61,8 @@ export const membersColumns: ColumnDef<ApplicationMapping>[] = [{
     filterFn: (row, id, value) => {
         return value.includes(row.getValue(id))
     },
-}]
+},
+    {
+        id: 'actions',
+        cell: ({row}) => h(MembersDropdown, {row}),
+    }]

@@ -22,8 +22,6 @@ export const useMemberStore = defineStore('members', {
       // Wait until the store is ready before attempting to fetch data
       await serviceClientReady();
 
-      console.log("MEMber starter")
-
       const cdb = useServiceClientStore().client.ConfigDB;
       const objs = useObjectStore().maps;
 
@@ -34,7 +32,6 @@ export const useMemberStore = defineStore('members', {
           objList.filter(o => o.rank > 0).keySeq().toArray()
         ),
         cdb.expand_members(),
-        rx.tap(o => console.log("expand_members", o)),
         rx.map(m => m.entrySeq().map(([uuid, members]) => ({uuid, members: members})).toJS())
       );
 

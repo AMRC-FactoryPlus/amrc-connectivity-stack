@@ -4,12 +4,8 @@
 
 import type {ColumnDef} from '@tanstack/vue-table'
 import {h} from 'vue'
-import {useServiceClientStore} from "@store/serviceClientStore.js";
-import {usePrincipalStore} from "@store/usePrincipalStore.js"
-import {useDialog} from '@/composables/useDialog';
-
 import DataTableColumnHeader from '@/components/ui/data-table/DataTableColumnHeader.vue'
-import {toast} from "vue-sonner";
+import SubclassesDropdown from "@pages/ConfigDB/Objects/SubclassesDropdown.vue";
 
 export interface ApplicationMapping {
     uuid: string
@@ -51,4 +47,8 @@ export const subclassColumns: ColumnDef<ApplicationMapping>[] = [{
     filterFn: (row, id, value) => {
         return value.includes(row.getValue(id))
     },
+},
+{
+    id: 'actions',
+    cell: ({row}) => h(SubclassesDropdown, {row}),
 }]

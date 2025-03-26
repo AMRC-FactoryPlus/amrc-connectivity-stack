@@ -28,30 +28,10 @@ function copy(id: string) {
     toast.success('UUID copied to clipboard')
 }
 
-function handlePrimaryClass() {
-  useDialog({
-    title: 'Change Primary Class?',
-    message: `Are you sure you want to change the primary class of ${props.row.original.originalObject.name} from ${props.row.original.originalObject.class.name} to ${props.row.original.name}`,
-    confirmText: 'Change',
-    onConfirm: async () => {
-      try {
-        // TODO: Implement
-        // await useServiceClientStore().client.Auth.delete_principal(row.getValue('uuid'))
-        // toast.success(`${row.getValue('uuid')} has been deleted`)
-        // useServiceClientStore().client.Fetch.cache = "reload"
-        // await usePrincipalStore().fetch()
-        // useServiceClientStore().client.Fetch.cache = "default"
-      } catch (err) {
-        toast.error(`Unable to delete ${props.row.original.uuid}`)
-      }
-    }
-  });
-}
-
 function handleDelete() {
   useDialog({
-    title: 'Remove Membership?',
-    message: `Are you sure you want to remove the membership of ${props.row.original.name}`,
+    title: 'Remove Classification?',
+    message: `Are you sure you want to remove the classification of ${props.row.original.name}`,
     confirmText: 'Remove',
     onConfirm: async () => {
       try {
@@ -100,28 +80,15 @@ function handleDelete() {
           </div>
         </DropdownMenuItem>
       </DropdownMenuGroup>
-      <div v-if="props.row.original.uuid !== props.row.original.originalObject.class.uuid">
-        <DropdownMenuSeparator/>
-        <DropdownMenuGroup>
-          <DropdownMenuItem @click="handlePrimaryClass" class="cursor-pointer">
-            <div class="flex items-center justify-center gap-2">
-              <i class="fa-solid fa-fw fa-tag"></i>
-              Set as Primary Class
-            </div>
-          </DropdownMenuItem>
-        </DropdownMenuGroup>
-      </div>
-      <div v-if="props.row.original.direct === 'Direct'">
-        <DropdownMenuSeparator/>
-        <DropdownMenuGroup>
-          <DropdownMenuItem @click="handleDelete" class="cursor-pointer">
-            <div class="flex items-center justify-center gap-2">
-              <i class="fa-solid fa-fw fa-trash text-red-500"></i>
-              Remove from Group
-            </div>
-          </DropdownMenuItem>
-        </DropdownMenuGroup>
-      </div>
+      <DropdownMenuSeparator/>
+      <DropdownMenuGroup>
+        <DropdownMenuItem @click="handleDelete" class="cursor-pointer">
+          <div class="flex items-center justify-center gap-2">
+            <i class="fa-solid fa-fw fa-trash text-red-500"></i>
+            Remove Classification
+          </div>
+        </DropdownMenuItem>
+      </DropdownMenuGroup>
     </DropdownMenuContent>
   </DropdownMenu>
 </template>

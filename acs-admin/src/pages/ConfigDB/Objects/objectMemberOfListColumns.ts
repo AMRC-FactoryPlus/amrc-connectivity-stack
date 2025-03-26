@@ -4,12 +4,7 @@
 
 import type {ColumnDef} from '@tanstack/vue-table'
 import {h} from 'vue'
-import {useServiceClientStore} from "@store/serviceClientStore.js";
-import {usePrincipalStore} from "@store/usePrincipalStore.js"
-import {useDialog} from '@/composables/useDialog';
-
 import DataTableColumnHeader from '@/components/ui/data-table/DataTableColumnHeader.vue'
-import {toast} from "vue-sonner";
 import MemberOfDropdown from "@pages/ConfigDB/Objects/MemberOfDropdown.vue";
 
 export interface ObjectMembership {

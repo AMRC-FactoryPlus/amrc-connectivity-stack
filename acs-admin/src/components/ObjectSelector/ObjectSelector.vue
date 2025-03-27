@@ -20,7 +20,7 @@
             :selected-objects="modelValue"
             :default-sort="initialSort"
             :data="storeData"
-            :search-key="column1MainKey"
+            :search-key="null"
             :columns="columns"
             :limit-height="true"
             :filters="[]">

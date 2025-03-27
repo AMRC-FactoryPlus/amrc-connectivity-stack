@@ -131,6 +131,18 @@ serviceSetup:
     helmChart:
       # Chart to deploy an edge cluster
       #cluster: null
+    openidClients:
+      grafana:
+        enabled: true
+        clientId: "grafana"
+        name: "Grafana"
+        redirectHost: "grafana"
+        redirectPath: "/login/generic_oauth"
+        roles:
+          - name: "viewer"
+          - name: "editor"
+          - name: "admin"
+
 
 edgeHelm:
   enabled: true
@@ -249,7 +261,7 @@ shell:
     repository: acs-krb-utils
 
 # XXX This should probably be included in acs-krb-utils
-curl: 
+curl:
   image:
     registry: docker.io
     repository: appropriate/curl
@@ -346,13 +358,38 @@ grafana:
   admin:
     existingSecret: grafana-admin-user
   grafana.ini:
+    server:
+      root_url: "$__file{/etc/acs-config/root_url}"
+    auth:
+      disable_login_form: true
     auth.basic:
       enabled: false
-    auth.proxy:
+    auth.generic_oauth:
       enabled: true
-      header_name: X-Auth-Principal
-      header_property: username
-      auto_sign_up: true
+      name: "Factory+"
+      allow_sign_up: true
+      client_id: grafana
+      client_secret: $__file{/etc/secrets/auth_generic_oauth/grafana}
+      scopes: openid profile email
+      auth_url: $__file{/etc/acs-config/auth_url}
+      token_url: $__file{/etc/acs-config/token_url}
+      api_url: $__file{/etc/acs-config/api_url}
+  extraConfigmapMounts:
+    - name: ini-config
+      mountPath: /etc/acs-config
+      configMap: acs-grafana-config
+      subPath: ""
+      readOnly: true
+      optional: false
+  extraSecretMounts:
+    - name: keycloak-client-mount
+      secretName: keycloak-clients
+      defaultMode: 0440
+      mountPath: /etc/secrets/auth_generic_oauth
+      readOnly: true
+      items:
+        - key: grafana
+          path: grafana
   sidecar:
     datasources:
       enabled: true
@@ -402,6 +439,13 @@ influxdb2:
         influx v1 dbrp create --bucket-id ${DOCKER_INFLUXDB_INIT_BUCKET_ID} --db default --rp default --default --org ${DOCKER_INFLUXDB_INIT_ORG}
   pdb:
     create: false
+
+openid:
+  enabled: true
+  image:
+    repository: quay.io/keycloak/keycloak
+    tag: 26.1.1
+    pullPolicy: IfNotPresent
 
 cert-manager:
   fullnameOverride: "cert-manager"

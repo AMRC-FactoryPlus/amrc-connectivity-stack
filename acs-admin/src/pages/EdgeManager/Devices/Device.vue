@@ -57,9 +57,13 @@
         </div>
         <div class="flex items-center justify-between gap-2 p-4 border-b">
           <div class="font-semibold text-lg">Schema</div>
-          <Button @click="changeSchema" size="sm" variant="ghost" class="flex items-center justify-center gap-2">
+<!--          <Button @click="changeSchema" size="sm" variant="ghost" class="flex items-center justify-center gap-2">-->
+<!--            <i class="fa-solid fa-sync"></i>-->
+<!--            <div>Change Schema</div>-->
+<!--          </Button>-->
+          <Button @click="loadSchemaBinding" size="sm" variant="ghost" class="flex items-center justify-center gap-2">
             <i class="fa-solid fa-sync"></i>
-            <div>Change Schema</div>
+            <div>Load Schema Binding</div>
           </Button>
         </div>
         <div class="space-y-4 p-4">
@@ -102,6 +106,7 @@ import { inop } from '@utils/inop.js'
 import SidebarDetail from '@/components/SidebarDetail.vue'
 import moment from 'moment'
 import EmptyState from '@components/EmptyState.vue'
+import { UUIDs } from '@amrc-factoryplus/service-client'
 
 export default {
   components: {
@@ -146,7 +151,30 @@ export default {
     }
   },
 
+  computed: {
+    device() {
+      return this.d.data.find(e => e.uuid === this.$route.params.deviceuuid) || {}
+    }
+  },
+
   methods: {
+
+    async loadSchemaBinding() {
+      if (!this.device?.deviceInformation?.node) {
+        toast.error('No node information available')
+        return
+      }
+
+      try {
+        await this.d.loadAdditionalBindings(this.device.uuid, {
+          'deviceInformation.node': UUIDs.App.EdgeAgentDeployment
+        })
+        toast.success('Node deployment information loaded')
+      } catch (error) {
+        console.error('Failed to load node deployment information:', error)
+        toast.error('Failed to load node information')
+      }
+    },
 
     changeSchema () {
       // Show a list with all schemas
@@ -154,20 +182,11 @@ export default {
 
     async getDeviceDetails (uuid) {
       this.loadingDetails = true
-
       await storeReady(this.d)
-
-      // Instantiate the device object as the information that we
-      // already have
-      this.device = this.d.data.find(e => e.uuid === uuid)
 
       if (!this.device) {
         toast.error('Device not found')
-        this.loadingDetails = false
-        return
       }
-
-      // Hydrate the device with additional bindings
 
       this.loadingDetails = false
     },
@@ -185,7 +204,6 @@ export default {
   data () {
     return {
       loadingDetails: true,
-      device: {},
       robotBeep: null,
       beepInterval: null,
     }

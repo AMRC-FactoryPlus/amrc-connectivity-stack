@@ -37,6 +37,8 @@ interface StoreState {
   loading: boolean
   rxsub: rx.Subscription | null
   ready: boolean  // Added ready state
+  // Add a map to store additional bindings per UUID
+  additionalBindings: Map<string, { bindings: AppBindings, subscription: rx.Subscription }>
 }
 
 interface ObservableMap {
@@ -78,7 +80,9 @@ export const useStore = (name: string, classUUID: string, appBindings: AppBindin
       data: [],
       loading: true,
       rxsub: null,
-      ready: false  // Initialize ready state
+      ready: false,
+      // Add a map to store additional bindings per UUID
+      additionalBindings: new Map<string, { bindings: AppBindings, subscription: rx.Subscription }>
     }),
     actions: {
       async start() {
@@ -164,10 +168,109 @@ export const useStore = (name: string, classUUID: string, appBindings: AppBindin
           this.ready = true  // Set ready state when data is loaded
         })
       },
+      async loadAdditionalBindings(uuid: string, extraBindings: AppBindings) {
+        this.loading = true;
+        
+        const cdb = useServiceClientStore().client.ConfigDB;
+        const baseObj = this.data.find(obj => obj.uuid === uuid);
+        
+        if (!baseObj) {
+          this.loading = false;
+          return;
+        }
+
+        // Helper to validate UUID format
+        const isUUID = (str: any): boolean => {
+          if (typeof str !== 'string') return false;
+          return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+        };
+
+        // Create observables for the additional bindings
+        const appObservables = Object.entries(extraBindings).reduce((acc, [path, value]) => {
+          if (typeof value !== 'string') return acc;
+
+          const refUuid = getNestedValue(baseObj, path);
+          // Only proceed if we have a valid UUID
+          if (refUuid && isUUID(refUuid)) {
+            acc[path] = cdb.search_app(value);
+          }
+          return acc;
+        }, {} as Record<string, rx.Observable<ImmutableMap<string, any>>>);
+
+        // If no valid bindings were found, return early
+        if (Object.keys(appObservables).length === 0) {
+          this.loading = false;
+          return;
+        }
+
+        const details = rx.combineLatest(appObservables);
+
+        const subscription = details.subscribe(values => {
+          const boundData = Object.entries(extraBindings).reduce((acc, [path, value]) => {
+            if (typeof value !== 'string') return acc;
+
+            const refUuid = getNestedValue(baseObj, path);
+            if (refUuid && isUUID(refUuid)) {
+              const resolvedValue = values[path]?.get(refUuid) || null;
+              const parts = path.split('.');
+              const key = parts.pop()!;
+              const parentPath = parts.join('.');
+              
+              if (parentPath) {
+                setNestedValue(acc, parentPath, {
+                  ...getNestedValue(baseObj, parentPath),
+                  [key]: resolvedValue
+                });
+              } else {
+                acc[key] = resolvedValue;
+              }
+            }
+            return acc;
+          }, {} as Record<string, any>);
+
+          const index = this.data.findIndex(obj => obj.uuid === uuid);
+          if (index !== -1) {
+            this.data[index] = {
+              ...this.data[index],
+              ...boundData
+            };
+          }
+
+          this.loading = false;
+        });
+
+        this.additionalBindings.set(uuid, {
+          bindings: extraBindings,
+          subscription
+        });
+      },
+
+      async clearAdditionalBindings(uuid: string) {
+        const binding = this.additionalBindings.get(uuid);
+        if (binding) {
+          binding.subscription?.unsubscribe();
+          this.additionalBindings.delete(uuid);
+          
+          // Reset the object to its original state
+          const index = this.data.findIndex(obj => obj.uuid === uuid);
+          if (index !== -1) {
+            const keys = Object.keys(binding.bindings);
+            const cleanedObj = { ...this.data[index] };
+            keys.forEach(key => delete cleanedObj[key]);
+            this.data[index] = cleanedObj;
+          }
+        }
+      },
+
       stop() {
-        this.rxsub?.unsubscribe()
-        this.rxsub = null
-        this.ready = false  // Reset ready state when stopping
+        this.rxsub?.unsubscribe();
+        this.rxsub = null;
+        // Clean up additional bindings
+        for (const [uuid, binding] of this.additionalBindings) {
+          binding.subscription?.unsubscribe();
+        }
+        this.additionalBindings.clear();
+        this.ready = false;
       },
 
       async storeReady() {

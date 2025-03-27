@@ -15,6 +15,14 @@ export interface MembersMapping {
         name: string
     }
     direct: string
+    originalObject: {
+        uuid: string
+        name: string
+        class: {
+            uuid: string
+            name: string
+        }
+    }
 }
 
 export const membersColumns: ColumnDef<MembersMapping>[] = [{

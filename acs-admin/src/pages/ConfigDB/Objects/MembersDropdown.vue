@@ -5,21 +5,21 @@
 <script setup lang="ts">
 import type {Row} from '@tanstack/vue-table'
 import type {MembersMapping} from './objectMembersListColumns'
-
 import {Button} from '@/components/ui/button'
 import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuGroup} from '@/components/ui/dropdown-menu'
 import {toast} from "vue-sonner";
 import {useDialog} from '@/composables/useDialog';
 import {useServiceClientStore} from '@store/serviceClientStore.js'
 
-// import { inject } from 'vue'
-// const groupMembershipUpdated = inject('groupMembershipUpdated')
+import { inject } from 'vue'
+const relationshipsUpdated = inject('relationshipsUpdated')
 
 interface DataTableRowActionsProps {
     row: Row<MembersMapping>
 }
 
 const s = useServiceClientStore()
+const cdb = s.client.ConfigDB
 
 const props = defineProps<DataTableRowActionsProps>()
 
@@ -35,14 +35,11 @@ function handleDelete() {
     confirmText: 'Remove',
     onConfirm: async () => {
       try {
-        // TODO: Implement
-        // await useServiceClientStore().client.Auth.delete_principal(row.getValue('uuid'))
-        // toast.success(`${row.getValue('uuid')} has been deleted`)
-        // useServiceClientStore().client.Fetch.cache = "reload"
-        // await usePrincipalStore().fetch()
-        // useServiceClientStore().client.Fetch.cache = "default"
+        await cdb.class_remove_member(props.row.original.originalObject.uuid, props.row.original.uuid)
+        toast.success(`${props.row.original.name} has been removed`)
+        relationshipsUpdated()
       } catch (err) {
-        toast.error(`Unable to delete ${props.row.original.uuid}`)
+        toast.error(`Unable to remove ${props.row.original.name}`)
       }
     }
   });

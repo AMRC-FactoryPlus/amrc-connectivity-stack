@@ -40,8 +40,21 @@
     <DataTable class="mt-4" :data="isMemberOf" :default-sort="initialSort" :columns="memberOfColumns" :filters="[]" @row-click="e => objectClicked(e.original)">
       <template #toolbar-left>
         <div class="flex justify-between items-end flex-grow mr-4">
-          <div class="font-semibold">Is object is a member of:</div>
-          <Button disabled>Add Membership</Button>
+          <div class="font-semibold">This object is a member of:</div>
+          <ObjectSelector
+              v-model="membershipsToAdd"
+              :store-data="availableMemberships"
+              title="Select Memberships"
+              subtitle="Select the objects which this object should become a member of"
+              column1-header="Name"
+              column1-main-key="name"
+              column1-sub-key="uuid"
+              column2-header="Class"
+              column2-main-key="class.name"
+              column2-sub-key="class.uuid"
+          >
+            <Button>Add Membership</Button>
+          </ObjectSelector>
         </div>
       </template>
     </DataTable>
@@ -57,7 +70,20 @@
       <template #toolbar-left>
         <div class="flex justify-between items-end flex-grow mr-4">
           <div class="font-semibold">Members of this object:</div>
-          <Button disabled>Add a Member</Button>
+          <ObjectSelector
+              v-model="membersToAdd"
+              :store-data="availableMembers"
+              title="Select new Members"
+              subtitle="Select the objects which become a member of this object"
+              column1-header="Name"
+              column1-main-key="name"
+              column1-sub-key="uuid"
+              column2-header="Class"
+              column2-main-key="class.name"
+              column2-sub-key="class.uuid"
+          >
+            <Button>Add a Member</Button>
+          </ObjectSelector>
         </div>
       </template>
     </DataTable>
@@ -79,6 +105,9 @@ import {useDirectRelationshipStore} from "@store/useDirectRelationshipStore.js";
 import {Button} from "@components/ui/button/index.js";
 import Copyable from "@components/Copyable.vue";
 import {useMemberStore} from "@store/useMemberStore.js";
+import {defineAsyncComponent} from "vue";
+import {useServiceClientStore} from "@store/serviceClientStore.js";
+import {toast} from "vue-sonner";
 
 export default {
   emits: ['rowClick'],
@@ -89,6 +118,7 @@ export default {
       membersColumns,
       subclassOfColumns,
       subclassColumns,
+      s: useServiceClientStore(),
       obj: useObjectStore(),
       g: useGroupStore(),
       r: useDirectRelationshipStore(),
@@ -98,12 +128,19 @@ export default {
     }
   },
 
+  provide () {
+    return {
+      relationshipsUpdated: this.updateData
+    }
+  },
+
   components: {
     Copyable,
     CardDescription, CardContent, CardHeader, CardTitle, Button,
     Card,
     Skeleton,
     DataTable,
+    ObjectSelector: defineAsyncComponent(() => import('@components/ObjectSelector/ObjectSelector.vue')),
   },
 
   computed: {
@@ -111,6 +148,7 @@ export default {
       return this.obj.data.find(o => o.uuid === this.route.params.object)
     },
     relationships () {
+      // BUG: This isn't refreshing when this.r.data changes???
       return this.r.data.find(o => o.uuid === this.route.params.object)
     },
     initialSort () {
@@ -129,9 +167,10 @@ export default {
         subclassOf = subclassOf.concat(objLookup)
         subclassesToLookup = objLookup.map(s => s.uuid)
       } while (subclassesToLookup.length > 0)
-      return subclassOf
+      return subclassOf.map(o => ({...o, originalObject: this.object}))
     },
     isMemberOf () {
+      // BUG: This isn't refreshing when this.r.data changes???
       const directMemberships = this.r.data.filter(group => group.directMembers.includes(this.object.uuid)).map(m => m.uuid)
       const directMembershipObjs = directMemberships.map(membership => {
         const obj = this.obj.data.find(o => o.uuid === membership)
@@ -140,8 +179,6 @@ export default {
           direct: "Direct"
         }
       })
-      // TODO: This is incomplete as group store is not exhaustive list of members
-      // We can create a group store
       const indirectMemberships = this.m.data.filter(group => group.members.includes(this.object.uuid) && !directMemberships.includes(group.uuid)).map(m => m.uuid)
       const indirectMembershipObjs = indirectMemberships.map(membership => {
         const obj = this.obj.data.find(o => o.uuid === membership)
@@ -170,11 +207,48 @@ export default {
           direct: "Indirect"
         }
       })
-      return dmObjects.concat(imObjects)
+      return dmObjects.concat(imObjects).map(o => ({...o, originalObject: this.object}))
     },
     subclasses () {
       const s = this.relationships?.directSubclasses ?? []
-      return s.map(sUUID => this.obj.data.find(o => o.uuid === sUUID))
+      return s.map(sUUID => this.obj.data.find(o => o.uuid === sUUID)).map(o => ({...o, originalObject: this.object}))
+    },
+    availableMemberships () {
+      const directMemberships = this.r.data.filter(group => group.directMembers.includes(this.object.uuid)).map(m => m.uuid)
+      return this.obj.data  // All objects
+          .filter(o => o.rank === this.object.rank+1) // All objects of a rank above
+          .filter(o => !directMemberships.includes(o.uuid)) // Objects of a rank above which it's not already a direct member of
+    },
+    availableMembers () {
+      const directMembers = this.relationships?.directMembers ?? []
+      return this.obj.data  // All objects
+          .filter(o => o.rank === this.object.rank-1) // All objects of a rank below
+          .filter(o => !directMembers.includes(o.uuid)) // Objects of a rank below which are not already a direct member
+    }
+  },
+
+  watch: {
+    membershipsToAdd: async function(val, oldVal) {
+      if (!val.length) {
+        return
+      }
+
+      for (const obj of val) {
+        await this.addMembership(obj)
+      }
+
+      await this.updateData();
+    },
+    membersToAdd: async function(val, oldVal) {
+      if (!val.length) {
+        return
+      }
+
+      for (const obj of val) {
+        await this.addMember(obj)
+      }
+
+      await this.updateData();
     },
   },
 
@@ -186,10 +260,37 @@ export default {
         this.router.push({ path: `/configdb/objects` })
       }
     },
+    async updateData () {
+      const client = this.s.client
+      client.Fetch.cache = "reload"
+      this.r.fetch()
+      client.Fetch.cache = "default"
+    },
+    async addMembership (group) {
+      const client = this.s.client
+      try {
+        await client.ConfigDB.class_add_member(group.uuid, this.object.uuid)
+        toast.success(`${this.object.name} has been added to ${group.name}`)
+      } catch (err) {
+        toast.error(`Unable to add ${this.object.name} to ${group.name}`)
+        console.error(`Unable to add ${this.object.name} to ${group.name}`, err)
+      }
+    },
+    async addMember (member) {
+      try {
+        await this.s.client.ConfigDB.class_add_member(this.object.uuid, member.uuid)
+        toast.success(`${member.name} has been added to ${this.object.name}`)
+      } catch (err) {
+        toast.error(`Unable to add ${member.name} to ${this.object.name}`)
+        console.error(`Unable to add ${member.name} to ${this.object.name}`, err)
+      }
+    },
   },
 
   data() {
     return {
+      membershipsToAdd: [],
+      membersToAdd: [],
     }
   },
 

@@ -56,6 +56,7 @@
             column2-header="Class"
             column2-main-key="class.name"
             column2-sub-key="class.uuid"
+            :multi-select="false"
         >
           <Button>Select</Button>
         </ObjectSelector>

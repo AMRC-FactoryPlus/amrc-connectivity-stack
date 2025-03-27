@@ -4,15 +4,24 @@
 <template>
   <div class="flex justify-between">
     <span>{{application?.name}}</span>
-    <Button>Add Entry</Button>
+    <Button disabled>Add Entry</Button>
   </div>
   <Skeleton v-if="loading || app.loading" v-for="i in 10" class="h-16 rounded-lg mb-2"/>
-  <DataTable v-else :data="data" :default-sort="initialSort" :columns="columns" :filters="[]" @row-click="e => objectClick(e.original)" />
+  <DataTableSearchable v-else
+                       :data="data"
+                       :default-sort="initialSort"
+                       :columns="columns"
+                       :filters="[]"
+                       :selected-objects="[]"
+                       :clickable="true"
+                       :search-key="null"
+                       :limit-height="false"
+                       @row-click="e => objectClick(e.original)" />
 </template>
 
 <script>
 import { Skeleton } from '@components/ui/skeleton'
-import DataTable from '@components/ui/data-table/DataTable.vue'
+import DataTableSearchable from "@components/ui/data-table-searchable/DataTableSearchable.vue";
 import { columns } from './applicationObjectListColumns.ts'
 import {Card} from "@components/ui/card/index.js";
 import {useRoute, useRouter} from "vue-router";
@@ -52,7 +61,7 @@ export default {
     Button,
     Card,
     Skeleton,
-    DataTable,
+    DataTableSearchable,
   },
 
   computed: {

@@ -38,8 +38,6 @@ spec:
               value: "edge"
             - name: KC_HEALTH_ENABLED
               value: "true"
-            - name: KRB5_CONFIG
-              value: /config/krb5-conf/krb5.conf
           ports:
             - name: http
               containerPort: 8080
@@ -48,8 +46,11 @@ spec:
               path: /health/ready
               port: 9000
           volumeMounts:
+            # XXX This would be better without the subPath, but we need
+            # to use a Java system property to move krb5.conf.
             - name: krb5-conf
-              mountPath: /config/krb5-conf
+              mountPath: /etc/krb5.conf
+              subPath: krb5.conf
             - name: openid-keytabs
               mountPath: /etc/keytabs
             - name: data

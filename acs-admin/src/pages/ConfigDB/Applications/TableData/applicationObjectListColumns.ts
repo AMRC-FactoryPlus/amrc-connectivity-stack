@@ -18,6 +18,10 @@ export interface ApplicationMapping {
         uuid: string
         name: string
     }
+    application: {
+        uuid: string
+        name: string
+    }
 }
 
 export const columns: ColumnDef<ApplicationMapping>[] = [{
@@ -57,18 +61,15 @@ export const columns: ColumnDef<ApplicationMapping>[] = [{
         return h('div', {onClick: async (e) => {
             e.stopPropagation()
             useDialog({
-                title: 'Remove Application?',
-                message: `Are you sure you want to delete the application "${row.getValue('name')}"`,
+                title: 'Remove Config Entry?',
+                message: `Are you sure you want to delete the config entry for "${row.getValue('name')}" from ${row.original.application.name}`,
                 confirmText: 'Remove',
                 onConfirm: async () => {
                     try {
-                        await useServiceClientStore().client.Auth.delete_principal(row.getValue('uuid'))
-                        toast.success(`${row.getValue('uuid')} has been deleted`)
-                        useServiceClientStore().client.Fetch.cache = "reload"
-                        await usePrincipalStore().fetch()
-                        useServiceClientStore().client.Fetch.cache = "default"
+                        await useServiceClientStore().client.ConfigDB.delete_config(row.original.application.uuid, row.original.uuid)
+                        toast.success(`Entry for ${row.original.name} has been deleted`)
                     } catch (err) {
-                        toast.error(`Unable to delete ${row.getValue('uuid')}`)
+                        toast.error(`Unable to delete entry for ${row.original.name}`)
                     }
                 }
             });

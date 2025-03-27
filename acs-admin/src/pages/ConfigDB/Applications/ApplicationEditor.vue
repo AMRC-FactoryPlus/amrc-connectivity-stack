@@ -121,7 +121,7 @@ export default {
 
       this.rxsub = details.subscribe(aObjs => {
         console.log("OBJS UPDATE: %o", aObjs);
-        this.data = aObjs;
+        this.data = aObjs.map(o => ({...o, application: {uuid: this.application.uuid, name: this.application.name}}));
         this.loading = false;
       });
     },

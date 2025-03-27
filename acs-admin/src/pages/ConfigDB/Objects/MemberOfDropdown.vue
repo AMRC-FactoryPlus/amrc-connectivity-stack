@@ -12,6 +12,7 @@ import {useDialog} from '@/composables/useDialog';
 import {useServiceClientStore} from '@store/serviceClientStore.js'
 
 import { inject } from 'vue'
+import {UUIDs} from "@amrc-factoryplus/service-client";
 const relationshipsUpdated = inject('relationshipsUpdated')
 
 interface DataTableRowActionsProps {
@@ -35,12 +36,9 @@ function handlePrimaryClass() {
     confirmText: 'Change',
     onConfirm: async () => {
       try {
-        // TODO: Implement
-        // await useServiceClientStore().client.Auth.delete_principal(row.getValue('uuid'))
-        // toast.success(`${row.getValue('uuid')} has been deleted`)
-        // useServiceClientStore().client.Fetch.cache = "reload"
-        // await usePrincipalStore().fetch()
-        // useServiceClientStore().client.Fetch.cache = "default"
+        await cdb.patch_config(UUIDs.App.Registration, props.row.original.originalObject.uuid, "merge", {"class": props.row.original.uuid})
+        toast.success(`The primary class of ${props.row.original.originalObject.name} is now ${props.row.original.name}`)
+        relationshipsUpdated()
       } catch (err) {
         toast.error(`Unable to delete ${props.row.original.uuid}`)
       }

@@ -112,8 +112,6 @@ export default {
         toast.success(`${this.name} has been created!`)
         this.node = null
 
-        await this.d.refresh();
-
       }
       catch (err) {
         toast.error(`Unable to create new device for ${this.node.name}`)

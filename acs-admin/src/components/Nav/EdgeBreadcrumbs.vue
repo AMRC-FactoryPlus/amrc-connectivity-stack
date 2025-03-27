@@ -136,7 +136,7 @@ export default {
     // ║  Devices  ║
     // ╚═══════════╝
     devices () {
-      return useDeviceStore().data.filter((device) => device.node === this.$route.params.nodeuuid)
+      return useDeviceStore().data.filter((device) => device.deviceInformation.node === this.$route.params.nodeuuid)
     },
     currentDevice () {
       if (useDeviceStore().data instanceof Array) {

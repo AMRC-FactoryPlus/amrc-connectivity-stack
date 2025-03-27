@@ -149,8 +149,6 @@ import EmptyState from '@/components/EmptyState.vue'
 import SidebarDetail from '@/components/SidebarDetail.vue'
 import moment from 'moment'
 import { toast } from 'vue-sonner'
-import { useStore } from '@store/useStore.js'
-import { UUIDs } from '@amrc-factoryplus/service-client'
 
 export default {
   components: {
@@ -207,7 +205,7 @@ export default {
     },
 
     devices () {
-      return Array.isArray(this.d.data) ? this.d.data.filter(e => e.node === this.node.uuid) : []
+      return Array.isArray(this.d.data) ? this.d.data.filter(e => e.deviceInformation.node === this.node.uuid) : []
     },
 
     connections () {
@@ -232,7 +230,7 @@ export default {
     },
 
     selectDevice(e) {
-      const cluster = this.n.data?.find(f => f.uuid === e.original.node)?.cluster;
+      const cluster = this.n.data?.find(f => f.uuid === e.original.deviceInformation.node)?.cluster;
 
       if (!cluster) {
         toast.error('Device has no cluster')

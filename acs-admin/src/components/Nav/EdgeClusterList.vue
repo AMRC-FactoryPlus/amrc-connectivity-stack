@@ -88,7 +88,7 @@ export default {
   async mounted () {
     await this.c.fetch()
     await this.n.fetch()
-    await this.d.fetch()
+    await this.d.start()
     await this.dr.start()
   },
 

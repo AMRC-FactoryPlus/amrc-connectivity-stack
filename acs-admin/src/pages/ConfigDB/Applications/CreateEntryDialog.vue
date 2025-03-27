@@ -201,7 +201,7 @@ export default {
         newObjectUuid = this.objectUuid
       }
       try {
-        const configResponse = await this.s.client.ConfigDB.put_config(this.app, newObjectUuid, this.config)
+        await this.s.client.ConfigDB.put_config(this.app, newObjectUuid, this.config)
         toast.success(`Config entry for ${this.objectName} created successfully.`)
       } catch (err) {
         toast.error(`Unable to create entry for ${this.objectName}`)
@@ -215,7 +215,7 @@ export default {
         this.dialogOpen = false
       }
       if (newObjectUuid && this.navigateAfter) {
-        this.router.push({ path: `/configdb/objects/${newObjectUuid}` })
+        this.router.push({ path: `/configdb/applications/${this.app}/${newObjectUuid}` })
       }
     }
   },

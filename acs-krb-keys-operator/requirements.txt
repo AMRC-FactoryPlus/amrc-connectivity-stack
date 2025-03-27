@@ -1,0 +1,12 @@
+krb5
+kubernetes
+kopf
+# Version 2.0 completely changes the API
+optional.py<2.0
+requests
+requests-cache
+requests-kerberos
+
+# Local patched version
+/acs-lib/py-python-kadmv
+

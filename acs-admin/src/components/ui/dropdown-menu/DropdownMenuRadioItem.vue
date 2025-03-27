@@ -1,12 +1,12 @@
+<!--
+  - Copyright (c) University of Sheffield AMRC 2025.
+  -->
+
 <script setup>
-import { computed } from "vue";
-import {
-  DropdownMenuItemIndicator,
-  DropdownMenuRadioItem,
-  useForwardPropsEmits,
-} from "radix-vue";
-import { Circle } from "lucide-vue-next";
-import { cn } from "@/lib/utils";
+import { computed } from 'vue'
+import { DropdownMenuItemIndicator, DropdownMenuRadioItem, useForwardPropsEmits } from 'reka-ui'
+import { Circle } from 'lucide-vue-next'
+import { cn } from '@/lib/utils'
 
 const props = defineProps({
   value: { type: String, required: true },

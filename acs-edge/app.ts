@@ -6,15 +6,15 @@
 import * as dotenv from 'dotenv';
 import sourceMapSupport from 'source-map-support'
 
-import {ServiceClient, UUIDs} from "@amrc-factoryplus/utilities";
+import { ServiceClient } from "@amrc-factoryplus/utilities";
 
-import {DriverBroker} from "./lib/driverBroker.js";
-import {GIT_VERSION} from "./lib/git-version.js";
-import {log} from "./lib/helpers/log.js";
-import {Translator} from "./lib/translator.js";
+import { DriverBroker } from "./lib/driverBroker.js";
+import { GIT_VERSION } from "./lib/git-version.js";
+import { log } from "./lib/helpers/log.js";
+import { Translator } from "./lib/translator.js";
 
 sourceMapSupport.install()
-dotenv.config({path: '../.env'});
+dotenv.config({ path: '../.env' });
 
 run()
 

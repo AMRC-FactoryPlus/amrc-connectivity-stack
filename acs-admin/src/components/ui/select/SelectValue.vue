@@ -1,5 +1,9 @@
+<!--
+  - Copyright (c) University of Sheffield AMRC 2025.
+  -->
+
 <script setup>
-import { SelectValue } from "radix-vue";
+import { SelectValue } from 'reka-ui'
 
 const props = defineProps({
   placeholder: { type: String, required: false },

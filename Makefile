@@ -63,13 +63,13 @@ subdirs+= uns-ingester-sparkplug
 
 recurse=	env MAKE="${MAKE}" ${tools}/recurse
 
-all: git.check-committed
+all: git.prepare
 	+${recurse} all ${subdirs}
 
-setup: git.check-committed
+setup: git.prepare
 	+${recurse} setup ${subdirs}
 
-lint: git.check-committed
+lint: git.prepare
 	+${recurse} lint ${subdirs}
 
 include ${mk}/acs.git.mk

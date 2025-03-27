@@ -1,5 +1,9 @@
+<!--
+  - Copyright (c) University of Sheffield AMRC 2025.
+  -->
+
 <script setup>
-import { TooltipProvider } from "radix-vue";
+import { TooltipProvider } from 'reka-ui'
 
 const props = defineProps({
   delayDuration: { type: Number, required: false },

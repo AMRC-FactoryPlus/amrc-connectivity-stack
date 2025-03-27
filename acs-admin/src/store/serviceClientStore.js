@@ -1,9 +1,14 @@
+/*
+ * Copyright (c) University of Sheffield AMRC 2025.
+ */
+
 import { defineStore } from 'pinia'
-import { ServiceClient, UUIDs } from '@amrc-factoryplus/service-client'
+import { RxClient, UUIDs } from '@amrc-factoryplus/rx-client'
 
 export const useServiceClientStore = defineStore('service-client', {
   state: () => {
     return {
+      username: null,
       client: null,
       loaded: false,
       scheme: null,
@@ -14,25 +19,26 @@ export const useServiceClientStore = defineStore('service-client', {
   actions: {
     // since we rely on `this`, we cannot use an arrow function
     login (opts) {
-      (new ServiceClient(opts)).init().then((client) => {
 
-        // save opts to local storage
-        localStorage.setItem('opts', JSON.stringify(opts))
+      const client = new RxClient(opts);
 
-        this.client  = client
-        this.loaded  = true
-        this.scheme  = import.meta.env.SCHEME
-        this.baseUrl = import.meta.env.BASEURL
+      // save opts to local storage
+      localStorage.setItem('opts', JSON.stringify(opts))
 
-        client.service_urls(UUIDs.Service.MQTT).then((urls) => {
-          this.urls.mqtt = urls
-        })
+      this.username = opts.username
+      this.client  = client
+      this.loaded  = true
+      this.scheme  = import.meta.env.SCHEME
+      this.baseUrl = import.meta.env.BASEURL
+
+      client.service_urls(UUIDs.Service.MQTT).then((urls) => {
+        this.urls.mqtt = urls
       })
+
+      client.Fetch.cache = 'reload';
     },
 
     logout () {
-
-      console.log('Logging out')
 
       // Delete the opts local storage item
       localStorage.removeItem('opts')

@@ -104,7 +104,9 @@ class RealmSetup {
       body: JSON.stringify(realm_representation),
     });
 
-    if (!response.ok) {
+    if (response.ok) {
+      this.log("Created new realm: %o", realm_representation);
+    } else {
       const status = response.status;
 
       if (status == 401 && !is_retry) {
@@ -166,7 +168,9 @@ class RealmSetup {
         body: JSON.stringify(client),
       });
 
-      if (!response.ok) {
+      if (response.ok) {
+        this.log("Created new realm client: %o", client_representation);
+      } else {
         const status = response.status;
 
         if (status == 401 && !is_retry) {

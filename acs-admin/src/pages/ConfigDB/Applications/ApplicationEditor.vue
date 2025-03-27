@@ -22,7 +22,7 @@
 <script>
 import { Skeleton } from '@components/ui/skeleton'
 import DataTableSearchable from "@components/ui/data-table-searchable/DataTableSearchable.vue";
-import { columns } from './applicationObjectListColumns.ts'
+import { columns } from './TableData/applicationObjectListColumns.ts'
 import {Card} from "@components/ui/card/index.js";
 import {useRoute, useRouter} from "vue-router";
 import {useApplicationStore} from "@store/useApplicationStore.js";

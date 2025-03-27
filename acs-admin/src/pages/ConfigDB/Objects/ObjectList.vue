@@ -17,7 +17,7 @@
 
 <script>
 import { Skeleton } from '@components/ui/skeleton'
-import { columns } from './objectListColumns.ts'
+import { columns } from './TableData/objectListColumns.ts'
 import {Card} from "@components/ui/card/index.js";
 import {useObjectStore} from "@store/useObjectStore.js";
 import DataTableSearchable from "@components/ui/data-table-searchable/DataTableSearchable.vue";

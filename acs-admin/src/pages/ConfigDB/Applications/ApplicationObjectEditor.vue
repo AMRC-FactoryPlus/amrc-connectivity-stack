@@ -13,7 +13,7 @@
 
 <script>
 import { Skeleton } from '@components/ui/skeleton'
-import { columns } from './applicationListColumns.ts'
+import { columns } from './TableData/applicationListColumns.ts'
 import {Card} from "@components/ui/card/index.js";
 import {useServiceClientStore} from "@store/serviceClientStore.js";
 import {useRoute, useRouter} from "vue-router";

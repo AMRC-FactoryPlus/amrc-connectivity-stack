@@ -119,10 +119,10 @@
 <script>
 import { Skeleton } from '@components/ui/skeleton'
 import DataTable from '@components/ui/data-table/DataTable.vue'
-import { memberOfColumns } from './objectMemberOfListColumns.ts'
-import { membersColumns } from './objectMembersListColumns.ts'
-import { subclassOfColumns } from './objectSubclassOfListColumns.ts'
-import { subclassColumns } from './objectSubclassListColumns.ts'
+import { memberOfColumns } from './TableData/objectMemberOfListColumns.ts'
+import { membersColumns } from './TableData/objectMembersListColumns.ts'
+import { subclassOfColumns } from './TableData/objectSubclassOfListColumns.ts'
+import { subclassColumns } from './TableData/objectSubclassListColumns.ts'
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from "@components/ui/card/index.js";
 import {useObjectStore} from "@store/useObjectStore.js";
 import {useGroupStore} from "@store/useGroupStore.js";

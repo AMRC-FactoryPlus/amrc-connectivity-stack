@@ -5,16 +5,15 @@
 import type {ColumnDef} from '@tanstack/vue-table'
 import {h} from 'vue'
 import DataTableColumnHeader from '@/components/ui/data-table/DataTableColumnHeader.vue'
-import MemberOfDropdown from "@pages/ConfigDB/Objects/MemberOfDropdown.vue";
+import SubclassesDropdown from "./SubclassesDropdown.vue";
 
-export interface MemberOfMapping {
+export interface SubclassMapping {
     uuid: string
     name: string
     class: {
         uuid: string
         name: string
     }
-    direct: string
     originalObject: {
         uuid: string
         name: string
@@ -25,7 +24,7 @@ export interface MemberOfMapping {
     }
 }
 
-export const memberOfColumns: ColumnDef<MemberOfMapping>[] = [{
+export const subclassColumns: ColumnDef<SubclassMapping>[] = [{
     accessorKey: 'name',
     header: ({column}) => h(DataTableColumnHeader, {
         column,
@@ -49,22 +48,9 @@ export const memberOfColumns: ColumnDef<MemberOfMapping>[] = [{
     }),
     cell: ({row}) => {
         return h('div', {class: 'max-w-[500px] truncate'}, [
-            h('div', {class: 'max-w-[500px] truncate'}, row.getValue('class')),
+            h('div', {class: 'max-w-[500px] truncate font-medium'}, row.getValue('class')),
             h('div', {class: 'max-w-[500px] truncate text-gray-400'}, row.original.class?.uuid ?? "UNKNOWN")
         ])
-    },
-    filterFn: (row, id, value) => {
-        return value.includes(row.getValue(id))
-    },
-}, {
-    accessorKey: 'direct',
-    accessorFn: (item) => item.direct,
-    header: ({column}) => h(DataTableColumnHeader, {
-        column,
-        title: 'Direct'
-    }),
-    cell: ({row}) => {
-        return h('div', {class: 'max-w-[500px] truncate font-medium'}, row.getValue('direct'))
     },
     filterFn: (row, id, value) => {
         return value.includes(row.getValue(id))
@@ -72,5 +58,5 @@ export const memberOfColumns: ColumnDef<MemberOfMapping>[] = [{
 },
 {
     id: 'actions',
-    cell: ({row}) => h(MemberOfDropdown, {row}),
+    cell: ({row}) => h(SubclassesDropdown, {row}),
 }]

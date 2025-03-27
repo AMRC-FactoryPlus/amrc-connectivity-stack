@@ -4,17 +4,16 @@
 
 import type {ColumnDef} from '@tanstack/vue-table'
 import {h} from 'vue'
-import MembersDropdown from "@pages/ConfigDB/Objects/MembersDropdown.vue";
 import DataTableColumnHeader from '@/components/ui/data-table/DataTableColumnHeader.vue'
+import SubclassOfDropdown from "./SubclassOfDropdown.vue";
 
-export interface MembersMapping {
+export interface SubclassOfMapping {
     uuid: string
     name: string
     class: {
         uuid: string
         name: string
     }
-    direct: string
     originalObject: {
         uuid: string
         name: string
@@ -25,7 +24,7 @@ export interface MembersMapping {
     }
 }
 
-export const membersColumns: ColumnDef<MembersMapping>[] = [{
+export const subclassOfColumns: ColumnDef<SubclassOfMapping>[] = [{
     accessorKey: 'name',
     header: ({column}) => h(DataTableColumnHeader, {
         column,
@@ -56,21 +55,8 @@ export const membersColumns: ColumnDef<MembersMapping>[] = [{
     filterFn: (row, id, value) => {
         return value.includes(row.getValue(id))
     },
-}, {
-    accessorKey: 'direct',
-    accessorFn: (item) => item.direct,
-    header: ({column}) => h(DataTableColumnHeader, {
-        column,
-        title: 'Direct'
-    }),
-    cell: ({row}) => {
-        return h('div', {class: 'max-w-[500px] truncate font-medium'}, row.getValue('direct'))
-    },
-    filterFn: (row, id, value) => {
-        return value.includes(row.getValue(id))
-    },
 },
     {
         id: 'actions',
-        cell: ({row}) => h(MembersDropdown, {row}),
+        cell: ({row}) => h(SubclassOfDropdown, {row}),
     }]

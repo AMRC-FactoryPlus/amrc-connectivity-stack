@@ -64,7 +64,7 @@
         <div class="flex items-center justify-center">
           <SidebarTrigger/>
           <Button title="Toggle fullscreen" variant="ghost" size="icon" @click="l.toggleFullscreen"><i class="fa-solid fa-expand"></i></Button>
-          <Button class="ml-3" variant="link" size="icon" @click="logout">logout</Button>
+          <Button class="ml-3" variant="link" size="icon" @click="logout">Logout</Button>
         </div>
       </header>
 

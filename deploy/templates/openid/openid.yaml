@@ -59,11 +59,6 @@ spec:
         - name: openid-keytabs
           secret:
             secretName: openid-keytabs
-            items:
-              - path: client
-                key: client
-              - path: server
-                key: server
 ---
 apiVersion: v1
 kind: Service

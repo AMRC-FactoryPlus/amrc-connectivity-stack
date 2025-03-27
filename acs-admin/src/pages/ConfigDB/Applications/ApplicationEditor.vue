@@ -4,7 +4,7 @@
 <template>
   <div class="flex justify-between">
     <span>{{application?.name}}</span>
-    <Button disabled>Add Entry</Button>
+    <CreateEntryDialog :objs="obj.data" :app="application?.uuid" />
   </div>
   <Skeleton v-if="loading || app.loading" v-for="i in 10" class="h-16 rounded-lg mb-2"/>
   <DataTableSearchable v-else
@@ -29,11 +29,12 @@ import {useApplicationStore} from "@store/useApplicationStore.js";
 import {useObjectStore} from "@store/useObjectStore.js";
 import {useServiceClientStore} from "@store/serviceClientStore.js";
 import {serviceClientReady} from "@store/useServiceClientReady.js";
-import {UUIDs} from "@amrc-factoryplus/service-client";
 import * as rxu from "@amrc-factoryplus/rx-util";
 import * as rx from "rxjs";
 import * as imm from "immutable";
 import {Button} from "@components/ui/button/index.js";
+import CreateEntryDialog from "@pages/ConfigDB/Applications/CreateEntryDialog.vue";
+import CreateObjectDialog from "@pages/ConfigDB/CreateObjectDialog.vue";
 
 export default {
   emits: ['rowClick'],
@@ -58,6 +59,8 @@ export default {
   },
 
   components: {
+    CreateObjectDialog,
+    CreateEntryDialog,
     Button,
     Card,
     Skeleton,

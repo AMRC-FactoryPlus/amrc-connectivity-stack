@@ -408,9 +408,7 @@ spark:
   enabled: true
   controller:
     uiIngress:
-      enable: true
-      urlFormat: "spark-console.factoryplus.app.amrc.co.uk/{{$appNamespace}}/{{$appName}}"
-      ingressClassName: "acs-traefik"
+      enable: false
     serviceAccount:
       name: "spark-operator"
   spark:

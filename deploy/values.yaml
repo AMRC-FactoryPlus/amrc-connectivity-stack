@@ -358,6 +358,7 @@ grafana:
   admin:
     existingSecret: grafana-admin-user
   grafana.ini:
+    root_url: "$__file{/etc/acs-config/root_url}"
     auth.basic:
       enabled: false
     auth.proxy:

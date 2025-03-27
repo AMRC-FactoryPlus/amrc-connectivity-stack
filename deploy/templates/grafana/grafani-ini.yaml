@@ -7,3 +7,4 @@ data:
   auth_url: {{ .Values.acs.secure | ternary "https://" "http://" }}openid.{{.Values.acs.baseUrl}}/realms/factory_plus/protocol/openid-connect/auth
   token_url: {{ .Values.acs.secure | ternary "https://" "http://" }}openid.{{.Values.acs.baseUrl}}/realms/factory_plus/protocol/openid-connect/token
   api_url: {{ .Values.acs.secure | ternary "https://" "http://" }}openid.{{.Values.acs.baseUrl}}/realms/factory_plus/protocol/openid-connect/userinfo
+  root_url: {{ .Values.acs.secure | ternary "https://" "http://" }}grafana.{{.Values.acs.baseUrl}}

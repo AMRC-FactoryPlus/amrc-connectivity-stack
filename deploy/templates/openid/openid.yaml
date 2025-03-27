@@ -7,7 +7,10 @@ metadata:
   labels:
     component: openid
 spec:
-  replicas: {{ .Values.openid.replicas | default 1 }}
+  strategy:
+    type: Recreate
+  # We cannot allow more replicas with a RWO PVC backend
+  replicas: 1
   selector:
     matchLabels:
       component: openid

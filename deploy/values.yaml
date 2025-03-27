@@ -442,7 +442,6 @@ influxdb2:
 
 openid:
   enabled: true
-  replicas: 1
   image:
     repository: quay.io/keycloak/keycloak
     tag: 26.1.1

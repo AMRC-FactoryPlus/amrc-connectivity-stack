@@ -51,4 +51,26 @@ export const columns: ColumnDef<ApplicationMapping>[] = [{
     filterFn: (row, id, value) => {
         return value.includes(row.getValue(id))
     },
+},{
+    id: 'actions',
+    cell: ({row}) => {
+        return h('div', {onClick: async (e) => {
+                e.stopPropagation()
+                useDialog({
+                    title: 'Remove Object?',
+                    message: `Are you sure you want to delete ${row.getValue('name')} (${row.original.uuid})`,
+                    confirmText: 'Remove',
+                    onConfirm: async () => {
+                        try {
+                            await useServiceClientStore().client.ConfigDB.delete_object(row.original.uuid)
+                            toast.success(`${row.getValue('name')} has been deleted`)
+                        } catch (err) {
+                            toast.error(`Unable to delete ${row.getValue('name')}`)
+                        }
+                    }
+                });
+            }, class: ''}, [
+            h('i', {class: 'fa-solid fa-fw fa-trash text-red-500'})
+        ])
+    },
 }]

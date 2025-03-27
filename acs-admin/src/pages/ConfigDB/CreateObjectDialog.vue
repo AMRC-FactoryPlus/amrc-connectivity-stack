@@ -150,7 +150,6 @@ export default {
       let newObjectUuid = null
       try {
         newObjectUuid = await this.s.client.ConfigDB.create_object(this.classUuid, this.objectUuid)
-        console.log(newObjectUuid)
         if (newObjectUuid) {
           await this.s.client.ConfigDB.patch_config(UUIDs.App.Info, newObjectUuid, "merge", {name: this.objectName})
           toast.success(`${this.objectName} has been created with UUID ${newObjectUuid}`)

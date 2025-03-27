@@ -17,7 +17,7 @@
         <div v-if="!obj.ready || app.loading"><i class="fa-solid fa-circle-notch animate-spin"></i></div>
       </div>
       <Button disabled v-if="activeTab==='applications'">Add Application</Button>
-      <Button disabled v-if="activeTab==='objects'">Add Object</Button>
+      <CreateObjectDialog v-if="activeTab==='objects'" :objs="obj.data" />
     </div>
     <TabsContent value="applications">
       <ApplicationList @rowClick="e => objectClicked(e.original)"></ApplicationList>
@@ -43,6 +43,7 @@ import ApplicationList from "@pages/ConfigDB/Applications/ApplicationList.vue";
 import ObjectList from "@pages/ConfigDB/Objects/ObjectList.vue";
 import PrincipalList from "@pages/AccessControl/Principals/PrincipalList.vue";
 import {useApplicationStore} from "@store/useApplicationStore.js";
+import CreateObjectDialog from "@pages/ConfigDB/CreateObjectDialog.vue";
 
 export default {
   setup () {
@@ -56,6 +57,7 @@ export default {
   },
 
   components: {
+    CreateObjectDialog,
     PrincipalList,
     ApplicationList,
     ObjectList,

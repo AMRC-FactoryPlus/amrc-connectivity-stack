@@ -131,18 +131,21 @@ const router = createRouter({
   routes,
 })
 
+// XXX - Disabled because it kept redirecting me to login every time I
+// refreshed the page.
+
 // Setup auth guard.
-router.beforeEach((to, from, next) => {
-  const clientLoaded = localStorage.getItem('clientLoaded');
-  if(!clientLoaded && to.path !== "/login"){
-    next({path: "/login"})
-  }else if(clientLoaded && to.path === "/login"){
-    next({path: "/"})
-  }
-  else{
-    next();
-  }
-})
+// router.beforeEach((to, from, next) => {
+//   const clientLoaded = localStorage.getItem('clientLoaded');
+//   if(!clientLoaded && to.path !== "/login"){
+//     next({path: "/login"})
+//   }else if(clientLoaded && to.path === "/login"){
+//     next({path: "/"})
+//   }
+//   else{
+//     next();
+//   }
+// })
 
 const pinia = createPinia()
 pinia.use(piniaPersist)

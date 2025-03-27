@@ -358,7 +358,10 @@ grafana:
   admin:
     existingSecret: grafana-admin-user
   grafana.ini:
-    root_url: "$__file{/etc/acs-config/root_url}"
+    server:
+      root_url: "$__file{/etc/acs-config/root_url}"
+    auth:
+      disable_login_form: true
     auth.basic:
       enabled: false
     auth.generic_oauth:

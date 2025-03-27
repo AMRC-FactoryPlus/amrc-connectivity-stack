@@ -32,8 +32,6 @@ export const useDirectRelationshipStore = defineStore('directrelationship', {
     async fetch () {
       this.loading = true
 
-      console.log("fetch direct relationship")
-
       // Wait until the store is ready before attempting to fetch data
       await serviceClientReady()
       await useObjectStore().readyPromise
@@ -47,6 +45,7 @@ export const useDirectRelationshipStore = defineStore('directrelationship', {
         }
         this.data = await Promise.all(uuids.map(async uuid => this.fetchDirectRelationships(uuid)))
 
+        console.log("fetch direct relationship complete", this.data)
         this.loading = false
       } catch (err){
         console.error(`Can't read grants`, err)

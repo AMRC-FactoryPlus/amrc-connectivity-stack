@@ -263,7 +263,7 @@ export default {
     async updateData () {
       const client = this.s.client
       client.Fetch.cache = "reload"
-      this.r.fetch()
+      await this.r.fetch()
       client.Fetch.cache = "default"
     },
     async addMembership (group) {

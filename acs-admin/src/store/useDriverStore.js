@@ -3,7 +3,7 @@
  */
 
 import { UUIDs } from "@amrc-factoryplus/service-client"
-import { useStore } from '@store/useStore.js'
+import { useStore } from '@store/useStore.ts'
 
 export const useDriverStore = () => useStore(
   'driver', 

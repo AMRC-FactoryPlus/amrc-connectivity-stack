@@ -31,7 +31,7 @@ export default {
 
   setup () {
     return {
-      s: useDeviceStore(),
+      d: useDeviceStore(),
     }
   },
 
@@ -57,16 +57,13 @@ export default {
 
   computed: {
     devices () {
-      return Array.isArray(this.s.data) ? this.s.data.filter(e => e.node === this.node.uuid) : []
+      console.log(this.d.data)
+      return Array.isArray(this.d.data) ? this.d.data.filter(e => e.deviceInformation.node === this.node.uuid) : []
     },
 
     devicesLoading () {
-      return this.s.loading
+      return this.d.loading
     },
-  },
-
-  async mounted () {
-    await this.s.fetch()
   },
 
   methods: {

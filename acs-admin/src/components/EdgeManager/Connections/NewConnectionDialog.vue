@@ -8,7 +8,6 @@
       <DialogHeader>
         <DialogTitle>Create a New Connection</DialogTitle>
         <DialogDescription>Create a new connection in the {{node.name}} node</DialogDescription>
-        {{formData}}
       </DialogHeader>
       <div class="flex flex-col justify-center gap-3 overflow-auto flex-1 fix-inset">
         <!-- Driver Selection -->

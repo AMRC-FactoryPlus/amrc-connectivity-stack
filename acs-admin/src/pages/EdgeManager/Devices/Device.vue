@@ -61,9 +61,9 @@
 <!--            <i class="fa-solid fa-sync"></i>-->
 <!--            <div>Change Schema</div>-->
 <!--          </Button>-->
-          <Button @click="loadSchemaBinding" size="sm" variant="ghost" class="flex items-center justify-center gap-2">
+          <Button @click="loadNodeBinding" size="sm" variant="ghost" class="flex items-center justify-center gap-2">
             <i class="fa-solid fa-sync"></i>
-            <div>Load Schema Binding</div>
+            <div>Load Node Binding</div>
           </Button>
         </div>
         <div class="space-y-4 p-4">
@@ -159,7 +159,7 @@ export default {
 
   methods: {
 
-    async loadSchemaBinding() {
+    async loadNodeBinding () {
       if (!this.device?.deviceInformation?.node) {
         toast.error('No node information available')
         return

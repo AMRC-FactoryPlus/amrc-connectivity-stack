@@ -169,7 +169,7 @@ class RealmSetup {
       });
 
       if (response.ok) {
-        this.log("Created new realm client: %o", client_representation);
+        this.log("Created new realm client: %o", client);
       } else {
         const status = response.status;
 

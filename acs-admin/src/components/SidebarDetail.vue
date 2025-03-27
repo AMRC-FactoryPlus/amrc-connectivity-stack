@@ -9,9 +9,9 @@
       <label class="flex items-center rounded-md text-xs font-medium">{{label}}</label>
     </div>
     <Copyable v-if="value" :text="value">
-      <span class="flex items-center text-sm text-gray-700 hover:text-gray-950 bg-gray-50 hover:bg-gray-200 px-2 py-1 rounded-md">{{value}}</span>
+      <span class="flex items-center text-sm text-gray-700 hover:text-gray-950 bg-gray-50 h-6 hover:bg-gray-200 px-2 py-1 rounded-md w-full">{{value}}</span>
     </Copyable>
-    <span v-else class="flex items-center text-sm text-gray-950 bg-gray-100 px-1.5 py-0.5 rounded-md opacity-60 hover:opacity-100">-</span>
+    <span v-else class="flex items-center text-sm text-gray-950 bg-gray-100 px-1.5 py-0.5 h-6 rounded-md opacity-60 hover:opacity-100 w-full">-</span>
   </div>
 </template>
 

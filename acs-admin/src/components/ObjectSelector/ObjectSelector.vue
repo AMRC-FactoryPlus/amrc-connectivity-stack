@@ -23,10 +23,12 @@
             :search-key="null"
             :columns="columns"
             :limit-height="true"
+            :clickable="!multiSelect"
+            @row-click="e => {$emit('update:modelValue', [e.original]); updateOpen(false)}"
             :filters="[]">
           <template #default="slotProps">
             <div class="flex items-center justify-center gap-2">
-              <div class="whitespace-nowrap mr-4">{{slotProps.selectedObjects.length}} of {{storeData.length}} selected</div>
+              <div v-if="multiSelect" class="whitespace-nowrap mr-4">{{slotProps.selectedObjects.length}} selected</div>
               <slot name="actions"></slot>
               <Button :disabled="!slotProps.selectedObjects.length"
                   @click="() => {$emit('update:modelValue', slotProps.selectedObjects); updateOpen(false)}">
@@ -143,6 +145,11 @@ export default {
       type: String,
       default: 'check',
     },
+
+    multiSelect: {
+      type: Boolean,
+      default: true,
+    }
   },
 
   watch: {
@@ -164,7 +171,7 @@ export default {
   },
 
   mounted () {
-    this.columns = buildColumns(this.column1Header, this.column1MainKey, this.column1SubKey, this.column2Header, this.column2MainKey, this.column2SubKey)
+    this.columns = buildColumns(this.column1Header, this.column1MainKey, this.column1SubKey, this.column2Header, this.column2MainKey, this.column2SubKey, this.multiSelect)
   },
 
   data () {

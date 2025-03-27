@@ -102,7 +102,7 @@ const limitHeight = props.limitHeight
             @update:model-value="props.searchKey ? table.getColumn(props.searchKey)?.setFilterValue($event) : table.setGlobalFilter(String($event))"
         />
         <div class="text-slate-500 whitespace-nowrap">
-          Showing {{table.getFilteredRowModel().rows.length}}
+          Showing {{table.getFilteredRowModel().rows.length}} of {{table.getPreFilteredRowModel().rows.length}}
         </div>
       </div>
       <div>

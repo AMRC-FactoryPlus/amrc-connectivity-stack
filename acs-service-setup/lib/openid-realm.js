@@ -73,12 +73,12 @@ class RealmSetup {
     await this.get_initial_access_token();
     await this.create_basic_realm(base_realm, false);
 
-    const client_configs = Object.values(this.config.openidClients);
+    const client_configs = Object.entries(this.config.openidClients);
     const enabled_clients = client_configs.filter(
-      (client) => client.enabled === true,
+      ([name, client]) => client.enabled === true,
     );
-    for (const client of enabled_clients) {
-      await this.create_client(client, false);
+    for (const [name, client] of enabled_clients) {
+      await this.create_client(name, client, false);
     }
   }
 
@@ -130,25 +130,25 @@ class RealmSetup {
    * @param {Boolean} is_retry - Whether the request is a retry after a 401. If this is false and a 401 is returned, this will retry after refreshing the token.
    * @returns {Promise<void>} Resolves when the client is created.
    */
-  async create_client(client_representation, is_retry) {
-    const secret_path = path.join(
-      "/etc/secret",
-      client_representation.redirectHost,
-    );
+  async create_client(name, client_representation, is_retry) {
+    const secret_path = path.join("/etc/secret", name);
     const content = await fs.readFile(secret_path, "utf8");
     const client_secret = content.trim();
+
+    const host = client_representation.redirectHost ?? name;
+    const url = `http${this.secure}://${host}.${this.base_url}`;
 
     const client = {
       id: crypto.randomUUID(),
       clientId: client_representation.clientId,
       name: client_representation.name,
-      rootUrl: `http${this.secure}://${client_representation.redirectHost}.${this.base_url}`,
-      adminUrl: `http${this.secure}://${client_representation.redirectHost}.${this.base_url}`,
-      baseUrl: `http${this.secure}://${client_representation.redirectHost}.${this.base_url}`,
+      rootUrl: url,
+      adminUrl: url,
+      baseUrl: url,
       enabled: true,
       secret: client_secret,
       redirectUris: [
-        `http${this.secure}://${client_representation.redirectHost}.${this.base_url}${client_representation.redirectPath}`,
+        `${url}${client_representation.redirectPath}`,
       ],
     };
 
@@ -173,7 +173,7 @@ class RealmSetup {
           await this.get_initial_access_token(this.refresh_token);
           await this.create_client(client_representation, true);
         } else if (status == 409) {
-          this.log("Client already exists");
+          this.log("Client %o already exists", name);
         } else if (status == 503) {
           await setTimeout(10000);
           await this.create_client(client_representation, false);

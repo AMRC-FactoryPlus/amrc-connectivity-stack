@@ -66,7 +66,7 @@ const routes = [
       icon: 'gears'
     },
     children: [
-      {path: '/:selected?', component: ConfigDB, meta: {}}
+      {path: ':selected?', component: ConfigDB, meta: {}}
     ]
   },
   {

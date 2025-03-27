@@ -50,6 +50,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useServiceClientStore } from '@/store/serviceClientStore.js'
+import {toast} from "vue-sonner";
 
 export default {
 
@@ -83,14 +84,19 @@ export default {
   },
 
   methods: {
-    login () {
+    async login () {
       this.loggingIn = true
-      this.s.login({
+      try{
+        await this.s.login({
         directory_url: this.directory,
         username: this.username,
         password: this.password,
         browser: true,
       })
+      }catch(e){
+        toast.error(`Login Error!`)
+      }
+
       this.loggingIn = false
     },
   },

@@ -18,9 +18,12 @@ export const useServiceClientStore = defineStore('service-client', {
   },
   actions: {
     // since we rely on `this`, we cannot use an arrow function
-    login (opts) {
+    async login (opts) {
 
       const client = new RxClient(opts);
+
+      // Try an auth lookup to check client authentication.
+      await client.Auth.whoami_uuid()
 
       // save opts to local storage
       localStorage.setItem('opts', JSON.stringify(opts))
@@ -31,9 +34,7 @@ export const useServiceClientStore = defineStore('service-client', {
       this.scheme  = import.meta.env.SCHEME
       this.baseUrl = import.meta.env.BASEURL
 
-      client.service_urls(UUIDs.Service.MQTT).then((urls) => {
-        this.urls.mqtt = urls
-      })
+      this.urls.MQTT = await client.service_urls(UUIDs.Service.MQTT);
 
       client.Fetch.cache = 'reload';
     },

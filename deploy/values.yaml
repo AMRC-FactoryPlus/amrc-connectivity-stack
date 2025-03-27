@@ -258,8 +258,6 @@ curl:
 minio:
   # -- Whether or not to enable MinIO
   enabled: true
-  # -- Whether or not to expose the MinIO console outside of the cluster
-  exposeConsole: false
 
 postgres:
   # -- Whether or not to enable Postgres
@@ -365,6 +363,8 @@ grafana:
       searchNamespace: ALL
 
 tenant:
+  exposeConsole: true
+  exposeApi: true
   tenant:
     name: fplus-minio-core
     certificate:
@@ -385,15 +385,6 @@ tenant:
       - name: deltalake
     users:
       - name: manager-minio-secret
-  ingress:
-    api:
-      enabled: true
-      ingressClassName: acs-traefik
-      host: minio-tenant-api.factoryplus.app.amrc.co.uk
-    console:
-      enabled: true
-      ingressClassName: acs-traefik
-      host: minio-tenant.factoryplus.app.amrc.co.uk
 
 influxdb2:
   enabled: true

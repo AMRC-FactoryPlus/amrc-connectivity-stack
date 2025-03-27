@@ -10,6 +10,7 @@ import Home from '@pages/Home.vue'
 import Activity from '@pages/Activity.vue'
 import Alerts from '@pages/Alerts/Alerts.vue'
 import AccessControl from '@pages/AccessControl/AccessControl.vue'
+import {useServiceClientStore} from "@store/serviceClientStore.js";
 
 const routes = [
   {
@@ -48,6 +49,15 @@ const routes = [
 const router = createRouter({
   history: createWebHashHistory(),
   routes,
+})
+
+router.beforeEach((to, from, next) => {
+  const s = useServiceClientStore();
+  if(!s.loaded && to.path !== "/"){
+    next({path: "/"})
+  }else{
+    next();
+  }
 })
 
 const pinia = createPinia()

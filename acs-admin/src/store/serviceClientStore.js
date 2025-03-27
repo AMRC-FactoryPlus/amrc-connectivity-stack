@@ -47,8 +47,6 @@ export const useServiceClientStore = defineStore('service-client', {
       localStorage.removeItem('opts')
       // Reset the local state
       this.$reset();
-      // Refresh the page
-      location.reload()
     },
   },
 })

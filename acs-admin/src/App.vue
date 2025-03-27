@@ -56,7 +56,7 @@
         <div class="flex items-center justify-center">
           <SidebarTrigger/>
           <Button title="Toggle fullscreen" variant="ghost" size="icon" @click="l.toggleFullscreen"><i class="fa-solid fa-expand"></i></Button>
-          <Button class="ml-3" variant="link" size="icon" @click="s.logout">Logout</Button>
+          <Button class="ml-3" variant="link" size="icon" @click="logout">logout</Button>
         </div>
       </header>
 
@@ -136,6 +136,14 @@ export default {
         this.l.toggleFullscreen()
       }
     },
+  },
+
+  methods: {
+    logout(){
+      // Cleanup the client store state.
+      this.s.logout();
+      this.$router.push("/");
+    }
   },
 
   async mounted () {

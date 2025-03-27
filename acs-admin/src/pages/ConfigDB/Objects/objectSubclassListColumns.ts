@@ -14,6 +14,14 @@ export interface SubclassMapping {
         uuid: string
         name: string
     }
+    originalObject: {
+        uuid: string
+        name: string
+        class: {
+            uuid: string
+            name: string
+        }
+    }
 }
 
 export const subclassColumns: ColumnDef<SubclassMapping>[] = [{

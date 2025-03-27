@@ -11,14 +11,15 @@ import {toast} from "vue-sonner";
 import {useDialog} from '@/composables/useDialog';
 import {useServiceClientStore} from '@store/serviceClientStore.js'
 
-// import { inject } from 'vue'
-// const groupMembershipUpdated = inject('groupMembershipUpdated')
+import { inject } from 'vue'
+const relationshipsUpdated = inject('relationshipsUpdated')
 
 interface DataTableRowActionsProps {
     row: Row<SubclassOfMapping>
 }
 
 const s = useServiceClientStore()
+const cdb = s.client.ConfigDB
 
 const props = defineProps<DataTableRowActionsProps>()
 
@@ -34,14 +35,11 @@ function handleDelete() {
     confirmText: 'Remove',
     onConfirm: async () => {
       try {
-        // TODO: Implement
-        // await useServiceClientStore().client.Auth.delete_principal(row.getValue('uuid'))
-        // toast.success(`${row.getValue('uuid')} has been deleted`)
-        // useServiceClientStore().client.Fetch.cache = "reload"
-        // await usePrincipalStore().fetch()
-        // useServiceClientStore().client.Fetch.cache = "default"
+        await cdb.class_remove_subclass(props.row.original.uuid, props.row.original.originalObject.uuid)
+        toast.success(`Classification of ${props.row.original.name} has been removed`)
+        relationshipsUpdated()
       } catch (err) {
-        toast.error(`Unable to delete ${props.row.original.uuid}`)
+        toast.error(`Unable to remove classification of ${props.row.original.name}`)
       }
     }
   });

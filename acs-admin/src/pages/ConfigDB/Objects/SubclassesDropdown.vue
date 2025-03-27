@@ -5,21 +5,21 @@
 <script setup lang="ts">
 import type {Row} from '@tanstack/vue-table'
 import type {SubclassMapping} from './objectSubclassListColumns'
-
 import {Button} from '@/components/ui/button'
 import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuGroup} from '@/components/ui/dropdown-menu'
 import {toast} from "vue-sonner";
 import {useDialog} from '@/composables/useDialog';
 import {useServiceClientStore} from '@store/serviceClientStore.js'
 
-// import { inject } from 'vue'
-// const groupMembershipUpdated = inject('groupMembershipUpdated')
+import { inject } from 'vue'
+const relationshipsUpdated = inject('relationshipsUpdated')
 
 interface DataTableRowActionsProps {
     row: Row<SubclassMapping>
 }
 
 const s = useServiceClientStore()
+const cdb = s.client.ConfigDB
 
 const props = defineProps<DataTableRowActionsProps>()
 
@@ -30,19 +30,16 @@ function copy(id: string) {
 
 function handleDelete() {
   useDialog({
-    title: 'Remove this Member?',
-    message: `Are you sure you want to remove ${props.row.original.name} from this group?`,
+    title: 'Remove this Subclass?',
+    message: `Are you sure you want to remove the classification of ${props.row.original.originalObject.name}?`,
     confirmText: 'Remove',
     onConfirm: async () => {
       try {
-        // TODO: Implement
-        // await useServiceClientStore().client.Auth.delete_principal(row.getValue('uuid'))
-        // toast.success(`${row.getValue('uuid')} has been deleted`)
-        // useServiceClientStore().client.Fetch.cache = "reload"
-        // await usePrincipalStore().fetch()
-        // useServiceClientStore().client.Fetch.cache = "default"
+        await cdb.class_remove_subclass(props.row.original.originalObject.uuid, props.row.original.uuid)
+        toast.success(`Classification of ${props.row.original.originalObject.name} has been removed`)
+        relationshipsUpdated()
       } catch (err) {
-        toast.error(`Unable to delete ${props.row.original.uuid}`)
+        toast.error(`Unable to delete ${props.row.original.originalObject.name}`)
       }
     }
   });

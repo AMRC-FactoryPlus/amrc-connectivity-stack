@@ -33,7 +33,20 @@
       <template #toolbar-left>
         <div class="flex justify-between items-end flex-grow mr-4">
           <div class="font-semibold">This object is a subclass of:</div>
-          <Button disabled>Add Classification</Button>
+          <ObjectSelector
+              v-model="subclassOfToAdd"
+              :store-data="availableSubclassOf"
+              title="Select Classifications"
+              subtitle="Select the objects which this object should become a subclass of"
+              column1-header="Name"
+              column1-main-key="name"
+              column1-sub-key="uuid"
+              column2-header="Class"
+              column2-main-key="class.name"
+              column2-sub-key="class.uuid"
+          >
+            <Button>Add Classification</Button>
+          </ObjectSelector>
         </div>
       </template>
     </DataTable>
@@ -62,7 +75,20 @@
       <template #toolbar-left>
         <div class="flex justify-between items-end flex-grow mr-4">
           <div class="font-semibold">Direct subclasses of this object:</div>
-          <Button disabled>Add a Subclass</Button>
+          <ObjectSelector
+              v-model="subclassesToAdd"
+              :store-data="availableSubclasses"
+              title="Select new Subclasses"
+              subtitle="Select the objects which become a subclass of this object"
+              column1-header="Name"
+              column1-main-key="name"
+              column1-sub-key="uuid"
+              column2-header="Class"
+              column2-main-key="class.name"
+              column2-sub-key="class.uuid"
+          >
+            <Button>Add a Subclass</Button>
+          </ObjectSelector>
         </div>
       </template>
     </DataTable>
@@ -213,11 +239,23 @@ export default {
       const s = this.relationships?.directSubclasses ?? []
       return s.map(sUUID => this.obj.data.find(o => o.uuid === sUUID)).map(o => ({...o, originalObject: this.object}))
     },
+    availableSubclassOf () {
+      const subclassOfUUIDs = this.isSubclassOf.map(m => m.uuid)
+      return this.obj.data  // All objects
+          .filter(o => o.rank === this.object.rank) // All objects of the same rank
+          .filter(o => !subclassOfUUIDs.includes(o.uuid)) // Objects of the same rank which are we are note already a subclass of
+    },
     availableMemberships () {
       const directMemberships = this.r.data.filter(group => group.directMembers.includes(this.object.uuid)).map(m => m.uuid)
       return this.obj.data  // All objects
           .filter(o => o.rank === this.object.rank+1) // All objects of a rank above
           .filter(o => !directMemberships.includes(o.uuid)) // Objects of a rank above which it's not already a direct member of
+    },
+    availableSubclasses () {
+      const subclasses = this.relationships?.directSubclasses ?? []
+      return this.obj.data  // All objects
+          .filter(o => o.rank === this.object.rank) // All objects of the same rank
+          .filter(o => !subclasses.includes(o.uuid)) // Objects of the same rank which are not already a subclass
     },
     availableMembers () {
       const directMembers = this.relationships?.directMembers ?? []
@@ -228,6 +266,17 @@ export default {
   },
 
   watch: {
+    subclassOfToAdd: async function(val, oldVal) {
+      if (!val.length) {
+        return
+      }
+
+      for (const obj of val) {
+        await this.addSubclassOf(obj)
+      }
+
+      await this.updateData();
+    },
     membershipsToAdd: async function(val, oldVal) {
       if (!val.length) {
         return
@@ -235,6 +284,17 @@ export default {
 
       for (const obj of val) {
         await this.addMembership(obj)
+      }
+
+      await this.updateData();
+    },
+    subclassesToAdd: async function(val, oldVal) {
+      if (!val.length) {
+        return
+      }
+
+      for (const obj of val) {
+        await this.addSubclass(obj)
       }
 
       await this.updateData();
@@ -266,6 +326,16 @@ export default {
       await this.r.fetch()
       client.Fetch.cache = "default"
     },
+    async addSubclassOf (group) {
+      const client = this.s.client
+      try {
+        await client.ConfigDB.class_add_subclass(group.uuid, this.object.uuid)
+        toast.success(`${this.object.name} has been classified as ${group.name}`)
+      } catch (err) {
+        toast.error(`Unable to classify ${this.object.name} as ${group.name}`)
+        console.error(`Unable to classify ${this.object.name} as ${group.name}`, err)
+      }
+    },
     async addMembership (group) {
       const client = this.s.client
       try {
@@ -274,6 +344,15 @@ export default {
       } catch (err) {
         toast.error(`Unable to add ${this.object.name} to ${group.name}`)
         console.error(`Unable to add ${this.object.name} to ${group.name}`, err)
+      }
+    },
+    async addSubclass (member) {
+      try {
+        await this.s.client.ConfigDB.class_add_subclass(this.object.uuid, member.uuid)
+        toast.success(`${member.name} has been classified as ${this.object.name}`)
+      } catch (err) {
+        toast.error(`Unable to classify ${member.name} as ${this.object.name}`)
+        console.error(`Unable to classify ${member.name} as ${this.object.name}`, err)
       }
     },
     async addMember (member) {
@@ -289,7 +368,9 @@ export default {
 
   data() {
     return {
+      subclassOfToAdd: [],
       membershipsToAdd: [],
+      subclassesToAdd: [],
       membersToAdd: [],
     }
   },

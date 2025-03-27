@@ -52,6 +52,8 @@ spec:
               mountPath: /config/krb5-conf
             - name: openid-keytabs
               mountPath: /etc/keytabs
+            - name: data
+              mountPath: /opt/keycloak/data
       volumes:
         - name: krb5-conf
           configMap:
@@ -59,6 +61,24 @@ spec:
         - name: openid-keytabs
           secret:
             secretName: openid-keytabs
+        - name: data
+          persistentVolumeClaim:
+            claimName: keycloak-data
+---
+# XXX Could we use Postgres here instead?
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: keycloak-data
+  namespace: {{ .Release.Namespace }}
+  labels:
+    component: openid
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
 ---
 apiVersion: v1
 kind: Service
@@ -72,9 +92,7 @@ spec:
       targetPort: 8080
   selector:
     factory-plus.service: openid
-
 ---
-
 apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey
 metadata:

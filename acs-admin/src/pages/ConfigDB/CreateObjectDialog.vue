@@ -7,7 +7,7 @@
     <DialogTrigger>
       <Button>
         <div class="flex items-center justify-center gap-2">
-<!--          <i class="fa-solid fa-user-plus"></i>-->
+          <i class="fa-solid fa-plus"></i>
           <div>Create Object</div>
         </div>
       </Button>
@@ -75,7 +75,7 @@
           </div>
           <Button :disabled="v$.$invalid" @click="formSubmit">
             <div class="flex items-center justify-center gap-2">
-              <!--            <i class="fa-solid fa-user-plus"></i>-->
+              <i class="fa-solid fa-plus"></i>
               <div>Create Object</div>
             </div>
           </Button>

@@ -95,32 +95,30 @@ class RealmSetup {
 
     this.log(`Attempting basic realm creation at: ${realm_url}`);
 
-    try {
-      const response = await fetch(realm_url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${this.access_token}`,
-        },
-        body: JSON.stringify(realm_representation),
-      });
+    const response = await fetch(realm_url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${this.access_token}`,
+      },
+      body: JSON.stringify(realm_representation),
+    });
 
-      if (!response.ok) {
-        const status = response.status;
+    if (!response.ok) {
+      const status = response.status;
 
-        if (status == 401 && !is_retry) {
-          await this.get_initial_access_token(this.refresh_token);
-          await this.create_basic_realm(realm_representation, true);
-        } else if (status == 503) {
-          await this.wait(10000);
-          await this.create_basic_realm(realm_representation, false);
-        } else {
-          const error = await response.text();
-          throw new Error(`${status}: ${error}`);
-        }
+      if (status == 401 && !is_retry) {
+        await this.get_initial_access_token(this.refresh_token);
+        await this.create_basic_realm(realm_representation, true);
+      } else if (status == 409) {
+        this.log("Realm already exists");
+      } else if (status == 503) {
+        await setTimeout(10000);
+        await this.create_basic_realm(realm_representation, false);
+      } else {
+        const error = await response.text();
+        throw new Error(`${status}: ${error}`);
       }
-    } catch (error) {
-      this.log(`Couldn't setup realm: ${error}`);
     }
   }
 
@@ -174,6 +172,8 @@ class RealmSetup {
         if (status == 401 && !is_retry) {
           await this.get_initial_access_token(this.refresh_token);
           await this.create_client(client_representation, true);
+        } else if (status == 409) {
+          this.log("Client already exists");
         } else if (status == 503) {
           await setTimeout(10000);
           await this.create_client(client_representation, false);
@@ -213,33 +213,27 @@ class RealmSetup {
       params.append("password", this.password);
     }
 
-    try {
-      const response = await fetch(token_url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: params,
-      });
+    const response = await fetch(token_url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: params,
+    });
 
-      if (response.ok) {
-        const data = await response.json();
-        this.access_token = data.access_token;
-        this.refresh_token = data.refresh_token;
+    if (response.ok) {
+      const data = await response.json();
+      this.access_token = data.access_token;
+      this.refresh_token = data.refresh_token;
 
-        return [data.access_token, data.refresh_token];
-      } else if (response.status == 503) {
-        await setTimeout(10000);
-        this.get_initial_access_token();
-      } else {
-        const status = response.status;
-        const error = await response.text();
-        throw new Error(`${status}: ${error}`);
-      }
-    } catch (error) {
-      this.log(
-        `Couldn't get an initial access token for realm setup: ${error}`,
-      );
+      return [data.access_token, data.refresh_token];
+    } else if (response.status == 503) {
+      await setTimeout(10000);
+      this.get_initial_access_token();
+    } else {
+      const status = response.status;
+      const error = await response.text();
+      throw new Error(`${status}: ${error}`);
     }
   }
 }

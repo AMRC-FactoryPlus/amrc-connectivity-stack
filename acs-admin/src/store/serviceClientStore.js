@@ -25,21 +25,18 @@ export const useServiceClientStore = defineStore('service-client', {
       // Try an auth lookup to check client authentication.
       try{
         this.urls.MQTT = await client.service_urls(UUIDs.Service.MQTT);
+        // save opts to local storage
+        localStorage.setItem('opts', JSON.stringify(opts))
+        this.username = opts.username
+        this.client  = client
+        this.loaded  = true
+        this.scheme  = import.meta.env.SCHEME
+        this.baseUrl = import.meta.env.BASEURL
+        client.Fetch.cache = 'reload';
       }catch (e) {
         this.$reset();
         throw e;
       }
-
-      // save opts to local storage
-      localStorage.setItem('opts', JSON.stringify(opts))
-
-      this.username = opts.username
-      this.client  = client
-      this.loaded  = true
-      this.scheme  = import.meta.env.SCHEME
-      this.baseUrl = import.meta.env.BASEURL
-
-      client.Fetch.cache = 'reload';
     },
 
     logout () {

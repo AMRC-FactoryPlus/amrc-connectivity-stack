@@ -54,7 +54,7 @@ import {toast} from "vue-sonner";
 
 export default {
 
-  name: 'Login',
+  name: 'LoginDialog',
 
   components: {
     Button,
@@ -93,6 +93,7 @@ export default {
         password: this.password,
         browser: true,
       })
+        this.$router.push("/");
       }catch(e){
         toast.error(`Login Failure. Incorrect Username or Password.`)
       }

@@ -142,7 +142,7 @@ export default {
     logout(){
       // Cleanup the client store state.
       this.s.logout();
-      this.$router.push("/");
+      this.$router.push("/login");
     }
   },
 
@@ -151,7 +151,7 @@ export default {
     // Check if opts exists in local storage
     if (localStorage.getItem('opts')) {
       // If it does then create the service client
-      this.s.login(JSON.parse(localStorage.getItem('opts')))
+      await this.s.login(JSON.parse(localStorage.getItem('opts')))
     }
 
     this.$router.isReady().then(() => {

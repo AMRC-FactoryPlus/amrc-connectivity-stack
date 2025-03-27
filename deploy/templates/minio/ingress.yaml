@@ -1,5 +1,5 @@
 {{ if .Values.minio.enabled }}
-{{ if and .Values.tenant.exposeApi (not (default false .Values.tenant.tenant.ingress.api.enabled)) }}
+{{ if and .Values.tenant.exposeApi .Values.tenant.tenant.ingress .Values.tenant.tenant.ingress.api (not (default false .Values.tenant.tenant.ingress.api.enabled)) }}
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
@@ -24,7 +24,7 @@ spec:
   {{- end -}}
 {{- end -}}
 ---
-{{ if and .Values.tenant.exposeConsole (not (default false .Values.tenant.tenant.ingress.console.enabled)) }}
+{{ if and .Values.tenant.exposeConsole .Values.tenant.tenant.ingress .Values.tenant.tenant.ingress.console (not (default false .Values.tenant.tenant.ingress.console.enabled)) }}
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:

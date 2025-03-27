@@ -1,0 +1,20 @@
+acs:
+  baseUrl: amrc-fpd-fry.shef.ac.uk # Set this to the domain that ACS will be served from. This should be the same as the wildcard DNS entry you created earlier.
+  secure: false
+  letsEncrypt:
+    enabled: false
+  defaultRegistry: cr.amrc-fp.shef.ac.uk/internal
+  defaultTag: v4.0.0-dev.2
+  defaultPullPolicy: Always
+identity:
+  realm: AMRC-FPD-FRY.SHEF.AC.UK # Set the identity realm for the deployment. This is used to namespace the identity server and should be unique to your deployment. It is recommende>traefik:
+  ports:
+    web:
+      expose: true
+    mqtt:
+      expose: true
+historians:
+ uns:
+  enabled: true
+ sparkplug:
+  enabled: true

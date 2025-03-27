@@ -1,0 +1,57 @@
+{
+    "apiVersion": "v1",
+    "kind": "Namespace",
+    "metadata": {
+        "creationTimestamp": "2025-03-24T14:30:51Z",
+        "deletionTimestamp": "2025-03-26T15:41:51Z",
+        "labels": {
+            "kubernetes.io/metadata.name": "factory-plus"
+        },
+        "name": "factory-plus",
+        "resourceVersion": "26702989",
+        "uid": "6b9be4a8-5a3c-4b51-87cb-5ac74b456f55"
+    },
+    "spec": {
+        "finalizers": []
+    },
+    "status": {
+        "conditions": [
+            {
+                "lastTransitionTime": "2025-03-26T15:42:26Z",
+                "message": "All resources successfully discovered",
+                "reason": "ResourcesDiscovered",
+                "status": "False",
+                "type": "NamespaceDeletionDiscoveryFailure"
+            },
+            {
+                "lastTransitionTime": "2025-03-26T15:42:26Z",
+                "message": "All legacy kube types successfully parsed",
+                "reason": "ParsedGroupVersions",
+                "status": "False",
+                "type": "NamespaceDeletionGroupVersionParsingFailure"
+            },
+            {
+                "lastTransitionTime": "2025-03-26T15:42:26Z",
+                "message": "All content successfully deleted, may be waiting on finalization",
+                "reason": "ContentDeleted",
+                "status": "False",
+                "type": "NamespaceDeletionContentFailure"
+            },
+            {
+                "lastTransitionTime": "2025-03-26T15:42:26Z",
+                "message": "Some resources are remaining: kerberos-keys.factoryplus.app.amrc.co.uk has 25 resource instances",
+                "reason": "SomeResourcesRemain",
+                "status": "True",
+                "type": "NamespaceContentRemaining"
+            },
+            {
+                "lastTransitionTime": "2025-03-26T15:42:26Z",
+                "message": "Some content in the namespace has finalizers remaining: kopf.zalando.org/KopfFinalizerMarker in 25 resource instances",
+                "reason": "SomeFinalizersRemain",
+                "status": "True",
+                "type": "NamespaceFinalizersRemaining"
+            }
+        ],
+        "phase": "Terminating"
+    }
+}

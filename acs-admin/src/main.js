@@ -10,6 +10,8 @@ import Home from '@pages/Home.vue'
 import Activity from '@pages/Activity.vue'
 import Alerts from '@pages/Alerts/Alerts.vue'
 import AccessControl from '@pages/AccessControl/AccessControl.vue'
+import {useServiceClientStore} from "@store/serviceClientStore.js";
+import Login from "@pages/Login.vue";
 
 const routes = [
   {
@@ -19,7 +21,16 @@ const routes = [
       name: 'Home',
       icon: 'house'
     },
-  }, {
+  },
+  {
+    path: "/login",
+    component: Login,
+    meta: {
+      name: "Login",
+      icon: "user-circle"
+    }
+  },
+  {
     path: '/activity',
     component: Activity,
     meta: {
@@ -48,6 +59,19 @@ const routes = [
 const router = createRouter({
   history: createWebHashHistory(),
   routes,
+})
+
+// Setup auth guard.
+router.beforeEach((to, from, next) => {
+  const s = useServiceClientStore();
+  if(!s.loaded && to.path !== "/login"){
+    next({path: "/login"})
+  }else if(s.loaded && to.path === "/login"){
+    next({path: "/"})
+  }
+  else{
+    next();
+  }
 })
 
 const pinia = createPinia()

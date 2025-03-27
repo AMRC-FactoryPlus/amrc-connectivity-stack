@@ -94,7 +94,7 @@ export default {
         browser: true,
       })
       }catch(e){
-        toast.error(`Login Error!`)
+        toast.error(`Login Failure. Incorrect Username or Password.`)
       }
 
       this.loggingIn = false

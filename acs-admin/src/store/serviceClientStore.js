@@ -23,7 +23,12 @@ export const useServiceClientStore = defineStore('service-client', {
       const client = new RxClient(opts);
 
       // Try an auth lookup to check client authentication.
-      await client.Auth.whoami_uuid()
+      try{
+        this.urls.MQTT = await client.service_urls(UUIDs.Service.MQTT);
+      }catch (e) {
+        this.$reset();
+        throw e;
+      }
 
       // save opts to local storage
       localStorage.setItem('opts', JSON.stringify(opts))
@@ -34,16 +39,14 @@ export const useServiceClientStore = defineStore('service-client', {
       this.scheme  = import.meta.env.SCHEME
       this.baseUrl = import.meta.env.BASEURL
 
-      this.urls.MQTT = await client.service_urls(UUIDs.Service.MQTT);
-
       client.Fetch.cache = 'reload';
     },
 
     logout () {
-
       // Delete the opts local storage item
       localStorage.removeItem('opts')
-
+      // Reset the local state
+      this.$reset();
       // Refresh the page
       location.reload()
     },

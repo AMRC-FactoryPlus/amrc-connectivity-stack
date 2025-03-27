@@ -5,7 +5,7 @@
 <template>
   <Toaster rich-colors/>
   <SidebarProvider>
-    <Sidebar v-if="!l.fullscreen" class="bg-white dark:bg-slate-800 z-20">
+    <Sidebar v-if="!l.fullscreen && s.loaded" class="bg-white dark:bg-slate-800 z-20">
       <SidebarHeader class="border-b h-16">
         <SidebarMenu>
           <SidebarMenuItem>
@@ -47,7 +47,7 @@
     </Sidebar>
 
     <SidebarInset>
-      <header v-if="!l.fullscreen"
+      <header v-if="!l.fullscreen && s.loaded"
           class="flex justify-between items-center border-b px-4 h-16 flex-shrink-0 lg:px-6 sticky top-0 bg-white z-10">
         <div class="flex items-center justify-center gap-2">
           <i :class="`fa-solid fa-${$route.meta.icon}`"></i>

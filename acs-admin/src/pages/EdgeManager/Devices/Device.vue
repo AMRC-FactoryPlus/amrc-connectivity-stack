@@ -18,7 +18,6 @@
           </div>
         </Transition>
         {{device}}
-        
         <EmptyState
             v-if="!device.deviceInformation.schema"
             icon="robot"
@@ -45,7 +44,7 @@
           <SidebarDetail
               icon="fas fa-bolt-lightning"
               label="Sparkplug Device ID"
-              :value="device.sparkplugName"
+              :value="device.deviceInformation.sparkplugName"
           />
           <SidebarDetail
               v-if="device.createdAt"
@@ -57,25 +56,21 @@
         </div>
         <div class="flex items-center justify-between gap-2 p-4 border-b">
           <div class="font-semibold text-lg">Schema</div>
-<!--          <Button @click="changeSchema" size="sm" variant="ghost" class="flex items-center justify-center gap-2">-->
-<!--            <i class="fa-solid fa-sync"></i>-->
-<!--            <div>Change Schema</div>-->
-<!--          </Button>-->
-          <Button @click="loadNodeBinding" size="sm" variant="ghost" class="flex items-center justify-center gap-2">
-            <i class="fa-solid fa-sync"></i>
-            <div>Load Node Binding</div>
+          <Button @click="changeSchema" size="sm" variant="ghost" class="flex items-center justify-center gap-2">
+            <i class="fa-solid fa-sync text-sm"></i>
+            <div class="text-sm">Change Schema</div>
           </Button>
         </div>
         <div class="space-y-4 p-4">
           <SidebarDetail
               icon="fas fa-code"
               label="Schema Type"
-              :value="device.schemaType"
+              :value="schema?.schemaInformation?.name"
           />
           <SidebarDetail
               icon="fas fa-square-v"
               label="Schema Version"
-              :value="device.schemaVersion"
+              :value="schema?.schemaInformation?.version"
           />
         </div>
         <div class="font-semibold text-lg p-4 border-b">Connection</div>
@@ -107,6 +102,7 @@ import SidebarDetail from '@/components/SidebarDetail.vue'
 import moment from 'moment'
 import EmptyState from '@components/EmptyState.vue'
 import { UUIDs } from '@amrc-factoryplus/service-client'
+import { useSchemaStore } from '@store/useSchemaStore.js'
 
 export default {
   components: {
@@ -129,6 +125,7 @@ export default {
     return {
       n: useNodeStore(),
       d: useDeviceStore(),
+      sch: useSchemaStore(),
       inop,
       moment,
     }
@@ -138,43 +135,41 @@ export default {
     async '$route.params.deviceuuid' (newUuid) {
       await this.getDeviceDetails(newUuid)
     },
+    
+    // Add schema watcher to stop beeping when schema is assigned
+    schema(newSchema) {
+      if (newSchema) {
+        this.stopRobotBeep()
+      } else if (!this.beepInterval) {
+        this.startRobotBeep()
+      }
+    }
   },
 
   mounted () {
     this.getDeviceDetails(this.$route.params.deviceuuid)
     this.startRobotBeep()
+    this.sch.start()
   },
 
   beforeUnmount() {
-    if (this.beepInterval) {
-      clearInterval(this.beepInterval)
-    }
+    this.stopRobotBeep()
   },
 
   computed: {
     device() {
       return this.d.data.find(e => e.uuid === this.$route.params.deviceuuid) || {}
+    },
+    
+    schema() {
+      const schemaUuid = this.device?.deviceInformation?.schema
+      if (!schemaUuid) return null
+      
+      return this.sch.data.find(s => s.uuid === schemaUuid) || null
     }
   },
 
   methods: {
-
-    async loadNodeBinding () {
-      if (!this.device?.deviceInformation?.node) {
-        toast.error('No node information available')
-        return
-      }
-
-      try {
-        await this.d.loadAdditionalBindings(this.device.uuid, {
-          'deviceInformation.node': UUIDs.App.EdgeAgentDeployment
-        })
-        toast.success('Node deployment information loaded')
-      } catch (error) {
-        console.error('Failed to load node deployment information:', error)
-        toast.error('Failed to load node information')
-      }
-    },
 
     changeSchema () {
       // Show a list with all schemas
@@ -192,12 +187,23 @@ export default {
     },
 
     startRobotBeep() {
+      // Only start beeping if there's no schema
+      if (this.schema) return
+
       this.beepInterval = setInterval(() => {
         this.robotBeep = "Beep Boop! What am I?"
         setTimeout(() => {
           this.robotBeep = null
         }, 1000)
       }, 10000)
+    },
+
+    stopRobotBeep() {
+      if (this.beepInterval) {
+        clearInterval(this.beepInterval)
+        this.beepInterval = null
+        this.robotBeep = null
+      }
     },
   },
 

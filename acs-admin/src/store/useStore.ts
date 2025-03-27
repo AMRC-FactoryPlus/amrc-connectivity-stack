@@ -36,6 +36,7 @@ interface StoreState {
   data: StoreData[]
   loading: boolean
   rxsub: rx.Subscription | null
+  ready: boolean  // Added ready state
 }
 
 interface ObservableMap {
@@ -77,10 +78,12 @@ export const useStore = (name: string, classUUID: string, appBindings: AppBindin
       data: [],
       loading: true,
       rxsub: null,
+      ready: false  // Initialize ready state
     }),
     actions: {
       async start() {
         this.loading = true
+        this.ready = false  // Reset ready state when starting
         await useObjectStore().start()
         await serviceClientReady()
 
@@ -92,10 +95,8 @@ export const useStore = (name: string, classUUID: string, appBindings: AppBindin
         const createAppObservables = (bindings: AppBindings): Record<string, rx.Observable<ImmutableMap<string, any>>> => {
           return Object.entries(bindings).reduce((acc, [key, value]) => {
             if (typeof value === 'object') {
-              // Handle nested binding
               acc[key] = cdb.search_app(value.app)
               if (value.appBindings) {
-                // For each nested binding, create an observable to resolve the referenced UUID
                 Object.entries(value.appBindings).forEach(([nestedKey, nestedApp]) => {
                   acc[`${key}.${nestedKey}`] = cdb.search_app(nestedApp)
                 })
@@ -125,12 +126,10 @@ export const useStore = (name: string, classUUID: string, appBindings: AppBindin
             const resolveBindings = (bindings: AppBindings): Record<string, any> => {
               return Object.entries(bindings).reduce((acc, [key, value]) => {
                 if (typeof value === 'object') {
-                  // Get the base configuration data
                   const baseData = v[key]?.get(baseObj.uuid) || {}
                   
                   if (value.appBindings) {
                     const resolvedData = { ...baseData }
-                    // For each nested binding, resolve the referenced UUID
                     Object.entries(value.appBindings).forEach(([nestedKey, nestedApp]) => {
                       const refUuid = getNestedValue(baseData, nestedKey)
                       if (refUuid) {
@@ -162,16 +161,18 @@ export const useStore = (name: string, classUUID: string, appBindings: AppBindin
           console.log(`${name.toUpperCase()} UPDATE: %o`, cs)
           this.data = cs
           this.loading = false
+          this.ready = true  // Set ready state when data is loaded
         })
       },
       stop() {
         this.rxsub?.unsubscribe()
         this.rxsub = null
+        this.ready = false  // Reset ready state when stopping
       },
 
       async storeReady() {
         await serviceClientReady()
-        while (this.loading) {
+        while (!this.ready || this.loading) {
           await new Promise(resolve => setTimeout(resolve, 100))
         }
       },

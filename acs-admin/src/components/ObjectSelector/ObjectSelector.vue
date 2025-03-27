@@ -15,7 +15,15 @@
         </div>
       </DialogHeader>
       <div class="flex flex-col justify-center gap-6 overflow-auto flex-1 fix-inset">
-        <DataTableSearchable :selected-objects="modelValue" v-if="columns" :data="storeData" :search-key="column1MainKey" :columns="columns" :limit-height="true" :filters="[]">
+        <DataTableSearchable
+            v-if="columns"
+            :selected-objects="modelValue"
+            :default-sort="initialSort"
+            :data="storeData"
+            :search-key="column1MainKey"
+            :columns="columns"
+            :limit-height="true"
+            :filters="[]">
           <template #default="slotProps">
             <div class="flex items-center justify-center gap-2">
               <div class="whitespace-nowrap mr-4">{{slotProps.selectedObjects.length}} of {{storeData.length}} selected</div>
@@ -143,6 +151,15 @@ export default {
     },
     open (value) {
       this.showModal = value
+    },
+  },
+
+  computed: {
+    initialSort () {
+      return [{
+        id: this.column1MainKey,
+        desc: false
+      }]
     },
   },
 

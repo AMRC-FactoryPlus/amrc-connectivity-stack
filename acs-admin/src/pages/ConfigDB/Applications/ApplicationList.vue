@@ -45,16 +45,6 @@ export default {
         desc: false
       }]
     },
-    filterOptions () {
-      return {
-        names: this.app.data.map((p) => p.name).filter((v, i, a) => a.indexOf(v) === i).map((p) => {
-          return {
-            label: p,
-            value: p,
-          }
-        }),
-      }
-    },
   },
 
   data() {

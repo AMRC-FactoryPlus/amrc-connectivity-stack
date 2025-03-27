@@ -4,7 +4,6 @@
 
 import { defineStore } from 'pinia'
 import * as rx from 'rxjs'
-
 import * as rxu from '@amrc-factoryplus/rx-util'
 
 import { useObjectStore } from '@store/useObjectStore.js'
@@ -12,6 +11,23 @@ import { useServiceClientStore } from '@/store/serviceClientStore.js'
 import { serviceClientReady } from '@store/useServiceClientReady.js'
 
 const stores = new Map()
+
+// Helper to get nested object value using dot notation
+const getNestedValue = (obj, path) => {
+  return path.split('.').reduce((acc, part) => acc?.[part], obj)
+}
+
+// Helper to set nested object value using dot notation
+const setNestedValue = (obj, path, value) => {
+  const parts = path.split('.')
+  const lastPart = parts.pop()
+  const target = parts.reduce((acc, part) => {
+    acc[part] = acc[part] || {}
+    return acc[part]
+  }, obj)
+  target[lastPart] = value
+  return obj
+}
 
 export const useStore = (name, classUUID, appBindings = {}) => {
   if (stores.has(name)) {
@@ -32,14 +48,28 @@ export const useStore = (name, classUUID, appBindings = {}) => {
 
         const cdb = useServiceClientStore().client.ConfigDB
         const objectsObservable = useObjectStore().maps
-
         const uuidsObservable = cdb.watch_members(classUUID)
 
         // Create observables for each app binding
-        const appObservables = Object.entries(appBindings).reduce((acc, [key, appUUID]) => {
-          acc[key] = cdb.search_app(appUUID)
-          return acc
-        }, {})
+        const createAppObservables = (bindings) => {
+          return Object.entries(bindings).reduce((acc, [key, value]) => {
+            if (typeof value === 'object') {
+              // Handle nested binding
+              acc[key] = cdb.search_app(value.app)
+              if (value.appBindings) {
+                // For each nested binding, create an observable to resolve the referenced UUID
+                Object.entries(value.appBindings).forEach(([nestedKey, nestedApp]) => {
+                  acc[`${key}.${nestedKey}`] = cdb.search_app(nestedApp)
+                })
+              }
+            } else {
+              acc[key] = cdb.search_app(value)
+            }
+            return acc
+          }, {})
+        }
+
+        const appObservables = createAppObservables(appBindings)
 
         const details = rxu.rx(
           rx.combineLatest({
@@ -54,11 +84,34 @@ export const useStore = (name, classUUID, appBindings = {}) => {
               class: { name: 'UNKNOWN' },
             })
 
-            // Merge in any bound app data
-            const boundData = Object.entries(appBindings).reduce((acc, [key]) => {
-              acc[key] = v[key].get(baseObj.uuid)
-              return acc
-            }, {})
+            const resolveBindings = (bindings) => {
+              return Object.entries(bindings).reduce((acc, [key, value]) => {
+                if (typeof value === 'object') {
+                  // Get the base configuration data
+                  const baseData = v[key]?.get(baseObj.uuid) || {}
+                  
+                  if (value.appBindings) {
+                    const resolvedData = { ...baseData }
+                    // For each nested binding, resolve the referenced UUID
+                    Object.entries(value.appBindings).forEach(([nestedKey, nestedApp]) => {
+                      const refUuid = getNestedValue(baseData, nestedKey)
+                      if (refUuid) {
+                        const resolvedValue = v[`${key}.${nestedKey}`]?.get(refUuid) || null
+                        setNestedValue(resolvedData, nestedKey, resolvedValue)
+                      }
+                    })
+                    acc[key] = resolvedData
+                  } else {
+                    acc[key] = baseData
+                  }
+                } else {
+                  acc[key] = v[key]?.get(baseObj.uuid) || null
+                }
+                return acc
+              }, {})
+            }
+
+            const boundData = resolveBindings(appBindings)
 
             return {
               ...baseObj,

@@ -13,9 +13,6 @@
           <TabsTrigger value="objects">
             Objects
           </TabsTrigger>
-          <TabsTrigger value="json">
-            JSON Dumps
-          </TabsTrigger>
         </TabsList>
         <div v-if="!obj.ready || app.loading"><i class="fa-solid fa-circle-notch animate-spin"></i></div>
       </div>
@@ -27,9 +24,6 @@
     </TabsContent>
     <TabsContent value="objects">
       <ObjectList @rowClick="e => objectClicked(e.original)"></ObjectList>
-    </TabsContent>
-    <TabsContent value="json">
-      JSON
     </TabsContent>
   </Tabs>
 </template>

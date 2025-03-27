@@ -90,10 +90,14 @@ export default {
   },
 
   async mounted () {
+    this.obj.start()
+    this.app.start()
     this.startObjectSync()
   },
 
   unmounted () {
+    this.app.stop()
+    this.obj.stop()
     this.stopObjectSync()
   },
 }

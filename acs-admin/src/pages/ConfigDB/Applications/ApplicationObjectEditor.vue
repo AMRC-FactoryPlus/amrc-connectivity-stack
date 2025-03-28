@@ -10,7 +10,7 @@
       </div>
       <div class="flex items-center gap-4">
         <Button variant="outline" @click="toggleYaml">
-          <Checkbox :model-value="isYaml" @click="toggleYaml" />
+          <Checkbox :model-value="settings.useYaml" @click="toggleYaml" />
           <div class="ml-2">Edit as Yaml</div>
         </Button>
         <Button :disabled="v$.$invalid" @click="formSubmit">Save</Button>
@@ -44,6 +44,7 @@ import useVuelidate from "@vuelidate/core";
 import {required} from "@vuelidate/validators";
 import {toast} from "vue-sonner";
 import {useDialog} from '@/composables/useDialog';
+import {useUserSettingsStore} from "@store/useUserSettingsStore.js";
 
 MonacoEditor.render = () => h('div')
 
@@ -56,6 +57,7 @@ export default {
       s: useServiceClientStore(),
       app: useApplicationStore(),
       obj: useObjectStore(),
+      settings: useUserSettingsStore(),
       columns: columns,
       router: useRouter(),
       route: useRoute(),
@@ -64,8 +66,7 @@ export default {
 
   data() {
     return {
-      format: "json",
-      isYaml: false,
+      format: this.settings.useYaml ? 'yaml' : 'json',
       data: [], // Stores the raw JavaScript Object to be transferred to/from the backend
       incomingBufferJson: null, // Stores the incoming formatted JSON string the server is sending to us
       code: null, // Stores the formatted JSON string that is being edited locally
@@ -128,17 +129,17 @@ export default {
     syncMessageReceived: function (message) {
       console.log("CONFIG UPDATE: %o", message);
       this.data = message
-      this.incomingBufferJson = this.stringify(message)
+      this.incomingBufferJson = this.formats.json.stringify(message)
       // If the code has been changed and the server is sending something different, ask the user what to do
       if (this.v$.$dirty) {
-        const codeJson = this.isYaml ? this.formats.json.stringify(this.formats.yaml.parse(this.code)) : this.code
+        const codeJson = this.settings.useYaml ? this.formats.json.stringify(this.formats.yaml.parse(this.code)) : this.code
         if (this.incomingBufferJson !== codeJson) {
           useDialog({
             title: 'Update From Remote?',
             message: `The remote config entry for this object has changed. Do you wish to overwrite your local changes with the remote version?`,
             confirmText: 'Use Remote',
             onConfirm: () => {
-              this.code = this.isYaml ? this.formats.yaml.stringify(this.formats.json.parse(this.incomingBufferJson)) : this.incomingBufferJson
+              this.code = this.settings.useYaml ? this.formats.yaml.stringify(this.formats.json.parse(this.incomingBufferJson)) : this.incomingBufferJson
               this.v$.$reset()
             }
           });
@@ -146,7 +147,7 @@ export default {
       } else {
         // The form hasn't been changed
         // We'll set the local string as this might be the first pass, or there are remote changes before anything has changed locally
-        this.code = this.isYaml ? this.formats.yaml.stringify(this.formats.json.parse(this.incomingBufferJson)) : this.incomingBufferJson
+        this.code = this.settings.useYaml ? this.formats.yaml.stringify(this.formats.json.parse(this.incomingBufferJson)) : this.incomingBufferJson
         if (!this.loading) {
           // Only notify if this isn't the first load
           toast.success(`Config entry has been updated from the remote`)
@@ -175,9 +176,9 @@ export default {
       }
     },
     toggleYaml() {
-      this.isYaml = !this.isYaml
+      this.settings.setUseYaml(!this.settings.useYaml)
       const obj = this.parse(this.code)
-      this.format = this.isYaml ? 'yaml' : 'json'
+      this.format = this.settings.useYaml ? 'yaml' : 'json'
       this.code = this.stringify(obj)
     },
     parse(s) {

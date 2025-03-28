@@ -15,10 +15,20 @@
         </div>
       </DialogHeader>
       <div class="flex flex-col justify-center gap-6 overflow-auto flex-1 fix-inset">
-        <DataTableSearchable :selected-objects="modelValue" v-if="columns" :data="storeData" :search-key="column1MainKey" :columns="columns" :limit-height="true" :filters="[]">
+        <DataTableSearchable
+            v-if="columns"
+            :selected-objects="modelValue"
+            :default-sort="initialSort"
+            :data="storeData"
+            :search-key="null"
+            :columns="columns"
+            :limit-height="true"
+            :clickable="!multiSelect"
+            @row-click="e => {$emit('update:modelValue', [e.original]); updateOpen(false)}"
+            :filters="[]">
           <template #default="slotProps">
             <div class="flex items-center justify-center gap-2">
-              <div class="whitespace-nowrap mr-4">{{slotProps.selectedObjects.length}} of {{storeData.length}} selected</div>
+              <div v-if="multiSelect" class="whitespace-nowrap mr-4">{{slotProps.selectedObjects.length}} selected</div>
               <slot name="actions"></slot>
               <Button :disabled="!slotProps.selectedObjects.length"
                   @click="() => {$emit('update:modelValue', slotProps.selectedObjects); updateOpen(false)}">
@@ -135,6 +145,11 @@ export default {
       type: String,
       default: 'check',
     },
+
+    multiSelect: {
+      type: Boolean,
+      default: true,
+    }
   },
 
   watch: {
@@ -146,8 +161,17 @@ export default {
     },
   },
 
+  computed: {
+    initialSort () {
+      return [{
+        id: this.column1MainKey,
+        desc: false
+      }]
+    },
+  },
+
   mounted () {
-    this.columns = buildColumns(this.column1Header, this.column1MainKey, this.column1SubKey, this.column2Header, this.column2MainKey, this.column2SubKey)
+    this.columns = buildColumns(this.column1Header, this.column1MainKey, this.column1SubKey, this.column2Header, this.column2MainKey, this.column2SubKey, this.multiSelect)
   },
 
   data () {

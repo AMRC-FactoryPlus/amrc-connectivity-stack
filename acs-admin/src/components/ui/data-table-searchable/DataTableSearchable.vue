@@ -10,29 +10,40 @@ import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow,} from '@/
 import {valueUpdater} from '@/lib/utils'
 import {ref} from 'vue'
 
-const sorting = ref<SortingState>([])
+interface DataTableProps<T> {
+    columns: ColumnDef<T, any>[]
+    data: T[],
+    searchKey?: string,
+    limitHeight: boolean,
+    filters: { name: string; property: string }[]
+    defaultSort?: SortingState,
+    selectedObjects: [],
+    empty?: string,
+    clickable?: boolean,
+}
+
+const props = defineProps<DataTableProps<any>>()
+
+const sorting = ref<SortingState>(props.defaultSort || [])
 const columnFilters = ref<ColumnFiltersState>([])
 const columnVisibility = ref<VisibilityState>({})
 const rowSelection = ref({})
 const expanded = ref<ExpandedState>({})
 
-interface DataTableProps<T> {
-    columns: ColumnDef<T, any>[]
-    data: T[],
-    searchKey: string,
-    limitHeight: boolean,
-    filters: { name: string; property: string }[]
-    defaultSort?: SortingState,
-    selectedObjects: [],
-    empty?: string
-}
-
 // Write a method to toggle the expanded state of a row
 const toggle = (row: any) => {
-    row.toggleSelected()
+  row.toggleSelected()
 }
 
-const props = defineProps<DataTableProps<any>>()
+const emit = defineEmits(['row-click'])
+
+const rowClick = function(row: any) {
+  if (props.clickable) {
+    emit('row-click', row)
+  } else {
+    toggle(row)
+  }
+}
 
 const table = useVueTable({
     get data() {
@@ -83,12 +94,17 @@ const limitHeight = props.limitHeight
 <template>
   <div class="w-full">
     <div class="flex gap-2 items-center justify-between py-4">
-      <Input
-          class="max-w-sm"
-          placeholder="Filter..."
-          :model-value="table.getColumn(props.searchKey)?.getFilterValue() as string"
-          @update:model-value="table.getColumn(props.searchKey)?.setFilterValue($event)"
-      />
+      <div class="flex gap-2 items-center">
+        <Input
+            class="max-w-sm"
+            placeholder="Filter..."
+            :model-value="props.searchKey ? table.getColumn(props.searchKey)?.getFilterValue() as string : table.getState().globalFilter"
+            @update:model-value="props.searchKey ? table.getColumn(props.searchKey)?.setFilterValue($event) : table.setGlobalFilter(String($event))"
+        />
+        <div class="text-slate-500 whitespace-nowrap">
+          Showing {{table.getFilteredRowModel().rows.length}} of {{table.getPreFilteredRowModel().rows.length}}
+        </div>
+      </div>
       <div>
         <slot :selected-objects="table.getSelectedRowModel().rows.map(r => {return {...r.original, metaRowId: r.id}})"></slot>
       </div>
@@ -105,7 +121,7 @@ const limitHeight = props.limitHeight
         <TableBody>
           <template v-if="table.getRowModel().rows?.length">
             <template v-for="row in table.getRowModel().rows" :key="row.id">
-              <TableRow class="cursor-pointer" :data-state="row.getIsSelected() && 'selected'" @click="() => {toggle(row)}">
+              <TableRow class="cursor-pointer" :data-state="row.getIsSelected() && 'selected'" @click="() => {rowClick(row)}">
                 <TableCell v-for="cell in row.getVisibleCells()" :key="cell.id">
                   <FlexRender :render="cell.column.columnDef.cell" :props="cell.getContext()"/>
                 </TableCell>

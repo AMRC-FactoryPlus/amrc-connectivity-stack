@@ -12,12 +12,18 @@ import {UUIDs} from "@amrc-factoryplus/service-client";
 import {serviceClientReady} from "@store/useServiceClientReady.js";
 
 export const useObjectStore = defineStore('object', {
-  state: () => ({
-    ready: false,
-    maps: null,
-    data: [],
-    rxsub: null,
-  }),
+  state: () => {
+    const ready = Promise.withResolvers();
+    return {
+      ready: false,
+      readyPromise: ready.promise,
+      _set_ready: ready.resolve,
+      maps: null,
+      data: [],
+      rxsub: null,
+
+    }
+  },
   actions: {
     async start () {
 
@@ -55,6 +61,7 @@ export const useObjectStore = defineStore('object', {
       maps.subscribe(map => {
         this.data = map.valueSeq().toArray();
         this.ready = true;
+        this._set_ready();
       });
     },
 

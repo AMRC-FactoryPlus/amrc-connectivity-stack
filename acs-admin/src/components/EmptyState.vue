@@ -13,6 +13,7 @@
       <i v-if="buttonIcon" :class="`fa-solid fa-${buttonIcon} mr-2`"></i>
       {{ buttonText }}
     </Button>
+    <slot name="actions"></slot>
   </div>
 </template>
 

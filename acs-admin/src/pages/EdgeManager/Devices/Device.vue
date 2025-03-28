@@ -8,6 +8,7 @@
       v-model:show="showSchemaDialog"
       :device-id="device.uuid"
       :current-schema-uuid="device?.deviceInformation.schema"
+      @download-config="downloadConfig"
   />
   <EdgeContainer>
     <EdgePageSkeleton v-if="loadingDetails"/>
@@ -178,6 +179,17 @@ export default {
   },
 
   methods: {
+    downloadConfig() {
+      const blob = new Blob([JSON.stringify(this.device, null, 2)], { type: 'application/json' })
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `device-${this.device.name}-${this.device.uuid}-config.json`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+    },
 
     changeSchema () {
       this.showSchemaDialog = true

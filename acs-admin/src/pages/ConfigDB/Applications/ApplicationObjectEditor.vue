@@ -9,8 +9,8 @@
         <RouterLink to="./">{{application?.name}}</RouterLink> - {{object?.name}}
       </div>
       <div class="flex items-center gap-4">
-        <Button disabled variant="outline" @click="() => {isYaml = !isYaml}">
-          <Checkbox :model-value="isYaml" @click="() => {isYaml = !isYaml}" />
+        <Button variant="outline" @click="toggleYaml">
+          <Checkbox :model-value="isYaml" @click="toggleYaml" />
           <div class="ml-2">Edit as Yaml</div>
         </Button>
         <Button :disabled="v$.$invalid" @click="formSubmit">Save</Button>
@@ -27,8 +27,8 @@
 </template>
 
 <script>
-import { Skeleton } from '@components/ui/skeleton'
-import { columns } from './TableData/applicationListColumns.ts'
+import {Skeleton} from '@components/ui/skeleton'
+import {columns} from './TableData/applicationListColumns.ts'
 import {Card} from "@components/ui/card/index.js";
 import {useServiceClientStore} from "@store/serviceClientStore.js";
 import {useRoute, useRouter} from "vue-router";
@@ -36,13 +36,15 @@ import {serviceClientReady} from "@store/useServiceClientReady.js";
 import {useApplicationStore} from "@store/useApplicationStore.js";
 import {useObjectStore} from "@store/useObjectStore.js";
 import MonacoEditor from "vue-monaco";
-import { h } from 'vue'
+import {h} from 'vue'
+import yaml from "yaml";
 import {Button} from "@components/ui/button/index.js";
 import {Checkbox} from "@components/ui/checkbox/index.js";
 import useVuelidate from "@vuelidate/core";
 import {required} from "@vuelidate/validators";
 import {toast} from "vue-sonner";
 import {useDialog} from '@/composables/useDialog';
+
 MonacoEditor.render = () => h('div')
 
 export default {
@@ -62,12 +64,27 @@ export default {
 
   data() {
     return {
+      format: "json",
       isYaml: false,
       data: [], // Stores the raw JavaScript Object to be transferred to/from the backend
-      incomingBuffer: null, // Stores the incoming formatted JSON string the server is sending to us
+      incomingBufferJson: null, // Stores the incoming formatted JSON string the server is sending to us
       code: null, // Stores the formatted JSON string that is being edited locally
       loading: false,
       rxsub: null,
+      formats: {
+        json: {
+          parse: JSON.parse,
+          stringify: (o) => JSON.stringify(o, null, 2),
+        },
+        yaml: {
+          parse: yaml.parse,
+          stringify: (o) => yaml.stringify(o, null, {
+            sortMapEntries:     true,
+            blockQuote:         "literal",
+            indent:             2,
+          }),
+        }
+      }
     }
   },
 
@@ -111,16 +128,17 @@ export default {
     syncMessageReceived: function (message) {
       console.log("CONFIG UPDATE: %o", message);
       this.data = message
-      this.incomingBuffer = JSON.stringify(message, null, 2)
+      this.incomingBufferJson = this.stringify(message)
       // If the code has been changed and the server is sending something different, ask the user what to do
       if (this.v$.$dirty) {
-        if (this.incomingBuffer !== this.code) {
+        const codeJson = this.isYaml ? this.formats.json.stringify(this.formats.yaml.parse(this.code)) : this.code
+        if (this.incomingBufferJson !== codeJson) {
           useDialog({
             title: 'Update From Remote?',
             message: `The remote config entry for this object has changed. Do you wish to overwrite your local changes with the remote version?`,
             confirmText: 'Use Remote',
             onConfirm: () => {
-              this.code = this.incomingBuffer
+              this.code = this.isYaml ? this.formats.yaml.stringify(this.formats.json.parse(this.incomingBufferJson)) : this.incomingBufferJson
               this.v$.$reset()
             }
           });
@@ -128,7 +146,7 @@ export default {
       } else {
         // The form hasn't been changed
         // We'll set the local string as this might be the first pass, or there are remote changes before anything has changed locally
-        this.code = this.incomingBuffer
+        this.code = this.isYaml ? this.formats.yaml.stringify(this.formats.json.parse(this.incomingBufferJson)) : this.incomingBufferJson
         if (!this.loading) {
           // Only notify if this isn't the first load
           toast.success(`Config entry has been updated from the remote`)
@@ -143,7 +161,7 @@ export default {
 
       const cdb = this.s.client.ConfigDB;
       try {
-        await cdb.put_config(this.application.uuid, this.object.uuid, JSON.parse(this.code))
+        await cdb.put_config(this.application.uuid, this.object.uuid, this.parse(this.code))
         toast.success(`Config entry for ${this.object.name} has been updated`)
         this.v$.$reset()
       } catch (err) {
@@ -155,6 +173,18 @@ export default {
       if (typeof e === 'string' || e instanceof String) {
         this.v$.code.$model = e
       }
+    },
+    toggleYaml() {
+      this.isYaml = !this.isYaml
+      const obj = this.parse(this.code)
+      this.format = this.isYaml ? 'yaml' : 'json'
+      this.code = this.stringify(obj)
+    },
+    parse(s) {
+      return this.formats[this.format].parse(s)
+    },
+    stringify(o) {
+      return this.formats[this.format].stringify(o)
     },
   },
 

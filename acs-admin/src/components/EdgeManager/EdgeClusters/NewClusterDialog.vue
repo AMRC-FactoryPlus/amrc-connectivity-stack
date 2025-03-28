@@ -9,7 +9,8 @@
         <DialogTitle>Create a New Edge Cluster</DialogTitle>
         <DialogDescription>Create a new edge cluster to logically group nodes</DialogDescription>
       </DialogHeader>
-      <div class="flex flex-col justify-center gap-3 overflow-auto flex-1 fix-inset">
+      <div class="flex flex-col justify-center gap-2 overflow-auto flex-1 fix-inset">
+        <label class="text-sm font-medium" for="payloadFormat">Cluster Name</label>
         <Input
             title="Name"
             class="max-w-sm"

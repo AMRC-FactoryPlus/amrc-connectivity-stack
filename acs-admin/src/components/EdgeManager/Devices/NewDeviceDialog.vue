@@ -9,13 +9,15 @@
         <DialogTitle>Create a New Device</DialogTitle>
         <DialogDescription>Create a new device for the {{node.name}} node</DialogDescription>
       </DialogHeader>
-      <div class="flex justify-center gap-6 overflow-auto flex-1 fix-inset">
+      <div class="flex flex-col gap-1">
+        <label class="text-sm font-medium">Device Name</label>
         <Input
-            title="Name"
             placeholder="e.g. My CNC Machine"
             v-model="v$.name.$model"
             :v="v$.name"
         />
+            <div v-if="v$.$invalid && v$.$dirty" class="text-xs text-red-500">
+              {{v$.$silentErrors[0]?.$message}}</div>
       </div>
       <DialogFooter :title="v$?.$silentErrors[0]?.$message">
         <Button :disabled="v$.$invalid" @click="formSubmit">
@@ -92,9 +94,14 @@ export default {
       if (!isFormCorrect) return
 
       try {
+        // Check if device name already exists
+        const existingDevice = this.d.data.find(device => device.name === this.name && device.deviceInformation.node === this.node.uuid)
+        if (existingDevice) {
+          toast.error(`A device named "${this.name}" already exists`)
+          return
+        }
 
-        // Create an entry for the device as a member of
-        // UUIDs.Class.Device with name as the name
+        // Create device with unique name
         const deviceUUID = await this.s.client.ConfigDB.create_object(UUIDs.Class.Device)
         this.s.client.ConfigDB.put_config(UUIDs.App.Info, deviceUUID, {
           name: this.name,
@@ -110,7 +117,6 @@ export default {
 
         toast.success(`${this.name} has been created!`)
         this.node = null
-
       }
       catch (err) {
         toast.error(`Unable to create new device for ${this.node.name}`)
@@ -132,7 +138,10 @@ export default {
       alphaNumUnderscoreSpace: helpers.withMessage('Letters, numbers, spaces and underscores are valid', (value) => {
         return /^[a-zA-Z0-9_ ]*$/.test(value)
       }),
-
+      unique: helpers.withMessage('This device name already exists', (value, vm) => {
+        if (!value) return true
+        return !vm.d.data.find(device => (device.name === value && device.deviceInformation.node === vm.node.uuid))
+      }),
     },
   },
 }

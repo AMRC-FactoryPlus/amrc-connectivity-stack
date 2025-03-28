@@ -214,7 +214,7 @@ export default {
         this.robotBeep = "Beep Boop! What am I?"
         setTimeout(() => {
           this.robotBeep = null
-        }, 1000)
+        }, 2000)
       }, 10000)
     },
 

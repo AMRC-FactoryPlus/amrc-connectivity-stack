@@ -12,7 +12,7 @@
         :id="element.title"
         :type="element.format === 'password' ? 'password' : element.type === 'number' ? 'number' : 'text'"
         :placeholder="element.options?.inputAttributes?.placeholder"
-        :value="localValue"
+        :model-value="localValue"
         @update:modelValue="updateValue"
         :v="v$"
         :class="{ 'border-red-500': v$.localValue.$error }"
@@ -27,7 +27,7 @@
     <template v-if="element.enum">
       <Select 
         :id="element.title"
-        :value="localValue"
+        :model-value="localValue"
         @update:modelValue="updateValue"
       >
         <SelectTrigger>
@@ -54,7 +54,7 @@
       <div class="flex items-center space-x-2">
         <Checkbox 
           :id="element.title"
-          :checked="localValue"
+          :model-value="localValue"
           @update:modelValue="updateValue"
         />
         <label :for="element.title" class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">

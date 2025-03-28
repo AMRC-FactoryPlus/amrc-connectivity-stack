@@ -6,14 +6,14 @@
   <Dialog :open="node" @update:open="handleOpen">
     <DialogContent v-if="node" class="sm:max-w-[425px]">
       <DialogHeader>
-        <DialogTitle>Create a New Connection</DialogTitle>
-        <DialogDescription>Create a new connection in the {{node.name}} node</DialogDescription>
+        <DialogTitle>{{existingConnection ? 'Edit Connection' : 'Create a New Connection'}}</DialogTitle>
+        <DialogDescription>{{existingConnection ? 'Edit connection in' : 'Create a new connection in'}} the {{node.name}} node</DialogDescription>
       </DialogHeader>
       <div class="flex flex-col justify-center gap-3 overflow-auto flex-1 fix-inset">
         <!-- Driver Selection -->
         <div class="flex flex-col gap-1">
           <label class="text-sm font-medium" for="host">Driver</label>
-          <Select name="host" v-model="selectedDriverName">
+          <Select :disabled="existingConnection" name="host" v-model="selectedDriverName">
             <SelectTrigger>
               <SelectValue>
                 {{selectedDriverName ?? 'Select a Driver...'}}
@@ -77,11 +77,12 @@
           <div class="flex items-center justify-center gap-2">
             <i :class="{
               'fa-solid': true,
-              'fa-plus': !isSubmitting,
+              'fa-pen': existingConnection && !isSubmitting,
+              'fa-plus': !existingConnection && !isSubmitting,
               'fa-circle-notch': isSubmitting,
               'animate-spin': isSubmitting
             }"></i>
-            <div>{{ isSubmitting ? 'Creating...' : 'Create Connection' }}</div>
+            <div>{{isSubmitting ? 'Saving...' : (existingConnection ? 'Update Connection' : 'Create Connection')}}</div>
           </div>
         </Button>
       </DialogFooter>
@@ -97,7 +98,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useDriverStore } from '@store/useDriverStore.js'
 import { useServiceClientStore } from '@store/serviceClientStore.js'
-import { UUIDs } from "@amrc-factoryplus/service-client";
+import { UUIDs } from '@amrc-factoryplus/service-client'
 import JSONFormElement from '@/components/ui/form/JSONFormElement.vue'
 import { useVuelidate } from '@vuelidate/core'
 import { required } from '@vuelidate/validators'
@@ -159,8 +160,21 @@ export default {
   },
 
   mounted () {
+    window.events.on('show-new-connection-dialog-for-node', async ({
+      node,
+      existingConnection,
+    }) => {
+      if (existingConnection?.configuration) {
 
-    window.events.on('show-new-connection-dialog-for-node', (node) => {
+        this.existingConnection = existingConnection
+        const existingConfig    = existingConnection.configuration
+        this.selectedDriverName = this.dr.data.find(d => d.uuid === existingConfig.driver_uuid)?.name
+        this.formData           = {
+          ...existingConfig.config,
+          payloadFormat: existingConfig.source.payloadFormat,
+        }
+      }
+
       this.node = node
     })
   },
@@ -240,11 +254,12 @@ export default {
 
       return key
     },
+
     resetFormWithDefaults() {
       this.formData = {
         payloadFormat: "Defined by Protocol"
       }
-      
+
       if (!this.selectedDriver?.definition?.schema?.properties) return
 
       const { properties } = this.selectedDriver.definition.schema
@@ -283,6 +298,7 @@ export default {
       this.errors = false
       this.validationState = {}
       this.isSubmitting = false
+      this.existingConnection = null
       this.v$.$reset()
     },
 
@@ -295,52 +311,75 @@ export default {
       this.isSubmitting = true
 
       try {
-        const connectionName = `${this.selectedDriverName}-${crypto.randomUUID()} (${this.node.name})`;
-        const connectionUUID = await this.s.client.ConfigDB.create_object(UUIDs.Class.EdgeAgentConnection)
+        const {
+                payloadFormat,
+                ...configData
+              } = _.cloneDeep(this.formData)
 
-        // Make a deep copy of the form data
-        const formDataCopy = _.cloneDeep(this.formData);
-        
-        // Extract payloadFormat and create config object
-        const { payloadFormat, ...configData } = formDataCopy;
+        if (this.existingConnection) {
+          // Update existing connection
+          await this.s.client.ConfigDB.patch_config(UUIDs.App.ConnectionConfiguration, this.existingConnection.uuid, 'merge',  // Add this parameter
+            {
+              config: configData,
+              driver_uuid: this.selectedDriver.uuid,
+              source: {
+                payloadFormat: payloadFormat,
+              },
+              topology: {
+                cluster: this.node.cluster,
+                host: this.node.hostname,
+              },
+            })
 
-        // Create the info config first
-        await this.s.client.ConfigDB.put_config(UUIDs.App.Info, connectionUUID, {
-          name: connectionName,
-        });
+          toast.success(`Connection updated successfully!`)
+        }
+        else {
+          // Create new connection
+          const connectionName = `${this.selectedDriverName}-${crypto.randomUUID()} (${this.node.name})`
+          const connectionUUID = await this.s.client.ConfigDB.create_object(UUIDs.Class.EdgeAgentConnection)
 
-        // Then create the connection configuration
-        const payload = {
-          createdAt: new Date().toISOString(),
-          config: configData,
-          deployment: {},
-          driver: this.selectedDriver.uuid,
-          edgeAgent: this.node.uuid,
-          source: {
-            payloadFormat: payloadFormat,
-          },
-          topology: {
-            cluster: this.node.cluster,
-            host: this.node.hostname,
-          },
-        };
+          // Create the info config first
+          await this.s.client.ConfigDB.put_config(UUIDs.App.Info, connectionUUID, {
+            name: connectionName,
+          })
 
-        await this.s.client.ConfigDB.put_config(UUIDs.App.ConnectionConfiguration, connectionUUID, payload);
+          // Then create the connection configuration
+          const payload = {
+            createdAt: new Date().toISOString(),
+            config: configData,
+            deployment: {},
+            driver: this.selectedDriver.uuid,
+            edgeAgent: this.node.uuid,
+            source: {
+              payloadFormat: payloadFormat,
+            },
+            topology: {
+              cluster: this.node.cluster,
+              host: this.node.hostname,
+            },
+          }
 
-        toast.success(`Connection created successfully!`);
-        this.handleOpen(false);
-        this.resetForm();
+          await this.s.client.ConfigDB.put_config(UUIDs.App.ConnectionConfiguration, connectionUUID, payload)
+
+          toast.success(`Connection created successfully!`)
+        }
+
+        this.handleOpen(false)
+        this.resetForm()
       } catch (err) {
-        toast.error(`Unable to create new connection`);
-        console.error(err);
+        toast.error(this.existingConnection ? 'Unable to update connection' : 'Unable to create new connection')
+        console.error(err)
       } finally {
-        this.isSubmitting = false;
+        this.isSubmitting = false
       }
     },
 
     handleOpen(e) {
       if (e === false) {
         this.node = null
+        if (this.existingConnection) {
+          this.selectedDriverName = null
+        }
       }
     },
   },
@@ -355,7 +394,8 @@ export default {
       errors: false,
       validationState: {},
       PAYLOAD_FORMATS,
-      isSubmitting: false
+      isSubmitting: false,
+      existingConnection: null,
     }
   },
 }

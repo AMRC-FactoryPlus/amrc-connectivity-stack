@@ -11,9 +11,20 @@
             v-if="!bootstrapped"
             :title="`Bootstrap Required for ${cluster.name}`"
             description="This edge cluster needs to be bootstrapped before it can be used. Click the button below to copy the bootstrap command to run on the Linux host of first node in the cluster."
-            :button-text="`Bootstrap`"
-            button-icon="rocket"
-            @button-click="copyBootstrap"/>
+            icon="rocket"
+        >
+            <template #actions>
+                <Button
+                    @click="copyBootstrap"
+                    :disabled="copyingBootstrap"
+                    class="flex items-center justify-center gap-2"
+                >
+                    <i v-if="copyingBootstrap" class="fa-solid fa-circle-notch animate-spin"></i>
+                    <i v-else class="fa-solid fa-rocket"></i>
+                    Bootstrap
+                </Button>
+            </template>
+        </EmptyState>
         <Tabs v-else default-value="nodes" class="flex flex-col flex-1 z-50">
           <TabsContent value="nodes" class="flex-1 ">
             <div v-if="nodes.length > 0">
@@ -84,8 +95,7 @@
             <div class="font-semibold text-xl">{{cluster.name}}</div>
           </div>
           <Button v-if="bootstrapped" title="Re-Bootstrap" size="xs" class="flex items-center justify-center gap-2 mr-1" @click="copyBootstrap" variant="ghost">
-            <i v-if="copyingBootstrap" class="fa-solid fa-circle-notch animate-spin text-gray-400"></i>
-            <i v-else class="fa-solid fa-refresh text-gray-400"></i>
+            <i class="fa-solid fa-refresh text-gray-400" :class="copyingBootstrap ? 'animate-spin' : ''"></i>
           </Button>
         </div>
         <div class="space-y-4 p-4">

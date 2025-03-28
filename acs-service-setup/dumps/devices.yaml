@@ -1,0 +1,8 @@
+service: !u UUIDs.Service.ConfigDB
+version: 1
+objects:
+  !u UUIDs.Class.App:
+    - !u UUIDs.App.DeviceInformation
+configs:
+  !u UUIDs.App.Info:
+    !u UUIDs.App.DeviceInformation: { name: "Device information" }

@@ -42,7 +42,7 @@ const forwardedProps = useForwardProps(delegatedProps);
       </SelectItemIndicator>
     </span>
 
-    <SelectItemText>
+    <SelectItemText class="w-full">
       <slot />
     </SelectItemText>
   </SelectItem>

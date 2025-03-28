@@ -1,4 +1,8 @@
-import { cva } from "class-variance-authority";
+/*
+ * Copyright (c) University of Sheffield AMRC 2025.
+ */
+
+import { cva } from 'class-variance-authority'
 
 export { default as Button } from "./Button.vue";
 
@@ -11,17 +15,20 @@ export const buttonVariants = cva(
           "bg-slate-900 text-slate-50 hover:bg-slate-900/90 dark:bg-slate-50 dark:text-slate-900 dark:hover:bg-slate-50/90",
         destructive:
           "bg-red-500 text-slate-50 hover:bg-red-500/90 dark:bg-red-900 dark:text-slate-50 dark:hover:bg-red-900/90",
-        outline:
-          "border border-slate-200 bg-white hover:bg-slate-100 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-950 dark:hover:bg-slate-800 dark:hover:text-slate-50",
+        outline: "border border-slate-200 bg-white hover:bg-slate-100 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-950 dark:hover:bg-slate-800 dark:hover:text-slate-50",
+        destructiveOutline:
+          "border border-red-500 bg-white hover:bg-red-500 hover:text-slate-50 dark:border-red-900 dark:bg-slate-950 dark:hover:bg-red-900 dark:hover:text-slate-50",
+        destructiveGhost:
+          "text-red-500 hover:bg-red-500 hover:text-white",
         secondary:
           "bg-slate-100 text-slate-900 hover:bg-slate-100/80 dark:bg-slate-800 dark:text-slate-50 dark:hover:bg-slate-800/80",
-        ghost:
-          "hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-50",
+        ghost: "hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-50",
         link: "text-slate-900 underline-offset-4 hover:underline dark:text-slate-50",
       },
       size: {
-        noPadding: "-ml-4 h-10 px-4 py-2",
+        plain: "",
         default: "h-10 px-4 py-2",
+        xs: "h-8 rounded-md px-3",
         sm: "h-9 rounded-md px-3",
         lg: "h-11 rounded-md px-8",
         icon: "h-10 w-10",

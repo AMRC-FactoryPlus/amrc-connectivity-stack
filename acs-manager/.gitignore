@@ -34,11 +34,6 @@ _ide_helper.php
 !/.idea
 /public/hot
 /storage/clockwork/
-/.idea/dataSources/1f41d385-7677-4c91-92b4-24eb24f29a45.xml
-/.idea/dataSources.local.xml
-/.idea/dataSources/1f41d385-7677-4c91-92b4-24eb24f29a45/storage_v2/_src_/schema/information_schema.FNRwLQ.meta
-/.idea/shelf/Uncommitted_changes_before_Merge_at_09_01_2021,_17_40_[feat__Manage_aircraft_assignment_to/shelved.patch
-/.idea/shelf/Uncommitted_changes_before_Merge_at_09_01_2021__17_40__feat__Manage_aircraft_assignment_to.xml
 /public/vendor/telescope/app.js
 .DS_Store
 /.local/data.ms

@@ -1,0 +1,119 @@
+<!--
+  - Copyright (c) University of Sheffield AMRC 2025.
+  -->
+
+<template>
+  <Dialog :open="show" @update:open="$emit('update:show', $event)">
+    <DialogContent class="sm:max-w-[425px]">
+      <DialogHeader>
+        <DialogTitle>Select a Connection</DialogTitle>
+        <DialogDescription>Choose how this device will communicate</DialogDescription>
+      </DialogHeader>
+      <div class="flex flex-col gap-3">
+        <div class="space-y-1">
+          <Label>Connection</Label>
+          <Select v-model="selectedConnection">
+            <SelectTrigger>
+              <SelectValue class="text-left" placeholder="Select a connection"/>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem
+                  v-for="connection in nodeConnections"
+                  :key="connection.uuid"
+                  :value="connection"
+              >
+                {{connection.name}}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <DialogFooter>
+        <Button variant="outline" @click="$emit('update:show', false)">Cancel</Button>
+        <Button type="submit" @click="save" :disabled="!selectedConnection">Save</Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
+</template>
+
+<script>
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useConnectionStore } from '@/store/useConnectionStore'
+import { UUIDs } from '@amrc-factoryplus/service-client'
+import { toast } from 'vue-sonner'
+import { useServiceClientStore } from '@store/serviceClientStore.js'
+
+export default {
+  components: {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    Button,
+    Label,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+  },
+
+  props: {
+    show: Boolean,
+    deviceId: String,
+    nodeUuid: String,
+    currentConnectionUuid: String,
+  },
+
+  emits: ['update:show'],
+
+  setup() {
+    return {
+      s: useServiceClientStore(),
+      conn: useConnectionStore(),
+    }
+  },
+
+  data() {
+    return {
+      selectedConnection: this.currentConnectionUuid,
+    }
+  },
+
+  computed: {
+    nodeConnections() {
+      return this.conn.data.filter(conn => conn.configuration?.topology?.node === this.nodeUuid)
+    },
+  },
+
+  methods: {
+    async save() {
+      try {
+        await this.s.client.ConfigDB.patch_config(
+          UUIDs.App.DeviceInformation,
+          this.deviceId,
+          "merge",
+          {
+            connection: this.selectedConnection,
+          }
+        )
+        
+        toast.success('Connection updated successfully')
+        this.$emit('update:show', false)
+      } catch (error) {
+        console.error(error)
+        toast.error('Failed to update connection')
+      }
+    },
+  },
+
+  mounted() {
+    this.conn.start()
+  },
+}
+</script>

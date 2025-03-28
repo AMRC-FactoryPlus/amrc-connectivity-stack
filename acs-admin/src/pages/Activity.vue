@@ -1,5 +1,5 @@
 <!--
-  - Copyright (c) University of Sheffield AMRC 2024.
+  - Copyright (c) University of Sheffield AMRC 2025.
   -->
 
 <template>
@@ -105,7 +105,7 @@ export default {
     this.mqtt = await this.s.client.MQTT.mqtt_client()
 
     this.mqtt.on('connect', this.onConnect)
-    this.mqtt.on('error', e => console.log(`MQTT error: ${e}`))
+    this.mqtt.on('error', e => console.error(`MQTT error: ${e}`))
     this.mqtt.on('message', this.onMessage)
 
     this.mqtt.subscribe('spBv1.0/#')
@@ -140,7 +140,7 @@ export default {
 
       const topic = Topic.parse(topicstr)
       if (!topic) {
-        console.log(`Bad MQTT topic ${topic}`)
+        console.error(`Bad MQTT topic ${topic}`)
         return
       }
 

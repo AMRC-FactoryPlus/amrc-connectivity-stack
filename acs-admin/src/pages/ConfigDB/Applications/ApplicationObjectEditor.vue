@@ -68,7 +68,6 @@ export default {
       code: null, // Stores the formatted JSON string that is being edited locally
       loading: false,
       rxsub: null,
-      saved: false,
     }
   },
 
@@ -122,6 +121,7 @@ export default {
             confirmText: 'Use Remote',
             onConfirm: () => {
               this.code = this.incomingBuffer
+              this.v$.$reset()
             }
           });
         }
@@ -145,7 +145,7 @@ export default {
       try {
         await cdb.put_config(this.application.uuid, this.object.uuid, JSON.parse(this.code))
         toast.success(`Config entry for ${this.object.name} has been updated`)
-        this.saved = true
+        this.v$.$reset()
       } catch (err) {
         toast.error(`Unable to update ${this.object.name}`)
         console.error(err)
@@ -155,7 +155,6 @@ export default {
       if (typeof e === 'string' || e instanceof String) {
         this.v$.code.$model = e
       }
-      this.saved = false
     },
   },
 
@@ -172,7 +171,7 @@ export default {
   },
 
   beforeRouteLeave (to, from , next) {
-    if (this.v$.$dirty && !this.saved) {
+    if (this.v$.$dirty) {
       useDialog({
         title: 'Leave Without Saving?',
         message: `You have unsaved changes to this config entry, if you leave you will lose your changes.`,

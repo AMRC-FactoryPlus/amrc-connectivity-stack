@@ -19,9 +19,14 @@
     <MonacoEditor
         v-if="v$.code.$model"
         class="editor h-[40em] w-[95%] border b-slate-300"
-        language="json"
+        :language="format"
         :value="v$.code.$model"
         @change="editorChange"
+        :options="{
+          lineNumbers: true,
+          tabCompletion: 'on',
+          glyphMargin: true
+        }"
       />
   </div>
 </template>

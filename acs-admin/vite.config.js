@@ -45,7 +45,20 @@ export default defineConfig({
       env: '.env',
       example: '.env.example',
     }),
-    monacoEditorEsmPlugin({}),
+    monacoEditorEsmPlugin({
+      languageWorkers: ['editorWorkerService', 'json'],
+      customWorkers: [
+        {
+          label: "yaml",
+          entry: "monaco-yaml",
+          worker: {
+            id: "monaco-yaml/yamlWorker",
+            entry: "monaco-yaml/yaml.worker"
+          }
+        }
+      ],
+      globalAPI: true,
+    }),
   ],
   resolve: {
     alias: {

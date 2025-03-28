@@ -181,7 +181,9 @@ export default {
       }
     },
 
-    async formSubmit () {
+    async formSubmit() {
+      this.$emit('download-config')
+      toast.info('Changing a schema clears device configuration, so we\'ve downloaded the old configuration for you as a backup.')
       try {
         await this.s.client.ConfigDB.put_config(UUIDs.App.DeviceInformation, this.deviceId, {
           schema: this.selectedVersion.uuid,
@@ -189,8 +191,7 @@ export default {
 
         toast.success('Schema updated successfully')
         this.$emit('update:show', false)
-      }
-      catch (err) {
+      } catch (err) {
         toast.error('Unable to update schema')
         console.error(err)
       }

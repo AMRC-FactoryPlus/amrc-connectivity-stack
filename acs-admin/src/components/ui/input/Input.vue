@@ -57,7 +57,7 @@ const modelValue = useVModel(props, 'modelValue', emits, {
 </script>
 
 <template>
-  <div class="relative">
+  <div class="relative flex-1">
     <input
       :type="inputType"
       :value="displayValue"

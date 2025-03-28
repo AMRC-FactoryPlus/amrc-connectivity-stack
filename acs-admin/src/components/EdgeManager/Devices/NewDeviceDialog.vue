@@ -12,7 +12,6 @@
       <div class="flex justify-center gap-6 overflow-auto flex-1 fix-inset">
         <Input
             title="Name"
-            class="max-w-sm"
             placeholder="e.g. My CNC Machine"
             v-model="v$.name.$model"
             :v="v$.name"

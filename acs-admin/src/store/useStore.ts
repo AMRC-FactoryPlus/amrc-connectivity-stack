@@ -139,6 +139,8 @@ export const useStore = (name: string, classUUID: string, appBindings: AppBindin
                       if (refUuid) {
                         const resolvedValue = v[`${key}.${nestedKey}`]?.get(refUuid) || null
                         setNestedValue(resolvedData, nestedKey, resolvedValue)
+                        // Store the UUID with _uuid prefix
+                        setNestedValue(resolvedData, `${nestedKey}_uuid`, refUuid)
                       }
                     })
                     acc[key] = resolvedData
@@ -146,7 +148,12 @@ export const useStore = (name: string, classUUID: string, appBindings: AppBindin
                     acc[key] = baseData
                   }
                 } else {
-                  acc[key] = v[key]?.get(baseObj.uuid) || null
+                  const data = v[key]?.get(baseObj.uuid) || null
+                  acc[key] = data
+                  // Store the UUID with _uuid prefix if data exists and has a uuid
+                  if (data?.uuid) {
+                    acc[`${key}_uuid`] = data.uuid
+                  }
                 }
                 return acc
               }, {} as Record<string, any>)

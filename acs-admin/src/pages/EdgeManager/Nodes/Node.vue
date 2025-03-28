@@ -226,7 +226,9 @@ export default {
     },
 
     newConnection () {
-      window.events.emit('show-new-connection-dialog-for-node', this.node)
+      window.events.emit('show-new-connection-dialog-for-node', {
+        node: this.node,
+      })
     },
 
     selectDevice(e) {
@@ -247,7 +249,12 @@ export default {
       })
     },
 
-    selectConnection(e) {},
+    selectConnection(e) {
+      window.events.emit('show-new-connection-dialog-for-node', {
+        node: this.node,
+        existingConnection: e.original
+      })
+    },
   },
 }
 </script>

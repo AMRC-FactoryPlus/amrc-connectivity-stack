@@ -21,7 +21,7 @@
         class="editor h-[40em] w-[95%] border b-slate-300"
         language="json"
         :value="v$.code.$model"
-        @change="(e) => {if (typeof e === 'string' || e instanceof String) v$.code.$model = e}"
+        @change="editorChange"
       />
   </div>
 </template>
@@ -68,6 +68,7 @@ export default {
       code: null, // Stores the formatted JSON string that is being edited locally
       loading: false,
       rxsub: null,
+      saved: false,
     }
   },
 
@@ -102,37 +103,39 @@ export default {
 
       const object = cdb.watch_config(app, obj)
 
-      this.rxsub = object.subscribe(aObj => {
-        console.log("CONFIG UPDATE: %o", aObj);
-        this.data = aObj
-        this.incomingBuffer = JSON.stringify(aObj, null, 2)
-        // If the code has been changed and the server is sending something different, ask the user what to do
-        if (this.v$.$dirty) {
-          if (this.incomingBuffer !== this.code) {
-            useDialog({
-              title: 'Update From Remote?',
-              message: `The remote config entry for this object has changed. Do you wish to overwrite your local changes with the remote version?`,
-              confirmText: 'Use Remote',
-              onConfirm: async () => {
-                this.code = this.incomingBuffer
-              }
-            });
-          }
-        } else {
-          // The form hasn't been changed
-          // We'll set the local string as this might be the first pass, or there are remote changes before anything has changed locally
-          this.code = this.incomingBuffer
-          if (!this.loading) {
-            // Only notify if this isn't the first load
-            toast.success(`Config entry has been updated from the remote`)
-          }
-        }
-        this.loading = false
-      });
+      this.rxsub = object.subscribe(this.syncMessageReceived);
     },
     stopObjectSync: function() {
       this.rxsub?.unsubscribe();
       this.rxsub = null;
+    },
+    syncMessageReceived: function (message) {
+      console.log("CONFIG UPDATE: %o", message);
+      this.data = message
+      this.incomingBuffer = JSON.stringify(message, null, 2)
+      // If the code has been changed and the server is sending something different, ask the user what to do
+      if (this.v$.$dirty) {
+        if (this.incomingBuffer !== this.code) {
+          useDialog({
+            title: 'Update From Remote?',
+            message: `The remote config entry for this object has changed. Do you wish to overwrite your local changes with the remote version?`,
+            confirmText: 'Use Remote',
+            onConfirm: () => {
+              this.code = this.incomingBuffer
+            }
+          });
+        }
+      } else {
+        // The form hasn't been changed
+        // We'll set the local string as this might be the first pass, or there are remote changes before anything has changed locally
+        this.code = this.incomingBuffer
+        if (!this.loading) {
+          // Only notify if this isn't the first load
+          toast.success(`Config entry has been updated from the remote`)
+        }
+      }
+      this.loading = false
+
     },
     async formSubmit () {
       const isFormCorrect = await this.v$.$validate()
@@ -142,11 +145,18 @@ export default {
       try {
         await cdb.put_config(this.application.uuid, this.object.uuid, JSON.parse(this.code))
         toast.success(`Config entry for ${this.object.name} has been updated`)
+        this.saved = true
       } catch (err) {
         toast.error(`Unable to update ${this.object.name}`)
         console.error(err)
       }
-    }
+    },
+    editorChange (e) {
+      if (typeof e === 'string' || e instanceof String) {
+        this.v$.code.$model = e
+      }
+      this.saved = false
+    },
   },
 
   async mounted () {
@@ -159,6 +169,24 @@ export default {
     this.app.stop()
     this.obj.stop()
     this.stopObjectSync()
+  },
+
+  beforeRouteLeave (to, from , next) {
+    if (this.v$.$dirty && !this.saved) {
+      useDialog({
+        title: 'Leave Without Saving?',
+        message: `You have unsaved changes to this config entry, if you leave you will lose your changes.`,
+        confirmText: 'Leave',
+        onConfirm: () => {
+          next()
+        },
+        onCancel: () => {
+          next(false)
+        }
+      });
+    } else {
+      next()
+    }
   },
 
   validations: {

@@ -42,6 +42,7 @@ import {Checkbox} from "@components/ui/checkbox/index.js";
 import useVuelidate from "@vuelidate/core";
 import {required} from "@vuelidate/validators";
 import {toast} from "vue-sonner";
+import {useDialog} from '@/composables/useDialog';
 MonacoEditor.render = () => h('div')
 
 export default {
@@ -62,9 +63,9 @@ export default {
   data() {
     return {
       isYaml: false,
-      incomingBuffer: null,
-      code: null,
-      data: [],
+      data: [], // Stores the raw JavaScript Object to be transferred to/from the backend
+      incomingBuffer: null, // Stores the incoming formatted JSON string the server is sending to us
+      code: null, // Stores the formatted JSON string that is being edited locally
       loading: false,
       rxsub: null,
     }
@@ -102,10 +103,31 @@ export default {
       const object = cdb.watch_config(app, obj)
 
       this.rxsub = object.subscribe(aObj => {
-        console.log("OBJ UPDATE: %o", aObj);
-        this.data = aObj;
-        this.code = JSON.stringify(aObj, null, 2);
-        this.loading = false;
+        console.log("CONFIG UPDATE: %o", aObj);
+        this.data = aObj
+        this.incomingBuffer = JSON.stringify(aObj, null, 2)
+        // If the code has been changed and the server is sending something different, ask the user what to do
+        if (this.v$.$dirty) {
+          if (this.incomingBuffer !== this.code) {
+            useDialog({
+              title: 'Update From Remote?',
+              message: `The remote config entry for this object has changed. Do you wish to overwrite your local changes with the remote version?`,
+              confirmText: 'Use Remote',
+              onConfirm: async () => {
+                this.code = this.incomingBuffer
+              }
+            });
+          }
+        } else {
+          // The form hasn't been changed
+          // We'll set the local string as this might be the first pass, or there are remote changes before anything has changed locally
+          this.code = this.incomingBuffer
+          if (!this.loading) {
+            // Only notify if this isn't the first load
+            toast.success(`Config entry has been updated from the remote`)
+          }
+        }
+        this.loading = false
       });
     },
     stopObjectSync: function() {
@@ -118,11 +140,10 @@ export default {
 
       const cdb = this.s.client.ConfigDB;
       try {
-        const resp = await cdb.put_config(this.application.uuid, this.object.uuid, JSON.parse(this.code))
-        console.log(resp)
+        await cdb.put_config(this.application.uuid, this.object.uuid, JSON.parse(this.code))
         toast.success(`Config entry for ${this.object.name} has been updated`)
       } catch (err) {
-        toast.error(`Unable to create ${this.objectName}`)
+        toast.error(`Unable to update ${this.object.name}`)
         console.error(err)
       }
     }

@@ -2,7 +2,7 @@
   - Copyright (c) University of Sheffield AMRC 2024.
   -->
 <template>
-  <Skeleton v-if="!obj.ready || r.loading" v-for="i in 10" class="h-16 rounded-lg mb-2"/>
+  <Skeleton v-if="!obj.ready || dm.loading || ds.loading || m.loading" v-for="i in 10" class="h-16 rounded-lg mb-2"/>
   <div v-else>
     <div class="flex items-center justify-between">
       <Card>
@@ -127,13 +127,14 @@ import {Card, CardContent, CardDescription, CardHeader, CardTitle} from "@compon
 import {useObjectStore} from "@store/useObjectStore.js";
 import {useGroupStore} from "@store/useGroupStore.js";
 import {useRoute, useRouter} from "vue-router";
-import {useDirectRelationshipStore} from "@store/useDirectRelationshipStore.js";
+import {useDirectMembersStore} from "@store/useDirectMembersStore.js";
 import {Button} from "@components/ui/button/index.js";
 import Copyable from "@components/Copyable.vue";
 import {useMemberStore} from "@store/useMemberStore.js";
 import {defineAsyncComponent} from "vue";
 import {useServiceClientStore} from "@store/serviceClientStore.js";
 import {toast} from "vue-sonner";
+import {useDirectSubclassesStore} from "@store/useDirectSubclassesStore.js";
 
 export default {
   emits: ['rowClick'],
@@ -146,17 +147,11 @@ export default {
       subclassColumns,
       s: useServiceClientStore(),
       obj: useObjectStore(),
-      g: useGroupStore(),
-      r: useDirectRelationshipStore(),
+      dm: useDirectMembersStore(),
+      ds: useDirectSubclassesStore(),
       m: useMemberStore(),
       route: useRoute(),
       router: useRouter(),
-    }
-  },
-
-  provide () {
-    return {
-      relationshipsUpdated: this.updateData
     }
   },
 
@@ -174,8 +169,13 @@ export default {
       return this.obj.data.find(o => o.uuid === this.route.params.object)
     },
     relationships () {
-      // BUG: This isn't refreshing when this.r.data changes???
-      return this.r.data.find(o => o.uuid === this.route.params.object)
+      const directMembers = this.dm.data.find(o => o.uuid === this.route.params.object)?.directMembers ?? []
+      const directSubclasses = this.ds.data.find(o => o.uuid === this.route.params.object)?.directSubclasses ?? []
+      return {
+        uuid: this.route.params.object,
+        directMembers,
+        directSubclasses,
+      }
     },
     initialSort () {
       return [{
@@ -188,7 +188,7 @@ export default {
       let subclassesToLookup = [this.object.uuid]
       do {
         // Try to find all the direct subclass links that refer to any of the uuids in the lookup array
-        const subclassLookup = this.r.data.filter(group => group.directSubclasses.some(g => subclassesToLookup.includes(g)))
+        const subclassLookup = this.ds.data.filter(group => group.directSubclasses.some(g => subclassesToLookup.includes(g)))
         const objLookup = subclassLookup.map(subclass => this.obj.data.find(o => o.uuid === subclass.uuid))
         subclassOf = subclassOf.concat(objLookup)
         subclassesToLookup = objLookup.map(s => s.uuid)
@@ -197,7 +197,7 @@ export default {
     },
     isMemberOf () {
       // BUG: This isn't refreshing when this.r.data changes???
-      const directMemberships = this.r.data.filter(group => group.directMembers.includes(this.object.uuid)).map(m => m.uuid)
+      const directMemberships = this.dm.data.filter(group => group.directMembers.includes(this.object.uuid)).map(m => m.uuid)
       const directMembershipObjs = directMemberships.map(membership => {
         const obj = this.obj.data.find(o => o.uuid === membership)
         return {
@@ -246,7 +246,7 @@ export default {
           .filter(o => !subclassOfUUIDs.includes(o.uuid)) // Objects of the same rank which are we are note already a subclass of
     },
     availableMemberships () {
-      const directMemberships = this.r.data.filter(group => group.directMembers.includes(this.object.uuid)).map(m => m.uuid)
+      const directMemberships = this.dm.data.filter(group => group.directMembers.includes(this.object.uuid)).map(m => m.uuid)
       return this.obj.data  // All objects
           .filter(o => o.rank === this.object.rank+1) // All objects of a rank above
           .filter(o => !directMemberships.includes(o.uuid)) // Objects of a rank above which it's not already a direct member of
@@ -320,12 +320,6 @@ export default {
         this.router.push({ path: `/configdb/objects` })
       }
     },
-    async updateData () {
-      const client = this.s.client
-      client.Fetch.cache = "reload"
-      await this.r.fetch()
-      client.Fetch.cache = "default"
-    },
     async addSubclassOf (group) {
       const client = this.s.client
       try {
@@ -377,16 +371,16 @@ export default {
 
   async mounted () {
     this.obj.start()
-    this.g.start()
     this.m.start()
-
-    this.r.fetch()
+    this.dm.start()
+    this.ds.start()
   },
 
   unmounted () {
     this.obj.stop()
-    this.g.stop()
     this.m.stop()
+    this.dm.stop()
+    this.ds.stop()
   },
 }
 </script>

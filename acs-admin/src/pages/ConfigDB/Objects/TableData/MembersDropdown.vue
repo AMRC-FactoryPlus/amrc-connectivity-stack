@@ -11,9 +11,6 @@ import {toast} from "vue-sonner";
 import {useDialog} from '@/composables/useDialog';
 import {useServiceClientStore} from '@store/serviceClientStore.js'
 
-import { inject } from 'vue'
-const relationshipsUpdated = inject('relationshipsUpdated')
-
 interface DataTableRowActionsProps {
     row: Row<MembersMapping>
 }
@@ -37,7 +34,6 @@ function handleDelete() {
       try {
         await cdb.class_remove_member(props.row.original.originalObject.uuid, props.row.original.uuid)
         toast.success(`${props.row.original.name} has been removed`)
-        relationshipsUpdated()
       } catch (err) {
         toast.error(`Unable to remove ${props.row.original.name}`)
       }

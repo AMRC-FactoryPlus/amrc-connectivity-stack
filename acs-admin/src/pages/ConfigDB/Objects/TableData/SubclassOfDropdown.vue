@@ -11,9 +11,6 @@ import {toast} from "vue-sonner";
 import {useDialog} from '@/composables/useDialog';
 import {useServiceClientStore} from '@store/serviceClientStore.js'
 
-import { inject } from 'vue'
-const relationshipsUpdated = inject('relationshipsUpdated')
-
 interface DataTableRowActionsProps {
     row: Row<SubclassOfMapping>
 }
@@ -37,7 +34,6 @@ function handleDelete() {
       try {
         await cdb.class_remove_subclass(props.row.original.uuid, props.row.original.originalObject.uuid)
         toast.success(`Classification of ${props.row.original.name} has been removed`)
-        relationshipsUpdated()
       } catch (err) {
         toast.error(`Unable to remove classification of ${props.row.original.name}`)
       }

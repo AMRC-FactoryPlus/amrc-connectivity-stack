@@ -10,10 +10,7 @@ import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparat
 import {toast} from "vue-sonner";
 import {useDialog} from '@/composables/useDialog';
 import {useServiceClientStore} from '@store/serviceClientStore.js'
-
-import { inject } from 'vue'
 import {UUIDs} from "@amrc-factoryplus/service-client";
-const relationshipsUpdated = inject('relationshipsUpdated')
 
 interface DataTableRowActionsProps {
     row: Row<MemberOfMapping>
@@ -38,7 +35,6 @@ function handlePrimaryClass() {
       try {
         await cdb.patch_config(UUIDs.App.Registration, props.row.original.originalObject.uuid, "merge", {"class": props.row.original.uuid})
         toast.success(`The primary class of ${props.row.original.originalObject.name} is now ${props.row.original.name}`)
-        relationshipsUpdated()
       } catch (err) {
         toast.error(`Unable to delete ${props.row.original.uuid}`)
       }
@@ -55,7 +51,6 @@ function handleDelete() {
       try {
         await cdb.class_remove_member(props.row.original.uuid, props.row.original.originalObject.uuid)
         toast.success(`Membership of ${props.row.original.name} has been removed`)
-        relationshipsUpdated()
       } catch (err) {
         toast.error(`Unable to remove membership from ${props.row.original.name}`)
       }

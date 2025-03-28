@@ -10,6 +10,13 @@
       :current-schema-uuid="device?.deviceInformation.schema"
       @download-config="downloadConfig"
   />
+  <ChangeConnectionDialog
+      v-if="device.deviceInformation"
+      v-model:show="showConnectionDialog"
+      :device-id="device.uuid"
+      :node-uuid="device.deviceInformation.node"
+      :current-connection-uuid="device?.deviceInformation.connection"
+  />
   <EdgeContainer>
     <EdgePageSkeleton v-if="loadingDetails"/>
     <div v-else class="flex h-full gap-4">
@@ -25,14 +32,34 @@
           </div>
         </Transition>
         <EmptyState
-            v-if="!device.deviceInformation.schema"
+            v-if="!device.deviceInformation.schema || !device.deviceInformation.connection"
             icon="robot"
-            :title="`What is ${device.name}?`"
-            description="Get started by assigning this device a schema."
-            button-text="Choose Schema"
-            button-icon="magnifying-glass"
-            @button-click="changeSchema"
-        />
+            :title="`Configure ${device.name}`"
+            description="Get started by assigning this device a schema and connection."
+        >
+            <template #actions>
+                <div class="flex gap-2">
+                    <Button 
+                        @click="changeSchema"
+                        :disabled="device.deviceInformation.schema"
+                        :variant="device.deviceInformation.schema ? 'outline' : 'default'"
+                        class="flex items-center justify-center gap-2"
+                    >
+                        <i :class="`fa-solid ${device.deviceInformation.schema ? 'fa-check' : 'fa-code'} text-sm`"></i>
+                        <span>{{ device.deviceInformation.schema ? 'Schema Configured' : 'Choose Schema' }}</span>
+                    </Button>
+                    <Button 
+                        @click="changeConnection"
+                        :disabled="device.deviceInformation.connection"
+                        :variant="device.deviceInformation.connection ? 'outline' : 'default'"
+                        class="flex items-center justify-center gap-2"
+                    >
+                        <i :class="`fa-solid ${device.deviceInformation.connection ? 'fa-check' : 'fa-plug'} text-sm`"></i>
+                        <span>{{ device.deviceInformation.connection ? 'Connection Configured' : 'Choose Connection' }}</span>
+                    </Button>
+                </div>
+            </template>
+        </EmptyState>
         <div v-else>{{device}}</div>
       </div>
 
@@ -61,16 +88,18 @@
               :value="moment(device.createdAt).fromNow()"
           />
         </div>
+        <!-- Schema section -->
         <div class="flex items-center justify-between gap-2 p-4 border-b">
           <div class="font-semibold text-lg">Schema</div>
           <Button 
+              v-if="device.deviceInformation?.schema"
               @click="changeSchema" 
               size="sm" 
-              :variant="device.deviceInformation.schema ? 'ghost' : 'default'"
+              variant="ghost"
               class="flex items-center justify-center gap-2"
           >
-              <i :class="`fa-solid ${device.deviceInformation.schema ? 'fa-sync' : 'fa-magnifying-glass'} text-sm`"></i>
-              <div class="text-sm">{{device.deviceInformation.schema ? 'Change' : 'Choose'}} Schema</div>
+              <i class="fa-solid fa-sync text-sm"></i>
+              <div class="text-sm">Change Schema</div>
           </Button>
         </div>
         <div class="space-y-4 p-4">
@@ -85,12 +114,25 @@
               :value="schema?.schemaInformation?.version"
           />
         </div>
-        <div class="font-semibold text-lg p-4 border-b">Connection</div>
+        <!-- Connection section -->
+        <div class="flex items-center justify-between gap-2 p-4 border-b">
+          <div class="font-semibold text-lg">Connection</div>
+          <Button 
+              v-if="device.deviceInformation?.connection"
+              @click="changeConnection" 
+              size="sm" 
+              variant="ghost"
+              class="flex items-center justify-center gap-2"
+          >
+              <i class="fa-solid fa-sync text-sm"></i>
+              <div class="text-sm">Change Connection</div>
+          </Button>
+        </div>
         <div class="space-y-4 p-4">
           <SidebarDetail
               icon="fas fa-plug"
               label="Connection"
-              :value="device.connection"
+              :value="device.deviceInformation.connection?.name"
           />
         </div>
       </div>
@@ -116,6 +158,8 @@ import EmptyState from '@components/EmptyState.vue'
 import { UUIDs } from '@amrc-factoryplus/service-client'
 import { useSchemaStore } from '@store/useSchemaStore.js'
 import ChangeSchemaDialog from '@components/EdgeManager/Devices/ChangeSchemaDialog.vue'
+import { useConnectionStore } from '@store/useConnectionStore.js'
+import ChangeConnectionDialog from '@components/EdgeManager/Devices/ChangeConnectionDialog.vue'
 
 export default {
   components: {
@@ -133,6 +177,7 @@ export default {
     DetailCard,
     SidebarDetail,
     ChangeSchemaDialog,
+    ChangeConnectionDialog,
   },
 
   setup () {
@@ -140,6 +185,7 @@ export default {
       n: useNodeStore(),
       d: useDeviceStore(),
       sch: useSchemaStore(),
+      conn: useConnectionStore(),
       inop,
       moment,
     }
@@ -150,13 +196,16 @@ export default {
       await this.getDeviceDetails(newUuid)
     },
     
-    // Add schema watcher to stop beeping when schema is assigned
-    schema(newSchema) {
-      if (newSchema) {
-        this.stopRobotBeep()
-      } else if (!this.beepInterval) {
-        this.startRobotBeep()
-      }
+    // Stop beeping when both schema and connection are assigned
+    'device.deviceInformation': {
+      handler(newInfo) {
+        if (newInfo?.schema && newInfo?.connection) {
+          this.stopRobotBeep()
+        } else if (!this.beepInterval) {
+          this.startRobotBeep()
+        }
+      },
+      deep: true
     }
   },
 
@@ -200,6 +249,10 @@ export default {
       this.showSchemaDialog = true
     },
 
+    changeConnection () {
+      this.showConnectionDialog = true
+    },
+
     async getDeviceDetails (uuid) {
       this.loadingDetails = true
       await storeReady(this.d)
@@ -236,6 +289,7 @@ export default {
   data () {
     return {
       showSchemaDialog: false,
+      showConnectionDialog: false,
       loadingDetails: true,
       robotBeep: null,
       beepInterval: null,

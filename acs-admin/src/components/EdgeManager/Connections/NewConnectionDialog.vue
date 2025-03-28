@@ -10,6 +10,15 @@
         <DialogDescription>{{existingConnection ? 'Edit connection in' : 'Create a new connection in'}} the {{node.name}} node</DialogDescription>
       </DialogHeader>
       <div class="flex flex-col justify-center gap-3 overflow-auto flex-1 fix-inset">
+        <!-- Connection Name -->
+        <div class="flex flex-col gap-1">
+          <label class="text-sm font-medium">Connection Name <span class="text-red-500">*</span></label>
+          <Input
+              placeholder="e.g. Machine Connection"
+              v-model="name"
+              required
+          />
+        </div>
         <!-- Driver Selection -->
         <div class="flex flex-col gap-1">
           <label class="text-sm font-medium" for="host">Driver</label>
@@ -92,8 +101,8 @@
           <div v-else></div>
 
           <!-- Existing save button -->
-          <Button 
-            :disabled="v$.$invalid || isSubmitting" 
+          <Button
+            :disabled="v$.$invalid || isSubmitting"
             @click="createConnection"
           >
             <div class="flex items-center justify-center gap-2">
@@ -124,11 +133,12 @@ import { useServiceClientStore } from '@store/serviceClientStore.js'
 import { UUIDs } from '@amrc-factoryplus/service-client'
 import JSONFormElement from '@/components/ui/form/JSONFormElement.vue'
 import { useVuelidate } from '@vuelidate/core'
-import { required } from '@vuelidate/validators'
+import { helpers, required } from '@vuelidate/validators'
 import { useEdgeClusterStore } from '@store/useEdgeClusterStore.js'
 import { toast } from 'vue-sonner'
 import _ from 'lodash'
 import { useConnectionStore } from '@store/useConnectionStore.js'
+import { useDeviceStore } from '@store/useDeviceStore.js'
 
 const PAYLOAD_FORMATS = [
   "Defined by Protocol",
@@ -149,6 +159,7 @@ export default {
       c: useEdgeClusterStore(),
       dr: useDriverStore(),
       cn: useConnectionStore(),
+      d: useDeviceStore(),
     }
   },
 
@@ -192,6 +203,7 @@ export default {
         this.existingConnection = existingConnection
         const existingConfig    = existingConnection.configuration
         this.selectedDriverName = this.dr.data.find(d => d.uuid === existingConfig.driver_uuid)?.name
+        this.name = existingConnection.name
         this.formData           = {
           ...existingConfig.config,
           payloadFormat: existingConfig.source.payloadFormat,
@@ -249,7 +261,13 @@ export default {
   validations() {
     return {
       selectedDriverName: { required },
-      formData: this.rules
+      formData: this.rules,
+      name: {
+        required,
+        alphaNumUnderscoreSpace: helpers.withMessage('Letters, numbers, spaces and underscores are valid', (value) => {
+          return /^[a-zA-Z0-9_ ]*$/.test(value)
+        }),
+      }
     }
   },
 
@@ -306,20 +324,15 @@ export default {
         newFormData[event.field] = fieldSchema?.type === 'number' ? Number(event.value) : event.value;
       }
 
-      // Update the entire form data object at once
       this.formData = newFormData;
-
-      this.validationState[event.field] = event.valid;
-      this.errors = Object.values(this.validationState).some(valid => !valid);
     },
 
     resetForm() {
       this.selectedDriverName = null
+      this.name = null
       this.formData = {
         payloadFormat: "Defined by Protocol"
       }
-      this.errors = false
-      this.validationState = {}
       this.isSubmitting = false
       this.existingConnection = null
       this.v$.$reset()
@@ -340,9 +353,14 @@ export default {
               } = _.cloneDeep(this.formData)
 
         if (this.existingConnection) {
-          // Update existing connection
-          await this.s.client.ConfigDB.patch_config(UUIDs.App.ConnectionConfiguration, this.existingConnection.uuid, 'merge',  // Add this parameter
-            {
+          // Update existing connection - update both info and configuration
+          await Promise.all([
+            // Update the name in Info app
+            this.s.client.ConfigDB.patch_config(UUIDs.App.Info, this.existingConnection.uuid, 'merge', {
+              name: this.name,
+            }),
+            // Update the connection configuration
+            this.s.client.ConfigDB.patch_config(UUIDs.App.ConnectionConfiguration, this.existingConnection.uuid, 'merge', {
               config: configData,
               driver_uuid: this.selectedDriver.uuid,
               source: {
@@ -351,21 +369,21 @@ export default {
               topology: {
                 cluster: this.node.cluster,
                 host: this.node.hostname,
+                node: this.node.uuid,
               },
             })
-
+          ])
           toast.success('Success!', {
             description: 'The connection has been updated successfully.',
           })
         }
         else {
           // Create new connection
-          const connectionName = `${this.selectedDriverName}-${crypto.randomUUID()} (${this.node.name})`
           const connectionUUID = await this.s.client.ConfigDB.create_object(UUIDs.Class.EdgeAgentConnection)
 
           // Create the info config first
           await this.s.client.ConfigDB.put_config(UUIDs.App.Info, connectionUUID, {
-            name: connectionName,
+            name: this.name,
           })
 
           // Then create the connection configuration
@@ -381,6 +399,7 @@ export default {
             topology: {
               cluster: this.node.cluster,
               host: this.node.hostname,
+              node: this.node.uuid,
             },
           }
 
@@ -423,27 +442,32 @@ export default {
             this.isDeleting = true
 
             try {
-              // Delete the connection configuration
-              await this.s.client.ConfigDB.delete_config(
-                UUIDs.App.ConnectionConfiguration,
-                this.existingConnection.uuid
-              )
-
-              // Delete the info configuration
-              await this.s.client.ConfigDB.delete_config(
-                UUIDs.App.Info,
-                this.existingConnection.uuid
-              )
 
               // Delete the object itself
               await this.s.client.ConfigDB.delete_object(
                 this.existingConnection.uuid
               )
 
+              // Set all devices that use this connection UUID to have a
+              // connection value of null (use the deviceStore)
+              this.d.data.forEach(device => {
+                if (device.deviceInformation.connection === this.existingConnection.uuid) {
+                  this.s.client.ConfigDB.patch_config(
+                    UUIDs.App.DeviceInformation,
+                    device.uuid,
+                    'merge',
+                    {
+                      connection: null,
+                    }
+                  )
+                }
+              })
+
+
               toast.success('Success!', {
                 description: 'The connection has been deleted successfully.',
               })
-              
+
               this.handleOpen(false)
               this.resetForm()
             } catch (err) {
@@ -467,12 +491,11 @@ export default {
   data () {
     return {
       node: null,
+      name: null,
       selectedDriverName: null,
       formData: {
         payloadFormat: "Defined by Protocol"
       },
-      errors: false,
-      validationState: {},
       PAYLOAD_FORMATS,
       isSubmitting: false,
       existingConnection: null,

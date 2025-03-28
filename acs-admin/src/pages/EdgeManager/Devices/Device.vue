@@ -63,9 +63,14 @@
         </div>
         <div class="flex items-center justify-between gap-2 p-4 border-b">
           <div class="font-semibold text-lg">Schema</div>
-          <Button @click="changeSchema" size="sm" variant="ghost" class="flex items-center justify-center gap-2">
-            <i class="fa-solid fa-sync text-sm"></i>
-            <div class="text-sm">Change Schema</div>
+          <Button 
+              @click="changeSchema" 
+              size="sm" 
+              :variant="device.deviceInformation.schema ? 'ghost' : 'default'"
+              class="flex items-center justify-center gap-2"
+          >
+              <i :class="`fa-solid ${device.deviceInformation.schema ? 'fa-sync' : 'fa-magnifying-glass'} text-sm`"></i>
+              <div class="text-sm">{{device.deviceInformation.schema ? 'Change' : 'Choose'}} Schema</div>
           </Button>
         </div>
         <div class="space-y-4 p-4">

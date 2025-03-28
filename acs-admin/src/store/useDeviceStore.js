@@ -9,6 +9,7 @@ export const useDeviceStore = () => useStore(
   'device',
   UUIDs.Class.Device,
   {
-    deviceInformation: UUIDs.App.DeviceInformation
+    deviceInformation: UUIDs.App.DeviceInformation,
+    sparkplugAddress: UUIDs.App.SparkplugAddress
   }
 )()

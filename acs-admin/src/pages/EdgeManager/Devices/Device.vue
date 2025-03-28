@@ -3,6 +3,10 @@
   -->
 
 <template>
+  <ChangeSchemaDialog
+      v-model:show="showSchemaDialog"
+      :device-id="device.uuid"
+  />
   <EdgeContainer>
     <EdgePageSkeleton v-if="loadingDetails"/>
     <div v-else class="flex h-full gap-4">
@@ -103,6 +107,7 @@ import moment from 'moment'
 import EmptyState from '@components/EmptyState.vue'
 import { UUIDs } from '@amrc-factoryplus/service-client'
 import { useSchemaStore } from '@store/useSchemaStore.js'
+import ChangeSchemaDialog from '@components/EdgeManager/Devices/ChangeSchemaDialog.vue'
 
 export default {
   components: {
@@ -119,6 +124,7 @@ export default {
     Copyable,
     DetailCard,
     SidebarDetail,
+    ChangeSchemaDialog,
   },
 
   setup () {
@@ -172,7 +178,7 @@ export default {
   methods: {
 
     changeSchema () {
-      // Show a list with all schemas
+      this.showSchemaDialog = true
     },
 
     async getDeviceDetails (uuid) {
@@ -209,6 +215,7 @@ export default {
 
   data () {
     return {
+      showSchemaDialog: false,
       loadingDetails: true,
       robotBeep: null,
       beepInterval: null,

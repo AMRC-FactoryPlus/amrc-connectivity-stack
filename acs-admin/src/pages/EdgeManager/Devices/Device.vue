@@ -4,8 +4,10 @@
 
 <template>
   <ChangeSchemaDialog
+      v-if="device.deviceInformation"
       v-model:show="showSchemaDialog"
       :device-id="device.uuid"
+      :current-schema-uuid="device?.deviceInformation.schema"
   />
   <EdgeContainer>
     <EdgePageSkeleton v-if="loadingDetails"/>

@@ -78,6 +78,11 @@ export default {
       type: String,
       required: true,
     },
+    currentSchemaUuid: {
+      type: String,
+      required: false,
+      default: null,
+    },
   },
 
   setup () {
@@ -132,6 +137,13 @@ export default {
   },
 
   watch: {
+
+    show(newVal) {
+      if (newVal === true) {
+        this.handleOpen(true)
+      }
+    },
+
     selectedSchema(newVal) {
       if (newVal && this.availableVersions.length > 0) {
         // Default to highest version when schema is selected
@@ -142,12 +154,30 @@ export default {
     }
   },
 
+  mounted () {
+    this.setInitialSchema()
+  },
+
   methods: {
+    setInitialSchema () {
+      console.debug('Setting initial schema', this.currentSchemaUuid)
+      if (this.currentSchemaUuid) {
+        const currentSchema  = this.schemaStore.data.find(s => s.uuid === this.currentSchemaUuid)
+        this.selectedSchema  = currentSchema
+        // Find and select the current version
+        this.selectedVersion = currentSchema
+      }
+    },
+
     handleOpen (e) {
       if (e === false) {
         this.selectedSchema = null
         this.selectedVersion = null
         this.$emit('update:show', false)
+      }
+      else {
+        this.$emit('update:show', true)
+        this.setInitialSchema()
       }
     },
 

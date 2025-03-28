@@ -182,12 +182,19 @@ export default {
     },
 
     async formSubmit() {
-      this.$emit('download-config')
-      toast.info('Changing a schema clears device configuration, so we\'ve downloaded the old configuration for you as a backup.')
+      // Only download config if we're changing from an existing schema
+      if (this.currentSchemaUuid) {
+        this.$emit('download-config')
+        toast.info('Changing a schema clears device configuration, so we\'ve downloaded the old configuration for you as a backup.')
+      }
+
       try {
-        await this.s.client.ConfigDB.put_config(UUIDs.App.DeviceInformation, this.deviceId, {
-          schema: this.selectedVersion.uuid,
-        })
+        await this.s.client.ConfigDB.patch_config(
+          UUIDs.App.DeviceInformation, 
+          this.deviceId,
+          "merge",
+          { schema: this.selectedVersion.uuid }
+        )
 
         toast.success('Schema updated successfully')
         this.$emit('update:show', false)

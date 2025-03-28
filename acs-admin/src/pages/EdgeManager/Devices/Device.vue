@@ -212,15 +212,15 @@ export default {
     },
 
     startRobotBeep() {
-      // Only start beeping if there's no schema
-      if (this.schema) return
+      if (this.device?.deviceInformation?.schema && this.device?.deviceInformation?.connection) return
 
       this.beepInterval = setInterval(() => {
-        this.robotBeep = "Beep Boop! What am I?"
+        this.robotBeep = this.robotMessages[this.currentMessageIndex]
+        this.currentMessageIndex = (this.currentMessageIndex + 1) % this.robotMessages.length
         setTimeout(() => {
           this.robotBeep = null
-        }, 2000)
-      }, 10000)
+        }, 5000)
+      }, 15000)
     },
 
     stopRobotBeep() {
@@ -228,6 +228,7 @@ export default {
         clearInterval(this.beepInterval)
         this.beepInterval = null
         this.robotBeep = null
+        this.currentMessageIndex = 0  // Reset the index when stopping
       }
     },
   },
@@ -238,6 +239,17 @@ export default {
       loadingDetails: true,
       robotBeep: null,
       beepInterval: null,
+      currentMessageIndex: 0,
+      robotMessages: [
+        "Beep Boop! What am I?",
+        "ERROR 404: Identity not found",
+        "Help! I don't know what I am! 🤖",
+        "01001000 01000101 01001100 01010000",
+        "Searching for meaning... and schemas... and connections...",
+        "I think, therefore I... wait, what am I?",
+        "404: Purpose not found",
+        "Existential crisis mode: Activated",
+      ],
     }
   },
 }

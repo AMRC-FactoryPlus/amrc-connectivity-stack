@@ -4,7 +4,7 @@
 
 <template>
   <Dialog :open="node" @update:open="handleOpen">
-    <DialogContent v-if="node" class="sm:max-w-[425px]">
+    <DialogContent v-if="node">
       <DialogHeader>
         <DialogTitle>{{existingConnection ? 'Edit Connection' : 'Create a New Connection'}}</DialogTitle>
         <DialogDescription>{{existingConnection ? 'Edit connection in' : 'Create a new connection in'}} the {{node.name}} node</DialogDescription>
@@ -70,21 +70,44 @@
         </div>
       </div>
       <DialogFooter>
-        <Button 
-          :disabled="v$.$invalid || isSubmitting" 
-          @click="createConnection"
-        >
-          <div class="flex items-center justify-center gap-2">
-            <i :class="{
-              'fa-solid': true,
-              'fa-pen': existingConnection && !isSubmitting,
-              'fa-plus': !existingConnection && !isSubmitting,
-              'fa-circle-notch': isSubmitting,
-              'animate-spin': isSubmitting
-            }"></i>
-            <div>{{isSubmitting ? 'Saving...' : (existingConnection ? 'Update Connection' : 'Create Connection')}}</div>
-          </div>
-        </Button>
+        <div class="flex w-full items-center justify-between">
+          <!-- Delete button - only show when editing -->
+          <Button
+            v-if="existingConnection"
+            variant="destructiveGhost"
+            :disabled="isSubmitting || isDeleting"
+            @click="deleteConnection"
+          >
+            <div class="flex items-center justify-center gap-2">
+              <i :class="{
+                'fa-solid': true,
+                'fa-trash': !isDeleting,
+                'fa-circle-notch': isDeleting,
+                'animate-spin': isDeleting
+              }"></i>
+              <div>{{ isDeleting ? 'Deleting...' : 'Delete Connection' }}</div>
+            </div>
+          </Button>
+          <!-- Spacer when not editing -->
+          <div v-else></div>
+
+          <!-- Existing save button -->
+          <Button 
+            :disabled="v$.$invalid || isSubmitting" 
+            @click="createConnection"
+          >
+            <div class="flex items-center justify-center gap-2">
+              <i :class="{
+                'fa-solid': true,
+                'fa-pen': existingConnection && !isSubmitting,
+                'fa-plus': !existingConnection && !isSubmitting,
+                'fa-circle-notch': isSubmitting,
+                'animate-spin': isSubmitting
+              }"></i>
+              <div>{{isSubmitting ? 'Saving...' : (existingConnection ? 'Update Connection' : 'Create Connection')}}</div>
+            </div>
+          </Button>
+        </div>
       </DialogFooter>
     </DialogContent>
   </Dialog>
@@ -188,7 +211,7 @@ export default {
     },
     formSchema() {
       const baseSchema = this.selectedDriver?.definition?.schema || {};
-      
+
       // Only include payloadFormat in schema if driver is selected
       return this.selectedDriverName ? {
         ...baseSchema,
@@ -233,7 +256,7 @@ export default {
   methods: {
     async encryptSensitiveInfo(value) {
       if (!this.node) throw new Error('No node selected')
-      
+
       // Generate a unique identifier for this sensitive info
       const key = '__FPSI__' + crypto.randomUUID()
       const cluster = this.node.cluster;
@@ -275,7 +298,7 @@ export default {
 
     handleFormChange(event) {
       const newFormData = _.cloneDeep(this.formData);
-      
+
       if (event.value === "") {
         delete newFormData[event.field];
       } else {
@@ -304,7 +327,7 @@ export default {
 
     async createConnection() {
       if (this.isSubmitting) return
-      
+
       const isFormCorrect = await this.v$.$validate()
       if (!isFormCorrect) return
 
@@ -331,7 +354,9 @@ export default {
               },
             })
 
-          toast.success(`Connection updated successfully!`)
+          toast.success('Success!', {
+            description: 'The connection has been updated successfully.',
+          })
         }
         else {
           // Create new connection
@@ -361,7 +386,9 @@ export default {
 
           await this.s.client.ConfigDB.put_config(UUIDs.App.ConnectionConfiguration, connectionUUID, payload)
 
-          toast.success(`Connection created successfully!`)
+          toast.success('Success!', {
+            description: 'The connection has been created successfully.',
+          })
         }
 
         this.handleOpen(false)
@@ -382,6 +409,59 @@ export default {
         }
       }
     },
+
+    async deleteConnection() {
+      if (this.isDeleting) return
+
+      toast.warning('Delete connection?', {
+        description: 'Are you sure you want to delete this connection? This action cannot be undone.',
+        duration: 5000,
+        closeButton: true,
+        action: {
+          label: 'Delete',
+          onClick: async () => {
+            this.isDeleting = true
+
+            try {
+              // Delete the connection configuration
+              await this.s.client.ConfigDB.delete_config(
+                UUIDs.App.ConnectionConfiguration,
+                this.existingConnection.uuid
+              )
+
+              // Delete the info configuration
+              await this.s.client.ConfigDB.delete_config(
+                UUIDs.App.Info,
+                this.existingConnection.uuid
+              )
+
+              // Delete the object itself
+              await this.s.client.ConfigDB.delete_object(
+                this.existingConnection.uuid
+              )
+
+              toast.success('Success!', {
+                description: 'The connection has been deleted successfully.',
+              })
+              
+              this.handleOpen(false)
+              this.resetForm()
+            } catch (err) {
+              console.error('Failed to delete connection:', err)
+              toast.error('Unable to delete connection', {
+                description: 'There was a problem deleting the connection.',
+                action: {
+                  label: 'Try again',
+                  onClick: () => this.deleteConnection()
+                }
+              })
+            } finally {
+              this.isDeleting = false
+            }
+          }
+        }
+      })
+    },
   },
 
   data () {
@@ -396,6 +476,7 @@ export default {
       PAYLOAD_FORMATS,
       isSubmitting: false,
       existingConnection: null,
+      isDeleting: false,
     }
   },
 }

@@ -24,7 +24,6 @@
             <div class="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 rotate-45 w-2 h-2 bg-white dark:bg-slate-800 border-r border-b border-slate-200 dark:border-slate-700"></div>
           </div>
         </Transition>
-        {{device}}
         <EmptyState
             v-if="!device.deviceInformation.schema"
             icon="robot"
@@ -34,6 +33,7 @@
             button-icon="magnifying-glass"
             @button-click="changeSchema"
         />
+        <div v-else>{{device}}</div>
       </div>
 
       <!-- Sidebar -->

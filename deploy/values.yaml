@@ -374,6 +374,7 @@ grafana:
       auth_url: $__file{/etc/acs-config/auth_url}
       token_url: $__file{/etc/acs-config/token_url}
       api_url: $__file{/etc/acs-config/api_url}
+      signout_redirect_url: $__file{/etc/acs-config/signout_redirect_url}
   extraConfigmapMounts:
     - name: ini-config
       mountPath: /etc/acs-config

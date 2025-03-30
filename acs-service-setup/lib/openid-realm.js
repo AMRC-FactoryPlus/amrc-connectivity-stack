@@ -57,11 +57,11 @@ class RealmSetup {
               serverPrincipal: [
                 `HTTP/openid.${this.base_url}@${this.acs_realm}`,
               ],
-              allowPasswordAuthentication: ["false"],
+              allowPasswordAuthentication: ["true"],
               debug: ["true"],
               keyTab: ["/etc/keytabs/server"],
               cachePolicy: ["DEFAULT"],
-              updateProfileFirstLogin: ["false"],
+              updateProfileFirstLogin: ["true"],
               kerberosRealm: [this.acs_realm],
               enabled: ["true"],
             },
@@ -149,9 +149,11 @@ class RealmSetup {
       baseUrl: url,
       enabled: true,
       secret: client_secret,
-      redirectUris: [
-        `${url}${client_representation.redirectPath}`,
-      ],
+      redirectUris: [`${url}${client_representation.redirectPath}`],
+      attributes: {
+        "backchannel.logout.session.required": "true",
+        "post.logout.redirect.uris": url,
+      },
     };
 
     const client_url = `http${this.secure}://openid.${this.base_url}/admin/realms/${this.realm}/clients`;

@@ -26,7 +26,7 @@ export const useServiceClientStore = defineStore('service-client', {
         this.urls.MQTT = await client.service_urls(UUIDs.Service.MQTT);
         // save opts to local storage
         localStorage.setItem('opts', JSON.stringify(opts))
-        localStorage.setItem('loaded', JSON.stringify(true));
+        localStorage.setItem('clientLoaded', JSON.stringify(true));
         this.username = opts.username;
         this.client  = client;
         this.loaded = true;
@@ -34,7 +34,7 @@ export const useServiceClientStore = defineStore('service-client', {
         this.baseUrl = import.meta.env.BASEURL;
       }catch (e) {
         this.$reset();
-        localStorage.removeItem('loaded')
+        localStorage.removeItem('clientLoaded')
         throw e;
       }
     },
@@ -42,7 +42,7 @@ export const useServiceClientStore = defineStore('service-client', {
     logout () {
       // Delete the opts local storage item
       localStorage.removeItem('opts');
-      localStorage.removeItem('loaded')
+      localStorage.removeItem('clientLoaded')
       // Reset the local state
       this.$reset();
     },

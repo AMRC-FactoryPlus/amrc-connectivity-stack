@@ -31,7 +31,7 @@
     <!-- currently not functional
     <Button class="mt-2" disabled>Add Object of Class</Button>
     -->
-    <DataTable class="mt-4" :data="isSubclassOf" :default-sort="initialSort" :columns="subclassOfColumns" :filters="[]" @row-click="e => objectClicked(e.original)">
+    <DataTable class="mt-4" :data="isSubclassOf" :default-sort="initialSort" :columns="subclassOfColumns" :filters="[]" @row-click="e => objectClicked(e.original)" v-if="object.rank > 0">
       <template #toolbar-left>
         <div class="flex justify-between items-end flex-grow mr-4">
           <div class="font-semibold">This object is a subclass of:</div>
@@ -73,7 +73,7 @@
         </div>
       </template>
     </DataTable>
-    <DataTable class="mt-4" :data="subclasses" :default-sort="initialSort" :columns="subclassColumns" :filters="[]" @row-click="e => objectClicked(e.original)">
+    <DataTable class="mt-4" :data="subclasses" :default-sort="initialSort" :columns="subclassColumns" :filters="[]" @row-click="e => objectClicked(e.original)" v-if="object.rank > 0">
       <template #toolbar-left>
         <div class="flex justify-between items-end flex-grow mr-4">
           <div class="font-semibold">Direct subclasses of this object:</div>
@@ -94,7 +94,7 @@
         </div>
       </template>
     </DataTable>
-    <DataTable class="mt-4" :data="members" :default-sort="initialSort" :columns="membersColumns" :filters="[]" @row-click="e => objectClicked(e.original)">
+    <DataTable class="mt-4" :data="members" :default-sort="initialSort" :columns="membersColumns" :filters="[]" @row-click="e => objectClicked(e.original)" v-if="object.rank > 0">
       <template #toolbar-left>
         <div class="flex justify-between items-end flex-grow mr-4">
           <div class="font-semibold">Members of this object:</div>

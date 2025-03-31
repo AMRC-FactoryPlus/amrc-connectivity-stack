@@ -78,7 +78,7 @@ export default {
 
   computed: {
     mqttUrl () {
-      return this.s.urls?.mqtt?.[0] ?? null
+      return this.s.urls?.MQTT?.[0] ?? null
     },
   },
 

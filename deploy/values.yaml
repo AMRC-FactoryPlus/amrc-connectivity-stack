@@ -440,6 +440,6 @@ kafka:
     enabled: true
     topics:
       - name: mqtt_data
-        partitions: 1
-        replicationFactor: 1
+        partitions: 3
+        replicationFactor: 2
 

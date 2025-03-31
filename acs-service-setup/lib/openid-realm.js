@@ -154,6 +154,26 @@ class RealmSetup {
         "backchannel.logout.session.required": "true",
         "post.logout.redirect.uris": url,
       },
+      protocolMappers: [
+        {
+          name: "client roles",
+          protocol: "openid-connect",
+          protocolMapper: "oidc-usermodel-client-role-mapper",
+          consentRequired: false,
+          config: {
+            "introspection.token.claim": "true",
+            multivalued: "true",
+            "userinfo.token.claim": "true",
+            "id.token.claim": "true",
+            "lightweight.claim": "false",
+            "access.token.claim": "true",
+            "claim.name": "${client_id}.roles",
+            "jsonType.label": "String",
+            "usermodel.clientRoleMapping.clientId":
+              client_representation.clientId,
+          },
+        },
+      ],
     };
 
     const client_url = `http${this.secure}://openid.${this.base_url}/admin/realms/${this.realm}/clients`;

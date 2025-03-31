@@ -192,6 +192,16 @@ class RealmSetup {
 
       if (response.ok) {
         this.log("Created new realm client: %o", client);
+        if (
+          client_representation.roles &&
+          Array.isArray(client_representation.roles)
+        ) {
+          await this.create_client_roles(
+            client.id,
+            client_representation.roles,
+            host,
+          );
+        }
       } else {
         const status = response.status;
 
@@ -210,6 +220,70 @@ class RealmSetup {
       }
     } catch (error) {
       this.log(`Couldn't setup client: ${error}`);
+    }
+  }
+
+  /**
+   * Create roles for a client by POSTing to the OpenID service.
+   *
+   * @async
+   * @param {string} clientId - The UUID of the client to create roles for.
+   * @param {Array} roles - Array of role configurations.
+   * @param {string} containerId - The container ID for the roles (name of the client).
+   * @param {Boolean} is_retry - Whether this is a retry after a 401. If this is false and a 401 is returned, this will retry after refreshing the token.
+   * @returns {Promise<void>} Resolves when all roles are created.
+   */
+  async create_client_roles(clientId, roles, containerId, is_retry = false) {
+    const roles_url = `http${this.secure}://openid.${this.base_url}/admin/realms/${this.realm}/clients/${clientId}/roles`;
+
+    this.log(`Creating roles for client ${containerId} at: ${roles_url}`);
+
+    for (const role of roles) {
+      const role_representation = {
+        id: crypto.randomUUID(),
+        name: role.name,
+        composite: false,
+        clientRole: true,
+        containerId: containerId,
+      };
+
+      try {
+        const response = await fetch(roles_url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${this.access_token}`,
+          },
+          body: JSON.stringify(role_representation),
+        });
+
+        if (response.ok) {
+          this.log(`Created role '${role.name}' for client '${clientId}'`);
+        } else {
+          const status = response.status;
+
+          if (status == 401 && !is_retry) {
+            await this.get_initial_access_token(this.refresh_token);
+            await this.create_client_roles(clientId, roles, containerId, true);
+            break;
+          } else if (status == 409) {
+            this.log(
+              `Role '${role.name}' already exists for client '${containerId}'`,
+            );
+          } else if (status == 503) {
+            await setTimeout(10000);
+            await this.create_client_roles(clientId, roles, containerId, false);
+            break;
+          } else {
+            const error = await response.text();
+            throw new Error(`${status}: ${error}`);
+          }
+        }
+      } catch (error) {
+        this.log(
+          `Couldn't create role '${role.name}' for client '${clientId}': ${error}`,
+        );
+      }
     }
   }
 

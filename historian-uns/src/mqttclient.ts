@@ -7,7 +7,6 @@ import {logger} from "./Utils/logger.js";
 import {InfluxDB, Point} from '@influxdata/influxdb-client'
 import {Agent} from 'http'
 import mqtt from "mqtt";
-import producer from './kafkaproducer.js'
 import {UnsTopic} from "./Utils/UnsTopic.js";
 
 let dotenv: any = null;
@@ -82,7 +81,6 @@ const writeApi = influxDB.getWriteApi(influxOrganisation,
 export default class MQTTClient {
     private sparkplugBroker: any;
     private serviceClient: ServiceClient;
-    private kafkaBatch: any[] = [];
 
     constructor({e}: MQTTClientConstructorParams) {
         this.serviceClient = e.serviceClient;
@@ -90,26 +88,20 @@ export default class MQTTClient {
 
     async init() {
 
-        process.on('exit', async () => {
+        process.on('exit', () => {
             this.flushBuffer('EXIT');
             keepAliveAgent.destroy();
-            await producer.disconnect();
         })
 
-        await producer.connect();
         return this;
     }
 
     private flushBuffer(source: string) {
         let bufferSize = i;
         i = 0;
-        writeApi.flush().then(async () => {
+        writeApi.flush().then(() => {
             logger.info(`🚀 Flushed ${bufferSize} points to InfluxDB [${source}]`);
             // Reset the interval
-            if (this.kafkaBatch.length > 0) {
-                await producer.sendBatch(this.kafkaBatch);
-                this.kafkaBatch = []; // Clear the batch after sending
-            }
             this.resetInterval();
         })
     }
@@ -189,13 +181,15 @@ export default class MQTTClient {
         let metricTimestamp: Date
         if (payload.timestamp) {
             metricTimestamp = new Date(payload.timestamp);
+        } else if (payload.timestamp) {
+            // Metrics might not have a timestamp so use the packet timestamp if we have it.
+            metricTimestamp = new Date(payload.timestamp);
         } else {
             // No timestamp can be found on the metric or the payload, just use the current time instead.
             metricTimestamp = new Date();
         }
 
         this.writeToInfluxDB(unsTopic, payload.value, metricTimestamp, customProperties.Unit, customProperties.Type);
-
 
         // Handle the batched metrics
         payload.batch?.forEach((metric) => {
@@ -312,28 +306,6 @@ export default class MQTTClient {
         }
 
         i++;
-
-        this.kafkaBatch.push({
-            measurement: `${topic.GetMetricName()}`,
-            type: type,
-            value: value,
-            timestamp: timestamp.toISOString(),
-            tags: {
-                topLevelInstance: topic.GetTopLevelInstance(),
-                bottomLevelInstance: topic.GetBottomLevelInstance(),
-                usesInstances: `${topic.GetTopLevelInstance()}:${topic.GetInstanceFull()}`,
-                topLevelSchema: topic.GetTopLevelSchema(),
-                bottomLevelSchema: topic.GetBottomLevelSchema(),
-                usesSchemas: `${topic.GetTopLevelSchema()}:${topic.GetSchemaFull()}`,
-                enterprise: topic.GetISA95Schema().Enterprise ?? "",
-                site: topic.GetISA95Schema().Site ?? "",
-                area: topic.GetISA95Schema().Area ?? "",
-                workCenter: topic.GetISA95Schema().WorkCenter ?? "",
-                workUnit: topic.GetISA95Schema().WorkUnit ?? "",
-                path: topic.GetMetricPath(),
-                unit: unit
-            }
-        });
 
         logger.debug(`Added to write buffer (${i}/${batchSize}): [${type}] ${topic.GetMetricPath()} = ${value}`);
 

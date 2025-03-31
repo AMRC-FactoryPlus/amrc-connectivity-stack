@@ -371,6 +371,13 @@ export default {
   },
 
   async mounted () {
+    /* XXX This will cause us to subscribe and unsubscribe to the
+     * complete set of class relations whenever this component is
+     * mounted or unmounted. This is slow and hammers the backend more
+     * than is needed. If we want the complete class structure
+     * client-side these stores should be moved up to a higher-level
+     * component; otherwise we would be better off only subscribing to
+     * the information we need for this object. */
     this.obj.start()
     this.m.start()
     this.d.start()

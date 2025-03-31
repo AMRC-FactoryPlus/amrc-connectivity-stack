@@ -1,7 +1,7 @@
 top=..
 include ${top}/mk/acs.init.mk
 
-repo?=historian-uns
-k8s.deployment?=historian-uns
+repo?=historian-uns-kafka
+k8s.deployment?=historian-uns-kafka
 
 include ${mk}/acs.js.mk

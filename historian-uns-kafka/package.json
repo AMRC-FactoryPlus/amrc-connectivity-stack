@@ -1,7 +1,7 @@
 {
-  "name": "historian-uns",
+  "name": "historian-uns-kafka",
   "version": "1.0.0",
-  "description": "An ingestion engine to enable InfluxDB to be a fully-featured UNS historian",
+  "description": "An ingestion engine bridge the UNS MQTT topic and kafka.",
   "author": "AMRC",
   "license": "MIT",
   "main": "./src/app.js",

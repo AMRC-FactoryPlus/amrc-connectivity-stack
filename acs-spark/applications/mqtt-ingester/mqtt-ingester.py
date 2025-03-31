@@ -2,10 +2,13 @@ import os
 import logging
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import from_json
-from pyspark.sql.types import StructType, StringType, IntegerType
+from pyspark.sql.types import StructType, StructField, StringType
 
 def main():
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, 
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
 
     # Create SparkSession with Delta Lake and S3 (Minio) configurations
     spark = SparkSession.builder \
@@ -24,13 +27,30 @@ def main():
         .option("subscribe", "mqtt_data") \
         .load()
 
-    # Define the schema of your JSON data coming from Kafka
-    json_schema = StructType() \
-        .add("id", StringType()) \
-        .add("value", IntegerType())
-        # Add additional fields as needed
+    # Define the schema of your JSON data coming from Kafka to match the posted data structure
+    json_schema = StructType([
+        StructField("measurement", StringType(), True),
+        StructField("type", StringType(), True),
+        StructField("value", StringType(), True),
+        StructField("timestamp", StringType(), True),
+        StructField("tags", StructType([
+            StructField("metricName", StringType(), True),
+            StructField("topLevelInstance", StringType(), True),
+            StructField("bottomLevelInstance", StringType(), True),
+            StructField("usesInstances", StringType(), True),
+            StructField("topLevelSchema", StringType(), True),
+            StructField("bottomLevelSchema", StringType(), True),
+            StructField("usesSchemas", StringType(), True),
+            StructField("enterprise", StringType(), True),
+            StructField("site", StringType(), True),
+            StructField("area", StringType(), True),
+            StructField("workCenter", StringType(), True),
+            StructField("workUnit", StringType(), True),
+            StructField("path", StringType(), True),
+            StructField("unit", StringType(), True)
+        ]), True)
+    ])
 
-    # Convert the binary 'value' column to string and parse it as JSON
     parsed_df = kafka_df.selectExpr("CAST(value AS STRING) as json_str") \
         .select(from_json("json_str", json_schema).alias("data")) \
         .select("data.*")

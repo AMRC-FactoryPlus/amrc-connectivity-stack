@@ -26,7 +26,7 @@ if (!flushInterval) {
     throw new Error("FLUSH_INTERVAL environment variable is not set");
 }
 
-export default class KafkaClient {
+export default class MqttClient {
     private sparkplugBroker: any;
     private kafkaBatch: any[] = [];
     private serviceClient: ServiceClient;

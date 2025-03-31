@@ -2,7 +2,7 @@
   - Copyright (c) University of Sheffield AMRC 2024.
   -->
 <template>
-  <Skeleton v-if="!obj.ready || dm.loading || ds.loading || m.loading" v-for="i in 10" class="h-16 rounded-lg mb-2"/>
+  <Skeleton v-if="!obj.ready || d.loading || m.loading" v-for="i in 10" class="h-16 rounded-lg mb-2"/>
   <div v-else>
     <div class="flex items-center justify-between">
       <Card>
@@ -127,14 +127,13 @@ import {Card, CardContent, CardDescription, CardHeader, CardTitle} from "@compon
 import {useObjectStore} from "@store/useObjectStore.js";
 import {useGroupStore} from "@store/useGroupStore.js";
 import {useRoute, useRouter} from "vue-router";
-import {useDirectMembersStore} from "@store/useDirectMembersStore.js";
+import {useDirectStore} from "@store/useDirectStore.js";
 import {Button} from "@components/ui/button/index.js";
 import Copyable from "@components/Copyable.vue";
 import {useMemberStore} from "@store/useMemberStore.js";
 import {defineAsyncComponent} from "vue";
 import {useServiceClientStore} from "@store/serviceClientStore.js";
 import {toast} from "vue-sonner";
-import {useDirectSubclassesStore} from "@store/useDirectSubclassesStore.js";
 
 export default {
   emits: ['rowClick'],
@@ -147,8 +146,7 @@ export default {
       subclassColumns,
       s: useServiceClientStore(),
       obj: useObjectStore(),
-      dm: useDirectMembersStore(),
-      ds: useDirectSubclassesStore(),
+      d: useDirectStore(),
       m: useMemberStore(),
       route: useRoute(),
       router: useRouter(),
@@ -169,8 +167,9 @@ export default {
       return this.obj.data.find(o => o.uuid === this.route.params.object)
     },
     relationships () {
-      const directMembers = this.dm.data.find(o => o.uuid === this.route.params.object)?.directMembers ?? []
-      const directSubclasses = this.ds.data.find(o => o.uuid === this.route.params.object)?.directSubclasses ?? []
+      const direct = this.d.data.find(o => o.uuid === this.route.params.object)
+      const directMembers = direct?.directMembers ?? []
+      const directSubclasses = direct?.directSubclasses ?? []
       return {
         uuid: this.route.params.object,
         directMembers,
@@ -188,7 +187,7 @@ export default {
       let subclassesToLookup = [this.object.uuid]
       do {
         // Try to find all the direct subclass links that refer to any of the uuids in the lookup array
-        const subclassLookup = this.ds.data.filter(group => group.directSubclasses.some(g => subclassesToLookup.includes(g)))
+        const subclassLookup = this.d.data.filter(group => group.directSubclasses.some(g => subclassesToLookup.includes(g)))
         const objLookup = subclassLookup.map(subclass => this.obj.data.find(o => o.uuid === subclass.uuid))
         subclassOf = subclassOf.concat(objLookup)
         subclassesToLookup = objLookup.map(s => s.uuid)
@@ -197,7 +196,7 @@ export default {
     },
     isMemberOf () {
       // BUG: This isn't refreshing when this.r.data changes???
-      const directMemberships = this.dm.data.filter(group => group.directMembers.includes(this.object.uuid)).map(m => m.uuid)
+      const directMemberships = this.d.data.filter(group => group.directMembers.includes(this.object.uuid)).map(m => m.uuid)
       const directMembershipObjs = directMemberships.map(membership => {
         const obj = this.obj.data.find(o => o.uuid === membership)
         return {
@@ -246,7 +245,7 @@ export default {
           .filter(o => !subclassOfUUIDs.includes(o.uuid)) // Objects of the same rank which are we are note already a subclass of
     },
     availableMemberships () {
-      const directMemberships = this.dm.data.filter(group => group.directMembers.includes(this.object.uuid)).map(m => m.uuid)
+      const directMemberships = this.d.data.filter(group => group.directMembers.includes(this.object.uuid)).map(m => m.uuid)
       return this.obj.data  // All objects
           .filter(o => o.rank === this.object.rank+1) // All objects of a rank above
           .filter(o => !directMemberships.includes(o.uuid)) // Objects of a rank above which it's not already a direct member of
@@ -372,15 +371,13 @@ export default {
   async mounted () {
     this.obj.start()
     this.m.start()
-    this.dm.start()
-    this.ds.start()
+    this.d.start()
   },
 
   unmounted () {
     this.obj.stop()
     this.m.stop()
-    this.dm.stop()
-    this.ds.stop()
+    this.d.stop()
   },
 }
 </script>

@@ -4,8 +4,14 @@
  */
 import { Kafka } from 'kafkajs';
 
-const kafkaBrokerUrl = process.env.KAFKA_BROKER_URL || "localhost:9092";
-const kafkaTopic = process.env.KAFKA_TOPIC || "mqtt_data";
+const kafkaBrokerUrl: string = process.env.KAFKA_BROKER_URL ?? "";
+if(!kafkaBrokerUrl) {
+    throw new Error("KAFKA_BROKER_URL environment variable is not set");
+}
+const kafkaTopic: string = process.env.KAFKA_TOPIC ?? "";
+if(!kafkaTopic) {
+    throw new Error("KAFKA_TOPIC environment variable is not set");
+}
 
 const kafka = new Kafka({
     clientId: 'mqtt-to-kafka',

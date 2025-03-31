@@ -16,12 +16,12 @@ try {
 
 dotenv?.config()
 
-const batchSize: number = Number.parseInt(process.env.BATCH_SIZE);
+const batchSize: number = Number.parseInt(process.env.BATCH_SIZE ?? "", 10);
 if (!batchSize) {
     throw new Error("BATCH_SIZE environment variable is not set");
 }
 
-const flushInterval: number = Number.parseInt(process.env.FLUSH_INTERVAL);
+const flushInterval: number = Number.parseInt(process.env.FLUSH_INTERVAL ?? "", 10);
 if (!flushInterval) {
     throw new Error("FLUSH_INTERVAL environment variable is not set");
 }

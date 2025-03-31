@@ -11,9 +11,10 @@ import {get} from 'lodash'
 
 export interface GenericObject {}
 
-export function buildColumns(column1Header, column1MainKey, column1SubKey, column2Header, column2MainKey, column2SubKey): ColumnDef<GenericObject>[] {
-    return [
-        {
+export function buildColumns(column1Header, column1MainKey, column1SubKey, column2Header, column2MainKey, column2SubKey, multiSelect): ColumnDef<GenericObject>[] {
+    const columns = [];
+    if (multiSelect) {
+        columns.push({
             id: 'select',
             header: ({table}) => h(Checkbox, {
                 'modelValue': table.getIsAllPageRowsSelected(),
@@ -27,7 +28,9 @@ export function buildColumns(column1Header, column1MainKey, column1SubKey, colum
             }),
             enableSorting: false,
             enableHiding: false,
-        },
+        })
+    }
+    columns.push(
         {
             accessorKey: column1MainKey,
             header: ({column}) => h(DataTableColumnHeader, {
@@ -44,7 +47,8 @@ export function buildColumns(column1Header, column1MainKey, column1SubKey, colum
                     return h('span', {class: 'max-w-[500px] truncate font-medium'}, get(row.original, column1MainKey, "Unknown"))
                 }
             },
-        },
+        })
+    columns.push(
         {
             accessorKey: column2MainKey,
             header: ({column}) => h(DataTableColumnHeader, {
@@ -61,7 +65,7 @@ export function buildColumns(column1Header, column1MainKey, column1SubKey, colum
                     return h('span', {class: 'max-w-[500px] truncate font-medium'}, get(row.original, column2MainKey, "Unknown"))
                 }
             },
-        }
-    ]
+        })
+    return columns
 
 }

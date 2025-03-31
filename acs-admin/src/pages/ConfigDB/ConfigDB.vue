@@ -16,7 +16,9 @@
         </TabsList>
         <div v-if="!obj.ready || app.loading"><i class="fa-solid fa-circle-notch animate-spin"></i></div>
       </div>
+      <!-- currently not functional
       <Button disabled v-if="activeTab==='applications'">Add Application</Button>
+      -->
       <CreateObjectDialog v-if="activeTab==='objects'" :objs="obj.data" />
     </div>
     <TabsContent value="applications">

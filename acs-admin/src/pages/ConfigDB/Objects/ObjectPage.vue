@@ -28,7 +28,9 @@
         </CardContent>
       </Card>
     </div>
+    <!-- currently not functional
     <Button class="mt-2" disabled>Add Object of Class</Button>
+    -->
     <DataTable class="mt-4" :data="isSubclassOf" :default-sort="initialSort" :columns="subclassOfColumns" :filters="[]" @row-click="e => objectClicked(e.original)">
       <template #toolbar-left>
         <div class="flex justify-between items-end flex-grow mr-4">

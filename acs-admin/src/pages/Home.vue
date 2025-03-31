@@ -3,7 +3,7 @@
   -->
 
 <template>
-  <div v-if="s.loaded" class="flex flex-col gap-4">
+  <div class="flex flex-col gap-4">
       <Card>
         <CardHeader class="pb-2">
           <CardDescription>MQTT Server</CardDescription>
@@ -44,9 +44,6 @@
           </CardFooter>
         </Card>
       </div>
-    </div>
-  <div v-else class="flex flex-1 items-center justify-center">
-    <Login/>
   </div>
 </template>
 
@@ -54,7 +51,6 @@
 import { Button } from '@components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useServiceClientStore } from '@/store/serviceClientStore.js'
-import Login from '@/components/Login.vue'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card/index.js'
 import Copyable from '@components/Copyable.vue'
 
@@ -77,7 +73,6 @@ export default {
     CardHeader,
     Button,
     Skeleton,
-    Login,
     Copyable
   },
 

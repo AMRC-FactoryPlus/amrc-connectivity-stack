@@ -1,5 +1,5 @@
 /*
- * Copyright (c) University of Sheffield AMRC 2024.
+ * Copyright (c) University of Sheffield AMRC 2025.
  */
 
 import * as imm from "immutable";
@@ -20,8 +20,10 @@ export const useObjectStore = defineStore('object', {
   }),
   actions: {
     async start () {
+
       if (this.rxsub)
-        throw new Error("Object store start() called twice!");
+        // Already started so just return
+        return;
 
       await serviceClientReady();
       const cdb = useServiceClientStore().client.ConfigDB;

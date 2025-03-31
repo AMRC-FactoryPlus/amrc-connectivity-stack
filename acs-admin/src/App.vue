@@ -5,7 +5,7 @@
 <template>
   <Toaster rich-colors/>
   <SidebarProvider>
-    <Sidebar v-if="!l.fullscreen" class="bg-white dark:bg-slate-800 z-20">
+    <Sidebar v-if="!l.fullscreen && s.loaded" class="bg-white dark:bg-slate-800 z-20">
       <SidebarHeader class="border-b h-16">
         <SidebarMenu>
           <SidebarMenuItem>
@@ -47,7 +47,7 @@
     </Sidebar>
 
     <SidebarInset>
-      <header v-if="!l.fullscreen"
+      <header v-if="!l.fullscreen && s.loaded"
           class="flex justify-between items-center border-b px-4 h-16 flex-shrink-0 lg:px-6 sticky top-0 bg-white z-10">
         <div class="flex items-center justify-center gap-2">
           <i :class="`fa-solid fa-${$route.meta.icon}`"></i>
@@ -56,7 +56,7 @@
         <div class="flex items-center justify-center">
           <SidebarTrigger/>
           <Button title="Toggle fullscreen" variant="ghost" size="icon" @click="l.toggleFullscreen"><i class="fa-solid fa-expand"></i></Button>
-          <Button class="ml-3" variant="link" size="icon" @click="s.logout">Logout</Button>
+          <Button class="ml-3" variant="link" size="icon" @click="logout">logout</Button>
         </div>
       </header>
 
@@ -138,12 +138,20 @@ export default {
     },
   },
 
+  methods: {
+    logout(){
+      // Cleanup the client store state.
+      this.s.logout();
+      this.$router.push("/login");
+    }
+  },
+
   async mounted () {
 
     // Check if opts exists in local storage
     if (localStorage.getItem('opts')) {
       // If it does then create the service client
-      this.s.login(JSON.parse(localStorage.getItem('opts')))
+      await this.s.login(JSON.parse(localStorage.getItem('opts')))
     }
 
     this.$router.isReady().then(() => {

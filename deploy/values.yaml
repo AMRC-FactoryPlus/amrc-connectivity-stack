@@ -220,6 +220,17 @@ historians:
     image:
       # -- The repository of the Warehouse component
       repository: historian-sparkplug
+  unsKafka:
+    enabled: true
+    logLevel: info
+    # -- The number of messages to batch together before sending to InfluxDB
+    batchSize: 5000
+    # -- Send all buffered messages after this amount of time has elapsed if the buffer is not full (in milliseconds)
+    flushInterval: 10000
+    image:
+      # -- The repository of the UNS Historian component
+      repository: historian-uns-kafka
+
 git:
   # -- Whether or not to enable the Git component
   enabled: true

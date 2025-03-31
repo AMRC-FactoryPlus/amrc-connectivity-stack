@@ -99,15 +99,7 @@ export default {
 
       // This gives an Observable of Sets
       const App = this.route.params.application;
-      const appObjs = rxu.rx(
-          rx.combineLatest(
-              cdb.watch_list(App)),
-          rx.map(imm.Set.union),
-          rx.map(ps => {
-            console.log("appObjs", ps)
-            return ps.filter(p => p != App)
-          }),
-      );
+      const appObjs = cdb.watch_list(App);
 
       const details = rxu.rx(
           rx.combineLatest(objs, appObjs),

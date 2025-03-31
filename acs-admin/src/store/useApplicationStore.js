@@ -31,13 +31,7 @@ export const useApplicationStore = defineStore('application', {
 
       // This gives an Observable of Sets
       const App = UUIDs.Class.App;
-      const apps = rxu.rx(
-          rx.combineLatest(
-              cdb.watch_members(App),
-              cdb.watch_subclasses(App)),
-          rx.map(imm.Set.union),
-          rx.map(ps => ps.filter(p => p != App)),
-      );
+      const apps = cdb.watch_members(App);
 
       const details = rxu.rx(
           rx.combineLatest(objs, apps),

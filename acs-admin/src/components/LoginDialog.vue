@@ -92,6 +92,7 @@ export default {
         username: this.username,
         password: this.password,
         browser: true,
+        verbose: import.meta.env.VERBOSE ?? "",
       })
         this.$router.push("/");
       }catch(e){

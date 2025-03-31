@@ -59,6 +59,7 @@ subdirs+= edge-test
 subdirs+= edge-tplink-smartplug
 subdirs+= historian-sparkplug
 subdirs+= historian-uns
+subdirs+= historian-uns-kafka
 subdirs+= uns-ingester-sparkplug
 
 recurse=	env MAKE="${MAKE}" ${tools}/recurse

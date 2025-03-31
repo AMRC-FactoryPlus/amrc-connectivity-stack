@@ -103,10 +103,10 @@ const router = createRouter({
 
 // Setup auth guard.
 router.beforeEach((to, from, next) => {
-  const s = useServiceClientStore();
-  if(!s.loaded && to.path !== "/login"){
+  const loaded = localStorage.getItem('loaded');
+  if(!loaded && to.path !== "/login"){
     next({path: "/login"})
-  }else if(s.loaded && to.path === "/login"){
+  }else if(loaded && to.path === "/login"){
     next({path: "/"})
   }
   else{

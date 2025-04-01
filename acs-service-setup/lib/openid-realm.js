@@ -134,6 +134,7 @@ class RealmSetup {
 
     await this.get_initial_access_token();
     await this.create_basic_realm(base_realm, false);
+    await this.create_admin_user(false);
 
     const client_configs = Object.entries(this.config.openidClients);
     const enabled_clients = client_configs.filter(
@@ -141,8 +142,8 @@ class RealmSetup {
     );
     for (const [name, client] of enabled_clients) {
       await this.create_client(name, client, false);
+      await this.create_client_role_mapping(client.clientId, client.adminRole);
     }
-    await this.create_admin_user(false);
   }
 
   /**
@@ -204,7 +205,7 @@ class RealmSetup {
     const url = `http${this.secure}://${host}.${this.base_url}`;
 
     const client = {
-      id: crypto.randomUUID(),
+      id: client_representation.clientId,
       clientId: client_representation.clientId,
       name: client_representation.name,
       rootUrl: url,
@@ -412,6 +413,163 @@ class RealmSetup {
   }
 
   /**
+    * Create client-level role mapping for the admin user.
+
+    * @async
+    * @param {string} client_id - The ID of the client containing the role.
+    * @param {string} role_name - The name of the role.
+    * @returns {Promise<void>} Resolves when the mapping is created.
+    */
+  async create_client_role_mapping(client_id, role_name) {
+    const admin_user_id = await this.get_admin_user_id(false);
+    const role_id = await this.get_client_role_id(
+      client_id,
+      admin_user_id,
+      role_name,
+    );
+
+    const role_list = [
+      {
+        id: role_id,
+        name: role_name,
+      },
+    ];
+
+    const role_mapping_url = `http${this.secure}://openid.${this.base_url}/admin/realms/${this.realm}/users/${admin_user_id}/role-mappings/clients/${client_id}`;
+
+    this.log("Attempting role mapping using: %o", role_list);
+
+    try {
+      this.get_user_management_token();
+      const response = await fetch(role_mapping_url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${this.user_management_access_token}`,
+        },
+        body: JSON.stringify(role_list),
+      });
+
+      if (response.ok) {
+        this.log(
+          `Admin role mapping completed successfully for client ${client_id}`,
+        );
+      } else {
+        const status = response.status;
+
+        if (status == 401 && !is_retry) {
+          await this.get_user_management_token();
+          await this.create_client_role_mapping(client_id, role_name, true);
+        } else if (status == 409) {
+          this.log(`Role mapping for ${client_id} already done.`);
+        } else if (status == 503) {
+          await setTimeout(10000);
+          await this.create_client_role_mapping(client_id, role_name, false);
+        } else {
+          const error = await response.text();
+          throw new Error(`${status}: ${error}`);
+        }
+      }
+    } catch (error) {
+      this.log(`Couldn't setup client role mapping for ${client_id}: ${error}`);
+    }
+  }
+
+  /**
+   * Get the ID of the admin user. This isn't the same as the ID given during creation.
+   *
+   * @async
+   * @param {Boolean} is_retry - Whether this is a retry after a 401. If this is false and a 401 is returned, this will retry after refreshing the token.
+   * @returns {Promise<string>} Resolves to the admin user ID.
+   */
+  async get_admin_user_id(is_retry) {
+    const user_query_url = `http${this.secure}://openid.${this.base_url}/admin/realms/${this.realm}/users?exact=true&username=${this.username}`;
+
+    await this.get_user_management_token();
+    const response = await fetch(user_query_url, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${this.user_management_access_token}`,
+      },
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      return data[0].id;
+    } else {
+      const status = response.status;
+
+      if (status == 401 && !is_retry) {
+        await this.get_user_management_token();
+        return await this.get_admin_user_id(true);
+      } else if (status == 503) {
+        await setTimeout(10000);
+        return await this.get_admin_user_id(false);
+      } else {
+        const error = await response.text();
+        throw new Error(`${status}: ${error}`);
+      }
+    }
+  }
+
+  /**
+   * Get the ID of the applicable role given the containing client ID, the user ID, and the role name.
+   *
+   * @async
+   * @param {string} client_id - ID of the client containing the role.
+   * @param {string} user_id - ID of the user to which the role will apply.
+   * @param {string} role_name - Name of the role.
+   * @param {Boolean} is_retry - Whether this is a retry after a 401. If this is false and a 401 is returned, this will retry after refreshing the token.
+   * @returns {Promise<string>} Resolves to the ID of the role.
+   */
+  async get_client_role_id(client_id, user_id, role_name, is_retry) {
+    const role_query_url = `http${this.secure}://openid.${this.base_url}/admin/realms/${this.realm}/users/${user_id}/role-mappings/clients/${client_id}/available`;
+
+    await this.get_user_management_token();
+    const response = await fetch(role_query, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${this.user_management_access_token}`,
+      },
+    });
+
+    if (response.ok) {
+      const roleList = await response.json();
+      for (const role of roleList) {
+        if (role.name === role_name) {
+          return role.id;
+        }
+      }
+      throw new Error(
+        `No role found with role name ${role_name} in ${client_id} available for ${user_id}`,
+      );
+    } else {
+      const status = response.status;
+
+      if (status == 401 && !is_retry) {
+        await this.get_user_management_token();
+        return await this.get_client_role_id(
+          client_id,
+          user_id,
+          role_name,
+          true,
+        );
+      } else if (status == 503) {
+        await setTimeout(10000);
+        return await this.get_client_role_id(
+          client_id,
+          user_id,
+          role_name,
+          false,
+        );
+      } else {
+        const error = await response.text();
+        throw new Error(`${status}: ${error}`);
+      }
+    }
+  }
+
+  /**
    * Fetch an initial access token for the user in the specified realm. This should only be used during realm setup.
    *
    * Sets the `access_token` and `refresh_token` properties of `OAuthRealm` as a side effect.
@@ -460,6 +618,7 @@ class RealmSetup {
       throw new Error(`${status}: ${error}`);
     }
   }
+
   /**
    * Fetch a token for the user management client in the Factory+ realm.
    *

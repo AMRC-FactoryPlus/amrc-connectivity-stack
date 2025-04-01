@@ -142,7 +142,9 @@ serviceSetup:
           - name: "viewer"
           - name: "editor"
           - name: "admin"
+          - name: "grafanaAdmin"
         defaultRole: "viewer"
+        adminRole: "grafanaAdmin"
 
 
 edgeHelm:

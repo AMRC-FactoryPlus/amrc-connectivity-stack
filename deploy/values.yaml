@@ -142,6 +142,7 @@ serviceSetup:
           - name: "viewer"
           - name: "editor"
           - name: "admin"
+        defaultRole: "viewer"
 
 
 edgeHelm:

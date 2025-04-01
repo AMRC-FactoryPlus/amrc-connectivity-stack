@@ -211,6 +211,7 @@ class RealmSetup {
       baseUrl: url,
       enabled: true,
       secret: client_secret,
+      defaultRoles: [client_representation.defaultRole],
       redirectUris: [`${url}${client_representation.redirectPath}`],
       attributes: {
         "backchannel.logout.session.required": "true",

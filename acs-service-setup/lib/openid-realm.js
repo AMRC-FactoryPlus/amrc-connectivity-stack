@@ -28,7 +28,10 @@ class RealmSetup {
     this.acs_realm = service_setup.acs_config.realm;
     this.access_token = "";
     this.refresh_token = "";
+    this.user_management_access_token = "";
     this.config = service_setup.config;
+    this.admin_cli_id = crypto.randomUUID();
+    this.admin_cli_secret = crypto.randomUUID();
   }
 
   /**
@@ -40,9 +43,6 @@ class RealmSetup {
    * @returns {Promise<void>}
    */
   async run() {
-    let admin_cli_id = crypto.randomUUID();
-    let admin_cli_secret = crypto.randomUUID();
-
     let base_realm = {
       id: crypto.randomUUID(),
       realm: this.realm,
@@ -73,12 +73,12 @@ class RealmSetup {
       },
       clients: [
         {
-          id: admin_cli_id,
+          id: this.admin_cli_id,
           clientId: "admin-cli",
           name: "${client_admin-cli}",
           enabled: true,
           clientAuthenticatorType: "client-secret",
-          secret: admin_cli_secret,
+          secret: this.admin_cli_secret,
           directAccessGrantsEnabled: true,
           serviceAccountsEnabled: true,
           authorizationServicesEnabled: true,
@@ -93,7 +93,7 @@ class RealmSetup {
               description: "",
               composite: false,
               clientRole: true,
-              containerId: admin_cli_id,
+              containerId: this.admin_cli_id,
               attributes: {},
             },
             {
@@ -101,7 +101,7 @@ class RealmSetup {
               name: "uma_protection",
               composite: false,
               clientRole: true,
-              containerId: admin_cli_id,
+              containerId: this.admin_cli_id,
               attributes: {},
             },
             {
@@ -110,7 +110,7 @@ class RealmSetup {
               description: "",
               composite: false,
               clientRole: true,
-              containerId: admin_cli_id,
+              containerId: this.admin_cli_id,
               attributes: {},
             },
           ],
@@ -142,6 +142,7 @@ class RealmSetup {
     for (const [name, client] of enabled_clients) {
       await this.create_client(name, client, false);
     }
+    await this.create_admin_user(false);
   }
 
   /**
@@ -351,6 +352,66 @@ class RealmSetup {
   }
 
   /**
+   * Create the admin user in the OpenID service.
+   * @async
+   * @param {Boolean} is_retry - Whether this is a retry after a 401. If this is false and a 401 is returned, this will retry after refreshing the token.
+   * @returns {Promise<void>} Resolves when the user is created.
+   */
+  async create_admin_user(is_retry) {
+    const admin_user = {
+      id: crypto.randomUUID(),
+      userName: this.username,
+      firstName: "Admin",
+      lastName: "User",
+      email: `admin@${this.acs_realm}`,
+      emailVerified: false,
+      enabled: true,
+      serviceAccountClientId: "admin-cli",
+      credentials: {
+        type: "password",
+        value: this.password,
+        temporary: "false",
+      },
+    };
+
+    const user_url = `http${this.secure}://openid.${this.base_url}/admin/realms/${this.realm}/users`;
+
+    this.log(`Attempting admin user creation at: ${user_url}`);
+
+    try {
+      const response = await fetch(user_url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${this.user_management_access_token}`,
+        },
+        body: JSON.stringify(admin_user),
+      });
+
+      if (response.ok) {
+        this.log("Created new realm: %o", admin_user);
+      } else {
+        const status = response.status;
+
+        if (status == 401 && !is_retry) {
+          await this.get_user_management_token();
+          await this.create_admin_user(admin_user, true);
+        } else if (status == 409) {
+          this.log("Admin user %o already exists", admin_user);
+        } else if (status == 503) {
+          await setTimeout(10000);
+          await this.create_admin_user(admin_user, false);
+        } else {
+          const error = await response.text();
+          throw new Error(`${status}: ${error}`);
+        }
+      }
+    } catch (error) {
+      this.log(`Couldn't setup admin user: ${error}`);
+    }
+  }
+
+  /**
    * Fetch an initial access token for the user in the specified realm. This should only be used during realm setup.
    *
    * Sets the `access_token` and `refresh_token` properties of `OAuthRealm` as a side effect.
@@ -393,6 +454,46 @@ class RealmSetup {
     } else if (response.status == 503) {
       await setTimeout(10000);
       this.get_initial_access_token();
+    } else {
+      const status = response.status;
+      const error = await response.text();
+      throw new Error(`${status}: ${error}`);
+    }
+  }
+  /**
+   * Fetch a token for the user management client in the Factory+ realm.
+   *
+   * Sets the `user_management_access_token` property of `OAuthRealm` as a side effect.
+   *
+   * @async
+   * @returns {Promise<string>} Resolves to an access token.
+   */
+  async get_user_management_token() {
+    const token_url = `http${this.secure}://openid.${this.base_url}/realms/${this.realm}/protocol/openid-connect/token`;
+
+    this.log(`Attempting token request at: ${token_url}`);
+
+    const params = new URLSearchParams();
+    params.append("grant_type", "client_credentials");
+    params.append("client_id", "admin-cli");
+    params.append("client_secret", this.admin_cli_secret);
+
+    const response = await fetch(token_url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: params,
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      this.user_management_access_token = data.access_token;
+
+      return data.access_token;
+    } else if (response.status == 503) {
+      await setTimeout(10000);
+      this.get_user_management_token();
     } else {
       const status = response.status;
       const error = await response.text();

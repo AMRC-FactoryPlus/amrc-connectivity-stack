@@ -40,6 +40,9 @@ class RealmSetup {
    * @returns {Promise<void>}
    */
   async run() {
+    let admin_cli_id = crypto.randomUUID();
+    let admin_cli_secret = crypto.randomUUID();
+
     let base_realm = {
       id: crypto.randomUUID(),
       realm: this.realm,
@@ -68,6 +71,65 @@ class RealmSetup {
           },
         ],
       },
+      clients: [
+        {
+          id: admin_cli_id,
+          clientId: "admin-cli",
+          name: "${client_admin-cli}",
+          enabled: true,
+          clientAuthenticatorType: "client-secret",
+          secret: admin_cli_secret,
+          directAccessGrantsEnabled: true,
+          serviceAccountsEnabled: true,
+          authorizationServicesEnabled: true,
+        },
+      ],
+      roles: {
+        client: {
+          "admin-cli": [
+            {
+              id: crypto.randomUUID(),
+              name: "manage-users",
+              description: "",
+              composite: false,
+              clientRole: true,
+              containerId: admin_cli_id,
+              attributes: {},
+            },
+            {
+              id: crypto.randomUUID(),
+              name: "uma_protection",
+              composite: false,
+              clientRole: true,
+              containerId: admin_cli_id,
+              attributes: {},
+            },
+            {
+              id: crypto.randomUUID(),
+              name: "manage-realm",
+              description: "",
+              composite: false,
+              clientRole: true,
+              containerId: admin_cli_id,
+              attributes: {},
+            },
+          ],
+        },
+      },
+      users: [
+        {
+          id: crypto.randomUUID(),
+          username: "service-account-admin-cli",
+          emailVerified: false,
+          enabled: true,
+          serviceAccountClientId: "admin-cli",
+          realmRoles: ["default-roles-factory_plus"],
+          clientRoles: {
+            "realm-management": ["manage-realm", "manage-users"],
+            "admin-cli": ["uma_protection"],
+          },
+        },
+      ],
     };
 
     await this.get_initial_access_token();

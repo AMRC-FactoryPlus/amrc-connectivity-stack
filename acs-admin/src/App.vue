@@ -68,7 +68,7 @@
         </div>
       </header>
 
-      <main class="flex flex-1 flex-col lg:gap-4 lg:p-4 overflow-auto">
+      <main class="flex flex-col max-h-[calc(100vh-4rem)] lg:gap-4 lg:pt-4 lg:px-4 flex-grow-0">
         <NewClusterDialog/>
         <NewNodeDialog/>
         <NewDeviceDialog/>

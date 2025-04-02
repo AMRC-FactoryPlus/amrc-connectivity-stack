@@ -26,7 +26,7 @@ const { isMobile, state, openMobile, setOpenMobile } = useSidebar();
     v-if="collapsible === 'none'"
     :class="
       cn(
-        'flex h-full w-[--sidebar-width] flex-col bg-sidebar text-sidebar-foreground',
+        'flex w-[--sidebar-width] flex-col bg-sidebar text-sidebar-foreground',
         props.class,
       )
     "

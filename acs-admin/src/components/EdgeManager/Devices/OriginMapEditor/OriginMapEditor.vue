@@ -3,7 +3,9 @@
   -->
 
 <template>
-  <SidebarProvider class="h-full">
+  <!-- Wrapper div with fixed height and no scrolling -->
+  <div class="w-full overflow-hidden flex-1">
+    <SidebarProvider class="overflow-hidden">
     <Dialog :open="!!newObjectContext" @update:open="(open) => { if (!open) newObjectContext = null }">
       <DialogContent class="sm:max-w-[425px]">
         <DialogHeader>
@@ -20,26 +22,29 @@
             :regex="Object.keys(newObjectContext[newObjectContext.length-1]?.value?.patternProperties || {})[0] || '.*'"></NewObjectOverlayForm>
       </DialogContent>
     </Dialog>
-    <Sidebar collapsible="none" class="flex flex-col h-full m-3 bg-gray-100/50 rounded-lg border border-gray-100">
-      <SidebarContent class="flex flex-col flex-1 overflow-hidden">
-        <SidebarGroup class="flex-1 overflow-auto">
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SchemaGroup v-if="schema" :key="groupRerenderTrigger"
-                  @selected="selectMetric"
-                  @newObject="newObject"
-                  @deleteObject="maybeDeleteObject"
-                  @toggle-show-only-populated="handleToggleShowOnlyPopulated"
-                  class="overflow-x-auto border-l-0"
-                  :schema="schema"
-                  :selected-metric="selectedMetric"
-                  :model="model"
-                  :show-only-populated="showOnlyPopulated">
-              </SchemaGroup>
-            </SidebarMenu>
+      <!-- Sidebar with fixed height and independent scrolling -->
+      <Sidebar collapsible="none" class="flex flex-col m-3 bg-gray-100/50 border rounded-lg">
+        <SidebarContent class="flex flex-col h-auto">
+          <!-- Schema tree with independent scrolling -->
+          <SidebarGroup class="h-auto overflow-hidden flex-1">
+            <SidebarGroupContent class="overflow-auto h-auto">
+              <SidebarMenu>
+                <SchemaGroup v-if="schema" :key="groupRerenderTrigger"
+                    @selected="selectMetric"
+                    @newObject="newObject"
+                    @deleteObject="maybeDeleteObject"
+                    @toggle-show-only-populated="handleToggleShowOnlyPopulated"
+                    class="overflow-x-auto border-l-0"
+                    :schema="schema"
+                    :selected-metric="selectedMetric"
+                    :model="model"
+                    :show-only-populated="showOnlyPopulated">
+                </SchemaGroup>
+              </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-        <Button variant="destructive" :disabled="loading" v-if="isDirty" @click="save()" class="mt-2">
+          <!-- Save button fixed at the bottom -->
+          <Button variant="destructive" :disabled="loading" v-if="isDirty" @click="save()" class="mt-2 shrink-0 m-3">
           <div v-if="!loading" class="flex items-center justify-center gap-1">
             <span>Save Changes</span>
             <i class="fa-sharp fa-solid fa-save ml-2"></i>
@@ -52,7 +57,9 @@
       </SidebarContent>
       <SidebarRail/>
     </Sidebar>
-    <SidebarInset class="flex flex-col flex-1 overflow-hidden px-3 pt-2">
+      <!-- Main content with fixed height and independent scrolling -->
+      <SidebarInset class="flex flex-col flex-1 overflow-hidden px-3 pt-2 h-full">
+        <!-- Fixed header -->
       <header class="flex h-10 shrink-0 items-center justify-between gap-2 px-1 mb-3">
           <Breadcrumb>
             <BreadcrumbList>
@@ -73,7 +80,8 @@
           </Breadcrumb>
         <div class="text-xs text-gray-400/90">{{selectedMetric?.model.Documentation}}</div>
       </header>
-      <div class="flex-1 overflow-auto">
+        <!-- Scrollable content area -->
+        <div class="flex-1 content-scroll">
         <div v-if="selectedMetric">
           <SparkplugMetric :key="rerenderTrigger"
               :selected-metric="selectedMetric" :model="model"
@@ -92,6 +100,7 @@
       </div>
     </SidebarInset>
   </SidebarProvider>
+  </div>
 </template>
 <script>
 import { v4 as uuidv4 } from 'uuid'
@@ -106,7 +115,7 @@ import { UUIDs } from '@amrc-factoryplus/service-client'
 import { useServiceClientStore } from '@store/serviceClientStore.js'
 import _ from 'lodash'
 import NewObjectOverlayForm from './NewObjectOverlayForm.vue'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarInset, SidebarMenu, SidebarMenuBadge, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarRail, SidebarTrigger } from '@/components/ui/sidebar'
 import { File } from 'lucide-vue-next'
@@ -891,4 +900,27 @@ export default {
   },
 }
 </script>
+
+<style scoped>
+/* Apply these styles to the component's root element */
+:deep(html), :deep(body), :deep(#app) {
+    height: 100%;
+    overflow: hidden;
+}
+
+/* Ensure the component takes up the full height */
+.h-full {
+    height: 100%;
+}
+
+/* Ensure scrollable areas have proper overflow behavior */
+.overflow-auto {
+    overflow: auto;
+}
+
+/* Prevent overflow on containers */
+.overflow-hidden {
+    overflow: hidden;
+}
+</style>
 

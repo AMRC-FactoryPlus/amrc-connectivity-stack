@@ -23,7 +23,6 @@
     </div>
     <!-- For every key that isn't a reserved word -->
     <div v-for="key in filteredKeys">
-
       <!-- Metric node -->
       <SidebarMenuButton
         v-if="type(key) === 'metric'"

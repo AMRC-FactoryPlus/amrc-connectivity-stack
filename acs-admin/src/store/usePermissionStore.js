@@ -48,7 +48,7 @@ export const usePermissionStore = defineStore('permission', {
       );
 
       this.rxsub = details.subscribe(ps => {
-        console.log("PERMS UPDATE: %o", ps);
+        console.debug("PERMS UPDATE: %o", ps);
         this.data = ps;
         this.loading = false;
       });

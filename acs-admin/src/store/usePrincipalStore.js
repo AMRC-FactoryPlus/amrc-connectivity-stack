@@ -1,5 +1,5 @@
 /*
- * Copyright (c) University of Sheffield AMRC 2024.
+ * Copyright (c) University of Sheffield AMRC 2025.
  */
 
 import { defineStore } from 'pinia'
@@ -62,7 +62,7 @@ export const usePrincipalStore = defineStore('principal', {
         // Retry with delay on error
         rx.retry({
           delay: (err, n) => {
-            console.log("Principals fetch failed (%s attempts): %o", n, err);
+            console.error("Principals fetch failed (%s attempts): %o", n, err);
             return rx.timer(5000);
           },
           resetOnSuccess: true,
@@ -79,7 +79,6 @@ export const usePrincipalStore = defineStore('principal', {
       );
 
       this.rxsub = seq.subscribe(princs => {
-        console.log("PRINCIPALS UPDATE");
         this.data = princs;
         this.loading = false;
       });

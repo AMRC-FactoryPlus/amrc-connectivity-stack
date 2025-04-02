@@ -5,7 +5,7 @@
 <template>
   <div class="flex flex-col gap-4">
       <Card>
-        <CardHeader class="pb-2">
+        <CardHeader>
           <CardDescription>MQTT Server</CardDescription>
           <Copyable :text="mqttUrl">
             <CardTitle class="text-4xl">
@@ -78,7 +78,7 @@ export default {
 
   computed: {
     mqttUrl () {
-      return this.s.urls?.mqtt?.[0] ?? null
+      return this.s.urls?.MQTT?.[0] ?? null
     },
   },
 

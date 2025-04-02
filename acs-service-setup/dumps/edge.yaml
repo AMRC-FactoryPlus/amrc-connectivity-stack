@@ -11,7 +11,7 @@ objects:
 
   !u ConfigDB.Class.R1Class:
     !u Edge.Class.Connection:
-      name: "Edge Agent SB connection"
+      name: "Edge Agent connection"
     # XXX I'm not certain a Driver shouldn't be a class of connections?
     !u Edge.Class.Driver:
       name: "Edge Agent driver"
@@ -42,11 +42,9 @@ objects:
   !u Edge.Class.Driver:
     !u ACS.Driver.REST:             { name: "REST" }
     !u ACS.Driver.MTConnect:        { name: "MTConnect" }
-    !u ACS.Driver.EtherNetIP:       { name: "EtherNet/IP" }
     !u ACS.Driver.S7:               { name: "S7" }
     !u ACS.Driver.OPCUA:            { name: "OPC-UA" }
     !u ACS.Driver.MQTT:             { name: "MQTT" }
-    !u ACS.Driver.Websocket:        { name: "Websocket" }
     !u ACS.Driver.UDP:              { name: "UDP" }
     !u ACS.Driver.Bacnet:           { name: "Bacnet" }
     !u ACS.Driver.Modbus:           { name: "Modbus" }
@@ -60,50 +58,368 @@ configs:
       internal:
         connType: REST
         details: RESTConnDetails
+      schema:
+        properties:
+          authMethod:
+            default: None
+            enum:
+              - None
+              - Basic
+            minLength: 1
+            title: Authentication Method
+            type: string
+          baseURL:
+            minLength: 1
+            title: Base URL
+            type: string
+          password:
+            format: password
+            minLength: 1
+            options:
+              dependencies:
+                authMethod: Basic
+            title: Password
+            type: string
+          username:
+            minLength: 1
+            options:
+              dependencies:
+                authMethod: Basic
+            title: Username
+            type: string
+        required:
+          - baseURL
+          - authMethod
+        title: REST Connection Details
+        type: object
     !u ACS.Driver.MTConnect:
       internal:
         connType: MTConnect
         details: MTConnectConnDetails
-    !u ACS.Driver.EtherNetIP:
-      internal:
-        connType: EtherNet/IP
-        details: EtherNetIPConnDetails
+      schema:
+        properties:
+          baseURL:
+            minLength: 1
+            title: Base URL
+            type: string
+            options:
+              order: 1
+          authMethod:
+            default: None
+            enum:
+              - None
+              - Basic
+            minLength: 1
+            title: Authentication Method
+            type: string
+            options:
+              order: 2
+          username:
+            minLength: 1
+            title: Username
+            type: string
+            options:
+              order: 3
+              dependencies:
+                authMethod: Basic
+          password:
+            format: password
+            minLength: 1
+            title: Password
+            type: string
+            options:
+              order: 4
+              dependencies:
+                authMethod: Basic
+        required:
+          - baseURL
+          - authMethod
+        title: MTConnect Connection Details
+        type: object
     !u ACS.Driver.S7:
       internal:
         connType: S7
         details: s7ConnDetails
+      schema:
+        properties:
+          hostname:
+            minLength: 1
+            title: Hostname/IP Address
+            type: string
+            options:
+              order: 1
+          port:
+            default: 102
+            minLength: 1
+            title: Port
+            type: number
+            options:
+              order: 2
+          rack:
+            minLength: 1
+            title: Rack
+            type: number
+            options:
+              order: 3
+          slot:
+            minLength: 1
+            title: Slot
+            type: number
+            options:
+              order: 4
+          timeout:
+            default: 5000
+            minLength: 1
+            title: Timeout
+            type: number
+            options:
+              order: 5
+        required:
+          - hostname
+          - port
+          - rack
+          - slot
+          - timeout
+        title: S7 Connection Details
+        type: object
     !u ACS.Driver.OPCUA:
       internal:
         connType: OPC UA
         details: OPCUAConnDetails
+      schema:
+        properties:
+          endpoint:
+            minLength: 1
+            title: Endpoint
+            type: string
+            pattern: ^opc.tcp://.+:\d+/?$
+            options:
+              order: 1
+              inputAttributes:
+                placeholder: e.g. opc.tcp://myserver:1234
+              patternmessage: This doesn't look like a valid OPC UA address (opc.tcp://host:port).
+          securityMode:
+            default: None
+            enum:
+              - None
+              - Sign
+              - SignAndEncrypt
+            minLength: 1
+            title: Security Mode
+            type: string
+            options:
+              order: 2
+          securityPolicy:
+            default: None
+            enum:
+              - None
+              - Basic128
+              - Basic192
+              - Basic192Rsa15
+              - Basic256Rsa15
+              - Basic256Sha256
+              - Aes128_Sha256
+              - Aes128_Sha256_RsaOaep
+              - PubSub_Aes128_CTR
+              - PubSub_Aes256_CTR
+              - Basic128Rsa15
+              - Basic256
+            minLength: 1
+            title: Security Policy
+            type: string
+            options:
+              order: 3
+          useCredentials:
+            format: checkbox
+            minLength: 1
+            title: Use credentials
+            type: boolean
+            options:
+              order: 4
+          username:
+            minLength: 1
+            title: Username
+            type: string
+            options:
+              order: 5
+              dependencies:
+                useCredentials: true
+          password:
+            format: password
+            minLength: 1
+            title: Password
+            type: string
+            options:
+              order: 6
+              dependencies:
+                useCredentials: true
+        required:
+          - endpoint
+          - securityPolicy
+          - securityMode
+          - useCredentials
+        title: OPC-UA Server Details
+        type: object
     !u ACS.Driver.MQTT:
       internal:
         connType: MQTT
         details: MQTTConnDetails
-    !u ACS.Driver.Websocket:
-      internal:
-        connType: Websocket
-        details: WebsocketConnDetails
+      schema:
+        properties:
+          host:
+            minLength: 1
+            title: Hostname/IP
+            type: string
+            options:
+              order: 1
+          port:
+            default: 1883
+            minLength: 1
+            title: Port
+            type: number
+            options:
+              order: 2
+          protocol:
+            default: mqtt
+            enum:
+              - mqtt
+              - mqtts
+              - tcp
+              - tls
+              - ws
+              - wss
+            minLength: 1
+            title: Protocol
+            type: string
+            options:
+              order: 3
+          clientId:
+            title: Client ID
+            type: string
+            options:
+              order: 4
+              inputAttributes:
+                placeholder: Leave blank for auto generation
+          username:
+            title: Username
+            type: string
+            options:
+              order: 5
+          password:
+            format: password
+            title: Password
+            type: string
+            options:
+              order: 6
+          cleanSession:
+            default: true
+            format: checkbox
+            title: Clean Session
+            type: boolean
+            options:
+              order: 7
+          keepAlive:
+            default: 60
+            title: Keep Alive Interval (sec)
+            type: number
+            options:
+              order: 8
+          useSSL:
+            format: checkbox
+            title: Use SSL?
+            type: boolean
+            options:
+              order: 9
+        required:
+          - host
+          - port
+          - protocol
+        title: MQTT Server Details
+        type: object
     !u ACS.Driver.UDP:
       internal:
         connType: UDP
         details: UDPConnDetails
+      schema:
+        properties:
+          port:
+            enum:
+              - 50205
+            title: Port
+            type: number
+            options:
+              order: 1
+        title: UDP Server Details
+        type: object
     !u ACS.Driver.Bacnet:
       image:
         registry: ghcr.io/amrc-factoryplus
         repository: edge-bacnet
+      schema:
+        properties:
+          host:
+            minLength: 1
+            title: Hostname/IP
+            type: string
+            options:
+              order: 1
+        required:
+          - host
+        title: Bacnet Connection Details
+        type: object
     !u ACS.Driver.Modbus:
       image:
         registry: ghcr.io/amrc-factoryplus
         repository: edge-modbus
+      schema:
+        properties:
+          host:
+            minLength: 1
+            title: Hostname/IP
+            type: string
+            options:
+              order: 1
+          port:
+            default: 502
+            title: Port
+            type: number
+            options:
+              order: 2
+        required:
+          - host
+        title: Modbus Connection Details
+        type: object
     !u ACS.Driver.Test:
       image:
         registry: ghcr.io/amrc-factoryplus
         repository: edge-test
+      schema:
+        properties: null
+        title: Test Connection Details
+        type: object
     !u ACS.Driver.TPlinkSmartPlug:
       image:
         registry: ghcr.io/amrc-factoryplus
         repository: edge-tplink-smartplug
+      schema:
+        properties:
+          host:
+            minLength: 1
+            title: Hostname/IP
+            type: string
+            options:
+              order: 1
+          timeout:
+            title: Connection Timeout (ms)
+            type: number
+            default: 5000
+            options:
+              order: 2
+        required:
+          - host
+        title: TP-Link Smart Plug Details
+        type: object
+
     !u ACS.Driver.External:
       external: true
 ---

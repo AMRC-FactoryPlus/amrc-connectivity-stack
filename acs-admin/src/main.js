@@ -6,6 +6,7 @@ import './assets/main.css'
 
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
+import piniaPersist from 'pinia-plugin-persist'
 import { createRouter, createWebHashHistory } from 'vue-router'
 import mitt from 'mitt'
 
@@ -20,6 +21,10 @@ import Login from "@pages/Login.vue";
 import EdgeCluster from '@pages/EdgeManager/EdgeClusters/EdgeCluster.vue'
 import Node from '@pages/EdgeManager/Nodes/Node.vue'
 import Device from '@pages/EdgeManager/Devices/Device.vue'
+import ConfigDB from "@pages/ConfigDB/ConfigDB.vue";
+import ApplicationEditor from "@pages/ConfigDB/Applications/ApplicationEditor.vue";
+import ApplicationObjectEditor from "@pages/ConfigDB/Applications/ApplicationObjectEditor.vue";
+import ObjectPage from "@pages/ConfigDB/Objects/ObjectPage.vue";
 
 // Create an event bus
 window.events = mitt()
@@ -84,6 +89,41 @@ const routes = [
       name: 'Device',
     },
   },
+  {
+    path: '/configdb/:tab?',
+    component: ConfigDB,
+    meta: {
+      name: 'ConfigDB',
+      icon: 'gears'
+    },
+    children: [
+      {path: ':selected?', component: ConfigDB, meta: {}}
+    ]
+  },
+  {
+    path: '/configdb/applications/:application',
+    component: ApplicationEditor,
+    meta: {
+      name: 'ConfigDB',
+      icon: 'gears'
+    }
+  },
+  {
+    path: '/configdb/applications/:application/:object',
+    component: ApplicationObjectEditor,
+    meta: {
+      name: 'ConfigDB',
+      icon: 'gears'
+    }
+  },
+  {
+    path: '/configdb/objects/:object',
+    component: ObjectPage,
+    meta: {
+      name: 'ConfigDB',
+      icon: 'gears'
+    }
+  },
 ]
 
 const router = createRouter({
@@ -96,10 +136,10 @@ const router = createRouter({
 
 // Setup auth guard.
 // router.beforeEach((to, from, next) => {
-//   const s = useServiceClientStore();
-//   if(!s.loaded && to.path !== "/login"){
+//   const clientLoaded = localStorage.getItem('clientLoaded');
+//   if(!clientLoaded && to.path !== "/login"){
 //     next({path: "/login"})
-//   }else if(s.loaded && to.path === "/login"){
+//   }else if(clientLoaded && to.path === "/login"){
 //     next({path: "/"})
 //   }
 //   else{
@@ -108,5 +148,6 @@ const router = createRouter({
 // })
 
 const pinia = createPinia()
+pinia.use(piniaPersist)
 
 createApp(App).use(router).use(pinia).mount('#app')

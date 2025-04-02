@@ -2,25 +2,14 @@
  * Copyright (c) University of Sheffield AMRC 2025.
  */
 
-import * as imm from 'immutable'
 import { defineStore } from 'pinia'
 import * as rx from 'rxjs'
-
-import { UUIDs } from '@amrc-factoryplus/service-client'
 import * as rxu from '@amrc-factoryplus/rx-util'
-
 import { useObjectStore } from '@store/useObjectStore.js'
 import { useServiceClientStore } from '@/store/serviceClientStore.js'
 import { serviceClientReady } from '@store/useServiceClientReady.js'
 
-// We track all classes which are members of one of these metaclasses.
-const GROUPS = [
-  `f1fabdd1-de90-4399-b3da-ccf6c2b2c08b`,     // Role
-  `1c567e3c-5519-4418-8682-6086f22fbc13`,     // Composite permission
-  `b7f0c2f4-ccf5-11ef-be77-777cd4e8cb41`,     // Service permission set
-];
-
-export const useGroupStore = defineStore('group', {
+export const useMemberStore = defineStore('members', {
   state: () => ({
     data: [],
     loading: true,
@@ -37,29 +26,18 @@ export const useGroupStore = defineStore('group', {
       const objs = useObjectStore().maps;
 
       // This gives an Observable of Maps from group UUID to Set.
-      const groups = rxu.rx(
-        GROUPS,
-        rx.map(g => cdb.watch_members(g)),
-        rx.combineLatestAll(),
-        rx.map(imm.Set.union),
+      const members = rxu.rx(
+        objs,
+        rx.map(objList =>
+          objList.filter(o => o.rank > 0).keySeq().toArray()
+        ),
         cdb.expand_members(),
+        rx.map(m => m.entrySeq().map(([uuid, members]) => ({uuid, members: members})).toJS())
       );
 
-      const details = rxu.rx(
-        rx.combineLatest(objs, groups),
-        rx.map(([objs, groups]) => 
-          groups.entrySeq()
-            .map(([uuid, members]) => ({
-              ...objs.get(uuid, {}),
-              uuid,
-              members:  members.toJS(),
-            }))
-            .toArray()),
-      );
-
-      this.rxsub = details.subscribe(grps => {
-        console.debug("GROUPS UPDATE: %o", grps);
-        this.data = grps;
+      this.rxsub = members.subscribe(members => {
+        console.log("MEMBERS UPDATE: %o", members);
+        this.data = members;
         this.loading = false;
       });
     },
@@ -67,10 +45,6 @@ export const useGroupStore = defineStore('group', {
       this.rxsub?.unsubscribe();
       this.rxsub = null;
     },
-
-    /* This is called in lots of places but now does nothing */
-    fetch () {},
-
     async storeReady () {
       await serviceClientReady()
 

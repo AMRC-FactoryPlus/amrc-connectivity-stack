@@ -1,6 +1,5 @@
 <!--
-  -  Factory+ / AMRC Connectivity Stack (ACS) Manager component
-  -  Copyright 2023 AMRC
+  - Copyright (c) University of Sheffield AMRC 2025.
   -->
 
 <template>
@@ -82,7 +81,7 @@
             </button>
           </div>
         </div>
-        <div v-if="metricLoading" class="flex flex-grow w-full gap-x-6">
+        <div v-if="!sparkplugMetricSchema" class="flex flex-grow w-full gap-x-6">
           <div class="flex items-center justify-center flex-grow">
             <div class="text-center mt-10 pb-3 flex-grow">
               <i class="fa-sharp fa-solid fa-circle-notch fa-spin fa-2x text-gray-300"></i>
@@ -90,9 +89,11 @@
             </div>
           </div>
         </div>
-        <div v-if="selectedMetric" class="flex flex-col h-full overflow-y-auto border-l">
-          <SparkplugMetric :key="rerenderTrigger" :selected-metric="selectedMetric" :model="model"
-                           @input="metricDetailsEdited" @loaded="metricLoading = false"></SparkplugMetric>
+        <div v-else-if="selectedMetric" class="flex flex-col h-full overflow-y-auto border-l">
+          <SparkplugMetric :key="rerenderTrigger"
+            :selected-metric="selectedMetric" :model="model"
+            :schema="sparkplugMetricSchema" @input="metricDetailsEdited">
+          </SparkplugMetric>
         </div>
         <div v-else class="flex flex-grow w-full gap-x-6">
           <div class="flex items-center justify-center flex-grow">
@@ -109,7 +110,8 @@
 </template>
 <script>
 import { v4 as uuidv4 } from 'uuid'
-import $RefParser from '@apidevtools/json-schema-ref-parser'
+
+const SparkplugMetric = "b16275f1-e443-4c41-a482-fcbdfbd20769";
 
 export default {
   name: 'DeviceEditorOriginMapTab',
@@ -134,6 +136,7 @@ export default {
     window.onbeforeunload = this.checkDirty
 
     document.addEventListener('keydown', this.doSave)
+    this.loadSparkplugMetricSchema();
     this.loadExistingConfig()
   },
 
@@ -160,6 +163,13 @@ export default {
       }
     },
 
+    /* Load the Sparkplug Metric schema once here and then pass it in to
+     * the SparkplugMetric components. */
+    async loadSparkplugMetricSchema () {
+      const sch = await this.refParser.fetchSchema(SparkplugMetric);
+      this.sparkplugMetricSchema = sch;
+    },
+
     loadExistingConfig () {
 
       this.loadingExistingConfig = true
@@ -170,21 +180,16 @@ export default {
 
       // 1. Get the latest version of the schema from the model
       let schemaObj = {
-        url: this.device.latest_origin_map.schema_version.schema.url + '-v' +
-            this.device.latest_origin_map.schema_version.version + '.json',
-        device_schema_id: this.device.latest_origin_map.schema_version.device_schema_id,
         schema_uuid: this.device.latest_origin_map.schema_uuid,
       }
-      this.refParser.dereference(schemaObj.url, (err, parsedSchema) => {
-        if (err) {
-          console.error(err)
-        } else {
+      this.refParser.dereference(schemaObj.schema_uuid)
+        .then(parsedSchema => {
           this.selectSchema({
             parsedSchema: parsedSchema,
             schemaObj: schemaObj,
           }, false)
-        }
-      })
+        })
+        .catch(e => this.handleError(e));
 
       // 2. Load the model object
       this.model = this.device.model
@@ -198,10 +203,12 @@ export default {
 
     updateDynamicSchemaObjects () {
 
-      /** This method goes through the model recursively and looks for Schema_UUIDs. If it finds one it works out where
-       * it was found and checks the relative place in the Schema object to see if it's the child of a regex. If it is
-       * then it won't have the required schema objects populated so we need to create them.
-       **/
+      /** This method goes through the model recursively and looks for
+       * Schema_UUIDs. If it finds one it works out where it was found
+       * and checks the relative place in the Schema object to see if
+       * it's the child of a regex. If it is then it won't have the
+       * required schema objects populated so we need to create them.
+       * */
 
           // The nestingPointer array is used to keep track of where we are in the model
       let nestingPointer = []
@@ -224,7 +231,7 @@ export default {
           Object.keys(modelLevel).includes('Schema_UUID')
 
           // Do not process this if it's a metric schema
-          && modelLevel.Schema_UUID !== 'b16275f1-e443-4c41-a482-fcbdfbd20769'
+          && modelLevel.Schema_UUID !== SparkplugMetric
 
           // Do not process this if it's already been added to the schema object
           && !_.get(this.schema, n.join('.') + '.properties.' + objectName)) {
@@ -482,9 +489,6 @@ export default {
     },
 
     selectMetric (val) {
-
-      this.metricLoading = true
-
       let reversed = [...val].reverse()
 
       // Get the existing value
@@ -539,7 +543,7 @@ export default {
                 '.')
 
             // Generate an Instance_UUID for this schema instance, only if we're stamping this for the first time and it's not a metric
-            if (e.schemaUUID !== 'b16275f1-e443-4c41-a482-fcbdfbd20769') {
+            if (e.schemaUUID !== SparkplugMetric) {
               this.set(reversed.slice(0, index + 1).map(e => e.key).join('.') + '.Instance_UUID', uuidv4(), this.model,
                   '.')
             }
@@ -612,7 +616,6 @@ export default {
     selectSchema (schema) {
       this.schemaBrowserVisible = false
       this.schema = schema.parsedSchema
-      this.selectedSchemaId = schema.schemaObj.device_schema_id
       this.selectedSchemaUUID = schema.schemaObj.schema_uuid
       this.loadingExistingConfig = false
     },
@@ -628,7 +631,6 @@ export default {
       axios.patch(`/api/devices/${this.device.id}/origin-map`, {
         'configuration': JSON.stringify(this.model),
         'activate': activate,
-        'device_schema_id': this.selectedSchemaId,
         'schema_uuid': this.selectedSchemaUUID,
       }).then(() => {
         this.loading = false
@@ -658,7 +660,6 @@ export default {
     return {
       isDirty: false,
       loadingExistingConfig: true,
-      refParser: $RefParser,
       loading: false,
       selectedMetric: null,
       groupRerenderTrigger: +new Date(),
@@ -666,15 +667,16 @@ export default {
       model: {},
       schemaBrowserVisible: false,
       schema: null,
-      selectedSchemaId: null,
       selectedSchemaUUID: null,
       showCDSImport: false,
       controls: [],
 
       newObjectContext: null,
-      metricLoading: false,
+      sparkplugMetricSchema: null,
     }
   },
+
+  inject: ["refParser"],
 }
 </script>
 

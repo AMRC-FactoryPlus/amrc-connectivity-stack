@@ -27,6 +27,7 @@
               </CardTitle>
             </component>
           </template>
+          <slot name="subtitle"></slot>
           <div v-if="subtitle" class="text-gray-500 text-sm max-w-xl">{{subtitle}}</div>
           <component :is="copyable ? 'Copyable' : 'div'" v-if="detail" :text="detail" class="flex items-center">
             <div :title="detailTooltip"

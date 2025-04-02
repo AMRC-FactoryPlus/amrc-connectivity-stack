@@ -17,14 +17,14 @@
       :node-uuid="device.deviceInformation.node"
       :current-connection-uuid="device?.deviceInformation.connection"
   />
-  <EdgeContainer>
+  <EdgeContainer padding="p-0">
     <EdgePageSkeleton v-if="loadingDetails"/>
-    <div v-else class="flex h-full gap-4">
+    <div v-else class="flex flex-1 h-full">
       <!-- Main content -->
-      <div class="flex-1 flex flex-col gap-4 relative">
+      <div class="flex-1 flex flex-col gap-4">
         <!-- Speech Bubble -->
         <Transition name="speech">
-          <div v-if="robotBeep" 
+          <div v-if="robotBeep"
                class="absolute z-10 left-1/2 top-[32%] transform -translate-x-1/2 bg-white dark:bg-slate-800 px-4 py-2 rounded-lg shadow-md border border-slate-200 dark:border-slate-700">
             <div class="text-sm font-medium">{{ robotBeep }}</div>
             <!-- Speech bubble triangle -->
@@ -39,7 +39,7 @@
         >
             <template #actions>
                 <div class="flex gap-2">
-                    <Button 
+                    <Button
                         @click="changeSchema"
                         :disabled="device.deviceInformation.schema"
                         :variant="device.deviceInformation.schema ? 'outline' : 'default'"
@@ -48,7 +48,7 @@
                         <i :class="`fa-solid ${device.deviceInformation.schema ? 'fa-check' : 'fa-code'} text-sm`"></i>
                         <span>{{ device.deviceInformation.schema ? 'Schema Configured' : 'Choose Schema' }}</span>
                     </Button>
-                    <Button 
+                    <Button
                         @click="changeConnection"
                         :disabled="device.deviceInformation.connection"
                         :variant="device.deviceInformation.connection ? 'outline' : 'default'"
@@ -60,11 +60,11 @@
                 </div>
             </template>
         </EmptyState>
-        <div v-else>{{device}}</div>
+        <OriginMapEditor :device="device" :device-schema="schema" v-else></OriginMapEditor>
       </div>
 
       <!-- Sidebar -->
-      <div class="w-96 border-l border-border -my-4 -mr-4">
+      <div class="w-96 border-l border-border hidden xl:block">
         <div class="flex items-center justify-start gap-2 p-4 border-b">
           <i :class="`fa-fw fa-solid fa-microchip`"></i>
           <div class="font-semibold text-xl">{{device.name}}</div>
@@ -91,10 +91,10 @@
         <!-- Schema section -->
         <div class="flex items-center justify-between gap-2 p-4 border-b">
           <div class="font-semibold text-lg">Schema</div>
-          <Button 
+          <Button
               v-if="device.deviceInformation?.schema"
-              @click="changeSchema" 
-              size="sm" 
+              @click="changeSchema"
+              size="sm"
               variant="ghost"
               class="flex items-center justify-center gap-2"
           >
@@ -117,10 +117,10 @@
         <!-- Connection section -->
         <div class="flex items-center justify-between gap-2 p-4 border-b">
           <div class="font-semibold text-lg">Connection</div>
-          <Button 
+          <Button
               v-if="device.deviceInformation?.connection"
-              @click="changeConnection" 
-              size="sm" 
+              @click="changeConnection"
+              size="sm"
               variant="ghost"
               class="flex items-center justify-center gap-2"
           >
@@ -160,9 +160,11 @@ import { useSchemaStore } from '@store/useSchemaStore.js'
 import ChangeSchemaDialog from '@components/EdgeManager/Devices/ChangeSchemaDialog.vue'
 import { useConnectionStore } from '@store/useConnectionStore.js'
 import ChangeConnectionDialog from '@components/EdgeManager/Devices/ChangeConnectionDialog.vue'
+import OriginMapEditor from '@components/EdgeManager/Devices/OriginMapEditor/OriginMapEditor.vue'
 
 export default {
   components: {
+    OriginMapEditor,
     EmptyState,
     EdgePageSkeleton,
     Button,

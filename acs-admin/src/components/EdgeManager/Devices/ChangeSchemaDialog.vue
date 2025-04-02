@@ -160,7 +160,6 @@ export default {
 
   methods: {
     setInitialSchema () {
-      console.debug('Setting initial schema', this.currentSchemaUuid)
       if (this.currentSchemaUuid) {
         const currentSchema  = this.schemaStore.data.find(s => s.uuid === this.currentSchemaUuid)
         this.selectedSchema  = currentSchema

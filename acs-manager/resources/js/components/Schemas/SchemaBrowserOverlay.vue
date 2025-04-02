@@ -1,20 +1,17 @@
 <!--
-  -  Factory+ / AMRC Connectivity Stack (ACS) Manager component
-  -  Copyright 2023 AMRC
+  - Copyright (c) University of Sheffield AMRC 2025.
   -->
 
 <template>
   <overlay :show="show" @close="$emit('close')" title="Select Device Schema">
     <template #content>
       <schema-browser :show-new="showNew" v-if="show" :device-schemas="deviceSchemas"
-                      :device-schema-versions="deviceSchemaVersions"
                       @selected="schemaVersionSelected" @new-schema="newSchema"/>
     </template>
   </overlay>
 </template>
 
 <script>
-import $RefParser from '@apidevtools/json-schema-ref-parser'
 import { v4 as uuidv4 } from 'uuid'
 
 export default {
@@ -26,7 +23,6 @@ export default {
   props: {
     show: { required: true, type: Boolean },
     deviceSchemas: { required: true },
-    deviceSchemaVersions: { required: true },
     showNew: { required: false, type: Boolean, default: false },
   },
 
@@ -54,41 +50,33 @@ export default {
       })
     },
 
+    /* XXX bmz: We should not be doing the fetches here. We have two
+     * callers, the origin map editor which wants a deref'd schema and
+     * the schema editor which wants a raw schema. We never need both,
+     * so we should just return the info and leave the fetch to the
+     * caller. */
     async schemaVersionSelected (schemaObj) {
       // Get the raw JSON in case our caller needs that (e.g. Schema Editor)
-      let raw = null
-      axios.post('/api/github-proxy/', {
-        path: schemaObj.url.replace('https://raw.githubusercontent.com/AMRC-FactoryPlus/schemas/main/', ''),
-      }).then(k => {
-        let data = k.data
-        raw = data.data
+      const uuid = schemaObj.schema_uuid;
+      const raw = await this.refParser.fetchSchema(uuid)
+        .catch(error => this.handleError(error));
+      const parsed = await this.refParser.dereference(uuid)
+        .catch(err => this.handleError(err));
 
-        // This resolves all references to other schemas and returns a JSON object of the complete flattened schema
-        this.refParser.dereference(schemaObj.url, (err, parsedSchema) => {
-          if (err) {
-            console.error(err)
-          } else {
-            this.$emit('schema-selected', {
-              parsedSchema: parsedSchema,
-              schemaObj: schemaObj,
-              rawSchema: raw,
-            })
-          }
-        })
-      }).catch(error => {
-        if (error && error.response && error.response.status === 401) {
-          this.goto_url('/login')
-        }
-        this.handleError(error)
-      })
+      this.$emit('schema-selected', {
+        parsedSchema: parsed,
+        schemaObj: schemaObj,
+        rawSchema: raw,
+      });
     },
   },
 
   data () {
     return {
-      refParser: $RefParser,
       parsedSchema: null,
     }
   },
+
+  inject: ["refParser"],
 }
 </script>

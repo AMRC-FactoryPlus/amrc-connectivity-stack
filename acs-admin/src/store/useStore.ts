@@ -169,7 +169,7 @@ export const useStore = (name: string, classUUID: string, appBindings: AppBindin
         )
 
         this.rxsub = details.subscribe(cs => {
-          console.log(`${name.toUpperCase()} UPDATE: %o`, cs)
+          console.debug(`${name.toUpperCase()} UPDATE: %o`, cs)
           this.data = cs
           this.loading = false
           this.ready = true  // Set ready state when data is loaded

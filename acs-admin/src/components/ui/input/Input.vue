@@ -41,6 +41,10 @@ const props = defineProps({
     required: false,
     default: false,
   },
+  icon: {
+    type: String,
+    required: false,
+  },
   onEncrypt: {
     type: Function,
     required: false,
@@ -58,22 +62,28 @@ const modelValue = useVModel(props, 'modelValue', emits, {
 
 <template>
   <div class="relative flex-1">
-    <input
-      :type="inputType"
-      :value="displayValue"
-      @input="handleInput"
-      @blur="handleBlur"
-      :disabled="disabled || isEncrypting"
-      :placeholder="placeholder"
-      :min="min"
-      :max="max"
-      :step="step"
-      class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-      :class="[
-        { 'border-red-500': v?.$error },
-        className
-      ]"
-    />
+    <div class="relative">
+      <!-- Icon on the left if provided -->
+      <div v-if="icon" class="absolute left-0 top-0 bottom-0 flex items-center pl-3 pointer-events-none">
+        <i :class="`fa-fw fa-solid fa-${icon} text-gray-400 text-sm`"></i>
+      </div>
+      <input
+        :type="inputType"
+        :value="displayValue"
+        @input="handleInput"
+        @blur="handleBlur"
+        :disabled="disabled || isEncrypting"
+        :placeholder="placeholder"
+        :min="min"
+        :max="max"
+        :step="step"
+        class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+        :class="[
+          { 'border-red-500': v?.$error, 'pl-[2.1rem]': icon },
+          className
+        ]"
+      />
+    </div>
 
     <!-- Only show encrypting status -->
     <div v-if="type === 'password' && isEncrypting" class="absolute right-0 top-0 bottom-0 flex items-center pr-2">
@@ -108,6 +118,7 @@ export default {
     min: [String, Number],
     max: [String, Number],
     step: [String, Number],
+    icon: String,
     onEncrypt: {
       type: Function,
       required: false,

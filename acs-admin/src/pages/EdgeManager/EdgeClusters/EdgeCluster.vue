@@ -196,11 +196,11 @@ export default {
     },
 
     hosts () {
-      return this.cluster.status.hosts
+      return this.cluster?.status?.hosts
     },
 
     bootstrapped () {
-      return this.hosts.length > 0
+      return this.hosts?.length > 0
     },
   },
 

@@ -3,12 +3,12 @@
   -->
 
 <template>
-  <div class="flex flex-col -m-4 flex-1">
+  <div class="flex flex-col h-full -m-4">
     <div class="flex justify-between bg-white sticky top-[-1rem] border-b z-10">
       <EdgeBreadcrumbs/>
       <slot name="header"></slot>
     </div>
-    <div class="m-4 flex-1 h-full">
+    <div class="flex-1 overflow-hidden" :class="[padding]">
       <slot></slot>
     </div>
   </div>
@@ -22,6 +22,10 @@ export default {
   name: 'EdgeContainer',
   components: {
     EdgeBreadcrumbs,
+  },
+
+  props: {
+    padding: { type: String, default: 'p-4' },
   },
 
   setup () {

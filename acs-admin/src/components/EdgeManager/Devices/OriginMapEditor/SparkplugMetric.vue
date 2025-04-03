@@ -17,11 +17,11 @@
     </div>
     <div class="rounded-lg border border-gray-300 p-5 bg-gray-100">
       <div class="grid gap-3 2xl:grid-cols-3">
-        <Control v-if="!isStatic" label="Device Address" :help="schema.properties.Address.description">
-          <Input v-model="localModel.Address" placeholder="Address" icon="globe-europe"/>
+        <Control v-if="!isStatic" :label="addressLabel" :help="addressHelp">
+          <Input v-model="localModel.Address" :placeholder="addressPlaceholder" :icon="addressIcon"/>
         </Control>
-        <Control v-if="!isStatic" label="Metric Path" :help="schema.properties.Path.description">
-          <Input v-model="localModel.Path" placeholder="Path" icon="folder-tree"/>
+        <Control v-if="!isStatic && !hidePathField" :label="pathLabel" :help="pathHelp">
+          <Input v-model="localModel.Path" :placeholder="pathPlaceholder" :icon="pathIcon"/>
         </Control>
         <Control v-if="isStatic" label="Static Value" :help="schema.properties.Value.description">
           <Input v-model="localModel.Value" placeholder="Value" icon="i-cursor"/>
@@ -124,9 +124,18 @@ import PermissionList from '@pages/AccessControl/Permissions/PermissionList.vue'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import DetailCard from '@components/DetailCard.vue'
 import { Button } from '@/components/ui/button'
+import { useConnectionStore } from '@/store/useConnectionStore'
+import { useDriverStore } from '@/store/useDriverStore'
 
 export default {
   name: 'SparkplugMetric',
+
+  setup() {
+    return {
+      conn: useConnectionStore(),
+      driver: useDriverStore(),
+    }
+  },
 
   components: {
     DetailCard,
@@ -163,6 +172,11 @@ export default {
       required: true,
       type: Object,
     },
+    connection: {
+      required: false,
+      type: String,
+      default: null,
+    },
   },
 
   data () {
@@ -188,6 +202,62 @@ export default {
         value: e,
       }))
     },
+
+    // Connection-specific computed properties
+    connectionInfo() {
+      return this.conn.data.find(c => c.uuid === this.connection) || null
+    },
+
+    driverInfo() {
+      if (!this.connectionInfo?.configuration?.driver) return null
+      return this.driver.data.find(d => d.uuid === this.connectionInfo.configuration.driver) || null
+    },
+
+    addressLabel() {
+      return this.driverInfo?.presentation?.address?.title || 'Device Address'
+    },
+
+    pathLabel() {
+      return this.driverInfo?.presentation?.path?.title || 'Metric Path'
+    },
+
+    addressHelp() {
+      return this.driverInfo?.presentation?.address?.description || this.schema.properties.Address.description
+    },
+
+    pathHelp() {
+      return this.driverInfo?.presentation?.path?.description || this.schema.properties.Path.description
+    },
+
+    addressIcon() {
+      const icon = this.driverInfo?.presentation?.address?.icon || 'globe-europe'
+      return `fa-solid fa-${icon}`
+    },
+
+    pathIcon() {
+      const icon = this.driverInfo?.presentation?.path?.icon || 'folder-tree'
+      return `fa-solid fa-${icon}`
+    },
+
+    addressPlaceholder() {
+      return this.driverInfo?.presentation?.address?.placeholder || 'Enter address'
+    },
+
+    pathPlaceholder() {
+      return this.driverInfo?.presentation?.path?.placeholder || 'Enter path'
+    },
+
+    hidePathField() {
+      // Default to false if not specified (meaning show the path field by default)
+      // This handles cases where any part of the path is missing
+      return this.driverInfo?.presentation?.path?.hidden === true
+    },
+  },
+
+  mounted() {
+    // Start the stores
+    this.conn.start()
+    this.driver.start()
   },
 
   watch: {
@@ -253,8 +323,12 @@ export default {
         if (!this.localModel.Address) {
           this.localModel.Address = ''
         }
-        if (!this.localModel.Path) {
+        // Only set Path if it should be shown for this driver
+        if (!this.hidePathField && !this.localModel.Path) {
           this.localModel.Path = ''
+        } else if (this.hidePathField) {
+          // If path shouldn't be shown, make sure it's null
+          this.localModel.Path = null
         }
         // Now clear Value
         this.localModel.Value = null

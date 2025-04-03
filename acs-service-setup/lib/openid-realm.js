@@ -445,7 +445,10 @@ class RealmSetup {
       new Request(user_query_url));
 
     const data = await response.json();
-    return data[0].id;
+    const id = data[0]?.id;
+    if (id == null)
+      throw new Error("Admin user doesn't exist");
+    return id;
   }
 
   /**

@@ -386,11 +386,11 @@ class RealmSetup {
       email: `admin@${this.acs_realm}`,
       emailVerified: false,
       enabled: true,
-      credentials: {
+      credentials: [{
         type: "password",
         value: this.password,
         temporary: "false",
-      },
+      }],
     };
 
     await this.openid_create({

@@ -512,7 +512,7 @@ configs:
         address:
           title: "Test Address"
           description: "Format: function:period:amplitude:packing (e.g. sin:3000:50:bd)"
-          icon: "vial"
+          icon: "wave-square"
           placeholder: "e.g. sin:3000:50:bd"
         path:
           hidden: true

@@ -214,8 +214,11 @@ export default {
       node,
       existingConnection,
     }) => {
-      if (existingConnection?.configuration) {
+      // Reset the form first to clear any previous state
+      this.resetForm()
 
+      if (existingConnection?.configuration) {
+        // If editing an existing connection, populate the form
         this.existingConnection = existingConnection
         const existingConfig    = existingConnection.configuration
         this.selectedDriverName = this.dr.data.find(d => d.uuid === existingConfig.driver_uuid)?.name
@@ -457,9 +460,8 @@ export default {
     handleOpen(e) {
       if (e === false) {
         this.node = null
-        if (this.existingConnection) {
-          this.selectedDriverName = null
-        }
+        // Always reset the form when closing the dialog
+        this.resetForm()
       }
     },
 

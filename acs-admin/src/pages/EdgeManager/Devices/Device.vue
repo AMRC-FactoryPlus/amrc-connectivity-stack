@@ -99,7 +99,6 @@
               class="flex items-center justify-center gap-2"
           >
               <i class="fa-solid fa-sync text-sm"></i>
-              <div class="text-sm">Change Schema</div>
           </Button>
         </div>
         <div class="space-y-4 p-4">
@@ -125,7 +124,6 @@
               class="flex items-center justify-center gap-2"
           >
               <i class="fa-solid fa-sync text-sm"></i>
-              <div class="text-sm">Change Connection</div>
           </Button>
         </div>
         <div class="space-y-4 p-4">

@@ -7,9 +7,30 @@
 import {UUIDs} from "@amrc-factoryplus/service-client";
 
 export async function migrate_edge_agent_config(ss) {
+    const Class = {
+        Private:        "eda329ca-4e55-4a92-812d-df74993c47e2",
+    };
+
+    const App = {
+        ServiceSetup: "5b47881c-b012-4040-945c-eacafca539b2",
+    }
+
     const {fplus} = ss;
     const cdb = fplus.ConfigDB;
     const log = fplus.debug.bound("manager");
+
+    // Check the migration status.
+    const privateConfigUUIDs = await cdb.list_configs(App.ServiceSetup);
+    for (const uuid of privateConfigUUIDs){
+        const privateConfig = await cdb.get_config(App.ServiceSetup, uuid);
+        if("name" in privateConfig &&
+            privateConfig.name === "v4-Migration" &&
+            privateConfig.migrated === true
+        ){
+            log("No migration required.")
+            return;
+        }
+    }
 
     const edgeAgentConfigUUIDs = await cdb.list_configs(UUIDs.App.EdgeAgentConfig);
     const driverUUIDs = await cdb.list_configs(UUIDs.App.DriverDefinition);
@@ -74,5 +95,23 @@ export async function migrate_edge_agent_config(ss) {
 
         }
     }
+
+    // Set migration status
+    log("Creating required Classes");
+    // Make sure the class exists.
+    await cdb.create_object(UUIDs.Class.Class, Class.Private);
+    await cdb.put_config(UUIDs.App.Info, Class.Private,
+        { name: "Private configuration" });
+
+    // create an instance of the private class.
+    const uuid = await cdb.create_object(Class.Private);
+    await cdb.put_config(UUIDs.App.Info, uuid, { name: "Migration Information" });
+
+    // Insert the migration config.
+    await cdb.put_config(App.ServiceSetup, uuid, {
+        name: "v4-Migration",
+        timestamp: new Date().toISOString(),
+        migrated: true,
+    });
 }
 

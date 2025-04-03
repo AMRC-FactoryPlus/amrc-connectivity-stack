@@ -99,7 +99,7 @@ export default {
           this.deviceId,
           "merge",
           {
-            connection: this.selectedConnection,
+            connection: this.selectedConnection.uuid,
           }
         )
         

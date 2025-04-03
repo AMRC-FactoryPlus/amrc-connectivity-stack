@@ -2,64 +2,6 @@
   - Copyright (c) University of Sheffield AMRC 2025.
   -->
 
-<script setup>
-import { useVModel } from '@vueuse/core'
-import { cn } from '@/lib/utils'
-
-const props = defineProps({
-  defaultValue: {
-    type: [String, Number],
-    required: false,
-  },
-  modelValue: {
-    type: [String, Number],
-    required: false,
-  },
-  class: {
-    type: null,
-    required: false,
-  },
-  v: {
-    type: Object,
-    required: false,
-  },
-  title: {
-    type: String,
-    required: false,
-  },
-  placeholder: {
-    type: String,
-    required: false,
-  },
-  type: {
-    type: String,
-    required: false,
-    default: 'text',
-  },
-  disabled: {
-    type: Boolean,
-    required: false,
-    default: false,
-  },
-  icon: {
-    type: String,
-    required: false,
-  },
-  onEncrypt: {
-    type: Function,
-    required: false,
-    default: null
-  }
-})
-
-const emits = defineEmits(['update:modelValue'])
-
-const modelValue = useVModel(props, 'modelValue', emits, {
-  passive: true,
-  defaultValue: props.defaultValue,
-})
-</script>
-
 <template>
   <div class="relative flex-1">
     <div class="relative">
@@ -84,6 +26,12 @@ const modelValue = useVModel(props, 'modelValue', emits, {
         ]"
       />
     </div>
+    <p v-if="info" class="text-xs text-gray-500">
+      {{info}}
+    </p>
+    <div v-if="v?.$errors.length" class="text-red-500 text-xs mt-0.5">
+      {{v?.$errors[0].$message}}
+    </div>
 
     <!-- Only show encrypting status -->
     <div v-if="type === 'password' && isEncrypting" class="absolute right-0 top-0 bottom-0 flex items-center pr-2">
@@ -97,7 +45,7 @@ const modelValue = useVModel(props, 'modelValue', emits, {
 
 <script>
 import { useServiceClientStore } from '@store/serviceClientStore.js'
-import {UUIDs} from "@amrc-factoryplus/service-client";
+import { UUIDs } from "@amrc-factoryplus/service-client"
 
 export default {
   name: 'Input',
@@ -122,6 +70,10 @@ export default {
     onEncrypt: {
       type: Function,
       required: false,
+      default: null
+    },
+    info: {
+      type: String,
       default: null
     }
   },
@@ -158,10 +110,13 @@ export default {
   },
 
   watch: {
-    modelValue(newValue) {
-      if (newValue !== this.localValue) {
-        this.localValue = newValue
-      }
+    modelValue: {
+      handler(newValue) {
+        if (newValue !== this.localValue) {
+          this.localValue = newValue
+        }
+      },
+      immediate: true
     }
   },
 

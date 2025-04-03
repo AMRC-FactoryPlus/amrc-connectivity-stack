@@ -131,7 +131,7 @@ class RealmSetup {
       body:     JSON.stringify(opts.body),
     });
 
-    const created = this.with_token(opts.tokensrc, request)
+    const created = await this.with_token(opts.tokensrc, request)
       .catch(FetchError.expect(409));
 
     if (created)

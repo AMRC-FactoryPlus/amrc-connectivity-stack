@@ -60,8 +60,6 @@ class RealmSetup {
     this.secure = service_setup.acs_config.secure;
     this.acs_realm = service_setup.acs_config.realm;
     this.config = service_setup.config;
-    this.admin_cli_id = crypto.randomUUID();
-    this.admin_cli_secret = crypto.randomUUID();
   }
 
   /** Generate a URL to the OpenID server.
@@ -144,6 +142,12 @@ class RealmSetup {
     return !!created;
   }
 
+  async client_secret (name) {
+    const secret_path = path.join("/etc/secret", name);
+    const content = await fs.readFile(secret_path, "utf8");
+    return content.trim();
+  }
+
   /**
    * Run setup for the realm. This generates the full realm representation.
    *
@@ -153,7 +157,32 @@ class RealmSetup {
    * @returns {Promise<void>}
    */
   async run() {
-    let base_realm = {
+    this.admin_cli_secret = await this.client_secret("_admin");
+
+    await this.create_basic_realm();
+    await this.create_admin_user();
+
+    const client_configs = Object.entries(this.config.openidClients);
+    const enabled_clients = client_configs.filter(
+      ([name, client]) => client.enabled === true,
+    );
+    for (const [name, client] of enabled_clients) {
+      await this.create_client(name, client);
+      await this.create_client_role_mapping(client.clientId, client.adminRole);
+    }
+  }
+
+  /**
+   * Create a new realm by POSTing to the OpenID service. Throws if the response is not ok.
+   *
+   * @async
+   * @param {Object} realm_representation - An object containing all the values that should be created for the realm.
+   * @returns {Promise<void>} Resolves when the realm is created.
+   */
+  async create_basic_realm() {
+    const admin_cli_id = crypto.randomUUID();
+
+    const base_realm = {
       id: crypto.randomUUID(),
       realm: this.realm,
       displayName: "Factory+",
@@ -183,9 +212,9 @@ class RealmSetup {
       },
       clients: [
         {
-          id: this.admin_cli_id,
+          id: admin_cli_id,
           clientId: "admin-cli",
-          name: "${client_admin-cli}",
+          name: "Admin service account",
           enabled: true,
           clientAuthenticatorType: "client-secret",
           secret: this.admin_cli_secret,
@@ -203,7 +232,7 @@ class RealmSetup {
               description: "",
               composite: false,
               clientRole: true,
-              containerId: this.admin_cli_id,
+              containerId: admin_cli_id,
               attributes: {},
             },
             {
@@ -211,7 +240,7 @@ class RealmSetup {
               name: "uma_protection",
               composite: false,
               clientRole: true,
-              containerId: this.admin_cli_id,
+              containerId: admin_cli_id,
               attributes: {},
             },
             {
@@ -220,7 +249,7 @@ class RealmSetup {
               description: "",
               composite: false,
               clientRole: true,
-              containerId: this.admin_cli_id,
+              containerId: admin_cli_id,
               attributes: {},
             },
           ],
@@ -242,33 +271,12 @@ class RealmSetup {
       ],
     };
 
-    await this.create_basic_realm(base_realm);
-    await this.create_admin_user();
-
-    const client_configs = Object.entries(this.config.openidClients);
-    const enabled_clients = client_configs.filter(
-      ([name, client]) => client.enabled === true,
-    );
-    for (const [name, client] of enabled_clients) {
-      await this.create_client(name, client);
-      await this.create_client_role_mapping(client.clientId, client.adminRole);
-    }
-  }
-
-  /**
-   * Create a new realm by POSTing to the OpenID service. Throws if the response is not ok.
-   *
-   * @async
-   * @param {Object} realm_representation - An object containing all the values that should be created for the realm.
-   * @returns {Promise<void>} Resolves when the realm is created.
-   */
-  async create_basic_realm(realm_representation) {
     await this.openid_create({
       name:     `realm %o`,
       tokensrc: this.get_initial_access_token,
       method:   "POST",
       path:     `admin/realms`,
-      body:     realm_representation,
+      body:     base_realm,
     });
   }
 
@@ -281,9 +289,7 @@ class RealmSetup {
    * @returns {Promise<void>} Resolves when the client is created.
    */
   async create_client(name, client_representation, is_retry) {
-    const secret_path = path.join("/etc/secret", name);
-    const content = await fs.readFile(secret_path, "utf8");
-    const client_secret = content.trim();
+    const client_secret = await this.client_secret(name);
 
     const host = client_representation.redirectHost ?? name;
     const url = `http${this.secure}://${host}.${this.base_url}`;
@@ -325,7 +331,7 @@ class RealmSetup {
       ],
     };
 
-    const created = await this.openid_create({
+    await this.openid_create({
       name:     `realm client %o`,
       tokensrc: this.get_initial_access_token,
       path:     `admin/realms/${this.realm}/clients`,

@@ -333,7 +333,7 @@ class RealmSetup {
       body:     client,
     });
 
-    if (created && client_representation.roles)
+    if (client_representation.roles)
       await this.create_client_roles(client.id, client_representation.roles, host);
   }
 

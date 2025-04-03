@@ -386,7 +386,6 @@ class RealmSetup {
       email: `admin@${this.acs_realm}`,
       emailVerified: false,
       enabled: true,
-      serviceAccountClientId: "admin-cli",
       credentials: {
         type: "password",
         value: this.password,

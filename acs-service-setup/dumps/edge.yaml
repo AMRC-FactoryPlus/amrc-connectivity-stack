@@ -53,9 +53,46 @@ objects:
     !u ACS.Driver.External:         { name: "External driver" }
 
 configs:
+  # Driver Definition Configuration
+  # UI customization is done through the 'presentation' key with the following structure:
+  #
+  # presentation:
+  #   address:                    # Configuration for the address field
+  #     title: "Device Address"   # Title for the address field
+  #     description: "..."        # Help text for the address field
+  #     icon: "microchip"        # Font Awesome icon name (without the fa- prefix)
+  #     placeholder: "..."       # Placeholder text for the address input
+  #   path:                       # Configuration for the path field
+  #     title: "Metric Path"     # Title for the path field
+  #     description: "..."        # Help text for the path field
+  #     icon: "code"             # Font Awesome icon name (without the fa- prefix)
+  #     placeholder: "..."       # Placeholder text for the path input
+  #     hidden: false             # Set to true to hide the path field (defaults to false)
+  #
+  # Example for a new driver:
+  # !u ACS.Driver.NewDriver:
+  #   polled: true
+  #   presentation:
+  #     address:
+  #       title: "Device ID"
+  #       description: "The device identifier"
+  #       icon: "microchip"
+  #       placeholder: "e.g. device123"
+  #     path:
+  #       title: "Parameter"
+  #       description: "The parameter to access"
+  #       icon: "code"
+  #       placeholder: "e.g. temperature"
+  #       hidden: false
   !u Edge.App.DriverDef:
     !u ACS.Driver.REST:
       polled: true
+      presentation:
+        address:
+          title: "REST Endpoint"
+          description: "The path following the domain in a REST call URL"
+          icon: "globe"
+          placeholder: "e.g. /api/status"
       internal:
         connType: REST
         details: RESTConnDetails
@@ -95,6 +132,17 @@ configs:
         type: object
     !u ACS.Driver.MTConnect:
       polled: true
+      presentation:
+        address:
+          title: "MTConnect Endpoint"
+          description: "The path following the domain in a REST call URL (usually /current)"
+          icon: "industry"
+          placeholder: "e.g. /current"
+        path:
+          title: "XML Path"
+          description: "XPath notation to extract specific values from the XML response"
+          icon: "code-branch"
+          placeholder: "e.g. //*[@dataItemId='temperature']/text()"
       internal:
         connType: MTConnect
         details: MTConnectConnDetails
@@ -140,6 +188,14 @@ configs:
         type: object
     !u ACS.Driver.S7:
       polled: true
+      presentation:
+        address:
+          title: "Memory Address"
+          description: "Database memory address given as %aa####.* where aa determines the variable type"
+          icon: "microchip"
+          placeholder: "e.g. %QD1026 or %Q1194.0"
+        path:
+          hidden: true
       internal:
         connType: S7
         details: s7ConnDetails
@@ -187,6 +243,14 @@ configs:
         type: object
     !u ACS.Driver.OPCUA:
       polled: true
+      presentation:
+        address:
+          title: "Node ID"
+          description: "The OPC UA Node ID (e.g. ns=2;s=/Channel/Spindle/actSpeed)"
+          icon: "sitemap"
+          placeholder: "e.g. ns=2;s=/Channel/Spindle/actSpeed"
+        path:
+          hidden: true
       internal:
         connType: OPC UA
         details: OPCUAConnDetails
@@ -265,6 +329,17 @@ configs:
         type: object
     !u ACS.Driver.MQTT:
       polled: false
+      presentation:
+        address:
+          title: "Topic"
+          description: "The MQTT topic to subscribe to"
+          icon: "exchange-alt"
+          placeholder: "e.g. /robot01/axis/1/position"
+        path:
+          title: "JSON Path"
+          description: "JSONPath notation to extract specific values from the message payload"
+          icon: "code"
+          placeholder: "e.g. $.value"
       internal:
         connType: MQTT
         details: MQTTConnDetails
@@ -342,6 +417,17 @@ configs:
         type: object
     !u ACS.Driver.UDP:
       polled: false
+      presentation:
+        address:
+          title: "Port"
+          description: "The UDP port to listen on"
+          icon: "network-wired"
+          placeholder: "e.g. 50205"
+        path:
+          title: "Data Selector"
+          description: "Selector to extract specific values from the UDP message"
+          icon: "filter"
+          placeholder: "e.g. data[0]"
       internal:
         connType: UDP
         details: UDPConnDetails
@@ -358,6 +444,17 @@ configs:
         type: object
     !u ACS.Driver.Bacnet:
       polled: true
+      presentation:
+        address:
+          title: "Device ID"
+          description: "The Bacnet device identifier"
+          icon: "building"
+          placeholder: "e.g. 1234"
+        path:
+          title: "Object ID"
+          description: "The Bacnet object identifier"
+          icon: "cube"
+          placeholder: "e.g. analog-value:1"
       image:
         registry: ghcr.io/amrc-factoryplus
         repository: edge-bacnet
@@ -375,6 +472,17 @@ configs:
         type: object
     !u ACS.Driver.Modbus:
       polled: true
+      presentation:
+        address:
+          title: "Register Address"
+          description: "The Modbus register address"
+          icon: "server"
+          placeholder: "e.g. 40001"
+        path:
+          title: "Register Type"
+          description: "The Modbus register type (coil, discrete input, holding register, input register)"
+          icon: "list-ul"
+          placeholder: "e.g. holding"
       image:
         registry: ghcr.io/amrc-factoryplus
         repository: edge-modbus
@@ -398,6 +506,14 @@ configs:
         type: object
     !u ACS.Driver.Test:
       polled: true
+      presentation:
+        address:
+          title: "Test Address"
+          description: "Format: function:period:amplitude:packing (e.g. sin:3000:50:bd)"
+          icon: "vial"
+          placeholder: "e.g. sin:3000:50:bd"
+        path:
+          hidden: true
       image:
         registry: ghcr.io/amrc-factoryplus
         repository: edge-test
@@ -407,6 +523,17 @@ configs:
         type: object
     !u ACS.Driver.TPlinkSmartPlug:
       polled: true
+      presentation:
+        address:
+          title: "Command"
+          description: "The command to send to the smart plug"
+          icon: "plug"
+          placeholder: "e.g. power"
+        path:
+          title: "Parameter"
+          description: "Additional parameters for the command"
+          icon: "sliders-h"
+          placeholder: "e.g. on/off"
       image:
         registry: ghcr.io/amrc-factoryplus
         repository: edge-tplink-smartplug
@@ -431,6 +558,17 @@ configs:
 
     !u ACS.Driver.External:
       polled: false
+      presentation:
+        address:
+          title: "Address"
+          description: "The address for the external driver"
+          icon: "puzzle-piece"
+          placeholder: "Enter address"
+        path:
+          title: "Path"
+          description: "The path for the external driver"
+          icon: "folder-tree"
+          placeholder: "Enter path"
       external: true
 ---
 service: !u UUIDs.Service.Authentication

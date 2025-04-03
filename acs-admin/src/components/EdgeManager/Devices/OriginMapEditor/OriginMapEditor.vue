@@ -86,6 +86,7 @@
           <SparkplugMetric :key="rerenderTrigger"
               :selected-metric="selectedMetric" :model="model"
               :schema="sparkplugMetricSchema.schema"
+              :connection="device.deviceInformation?.connection"
               @input="metricDetailsEdited"
               @remove-metric="removeMetric">
           </SparkplugMetric>

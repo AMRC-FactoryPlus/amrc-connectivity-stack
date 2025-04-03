@@ -55,6 +55,7 @@ objects:
 configs:
   !u Edge.App.DriverDef:
     !u ACS.Driver.REST:
+      polled: true
       internal:
         connType: REST
         details: RESTConnDetails
@@ -93,6 +94,7 @@ configs:
         title: REST Connection Details
         type: object
     !u ACS.Driver.MTConnect:
+      polled: true
       internal:
         connType: MTConnect
         details: MTConnectConnDetails
@@ -137,6 +139,7 @@ configs:
         title: MTConnect Connection Details
         type: object
     !u ACS.Driver.S7:
+      polled: true
       internal:
         connType: S7
         details: s7ConnDetails
@@ -183,6 +186,7 @@ configs:
         title: S7 Connection Details
         type: object
     !u ACS.Driver.OPCUA:
+      polled: true
       internal:
         connType: OPC UA
         details: OPCUAConnDetails
@@ -261,6 +265,7 @@ configs:
         title: OPC-UA Server Details
         type: object
     !u ACS.Driver.MQTT:
+      polled: false
       internal:
         connType: MQTT
         details: MQTTConnDetails
@@ -337,6 +342,7 @@ configs:
         title: MQTT Server Details
         type: object
     !u ACS.Driver.UDP:
+      polled: false
       internal:
         connType: UDP
         details: UDPConnDetails
@@ -352,6 +358,7 @@ configs:
         title: UDP Server Details
         type: object
     !u ACS.Driver.Bacnet:
+      polled: true
       image:
         registry: ghcr.io/amrc-factoryplus
         repository: edge-bacnet
@@ -368,6 +375,7 @@ configs:
         title: Bacnet Connection Details
         type: object
     !u ACS.Driver.Modbus:
+      polled: true
       image:
         registry: ghcr.io/amrc-factoryplus
         repository: edge-modbus
@@ -390,6 +398,7 @@ configs:
         title: Modbus Connection Details
         type: object
     !u ACS.Driver.Test:
+      polled: true
       image:
         registry: ghcr.io/amrc-factoryplus
         repository: edge-test
@@ -398,6 +407,7 @@ configs:
         title: Test Connection Details
         type: object
     !u ACS.Driver.TPlinkSmartPlug:
+      polled: true
       image:
         registry: ghcr.io/amrc-factoryplus
         repository: edge-tplink-smartplug
@@ -421,6 +431,7 @@ configs:
         type: object
 
     !u ACS.Driver.External:
+      polled: false
       external: true
 ---
 service: !u UUIDs.Service.Authentication

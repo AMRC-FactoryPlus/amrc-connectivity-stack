@@ -23,7 +23,7 @@
       </DialogContent>
     </Dialog>
       <!-- Sidebar with fixed height and independent scrolling -->
-      <Sidebar collapsible="none" class="flex flex-col m-3 bg-gray-100/50 border rounded-lg">
+      <Sidebar collapsible="none" class="flex flex-col ml-3 my-3 bg-gray-100/50 border rounded-lg">
         <SidebarContent class="flex flex-col h-auto">
           <!-- Schema tree with independent scrolling -->
           <SidebarGroup class="h-auto overflow-hidden flex-1">
@@ -58,9 +58,9 @@
       <SidebarRail/>
     </Sidebar>
       <!-- Main content with fixed height and independent scrolling -->
-      <SidebarInset class="flex flex-col flex-1 overflow-hidden px-3 pt-2 h-full">
+      <SidebarInset class="flex flex-col flex-1 overflow-hidden px-6 pt-4 h-full">
         <!-- Fixed header -->
-      <header class="flex h-10 shrink-0 items-center justify-between gap-2 px-1 mb-3">
+      <header class="flex shrink-0 items-center justify-between gap-2 px-1 mb-3">
           <Breadcrumb>
             <BreadcrumbList>
               <template v-if="selectedMetric">

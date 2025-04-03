@@ -319,10 +319,28 @@ export default {
 
         // Add required validation if field is in required array
         if (this.formSchema.required?.includes(key)) {
-          rules.formData[key].required = helpers.withMessage(
-            `${schema.title || key} is required`,
-            required
-          )
+          // For boolean fields (checkboxes), we need special handling
+          if (schema.type === 'boolean') {
+            // For checkboxes, we'll consider them valid if they have a default value
+            // or if they've been explicitly set (even to false)
+            rules.formData[key].required = helpers.withMessage(
+              `${schema.title || key} is required`,
+              (value) => {
+                // If the field has a default value, consider it valid
+                if ('default' in schema) {
+                  return true;
+                }
+                // Otherwise, check if it's been explicitly set (not undefined)
+                return value !== undefined;
+              }
+            )
+          } else {
+            // For non-boolean fields, use the standard required validator
+            rules.formData[key].required = helpers.withMessage(
+              `${schema.title || key} is required`,
+              required
+            )
+          }
         }
 
         // Add minLength validation if specified
@@ -407,14 +425,20 @@ export default {
 
       const { properties } = this.selectedDriver.definition.schema
 
-      // Initialize all fields with empty values first
-      Object.keys(properties).forEach(key => {
-        this.formData[key] = ''
+      // Initialize all fields with appropriate default values
+      Object.entries(properties).forEach(([key, prop]) => {
+        // For boolean fields, initialize with false if no default
+        if (prop.type === 'boolean') {
+          this.formData[key] = 'default' in prop ? prop.default : false
+        } else {
+          // For other fields, initialize with empty string
+          this.formData[key] = ''
+        }
       })
 
-      // Then apply defaults from schema
+      // Then apply defaults from schema for non-boolean fields
       Object.entries(properties).forEach(([key, prop]) => {
-        if ('default' in prop) {
+        if ('default' in prop && prop.type !== 'boolean') {
           this.formData[key] = prop.default
         }
       })
@@ -424,7 +448,16 @@ export default {
         if (this.v$.formData) {
           Object.keys(this.formData).forEach(key => {
             if (this.v$.formData[key]) {
-              this.v$.formData[key].$touch()
+              // For boolean fields with default values, we need to mark them as dirty and valid
+              const prop = properties[key];
+              if (prop.type === 'boolean' && 'default' in prop) {
+                this.v$.formData[key].$touch();
+                // Force the field to be considered valid
+                this.v$.formData[key].$commit();
+              } else {
+                // For other fields, just touch them
+                this.v$.formData[key].$touch();
+              }
             }
           })
         }
@@ -439,6 +472,9 @@ export default {
       let typedValue = event.value;
       if (event.value !== "" && fieldSchema?.type === 'number') {
         typedValue = Number(event.value);
+      } else if (fieldSchema?.type === 'boolean') {
+        // For boolean fields, ensure the value is a boolean
+        typedValue = Boolean(event.value);
       }
 
       // Update the form data directly

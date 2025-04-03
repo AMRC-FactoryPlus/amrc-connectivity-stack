@@ -53,8 +53,7 @@ class RealmSetup {
     const { fplus } = service_setup;
     this.log = fplus.debug.bound("oauth");
 
-    this.username = fplus.opts.username;
-    this.password = fplus.opts.password;
+    this.username = "_bootstrap";
     this.realm = "factory_plus";
     this.base_url = service_setup.acs_config.domain;
     this.secure = service_setup.acs_config.secure;
@@ -157,6 +156,7 @@ class RealmSetup {
    * @returns {Promise<void>}
    */
   async run() {
+    this.password = await this.client_secret("_bootstrap");
     this.admin_cli_secret = await this.client_secret("_admin");
 
     await this.create_basic_realm();

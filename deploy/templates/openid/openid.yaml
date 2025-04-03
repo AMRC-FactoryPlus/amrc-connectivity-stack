@@ -31,12 +31,12 @@ spec:
           args: ["start-dev"]
           env:
             - name: KEYCLOAK_ADMIN
-              value: "admin"
+              value: "_bootstrap"
             - name: KEYCLOAK_ADMIN_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: admin-password
-                  key: password
+                  name: keycloak-clients
+                  key: _bootstrap
             - name: KC_PROXY
               value: "edge"
             - name: KC_HEALTH_ENABLED

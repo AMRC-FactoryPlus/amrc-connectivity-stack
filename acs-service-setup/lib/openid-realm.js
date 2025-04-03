@@ -272,7 +272,7 @@ class RealmSetup {
     };
 
     await this.openid_create({
-      name:     `realm %o`,
+      name:     `realm`,
       tokensrc: this.get_initial_access_token,
       method:   "POST",
       path:     `admin/realms`,
@@ -332,7 +332,7 @@ class RealmSetup {
     };
 
     await this.openid_create({
-      name:     `realm client %o`,
+      name:     `realm client ${name}`,
       tokensrc: this.get_initial_access_token,
       path:     `admin/realms/${this.realm}/clients`,
       method:   "POST",
@@ -363,7 +363,7 @@ class RealmSetup {
       };
 
       await this.openid_create({
-        name:     `Role ${role.name} for client ${clientId}`,
+        name:     `role ${role.name} for client ${clientId}`,
         tokensrc: this.get_initial_access_token,
         path:     `admin/realms/${this.realm}/clients/${clientId}/roles`,
         method:   "POST",
@@ -396,7 +396,7 @@ class RealmSetup {
     };
 
     await this.openid_create({
-      name:     `Admin user`,
+      name:     `admin user`,
       tokensrc: this.get_user_management_token,
       method:   "POST",
       path:     `admin/realms/${this.realm}/users`,
@@ -425,7 +425,7 @@ class RealmSetup {
 
     const path = `admin/realms/${this.realm}/users/${admin_user_id}/role-mappings/clients/${client_id}`;
     await this.openid_create({
-      name:     `Role mapping for ${client_id}`,
+      name:     `role mapping for ${client_id}`,
       tokensrc: this.get_user_management_token,
       method:   "POST",
       path,
@@ -495,7 +495,7 @@ class RealmSetup {
 
     const token_url = this.url(`realms/master/protocol/openid-connect/token`);
 
-    this.log(`Attempting token request at: ${token_url}`);
+    this.log("%s token request at: %s", force ? "Refresh" : "Initial", token_url);
 
     const params = new URLSearchParams();
     if (this.refresh_token != undefined) {
@@ -537,9 +537,9 @@ class RealmSetup {
     if (this.user_management_token && !force)
       return this.user_management_token;
 
-    const token_url = this.url(`/realms/${this.realm}/protocol/openid-connect/token`);
+    const token_url = this.url(`realms/${this.realm}/protocol/openid-connect/token`);
 
-    this.log(`Attempting token request at: ${token_url}`);
+    this.log("%s token request at: %s", force ? "Refresh" : "Initial", token_url);
 
     const params = new URLSearchParams();
     params.append("grant_type", "client_credentials");

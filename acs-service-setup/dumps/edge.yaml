@@ -235,7 +235,6 @@ configs:
               order: 3
           useCredentials:
             format: checkbox
-            minLength: 1
             title: Use credentials
             type: boolean
             options:

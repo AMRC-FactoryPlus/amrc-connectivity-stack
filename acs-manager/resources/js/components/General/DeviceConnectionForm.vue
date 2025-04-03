@@ -1,6 +1,5 @@
 <!--
-  -  Factory+ / AMRC Connectivity Stack (ACS) Manager component
-  -  Copyright 2023 AMRC
+  - Copyright (c) University of Sheffield AMRC 2025.
   -->
 
 <template>
@@ -777,7 +776,7 @@ export default {
                 title: 'Use credentials',
                 type: 'boolean',
                 format: 'checkbox',
-                default: true,
+                default: false,
               },
               username: {
                 showIf: () => {

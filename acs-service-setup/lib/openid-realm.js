@@ -375,13 +375,12 @@ class RealmSetup {
   /**
    * Create the admin user in the OpenID service.
    * @async
-   * @param {Boolean} is_retry - Whether this is a retry after a 401. If this is false and a 401 is returned, this will retry after refreshing the token.
    * @returns {Promise<void>} Resolves when the user is created.
    */
-  async create_admin_user(is_retry) {
+  async create_admin_user() {
     const admin_user = {
       id: crypto.randomUUID(),
-      userName: this.username,
+      username: this.username,
       firstName: "Admin",
       lastName: "User",
       email: `admin@${this.acs_realm}`,
@@ -498,7 +497,7 @@ class RealmSetup {
     this.log("%s token request at: %s", force ? "Refresh" : "Initial", token_url);
 
     const params = new URLSearchParams();
-    if (this.refresh_token != undefined) {
+    if (refresh_token != undefined) {
       params.append("grant_type", "refresh_token");
       params.append("client_id", "admin-cli");
       params.append("refresh_token", refresh_token);

@@ -2,6 +2,63 @@
   - Copyright (c) University of Sheffield AMRC 2025.
   -->
 
+<script setup>
+import { useVModel } from '@vueuse/core'
+
+const props = defineProps({
+  defaultValue: {
+    type: [String, Number],
+    required: false,
+  },
+  modelValue: {
+    type: [String, Number],
+    required: false,
+  },
+  class: {
+    type: null,
+    required: false,
+  },
+  v: {
+    type: Object,
+    required: false,
+  },
+  title: {
+    type: String,
+    required: false,
+  },
+  placeholder: {
+    type: String,
+    required: false,
+  },
+  type: {
+    type: String,
+    required: false,
+    default: 'text',
+  },
+  disabled: {
+    type: Boolean,
+    required: false,
+    default: false,
+  },
+  icon: {
+    type: String,
+    required: false,
+  },
+  onEncrypt: {
+    type: Function,
+    required: false,
+    default: null
+  }
+})
+
+const emits = defineEmits(['update:modelValue'])
+
+const modelValue = useVModel(props, 'modelValue', emits, {
+  passive: true,
+  defaultValue: props.defaultValue,
+})
+</script>
+
 <template>
   <div class="relative flex-1">
     <div class="relative">
@@ -45,7 +102,7 @@
 
 <script>
 import { useServiceClientStore } from '@store/serviceClientStore.js'
-import { UUIDs } from "@amrc-factoryplus/service-client"
+import {UUIDs} from "@amrc-factoryplus/service-client";
 
 export default {
   name: 'Input',
@@ -110,13 +167,10 @@ export default {
   },
 
   watch: {
-    modelValue: {
-      handler(newValue) {
-        if (newValue !== this.localValue) {
-          this.localValue = newValue
-        }
-      },
-      immediate: true
+    modelValue(newValue) {
+      if (newValue !== this.localValue) {
+        this.localValue = newValue
+      }
     }
   },
 

@@ -102,7 +102,7 @@ export default {
             connection: this.selectedConnection.uuid,
           }
         )
-        
+
         toast.success('Connection updated successfully')
         this.$emit('update:show', false)
       } catch (error) {

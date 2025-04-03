@@ -130,7 +130,7 @@
           <SidebarDetail
               icon="fas fa-plug"
               label="Connection"
-              :value="device.deviceInformation.connection?.name"
+              :value="connection?.name"
           />
         </div>
       </div>
@@ -195,7 +195,7 @@ export default {
     async '$route.params.deviceuuid' (newUuid) {
       await this.getDeviceDetails(newUuid)
     },
-    
+
     // Stop beeping when both schema and connection are assigned
     'device.deviceInformation': {
       handler(newInfo) {
@@ -213,6 +213,7 @@ export default {
     this.getDeviceDetails(this.$route.params.deviceuuid)
     this.startRobotBeep()
     this.sch.start()
+    this.conn.start()
   },
 
   beforeUnmount() {
@@ -223,12 +224,19 @@ export default {
     device() {
       return this.d.data.find(e => e.uuid === this.$route.params.deviceuuid) || {}
     },
-    
+
     schema() {
       const schemaUuid = this.device?.deviceInformation?.schema
       if (!schemaUuid) return null
-      
+
       return this.sch.data.find(s => s.uuid === schemaUuid) || null
+    },
+
+    connection() {
+      const connectionUuid = this.device?.deviceInformation?.connection
+      if (!connectionUuid) return null
+
+      return this.conn.data.find(c => c.uuid === connectionUuid) || null
     }
   },
 

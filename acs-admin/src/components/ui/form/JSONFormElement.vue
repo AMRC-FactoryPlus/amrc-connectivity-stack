@@ -8,14 +8,14 @@
 
     <!-- Text/Number Input (only if no enum) -->
     <template v-if="(element.type === 'string' || element.type === 'number') && !element.enum">
-      <Input 
+      <Input
         :id="element.title"
         :type="element.format === 'password' ? 'password' : element.type === 'number' ? 'number' : 'text'"
         :placeholder="element.options?.inputAttributes?.placeholder"
         :model-value="localValue"
         @update:modelValue="updateValue"
-        :v="v$"
-        :class="{ 'border-red-500': v$.localValue.$error }"
+        :v="v"
+        :class="{ 'border-red-500': v?.$error }"
         :min="element.type === 'number' ? element.minimum : undefined"
         :max="element.type === 'number' ? element.maximum : undefined"
         :step="element.type === 'number' ? element.multipleOf || 1 : undefined"
@@ -25,7 +25,7 @@
 
     <!-- Enum/Select -->
     <template v-if="element.enum">
-      <Select 
+      <Select
         :id="element.title"
         :model-value="localValue"
         @update:modelValue="updateValue"
@@ -37,9 +37,9 @@
         </SelectTrigger>
         <SelectContent>
           <SelectGroup>
-            <SelectItem 
-              v-for="option in element.enum" 
-              :key="option" 
+            <SelectItem
+              v-for="option in element.enum"
+              :key="option"
               :value="option"
             >
               {{ option }}
@@ -52,7 +52,7 @@
     <!-- Boolean/Checkbox -->
     <template v-if="element.type === 'boolean'">
       <div class="flex items-center space-x-2">
-        <Checkbox 
+        <Checkbox
           :id="element.title"
           :model-value="localValue"
           @update:modelValue="updateValue"
@@ -70,8 +70,6 @@
 </template>
 
 <script>
-import { useVuelidate } from '@vuelidate/core'
-import { required, minLength, helpers } from '@vuelidate/validators'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -98,9 +96,7 @@ export default {
   },
 
   setup() {
-    return {
-      v$: useVuelidate()
-    }
+    return {}
   },
 
   props: {
@@ -118,6 +114,11 @@ export default {
     },
     onEncrypt: {
       type: Function,
+      required: false,
+      default: null
+    },
+    v: {
+      type: Object,
       required: false,
       default: null
     }
@@ -139,12 +140,16 @@ export default {
 
   methods: {
     updateValue(newValue) {
-      this.v$.localValue.$model = newValue
+      this.localValue = newValue
+
+      // Emit the update:modelValue event for v-model binding
       this.$emit('update:modelValue', newValue)
+
+      // Emit the change event with field information for parent component
       this.$emit('change', {
         field: this.element.key,
         value: newValue,
-        valid: !this.v$.localValue.$error
+        valid: this.v ? !this.v.$error : true
       })
     }
   },
@@ -152,16 +157,22 @@ export default {
   watch: {
     modelValue: {
       handler(newValue) {
-        if (this.v$.localValue.$model !== newValue) {
-          this.v$.localValue.$model = newValue
+        if (this.localValue !== newValue) {
+          this.localValue = newValue
+
+          // If we have validation, we don't need to do anything here
+          // The parent component will handle validation
         }
       }
     },
     isVisible: {
       handler(newVisible) {
-        if (!newVisible && this.v$.localValue.$model !== '') {
-          this.v$.localValue.$model = ''
-          this.v$.$reset()
+        if (!newVisible && this.localValue !== '') {
+          this.localValue = ''
+
+          // The parent component will handle validation reset
+
+          // Emit events to update parent component
           this.$emit('update:modelValue', '')
           this.$emit('change', {
             field: this.element.key,
@@ -179,31 +190,6 @@ export default {
     }
   },
 
-  validations() {
-    const validations = {}
 
-    if (this.element.required) {
-      validations.required = required
-    }
-
-    if (this.element.minLength) {
-      validations.minLength = minLength(this.element.minLength)
-    }
-
-    if (this.element.pattern) {
-      // Create a RegExp object from the pattern string
-      validations.pattern = helpers.regex(new RegExp(this.element.pattern))
-      if (this.element.options?.patternmessage) {
-        validations.pattern = helpers.withMessage(
-          this.element.options.patternmessage,
-          validations.pattern
-        )
-      }
-    }
-
-    return {
-      localValue: validations
-    }
-  },
 }
 </script>

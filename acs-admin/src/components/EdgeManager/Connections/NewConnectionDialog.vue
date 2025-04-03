@@ -53,9 +53,10 @@
             key: key,
             required: formSchema.required?.includes(key)
           }"
-          v-model="formData[key]"
+          v-model="v$.formData[key].$model"
           :formData="formData"
           :onEncrypt="encryptSensitiveInfo"
+          :v="v$.formData[key]"
           @change="handleFormChange"
         />
 
@@ -79,19 +80,17 @@
         </div>
 
         <!-- Poll Interval (in milliseconds) - only for polled drivers -->
-        <div v-if="isPolledDriver" class="flex flex-col gap-1">
+        <div v-if="selectedDriver?.definition?.polled === true" class="flex flex-col gap-1">
           <label class="text-sm font-medium" for="pollInt">Poll Interval (ms) <span class="text-red-500">*</span></label>
           <Input
             type="number"
+            info="The interval in milliseconds between device polls"
             name="pollInt"
-            v-model="pollInt"
+            :v="v$.pollInt"
+            v-model="v$.pollInt.$model"
             min="1"
-            :class="{ 'border-red-500': v$.pollInt.$error }"
             required
           />
-          <p class="text-sm text-gray-500">
-            The interval in milliseconds between device polls. Default is 1000ms (1 second).
-          </p>
         </div>
       </div>
       <DialogFooter>
@@ -149,7 +148,7 @@ import { useServiceClientStore } from '@store/serviceClientStore.js'
 import { UUIDs } from '@amrc-factoryplus/service-client'
 import JSONFormElement from '@/components/ui/form/JSONFormElement.vue'
 import { useVuelidate } from '@vuelidate/core'
-import { helpers, required } from '@vuelidate/validators'
+import { helpers, required, minLength } from '@vuelidate/validators'
 import { useEdgeClusterStore } from '@store/useEdgeClusterStore.js'
 import { toast } from 'vue-sonner'
 import _ from 'lodash'
@@ -167,10 +166,9 @@ const PAYLOAD_FORMATS = [
 export default {
 
   setup () {
-    const v$ = useVuelidate()
 
     return {
-      v$,
+      v$: useVuelidate(),
       s: useServiceClientStore(),
       c: useEdgeClusterStore(),
       dr: useDriverStore(),
@@ -202,9 +200,15 @@ export default {
 
   watch: {
     selectedDriverName(newVal, oldVal) {
-      // Only reset if actually changing drivers
-      if (newVal !== oldVal && oldVal !== null) {
-        this.resetFormWithDefaults()
+      // Reset form when driver changes
+      if (newVal !== oldVal) {
+        if (newVal) {
+          // When selecting a driver, initialize form with defaults
+          this.resetFormWithDefaults()
+        } else {
+          // When clearing driver selection, reset the form
+          this.resetForm()
+        }
       }
     }
   },
@@ -241,9 +245,7 @@ export default {
     selectedDriver () {
       return this.dr.data.find(d => d.name === this.selectedDriverName)
     },
-    isPolledDriver() {
-      return this.selectedDriver?.definition?.polled === true
-    },
+    // Removed isPolledDriver computed property to avoid recursive updates
     formSchema() {
       const baseSchema = this.selectedDriver?.definition?.schema || {};
 
@@ -270,39 +272,101 @@ export default {
         })
         .map(([key]) => key)
     },
-    rules() {
-      return {
-        ...this.selectedDriver?.definition?.schema?.required?.reduce((acc, field) => {
-          acc[field] = { required }
-          return acc
-        }, {}),
-        payloadFormat: { required }
-      }
-    }
+
   },
 
   validations() {
-    return {
+    // Create a validation rules object
+    const rules = {
       selectedDriverName: { required },
-      formData: this.rules,
       name: {
         required,
-        alphaNumUnderscoreSpace: helpers.withMessage('Letters, numbers, spaces and underscores are valid', (value) => {
-          return /^[a-zA-Z0-9_ ]*$/.test(value)
-        }),
+        alphaNumUnderscoreSpace: helpers.withMessage(
+          'Letters, numbers, spaces and underscores are valid',
+          (value) => /^[a-zA-Z0-9_ ]*$/.test(value)
+        ),
       },
-      ...this.isPolledDriver ? {
-        pollInt: {
-          required,
-          numeric: helpers.withMessage('Must be a number', (value) => {
-            return !isNaN(parseFloat(value)) && isFinite(value)
-          }),
-          min: helpers.withMessage('Must be at least 0', (value) => {
-            return parseInt(value) >= 0
-          })
-        }
-      } : {}
+      pollInt: {
+        requiredWhenPolled: helpers.withMessage(
+          'Poll interval is required for polled drivers',
+          (value) => !this.selectedDriver?.definition?.polled || value !== null
+        ),
+        numeric: helpers.withMessage(
+          'Must be a number',
+          (value) => !isNaN(parseFloat(value)) && isFinite(value)
+        ),
+        min: helpers.withMessage(
+          'Must be at least 0',
+          (value) => parseInt(value) >= 0
+        )
+      },
+      formData: {}
     }
+
+    // Initialize formData if it doesn't exist
+    if (!this.formData) {
+      this.formData = {
+        payloadFormat: "Defined by Protocol"
+      }
+    }
+
+    // Only add form field validations if we have a schema
+    if (this.formSchema?.properties) {
+      // For each property in the schema
+      Object.entries(this.formSchema.properties).forEach(([key, schema]) => {
+        // Create an empty validation object for this field
+        rules.formData[key] = {}
+
+        // Add required validation if field is in required array
+        if (this.formSchema.required?.includes(key)) {
+          rules.formData[key].required = helpers.withMessage(
+            `${schema.title || key} is required`,
+            required
+          )
+        }
+
+        // Add minLength validation if specified
+        if (schema.minLength) {
+          rules.formData[key].minLength = helpers.withMessage(
+            `Minimum length is ${schema.minLength}`,
+            minLength(schema.minLength)
+          )
+        }
+
+        // Add pattern validation if specified
+        if (schema.pattern) {
+          rules.formData[key].pattern = helpers.withMessage(
+            schema.options?.patternmessage || `Must match pattern: ${schema.pattern}`,
+            helpers.regex(new RegExp(schema.pattern))
+          )
+        }
+
+        // Add numeric validation for number types
+        if (schema.type === 'number') {
+          rules.formData[key].numeric = helpers.withMessage(
+            'Must be a number',
+            (value) => value === null || value === '' || (!isNaN(parseFloat(value)) && isFinite(value))
+          )
+
+          // Add min/max validations if specified
+          if (schema.minimum !== undefined) {
+            rules.formData[key].min = helpers.withMessage(
+              `Minimum value is ${schema.minimum}`,
+              (value) => value === null || value === '' || parseFloat(value) >= schema.minimum
+            )
+          }
+
+          if (schema.maximum !== undefined) {
+            rules.formData[key].max = helpers.withMessage(
+              `Maximum value is ${schema.maximum}`,
+              (value) => value === null || value === '' || parseFloat(value) <= schema.maximum
+            )
+          }
+        }
+      })
+    }
+
+    return rules
   },
 
   methods: {
@@ -331,6 +395,10 @@ export default {
     },
 
     resetFormWithDefaults() {
+      // First reset the validation state
+      this.v$.$reset()
+
+      // Initialize with default payload format
       this.formData = {
         payloadFormat: "Defined by Protocol"
       }
@@ -339,29 +407,56 @@ export default {
 
       const { properties } = this.selectedDriver.definition.schema
 
+      // Initialize all fields with empty values first
+      Object.keys(properties).forEach(key => {
+        this.formData[key] = ''
+      })
+
+      // Then apply defaults from schema
       Object.entries(properties).forEach(([key, prop]) => {
         if ('default' in prop) {
           this.formData[key] = prop.default
         }
       })
 
-      this.v$.$reset()
+      // After setting defaults, touch all fields to trigger validation
+      this.$nextTick(() => {
+        if (this.v$.formData) {
+          Object.keys(this.formData).forEach(key => {
+            if (this.v$.formData[key]) {
+              this.v$.formData[key].$touch()
+            }
+          })
+        }
+      })
     },
 
     handleFormChange(event) {
-      const newFormData = _.cloneDeep(this.formData);
+      // Get the field schema to determine the type
+      const fieldSchema = this.selectedDriver?.definition?.schema?.properties[event.field];
 
-      if (event.value === "") {
-        delete newFormData[event.field];
-      } else {
-        const fieldSchema = this.selectedDriver?.definition?.schema?.properties[event.field];
-        newFormData[event.field] = fieldSchema?.type === 'number' ? Number(event.value) : event.value;
+      // Convert value to the appropriate type
+      let typedValue = event.value;
+      if (event.value !== "" && fieldSchema?.type === 'number') {
+        typedValue = Number(event.value);
       }
 
-      this.formData = newFormData;
+      // Update the form data directly
+      this.formData[event.field] = typedValue;
+
+      // Touch the field to trigger validation
+      this.$nextTick(() => {
+        if (this.v$.formData && this.v$.formData[event.field]) {
+          this.v$.formData[event.field].$touch();
+        }
+      });
     },
 
     resetForm() {
+      // First reset the validation state
+      this.v$.$reset()
+
+      // Reset all form fields
       this.selectedDriverName = null
       this.name = null
       this.pollInt = 1000 // Reset to default 1000ms
@@ -370,7 +465,6 @@ export default {
       }
       this.isSubmitting = false
       this.existingConnection = null
-      this.v$.$reset()
     },
 
     async createConnection() {
@@ -398,7 +492,7 @@ export default {
             this.s.client.ConfigDB.patch_config(UUIDs.App.ConnectionConfiguration, this.existingConnection.uuid, 'merge', {
               config: configData,
               driver_uuid: this.selectedDriver.uuid,
-              ...(this.isPolledDriver ? { pollInt: parseInt(this.pollInt) } : {}), // Add poll interval only for polled drivers
+              ...(this.selectedDriver?.definition?.polled === true ? { pollInt: parseInt(this.pollInt) } : {}), // Add poll interval only for polled drivers
               source: {
                 payloadFormat: payloadFormat,
               },
@@ -429,7 +523,7 @@ export default {
             deployment: {},
             driver: this.selectedDriver.uuid,
             edgeAgent: this.node.uuid,
-            ...(this.isPolledDriver ? { pollInt: parseInt(this.pollInt) } : {}), // Add poll interval only for polled drivers
+            ...(this.selectedDriver?.definition?.polled === true ? { pollInt: parseInt(this.pollInt) } : {}), // Add poll interval only for polled drivers
             source: {
               payloadFormat: payloadFormat,
             },
@@ -521,7 +615,7 @@ export default {
           }
         }
       })
-    },
+    }
   },
 
   data () {

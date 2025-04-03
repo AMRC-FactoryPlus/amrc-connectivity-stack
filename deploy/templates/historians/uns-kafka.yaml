@@ -1,0 +1,60 @@
+# In the future if we have any more ingesters then this should be
+# enabled if any of the ingesters are enabled.
+{{- if .Values.historians.unsKafka.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: historian-uns-kafka
+  namespace: {{ .Release.Namespace }}
+  labels:
+    component: historian-uns-kafka
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: historian-uns-kafka
+  template:
+    metadata:
+      labels:
+        component: historian-uns-kafka
+        factory-plus.service: historian-uns-kafka
+    spec:
+      {{- with .Values.acs.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: krb5-conf
+          configMap:
+            name: krb5-conf
+        - name: keytabs
+          secret:
+            secretName: historian-uns-keytabs
+      containers:
+        - name: historian-uns-kafka
+{{ include "amrc-connectivity-stack.image" (list . .Values.historians.unsKafka) | indent 10 }}
+          command: [ "/usr/bin/k5start", "-Uf", "/keytabs/client" ]
+          args: [ "node", "--es-module-specifier-resolution=node", "app.js" ]
+          env:
+            - name: KRB5_CONFIG
+              value: /config/krb5-conf/krb5.conf
+            - name: CLIENT_KEYTAB
+              value: /keytabs/client
+            - name: LOG_LEVEL
+              value: {{ .Values.historians.unsKafka.logLevel | required "values.historians.unsKafka.logLevel" }}
+            - name: BATCH_SIZE
+              value: {{ .Values.historians.unsKafka.batchSize | quote | required "values.historians.unsKafka.batchSize" }}
+            - name: FLUSH_INTERVAL
+              value: {{ .Values.historians.unsKafka.flushInterval | quote | required "values.historians.unsKafka.flushInterval" }}
+            - name: KAFKA_TOPIC
+              value: {{ (index .Values.kafka.provisioning.topics 0).name }}
+            - name: KAFKA_BROKER_URL
+              value: http://acs-kafka.{{ .Release.Namespace }}.svc.cluster.local
+            - name: DIRECTORY_URL
+              value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
+          volumeMounts:
+            - mountPath: /config/krb5-conf
+              name: krb5-conf
+            - mountPath: /keytabs
+              name: keytabs
+{{- end -}}

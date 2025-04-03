@@ -1,0 +1,19 @@
+/node_modules/
+
+# Vim swap
+*.swp
+
+# Environment
+.env
+dist/
+
+dist/
+
+# Secrets
+/keytabs/
+/volumes/
+
+# IDE
+.idea/
+
+*keytab*

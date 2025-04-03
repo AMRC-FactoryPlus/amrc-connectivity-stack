@@ -1,0 +1,44 @@
+{
+  "name": "historian-uns-kafka",
+  "version": "1.0.0",
+  "description": "An ingestion engine bridge the UNS MQTT topic and kafka.",
+  "author": "AMRC",
+  "license": "MIT",
+  "main": "./src/app.js",
+  "type": "module",
+  "keywords": [
+    "amrc",
+    "factory-plus",
+    "factoryplus",
+    "acs",
+    "amrc-connectivity-stack",
+    "mqtt",
+    "uns"
+  ],
+  "scripts": {
+    "start": "node dist/app.js",
+    "start:shell": "k5start -Uf $CLIENT_KEYTAB npm run start",
+    "dev": " npm run build && npm run start",
+    "build": "tsc",
+    "clean": "tsc --build --clean",
+    "lint": "eslint --ignore-path .gitignore --ext .ts src/",
+    "lint:fix": "npm run lint -- --fix"
+  },
+  "dependencies": {
+    "@amrc-factoryplus/service-client": "^1.3.6",
+    "async": "^3.2.4",
+    "gssapi.js": "^2.0.1",
+    "kafkajs": "^2.2.4",
+    "long": "^5.2.3",
+    "mqtt": "^5.9.1",
+    "pino": "^8.11.0",
+    "pino-pretty": "^10.0.0"
+  },
+  "devDependencies": {
+    "@types/dotenv": "^6.1.1",
+    "cross-env": "^7.0.3",
+    "dotenv": "^16.0.3",
+    "ts-node": "^10.9.1",
+    "tsc-alias": "^1.7.0"
+  }
+}

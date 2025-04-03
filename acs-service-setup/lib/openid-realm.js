@@ -106,7 +106,7 @@ class RealmSetup {
     const token = await tokensrc.call(this, retry);
 
     request.headers.set("Authorization", `Bearer ${token}`);
-    const doit = fetch(request);
+    const doit = this.try_fetch(request);
     const response = await (retry ? doit : doit.catch(FetchError.expect(401)));
 
     if (!response)

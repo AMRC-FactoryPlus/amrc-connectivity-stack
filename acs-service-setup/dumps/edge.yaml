@@ -90,9 +90,14 @@ configs:
       presentation:
         address:
           title: "REST Endpoint"
-          description: "The path following the domain in a REST call URL"
+          description: "The path following the domain in a REST call URL (e.g. /status)"
           icon: "globe"
           placeholder: "e.g. /api/status"
+        path:
+          title: "JSON Path"
+          description: "JSONPath notation to extract specific values from the JSON response (e.g. $.status.value)"
+          icon: "code"
+          placeholder: "e.g. $.data.value"
       internal:
         connType: REST
         details: RESTConnDetails
@@ -140,7 +145,7 @@ configs:
           placeholder: "e.g. /current"
         path:
           title: "XML Path"
-          description: "XPath notation to extract specific values from the XML response"
+          description: "XPath notation to extract specific values from the XML response (e.g. //*[@componentId='x']//*[@dataItemId='xp']/text())"
           icon: "code-branch"
           placeholder: "e.g. //*[@dataItemId='temperature']/text()"
       internal:
@@ -191,7 +196,7 @@ configs:
       presentation:
         address:
           title: "Memory Address"
-          description: "Database memory address given as %aa####.* where aa determines the variable type"
+          description: "Database memory address given as %aa####.* where aa determines the variable type (e.g. %I=input bit, %Q=output bit, %IB=input byte, %QB=output byte, %IW=input word, %QW=output word, %ID=input double word, %QD=output double word)"
           icon: "microchip"
           placeholder: "e.g. %QD1026 or %Q1194.0"
         path:
@@ -246,7 +251,7 @@ configs:
       presentation:
         address:
           title: "Node ID"
-          description: "The OPC UA Node ID (e.g. ns=2;s=/Channel/Spindle/actSpeed)"
+          description: "The OPC UA Node ID in format ns=X;s=PATH or i=X (e.g. ns=2;s=/Channel/Spindle/actSpeed)"
           icon: "sitemap"
           placeholder: "e.g. ns=2;s=/Channel/Spindle/actSpeed"
         path:
@@ -332,12 +337,12 @@ configs:
       presentation:
         address:
           title: "Topic"
-          description: "The MQTT topic to subscribe to"
+          description: "The MQTT topic to subscribe to (e.g. device/+/data or factory/area1/#)"
           icon: "exchange-alt"
           placeholder: "e.g. /robot01/axis/1/position"
         path:
           title: "JSON Path"
-          description: "JSONPath notation to extract specific values from the message payload"
+          description: "JSONPath notation to extract specific values from the message payload (e.g. $.data.temperature)"
           icon: "code"
           placeholder: "e.g. $.value"
       internal:
@@ -420,12 +425,12 @@ configs:
       presentation:
         address:
           title: "Port"
-          description: "The UDP port to listen on"
+          description: "The UDP port to listen on (e.g. 50205)"
           icon: "network-wired"
           placeholder: "e.g. 50205"
         path:
           title: "Data Selector"
-          description: "Selector to extract specific values from the UDP message"
+          description: "Selector to extract specific values from the UDP message (e.g. data[0] for first byte)"
           icon: "filter"
           placeholder: "e.g. data[0]"
       internal:
@@ -447,12 +452,12 @@ configs:
       presentation:
         address:
           title: "Device ID"
-          description: "The Bacnet device identifier"
+          description: "The Bacnet device identifier (numeric ID of the device)"
           icon: "building"
           placeholder: "e.g. 1234"
         path:
           title: "Object ID"
-          description: "The Bacnet object identifier"
+          description: "The Bacnet object identifier (format: object-type:instance-number, e.g. analog-value:1)"
           icon: "cube"
           placeholder: "e.g. analog-value:1"
       image:
@@ -474,15 +479,12 @@ configs:
       polled: true
       presentation:
         address:
-          title: "Register Address"
-          description: "The Modbus register address"
+          title: "Modbus Address"
+          description: "Format: id,type,address,length (e.g. 1,holding,0,1) where id=device ID, type=register type (holding, input, coil, discrete), address=register address, length=number of registers"
           icon: "server"
-          placeholder: "e.g. 40001"
+          placeholder: "e.g. 1,holding,0,1"
         path:
-          title: "Register Type"
-          description: "The Modbus register type (coil, discrete input, holding register, input register)"
-          icon: "list-ul"
-          placeholder: "e.g. holding"
+          hidden: true
       image:
         registry: ghcr.io/amrc-factoryplus
         repository: edge-modbus
@@ -526,14 +528,11 @@ configs:
       presentation:
         address:
           title: "Command"
-          description: "The command to send to the smart plug"
+          description: "The command to read from the smart plug (SysInfo, PowerState, InUse, or Meter)"
           icon: "plug"
-          placeholder: "e.g. power"
+          placeholder: "e.g. PowerState"
         path:
-          title: "Parameter"
-          description: "Additional parameters for the command"
-          icon: "sliders-h"
-          placeholder: "e.g. on/off"
+          hidden: true
       image:
         registry: ghcr.io/amrc-factoryplus
         repository: edge-tplink-smartplug
@@ -561,12 +560,12 @@ configs:
       presentation:
         address:
           title: "Address"
-          description: "The address for the external driver"
+          description: "The address for the external driver (format depends on the specific external driver)"
           icon: "puzzle-piece"
           placeholder: "Enter address"
         path:
           title: "Path"
-          description: "The path for the external driver"
+          description: "The path for the external driver (format depends on the specific external driver)"
           icon: "folder-tree"
           placeholder: "Enter path"
       external: true

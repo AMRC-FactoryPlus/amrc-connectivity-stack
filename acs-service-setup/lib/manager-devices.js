@@ -7,29 +7,19 @@
 import {UUIDs} from "@amrc-factoryplus/service-client";
 
 export async function migrate_edge_agent_config(ss) {
-    const Class = {
-        Private:        "eda329ca-4e55-4a92-812d-df74993c47e2",
-    };
-
-    const App = {
-        ServiceSetup: "5b47881c-b012-4040-945c-eacafca539b2",
-    }
 
     const {fplus} = ss;
     const cdb = fplus.ConfigDB;
     const log = fplus.debug.bound("manager");
+    const MIGRATION_OBJECT_UUID = "d0208d04-a17d-4281-94ef-496b9f6aeede";
 
     // Check the migration status.
-    const privateConfigUUIDs = await cdb.list_configs(App.ServiceSetup);
-    for (const uuid of privateConfigUUIDs){
-        const privateConfig = await cdb.get_config(App.ServiceSetup, uuid);
-        if("name" in privateConfig &&
-            privateConfig.name === "v4-Migration" &&
-            privateConfig.migrated === true
-        ){
-            log("No migration required.")
-            return;
-        }
+    const privateConfig = await cdb.get_config(UUIDs.App.ServiceSetup, MIGRATION_OBJECT_UUID);
+    if(
+        privateConfig && privateConfig.migrated === true
+    ){
+        log("Nothing to migrate.")
+        return;
     }
 
     const edgeAgentConfigUUIDs = await cdb.list_configs(UUIDs.App.EdgeAgentConfig);
@@ -45,7 +35,6 @@ export async function migrate_edge_agent_config(ss) {
     for (const uuid of edgeAgentConfigUUIDs) {
         const edgeAgentConfig = await cdb.get_config(UUIDs.App.EdgeAgentConfig, uuid);
         const edgeDeploymentConfig = await cdb.get_config(UUIDs.App.EdgeAgentDeployment, uuid);
-        // TODO: add a check to skip config if it already exists in the new apps
         for (const connection of edgeAgentConfig.deviceConnections) {
             const connectionObjectUUID = await cdb.create_object(UUIDs.Class.EdgeAgentConnection);
             await cdb.put_config(UUIDs.App.Info, connectionObjectUUID, {
@@ -99,16 +88,16 @@ export async function migrate_edge_agent_config(ss) {
     // Set migration status
     log("Creating required Classes");
     // Make sure the class exists.
-    await cdb.create_object(UUIDs.Class.Class, Class.Private);
-    await cdb.put_config(UUIDs.App.Info, Class.Private,
+    await cdb.create_object(UUIDs.Class.Class, UUIDs.Class.Private);
+    await cdb.put_config(UUIDs.App.Info, UUIDs.Class.Private,
         { name: "Private configuration" });
 
     // create an instance of the private class.
-    const uuid = await cdb.create_object(Class.Private);
-    await cdb.put_config(UUIDs.App.Info, uuid, { name: "Migration Information" });
+    await cdb.create_object(UUIDs.Class.Private, MIGRATION_OBJECT_UUID);
+    await cdb.put_config(UUIDs.App.Info, MIGRATION_OBJECT_UUID, { name: "Migration Information" });
 
     // Insert the migration config.
-    await cdb.put_config(App.ServiceSetup, uuid, {
+    await cdb.put_config(UUIDs.App.ServiceSetup, MIGRATION_OBJECT_UUID, {
         name: "v4-Migration",
         timestamp: new Date().toISOString(),
         migrated: true,

@@ -86,7 +86,7 @@ class RealmSetup {
     if (response.status >= 500 && response.status < 600) {
       await setTimeout(10000);
       this.log("Retrying %s", request.url);
-      return this.try_fetch(request);
+      return this.try_fetch(new Request(request));
     }
 
     await FetchError.throwOf(response);

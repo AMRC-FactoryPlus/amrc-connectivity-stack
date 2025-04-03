@@ -21,7 +21,7 @@
     <EdgePageSkeleton v-if="loadingDetails"/>
     <div v-else class="flex flex-1 h-full">
       <!-- Main content -->
-      <div class="flex-1 flex flex-col gap-4">
+      <div class="flex-1 flex flex-col gap-4 relative">
         <!-- Speech Bubble -->
         <Transition name="speech">
           <div v-if="robotBeep"
@@ -275,7 +275,7 @@ export default {
         setTimeout(() => {
           this.robotBeep = null
         }, 5000)
-      }, 15000)
+      }, 10000)
     },
 
     stopRobotBeep() {
@@ -299,7 +299,6 @@ export default {
       robotMessages: [
         "Beep Boop! What am I?",
         "ERROR 404: Identity not found",
-        "Help! I don't know what I am! 🤖",
         "01001000 01000101 01001100 01010000",
         "Searching for meaning... and schemas... and connections...",
         "I think, therefore I... wait, what am I?",

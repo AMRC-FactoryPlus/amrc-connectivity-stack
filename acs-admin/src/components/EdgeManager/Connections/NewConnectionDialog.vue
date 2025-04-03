@@ -77,6 +77,22 @@
             </SelectContent>
           </Select>
         </div>
+
+        <!-- Poll Interval (in milliseconds) - only for polled drivers -->
+        <div v-if="isPolledDriver" class="flex flex-col gap-1">
+          <label class="text-sm font-medium" for="pollInt">Poll Interval (ms) <span class="text-red-500">*</span></label>
+          <Input
+            type="number"
+            name="pollInt"
+            v-model="pollInt"
+            min="1"
+            :class="{ 'border-red-500': v$.pollInt.$error }"
+            required
+          />
+          <p class="text-sm text-gray-500">
+            The interval in milliseconds between device polls. Default is 1000ms (1 second).
+          </p>
+        </div>
       </div>
       <DialogFooter>
         <div class="flex w-full items-center justify-between">
@@ -204,6 +220,7 @@ export default {
         const existingConfig    = existingConnection.configuration
         this.selectedDriverName = this.dr.data.find(d => d.uuid === existingConfig.driver_uuid)?.name
         this.name = existingConnection.name
+        this.pollInt = existingConfig.pollInt || 1000 // Load existing poll interval or default to 1000ms
         this.formData           = {
           ...existingConfig.config,
           payloadFormat: existingConfig.source.payloadFormat,
@@ -220,6 +237,9 @@ export default {
     },
     selectedDriver () {
       return this.dr.data.find(d => d.name === this.selectedDriverName)
+    },
+    isPolledDriver() {
+      return this.selectedDriver?.definition?.polled === true
     },
     formSchema() {
       const baseSchema = this.selectedDriver?.definition?.schema || {};
@@ -267,7 +287,18 @@ export default {
         alphaNumUnderscoreSpace: helpers.withMessage('Letters, numbers, spaces and underscores are valid', (value) => {
           return /^[a-zA-Z0-9_ ]*$/.test(value)
         }),
-      }
+      },
+      ...this.isPolledDriver ? {
+        pollInt: {
+          required,
+          numeric: helpers.withMessage('Must be a number', (value) => {
+            return !isNaN(parseFloat(value)) && isFinite(value)
+          }),
+          min: helpers.withMessage('Must be at least 0', (value) => {
+            return parseInt(value) >= 0
+          })
+        }
+      } : {}
     }
   },
 
@@ -330,6 +361,7 @@ export default {
     resetForm() {
       this.selectedDriverName = null
       this.name = null
+      this.pollInt = 1000 // Reset to default 1000ms
       this.formData = {
         payloadFormat: "Defined by Protocol"
       }
@@ -363,6 +395,7 @@ export default {
             this.s.client.ConfigDB.patch_config(UUIDs.App.ConnectionConfiguration, this.existingConnection.uuid, 'merge', {
               config: configData,
               driver_uuid: this.selectedDriver.uuid,
+              ...(this.isPolledDriver ? { pollInt: parseInt(this.pollInt) } : {}), // Add poll interval only for polled drivers
               source: {
                 payloadFormat: payloadFormat,
               },
@@ -393,6 +426,7 @@ export default {
             deployment: {},
             driver: this.selectedDriver.uuid,
             edgeAgent: this.node.uuid,
+            ...(this.isPolledDriver ? { pollInt: parseInt(this.pollInt) } : {}), // Add poll interval only for polled drivers
             source: {
               payloadFormat: payloadFormat,
             },
@@ -493,6 +527,7 @@ export default {
       node: null,
       name: null,
       selectedDriverName: null,
+      pollInt: 1000, // Default to 1000ms (1 second)
       formData: {
         payloadFormat: "Defined by Protocol"
       },

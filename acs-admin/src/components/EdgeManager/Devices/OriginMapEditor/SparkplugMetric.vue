@@ -209,8 +209,7 @@ export default {
     },
 
     driverInfo() {
-      if (!this.connectionInfo?.configuration?.driver) return null
-      return this.driver.data.find(d => d.uuid === this.connectionInfo.configuration.driver) || null
+      return this.connectionInfo?.configuration?.driver || null
     },
 
     addressLabel() {

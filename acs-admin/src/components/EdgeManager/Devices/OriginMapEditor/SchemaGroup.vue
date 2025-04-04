@@ -26,8 +26,11 @@
       <!-- Metric node -->
       <SidebarMenuButton
         v-if="type(key) === 'metric'"
-        :is-active="selectedMetric === schema.properties[key]"
-        class="h-7 border-l -ml-2 rounded-none hover:bg-gray-100"
+        :is-active="isMetricSelected(key)"
+        :class="[
+          'h-7 border-l -ml-2 rounded-none hover:bg-gray-100 rounded-r-full',
+          isMetricSelected(key) ? 'border-l-2 border-gray-500 !bg-gray-200/70 font-medium' : ''
+        ]"
         @click="$emit('selected', [{
           key: key,
           value: schema.properties[key],
@@ -202,6 +205,36 @@ export default {
   },
 
   methods: {
+
+    isMetricSelected(key) {
+      // If selectedMetric is not set, return false
+      if (!this.selectedMetric) return false;
+
+      // For metrics with a path property (which is how they're set in OriginMapEditor.vue)
+      if (this.selectedMetric.path) {
+        // Get the last segment of the path (the metric name)
+        const lastPathSegment = this.selectedMetric.path[this.selectedMetric.path.length - 1];
+
+        // Check if the current nested path matches the beginning of the selected metric's path
+        // and if the key matches the last segment of the path
+        if (this.nestedPath.length === this.selectedMetric.path.length - 1) {
+          // Check if all segments of the nested path match the corresponding segments in the selected metric's path
+          let pathMatches = true;
+          for (let i = 0; i < this.nestedPath.length; i++) {
+            if (this.nestedPath[i] !== this.selectedMetric.path[i]) {
+              pathMatches = false;
+              break;
+            }
+          }
+
+          // If the paths match and the key matches the last segment, this is the selected metric
+          return pathMatches && lastPathSegment === key;
+        }
+      }
+
+      // Fallback to direct object comparison (though this is unlikely to work for dynamic objects)
+      return this.selectedMetric === this.schema.properties[key];
+    },
 
     isMetricInModel(key) {
       // Get the path to the metric in the model

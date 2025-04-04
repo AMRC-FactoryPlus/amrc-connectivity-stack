@@ -378,6 +378,12 @@ grafana:
       token_url: $__file{/etc/acs-config/token_url}
       api_url: $__file{/etc/acs-config/api_url}
       signout_redirect_url: $__file{/etc/acs-config/signout_redirect_url}
+      role_attribute_path: |
+        contains(roles[*], 'grafanaAdmin') && 'GrafanaAdmin'
+        || contains(roles[*], 'admin') && 'Admin'
+        || contains(roles[*], 'editor') && 'Editor'
+        || 'Viewer'
+      allow_assign_grafana_admin: true
   extraConfigmapMounts:
     - name: ini-config
       mountPath: /etc/acs-config

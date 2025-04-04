@@ -21,7 +21,7 @@ export async function migrate_edge_agent_config(ss) {
         log("Nothing to migrate.")
         return;
     }
-
+    log("Migrating Edge Agent Config.")
     const edgeAgentConfigUUIDs = await cdb.list_configs(UUIDs.App.EdgeAgentConfig);
     const driverUUIDs = await cdb.list_configs(UUIDs.App.DriverDefinition);
     const drivers = {};
@@ -36,6 +36,7 @@ export async function migrate_edge_agent_config(ss) {
         const edgeAgentConfig = await cdb.get_config(UUIDs.App.EdgeAgentConfig, uuid);
         const edgeDeploymentConfig = await cdb.get_config(UUIDs.App.EdgeAgentDeployment, uuid);
         for (const connection of edgeAgentConfig.deviceConnections) {
+            log(`Migrating connection ${connection.name}`);
             const connectionObjectUUID = await cdb.create_object(UUIDs.Class.EdgeAgentConnection);
             await cdb.put_config(UUIDs.App.Info, connectionObjectUUID, {
                 name: connection.name
@@ -61,6 +62,7 @@ export async function migrate_edge_agent_config(ss) {
             await cdb.put_config(UUIDs.App.ConnectionConfiguration, connectionObjectUUID, connectionConfig);
             // Migrate device information
             for (const device of connection.devices){
+                log(`Migrating device ${device.deviceId}`);
                 // create object
                 const deviceObjectUUID = await cdb.create_object(UUIDs.Class.Device);
                 // create object information
@@ -102,5 +104,6 @@ export async function migrate_edge_agent_config(ss) {
         timestamp: new Date().toISOString(),
         migrated: true,
     });
+    log("Migration completed.")
 }
 

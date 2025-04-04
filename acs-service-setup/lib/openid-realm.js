@@ -331,6 +331,26 @@ class RealmSetup {
         "backchannel.logout.session.required": "true",
         "post.logout.redirect.uris": url,
       },
+      protocolMappers: [
+        {
+          name: "client roles",
+          protocol: "openid-connect",
+          protocolMapper: "oidc-usermodel-client-role-mapper",
+          consentRequired: false,
+          config: {
+            "introspection.token.claim": "true",
+            multivalued: "true",
+            "userinfo.token.claim": "true",
+            "id.token.claim": "true",
+            "lightweight.claim": "false",
+            "access.token.claim": "true",
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "usermodel.clientRoleMapping.clientId":
+              client_representation.clientId,
+          },
+        },
+      ],
     };
 
     await this.openid_create({
@@ -429,6 +449,8 @@ class RealmSetup {
   async create_client_role_mappings (client_id, roles) {
     const { admin_user_id, realm } = this;
 
+    this.log("Checking role mappings for %s", client_id);
+
     const path = `admin/realms/${realm}/users/${admin_user_id}/role-mappings/clients/${client_id}`;
 
     const get_roles = type => this.with_token(
@@ -444,6 +466,8 @@ class RealmSetup {
       this.log("Admin already has role %s for %s", name, client_id);
       want.delete(name);
     }
+
+    if (!want.size) return;
 
     const available = await get_roles("available");
     const assign = available.filter(r => want.has(r.name));

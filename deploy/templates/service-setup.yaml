@@ -35,6 +35,10 @@ spec:
               value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
             - name: SERVICE_USERNAME
               value: admin
+            # Currently the openid realm setup relies on having the
+            # admin@ credentials available, with a password rather than
+            # a keytab. If service-setup is ever moved over to using its
+            # own account there will need to be changes to that code.
             - name: SERVICE_PASSWORD
               valueFrom:
                 secretKeyRef:

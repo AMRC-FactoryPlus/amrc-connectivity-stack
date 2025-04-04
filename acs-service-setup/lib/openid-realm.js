@@ -53,6 +53,7 @@ class RealmSetup {
     const { fplus } = service_setup;
     this.log = fplus.debug.bound("oauth");
 
+    this.fplus = fplus;
     this.username = "_bootstrap";
     this.realm = "factory_plus";
     this.base_url = service_setup.acs_config.domain;
@@ -90,6 +91,27 @@ class RealmSetup {
 
     await FetchError.throwOf(response);
   }
+
+  /** Fetch a token.
+   * @async
+   * @arg realm - The realm name.
+   * @arg params - An object of parameters for the token request.
+   */
+  async fetch_token (realm, params) {
+    const token_url = this.url(`realms/${realm}/protocol/openid-connect/token`);
+
+    this.log("Token request [%s]: %s", params.grant_type, token_url);
+
+    const response = await this.try_fetch(new Request(token_url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams(params),
+    }));
+
+    return response.json();
+}
       
   /** Make a request with a token.
    * 5xx errors will delay and retry.
@@ -160,7 +182,7 @@ class RealmSetup {
     this.admin_cli_secret = await this.client_secret("_admin");
 
     await this.create_basic_realm();
-    await this.create_admin_user();
+    this.admin_user_id = await this.create_admin_user();
 
     const client_configs = Object.entries(this.config.openidClients);
     const enabled_clients = client_configs.filter(
@@ -378,28 +400,42 @@ class RealmSetup {
    * @returns {Promise<void>} Resolves when the user is created.
    */
   async create_admin_user() {
+    const { username, password } = this.fplus.opts;
+
+    this.log("Setting up %s account", username);
+    /* Attempt a login as the admin user. This will fail if the user
+     * profile hasn't been created yet but will create the user on the
+     * OpenID side as a side-effect. We need to use the client secret
+     * here as OAuth doesn't appear to provide any way for users to log
+     * in on their own account. */
+    await this.fetch_token(this.realm, {
+      grant_type:     "password",
+      client_id:      "admin-cli",
+      client_secret:  this.admin_cli_secret,
+      username,
+      password,
+    }).catch(FetchError.expect(400));
+
+    /* Fetch the user id (allocated by Keycloak) */
+    const id = await this.get_user_id(username);
+
     const admin_user = {
-      id: crypto.randomUUID(),
-      username: this.username,
       firstName: "Admin",
       lastName: "User",
-      email: `admin@${this.acs_realm}`,
+      email: `${username}@${this.acs_realm}`,
       emailVerified: false,
-      enabled: true,
-      credentials: [{
-        type: "password",
-        value: this.password,
-        temporary: "false",
-      }],
     };
 
+    /* Update the profile */
     await this.openid_create({
-      name:     `admin user`,
+      name:     `admin profile`,
       tokensrc: this.get_user_management_token,
-      method:   "POST",
-      path:     `admin/realms/${this.realm}/users`,
+      method:   "PUT",
+      path:     `admin/realms/${this.realm}/users/${id}`,
       body:     admin_user,
     });
+
+    return id;
   }
 
   /**
@@ -411,7 +447,7 @@ class RealmSetup {
     * @returns {Promise<void>} Resolves when the mapping is created.
     */
   async create_client_role_mapping(client_id, role_name) {
-    const admin_user_id = await this.get_admin_user_id();
+    const { admin_user_id, realm } = this;
     const role_id = await this.get_client_role_id(client_id, admin_user_id, role_name);
 
     const role_list = [
@@ -421,7 +457,7 @@ class RealmSetup {
       },
     ];
 
-    const path = `admin/realms/${this.realm}/users/${admin_user_id}/role-mappings/clients/${client_id}`;
+    const path = `admin/realms/${realm}/users/${admin_user_id}/role-mappings/clients/${client_id}`;
     await this.openid_create({
       name:     `role mapping for ${client_id}`,
       tokensrc: this.get_user_management_token,
@@ -437,8 +473,8 @@ class RealmSetup {
    * @async
    * @returns {Promise<string>} Resolves to the admin user ID.
    */
-  async get_admin_user_id() {
-    const user_query_url = this.url(`admin/realms/${this.realm}/users?exact=true&username=${this.username}`);
+  async get_user_id(username) {
+    const user_query_url = this.url(`admin/realms/${this.realm}/users?exact=true&username=${username}`);
 
     const response = await this.with_token(
       this.get_user_management_token,
@@ -447,7 +483,7 @@ class RealmSetup {
     const data = await response.json();
     const id = data[0]?.id;
     if (id == null)
-      throw new Error("Admin user doesn't exist");
+      throw new Error(`User ${username} doesn't exist`);
     return id;
   }
 
@@ -494,34 +530,22 @@ class RealmSetup {
     if (access_token && !force)
       return access_token;
 
-    const token_url = this.url(`realms/master/protocol/openid-connect/token`);
+    const params = {
+      client_id: "admin-cli",
+      ...(refresh_token ? {
+          grant_type:   "refresh_token",
+          refresh_token,
+        } : {
+          grant_type:   "password",
+          username:     this.username,
+          password:     this.password,
+        }),
+    };
 
-    this.log("%s token request at: %s", force ? "Refresh" : "Initial", token_url);
+    const data = await this.fetch_token("master", params);
 
-    const params = new URLSearchParams();
-    if (refresh_token != undefined) {
-      params.append("grant_type", "refresh_token");
-      params.append("client_id", "admin-cli");
-      params.append("refresh_token", refresh_token);
-    } else {
-      params.append("grant_type", "password");
-      params.append("client_id", "admin-cli");
-      params.append("username", this.username);
-      params.append("password", this.password);
-    }
-
-    const response = await this.try_fetch(new Request(token_url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: params,
-    }));
-
-    const data = await response.json();
     this.access_token = data.access_token;
     this.refresh_token = data.refresh_token;
-
     return data.access_token;
   }
 
@@ -538,26 +562,13 @@ class RealmSetup {
     if (this.user_management_token && !force)
       return this.user_management_token;
 
-    const token_url = this.url(`realms/${this.realm}/protocol/openid-connect/token`);
+    const data = await this.fetch_token(this.realm, {
+      grant_type:     "client_credentials",
+      client_id:      "admin-cli",
+      client_secret:  this.admin_cli_secret,
+    });
 
-    this.log("%s token request at: %s", force ? "Refresh" : "Initial", token_url);
-
-    const params = new URLSearchParams();
-    params.append("grant_type", "client_credentials");
-    params.append("client_id", "admin-cli");
-    params.append("client_secret", this.admin_cli_secret);
-
-    const response = await this.try_fetch(new Request(token_url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: params,
-    }));
-
-    const data = await response.json();
     this.user_management_token = data.access_token;
-
     return data.access_token;
   }
 }

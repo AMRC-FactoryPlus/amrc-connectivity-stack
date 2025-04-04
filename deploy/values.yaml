@@ -134,18 +134,31 @@ serviceSetup:
     openidClients:
       grafana:
         enabled: true
-        clientId: "grafana"
         name: "Grafana"
-        redirectHost: "grafana"
         redirectPath: "/login/generic_oauth"
         roles:
           - name: "viewer"
           - name: "editor"
           - name: "admin"
           - name: "grafanaAdmin"
-        defaultRole: "viewer"
-        adminRole: "grafanaAdmin"
-
+        defaultRoles: [viewer]
+        adminRoles: [grafanaAdmin]
+      realm-management:
+        enabled: true
+        builtin: true
+        adminRoles:
+          - view-realm
+          - view-users
+          - view-clients
+          - view-events
+          - manage-realm
+          - manage-users
+          - create-client
+          - manage-clients
+          - manage-events
+          - view-identity-providers
+          - manage-identity-providers
+          - impersonation
 
 edgeHelm:
   enabled: true
@@ -378,7 +391,7 @@ grafana:
       token_url: $__file{/etc/acs-config/token_url}
       api_url: $__file{/etc/acs-config/api_url}
       signout_redirect_url: $__file{/etc/acs-config/signout_redirect_url}
-      role_attribute_path: |
+      role_attribute_path: >
         contains(roles[*], 'grafanaAdmin') && 'GrafanaAdmin'
         || contains(roles[*], 'admin') && 'Admin'
         || contains(roles[*], 'editor') && 'Editor'

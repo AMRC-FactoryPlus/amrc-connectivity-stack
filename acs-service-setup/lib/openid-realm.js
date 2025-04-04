@@ -188,9 +188,10 @@ class RealmSetup {
     const enabled_clients = client_configs.filter(
       ([name, client]) => client.enabled === true,
     );
-    for (const [name, client] of enabled_clients) {
-      await this.create_client(name, client);
-      await this.create_client_role_mapping(client.clientId, client.adminRole);
+    for (const [clientId, client] of enabled_clients) {
+      if (!client.builtin)
+        await this.create_client(clientId, client);
+      await this.create_client_role_mappings(clientId, client.adminRoles);
     }
   }
 
@@ -307,54 +308,33 @@ class RealmSetup {
    *
    * @async
    * @param {Object} client_representation - An object containing all the values that should be created for the client.
-   * @param {Boolean} is_retry - Whether the request is a retry after a 401. If this is false and a 401 is returned, this will retry after refreshing the token.
    * @returns {Promise<void>} Resolves when the client is created.
    */
-  async create_client(name, client_representation, is_retry) {
-    const client_secret = await this.client_secret(name);
+  async create_client(clientId, client_representation) {
+    const client_secret = await this.client_secret(clientId);
 
-    const host = client_representation.redirectHost ?? name;
+    const host = client_representation.redirectHost ?? clientId;
     const url = `http${this.secure}://${host}.${this.base_url}`;
 
     const client = {
-      id: client_representation.clientId,
-      clientId: client_representation.clientId,
+      id: clientId,
+      clientId,
       name: client_representation.name,
       rootUrl: url,
       adminUrl: url,
       baseUrl: url,
       enabled: true,
       secret: client_secret,
-      defaultRoles: [client_representation.defaultRole],
+      defaultRoles: client_representation.defaultRoles,
       redirectUris: [`${url}${client_representation.redirectPath}`],
       attributes: {
         "backchannel.logout.session.required": "true",
         "post.logout.redirect.uris": url,
       },
-      protocolMappers: [
-        {
-          name: "client roles",
-          protocol: "openid-connect",
-          protocolMapper: "oidc-usermodel-client-role-mapper",
-          consentRequired: false,
-          config: {
-            "introspection.token.claim": "true",
-            multivalued: "true",
-            "userinfo.token.claim": "true",
-            "id.token.claim": "true",
-            "lightweight.claim": "false",
-            "access.token.claim": "true",
-            "claim.name": "${client_id}.roles",
-            "jsonType.label": "String",
-            "usermodel.clientRoleMapping.clientId":
-              client_representation.clientId,
-          },
-        },
-      ],
     };
 
     await this.openid_create({
-      name:     `realm client ${name}`,
+      name:     `realm client ${clientId}`,
       tokensrc: this.get_initial_access_token,
       path:     `admin/realms/${this.realm}/clients`,
       method:   "POST",
@@ -446,7 +426,7 @@ class RealmSetup {
     * @param {string} role_name - The name of the role.
     * @returns {Promise<void>} Resolves when the mapping is created.
     */
-  async create_client_role_mapping(client_id, role_name) {
+  async create_client_role_mappings (client_id, roles) {
     const { admin_user_id, realm } = this;
 
     const path = `admin/realms/${realm}/users/${admin_user_id}/role-mappings/clients/${client_id}`;
@@ -456,24 +436,30 @@ class RealmSetup {
       new Request(this.url(`${path}/${type}`))
     ).then(res => res.json());
 
+    const want = new Set(roles);
+
     const assigned = await get_roles("");
-    if (assigned.some(r => r.name == role_name)) {
-      this.log("Admin user already a member of role %s", role_name);
-      return;
+    const have = assigned.map(r => r.name).filter(n => want.has(n));
+    for (const name of have) {
+      this.log("Admin already has role %s for %s", name, client_id);
+      want.delete(name);
     }
 
     const available = await get_roles("available");
-    const role = available.find(r => r.name == role_name);
+    const assign = available.filter(r => want.has(r.name));
 
-    if (!role)
-      throw new Error(`Cannot find role ${role_name} for ${client_id}`);
+    if (assign.length != want.size) {
+      this.log("Required roles: %s", [...want].join(", "));
+      this.log("Available roles: %s", assign.map(r => r.name).join(", "));
+      throw new Error("Not all required roles are available");
+    }
 
     await this.openid_create({
       name:     `role mapping for ${client_id}`,
       tokensrc: this.get_user_management_token,
       method:   "POST",
       path,
-      body:     [role],
+      body:     assign,
     });
   }
 

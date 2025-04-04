@@ -10,6 +10,7 @@ import { DumpLoader }           from "./dumps.js";
 import { fixups }               from "./fixups.js";
 import { setup_git_repos }      from "./git-repos.js";
 import { setup_local_uuids }    from "./local-uuids.js";
+import {migrate_edge_agent_config} from "./manager-devices.js";
 
 export class ServiceSetup {
     constructor (opts) {
@@ -54,6 +55,9 @@ export class ServiceSetup {
 
         this.log("Creating shared git repositories");
         await setup_git_repos(this, local);
+
+        this.log("Migrating managed edge agent config");
+        await migrate_edge_agent_config(this);
 
         this.log("Migrating legacy Auth groups");
         await migrate_auth_groups(this);

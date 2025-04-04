@@ -448,22 +448,32 @@ class RealmSetup {
     */
   async create_client_role_mapping(client_id, role_name) {
     const { admin_user_id, realm } = this;
-    const role_id = await this.get_client_role_id(client_id, admin_user_id, role_name);
-
-    const role_list = [
-      {
-        id: role_id,
-        name: role_name,
-      },
-    ];
 
     const path = `admin/realms/${realm}/users/${admin_user_id}/role-mappings/clients/${client_id}`;
+
+    const get_roles = type => this.with_token(
+      this.get_user_management_token,
+      new Request(this.url(`${path}/${type}`))
+    ).then(res => res.json());
+
+    const assigned = await get_roles("");
+    if (assigned.some(r => r.name == role_name)) {
+      this.log("Admin user already a member of role %s", role_name);
+      return;
+    }
+
+    const available = await get_roles("available");
+    const role = available.find(r => r.name == role_name);
+
+    if (!role)
+      throw new Error(`Cannot find role ${role_name} for ${client_id}`);
+
     await this.openid_create({
       name:     `role mapping for ${client_id}`,
       tokensrc: this.get_user_management_token,
       method:   "POST",
       path,
-      body:     role_list,
+      body:     [role],
     });
   }
 
@@ -485,34 +495,6 @@ class RealmSetup {
     if (id == null)
       throw new Error(`User ${username} doesn't exist`);
     return id;
-  }
-
-  /**
-   * Get the ID of the applicable role given the containing client ID, the user ID, and the role name.
-   *
-   * @async
-   * @param {string} client_id - ID of the client containing the role.
-   * @param {string} user_id - ID of the user to which the role will apply.
-   * @param {string} role_name - Name of the role.
-   * @param {Boolean} is_retry - Whether this is a retry after a 401. If this is false and a 401 is returned, this will retry after refreshing the token.
-   * @returns {Promise<string>} Resolves to the ID of the role.
-   */
-  async get_client_role_id(client_id, user_id, role_name, is_retry) {
-    const role_query_url = this.url(`admin/realms/${this.realm}/users/${user_id}/role-mappings/clients/${client_id}/available`);
-
-    const response = await this.with_token(
-      this.get_user_management_token,
-      new Request(role_query_url));
-
-    const roleList = await response.json();
-    for (const role of roleList) {
-      if (role.name === role_name) {
-        return role.id;
-      }
-    }
-    throw new Error(
-      `No role found with role name ${role_name} in ${client_id} available for ${user_id}`,
-    );
   }
 
   /**

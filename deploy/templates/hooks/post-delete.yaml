@@ -18,6 +18,7 @@ spec:
             - |
               echo "Starting cleanup..."
               for i in $(kubectl -n {{ .Release.Namespace }} get kerberos-keys -o name); do kubectl -n {{ .Release.Namespace }} patch $i --type=json -p='[{"op": "remove", "path": "/metadata/finalizers"}]'; done
+              for i in $(kubectl -n {{ .Release.Namespace }} get localsecrets -o name); do kubectl -n {{ .Release.Namespace }} patch $i --type=json -p='[{"op": "remove", "path": "/metadata/finalizers"}]'; done
               echo "Cleanup complete!"
       restartPolicy: Never
   backoffLimit: 3
@@ -45,7 +46,7 @@ metadata:
     "helm.sh/hook-delete-policy": before-hook-creation
 rules:
   - apiGroups: [ "factoryplus.app.amrc.co.uk" ]
-    resources: [ "kerberos-keys" ]
+    resources: [ "kerberos-keys", "localsecrets" ]
     verbs: [ "get", "list", "patch" ] # Specify only necessary actions
 
 ---

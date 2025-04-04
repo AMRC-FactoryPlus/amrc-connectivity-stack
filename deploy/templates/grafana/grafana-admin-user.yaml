@@ -1,17 +1,11 @@
 {{ if .Values.grafana.enabled }}
-{{- if not (lookup "v1" "Secret" .Release.Namespace "grafana-admin-user") }}
-
 apiVersion: v1
 kind: Secret
 metadata:
   name: "grafana-admin-user"
   namespace: {{ .Release.Namespace }}
-  annotations:
-    "helm.sh/resource-policy": "keep"
 type: Opaque
-data:
-  admin-user: {{ (printf "admin@%s" (.Values.identity.realm | required "values.identity.realm is required!") | b64enc) | quote }}
-  admin-password: {{ (printf "" | b64enc) | quote }}
-
-{{- end }}
+stringData:
+  admin-user: "_bootstrap"
+  admin-password: {{ randAlphaNum 20 | quote }}
 {{- end -}}

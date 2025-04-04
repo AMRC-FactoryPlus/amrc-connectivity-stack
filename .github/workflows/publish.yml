@@ -157,6 +157,7 @@ jobs:
           - acs-cluster-manager
           - acs-cmdesc
           - acs-edge-sync
+          - acs-files
           - acs-git
           - acs-identity
           - acs-krb-keys-operator

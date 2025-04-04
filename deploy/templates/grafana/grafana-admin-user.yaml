@@ -1,0 +1,11 @@
+{{ if .Values.grafana.enabled }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: "grafana-admin-user"
+  namespace: {{ .Release.Namespace }}
+type: Opaque
+stringData:
+  admin-user: "_bootstrap"
+  admin-password: {{ randAlphaNum 20 | quote }}
+{{- end -}}

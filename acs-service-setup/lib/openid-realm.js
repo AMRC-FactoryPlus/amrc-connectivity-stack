@@ -446,21 +446,30 @@ class RealmSetup {
     * @param {string} role_name - The name of the role.
     * @returns {Promise<void>} Resolves when the mapping is created.
     */
-  async create_client_role_mappings (client_id, roles) {
+  async create_client_role_mappings (client_name, roles) {
     const { admin_user_id, realm } = this;
 
-    this.log("Checking role mappings for %s", client_id);
+    this.log("Checking role mappings for %s", client_name);
 
-    const path = `admin/realms/${realm}/users/${admin_user_id}/role-mappings/clients/${client_id}`;
-
-    const get_roles = type => this.with_token(
+    const fetch_info = path => this.with_token(
       this.get_user_management_token,
-      new Request(this.url(`${path}/${type}`))
+      new Request(this.url(path))
     ).then(res => res.json());
+
+    const realm_p = `admin/realms/${realm}`;
+    const clients = await fetch_info(`${realm_p}/clients?clientId=${client_name}`);
+
+    if (clients.length != 1)
+      throw new Error(`Can't find client ${client_name}`);
+
+    const client_id = clients[0].id;
+    this.log("Found client-id %s", client_id);
+
+    const map_p = `${realm_p}/users/${admin_user_id}/role-mappings/clients/${client_id}`;
 
     const want = new Set(roles);
 
-    const assigned = await get_roles("");
+    const assigned = await fetch_info(map_p);
     const have = assigned.map(r => r.name).filter(n => want.has(n));
     for (const name of have) {
       this.log("Admin already has role %s for %s", name, client_id);
@@ -469,7 +478,7 @@ class RealmSetup {
 
     if (!want.size) return;
 
-    const available = await get_roles("available");
+    const available = await fetch_info(`${map_p}/available`);
     const assign = available.filter(r => want.has(r.name));
 
     if (assign.length != want.size) {

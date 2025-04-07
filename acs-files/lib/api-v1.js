@@ -21,6 +21,7 @@ export class APIv1 {
     api.get('/:uuid', this.get_file_by_uuid.bind(this));
     api.get('/', this.list_storage.bind(this));
     api.post('/', this.post_file.bind(this));
+    api.delete('/:uuid', this.delete_file_by_uuid.bind(this));
   }
 
   async list_storage(req, res) {
@@ -123,5 +124,38 @@ export class APIv1 {
     return res.status(201).json({
       message: 'OK. File uploaded to storage and its metadata to ConfigDB.',
     });
+  }
+
+  async delete_file_by_uuid(req, res) {
+    const file_uuid = req.params.uuid;
+
+    if (!file_uuid)
+      return res
+        .status(400)
+        .json({ message: 'FAILED: File Uuid not provided.' });
+
+    if (!Valid.uuid.test(file_uuid))
+      return res.status(410).json({ message: 'FAILED: File Uuid is invalid' });
+
+    // const ok = await this.auth.check_acl(
+    //   req.auth,
+    //   Perm.Delete,
+    //   file_uuid,
+    //   true
+    // );
+
+    // if (!ok)
+    //   return res
+    //     .status(403)
+    //     .json({ message: 'FAILED: No Delete permission' });
+
+    const file_path = path.resolve(this.uploadPath, file_uuid);
+
+    
+    await fs.unlink(file_path);
+    await this.configDb.mark_object_deleted(file_uuid);
+    return res.status(200).json({ message: 'OK. File deleted.' });
+    
+    
   }
 }

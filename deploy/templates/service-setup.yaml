@@ -83,7 +83,6 @@ spec:
               - "-c"
               - |
                 php artisan migrate --force
-                php artisan connections:register
           env:
             - name: KRB5_CONFIG
               value: /config/krb5-conf/krb5.conf

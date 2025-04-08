@@ -126,7 +126,7 @@ export class APIv1 {
     });
   }
 
-  async delete_file_by_uuid(req, res) {
+  async delete_file_by_uuid(req, res, next) {
     const file_uuid = req.params.uuid;
 
     if (!file_uuid)
@@ -137,6 +137,7 @@ export class APIv1 {
     if (!Valid.uuid.test(file_uuid))
       return res.status(410).json({ message: 'FAILED: File Uuid is invalid' });
 
+    // Check Delete permission
     // const ok = await this.auth.check_acl(
     //   req.auth,
     //   Perm.Delete,
@@ -151,9 +152,20 @@ export class APIv1 {
 
     const file_path = path.resolve(this.uploadPath, file_uuid);
 
-    
-    await fs.unlink(file_path);
+    //Mark file as deleted in ConfigDB and remove from storage
     await this.configDb.mark_object_deleted(file_uuid);
+
+    try{
+      
+      await fs.unlink(file_path);
+    }
+    catch(err){
+      if (err.code === 'ENOENT') {
+        return res.status(404).json({ message: 'File not found' });
+      }
+      next(err);
+    }
+   
     return res.status(200).json({ message: 'OK. File deleted.' });
     
     

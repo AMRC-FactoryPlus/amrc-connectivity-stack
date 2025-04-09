@@ -22,7 +22,7 @@ Most of the components deployed by ACS are implementations of the core component
 
 These are proposals for potential future work.
 
-* [Dynamic deployment](./docs/dyn-deploy/index.md)
+* [Dynamic deployment](docs/concepts/dyn-deploy/index.md)
 
 ## Maintainers
 

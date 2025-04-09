@@ -173,7 +173,7 @@ All proposals need to meet these conditions:
 
 ### Permission templates
 
-[Full proposal](./auth/sexpr.md).
+[Full proposal](sexpr.md).
 
 This proposal is intended as a simple way to define a JSON-based
 expression language which can be used to express rich permission
@@ -187,7 +187,7 @@ partial evaluation is difficult to handle correctly.
 
 ### Minimal changes
 
-[Full proposal](./auth/minimal.md).
+[Full proposal](minimal.md).
 
 This is intended as a simplest-possible proposal while still meeting the
 conditions above.

@@ -18,8 +18,15 @@
   - [Object Model](./configDB/object-model.md)
 - Development
   - [Contributor Guidelines](./development/contributor-guidelines.md)
-- Dynamic Deployment
-  - [Index](./dyn-deploy/index.md)
+- Concepts
+  - Dynamic Deployment
+  - [Index](concepts/dyn-deploy/index.md)
+  - [Rendezvous](concepts/dyn-deploy/rendezvous.md)
+  - [Reconciliation](concepts/dyn-deploy/reconcilation.md)
+    - Auth
+      - [Auth](concepts/dyn-deploy/auth/auth.md)
+      - [Dynamic groups](concepts/dyn-deploy/auth/minimal.md)
+      - [S-expressions](concepts/dyn-deploy/auth/sexpr.md)
 - Getting Started
   - [Installation](./getting-started/installation.md)
   - [Quick Started](./getting-started/quick-start.md)

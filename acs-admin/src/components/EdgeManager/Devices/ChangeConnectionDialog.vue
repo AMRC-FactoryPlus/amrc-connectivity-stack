@@ -45,6 +45,9 @@ import { useConnectionStore } from '@/store/useConnectionStore'
 import { UUIDs } from '@amrc-factoryplus/service-client'
 import { toast } from 'vue-sonner'
 import { useServiceClientStore } from '@store/serviceClientStore.js'
+import { useDeviceStore } from '@/store/useDeviceStore'
+import { updateEdgeAgentConfig } from '@/utils/edgeAgentConfigUpdater'
+import { storeReady } from '@store/useStoreReady.js'
 
 export default {
   components: {
@@ -76,12 +79,24 @@ export default {
     return {
       s: useServiceClientStore(),
       conn: useConnectionStore(),
+      d: useDeviceStore(),
     }
   },
 
   data() {
     return {
-      selectedConnection: this.currentConnectionUuid,
+      selectedConnection: null,
+    }
+  },
+
+  watch: {
+    currentConnectionUuid: {
+      immediate: true,
+      handler(uuid) {
+        if (uuid) {
+          this.selectedConnection = this.conn.data.find(conn => conn.uuid === uuid) || null
+        }
+      }
     }
   },
 
@@ -94,6 +109,7 @@ export default {
   methods: {
     async save() {
       try {
+        // Update the device connection
         await this.s.client.ConfigDB.patch_config(
           UUIDs.App.DeviceInformation,
           this.deviceId,
@@ -102,6 +118,16 @@ export default {
             connection: this.selectedConnection.uuid,
           }
         )
+
+        // Stop and restart the device store to force a refresh
+        this.d.stop()
+        this.d.start()
+        await storeReady(this.d)
+
+        // Update the Edge Agent configuration
+        await updateEdgeAgentConfig({
+          deviceId: this.deviceId
+        })
 
         toast.success('Connection updated successfully')
         this.$emit('update:show', false)
@@ -114,6 +140,7 @@ export default {
 
   mounted() {
     this.conn.start()
+    this.d.start()
   },
 }
 </script>

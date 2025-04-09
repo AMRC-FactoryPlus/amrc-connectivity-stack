@@ -44,7 +44,7 @@
           </SidebarGroupContent>
         </SidebarGroup>
           <!-- Save button fixed at the bottom -->
-          <Button variant="destructive" :disabled="loading" v-if="isDirty" @click="save()" class="mt-2 shrink-0 m-3">
+          <Button variant="destructive" :disabled="loading" @click="save()" class="mt-2 shrink-0 m-3">
           <div v-if="!loading" class="flex items-center justify-center gap-1">
             <span>Save Changes</span>
             <i class="fa-sharp fa-solid fa-save ml-2"></i>
@@ -114,8 +114,10 @@ import { Button } from '@/components/ui/button'
 import { toast } from 'vue-sonner'
 import { UUIDs } from '@amrc-factoryplus/service-client'
 import { useServiceClientStore } from '@store/serviceClientStore.js'
+import { useConnectionStore } from '@store/useConnectionStore.js'
 import _ from 'lodash'
 import NewObjectOverlayForm from './NewObjectOverlayForm.vue'
+import { updateEdgeAgentConfig } from '@/utils/edgeAgentConfigUpdater'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarInset, SidebarMenu, SidebarMenuBadge, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarRail, SidebarTrigger } from '@/components/ui/sidebar'
@@ -133,6 +135,7 @@ export default {
     return {
       sch: useSchemaStore(),
       s: useServiceClientStore(),
+      conn: useConnectionStore(),
     }
   },
 
@@ -190,6 +193,9 @@ export default {
     if (savedShowOnlyPopulated !== null) {
       this.showOnlyPopulated = savedShowOnlyPopulated === 'true';
     }
+
+    // Start the connection store
+    this.conn.start()
   },
 
   computed: {
@@ -864,21 +870,28 @@ export default {
 
       this.prepareModelForSaving()
 
-      console.log(this.model)
+      // > BEFORE CLOSE - Validate the model against the schema - check
+      // branched manager code
 
       // Patch the Device Information application
       try {
         await this.s.client.ConfigDB.patch_config(UUIDs.App.DeviceInformation, this.device.uuid, "merge", { originMap: this.model })
+
+        await updateEdgeAgentConfig({
+          deviceId: this.device.uuid
+        })
 
         this.loading = false
         this.isDirty = false
         toast.success('Origin Map updated successfully')
       }
       catch (err) {
+        this.loading = false
         toast.error('Unable to update Origin Map')
         console.error(err)
       }
     },
+
   },
 
   data () {

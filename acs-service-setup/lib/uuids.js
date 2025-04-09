@@ -391,6 +391,7 @@ export const UNS = {
     Group: {
         Sparkplug:  "e414d355-b991-429b-8f5d-97e823ff71f5",
         Historian:  "03f5f08a-f61e-4134-8f66-b2951e3bbb69",
+        Kafka: "98b4c9cf-d283-4fe1-a33c-8bdf48fe54bc",
 
         Ingester:   "e03152b8-cdab-11ef-8ee9-77393064507e",
         Reader:     "d6a4d87c-cd02-11ef-9a87-2f86ebe5ee08",

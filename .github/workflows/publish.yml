@@ -168,6 +168,7 @@ jobs:
           - edge-helm-charts
           - historian-sparkplug
           - historian-uns
+          - historian-uns-kafka
           - uns-ingester-sparkplug
     permissions:
       contents: read

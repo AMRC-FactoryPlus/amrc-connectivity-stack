@@ -1,0 +1,55 @@
+{{ if and .Values.minio.enabled .Values.spark.enabled .Values.kafka.enabled }}
+{{- if not (lookup "v1" "SparkApplication" .Release.Namespace "kafka-ingester") }}
+
+apiVersion: sparkoperator.k8s.io/v1beta2
+kind: SparkApplication
+metadata:
+  name: kafka-ingester
+  namespace: {{ .Release.Namespace }}
+spec:
+  type: Python
+  pythonVersion: "3"
+  mode: cluster
+  image: ghcr.io/factory-plus/kafka-ingester:v4.0.0-dev1
+  imagePullPolicy: IfNotPresent
+  mainApplicationFile: local:///app/mqtt-ingester.py
+  sparkVersion: 3.5.3
+  restartPolicy:
+    type: Always
+  driver:
+    cores: 1
+    memory: 1024m
+    labels:
+      version: 3.5.3
+    serviceAccount: spark-operator
+    env:
+      - name: AWS_ACCESS_KEY_ID
+        valueFrom:
+          secretKeyRef:
+            name: manager-minio-secret
+            key: CONSOLE_ACCESS_KEY
+      - name: AWS_SECRET_ACCESS_KEY
+        valueFrom:
+          secretKeyRef:
+            name: manager-minio-secret
+            key: CONSOLE_SECRET_KEY
+  executor:
+    cores: 1
+    instances: 1
+    memory: 1024m
+    labels:
+      version: 3.5.3
+    env:
+      - name: AWS_ACCESS_KEY_ID
+        valueFrom:
+          secretKeyRef:
+            name: manager-minio-secret
+            key: CONSOLE_ACCESS_KEY
+      - name: AWS_SECRET_ACCESS_KEY
+        valueFrom:
+          secretKeyRef:
+            name: manager-minio-secret
+            key: CONSOLE_SECRET_KEY
+
+{{- end }}
+{{- end -}}

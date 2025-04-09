@@ -215,4 +215,5 @@ clusters do not have access to the Internet.
 
 - [Edge Deployments](edge-deployments.md) - Learn about deploying to edge clusters
 - [Edge Bootstrap](edge-bootstrap.md) - Learn about the bootstrap process for edge clusters
+- [Edge Scout](./edge-scout.md) - Learn about the edge scout mode
 - [Architecture Overview](../overview.md) - Return to the architecture overview

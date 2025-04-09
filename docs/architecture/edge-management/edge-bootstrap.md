@@ -242,5 +242,6 @@ in the form of JSON objects. String values at any level of the form
 ## Next Steps
 
 - [Edge Deployments](edge-deployments.md) - Learn about deploying to edge clusters
+- [Edge Scout](./edge-scout.md) - Learn about the edge scout mode
 - [Edge Management Overview](overview.md) - Return to the edge management overview
 - [Architecture Overview](../overview.md) - Return to the architecture overview

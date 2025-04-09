@@ -8,6 +8,8 @@ import {
     Metrics,
     parseTimeStampFromPayload,
     parseValueFromPayload,
+    processArrayPayload,
+    isArrayPayload,
     serialisationType,
     sparkplugDataType,
     sparkplugMetric,
@@ -350,40 +352,83 @@ export class Device {
                     // value
                     if (!parseVals || (parseVals && ((typeof metric.properties.path !== "undefined" && metric.properties.path.value) || Object.keys(
                         obj).length == 1))) {
-                        // Get new value either directly or by parsing
-                        let newVal = parseVals ? parseValueFromPayload(obj[addr],
-                            metric,
-                            this._payloadFormat,
-                            this._delimiter
-                        ) : obj[addr];
-
-                        // Test if the value is a bigint and convert it to a Long. This is a hack to ensure that the
-                        // Tahu library works - it only accepts Longs, not bigints.
-                        if (typeof newVal === "bigint") {
-                            newVal = Long.fromString(newVal.toString());
+                        // Check if this is a JSON array payload
+                        let payload: any;
+                        try {
+                            if (typeof obj[addr] === "string") {
+                                payload = JSON.parse(obj[addr]);
+                            } else if (Buffer.isBuffer(obj[addr])) {
+                                payload = JSON.parse(obj[addr].toString());
+                            } else {
+                                payload = obj[addr];
+                            }
+                        } catch (e) {
+                            // Not a valid JSON, continue with normal processing
+                            payload = obj[addr];
                         }
 
-                        // If it has a sensible value...
-                        // + Use the deadband here
+                        // Check if this is an array payload
+                        if (parseVals && this._payloadFormat === serialisationType.JSON && isArrayPayload(payload)) {
+                            // Process each item in the array
+                            const arrayResults = processArrayPayload(payload, metric);
 
-                        if (
-                            (newVal || newVal == 0)
-                            && (metric.value !== newVal)
-                        ) {
-                            // If timestamp is provided in data package
-                            const timestamp = parseTimeStampFromPayload(obj[addr],
+                            // Create a metric for each item in the array
+                            arrayResults.forEach(result => {
+                                const { value, timestamp } = result;
+
+                                // Test if the value is a bigint and convert it to a Long
+                                let processedValue = value;
+                                if (typeof processedValue === "bigint") {
+                                    processedValue = Long.fromString(processedValue.toString());
+                                }
+
+                                // If it has a sensible value and is different from the current value
+                                if ((processedValue || processedValue === 0) && (metric.value !== processedValue)) {
+                                    // Create a copy of the metric with the new value and timestamp
+                                    const updatedMetric = {
+                                        ...this._metrics.setValueByAddrPath(addr, path, processedValue, timestamp || Date.now())
+                                    };
+
+                                    // Add to the list of changed metrics
+                                    changedMetrics.push(updatedMetric);
+                                }
+                            });
+                        } else {
+                            // Standard processing for non-array payloads
+                            let newVal = parseVals ? parseValueFromPayload(obj[addr],
                                 metric,
                                 this._payloadFormat,
                                 this._delimiter
-                            );
+                            ) : obj[addr];
 
-                            // Update the metric value and push it to the array of changed metrics
+                            // Test if the value is a bigint and convert it to a Long. This is a hack to ensure that the
+                            // Tahu library works - it only accepts Longs, not bigints.
+                            if (typeof newVal === "bigint") {
+                                newVal = Long.fromString(newVal.toString());
+                            }
+
+                            // If it has a sensible value...
+                            // + Use the deadband here
+
+                            if (
+                                (newVal || newVal == 0)
+                                && (metric.value !== newVal)
+                            ) {
+                                // If timestamp is provided in data package
+                                const timestamp = parseTimeStampFromPayload(obj[addr],
+                                    metric,
+                                    this._payloadFormat,
+                                    this._delimiter
+                                );
+
+                                // Update the metric value and push it to the array of changed metrics
                             changedMetrics.push({
                                 ...(this._metrics.setValueByAddrPath(addr,
-                                    path,
-                                    newVal,
+                                        path,
+                                        newVal,
                                     timestamp))
                             });
+                            }
                         }
                     }
                 }

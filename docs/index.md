@@ -11,9 +11,6 @@
      - [Edge Bootstrap](./architecture/edge-management/edge-bootstrap.md)
      - [Edge Deployments](./architecture/edge-management/edge-deployments.md)
      - [Edge Scout](./architecture/edge-management/edge-scout.md)
-- Auth
-  - [Dynamic Groups](./auth/dyn-groups.md)
-  - [S-Expressions](./auth/sexpr.md)
 - ConfigDB
   - [Object Model](./configDB/object-model.md)
 - Development

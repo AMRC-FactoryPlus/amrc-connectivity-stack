@@ -463,6 +463,7 @@ configs:
       image:
         registry: ghcr.io/amrc-factoryplus
         repository: edge-bacnet
+        reference: bacnet
       schema:
         properties:
           host:
@@ -488,6 +489,7 @@ configs:
       image:
         registry: ghcr.io/amrc-factoryplus
         repository: edge-modbus
+        reference: modbus
       schema:
         properties:
           host:
@@ -515,10 +517,13 @@ configs:
           icon: "wave-square"
           placeholder: "e.g. sin:3000:50:bd"
         path:
-          hidden: true
+          title: "Path"
+          description: "Set this to 0"
+          placeholder: "e.g. 0 (must be set to 0)"
       image:
         registry: ghcr.io/amrc-factoryplus
         repository: edge-test
+        reference: test
       schema:
         properties: null
         title: Test Connection Details
@@ -536,6 +541,7 @@ configs:
       image:
         registry: ghcr.io/amrc-factoryplus
         repository: edge-tplink-smartplug
+        reference: tplink-smartplug
       schema:
         properties:
           host:

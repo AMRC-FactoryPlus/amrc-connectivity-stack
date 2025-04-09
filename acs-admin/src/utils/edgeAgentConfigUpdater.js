@@ -104,6 +104,76 @@ function processOriginMapObject(obj, path, tags) {
 }
 
 /**
+ * Updates the Edge Agent Deployment configuration for a node to include external drivers
+ *
+ * @param {Object} serviceClient - The Factory+ service client
+ * @param {string} nodeUuid - UUID of the node
+ * @param {Array} connections - Array of connection objects from the connection store
+ * @param {Array} deviceConnections - Array of device connection configurations from the Edge Agent config
+ * @returns {Promise<void>}
+ */
+async function updateEdgeAgentDeployment(serviceClient, nodeUuid, connections, deviceConnections) {
+  try {
+    // Get the current Edge Agent Deployment configuration
+    const [deployment, etag] = await serviceClient.ConfigDB.get_config_with_etag(UUIDs.App.EdgeAgentDeployment, nodeUuid) || [{}, null]
+
+    if (!deployment) {
+      console.error('Edge Agent Deployment configuration not found for node:', nodeUuid)
+      return
+    }
+
+    // Initialize the values.drivers object if it doesn't exist
+    if (!deployment.values) {
+      deployment.values = {}
+    }
+    if (!deployment.values.drivers) {
+      deployment.values.drivers = {}
+    }
+
+    // Create a map of connection names to driver image references
+    const driverMap = {}
+
+    // Process each device connection to find external drivers
+    for (const deviceConn of deviceConnections) {
+      // Find the corresponding connection in the connection store
+      const connection = connections.find(conn => {
+        const connConfig = conn.configuration
+        if (!connConfig) return false
+
+        const connType = connConfig.driver?.internal?.connType || 'Driver'
+        const connDetailsKey = connConfig.driver?.internal?.details || 'DriverDetails'
+        const connDetails = connConfig.config
+
+        // Check if this connection matches the device connection
+        const connMatches = deviceConn.connType === connType
+        const detailsMatch = connDetails ?
+          JSON.stringify(deviceConn[connDetailsKey] || deviceConn.DriverDetails) === JSON.stringify(connDetails) :
+          true
+
+        return connMatches && detailsMatch
+      })
+
+      // If we found a matching connection and it's an external driver, add it to the map
+      if (connection &&
+          connection.configuration?.driver?.image?.reference) {
+        driverMap[deviceConn.name] = {
+          image: connection.configuration.driver.image.reference
+        }
+      }
+    }
+
+    // Update the deployment configuration with the driver map
+    deployment.values.drivers = driverMap
+
+    // Update the Edge Agent Deployment configuration in the ConfigDB
+    await serviceClient.ConfigDB.put_config(UUIDs.App.EdgeAgentDeployment, nodeUuid, deployment)
+  } catch (error) {
+    console.error('Error updating Edge Agent Deployment configuration:', error)
+    // Don't fail the whole operation if this part fails
+  }
+}
+
+/**
  * Updates the Edge Agent configuration for a device when its connection changes
  * or when its origin map is updated.
  *
@@ -250,7 +320,8 @@ export async function updateEdgeAgentConfig({
 
       for (const device of devicesForThisConnection) {
         // Find if this device already exists in the connection
-        const deviceIdValue = device.device_id
+        const deviceIdValue = device.name
+
         let deviceIndex = -1
 
         if (connectionConfig.devices) {
@@ -332,6 +403,9 @@ export async function updateEdgeAgentConfig({
 
     // Update the edge agent config in the ConfigDB
     await serviceClient.ConfigDB.put_config(UUIDs.App.EdgeAgentConfig, nodeUuid, config)
+
+    // Update the Edge Agent Deployment configuration for external drivers
+    await updateEdgeAgentDeployment(serviceClient, nodeUuid, connections, config.deviceConnections)
   } catch (configErr) {
     console.error('Error updating edge agent config:', configErr)
     // Don't fail the whole operation if this part fails

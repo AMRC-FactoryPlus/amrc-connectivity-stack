@@ -148,4 +148,4 @@ only looks up ACLs when a client first connects, and changes occurring
 while a connection is open will not be honoured.
 
 [Analysis of some of the issues with the current Auth
-service](auth/auth.md)
+service](auth/overview)

@@ -354,6 +354,76 @@ export class Metrics {
     // }
 }
 
+/**
+ * Checks if a payload is an array of objects
+ * @param payload The payload to check
+ * @returns True if the payload is an array of objects, false otherwise
+ */
+export function isArrayPayload(payload: any): boolean {
+    return Array.isArray(payload) && payload.length > 0 && typeof payload[0] === 'object';
+}
+
+/**
+ * Processes an array payload and returns an array of values and timestamps
+ * @param payload The array payload to process
+ * @param metric The metric to use for processing
+ * @param payloadFormat The format of the payload
+ * @returns An array of objects with value and timestamp properties
+ */
+export function processArrayPayload(payload: any[], metric: sparkplugMetric): { value: any, timestamp?: number }[] {
+    const path = (typeof metric.properties !== "undefined" && typeof metric.properties.path !== "undefined" ? metric.properties.path.value as string : "");
+    const results: { value: any, timestamp?: number }[] = [];
+
+    // Process each object in the array
+    payload.forEach(item => {
+        let value;
+        let timestamp;
+
+        // Extract value based on path or direct property
+        if (path) {
+            /* Work around a bug in the JSONPath library */
+            let newVal = path === "$" && item === false
+                ? [false]
+                : JSONPath({
+                    path: path,
+                    json: item
+                });
+
+            if (item === 0 || !Array.isArray(newVal)) {
+                value = 0;
+            } else {
+                if (newVal[0]?.type === "Buffer") {
+                    newVal[0] = Buffer.from(newVal[0].data);
+                }
+                value = parseTypeFromString(metric.type, newVal[0]);
+            }
+        } else if (item.hasOwnProperty('value')) {
+            // If no path is provided but the object has a 'value' property, use that
+            value = parseTypeFromString(metric.type, item.value);
+        } else {
+            // If no path and no 'value' property, return the object itself
+            value = parseTypeFromString(metric.type, item);
+        }
+
+        // Extract timestamp if available
+        if (item.hasOwnProperty('timestamp')) {
+            timestamp = item.timestamp;
+            if (timestamp && !isTimestampInMilliseconds(timestamp)) {
+                timestamp = timestamp * 1000;
+            }
+        } else if (item.hasOwnProperty('time')) {
+            timestamp = item.time;
+            if (timestamp && !isTimestampInMilliseconds(timestamp)) {
+                timestamp = timestamp * 1000;
+            }
+        }
+
+        results.push({ value, timestamp });
+    });
+
+    return results;
+}
+
 export function parseValueFromPayload(msg: any, metric: sparkplugMetric, payloadFormat: serialisationType | string, delimiter?: string) {
     let payload: any;
     const path = (typeof metric.properties !== "undefined" && typeof metric.properties.path !== "undefined" ? metric.properties.path.value as string : "");
@@ -381,6 +451,9 @@ export function parseValueFromPayload(msg: any, metric: sparkplugMetric, payload
             } catch (e: any) {
                 log('Failed to parse JSON data')
             }
+
+            // Note: Array payloads are now handled in _handleData using processArrayPayload
+            // This function only processes non-array payloads or is called for a single item
 
             if (path) {
                 /* Work around a bug in the JSONPath library */
@@ -415,6 +488,9 @@ export function parseValueFromPayload(msg: any, metric: sparkplugMetric, payload
 
                     newVal.rows = dataSet;
                     return newVal;
+                } else if (typeof payload === 'object' && payload.hasOwnProperty('value')) {
+                    // If no path is provided but the object has a 'value' property, use that
+                    return parseTypeFromString(metric.type, payload.value);
                 }
             }
             break;
@@ -472,6 +548,10 @@ export function parseTimeStampFromPayload(msg: any, metric: sparkplugMetric, pay
                 log('Failed to parse JSON data')
             }
 
+            // Note: Array payloads are now handled in _handleData using processArrayPayload
+            // This function only processes non-array payloads
+
+            // Extract timestamp from the payload
             const timestamp = JSONPath({
                 path: '$.timestamp',
                 json: payload
@@ -490,6 +570,27 @@ export function parseTimeStampFromPayload(msg: any, metric: sparkplugMetric, pay
                 }
 
                 return extractedTimestamp * 1000;
+            }
+
+            // If no timestamp found in the standard location, check if the payload itself has a timestamp or time property
+            if (typeof payload === 'object') {
+                if (payload.hasOwnProperty('timestamp')) {
+                    const directTimestamp = payload.timestamp;
+                    if (directTimestamp) {
+                        if (isTimestampInMilliseconds(directTimestamp)) {
+                            return directTimestamp;
+                        }
+                        return directTimestamp * 1000;
+                    }
+                } else if (payload.hasOwnProperty('time')) {
+                    const directTimestamp = payload.time;
+                    if (directTimestamp) {
+                        if (isTimestampInMilliseconds(directTimestamp)) {
+                            return directTimestamp;
+                        }
+                        return directTimestamp * 1000;
+                    }
+                }
             }
 
             return undefined;

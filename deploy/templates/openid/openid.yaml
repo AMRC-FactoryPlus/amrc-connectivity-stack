@@ -1,0 +1,111 @@
+{{ if .Values.openid.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openid
+  namespace: {{ .Release.Namespace }}
+  labels:
+    component: openid
+spec:
+  strategy:
+    type: Recreate
+  # We cannot allow more replicas with a RWO PVC backend
+  replicas: 1
+  selector:
+    matchLabels:
+      component: openid
+  template:
+    metadata:
+      labels:
+        component: openid
+        factory-plus.service: openid
+    spec:
+      {{- with .Values.acs.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: openid
+          image: "{{ .Values.openid.image.repository }}:{{ .Values.openid.image.tag }}"
+          imagePullPolicy: {{ .Values.openid.image.pullPolicy }}
+          args: ["start-dev"]
+          env:
+            - name: KEYCLOAK_ADMIN
+              value: "_bootstrap"
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-clients
+                  key: _bootstrap
+            - name: KC_PROXY
+              value: "edge"
+            - name: KC_HEALTH_ENABLED
+              value: "true"
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 9000
+          volumeMounts:
+            # XXX This would be better without the subPath, but we need
+            # to use a Java system property to move krb5.conf.
+            - name: krb5-conf
+              mountPath: /etc/krb5.conf
+              subPath: krb5.conf
+            - name: openid-keytabs
+              mountPath: /etc/keytabs
+            - name: data
+              mountPath: /opt/keycloak/data
+      volumes:
+        - name: krb5-conf
+          configMap:
+            name: krb5-conf
+        - name: openid-keytabs
+          secret:
+            secretName: openid-keytabs
+        - name: data
+          persistentVolumeClaim:
+            claimName: keycloak-data
+---
+# XXX Could we use Postgres here instead?
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: keycloak-data
+  namespace: {{ .Release.Namespace }}
+  labels:
+    component: openid
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: openid
+  namespace: {{ .Release.Namespace }}
+spec:
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+  selector:
+    factory-plus.service: openid
+---
+apiVersion: factoryplus.app.amrc.co.uk/v1
+kind: KerberosKey
+metadata:
+  name: http.openid
+  namespace: {{ .Release.Namespace }}
+spec:
+  type: Random
+  principal: HTTP/openid.{{ .Release.Namespace }}.svc.cluster.local@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+  additionalPrincipals:
+    - HTTP/openid.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+  secret: openid-keytabs/server
+{{- end }}

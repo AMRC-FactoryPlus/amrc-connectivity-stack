@@ -57,6 +57,8 @@ spec:
             - name: VERBOSE
               value: {{.Values.mqtt.verbosity | quote | required "values.mqtt.verbosity is required!"}}
           volumeMounts:
+            # XXX This would be better without the subPath, but we need
+            # to use a Java system property to move krb5.conf.
             - mountPath: /etc/krb5.conf
               name: krb5-conf
               subPath: krb5.conf

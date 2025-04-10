@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: acs-grafana-config
+data:
+  auth_url: {{ .Values.acs.secure | ternary "https://" "http://" }}openid.{{.Values.acs.baseUrl}}/realms/factory_plus/protocol/openid-connect/auth
+  token_url: {{ .Values.acs.secure | ternary "https://" "http://" }}openid.{{.Values.acs.baseUrl}}/realms/factory_plus/protocol/openid-connect/token
+  api_url: {{ .Values.acs.secure | ternary "https://" "http://" }}openid.{{.Values.acs.baseUrl}}/realms/factory_plus/protocol/openid-connect/userinfo
+  root_url: {{ .Values.acs.secure | ternary "https://" "http://" }}grafana.{{.Values.acs.baseUrl}}
+  signout_redirect_url: {{ .Values.acs.secure | ternary "https://" "http://" }}openid.{{.Values.acs.baseUrl}}/realms/factory_plus/protocol/openid-connect/logout?post_logout_redirect_uri={{ .Values.acs.secure | ternary "https://" "http://" }}grafana.{{.Values.acs.baseUrl}}&client_id=grafana

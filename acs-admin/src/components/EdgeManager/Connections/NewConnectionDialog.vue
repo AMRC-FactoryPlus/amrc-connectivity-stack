@@ -118,7 +118,7 @@
           <!-- Existing save button -->
           <Button
             :disabled="v$.$invalid || isSubmitting"
-            @click="createConnection"
+            @click="save"
           >
             <div class="flex items-center justify-center gap-2">
               <i :class="{
@@ -154,6 +154,7 @@ import { toast } from 'vue-sonner'
 import _ from 'lodash'
 import { useConnectionStore } from '@store/useConnectionStore.js'
 import { useDeviceStore } from '@store/useDeviceStore.js'
+import { updateEdgeAgentConfig } from '@utils/edgeAgentConfigUpdater.js'
 
 const PAYLOAD_FORMATS = [
   "Defined by Protocol",
@@ -506,7 +507,7 @@ export default {
       this.existingConnection = null
     },
 
-    async createConnection() {
+    async save() {
       if (this.isSubmitting) return
 
       const isFormCorrect = await this.v$.$validate()
@@ -520,10 +521,8 @@ export default {
                 ...configData
               } = _.cloneDeep(this.formData)
 
-
         if (this.existingConnection) {
-          // Log the payload format being saved
-          console.log('Updating connection with payload format:', payloadFormat)
+
           // Update existing connection - update both info and configuration
           await Promise.all([
             // Update the name in Info app
@@ -545,6 +544,12 @@ export default {
               },
             })
           ])
+
+          // Update the edge agent config
+          await updateEdgeAgentConfig({
+            connectionId: this.existingConnection.uuid
+          })
+
           toast.success('Success!', {
             description: 'The connection has been updated successfully.',
           })
@@ -579,6 +584,11 @@ export default {
           }
 
           await this.s.client.ConfigDB.put_config(UUIDs.App.ConnectionConfiguration, connectionUUID, payload)
+
+          // Update the edge agent config
+          await updateEdgeAgentConfig({
+            connectionId: connectionUUID
+          })
 
           toast.success('Success!', {
             description: 'The connection has been created successfully.',

@@ -6,6 +6,7 @@ import { UUIDs } from '@amrc-factoryplus/service-client'
 import { useDeviceStore } from '@/store/useDeviceStore'
 import { useConnectionStore } from '@/store/useConnectionStore'
 import { useServiceClientStore } from '@/store/serviceClientStore.js'
+import { useDriverStore } from '@/store/useDriverStore.js'
 
 /**
  * Creates an array of tags from the origin map for the edge agent config
@@ -106,13 +107,16 @@ function processOriginMapObject(obj, path, tags) {
 /**
  * Updates the Edge Agent Deployment configuration for a node to include external drivers
  *
- * @param {Object} serviceClient - The Factory+ service client
  * @param {string} nodeUuid - UUID of the node
  * @param {Array} connections - Array of connection objects from the connection store
  * @param {Array} deviceConnections - Array of device connection configurations from the Edge Agent config
  * @returns {Promise<void>}
  */
-async function updateEdgeAgentDeployment(serviceClient, nodeUuid, connections, deviceConnections) {
+async function updateEdgeAgentDeployment(nodeUuid, connections, deviceConnections) {
+  // Get the stores
+  const driverStore = useDriverStore()
+  const serviceClientStore = useServiceClientStore()
+  const serviceClient = serviceClientStore.client
   try {
     // Get the current Edge Agent Deployment configuration
     const [deployment, etag] = await serviceClient.ConfigDB.get_config_with_etag(UUIDs.App.EdgeAgentDeployment, nodeUuid) || [{}, null]
@@ -133,12 +137,23 @@ async function updateEdgeAgentDeployment(serviceClient, nodeUuid, connections, d
     // Create a map of connection names to driver image references
     const driverMap = {}
 
+    console.log('Updating edge agent deployment for node:', nodeUuid)
+    console.log('Connections:', connections)
+    console.log('Device connections:', deviceConnections)
+
     // Process each device connection to find external drivers
     for (const deviceConn of deviceConnections) {
       // Find the corresponding connection in the connection store
+      console.log('Looking for connection matching device connection:', deviceConn.name, 'with connType:', deviceConn.connType)
+
       const connection = connections.find(conn => {
         const connConfig = conn.configuration
-        if (!connConfig) return false
+        if (!connConfig) {
+          console.log('Connection has no configuration:', conn.name)
+          return false
+        }
+
+        console.log('Checking connection:', conn.name, 'with configuration:', connConfig)
 
         const connType = connConfig.driver?.internal?.connType || 'Driver'
         const connDetailsKey = connConfig.driver?.internal?.details || 'DriverDetails'
@@ -150,20 +165,88 @@ async function updateEdgeAgentDeployment(serviceClient, nodeUuid, connections, d
           JSON.stringify(deviceConn[connDetailsKey] || deviceConn.DriverDetails) === JSON.stringify(connDetails) :
           true
 
+        console.log('Connection match check for', conn.name, '- Type match:', connMatches, 'Details match:', detailsMatch)
+        console.log('Connection driver info:', connConfig.driver)
+
         return connMatches && detailsMatch
       })
 
-      // If we found a matching connection and it's an external driver, add it to the map
-      if (connection &&
-          connection.configuration?.driver?.image?.reference) {
-        driverMap[deviceConn.name] = {
-          image: connection.configuration.driver.image.reference
+      // If we found a matching connection, check for driver image reference
+      if (connection) {
+        console.log('Found matching connection:', connection.name)
+
+        // Check for driver image reference in different possible locations
+        let imageReference = null;
+
+        // Check if driver is a UUID that points to a driver definition
+        if (connection.configuration?.driver_uuid) {
+          const driverUuid = connection.configuration.driver_uuid;
+          console.log('Found driver UUID:', driverUuid);
+
+          // Look up the driver definition in the driver store
+          const driverDef = driverStore.data.find(d => d.uuid === driverUuid);
+
+          if (driverDef && driverDef.definition?.image?.reference) {
+            imageReference = driverDef.definition.image.reference;
+            console.log('Found driver image reference from driver store:', imageReference);
+          } else {
+            console.log('Driver definition not found in driver store or missing image reference');
+            console.log('Driver definition:', driverDef);
+          }
         }
+        // Check direct image reference as fallback
+        else if (connection.configuration?.driver?.image?.reference) {
+          imageReference = connection.configuration.driver.image.reference;
+          console.log('Found driver image reference directly from connection:', imageReference);
+        }
+
+        if (imageReference) {
+          console.log('Adding driver image to map:', imageReference);
+          driverMap[deviceConn.name] = {
+            image: imageReference
+          };
+        } else {
+          console.log('Connection does not have a valid driver image reference:', connection.name);
+          console.log('Driver configuration:', JSON.stringify(connection.configuration?.driver, null, 2));
+          console.log('Driver UUID:', connection.configuration?.driver_uuid);
+
+          // As a fallback, check if we have a driver object with any reference we can use
+          if (connection.configuration?.driver) {
+            console.log('Attempting to find any usable reference in driver object');
+            const driver = connection.configuration.driver;
+
+            // Try to find any reference property that might contain the image reference
+            if (driver.reference) {
+              console.log('Found driver.reference:', driver.reference);
+              driverMap[deviceConn.name] = {
+                image: driver.reference
+              };
+            } else if (driver.image) {
+              if (typeof driver.image === 'string') {
+                console.log('Found driver.image as string:', driver.image);
+                driverMap[deviceConn.name] = {
+                  image: driver.image
+                };
+              } else if (driver.image.reference) {
+                console.log('Found driver.image.reference:', driver.image.reference);
+                driverMap[deviceConn.name] = {
+                  image: driver.image.reference
+                };
+              }
+            }
+          }
+        }
+      } else {
+        console.log('No matching connection found for device connection:', deviceConn.name);
       }
     }
 
     // Update the deployment configuration with the driver map
+    console.log('Final driver map:', driverMap)
     deployment.values.drivers = driverMap
+
+    // Log the final deployment configuration
+    console.log('Final deployment configuration:', JSON.stringify(deployment, null, 2))
 
     // Update the Edge Agent Deployment configuration in the ConfigDB
     await serviceClient.ConfigDB.put_config(UUIDs.App.EdgeAgentDeployment, nodeUuid, deployment)
@@ -456,9 +539,8 @@ export async function updateEdgeAgentConfig({
     await serviceClient.ConfigDB.put_config(UUIDs.App.EdgeAgentConfig, nodeUuid, config)
 
     // Update the Edge Agent Deployment configuration for external drivers
-    await updateEdgeAgentDeployment(serviceClient, nodeUuid, connections, config.deviceConnections)
+    await updateEdgeAgentDeployment(nodeUuid, connections, config.deviceConnections)
   } catch (configErr) {
     console.error('Error updating edge agent config:', configErr)
-    // Don't fail the whole operation if this part fails
   }
 }

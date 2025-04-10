@@ -1,11 +1,9 @@
 <!--
-  -  Factory+ / AMRC Connectivity Stack (ACS) Manager component
-  -  Copyright 2023 AMRC
+  - Copyright (c) University of Sheffield AMRC 2025.
   -->
 
 <template>
   <div class="flex flex-col px-2 border-l-2 border-gray-100 hover:border-gray-200">
-
     <!--For every key that isn't a reserved word-->
     <div class="px-1"
          v-for="(key) in Object.keys(schema.properties).filter(e => !['patternProperties', '$meta', 'Schema_UUID', 'Instance_UUID', 'required'].includes(e))">

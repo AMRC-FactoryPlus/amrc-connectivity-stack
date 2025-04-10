@@ -76,15 +76,19 @@ const table = useVueTable({
 </script>
 
 <template>
-  <div class="space-y-4">
+  <div class="space-y-2">
     <DataTableToolbar v-if="!l.fullscreen" :filters="filters" :table="table">
       <template #left>
         <slot name="toolbar-left" :table="table"></slot>
       </template>
+      <template #right>
+        <slot name="toolbar-right" :table="table"></slot>
+      </template>
     </DataTableToolbar>
     <slot name="below-toolbar"></slot>
     <div class="rounded-md border">
-      <Table>
+      <slot v-if="table.getRowModel().rows?.length === 0 && $slots.empty" name="empty"></slot>
+      <Table v-else>
         <TableHeader>
           <TableRow v-for="headerGroup in table.getHeaderGroups()" :key="headerGroup.id">
             <TableHead v-for="header in headerGroup.headers" :key="header.id">

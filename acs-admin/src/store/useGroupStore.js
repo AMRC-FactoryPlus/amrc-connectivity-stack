@@ -58,7 +58,7 @@ export const useGroupStore = defineStore('group', {
       );
 
       this.rxsub = details.subscribe(grps => {
-        console.log("GROUPS UPDATE: %o", grps);
+        console.debug("GROUPS UPDATE: %o", grps);
         this.data = grps;
         this.loading = false;
       });

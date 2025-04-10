@@ -42,6 +42,7 @@ subdirs+= acs-configdb
 subdirs+= acs-directory
 subdirs+= acs-edge
 subdirs+= acs-edge-sync
+subdirs+= acs-files
 subdirs+= acs-git
 subdirs+= acs-identity
 subdirs+= acs-krb-keys-operator

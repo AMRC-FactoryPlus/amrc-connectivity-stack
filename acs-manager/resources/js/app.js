@@ -1,6 +1,5 @@
 /*
- *  Factory+ / AMRC Connectivity Stack (ACS) Manager component
- *  Copyright 2023 AMRC
+ * Copyright (c) University of Sheffield AMRC 2025.
  */
 
 /**
@@ -15,6 +14,7 @@ import '../css/app.css';
 import Vue from 'vue';
 import VTooltip from 'v-tooltip';
 import moment from 'moment';
+import $RefParser from '@apidevtools/json-schema-ref-parser'
 
 import Toast from 'vue-toastification';
 import 'vue-toastification/dist/index.css';
@@ -438,6 +438,38 @@ Vue.mixin({
   },
 });
 
+function buildRefParser () {
+  const parser = {
+    order: 1,
+    canParse: true,
+    parse: file => file.data,
+  };
+  const fetchSchema = uuid => axios.get(`/api/device-schemas/${uuid}`)
+    .then(res => res.data.data);
+  const resolver = {
+    order: 1,
+    /* We accept an extraneous / here because some part of the awful
+     * URL-munging done by schema-ref-parser introduces it. */
+    canRead: /^urn:uuid\/?:[-0-9a-f]{36}$/,
+    read (file) {
+      const uuid = file.url.replace(/^urn:uuid\/?:/, "");
+      return fetchSchema(uuid);
+    },
+  };
+
+  const rp = new $RefParser();
+  const dereference = uuid => rp.dereference(`urn:uuid:${uuid}`, {
+    parse:    { all: parser },
+    resolve:  {
+      uuid: resolver,
+      file: false,
+      http: false,
+    },
+  });
+
+  return { fetchSchema, dereference };
+}
+
 const app = new Vue({
   el: '#app',
   validations: {},
@@ -461,4 +493,10 @@ const app = new Vue({
     baseTitle: null,
     user: JSON.parse(document.querySelector('meta[name=\'user\']').getAttribute('content')),
   },
+
+  provide () {
+    return {
+      refParser: buildRefParser(),
+    };
+  }
 });

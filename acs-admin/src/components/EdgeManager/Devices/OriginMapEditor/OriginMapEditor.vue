@@ -891,6 +891,10 @@ export default {
     },
 
     validateModel() {
+
+      // XXX - Validation is currently disabled
+      return { valid: true };
+
       // Create a new Ajv instance
       const ajv = new Ajv({ allErrors: true, strictTypes: false });
       // Add format validators

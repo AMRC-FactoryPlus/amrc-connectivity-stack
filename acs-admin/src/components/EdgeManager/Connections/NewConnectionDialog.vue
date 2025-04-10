@@ -418,8 +418,6 @@ export default {
       // First reset the validation state
       this.v$.$reset()
 
-      console.log("Resetting form with defaults")
-
       // Initialize with default payload format
       this.formData = {
         payloadFormat: "Defined by Protocol"
@@ -546,9 +544,11 @@ export default {
           ])
 
           // Update the edge agent config
+          console.log('Updating edge agent config for connection:', this.existingConnection.uuid)
           await updateEdgeAgentConfig({
             connectionId: this.existingConnection.uuid
           })
+          console.log('Edge agent config update completed')
 
           toast.success('Success!', {
             description: 'The connection has been updated successfully.',
@@ -586,9 +586,11 @@ export default {
           await this.s.client.ConfigDB.put_config(UUIDs.App.ConnectionConfiguration, connectionUUID, payload)
 
           // Update the edge agent config
+          console.log('Updating edge agent config for new connection:', connectionUUID)
           await updateEdgeAgentConfig({
             connectionId: connectionUUID
           })
+          console.log('Edge agent config update completed for new connection')
 
           toast.success('Success!', {
             description: 'The connection has been created successfully.',

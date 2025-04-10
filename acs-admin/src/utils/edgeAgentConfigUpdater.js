@@ -204,16 +204,34 @@ export async function updateEdgeAgentConfig({
     let connections = []
 
     if (connectionId) {
-      // Get the connection
-      const connection = connectionStore.data.find(c => c.uuid === connectionId)
-      if (!connection) {
-        console.error('Connection not found:', connectionId)
+      // Get the connection directly from ConfigDB to ensure we have the latest data
+      try {
+        // Get the connection info
+        const connectionInfo = await serviceClient.ConfigDB.get_config(UUIDs.App.Info, connectionId) || {}
+        // Get the connection configuration
+        const connectionConfig = await serviceClient.ConfigDB.get_config(UUIDs.App.ConnectionConfiguration, connectionId) || {}
+
+        if (!connectionInfo || !connectionConfig) {
+          console.error('Connection not found in ConfigDB:', connectionId)
+          return
+        }
+
+        // Create a complete connection object with the latest data
+        const connection = {
+          uuid: connectionId,
+          name: connectionInfo.name,
+          configuration: connectionConfig
+        }
+
+        console.log('Fetched latest connection data from ConfigDB:', connection)
+        connections.push(connection)
+
+        // Find all devices using this connection
+        devices = deviceStore.data.filter(d => d.deviceInformation?.connection === connectionId)
+      } catch (error) {
+        console.error('Error fetching connection from ConfigDB:', error)
         return
       }
-      connections.push(connection)
-
-      // Find all devices using this connection
-      devices = deviceStore.data.filter(d => d.deviceInformation?.connection === connectionId)
     } else {
       // Get the device
       const device = deviceStore.data.find(d => d.uuid === deviceId)
@@ -226,9 +244,26 @@ export async function updateEdgeAgentConfig({
 
       // Get the connection for this device
       if (device.deviceInformation?.connection) {
-        const connection = connectionStore.data.find(c => c.uuid === device.deviceInformation.connection)
-        if (connection) {
-          connections.push(connection)
+        try {
+          // Get the connection info
+          const connectionId = device.deviceInformation.connection
+          const connectionInfo = await serviceClient.ConfigDB.get_config(UUIDs.App.Info, connectionId) || {}
+          // Get the connection configuration
+          const connectionConfig = await serviceClient.ConfigDB.get_config(UUIDs.App.ConnectionConfiguration, connectionId) || {}
+
+          if (connectionInfo && connectionConfig) {
+            // Create a complete connection object with the latest data
+            const connection = {
+              uuid: connectionId,
+              name: connectionInfo.name,
+              configuration: connectionConfig
+            }
+
+            console.log('Fetched latest connection data from ConfigDB:', connection)
+            connections.push(connection)
+          }
+        } catch (error) {
+          console.error('Error fetching connection from ConfigDB:', error)
         }
       }
     }
@@ -266,6 +301,9 @@ export async function updateEdgeAgentConfig({
       const connectionConfiguration = connection?.configuration
       if (!connectionConfiguration) continue
 
+      console.log('Processing connection:', connection.name)
+      console.log('Connection configuration:', connectionConfiguration)
+
       // Find if this connection already exists in the config
       const connType = connectionConfiguration.driver?.internal?.connType || 'Driver'
       const connDetailsKey = connectionConfiguration.driver?.internal?.details || 'DriverDetails'
@@ -284,7 +322,18 @@ export async function updateEdgeAgentConfig({
         })
 
         if (connectionIndex >= 0) {
+          console.log('Found existing connection in edge agent config at index:', connectionIndex)
           connectionConfig = config.deviceConnections[connectionIndex]
+          // Update the pollInt for existing connections
+          if (connectionConfiguration.pollInt) {
+            console.log('Updating pollInt from', connectionConfig.pollInt, 'to', connectionConfiguration.pollInt)
+            connectionConfig.pollInt = connectionConfiguration.pollInt
+          }
+          // Update the payloadFormat for existing connections
+          if (connectionConfiguration.source?.payloadFormat) {
+            console.log('Updating payloadFormat from', connectionConfig.payloadFormat, 'to', connectionConfiguration.source.payloadFormat)
+            connectionConfig.payloadFormat = connectionConfiguration.source.payloadFormat
+          }
         }
       }
 
@@ -375,7 +424,6 @@ export async function updateEdgeAgentConfig({
           deviceType: deviceOriginMap?.Schema_UUID || device.deviceInformation.schema,
           templates: [],
           tags: tags,
-          pollInt: connectionConfiguration.pollInt || 1000,
           pubInterval: device.pub_interval || 0,
           payloadFormat: connectionConfiguration.source?.payloadFormat || 'Defined by Protocol'
         }
@@ -400,6 +448,9 @@ export async function updateEdgeAgentConfig({
         return conn.devices && conn.devices.length > 0
       })
     }
+
+    // Log the final config before saving
+    console.log('Final edge agent config to be saved:', JSON.stringify(config, null, 2))
 
     // Update the edge agent config in the ConfigDB
     await serviceClient.ConfigDB.put_config(UUIDs.App.EdgeAgentConfig, nodeUuid, config)

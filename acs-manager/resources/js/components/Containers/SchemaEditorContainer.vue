@@ -1,6 +1,5 @@
 <!--
-  -  Factory+ / AMRC Connectivity Stack (ACS) Manager component
-  -  Copyright 2023 AMRC
+  - Copyright (c) University of Sheffield AMRC 2025.
   -->
 
 <!-- TODO:-->
@@ -12,11 +11,9 @@
   <div class="flex bg-white m-3 overflow-auto flex-1 gap-1 h-100vh">
     <SchemaBrowserOverlay show-new :show="schemaBrowserVisible" @close="schemaBrowserVisible=false"
                           :device-schemas="deviceSchemas"
-                          :device-schema-versions="deviceSchemaVersions"
                           @schema-selected="selectSchema"></SchemaBrowserOverlay>
     <SchemaBrowserOverlay :show="subSchemaBrowserVisible" @close="subSchemaBrowserVisible=false"
                           :device-schemas="deviceSchemas"
-                          :device-schema-versions="deviceSchemaVersions"
                           @schema-selected="subSchemaSelected"></SchemaBrowserOverlay>
     <div v-if="schema" class="w-2/5 flex flex-col gap-3 p-2">
       <div class="flex items-center gap-2">
@@ -102,6 +99,9 @@ export default {
     this.initialiseContainerComponent()
 
     // Load the schema in the query string if it exists
+    // XXX bmz: This section of code will not now work. We need to
+    // decide whether we are offering schemas from Github or schemas
+    // from the ConfigDB.
     let urlParams = new URLSearchParams(window.location.search)
     if (urlParams.has('schema')) {
       let schema = urlParams.get('schema')

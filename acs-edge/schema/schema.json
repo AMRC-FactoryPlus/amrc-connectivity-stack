@@ -274,7 +274,6 @@
                             "useCredentials": {
                                 "title": "Use credentials",
                                 "type": "boolean",
-                                "minLength": 1
                             },
                             "username": {
                                 "title": "Username",

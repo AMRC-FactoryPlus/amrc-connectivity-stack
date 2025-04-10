@@ -3,7 +3,7 @@
   -->
 
 <template>
-  <Toaster rich-colors/>
+  <Toaster rich-colors class="pointer-events-auto"/>
   <SidebarProvider>
     <Sidebar v-if="!l.fullscreen && s.loaded" class="bg-white dark:bg-slate-800 z-20">
       <SidebarHeader class="border-b h-16">
@@ -24,6 +24,14 @@
 
       <SidebarContent>
         <Nav/>
+        <SidebarGroup>
+          <SidebarGroupLabel class="mb-2">Edge Clusters & Devices</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <EdgeClusterList/>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
         <div class="mt-auto p-4">
           <Card>
             <CardHeader class="p-2 pt-0 md:p-4">
@@ -56,11 +64,15 @@
         <div class="flex items-center justify-center">
           <SidebarTrigger/>
           <Button title="Toggle fullscreen" variant="ghost" size="icon" @click="l.toggleFullscreen"><i class="fa-solid fa-expand"></i></Button>
-          <Button class="ml-3" variant="link" size="icon" @click="logout">logout</Button>
+          <Button class="ml-3" variant="link" size="icon" @click="logout">Logout</Button>
         </div>
       </header>
 
-      <main class="flex flex-1 flex-col lg:gap-4 lg:p-4 overflow-auto">
+      <main class="flex flex-col max-h-[calc(100vh-4rem)] lg:gap-4 lg:pt-4 lg:px-4 flex-grow-0">
+        <NewClusterDialog/>
+        <NewNodeDialog/>
+        <NewDeviceDialog/>
+        <NewConnectionDialog/>
         <RouterView/>
       </main>
     </SidebarInset>
@@ -74,12 +86,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
-import Nav from '@/components/Nav.vue'
+import Nav from '@/components/Nav/Nav.vue'
+import EdgeClusterList from '@/components/Nav/EdgeClusterList.vue'
 import { useServiceClientStore } from '@/store/serviceClientStore.js'
 import { useLayoutStore } from '@/store/layoutStore.js'
 import { useMagicKeys } from '@vueuse/core'
 import { Toaster } from '@/components/ui/sonner'
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarInput, SidebarInset, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarRail, SidebarTrigger } from '@/components/ui/sidebar'
+import NewClusterDialog from '@components/EdgeManager/EdgeClusters/NewClusterDialog.vue'
+import NewNodeDialog from '@components/EdgeManager/Nodes/NewNodeDialog.vue'
+import NewConnectionDialog from '@components/EdgeManager/Connections/NewConnectionDialog.vue'
+import NewDeviceDialog from '@components/EdgeManager/Devices/NewDeviceDialog.vue'
 
 export default {
   name: 'App',
@@ -95,6 +112,9 @@ export default {
   },
 
   components: {
+    NewClusterDialog,
+    NewNodeDialog,
+    NewDeviceDialog,
     Sidebar,
     SidebarContent,
     SidebarGroup,
@@ -127,7 +147,9 @@ export default {
     SheetContent,
     SheetTrigger,
     Nav,
+    EdgeClusterList,
     Toaster,
+    NewConnectionDialog,
   },
 
   watch: {
@@ -159,6 +181,10 @@ export default {
         this.l.toggleFullscreen(this.$route.query.fullscreen === 'true')
       }
     })
+  },
+
+  data () {
+    return {}
   },
 }
 </script>

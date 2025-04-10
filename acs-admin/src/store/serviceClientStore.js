@@ -14,6 +14,7 @@ export const useServiceClientStore = defineStore('service-client', {
       scheme: null,
       baseUrl: null,
       urls: {},
+      ready: false
     }
   },
   actions: {
@@ -32,7 +33,9 @@ export const useServiceClientStore = defineStore('service-client', {
         this.loaded = true;
         this.scheme  = import.meta.env.SCHEME;
         this.baseUrl = import.meta.env.BASEURL;
-      }catch (e) {
+
+      this.ready = true
+      } catch (e) {
         this.$reset();
         localStorage.removeItem('clientLoaded')
         throw e;

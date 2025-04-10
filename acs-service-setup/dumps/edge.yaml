@@ -11,7 +11,7 @@ objects:
 
   !u ConfigDB.Class.R1Class:
     !u Edge.Class.Connection:
-      name: "Edge Agent SB connection"
+      name: "Edge Agent connection"
     # XXX I'm not certain a Driver shouldn't be a class of connections?
     !u Edge.Class.Driver:
       name: "Edge Agent driver"
@@ -42,11 +42,9 @@ objects:
   !u Edge.Class.Driver:
     !u ACS.Driver.REST:             { name: "REST" }
     !u ACS.Driver.MTConnect:        { name: "MTConnect" }
-    !u ACS.Driver.EtherNetIP:       { name: "EtherNet/IP" }
     !u ACS.Driver.S7:               { name: "S7" }
     !u ACS.Driver.OPCUA:            { name: "OPC-UA" }
     !u ACS.Driver.MQTT:             { name: "MQTT" }
-    !u ACS.Driver.Websocket:        { name: "Websocket" }
     !u ACS.Driver.UDP:              { name: "UDP" }
     !u ACS.Driver.Bacnet:           { name: "Bacnet" }
     !u ACS.Driver.Modbus:           { name: "Modbus" }
@@ -55,56 +53,527 @@ objects:
     !u ACS.Driver.External:         { name: "External driver" }
 
 configs:
+  # Driver Definition Configuration
+  # UI customization is done through the 'presentation' key with the following structure:
+  #
+  # presentation:
+  #   address:                    # Configuration for the address field
+  #     title: "Device Address"   # Title for the address field
+  #     description: "..."        # Help text for the address field
+  #     icon: "microchip"        # Font Awesome icon name (without the fa- prefix)
+  #     placeholder: "..."       # Placeholder text for the address input
+  #   path:                       # Configuration for the path field
+  #     title: "Metric Path"     # Title for the path field
+  #     description: "..."        # Help text for the path field
+  #     icon: "code"             # Font Awesome icon name (without the fa- prefix)
+  #     placeholder: "..."       # Placeholder text for the path input
+  #     hidden: false             # Set to true to hide the path field (defaults to false)
+  #
+  # Example for a new driver:
+  # !u ACS.Driver.NewDriver:
+  #   polled: true
+  #   presentation:
+  #     address:
+  #       title: "Device ID"
+  #       description: "The device identifier"
+  #       icon: "microchip"
+  #       placeholder: "e.g. device123"
+  #     path:
+  #       title: "Parameter"
+  #       description: "The parameter to access"
+  #       icon: "code"
+  #       placeholder: "e.g. temperature"
+  #       hidden: false
   !u Edge.App.DriverDef:
     !u ACS.Driver.REST:
+      polled: true
+      presentation:
+        address:
+          title: "REST Endpoint"
+          description: "The path following the domain in a REST call URL (e.g. /status)"
+          icon: "globe"
+          placeholder: "e.g. /api/status"
+        path:
+          title: "JSON Path"
+          description: "JSONPath notation to extract specific values from the JSON response (e.g. $.status.value)"
+          icon: "code"
+          placeholder: "e.g. $.data.value"
       internal:
         connType: REST
         details: RESTConnDetails
+      schema:
+        properties:
+          authMethod:
+            default: None
+            enum:
+              - None
+              - Basic
+            minLength: 1
+            title: Authentication Method
+            type: string
+          baseURL:
+            minLength: 1
+            title: Base URL
+            type: string
+          password:
+            format: password
+            minLength: 1
+            options:
+              dependencies:
+                authMethod: Basic
+            title: Password
+            type: string
+          username:
+            minLength: 1
+            options:
+              dependencies:
+                authMethod: Basic
+            title: Username
+            type: string
+        required:
+          - baseURL
+          - authMethod
+        title: REST Connection Details
+        type: object
     !u ACS.Driver.MTConnect:
+      polled: true
+      presentation:
+        address:
+          title: "MTConnect Endpoint"
+          description: "The path following the domain in a REST call URL (usually /current)"
+          icon: "industry"
+          placeholder: "e.g. /current"
+        path:
+          title: "XML Path"
+          description: "XPath notation to extract specific values from the XML response (e.g. //*[@componentId='x']//*[@dataItemId='xp']/text())"
+          icon: "code-branch"
+          placeholder: "e.g. //*[@dataItemId='temperature']/text()"
       internal:
         connType: MTConnect
         details: MTConnectConnDetails
-    !u ACS.Driver.EtherNetIP:
-      internal:
-        connType: EtherNet/IP
-        details: EtherNetIPConnDetails
+      schema:
+        properties:
+          baseURL:
+            minLength: 1
+            title: Base URL
+            type: string
+            options:
+              order: 1
+          authMethod:
+            default: None
+            enum:
+              - None
+              - Basic
+            minLength: 1
+            title: Authentication Method
+            type: string
+            options:
+              order: 2
+          username:
+            minLength: 1
+            title: Username
+            type: string
+            options:
+              order: 3
+              dependencies:
+                authMethod: Basic
+          password:
+            format: password
+            minLength: 1
+            title: Password
+            type: string
+            options:
+              order: 4
+              dependencies:
+                authMethod: Basic
+        required:
+          - baseURL
+          - authMethod
+        title: MTConnect Connection Details
+        type: object
     !u ACS.Driver.S7:
+      polled: true
+      presentation:
+        address:
+          title: "Memory Address"
+          description: "Database memory address given as %aa####.* where aa determines the variable type (e.g. %I=input bit, %Q=output bit, %IB=input byte, %QB=output byte, %IW=input word, %QW=output word, %ID=input double word, %QD=output double word)"
+          icon: "microchip"
+          placeholder: "e.g. %QD1026 or %Q1194.0"
+        path:
+          hidden: true
       internal:
         connType: S7
         details: s7ConnDetails
+      schema:
+        properties:
+          hostname:
+            minLength: 1
+            title: Hostname/IP Address
+            type: string
+            options:
+              order: 1
+          port:
+            default: 102
+            minLength: 1
+            title: Port
+            type: number
+            options:
+              order: 2
+          rack:
+            minLength: 1
+            title: Rack
+            type: number
+            options:
+              order: 3
+          slot:
+            minLength: 1
+            title: Slot
+            type: number
+            options:
+              order: 4
+          timeout:
+            default: 5000
+            minLength: 1
+            title: Timeout
+            type: number
+            options:
+              order: 5
+        required:
+          - hostname
+          - port
+          - rack
+          - slot
+          - timeout
+        title: S7 Connection Details
+        type: object
     !u ACS.Driver.OPCUA:
+      polled: true
+      presentation:
+        address:
+          title: "Node ID"
+          description: "The OPC UA Node ID in format ns=X;s=PATH or i=X (e.g. ns=2;s=/Channel/Spindle/actSpeed)"
+          icon: "sitemap"
+          placeholder: "e.g. ns=2;s=/Channel/Spindle/actSpeed"
+        path:
+          hidden: true
       internal:
         connType: OPC UA
         details: OPCUAConnDetails
+      schema:
+        properties:
+          endpoint:
+            minLength: 1
+            title: Endpoint
+            type: string
+            pattern: ^opc.tcp://.+:\d+/?$
+            options:
+              order: 1
+              inputAttributes:
+                placeholder: e.g. opc.tcp://myserver:1234
+              patternmessage: This doesn't look like a valid OPC UA address (opc.tcp://host:port).
+          securityMode:
+            default: None
+            enum:
+              - None
+              - Sign
+              - SignAndEncrypt
+            minLength: 1
+            title: Security Mode
+            type: string
+            options:
+              order: 2
+          securityPolicy:
+            default: None
+            enum:
+              - None
+              - Basic128
+              - Basic192
+              - Basic192Rsa15
+              - Basic256Rsa15
+              - Basic256Sha256
+              - Aes128_Sha256
+              - Aes128_Sha256_RsaOaep
+              - PubSub_Aes128_CTR
+              - PubSub_Aes256_CTR
+              - Basic128Rsa15
+              - Basic256
+            minLength: 1
+            title: Security Policy
+            type: string
+            options:
+              order: 3
+          useCredentials:
+            format: checkbox
+            title: Use credentials
+            type: boolean
+            options:
+              order: 4
+          username:
+            minLength: 1
+            title: Username
+            type: string
+            options:
+              order: 5
+              dependencies:
+                useCredentials: true
+          password:
+            format: password
+            minLength: 1
+            title: Password
+            type: string
+            options:
+              order: 6
+              dependencies:
+                useCredentials: true
+        required:
+          - endpoint
+          - securityPolicy
+          - securityMode
+          - useCredentials
+        title: OPC-UA Server Details
+        type: object
     !u ACS.Driver.MQTT:
+      polled: false
+      presentation:
+        address:
+          title: "Topic"
+          description: "The MQTT topic to subscribe to (e.g. device/+/data or factory/area1/#)"
+          icon: "exchange-alt"
+          placeholder: "e.g. /robot01/axis/1/position"
+        path:
+          title: "JSON Path"
+          description: "JSONPath notation to extract specific values from the message payload (e.g. $.data.temperature)"
+          icon: "code"
+          placeholder: "e.g. $.value"
       internal:
         connType: MQTT
         details: MQTTConnDetails
-    !u ACS.Driver.Websocket:
-      internal:
-        connType: Websocket
-        details: WebsocketConnDetails
+      schema:
+        properties:
+          host:
+            minLength: 1
+            title: Hostname/IP
+            type: string
+            options:
+              order: 1
+          port:
+            default: 1883
+            minLength: 1
+            title: Port
+            type: number
+            options:
+              order: 2
+          protocol:
+            default: mqtt
+            enum:
+              - mqtt
+              - mqtts
+              - tcp
+              - tls
+              - ws
+              - wss
+            minLength: 1
+            title: Protocol
+            type: string
+            options:
+              order: 3
+          clientId:
+            title: Client ID
+            type: string
+            options:
+              order: 4
+              inputAttributes:
+                placeholder: Leave blank for auto generation
+          username:
+            title: Username
+            type: string
+            options:
+              order: 5
+          password:
+            format: password
+            title: Password
+            type: string
+            options:
+              order: 6
+          cleanSession:
+            default: true
+            format: checkbox
+            title: Clean Session
+            type: boolean
+            options:
+              order: 7
+          keepAlive:
+            default: 60
+            title: Keep Alive Interval (sec)
+            type: number
+            options:
+              order: 8
+          useSSL:
+            format: checkbox
+            title: Use SSL?
+            type: boolean
+            options:
+              order: 9
+        required:
+          - host
+          - port
+          - protocol
+        title: MQTT Server Details
+        type: object
     !u ACS.Driver.UDP:
+      polled: false
+      presentation:
+        address:
+          title: "Port"
+          description: "The UDP port to listen on (e.g. 50205)"
+          icon: "network-wired"
+          placeholder: "e.g. 50205"
+        path:
+          title: "Data Selector"
+          description: "Selector to extract specific values from the UDP message (e.g. data[0] for first byte)"
+          icon: "filter"
+          placeholder: "e.g. data[0]"
       internal:
         connType: UDP
         details: UDPConnDetails
+      schema:
+        properties:
+          port:
+            enum:
+              - 50205
+            title: Port
+            type: number
+            options:
+              order: 1
+        title: UDP Server Details
+        type: object
     !u ACS.Driver.Bacnet:
+      polled: true
+      presentation:
+        address:
+          title: "Device ID"
+          description: "The Bacnet device identifier (numeric ID of the device)"
+          icon: "building"
+          placeholder: "e.g. 1234"
+        path:
+          title: "Object ID"
+          description: "The Bacnet object identifier (format: object-type:instance-number, e.g. analog-value:1)"
+          icon: "cube"
+          placeholder: "e.g. analog-value:1"
       image:
         registry: ghcr.io/amrc-factoryplus
         repository: edge-bacnet
+        reference: bacnet
+      schema:
+        properties:
+          host:
+            minLength: 1
+            title: Hostname/IP
+            type: string
+            options:
+              order: 1
+        required:
+          - host
+        title: Bacnet Connection Details
+        type: object
     !u ACS.Driver.Modbus:
+      polled: true
+      presentation:
+        address:
+          title: "Modbus Address"
+          description: "Format: id,type,address,length (e.g. 1,holding,0,1) where id=device ID, type=register type (holding, input, coil, discrete), address=register address, length=number of registers"
+          icon: "server"
+          placeholder: "e.g. 1,holding,0,1"
+        path:
+          hidden: true
       image:
         registry: ghcr.io/amrc-factoryplus
         repository: edge-modbus
+        reference: modbus
+      schema:
+        properties:
+          host:
+            minLength: 1
+            title: Hostname/IP
+            type: string
+            options:
+              order: 1
+          port:
+            default: 502
+            title: Port
+            type: number
+            options:
+              order: 2
+        required:
+          - host
+        title: Modbus Connection Details
+        type: object
     !u ACS.Driver.Test:
+      polled: true
+      presentation:
+        address:
+          title: "Test Address"
+          description: "Format: function:period:amplitude:packing (e.g. sin:3000:50:bd)"
+          icon: "wave-square"
+          placeholder: "e.g. sin:3000:50:bd"
+        path:
+          title: "Path"
+          description: "Set this to 0"
+          placeholder: "e.g. 0 (must be set to 0)"
       image:
         registry: ghcr.io/amrc-factoryplus
         repository: edge-test
+        reference: test
+      schema:
+        properties: null
+        title: Test Connection Details
+        type: object
     !u ACS.Driver.TPlinkSmartPlug:
+      polled: true
+      presentation:
+        address:
+          title: "Command"
+          description: "The command to read from the smart plug (SysInfo, PowerState, InUse, or Meter)"
+          icon: "plug"
+          placeholder: "e.g. PowerState"
+        path:
+          hidden: true
       image:
         registry: ghcr.io/amrc-factoryplus
         repository: edge-tplink-smartplug
+        reference: tplink-smartplug
+      schema:
+        properties:
+          host:
+            minLength: 1
+            title: Hostname/IP
+            type: string
+            options:
+              order: 1
+          timeout:
+            title: Connection Timeout (ms)
+            type: number
+            default: 5000
+            options:
+              order: 2
+        required:
+          - host
+        title: TP-Link Smart Plug Details
+        type: object
+
     !u ACS.Driver.External:
+      polled: false
+      presentation:
+        address:
+          title: "Address"
+          description: "The address for the external driver (format depends on the specific external driver)"
+          icon: "puzzle-piece"
+          placeholder: "Enter address"
+        path:
+          title: "Path"
+          description: "The path for the external driver (format depends on the specific external driver)"
+          icon: "folder-tree"
+          placeholder: "Enter path"
       external: true
 ---
 service: !u UUIDs.Service.Authentication

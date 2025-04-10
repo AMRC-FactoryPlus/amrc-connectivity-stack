@@ -27,7 +27,6 @@ echo $(kubectl get secret admin-password -o jsonpath="{.data.password}" -n {{.Re
 
 Admin: {{ .Values.acs.secure | ternary "https://" "http://" }}{{.Values.acs.baseUrl}} (or {{ .Values.acs.secure | ternary "https://" "http://" }}admin.{{.Values.acs.baseUrl}})
 Visualiser: {{ .Values.acs.secure | ternary "https://" "http://" }}visualiser.{{.Values.acs.baseUrl}}
-Manager: {{ .Values.acs.secure | ternary "https://" "http://" }}manager.{{.Values.acs.baseUrl}}
 MQTT: {{ .Values.acs.secure | ternary "mqtts://" "mqtt://" }}mqtt.{{.Values.acs.baseUrl}}:{{ .Values.acs.secure | ternary "8883" "1883" }}
 Grafana: {{ .Values.acs.secure | ternary "https://" "http://" }}grafana.{{.Values.acs.baseUrl}}
 Auth: {{ .Values.acs.secure | ternary "https://" "http://" }}auth.{{.Values.acs.baseUrl}}/editor

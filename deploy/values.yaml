@@ -163,31 +163,6 @@ visualiser:
     # -- The repository of the MQTT component
     repository: acs-visualiser
 
-manager:
-  # -- Whether or not to enable the Manager component
-  enabled: true
-  image:
-    # -- The repository of the Manager component
-    repository: acs-manager
-  edge:
-    # -- The repository of the Edge Agent component
-    repository: acs-edge
-  meilisearch:
-    # -- The key that the manager uses to connect to the Meilisearch search engine
-    key: masterKey
-    image:
-      registry: docker.io
-      repository: getmeili/meilisearch
-      tag: v0.30.0
-  # -- A string used to customise the branding of the manager
-  name: Factory+ Manager
-  # -- The environment that the manager is running in
-  env: production
-  # -- Whether debug mode is enabled. DO NOT USE THIS IN PRODUCTION.
-  debug: false
-  # -- The minimum log level that the manager will log messages at
-  logLevel: warning
-
 cmdesc:
   # -- Whether or not to enable the Commands component
   enabled: true

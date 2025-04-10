@@ -1,4 +1,3 @@
-{{ if .Values.manager.enabled }}
 apiVersion: kubegres.reactive-tech.io/v1
 kind: Kubegres
 metadata:
@@ -48,4 +47,3 @@ data:
     PSQL
 
     echo "Done."
-{{- end -}}

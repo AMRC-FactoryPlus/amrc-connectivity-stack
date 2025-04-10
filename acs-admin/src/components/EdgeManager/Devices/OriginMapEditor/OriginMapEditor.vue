@@ -221,6 +221,21 @@ export default {
           }
         }
       }
+    },
+
+    // Watch for changes to the origin map in device information
+    'device.deviceInformation.originMap': {
+      immediate: true,
+      handler(newOriginMap) {
+        console.debug('Origin map changed:', newOriginMap)
+        // If the origin map is null or undefined, reset our model
+        if (newOriginMap === null || newOriginMap === undefined) {
+          console.debug('Resetting origin map model')
+          this.resetModel()
+          // Trigger a re-render of the schema group
+          this.groupRerenderTrigger = +new Date()
+        }
+      }
     }
   },
 
@@ -277,6 +292,8 @@ export default {
       this.loadingExistingConfig = true
 
       if (!this.device.deviceInformation.originMap) {
+        // Reset the model to an empty object if there's no origin map
+        this.resetModel()
         this.loadingExistingConfig = false
         return
       }
@@ -822,6 +839,15 @@ export default {
       this.isDirty = true
     },
 
+    resetModel() {
+      // Reset the model to an empty object
+      this.model = {}
+      // Clear the selected metric
+      this.selectedMetric = null
+      // Reset the dirty state
+      this.isDirty = false
+    },
+
     prepareModelForSaving () {
 
       // Set the top level Schema_UUID
@@ -876,6 +902,8 @@ export default {
       // Patch the Device Information application
       try {
         await this.s.client.ConfigDB.patch_config(UUIDs.App.DeviceInformation, this.device.uuid, "merge", { originMap: this.model })
+
+        // BUG HERE - USES OLD CONFIG. MAKE SURE THAT updateEdgeAgentConfig refreshes all stores when it's called
 
         await updateEdgeAgentConfig({
           deviceId: this.device.uuid

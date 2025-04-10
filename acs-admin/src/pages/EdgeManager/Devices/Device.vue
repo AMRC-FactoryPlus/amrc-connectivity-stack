@@ -9,6 +9,7 @@
       :device-id="device.uuid"
       :current-schema-uuid="device?.deviceInformation.schema"
       @download-config="downloadConfig"
+      @schema-changed="handleSchemaChanged"
   />
   <ChangeConnectionDialog
       v-if="device.deviceInformation"
@@ -290,6 +291,16 @@ export default {
         this.robotBeep = null
         this.currentMessageIndex = 0  // Reset the index when stopping
       }
+    },
+
+    handleSchemaChanged(schemaUuid) {
+      // Force refresh the device data
+      this.d.stop()
+      this.d.start()
+      storeReady(this.d).then(() => {
+        // Notify the user that the schema has been changed and the origin map cleared
+        toast.success('Schema updated and origin map cleared')
+      })
     },
   },
 

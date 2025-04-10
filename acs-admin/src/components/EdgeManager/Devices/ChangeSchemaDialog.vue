@@ -65,8 +65,10 @@ import { Button } from '@components/ui/button'
 import { Label } from '@components/ui/label'
 import { useServiceClientStore } from '@store/serviceClientStore.js'
 import { useSchemaStore } from '@store/useSchemaStore.js'
+import { useDeviceStore } from '@/store/useDeviceStore'
 import { toast } from 'vue-sonner'
 import { UUIDs } from '@amrc-factoryplus/service-client'
+import { storeReady } from '@store/useStoreReady.js'
 
 export default {
   props: {
@@ -85,10 +87,13 @@ export default {
     },
   },
 
+  emits: ['update:show', 'download-config', 'schema-changed'],
+
   setup () {
     return {
       s: useServiceClientStore(),
       schemaStore: useSchemaStore(),
+      d: useDeviceStore(),
     }
   },
 
@@ -155,6 +160,7 @@ export default {
   },
 
   mounted () {
+    this.d.start()
     this.setInitialSchema()
   },
 
@@ -170,14 +176,18 @@ export default {
 
     handleOpen (e) {
       if (e === false) {
-        this.selectedSchema = null
-        this.selectedVersion = null
+        this.resetForm()
         this.$emit('update:show', false)
       }
       else {
         this.$emit('update:show', true)
         this.setInitialSchema()
       }
+    },
+
+    resetForm() {
+      this.selectedSchema = null
+      this.selectedVersion = null
     },
 
     async formSubmit() {
@@ -188,14 +198,36 @@ export default {
       }
 
       try {
+        // When changing schema, we need to clear the origin map
+        // First, update the schema
         await this.s.client.ConfigDB.patch_config(
-          UUIDs.App.DeviceInformation, 
+          UUIDs.App.DeviceInformation,
           this.deviceId,
           "merge",
           { schema: this.selectedVersion.uuid }
         )
 
-        toast.success('Schema updated successfully')
+        // Then clear the origin map
+        await this.s.client.ConfigDB.patch_config(
+          UUIDs.App.DeviceInformation,
+          this.deviceId,
+          "merge",
+          { originMap: null }
+        )
+
+        // Refresh the device data by restarting the device store
+        this.d.stop()
+        this.d.start()
+        await storeReady(this.d)
+
+        // Store the selected version UUID before resetting the form
+        const selectedVersionUuid = this.selectedVersion.uuid
+
+        // Reset the form completely
+        this.resetForm()
+
+        // Emit schema-changed event to notify parent component
+        this.$emit('schema-changed', selectedVersionUuid)
         this.$emit('update:show', false)
       } catch (err) {
         toast.error('Unable to update schema')
@@ -209,6 +241,6 @@ export default {
       selectedSchema: null,
       selectedVersion: null,
     }
-  }
+  },
 }
 </script>

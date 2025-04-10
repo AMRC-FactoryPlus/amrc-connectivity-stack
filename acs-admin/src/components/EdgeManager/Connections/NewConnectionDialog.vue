@@ -201,9 +201,8 @@ export default {
   watch: {
     selectedDriverName(newVal, oldVal) {
       // Reset form when driver changes
-      if (newVal !== oldVal) {
+      if (newVal !== oldVal && !this.existingConnection) {
         if (newVal) {
-          // When selecting a driver, initialize form with defaults
           this.resetFormWithDefaults()
         } else {
           // When clearing driver selection, reset the form
@@ -228,9 +227,10 @@ export default {
         this.selectedDriverName = this.dr.data.find(d => d.uuid === existingConfig.driver_uuid)?.name
         this.name = existingConnection.name
         this.pollInt = existingConfig.pollInt || 1000 // Load existing poll interval or default to 1000ms
-        this.formData           = {
+        this.formData = {
           ...existingConfig.config,
-          payloadFormat: existingConfig.source.payloadFormat,
+          // Make sure we handle different possible structures for the payload format
+          payloadFormat: existingConfig.source?.payloadFormat || "Defined by Protocol",
         }
       }
 
@@ -305,6 +305,7 @@ export default {
 
     // Initialize formData if it doesn't exist
     if (!this.formData) {
+      console.log('Initializing formData')
       this.formData = {
         payloadFormat: "Defined by Protocol"
       }
@@ -416,6 +417,8 @@ export default {
       // First reset the validation state
       this.v$.$reset()
 
+      console.log("Resetting form with defaults")
+
       // Initialize with default payload format
       this.formData = {
         payloadFormat: "Defined by Protocol"
@@ -517,7 +520,10 @@ export default {
                 ...configData
               } = _.cloneDeep(this.formData)
 
+
         if (this.existingConnection) {
+          // Log the payload format being saved
+          console.log('Updating connection with payload format:', payloadFormat)
           // Update existing connection - update both info and configuration
           await Promise.all([
             // Update the name in Info app
@@ -544,6 +550,8 @@ export default {
           })
         }
         else {
+          // Log the payload format being saved for new connection
+          console.log('Creating new connection with payload format:', payloadFormat)
           // Create new connection
           const connectionUUID = await this.s.client.ConfigDB.create_object(UUIDs.Class.EdgeAgentConnection)
 

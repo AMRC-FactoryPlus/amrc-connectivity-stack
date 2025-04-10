@@ -119,6 +119,8 @@ import _ from 'lodash'
 import NewObjectOverlayForm from './NewObjectOverlayForm.vue'
 import { updateEdgeAgentConfig } from '@/utils/edgeAgentConfigUpdater'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import Ajv from 'ajv'
+import addFormats from 'ajv-formats'
 
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarInset, SidebarMenu, SidebarMenuBadge, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarRail, SidebarTrigger } from '@/components/ui/sidebar'
 import { File } from 'lucide-vue-next'
@@ -888,6 +890,44 @@ export default {
       delete schema[pList[len - 1]]
     },
 
+    validateModel() {
+      // Create a new Ajv instance
+      const ajv = new Ajv({ allErrors: true, strictTypes: false });
+      // Add format validators
+      addFormats(ajv);
+      // Add vocabulary for schema keywords that aren't strictly part of validation
+      ajv.addVocabulary(['options', 'headerTemplate', 'links']);
+
+      try {
+        // Compile the schema
+        const validate = ajv.compile(this.schema);
+
+        // Validate the model against the schema
+        const valid = validate(this.model);
+
+        if (!valid) {
+          // Format validation errors for display
+          const errors = validate.errors.map(error => {
+            const path = error.instancePath || 'root';
+            return `${path}: ${error.message}`;
+          });
+
+          return {
+            valid: false,
+            errors: errors
+          };
+        }
+
+        return { valid: true };
+      } catch (err) {
+        console.error('Schema validation error:', err);
+        return {
+          valid: false,
+          errors: [`Schema validation failed: ${err.message}`]
+        };
+      }
+    },
+
     async save () {
       if (this.loading) {
         return
@@ -896,8 +936,40 @@ export default {
 
       this.prepareModelForSaving()
 
-      // > BEFORE CLOSE - Validate the model against the schema - check
-      // branched manager code
+      // Validate the model against the schema
+      const validation = this.validateModel();
+      if (!validation.valid) {
+        this.loading = false;
+
+        // Show validation errors to the user
+        toast.error('Validation failed', {
+          description: 'The origin map contains errors that need to be fixed.',
+          action: {
+            label: 'View Errors',
+            onClick: () => {
+              // Display the errors in a more readable format
+              console.error('Validation errors:', validation.errors);
+
+              // Show the first few errors to the user
+              const firstErrors = validation.errors.slice(0, 3);
+              firstErrors.forEach(error => {
+                toast.error('Validation Error', {
+                  description: error,
+                  duration: 5000
+                });
+              });
+
+              if (validation.errors.length > 3) {
+                toast.error('Additional Errors', {
+                  description: `${validation.errors.length - 3} more errors found. Check the console for details.`,
+                  duration: 5000
+                });
+              }
+            }
+          }
+        });
+        return;
+      }
 
       // Patch the Device Information application
       try {

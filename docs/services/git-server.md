@@ -1,4 +1,4 @@
-# Internal Git server
+# Internal Git Server
 
 ACS version 3 relies on [Flux](https://fluxcd.io) to control edge
 clusters, and Flux relies on Git repositories. As such it has become
@@ -14,7 +14,7 @@ The server has the ability to automatically mirror external repos into
 an internal repo. This is useful when the central cluster can contact
 the Internet but the edge clusters cannot.
 
-## Git repository configuration ConfigDB Application
+## Git Repository Configuration ConfigDB Application
 
 The 'Git repository configuration' Application has UUID
 `38d62a93-b6b4-4f63-bad4-d433e3eaff29`. Entries of this type are created
@@ -59,7 +59,7 @@ remote commit. Changing the `url` or `ref` to pull from will trigger a
 pull immediately, which will update to the newly requested commit
 regardless of its relationship to the previous position of the branch.
 
-## Git server HTTP API
+## Git Server HTTP API
 
 The Git server is normally deployed at `https://git.DOMAIN` where
 `DOMAIN` is the ACS external base domain. In any case the base URL for
@@ -94,7 +94,7 @@ Deletes the storage associated with a repo, permanently. If the repo
 still exists in the ConfigDB, or if it is subsequently created, it will
 revert to an empty repo.
 
-## Git repository permissions
+## Git Repository Permissions
 
 The Git server uses the following permissions in the Auth service.
 
@@ -120,7 +120,7 @@ This grants permission to list and delete repo storage. It should be
 granted on the Null UUID; storage permissions for individual repos are
 not supported.
 
-## Git server MQTT interface
+## Git Server MQTT Interface
 
 The Git server publishes as a Sparkplug Node, normally under the
 `ORG-Service-Core/Git` address. The server publishes information about

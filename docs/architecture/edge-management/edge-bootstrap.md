@@ -1,14 +1,14 @@
-# Edge clusters: Bootstrap process
+# Edge Clusters: Bootstrap Process
 
 This document describes the process of setting up a new edge cluster. It
-assumes familiarity with [the overall architecture](./edge-clusters.md)
+assumes familiarity with [the overall architecture](overview.md)
 including the data structures used by the ConfigDB. In addition, the
 Helm chart templates used are described in full in [the deployment
-document](./edge-deployments.md).
+document](edge-deployments.md).
 
-![Diagram of edge cluster bootstrap process](assets/edge-clusters/bootstrap.jpeg)
+![Diagram of edge cluster bootstrap process](../../assets/edge-clusters/bootstrap.jpeg)
 
-## Scope of ACS bootstrap
+## Scope of ACS Bootstrap
 
 The ACS edge cluster bootstrap process starts with a Kubernetes cluster
 which is to serve as an edge cluster and makes the required links to the
@@ -46,7 +46,7 @@ All the edge cluster machines need the following network access:
 * `kubectl` access to the cluster is required for the initial bootstrap
   step.
 
-## Creating the cluster on the central services
+## Creating the Cluster on the Central Services
 
 Deploying a new edge cluster starts by using the 'New cluster' interface
 in the Manager. This requests a name for the cluster and a Helm chart to
@@ -62,7 +62,7 @@ following steps:
 
 * A 'Sparkplug address information' entry is created for the cluster
   giving the [generated Sparkplug
-  Group-ID](./edge-clusters.md#sparkplug-groups).
+  Group-ID](overview.md#sparkplug-groups).
 * A 'Git repository configuration' entry is created for the cluster,
   which makes a new internal Git repo available.
 * The new repository is cloned and initialised as described below.
@@ -74,7 +74,7 @@ cluster setup status' entry, so that the process can be picked up again
 if the cluster manager is restarted, but the contents of this should be
 considered private.
 
-## Bootstrapping at the edge
+## Bootstrapping at the Edge
 
 At this point the Manager will make a link to the bootstrap script for
 this cluster available. Clicking the link will copy a shell command to
@@ -111,7 +111,7 @@ contains manifests instructing Flux to install the 'Edge cluster' Helm
 chart, which will deploy the edge operators (`krbkeys`, `sync`, `monitor`) and
 the `Sealed Secrets` Helm chart as a sub-chart.
 
-## Status reports from the edge
+## Status Reports from the Edge
 
 Once the Edge Sync operator has started up, one of its jobs is to keep
 up to date records in the central cluster of the state of the edge
@@ -127,21 +127,21 @@ key to the ConfigDB.
 
 The Edge Monitor reports over MQTT. Initially it will simply `NBIRTH`
 itself, announcing that the cluster is operational. Once [deployments
-have been made](./edge-deployments.md) this will trigger additional
+have been made](edge-deployments.md) this will trigger additional
 actions from the Monitor.
 
-## Implementation details
+## Implementation Details
 
 This section describes some of the details of the implementation,
 hopefully providing the information needed to debug any problems.
 
 The 'Helm chart template' and 'HelmRelease template' ConfigDB
 Applications are documented in [the deployment
-documentation](./edge-deployments.md#implementation-details). The 'Git
+documentation](edge-deployments.md#implementation-details). The 'Git
 repository configuration' ConfigDB Application is documented in [the Git
-server documentation](./git-server.md).
+server documentation](../../services/git-server.md).
 
-### Edge cluster configuration ConfigDB Application
+### Edge Cluster Configuration ConfigDB Application
 
 The 'Edge cluster configuration' Application has UUID
 `bdb13634-0b3d-4e38-a065-9d88c12ee78d`. Entries of this type are created
@@ -168,7 +168,7 @@ attempt to change the name of a deployed cluster, this is not possible
 as the principals created by the bootstrap would no longer match the
 accounts created for the cluster.
 
-### Edge cluster setup status ConfigDB Application
+### Edge Cluster Setup Status ConfigDB Application
 
 The 'Edge cluster setup status' Application has UUID
 `f6c67e6f-e48e-4f69-b4bb-bfbddcc2a517`. Entries of this type are created
@@ -181,7 +181,7 @@ Manager will set the `ready` property to `true` once it has finished
 setup; the bootstrap script for the cluster will not be available until
 this has happened.
 
-### Edge cluster status ConfigDB Application
+### Edge Cluster Status ConfigDB Application
 
 The 'Edge cluster status' Application has UUID
 `747a62c9-1b66-4a2e-8dd9-0b70a91b6b75`. Entries of this type are created
@@ -209,7 +209,7 @@ retrieve the relevant information from the cluster.
 * `kubeseal_cert`: A string containing the X.509 certificate used to
   encrypt Sealed Secrets for this cluster.
 
-### Bootstrap script ConfigDB Application
+### Bootstrap Script ConfigDB Application
 
 The 'Bootstrap script' Application has UUID
 `a807d8fc-63ff-48bb-85c7-82b93beb606e` and should have a single entry
@@ -221,7 +221,7 @@ template for an overall driver script. Some additional files are added
 by the Cluster Manager. The files are wrapped up in shell here-docs and
 included into the driver script.
 
-### Flux template ConfigDB Application
+### Flux Template ConfigDB Application
 
 The 'Flux template' Application has UUID
 `72804a19-636b-4836-b62b-7ad1476f2b86` and should have a single entry
@@ -238,3 +238,10 @@ in the form of JSON objects. String values at any level of the form
 * `url`: Git repository URLs:
     * `self`: The repo for this cluster.
     * `helm`: The repo holding the edge Helm charts.
+
+## Next Steps
+
+- [Edge Deployments](edge-deployments.md) - Learn about deploying to edge clusters
+- [Edge Scout](./edge-scout.md) - Learn about the edge scout mode
+- [Edge Management Overview](overview.md) - Return to the edge management overview
+- [Architecture Overview](../overview.md) - Return to the architecture overview

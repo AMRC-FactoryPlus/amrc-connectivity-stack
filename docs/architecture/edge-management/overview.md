@@ -1,4 +1,4 @@
-# Edge Clusters: Overall architecture
+# Edge Clusters: Overall Architecture
 
 As of ACS version 3 we require the machines running Edge Agents and
 actually collecting data (the edge) to be part of one or more Kubernetes
@@ -12,7 +12,7 @@ a machine joined to a Kubernetes cluster compromises the entire cluster,
 and keeping edge devices to their own cluster limits the possible
 damage.
 
-## Central cluster
+## Central Cluster
 
 The central Kubernetes cluster runs a number of essential services:
 
@@ -31,7 +31,7 @@ cluster also provides:
 * The Cluster Manager service, which is responsible for setting up edge
   clusters in the central services.
 
-## Edge clusters
+## Edge Clusters
 
 Edge devices on the shop floor must then be joined into a number of edge
 clusters. Choosing how to assign edge devices to clusters is a local
@@ -84,7 +84,7 @@ following respects:
   `acs.organisation` supplied in the ACS `values.yaml` and
   `Cluster-Name` is the name assigned to the cluster.
 
-## Soft gateways
+## Soft Gateways
 
 Since the beginning of the Factory+ project we have found it necessary
 to have a number of Edge Agents running not on physical machines on the
@@ -118,7 +118,7 @@ instead two possibilities:
   created alongside the central cluster. Edge Agents can then be
   deployed (almost certainly 'floating') to this cluster.
 
-## Specialised hosts
+## Specialised Hosts
 
 Some machines on the shop floor will not be suitable for running
 general-purpose workloads such as the cluster operators and floating
@@ -144,7 +144,7 @@ charts. When deploying a new Edge Agent in the Manager, hosts with this
 taint will have the value of the taint displayed after the hostname in
 square brackets.
 
-## Network requirements
+## Network Requirements
 
 All communication between central and edge clusters happens over
 Factory+ channels; there is no need for any Kubernetes API access in
@@ -170,7 +170,7 @@ and self-maintaining, we cannot at this point recommend isolating a
 cluster entirely. In particular, administrator access to the Kubernetes
 API on the edge is likely to be useful for management and debugging.
 
-## Communication and control
+## Communication and Control
 
 Communication and control between the clusters occurs over two channels:
 the ACS ConfigDB (Config Store) and the internal Git repositories, both
@@ -210,3 +210,10 @@ The internal Git server has the facility to create an internal repo
 which mirrors the contents of an external repo. This is used when the
 edge Helm charts are to be pulled from public Github but the edge
 clusters do not have access to the Internet.
+
+## Next Steps
+
+- [Edge Deployments](edge-deployments.md) - Learn about deploying to edge clusters
+- [Edge Bootstrap](edge-bootstrap.md) - Learn about the bootstrap process for edge clusters
+- [Edge Scout](./edge-scout.md) - Learn about the edge scout mode
+- [Architecture Overview](../overview.md) - Return to the architecture overview

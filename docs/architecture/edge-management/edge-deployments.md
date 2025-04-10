@@ -1,10 +1,10 @@
-# Edge clusters: Deploying to the edge
+# Edge Clusters: Deploying to the Edge
 
 This document assumes familiarity with the [overall edge cluster
-architecture](./edge-clusters.md), including the data structures used by
+architecture](overview.md), including the data structures used by
 the ConfigDB.
 
-![Diagram of edge deployment](assets/edge-clusters/deployment.jpeg)
+![Diagram of edge deployment](../../assets/edge-clusters/deployment.jpeg)
 
 ## Edge Helm Charts
 
@@ -33,7 +33,7 @@ the `values.yaml` to use on deployment. This template will be filled in
 with a few fixed pieces of information about the deployment such as the
 UUID and the hostname of the machine to deploy to.
 
-## Edge deployment
+## Edge Deployment
 
 Creating a Deployment in the Manager simply creates an entry in the
 ConfigDB detailing what is to be deployed and where. These entries live
@@ -54,7 +54,7 @@ cluster and uses the 'Helm chart template' entries to construct a set of
 Flux HelmRelease Kubernetes objects. Flux on the edge then pulls the
 Helm charts from the internal Git repo and performs the deployment.
 
-## Edge Agent configuration
+## Edge Agent Configuration
 
 When the Edge Agent configuration is updated in the Manager, this
 information also goes into the ConfigDB. The Edge Agent pulls its
@@ -62,7 +62,7 @@ configuration from the ConfigDB at startup, and the Edge Monitor tracks
 the current state of the ConfigDB and instructs the Edge Agent to reload
 its config if it is out of date.
 
-![Diagram of secret sealing process](assets/edge-clusters/secrets.jpeg)
+![Diagram of secret sealing process](../../assets/edge-clusters/secrets.jpeg)
 
 Secret information (credentials for communicating with devices) is
 handled differently from the rest of the configuration. The
@@ -85,12 +85,12 @@ send a rebirth request. If three rebirth requests are sent with no
 packet received then the Edge Monitor will raise an Alert over
 Sparkplug.
 
-## Implementation details
+## Implementation Details
 
 This section describes some of the details of the implementation,
 hopefully providing the information needed to debug any problems.
 
-### Edge deployment ConfigDB Application
+### Edge Deployment ConfigDB Application
 
 The 'Edge deployment' Application has UUID
 `f2b9417a-ef7f-421f-b387-bb8183a48cdb`. Entries of this type are created
@@ -111,7 +111,7 @@ The Edge Sync operators will pick up changes to these entries via the
 ConfigDB MQTT interface. If an update appears to have been missed then
 restarting the Edge Sync operator will force a full reconcile.
 
-### Helm chart template ConfigDB Application
+### Helm Chart Template ConfigDB Application
 
 The 'Helm chart template' Application has UUID
 `729fe070-5e67-4bc7-94b5-afd75cb42b03`. Entries of this type are created
@@ -135,7 +135,7 @@ deployment entry referencing the templates. Templates available are
 only available for deployments, and may be empty for a floating
 deployment.
 
-### HelmRelease template ConfigDB Application
+### HelmRelease Template ConfigDB Application
 
 The 'HelmRelease template' Application has UUID
 `88436128-09a3-4c9c-b7f4-b0e495137265`, and should have only a single
@@ -144,7 +144,7 @@ and should not be modified. It is used by the Edge Sync operator and by
 the Cluster Manager when a Flux HelmRelease resource needs to be
 created.
 
-### Edge Agent config ConfigDB Application
+### Edge Agent Config ConfigDB Application
 
 The 'Edge Agent config' Application has UUID
 `aac6f843-cfee-4683-b121-6943bfdf9173`. Entries of this type are
@@ -165,7 +165,7 @@ the Sparkplug NCMD `Node Control/Reload Edge Agent Config` if the Edge
 Agent is publishing a different config revision from the current ETag
 from the ConfigDB. This causes the Edge Agent to reload its config.
 
-### KerberosKey Kubernetes resource
+### KerberosKey Kubernetes Resource
 
 This is a Kubernetes Custom Resource with ApiVersion
 `factoryplus.app.amrc.co.uk/v1` and Kind `KerberosKey`. Resources of
@@ -212,7 +212,7 @@ The operator will attach a
 KerberosKey resource once it has decided what the account UUID should
 be.
 
-### SparkplugNode Kubernetes resource
+### SparkplugNode Kubernetes Resource
 
 This is a Kubernetes Custom Resource with ApiVersion
 `factoryplus.app.amrc.co.uk/v1` and Kind `SparkplugNode`. Resources of
@@ -240,3 +240,10 @@ resource, named after the UUID of the Node it is monitoring. This Device
 will publish an Alert if the Monitor cannot get a response from the Node
 after repeated attempts. The Device will publish `DDEATH` if the
 SparkplugNode resource is removed.
+
+## Next Steps
+
+- [Edge Bootstrap](edge-bootstrap.md) - Learn about the bootstrap process for edge clusters
+- [Edge Scout](./edge-scout.md) - Learn about the edge scout mode
+- [Edge Management Overview](overview.md) - Return to the edge management overview
+- [Architecture Overview](../overview.md) - Return to the architecture overview

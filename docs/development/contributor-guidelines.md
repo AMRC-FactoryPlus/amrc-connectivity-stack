@@ -82,7 +82,7 @@ help you write effective and meaningful commit messages.
   understand at a glance.
 - **Explain the "why":** While the code itself shows *what* was changed,
   the commit message should explain *why* the change was necessary.
-- **Use the imperative mood:** Treat the message as if it’s giving
+- **Use the imperative mood:** Treat the message as if it's giving
   commands, e.g., "Fix bug in login logic" instead of "Fixed bug in
   login logic."
 - **Reference relevant issues:** Include issue numbers when applicable
@@ -129,10 +129,10 @@ Help us improve our documentation! You can contribute by fixing typos,
 improving examples, or adding more detailed explanations.
 
 To contribute:
-- Make changes to the appropriate .md files or [docs directory](./docs)
+- Make changes to the appropriate .md files or [docs directory](../../docs)
 - Open a pull request with your improvements
 
 ### License
 
 By contributing to this project, you agree that your contributions will
-be licensed under the [MIT licence](LICENSE) of this repository.
+be licensed under the [MIT licence](../../LICENSE) of this repository.

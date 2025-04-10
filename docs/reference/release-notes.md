@@ -81,4 +81,4 @@ certificate instead.
 
 This is a major release, with fundamental changes to the architecture.
 [Detailed release notes are available
-here.](./docs/whats-changed-in-v3.md)
+here.](../getting-started/whats-new-in-v3.md)

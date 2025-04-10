@@ -27,7 +27,7 @@ There are several advantages to this.
 
 The current ACS v3 Edge Agent deployment process works like this:
 
-![ACS v3 deployment diagram](./v3-deploy.svg)
+![ACS v3 deployment diagram](v3-deploy.svg)
 
 1. An administrator configures an Edge Agent in the Manager. This
    includes information about where the Edge Agent should run, the
@@ -52,7 +52,7 @@ The current ACS v3 Edge Agent deployment process works like this:
 The proposed new process adds an extra service sitting between
 configuration and deployment, and works like this:
 
-![ACS dynamic deployment diagram](./dyn-deploy.svg)
+![ACS dynamic deployment diagram](dyn-deploy.svg)
 
 1. An administrator configures an available connection in the Manager.
    This is not yet attached to a specific Edge Agent, but information is
@@ -113,7 +113,7 @@ making the data available in formats other than Sparkplug or performing
 translation or processing on the data.
 
 [Detailed specification for the Reconcilation
-service](./reconcilation.md)
+service](reconcilation.md)
 
 ## Rendezvous service
 
@@ -129,7 +129,7 @@ to it. Requests and responses come and go as requirements and
 availability of data changes, and one of the jobs of the Rendezvous
 service is to help clients manage this data flow.
 
-[Detailed specification for the Rendezvous service](./rendezvous.md)
+[Detailed specification for the Rendezvous service](rendezvous.md)
 
 ## Changes to existing services
 
@@ -139,7 +139,7 @@ complex environment. This will apply particularly to the Rendezvous
 service which will need to be able to notify its clients of changes in a
 reliable and structured way.
 
-[Specification for a new generic change-notify service](./notify-v1.md)
+[Specification for a new generic change-notify service](notify-v1.md)
 
 A more dynamic environment will require more dynamic authorisation
 decisions. The current Auth service has no change-notify mechanism and
@@ -148,4 +148,4 @@ only looks up ACLs when a client first connects, and changes occurring
 while a connection is open will not be honoured.
 
 [Analysis of some of the issues with the current Auth
-service](./auth.md)
+service](auth/overview)

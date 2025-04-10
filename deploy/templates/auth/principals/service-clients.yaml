@@ -68,18 +68,6 @@ spec:
   principal: sv1mqtt@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
 {{- end }}
 ---
-{{- if .Values.manager.enabled }}
-apiVersion: factoryplus.app.amrc.co.uk/v1
-kind: KerberosKey
-metadata:
-  name: sv1manager
-  namespace: {{ .Release.Namespace }}
-spec:
-  type: Random
-  principal: sv1manager@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
-  secret: manager-keytab/client-keytab
-{{- end }}
----
 {{- if .Values.historians.sparkplug.enabled }}
 apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey

@@ -296,114 +296,6 @@ jobs:
           version: ${{ steps.prepare.outputs.version }}
           service-name: ${{ steps.prepare.outputs.service-name }}
           digest: ${{ steps.build-and-push.outputs.digest }}
-  build-manager:
-    name: Build Manager
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-      id-token: write
-      pull-requests: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - uses: ./.github/actions/prepare
-        id: prepare
-        with:
-          service-name: acs-manager
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Check Backend Builder
-        id: check-backend-builder
-        run: |
-          docker manifest inspect ghcr.io/amrc-factoryplus/acs-manager:backend-build-${{ env.BUILD_PHP_VERSION}} || echo "needs-build=true" >> $GITHUB_OUTPUT
-
-      - name: Build Backend Builder
-        id: build-backend-builder
-        if: steps.check-backend-builder.outputs.needs-build == 'true'
-        uses: docker/build-push-action@v6
-        with:
-          context: ./acs-manager
-          file: ./acs-manager/.docker/Dockerfiles/Dockerfile.backend-build
-          push: true
-          tags: ghcr.io/amrc-factoryplus/acs-manager:backend-build-${{ env.BUILD_PHP_VERSION}}
-
-      - name: Check Backend Base
-        id: check-backend-base
-        run: |
-          docker manifest inspect ghcr.io/amrc-factoryplus/acs-manager:prod-base-${{ env.BASE_PHP_VERSION}} || echo "needs-build=true" >> $GITHUB_OUTPUT
-
-      - name: Build Backend Base
-        id: build-backend-base
-        if: steps.check-backend-base.outputs.needs-build == 'true'
-        uses: docker/build-push-action@v6
-        with:
-          context: ./acs-manager
-          file: ./acs-manager/.docker/Dockerfiles/Dockerfile.backend-base
-          push: true
-          tags: ghcr.io/amrc-factoryplus/acs-manager:prod-base-${{ env.BASE_PHP_VERSION}}
-
-      - name: Build Backend
-        id: build-backend
-        uses: docker/build-push-action@v6
-        with:
-          context: ./acs-manager
-          file: ./acs-manager/.docker/Dockerfiles/Dockerfile
-          load: true
-          tags: ghcr.io/amrc-factoryplus/acs-manager:${{ steps.prepare.outputs.version }}-backend
-          labels: ${{  steps.prepare.outputs.labels }}
-          outputs: type=docker,dest=/tmp/image.tar
-          build-args: |
-            base_version=${{ env.BASE_PHP_VERSION }}
-            build_version=${{ env.BUILD_PHP_VERSION }}
-
-      - name: Upload Backend
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ steps.prepare.outputs.version }}-backend
-          path: /tmp/image.tar
-
-      - name: Build & Push Frontend
-        id: build-and-push-frontend
-        uses: docker/build-push-action@v6
-        with:
-          context: ./acs-manager
-          push: true
-          file: ./acs-manager/.docker/Dockerfiles/Dockerfile
-          target: production-frontend
-          tags: ghcr.io/amrc-factoryplus/acs-manager:${{ steps.prepare.outputs.version }}-frontend
-          labels: ${{ steps.prepare.outputs.labels }}
-  push-manager:
-    name: Push Backend
-    runs-on: ubuntu-latest
-    needs: build-manager
-    permissions:
-      contents: read
-      packages: write
-      id-token: write
-      pull-requests: write
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - uses: ./.github/actions/prepare
-        id: prepare
-        with:
-          service-name: acs-manager
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Download artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: ${{ steps.prepare.outputs.version }}-backend
-          path: /tmp
-
-      - name: Load and push image
-        run: |
-          docker load --input /tmp/image.tar
-          docker image ls -a
-          docker push ghcr.io/amrc-factoryplus/acs-manager:${{ steps.prepare.outputs.version }}-backend
 
   build-mqtt:
     runs-on: ubuntu-latest
@@ -458,7 +350,7 @@ jobs:
           digest: ${{ steps.build-and-push.outputs.digest }}
   build-helm-chart:
     if: github.event_name == 'release'
-    needs: [ 'build-x86-js', 'build-arm-js', 'build-x86-pg', 'push-manager', 'build-mqtt' ]
+    needs: [ 'build-x86-js', 'build-arm-js', 'build-x86-pg', 'build-mqtt' ]
     runs-on: ubuntu-latest
     steps:
       - name: Install Helm

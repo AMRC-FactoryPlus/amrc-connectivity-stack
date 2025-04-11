@@ -72,7 +72,7 @@
             <EmptyState
                 v-else
                 title="No Nodes"
-                :description="`No nodes have been added to the ${cluster.name} cluster yet.`"
+                :description="`No nodes have been added to the ${cluster.name} cluster yet. Note that nodes that have been created but have not yet started up will not show here (yet!).`"
                 :button-text="`Add Node`"
                 button-icon="plus"
                 @button-click="newNode"/>

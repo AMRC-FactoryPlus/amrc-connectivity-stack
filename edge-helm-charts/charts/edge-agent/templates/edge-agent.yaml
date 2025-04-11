@@ -49,6 +49,13 @@ spec:
         # edge-agent container. This prevents security-related back-offs
         # that might occur due to AppArmor policies
         container.apparmor.security.beta.kubernetes.io/edge-agent: "unconfined"
+
+        # Add AppArmor annotations for all driver containers
+{{- range $name, $driver := coalesce .Values.drivers dict }}
+  {{- if not $driver.external }}
+        container.apparmor.security.beta.kubernetes.io/driver-{{ $name | lower }}: "unconfined"
+  {{- end }}
+{{- end }}
     spec:
       # Setting restartPolicy to Always ensures the pod will be
       # restarted if it exit.s While this doesn't directly disable
@@ -142,6 +149,8 @@ spec:
   {{- if not $driver.external }}
         - name: "driver-{{ $name | lower }}"
     {{- list $ $driver.image | include "edge-agent.image" | nindent 10 }}
+          # Add startup probe to prevent back-offs for driver containers
+    {{- dict "containerName" (printf "driver-%s" ($name | lower)) | include "edge-agent.backoff-prevention-probe" | nindent 10 }}
     {{- if $driver.privileged }}
           securityContext:
             privileged: true

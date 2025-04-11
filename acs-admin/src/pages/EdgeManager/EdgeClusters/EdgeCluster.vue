@@ -10,7 +10,7 @@
         <EmptyState
             v-if="!bootstrapped"
             :title="`Bootstrap Required for ${cluster.name}`"
-            description="This edge cluster needs to be bootstrapped before it can be used. Click the button below to copy the bootstrap command to run on the Linux host of first node in the cluster."
+            description="This edge cluster needs to be bootstrapped before it can be used. Click the button below to copy the bootstrap command to run on the Linux host of the first node in the cluster. Note that it may take a few minutes to show up after running the bootstrap command."
             icon="rocket"
         >
             <template #actions>
@@ -26,24 +26,37 @@
             </template>
         </EmptyState>
         <Tabs v-else default-value="nodes" class="flex flex-col flex-1 z-50">
+          <div>
+            <TabsList>
+              <TabsTrigger value="nodes">
+                {{nodes.length ? `${nodes.length}  Node${nodes.length > 1 ? 's' : ''}` : 'No Nodes'}}
+              </TabsTrigger>
+              <TabsTrigger value="deployments" disabled>
+                Deployments
+              </TabsTrigger>
+              <TabsTrigger value="hosts" :disabled="hosts.length === 0">
+                {{hosts.length ? `${hosts.length} Host${hosts.length > 1 ? 's' : ''}` : 'No Hosts'}}
+              </TabsTrigger>
+            </TabsList>
+          </div>
           <TabsContent value="nodes" class="flex-1 ">
             <div v-if="nodes.length > 0">
               <DataTable :data="nodes" :columns="nodeColumns" :filters="[]" @rowClick="selectNode">
-                <template #toolbar-left>
-                  <div class="flex items-center justify-between gap-2">
-                    <TabsList>
-                      <TabsTrigger value="nodes">
-                        {{nodes.length ? `${nodes.length}  Node${nodes.length > 1 ? 's' : ''}` : 'No Nodes'}}
-                      </TabsTrigger>
-                      <TabsTrigger value="deployments" disabled>
-                        Deployments
-                      </TabsTrigger>
-                      <TabsTrigger value="hosts" :disabled="hosts.length === 0">
-                        {{hosts.length ? `${hosts.length} Host${hosts.length > 1 ? 's' : ''}` : 'No Hosts'}}
-                      </TabsTrigger>
-                    </TabsList>
-                  </div>
-                </template>
+<!--                <template #toolbar-left>-->
+<!--                  <div class="flex items-center justify-between gap-2">-->
+<!--                    <TabsList>-->
+<!--                      <TabsTrigger value="nodes">-->
+<!--                        {{nodes.length ? `${nodes.length}  Node${nodes.length > 1 ? 's' : ''}` : 'No Nodes'}}-->
+<!--                      </TabsTrigger>-->
+<!--                      <TabsTrigger value="deployments" disabled>-->
+<!--                        Deployments-->
+<!--                      </TabsTrigger>-->
+<!--                      <TabsTrigger value="hosts" :disabled="hosts.length === 0">-->
+<!--                        {{hosts.length ? `${hosts.length} Host${hosts.length > 1 ? 's' : ''}` : 'No Hosts'}}-->
+<!--                      </TabsTrigger>-->
+<!--                    </TabsList>-->
+<!--                  </div>-->
+<!--                </template>-->
                 <template #toolbar-right>
                   <Button
                       @click="newNode"
@@ -68,21 +81,21 @@
           </TabsContent>
           <TabsContent value="hosts">
             <DataTable :data="hosts" :columns="hostColumns" :filters="[]">
-              <template #toolbar-left>
-                <div class="flex items-center justify-between gap-2">
-                  <TabsList>
-                    <TabsTrigger value="nodes">
-                      {{nodes.length ? `${nodes.length}  Node${nodes.length > 1 ? 's' : ''}` : 'No Nodes'}}
-                    </TabsTrigger>
-                    <TabsTrigger value="deployments" disabled>
-                      Deployments
-                    </TabsTrigger>
-                    <TabsTrigger value="hosts" :disabled="hosts.length === 0">
-                      {{hosts.length ? `${hosts.length} Host${hosts.length > 1 ? 's' : ''}` : 'No Hosts'}}
-                    </TabsTrigger>
-                  </TabsList>
-                </div>
-              </template>
+<!--              <template #toolbar-left>-->
+<!--                <div class="flex items-center justify-between gap-2">-->
+<!--                  <TabsList>-->
+<!--                    <TabsTrigger value="nodes">-->
+<!--                      {{nodes.length ? `${nodes.length}  Node${nodes.length > 1 ? 's' : ''}` : 'No Nodes'}}-->
+<!--                    </TabsTrigger>-->
+<!--                    <TabsTrigger value="deployments" disabled>-->
+<!--                      Deployments-->
+<!--                    </TabsTrigger>-->
+<!--                    <TabsTrigger value="hosts" :disabled="hosts.length === 0">-->
+<!--                      {{hosts.length ? `${hosts.length} Host${hosts.length > 1 ? 's' : ''}` : 'No Hosts'}}-->
+<!--                    </TabsTrigger>-->
+<!--                  </TabsList>-->
+<!--                </div>-->
+<!--              </template>-->
             </DataTable>
           </TabsContent>
         </Tabs>

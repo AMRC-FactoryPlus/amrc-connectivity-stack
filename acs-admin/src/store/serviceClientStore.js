@@ -33,7 +33,7 @@ export const useServiceClientStore = defineStore('service-client', {
         this.loaded = true;
         this.scheme  = import.meta.env.SCHEME;
         this.baseUrl = import.meta.env.BASEURL;
-
+        client.Fetch.cache = 'reload';
       this.ready = true
       } catch (e) {
         this.$reset();

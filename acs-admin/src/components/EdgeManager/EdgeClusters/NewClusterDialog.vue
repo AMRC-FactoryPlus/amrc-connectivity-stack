@@ -157,8 +157,6 @@ export default {
         toast.success(`The ${this.name} edge cluster has been created!`)
         this.showing = false
 
-        await this.e.refresh()
-
       }
       catch (err) {
         toast.error(`Unable to create new edge cluster`)

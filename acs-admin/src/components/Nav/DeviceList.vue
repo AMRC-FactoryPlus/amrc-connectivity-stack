@@ -57,7 +57,6 @@ export default {
 
   computed: {
     devices () {
-      console.log(this.d.data)
       return Array.isArray(this.d.data) ? this.d.data.filter(e => e.deviceInformation.node === this.node.uuid) : []
     },
 

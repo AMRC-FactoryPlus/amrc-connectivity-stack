@@ -1,5 +1,5 @@
 <!--
-  - Copyright (c) University of Sheffield AMRC 2024.
+  - Copyright (c) University of Sheffield AMRC 2025.
   -->
 <template>
   <Skeleton v-if="loading" v-for="i in 10" class="h-16 rounded-lg mb-2"/>
@@ -132,7 +132,7 @@ export default {
       this.rxsub = null;
     },
     syncMessageReceived: function (message) {
-      console.log("CONFIG UPDATE: %o", message);
+      console.debug("CONFIG UPDATE: %o", message);
       this.data = message
       this.incomingBufferJson = this.formats.json.stringify(message)
       // If the code has been changed and the server is sending something different, ask the user what to do

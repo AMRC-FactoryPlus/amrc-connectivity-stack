@@ -184,13 +184,9 @@ export default {
       const value = event.target.value
 
       // Handle password field encryption
-      if (this.type === 'password' && value && value !== '••••••••') {
+      if (this.type === 'password' && value && value !== '••••••••' && this.onEncrypt) {
         try {
           this.isEncrypting = true
-
-          if (!this.onEncrypt) {
-            throw new Error('Encryption handler not provided')
-          }
 
           const encryptedKey = await this.onEncrypt(value)
           this.updateValue(encryptedKey)

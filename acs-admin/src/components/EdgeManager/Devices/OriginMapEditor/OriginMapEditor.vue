@@ -129,7 +129,6 @@ import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbP
 import { Separator } from '@/components/ui/separator'
 
 const SparkplugMetricUUID = 'b16275f1-e443-4c41-a482-fcbdfbd20769'
-
 export default {
 
   setup () {
@@ -726,7 +725,7 @@ export default {
         this.set(reversed.map(e => e.key).join('.'), newMetric, this.model, '.')
 
         // Ensure that the Schema_UUID and Instance_UUID are set on every model in the chain where required.
-        // console.debug(reversed) will show the incoming payload and will make this more clear.
+        // console.log(reversed) will show the incoming payload and will make this more clear.
         reversed.forEach((e, index) => {
           // If this entry in the chain has a Schema_UUID and the model doesn't have one yet then stamp it on
           if (e.schemaUUID && !reversed.slice(0, index + 1).reduce((acc, curr) => acc && acc[curr.key]?.Schema_UUID, this.model)) {

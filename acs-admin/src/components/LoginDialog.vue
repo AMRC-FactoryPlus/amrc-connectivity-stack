@@ -6,7 +6,7 @@
   <Card class="mx-auto max-w-sm">
     <CardHeader>
       <CardTitle class="text-2xl">
-        Welcome to ACS
+        Welcome to ACS!
       </CardTitle>
       <CardDescription>
         Enter your details below to login to your account

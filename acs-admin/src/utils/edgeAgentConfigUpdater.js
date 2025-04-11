@@ -187,8 +187,8 @@ async function updateEdgeAgentDeployment(nodeUuid, connections, deviceConnection
         let imageReference = null;
 
         // Check if driver is a UUID that points to a driver definition
-        if (connection.configuration?.driver_uuid) {
-          const driverUuid = connection.configuration.driver_uuid;
+        if (connection.configuration?.driver) {
+          const driverUuid = connection.configuration.driver;
           console.debug('Found driver UUID:', driverUuid);
 
           // Look up the driver definition in the driver store
@@ -202,11 +202,6 @@ async function updateEdgeAgentDeployment(nodeUuid, connections, deviceConnection
             console.debug('Driver definition:', driverDef);
           }
         }
-        // Check direct image reference as fallback
-        else if (connection.configuration?.driver?.image?.reference) {
-          imageReference = connection.configuration.driver.image.reference;
-          console.debug('Found driver image reference directly from connection:', imageReference);
-        }
 
         if (imageReference) {
           console.debug('Adding driver image to map:', imageReference);
@@ -217,32 +212,6 @@ async function updateEdgeAgentDeployment(nodeUuid, connections, deviceConnection
           console.debug('Connection does not have a valid driver image reference:', connection.name);
           console.debug('Driver configuration:', JSON.stringify(connection.configuration?.driver, null, 2));
           console.debug('Driver UUID:', connection.configuration?.driver_uuid);
-
-          // As a fallback, check if we have a driver object with any reference we can use
-          if (connection.configuration?.driver) {
-            console.debug('Attempting to find any usable reference in driver object');
-            const driver = connection.configuration.driver;
-
-            // Try to find any reference property that might contain the image reference
-            if (driver.reference) {
-              console.debug('Found driver.reference:', driver.reference);
-              driverMap[deviceConn.name] = {
-                image: driver.reference
-              };
-            } else if (driver.image) {
-              if (typeof driver.image === 'string') {
-                console.debug('Found driver.image as string:', driver.image);
-                driverMap[deviceConn.name] = {
-                  image: driver.image
-                };
-              } else if (driver.image.reference) {
-                console.debug('Found driver.image.reference:', driver.image.reference);
-                driverMap[deviceConn.name] = {
-                  image: driver.image.reference
-                };
-              }
-            }
-          }
         }
       } else {
         console.debug('No matching connection found for device connection:', deviceConn.name);

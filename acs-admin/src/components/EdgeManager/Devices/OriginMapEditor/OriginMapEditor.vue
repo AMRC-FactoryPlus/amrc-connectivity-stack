@@ -108,7 +108,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { useSchemaStore } from '@store/useSchemaStore.js'
 import SchemaGroup from './SchemaGroup.vue'
 import SparkplugMetric from './SparkplugMetric.vue'
-import * as $RefParser from '@apidevtools/json-schema-ref-parser'
+import $RefParser from '@apidevtools/json-schema-ref-parser'
 import { storeReady } from '@store/useStoreReady.js'
 import { Button } from '@/components/ui/button'
 import { toast } from 'vue-sonner'
@@ -368,7 +368,7 @@ export default {
             this.removePropertiesWithPatternProperties(schemaToInstantiate.properties)
           }
 
-          // console.log('PatternProperties found. Creating', schemaToInstantiate.title, 'called', objectName, 'at',
+          // console.debug('PatternProperties found. Creating', schemaToInstantiate.title, 'called', objectName, 'at',
           //     n.join('.'), schemaToInstantiate)
 
           // Only create the object if we have a valid schema to instantiate
@@ -726,7 +726,7 @@ export default {
         this.set(reversed.map(e => e.key).join('.'), newMetric, this.model, '.')
 
         // Ensure that the Schema_UUID and Instance_UUID are set on every model in the chain where required.
-        // console.log(reversed) will show the incoming payload and will make this more clear.
+        // console.debug(reversed) will show the incoming payload and will make this more clear.
         reversed.forEach((e, index) => {
           // If this entry in the chain has a Schema_UUID and the model doesn't have one yet then stamp it on
           if (e.schemaUUID && !reversed.slice(0, index + 1).reduce((acc, curr) => acc && acc[curr.key]?.Schema_UUID, this.model)) {

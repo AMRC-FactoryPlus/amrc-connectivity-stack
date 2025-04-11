@@ -306,7 +306,7 @@ export default {
 
     // Initialize formData if it doesn't exist
     if (!this.formData) {
-      console.log('Initializing formData')
+      console.debug('Initializing formData')
       this.formData = {
         payloadFormat: "Defined by Protocol"
       }
@@ -544,11 +544,11 @@ export default {
           ])
 
           // Update the edge agent config
-          console.log('Updating edge agent config for connection:', this.existingConnection.uuid)
+          console.debug('Updating edge agent config for connection:', this.existingConnection.uuid)
           await updateEdgeAgentConfig({
             connectionId: this.existingConnection.uuid
           })
-          console.log('Edge agent config update completed')
+          console.debug('Edge agent config update completed')
 
           toast.success('Success!', {
             description: 'The connection has been updated successfully.',
@@ -556,7 +556,7 @@ export default {
         }
         else {
           // Log the payload format being saved for new connection
-          console.log('Creating new connection with payload format:', payloadFormat)
+          console.debug('Creating new connection with payload format:', payloadFormat)
           // Create new connection
           const connectionUUID = await this.s.client.ConfigDB.create_object(UUIDs.Class.EdgeAgentConnection)
 
@@ -586,11 +586,11 @@ export default {
           await this.s.client.ConfigDB.put_config(UUIDs.App.ConnectionConfiguration, connectionUUID, payload)
 
           // Update the edge agent config
-          console.log('Updating edge agent config for new connection:', connectionUUID)
+          console.debug('Updating edge agent config for new connection:', connectionUUID)
           await updateEdgeAgentConfig({
             connectionId: connectionUUID
           })
-          console.log('Edge agent config update completed for new connection')
+          console.debug('Edge agent config update completed for new connection')
 
           toast.success('Success!', {
             description: 'The connection has been created successfully.',

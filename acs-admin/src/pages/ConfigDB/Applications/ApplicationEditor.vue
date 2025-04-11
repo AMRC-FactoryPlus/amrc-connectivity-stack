@@ -1,5 +1,5 @@
 <!--
-  - Copyright (c) University of Sheffield AMRC 2024.
+  - Copyright (c) University of Sheffield AMRC 2025.
   -->
 <template>
   <div class="flex justify-between">
@@ -81,7 +81,6 @@ export default {
 
   methods: {
     objectClick: function(obj) {
-      console.log(obj)
       if (obj.uuid) {
         this.router.push({ path: `/configdb/applications/${this.route.params.application}/${obj.uuid}` })
       } else {
@@ -104,7 +103,6 @@ export default {
       const details = rxu.rx(
           rx.combineLatest(objs, appObjs),
           rx.map(([objs, appObjs]) => {
-            console.log("details", appObjs)
             return appObjs.map(uuid =>
                 objs.get(uuid, { name: "UNKNOWN", class: { name: "UNKNOWN" } }))
                 .toArray()
@@ -112,7 +110,7 @@ export default {
       );
 
       this.rxsub = details.subscribe(aObjs => {
-        console.log("OBJS UPDATE: %o", aObjs);
+        console.debug("OBJS UPDATE: %o", aObjs);
         this.data = aObjs.map(o => ({...o, application: {uuid: this.application.uuid, name: this.application.name}}));
         this.loading = false;
       });

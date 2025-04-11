@@ -10,7 +10,7 @@
         <EmptyState
             v-if="!bootstrapped"
             :title="`Bootstrap Required for ${cluster.name}`"
-            description="This edge cluster needs to be bootstrapped before it can be used. Click the button below to copy the bootstrap command to run on the Linux host of first node in the cluster."
+            description="This edge cluster needs to be bootstrapped before it can be used. Click the button below to copy the bootstrap command to run on the Linux host of the first node in the cluster. Note that it may take a few minutes to show up after running the bootstrap command."
             icon="rocket"
         >
             <template #actions>
@@ -72,7 +72,7 @@
             <EmptyState
                 v-else
                 title="No Nodes"
-                :description="`No nodes have been added to the ${cluster.name} cluster yet. Note that nodes that have been created but have not yet started up will not show here (yet!).`"
+                :description="`No nodes have been added to the ${cluster.name} cluster yet.`"
                 :button-text="`Add Node`"
                 button-icon="plus"
                 @button-click="newNode"/>

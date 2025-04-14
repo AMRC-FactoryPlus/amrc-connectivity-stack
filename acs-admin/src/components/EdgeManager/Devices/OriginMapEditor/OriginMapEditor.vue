@@ -108,7 +108,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { useSchemaStore } from '@store/useSchemaStore.js'
 import SchemaGroup from './SchemaGroup.vue'
 import SparkplugMetric from './SparkplugMetric.vue'
-import $RefParser from '@apidevtools/json-schema-ref-parser'
+import * as jsonSchemaRefParser from '@apidevtools/json-schema-ref-parser'
 import { storeReady } from '@store/useStoreReady.js'
 import { Button } from '@/components/ui/button'
 import { toast } from 'vue-sonner'
@@ -269,7 +269,7 @@ export default {
         },
       }
 
-      const rp        = new $RefParser()
+      const rp = new jsonSchemaRefParser.$RefParser()
       // Remove the prefix if it's already there
       const cleanUuid = schemaUuid.replace(/^urn:uuid:/, '')
       return rp.dereference(`urn:uuid:${cleanUuid}`, {

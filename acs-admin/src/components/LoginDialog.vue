@@ -96,7 +96,7 @@ export default {
       })
         this.$router.push("/");
       }catch(e){
-        toast.error(`Login Failed. Incorrect username/password?`)
+        toast.error(`Login Failed`)
       }
 
       this.loggingIn = false

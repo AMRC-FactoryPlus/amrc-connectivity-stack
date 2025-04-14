@@ -25,6 +25,8 @@ export default defineConfig({
   },
   build: {
     target: 'esnext',
+    minify: false,
+    sourcemap: true,
     rollupOptions: {
       treeshake: 'safest'
     }

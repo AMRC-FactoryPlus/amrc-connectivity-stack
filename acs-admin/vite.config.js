@@ -29,7 +29,7 @@ export default defineConfig({
     sourcemap: true,
     rollupOptions: {
       treeshake: 'safest'
-    }
+    },
   },
   optimizeDeps: {
     include: ['buffer'],
@@ -38,14 +38,15 @@ export default defineConfig({
     }
   },
   plugins: [
+    importMetaEnv.vite({
+      env: '.env',
+      example: '.env.example',
+      files: ['dist/index.html'], // explicitly define the correct path
+    }),
     vue(),
     VueDevTools(),
     inject({
       Buffer: ['buffer', 'Buffer'],
-    }),
-    importMetaEnv.vite({
-      env: '.env',
-      example: '.env.example',
     }),
     monacoEditorEsmPlugin({
       languageWorkers: ['editorWorkerService', 'json'],

@@ -50,6 +50,7 @@ BEGIN;
 \ir v8.sql
 \ir v9.sql
 \ir v10.sql
+\ir v11.sql
 
 \ir grant.sql
 

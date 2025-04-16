@@ -364,6 +364,64 @@ export function isArrayPayload(payload: any): boolean {
 }
 
 /**
+ * Parse a query-string style path property for batch extraction.
+ * Returns an object with readings, value, and timestamp JSONPath expressions.
+ */
+function parseBatchPath(path: string): { readings?: string, value: string, timestamp?: string } | null {
+    if (!path || !path.includes(";")) return null;
+    const parts = path.split(";");
+    const result: any = {};
+    for (const part of parts) {
+        const [k, v] = part.split("=");
+        if (k && v) result[k.trim()] = v.trim();
+    }
+    // For compatibility: if only value is present, treat as value path
+    if (!result.value && result.readings) result.value = result.readings;
+    if (!result.value && path.startsWith("$")) result.value = path;
+    if (!result.value) return null;
+    return result;
+}
+
+/**
+ * Extract batch readings from a payload using the batch path definition.
+ * Returns an array of {value, timestamp} objects.
+ */
+function extractBatchReadings(payload: any, batchPath: { readings?: string, value: string, timestamp?: string }, metric: sparkplugMetric): { value: any, timestamp?: number }[] {
+    let readings = [payload];
+    if (batchPath.readings) {
+        try {
+            readings = JSONPath({ path: batchPath.readings, json: payload });
+        } catch (e) {
+            readings = [];
+        }
+    }
+    const results: { value: any, timestamp?: number }[] = [];
+    for (const reading of readings) {
+        let value: any;
+        let timestamp: number | undefined;
+        try {
+            value = JSONPath({ path: batchPath.value, json: reading });
+            value = Array.isArray(value) ? value[0] : value;
+            value = parseTypeFromString(metric.type, value);
+        } catch (e) {
+            value = undefined;
+        }
+        if (batchPath.timestamp) {
+            try {
+                timestamp = JSONPath({ path: batchPath.timestamp, json: reading });
+                timestamp = Array.isArray(timestamp) ? timestamp[0] : timestamp;
+                if (timestamp && !isTimestampInMilliseconds(timestamp)) timestamp = timestamp * 1000;
+            } catch (e) {
+                timestamp = undefined;
+            }
+        }
+        if (!timestamp) timestamp = Date.now();
+        results.push({ value, timestamp });
+    }
+    return results;
+}
+
+/**
  * Processes an array payload and returns an array of values and timestamps
  * @param payload The array payload to process
  * @param metric The metric to use for processing
@@ -372,56 +430,13 @@ export function isArrayPayload(payload: any): boolean {
  */
 export function processArrayPayload(payload: any[], metric: sparkplugMetric): { value: any, timestamp?: number }[] {
     const path = (typeof metric.properties !== "undefined" && typeof metric.properties.path !== "undefined" ? metric.properties.path.value as string : "");
-    const results: { value: any, timestamp?: number }[] = [];
-
-    // Process each object in the array
-    payload.forEach(item => {
-        let value;
-        let timestamp;
-
-        // Extract value based on path or direct property
-        if (path) {
-            /* Work around a bug in the JSONPath library */
-            let newVal = path === "$" && item === false
-                ? [false]
-                : JSONPath({
-                    path: path,
-                    json: item
-                });
-
-            if (item === 0 || !Array.isArray(newVal)) {
-                value = 0;
-            } else {
-                if (newVal[0]?.type === "Buffer") {
-                    newVal[0] = Buffer.from(newVal[0].data);
-                }
-                value = parseTypeFromString(metric.type, newVal[0]);
-            }
-        } else if (item.hasOwnProperty('value')) {
-            // If no path is provided but the object has a 'value' property, use that
-            value = parseTypeFromString(metric.type, item.value);
-        } else {
-            // If no path and no 'value' property, return the object itself
-            value = parseTypeFromString(metric.type, item);
-        }
-
-        // Extract timestamp if available
-        if (item.hasOwnProperty('timestamp')) {
-            timestamp = item.timestamp;
-            if (timestamp && !isTimestampInMilliseconds(timestamp)) {
-                timestamp = timestamp * 1000;
-            }
-        } else if (item.hasOwnProperty('time')) {
-            timestamp = item.time;
-            if (timestamp && !isTimestampInMilliseconds(timestamp)) {
-                timestamp = timestamp * 1000;
-            }
-        }
-
-        results.push({ value, timestamp });
-    });
-
-    return results;
+    const batchPath = parseBatchPath(path);
+    if (batchPath) {
+        // Use new batch extraction logic
+        return extractBatchReadings(payload, batchPath, metric);
+    }
+    // If not using explicit batch path, do not process as batch
+    return [];
 }
 
 export function parseValueFromPayload(msg: any, metric: sparkplugMetric, payloadFormat: serialisationType | string, delimiter?: string) {

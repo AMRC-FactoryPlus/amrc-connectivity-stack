@@ -354,6 +354,91 @@ export class Metrics {
     // }
 }
 
+/**
+ * Checks if a payload is an array of objects
+ * @param payload The payload to check
+ * @returns True if the payload is an array of objects, false otherwise
+ */
+export function isArrayPayload(payload: any): boolean {
+    return Array.isArray(payload) && payload.length > 0 && typeof payload[0] === 'object';
+}
+
+/**
+ * Parse a query-string style path property for batch extraction.
+ * Returns an object with readings, value, and timestamp JSONPath expressions.
+ */
+function parseBatchPath(path: string): { readings?: string, value: string, timestamp?: string } | null {
+    if (!path || !path.includes(";")) return null;
+    const parts = path.split(";");
+    const result: any = {};
+    for (const part of parts) {
+        const [k, v] = part.split("=");
+        if (k && v) result[k.trim()] = v.trim();
+    }
+    // For compatibility: if only value is present, treat as value path
+    if (!result.value && result.readings) result.value = result.readings;
+    if (!result.value && path.startsWith("$")) result.value = path;
+    if (!result.value) return null;
+    return result;
+}
+
+/**
+ * Extract batch readings from a payload using the batch path definition.
+ * Returns an array of {value, timestamp} objects.
+ */
+function extractBatchReadings(payload: any, batchPath: { readings?: string, value: string, timestamp?: string }, metric: sparkplugMetric): { value: any, timestamp?: number }[] {
+    let readings = [payload];
+    if (batchPath.readings) {
+        try {
+            readings = JSONPath({ path: batchPath.readings, json: payload });
+        } catch (e) {
+            readings = [];
+        }
+    }
+    const results: { value: any, timestamp?: number }[] = [];
+    for (const reading of readings) {
+        let value: any;
+        let timestamp: number | undefined;
+        try {
+            value = JSONPath({ path: batchPath.value, json: reading });
+            value = Array.isArray(value) ? value[0] : value;
+            value = parseTypeFromString(metric.type, value);
+        } catch (e) {
+            value = undefined;
+        }
+        if (batchPath.timestamp) {
+            try {
+                timestamp = JSONPath({ path: batchPath.timestamp, json: reading });
+                timestamp = Array.isArray(timestamp) ? timestamp[0] : timestamp;
+                if (timestamp && !isTimestampInMilliseconds(timestamp)) timestamp = timestamp * 1000;
+            } catch (e) {
+                timestamp = undefined;
+            }
+        }
+        if (!timestamp) timestamp = Date.now();
+        results.push({ value, timestamp });
+    }
+    return results;
+}
+
+/**
+ * Processes an array payload and returns an array of values and timestamps
+ * @param payload The array payload to process
+ * @param metric The metric to use for processing
+ * @param payloadFormat The format of the payload
+ * @returns An array of objects with value and timestamp properties
+ */
+export function processArrayPayload(payload: any[], metric: sparkplugMetric): { value: any, timestamp?: number }[] {
+    const path = (typeof metric.properties !== "undefined" && typeof metric.properties.path !== "undefined" ? metric.properties.path.value as string : "");
+    const batchPath = parseBatchPath(path);
+    if (batchPath) {
+        // Use new batch extraction logic
+        return extractBatchReadings(payload, batchPath, metric);
+    }
+    // If not using explicit batch path, do not process as batch
+    return [];
+}
+
 export function parseValueFromPayload(msg: any, metric: sparkplugMetric, payloadFormat: serialisationType | string, delimiter?: string) {
     let payload: any;
     const path = (typeof metric.properties !== "undefined" && typeof metric.properties.path !== "undefined" ? metric.properties.path.value as string : "");
@@ -381,6 +466,9 @@ export function parseValueFromPayload(msg: any, metric: sparkplugMetric, payload
             } catch (e: any) {
                 log('Failed to parse JSON data')
             }
+
+            // Note: Array payloads are now handled in _handleData using processArrayPayload
+            // This function only processes non-array payloads or is called for a single item
 
             if (path) {
                 /* Work around a bug in the JSONPath library */
@@ -415,6 +503,9 @@ export function parseValueFromPayload(msg: any, metric: sparkplugMetric, payload
 
                     newVal.rows = dataSet;
                     return newVal;
+                } else if (typeof payload === 'object' && payload.hasOwnProperty('value')) {
+                    // If no path is provided but the object has a 'value' property, use that
+                    return parseTypeFromString(metric.type, payload.value);
                 }
             }
             break;
@@ -472,6 +563,10 @@ export function parseTimeStampFromPayload(msg: any, metric: sparkplugMetric, pay
                 log('Failed to parse JSON data')
             }
 
+            // Note: Array payloads are now handled in _handleData using processArrayPayload
+            // This function only processes non-array payloads
+
+            // Extract timestamp from the payload
             const timestamp = JSONPath({
                 path: '$.timestamp',
                 json: payload
@@ -490,6 +585,27 @@ export function parseTimeStampFromPayload(msg: any, metric: sparkplugMetric, pay
                 }
 
                 return extractedTimestamp * 1000;
+            }
+
+            // If no timestamp found in the standard location, check if the payload itself has a timestamp or time property
+            if (typeof payload === 'object') {
+                if (payload.hasOwnProperty('timestamp')) {
+                    const directTimestamp = payload.timestamp;
+                    if (directTimestamp) {
+                        if (isTimestampInMilliseconds(directTimestamp)) {
+                            return directTimestamp;
+                        }
+                        return directTimestamp * 1000;
+                    }
+                } else if (payload.hasOwnProperty('time')) {
+                    const directTimestamp = payload.time;
+                    if (directTimestamp) {
+                        if (isTimestampInMilliseconds(directTimestamp)) {
+                            return directTimestamp;
+                        }
+                        return directTimestamp * 1000;
+                    }
+                }
             }
 
             return undefined;

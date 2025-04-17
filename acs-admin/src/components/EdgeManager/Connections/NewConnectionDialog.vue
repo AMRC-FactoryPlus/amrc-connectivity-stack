@@ -15,17 +15,18 @@
           <label class="text-sm font-medium">Connection Name <span class="text-red-500">*</span></label>
           <Input
               placeholder="e.g. Machine Connection"
-              v-model="name"
+              v-model="v$.name.$model"
+              :v="v$.name"
               required
           />
         </div>
         <!-- Driver Selection -->
         <div class="flex flex-col gap-1">
-          <label class="text-sm font-medium" for="host">Driver</label>
-          <Select :disabled="existingConnection" name="host" v-model="selectedDriverName">
-            <SelectTrigger>
+          <label class="text-sm font-medium" for="host">Driver <span class="text-red-500">*</span></label>
+          <Select :disabled="existingConnection" name="host" v-model="v$.selectedDriverName.$model">
+            <SelectTrigger :class="{'border-red-500': v$.selectedDriverName.$error}">
               <SelectValue>
-                {{selectedDriverName ?? 'Select a Driver...'}}
+                {{v$.selectedDriverName.$model ?? 'Select a Driver...'}}
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
@@ -42,6 +43,9 @@
               </SelectGroup>
             </SelectContent>
           </Select>
+          <div v-if="v$.selectedDriverName.$error" class="text-sm text-red-500 mt-1">
+            Please select a driver
+          </div>
         </div>
 
         <!-- Driver-specific form fields -->
@@ -93,7 +97,7 @@
           />
         </div>
       </div>
-      <DialogFooter>
+      <DialogFooter :title="v$?.$silentErrors[0]?.$message">
         <div class="flex w-full items-center justify-between">
           <!-- Delete button - only show when editing -->
           <Button
@@ -148,6 +152,17 @@ import { useServiceClientStore } from '@store/serviceClientStore.js'
 import { UUIDs } from '@amrc-factoryplus/service-client'
 import JSONFormElement from '@/components/ui/form/JSONFormElement.vue'
 import { useVuelidate } from '@vuelidate/core'
+
+// Function to sanitize connection names for Kubernetes compatibility
+function sanitizeConnectionName(name) {
+  if (!name) return name;
+  // Replace spaces and other non-alphanumeric characters with hyphens
+  // Convert to lowercase and ensure it follows RFC 1123 subdomain naming rules
+  return name.toLowerCase()
+    .replace(/[^a-z0-9-\.]/g, '-')
+    .replace(/^[^a-z0-9]+/, '') // Ensure it starts with alphanumeric
+    .replace(/[^a-z0-9]+$/, ''); // Ensure it ends with alphanumeric
+}
 import { helpers, required, minLength } from '@vuelidate/validators'
 import { useEdgeClusterStore } from '@store/useEdgeClusterStore.js'
 import { toast } from 'vue-sonner'
@@ -225,8 +240,8 @@ export default {
         // If editing an existing connection, populate the form
         this.existingConnection = existingConnection
         const existingConfig    = existingConnection.configuration
-        this.selectedDriverName = this.dr.data.find(d => d.uuid === existingConfig.driver_uuid)?.name
-        this.name = existingConnection.name
+        this.v$.selectedDriverName.$model = this.dr.data.find(d => d.uuid === existingConfig.driver_uuid)?.name
+        this.v$.name.$model = existingConnection.name
         this.pollInt = existingConfig.pollInt || 1000 // Load existing poll interval or default to 1000ms
         this.formData = {
           ...existingConfig.config,
@@ -282,9 +297,16 @@ export default {
       selectedDriverName: { required },
       name: {
         required,
-        alphaNumUnderscoreSpace: helpers.withMessage(
-          'Letters, numbers, spaces and underscores are valid',
-          (value) => /^[a-zA-Z0-9_ ]*$/.test(value)
+        // Only allow characters that are valid for Kubernetes resource names
+        // This will prevent issues with LocalSecret resources
+        kubernetesNameSafe: helpers.withMessage(
+          'Only letters, numbers, hyphens, and dots are allowed. Must start and end with an alphanumeric character.',
+          (value) => {
+            if (!value) return true; // Skip validation if empty (required will catch this)
+            // RFC 1123 subdomain pattern - lowercase alphanumeric, hyphens and dots
+            // Must start and end with alphanumeric
+            return /^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$/.test(value.toLowerCase());
+          }
         ),
       },
       pollInt: {
@@ -306,7 +328,7 @@ export default {
 
     // Initialize formData if it doesn't exist
     if (!this.formData) {
-      console.log('Initializing formData')
+      console.debug('Initializing formData')
       this.formData = {
         payloadFormat: "Defined by Protocol"
       }
@@ -495,8 +517,8 @@ export default {
       this.v$.$reset()
 
       // Reset all form fields
-      this.selectedDriverName = null
-      this.name = null
+      this.v$.selectedDriverName.$model = null
+      this.v$.name.$model = null
       this.pollInt = 1000 // Reset to default 1000ms
       this.formData = {
         payloadFormat: "Defined by Protocol"
@@ -519,13 +541,23 @@ export default {
                 ...configData
               } = _.cloneDeep(this.formData)
 
+        // Store the original name for display purposes
+        const originalName = this.name;
+        // Sanitize the name for Kubernetes compatibility
+        const sanitizedName = sanitizeConnectionName(originalName);
+
+        console.debug('Connection name:', originalName);
+        console.debug('Sanitized name for Kubernetes:', sanitizedName);
+
         if (this.existingConnection) {
 
           // Update existing connection - update both info and configuration
           await Promise.all([
             // Update the name in Info app
             this.s.client.ConfigDB.patch_config(UUIDs.App.Info, this.existingConnection.uuid, 'merge', {
-              name: this.name,
+              name: originalName,
+              // Add the sanitized name as a separate field
+              k8s_name: sanitizedName,
             }),
             // Update the connection configuration
             this.s.client.ConfigDB.patch_config(UUIDs.App.ConnectionConfiguration, this.existingConnection.uuid, 'merge', {
@@ -544,11 +576,11 @@ export default {
           ])
 
           // Update the edge agent config
-          console.log('Updating edge agent config for connection:', this.existingConnection.uuid)
+          console.debug('Updating edge agent config for connection:', this.existingConnection.uuid)
           await updateEdgeAgentConfig({
             connectionId: this.existingConnection.uuid
           })
-          console.log('Edge agent config update completed')
+          console.debug('Edge agent config update completed')
 
           toast.success('Success!', {
             description: 'The connection has been updated successfully.',
@@ -556,13 +588,15 @@ export default {
         }
         else {
           // Log the payload format being saved for new connection
-          console.log('Creating new connection with payload format:', payloadFormat)
+          console.debug('Creating new connection with payload format:', payloadFormat)
           // Create new connection
           const connectionUUID = await this.s.client.ConfigDB.create_object(UUIDs.Class.EdgeAgentConnection)
 
           // Create the info config first
           await this.s.client.ConfigDB.put_config(UUIDs.App.Info, connectionUUID, {
-            name: this.name,
+            name: originalName,
+            // Add the sanitized name as a separate field
+            k8s_name: sanitizedName,
           })
 
           // Then create the connection configuration
@@ -586,11 +620,11 @@ export default {
           await this.s.client.ConfigDB.put_config(UUIDs.App.ConnectionConfiguration, connectionUUID, payload)
 
           // Update the edge agent config
-          console.log('Updating edge agent config for new connection:', connectionUUID)
+          console.debug('Updating edge agent config for new connection:', connectionUUID)
           await updateEdgeAgentConfig({
             connectionId: connectionUUID
           })
-          console.log('Edge agent config update completed for new connection')
+          console.debug('Edge agent config update completed for new connection')
 
           toast.success('Success!', {
             description: 'The connection has been created successfully.',

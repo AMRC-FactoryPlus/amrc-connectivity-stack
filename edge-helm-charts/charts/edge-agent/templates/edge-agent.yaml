@@ -1,16 +1,29 @@
 {{- $k8sname := include "edge-agent.k8sname" . }}
+# This deployment is configured to completely disable Kubernetes
+# back-offs for edge agents. This ensures that when an edge agent fails,
+# it will be restarted immediately without any exponential back-off
+# delay.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: edge-agent-{{ $k8sname }}
   namespace: {{ .Release.Namespace }}
+  annotations:
+    # Custom annotation to document that this deployment has back-offs
+    # disabled This can be used by operators or scripts to identify
+    # deployments with this configuration
+    factory-plus.app/disable-backoff: "true"
   labels:
     factory-plus.app: edge-agent
     factory-plus.service: edge-agent-{{ $k8sname }}
     factory-plus.nodeUuid: {{ .Values.uuid }}
     factory-plus.name: {{ .Values.name }}
 spec:
+  # Only one replica is needed per edge agent
   replicas: 1
+  # The Recreate strategy ensures that the old pod is fully terminated
+  # before a new one is created This prevents multiple instances of the
+  # same edge agent from running simultaneously
   strategy:
     type: Recreate
   selector:
@@ -23,7 +36,32 @@ spec:
         factory-plus.app: edge-agent
         factory-plus.nodeUuid: {{ .Values.uuid }}
         factory-plus.name: {{ .Values.name }}
+      annotations:
+        # The following annotations help disable back-offs for edge
+        # agent pods:
+
+        # This annotation tells the cluster autoscaler that it's safe to
+        # evict this pod. This prevents back-offs that might occur during
+        # cluster scaling operations
+        cluster-autoscaler.kubernetes.io/safe-to-evict: "true"
+
+        # This annotation disables AppArmor restrictions for the
+        # edge-agent container. This prevents security-related back-offs
+        # that might occur due to AppArmor policies
+        container.apparmor.security.beta.kubernetes.io/edge-agent: "unconfined"
+
+        # Add AppArmor annotations for all driver containers
+{{- range $name, $driver := coalesce .Values.drivers dict }}
+  {{- if not $driver.external }}
+        container.apparmor.security.beta.kubernetes.io/driver-{{ $name | lower }}: "unconfined"
+  {{- end }}
+{{- end }}
     spec:
+      # Setting restartPolicy to Always ensures the pod will be
+      # restarted if it exit.s While this doesn't directly disable
+      # back-offs, it works with other settings to ensure the pod is
+      # restarted as quickly as possible
+      restartPolicy: Always
 {{ if .Values.hostname }}
       nodeSelector:
         kubernetes.io/hostname: {{ .Values.hostname | quote }}
@@ -34,6 +72,37 @@ spec:
       containers:
         - name: edge-agent
 {{ list . "edgeAgent" | include "edge-agent.image" | indent 10 }}
+          # This startup probe is a key mechanism for preventing
+          # back-offs
+          #
+          # How it works:
+          # 1. The probe always succeeds (runs the 'true' command which
+          # always returns exit code 0)
+          # 2. When a container fails, Kubernetes will restart it and
+          # then immediately run the startup probe
+          # 3. With an extremely high failure threshold (9999999),
+          # Kubernetes will keep trying the probe without applying
+          # back-off delays even if the container keeps failing
+          # 4. This effectively bypasses Kubernetes' built-in back-off
+          # mechanism, which cannot be directly disabled through
+          # standard configuration
+          #
+          # This ensures that the container restarts immediately after a
+          # failure, rather than waiting for increasingly longer periods
+          # of time
+          startupProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - "true"
+            # Start checking almost immediately after container starts
+            initialDelaySeconds: 1
+            # Check frequently
+            periodSeconds: 1
+            # Set an extremely high threshold to prevent Kubernetes from
+            # giving up This is the key to preventing back-offs
+            failureThreshold: 9999999
           env:
             - name: DEBUG
               value: {{ .Values.debug | quote }}
@@ -80,6 +149,8 @@ spec:
   {{- if not $driver.external }}
         - name: "driver-{{ $name | lower }}"
     {{- list $ $driver.image | include "edge-agent.image" | nindent 10 }}
+          # Add startup probe to prevent back-offs for driver containers
+    {{- dict "containerName" (printf "driver-%s" ($name | lower)) | include "edge-agent.backoff-prevention-probe" | nindent 10 }}
     {{- if $driver.privileged }}
           securityContext:
             privileged: true

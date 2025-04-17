@@ -143,7 +143,6 @@ export default {
           config = {
             ...config,
             bare: true,
-            createdAt: new Date().toISOString(),
             values: {
               sealedSecrets: {
                 enabled: false,

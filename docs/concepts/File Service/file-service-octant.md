@@ -3,69 +3,60 @@
 
 ## Objective
 
-- Define process for automatic ingestion of large TDMS files (>100MB) from the local file system directory into
-the ACS File Service storage:
-  - Option 1: Store files as a blob in Kubernetes volume. 
-  - Option 2: Parse the TDMS file and store them in a database which can handle time series data (InfluxDB?). 
+- Define process for the automatic ingestion of large TDMS files from the local file system directory into
+the ACS File Service storage.
 
-- Investigate if ACS can extract context from the TDMS files:
-  - Option 1: Parse the TDMS file and extract the data summary/partial representation of the data. 
-  - Option 2: Query the time series database for a summary/partial representation of the data.
+- Investigate if ACS can extract a data summary from the TDMS files.
 
-The data from the sensors is written to the TDMS at high frequency (1MHz) but the files are produced at a rate ranging
-from 1-10(s) of minutes.
+- The application must support the uploading of file being produced at a rate ranging from 1-10+ minutes and sizes ranging from 100MB to 14GB.
+The files will contain data from the sensors written at a high frequency (1MHz).
  
 ## Solution 
 
-### Component 1: Folder Watcher
-- Implement a new feature within the File Service that watches a folder where .tdms files are being generated. Use a Node.js 
-tool such as chokidar for monitoring file changes.
-- The watcher must run in a separate process to ensure it does not block the File Service's web server. This can be done 
-using Node's child_process module, which also allows us to run Python scripts if needed for TDMS parsing.
-- The watcher must emit an event when new files have been fully written to disk and can be uploaded. This could involve checking for file 
-size stability.
-- Add an option for deleting local TDMS files after successfully uploading to free up disk space.
-- Include basic logging and metrics to monitor the number of files processed, upload success or failure, and available disk space.
-- Implementing a retry mechanism for failed uploads and (optionally) move failed files to a separate folder for inspection.
-- Add a simple status endpoint or CLI command within the File Service to report ingestion progress and any backlog of unprocessed files.
+### ACS File Service
+The ACS File service deployed in ACS v4.0.0 will be modified to store file extensions in the files metadata stored in ConfigDB.
+The POST file endpoint will parse a header containing the UUID of the file extension. The change/notify interface will be implemented on 
+the API; on file creation it will emit the file UUID and the file type UUID. 
 
-### Component 2: Uploader
-#### Option 1
- - On an event from the folder watcher, the uploader will post the TDMS file to the ACS File Service to store in the Kubernetes volume. 
+### File Edge Agent
+The File Edge Agent will be created to automatically upload files TDMS files from the edge. It will be a NodeJS application
+which watches a directory for new files, when a file is created in this directory, the file will be posted to the ACS File Service. 
+This application will run off cluster and use the JS-Service-Client with username and password authentication. 
 
-#### Option 2
-- Parse the TDMS file and insert the data into a time series database local to ACS File Service. 
+### Summary Generator
+The Summary Generator is a Python application which will run in the ACS-Files pod on the central cluster. The application will
+listen to the change/notify interface of the ACS File Service API, when a new file is created and the file type is TDMS, the 
+application calls the File Service API with the file UUID to retrieve and parse the TDMS file to create a data summary. 
+This summary is then inserted into the InfluxDB default ACS bucket. The application will use and build on the Python service 
+client used by the acs-krb-keys-operator.
 
-### Component 3: Summary Generator
-- A data summary is generated when an ACS File Service endpoint is called for a given file UUID.
-  `GET /v1/file/summary/:uuid`
+### Deployment Diagram 
+![Deployment Diagram](deployment.png)
 
-#### Option 1
-- `GET /v1/file/summary/:uuid` is called, the file from the kubernetes volume is parsed and a summary is generated and returned. 
-#### Option 2
-- `GET /v1/file/summary/:uuid` is called and the file service queries the time series database for the summary which is returned. 
+### File Upload process
 
-### Component 4: Storage
+1. The TDMS file is created by the data producer and stored in a directory on the local file system.  
+2. The File Edge Agent "folder watcher" detects a new file has been created and queues the file to be posted to the 
+ACS file service.  
+3. The queue is processed and the TDMS file is posted by the File Edge Agent "uploader" to the ACS File Service.  
+4. The ACS File Service API creates the file metadata in ConfigDB.  
+5. The ACS File Service API Writes the uploaded TDMS file to the Kubernetes volume.   
+6. The change/notify interface on the ACS File Service sends the created file UUID and the file type UUID.  
+7. On the file created notification, the File Service Summary Generator looks up the type UUID in ConfigDB to check if the file 
+is a TDMS file.  
+8. If the type is TDMS, a get request is made to the File Service API to retrieve the file.  
+9. The summary is generated by the File Service Summary Generator and inserted into InfluxDB.  
+10. The summary is visible in Grafana using the Influx datasource.   
 
-#### Option 1 
-- Kubernetes volume.
-#### Option 2 
-- Time series database. 
-- Do we want to store the raw file anyway in Kubernetes volume? 
+## Future Work
+The above defines an architecture for handling the storage of high frequency data files in ACS but has the following drawbacks:
+- The File Edge agent is not part of the edge cluster and can't be managed by the central cluster.
+- The summary won't be visible in near real-time due to the summary being generated after the file has been uploaded.
+- The Summary generator will have to be modified to support the parsing of new data file types.
 
-## Testing
-- Request a large volume of sample TDMS files from James to simulate real-world usage scenarios.
-- Create a script within the /tests directory of the File Service that mimics file generation and high frequency data writing. 
-- This script should copy or write files into the watched folder at a rate comparable to the expected production load (1MHz).
-- Validate the behavior of the watcher with a focus on the following points:
-  - It accurately detects new files once they are fully written.
-  - It uploads files consistently and reliably, even large files under high load.
-  - It avoids uploading files prematurely, before they are fully written.
-  - It only deletes files that have been successfully uploaded and the option is enabled.
-  - It does not miss or duplicate file uploads.
-
-## Questions: 
- - Will this be part of an ACS edge deployment or will it be a separate application which interacts with ACS? 
- - What does the physical architecture of this look like? 
- - Should we also create metadata for TDMS files in ConfigDB?
+The proposed solution:
+- Create a new edge agent type: **File Edge Agent** which will be a Sparkplug Node. 
+- The summary generator will be a driver, these can be created for the parsing of different file types and will follow a 
+similar architecture to the existing Edge Agent. 
+- Instead of inserting the data summary into influx directly, device summary data will be published to MQTT.
 

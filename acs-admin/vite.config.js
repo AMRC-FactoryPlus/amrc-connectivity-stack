@@ -74,6 +74,7 @@ export default defineConfig({
       'got': EMPTY,
       'got-fetch': EMPTY,
       'gssapi.js': EMPTY,
+      'path': 'path-browserify',
     },
     preserveSymlinks: true,
   }

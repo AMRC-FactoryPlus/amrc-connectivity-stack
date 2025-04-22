@@ -6,22 +6,22 @@
   <!-- Wrapper div with fixed height and no scrolling -->
   <div class="w-full overflow-hidden flex-1">
     <SidebarProvider class="overflow-hidden">
-    <Dialog :open="!!newObjectContext" @update:open="(open) => { if (!open) newObjectContext = null }">
-      <DialogContent class="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle v-if="newObjectContext && newObjectContext.length">
-            Add a new entry to {{ newObjectContext[0].key }}
-          </DialogTitle>
-          <DialogDescription>Create a new item in this section</DialogDescription>
-        </DialogHeader>
-        <NewObjectOverlayForm
-            @create="createObject"
-            @close="newObjectContext = null"
-            v-if="newObjectContext && newObjectContext[newObjectContext.length-1]?.value?.patternProperties"
-            :object-type="newObjectContext && newObjectContext.length ? newObjectContext[0].key : 'Object'"
-            :regex="Object.keys(newObjectContext[newObjectContext.length-1]?.value?.patternProperties || {})[0] || '.*'"></NewObjectOverlayForm>
-      </DialogContent>
-    </Dialog>
+      <Dialog :open="!!newObjectContext" @update:open="(open) => { if (!open) newObjectContext = null }">
+        <DialogContent class="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle v-if="newObjectContext && newObjectContext.length">
+              Add a new entry to {{ newObjectContext[0].key }}
+            </DialogTitle>
+            <DialogDescription>Create a new item in this section</DialogDescription>
+          </DialogHeader>
+          <NewObjectOverlayForm
+              @create="createObject"
+              @close="newObjectContext = null"
+              v-if="newObjectContext && newObjectContext[newObjectContext.length-1]?.value?.patternProperties"
+              :object-type="newObjectContext && newObjectContext.length ? newObjectContext[0].key : 'Object'"
+              :regex="Object.keys(newObjectContext[newObjectContext.length-1]?.value?.patternProperties || {})[0] || '.*'"></NewObjectOverlayForm>
+        </DialogContent>
+      </Dialog>
       <!-- Sidebar with fixed height and independent scrolling -->
       <Sidebar collapsible="none" class="flex flex-col ml-3 my-3 bg-gray-100/50 border rounded-lg">
         <SidebarContent class="flex flex-col h-auto">

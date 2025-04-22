@@ -41,45 +41,45 @@
                     :show-only-populated="showOnlyPopulated">
                 </SchemaGroup>
               </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+            </SidebarGroupContent>
+          </SidebarGroup>
           <!-- Save button fixed at the bottom -->
           <Button variant="destructive" :disabled="loading" @click="save()" class="mt-2 shrink-0 m-3">
-          <div v-if="!loading" class="flex items-center justify-center gap-1">
-            <span>Save Changes</span>
-            <i class="fa-sharp fa-solid fa-save ml-2"></i>
-          </div>
-          <div v-else class="flex items-center justify-center gap-1">
-            <span>Saving</span>
-            <i class="fa-sharp fa-solid fa-circle-notch fa-spin ml-2"></i>
-          </div>
-        </Button>
-      </SidebarContent>
-      <SidebarRail/>
-    </Sidebar>
+            <div v-if="!loading" class="flex items-center justify-center gap-1">
+              <span>Save Changes</span>
+              <i class="fa-sharp fa-solid fa-save ml-2"></i>
+            </div>
+            <div v-else class="flex items-center justify-center gap-1">
+              <span>Saving</span>
+              <i class="fa-sharp fa-solid fa-circle-notch fa-spin ml-2"></i>
+            </div>
+          </Button>
+        </SidebarContent>
+        <SidebarRail/>
+      </Sidebar>
       <!-- Main content with fixed height and independent scrolling -->
       <SidebarInset class="flex flex-col flex-1 overflow-hidden px-6 pt-4 h-full">
         <!-- Fixed header -->
-      <header class="flex shrink-0 items-center justify-between gap-2 px-1 mb-3">
-          <Breadcrumb>
-            <BreadcrumbList>
-              <template v-if="selectedMetric">
-                <template v-for="(segment, index) in selectedMetric.path.slice(0, -1)" :key="index">
-                  <BreadcrumbItem class="hidden md:block">
-                    <BreadcrumbLink>
-                      {{segment}}
-                    </BreadcrumbLink>
+        <header class="flex shrink-0 items-center justify-between gap-2 px-1 mb-3">
+            <Breadcrumb>
+              <BreadcrumbList>
+                <template v-if="selectedMetric">
+                  <template v-for="(segment, index) in selectedMetric.path.slice(0, -1)" :key="index">
+                    <BreadcrumbItem class="hidden md:block">
+                      <BreadcrumbLink>
+                        {{segment}}
+                      </BreadcrumbLink>
+                    </BreadcrumbItem>
+                    <BreadcrumbSeparator class="hidden md:block"/>
+                  </template>
+                  <BreadcrumbItem>
+                    <BreadcrumbPage>{{selectedMetric.path.slice(-1)[0]}}</BreadcrumbPage>
                   </BreadcrumbItem>
-                  <BreadcrumbSeparator class="hidden md:block"/>
                 </template>
-                <BreadcrumbItem>
-                  <BreadcrumbPage>{{selectedMetric.path.slice(-1)[0]}}</BreadcrumbPage>
-                </BreadcrumbItem>
-              </template>
-            </BreadcrumbList>
-          </Breadcrumb>
-        <div class="text-xs text-gray-400/90">{{selectedMetric?.model.Documentation}}</div>
-      </header>
+              </BreadcrumbList>
+            </Breadcrumb>
+          <div class="text-xs text-gray-400/90">{{selectedMetric?.model.Documentation}}</div>
+        </header>
         <!-- Scrollable content area -->
         <div class="flex-1 content-scroll">
         <div v-if="selectedMetric">

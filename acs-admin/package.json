@@ -13,7 +13,7 @@
     "@amrc-factoryplus/rx-util": "file:../lib/js-rx-util",
     "@amrc-factoryplus/service-client": "file:../lib/js-service-client",
     "@amrc-factoryplus/sparkplug-app": "file:../lib/js-sparkplug-app",
-    "@apidevtools/json-schema-ref-parser": "^11.9.3",
+    "@apidevtools/json-schema-ref-parser": "file:../lib/js-json-schema-ref-parser",
     "@import-meta-env/cli": "^0.6.9",
     "@import-meta-env/unplugin": "^0.6.2",
     "@rollup/plugin-inject": "^5.0.5",

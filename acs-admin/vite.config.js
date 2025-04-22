@@ -30,6 +30,10 @@ export default defineConfig({
     rollupOptions: {
       treeshake: 'safest'
     },
+    commonjsOptions: {
+      strictRequires: true,
+      transformMixedEsModules: true,
+    },
   },
   optimizeDeps: {
     include: ['buffer'],

@@ -36,7 +36,7 @@ export const useMemberStore = defineStore('members', {
       );
 
       this.rxsub = members.subscribe(members => {
-        console.log("MEMBERS UPDATE: %o", members);
+        console.debug("MEMBERS UPDATE: %o", members);
         this.data = members;
         this.loading = false;
       });

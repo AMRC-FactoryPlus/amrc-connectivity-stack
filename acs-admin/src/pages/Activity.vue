@@ -51,6 +51,7 @@ import relativeTime from 'dayjs/plugin/relativeTime'
 import { useServiceClientStore } from '@/store/serviceClientStore.js'
 import { Topic } from '@amrc-factoryplus/service-client'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card/index.js'
+import {serviceClientReady} from "@store/useServiceClientReady.js";
 
 export default {
 
@@ -102,6 +103,7 @@ export default {
       this.lastRefreshTime = new Date().getTime()
     }, 1000) // Update every 60 seconds
 
+    await serviceClientReady()
     this.mqtt = await this.s.client.MQTT.mqtt_client()
 
     this.mqtt.on('connect', this.onConnect)

@@ -35,8 +35,6 @@ export const useDirectStore = defineStore('direct', {
       const cdb = useServiceClientStore().client.ConfigDB;
       const objs = useObjectStore().maps;
 
-      console.log(cdb)
-
       // Find all classes
       const classes = rxu.rx(objs,
         rx.map(objList => 
@@ -60,7 +58,7 @@ export const useDirectStore = defineStore('direct', {
       );
 
       this.rxsub = direct.subscribe(classes => {
-        console.log("DIRECT UPDATE: %o", classes);
+        console.debug("DIRECT UPDATE: %o", classes);
         this.data = classes;
         this.loading = false;
       });

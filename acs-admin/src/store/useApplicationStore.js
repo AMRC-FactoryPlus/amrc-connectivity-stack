@@ -42,7 +42,7 @@ export const useApplicationStore = defineStore('application', {
       );
 
       this.rxsub = details.subscribe(apps => {
-        console.log("APPS UPDATE: %o", apps);
+        console.debug("APPS UPDATE: %o", apps);
         this.data = apps;
         this.loading = false;
       });

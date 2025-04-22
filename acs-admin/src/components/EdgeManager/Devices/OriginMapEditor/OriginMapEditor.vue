@@ -108,7 +108,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { useSchemaStore } from '@store/useSchemaStore.js'
 import SchemaGroup from './SchemaGroup.vue'
 import SparkplugMetric from './SparkplugMetric.vue'
-import * as $RefParser from '@apidevtools/json-schema-ref-parser'
+import { dereference } from '@/utils/jsonSchemaRefParserWrapper';
 import { storeReady } from '@store/useStoreReady.js'
 import { Button } from '@/components/ui/button'
 import { toast } from 'vue-sonner'
@@ -129,7 +129,6 @@ import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbP
 import { Separator } from '@/components/ui/separator'
 
 const SparkplugMetricUUID = 'b16275f1-e443-4c41-a482-fcbdfbd20769'
-
 export default {
 
   setup () {
@@ -270,10 +269,9 @@ export default {
         },
       }
 
-      const rp        = new $RefParser()
       // Remove the prefix if it's already there
       const cleanUuid = schemaUuid.replace(/^urn:uuid:/, '')
-      return rp.dereference(`urn:uuid:${cleanUuid}`, {
+      return await dereference(`urn:uuid:${cleanUuid}`, {
         parse: { all: parser },
         resolve: {
           uuid: resolver,
@@ -368,7 +366,7 @@ export default {
             this.removePropertiesWithPatternProperties(schemaToInstantiate.properties)
           }
 
-          // console.log('PatternProperties found. Creating', schemaToInstantiate.title, 'called', objectName, 'at',
+          // console.debug('PatternProperties found. Creating', schemaToInstantiate.title, 'called', objectName, 'at',
           //     n.join('.'), schemaToInstantiate)
 
           // Only create the object if we have a valid schema to instantiate

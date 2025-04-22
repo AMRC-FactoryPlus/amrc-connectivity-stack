@@ -58,7 +58,7 @@
         <SidebarRail/>
       </Sidebar>
       <!-- Main content with fixed height and independent scrolling -->
-      <SidebarInset class="flex flex-col flex-1 overflow-hidden px-6 pt-4 h-full">
+      <SidebarInset class="flex flex-col flex-1 overflow-auto px-6 py-4 h-full">
         <!-- Fixed header -->
         <header class="flex shrink-0 items-center justify-between gap-2 px-1 mb-3">
             <Breadcrumb>

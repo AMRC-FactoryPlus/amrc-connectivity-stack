@@ -40,6 +40,7 @@
     "monaco-editor": "^0.52.2",
     "monaco-yaml": "^5.3.1",
     "numeral": "^2.0.6",
+    "path-browserify": "^1.0.1",
     "pinia": "^2.3.1",
     "pinia-plugin-persist": "^1.0.0",
     "postcss": "^8.5.1",

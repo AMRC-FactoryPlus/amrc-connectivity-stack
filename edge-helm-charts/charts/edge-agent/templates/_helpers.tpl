@@ -15,5 +15,7 @@ imagePullPolicy: {{ $spec.pullPolicy }}
 {{- end }}
 
 {{- define "edge-agent.sanitize-name" -}}
-{{- . | lower | replace " " "-" | replace "_" "-" | regexFind "[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*" -}}
+{{- . | lower | replace " " "-" | replace "_" "-" 
+    | regexFind "[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*"
+-}}
 {{- end -}}

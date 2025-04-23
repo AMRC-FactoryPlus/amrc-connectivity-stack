@@ -38,7 +38,7 @@ drivers: {}
     # A list of host paths to mount into the driver container.
     #hostPaths:
     #  - hostPath: /dev/ttyUSB0
-    #    mountPoint: /dev/arduino
+    #    mountPath: /dev/arduino
 
 # Make the driver interface available externally.
 #externalIPs: []

@@ -6,7 +6,7 @@
   {{- range $ix, $hp := coalesce $driver.hostPaths list }}
     {{- $vn := printf "hp-%s-%d" (include "edge-agent.k8sname" $name) $ix }}
     {{- $_ := set $driverMounts.volumes $vn $hp.hostPath }}
-    {{- $_ := set (get $driverMounts.mounts $name) $vn $hp.mountPoint }}
+    {{- $_ := set (get $driverMounts.mounts $name) $vn $hp.mountPath }}
   {{- end }}
 {{- end -}}
 
@@ -183,7 +183,7 @@ spec:
           volumeMounts:
     {{- end }}
     {{- range $n, $m := $hp }}
-            - mountPoint: "{{ $m }}"
+            - mountPath: "{{ $m }}"
               name: "{{ $n }}"
     {{- end }}
   {{- end }}

@@ -301,6 +301,11 @@ export async function updateEdgeAgentConfig({
         // Create a complete connection object with the latest data
         const connection = {
           uuid: connectionId,
+          /* XXX bmz: This should not be the GI name, that is for human
+           * consumption. Either (1) we should generate names, (2) we need a
+           * `name` prop in the Connection Config entry or (3) we need
+           * an _Edge Agent request_ entry with map from names to
+           * connection UUIDs, and maybe also from names to Devices. */
           name: connectionInfo.name,
           configuration: connectionConfig
         }
@@ -359,6 +364,20 @@ export async function updateEdgeAgentConfig({
       return
     }
 
+    /* XXX bmz: The structure here is inside-out. We have a complete
+     * list of origin maps and connection configs; we can generate the
+     * EA configs completely from these. We should not be using the
+     * existing config at all, instead we should just rebuild the whole
+     * thing from scratch using the information we have. This would
+     * avoid all the fragile logic searching for matching parts of the
+     * existing config and would ensure that configs are properly
+     * updated when the code here changes.
+     *
+     * Also: this should not be in the frontend. The frontend should
+     * just update the source entries and then a backend service should
+     * pick those changes up and generate the Edge Agent configs.
+     */
+
     // Get the node UUID from the first device
     const nodeUuid = devices[0].deviceInformation?.node
     if (!nodeUuid) {
@@ -396,26 +415,35 @@ export async function updateEdgeAgentConfig({
       let connectionConfig = null
 
       if (config.deviceConnections) {
-        connectionIndex = config.deviceConnections.findIndex(conn => {
-          // Check if this connection matches our connection
-          const connMatches = conn.connType === connType
-          const detailsMatch = connDetails ? JSON.stringify(conn[connDetailsKey] || conn.DriverDetails) === JSON.stringify(connDetails) : true
-          return connMatches && detailsMatch
-        })
+        connectionIndex = config.deviceConnections.findIndex(conn => 
+          conn.uuid == connection.uuid);
 
-        if (connectionIndex >= 0) {
-          console.debug('Found existing connection in edge agent config at index:', connectionIndex)
-          connectionConfig = config.deviceConnections[connectionIndex]
-          // Update the pollInt for existing connections
-          if (connectionConfiguration.pollInt) {
-            console.debug('Updating pollInt from', connectionConfig.pollInt, 'to', connectionConfiguration.pollInt)
-            connectionConfig.pollInt = connectionConfiguration.pollInt
-          }
-          // Update the payloadFormat for existing connections
-          if (connectionConfiguration.source?.payloadFormat) {
-            console.debug('Updating payloadFormat from', connectionConfig.payloadFormat, 'to', connectionConfiguration.source.payloadFormat)
-            connectionConfig.payloadFormat = connectionConfiguration.source.payloadFormat
-          }
+        // If we don't have a recorded UUID, fall back to matching on
+        // the connection definition.
+        if (connectionIndex < 0) {
+          connectionIndex = config.deviceConnections.findIndex(conn => {
+            // Check if this connection matches our connection
+            const connMatches = conn.connType === connType
+            const detailsMatch = connDetails ? JSON.stringify(conn[connDetailsKey] || conn.DriverDetails) === JSON.stringify(connDetails) : true
+            return connMatches && detailsMatch
+          })
+        }
+      }
+
+      if (connectionIndex >= 0) {
+        console.debug('Found existing connection in edge agent config at index:', connectionIndex)
+        connectionConfig = config.deviceConnections[connectionIndex]
+        // Update connection UUID
+        connectionConfig.uuid = connection.uuid;
+        // Update the pollInt for existing connections
+        if (connectionConfiguration.pollInt) {
+          console.debug('Updating pollInt from', connectionConfig.pollInt, 'to', connectionConfiguration.pollInt)
+          connectionConfig.pollInt = connectionConfiguration.pollInt
+        }
+        // Update the payloadFormat for existing connections
+        if (connectionConfiguration.source?.payloadFormat) {
+          console.debug('Updating payloadFormat from', connectionConfig.payloadFormat, 'to', connectionConfiguration.source.payloadFormat)
+          connectionConfig.payloadFormat = connectionConfiguration.source.payloadFormat
         }
       }
 

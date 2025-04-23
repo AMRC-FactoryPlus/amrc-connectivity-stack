@@ -1,10 +1,10 @@
-{{- $k8sname := include "edge-agent.k8sname" . }}
+{{- $k8sname := include "edge-agent.k8sname" .Values.name }}
 
 {{- $driverMounts := dict "volumes" dict "mounts" dict }}
 {{- range $name, $driver := coalesce .Values.drivers dict }}
   {{- $_ := set $driverMounts.mounts $name dict }}
   {{- range $ix, $hp := coalesce $driver.hostPaths list }}
-    {{- $vn := printf "hp-%s-%d" $name $ix }}
+    {{- $vn := printf "hp-%s-%d" (include "edge-agent.k8sname" $name) $ix }}
     {{- $_ := set $driverMounts.volumes $vn $hp.hostPath }}
     {{- $_ := set (get $driverMounts.mounts $name) $vn $hp.mountPoint }}
   {{- end }}

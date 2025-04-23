@@ -17,11 +17,8 @@ imagePullPolicy: {{ .pullPolicy }}
 {{- end }}
 
 {{- define "edge-agent.k8sname" }}
-    {{- .Values.name | lower | replace "_" "-" }}
-{{- end }}
-
-{{- define "edge-agent.sanitize-name" -}}
-    {{- . | lower | replace " " "-" | replace "_" "-" 
-        | regexFind "[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*"
+    {{- . | lower 
+        | regexReplaceAllLiteral "[^-a-z0-9]+" "-"
+        | trimAll "-"
     }}
-{{- end -}}
+{{- end }}

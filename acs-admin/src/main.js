@@ -43,7 +43,8 @@ const routes = [
     component: Login,
     meta: {
       name: "Login",
-      icon: "user-circle"
+      icon: "user-circle",
+      anonAllowed: true,
     }
   },
   {
@@ -131,21 +132,49 @@ const router = createRouter({
   routes,
 })
 
-// XXX - Disabled because it kept redirecting me to login every time I
-// refreshed the page.
-
 // Setup auth guard.
-// router.beforeEach((to, from, next) => {
-//   const clientLoaded = localStorage.getItem('clientLoaded');
-//   if(!clientLoaded && to.path !== "/login"){
-//     next({path: "/login"})
-//   }else if(clientLoaded && to.path === "/login"){
-//     next({path: "/"})
-//   }
-//   else{
-//     next();
-//   }
-// })
+// This should pull a token from local storage, but currently uses the users credentials to fetch tokens
+router.beforeEach(async (to, from, next) => {
+  // If we don't need auth, we can go straight through
+  // This is only for login at the moment, but other pages may be accessible in future
+  if (to.meta.anonAllowed) {
+    next()
+    return
+  }
+  // From here on, we do need auth
+  // If we are navigating between pages with the service client ready
+  if (useServiceClientStore().ready) {
+    next()
+    return
+  }
+  // Otherwise we are loading fresh and need to initialise the service client
+  const optsString = localStorage.getItem('opts');
+  // If there is no opts value stored, make sure we go to login
+  if (!optsString) {
+    // Make sure we go to login
+    if (to.path !== "/login") {
+      next({path: "/login"})
+      return
+    }
+    // Allow through to the login page
+    next()
+    return
+  }
+  // We do have opts, we should try to use them
+  try {
+    const opts = JSON.parse(optsString)
+    await useServiceClientStore().login(opts)
+    // Seems to have worked! Go through
+    next()
+    return
+  } catch (e) {
+    // Login failed, lets remove opts and login again
+    useServiceClientStore().logout()
+    console.error("Login with stored credentials failed, credentials reset", e)
+    next({path: "/login"})
+    return
+  }
+})
 
 const pinia = createPinia()
 pinia.use(piniaPersist)

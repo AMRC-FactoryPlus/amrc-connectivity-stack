@@ -1,6 +1,6 @@
 {{- define "edge-agent._image" -}}
 image: "{{ .registry }}/{{ .repository }}:{{ .tag }}"
-imagePullPolicy: {{ .pullPolicy }}
+imagePullPolicy: "{{ .pullPolicy }}"
 {{- end }}
 
 {{- define "edge-agent.image" }}
@@ -16,9 +16,9 @@ imagePullPolicy: {{ .pullPolicy }}
     {{- end }}
 {{- end }}
 
+{{/* Grr this wretched language is awful */}}
 {{- define "edge-agent.k8sname" }}
-    {{- . | lower 
-        | regexReplaceAllLiteral "[^-a-z0-9]+" "-"
-        | trimAll "-"
-    }}
+    {{- $lc := . | lower }}
+    {{- $rp := regexReplaceAllLiteral "[^a-z0-9-]+" $lc "-" }}
+    {{- $rp | trimAll "-" }}
 {{- end }}

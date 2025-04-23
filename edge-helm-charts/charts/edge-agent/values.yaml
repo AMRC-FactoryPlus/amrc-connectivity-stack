@@ -1,9 +1,9 @@
 image:
   # Default image parameters. These can be overidden per-image.
   default:
-    registry: %%REGISTRY%%
-    tag: %%TAG%%
-    pullPolicy: %%PULLPOLICY%%
+    registry: "%%REGISTRY%%"
+    tag: "%%TAG%%"
+    pullPolicy: "%%PULLPOLICY%%"
   # Edge Agent image to pull
   edgeAgent:
     repository: acs-edge

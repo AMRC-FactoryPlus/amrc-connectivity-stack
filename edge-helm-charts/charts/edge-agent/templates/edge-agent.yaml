@@ -1,4 +1,15 @@
 {{- $k8sname := include "edge-agent.k8sname" . }}
+
+{{- $driverMounts := dict "volumes" dict "mounts" dict }}
+{{- range $name, $driver := coalesce .Values.drivers dict }}
+  {{- $_ := set $driverMounts.mounts $name dict }}
+  {{- range $ix, $hp := coalesce $driver.hostPaths list }}
+    {{- $vn := printf "hp-%s-%d" $name $ix }}
+    {{- $_ := set $driverMounts.volumes $vn $hp.hostPath }}
+    {{- $_ := set (get $driverMounts.mounts $name) $vn $hp.mountPoint }}
+  {{- end }}
+{{- end -}}
+
 # This deployment is configured to completely disable Kubernetes
 # back-offs for edge agents. This ensures that when an edge agent fails,
 # it will be restarted immediately without any exponential back-off
@@ -167,12 +178,13 @@ spec:
                   key: "{{ $name }}"
             - name: VERBOSE
               value: "{{ $.Values.verbosity }}"
-    {{- if $driver.deviceMounts }}
+    {{- $hp := get $driverMounts.mounts $name }}
+    {{- if $hp }}
           volumeMounts:
-      {{- range $name, $path := coalesce $driver.deviceMounts dict }}
-            - mountPath: "{{ $path }}"
-              name: "driver-dev-{{ $name }}"
-      {{- end }}
+    {{- end }}
+    {{- range $n, $m := $hp }}
+            - mountPoint: "{{ $m }}"
+              name: "{{ $n }}"
     {{- end }}
   {{- end }}
 {{- end }}
@@ -187,10 +199,10 @@ spec:
           secret:
             optional: true
             secretName: driver-passwords.{{ $k8sname }}
-{{- range $name, $path := coalesce .Values.driverDevices dict }}
-        - name: "driver-dev-{{ $name }}"
+{{- range $n, $p := $driverMounts.volumes }}
+        - name: "{{ $n }}"
           hostPath:
-            path: "{{ $path }}"
+            path: "{{ $p }}"
 {{- end }}
 ---
 apiVersion: factoryplus.app.amrc.co.uk/v1

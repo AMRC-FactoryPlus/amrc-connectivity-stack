@@ -155,7 +155,7 @@ async function updateEdgeAgentDeployment(nodeUuid, connections, deviceConnection
     // Process each device connection to find external drivers
     for (const deviceConn of deviceConnections) {
       // Find the corresponding connection in the connection store
-      console.debug('Looking for connection matching device connection:', deviceConn.name, 'with connType:', deviceConn.connType)
+      console.debug('Looking for connection matching device connection:', deviceConn.name, 'with uuid:', deviceConn.uuid)
 
       // The s-s migration will have given every deviceConnections a uuid
       const connection = connections.find(conn => conn.uuid == deviceConn.uuid)

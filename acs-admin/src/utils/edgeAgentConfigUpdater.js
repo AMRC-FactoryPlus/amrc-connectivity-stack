@@ -127,6 +127,9 @@ async function updateEdgeAgentDeployment(nodeUuid, connections, deviceConnection
   try {
 
     // Get the current Edge Agent Deployment configuration
+    /* XXX bmz: This is incorrect. If we are generating this then we
+     * should do so from our source information and not look at what's
+     * there already. */
     const [deployment, etag] = await serviceClient.ConfigDB.get_config_with_etag(UUIDs.App.EdgeAgentDeployment, nodeUuid) || [{}, null]
 
     if (!deployment) {
@@ -156,45 +159,37 @@ async function updateEdgeAgentDeployment(nodeUuid, connections, deviceConnection
 
       // The s-s migration will have given every deviceConnections a uuid
       const connection = connections.find(conn => conn.uuid == deviceConn.uuid)
-
-      // If we found a matching connection, check for driver image reference
-      if (connection) {
-        console.debug('Found matching connection:', connection.name)
-
-        // Check for driver image reference in different possible locations
-        let imageReference = null;
-
-        // Check if driver is a UUID that points to a driver definition
-        if (connection.configuration?.driver) {
-          const driverUuid = connection.configuration.driver;
-          console.debug('Found driver UUID:', driverUuid);
-
-          // Look up the driver definition in the driver store
-          const driverDef = driverStore.data.find(d => d.uuid === driverUuid);
-
-          if (driverDef && driverDef.definition?.image?.reference) {
-            imageReference = driverDef.definition.image.reference;
-            console.debug('Found driver image reference from driver store:', imageReference);
-          } else {
-            console.debug('Driver definition not found in driver store or missing image reference');
-            console.debug('Driver definition:', driverDef);
-          }
-        }
-
-        if (imageReference) {
-          console.debug('Adding driver image to map:', imageReference);
-          driverMap[deviceConn.name] = {
-            image: imageReference
-          };
-        } else {
-          console.debug('Connection does not have a valid driver image reference:', connection.name);
-          console.debug('Driver configuration:', JSON.stringify(connection.configuration?.driver, null, 2));
-          console.debug('Driver UUID:', connection.configuration?.driver_uuid);
-        }
-      } else {
+      if (!connection) {
         console.debug('No matching connection found for device connection:', deviceConn.name);
+        continue;
       }
+      console.debug('Found matching connection:', connection.name)
+
+      // Check if driver is a UUID that points to a driver definition
+      const driverUuid = connection.configuration?.driver;
+      if (!driverUuid) {
+        console.debug('No driver for connection:', deviceConn.name);
+        continue;
+      }
+      console.debug('Found driver UUID:', driverUuid);
+
+      // Look up the driver definition in the driver store
+      const driverDef = driverStore.data.find(d => d.uuid === driverUuid);
+      const image = driverDef?.definition?.image;
+      if (!image) {
+        console.debug('Driver definition not found in driver store or missing image');
+        console.debug('Driver definition', driverDef);
+        continue;
+      }
+      console.debug('Found driver image from driver store', image);
+
+      driverMap[deviceConn.name] = {
+        ...(connection.deployment ?? {}),
+        image,
+      };
     }
+
+    /* XXX bmz: Here we need a source for EA-level values. */
 
     // Update the deployment configuration with the driver map
     console.debug('Final driver map:', driverMap)

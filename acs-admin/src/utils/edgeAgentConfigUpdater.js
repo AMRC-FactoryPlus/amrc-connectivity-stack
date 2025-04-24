@@ -113,8 +113,9 @@ function processOriginMapObject(obj, path, tags) {
  * @param {Array} deviceConnections - Array of device connection configurations from the Edge Agent config
  * @returns {Promise<void>}
  */
-async function updateEdgeAgentDeployment(nodeUuid, connections, deviceConnections) {
+async function updateEdgeAgentDeployment(nodeUuid, deviceConnections) {
   // Get the stores
+  const connectionStore = useConnectionStore()
   const driverStore = useDriverStore()
   const serviceClientStore = useServiceClientStore()
   const serviceClient = serviceClientStore.client
@@ -149,7 +150,7 @@ async function updateEdgeAgentDeployment(nodeUuid, connections, deviceConnection
     const driverMap = {}
 
     console.debug('Updating edge agent deployment for node:', nodeUuid)
-    console.debug('Connections:', connections)
+    console.debug('Connections:', connectionStore.data)
     console.debug('Device connections:', deviceConnections)
 
     // Process each device connection to find external drivers
@@ -157,8 +158,8 @@ async function updateEdgeAgentDeployment(nodeUuid, connections, deviceConnection
       // Find the corresponding connection in the connection store
       console.debug('Looking for connection matching device connection:', deviceConn.name, 'with uuid:', deviceConn.uuid)
 
-      // The s-s migration will have given every deviceConnections a uuid
-      const connection = connections.find(conn => conn.uuid == deviceConn.uuid)
+      // The s-s migration will have given every deviceConnection a uuid
+      const connection = connectionStore.data.find(conn => conn.uuid === deviceConn.uuid)
       if (!connection) {
         console.debug('No matching connection found for device connection:', deviceConn.name);
         continue;
@@ -529,7 +530,7 @@ export async function updateEdgeAgentConfig({
     await serviceClient.ConfigDB.put_config(UUIDs.App.EdgeAgentConfig, nodeUuid, config)
 
     // Update the Edge Agent Deployment configuration for external drivers
-    await updateEdgeAgentDeployment(nodeUuid, connections, config.deviceConnections)
+    await updateEdgeAgentDeployment(nodeUuid, config.deviceConnections)
   } catch (configErr) {
     console.error('Error updating edge agent config:', configErr)
   }

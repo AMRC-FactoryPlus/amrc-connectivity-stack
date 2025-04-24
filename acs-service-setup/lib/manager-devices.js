@@ -183,6 +183,7 @@ class MigrateAgents {
                 dvals.hostPaths = hps;
         }
         delete dvals.deviceMounts;
+        delete dvals.image;
 
         return dvals;
     }
@@ -204,8 +205,8 @@ class MigrateAgents {
                 payloadFormat:  conn.payloadFormat,
             },
             topology:   {
-                cluster:        deployment?.cluster,
-                hostname:       deployment?.hostname,
+                cluster:        dep?.cluster,
+                hostname:       dep?.hostname,
             },
         };
     }

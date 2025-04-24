@@ -58,7 +58,7 @@ class MigrateAgents {
         const agents = await cdb.class_members(Class.EdgeAgent);
         this.deployments = await Promise.all(
             agents.map(o =>
-                cdb.get_config(App.EdgeDeployment, o)
+                cdb.get_config(Edge.App.Deployment, o)
                     .then(c => [o, c])))
             .then(es => new Map(es));
     }
@@ -160,7 +160,7 @@ class MigrateAgents {
         this.log("Registering connection %s of Edge Agent %s", conn.name, agent);
 
         const cconf = this.connection_config(agent, conn);
-        const cobj = await cdb.create_object(Class.Connection);
+        const cobj = await cdb.create_object(Class.EdgeAgentConnection);
         await cdb.put_config(App.Info, cobj, { name: conn.name });
         await cdb.put_config(App.ConnectionConfiguration, cobj, cconf);
 

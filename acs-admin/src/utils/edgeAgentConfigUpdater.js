@@ -116,14 +116,13 @@ function processOriginMapObject(obj, path, tags) {
 async function updateEdgeAgentDeployment(nodeUuid, deviceConnections) {
   // Get the stores
   const connectionStore = useConnectionStore()
-  const driverStore = useDriverStore()
   const serviceClientStore = useServiceClientStore()
   const serviceClient = serviceClientStore.client
 
-  // The driver store should already be refreshed by the parent function, but let's make sure
-  if (!driverStore.ready) {
+  // The store should already be refreshed by the parent function, but let's make sure
+  if (!connectionStore.ready) {
     console.debug('Driver store not ready, waiting...')
-    await storeReady(driverStore)
+    await storeReady(connectionStore)
   }
   try {
 
@@ -166,26 +165,17 @@ async function updateEdgeAgentDeployment(nodeUuid, deviceConnections) {
       }
       console.debug('Found matching connection:', connection.name)
 
-      // Check if driver is a UUID that points to a driver definition
-      const driverUuid = connection.configuration?.driver;
-      if (!driverUuid) {
-        console.debug('No driver for connection:', deviceConn.name);
-        continue;
-      }
-      console.debug('Found driver UUID:', driverUuid);
-
-      // Look up the driver definition in the driver store
-      const driverDef = driverStore.data.find(d => d.uuid === driverUuid);
-      const image = driverDef?.definition?.image;
+      // Check if we have a driver image definition
+      const image = connection.configuration?.driver?.image;
       if (!image) {
-        console.debug('Driver definition not found in driver store or missing image');
-        console.debug('Driver definition', driverDef);
+        console.debug('Driver image not found in connection store');
+        console.debug('Connection', connection);
         continue;
       }
       console.debug('Found driver image from driver store', image);
 
       driverMap[deviceConn.name] = {
-        ...(connection.deployment ?? {}),
+        ...(connection.configuration.deployment ?? {}),
         image,
       };
     }

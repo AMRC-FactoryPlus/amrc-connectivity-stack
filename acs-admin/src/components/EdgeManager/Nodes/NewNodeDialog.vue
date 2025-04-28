@@ -105,7 +105,6 @@ import { helpers, required } from '@vuelidate/validators'
 import { useServiceClientStore } from '@store/serviceClientStore.js'
 // import { useHelmChartTemplateStore } from '@store/useHelmChartTemplateStore.js'
 import { toast } from 'vue-sonner'
-import { useNodeStore } from '@store/useNodeStore.js'
 import { sparkplug_safe_string } from '@amrc-factoryplus/service-client/lib/sparkplug/util.js'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Combobox, ComboboxAnchor, ComboboxEmpty, ComboboxGroup, ComboboxInput, ComboboxItem, ComboboxList } from '@/components/ui/combobox'
@@ -117,7 +116,6 @@ export default {
     return {
       v$: useVuelidate(),
       s: useServiceClientStore(),
-      n: useNodeStore(), // h: useHelmChartTemplateStore(),
     }
   },
 
@@ -229,8 +227,6 @@ export default {
 
         toast.success(`${this.name} has been created!`)
         this.cluster = null
-
-        await this.n.refresh()
 
       }
       catch (err) {

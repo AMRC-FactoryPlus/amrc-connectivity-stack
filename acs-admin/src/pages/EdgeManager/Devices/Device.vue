@@ -142,7 +142,6 @@
 </template>
 
 <script>
-import { useNodeStore } from '@store/useNodeStore.js'
 import EdgeContainer from '@components/Containers/EdgeContainer.vue'
 import { Button } from '@components/ui/button/index.js'
 import DetailCard from '@components/DetailCard.vue'
@@ -184,7 +183,6 @@ export default {
 
   setup () {
     return {
-      n: useNodeStore(),
       d: useDeviceStore(),
       sch: useSchemaStore(),
       conn: useConnectionStore(),

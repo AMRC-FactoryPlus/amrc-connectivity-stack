@@ -205,7 +205,7 @@ export default {
     },
 
     nodes () {
-      return Array.isArray(this.n.data) ? this.n.data.filter(e => e.cluster === this.cluster.uuid) : []
+      return Array.isArray(this.n.data) ? this.n.data.filter(e => e.deployment.cluster === this.cluster.uuid) : []
     },
 
     hosts () {

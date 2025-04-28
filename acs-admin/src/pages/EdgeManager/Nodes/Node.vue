@@ -232,7 +232,8 @@ export default {
     },
 
     selectDevice(e) {
-      const cluster = this.n.data?.find(f => f.uuid === e.original.deviceInformation.node)?.cluster;
+      console.log(this.n.data)
+      const cluster = this.n.data?.find(f => f.uuid === e.original.deviceInformation.node)?.deployment.cluster;
 
       if (!cluster) {
         toast.error('Device has no cluster')

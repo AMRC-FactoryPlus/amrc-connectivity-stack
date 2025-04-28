@@ -193,7 +193,7 @@ export default {
     },
 
     nodes () {
-      return Array.isArray(this.n.data) ? this.n.data.filter(e => e.deployment.cluster === this.cluster.uuid) : []
+      return Array.isArray(this.n.data) ? this.n.data.filter(e => e.deployment?.cluster === this.cluster.uuid) : []
     },
 
     hosts () {
@@ -252,7 +252,7 @@ export default {
         this.copyingBootstrap = false
         if (responseJson) {
           toast.warning(
-            `Unable to copy bootstrap script, likely due to an insecure deployment. Manually run the following command on the edge node to bootstrap the first node of the cluster: ${responseJson}`)
+            `Unable to copy bootstrap script, likely due to an insecure deployment. Manually run the following command on the edge node to bootstrap the first node of the cluster: curl ${responseJson} | sh -`)
         }
         else {
           toast.error('The bootstrap script is not ready yet. Please wait a few moments and try again.')

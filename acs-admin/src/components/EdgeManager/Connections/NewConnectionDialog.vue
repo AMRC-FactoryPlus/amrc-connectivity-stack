@@ -429,8 +429,10 @@ export default {
         // url: `v1/cluster/${this.node.cluster}/secret/${this.node.namespace}/edge-agent-sensitive-information-${this.node.uuid}/${key}`,
         url: `v1/cluster/${cluster}/secret/${namespace}/${name}/${key}`,
         method: 'PUT',
-        contentType: 'application/octet-stream',
-        body: value
+        body: value,
+        headers: {
+          'Content-Type': 'application/octet-stream',
+        },
       })
 
       return key

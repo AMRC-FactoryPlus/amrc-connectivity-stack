@@ -322,16 +322,16 @@ export async function updateEdgeAgentConfig({
       if (connectionIndex >= 0) {
         console.debug('Found existing connection in edge agent config at index:', connectionIndex)
         connectionConfig = config.deviceConnections[connectionIndex]
-        // Update the pollInt for existing connections
-        if (connectionConfiguration.pollInt) {
-          console.debug('Updating pollInt from', connectionConfig.pollInt, 'to', connectionConfiguration.pollInt)
-          connectionConfig.pollInt = connectionConfiguration.pollInt
+        const update = (key, val) => {
+          if (connectionConfig[key] != val) {
+            console.debug('Updating %s from %o to %o', key, connectionConfig[key], val)
+            connectionConfig[key] = val
+          }
         }
-        // Update the payloadFormat for existing connections
-        if (connectionConfiguration.source?.payloadFormat) {
-          console.debug('Updating payloadFormat from', connectionConfig.payloadFormat, 'to', connectionConfiguration.source.payloadFormat)
-          connectionConfig.payloadFormat = connectionConfiguration.source.payloadFormat
-        }
+        update("pollInt", connectionConfiguration.pollInt)
+        update("payloadFormat", connectionConfiguration.source?.payloadFormat)
+        update("connType", connType)
+        update(connDetailsKey, connDetails)
       }
 
       // If connection doesn't exist, create it

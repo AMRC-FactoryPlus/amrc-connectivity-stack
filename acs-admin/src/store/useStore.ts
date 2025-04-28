@@ -286,6 +286,16 @@ export const useStore = (name: string, classUUID: string, appBindings: AppBindin
           await new Promise(resolve => setTimeout(resolve, 100))
         }
       },
+
+      /* Currently this is quite a heavy method; it unsubscribes and
+       * resubscribes upstream as the only way to ensure we have the
+       * latest data. In the future it would be good to adapt the notify
+       * protocol to support write barriers within the protocol. */
+      async synchronise() {
+        await this.stop();
+        await this.start();
+        await this.storeReady();
+      },
     },
   })
 

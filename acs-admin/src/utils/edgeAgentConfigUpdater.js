@@ -226,21 +226,10 @@ export async function updateEdgeAgentConfig({
   // Refresh all stores to ensure we have the latest data
   console.debug('Refreshing stores before updating edge agent config')
 
-  // Stop and restart all stores
-  deviceStore.stop()
-  connectionStore.stop()
-  driverStore.stop()
-
-  deviceStore.start()
-  connectionStore.start()
-  driverStore.start()
-
-  // Wait for all stores to be ready
-  await Promise.all([
-    storeReady(deviceStore),
-    storeReady(connectionStore),
-    storeReady(driverStore)
-  ])
+  // Synchronise all stores 
+  await Promise.all(
+    [deviceStore, connectionStore, driverStore]
+      .map(s => s.synchronise()))
 
   console.debug('All stores refreshed')
   try {
@@ -250,73 +239,18 @@ export async function updateEdgeAgentConfig({
     let connections = []
 
     if (connectionId) {
-      // Get the connection directly from ConfigDB to ensure we have the latest data
-      try {
-        // Get the connection info
-        const connectionInfo = await serviceClient.ConfigDB.get_config(UUIDs.App.Info, connectionId) || {}
-        // Get the connection configuration
-        const connectionConfig = await serviceClient.ConfigDB.get_config(UUIDs.App.ConnectionConfiguration, connectionId) || {}
-
-        if (!connectionInfo || !connectionConfig) {
-          console.error('Connection not found in ConfigDB:', connectionId)
-          return
-        }
-
-        // Create a complete connection object with the latest data
-        const connection = {
-          uuid: connectionId,
-          /* XXX bmz: This should not be the GI name, that is for human
-           * consumption. Either (1) we should generate names, (2) we need a
-           * `name` prop in the Connection Config entry or (3) we need
-           * an _Edge Agent request_ entry with map from names to
-           * connection UUIDs, and maybe also from names to Devices. */
-          name: connectionInfo.name,
-          configuration: connectionConfig
-        }
-
-        console.debug('Fetched latest connection data from ConfigDB:', connection)
-        connections.push(connection)
-
-        // Find all devices using this connection
-        devices = deviceStore.data.filter(d => d.deviceInformation?.connection === connectionId)
-      } catch (error) {
-        console.error('Error fetching connection from ConfigDB:', error)
-        return
-      }
+      connections = connectionStore.data.filter(c => c.uuid == connectionId)
+      // Find all devices using this connection
+      devices = deviceStore.data.filter(d => d.deviceInformation?.connection === connectionId)
     } else {
-      // Get the device
-      const device = deviceStore.data.find(d => d.uuid === deviceId)
-
-      if (!device) {
+      devices = deviceStore.data.filter(d => d.uuid === deviceId)
+      if (!devices.length) {
         console.error('Device not found:', deviceId)
         return
       }
-      devices.push(device)
 
-      // Get the connection for this device
-      if (device.deviceInformation?.connection) {
-        try {
-          // Get the connection info
-          const connectionId = device.deviceInformation.connection
-          const connectionInfo = await serviceClient.ConfigDB.get_config(UUIDs.App.Info, connectionId) || {}
-          // Get the connection configuration
-          const connectionConfig = await serviceClient.ConfigDB.get_config(UUIDs.App.ConnectionConfiguration, connectionId) || {}
-
-          if (connectionInfo && connectionConfig) {
-            // Create a complete connection object with the latest data
-            const connection = {
-              uuid: connectionId,
-              name: connectionInfo.name,
-              configuration: connectionConfig
-            }
-
-            console.debug('Fetched latest connection data from ConfigDB:', connection)
-            connections.push(connection)
-          }
-        } catch (error) {
-          console.error('Error fetching connection from ConfigDB:', error)
-        }
-      }
+      connections = connectionStore.data.filter(c => 
+        c.uuid === devices[0].deviceInformation?.connection)
     }
 
     console.debug('Devices:', devices)

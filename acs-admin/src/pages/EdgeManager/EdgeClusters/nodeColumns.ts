@@ -8,11 +8,15 @@ import {h} from 'vue'
 import DataTableColumnHeader from '@/components/ui/data-table/DataTableColumnHeader.vue'
 
 export interface Host {
-    name: string,
-    charts: string[],
-    cluster: string,
-    hostname: string,
     uuid: string,
+    name: string,
+    deployment: {
+        chart: string,
+        cluster: string,
+        hostname: string,
+        name: string,
+        createdAt: string,
+    }
 }
 
 export const nodeColumns: ColumnDef<Host>[] = [
@@ -36,7 +40,7 @@ export const nodeColumns: ColumnDef<Host>[] = [
     },
     {
         accessorKey: 'hostname',
-        accessorFn: (row) => row.hostname,
+        accessorFn: (row) => row.deployment.hostname,
         header: ({column}) => h(DataTableColumnHeader, {
             column,
             title: 'Host'

@@ -1,9 +1,9 @@
 image:
   # Default image parameters. These can be overidden per-image.
   default:
-    registry: %%REGISTRY%%
-    tag: %%TAG%%
-    pullPolicy: %%PULLPOLICY%%
+    registry: "%%REGISTRY%%"
+    tag: "%%TAG%%"
+    pullPolicy: "%%PULLPOLICY%%"
   # Edge Agent image to pull
   edgeAgent:
     repository: acs-edge
@@ -23,20 +23,22 @@ drivers: {}
   #Test:
     # An image name from the image list above.
     #image: test
+
+    # OR: a full image specification, with defaults from image.default.
+    #image:
+    #  repository: edge-test
+
     # OR: this driver is deployed externally
     #external: false
+
     # Run this driver as a privileged container. This removes a k8s
     # security feature but is necessary to allow access to hardware.
     #privileged: true
-    # An object mapping mount names from driverDevices to mount points
-    # in the driver container.
-    #deviceMounts:
-      #arduino: /dev/arduino
 
-# Host paths which may be mounted into drivers. This is to make host
-# devices available inside the driver containers.
-#driverDevices:
-  #arduino: /dev/ttyUSB0
+    # A list of host paths to mount into the driver container.
+    #hostPaths:
+    #  - hostPath: /dev/ttyUSB0
+    #    mountPath: /dev/arduino
 
 # Make the driver interface available externally.
 #externalIPs: []

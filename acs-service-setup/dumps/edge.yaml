@@ -463,7 +463,6 @@ configs:
       image:
         registry: ghcr.io/amrc-factoryplus
         repository: edge-bacnet
-        reference: bacnet
       schema:
         properties:
           host:
@@ -489,7 +488,6 @@ configs:
       image:
         registry: ghcr.io/amrc-factoryplus
         repository: edge-modbus
-        reference: modbus
       schema:
         properties:
           host:
@@ -523,7 +521,6 @@ configs:
       image:
         registry: ghcr.io/amrc-factoryplus
         repository: edge-test
-        reference: test
       schema:
         properties: null
         title: Test Connection Details
@@ -541,7 +538,6 @@ configs:
       image:
         registry: ghcr.io/amrc-factoryplus
         repository: edge-tplink-smartplug
-        reference: tplink-smartplug
       schema:
         properties:
           host:

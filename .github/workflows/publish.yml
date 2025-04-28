@@ -1,9 +1,7 @@
 name: Build & Release ACS
 
 env:
-  BASE_JS_VERSION: v3.0.0
-  BASE_PHP_VERSION: v3.0.0
-  BUILD_PHP_VERSION: v3.0.0
+  BASE_JS_VERSION: v4.0.0
 
 on:
   release:

@@ -239,6 +239,7 @@ export default {
     },
     async copyBootstrap () {
       this.copyingBootstrap = true
+      let responseJson
       try {
 
         const bootstrapResponse = await useServiceClientStore().client.Fetch.fetch({
@@ -247,7 +248,7 @@ export default {
           method: 'POST',
         })
 
-        const responseJson = await bootstrapResponse.json()
+        responseJson = await bootstrapResponse.json()
 
         if (bootstrapResponse.status) {
           this.copyingBootstrap = false
@@ -261,7 +262,13 @@ export default {
       }
       catch {
         this.copyingBootstrap = false
-        toast.error('The bootstrap script is not ready yet. Please wait a few moments and try again.')
+        if (responseJson) {
+          toast.warning(
+            `Unable to copy bootstrap script, likely due to an insecure deployment. Manually run the following command on the edge node to bootstrap the first node of the cluster: ${responseJson}`)
+        }
+        else {
+          toast.error('The bootstrap script is not ready yet. Please wait a few moments and try again.')
+        }
       }
     },
   },

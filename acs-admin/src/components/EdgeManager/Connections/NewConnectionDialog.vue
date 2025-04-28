@@ -426,7 +426,7 @@ export default {
 
       // Generate a unique identifier for this sensitive info
       const key = '__FPSI__' + this.random()
-      const cluster = this.node.cluster;
+      const cluster = this.node.deployment.cluster;
       const config = this.c.data.find(c => c.uuid === cluster)
       const namespace = config?.configuration?.namespace;
 

@@ -427,7 +427,11 @@ export default {
       // Generate a unique identifier for this sensitive info
       const key = '__FPSI__' + this.random()
       const cluster = this.node.cluster;
-      const namespace = this.c.data.find(c => c.uuid === cluster)?.namespace;
+      const config = this.c.data.find(c => c.uuid === cluster)
+      const namespace = config?.configuration?.namespace;
+
+      console.debug("Node: %o, cluster: %o, config: %o, ns: %o",
+          this.node, cluster, config, namespace);
 
       if (!namespace) throw new Error('No namespace found for cluster')
 

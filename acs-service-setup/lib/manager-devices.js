@@ -122,7 +122,7 @@ class MigrateAgents {
     }
 
     async migrate_agents () {
-        const { cdb, connections } = this;
+        const { connections } = this;
 
         this.log("Registering Connections");
 
@@ -147,10 +147,8 @@ class MigrateAgents {
                 for (const device of conn.devices)
                     await this.register_device(agent, conn.uuid, device);
             }
-            if (dirty) {
-                this.log("Updating config for Edge Agent %s", agent);
-                await cdb.put_config(App.EdgeAgentConfig, agent, config);
-            }
+            if (dirty)
+                await this.update_deployment(agent, config);
         }
     }
 
@@ -163,6 +161,7 @@ class MigrateAgents {
         const cobj = await cdb.create_object(Class.EdgeAgentConnection);
         await cdb.put_config(App.Info, cobj, { name: conn.name });
         await cdb.put_config(App.ConnectionConfiguration, cobj, cconf);
+        this.connections.set(cobj, cconf);
 
         this.log("Registered as %s", cobj);
         return cobj;
@@ -171,6 +170,10 @@ class MigrateAgents {
     deployment_config (values, dvals) {
         const ddevs = values?.driverDevices;
         const dmnts = dvals?.deviceMounts;
+        const rv = {...dvals};
+
+        delete rv.deviceMounts;
+        delete rv.image;
         
         if (ddevs && dmnts) {
             const hps = [];
@@ -180,12 +183,10 @@ class MigrateAgents {
                 hps.push({ hostPath, mountPath });
             }
             if (hps.length)
-                dvals.hostPaths = hps;
+                rv.hostPaths = hps;
         }
-        delete dvals.deviceMounts;
-        delete dvals.image;
 
-        return dvals;
+        return rv;
     }
 
     connection_config (edgeAgent, conn) {
@@ -230,6 +231,32 @@ class MigrateAgents {
         await cdb.put_config(App.DeviceInformation, dobj, dconf);
 
         this.log("Registered as %s", dobj);
+    }
+
+    async update_deployment (agent, config) {
+        const { cdb } = this;
+
+        this.log("Updating config for Edge Agent %s", agent);
+        await cdb.put_config(App.EdgeAgentConfig, agent, config);
+
+        /* We must fix up the Deployment to be compatible with the new
+         * Helm chart. This means doing the work the Manager does when
+         * it updates the Deployment. */
+        const deployment = this.deployments.get(agent);
+        const connections = config.deviceConnections;
+
+        const values = deployment.values ??= {};
+        delete values.image;
+        delete values.driverDevices;
+
+        values.drivers = Object.fromEntries(connections
+            .map(dc => [dc.name, this.connections.get(dc.uuid)])
+            .map(([n, c]) => [n, c, this.drivers.get(c.driver).image])
+            .filter(([n, c, i]) => i)
+            .map(([n, c, image]) => [n, { ...(c.deployment ?? {}), image }]));
+
+        this.log("Updating deployment for Edge Agent %s", agent);
+        await cdb.put_config(Edge.App.Deployment, agent, deployment);
     }
 }
             

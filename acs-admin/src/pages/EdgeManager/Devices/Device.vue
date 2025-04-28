@@ -65,74 +65,76 @@
       </div>
 
       <!-- Sidebar -->
-      <div class="w-96 border-l border-border hidden xl:block">
-        <div class="flex items-center justify-start gap-2 p-4 border-b">
-          <i :class="`fa-fw fa-solid fa-microchip`"></i>
-          <div class="font-semibold text-xl">{{device.name}}</div>
-        </div>
-        <div class="space-y-4 p-4">
-          <SidebarDetail
-              icon="fas fa-key"
-              label="Device UUID"
-              :value="device.uuid"
-          />
-          <SidebarDetail
-              icon="fas fa-bolt-lightning"
-              label="Sparkplug Device ID"
-              :value="device.deviceInformation.sparkplugName"
-          />
-          <SidebarDetail
-              v-if="device.createdAt"
-              :title="device.createdAt"
-              icon="clock"
-              label="Created"
-              :value="moment(device.createdAt).fromNow()"
-          />
-        </div>
-        <!-- Schema section -->
-        <div class="flex items-center justify-between gap-2 p-4 border-b">
-          <div class="font-semibold text-lg">Schema</div>
-          <Button
-              v-if="device.deviceInformation?.schema"
-              @click="changeSchema"
-              size="sm"
-              variant="ghost"
-              class="flex items-center justify-center gap-2"
-          >
+      <div class="w-96 border-l border-border hidden xl:block overflow-y-auto">
+        <div>
+          <div class="flex items-center justify-start gap-2 p-4 border-b">
+            <i :class="`fa-fw fa-solid fa-microchip`"></i>
+            <div class="font-semibold text-xl">{{device.name}}</div>
+          </div>
+          <div class="space-y-4 p-4">
+            <SidebarDetail
+                icon="fas fa-key"
+                label="Device UUID"
+                :value="device.uuid"
+            />
+            <SidebarDetail
+                icon="fas fa-bolt-lightning"
+                label="Sparkplug Device ID"
+                :value="device.deviceInformation.sparkplugName"
+            />
+            <SidebarDetail
+                v-if="device.createdAt"
+                :title="device.createdAt"
+                icon="clock"
+                label="Created"
+                :value="moment(device.createdAt).fromNow()"
+            />
+          </div>
+          <!-- Schema section -->
+          <div class="flex items-center justify-between gap-2 p-4 border-b">
+            <div class="font-semibold text-lg">Schema</div>
+            <Button
+                v-if="device.deviceInformation?.schema"
+                @click="changeSchema"
+                size="sm"
+                variant="ghost"
+                class="flex items-center justify-center gap-2"
+            >
               <i class="fa-solid fa-sync text-sm"></i>
-          </Button>
-        </div>
-        <div class="space-y-4 p-4">
-          <SidebarDetail
-              icon="fas fa-code"
-              label="Schema Type"
-              :value="schema?.schemaInformation?.name"
-          />
-          <SidebarDetail
-              icon="fas fa-square-v"
-              label="Schema Version"
-              :value="schema?.schemaInformation?.version"
-          />
-        </div>
-        <!-- Connection section -->
-        <div class="flex items-center justify-between gap-2 p-4 border-b">
-          <div class="font-semibold text-lg">Connection</div>
-          <Button
-              v-if="device.deviceInformation?.connection"
-              @click="changeConnection"
-              size="sm"
-              variant="ghost"
-              class="flex items-center justify-center gap-2"
-          >
+            </Button>
+          </div>
+          <div class="space-y-4 p-4">
+            <SidebarDetail
+                icon="fas fa-code"
+                label="Schema Type"
+                :value="schema?.schemaInformation?.name"
+            />
+            <SidebarDetail
+                icon="fas fa-square-v"
+                label="Schema Version"
+                :value="schema?.schemaInformation?.version"
+            />
+          </div>
+          <!-- Connection section -->
+          <div class="flex items-center justify-between gap-2 p-4 border-b">
+            <div class="font-semibold text-lg">Connection</div>
+            <Button
+                v-if="device.deviceInformation?.connection"
+                @click="changeConnection"
+                size="sm"
+                variant="ghost"
+                class="flex items-center justify-center gap-2"
+            >
               <i class="fa-solid fa-sync text-sm"></i>
-          </Button>
-        </div>
-        <div class="space-y-4 p-4">
-          <SidebarDetail
-              icon="fas fa-plug"
-              label="Connection"
-              :value="connection?.name"
-          />
+            </Button>
+          </div>
+          <div class="space-y-4 p-4">
+            <SidebarDetail
+                icon="fas fa-plug"
+                label="Connection"
+                :value="connection?.name"
+            />
+          </div>
         </div>
       </div>
     </div>

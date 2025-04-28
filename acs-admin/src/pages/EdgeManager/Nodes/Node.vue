@@ -9,10 +9,10 @@
       <!-- Main content -->
       <div class="flex-1 flex flex-col gap-4 pr-4">
         <div class="flex-1">
-          <Tabs v-if="!nodeLoading" default-value="devices" class="flex flex-col flex-1 h-full">
+          <Tabs default-value="devices" class="flex flex-col flex-1 h-full">
             <TabsContent value="devices" class="flex-1">
-              <div v-if="devices.length > 0">
-                <DataTable v-if="devices.length > 0" :data="devices" :columns="deviceColumns" :filters="[]" @rowClick="selectDevice">
+              <div>
+                <DataTable :data="devices" :columns="deviceColumns" :filters="[]" @rowClick="selectDevice">
                   <template #toolbar-left>
                     <div class="flex items-center justify-between gap-2">
                       <TabsList>
@@ -35,15 +35,16 @@
                       Add Device
                     </Button>
                   </template>
+                  <template #empty>
+                    <EmptyState
+                        title="No Devices"
+                        :description="`No devices have been added to the ${node.name} node yet.`"
+                        :button-text="`Add Device`"
+                        button-icon="plus"
+                        @button-click="newDevice"/>
+                  </template>
                 </DataTable>
               </div>
-              <EmptyState
-                  v-else
-                  title="No Devices"
-                  :description="`No devices have been added to the ${node.name} node yet.`"
-                  :button-text="`Add Device`"
-                  button-icon="plus"
-                  @button-click="newDevice"/>
             </TabsContent>
             <TabsContent value="connections" class="flex-1">
               <DataTable :data="connections" :columns="connectionColumns" :filters="[]" @rowClick="selectConnection">

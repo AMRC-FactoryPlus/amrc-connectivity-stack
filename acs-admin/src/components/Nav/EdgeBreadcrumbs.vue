@@ -108,6 +108,10 @@ export default {
     }
   },
 
+  mounted () {
+    useNodeStore().start()
+  },
+
   computed: {
     route () {
       return this.$route
@@ -125,7 +129,7 @@ export default {
     // ║  Nodes  ║
     // ╚═════════╝
     nodes () {
-      return useNodeStore().data.filter((node) => node.cluster === this.$route.params.clusteruuid)
+      return useNodeStore().data.filter((node) => node.deployment.cluster === this.$route.params.clusteruuid)
     },
     currentNode () {
       if (useNodeStore().data instanceof Array) {

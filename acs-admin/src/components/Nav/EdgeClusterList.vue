@@ -47,7 +47,6 @@ import { useDeviceStore } from '@store/useDeviceStore.js'
 import NodeList from './NodeList.vue'
 import { useObjectStore } from '@store/useObjectStore.js'
 import { useDriverStore } from '@store/useDriverStore.js'
-import { UUIDs } from '@amrc-factoryplus/service-client'
 
 export default {
 
@@ -79,14 +78,10 @@ export default {
     clusters () {
       return this.c.data
     },
-
-    clustersLoading () {
-      return this.c.loading
-    },
   },
 
   async mounted () {
-    await this.n.fetch()
+    await this.n.start()
     await this.c.start()
     await this.d.start()
     await this.dr.start()

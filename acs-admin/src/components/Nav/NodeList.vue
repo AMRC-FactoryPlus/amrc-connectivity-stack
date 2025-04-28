@@ -72,18 +72,13 @@ export default {
 
   computed: {
     nodes () {
-      return Array.isArray(this.s.data) ? this.s.data.filter(e => e.cluster === this.cluster.uuid) : []
+      return Array.isArray(this.s.data) ? this.s.data.filter(e => e.deployment.cluster === this.cluster.uuid) : []
     },
 
-    nodesLoading () {
-      return this.s.loading
-    },
   },
 
-  methods: {
-    newNode () {
-      window.events.emit('show-new-node-dialog-for-cluster', this.cluster)
-    },
-  },
+  async mounted () {
+    await this.s.start()
+  }
 }
 </script>

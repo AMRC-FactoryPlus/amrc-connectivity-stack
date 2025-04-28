@@ -4,4 +4,4 @@ include ${top}/mk/acs.init.mk
 repo?=acs-admin
 k8s.deployment?=admin
 
-include ${mk}/acs.js.mk
+include ${mk}/acs.docker.mk

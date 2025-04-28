@@ -20,24 +20,22 @@ export const useServiceClientStore = defineStore('service-client', {
   actions: {
     // since we rely on `this`, we cannot use an arrow function
     async login (opts) {
-
       const client = new RxClient(opts);
       // Try an auth lookup to check client authentication.
-      try{
+      try {
         this.urls.MQTT = await client.service_urls(UUIDs.Service.MQTT);
-        // save opts to local storage
-        localStorage.setItem('opts', JSON.stringify(opts))
-        localStorage.setItem('clientLoaded', JSON.stringify(true));
         this.username = opts.username;
         this.client  = client;
         this.loaded = true;
         this.scheme  = import.meta.env.SCHEME;
         this.baseUrl = import.meta.env.BASEURL;
+        // Save opts to local storage for use on page reload
+        // Here we should store a token rather than the actual credentials
+        localStorage.setItem('opts', JSON.stringify(opts));
         // client.Fetch.cache = 'reload';
-      this.ready = true
+        this.ready = true;
       } catch (e) {
-        this.$reset();
-        localStorage.removeItem('clientLoaded')
+        this.logout();
         throw e;
       }
     },
@@ -45,9 +43,9 @@ export const useServiceClientStore = defineStore('service-client', {
     logout () {
       // Delete the opts local storage item
       localStorage.removeItem('opts');
-      localStorage.removeItem('clientLoaded')
       // Reset the local state
       this.$reset();
+      this.ready = false;
     },
   },
 })

@@ -412,11 +412,20 @@ export default {
   },
 
   methods: {
+    random() {
+      if (crypto.randomUUID)
+        return crypto.randomUUID();
+
+      const buf = new Uint8Array(16);
+      crypto.getRandomValues(buf);
+      return buf.toHex();
+    },
+
     async encryptSensitiveInfo(value) {
       if (!this.node) throw new Error('No node selected')
 
       // Generate a unique identifier for this sensitive info
-      const key = '__FPSI__' + crypto.randomUUID()
+      const key = '__FPSI__' + this.random()
       const cluster = this.node.cluster;
       const namespace = this.c.data.find(c => c.uuid === cluster)?.namespace;
 

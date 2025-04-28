@@ -461,7 +461,6 @@ configs:
           icon: "cube"
           placeholder: "e.g. analog-value:1"
       image:
-        registry: ghcr.io/amrc-factoryplus
         repository: edge-bacnet
       schema:
         properties:
@@ -486,7 +485,6 @@ configs:
         path:
           hidden: true
       image:
-        registry: ghcr.io/amrc-factoryplus
         repository: edge-modbus
       schema:
         properties:
@@ -519,7 +517,6 @@ configs:
           description: "Set this to 0"
           placeholder: "e.g. 0 (must be set to 0)"
       image:
-        registry: ghcr.io/amrc-factoryplus
         repository: edge-test
       schema:
         properties: null
@@ -536,7 +533,6 @@ configs:
         path:
           hidden: true
       image:
-        registry: ghcr.io/amrc-factoryplus
         repository: edge-tplink-smartplug
       schema:
         properties:

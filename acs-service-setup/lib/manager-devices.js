@@ -243,6 +243,12 @@ class MigrateAgents {
          * Helm chart. This means doing the work the Manager does when
          * it updates the Deployment. */
         const deployment = this.deployments.get(agent);
+
+        /* We don't know why this Deployment didn't exist. It is not
+         * safe to simply create it. The Manager will do so but only
+         * when the user takes explicit action. */
+        if (!deployment) return;
+
         const connections = config.deviceConnections;
 
         const values = deployment.values ??= {};

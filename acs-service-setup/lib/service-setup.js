@@ -11,6 +11,7 @@ import { fixups }               from "./fixups.js";
 import { setup_git_repos }      from "./git-repos.js";
 import { setup_local_uuids }    from "./local-uuids.js";
 import {migrate_edge_agent_config} from "./manager-devices.js";
+import { services_ready }       from "./services-ready.js";
 
 export class ServiceSetup {
     constructor (opts) {
@@ -40,6 +41,9 @@ export class ServiceSetup {
     }
 
     async run () {
+        this.log("Waiting for services to be ready");
+        await services_ready(this);
+
         this.log("Loading early dumps");
         await this.dumps.load_dumps(true);
 

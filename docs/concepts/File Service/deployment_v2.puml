@@ -25,10 +25,11 @@ together {
      rectangle "DAQ PC" {
           node "TDMS Driver" as fdriver
           file "Directory" as dir
-          rectangle "Edge Cluster" {
-              node "Edge Agent" as fagent
-          }
      }
+     
+     rectangle "Edge Cluster" {
+                   node "Edge Agent" as fagent
+               }
 }
 
 device ---> dir : [1]

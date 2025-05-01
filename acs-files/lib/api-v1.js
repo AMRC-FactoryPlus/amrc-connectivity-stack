@@ -1,6 +1,6 @@
 import express from 'express';
 import { App, Class, Perm, Special } from './constants.js';
-import { promises as fs } from 'fs';
+import fs from 'fs'
 import path from 'path';
 
 const Valid = {
@@ -36,7 +36,7 @@ export class APIv1 {
         .status(403)
         .json({ message: 'FAILED: No ListStorage Permission' });
 
-    const files = await fs.readdir(this.uploadPath);
+    const files = await fs.promises.readdir(this.uploadPath);
 
     return res.json({ files });
   }
@@ -98,30 +98,40 @@ export class APIv1 {
 
     const created_uuid = await this.configDb.create_object(Class.File);
 
-    await fs.mkdir(this.uploadPath, { recursive: true });
+    await fs.promises.mkdir(this.uploadPath, { recursive: true });
 
     const file_path = path.resolve(this.uploadPath, created_uuid);
 
-    await fs.writeFile(file_path, req.body);
+    const fileStream = fs.createWriteStream(file_path);
 
-    const stats = await fs.stat(file_path);
+    req.pipe(fileStream);
 
-    const curr_date = new Date();
-    const original_file_name = req.headers['original-filename'] || null;
+    fileStream.on('finish', async () => {
+      const stats = await fs.promises.stat(file_path);
 
-    let file_JSON = {
-      file_uuid: created_uuid,
-      date_uploaded: curr_date,
-      user_who_uploaded: req.auth,
-      file_size: stats.size,
-      original_file_name: original_file_name,
-    };
+      const curr_date = new Date();
+      const original_file_name = req.headers['original-filename'] || null;
 
-    // Store the file config under App 'Files Configuration'
-    await this.configDb.put_config(App.Config, created_uuid, file_JSON);
+      let file_JSON = {
+        file_uuid: created_uuid,
+        date_uploaded: curr_date,
+        user_who_uploaded: req.auth,
+        file_size: stats.size,
+        original_file_name: original_file_name,
+      };
 
-    return res.status(201).json({
-      message: 'OK. File uploaded to storage and its metadata to ConfigDB.',
+      // Store the file config under App 'Files Configuration'
+      await this.configDb.put_config(App.Config, created_uuid, file_JSON);
+
+      return res.status(201).json({
+        message: 'File uploaded successfully.',
+        uuid: created_uuid,
+      });
     });
+
+    fileStream.on('error', (err) => {
+      res.status(500).send('Error uploading file: ' + err.message);
+    });
+
   }
 }

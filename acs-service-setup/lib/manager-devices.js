@@ -1,7 +1,5 @@
 /*
- * ACS service setup
- * Migrate Manager edge agent config to devices and connections in the ConfigDB
- * Copyright 2025 University of Sheffield AMRC
+ * Copyright (c) University of Sheffield AMRC 2025.
  */
 
 import util from "util";
@@ -174,7 +172,7 @@ class MigrateAgents {
 
         delete rv.deviceMounts;
         delete rv.image;
-        
+
         if (ddevs && dmnts) {
             const hps = [];
             for (const [tag, mountPath] of Object.entries(dmnts)) {
@@ -217,9 +215,16 @@ class MigrateAgents {
 
         this.log("Registering device %s of Edge Agent %s", device.deviceId, node);
 
+        const schemaTag = device.tags.find(t => t.Name === "Schema_UUID");
+
+        // Skip devices that don't have a schema (Schema_UUID is null)
+        if (!schemaTag || !schemaTag.value) {
+            this.log("Skipping device %s of Edge Agent %s - no schema UUID found", device.deviceId, node);
+            return;
+        }
+
         const dobj = await cdb.create_object(Class.Device);
         await cdb.put_config(App.Info, dobj, { name: device.deviceId });
-        const schemaTag = device.tags.find(t => t.Name === "Schema_UUID");
 
         const dconf = {
             connection, node,
@@ -259,7 +264,7 @@ class MigrateAgents {
         await cdb.put_config(Edge.App.Deployment, agent, deployment);
     }
 }
-            
+
 export function migrate_edge_agent_config(ss) {
     return new MigrateAgents(ss).run();
 }

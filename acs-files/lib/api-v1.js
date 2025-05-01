@@ -2,10 +2,13 @@ import express from 'express';
 import { App, Class, Perm, Special } from './constants.js';
 import fs from 'fs'
 import path from 'path';
+import {parseSize} from "./parseSize.js";
 
 const Valid = {
   uuid: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
 };
+
+const MAX_FILE_SIZE = parseSize(process.env.BODY_LIMIT || '10GB');
 
 export class APIv1 {
   constructor(opts) {
@@ -95,20 +98,38 @@ export class APIv1 {
     if (!ok) {
       return res.status(403).json({ message: 'FAILED: No Upload permission' });
     }
-
     const created_uuid = await this.configDb.create_object(Class.File);
-
     await fs.promises.mkdir(this.uploadPath, { recursive: true });
-
     const file_path = path.resolve(this.uploadPath, created_uuid);
+    const file_stream = fs.createWriteStream(file_path);
 
-    const fileStream = fs.createWriteStream(file_path);
+    let total_bytes = 0;
+    let aborted = false;
 
-    req.pipe(fileStream);
+    req.pipe(file_stream);
+    console.log(`Max file size:${MAX_FILE_SIZE}`);
+    req.on('data', (chunk) => {
+      total_bytes += chunk.length;
+      if (total_bytes > MAX_FILE_SIZE) {
+        res.status(413).json({
+          message: 'File exceeded maximum file size',
+        });
+        aborted = true;
+        file_stream.destroy();
+        req.destroy();
+        fs.unlink(file_path, () => {});
+        return;
+      }
 
-    fileStream.on('finish', async () => {
+      file_stream.write(chunk);
+    });
+
+    file_stream.on('finish', async () => {
+      if (aborted) {
+        return;
+      }
+
       const stats = await fs.promises.stat(file_path);
-
       const curr_date = new Date();
       const original_file_name = req.headers['original-filename'] || null;
 
@@ -129,8 +150,11 @@ export class APIv1 {
       });
     });
 
-    fileStream.on('error', (err) => {
-      res.status(500).send('Error uploading file: ' + err.message);
+    file_stream.on('error', (err) => {
+      if (aborted) {
+        return;
+      }
+      return res.status(500).send('Error uploading file: ' + err.message);
     });
 
   }

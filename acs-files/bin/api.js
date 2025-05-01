@@ -28,7 +28,6 @@ const api = await new WebAPI({
   keytab: env.SERVER_KEYTAB,
   http_port: env.PORT,
   max_age: env.CACHE_MAX_AGE,
-  body_limit: env.BODY_LIMIT,
   routes: routes({
     auth: fplus.Auth,
     configDb: fplus.ConfigDB,

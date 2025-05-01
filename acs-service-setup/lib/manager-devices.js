@@ -62,13 +62,13 @@ class MigrateAgents {
     }
 
     async register_drivers () {
-        const { cdb } = this;
+        const { cdb, drivers } = this;
 
         this.log("Locating/registering Drivers");
 
         const tags = this.driver_by_image = new Map();
         const internal = this.internal_drivers = new Map();
-        for (const [uuid, def] of this.drivers.entries()) {
+        for (const [uuid, def] of drivers.entries()) {
             if (def.internal) {
                 internal.set(def.internal.connType, [uuid, def.internal.details]);
                 continue;
@@ -92,6 +92,7 @@ class MigrateAgents {
                 const drv = await cdb.create_object(Edge.Class.Driver);
                 await cdb.put_config(App.Info, drv, { name });
                 await cdb.put_config(App.DriverDefinition, drv, { image });
+                drivers.set(drv, { image });
                 tags.set(tag, drv);
 
                 this.log("Registered driver %s as %s", tag, drv);

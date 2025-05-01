@@ -93,6 +93,8 @@ apiVersion: v1
 metadata:
   name: files-storage
   namespace: {{ .Release.Namespace }}
+  annotations:
+    "helm.sh/resource-policy": keep
   labels:
     component: files
 spec:

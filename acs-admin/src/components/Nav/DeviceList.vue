@@ -57,7 +57,7 @@ export default {
 
   computed: {
     devices () {
-      return Array.isArray(this.d.data) ? this.d.data.filter(e => e.deviceInformation.node === this.node.uuid) : []
+      return Array.isArray(this.d.data) ? this.d.data.filter(e => e.deviceInformation?.node === this.node.uuid) : []
     },
 
     devicesLoading () {

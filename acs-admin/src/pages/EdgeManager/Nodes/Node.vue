@@ -202,7 +202,7 @@ export default {
     },
 
     cluster() {
-      return this.c.data.find(e => e.uuid === this.node.deployment.cluster)?.name
+      return this.c.data.find(e => e.uuid === this.node.deployment?.cluster)?.name
     },
 
     devices () {

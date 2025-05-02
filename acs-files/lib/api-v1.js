@@ -107,7 +107,6 @@ export class APIv1 {
     let aborted = false;
 
     req.pipe(file_stream);
-    console.log(`Max file size:${MAX_FILE_SIZE}`);
     req.on('data', (chunk) => {
       total_bytes += chunk.length;
       if (total_bytes > MAX_FILE_SIZE) {
@@ -120,7 +119,6 @@ export class APIv1 {
         fs.unlink(file_path, () => {});
         return;
       }
-
       file_stream.write(chunk);
     });
 

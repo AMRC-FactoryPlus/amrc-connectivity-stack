@@ -3,6 +3,7 @@ import { App, Class, Perm, Special } from './constants.js';
 import fs from 'fs'
 import path from 'path';
 import {parseSize} from "./parseSize.js";
+import { v4 as uuidv4 } from 'uuid';
 
 const Valid = {
   uuid: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
@@ -98,9 +99,9 @@ export class APIv1 {
     if (!ok) {
       return res.status(403).json({ message: 'FAILED: No Upload permission' });
     }
-    const created_uuid = await this.configDb.create_object(Class.File);
+    const file_uuid = uuidv4();
     await fs.promises.mkdir(this.uploadPath, { recursive: true });
-    const file_path = path.resolve(this.uploadPath, created_uuid);
+    const file_path = path.resolve(this.uploadPath, file_uuid);
     const file_stream = fs.createWriteStream(file_path);
 
     let total_bytes = 0;
@@ -132,19 +133,20 @@ export class APIv1 {
       const original_file_name = req.headers['original-filename'] || null;
 
       let file_JSON = {
-        file_uuid: created_uuid,
+        file_uuid: file_uuid,
         date_uploaded: curr_date,
         user_who_uploaded: req.auth,
         file_size: stats.size,
         original_file_name: original_file_name,
       };
 
+      await this.configDb.create_object(Class.File, file_uuid);
       // Store the file config under App 'Files Configuration'
-      await this.configDb.put_config(App.Config, created_uuid, file_JSON);
+      await this.configDb.put_config(App.Config, file_uuid, file_JSON);
 
       return res.status(201).json({
         message: 'File uploaded successfully.',
-        uuid: created_uuid,
+        uuid: file_uuid,
       });
     });
 

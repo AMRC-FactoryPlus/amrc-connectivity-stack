@@ -37,7 +37,7 @@ ACS Admin is built using the following technologies:
 - **Build Tool**: [Vite](https://vitejs.dev/) with [Bun](https://bun.sh/) as the JavaScript runtime
 - **State Management**: [Pinia](https://pinia.vuejs.org/) with persistence support
 - **Routing**: [Vue Router](https://router.vuejs.org/)
-- **UI Components**: Custom components built with [Tailwind CSS](https://tailwindcss.com/) and [shadcn/ui](https://ui.shadcn.com/)
+- **UI Components**: Custom components built with [Tailwind CSS](https://tailwindcss.com/) and [shadcn/ui](https://www.shadcn-vue.com/)
 - **Reactive Programming**: [RxJS](https://rxjs.dev/) for reactive data handling
 - **API Integration**: Custom Factory+ service client libraries
 

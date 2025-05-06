@@ -102,7 +102,7 @@ files:
   enabled: true
   image:
     repository: acs-files
-  bodyLimit: 10GB
+  bodyLimit: 500kb
   storage: 20Gi
 
 monitor:

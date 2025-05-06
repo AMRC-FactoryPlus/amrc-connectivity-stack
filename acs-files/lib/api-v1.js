@@ -102,60 +102,79 @@ export class APIv1 {
     const file_uuid = uuidv4();
     await fs.promises.mkdir(this.uploadPath, { recursive: true });
     const file_path = path.resolve(this.uploadPath, file_uuid);
-    const file_stream = fs.createWriteStream(file_path);
+    const write_stream = fs.createWriteStream(file_path);
 
     let total_bytes = 0;
     let aborted = false;
 
-    req.pipe(file_stream);
     req.on('data', (chunk) => {
       total_bytes += chunk.length;
-      if (total_bytes > MAX_FILE_SIZE) {
-        res.status(413).json({
-          message: 'File exceeded maximum file size',
-        });
+
+      // Check size limit before writing
+      if (total_bytes > MAX_FILE_SIZE && !aborted) {
         aborted = true;
-        file_stream.destroy();
-        req.destroy();
-        fs.unlink(file_path, () => {});
-        return;
+        write_stream.end();
+
+        // Clean up the incomplete file
+        fs.unlink(file_path, (err) => {
+          if (err) console.error('Failed to delete incomplete file:', err);
+        });
+
+        return res.status(413).json({
+          message: 'File exceeded maximum file size'
+        });
       }
-      file_stream.write(chunk);
+
+      // Only write if we haven't aborted
+      if (!aborted) {
+        // Handle backpressure
+        const canContinue = write_stream.write(chunk);
+        if (!canContinue) {
+          req.pause();
+        }
+      }
     });
 
-    file_stream.on('finish', async () => {
-      if (aborted) {
-        return;
-      }
-
-      const stats = await fs.promises.stat(file_path);
-      const curr_date = new Date();
-      const original_file_name = req.headers['original-filename'] || null;
-
-      let file_JSON = {
-        file_uuid: file_uuid,
-        date_uploaded: curr_date,
-        user_who_uploaded: req.auth,
-        file_size: stats.size,
-        original_file_name: original_file_name,
-      };
-
-      await this.configDb.create_object(Class.File, file_uuid);
-      // Store the file config under App 'Files Configuration'
-      await this.configDb.put_config(App.Config, file_uuid, file_JSON);
-
-      return res.status(201).json({
-        message: 'File uploaded successfully.',
-        uuid: file_uuid,
-      });
+    write_stream.on('drain', () => {
+      req.resume();
     });
 
-    file_stream.on('error', (err) => {
-      if (aborted) {
-        return;
+    req.on('end', async () => {
+      if (!aborted) {
+        write_stream.end();
+        const stats = await fs.promises.stat(file_path);
+        const curr_date = new Date();
+        const original_file_name = req.headers['original-filename'] || null;
+
+        let file_JSON = {
+          file_uuid: file_uuid,
+          date_uploaded: curr_date,
+          user_who_uploaded: req.auth,
+          file_size: stats.size,
+          original_file_name: original_file_name,
+        };
+
+        await this.configDb.create_object(Class.File, file_uuid);
+        // Store the file config under App 'Files Configuration'
+        await this.configDb.put_config(App.Config, file_uuid, file_JSON);
+
+        return res.status(201).json({
+          message: 'File uploaded successfully.',
+          uuid: file_uuid,
+        });
       }
+    });
+
+    req.on('error', (err) => {
+      write_stream.end();
+      fs.unlink(file_path, () => {});
+      res.status(500).json({ message: 'Upload failed', error: err.message });
+    });
+
+    write_stream.on('error', (err) => {
+      aborted = true;
+      fs.unlink(file_path, () => {});
       return res.status(500).send('Error uploading file: ' + err.message);
     });
-
   }
 }

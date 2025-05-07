@@ -55,8 +55,32 @@ function createTagsFromOriginMap(originMap) {
 function processOriginMapObject(obj, path, tags) {
   if (!obj || typeof obj !== 'object') return
 
-  // Skip Schema_UUID and Instance_UUID as they're handled separately
+  // Process Schema_UUID and Instance_UUID for the current object level
+  if (obj.Schema_UUID && path) {
+    tags.push({
+      Name: `${path}/Schema_UUID`,
+      type: 'UUID',
+      method: 'GET',
+      value: obj.Schema_UUID,
+      docs: 'A reference to the schema used for this object.',
+      recordToDB: true
+    })
+  }
+
+  if (obj.Instance_UUID && path) {
+    tags.push({
+      Name: `${path}/Instance_UUID`,
+      type: 'UUID',
+      method: 'GET',
+      value: obj.Instance_UUID,
+      docs: 'A reference to the instance of this object.',
+      recordToDB: true
+    })
+  }
+
+  // Process all other properties
   for (const key in obj) {
+    // Skip Schema_UUID and Instance_UUID as we've already handled them above
     if (key === 'Schema_UUID' || key === 'Instance_UUID') continue
 
     const value = obj[key]
@@ -111,32 +135,6 @@ function processOriginMapObject(obj, path, tags) {
         }
       } else {
         // This is an object, process it recursively
-
-        // First, check if this object has Schema_UUID and Instance_UUID
-        // and add them as tags before processing the rest of the object
-        if (value.Schema_UUID) {
-          tags.push({
-            Name: `${newPath}/Schema_UUID`,
-            type: 'UUID',
-            method: 'GET',
-            value: value.Schema_UUID,
-            docs: 'A reference to the schema used for this object.',
-            recordToDB: true
-          })
-        }
-
-        if (value.Instance_UUID) {
-          tags.push({
-            Name: `${newPath}/Instance_UUID`,
-            type: 'UUID',
-            method: 'GET',
-            value: value.Instance_UUID,
-            docs: 'A reference to the instance of this object.',
-            recordToDB: true
-          })
-        }
-
-        // Then process the rest of the object recursively
         processOriginMapObject(value, newPath, tags)
       }
     }

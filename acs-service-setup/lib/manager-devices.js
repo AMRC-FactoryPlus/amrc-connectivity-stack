@@ -317,10 +317,10 @@ class MigrateAgents {
 
         const dconf = {
             connection, node,
-            createdAt: new Date().toISOString(),
-            originMap: transformedOriginMap,
-            schema: schemaTag.value,
-            sparkplugName: device.deviceId,
+            createdAt:      new Date().toISOString(),
+            originMap:      transformedOriginMap,
+            schema:         schemaTag.value,
+            sparkplugName:  device.deviceId,
         };
         await cdb.put_config(App.DeviceInformation, dobj, dconf);
 

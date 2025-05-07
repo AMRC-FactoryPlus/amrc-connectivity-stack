@@ -8,8 +8,7 @@ metadata:
   # Give the job a random id so helm reruns it on helm upgrade.
   name: service-setup-{{ randAlphaNum 8 | lower }}
 spec:
-  ttlSecondsAfterFinished: 300
-  backoffLimit: 10
+  backoffLimit: 9999
   template:
     spec:
       serviceAccountName: service-setup
@@ -17,6 +16,9 @@ spec:
       volumes:
         - name: git-checkouts
           emptyDir: { }
+        - name: krb5-conf
+          configMap:
+            name: krb5-conf
       initContainers:
         - name: service-setup
 {{ include "amrc-connectivity-stack.image" (list . .Values.serviceSetup) | indent 10 }}
@@ -40,7 +42,10 @@ spec:
               value: {{
                 dict
                   "organisation"    .Values.acs.organisation
+                  "namespace"       .Release.Namespace
                   "domain"          .Values.acs.baseUrl
+                  "k8sdomain"       "cluster.local"
+                  "secure"          (.Values.acs.secure | ternary "s" "")
                   "realm"           .Values.identity.realm
                   "directory"
                     (include "amrc-connectivity-stack.external-url" 
@@ -65,6 +70,22 @@ spec:
               value: ALL,!token,!service
             - name: GIT_REPO_PATH
               value: {{ .Values.edgeHelm.repoPath }}
+{{ if .Values.acs.schemas.load }}
+        - name: load-schemas
+{{ include "amrc-connectivity-stack.image" (list . .Values.acs.schemas) | indent 10 }}
+          env:
+            - name: DIRECTORY_URL
+              value: http://directory.{{ $.Release.Namespace }}.svc.cluster.local
+            - name: SERVICE_USERNAME
+              value: admin
+            - name: SERVICE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: admin-password
+                  key: password
+            - name: VERBOSE
+              value: ALL,!token,!service
+{{ end }}
       containers:
         - name: restart-mqtt
           image: bitnami/kubectl:latest

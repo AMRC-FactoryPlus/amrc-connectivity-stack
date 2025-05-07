@@ -5,7 +5,7 @@
  */
 
 import { ServiceClient }    from "@amrc-factoryplus/service-client";
-import { WebAPI }           from "@amrc-factoryplus/utilities";
+import { WebAPI }           from "@amrc-factoryplus/service-api";
 
 import { GIT_VERSION } from "../lib/git-version.js";
 import ApiV1 from "../lib/api_v1.js";

@@ -28,7 +28,7 @@ function sym_diff(one, two) {
  * the database directly, and sometimes we need to query using a query
  * function for a transaction. The model inherits from this class. */
 export default class Queries {
-    static DBVersion = 11;
+    static DBVersion = 12;
 
     constructor(query) {
         this.query = query;
@@ -143,6 +143,14 @@ export default class Queries {
 //        `, [q.device, q.start, q.finish]);
 //
 //        return dbr.rows;
+    }
+
+    async close_all_sessions (timestamp) {
+        await this.query(`
+            update session
+            set finish = $1
+            where finish is null
+        `, [timestamp]);
     }
 
     /* Schema */
@@ -330,7 +338,7 @@ export default class Queries {
         const ins = await this.query(`
             insert into service_provider as prv (service, device, url)
             values ($1, $2, $3)
-            on conflict (service, device) do update 
+            on conflict (service) do update 
                 set url = $3
             where prv.device is distinct from $2
                 or prv.url is distinct from $3
@@ -403,18 +411,20 @@ export default class Queries {
         /* This session replaces old sessions for this device/address. */
         await this.query(`
             update session
-            set next_for_device = $1
+            set next_for_device = $1,
+                finish = coalesce(finish, $3)
             where device = $2
               and next_for_device is null
               and id != $1
-        `, [sess, opts.devid]);
+        `, [sess, opts.devid, opts.time]);
         await this.query(`
             update session
-            set next_for_address = $1
+            set next_for_address = $1,
+                finish = coalesce(finish, $3)
             where address = $2
               and next_for_address is null
               and id != $1
-        `, [sess, opts.addrid]);
+        `, [sess, opts.addrid, opts.time]);
 
         return sess;
     }
@@ -422,6 +432,8 @@ export default class Queries {
     /* This will close all child device sessions when closing a node
      * session. */
     async record_death(time, addr) {
+        if (!time)
+            throw new Error("Recording DEATH with null timestamp");
         return await this.query(`
             update session ses
             set finish = $1 from device dev, address adr

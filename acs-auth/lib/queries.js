@@ -4,182 +4,255 @@
  * Copyright 2022 AMRC
  */
 
-import { Special } from "./uuids.js";
+import util from "util";
+
+class QueryError extends Error {
+    constructor (sql, bind, msg, ...args) {
+        super(util.format(msg, ...args));
+        this.status = 500;
+        this.sql = sql;
+        this.bind = bind;
+    }
+
+    static throw (...args) {
+        throw new this(...args);
+    }
+}
+
+class OnlyOneError extends QueryError {
+    constructor (sql, bind, n) {
+        super(sql, bind, "Query returned %s rows instead of 1", n);
+    }
+
+    static check (dbr, sql, bind) {
+        if (dbr.rowCount > 1)
+            this.throw(sql, bind, dbr.rowCount);
+    }
+}
 
 /* Queries is a separate class, because sometimes we want to query on
  * the database directly, and sometimes we need to query using a query
  * function for a transaction. The model inherits from this class. */
 export default class Queries {
-    static DBVersion = 1;
+    static DBVersion = 2;
 
     constructor (query) {
         this.query = query;
     }
 
-    /* This takes a principal id. Right now this is a UUID, but it
-     * should change to a DB unique ID soon... Don't rely on it, just
-     * use principal_by_krb or principal_by_uuid and pass back what you get. */
-    async acl_get (princ_id, permission) {
-        /* XXX This query, with a setof function to resolve the group
-         * members, is incorrect. If I normalise to a table of UUIDs
-         * then I can make it an ordinary left join. */
-        const dbr = await this.query(`
-            select a.permission, 
-                case a.target
-                    when '${Special.Self}'::uuid then a.principal
-                    else a.target
-                end target
-            from resolved_ace a
-            where a.principal = $1
-                and a.permission in (
-                    select members_of($2::uuid))
-        `, [princ_id, permission]);
-
+    async q_rows (sql, bind) {
+        const dbr = await this.query(sql, bind);
         return dbr.rows;
     }
+    async q_row (sql, bind) {
+        const dbr = await this.query(sql, bind);
+        OnlyOneError.check(dbr, sql, bind);
+        return dbr.rows[0];
+    }
+    async q_single (text, values) {
+        const dbr = await this.query({ text, values, rowMode: "array" });
+        OnlyOneError.check(dbr, text, values);
+        return dbr.rows[0]?.[0];
+    }
+    async q_list (text, values) {
+        const dbr = await this.query({ text, values, rowMode: "array" });
+        return dbr.rows.map(r => r[0]);
+    }
 
-    async ace_get_all () {
-        const dbr = await this.query(`
-            select ace.principal, ace.permission, ace.target
-            from ace
+    async uuid_find (uuid) {
+        return await this.q_single(
+                `select id from uuid where uuid = $1`,
+                [uuid])
+            ?? await this.q_single(
+                `insert into uuid (uuid) values ($1) returning id`,
+                [uuid]);
+    }
+
+    async grant_find (uuid, permitted) {
+        const g = await this.q_row(`
+            select e.id, p.uuid permission
+            from ace e
+                join uuid p on p.id = e.permission
+            where e.uuid = $1
+        `, [uuid]);
+        if (!g) return [404];
+        if (!permitted(g.permission)) return [403];
+        return [200, g.id];
+    }
+
+    grant_get_all () {
+        return this.q_rows(`
+            select e.uuid, u.uuid principal, p.uuid permission, t.uuid target,
+                e.plural
+            from ace e
+                join uuid u on u.id = e.principal
+                join uuid p on p.id = e.permission
+                join uuid t on t.id = e.target
         `);
-        return dbr.rows;
     }
 
-    async ace_add (ace) {
-        const dbr = await this.query(`
-            insert into ace (principal, permission, target)
-            values ($1, $2, $3)
-            on conflict do nothing
-        `, [ace.principal, ace.permission, ace.target]);
-        return 204;
+    async grant_resolve_uuids (g) {
+        /* XXX These cannot run in parallel as we are in a txn and only
+         * have a single Pg connection. */
+        return Promise.all(
+            [g.principal, g.permission, g.target]
+                .map(u => this.uuid_find(u)));
     }
 
-    async ace_delete (ace) {
-        const dbr = await this.query(`
-            delete from ace
+    /* This returns 201 for a new grant, 200 for an exact duplicate, and
+     * 409 otherwise. There is a slight risk here of one client
+     * 'stealing' another's grant; I think the only solution would be
+     * ownership of grants. */
+    /* XXX This logic should be in model. */
+    async grant_new (g) {
+        const ids = await this.grant_resolve_uuids(g);
+        const bind = [...ids, g.plural];
+
+        const existing = await this.q_single(`
+            select uuid
+            from ace
             where principal = $1
                 and permission = $2
                 and target = $3
-        `, [ace.principal, ace.permission, ace.target]);
-        return 204;
+                and plural = $4
+        `, bind);
+        if (existing) return { status: 200, uuid: existing };
+
+        const uuid = await this.q_single(`
+            insert into ace (principal, permission, target, plural)
+            values ($1, $2, $3, $4)
+            on conflict do nothing
+            returning uuid
+        `, bind);
+
+        if (!uuid) return { status: 409 };
+        return { status: 201, uuid };
     }
 
-    /* This returns a UUID. Soon it will return an integer ID. */
-    async principal_by_krb (principal) {
-        const dbr = await this.query(`
-            select p.uuid from principal p
-            where p.kerberos = $1
-        `, [principal]);
-        return dbr.rows[0]?.uuid;
+    grant_delete (id) {
+        return this.q_single(
+            `delete from ace where id = $1`,
+            [id]);
     }
 
-    /* This returns a UUID. Soon it will return an integer ID. */
-    async principal_by_uuid (uuid) {
-        /* I am allowing principal UUIDs that don't have a Kerberos
-         * principal. This is needed ATM for command escalation; there
-         * isn't a 1-1 mapping between Nodes and Kerberos principals,
-         * and NDATA-style cmdesc needs command escalation rights to be
-         * granted to the Node, not the user account behind it. */
-        return uuid;
+    async grant_update (id, g) {
+        const ids = await this.grant_resolve_uuids(g);
+        return this.q_single(`
+            update ace
+            set principal = $2, permission = $3, target = $4, plural = $5
+            where id = $1
+            returning 1 ok
+        `, [id, ...ids, g.plural]);
     }
 
-    async principal_get_all () {
-        const dbr = await this.query(`
-            select p.uuid, p.kerberos from principal p
+    idkind_find (kind) {
+        return this.q_single(
+            `select id from idkind where kind = $1`, [kind]);
+    }
+
+    identity_get_all () {
+        return this.q_rows(`
+            select u.uuid, k.kind, i.name
+            from identity i
+                join uuid u on u.id = i.principal
+                join idkind k on k.id = i.kind
         `);
+    }
+
+    identity_add (pid, kid, name) {
+        return this.query(`
+            insert into identity (principal, kind, name)
+            values ($1::integer, $2::integer, $3::text)
+            except select principal, kind, name from identity
+        `, [pid, kid, name])
+            .then(() => 204)
+            .catch(e => e?.code == "23505" ? 409 : Promise.reject(e));
+    }
+
+    async identity_delete (uuid, kind) {
+        const ok = await this.q_single(`
+            delete from identity i
+            using uuid u, idkind k
+            where i.principal = u.id
+                and i.kind = k.id
+                and u.uuid = $1
+                and k.kind = $2
+            returning 1 ok
+        `, [uuid, kind]);
+        return ok ? 204 : 404;
+    }
+
+    async group_all () {
+        const dbr = await this.query(`
+            select parent, child from old_member
+        `,);
         return dbr.rows;
     }
 
-    async principal_list () {
-        const dbr = await this.query(`
-            select kerberos from principal 
-        `);
-        return dbr.rows.map(r => r.kerberos);
-    }
-
-    async principal_add (princ) {
-        const dbr = await this.query(`
-            insert into principal (uuid, kerberos)
-            values ($1, $2)
-            on conflict do nothing
-            returning 1 ok
-        `, [princ.uuid, princ.kerberos]);
-        return dbr.rows[0]?.ok ? 204 : 409;
-    }
-
-    async principal_get (uuid) {
-        const dbr = await this.query(`
-            select uuid, kerberos
-            from principal
-            where uuid = $1
-        `, [uuid]);
-        return dbr.rows[0];
-    }
-
-    async principal_delete (uuid) {
-        const dbr = await this.query(`
-            delete from principal
-            where uuid = $1
-            returning 1 ok
-        `, [uuid]);
-        return dbr.rows[0]?.ok ? 204 : 404;
-    }
-
-    async principal_find_by_krb (kerberos) {
-        const dbr = await this.query(`
-            select uuid
-            from principal
-            where kerberos = $1
-        `, [kerberos]);
-        return dbr.rows[0]?.uuid;
-    }
-
-    async group_list () {
-        const dbr = await this.query(`
-            select distinct parent from member
-        `);
-        return dbr.rows.map(r => r.parent);
-    }
-
-    async group_get (grp) {
-        const dbr = await this.query(`
-            select child from member
-            where parent = $1
-        `, [grp]);
-        return dbr.rows.map(r => r.child);
-    }
-
-    async group_add (group, member) {
-        const dbr = await this.query(`
-            insert into member (parent, child)
-            values ($1, $2)
-            on conflict do nothing
-        `, [group, member]);
-        return 204;
-    }
-
     async group_delete (group, member) {
-        const dbr = await this.query(`
-            delete from member
+        await this.query(`
+            delete from old_member
             where parent = $1
                 and child = $2
         `, [group, member]);
         return 204;
     }
 
-    async effective_get (principal) {
-        const dbr = await this.query(`
-            select p.kerberos, a.principal, a.permission,
-                case a.target
-                    when '${Special.Self}'::uuid then a.principal
-                    else a.target
-                end target
-            from resolved_ace a
-                join principal p on a.principal = p.uuid
-            where p.kerberos = $1
-        `, [principal]);
-        return dbr.rows;
+    group_list () {
+        return this.q_list(`
+            select distinct parent from old_member
+        `);
+    }
+
+    group_get (group) {
+        return this.q_list(`
+            select child from old_member
+            where parent = $1
+        `, [group]);
+    }
+
+    dump_load_uuids (uuids) {
+        return this.q_list(`
+            insert into uuid (uuid)
+            select u.uuid
+            from unnest($1::uuid[]) u(uuid)
+            on conflict do nothing
+            returning uuid
+        `, [[...uuids]]);
+    }
+
+    dump_load_krbs (krbs) {
+        return this.q_list(`
+            insert into identity (principal, kind, name)
+            select u.id, 1, i.i->>'kerberos'
+            from unnest($1::jsonb[]) i(i)
+                join uuid u on u.uuid::text = i.i->>'uuid'
+            except select principal, kind, name from identity
+            returning name
+        `, [krbs]);
+    }
+
+    /* XXX This form of loading gives no way for a revised version of a
+     * dump to remove old grants. This is a problem across the board
+     * with our dump loading logic but is more important here. I think
+     * the only solution that works is to introduce a 'source' for these
+     * entries such that loading a new dumps clears old data from that
+     * source. Moving the grants into the ConfigDB would make it easier
+     * to solve this in general. */
+    dump_load_aces (aces) {
+        return this.q_rows(`
+            insert into ace (principal, permission, target, plural)
+            select u.id, p.id, t.id, 
+                coalesce((g.g->'plural')::boolean, false)
+            from unnest($1::jsonb[]) g(g)
+                join uuid u on u.uuid::text = g.g->>'principal'
+                join uuid p on p.uuid::text = g.g->>'permission'
+                join uuid t on t.uuid::text = g.g->>'target'
+            on conflict (principal, permission, target) do update
+                set plural = excluded.plural
+                where ace.plural != excluded.plural
+            returning principal, permission, target
+        `, [aces]);
     }
 }
 

@@ -4,14 +4,10 @@
  * Copyright 2023 AMRC
  */
 
-import { Debug } from "@amrc-factoryplus/utilities";
-
 import { Checkout }             from "./checkout.js";
 import { run_kubeseal }         from "./kubeseal.js";
 import * as manifests           from "./manifests.js";
 import { Edge }                 from "./uuids.js";
-
-const debug = new Debug();
 
 /* This needs reworking. The repo URLs are now by-uuid and the
  * certificate is in a different App. */
@@ -20,7 +16,7 @@ export class SealedSecrets {
         this.fplus      = opts.fplus;
         this.cert_dir   = opts.cert_dir;
 
-        this.log = debug.log.bind(debug, "edge");
+        this.log = this.fplus.debug.bound("edge");
     }
 
     async seal_secret (opts) {

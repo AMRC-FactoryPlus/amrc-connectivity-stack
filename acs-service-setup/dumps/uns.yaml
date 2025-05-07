@@ -2,43 +2,49 @@
 # and grants it the necessary permissions to read and write to the UNS.
 # It also adds the ReadEntireUNS permission to the Warehouse role so
 # that the UNS historian can use it and has permission to read the UNS.
+#
+#-REQUIRE: auth sparkplug
 ---
 service: !u UUIDs.Service.ConfigDB
-version: 1
-overwrite: true
+version: 2
 objects:
-  !u UUIDs.Class.App:
-    - !u ACS.App.MQTTPermTemplate
-  !u ACS.Class.Permission:
-    - !u ACS.Perm.MQTT.WriteToEntireUNS
-    - !u ACS.Perm.MQTT.ReadEntireUNS
-  !u ACS.Class.UserGroup:
-    - !u ACS.Group.SparkplugIngesters
-    - !u ACS.Group.HistorianUNS
+  !u Auth.Class.ServiceRole:
+    !u UNS.Group.Sparkplug:
+      name: "UNS Sparkplug ingester"
+      subclassOf:
+        - !u Auth.Class.CentralService
+        - !u ACS.Group.SparkplugReader
+        - !u UNS.Group.Ingester
+    !u UNS.Group.Historian:
+      name: "UNS historian"
+      subclassOf:
+        - !u Auth.Class.CentralService
+        - !u UNS.Group.Reader
+
+  !u Auth.Class.ClientRole:
+    !u UNS.Group.Ingester:
+      name: "UNS ingester"
+      subclassOf:
+        - !u Auth.Class.Principal
+    !u UNS.Group.Reader:
+      name: "UNS global reader"
+      subclassOf:
+        - !u Auth.Class.Principal
+
+  !u ACS.PermGroup.MQTT:
+    !u UNS.Perm.WriteToEntireUNS: { name: "Write to entire UNS" }
+    !u UNS.Perm.ReadEntireUNS: { name: "Read entire UNS" }
 configs:
-  !u UUIDs.App.Info:
-    !u ACS.Perm.MQTT.WriteToEntireUNS: { name: "MQTT: Write to entire UNS" }
-    !u ACS.Perm.MQTT.ReadEntireUNS: { name: "MQTT: Read entire UNS" }
-    !u ACS.Group.SparkplugIngesters: { name: "Sparkplug Ingesters" }
-    !u ACS.Group.HistorianUNS: { name: "Historian UNS" }
   !u ACS.App.MQTTPermTemplate:
-    !u ACS.Perm.MQTT.WriteToEntireUNS:
+    !u UNS.Perm.WriteToEntireUNS:
       UNS/v1/#: w
-    !u ACS.Perm.MQTT.ReadEntireUNS:
+    !u UNS.Perm.ReadEntireUNS:
       UNS/v1/#: rs
 ---
 service: !u UUIDs.Service.Authentication
-version: 1
-groups:
-  !u ACS.Group.GlobalDebuggers:
-    - !u ACS.Group.SparkplugIngesters
-  !u ACS.PermGroup.MQTT:
-    - !u ACS.Perm.MQTT.WriteToEntireUNS
-    - !u ACS.Perm.MQTT.ReadEntireUNS
-aces:
-  - principal: !u ACS.Group.HistorianUNS
-    permission: !u ACS.Perm.MQTT.ReadEntireUNS
-    target: !u UUIDs.Special.Null
-  - principal: !u ACS.Group.SparkplugIngesters
-    permission: !u ACS.Perm.MQTT.WriteToEntireUNS
-    target: !u UUIDs.Special.Self
+version: 2
+grants:
+  !u UNS.Group.Reader:
+    !u UNS.Perm.ReadEntireUNS: null
+  !u UNS.Group.Ingester:
+    !u UNS.Perm.WriteToEntireUNS: null

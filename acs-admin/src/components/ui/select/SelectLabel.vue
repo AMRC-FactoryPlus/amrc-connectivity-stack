@@ -1,6 +1,10 @@
+<!--
+  - Copyright (c) University of Sheffield AMRC 2025.
+  -->
+
 <script setup>
-import { SelectLabel } from "radix-vue";
-import { cn } from "@/lib/utils";
+import { SelectLabel } from 'reka-ui'
+import { cn } from '@/lib/utils'
 
 const props = defineProps({
   for: { type: String, required: false },

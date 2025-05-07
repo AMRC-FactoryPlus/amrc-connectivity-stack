@@ -11,13 +11,13 @@ import { ServiceClient } from "@amrc-factoryplus/service-client";
 import MQTTCli from "../lib/mqttcli.js";
 import Model from "../lib/model.js";
 
+const fplus = new ServiceClient({ env: process.env });
 const model = await new Model({
-    isolation: "repeatable read",
-    readonly: false,
-    verbose: true,
+    isolation:  "repeatable read",
+    readonly:   false,
+    debug:      fplus.debug,
 }).init();
 
-const fplus = new ServiceClient({ env: process.env });
 fplus.set_service_discovery(model.find_service_url.bind(model));
 
 const app = await new MQTTCli({

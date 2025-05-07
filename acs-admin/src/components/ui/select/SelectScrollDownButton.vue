@@ -1,8 +1,12 @@
+<!--
+  - Copyright (c) University of Sheffield AMRC 2025.
+  -->
+
 <script setup>
-import { computed } from "vue";
-import { SelectScrollDownButton, useForwardProps } from "radix-vue";
-import { ChevronDown } from "lucide-vue-next";
-import { cn } from "@/lib/utils";
+import { computed } from 'vue'
+import { SelectScrollDownButton, useForwardProps } from 'reka-ui'
+import { ChevronDown } from 'lucide-vue-next'
+import { cn } from '@/lib/utils'
 
 const props = defineProps({
   asChild: { type: Boolean, required: false },

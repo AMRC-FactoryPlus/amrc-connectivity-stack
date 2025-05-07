@@ -1,3 +1,16 @@
+/*
+ * Copyright (c) University of Sheffield AMRC 2025.
+ */
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+.fix-inset {
+    @apply !p-1 !-m-1
+}
+
+@layer base {
+  :root {
+
+        --radius: 0.5rem}}

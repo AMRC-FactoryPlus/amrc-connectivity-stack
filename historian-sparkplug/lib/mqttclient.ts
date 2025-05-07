@@ -3,7 +3,7 @@
  * Copyright "2024" AMRC
  */
 
-import {ServiceClient, SpB, Topic, UUIDs} from "@amrc-factoryplus/utilities";
+import {ServiceClient, SpB, Topic, UUIDs} from "@amrc-factoryplus/service-client";
 import {Reader} from "protobufjs";
 import {logger} from "../bin/ingester.js";
 import Long from "long";
@@ -161,11 +161,13 @@ export default class MQTTClient {
         let payload;
 
         try {
-            payload = SpB.decodePayload(message);
+            payload = SpB.decodeToNative(message);
         } catch {
             logger.error(`🚨 Bad payload on topic ${topicString}`);
             return;
         }
+        /* Default the payload timestamp here */
+        payload.timestamp ??= new Date();
 
         if (!topic) {
             logger.error(`🚨 Bad topic: ${topicString}`);
@@ -236,7 +238,6 @@ export default class MQTTClient {
 
                 // Store the birth certificate mapping in the alias resolver. This uses the alias as the key and a simplified object containing the name and type as the value.
                 this.setNestedValue(this.aliasResolver, [topic.address.group, topic.address.node, topic.address.device], payload.metrics.reduce(function (acc, obj) {
-                    let alias = Long.isLong(obj.alias) ? obj.alias.toNumber() : obj.alias;
 
                     // Work out all schemas that are involved in this metric.
                     //
@@ -289,7 +290,7 @@ export default class MQTTClient {
                         }
                     }, "");
 
-                    acc[alias] = {
+                    acc[obj.alias] = {
                         instance: {
                             // The top level instance for this device
                             top: topLevelInstance,
@@ -312,7 +313,7 @@ export default class MQTTClient {
                         },
                         name: obj.name,
                         type: obj.type,
-                        alias: alias,
+                        alias: obj.alias,
                         unit: obj.properties?.engUnit?.value,
                         transient: obj.isTransient
                     };
@@ -397,16 +398,7 @@ export default class MQTTClient {
                 logger.error(`Metric ${metric.alias} is unknown for ${topic.address.group}/${topic.address.node}/${topic.address.device}`);
             }
 
-            let metricTimestamp: Date
-            if (metric.timestamp) {
-                metricTimestamp = new Date(metric.timestamp);
-            } else if (payload.timestamp) {
-                // Metrics might not have a timestamp so use the packet timestamp if we have it.
-                metricTimestamp = new Date(payload.timestamp);
-            } else {
-                // No timestamp can be found on the metric or the payload, just use the current time instead.
-                metricTimestamp = new Date();
-            }
+            const metricTimestamp = metric.timestamp ?? payload.timestamp;
             // Send each metric to InfluxDB
             this.writeToInfluxDB(birth, topic, metric.value, metricTimestamp)
         });

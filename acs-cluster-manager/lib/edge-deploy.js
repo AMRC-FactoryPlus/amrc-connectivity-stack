@@ -6,7 +6,7 @@
 
 import express from "express";
 
-import { UUIDs } from "@amrc-factoryplus/utilities";
+import { UUIDs } from "@amrc-factoryplus/service-client";
 
 //import { Clusters }         from "./clusters.js";
 import { SealedSecrets }    from "./secrets.js";
@@ -37,8 +37,6 @@ export class EdgeDeploy {
     }
 
     async init () {
-        await this.fplus.Directory.register_service_url(
-            Edge.Service.EdgeDeployment, this.http_url);
 
         const app = this.routes;
         app.get("/cluster/:cluster/bootstrap", this.wrap(this.bootstrap));

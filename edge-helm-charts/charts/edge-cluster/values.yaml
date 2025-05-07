@@ -25,9 +25,9 @@ sealedSecrets:
 image:
   # Values under default: will be used if not overridden per-image
   default:
-    registry: ghcr.io/amrc-factoryplus
-    pullPolicy: IfNotPresent
+    registry: %%REGISTRY%%
     tag: %%TAG%%
+    pullPolicy: %%PULLPOLICY%%
   edgeSync:
     repository: acs-edge-sync
     #tag: ''

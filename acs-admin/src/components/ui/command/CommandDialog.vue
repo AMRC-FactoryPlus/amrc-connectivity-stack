@@ -1,7 +1,11 @@
+<!--
+  - Copyright (c) University of Sheffield AMRC 2025.
+  -->
+
 <script setup>
-import { useForwardPropsEmits } from "radix-vue";
-import Command from "./Command.vue";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { useForwardPropsEmits } from 'reka-ui'
+import Command from './Command.vue'
+import { Dialog, DialogContent } from '@/components/ui/dialog'
 
 const props = defineProps({
   open: { type: Boolean, required: false },

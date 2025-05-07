@@ -12,12 +12,14 @@ ifdef acs_npm
 build_args+=	--build-arg acs_npm="${acs_npm}"
 endif
 
-.PHONY: lint update
+.PHONY: js.npminstall js.eslint update js.update
 
 build: lint
 
-lint:
-	@:
+setup: js.npminstall
+
+js.npminstall:
+	npm install --no-save --install-links
 
 ifdef eslint
 lint: js.eslint

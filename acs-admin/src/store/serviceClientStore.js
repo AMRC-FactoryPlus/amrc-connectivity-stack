@@ -1,44 +1,51 @@
+/*
+ * Copyright (c) University of Sheffield AMRC 2025.
+ */
+
 import { defineStore } from 'pinia'
-import { ServiceClient, UUIDs } from '@amrc-factoryplus/service-client'
+import { RxClient, UUIDs } from '@amrc-factoryplus/rx-client'
 
 export const useServiceClientStore = defineStore('service-client', {
   state: () => {
     return {
+      username: null,
       client: null,
       loaded: false,
       scheme: null,
       baseUrl: null,
       urls: {},
+      ready: false
     }
   },
   actions: {
     // since we rely on `this`, we cannot use an arrow function
-    login (opts) {
-      (new ServiceClient(opts)).init().then((client) => {
-
-        // save opts to local storage
-        localStorage.setItem('opts', JSON.stringify(opts))
-
-        this.client  = client
-        this.loaded  = true
-        this.scheme  = import.meta.env.SCHEME
-        this.baseUrl = import.meta.env.BASEURL
-
-        client.service_urls(UUIDs.Service.MQTT).then((urls) => {
-          this.urls.mqtt = urls
-        })
-      })
+    async login (opts) {
+      const client = new RxClient(opts);
+      // Try an auth lookup to check client authentication.
+      try {
+        this.urls.MQTT = await client.service_urls(UUIDs.Service.MQTT);
+        this.username = opts.username;
+        this.client  = client;
+        this.loaded = true;
+        this.scheme  = import.meta.env.SCHEME;
+        this.baseUrl = import.meta.env.BASEURL;
+        // Save opts to local storage for use on page reload
+        // Here we should store a token rather than the actual credentials
+        localStorage.setItem('opts', JSON.stringify(opts));
+        // client.Fetch.cache = 'reload';
+        this.ready = true;
+      } catch (e) {
+        this.logout();
+        throw e;
+      }
     },
 
     logout () {
-
-      console.log('Logging out')
-
       // Delete the opts local storage item
-      localStorage.removeItem('opts')
-
-      // Refresh the page
-      location.reload()
+      localStorage.removeItem('opts');
+      // Reset the local state
+      this.$reset();
+      this.ready = false;
     },
   },
 })

@@ -1,4 +1,4 @@
-{{- $k8sname := include "edge-agent.k8sname" . }}
+{{- $k8sname := include "edge-agent.k8sname" .Values.name }}
 apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey
 metadata:

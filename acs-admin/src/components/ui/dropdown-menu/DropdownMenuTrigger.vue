@@ -1,5 +1,9 @@
+<!--
+  - Copyright (c) University of Sheffield AMRC 2025.
+  -->
+
 <script setup>
-import { DropdownMenuTrigger, useForwardProps } from "radix-vue";
+import { DropdownMenuTrigger, useForwardProps } from 'reka-ui'
 
 const props = defineProps({
   disabled: { type: Boolean, required: false },

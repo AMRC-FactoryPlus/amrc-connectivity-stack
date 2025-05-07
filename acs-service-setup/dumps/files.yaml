@@ -1,0 +1,69 @@
+#-REQUIRE: auth
+---
+service: !u UUIDs.Service.ConfigDB
+version: 2
+objects:
+  !u Auth.Class.ServiceRole:
+    !u Files.Requirement.ServiceAccount:
+      name: "Files Service Server"
+      subclassOf:
+        - !u Auth.Class.CentralService
+
+  !u Auth.Class.ServicePerms:
+    !u Files.Perm.All:
+      name: "Files Permission"
+      subclassOf:
+        - !u UUIDs.Class.Permission
+
+  !u UUIDs.Class.Service:
+    !u Files.Service.Files: { name: "Files Hosting" }
+
+  !u UUIDs.Class.App:
+    !u Files.App.Config: { name: "Files Configuration" }
+
+  !u Files.Perm.All:
+    !u Files.Perm.Upload: { name: "Upload" }
+    !u Files.Perm.Download: { name: "Download" }
+    !u Files.Perm.ListStorage: { name: "List Storage" }
+
+  !u ConfigDB.Class.R2Class:
+    !u Files.Class.FileGroup: {name: "File Group"}
+    !u Files.Class.FileType:
+      name: "File Type"
+      subclassOf:
+        - !u Files.Class.FileGroup
+
+  !u ConfigDB.Class.R1Class:
+    !u Files.Class.File: { name: "File" }
+    !u Files.FileType.PDF:
+        name: "PDF"
+        subclassOf:
+          - !u Files.Class.File
+    !u Files.FileType.CSV:
+        name: "CSV"
+        subclassOf:
+          - !u Files.Class.File
+    !u Files.FileType.CAD:
+        name: "CAD"
+        subclassOf:
+          - !u Files.Class.File
+    !u Files.FileType.TXT:
+        name: "TXT"
+        subclassOf:
+          - !u Files.Class.File
+
+---
+service: !u UUIDs.Service.Authentication
+version: 2
+grants:
+  !u Files.Requirement.ServiceAccount:
+    !u Auth.Perm.ReadACL:
+      !u Files.Perm.All: true
+    !u ConfigDB.Perm.WriteConfig:
+      !u Files.App.Config: false
+    !u ConfigDB.Perm.ManageObjects:
+      !u Files.Class.File: false
+
+  !u ACS.Group.Administrator:
+    !u Files.Perm.All: null
+

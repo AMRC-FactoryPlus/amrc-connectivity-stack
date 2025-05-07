@@ -7,25 +7,26 @@
  */
 
 import { ServiceClient, UUIDs } from "@amrc-factoryplus/service-client";
-import { WebAPI }               from "@amrc-factoryplus/utilities";
+import { WebAPI }               from "@amrc-factoryplus/service-api";
 
 import Model from "../lib/model.js";
 import APIv1 from "../lib/api_v1.js";
+import { Loader } from "../lib/loader.js";
 import { Perm } from "../lib/uuids.js";
 import { GIT_VERSION } from "../lib/git-version.js";
 
 /* This is the version of the service spec we support. */
-const Version = "1.0.0";
-
-const model = await new Model({
-    readonly: true,
-    verbose: true,
-}).init();
+const Version = "1.1.0";
 
 const fplus = new ServiceClient({
     env:    process.env,
     permission_group:   Perm.All,
 });
+const model = await new Model({
+    readonly:   true,
+    debug:      fplus.debug,
+}).init();
+
 fplus.set_service_discovery(model.find_service_url.bind(model));
 
 const api = await new APIv1({
@@ -33,6 +34,10 @@ const api = await new APIv1({
     fplus,
     internal_hostname:  process.env.HOSTNAME,
 }).init();
+const loader = new Loader({
+    model,
+    fplus,
+});
 
 const app = await new WebAPI({
     ping:       {
@@ -45,7 +50,7 @@ const app = await new WebAPI({
             revision:       GIT_VERSION,
         },
     },
-    verbose:    process.env.VERBOSE,
+    debug:      fplus.debug,
     keytab:     process.env.SERVER_KEYTAB,
     http_port:  process.env.PORT,
     max_age:    process.env.CACHE_MAX_AGE,
@@ -61,6 +66,7 @@ const app = await new WebAPI({
 
     routes: app => {
         app.use("/v1", api.routes);
+        app.use("/load",loader.routes)
     },
 }).init();
 

@@ -1,7 +1,11 @@
+<!--
+  - Copyright (c) University of Sheffield AMRC 2025.
+  -->
+
 <script setup>
-import { computed } from "vue";
-import { DialogTitle, useForwardProps } from "radix-vue";
-import { cn } from "@/lib/utils";
+import { computed } from 'vue'
+import { DialogTitle, useForwardProps } from 'reka-ui'
+import { cn } from '@/lib/utils'
 
 const props = defineProps({
   asChild: { type: Boolean, required: false },

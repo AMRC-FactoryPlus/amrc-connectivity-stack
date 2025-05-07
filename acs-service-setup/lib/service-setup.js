@@ -3,13 +3,16 @@
  * Copyright 2023 AMRC
  */
 
-import { ServiceClient } from "@amrc-factoryplus/utilities";
+import timers from "timers/promises";
 
-import { setup_clusters }       from "./clusters.js";
-import { load_dumps }           from "./dumps.js";
+import { ServiceClient } from "@amrc-factoryplus/service-client";
+
+import { migrate_auth_groups }  from "./auth-group.js";
+import { DumpLoader }           from "./dumps.js";
 import { fixups }               from "./fixups.js";
-import { setup_helm }           from "./helm.js";
-import { setup_manager }        from "./manager.js";
+import { setup_git_repos }      from "./git-repos.js";
+import { setup_local_uuids }    from "./local-uuids.js";
+import {migrate_edge_agent_config} from "./manager-devices.js";
 
 export class ServiceSetup {
     constructor (opts) {
@@ -19,6 +22,12 @@ export class ServiceSetup {
 
         this.fplus = new ServiceClient({ env: opts.env });
         this.log = this.fplus.debug.bound("setup");
+        this.dumps = new DumpLoader({
+            fplus:      this.fplus,
+            acs_config: this.acs_config,
+            dumps:      "dumps",
+            log:        this.fplus.debug.bound("dump"),
+        });
 
         this.log("Service setup config: %o", this.config);
         this.log("ACS config: %o", this.acs_config);
@@ -32,21 +41,44 @@ export class ServiceSetup {
         return this;
     }
 
+    async wait_for (service, version) {
+        this.log("Waiting for %s (%s)", service.service, version);
+        while (!await service.version_satisfies(version)) {
+            this.log("Service not ready, waiting 3s");
+            await timers.setTimeout(3000);
+        }
+        this.log("Service %s ready", service.service);
+    }
+
     async run () {
+        const { fplus } = this;
+
+        await this.wait_for(fplus.Directory, "1.1.0");
+
+        this.log("Loading early dumps");
+        await this.dumps.load_dumps(true);
+
+        await this.wait_for(fplus.Auth, "2.0.0");
+        await this.wait_for(fplus.ConfigDB, "2.0.0");
+
         this.log("Running fixups");
         await fixups(this);
 
+        this.log("Creating local UUIDs");
+        const local = await setup_local_uuids(this);
+        this.dumps.set_local_uuids(local);
+
         this.log("Loading service dump files");
-        await load_dumps(this);
+        await this.dumps.load_dumps(false);
 
-        this.log("Creating Helm chart templates");
-        const helm = await setup_helm(this);
+        this.log("Creating shared git repositories");
+        await setup_git_repos(this, local);
 
-        this.log("Creating edge cluster objects");
-        await setup_clusters(this, helm);
+        this.log("Migrating managed edge agent config");
+        await migrate_edge_agent_config(this);
 
-        this.log("Creating Manager config");
-        await setup_manager(this, helm);
+        this.log("Migrating legacy Auth groups");
+        await migrate_auth_groups(this);
 
         this.log("Finished setup");
     }

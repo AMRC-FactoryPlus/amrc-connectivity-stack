@@ -7,9 +7,17 @@
 # Local config
 config.mk
 
+# Generated files
+lib/git-version.js
+
 # Secrets
 /keytabs/
 /volumes/
+
+/tmp/
+
+# Generated files
+lib/git-version.js
 
 # IDE
 .idea/

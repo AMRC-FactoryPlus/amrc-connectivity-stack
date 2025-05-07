@@ -1,17 +1,37 @@
+<!--
+  - Copyright (c) University of Sheffield AMRC 2025.
+  -->
+
 <template>
-  <div class="grid h-screen overflow-auto w-full"
-      :class="!l.fullscreen ? 'md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]' : 'grid-cols-1'">
-    <div v-if="!l.fullscreen" class="hidden border-r bg-muted/40 md:block">
-      <div class="flex h-full max-h-screen flex-col">
-        <div class="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6">
-          <a href="/" class="flex items-center gap-2 font-semibold">
-            <img class="size-4" src="/favicon.svg">
-            <span class="">ACS</span>
-          </a>
-        </div>
-        <div class="flex-1 p-2">
-          <Nav/>
-        </div>
+  <Toaster rich-colors class="pointer-events-auto"/>
+  <SidebarProvider>
+    <Sidebar v-if="!l.fullscreen && s.loaded" class="bg-white dark:bg-slate-800 z-20">
+      <SidebarHeader class="border-b h-16">
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <div class="flex items-center gap-2.5 h-12 pl-2">
+              <div class="flex aspect-square size-6 items-center justify-center">
+                <img src="/favicon.svg">
+              </div>
+              <div class="flex flex-col gap-0.5 leading-none">
+                <h1 class="font-bold text-base h-4">ACS</h1>
+                <h2 class="text-gray-500 text-sm">{{s.username}}</h2>
+              </div>
+            </div>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarHeader>
+
+      <SidebarContent>
+        <Nav/>
+        <SidebarGroup>
+          <SidebarGroupLabel class="mb-2">Edge Clusters & Devices</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <EdgeClusterList/>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
         <div class="mt-auto p-4">
           <Card>
             <CardHeader class="p-2 pt-0 md:p-4">
@@ -30,25 +50,33 @@
             </CardContent>
           </Card>
         </div>
-      </div>
-    </div>
-    <div class="flex flex-col overflow-auto">
-      <header v-if="!l.fullscreen"
-          class="flex justify-between items-center border-b px-4 lg:h-[60px] flex-shrink-0 lg:px-6">
+      </SidebarContent>
+      <SidebarRail/>
+    </Sidebar>
+
+    <SidebarInset>
+      <header v-if="!l.fullscreen && s.loaded"
+          class="flex justify-between items-center border-b px-4 h-16 flex-shrink-0 lg:px-6 sticky top-0 bg-white z-10">
         <div class="flex items-center justify-center gap-2">
           <i :class="`fa-solid fa-${$route.meta.icon}`"></i>
           <h3 class="text-lg font-bold tracking-tight">{{$route.meta.name}}</h3>
         </div>
-        <div class="flex items-center justify-center gap-3">
-          <Button variant="ghost" size="icon" @click="l.toggleFullscreen"><i class="fa-solid fa-expand"></i></Button>
-          <Button variant="link" size="icon" @click="s.logout">Logout</Button>
+        <div class="flex items-center justify-center">
+          <SidebarTrigger/>
+          <Button title="Toggle fullscreen" variant="ghost" size="icon" @click="l.toggleFullscreen"><i class="fa-solid fa-expand"></i></Button>
+          <Button class="ml-3" variant="link" size="icon" @click="logout">Logout</Button>
         </div>
       </header>
-      <main class="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6">
+
+      <main class="flex flex-col max-h-[calc(100vh-4rem)] lg:gap-4 lg:pt-4 lg:px-4 flex-grow-0 overflow-y-auto pb-4">
+        <NewClusterDialog/>
+        <NewNodeDialog/>
+        <NewDeviceDialog/>
+        <NewConnectionDialog/>
         <RouterView/>
       </main>
-    </div>
-  </div>
+    </SidebarInset>
+  </SidebarProvider>
 </template>
 
 <script>
@@ -58,10 +86,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
-import Nav from '@/components/Nav.vue'
+import Nav from '@/components/Nav/Nav.vue'
+import EdgeClusterList from '@/components/Nav/EdgeClusterList.vue'
 import { useServiceClientStore } from '@/store/serviceClientStore.js'
 import { useLayoutStore } from '@/store/layoutStore.js'
 import { useMagicKeys } from '@vueuse/core'
+import { Toaster } from '@/components/ui/sonner'
+import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarInput, SidebarInset, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarRail, SidebarTrigger } from '@/components/ui/sidebar'
+import NewClusterDialog from '@components/EdgeManager/EdgeClusters/NewClusterDialog.vue'
+import NewNodeDialog from '@components/EdgeManager/Nodes/NewNodeDialog.vue'
+import NewConnectionDialog from '@components/EdgeManager/Connections/NewConnectionDialog.vue'
+import NewDeviceDialog from '@components/EdgeManager/Devices/NewDeviceDialog.vue'
 
 export default {
   name: 'App',
@@ -77,6 +112,23 @@ export default {
   },
 
   components: {
+    NewClusterDialog,
+    NewNodeDialog,
+    NewDeviceDialog,
+    Sidebar,
+    SidebarContent,
+    SidebarGroup,
+    SidebarGroupContent,
+    SidebarGroupLabel,
+    SidebarHeader,
+    SidebarInput,
+    SidebarInset,
+    SidebarMenu,
+    SidebarMenuButton,
+    SidebarMenuItem,
+    SidebarProvider,
+    SidebarRail,
+    SidebarTrigger,
     Badge,
     Button,
     Card,
@@ -95,6 +147,9 @@ export default {
     SheetContent,
     SheetTrigger,
     Nav,
+    EdgeClusterList,
+    Toaster,
+    NewConnectionDialog,
   },
 
   watch: {
@@ -105,19 +160,31 @@ export default {
     },
   },
 
+  methods: {
+    logout(){
+      // Cleanup the client store state.
+      this.s.logout();
+      this.$router.push("/login");
+    }
+  },
+
   async mounted () {
+
     // Check if opts exists in local storage
     if (localStorage.getItem('opts')) {
       // If it does then create the service client
-      this.s.login(JSON.parse(localStorage.getItem('opts')))
+      await this.s.login(JSON.parse(localStorage.getItem('opts')))
     }
-
 
     this.$router.isReady().then(() => {
       if (this.$route.query.fullscreen) {
         this.l.toggleFullscreen(this.$route.query.fullscreen === 'true')
       }
     })
+  },
+
+  data () {
+    return {}
   },
 }
 </script>

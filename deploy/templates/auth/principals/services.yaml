@@ -75,20 +75,6 @@ spec:
     - mqtt/mqtt.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
 {{- end }}
 ---
-{{- if .Values.manager.enabled }}
-apiVersion: factoryplus.app.amrc.co.uk/v1
-kind: KerberosKey
-metadata:
-  name: http.manager
-  namespace: {{ .Release.Namespace }}
-spec:
-  type: Random
-  principal: HTTP/manager.{{ .Release.Namespace }}.svc.cluster.local@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
-  additionalPrincipals:
-    - HTTP/manager.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
-  secret: manager-keytab/keytab
-{{- end }}
----
 {{- if .Values.postgres.enabled }}
 apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey

@@ -34,10 +34,9 @@ spec:
 
       containers:
         - name: historian-sparkplug
-          image: "{{ include "amrc-connectivity-stack.image-name" (list . .Values.historians.sparkplug) }}"
+{{ include "amrc-connectivity-stack.image" (list . .Values.historians.sparkplug) | indent 10 }}
           command: [ "/usr/bin/k5start", "-Uf", "/keytabs/client" ]
           args: [ "node", "--es-module-specifier-resolution=node", "bin/ingester.js" ]
-          imagePullPolicy: {{ .Values.historians.sparkplug.image.pullPolicy }}
           env:
             - name: KRB5_CONFIG
               value: /config/krb5-conf/krb5.conf

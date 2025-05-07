@@ -19,7 +19,9 @@
     "webapi": "node bin/directory-webapi"
   },
   "dependencies": {
-    "@amrc-factoryplus/utilities": "2.0.0",
+    "@amrc-factoryplus/service-client": "file:../lib/js-service-client",
+    "@amrc-factoryplus/service-api": "file:../lib/js-service-api",
+    "@amrc-factoryplus/pg-client": "file:../lib/js-pg-client",
     "async": "^3.2.4",
     "express": "^4.17.1",
     "express-openapi-validator": "^4.13.2"

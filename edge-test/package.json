@@ -14,5 +14,10 @@
     "@amrc-factoryplus/edge-driver": "^0.0.5",
     "async": "^3.2.5",
     "mqtt": "^5.7.2"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.20.0",
+    "eslint": "^9.20.1",
+    "globals": "^15.14.0"
   }
 }

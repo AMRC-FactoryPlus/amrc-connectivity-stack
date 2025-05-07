@@ -12,7 +12,7 @@ import cgi from "cgi";
 import express from "express";
 import git from "isomorphic-git";
 
-import { Debug, UUIDs } from "@amrc-factoryplus/utilities";
+import { UUIDs } from "@amrc-factoryplus/service-client";
 
 import { Git } from "./uuids.js";
 
@@ -22,8 +22,7 @@ export class GitServer {
         this.fplus = opts.fplus;
         this.http_url = opts.http_url;
 
-        this.debug = new Debug();
-        this.log = this.debug.log.bind(this.debug, "git");
+        this.log = this.fplus.debug.bound("git");
 
         this.routes = express.Router();
 
@@ -51,8 +50,6 @@ export class GitServer {
     }
 
     async init () { 
-        await this.fplus.Directory.register_service_url(
-            Git.Service.Git, this.http_url);
 
         this.fplus.Fetch.cache = "reload";
 

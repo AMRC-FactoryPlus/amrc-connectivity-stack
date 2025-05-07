@@ -6,88 +6,64 @@
 
 import express from "express";
 
-import {Debug, UUIDs} from "@amrc-factoryplus/utilities";
+import { forward } from "@amrc-factoryplus/service-api";
 
-import Model from "./model.js";
-import {Perm} from "./uuids.js";
-
-const UUID_rx = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-const KRB_rx = /^[a-zA-Z0-9_./-]+@[A-Z0-9-.]+$/;
-
-const booleans = {
-    undefined: false,
-    "true": true, "false": false,
-    "1": true, "0": false,
-    on: true, off: false,
-    yes: true, no: false,
-};
-
-function valid_uuid(uuid) {
-    if (UUID_rx.test(uuid))
-        return true;
-    //debug.log("debug", `Ignoring invalid UUID [${uuid}]`);
-    return false;
-}
-
-function valid_krb(krb) {
-    if (KRB_rx.test(krb))
-        return true;
-    //debug.log("debug", `Ignoring invalid principal [${krb}]`);
-    return false;
-}
+import {Perm, Special} from "./uuids.js";
+import { booleans, valid_krb, valid_uuid } from "./validate.js";
 
 export default class AuthZ {
     constructor(opts) {
-        this.debug  = new Debug(opts);
-        this.model  = new Model(opts);
-        this.routes = express.Router();
-    }
+        this.debug  = opts.debug;
+        this.model = opts.model;
+        this.data = opts.data;
 
-    async init() {
-        await this.model.init();
-        this.setup_routes();
-        return this;
+        this.routes = this.setup_routes();
     }
 
     setup_routes() {
-        let api = this.routes;
+        let api = express.Router();
 
-        /* Validate against the spec */
-        //const spec = url.fileURLToPath(new URL("openapi.yaml", import.meta.url));
-        //api.use(OpenApiValidator.middleware({
-        //    apiSpec: spec,
-        //}));
+        const gone = (req, res) => res.status(410).end();
+        
+        /* These are all removed. */
+        api.route("/principal")
+            .get(gone)
+            .post(gone);
+        api.get("/ace", gone);
+        api.post("/ace", gone);
+        api.get("/effective", gone);
+        api.get("/effective/:principal", gone);
 
-        //api.use(this.authz.bind(this));
-
+        /* This will be used by other services until they are all
+         * updated. */
         api.get("/acl", this.get_acl.bind(this));
 
-        api.get("/ace", this.ace_get.bind(this));
-        api.post("/ace", this.ace_post.bind(this));
-
-        api.route("/principal")
-            .get(this.principal_list.bind(this))
-            .post(this.principal_add.bind(this));
+        /* These are used by the service-client library to find
+         * Sparkplug addresses; in particular by the Edge Agent. */
         api.get("/principal/find", this.principal_find.bind(this));
         api.route("/principal/:uuid")
             .get(this.principal_get.bind(this))
-            //.put(this.principal_update.bind(this))
-            .delete(this.principal_delete.bind(this));
+            .delete(gone);
 
-        api.get("/group", this.group_list.bind(this));
+        /* These endpoints are for migration only. PUT has been removed
+         * so group members can only be deleted. Normally all groups
+         * will be cleared the first time service-setup runs; the only
+         * reason for this not happening would be if groups were not
+         * correctly registered in the ConfigDB. */
+        api.get("/group/all", this.group_all.bind(this));
+        api.get("/group", this.group_get.bind(this));
         api.get("/group/:group", this.group_get.bind(this));
-        api.put("/group/:group/:member", this.group_add.bind(this));
-        api.delete("/group/:group/:member", this.group_delete.bind(this));
+        api.route("/group/:group/:member")
+            .put(gone)
+            .delete(this.group_delete.bind(this));
 
-        api.get("/effective", this.effective_list.bind(this));
-        api.get("/effective/:principal", this.effective_get.bind(this));
-
-        api.post("/load", this.dump_load.bind(this));
-        api.get("/save", this.dump_save.bind(this));
+        return api;
     }
 
+    /* This accepts a `permission` QS for compatibility but ignores it.
+     * Now we always return all permissions the client can read. */
     async get_acl(req, res) {
-        const {principal, permission} = req.query;
+        const { principal, permission } = req.query;
         const by_uuid = booleans[req.query["by-uuid"]];
 
         if (by_uuid == undefined)
@@ -96,213 +72,75 @@ export default class AuthZ {
         const princ_valid = by_uuid
             ? valid_uuid(principal) : valid_krb(principal);
         if (!princ_valid || !valid_uuid(permission))
-            return res.status(400).end();
+            return res.status(410).end();
 
-        const ok = await this.model.check_acl(
-            req.auth, Perm.Read_ACL, permission, true)
-        if (!ok)
-            return res.status(403).end();
-
-        const acl = await this.model.get_acl(principal, permission, by_uuid);
-        return res.status(200).json(acl);
-    }
-
-    async ace_get(req, res) {
-        const ok = await this.model.check_acl(
-            req.auth, Perm.Manage_ACL, UUIDs.Null, false);
-        if (!ok) return res.status(403).end();
-
-        const aces = await this.model.ace_get_all();
-        return res.status(200).json(aces);
-    }
-
-    async ace_post(req, res) {
-        const ace = req.body;
-
-        const ok = await this.model.check_acl(
-            req.auth, Perm.Manage_ACL, ace.permission, true);
-        if (!ok) return res.status(403).end();
-
-        const st = await this.model.action_invoke(
-            {add: "ace_add", delete: "ace_delete",},
-            ace.action, ace);
-
-        return res.status(st).end();
-    }
-
-    async principal_list(req, res) {
-        const ok = await this.model.check_acl(
-            req.auth, Perm.Read_Krb, UUIDs.Null, false);
-        if (!ok) return res.status(403).end();
-
-        const princs = await this.model.principal_get_all();
-        return res.status(200).json(princs);
-    }
-
-    async principal_add(req, res) {
-        const princ = req.body;
-
-        const ok = await this.model.check_acl(
-            req.auth, Perm.Manage_Krb, UUIDs.Null, false);
-        if (!ok) return res.status(403).end();
-
-        const st = await this.model.principal_add(princ);
-        return res.status(st).end();
+        const url = by_uuid ? `/v2/acl/${principal}`
+            : `/v2/acl/kerberos/${encodeURIComponent(principal)}`;
+        return forward(url)(req, res);
     }
 
     async principal_get(req, res) {
         const {uuid} = req.params;
         if (!valid_uuid(uuid))
-            return res.status(400).end();
+            return res.status(410).end();
 
-        const ids = await this.model.principal_get(uuid);
+        /* This API only ever returns Kerberos identities */
+        const id = await this.data.find_identities(i => 
+            i.uuid == uuid && i.kind == "kerberos");
+        const kerberos = id[0]?.name;
 
-        /* We can return 403 here as long as we don't return 404 until
-         * we've checked the permissions. */
-        const ok = req.auth == ids?.kerberos
-            || await this.model.check_acl(req.auth, Perm.Read_Krb, uuid, true);
-        if (!ok) return res.status(403).end();
+        /* The permissions here are odd for historical reasons. If the
+         * principal turns out to be the client's they can look up
+         * regardless. */
+        const tok = await this.data.check_targ(req.auth, Perm.ReadKrb, true);
+        if (!(kerberos == req.auth || tok?.(uuid)))
+            return res.status(403).end();
 
-        if (ids == null)
-            return res.status(404).end();
-        return res.status(200).json(ids);
+        if (!kerberos) return res.status(404).end();
+        return res.status(200).json({ uuid, kerberos });
     }
 
-    async principal_delete(req, res) {
-        const {uuid} = req.params;
-        if (!valid_uuid(uuid))
-            return res.status(400).end();
-
-        const ok = await this.model.check_acl(
-            req.auth, Perm.Manage_Krb, uuid, true);
-        if (!ok) return res.status(403).end();
-
-        const st = await this.model.principal_delete(uuid);
-        return res.status(st).end();
-    }
-
-    /* This endpoint may change in future to allow searching for
-     * principals by other criteria, e.g. Node address. */
+    /* XXX This also used to allow by-name lookup of the client's own
+     * identity, but I don't think that's used anywhere. */
     async principal_find(req, res) {
-        const kerberos = req.query?.kerberos ?? req.auth;
-        if (!valid_krb(kerberos))
-            return res.status(400).end();
-
-        const uuid = await this.model.principal_find_by_krb(kerberos);
-        if (uuid == null)
-            return res.status(404).end();
-
-        /* We have to check permissions against the returned UUID. This
-         * means that we must return 404 instead of 403 if the check
-         * fails. Principals are always allowed to look up their own
-         * information. */
-        const ok = req.auth == kerberos
-            || await this.model.check_acl(req.auth, Perm.Read_Krb, uuid, true)
-        if (!ok) return res.status(404).end();
-
-        return res.status(200).json(uuid);
+        const kerberos = req.query?.kerberos;
+        const url = kerberos == null ? "/v2/whoami/uuid"
+            : `/v2/identity/kerberos/${kerberos}`;
+        return forward(url)(req, res);
     }
 
-    async group_list(req, res) {
-        const ok = await this.model.check_acl(
-            req.auth, Perm.Manage_Group, UUIDs.Null, false);
-        if (!ok) return res.status(403).end();
+    /* These all now require wildcard ManageGroup. This is a change from
+     * before but this is meant to be an admin-only interface now. */
+    async group_all(req, res) {
+        const tok = await this.data.check_targ(req.auth, Perm.ManageGroup, false);
+        if (!tok?.(Special.Wildcard))
+            return res.status(403).end();
 
-        const groups = await this.model.group_list();
+        const groups = await this.model.group_all();
         return res.status(200).json(groups);
     }
 
-    async group_get(req, res) {
-        const grp = req.params.group;
+    async group_get (req, res) {
+        const tok = await this.data.check_targ(req.auth, Perm.ManageGroup, false);
+        if (!tok?.(Special.Wildcard))
+            return res.status(403).end();
 
-        const ok = await this.model.check_acl(
-            req.auth, Perm.Manage_Group, grp, true);
-        if (!ok) return res.status(403).end();
+        const { group } = req.params;
 
-        const members = await this.model.group_get(grp);
-        return res.status(200).json(members);
-    }
-
-    async group_add(req, res) {
-        const {group, member} = req.params;
-
-        const ok = await this.model.check_acl(
-            req.auth, Perm.Manage_Group, group, true);
-        if (!ok) return res.status(403).end();
-
-        const st = await this.model.group_add(group, member);
-        return res.status(st).end();
+        const rv = group
+            ? await this.model.group_get(group)
+            : await this.model.group_list();
+        return res.status(200).json(rv);
     }
 
     async group_delete(req, res) {
-        const {group, member} = req.params;
+        const tok = await this.data.check_targ(req.auth, Perm.ManageGroup, false);
+        if (!tok?.(Special.Wildcard))
+            return res.status(403).end();
 
-        const ok = await this.model.check_acl(
-            req.auth, Perm.Manage_Group, group, true);
-        if (!ok) return res.status(403).end();
+        const {group, member} = req.params;
 
         const st = await this.model.group_delete(group, member);
         return res.status(st).end();
-    }
-
-    async effective_list(req, res) {
-        const ok = await this.model.check_acl(
-            req.auth, Perm.Read_Eff, UUIDs.Null, false);
-        if (!ok) return res.status(403).end();
-
-        const princs = await this.model.principal_list();
-        return res.status(200).json(princs);
-    }
-
-    async effective_get(req, res) {
-        const ok = await this.model.check_acl(
-            req.auth, Perm.Read_Eff, UUIDs.Null, false);
-        if (!ok) return res.status(403).end();
-
-        const {principal} = req.params;
-        const eff = await this.model.effective_get(principal);
-        return res.status(200).json(eff);
-    }
-
-    async dump_load(req, res) {
-        const dump = req.body;
-
-        if (!this.model.dump_validate(dump)) {
-            this.debug.log("dump", "Dump failed initial validation");
-            return res.status(400).end();
-        }
-
-        const perms = {
-            aces: Perm.Manage_ACL,
-            groups: Perm.Manage_Group,
-            principals: Perm.Manage_Krb,
-        };
-        for (const [key, perm] of Object.entries(perms)) {
-            if (key in dump) {
-                const ok = await this.model.check_acl(
-                    req.auth, perm, UUIDs.Null, false);
-                if (!ok) {
-                    this.debug.log("dump", "Refusing dump: %s needs permission to set %s",
-                        req.auth, key);
-                    return res.status(403).end();
-                }
-            }
-        }
-
-        const st = await this.model.dump_load(dump);
-        return res.status(st).end();
-    }
-
-    async dump_save(req, res) {
-        const ckperm = async p =>
-            await this.model.check_acl(req.auth, p, UUIDs.Null, false);
-        const ok = await ckperm(Perm.Manage_ACL)
-            && await ckperm(Perm.Manage_Group)
-            && await ckperm(Perm.Manage_Krb);
-        if (!ok)
-            return res.status(403).end();
-
-        const rv = await this.model.dump_save();
-        return res.status(200).json(rv);
     }
 }

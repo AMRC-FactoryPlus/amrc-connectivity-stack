@@ -1,4 +1,6 @@
 .idea/
 config.mk
 */config.mk
-.env
+*/.npm_install_done
+.vscode
+.DS_Store

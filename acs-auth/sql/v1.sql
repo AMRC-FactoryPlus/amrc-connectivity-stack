@@ -1,8 +1,9 @@
 -- Factory+ / AMRC Connectivity Stack (ACS) Authorisation component
 -- DB schema version 1.
--- Copyright 2022 AMRC.
+-- Copyright 2022 University of Sheffield AMRC
 
-call migrate_to(1, $migrate$
+select version < 1 need_update from version \gset
+\if :need_update
     -- The DB design here is evolutionary and not correct; it needs
     -- refactoring into a table of UUIDs which is FK'd to from
     -- everywhere else.
@@ -55,4 +56,6 @@ call migrate_to(1, $migrate$
                 from group_members
                 where parent = g;
         $$;
-$migrate$);
+
+    update version set version = 1;
+\endif

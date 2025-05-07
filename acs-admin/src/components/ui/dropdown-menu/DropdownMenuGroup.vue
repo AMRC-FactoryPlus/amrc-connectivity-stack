@@ -1,5 +1,9 @@
+<!--
+  - Copyright (c) University of Sheffield AMRC 2025.
+  -->
+
 <script setup>
-import { DropdownMenuGroup } from "radix-vue";
+import { DropdownMenuGroup } from 'reka-ui'
 
 const props = defineProps({
   asChild: { type: Boolean, required: false },

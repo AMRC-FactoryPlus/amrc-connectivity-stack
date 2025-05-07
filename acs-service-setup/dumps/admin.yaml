@@ -1,54 +1,103 @@
-# Create the Administrator account and group
-# Grant appropriate permissions
+# Grant appropriate permissions to the Administrator group
+#-REQUIRE: auth sparkplug uns
 ---
 service: !u UUIDs.Service.ConfigDB
-version: 1
-overwrite: true
-classes:
-  - !u ACS.Class.UserAccount
-  - !u ACS.Class.UserGroup
+version: 2
 objects:
-  !u ACS.Class.UserGroup:
-    - !u ACS.Group.Administrators
-    - !u ACS.Group.GlobalDebuggers
-configs:
-  !u UUIDs.App.Info:
-    !u ACS.Class.UserAccount:     { name: "User account" }
-    !u ACS.Class.UserGroup:       { name: "User group" }
-    !u ACS.Group.Administrators:  { name: "Administrators" }
-    !u ACS.Group.GlobalDebuggers: { name: "MQTT global debuggers" }
+  !u Auth.Class.ClientRole:
+    !u ACS.Group.Administrator:
+      name: "Administrator"
+      subclassOf:
+        - !u ACS.Group.SparkplugReader
+        - !u UNS.Group.Reader
+#---
+## Maybe we move the Auth storage entirely into the ConfigDB. We have
+## about 200 records altogether... we could hold the whole thing in
+## memory, tracked from ConfigDB changes. Or we could spill to Pg or
+## Redis. I'm not going this way for now in the limited time we have but
+## I think it might be the way forward in future.
+#
+# R2Class
+#   ⊃ Permission group
+#     𝒫 Permission
+#     ⊃ Service permission set
+#     ⊃ Composite permission
+#
+# R1Class 
+#   ⊃ Config entry group
+#     𝒫 Config entry
+#     ⊃ Application
+#       ∋ Grant
+#     ⊃ Grant group
+#       𝒫 Grant
+#       ⊃ Permission
+#
+# Individual
+#   ⊃ Config entry
+#     ⊃ Grant
+#       ∋ Admins have full ConfigDB access
+#
+#service: !u UUIDs.Service.ConfigDB
+#version: 2
+#objects:
+#  !u UUIDs.Class.App:
+#    f5db0a06-ce9f-11ef-acaf-e32f612ec46b:
+#      name: "Grant definition"
+#  !u ConfigDB.Class.R1Class:
+#    8ede8a34-cea0-11ef-8d1a-6768c15c6b2f:
+#      name: "Permission grant"
+#  8ede8a34-cea0-11ef-8d1a-6768c15c6b2f:
+#    26dd32be-cea0-11ef-8638-4b9832bb4bc0:
+#      name: "Admins have full Auth access"
+#    316db19a-cea0-11ef-8c3e-d7c765a7946f:
+#      name: "Admins can access Cluster Manager"
+#    330473fe-cea0-11ef-a977-63ee98241d38:
+#      name: "Admins can send any CMD"
+#    345f24ba-cea0-11ef-8a1b-bf4371864be2:
+#      name: "Admins have full ConfigDB access"
+#    359e7cf4-cea0-11ef-86dd-1bb279cadc72:
+#      name: "Admins have full Directory access"
+#    378e11fa-cea0-11ef-a0f7-37fda7fa7e32: 
+#      name: "Admins have full Git access"
+#configs:
+#  f5db0a06-ce9f-11ef-acaf-e32f612ec46b:
+#    26dd32be-cea0-11ef-8638-4b9832bb4bc0:
+#      principal: !u ACS.Group.Administrator
+#      permission: !u ACS.PermGroup.Auth
+#      target: !u UUIDs.Special.Null
+#    316db19a-cea0-11ef-8c3e-d7c765a7946f:
+#      principal: !u ACS.Group.Administrator
+#      permission: !u ACS.PermGroup.Clusters
+#      target: !u UUIDs.Special.Null
+#    330473fe-cea0-11ef-a977-63ee98241d38:
+#      principal: !u ACS.Group.Administrator
+#      permission: !u ACS.PermGroup.CmdEsc
+#      target: !u UUIDs.Special.Null
+#    345f24ba-cea0-11ef-8a1b-bf4371864be2:
+#      principal: !u ACS.Group.Administrator
+#      permission: !u ACS.PermGroup.ConfigDB
+#      target: !u UUIDs.Special.Null
+#    359e7cf4-cea0-11ef-86dd-1bb279cadc72:
+#      principal: !u ACS.Group.Administrator
+#      permission: !u ACS.PermGroup.Directory
+#      target: !u UUIDs.Special.Null
+#    378e11fa-cea0-11ef-a0f7-37fda7fa7e32:
+#      principal: !u ACS.Group.Administrator
+#      permission: !u ACS.PermGroup.Git
+#      target: !u UUIDs.Special.Null
 ---
 service: !u UUIDs.Service.Authentication
-version: 1
-groups:
-  !u ACS.Group.GlobalDebuggers:
-    - !u ACS.Group.Administrators
-aces:
-  - principal: !u ACS.Group.Administrators
-    permission: !u ACS.PermGroup.Auth
-    target: !u UUIDs.Special.Null
-  - principal: !u ACS.Group.Administrators
-    permission: !u ACS.PermGroup.Clusters
-    target: !u UUIDs.Special.Null
-  - principal: !u ACS.Group.Administrators
-    permission: !u ACS.PermGroup.CmdEsc
-    target: !u UUIDs.Special.Null
-  - principal: !u ACS.Group.Administrators
-    permission: !u ACS.PermGroup.ConfigDB
-    target: !u UUIDs.Special.Null
-  - principal: !u ACS.Group.Administrators
-    permission: !u ACS.PermGroup.Directory
-    target: !u UUIDs.Special.Null
-  - principal: !u ACS.Group.Administrators
-    permission: !u ACS.PermGroup.Git
-    target: !u UUIDs.Special.Null
+version: 2
+grants:
+  # XXX I'm not sure these are appropriate; we are relying on the old
+  # permission group expansion semantics, but these are not composite
+  # permissions. For now all perm groups are expanded, but possibly
+  # these should be individual grants?
+  !u ACS.Group.Administrator:
+    !u ACS.PermGroup.Auth: null
+    !u ACS.PermGroup.Clusters: null
+    !u ACS.PermGroup.CmdEsc: null
+    !u ACS.PermGroup.ConfigDB: null
+    !u ACS.PermGroup.Directory: null
+    !u ACS.PermGroup.Git: null
 
-  - principal: !u ACS.Group.GlobalDebuggers
-    permission: !u ACS.Perm.MQTT.ReadWholeNamespace
-    target: !u UUIDs.Special.Null
-  - principal: !u ACS.Group.GlobalDebuggers
-    permission: !u UUIDs.Permission.CmdEsc.Rebirth
-    target: !u UUIDs.Special.Null
-  - principal: !u ACS.Group.GlobalDebuggers
-    permission: !u ACS.Perm.MQTT.ReadEntireUNS
-    target: !u UUIDs.Special.Null

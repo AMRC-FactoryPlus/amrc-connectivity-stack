@@ -7,7 +7,7 @@
 import express from "express";
 import typeis from "type-is";
 
-import {Address} from "@amrc-factoryplus/utilities";
+import {Address} from "@amrc-factoryplus/service-client";
 
 export default class ApiV1 {
     constructor(opts) {

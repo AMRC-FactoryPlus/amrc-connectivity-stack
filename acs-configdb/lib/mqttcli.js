@@ -4,7 +4,11 @@
  * Copyright 2022 AMRC
  */
 
-import {Address, Debug, MetricBuilder, SpB, Topic, UUIDs} from "@amrc-factoryplus/utilities";
+import * as timers from "timers/promises";
+
+import { 
+    Address, MetricBuilder, SpB, Topic, UUIDs
+} from "@amrc-factoryplus/service-client";
 
 import {Device_Info, Schema, Service} from "./constants.js";
 
@@ -14,8 +18,6 @@ const Changed = {
     schema: "Schema",
 };
 
-const debug = new Debug();
-
 export default class MQTTCli {
     constructor(opts) {
         this.fplus = opts.fplus;
@@ -24,12 +26,24 @@ export default class MQTTCli {
         this.url = opts.url;
         this.silent = opts.silent;
 
+        this.log = opts.fplus.debug.bound("mqtt");
+
         this.address = Address.parse(opts.sparkplug_address);
         this.seq = 0;
     }
 
-    async init() {
-        return this;
+    static fromEnv (fplus, env) {
+        if (env.MQTT_DISABLE) {
+            fplus.debug.log("mqtt", "Disabling MQTT connection.");
+            return;
+        }
+        return new MQTTCli({
+            fplus,
+            sparkplug_address:  env.SPARKPLUG_ADDRESS,
+            device_uuid:        env.DEVICE_UUID,
+            url:                env.HTTP_API_URL,
+            silent:             !!env.MQTT_MONITOR_ONLY,
+        });
     }
 
     will() {
@@ -51,14 +65,20 @@ export default class MQTTCli {
 
     async run() {
         if (this.silent)
-            debug.log("mqtt", "Running in monitor-only mode.");
+            this.log("Running in monitor-only mode.");
 
-        const mqtt = await this.fplus.mqtt_client({
-            verbose: true,
-            will: this.will(),
-        });
-        this.mqtt = mqtt;
+        for (;;) {
+            this.mqtt = await this.fplus.mqtt_client({
+                verbose: true,
+                will: this.will(),
+            });
+            if (this.mqtt) break;
 
+            this.log("Cannot connect to MQTT, retrying in 30s");
+            await timers.setTimeout(30000);
+        }
+
+        const { mqtt } = this;
         mqtt.on("gssconnect", this.on_connect.bind(this));
         mqtt.on("error", this.on_error.bind(this));
         mqtt.on("message", this.on_message.bind(this));
@@ -80,7 +100,7 @@ export default class MQTTCli {
 
     publish(kind, metrics, with_uuid) {
         if (!this.mqtt) {
-            debug.log("mqtt", "Can't publish without an MQTT connection.");
+            this.log("Can't publish without an MQTT connection.");
             return;
         }
 
@@ -91,7 +111,7 @@ export default class MQTTCli {
     }
 
     on_connect() {
-        debug.log("mqtt", "Connected to MQTT broker.");
+        this.log("Connected to MQTT broker.");
         this.rebirth();
     }
 
@@ -107,17 +127,15 @@ export default class MQTTCli {
             {name: "Device_Information/Manufacturer", type: "String", value: Device_Info.Manufacturer},
             {name: "Device_Information/Model", type: "String", value: Device_Info.Model},
             {name: "Device_Information/Serial", type: "String", value: Device_Info.Serial},
-
             {name: "Schema_UUID", type: "UUID", value: Schema.Service},
             {name: "Instance_UUID", type: "UUID", value: this.device_uuid},
             {name: "Service_UUID", type: "UUID", value: Service.Registry},
-            {name: "Service_URL", type: "String", value: this.url},
         ]);
         metrics.push.apply(metrics,
             Object.values(Changed).map(v =>
                 ({name: `Last_Changed/${v}`, type: "UUID", value: ""})));
 
-        debug.log("mqtt", `Publishing birth certificate`);
+        this.log(`Publishing birth certificate`);
         this.publish("BIRTH", metrics, true);
     }
 
@@ -136,7 +154,7 @@ export default class MQTTCli {
     }
 
     on_error(error) {
-        debug.log("mqtt", "MQTT error: %o", error);
+        this.log("MQTT error: %o", error);
     }
 
     async on_message(topicstr, message) {
@@ -147,7 +165,7 @@ export default class MQTTCli {
         try {
             payload = SpB.decodePayload(message);
         } catch {
-            debug.log("mqtt", `Bad payload on topic ${topicstr}`);
+            this.log(`Bad payload on topic ${topicstr}`);
             return;
         }
 
@@ -165,7 +183,7 @@ export default class MQTTCli {
                 await this.on_command(addr, payload);
                 break;
             default:
-                debug.log("mqtt", `Unknown Sparkplug message type ${topic.type}!`);
+                this.log(`Unknown Sparkplug message type ${topic.type}!`);
         }
     }
 
@@ -181,7 +199,7 @@ export default class MQTTCli {
                     await this.rebirth();
                     break;
                 default:
-                    debug.log("mqtt", `Received unknown CMD: ${m.name}`);
+                    this.log(`Received unknown CMD: ${m.name}`);
                 /* Ignore for now */
             }
         }

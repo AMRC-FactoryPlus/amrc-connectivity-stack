@@ -6,17 +6,13 @@
 
 import k8s          from "@kubernetes/client-node";
 
-import { Debug }    from "@amrc-factoryplus/utilities";
-
 import { KRB, FLUX, flux_krb_key }  from "./manifests.js";
-
-const debug = new Debug();
 
 export class KrbKeys {
     constructor (opts) {
         this.fplus      = opts.fplus;
 
-        this.log = debug.log.bind(debug, "krbkeys");
+        this.log = this.fplus.debug.bound("krbkeys");
 
         const kc = this.kc = new k8s.KubeConfig();
         kc.loadFromCluster();

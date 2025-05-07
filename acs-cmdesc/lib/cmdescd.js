@@ -4,7 +4,7 @@
  * Copyright 2022 AMRC
  */
 
-import {Address, Debug, UUIDs,} from "@amrc-factoryplus/utilities";
+import {Address, UUIDs,} from "@amrc-factoryplus/service-client";
 
 const CCL_Perms = "9584ee09-a35a-4278-bc13-21a8be1f007c";
 const CCL_Template = "60e99f28-67fe-4344-a6ab-b1edb8b8e810";

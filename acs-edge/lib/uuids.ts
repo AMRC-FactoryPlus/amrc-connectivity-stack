@@ -9,7 +9,8 @@ export const Special = {
     V5Metric:       "8a4dc2f4-2f9f-45fc-b2e9-ed7b9cda6145",
 };
 export const App = {
-    AgentConfig:    "aac6f843-cfee-4683-b121-6943bfdf9173",
+    AgentConfig:      "aac6f843-cfee-4683-b121-6943bfdf9173",
+    EdgeScoutResults: "f8c1b13b-ebaf-45c9-b712-9cd712695513"
 };
 export const Schema = {
     EdgeAgent:      "15360868-2f35-4b52-990b-49329fb246fe",

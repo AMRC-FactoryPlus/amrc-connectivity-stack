@@ -1,0 +1,15 @@
+#!/bin/sh
+
+# This implements recursion for POSIX make. There are many reasons why
+# recursive make is not the best way to do things but it is difficult to
+# avoid within the restriction of POSIX make syntax.
+
+set -e
+
+target="$1"
+shift
+
+for d in "$@"
+do
+    ${MAKE} -C "${d}" "${target}"
+done

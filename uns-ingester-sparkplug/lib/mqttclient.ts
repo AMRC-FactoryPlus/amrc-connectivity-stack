@@ -89,9 +89,9 @@ export default class MQTTClient {
         let payload;
 
         try {
-            payload = SpB.decodePayload(message);
-        } catch {
-            logger.error(`🚨 Bad payload on topic ${topicString}`);
+            payload = SpB.decodeToNative(message);
+        } catch (e) {
+            logger.error(`🚨 Bad payload on topic ${topicString}: ${e}`);
             return;
         }
 
@@ -195,8 +195,6 @@ export default class MQTTClient {
 
                 // Store the birth certificate mapping in the alias resolver. This uses the alias as the key and a simplified object containing the name and type as the value.
                 this.setNestedValue(this.aliasResolver, [topic.address.group, topic.address.node, topic.address.device], payload.metrics.reduce(function (acc, obj) {
-                    let alias = Long.isLong(obj.alias) ? obj.alias.toNumber() : obj.alias;
-
                     // Work out all schemas that are involved in this metric.
                     //
                     // e.g. Assume the current metric is CNC/Axes/1/BaseAxis/Position/Actual
@@ -248,7 +246,7 @@ export default class MQTTClient {
                         }
                     }, "");
 
-                    acc[alias] = {
+                    acc[obj.alias] = {
                         instance: {
                             // The top level instance for this device
                             top: topLevelInstance,
@@ -278,7 +276,7 @@ export default class MQTTClient {
                         },
                         name: obj.name,
                         type: obj.type,
-                        alias: alias,
+                        alias: obj.alias,
                         unit: obj.properties?.engUnit?.value,
                         transient: obj.isTransient
                     };
@@ -455,9 +453,9 @@ export default class MQTTClient {
             let payload: UnsMetric;
             // if theirs more than one of the same metric from the same sparkplug payload, add the values to the batch array.
             if (metricContainers.length > 1) {
-                const sortedMetricContainers = metricContainers.sort((a, b) => a.metric.timestamp.toNumber() - b.metric.timestamp.toNumber());
+                const sortedMetricContainers = metricContainers.sort((a, b) => a.metric.timestamp - b.metric.timestamp);
                 payload = {
-                    timestamp: new Date(sortedMetricContainers[0].metric.timestamp.toNumber()),
+                    timestamp: new Date(sortedMetricContainers[0].metric.timestamp),
                     value: sortedMetricContainers[0].metric.value,
                     batch: []
                 }
@@ -465,13 +463,13 @@ export default class MQTTClient {
                 sortedMetricContainers.shift();
                 sortedMetricContainers.forEach(metricContainer => {
                     payload.batch.push({
-                        timestamp: new Date(metricContainer.metric.timestamp.toNumber()),
+                        timestamp: new Date(metricContainer.metric.timestamp),
                         value: metricContainer.metric.value
                     });
                 });
             } else {
                 payload = {
-                    timestamp: new Date(metricContainers[0].metric.timestamp.toNumber()),
+                    timestamp: new Date(metricContainers[0].metric.timestamp),
                     value: metricContainers[0].metric.value
                 };
             }

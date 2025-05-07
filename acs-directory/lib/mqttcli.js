@@ -9,10 +9,10 @@ import async from "async";
 import Long from "long";
 
 import {
-    Address, Debug, 
+    Address, 
     MetricBranch, MetricBuilder, MetricTree, 
     SpB, Topic, UUIDs
-} from "@amrc-factoryplus/utilities";
+} from "@amrc-factoryplus/service-client";
 import { Device_Info } from "./constants.js";
 import { Schema } from "./uuids.js";
 
@@ -32,11 +32,6 @@ function map_get_or_create(map, key, factory) {
     const rv = factory();
     map.set(key, rv);
     return rv;
-}
-
-function ts_date (ts) {
-    const val = Long.isLong(ts) ? ts.toNumber() : ts;
-    return new Date(val);
 }
 
 function for_each_metric(tree, action) {
@@ -127,6 +122,11 @@ export default class MQTTCli {
         if (this.silent)
             this.log("mqtt", "Running in monitor-only mode.");
 
+        /* We have just started. Any open Sparkplug sessions must be
+         * closed, as we may have missed a DEATH while we were offline.
+         */
+        this.model.close_all_sessions(new Date());
+
         const mqtt = await this.fplus.mqtt_client({
             verbose: true,
             will: this.will(),
@@ -181,7 +181,6 @@ export default class MQTTCli {
         this.seq = 0;
         const Birth = MetricBuilder.birth;
         const metrics = Birth.node([]);
-        Birth.command_escalation(metrics);
         metrics.push.apply(metrics, [
             {name: "Device_Information/Schema_UUID", type: "UUID", value: UUIDs.Schema.Device_Information},
             {name: "Device_Information/Manufacturer", type: "String", value: Device_Info.Manufacturer},
@@ -191,7 +190,6 @@ export default class MQTTCli {
             {name: "Schema_UUID", type: "UUID", value: UUIDs.Schema.Service},
             {name: "Instance_UUID", type: "UUID", value: this.device_uuid},
             {name: "Service_UUID", type: "UUID", value: UUIDs.Service.Directory},
-            {name: "Service_URL", type: "String", value: this.url},
 
             {name: "Last_Changed/Device_UUID", type: "UUID", value: ""},
             {name: "Last_Changed/Device_Address", type: "String", value: ""},
@@ -216,11 +214,13 @@ export default class MQTTCli {
 
         let payload;
         try {
-            payload = SpB.decodePayload(message);
+            payload = SpB.decodeToNative(message);
         } catch {
             this.log("mqtt", `Bad payload on topic ${topicstr}`);
             return;
         }
+        /* Default the payload timestamp here. */
+        payload.timestamp ??= new Date();
 
         /* Push messages to a queue so they are processed serially. I
          * think this is stricter than is necessary: probably messages
@@ -373,7 +373,7 @@ export default class MQTTCli {
                 metric: active.name,
                 active: active.value,
                 alias:  active.alias,
-                stamp:  ts_date(active.timestamp ?? timestamp),
+                stamp:  active.timestamp,
             });
         });
 
@@ -391,8 +391,8 @@ export default class MQTTCli {
         for (const alrt of alerts.values()) {
             metrics.name.set(alrt.metric, alrt.uuid);
             if (alrt.alias != undefined) {
-                /* We must stringify the alias as it is a Long */
-                metrics.alias.set(alrt.alias.toString(), alrt.uuid);
+                /* Aliases are BigInts now which can be Map keys */
+                metrics.alias.set(alrt.alias, alrt.uuid);
             }
         }
         this.log("alerts", "Recorded aliases for %s: %o", address, metrics);
@@ -406,10 +406,10 @@ export default class MQTTCli {
 
         const updates = payload.metrics.flatMap(m => {
             const uuid = "alias" in m 
-                ? alerts.alias.get(m.alias.toString()) 
+                ? alerts.alias.get(m.alias) 
                 : alerts.name.get(m.name);
             if (!uuid) return [];
-            const stamp = ts_date(m.timestamp ?? payload.timestamp);
+            const stamp = m.timestamp ?? payload.timestamp;
             return [[uuid, m.value, stamp]];
         });
         this.log("alerts", "Updates: %o", updates);
@@ -460,7 +460,7 @@ export default class MQTTCli {
         this.record_alert_metrics(address, alerts);
 
         await this.model.birth({
-            time: ts_date(payload.timestamp ?? 0),
+            time: payload.timestamp,
             address,
             uuid: tree.Instance_UUID?.value,
             top_schema: tree.Schema_UUID?.value,
@@ -474,7 +474,7 @@ export default class MQTTCli {
     }
 
     async on_death(address, payload) {
-        const time =  ts_date(payload.timestamp ?? 0);
+        const time = payload.timestamp;
 
         this.log("device", `Registering DEATH for ${address}`);
 
@@ -518,12 +518,7 @@ export default class MQTTCli {
         const node = addr.parent_node();
 
         this.log("rebirth", `Sending (escalated) rebirth request to ${node}`);
-        const metrics = MetricBuilder.data.command_escalation(
-            //addr, 
-            //(addr.isDevice() ? "Device Control/Rebirth" : "Node Control/Rebirth"),
-            node, "Node Control/Rebirth", "true",
-        );
-        this.publish("DATA", metrics);
+        await this.fplus.CmdEsc.rebirth(node);
     }
 
     /* We don't want to attempt rebirth too often (Ignition may be doing

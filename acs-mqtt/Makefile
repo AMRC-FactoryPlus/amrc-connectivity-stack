@@ -14,7 +14,7 @@ pluginver!=	cd ${src} && \
 
 zip=hivemq-auth-krb-${pluginver}-distribution.zip
 
-build_args+=	krb_zipfile=${zip}
+build_args+=	--build-arg krb_zipfile=${zip}
 
 include ${mk}/acs.docker.mk
 

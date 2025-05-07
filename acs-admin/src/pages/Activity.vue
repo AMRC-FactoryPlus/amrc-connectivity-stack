@@ -1,3 +1,7 @@
+<!--
+  - Copyright (c) University of Sheffield AMRC 2025.
+  -->
+
 <template>
   <div class="flex flex-col flex-1">
     <div v-if="s.loaded && connected" id="app"
@@ -23,12 +27,12 @@
             <div class="text-md font-bold line-clamp-1">
               {{topic.device ?? topic.node}}
             </div>
-            <p class="text-xs">
+            <div class="text-xs">
               <div class="text-xs mt-2 line-clamp-1"
                   :class="pendingDeletions[topic.path] ? 'text-white' : 'text-gray-400'">{{dayjs(
                   updatedTimes.find(e => e.path === topic.path).lastUpdated).fromNow()}}
               </div>
-            </p>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -47,6 +51,7 @@ import relativeTime from 'dayjs/plugin/relativeTime'
 import { useServiceClientStore } from '@/store/serviceClientStore.js'
 import { Topic } from '@amrc-factoryplus/service-client'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card/index.js'
+import {serviceClientReady} from "@store/useServiceClientReady.js";
 
 export default {
 
@@ -98,10 +103,11 @@ export default {
       this.lastRefreshTime = new Date().getTime()
     }, 1000) // Update every 60 seconds
 
+    await serviceClientReady()
     this.mqtt = await this.s.client.MQTT.mqtt_client()
 
     this.mqtt.on('connect', this.onConnect)
-    this.mqtt.on('error', e => console.log(`MQTT error: ${e}`))
+    this.mqtt.on('error', e => console.error(`MQTT error: ${e}`))
     this.mqtt.on('message', this.onMessage)
 
     this.mqtt.subscribe('spBv1.0/#')
@@ -136,7 +142,7 @@ export default {
 
       const topic = Topic.parse(topicstr)
       if (!topic) {
-        console.log(`Bad MQTT topic ${topic}`)
+        console.error(`Bad MQTT topic ${topic}`)
         return
       }
 

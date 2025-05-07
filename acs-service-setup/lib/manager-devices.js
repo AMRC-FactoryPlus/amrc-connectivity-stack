@@ -211,7 +211,86 @@ class MigrateAgents {
         };
     }
 
-    async register_device (node, connection, device) {
+    // Transform flat array of metrics into nested object structure
+    transformOriginMap(tags) {
+        // Field name mapping from old to new format
+        const fieldMapping = {
+            'address': 'Address',
+            'path': 'Path',
+            'method': 'Method',
+            'type': 'Sparkplug_Type',
+            'docs': 'Documentation',
+            'recordToDB': 'Record_To_Historian',
+            'engHigh': 'Eng_High',
+            'engLow': 'Eng_Low',
+            'engUnit': 'Eng_Unit',
+            'deadBand': 'Deadband',
+        };
+
+        // Create the root object for the nested structure
+        const nestedMap = {};
+
+        // Process each tag
+        for (const tag of tags) {
+            // Skip tags without a Name
+            if (!tag.Name) continue;
+
+            // Split the name by '/' to get the path components
+            const pathComponents = tag.Name.split('/');
+
+            // Handle Schema_UUID and Instance_UUID at the root level
+            if (pathComponents.length === 1 &&
+                (pathComponents[0] === 'Schema_UUID' || pathComponents[0] === 'Instance_UUID')) {
+                nestedMap[pathComponents[0]] = tag.value;
+                continue;
+            }
+
+            // Create nested structure based on path components
+            let current = nestedMap;
+            for (let i = 0; i < pathComponents.length - 1; i++) {
+                const component = pathComponents[i];
+                if (!current[component]) {
+                    current[component] = {};
+                }
+                current = current[component];
+            }
+
+            // Get the last component (actual field name)
+            const lastComponent = pathComponents[pathComponents.length - 1];
+
+            // Handle Schema_UUID and Instance_UUID at nested levels
+            if (lastComponent === 'Schema_UUID' || lastComponent === 'Instance_UUID') {
+                current[lastComponent] = tag.value;
+                continue;
+            }
+
+            // For other fields, create an object with all properties
+            if (!current[lastComponent]) {
+                current[lastComponent] = {};
+            }
+
+            // Special handling for value - it should be a property of the object
+            if (tag.value !== undefined && lastComponent !== 'Schema_UUID' && lastComponent !== 'Instance_UUID') {
+                current[lastComponent]['Value'] = tag.value;
+            }
+
+            // Map all fields from the tag to the new format
+            for (const [oldKey, newKey] of Object.entries(fieldMapping)) {
+                if (tag[oldKey] !== undefined) {
+                    // Special handling for boolean values to ensure they remain boolean
+                    if (oldKey === 'recordToDB') {
+                        current[lastComponent][newKey] = Boolean(tag[oldKey]);
+                    } else {
+                        current[lastComponent][newKey] = tag[oldKey];
+                    }
+                }
+            }
+        }
+
+        return nestedMap;
+    }
+
+    async register_device(node, connection, device) {
         const { cdb } = this;
 
         this.log("Registering device %s of Edge Agent %s", device.deviceId, node);
@@ -227,12 +306,21 @@ class MigrateAgents {
         const dobj = await cdb.create_object(Class.Device);
         await cdb.put_config(App.Info, dobj, { name: device.deviceId });
 
+        // Log the original tags for debugging
+        this.log("Original device tags for %s: %s", device.deviceId, JSON.stringify(device.tags, null, 2));
+
+        // Transform the flat array of tags into a nested object structure
+        const transformedOriginMap = this.transformOriginMap(device.tags);
+
+        // Log the transformed originMap for debugging
+        this.log("Transformed originMap for %s: %s", device.deviceId, JSON.stringify(transformedOriginMap, null, 2));
+
         const dconf = {
             connection, node,
-            createdAt:      new Date().toISOString(),
-            originMap:      device.tags,
-            schema:         schemaTag.value,
-            sparkplugName:  device.deviceId,
+            createdAt: new Date().toISOString(),
+            originMap: transformedOriginMap,
+            schema: schemaTag.value,
+            sparkplugName: device.deviceId,
         };
         await cdb.put_config(App.DeviceInformation, dobj, dconf);
 

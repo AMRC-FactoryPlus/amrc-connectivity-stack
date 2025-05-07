@@ -329,6 +329,8 @@ grafana:
   enabled: true
   persistence:
     enabled: true
+    annotations:
+      "helm.sh/resource-policy": "keep"
   envFromSecret: influxdb-auth
   admin:
     existingSecret: grafana-admin-user

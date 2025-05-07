@@ -29,8 +29,7 @@ const api = await new WebAPI({
   http_port: env.PORT,
   max_age: env.CACHE_MAX_AGE,
   routes: routes({
-    auth: fplus.Auth,
-    configDb: fplus.ConfigDB,
+    fplus: fplus,
     uploadPath: uploadPath,
   }),
 }).init();

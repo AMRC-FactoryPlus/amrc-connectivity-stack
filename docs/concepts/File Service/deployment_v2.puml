@@ -1,0 +1,54 @@
+@startuml
+node "Device" as device
+
+together {
+    rectangle "Central Cluster" {
+        database "ConfigDB" as configdb {
+            file "File Metadata" as metadata
+        }
+
+        database "InfluxDB" as influx
+
+        database "Kubernetes Volume" as kvolume
+
+
+        rectangle "ACS File Service" as fservice {
+            node "API" as fsapi
+        }
+
+        node "MQTT" as mqtt
+
+        node "Grafana" as grafana
+
+    }
+
+     rectangle "DAQ PC" {
+          node "TDMS Driver" as fdriver
+          file "Directory" as dir
+     }
+     
+     rectangle "Edge Cluster" {
+                   node "Edge Agent" as fagent
+               }
+}
+
+device ---> dir : [1]
+
+fdriver <--> dir : [2]
+
+fdriver ---> fagent : [3]
+
+fagent ---> mqtt: [4]
+
+mqtt --> influx: [5]
+
+influx --> grafana: [6]
+
+fdriver ---> fsapi: [7]
+
+fsapi ---> metadata: [8]
+
+fsapi <---> kvolume: [9]
+
+fdriver --> metadata: [10]
+@enduml

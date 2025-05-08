@@ -1,12 +1,8 @@
 /*
- *  Factory+ / AMRC Connectivity Stack (ACS) Edge component
- *  Copyright 2023 AMRC
+ * Copyright (c) University of Sheffield AMRC 2025.
  */
 
-import {
-    log, logf
-} from "./helpers/log.js";
-import * as fs from "fs";
+import {log} from "./helpers/log.js";
 import { SparkplugNode } from "./sparkplugNode.js";
 import {
     Metrics,
@@ -16,8 +12,7 @@ import {
     sparkplugDataType,
     sparkplugMetric,
     sparkplugPayload,
-    sparkplugTemplate,
-    sparkplugValue
+    sparkplugTemplate
 } from "./helpers/typeHandler.js";
 import { EventEmitter } from "events";
 import Long from "long";
@@ -462,6 +457,7 @@ export class Device {
      * Start Subscription for tag value changes
      */
     #subscribeToMetricChanges() {
+
         // Get the polling interval time from config
         /* XXX bmz: The Manager only configures a single polling
          * interval per connection, so we could run a single poll loop
@@ -659,11 +655,8 @@ export class Device {
                         const newMetric = {
                             ...oldMetric, value: metric.value
                         };
-                        if (typeof newMetric.properties !== "undefined" && newMetric.properties.method.value !== "GET") {
-                            metricsToWrite.push(newMetric);
-                        } else {
-                            log(`${metric.name} is read only. Cannot write to it.`);
-                        }
+
+                        metricsToWrite.push(newMetric);
                     }
                     break;
             }

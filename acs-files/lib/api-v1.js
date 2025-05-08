@@ -110,11 +110,8 @@ export class APIv1 {
     }
 
     // check the file object uuid exists.
-    const r = await this.fplus.fetch({
-      service: UUIDs.Service.ConfigDB,
-      url: `v1/class/${file_uuid}`,
-    });
-    if(!r.ok){
+    const exists = await this.configDb.class_has_member(Class.File, file_uuid);
+    if(!exists){
       return res.status(404).json({ message: 'FAILED: File object not found.' });
     }
 
@@ -210,6 +207,7 @@ export class APIv1 {
     write_stream.on('error', (err) => {
       aborted = true;
       fs.unlink(file_path, () => {});
+      fs.unlink(temp_path, () => {});
       return res.status(500).send('Error uploading file: ' + err.message);
     });
   }

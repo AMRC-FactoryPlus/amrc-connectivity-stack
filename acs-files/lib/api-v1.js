@@ -13,9 +13,8 @@ const MAX_FILE_SIZE = parseSize(process.env.BODY_LIMIT || '10GB');
 
 export class APIv1 {
   constructor(opts) {
-    this.configDb = opts.fplus.ConfigDB;
-    this.auth = opts.fplus.Auth;
-    this.fplus = opts.fplus;
+    this.configDb = opts.configDb;
+    this.auth = opts.auth;
     this.uploadPath = opts.uploadPath;
     this.routes = express.Router();
     this.setup_routes();

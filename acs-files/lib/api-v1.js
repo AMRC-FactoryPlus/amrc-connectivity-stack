@@ -118,9 +118,13 @@ export class APIv1 {
     // check if the file already exists.
     const file_path = path.resolve(this.uploadPath, file_uuid);
     // Temporary path to use while writing to disk.
-    const temp_path = path.resolve(this.uploadPath, `${file_path}_TEMP"`);
-    if(fs.existsSync(file_path)){
+    const temp_path = path.resolve(this.uploadPath, `${file_path}_TEMP_${Date.now()}"`);
+
+    try {
+      await fs.promises.access(file_path, fs.constants.R_OK);
       return res.status(409).json({ message: `FAILED: File with the UUID ${file_uuid} already exists.` });
+    } catch(e) {
+      console.log(`No file with UUID ${file_uuid} exists. Continuing.`);
     }
 
     // write the file.
@@ -141,7 +145,7 @@ export class APIv1 {
         write_stream.end();
 
         // Clean up the incomplete file
-        fs.unlink(file_path, (err) => {
+        fs.unlink(temp_path, (err) => {
           if (err) console.error('Failed to delete incomplete file:', err);
         });
 
@@ -174,7 +178,7 @@ export class APIv1 {
       if (!aborted) {
         write_stream.end();
         // Rename the temporary file now it's written to disk.
-        fs.renameSync(temp_path, file_path);
+        await fs.promises.rename(temp_path, file_path);
         const stats = await fs.promises.stat(file_path);
         const curr_date = new Date();
         const original_file_name = req.headers['original-filename'] || null;
@@ -200,13 +204,12 @@ export class APIv1 {
 
     req.on('error', (err) => {
       write_stream.end();
-      fs.unlink(file_path, () => {});
+      fs.unlink(temp_path, () => {});
       return res.status(500).json({ message: 'Upload failed', error: err.message });
     });
 
     write_stream.on('error', (err) => {
       aborted = true;
-      fs.unlink(file_path, () => {});
       fs.unlink(temp_path, () => {});
       return res.status(500).send('Error uploading file: ' + err.message);
     });

@@ -47,6 +47,8 @@ import { useDeviceStore } from '@store/useDeviceStore.js'
 import NodeList from './NodeList.vue'
 import { useObjectStore } from '@store/useObjectStore.js'
 import { useDriverStore } from '@store/useDriverStore.js'
+import { useDeploymentStore } from '@store/useDeploymentStore.js'
+import { useEdgeAgentStore } from '@store/useEdgeAgentStore.js'
 
 export default {
 
@@ -56,7 +58,9 @@ export default {
       c: useEdgeClusterStore(),
       n: useNodeStore(),
       d: useDeviceStore(),
-      dr: useDriverStore()
+      dr: useDriverStore(),
+      dp: useDeploymentStore(),
+      ea: useEdgeAgentStore(),
     }
   },
 
@@ -85,6 +89,8 @@ export default {
     await this.c.start()
     await this.d.start()
     await this.dr.start()
+    await this.dp.start()
+    await this.ea.start()
   },
 
   methods: {

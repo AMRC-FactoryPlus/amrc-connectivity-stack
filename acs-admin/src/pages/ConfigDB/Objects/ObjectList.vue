@@ -1,18 +1,25 @@
 <!--
-  - Copyright (c) University of Sheffield AMRC 2024.
+  - Copyright (c) University of Sheffield AMRC 2025.
   -->
 <template>
   <Skeleton v-if="!obj.ready" v-for="i in 10" class="h-16 rounded-lg mb-2"/>
   <DataTableSearchable v-else
-                       :data="obj.data"
-                       :default-sort="initialSort"
-                       :columns="columns"
-                       :filters="[]"
-                       :selected-objects="[]"
-                       :clickable="true"
-                       :search-key="null"
-                       :limit-height="false"
-                       @row-click="e => $emit('rowClick', e)"/>
+      :data="obj.data"
+      :default-sort="initialSort"
+      :columns="columns"
+      :filters="[]"
+      :selected-objects="[]"
+      :clickable="true"
+      :search-key="null"
+      :limit-height="false"
+      @row-click="e => $emit('rowClick', e)">
+    <template #toolbar-left>
+      <slot></slot>
+    </template>
+    <template #toolbar-right>
+      <slot name="toolbar-right"></slot>
+    </template>
+  </DataTableSearchable>
 </template>
 
 <script>

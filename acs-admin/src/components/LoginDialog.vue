@@ -3,7 +3,7 @@
   -->
 
 <template>
-  <Card class="mx-auto max-w-sm">
+  <Card class="mx-auto max-w-sm ring ring-offset-2 ring-offset-gray-100 ring-gray-400 !ring-opacity-30">
     <CardHeader>
       <CardTitle class="text-2xl">
         Welcome to ACS!

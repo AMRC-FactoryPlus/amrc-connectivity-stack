@@ -584,8 +584,7 @@ export default {
               },
               topology: {
                 cluster: this.node.cluster,
-                host: this.node.hostname,
-                node: this.node.uuid,
+                hostname: this.node.hostname,
               },
             })
           ])
@@ -627,8 +626,7 @@ export default {
             },
             topology: {
               cluster: this.node.cluster,
-              host: this.node.hostname,
-              node: this.node.uuid,
+              hostname: this.node.hostname,
             },
           }
 

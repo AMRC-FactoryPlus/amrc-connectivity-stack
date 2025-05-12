@@ -35,8 +35,8 @@
                       <TabsTrigger value="nodes">
                         {{nodes.length ? `${nodes.length}  Node${nodes.length > 1 ? 's' : ''}` : 'No Nodes'}}
                       </TabsTrigger>
-                      <TabsTrigger value="deployments" disabled>
-                        Deployments
+                      <TabsTrigger value="deployments">
+                        {{deployments.length ? `${deployments.length}  Deployment${deployments.length > 1 ? 's' : ''}` : 'No Deployments'}}
                       </TabsTrigger>
                       <TabsTrigger value="hosts" :disabled="hosts.length === 0">
                         {{hosts.length ? `${hosts.length} Host${hosts.length > 1 ? 's' : ''}` : 'No Hosts'}}
@@ -66,6 +66,24 @@
             </div>
           </TabsContent>
           <TabsContent value="deployments">
+            <DataTable :data="deployments" :columns="hostColumns" :filters="[]">
+              <template #toolbar-left>
+                <div class="flex items-center justify-between gap-2">
+                  <TabsList>
+                    <TabsTrigger value="nodes">
+                      {{nodes.length ? `${nodes.length}  Node${nodes.length > 1 ? 's' : ''}` : 'No Nodes'}}
+                    </TabsTrigger>
+                    <TabsTrigger value="deployments">
+                      {{deployments.length ? `${deployments.length}  Deployment${deployments.length > 1 ? 's' : ''}` : 'No Deployments'}}
+                    </TabsTrigger>
+                    <TabsTrigger value="hosts" :disabled="hosts.length === 0">
+                      {{hosts.length ? `${hosts.length} Host${hosts.length > 1 ? 's' : ''}` : 'No Hosts'}}
+                    </TabsTrigger>
+                  </TabsList>
+                </div>
+                {{deployments}}
+              </template>
+            </DataTable>
           </TabsContent>
           <TabsContent value="hosts">
             <DataTable :data="hosts" :columns="hostColumns" :filters="[]">
@@ -75,8 +93,8 @@
                     <TabsTrigger value="nodes">
                       {{nodes.length ? `${nodes.length}  Node${nodes.length > 1 ? 's' : ''}` : 'No Nodes'}}
                     </TabsTrigger>
-                    <TabsTrigger value="deployments" disabled>
-                      Deployments
+                    <TabsTrigger value="deployments">
+                      {{deployments.length ? `${deployments.length}  Deployment${deployments.length > 1 ? 's' : ''}` : 'No Deployments'}}
                     </TabsTrigger>
                     <TabsTrigger value="hosts" :disabled="hosts.length === 0">
                       {{hosts.length ? `${hosts.length} Host${hosts.length > 1 ? 's' : ''}` : 'No Hosts'}}
@@ -145,6 +163,7 @@ import DetailCard from '@components/DetailCard.vue'
 import EmptyState from '@components/EmptyState.vue'
 import SidebarDetail from '@components/SidebarDetail.vue'
 import moment from 'moment'
+import { useDeploymentStore } from '@store/useDeploymentStore.js'
 
 export default {
   components: {
@@ -176,6 +195,7 @@ export default {
   setup () {
     return {
       e: useEdgeClusterStore(),
+      dp: useDeploymentStore(),
       n: useNodeStore(),
       hostColumns,
       nodeColumns,
@@ -194,6 +214,10 @@ export default {
 
     nodes () {
       return Array.isArray(this.n.data) ? this.n.data.filter(e => e.deployment?.cluster === this.cluster.uuid) : []
+    },
+
+    deployments () {
+      return Array.isArray(this.dp.data) ? this.dp.data.filter(e => e.deployment?.cluster === this.cluster.uuid) : []
     },
 
     hosts () {

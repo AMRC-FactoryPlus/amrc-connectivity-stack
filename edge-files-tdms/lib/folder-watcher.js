@@ -2,57 +2,25 @@ import chokidar from 'chokidar'
 import fs from 'fs/promises';
 import { EventEmitter } from 'events';
 import {EVENTS} from './file-events.js';
-import path from 'path';
 
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-const STATE_FILE = path.resolve('./handledFiles.json');
 const MAX_RETRIES = 3;
 
-export class FolderWatcher extends EventEmitter{
-    constructor(folderPath){
+class FolderWatcher extends EventEmitter{
+    constructor(folderPath, stateManager){
         super();
         this.folderPath = folderPath;
-        this.handledFiles = new Set();
+        this.stateManager = stateManager;
         this.retryCounts = new Map();
+        this.seenFiles = new Set();
     }
-
-    async isFileExist(filePath){
-        try{
-            await fs.access(filePath);
-            return true;
-        }
-        catch{
-            return false;
-        }
-    }
-
-    async loadSeenFiles(){
-        if(await this.isFileExist(STATE_FILE)){
-            try{
-                const data = await fs.readFile(STATE_FILE, 'utf-8');
-                const files = JSON.parse(data);
-                files.forEach(file => this.handledFiles.add(file));
-                console.log(`WATCHER: Loaded ${files.length} seen files`);
-            }catch(err){
-                console.warn(`WATCHER: Failed to load seen files: ${err.message}`);
-            }
-        }
-    }
-
-    async saveSeenFiles(){
-        try{
-            await fs.writeFile(STATE_FILE, JSON.stringify([...this.handledFiles]), 'utf-8');
-        }catch(err){
-            console.warn(`Watcher: Failed to save seen files: ${err.message}`);
-        }
-    }
-
 
     async run(){
-        await this.loadSeenFiles();
+        await this.stateManager.loadSeenFiles();
+        this.seenFiles = new Set(this.stateManager.getHandledFilePaths());
 
         const watcher = chokidar.watch(this.folderPath, {
             persistent: true,
@@ -61,7 +29,7 @@ export class FolderWatcher extends EventEmitter{
         });
 
         watcher.on('add', async (filePath) => {
-            if(this.handledFiles.has(filePath)){
+            if(this.seenFiles?.has(filePath)){
                 return;
             }
             console.log(`WATCHER: File detected - ${filePath}`);
@@ -78,13 +46,12 @@ export class FolderWatcher extends EventEmitter{
             await this.isFileReady(filePath);
             console.log(`WATCHER: File ready ${filePath}`);
 
-            this.handledFiles.add(filePath);
-            await this.saveSeenFiles();
-
-            this.emit(EVENTS.NEW_FILE, filePath);
-
-
-        }catch(err){
+            if(!this.stateManager.hasSeenFile(filePath)){
+                await this.stateManager.addSeenFile(filePath);
+                this.emit(EVENTS.NEW_FILE, filePath);
+            }
+        }
+        catch(err){
             console.warn(`WATCHER: File not ready - ${filePath}: ${err.message}`);
 
             const retries = this.retryCounts.get(filePath) || 0;
@@ -116,3 +83,5 @@ export class FolderWatcher extends EventEmitter{
         }
     }
 }
+
+export default FolderWatcher;

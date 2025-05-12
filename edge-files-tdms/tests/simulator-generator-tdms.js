@@ -9,14 +9,14 @@ function sleep(ms){
 }
 
 class TDMSSimulator{
-    constructor(src_dir, dest_dir){
-        this.src_dir = src_dir;
-        this.dest_dir = dest_dir;
+    constructor(srcDir, destDir){
+        this.srcDir = srcDir;
+        this.destDir = destDir;
     }
 
-    async writeTDMS(){
-        const srcHandle = await fs.open(this.src_dir, 'r');
-        const destHandle = await fs.open(this.dest_dir, 'w');
+    async writeTDMS(srcFilePath, destFilePath){
+        const srcHandle = await fs.open(srcFilePath, 'r');
+        const destHandle = await fs.open(destFilePath, 'w');
 
         try{
             const stats = await srcHandle.stat();
@@ -36,7 +36,7 @@ class TDMSSimulator{
                 await sleep(WRITE_INTERVAL_MS);
             }
 
-            console.log(`SIMULATOR: Finished writing ${path.basename(this.dest_dir)}`);
+            console.log(`SIMULATOR: Finished writing ${path.basename(this.destDir)}`);
 
         }
         finally{
@@ -46,7 +46,7 @@ class TDMSSimulator{
     }
 
     async run(){
-        const files = await fs.readdir(this.src_dir);
+        const files = await fs.readdir(this.srcDir);
         const tdmsFiles = files.filter(f => f.endsWith('.tdms'));
 
         if(tdmsFiles.length === 0){
@@ -54,13 +54,14 @@ class TDMSSimulator{
             return;
         }
 
-        for (const file in tdmsFiles){
+        for (const file of tdmsFiles){
             console.log(`SIMULATOR: Generating ${file}...`);
-            await this.writeTDMS()
+            const srcPath = path.join(this.srcDir, file);
+            const destPath = path.join(this.destDir, file);
+            await this.writeTDMS(srcPath, destPath);
         }
         console.log(`SIMULATOR: All files written.`);
     }
 }
 
-
-
+export default TDMSSimulator;

@@ -105,25 +105,30 @@ export class APIv1 {
     // Check we have a UUID to work with.
     const file_uuid = req.params.uuid;
     if (!file_uuid){
-      return res.status(400).json({ message: 'FAILED: File Uuid not provided.' });
+      return res.status(404).json({ message: 'FAILED: File Uuid not provided.' });
     }
 
     // check the file object uuid exists.
-    const exists = await this.configDb.class_has_member(Class.File, file_uuid);
-    if(!exists){
+    const objectExists = await this.configDb.class_has_member(Class.File, file_uuid);
+    if(!objectExists){
       return res.status(404).json({ message: 'FAILED: File object not found.' });
     }
 
     // check if the file already exists.
     const file_path = path.resolve(this.uploadPath, file_uuid);
     // Temporary path to use while writing to disk.
-    const temp_path = path.resolve(this.uploadPath, `${file_path}_TEMP_${Date.now()}"`);
-
-    try {
-      await fs.promises.access(file_path, fs.constants.R_OK);
-      return res.status(409).json({ message: `FAILED: File with the UUID ${file_uuid} already exists.` });
-    } catch(e) {
-      console.log(`No file with UUID ${file_uuid} exists. Continuing.`);
+    const temp_path = path.resolve(this.uploadPath, `${file_uuid}.temp"`);
+    // Check if the file already exists.
+    const fileExists = await fs.promises.access(file_path)
+        .then(() => true, () => false);
+    if (fileExists){
+      return res.status(409);
+    }
+    // Check if the temporary file already exists.
+    const tempFileExists = await fs.promises.access(temp_path)
+        .then(() => true, () => false);
+    if (tempFileExists){
+      return res.status(509);
     }
 
     // write the file.

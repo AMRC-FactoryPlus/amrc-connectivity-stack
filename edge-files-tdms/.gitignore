@@ -1,0 +1,4 @@
+.env
+node_modules/
+tests/tdms_files/
+tests/folder_to_watch/

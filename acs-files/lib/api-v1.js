@@ -3,8 +3,9 @@ import { App, Class, Perm, Special } from './constants.js';
 import fs from 'fs'
 import path from 'path';
 import {parseSize} from "./parseSize.js";
-import { UUIDs } from "@amrc-factoryplus/service-client";
-
+import streamSize  from "stream-size";
+const getSizeTransform = streamSize.default;
+import * as stream from "node:stream";
 const Valid = {
   uuid: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
 };
@@ -13,8 +14,10 @@ const MAX_FILE_SIZE = parseSize(process.env.BODY_LIMIT || '10GB');
 
 export class APIv1 {
   constructor(opts) {
-    this.configDb = opts.configDb;
-    this.auth = opts.auth;
+    this.fplus = opts.fplus;
+    this.configDb = this.fplus.ConfigDB;
+    this.auth = this.fplus.Auth;
+    this.log = this.fplus.debug.bound("api-v1");
     this.uploadPath = opts.uploadPath;
     this.routes = express.Router();
     this.setup_routes();
@@ -117,105 +120,80 @@ export class APIv1 {
     // check if the file already exists.
     const file_path = path.resolve(this.uploadPath, file_uuid);
     // Temporary path to use while writing to disk.
-    const temp_path = path.resolve(this.uploadPath, `${file_uuid}.temp"`);
+    const temp_path = path.resolve(this.uploadPath, `${file_uuid}.temp`);
+
+    await fs.promises.mkdir(this.uploadPath, { recursive: true });
+
+    // Check if the temporary file already exists.
+    let fileHandle;
+    try{
+      this.log("opening temp file");
+      fileHandle = await fs.promises.open(temp_path, 'wx');
+    }
+    catch(err){
+      if(err.code === 'EEXIST') {
+        return res.status(503).json({ message: `Upload of File with UUID ${file_uuid} currently in progress.` });
+      }else{
+        this.log(err.message);
+        return res.status(500).send();
+      }
+    }
+    this.log("Checking if the file already exists.");
     // Check if the file already exists.
-    const fileExists = await fs.promises.access(file_path)
+    const fileExists = await fs.promises.access(file_path, fs.constants.F_OK)
         .then(() => true, () => false);
     if (fileExists){
-      return res.status(409);
+      await fileHandle.close();
+      await fs.promises.unlink(temp_path);
+      return res.status(409).json({ message: `File with UUID ${file_uuid} already exists.` });
     }
-    // Check if the temporary file already exists.
-    const tempFileExists = await fs.promises.access(temp_path)
-        .then(() => true, () => false);
-    if (tempFileExists){
-      return res.status(509);
-    }
-
     // write the file.
-    await fs.promises.mkdir(this.uploadPath, { recursive: true });
     const write_stream = fs.createWriteStream(temp_path);
 
-    let total_bytes = 0;
-    let aborted = false;
-    let receivedData = false;
+    this.log("Writing to temp file");
+    const size_limit = getSizeTransform(MAX_FILE_SIZE);
+    const [st, err] = await stream.promises.pipeline(req, size_limit, write_stream)
+        .then(() => [201])
+        .catch(e => [/^Stream exceeded maximum size/.test(e.message) ? 413 : 500, e]);
+    if (st != 201) {
+      this.log("File upload failed: %o", err);
+      await fileHandle.close();
+      await fs.promises.unlink(temp_path);
+      return res.status(st).json({ message: 'File exceeded maximum size.' });
+    }
 
-    req.on('data', (chunk) => {
-      total_bytes += chunk.length;
-      receivedData = true;
+    write_stream.end();
 
-      // Check size limit before writing
-      if (total_bytes > MAX_FILE_SIZE && !aborted) {
-        aborted = true;
-        write_stream.end();
+    const stats = await fs.promises.stat(temp_path);
+    const curr_date = new Date();
+    const original_file_name = req.headers['original-filename'] || null;
 
-        // Clean up the incomplete file
-        fs.unlink(temp_path, (err) => {
-          if (err) console.error('Failed to delete incomplete file:', err);
-        });
+    // write any additional metadata.
+    let file_JSON = {
+      file_uuid: file_uuid,
+      date_uploaded: curr_date,
+      user_who_uploaded: req.auth,
+      file_size: stats.size,
+      original_file_name: original_file_name,
+    };
 
-        return res.status(413).json({
-          message: 'File exceeded maximum file size'
-        });
-      }
+    try{
+      this.log("Writing metadata to configdb")
+      // Store the file config under App 'Files Configuration'
+      await this.configDb.put_config(App.Config, file_uuid, file_JSON);
+    }catch (e) {
+      await fileHandle.close();
+      await fs.promises.unlink(temp_path);
+      return res.status(503).send('Error uploading file: ' + e.message);
+    }
 
-      // Only write if we haven't aborted
-      if (!aborted) {
-        // Handle backpressure
-        const canContinue = write_stream.write(chunk);
-        if (!canContinue) {
-          req.pause();
-        }
-      }
-    });
-
-    // Resume once the write buffer has been emptied.
-    write_stream.on('drain', () => {
-      req.resume();
-    });
-
-    req.on('end', async () => {
-      // If the "data" event hasn't fired, nothing's been written.
-      if(!receivedData){
-        return res.status(400).json({ message: 'No file uploaded' });
-      }
-
-      if (!aborted) {
-        write_stream.end();
-        // Rename the temporary file now it's written to disk.
-        await fs.promises.rename(temp_path, file_path);
-        const stats = await fs.promises.stat(file_path);
-        const curr_date = new Date();
-        const original_file_name = req.headers['original-filename'] || null;
-
-        // write any additional metadata.
-        let file_JSON = {
-          file_uuid: file_uuid,
-          date_uploaded: curr_date,
-          user_who_uploaded: req.auth,
-          file_size: stats.size,
-          original_file_name: original_file_name,
-        };
-
-        // Store the file config under App 'Files Configuration'
-        await this.configDb.put_config(App.Config, file_uuid, file_JSON);
-
-        return res.status(201).json({
-          message: 'File uploaded successfully.',
-          uuid: file_uuid,
-        });
-      }
-    });
-
-    req.on('error', (err) => {
-      write_stream.end();
-      fs.unlink(temp_path, () => {});
-      return res.status(500).json({ message: 'Upload failed', error: err.message });
-    });
-
-    write_stream.on('error', (err) => {
-      aborted = true;
-      fs.unlink(temp_path, () => {});
-      return res.status(500).send('Error uploading file: ' + err.message);
+    this.log("Renaming file.")
+    // Rename the temporary file now it's written to disk.
+    await fs.promises.rename(temp_path, file_path);
+    await fileHandle.close();
+    return res.status(201).json({
+      message: 'File uploaded successfully.',
+      uuid: file_uuid,
     });
   }
 

@@ -92,7 +92,7 @@ export class APIv1 {
     });
   }
 
-  async put_file_by_uuid(req, res, next) {
+  async put_file_by_uuid(req, res) {
     // Check the client has permission.
     const ok = await this.auth.check_acl(
         req.auth,
@@ -111,13 +111,12 @@ export class APIv1 {
       return res.status(404).json({ message: 'FAILED: File Uuid not provided.' });
     }
 
-    // check the file object uuid exists.
+    // Check the file object uuid exists.
     const objectExists = await this.configDb.class_has_member(Class.File, file_uuid);
     if(!objectExists){
       return res.status(404).json({ message: 'FAILED: File object not found.' });
     }
 
-    // check if the file already exists.
     const file_path = path.resolve(this.uploadPath, file_uuid);
     // Temporary path to use while writing to disk.
     const temp_path = path.resolve(this.uploadPath, `${file_uuid}.temp`);
@@ -126,19 +125,13 @@ export class APIv1 {
 
     // Check if the temporary file already exists.
     let fileHandle;
-    try{
-      this.log("opening temp file");
+    try {
       fileHandle = await fs.promises.open(temp_path, 'wx');
+    } catch (error) {
+      const statusCode = error.code === 'EEXIST' ? 503 : 500;
+      return res.status(statusCode).json({ message: error.message });
     }
-    catch(err){
-      if(err.code === 'EEXIST') {
-        return res.status(503).json({ message: `Upload of File with UUID ${file_uuid} currently in progress.` });
-      }else{
-        this.log(err.message);
-        return res.status(500).send();
-      }
-    }
-    this.log("Checking if the file already exists.");
+
     // Check if the file already exists.
     const fileExists = await fs.promises.access(file_path, fs.constants.F_OK)
         .then(() => true, () => false);
@@ -159,7 +152,7 @@ export class APIv1 {
       this.log("File upload failed: %o", err);
       await fileHandle.close();
       await fs.promises.unlink(temp_path);
-      return res.status(st).json({ message: 'File exceeded maximum size.' });
+      return res.status(st).json({ message: err.message });
     }
 
     write_stream.end();
@@ -178,7 +171,7 @@ export class APIv1 {
     };
 
     try{
-      this.log("Writing metadata to configdb")
+      this.log("Writing metadata to configDB.")
       // Store the file config under App 'Files Configuration'
       await this.configDb.put_config(App.Config, file_uuid, file_JSON);
     }catch (e) {

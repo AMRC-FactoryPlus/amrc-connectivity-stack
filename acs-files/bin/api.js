@@ -4,6 +4,7 @@ import { ServiceClient } from '@amrc-factoryplus/service-client';
 import { WebAPI } from '@amrc-factoryplus/service-api';
 import { routes } from '../lib/routes.js';
 import { Version, Service } from '../lib/constants.js';
+import {clean_up} from "../lib/startup.js";
 
 const { env } = process;
 
@@ -12,6 +13,11 @@ const fplus = await new ServiceClient({
 }).init();
 
 const uploadPath = env.FILES_STORAGE;
+
+await clean_up({
+  path : uploadPath,
+  fplus
+});
 
 const api = await new WebAPI({
   ping: {

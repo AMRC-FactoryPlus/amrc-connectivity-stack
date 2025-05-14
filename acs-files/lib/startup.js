@@ -2,46 +2,45 @@ import fs from "fs";
 import {App} from "./constants.js";
 import path from 'path';
 /**
- *
- * @param opts
+ * Removes temporary files from the kubernetes volume which don't have
+ * a file config entry in configDB.
+ * @param {Object} opts - Configuration options.
+ * @param {string} opts.path - Path to the upload directory.
+ * @param {ServiceClient} opts.fplus - The factoryplus service client.
  * @returns {Promise<void>}
  */
 export async function clean_up(opts) {
     const uploadPath = opts.path;
     const fplus = opts.fplus;
     const log = fplus.debug.bound("clean_up");
+    log("Running cleaning up...");
     const exists = await fs.promises.access(uploadPath)
         .then(() => true, () => false);
     if (!exists){
-        log("Start path doesn't exist");
+        log("Upload path doesn't exist.");
         return;
     }
     // search for existing temporary files
     const files = await fs.promises.readdir(uploadPath);
     log("Reading files. Found " + files.length + " files...");
-    log(JSON.stringify(files));
     // check for a file configuration entry
     for (const file of files){
-        log("Reading " + file);
-        const test = file.match(/^.*\.(temp)$/);
-        log("Result " + JSON.stringify(test));
+        log("Checking " + file);
         if(!file.match(/^.*\.(temp)$/g)){
-            log("No match found for " + file);
             continue;
         }
         const tempPath = path.resolve(uploadPath, file);
         const fileUUID = file.split('.')[0];
-        log("file matched regex " + file);
-        log("Getting config entry for file.")
+        log(`Getting config entry for file ${file}.`)
         const config = await fplus.ConfigDB.get_config(App.Config, fileUUID);
-        // If we have config, the upload succeeded so rename the temporary file.
         if (config){
-            log("Config found, renaming file.")
+            // If we have config, the upload succeeded so rename the temporary file.
+            log(`Config found, renaming file ${file}.`)
             const newPath = path.resolve(uploadPath, fileUUID)
             await fs.promises.rename(tempPath, newPath);
         }else{
-            log("No config found, deleting file.");
             // If not config has been found, delete the file.
+            log(`No config found, deleting file ${file}.`);
             await fs.promises.unlink(tempPath);
         }
     }

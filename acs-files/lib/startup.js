@@ -26,7 +26,7 @@ export async function clean_up(opts) {
     // check for a file configuration entry
     for (const file of files){
         log("Checking " + file);
-        if(!file.match(/^.*\.(temp)$/g)){
+        if(!file.match(/^.*\.(temp)$/)){
             continue;
         }
         const tempPath = path.resolve(uploadPath, file);

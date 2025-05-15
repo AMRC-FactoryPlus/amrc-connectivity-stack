@@ -149,6 +149,18 @@ edgeHelm:
   image:
     repository: edge-helm-charts
   repoPath: shared/helm
+  # Chart sources configuration
+  chartSources: []
+  # Example chart sources configuration:
+  # chartSources:
+  #   - name: "Custom Charts"
+  #     enabled: true
+  #     url: "https://github.com/example/custom-helm-charts.git"
+  #     branch: "main"
+  #     auth:
+  #       type: "basic"
+  #       username: "username"
+  #       # Password is provided via SOURCE_0_PASSWORD environment variable
 
 mqtt:
   # -- Whether or not to enable the MQTT component
@@ -236,7 +248,7 @@ shell:
     repository: acs-krb-utils
 
 # XXX This should probably be included in acs-krb-utils
-curl: 
+curl:
   image:
     registry: docker.io
     repository: appropriate/curl

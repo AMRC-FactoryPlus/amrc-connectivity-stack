@@ -48,7 +48,7 @@ spec:
                   "secure"          (.Values.acs.secure | ternary "s" "")
                   "realm"           .Values.identity.realm
                   "directory"
-                    (include "amrc-connectivity-stack.external-url" 
+                    (include "amrc-connectivity-stack.external-url"
                       (list . "directory"))
                 | toRawJson | quote }}
           volumeMounts:
@@ -70,6 +70,8 @@ spec:
               value: ALL,!token,!service
             - name: GIT_REPO_PATH
               value: {{ .Values.edgeHelm.repoPath }}
+            - name: CHART_SOURCES
+              value: {{ .Values.edgeHelm.chartSources | toJson | quote }}
 {{ if .Values.acs.schemas.load }}
         - name: load-schemas
 {{ include "amrc-connectivity-stack.image" (list . .Values.acs.schemas) | indent 10 }}

@@ -1,13 +1,48 @@
 # ACS Edge Helm Charts repository
 
 This repository contains Helm Charts deployed automatically to edge
-clusters by ACS v3.
+clusters by ACS.
 
 Normally an installation of ACS will clone a copy of this repo into its
 internal on-prem Git server. From there the edge clusters will pull the
 Helm charts using Flux.
 
-Helm charts are made available from the Manager by creating 
+## Multiple Chart Sources
+
+The edge-helm-charts system supports merging charts from multiple sources.
+By default, it will use the local charts directory, but you can configure
+additional chart sources through the `edgeHelm.chartSources` configuration
+in your ACS values.yaml file.
+
+Each chart source is defined with the following properties:
+- `name`: A descriptive name for the chart source
+- `enabled`: Whether this source is enabled (true/false)
+- `url`: The Git repository URL to clone charts from (required)
+- `branch`: The branch to use (defaults to "main")
+- `auth`: Optional authentication configuration
+  - `type`: Authentication type (e.g., "basic")
+  - `username`: Username for authentication
+  - Password is provided via environment variable `SOURCE_<index>_PASSWORD`
+
+Example configuration:
+```yaml
+edgeHelm:
+  chartSources:
+    - name: "Custom Charts"
+      enabled: true
+      url: "https://github.com/example/custom-helm-charts.git"
+      branch: "main"
+      auth:
+        type: "basic"
+        username: "username"
+```
+
+When multiple chart sources are configured, the system will:
+1. Always include the local charts directory first
+2. Then merge in charts from each enabled source in the order they are defined
+3. If a chart exists in multiple sources, the last source will take precedence
+
+Helm charts are made available from the Manager by creating
 _Helm chart template_ (`729fe070-5e67-4bc7-94b5-afd75cb42b03`) ConfigDB
 entries. It is possible for multiple config entries to reference the
 same chart with different configurations. There are several layers of
@@ -16,7 +51,7 @@ templating involved.
 ## Deployment process
 
 When a deployment is created in the Manager (or otherwise), this results
-in the creation of an _Edge deployment_ 
+in the creation of an _Edge deployment_
 (`f2b9417a-ef7f-421f-b387-bb8183a48cdb`) ConfigDB entry. This is what
 actually causes the deployment to be pushed to the edge.
 
@@ -48,7 +83,7 @@ expansion above, is rather more complicated.
 ## Creating a new chart template
 
 To deploy an existing chart with different values, start by creating a
-new ConfigDB object in the _Helm chart_ 
+new ConfigDB object in the _Helm chart_
 (`f9be0334-0ff7-43d3-9d8a-188d3e4d472b`) class. This UUID is what you
 will use in the `charts` array of your deployment.
 
@@ -160,12 +195,25 @@ file.
 
 ### Deploying the chart to the edge
 
-Once the chart is written, commit it to Git and get it pushed to your
-internal Git server. There are three ways to accomplish this:
+Once the chart is written, there are several ways to get it deployed to your edge clusters:
 
 * Changes that are accepted into an ACS release will be pushed to all
   installations which are using the default settings. Untested charts
   are unlikely to be accepted into a release.
+
+* Use the multiple chart sources feature to add your chart repository as an additional source.
+  This is the recommended approach as it allows you to maintain your charts separately
+  while still benefiting from updates to the core ACS charts. Configure this in your
+  ACS `values.yaml` file:
+
+  ```yaml
+  edgeHelm:
+    chartSources:
+      - name: "My Custom Charts"
+        enabled: true
+        url: "https://github.com/myorg/my-custom-charts.git"
+        branch: "main"
+  ```
 
 * Push to a branch on this repo, a clone on public Github, or a clone
   created on your own infrastructure. Change the service-setup config of

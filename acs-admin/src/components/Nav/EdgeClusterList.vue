@@ -48,7 +48,7 @@ import NodeList from './NodeList.vue'
 import { useObjectStore } from '@store/useObjectStore.js'
 import { useDriverStore } from '@store/useDriverStore.js'
 import { useDeploymentStore } from '@store/useDeploymentStore.js'
-import { useEdgeAgentStore } from '@store/useEdgeAgentStore.js'
+import { useHelmChartStore } from '@store/useHelmChartStore.js'
 
 export default {
 
@@ -60,7 +60,7 @@ export default {
       d: useDeviceStore(),
       dr: useDriverStore(),
       dp: useDeploymentStore(),
-      ea: useEdgeAgentStore(),
+      hc: useHelmChartStore(),
     }
   },
 
@@ -90,7 +90,7 @@ export default {
     await this.d.start()
     await this.dr.start()
     await this.dp.start()
-    await this.ea.start()
+    await this.hc.start()
   },
 
   methods: {

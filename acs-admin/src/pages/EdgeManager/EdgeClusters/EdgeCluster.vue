@@ -66,7 +66,7 @@
             </div>
           </TabsContent>
           <TabsContent value="deployments">
-            <DataTable :data="deployments" :columns="hostColumns" :filters="[]">
+            <DataTable :data="deployments" :columns="deploymentColumns" :filters="[]" @rowClick="selectDeployment">
               <template #toolbar-left>
                 <div class="flex items-center justify-between gap-2">
                   <TabsList>
@@ -81,7 +81,24 @@
                     </TabsTrigger>
                   </TabsList>
                 </div>
-                {{deployments}}
+              </template>
+              <template #toolbar-right>
+                <Button
+                    @click="newDeployment"
+                    size="sm"
+                    class="ml-auto hidden lg:flex items-center justify-center gap-1.5"
+                >
+                  <i class="fa-solid fa-plus"></i>
+                  New Edge Deployment
+                </Button>
+              </template>
+              <template #empty>
+                <EmptyState
+                    title="No Edge Deployments"
+                    :description="`No edge deployments have been added to the ${cluster.name} cluster yet.`"
+                    button-text="New Edge Deployment"
+                    button-icon="plus"
+                    @button-click="newDeployment"/>
               </template>
             </DataTable>
           </TabsContent>
@@ -155,6 +172,7 @@ import { Button } from '@components/ui/button/index.js'
 import DataTable from '@components/ui/data-table/DataTable.vue'
 import { hostColumns } from './hostColumns.ts'
 import { nodeColumns } from './nodeColumns.ts'
+import { deploymentColumns } from './deploymentColumns.ts'
 import { Alert, AlertDescription, AlertTitle } from '@components/ui/alert/index.js'
 import { toast } from 'vue-sonner'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card/index.js'
@@ -199,6 +217,7 @@ export default {
       n: useNodeStore(),
       hostColumns,
       nodeColumns,
+      deploymentColumns,
       moment
     }
   },
@@ -235,12 +254,26 @@ export default {
       window.events.emit('show-new-node-dialog-for-cluster', this.cluster)
     },
 
+    newDeployment () {
+      window.events.emit('show-new-deployment-dialog-for-cluster', this.cluster)
+    },
+
     selectNode: function (e) {
       this.$router.push({
         name: 'Node',
         params: {
           nodeuuid: e.original.uuid,
           clusteruuid: e.original.cluster,
+        },
+      })
+    },
+
+    selectDeployment: function (e) {
+      this.$router.push({
+        name: 'ApplicationObjectEditor',
+        params: {
+          application: UUIDs.App.EdgeAgentDeployment,
+          object: e.original.uuid,
         },
       })
     },

@@ -1,4 +1,4 @@
-import fs from "fs";
+import fs from "node:fs/promises";
 import {App} from "./constants.js";
 import path from 'path';
 /**
@@ -14,16 +14,16 @@ export async function clean_up(opts) {
     const fplus = opts.fplus;
     const log = fplus.debug.bound("clean_up");
     log("Running cleaning up...");
-    const exists = await fs.promises.access(uploadPath)
-        .then(() => true, () => false);
-    if (!exists){
-        log("Upload path doesn't exist.");
-        return;
+    let files = [];
+    try{
+        files = await fs.readdir(uploadPath);
     }
-    // search for existing temporary files
-    const files = await fs.promises.readdir(uploadPath);
+    catch(err){
+        if(err.code !== "ENOENT"){
+            throw err;
+        }
+    }
     log("Reading files. Found " + files.length + " files...");
-    // check for a file configuration entry
     for (const file of files){
         log("Checking " + file);
         if(!file.match(/^.*\.(temp)$/)){
@@ -37,11 +37,11 @@ export async function clean_up(opts) {
             // If we have config, the upload succeeded so rename the temporary file.
             log(`Config found, renaming file ${file}.`)
             const newPath = path.resolve(uploadPath, fileUUID)
-            await fs.promises.rename(tempPath, newPath);
+            await fs.rename(tempPath, newPath);
         }else{
             // If not config has been found, delete the file.
             log(`No config found, deleting file ${file}.`);
-            await fs.promises.unlink(tempPath);
+            await fs.unlink(tempPath);
         }
     }
 }

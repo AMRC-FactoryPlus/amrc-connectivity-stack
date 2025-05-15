@@ -1,6 +1,6 @@
 import express from 'express';
 import { App, Class, Perm, Special } from './constants.js';
-import fs from 'fs'
+import fs from 'node:fs/promises'
 import path from 'path';
 import {parseSize} from "./parseSize.js";
 import streamSize  from "stream-size";
@@ -44,7 +44,7 @@ export class APIv1 {
         .status(403)
         .json({ message: 'FAILED: No ListStorage Permission' });
 
-    const files = await fs.promises.readdir(this.uploadPath);
+    const files = await fs.readdir(this.uploadPath);
 
     return res.json({ files });
   }
@@ -121,12 +121,12 @@ export class APIv1 {
     // Temporary path to use while writing to disk.
     const temp_path = path.resolve(this.uploadPath, `${file_uuid}.temp`);
 
-    await fs.promises.mkdir(this.uploadPath, { recursive: true });
+    await fs.mkdir(this.uploadPath, { recursive: true });
 
     // Check if the temporary file already exists.
     let fileHandle;
     try {
-      fileHandle = await fs.promises.open(temp_path, 'wx');
+      fileHandle = await fs.open(temp_path, 'wx');
     } catch (error) {
       const statusCode = error.code === 'EEXIST' ? 503 : 500;
       return res.status(statusCode).json({ message: error.message });
@@ -136,11 +136,11 @@ export class APIv1 {
     /* Now fileHandle belongs to the WriteStream; we mustn't touch it again */
     const unlock_tempfile = async () => {
       await new Promise(resolve => write_stream.close(resolve));
-      await fs.promises.unlink(temp_path);
+      await fs.unlink(temp_path);
     };
 
     // Check if the file already exists.
-    const fileExists = await fs.promises.access(file_path, fs.constants.F_OK)
+    const fileExists = await fs.access(file_path, fs.constants.F_OK)
         .then(() => true, () => false);
     if (fileExists){
       await unlock_tempfile();
@@ -157,7 +157,7 @@ export class APIv1 {
       return res.status(st).json({ message: err.message });
     }
 
-    const stats = await fs.promises.stat(temp_path);
+    const stats = await fs.stat(temp_path);
     const curr_date = new Date();
     const original_file_name = req.headers['original-filename'] || null;
 
@@ -181,7 +181,7 @@ export class APIv1 {
 
     this.log("Renaming file.")
     // Rename the temporary file now it's written to disk.
-    await fs.promises.rename(temp_path, file_path);
+    await fs.rename(temp_path, file_path);
     return res.status(201).json({
       message: 'File uploaded successfully.',
       uuid: file_uuid,

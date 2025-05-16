@@ -304,23 +304,36 @@ export class Deployments {
             // For each deployment UUID, get the deployment config
             rx.mergeMap(agent => cdb.get_config(Deployments, agent)
                 .then(spec => ({ uuid: agent, spec }))),
-            // Extract the chart UUIDs and source from the deployment
+            // Extract the chart UUIDs from the deployment
             rx.map(dep => {
                 const { spec } = dep;
-                // Extract source field (default to "helm-charts" if not specified)
-                const source = spec.source || "helm-charts";
                 // Handle both single chart and multiple charts
                 const charts =
                     spec.chart ? rx.of(spec.chart) : rx.from(spec.charts);
-                return [dep, charts, source];
+                return [dep, charts];
             }),
-            // For each chart UUID, get the chart template and include the source
-            rx.mergeMap(([deployment, charts, source]) => charts.pipe(
+            // For each chart UUID, get the chart template and extract the source
+            rx.mergeMap(([deployment, charts]) => charts.pipe(
+                // Get the chart template configuration using the chart UUID
                 rx.mergeMap(ch => cdb.get_config(HelmChart, ch)),
                 /* XXX We could cache (against an etag) to avoid
                  * recompiling every time... */
-                rx.map(tmpl => template(tmpl)),
-                rx.map(chart => ({ ...deployment, chart, source })))),
+                rx.map(tmpl => {
+                    // Extract source field from the chart template
+                    // If not specified, we'll use the default "helm-charts" repository
+                    // This is a deliberate choice to maintain backward compatibility
+                    // with existing chart templates that don't specify a source
+                    const source = tmpl.source || "helm-charts";
+
+                    return { tmpl, source };
+                }),
+                // Add the chart template and source to the deployment object
+                // This is important because we'll use this source later in collectSources
+                rx.map(({ tmpl, source }) => ({
+                    ...deployment,
+                    chart: template(tmpl),
+                    source
+                })))),
             rx.toArray(),
         );
 
@@ -359,10 +372,14 @@ export class Deployments {
                     .map(v => v ?? {}).reduce(jmp.merge);
 
                 // Include the source in the template data
+                // The source was extracted from the chart template in _init_deployments
+                // and is now a property of the deployment object
+                // We already defaulted to "helm-charts" in _init_deployments if not specified
                 return config.template({
                     uuid, values,
-                    chart:  chart.chart,
-                    source: source || "helm-charts", // Default to helm-charts if not specified
+                    chart: chart.chart,
+                    source,
+                    prefix: chart.prefix || chart.chart,
                 });
             })
             .groupBy(Resource);
@@ -370,20 +387,21 @@ export class Deployments {
 
     /**
      * Collect all unique sources from deployments and look up their repository URLs
-     * Only collects sources that are explicitly specified in the deployment entries
-     * @param {Array} deployments - List of deployment objects
+     * Only collects sources that are explicitly specified in the chart templates
+     * @param {Array} deployments - List of deployment objects with chart templates
      * @returns {Promise<Object>} - Map of source name to repository URL
      */
     async collectSources(deployments) {
         // Extract unique sources from deployments
-        // Only include sources that are explicitly specified in the spec (not defaulted)
+        // Only include sources that are explicitly specified and not "helm-charts"
         const sources = imm.Set(
             deployments
                 .filter(d => {
-                    // Check if the source is explicitly specified in the spec
-                    return d.spec?.source
+                    // The source comes from the chart template, which has already been
+                    // extracted and added to the deployment object in _init_deployments
+                    return d.source && d.source !== "helm-charts";
                 })
-                .map(d => d.spec.source)
+                .map(d => d.source)
         ).toJS();
 
         this.log("Unique explicitly specified sources found: %o", sources);

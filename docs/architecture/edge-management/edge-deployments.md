@@ -114,6 +114,11 @@ Entries are JSON objects with the following properties:
   charts to deploy. If not specified, the default "helm-charts" repository
   is used.
 
+> Note: When creating Git repository configuration entries for 
+> custom edge helm charts, make sure to use the `Shared repo` class 
+> as it has the correct permissions for the edge components to 
+> access it.
+
 The Edge Sync operators will pick up changes to these entries via the
 ConfigDB MQTT interface. If an update appears to have been missed then
 restarting the Edge Sync operator will force a full reconcile.
@@ -129,10 +134,14 @@ creating a cluster or an Edge Agent.
 
 Entries are JSON objects with the following properties:
 
-* `chart`: The name of the directory in the Git repository containing
-  the chart to deploy.
+* `chart`: The name of the chart to deploy. This is path from the 
+  top level of the checked out repo.
 * `source` (optional): The UUID of the Git repository containing the Helm
-  chart. If not specified, the source from the Edge deployment entry is used.
+  chart. If not specified, the default "helm-charts" repository is used.
+* `prefix` (optional): A kubernetes-compatible prefix to add to the 
+  chart name. If not provided the chart value will be used. Must be 
+  specified if the chart name has slashes in it otherwise the name 
+  generated will not be kubernetes-compatible.
 * `values`: An object equivalent to a Helm `values.yaml` file.
 
 The `values` object will be scanned recursively for strings of the form
@@ -270,22 +279,24 @@ you to maintain your own chart repositories separately from the core ACS charts.
    }
    ```
 
-2. When creating an Edge deployment, specify the `source` field with the UUID
-   of your Git repository:
+2. When creating a Helm Chart Template, specify the `source` field with the UUID
+   of your Git repository and optionally the `prefix` field for subdirectories:
    ```json
    {
-     "cluster": "6e01521a-1151-499a-81ac-78be05a13f57",
-     "name": "MyDeployment",
+     "chart": "my-custom-chart",
      "source": "e6d41259-ac54-42e0-b2b5-8c447001d42f",
-     "chart": "e1704187-9b83-4820-87d2-c0a1d2697525"
+     "prefix": "charts",
+     "values": {
+       "host": "localhost"
+     }
    }
    ```
 
 3. The Edge Sync operator will:
-   - Extract the `source` field from the deployment
+   - Extract the `source` and `prefix` fields from the Helm Chart Template
    - Look up the repository URL for the source UUID
    - Create a GitRepository resource on the edge cluster for each unique source
-   - Update HelmRelease resources to reference the correct source
+   - Update HelmRelease resources to reference the correct source and path
 
 4. Flux on the edge cluster will pull the Helm charts from the specified Git
    repository and deploy them.
@@ -296,7 +307,7 @@ The Edge Sync operator creates GitRepository resources for each unique source
 used by deployments targeting the current cluster. It then creates HelmRelease
 resources that reference the correct GitRepository source.
 
-Existing deployments without a `source` field will continue to work with the
+Existing chart templates without a `source` field will continue to work with the
 default "helm-charts" source.
 
 ## Next Steps

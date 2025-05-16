@@ -110,6 +110,7 @@ const routes = [
     }
   },
   {
+    name: 'ApplicationObjectEditor',
     path: '/configdb/applications/:application/:object',
     component: ApplicationObjectEditor,
     meta: {

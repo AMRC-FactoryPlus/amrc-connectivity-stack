@@ -1,6 +1,5 @@
-/* ACS service setup
- * Job control object
- * Copyright 2023 AMRC
+/*
+ * Copyright (c) University of Sheffield AMRC 2025.
  */
 
 import timers from "timers/promises";
@@ -13,6 +12,7 @@ import { fixups }               from "./fixups.js";
 import { setup_git_repos }      from "./git-repos.js";
 import { setup_local_uuids }    from "./local-uuids.js";
 import {migrate_edge_agent_config} from "./manager-devices.js";
+import {migrate_deployment_charts} from "./deployment-charts.js";
 
 export class ServiceSetup {
     constructor (opts) {
@@ -79,6 +79,9 @@ export class ServiceSetup {
 
         this.log("Migrating legacy Auth groups");
         await migrate_auth_groups(this);
+
+        this.log("Migrating Edge Deployment charts");
+        await migrate_deployment_charts(this);
 
         this.log("Finished setup");
     }

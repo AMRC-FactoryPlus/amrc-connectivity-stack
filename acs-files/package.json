@@ -14,6 +14,7 @@
     "@amrc-factoryplus/service-client": "file:../lib/js-service-client",
     "@dotenvx/dotenvx": "^1.39.0",
     "express": "^4.21.2",
+    "stream-size": "^0.0.6",
     "uuid": "^11.0.5"
   },
   "devDependencies": {

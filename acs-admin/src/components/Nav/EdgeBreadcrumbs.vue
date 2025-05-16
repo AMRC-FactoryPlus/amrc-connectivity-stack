@@ -129,7 +129,7 @@ export default {
     // ║  Nodes  ║
     // ╚═════════╝
     nodes () {
-      return useNodeStore().data.filter((node) => node.deployment.cluster === this.$route.params.clusteruuid)
+      return useNodeStore().data.filter((node) => node.deployment?.cluster === this.$route.params.clusteruuid)
     },
     currentNode () {
       if (useNodeStore().data instanceof Array) {
@@ -140,7 +140,7 @@ export default {
     // ║  Devices  ║
     // ╚═══════════╝
     devices () {
-      return useDeviceStore().data.filter((device) => device.deviceInformation.node === this.$route.params.nodeuuid)
+      return useDeviceStore().data.filter((device) => device.deviceInformation?.node === this.$route.params.nodeuuid)
     },
     currentDevice () {
       if (useDeviceStore().data instanceof Array) {

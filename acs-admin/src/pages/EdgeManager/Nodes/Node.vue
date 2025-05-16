@@ -202,7 +202,7 @@ export default {
     },
 
     cluster() {
-      return this.c.data.find(e => e.uuid === this.node.cluster)?.name
+      return this.c.data.find(e => e.uuid === this.node.deployment?.cluster)?.name
     },
 
     devices () {
@@ -217,7 +217,7 @@ export default {
     },
 
     hostname() {
-      return this.node.hostname ?? 'Floating'
+      return this.node.deployment.hostname ?? 'Floating'
     },
   },
 

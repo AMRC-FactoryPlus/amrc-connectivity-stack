@@ -1,16 +1,12 @@
 /*
- *  Factory+ / AMRC Connectivity Stack (ACS) Edge component
- *  Copyright 2023 AMRC
+ * Copyright (c) University of Sheffield AMRC 2025.
  */
 
-import * as util from "util";
-import Long from "long";
+import {Metrics, serialisationType, writeValToBuffer} from "../helpers/typeHandler.js";
+import {log} from "../helpers/log.js";
 
-import { Metrics, serialisationType } from "../helpers/typeHandler.js";
-import { log } from "../helpers/log.js";
-
-import { DriverBroker } from "../driverBroker.js";
-import { DeviceConnection } from "../device.js";
+import {DriverBroker} from "../driverBroker.js";
+import {DeviceConnection} from "../device.js";
 
 interface addrGroup {
     poll:   number,
@@ -61,7 +57,7 @@ export class DriverConnection extends DeviceConnection {
         this.emit("close");
     }
 
-    
+
 
     readMetrics(metrics: Metrics, payloadFormat?: string, delimiter?: string) {
         const poll = metrics.addresses
@@ -76,9 +72,29 @@ export class DriverConnection extends DeviceConnection {
     }
 
     writeMetrics(metrics: Metrics, writeCallback: Function, payloadFormat: serialisationType, delimiter?: string) {
-        let err = null;
-        // Do whatever connection specific stuff you need to in order to
-        // write to the device
+        let err;
+
+        metrics.array.forEach(m => {
+
+            // @ts-ignore
+            const foundKey = [...this.addrs.entries()].find(([key, value]) => value === m.properties.address.value)?.[0];
+            // @ts-ignore
+            const addr = this.addrs.get(foundKey);
+            if (!addr) {
+                // @ts-ignore
+                err = new Error(`Address ${m.properties.address.value} not found`);
+                return;
+            }
+
+            const payload = writeValToBuffer(m);
+
+            this.broker.publish({
+                id:         this.id,
+                msg:        "cmd",
+                data:       addr,
+                payload:    payload,
+            });
+        });
 
         // Call the writeCallback when complete, setting the error if
         // necessary
@@ -95,6 +111,7 @@ export class DriverConnection extends DeviceConnection {
      * @param subscriptionStartCallback A function to call once the subscription has been setup
      */
     async startSubscription(metrics: Metrics, payloadFormat: serialisationType, delimiter: string, interval: number, deviceId: string, subscriptionStartCallback: Function) {
+
         const addrs = metrics.addresses;
         const unassigned = addrs.filter(a => !this.topics.has(a));
         for (const a of unassigned) {
@@ -122,7 +139,7 @@ export class DriverConnection extends DeviceConnection {
      */
     //async stopSubscription(deviceId: string, stopSubCallback: Function) {
     //}
-    
+
     #newTopic () {
         while (true) {
             const dt = Math.floor(Math.random() * 100000).toString();

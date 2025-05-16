@@ -11,22 +11,4 @@ The ACS Admin interface provides a web-based management console for the AMRC Con
 
 ## Developer Documentation
 
-- [useStore](docs/useStore.md) - Reactive store utility for Factory+ objects with automatic binding resolution
-
-## Project Setup
-
-```sh
-bun install
-```
-
-### Compile and Hot-Reload for Development
-
-```sh
-bun dev
-```
-
-### Compile and Minify for Production
-
-```sh
-bun build
-```
+- [Developer Guide](docs/developer-guide.md) - Comprehensive guide for ACS Admin developers

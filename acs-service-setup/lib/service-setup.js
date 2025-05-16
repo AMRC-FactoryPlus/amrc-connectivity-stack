@@ -3,6 +3,8 @@
  * Copyright 2023 AMRC
  */
 
+import timers from "timers/promises";
+
 import { ServiceClient } from "@amrc-factoryplus/service-client";
 
 import { migrate_auth_groups }  from "./auth-group.js";
@@ -39,9 +41,25 @@ export class ServiceSetup {
         return this;
     }
 
+    async wait_for (service, version) {
+        this.log("Waiting for %s (%s)", service.service, version);
+        while (!await service.version_satisfies(version)) {
+            this.log("Service not ready, waiting 3s");
+            await timers.setTimeout(3000);
+        }
+        this.log("Service %s ready", service.service);
+    }
+
     async run () {
+        const { fplus } = this;
+
+        await this.wait_for(fplus.Directory, "1.1.0");
+
         this.log("Loading early dumps");
         await this.dumps.load_dumps(true);
+
+        await this.wait_for(fplus.Auth, "2.0.0");
+        await this.wait_for(fplus.ConfigDB, "2.0.0");
 
         this.log("Running fixups");
         await fixups(this);

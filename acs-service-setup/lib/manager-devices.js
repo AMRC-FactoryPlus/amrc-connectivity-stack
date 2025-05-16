@@ -1,7 +1,5 @@
 /*
- * ACS service setup
- * Migrate Manager edge agent config to devices and connections in the ConfigDB
- * Copyright 2025 University of Sheffield AMRC
+ * Copyright (c) University of Sheffield AMRC 2025.
  */
 
 import util from "util";
@@ -64,13 +62,13 @@ class MigrateAgents {
     }
 
     async register_drivers () {
-        const { cdb } = this;
+        const { cdb, drivers } = this;
 
         this.log("Locating/registering Drivers");
 
         const tags = this.driver_by_image = new Map();
         const internal = this.internal_drivers = new Map();
-        for (const [uuid, def] of this.drivers.entries()) {
+        for (const [uuid, def] of drivers.entries()) {
             if (def.internal) {
                 internal.set(def.internal.connType, [uuid, def.internal.details]);
                 continue;
@@ -94,6 +92,7 @@ class MigrateAgents {
                 const drv = await cdb.create_object(Edge.Class.Driver);
                 await cdb.put_config(App.Info, drv, { name });
                 await cdb.put_config(App.DriverDefinition, drv, { image });
+                drivers.set(drv, { image });
                 tags.set(tag, drv);
 
                 this.log("Registered driver %s as %s", tag, drv);
@@ -174,7 +173,7 @@ class MigrateAgents {
 
         delete rv.deviceMounts;
         delete rv.image;
-        
+
         if (ddevs && dmnts) {
             const hps = [];
             for (const [tag, mountPath] of Object.entries(dmnts)) {
@@ -212,19 +211,114 @@ class MigrateAgents {
         };
     }
 
-    async register_device (node, connection, device) {
+    // Transform flat array of metrics into nested object structure
+    transformOriginMap(tags) {
+        // Field name mapping from old to new format
+        const fieldMapping = {
+            'address': 'Address',
+            'path': 'Path',
+            'method': 'Method',
+            'type': 'Sparkplug_Type',
+            'docs': 'Documentation',
+            'recordToDB': 'Record_To_Historian',
+            'engHigh': 'Eng_High',
+            'engLow': 'Eng_Low',
+            'engUnit': 'Eng_Unit',
+            'deadBand': 'Deadband',
+        };
+
+        // Create the root object for the nested structure
+        const nestedMap = {};
+
+        // Process each tag
+        for (const tag of tags) {
+            // Skip tags without a Name
+            if (!tag.Name) continue;
+
+            // Split the name by '/' to get the path components
+            const pathComponents = tag.Name.split('/');
+
+            // Handle Schema_UUID and Instance_UUID at the root level
+            if (pathComponents.length === 1 &&
+                (pathComponents[0] === 'Schema_UUID' || pathComponents[0] === 'Instance_UUID')) {
+                nestedMap[pathComponents[0]] = tag.value;
+                continue;
+            }
+
+            // Create nested structure based on path components
+            let current = nestedMap;
+            for (let i = 0; i < pathComponents.length - 1; i++) {
+                const component = pathComponents[i];
+                if (!current[component]) {
+                    current[component] = {};
+                }
+                current = current[component];
+            }
+
+            // Get the last component (actual field name)
+            const lastComponent = pathComponents[pathComponents.length - 1];
+
+            // Handle Schema_UUID and Instance_UUID at nested levels
+            if (lastComponent === 'Schema_UUID' || lastComponent === 'Instance_UUID') {
+                current[lastComponent] = tag.value;
+                continue;
+            }
+
+            // For other fields, create an object with all properties
+            if (!current[lastComponent]) {
+                current[lastComponent] = {};
+            }
+
+            // Special handling for value - it should be a property of the object
+            if (tag.value !== undefined && lastComponent !== 'Schema_UUID' && lastComponent !== 'Instance_UUID') {
+                current[lastComponent]['Value'] = tag.value;
+            }
+
+            // Map all fields from the tag to the new format
+            for (const [oldKey, newKey] of Object.entries(fieldMapping)) {
+                if (tag[oldKey] !== undefined) {
+                    // Special handling for boolean values to ensure they remain boolean
+                    if (oldKey === 'recordToDB') {
+                        current[lastComponent][newKey] = Boolean(tag[oldKey]);
+                    } else {
+                        current[lastComponent][newKey] = tag[oldKey];
+                    }
+                }
+            }
+        }
+
+        return nestedMap;
+    }
+
+    async register_device(node, connection, device) {
         const { cdb } = this;
 
         this.log("Registering device %s of Edge Agent %s", device.deviceId, node);
 
+        const schemaTag = device.tags.find(t => t.Name === "Schema_UUID");
+
+        // Skip devices that don't have a schema (Schema_UUID is null)
+        if (!schemaTag || !schemaTag.value) {
+            this.log("Skipping device %s of Edge Agent %s - no schema UUID found", device.deviceId, node);
+            return;
+        }
+
         const dobj = await cdb.create_object(Class.Device);
         await cdb.put_config(App.Info, dobj, { name: device.deviceId });
-        const schemaTag = device.tags.find(t => t.Name === "Schema_UUID");
+
+        // Log the original tags for debugging
+        this.log("Original device tags for %s: %s", device.deviceId, JSON.stringify(device.tags, null, 2));
+
+        // Transform the flat array of tags into a nested object structure
+        const transformedOriginMap = this.transformOriginMap(device.tags);
+
+        // Log the transformed originMap for debugging
+        this.log("Transformed originMap for %s: %s", device.deviceId, JSON.stringify(transformedOriginMap, null, 2));
 
         const dconf = {
             connection, node,
             createdAt:      new Date().toISOString(),
-            originMap:      device.tags,
+            originMap:      transformedOriginMap,
             schema:         schemaTag.value,
             sparkplugName:  device.deviceId,
         };
@@ -243,6 +337,12 @@ class MigrateAgents {
          * Helm chart. This means doing the work the Manager does when
          * it updates the Deployment. */
         const deployment = this.deployments.get(agent);
+
+        /* We don't know why this Deployment didn't exist. It is not
+         * safe to simply create it. The Manager will do so but only
+         * when the user takes explicit action. */
+        if (!deployment) return;
+
         const connections = config.deviceConnections;
 
         const values = deployment.values ??= {};
@@ -259,7 +359,7 @@ class MigrateAgents {
         await cdb.put_config(Edge.App.Deployment, agent, deployment);
     }
 }
-            
+
 export function migrate_edge_agent_config(ss) {
     return new MigrateAgents(ss).run();
 }

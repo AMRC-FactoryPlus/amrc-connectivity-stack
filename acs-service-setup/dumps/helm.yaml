@@ -117,7 +117,7 @@ configs:
               reconcileStrategy: Revision
               sourceRef:
                 kind: GitRepository
-                name: helm-charts
+                name: "{{source}}"
           install:
             crds: CreateReplace
           upgrade:

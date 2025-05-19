@@ -2,15 +2,15 @@
  * Copyright (c) University of Sheffield AMRC 2025.
  */
 
-import deep_equal       from "deep-equal";
-import * as imm         from "immutable";
-import k8s              from "@kubernetes/client-node";
-import jmp              from "json-merge-patch";
-import rx               from "rxjs";
-import template         from "json-templates";
+import deep_equal from "deep-equal";
+import * as imm from "immutable";
+import k8s from "@kubernetes/client-node";
+import jmp from "json-merge-patch";
+import rx from "rxjs";
+import template from "json-templates";
 
-import { Edge }             from "./uuids.js";
-import { LABELS }           from "./metadata.js";
+import { Edge } from "./uuids.js";
+import { LABELS } from "./metadata.js";
 
 // Define a record type for Kubernetes resources to help with grouping
 const Resource = imm.Record({ apiVersion: null, kind: null });
@@ -31,7 +31,7 @@ class Reconciliation {
         this.log = deploy.log;
     }
 
-    async prepare () {
+    async prepare() {
         this.objs = k8s.KubernetesObjectApi.makeApiClient(this.deploy.kc);
 
         // Helper function to convert a list of resources to a Map keyed by name
@@ -45,7 +45,7 @@ class Reconciliation {
         this.log("Want %o", this.want.toJS());
     }
 
-    async apply () {
+    async apply() {
         // Create or update resources that we want
         for (const [name, man] of this.want) {
             const old = this.have.get(name);
@@ -93,7 +93,7 @@ class Reconciliation {
         }
     }
 
-    async check (pr) {
+    async check(pr) {
         const { response, body } = await pr;
         const st = response.statusCode;
         this.log("K8s status: %s", st);
@@ -101,7 +101,7 @@ class Reconciliation {
             throw `Can't update ${this.resource}: ${st}`;
     }
 
-    async get_resources () {
+    async get_resources() {
         const { response, body } = await this.objs.list(
             this.resource.apiVersion, this.resource.kind,
             this.deploy.namespace,
@@ -237,7 +237,7 @@ class GitRepoReconciliation {
 }
 
 export class Deployments {
-    constructor (opts) {
+    constructor(opts) {
         this.fplus = opts.fplus;
         this.cluster = opts.cluster;
         this.kc = opts.kubeconfig;
@@ -247,7 +247,7 @@ export class Deployments {
         this.log = opts.fplus.debug.log.bind(opts.fplus.debug, "deploy");
     }
 
-    async init () {
+    async init() {
         const config = await this._init_config();
         const deployments = await this._init_deployments();
         this.manifests = this._init_manifests(config, deployments);
@@ -255,13 +255,13 @@ export class Deployments {
         return this;
     }
 
-    run () {
+    run() {
         // Subscribe to manifest changes and reconcile when they change
         this.manifests.subscribe(ms =>
             this.reconcile_manifests(ms));
     }
 
-    async _init_config () {
+    async _init_config() {
         const watcher = await this.fplus.ConfigDB.watcher();
         const app = Edge.App.HelmRelease;
 
@@ -279,8 +279,8 @@ export class Deployments {
                     metadata: {
                         namespace: this.namespace,
                         labels: {
-                            [LABELS.managed]:   LABELS.sync,
-                            [LABELS.uuid]:      "{{uuid}}",
+                            [LABELS.managed]: LABELS.sync,
+                            [LABELS.uuid]: "{{uuid}}",
                         },
                     },
                 });
@@ -290,7 +290,7 @@ export class Deployments {
         );
     }
 
-    async _init_deployments () {
+    async _init_deployments() {
         const { Deployments, HelmChart } = Edge.App;
         const cdb = this.fplus.ConfigDB;
         const watcher = await cdb.watcher();
@@ -318,21 +318,12 @@ export class Deployments {
                 rx.mergeMap(ch => cdb.get_config(HelmChart, ch)),
                 /* XXX We could cache (against an etag) to avoid
                  * recompiling every time... */
-                rx.map(tmpl => {
-                    // Extract source field from the chart template
-                    // If not specified, we'll use the default "helm-charts" repository
-                    // This is a deliberate choice to maintain backward compatibility
-                    // with existing chart templates that don't specify a source
-                    const source = tmpl.source || "helm-charts";
-
-                    return { tmpl, source };
-                }),
-                // Add the chart template and source to the deployment object
-                // This is important because we'll use this source later in collectSources
-                rx.map(({ tmpl, source }) => ({
+                // Pass the template directly to the deployment object
+                // We'll extract the source in create_manifests
+                rx.map(tmpl => ({
                     ...deployment,
                     chart: template(tmpl),
-                    source
+                    tmpl
                 })))),
             rx.toArray(),
         );
@@ -343,7 +334,7 @@ export class Deployments {
             .pipe(rx.switchMap(lookup));
     }
 
-    _init_manifests (config, deployments) {
+    _init_manifests(config, deployments) {
         return rx.combineLatest({ config, deployments }).pipe(
             rx.tap(opts => this.log("Reconcile needed: %o", opts)),
             rx.map(opts => ({
@@ -359,27 +350,48 @@ export class Deployments {
         );
     }
 
-    create_manifests ({ config, deployments }) {
+    create_manifests({ config, deployments }) {
         return imm.List(deployments)
             .map(deployment => {
-                const { uuid, spec, source } = deployment;
+                const { uuid, spec, tmpl } = deployment;
                 const chart = deployment.chart({
                     uuid,
-                    name:       spec.name,
-                    hostname:   spec.hostname,
+                    name: spec.name,
+                    hostname: spec.hostname,
                 });
+
+                // Log the chart object to debug
+                this.log("Chart object: %o", chart);
+
                 const values = [this.values, chart.values, spec.values]
                     .map(v => v ?? {}).reduce(jmp.merge);
 
-                // Include the source in the template data
-                // The source was extracted from the chart template in _init_deployments
-                // and is now a property of the deployment object
-                // We already defaulted to "helm-charts" in _init_deployments if not specified
+                // Extract source field from the template
+                // If not specified, default to "helm-charts" for backward compatibility
+                const source = tmpl.source || "helm-charts";
+
+                // Log whether we're using the default or a specified source
+                if (!tmpl.source) {
+                    this.log("Chart template does not specify a source, using default 'helm-charts'");
+                } else {
+                    this.log("Using source '%s' from chart template", tmpl.source);
+                }
+
+                // Ensure we have a valid prefix for Kubernetes resource names
+                // If prefix is specified in the template, use that
+                // Otherwise, use the chart name from the template
+                // This ensures we always have a valid prefix even if chart.chart is undefined
+                const prefix = tmpl.prefix || tmpl.chart;
+
+                // Log the prefix we're using
+                this.log("Using prefix '%s' for chart '%s'", prefix, tmpl.chart);
+
+                // Include the source and prefix in the template data
                 return config.template({
                     uuid, values,
                     chart: chart.chart,
                     source,
-                    prefix: chart.prefix || chart.chart,
+                    prefix,
                 });
             })
             .groupBy(Resource);
@@ -388,23 +400,26 @@ export class Deployments {
     /**
      * Collect all unique sources from deployments and look up their repository URLs
      * Only collects sources that are explicitly specified in the chart templates
+     * and are not the default "helm-charts" (which is created by the bootstrap process)
      * @param {Array} deployments - List of deployment objects with chart templates
      * @returns {Promise<Object>} - Map of source name to repository URL
      */
     async collectSources(deployments) {
         // Extract unique sources from deployments
-        // Only include sources that are explicitly specified and not "helm-charts"
+        // We filter out "helm-charts" because it's already created by the bootstrap process
+        // and doesn't need to be managed by our code
         const sources = imm.Set(
             deployments
                 .filter(d => {
-                    // The source comes from the chart template, which has already been
-                    // extracted and added to the deployment object in _init_deployments
-                    return d.source && d.source !== "helm-charts";
+                    // Extract source from the template
+                    const source = d.tmpl?.source;
+                    // Only include explicitly specified sources that aren't the default
+                    return source && source !== "helm-charts";
                 })
-                .map(d => d.source)
+                .map(d => d.tmpl.source)
         ).toJS();
 
-        this.log("Unique explicitly specified sources found: %o", sources);
+        this.log("Unique non-default sources found: %o", sources);
 
         // Look up repository URLs for each source
         const sourceMap = {};

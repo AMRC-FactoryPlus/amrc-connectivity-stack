@@ -307,6 +307,11 @@ export class Deployments {
             // Extract the chart UUIDs from the deployment
             rx.map(dep => {
                 const { spec } = dep;
+                // XXX - The support for the charts key is deprecated
+                // and will be removed in a future version. This is here
+                // for backward compatibility. New deployments should
+                // use the chart key instead.
+                //
                 // Handle both single chart and multiple charts
                 const charts =
                     spec.chart ? rx.of(spec.chart) : rx.from(spec.charts);

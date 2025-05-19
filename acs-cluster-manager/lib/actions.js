@@ -148,10 +148,10 @@ export class Update extends Action {
                 /* This will succeed if we add a duplicate. This is
                  * important for migration. */
                 const grant = await auth.add_grant({
-                    principal: uuid,
+                    principal:  uuid,
                     permission: perm,
-                    target: cluster,
-                    plural: false,
+                    target:     cluster,
+                    plural:     false,
                 });
             }
 
@@ -218,10 +218,10 @@ export class Update extends Action {
         /* Build the initial repo contents */
         const flux = template.flux({
             helm,
-            namespace: spec.namespace,
+            namespace:  spec.namespace,
             url: {
-                self: await git.repo_by_uuid(uuid),
-                helm: await git.repo_by_uuid(this.config.repo.helm.uuid),
+                self:   await git.repo_by_uuid(uuid),
+                helm:   await git.repo_by_uuid(this.config.repo.helm.uuid),
             },
         });
 

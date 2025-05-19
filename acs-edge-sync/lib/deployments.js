@@ -2,15 +2,15 @@
  * Copyright (c) University of Sheffield AMRC 2025.
  */
 
-import deep_equal from "deep-equal";
-import * as imm from "immutable";
-import k8s from "@kubernetes/client-node";
-import jmp from "json-merge-patch";
-import rx from "rxjs";
-import template from "json-templates";
+import deep_equal       from "deep-equal";
+import * as imm         from "immutable";
+import k8s              from "@kubernetes/client-node";
+import jmp              from "json-merge-patch";
+import rx               from "rxjs";
+import template         from "json-templates";
 
-import { Edge } from "./uuids.js";
-import { LABELS } from "./metadata.js";
+import { Edge }             from "./uuids.js";
+import { LABELS }           from "./metadata.js";
 
 // Define a record type for Kubernetes resources to help with grouping
 const Resource = imm.Record({ apiVersion: null, kind: null });
@@ -31,7 +31,7 @@ class Reconciliation {
         this.log = deploy.log;
     }
 
-    async prepare() {
+    async prepare () {
         this.objs = k8s.KubernetesObjectApi.makeApiClient(this.deploy.kc);
 
         // Helper function to convert a list of resources to a Map keyed by name
@@ -45,7 +45,7 @@ class Reconciliation {
         this.log("Want %o", this.want.toJS());
     }
 
-    async apply() {
+    async apply () {
         // Create or update resources that we want
         for (const [name, man] of this.want) {
             const old = this.have.get(name);
@@ -93,7 +93,7 @@ class Reconciliation {
         }
     }
 
-    async check(pr) {
+    async check (pr) {
         const { response, body } = await pr;
         const st = response.statusCode;
         this.log("K8s status: %s", st);
@@ -101,7 +101,7 @@ class Reconciliation {
             throw `Can't update ${this.resource}: ${st}`;
     }
 
-    async get_resources() {
+    async get_resources () {
         const { response, body } = await this.objs.list(
             this.resource.apiVersion, this.resource.kind,
             this.deploy.namespace,
@@ -237,7 +237,7 @@ class GitRepoReconciliation {
 }
 
 export class Deployments {
-    constructor(opts) {
+    constructor (opts) {
         this.fplus = opts.fplus;
         this.cluster = opts.cluster;
         this.kc = opts.kubeconfig;
@@ -247,7 +247,7 @@ export class Deployments {
         this.log = opts.fplus.debug.log.bind(opts.fplus.debug, "deploy");
     }
 
-    async init() {
+    async init () {
         const config = await this._init_config();
         const deployments = await this._init_deployments();
         this.manifests = this._init_manifests(config, deployments);
@@ -255,13 +255,13 @@ export class Deployments {
         return this;
     }
 
-    run() {
+    run () {
         // Subscribe to manifest changes and reconcile when they change
         this.manifests.subscribe(ms =>
             this.reconcile_manifests(ms));
     }
 
-    async _init_config() {
+    async _init_config () {
         const watcher = await this.fplus.ConfigDB.watcher();
         const app = Edge.App.HelmRelease;
 
@@ -279,8 +279,8 @@ export class Deployments {
                     metadata: {
                         namespace: this.namespace,
                         labels: {
-                            [LABELS.managed]: LABELS.sync,
-                            [LABELS.uuid]: "{{uuid}}",
+                            [LABELS.managed]:   LABELS.sync,
+                            [LABELS.uuid]:      "{{uuid}}",
                         },
                     },
                 });
@@ -290,7 +290,7 @@ export class Deployments {
         );
     }
 
-    async _init_deployments() {
+    async _init_deployments () {
         const { Deployments, HelmChart } = Edge.App;
         const cdb = this.fplus.ConfigDB;
         const watcher = await cdb.watcher();
@@ -339,7 +339,7 @@ export class Deployments {
             .pipe(rx.switchMap(lookup));
     }
 
-    _init_manifests(config, deployments) {
+    _init_manifests (config, deployments) {
         return rx.combineLatest({ config, deployments }).pipe(
             rx.tap(opts => this.log("Reconcile needed: %o", opts)),
             rx.map(opts => ({
@@ -355,14 +355,14 @@ export class Deployments {
         );
     }
 
-    create_manifests({ config, deployments }) {
+    create_manifests ({ config, deployments }) {
         return imm.List(deployments)
             .map(deployment => {
                 const { uuid, spec, tmpl } = deployment;
                 const chart = deployment.chart({
                     uuid,
-                    name: spec.name,
-                    hostname: spec.hostname,
+                    name:       spec.name,
+                    hostname:   spec.hostname,
                 });
 
                 // Log the chart object to debug

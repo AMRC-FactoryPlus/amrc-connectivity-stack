@@ -6,10 +6,10 @@ import jmp from "json-merge-patch";
 import rx from "rxjs";
 import yaml from "yaml";
 
-import { UUIDs, ServiceError } from "@amrc-factoryplus/service-client";
+import { UUIDs, ServiceError }  from "@amrc-factoryplus/service-client";
 
-import { Checkout } from "./checkout.js";
-import { Git, Edge } from "./uuids.js";
+import { Checkout }     from "./checkout.js";
+import { Git, Edge }    from "./uuids.js";
 
 const README = `
 This repo is managed by the Edge Deployment Operator.
@@ -23,7 +23,7 @@ Generated manifests are named 'SERVICE/SUBSYSTEM/*', where SERVICE will
 normally be 'edo'.
 `;
 
-function svc_catch(...codes) {
+function svc_catch (...codes) {
     return err => {
         if (err instanceof ServiceError && codes.includes(err.status))
             return;
@@ -32,7 +32,7 @@ function svc_catch(...codes) {
 }
 
 class Action {
-    constructor(op, uuid, status) {
+    constructor (op, uuid, status) {
         this.op = op;
         this.uuid = uuid;
         this.status = status;
@@ -47,11 +47,11 @@ class Action {
         this.log = op.fplus.debug.bound("cluster");
     }
 
-    update(patch) {
+    update (patch) {
         this.op.status_updates.next([this.uuid, patch]);
     }
 
-    name() {
+    name () {
         const { spec, status, uuid } = this;
         const name = status?.spec?.name ?? spec?.name;
 
@@ -63,14 +63,14 @@ class Action {
         return name;
     }
 
-    principal(srv) {
+    principal (srv) {
         const name = this.name();
         return `${srv}/${name}@${this.op.realm}`;
     }
 }
 
 export class Update extends Action {
-    async apply() {
+    async apply () {
         const { cdb, status, uuid } = this;
 
         this.fixup_account_status();
@@ -95,7 +95,7 @@ export class Update extends Action {
         this.log("Cluster %s is ready", this.name());
     }
 
-    fixup_account_status() {
+    fixup_account_status () {
         const { status } = this;
 
         const changes = new Map();
@@ -114,7 +114,7 @@ export class Update extends Action {
         jmp.apply(status, patch);
     }
 
-    async address() {
+    async address () {
         const { cdb, uuid, spec, prefix } = this;
         const name = this.name();
 
@@ -123,7 +123,7 @@ export class Update extends Action {
         await cdb.put_config(UUIDs.App.SparkplugAddress, uuid, { group_id });
     }
 
-    async accounts() {
+    async accounts () {
         const { auth, cdb, uuid: cluster, spec, status } = this;
         const group = this.config.group;
         const name = this.name();
@@ -164,7 +164,7 @@ export class Update extends Action {
         await do_acc("krbkeys");
     }
 
-    async repo() {
+    async repo () {
         const { uuid, spec } = this;
         const group = this.config.group.cluster;
         const name = this.name();
@@ -192,7 +192,7 @@ export class Update extends Action {
         this.update({ self_link });
     }
 
-    async flux() {
+    async flux () {
         const { uuid, spec } = this;
         const name = this.name();
         const git = this.fplus.Git;
@@ -233,7 +233,7 @@ export class Update extends Action {
 }
 
 export class Delete extends Action {
-    async apply() {
+    async apply () {
         const { auth, cdb, status, uuid } = this;
         const group = this.config.group;
         const name = this.name();

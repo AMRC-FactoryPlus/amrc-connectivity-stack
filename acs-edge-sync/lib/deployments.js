@@ -360,7 +360,7 @@ export class Deployments {
     }
 
     create_manifests ({ config, deployments }) {
-        return imm.List(deployments)
+        const specs = imm.List(deployments)
             .map(deployment => {
                 const { uuid, spec, source } = deployment;
                 const chart = deployment.chart({
@@ -375,13 +375,16 @@ export class Deployments {
                 // The source was extracted from the chart template in _init_deployments
                 // and is now a property of the deployment object
                 // We already defaulted to "helm-charts" in _init_deployments if not specified
-                return config.template({
+                return {
                     uuid, values,
                     chart: chart.chart,
                     source,
                     prefix: chart.prefix || chart.chart,
-                });
-            })
+                };
+            });
+        this.log("Manifest specs: %o", specs.toJS());
+        return specs
+            .map(s => config.template(s))
             .groupBy(Resource);
     }
 

@@ -1,8 +1,9 @@
+#!/usr/bin/env node
+
 /*
  * Copyright (c) University of Sheffield AMRC 2025.
  */
 
-#!/usr/bin/env node
 
 import fs from "fs";
 import process from "process";

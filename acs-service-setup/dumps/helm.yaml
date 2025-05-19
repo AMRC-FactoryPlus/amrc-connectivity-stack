@@ -72,6 +72,9 @@ configs:
         chart:
           description: Path to the Helm chart within the source repo.
           type: string
+        prefix:
+          description: Kubernetes-compatible prefix to add to the chart name. Must be specified if the chart name contains slashes.
+          type: string
         source:
           description: Source to pull the Helm chart from.
           type: string

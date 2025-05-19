@@ -131,7 +131,6 @@ configs:
   !u Clusters.App.HelmTemplate:
     !u Local.Chart.Cluster:
       chart:  "edge-cluster"
-      source: "helm-charts"
       values:
         krb5: { realm: !acs "${realm}" }
         uuid:
@@ -147,7 +146,6 @@ configs:
           directory: !acs "${directory}"
     !u Local.Chart.EdgeAgent:
       chart:  "edge-agent"
-      source: "helm-charts"
       values:
         name:   "{{name}}"
         uuid:   "{{uuid}}"

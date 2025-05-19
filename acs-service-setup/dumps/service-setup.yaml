@@ -22,6 +22,10 @@ objects:
   !u ConfigDB.Class.R1Class:
     !u Clusters.Class.HelmChart:
       name: "Helm chart"
+    !u Clusters.Class.SystemHelmChart:
+      name: "System Helm chart"
+      subclassOf:
+        - !u Clusters.Class.HelmChart
     !u Git.Class.Repo:
       name: "Git repository"
 

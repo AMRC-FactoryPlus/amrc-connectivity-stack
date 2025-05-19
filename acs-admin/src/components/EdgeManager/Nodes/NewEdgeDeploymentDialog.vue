@@ -197,9 +197,12 @@ export default {
     },
 
     helmCharts () {
-      return this.h.data.filter(h => ![
-        'cbccacf9-91cc-4ff7-a9e1-e6530cda4c28', 'abaeb7a2-6f22-4d4a-8206-938464d5c8e5',
-      ].includes(h.uuid))
+      // Filter out system charts by checking if they are not instances of SystemHelmChart
+      return this.h.data.filter(chart =>
+        {
+          return chart.class.uuid !== UUIDs.Class.SystemHelmChart
+        }
+      );
     },
 
     editorValue () {

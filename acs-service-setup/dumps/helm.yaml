@@ -49,11 +49,13 @@ objects:
       subclassOf:
         - !u Auth.Class.EdgeService
 
-  !u Clusters.Class.HelmChart:
+  !u Clusters.Class.SystemHelmChart:
     !u Local.Chart.EdgeAgent:
       name: "Edge Agent"
     !u Local.Chart.Cluster:
       name: "Edge cluster"
+
+  !u Clusters.Class.HelmChart:
     !u Local.Chart.ModbusRest:
       name: "Modbus-REST adapter"
     !u Local.Chart.MQTT:

@@ -109,7 +109,7 @@ configs:
         apiVersion: helm.toolkit.fluxcd.io/v2beta1
         kind: HelmRelease
         metadata:
-          name: "{{chart}}-{{uuid}}"
+          name: "{{prefix}}-{{uuid}}"
         spec:
           chart:
             spec:
@@ -117,7 +117,7 @@ configs:
               reconcileStrategy: Revision
               sourceRef:
                 kind: GitRepository
-                name: helm-charts
+                name: "{{source}}"
           install:
             crds: CreateReplace
           upgrade:

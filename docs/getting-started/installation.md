@@ -88,7 +88,7 @@ Take note of the service URLs printed at the end of the installation. You will n
 Get the password for the admin user by running the following command. Note that it may not return the password until the deployment has finished bootstrapping.
 
 ```bash
-echo $(sudo kubectl get secret krb5-passwords -o jsonpath="{.data.admin}" -n {{.Release.Namespace}} | base64 --decode)
+echo $(kubectl get secret admin-password -o jsonpath="{.data.password}" -n {{.Release.Namespace}} | base64 --decode)
 ```
 
 Once you have the admin password you can connect to the MQTT broker at the URL supplied to you and subscribe to spBv1.0/#. It's advisable to do this before you start adding devices to the system so that you can see all traffic. The bundled [Visualiser](whats-new-in-v3.md#visualiser) is a great tool to view MQTT traffic (plus it's ACS-aware!), or something like MQTTExplorer may be more useful if you're interested in viewing raw packet contents. MQTTExplorer can be downloaded [here](https://mqtt-explorer.com), however building the tool from [this](https://github.com/thomasnordquist/MQTT-Explorer/pull/712) pull request may be more useful when working with ACS and Sparkplug messages.

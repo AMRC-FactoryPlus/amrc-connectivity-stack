@@ -307,6 +307,11 @@ export class Deployments {
             // Extract the chart UUIDs from the deployment
             rx.map(dep => {
                 const { spec } = dep;
+                // XXX - The support for the charts key is deprecated
+                // and will be removed in a future version. This is here
+                // for backward compatibility. New deployments should
+                // use the chart key instead.
+                //
                 // Handle both single chart and multiple charts
                 const charts =
                     spec.chart ? rx.of(spec.chart) : rx.from(spec.charts);
@@ -318,21 +323,12 @@ export class Deployments {
                 rx.mergeMap(ch => cdb.get_config(HelmChart, ch)),
                 /* XXX We could cache (against an etag) to avoid
                  * recompiling every time... */
-                rx.map(tmpl => {
-                    // Extract source field from the chart template
-                    // If not specified, we'll use the default "helm-charts" repository
-                    // This is a deliberate choice to maintain backward compatibility
-                    // with existing chart templates that don't specify a source
-                    const source = tmpl.source || "helm-charts";
-
-                    return { tmpl, source };
-                }),
-                // Add the chart template and source to the deployment object
-                // This is important because we'll use this source later in collectSources
-                rx.map(({ tmpl, source }) => ({
+                // Pass the template directly to the deployment object
+                // We'll extract the source in create_manifests
+                rx.map(tmpl => ({
                     ...deployment,
                     chart: template(tmpl),
-                    source
+                    tmpl
                 })))),
             rx.toArray(),
         );
@@ -362,24 +358,45 @@ export class Deployments {
     create_manifests ({ config, deployments }) {
         return imm.List(deployments)
             .map(deployment => {
-                const { uuid, spec, source } = deployment;
+                const { uuid, spec, tmpl } = deployment;
                 const chart = deployment.chart({
                     uuid,
                     name:       spec.name,
                     hostname:   spec.hostname,
                 });
+
+                // Log the chart object to debug
+                this.log("Chart object: %o", chart);
+
                 const values = [this.values, chart.values, spec.values]
                     .map(v => v ?? {}).reduce(jmp.merge);
 
-                // Include the source in the template data
-                // The source was extracted from the chart template in _init_deployments
-                // and is now a property of the deployment object
-                // We already defaulted to "helm-charts" in _init_deployments if not specified
+                // Extract source field from the template
+                // If not specified, default to "helm-charts" for backward compatibility
+                const source = tmpl.source || "helm-charts";
+
+                // Log whether we're using the default or a specified source
+                if (!tmpl.source) {
+                    this.log("Chart template does not specify a source, using default 'helm-charts'");
+                } else {
+                    this.log("Using source '%s' from chart template", tmpl.source);
+                }
+
+                // Ensure we have a valid prefix for Kubernetes resource names
+                // If prefix is specified in the template, use that
+                // Otherwise, use the chart name from the template
+                // This ensures we always have a valid prefix even if chart.chart is undefined
+                const prefix = tmpl.prefix || tmpl.chart;
+
+                // Log the prefix we're using
+                this.log("Using prefix '%s' for chart '%s'", prefix, tmpl.chart);
+
+                // Include the source and prefix in the template data
                 return config.template({
                     uuid, values,
                     chart: chart.chart,
                     source,
-                    prefix: chart.prefix || chart.chart,
+                    prefix,
                 });
             })
             .groupBy(Resource);
@@ -388,23 +405,26 @@ export class Deployments {
     /**
      * Collect all unique sources from deployments and look up their repository URLs
      * Only collects sources that are explicitly specified in the chart templates
+     * and are not the default "helm-charts" (which is created by the bootstrap process)
      * @param {Array} deployments - List of deployment objects with chart templates
      * @returns {Promise<Object>} - Map of source name to repository URL
      */
     async collectSources(deployments) {
         // Extract unique sources from deployments
-        // Only include sources that are explicitly specified and not "helm-charts"
+        // We filter out "helm-charts" because it's already created by the bootstrap process
+        // and doesn't need to be managed by our code
         const sources = imm.Set(
             deployments
                 .filter(d => {
-                    // The source comes from the chart template, which has already been
-                    // extracted and added to the deployment object in _init_deployments
-                    return d.source && d.source !== "helm-charts";
+                    // Extract source from the template
+                    const source = d.tmpl?.source;
+                    // Only include explicitly specified sources that aren't the default
+                    return source && source !== "helm-charts";
                 })
-                .map(d => d.source)
+                .map(d => d.tmpl.source)
         ).toJS();
 
-        this.log("Unique explicitly specified sources found: %o", sources);
+        this.log("Unique non-default sources found: %o", sources);
 
         // Look up repository URLs for each source
         const sourceMap = {};

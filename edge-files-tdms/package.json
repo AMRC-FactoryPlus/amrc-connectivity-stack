@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@dotenvx/dotenvx": "^1.43.0",
-    "chokidar": "^4.0.3"
+    "chokidar": "^4.0.3",
+    "@amrc-factoryplus/service-client": "file:../lib/js-service-client"
   }
 }

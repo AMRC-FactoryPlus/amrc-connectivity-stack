@@ -4,11 +4,10 @@ import {EVENTS} from './tdms-file-events.js';
 const MAX_RETRIES = 3;
 
 class FolderWatcher {
-  constructor(folderPath, stateManager, eventManager) {
-
-    this.folderPath = folderPath;
-    this.stateManager = stateManager;
-    this.eventManager = eventManager;
+  constructor(opts) {
+    this.folderPath = opts.folderPath;
+    this.stateManager = opts.stateManager;
+    this.eventManager = opts.eventManager;
     this.retryCounts = new Map();
     this.seenFiles = new Set();
   }
@@ -57,7 +56,7 @@ class FolderWatcher {
         setTimeout(() => this.handleFile(filePath), 2000);
       } else {
         this.retryCounts.delete(filePath);
-        this.eventManager.emit(EVENTS.FILE_ERROR, { filePath, error: err });
+        this.eventManager.emit(EVENTS.NEW_FILE_ERROR, { filePath, error: err });
       }
     }
   }

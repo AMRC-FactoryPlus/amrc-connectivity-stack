@@ -1,4 +1,5 @@
 import fs from 'fs/promises';
+import {isFileExist} from './utils.js';
 
 class StateManager{
     constructor(stateFile){
@@ -6,18 +7,8 @@ class StateManager{
         this.seenFiles = new Map();
     }
 
-    async isFileExist(filePath){
-        try{
-            await fs.access(filePath);
-            return true;
-        }
-        catch{
-            return false;
-        }
-    }
-
     async loadSeenFiles(){
-        if(await this.isFileExist(this.stateFile)){
+        if(await isFileExist(this.stateFile)){
             try{
                 const data = await fs.readFile(this.stateFile, 'utf-8');
                 const files = await JSON.parse(data);

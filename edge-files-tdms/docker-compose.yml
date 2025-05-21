@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: run
+    image: edge-files-tdms
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./tests/folder_to_watch:/home/node/app/tests/folder_to_watch
+      - ./tests/tdms_files:/home/node/app/tests/tdms_files
+      - ./STATE.json:/home/node/app/STATE.json
+    environment:
+      - TDMS_DIR_TO_WATCH=${TDMS_DIR_TO_WATCH}
+      - TDMS_SRC_DIR=${TDMS_SRC_DIR}
+      - STATE_FILE=${STATE_FILE}
+      - NODE_ENV=${NODE_ENV}
+      - SERVICE_USERNAME=${SERVICE_USERNAME}
+      - SERVICE_PASSWORD=${SERVICE_PASSWORD}
+      - FILES_SERVICE=${FILES_SERVICE}
+      - AUTHN_URL=${AUTHN_URL}
+      - CONFIGDB_URL=${CONFIGDB_URL}
+      - DIRECTORY_URL=${DIRECTORY_URL}

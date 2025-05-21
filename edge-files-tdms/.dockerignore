@@ -1,0 +1,3 @@
+node_modules
+tests/folder_to_watch
+tests/tdms_files

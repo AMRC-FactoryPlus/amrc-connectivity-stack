@@ -1,16 +1,15 @@
 #!/usr/bin/env node
 
 /*
- * Factory+ / AMRC Connectivity Stack (ACS) Git server
- * Main entry point
- * Copyright 2022 AMRC
+ * Copyright (c) University of Sheffield AMRC 2025.
  */
+
 
 import fs from "fs";
 import process from "process";
 
 import { ServiceClient }    from "@amrc-factoryplus/service-client";
-import { WebAPI }           from "@amrc-factoryplus/service-api";        
+import { WebAPI }           from "@amrc-factoryplus/service-api";
 
 import { GIT_VERSION }      from "../lib/git-version.js";
 import { GitServer }        from "../lib/git-server.js";
@@ -72,6 +71,7 @@ const status = await new RepoStatus({
 
 const pulls = await new AutoPull({
     fplus, data, status,
+    secrets_dir: process.env.SECRETS_DIR || "/run/secrets",
 }).init();
 
 const sparkplug = await new SparkplugNode({

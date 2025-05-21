@@ -2,8 +2,9 @@ import fs from 'fs/promises';
 import {isFileExist} from './utils.js';
 
 class StateManager{
-    constructor(stateFile){
-        this.stateFile = stateFile;
+    constructor(opts){
+        this.stateFile = opts.stateFile;
+        this.eventManager = opts.eventManager;
         this.seenFiles = new Map();
     }
 
@@ -33,7 +34,13 @@ class StateManager{
         return this.seenFiles;
     }
 
-
+    async resumePendingUploads() {
+        for (const [filePath, meta] of this.seenFiles.entries()) {
+            if (meta.uuid && !meta.isUploaded) {
+                this.eventManager.emit(EVENTS.FILE_READY, filePath);
+            }
+        }
+    }
     async addSeenFile(filePath){
         if (this.seenFiles.has(filePath)){
             return;

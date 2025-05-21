@@ -15,14 +15,7 @@ const {
   NODE_ENV
 } = process.env;
 
-    async function resumePendingUploads(stateManager, eventManager) {
-    for (const [filePath, meta] of stateManager.seenFiles.entries()) {
-        if (meta.uuid && !meta.isUploaded) {
-            // Emit event to trigger upload with existing UUID
-            eventManager.emit(EVENTS.FILE_READY, filePath);
-        }
-    }
-    }
+
 
 async function main() {
   const fplus = await new ServiceClient({
@@ -30,7 +23,7 @@ async function main() {
   }).init();
 
   const eventManager = new TDMSEventManager();
-  const stateManager = new StateManager(STATE_FILE);
+  const stateManager = new StateManager({stateFile:STATE_FILE, eventManager});
 
   eventManager.on(EVENTS.FILE_UUID_CREATED, ({filePath, fileUuid}) => stateManager.updateWithUuid(filePath, fileUuid));
   eventManager.on(EVENTS.UPLOAD_SUCCESS, stateManager.updateAsUploaded.bind(stateManager));

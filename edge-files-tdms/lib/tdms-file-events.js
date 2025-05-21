@@ -3,6 +3,7 @@ import { EventEmitter } from 'events';
 export const EVENTS = {
   NEW_FILE: 'newFile',
   NEW_FILE_ERROR: 'newFileError',
+  FILE_UUID_CREATED: 'fileUuidCreated',
   UPLOAD_SUCCESS: 'fileUploadSuccess',
   UPLOAD_FAILED: 'fileUploadFailed',
 };

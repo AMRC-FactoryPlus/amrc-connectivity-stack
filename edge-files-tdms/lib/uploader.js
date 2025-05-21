@@ -9,8 +9,9 @@ class Uploader extends EventEmitter {
     constructor(opts) {
         super();
         this.eventManager = opts.eventManager;
+        this.stateManager = opts.stateManager;
         this.fplus = opts.fplus;
-        this.configDb = this.fplus.configDB;
+        this.configDb = this.fplus.ConfigDB;
         this.username = opts.username;
         this.password = opts.password;
         this.filesServiceUrl = opts.filesServiceUrl;
@@ -30,21 +31,28 @@ class Uploader extends EventEmitter {
     }
 
     async onNewFileHandler(filePath) {
+        console.log(`UPLOADER: On New File ${filePath}`);
         try {
             if (!(await isFileExist(filePath))) {
                 console.error(`UPLOADER: Filepath ${filePath} does not exist.`);
                 return;
             }
 
-            const fileUuid = await this.configDb.create_object(Class.File);
-            console.log(`UPLOADER: Created file object in ConfigDB with UUID ${fileUuid}`);
+            const fileState = this.stateManager.getFileState(filePath);
+            let fileUuid = fileState?.uuid;
+
+            if(!fileUuid){
+                fileUuid = await this.configDb.create_object(Class.File);
+                this.eventManager.emit(EVENTS.FILE_UUID_CREATED, filePath, fileUuid);
+                console.log(`UPLOADER: Created file object in ConfigDB with UUID ${fileUuid}`);
+            }
 
             const fileName = path.basename(filePath);
             const fileStream = fsSync.createReadStream(filePath);
 
             const credentials = Buffer.from(`${this.username}:${this.password}`).toString('base64');
 
-            const response = await fetch(this.filesServiceUrl, {
+            const response = await fetch(`${this.filesServiceUrl}/${fileUuid}`, {
                 method: 'PUT',
                 headers: {
                     'Authorization': `Basic ${credentials}`,
@@ -52,6 +60,7 @@ class Uploader extends EventEmitter {
                     'Content-Type': 'application/octet-stream',
                 },
                 body: fileStream,
+                duplex: 'half'
             });
 
             if (!response.ok) {
@@ -62,7 +71,7 @@ class Uploader extends EventEmitter {
             const data = await response.json();
             console.log(`UPLOADER: Successfully uploaded ${filePath}`, data);
 
-            this.eventManager.emit(EVENTS.UPLOAD_SUCCESS, filePath);
+            this.eventManager.emit(EVENTS.UPLOAD_SUCCESS, filePath, fileUuid);
         } catch (err) {
             console.error(`UPLOADER: Error uploading ${filePath}`, err);
             this.eventManager.emit(EVENTS.UPLOAD_FAILED, filePath, err);

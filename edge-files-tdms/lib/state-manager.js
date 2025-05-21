@@ -11,7 +11,12 @@ class StateManager{
         if(await isFileExist(this.stateFile)){
             try{
                 const data = await fs.readFile(this.stateFile, 'utf-8');
-                const files = await JSON.parse(data);
+                let files;
+                try{
+                    await JSON.parse(data);
+                }catch(jsonErr){
+                    console.warn(`STATE MANAGER: Invalid JSON in ${this.stateFile}: ${jsonErr.message}`);
+                }
 
                 files.forEach(file => {
                     this.seenFiles.set(file.path, {isUploaded: file.isUploaded});
@@ -28,11 +33,14 @@ class StateManager{
         return this.seenFiles;
     }
 
+
     async addSeenFile(filePath){
+        if (this.seenFiles.has(filePath)){
+            return;
+        }
         try{
             this.seenFiles.set(filePath, {isUploaded: false });
             await this.saveSeenFiles();
-
         }catch(err){
             console.error(`STATE MANAGER: Failed to add new file ${filePath}`);
         }
@@ -46,7 +54,8 @@ class StateManager{
         try{
             const data = [...this.seenFiles.entries()].map(([path, meta]) => ({
                 path,
-                isUploaded: meta.isUploaded
+                isUploaded: meta.isUploaded,
+                uuid: meta.uuid || null
             }));
 
             await fs.writeFile(this.stateFile, JSON.stringify(data, null, 2), 'utf-8');
@@ -59,11 +68,26 @@ class StateManager{
         if(this.seenFiles.has(filePath)){
             this.seenFiles.get(filePath).isUploaded = true;
             await this.saveSeenFiles();
+        }else{
+            console.warn(`STATE MANAGER: Tried to update isUploaded for unknown file ${filePath}`);
+        }
+    }
+
+    async updateWithUuid(filePath, fileUuid){
+        if(this.seenFiles.has(filePath)){
+            this.seenFiles.get(filePath).uuid = fileUuid;
+            await this.saveSeenFiles();
+        }else{
+            console.warn(`STATE MANAGER: Tried to update UUID for unknown file ${filePath}`);
         }
     }
 
     getHandledFilePaths(){
         return [...this.seenFiles.keys()];
+    }
+
+    getFileState(filePath){
+        return this.seenFiles.get(filePath);
     }
 }
 

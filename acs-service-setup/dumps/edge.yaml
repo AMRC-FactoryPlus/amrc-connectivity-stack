@@ -483,7 +483,9 @@ configs:
           icon: "server"
           placeholder: "e.g. 1,holding,0,1"
         path:
-          hidden: true
+          title: "Path"
+          description: "Set this to 0"
+          placeholder: "e.g. 0 (must be set to 0)"
       image:
         repository: edge-modbus
       schema:
@@ -500,6 +502,15 @@ configs:
             type: number
             options:
               order: 2
+          protocol:
+            default: tcp
+            enum:
+              - tcp
+            minLength: 1
+            title: Protocol
+            type: string
+            options:
+              order: 3
         required:
           - host
         title: Modbus Connection Details

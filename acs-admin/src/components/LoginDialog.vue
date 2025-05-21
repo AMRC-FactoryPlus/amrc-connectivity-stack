@@ -3,7 +3,7 @@
   -->
 
 <template>
-  <Card class="mx-auto max-w-sm">
+  <Card class="mx-auto max-w-sm transition-all duration-300 hover:ring ring-offset-2 ring-offset-gray-100 ring-gray-400 !ring-opacity-30">
     <CardHeader>
       <CardTitle class="text-2xl">
         Welcome to ACS!
@@ -15,7 +15,7 @@
     <CardContent>
       <div class="grid gap-4">
         <div class="grid gap-2">
-          <Label for="email">Username</Label>
+          <Label for="username">Username</Label>
           <Input
               autofocus
               id="username"
@@ -38,7 +38,6 @@
             <i class="fa-solid fa-circle-notch animate-spin"></i>
           </div>
         </Button>
-        <div class="text-xs text-gray-300">{{directory}}</div>
       </div>
     </CardContent>
   </Card>

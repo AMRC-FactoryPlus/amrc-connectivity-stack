@@ -55,8 +55,32 @@ function createTagsFromOriginMap(originMap) {
 function processOriginMapObject(obj, path, tags) {
   if (!obj || typeof obj !== 'object') return
 
-  // Skip Schema_UUID and Instance_UUID as they're handled separately
+  // Process Schema_UUID and Instance_UUID for the current object level
+  if (obj.Schema_UUID && path) {
+    tags.push({
+      Name: `${path}/Schema_UUID`,
+      type: 'UUID',
+      method: 'GET',
+      value: obj.Schema_UUID,
+      docs: 'A reference to the schema used for this object.',
+      recordToDB: true
+    })
+  }
+
+  if (obj.Instance_UUID && path) {
+    tags.push({
+      Name: `${path}/Instance_UUID`,
+      type: 'UUID',
+      method: 'GET',
+      value: obj.Instance_UUID,
+      docs: 'A reference to the instance of this object.',
+      recordToDB: true
+    })
+  }
+
+  // Process all other properties
   for (const key in obj) {
+    // Skip Schema_UUID and Instance_UUID as we've already handled them above
     if (key === 'Schema_UUID' || key === 'Instance_UUID') continue
 
     const value = obj[key]
@@ -94,6 +118,18 @@ function processOriginMapObject(obj, path, tags) {
             method: 'GET',
             value: value.Schema_UUID,
             docs: 'A reference to the schema used for this object.',
+            recordToDB: true
+          })
+        }
+
+        // Add Instance_UUID for this value if it exists
+        if (value.Instance_UUID) {
+          tags.push({
+            Name: `${newPath}/Instance_UUID`,
+            type: 'UUID',
+            method: 'GET',
+            value: value.Instance_UUID,
+            docs: 'A reference to the instance of this object.',
             recordToDB: true
           })
         }
@@ -226,7 +262,7 @@ export async function updateEdgeAgentConfig({
   // Refresh all stores to ensure we have the latest data
   console.debug('Refreshing stores before updating edge agent config')
 
-  // Synchronise all stores 
+  // Synchronise all stores
   await Promise.all(
     [deviceStore, connectionStore, driverStore]
       .map(s => s.synchronise()))
@@ -249,7 +285,7 @@ export async function updateEdgeAgentConfig({
         return
       }
 
-      connections = connectionStore.data.filter(c => 
+      connections = connectionStore.data.filter(c =>
         c.uuid === devices[0].deviceInformation?.connection)
     }
 
@@ -315,7 +351,7 @@ export async function updateEdgeAgentConfig({
       // We can search by UUID; service-setup will have updated all EA
       // configs to have this uuid property.
       if (config.deviceConnections) {
-        connectionIndex = config.deviceConnections.findIndex(conn => 
+        connectionIndex = config.deviceConnections.findIndex(conn =>
           conn.uuid == connection.uuid);
       }
 

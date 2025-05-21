@@ -102,7 +102,7 @@ export default {
 
   computed: {
     nodeConnections() {
-      return this.conn.data.filter(conn => conn.configuration?.topology?.node === this.nodeUuid)
+      return this.conn.data.filter(conn => conn.configuration?.edgeAgent === this.nodeUuid)
     },
   },
 

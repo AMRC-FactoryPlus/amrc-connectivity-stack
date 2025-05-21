@@ -1,6 +1,5 @@
-/* ACS service setup
- * UUIDs used by the services
- * Copyright 2023 AMRC
+/*
+ * Copyright (c) University of Sheffield AMRC 2025.
  */
 
 export const ACS = {
@@ -247,6 +246,7 @@ export const Clusters = {
         Cluster:            "f24d354d-abc1-4e32-98e1-0667b3e40b61",
         Account:            "97756c9a-38e6-4238-b78c-3df6f227a6c9",
         HelmChart:          "f9be0334-0ff7-43d3-9d8a-188d3e4d472b",
+        SystemHelmChart: "a5c54a2e-8f7b-4b2a-9e8d-3f7c9e7d1c6a",
         ClusterGroups:      "979f7fd9-bbc7-4810-a774-6082c7394db6",
     },
     Service: {

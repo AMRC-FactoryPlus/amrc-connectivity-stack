@@ -2,10 +2,7 @@
  * Copyright (c) University of Sheffield AMRC 2025.
  */
 
-import {
-    log, logf
-} from "./helpers/log.js";
-import * as fs from "fs";
+import {log} from "./helpers/log.js";
 import { SparkplugNode } from "./sparkplugNode.js";
 import {
     Metrics,

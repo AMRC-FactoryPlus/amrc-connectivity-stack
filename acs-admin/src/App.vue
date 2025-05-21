@@ -70,7 +70,7 @@
 
       <main class="flex flex-col max-h-[calc(100vh-4rem)] lg:gap-4 lg:pt-4 lg:px-4 flex-grow-0 overflow-y-auto pb-4">
         <NewClusterDialog/>
-        <NewNodeDialog/>
+        <NewEdgeDeploymentDialog/>
         <NewDeviceDialog/>
         <NewConnectionDialog/>
         <RouterView/>
@@ -94,7 +94,7 @@ import { useMagicKeys } from '@vueuse/core'
 import { Toaster } from '@/components/ui/sonner'
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarInput, SidebarInset, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarRail, SidebarTrigger } from '@/components/ui/sidebar'
 import NewClusterDialog from '@components/EdgeManager/EdgeClusters/NewClusterDialog.vue'
-import NewNodeDialog from '@components/EdgeManager/Nodes/NewNodeDialog.vue'
+import NewEdgeDeploymentDialog from '@components/EdgeManager/Nodes/NewEdgeDeploymentDialog.vue'
 import NewConnectionDialog from '@components/EdgeManager/Connections/NewConnectionDialog.vue'
 import NewDeviceDialog from '@components/EdgeManager/Devices/NewDeviceDialog.vue'
 
@@ -113,7 +113,7 @@ export default {
 
   components: {
     NewClusterDialog,
-    NewNodeDialog,
+    NewEdgeDeploymentDialog,
     NewDeviceDialog,
     Sidebar,
     SidebarContent,

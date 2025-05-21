@@ -36,21 +36,23 @@ export async function migrate_auth_groups (ss) {
             continue;
         }
 
+        const clear = () => auth.fetch({
+            method: "DELETE", 
+            url:    `authz/group/${parent}/${child}`
+        });
         const [pr, cr] = [parent, child].map(o => rank.get(o));
         if (pr == cr) {
             log("Migrating %s ⊂ %s", child, parent);
             await cdb.class_add_subclass(parent, child);
+            await clear();
         }
         else if (pr == cr + 1) {
             log("Migrating %s ∈ %s", child, parent);
             await cdb.class_add_member(parent, child);
+            await clear();
         }
         else {
             log("Can't migrate %s ∈ %s: rank mismatch", child, parent);
         }
-
-        /* XXX We want to DELETE authz/group to remove the memberships
-         * we have deleted; but leave them for now so the auth service
-         * keeps working. */
     }
 }

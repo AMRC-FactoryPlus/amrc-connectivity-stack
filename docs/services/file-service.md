@@ -47,13 +47,22 @@ The following endpoints are exposed for the **ACS-Files** service:
 - Checks whether the requesting principal has **Download** permission for the file with the specified `uuid` by calling ACS Auth Service.
 - If authorised, the file is retrieved from storage by the `uuid` and returned to the requester as a **binary data stream** for download.
 
-#### `POST /v1/file`
+#### `PUT /v1/file/:uuid`
+- Checks whether the requesting principal has **Upload** permission for the `Files Configuration` Application.
+- Checks if a **File Object** exists with the given uuid. 
+- If valid:
+  - The file contents is written to a temporary file in the Kubernetes volume.
+  - The temporary file is renamed using the file UUID from the request path, making it available for download. 
+  - The file's metadata is stored in ACS ConfigDB under the `Files Configuration` application, mapping it to the file's UUID. This ensures that files in storage and their metadata in ConfigDB remain **linked**.
+
+#### `GET /v1/file`
+- **Admin-only endpoint**
+- Returns a **list of all files** available in storage.
+
+#### `POST /v1/file` `❌ REMOVED`
 - Checks whether the requesting principal has **Upload** permission for the `Files Configuration` Application.
 - If authorised:
   - A new **File** object is created in ACS ConfigDB, generating a UUID for the file.
   - The file is uploaded to storage using the newly generated UUID as its filename.
   - The file's metadata is stored in ACS ConfigDB under the `Files Configuration` application, mapping it to the file's UUID. This ensures that files in storage and their metadata in ConfigDB remain **linked**.
 
-#### `GET /v1/file`
-- **Admin-only endpoint**
-- Returns a **list of all files** available in storage.

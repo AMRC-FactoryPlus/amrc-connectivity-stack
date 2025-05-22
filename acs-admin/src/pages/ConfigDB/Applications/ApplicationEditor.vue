@@ -2,21 +2,23 @@
   - Copyright (c) University of Sheffield AMRC 2025.
   -->
 <template>
-  <div class="flex justify-between">
-    <span>{{application?.name}}</span>
-    <CreateEntryDialog :objs="obj.data" :app="application?.uuid" />
-  </div>
-  <Skeleton v-if="loading || app.loading" v-for="i in 10" class="h-16 rounded-lg mb-2"/>
-  <DataTableSearchable v-else
-                       :data="data"
-                       :default-sort="initialSort"
-                       :columns="columns"
-                       :filters="[]"
-                       :selected-objects="[]"
-                       :clickable="true"
-                       :search-key="null"
-                       :limit-height="false"
-                       @row-click="e => objectClick(e.original)" />
+  <ConfigDBContainer>
+    <div class="flex justify-between">
+      <span>{{application?.name}}</span>
+      <CreateEntryDialog :objs="obj.data" :app="application?.uuid" />
+    </div>
+    <Skeleton v-if="loading || app.loading" v-for="i in 10" class="h-16 rounded-lg mb-2"/>
+    <DataTableSearchable v-else
+        :data="data"
+        :default-sort="initialSort"
+        :columns="columns"
+        :filters="[]"
+        :selected-objects="[]"
+        :clickable="true"
+        :search-key="null"
+        :limit-height="false"
+        @row-click="e => objectClick(e.original)" />
+  </ConfigDBContainer>
 </template>
 
 <script>
@@ -35,6 +37,7 @@ import * as imm from "immutable";
 import {Button} from "@components/ui/button/index.js";
 import CreateEntryDialog from "@pages/ConfigDB/Applications/CreateEntryDialog.vue";
 import CreateObjectDialog from "@pages/ConfigDB/CreateObjectDialog.vue";
+import ConfigDBContainer from '@components/Containers/ConfigDBContainer.vue'
 
 export default {
   emits: ['rowClick'],
@@ -50,14 +53,6 @@ export default {
     }
   },
 
-  data() {
-    return {
-      rxsub: null,
-      data: [],
-      loading: false,
-    }
-  },
-
   components: {
     CreateObjectDialog,
     CreateEntryDialog,
@@ -65,6 +60,7 @@ export default {
     Card,
     Skeleton,
     DataTableSearchable,
+    ConfigDBContainer,
   },
 
   computed: {
@@ -77,6 +73,32 @@ export default {
     application () {
       return this.app.data.find(a => a.uuid === this.route.params.application)
     },
+  },
+
+  watch: {
+    'route.params.application': {
+      handler: function (val) {
+        this.getData()
+      },
+      immediate: true,
+    },
+  },
+
+  async mounted () {
+    // Start a reactive fetch via the notify interface
+    await this.obj.start()
+    await this.app.start()
+
+    this.getData()
+
+    this.got = true
+  },
+
+  unmounted () {
+    this.obj.stop()
+    this.app.stop()
+
+    this.stopObjectSync()
   },
 
   methods: {
@@ -118,22 +140,27 @@ export default {
     stopObjectSync: function() {
       this.rxsub?.unsubscribe();
       this.rxsub = null;
+    },
+
+    getData () {
+      if (this.got) {
+        this.obj.stop()
+        this.app.stop()
+        this.stopObjectSync()
+      }
+      this.obj.start()
+      this.app.start()
+      this.startObjectSync()
+    },
+  },
+
+  data() {
+    return {
+      rxsub: null,
+      data: [],
+      loading: false,
+      got: false,
     }
-  },
-
-  async mounted () {
-    // Start a reactive fetch via the notify interface
-    this.obj.start()
-    this.app.start()
-
-    this.startObjectSync()
-  },
-
-  unmounted () {
-    this.obj.stop()
-    this.app.stop()
-
-    this.stopObjectSync()
   },
 }
 </script>

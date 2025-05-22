@@ -2,13 +2,14 @@
   - Copyright (c) University of Sheffield AMRC 2025.
   -->
 <template>
+  <ConfigDBContainer>
   <Skeleton v-if="loading" v-for="i in 10" class="h-16 rounded-lg mb-2"/>
   <div v-else>
-    <div class="flex justify-between items-center mb-4">
+    <div class="flex justify-between items-center mb-2">
       <div>
         <RouterLink to="./">{{application?.name}}</RouterLink> - {{object?.name}}
       </div>
-      <div class="flex items-center gap-4">
+      <div class="flex items-center gap-2">
         <Button variant="outline" @click="toggleYaml">
           <Checkbox :model-value="settings.useYaml" @click="toggleYaml" />
           <div class="ml-2">Edit as Yaml</div>
@@ -17,8 +18,8 @@
       </div>
     </div>
     <MonacoEditor
-        v-if="v$.code.$model !== null && v$.code.$model !== undefined"
-        class="editor h-[40em] w-[95%] border b-slate-300"
+        v-if="v$.code.$model"
+        class="editor h-[40em] border b-slate-300"
         :language="format"
         :value="v$.code.$model"
         @change="editorChange"
@@ -29,6 +30,7 @@
         }"
       />
   </div>
+  </ConfigDBContainer>
 </template>
 
 <script>
@@ -50,6 +52,7 @@ import {required} from "@vuelidate/validators";
 import {toast} from "vue-sonner";
 import {useDialog} from '@/composables/useDialog';
 import {useUserSettingsStore} from "@store/useUserSettingsStore.js";
+import ConfigDBContainer from '@components/Containers/ConfigDBContainer.vue'
 
 MonacoEditor.render = () => h('div')
 
@@ -77,6 +80,7 @@ export default {
       code: null, // Stores the formatted JSON string that is being edited locally
       loading: false,
       rxsub: null,
+      ignoreRouteChange: false, // Flag to prevent route watcher from triggering during cancellation
       formats: {
         json: {
           parse: JSON.parse,
@@ -95,6 +99,7 @@ export default {
   },
 
   components: {
+    ConfigDBContainer,
     Checkbox,
     Button,
     Card,
@@ -114,6 +119,11 @@ export default {
   methods: {
     startObjectSync: async function () {
       this.loading = true;
+
+      // Reset form state for new object
+      this.data = [];
+      this.incomingBufferJson = null;
+      this.code = null;
 
       // Wait until the store is ready before attempting to fetch data
       await serviceClientReady();
@@ -206,21 +216,105 @@ export default {
     this.stopObjectSync()
   },
 
-  beforeRouteLeave (to, from , next) {
+  watch: {
+    '$route.params.object': {
+      handler: function(newVal, oldVal) {
+        // Skip if we're handling a cancellation or if values are the same
+        if (this.ignoreRouteChange || newVal === oldVal) {
+          this.ignoreRouteChange = false;
+          return;
+        }
+
+        // Check for dirty form before changing
+        if (this.v$.$dirty) {
+          useDialog({
+            title: 'Leave Without Saving?',
+            message: `You have unsaved changes to this config entry, if you leave you will lose your changes.`,
+            confirmText: 'Leave',
+            onConfirm: () => {
+              this.stopObjectSync();
+              this.startObjectSync();
+              this.v$.$reset();
+            },
+            onCancel: () => {
+              // Set flag to prevent watcher from triggering again
+              this.ignoreRouteChange = true;
+
+              // Stay on the current object by navigating back
+              this.$router.replace({
+                name: this.$route.name,
+                params: { ...this.$route.params, object: oldVal }
+              });
+            }
+          });
+        } else {
+          // No unsaved changes, just reload
+          this.stopObjectSync();
+          this.startObjectSync();
+        }
+      }
+    },
+    '$route.params.application': {
+      handler: function(newVal, oldVal) {
+        // Skip if we're handling a cancellation or if values are the same
+        if (this.ignoreRouteChange || newVal === oldVal) {
+          this.ignoreRouteChange = false;
+          return;
+        }
+
+        // Check for dirty form before changing
+        if (this.v$.$dirty) {
+          useDialog({
+            title: 'Leave Without Saving?',
+            message: `You have unsaved changes to this config entry, if you leave you will lose your changes.`,
+            confirmText: 'Leave',
+            onConfirm: () => {
+              this.stopObjectSync();
+              this.startObjectSync();
+              this.v$.$reset();
+            },
+            onCancel: () => {
+              // Set flag to prevent watcher from triggering again
+              this.ignoreRouteChange = true;
+
+              // Stay on the current application by navigating back
+              this.$router.replace({
+                name: this.$route.name,
+                params: { ...this.$route.params, application: oldVal }
+              });
+            }
+          });
+        } else {
+          // No unsaved changes, just reload
+          this.stopObjectSync();
+          this.startObjectSync();
+        }
+      }
+    }
+  },
+
+  beforeRouteLeave (to, from, next) {
+    // If we're handling a cancellation, allow the navigation
+    if (this.ignoreRouteChange) {
+      this.ignoreRouteChange = false;
+      next();
+      return;
+    }
+
     if (this.v$.$dirty) {
       useDialog({
         title: 'Leave Without Saving?',
         message: `You have unsaved changes to this config entry, if you leave you will lose your changes.`,
         confirmText: 'Leave',
         onConfirm: () => {
-          next()
+          next();
         },
         onCancel: () => {
-          next(false)
+          next(false);
         }
       });
     } else {
-      next()
+      next();
     }
   },
 

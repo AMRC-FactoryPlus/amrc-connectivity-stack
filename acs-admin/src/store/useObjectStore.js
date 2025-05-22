@@ -2,7 +2,6 @@
  * Copyright (c) University of Sheffield AMRC 2025.
  */
 
-import * as imm from "immutable";
 import { defineStore } from 'pinia'
 import * as rx from 'rxjs'
 

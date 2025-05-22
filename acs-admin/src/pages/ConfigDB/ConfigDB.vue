@@ -56,7 +56,6 @@ import ObjectList from "@pages/ConfigDB/Objects/ObjectList.vue";
 import PrincipalList from "@pages/AccessControl/Principals/PrincipalList.vue";
 import {useApplicationStore} from "@store/useApplicationStore.js";
 import CreateObjectDialog from "@pages/ConfigDB/CreateObjectDialog.vue";
-import EdgePageSkeleton from '@components/EdgeManager/EdgePageSkeleton.vue'
 
 export default {
   setup () {
@@ -70,7 +69,6 @@ export default {
   },
 
   components: {
-    EdgePageSkeleton,
     CreateObjectDialog,
     PrincipalList,
     ApplicationList,

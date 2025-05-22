@@ -6,16 +6,11 @@ const MAX_RETRIES = 3;
 class FolderWatcher {
   constructor(opts) {
     this.folderPath = opts.folderPath;
-    this.stateManager = opts.stateManager;
     this.eventManager = opts.eventManager;
     this.retryCounts = new Map();
-    this.seenFiles = new Set();
   }
 
   async run() {
-    await this.stateManager.loadSeenFiles();
-    this.seenFiles = new Set(this.stateManager.getHandledFilePaths());
-
     const watcher = chokidar.watch(this.folderPath, {
       persistent: true,
       ignoreInitial: false,
@@ -25,25 +20,24 @@ class FolderWatcher {
       },
     });
 
+    watcher.on('ready', () => {
+      console.log('WATCHER: Initial scan complete. Ready for changes.');
+    });
+
     watcher.on('add', async (filePath) => {
-      if (this.seenFiles?.has(filePath)) {
-        return;
-      }
       console.log(`WATCHER: File ready - ${filePath}`);
-      this.handleFile(filePath);
+      await this.handleFile(filePath);
     });
 
     watcher.on('addDir', (dirPath) => {
-      console.log(`WATCHER: Now watching directory - ${dirPath}`);
+      console.log(`WATCHER: Watching directory - ${dirPath}`);
     });
   }
 
   async handleFile(filePath) {
     try {
-      if (!this.stateManager.hasSeenFile(filePath)) {
-        await this.stateManager.addSeenFile(filePath);
-        this.eventManager.emit(EVENTS.NEW_FILE, filePath);
-      }
+      this.eventManager.emit(EVENTS.FILE_DETECTED, {filePath});
+
     } catch (err) {
       console.warn(`WATCHER: File not ready - ${filePath}: ${err.message}`);
 
@@ -53,10 +47,10 @@ class FolderWatcher {
         console.log(
           `WATCHER: Retrying (${retries + 1}/${MAX_RETRIES}) - ${filePath}`
         );
-        setTimeout(() => this.handleFile(filePath), 2000);
+        setTimeout(() => this.handleFile(filePath).catch(err => console.warn(`WATCHER: Retry failed for ${filePath}: ${err.message}`)), 2000);
       } else {
         this.retryCounts.delete(filePath);
-        this.eventManager.emit(EVENTS.NEW_FILE_ERROR, { filePath, error: err });
+        this.eventManager.emit(EVENTS.FILE_DETECTION_FAILED, { filePath, error: err });
       }
     }
   }

@@ -15,8 +15,6 @@ const {
   NODE_ENV
 } = process.env;
 
-
-
 async function main() {
   const fplus = await new ServiceClient({
     env: process.env,
@@ -24,9 +22,6 @@ async function main() {
 
   const eventManager = new TDMSEventManager();
   const stateManager = new StateManager({stateFile:STATE_FILE, eventManager});
-
-  eventManager.on(EVENTS.FILE_UUID_CREATED, ({filePath, fileUuid}) => stateManager.updateWithUuid(filePath, fileUuid));
-  eventManager.on(EVENTS.UPLOAD_SUCCESS, stateManager.updateAsUploaded.bind(stateManager));
 
   const uploader = new Uploader({
     fplus,
@@ -43,14 +38,55 @@ async function main() {
     eventManager,
   });
 
-  await stateManager.loadSeenFiles();
+
+  registerEventHandlers(stateManager, eventManager);
+
+  await stateManager.run();
   await uploader.run();
   await folderWatcher.run();
+
+  await resumePendingUploads(stateManager, eventManager);
+
 
   if (NODE_ENV !== 'production') {
     const simulator = new TDMSSimulator(TDMS_SRC_DIR, TDMS_DIR_TO_WATCH);
     await simulator.run();
   }
+}
+
+async function resumePendingUploads(stateManager, eventManager) {
+    const seenFiles = stateManager.getSeenFiles();
+
+    for (const [filePath, meta] of seenFiles) {
+        if (meta.uuid && !meta.isUploaded) {
+            eventManager.emit(EVENTS.FILE_DETECTED, {filePath});
+        }
+    }
+}
+
+
+function registerEventHandlers(stateManager, eventManager) {
+  eventManager.on(EVENTS.FILE_DETECTED, async ({filePath}) => {
+    if (!stateManager.hasSeenFile(filePath)) {
+      await stateManager.addSeenFile(filePath);
+      eventManager.emit(EVENTS.FILE_READY, {filePath});
+    }
+  });
+
+  eventManager.on(EVENTS.FILE_UUID_CREATED, ({ filePath, fileUuid }) =>
+    stateManager.updateWithUuid(filePath, fileUuid)
+  );
+
+  eventManager.on(EVENTS.FILE_UPLOADED, ({filePath}) =>
+    stateManager.updateAsUploaded(filePath)
+  );
+
+  eventManager.on(EVENTS.FILE_UPLOAD_FAILED, ({ filePath, error }) => {
+    console.warn(`RETRYING: Upload failed for ${filePath}, retrying in 5 seconds...`);
+    setTimeout(() => {
+        eventManager.emit(EVENTS.FILE_READY, {filePath});
+      }, 5000);
+  });
 }
 
 main().catch(err => {

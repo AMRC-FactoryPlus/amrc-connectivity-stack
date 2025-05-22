@@ -4,8 +4,11 @@ import {isFileExist} from './utils.js';
 class StateManager{
     constructor(opts){
         this.stateFile = opts.stateFile;
-        this.eventManager = opts.eventManager;
         this.seenFiles = new Map();
+    }
+
+    async run(){
+        await this.loadSeenFiles();
     }
 
     async loadSeenFiles(){
@@ -14,7 +17,7 @@ class StateManager{
                 const data = await fs.readFile(this.stateFile, 'utf-8');
                 let files;
                 try{
-                    await JSON.parse(data);
+                    files = await JSON.parse(data);
                 }catch(jsonErr){
                     console.warn(`STATE MANAGER: Invalid JSON in ${this.stateFile}: ${jsonErr.message}`);
                 }
@@ -34,13 +37,8 @@ class StateManager{
         return this.seenFiles;
     }
 
-    async resumePendingUploads() {
-        for (const [filePath, meta] of this.seenFiles.entries()) {
-            if (meta.uuid && !meta.isUploaded) {
-                this.eventManager.emit(EVENTS.FILE_READY, filePath);
-            }
-        }
-    }
+
+
     async addSeenFile(filePath){
         if (this.seenFiles.has(filePath)){
             return;
@@ -87,6 +85,10 @@ class StateManager{
         }else{
             console.warn(`STATE MANAGER: Tried to update UUID for unknown file ${filePath}`);
         }
+    }
+
+    getSeenFiles(){
+        return this.seenFiles;
     }
 
     getHandledFilePaths(){

@@ -7,7 +7,7 @@
     <div v-if="currentApplication" class="flex items-center p-3">
       <RouterLink :to="`/configdb/applications/${currentApplication?.uuid}`">
         <Button title="Go to application" variant="ghost" size="sm">
-          <i class="fa-solid fa-boxes-stacked mr-2"></i>
+          <i class="fa-solid fa-puzzle-piece mr-2"></i>
           <div :class="!currentObject ? '!font-bold' : ''">{{currentApplication?.name}}</div>
         </Button>
       </RouterLink>

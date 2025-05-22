@@ -8,8 +8,13 @@
       <ConfigDBBreadcrumbs/>
       <slot name="header"></slot>
     </div>
-    <div class="flex-1 overflow-hidden" :class="[padding]">
-      <slot></slot>
+    <div class="flex-1 overflow-hidden">
+      <div class="flex h-full">
+        <div class="flex-1 overflow-auto" :class="[padding]">
+          <slot></slot>
+        </div>
+        <slot name="sidebar"></slot>
+      </div>
     </div>
   </div>
 </template>
@@ -18,8 +23,7 @@
 import ConfigDBBreadcrumbs from '@components/Nav/ConfigDBBreadcrumbs.vue'
 
 export default {
-
-  name: 'EdgeContainer',
+  name: 'ConfigDBContainer',
   components: {
     ConfigDBBreadcrumbs,
   },

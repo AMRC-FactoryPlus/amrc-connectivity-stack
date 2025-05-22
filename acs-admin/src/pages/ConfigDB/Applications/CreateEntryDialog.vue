@@ -8,7 +8,7 @@
       <Button>
         <div class="flex items-center justify-center gap-2">
           <i class="fa-solid fa-plus"></i>
-          <div>Create Config Entry</div>
+          <div>Create Entry</div>
         </div>
       </Button>
     </DialogTrigger>

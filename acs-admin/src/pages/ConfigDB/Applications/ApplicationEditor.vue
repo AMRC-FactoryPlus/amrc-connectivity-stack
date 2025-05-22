@@ -3,10 +3,6 @@
   -->
 <template>
   <ConfigDBContainer>
-    <div class="flex justify-between">
-      <span>{{application?.name}}</span>
-      <CreateEntryDialog :objs="obj.data" :app="application?.uuid" />
-    </div>
     <Skeleton v-if="loading || app.loading" v-for="i in 10" class="h-16 rounded-lg mb-2"/>
     <DataTableSearchable v-else
         :data="data"
@@ -17,7 +13,30 @@
         :clickable="true"
         :search-key="null"
         :limit-height="false"
-        @row-click="e => objectClick(e.original)" />
+        @row-click="e => objectClick(e.original)">
+      <template #toolbar-right>
+        <CreateEntryDialog :objs="obj.data" :app="application?.uuid" />
+      </template>
+    </DataTableSearchable>
+    <template #sidebar>
+      <!-- Sidebar -->
+      <div class="w-96 border-l border-border -mr-4">
+        <div class="flex items-center justify-between gap-2 w-full p-4 border-b">
+          <div class="flex items-center justify-center gap-2">
+            <i class="fa-fw fa-solid fa-puzzle-piece"></i>
+            <div class="font-semibold text-xl">{{application.name}}</div>
+          </div>
+
+        </div>
+        <div class="space-y-4 p-4">
+          <SidebarDetail
+              icon="key"
+              label="Application UUID"
+              :value="application.uuid"
+          />
+        </div>
+      </div>
+    </template>
   </ConfigDBContainer>
 </template>
 
@@ -38,6 +57,7 @@ import {Button} from "@components/ui/button/index.js";
 import CreateEntryDialog from "@pages/ConfigDB/Applications/CreateEntryDialog.vue";
 import CreateObjectDialog from "@pages/ConfigDB/CreateObjectDialog.vue";
 import ConfigDBContainer from '@components/Containers/ConfigDBContainer.vue'
+import SidebarDetail from '@components/SidebarDetail.vue'
 
 export default {
   emits: ['rowClick'],
@@ -61,6 +81,7 @@ export default {
     Skeleton,
     DataTableSearchable,
     ConfigDBContainer,
+    SidebarDetail,
   },
 
   computed: {

@@ -26,7 +26,7 @@ class Uploader {
     }
 
     async handleFileReady({filePath}) {
-        console.log(`UPLOADER: Handling new files: ${filePath}`);
+        console.log(`UPLOADER: Handling new file: ${filePath}.`);
 
         try {
             if (!(await isFileExist(filePath))) {
@@ -47,8 +47,10 @@ class Uploader {
             if(!fileUuid){
                 try{
                     fileUuid = await this.configDb.create_object(Class.File);
-                    this.eventManager.emit(EVENTS.FILE_UUID_CREATED, {filePath, fileUuid});
-                    console.log(`UPLOADER: Created file object in ConfigDB with UUID ${fileUuid} for ${filePath}`);
+                    if(fileUuid){
+                        this.eventManager.emit(EVENTS.FILE_UUID_CREATED, {filePath, fileUuid});
+                        console.log(`UPLOADER: Created file object in ConfigDB with UUID ${fileUuid} for ${filePath}`);
+                    }
                 }
                 catch(configErr){
                     console.error(`UPLOADER: Could not create object in ConfigDB for ${filePath} with error: ${configErr}`);
@@ -74,6 +76,12 @@ class Uploader {
 
             if (!response.ok) {
                 const errorText = await response.text();
+
+                if (errorText.includes("EEXIST")) {
+                    console.warn(`UPLOADER: File already exists on File Service for UUID ${fileUuid}, treating as uploaded.`);
+                    this.eventManager.emit(EVENTS.FILE_UPLOADED, { filePath });
+                    return;
+                }
                 throw new Error(`HTTP ${response.status}: ${errorText}`);
             }
 

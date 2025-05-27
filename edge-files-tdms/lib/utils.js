@@ -1,4 +1,5 @@
 import fs from 'fs/promises';
+import path from 'path';
 
 export async function isFileExist(filePath) {
     try {
@@ -7,4 +8,12 @@ export async function isFileExist(filePath) {
     } catch {
         return false;
     }
+}
+
+
+export function normalizePath(filePath) {
+    if (!filePath || typeof filePath !== 'string') {
+        throw new Error(`Invalid file path: ${filePath}, could not normalize it.`);
+    }
+    return path.resolve(filePath);
 }

@@ -1,5 +1,6 @@
 import chokidar from 'chokidar'
 import {EVENTS} from './tdms-file-events.js';
+import { normalizePath } from './utils.js';
 
 const MAX_RETRIES = 3;
 
@@ -25,35 +26,55 @@ class FolderWatcher {
     });
 
     watcher.on('add', async (filePath) => {
-      console.log(`WATCHER: File ready - ${filePath}`);
-      await this.handleFile(filePath);
+      try{
+        console.log(`WATCHER: File ready - ${filePath}`);
+        await this.handleFile(filePath);
+      }catch(err){
+        console.error(`WATCHER: Unexpected error handling ${filePath}`, err);
+      }
     });
 
     watcher.on('addDir', (dirPath) => {
-      console.log(`WATCHER: Watching directory - ${dirPath}`);
+      try{
+        console.log(`WATCHER: Watching directory - ${dirPath}`);
+      }catch(err){
+        console.error(`WATCHER: Unexpected error handling ${dirPath}`, err);
+      }
     });
   }
 
   async handleFile(filePath) {
+    const normalizedPath = normalizePath(filePath);
+
+    if (!normalizedPath || typeof normalizedPath !== 'string') {
+      console.warn(`WATCHER: Invalid file path received: ${filePath}`);
+      return;
+    }
+
     try {
-      this.eventManager.emit(EVENTS.FILE_DETECTED, {filePath});
-
+      this.retryCounts.delete(normalizedPath);
+      this.eventManager.emit(EVENTS.FILE_DETECTED, { filePath: normalizedPath });
     } catch (err) {
-      console.warn(`WATCHER: File not ready - ${filePath}: ${err.message}`);
+      console.warn(`WATCHER: File not ready - ${normalizedPath}: ${err.message}`);
 
-      const retries = this.retryCounts.get(filePath) || 0;
+      const retries = this.retryCounts.get(normalizedPath) || 0;
+      
       if (retries < MAX_RETRIES) {
-        this.retryCounts.set(filePath, retries + 1);
-        console.log(
-          `WATCHER: Retrying (${retries + 1}/${MAX_RETRIES}) - ${filePath}`
+        this.retryCounts.set(normalizedPath, retries + 1);
+        console.log(`WATCHER: Retrying (${retries + 1}/${MAX_RETRIES}) - ${normalizedPath}`);
+        setTimeout(() =>
+          this.handleFile(normalizedPath).catch(err =>
+            console.warn(`WATCHER: Retry failed for ${normalizedPath}: ${err.message}`)
+          ),
+          2000
         );
-        setTimeout(() => this.handleFile(filePath).catch(err => console.warn(`WATCHER: Retry failed for ${filePath}: ${err.message}`)), 2000);
       } else {
-        this.retryCounts.delete(filePath);
-        this.eventManager.emit(EVENTS.FILE_DETECTION_FAILED, { filePath, error: err });
+        this.retryCounts.delete(normalizedPath);
+        this.eventManager.emit(EVENTS.FILE_DETECTION_FAILED, { filePath: normalizedPath, error: err });
       }
     }
   }
+
 }
 
 export default FolderWatcher;

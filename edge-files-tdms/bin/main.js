@@ -45,8 +45,8 @@ async function main() {
   await uploader.run();
   await folderWatcher.run();
 
-  await resumePendingUploads(stateManager, eventManager);
 
+  await resumePendingUploads(stateManager, eventManager);
 
   if (NODE_ENV !== 'production') {
     const simulator = new TDMSSimulator(TDMS_SRC_DIR, TDMS_DIR_TO_WATCH);
@@ -55,13 +55,14 @@ async function main() {
 }
 
 async function resumePendingUploads(stateManager, eventManager) {
-    const seenFiles = stateManager.getSeenFiles();
+  const seenFiles = await stateManager.getSeenFiles();
 
-    for (const [filePath, meta] of seenFiles) {
-        if (meta.uuid && !meta.isUploaded) {
-            eventManager.emit(EVENTS.FILE_DETECTED, {filePath});
-        }
+  for (const [filePath, meta] of seenFiles) {
+    if (!meta.isUploaded) {
+        eventManager.emit(EVENTS.FILE_READY, {filePath});
+        console.log(`Resumed pending upload for ${filePath}`);
     }
+  }
 }
 
 
@@ -74,8 +75,14 @@ function registerEventHandlers(stateManager, eventManager) {
   });
 
   eventManager.on(EVENTS.FILE_UUID_CREATED, ({ filePath, fileUuid }) =>
-    stateManager.updateWithUuid(filePath, fileUuid)
-  );
+  {
+    if(fileUuid){
+      stateManager.updateWithUuid(filePath, fileUuid)
+    }
+    else {
+    console.warn(`EVENT: Skipping UUID update for ${filePath} due to null UUID`);
+   }
+  });
 
   eventManager.on(EVENTS.FILE_UPLOADED, ({filePath}) =>
     stateManager.updateAsUploaded(filePath)

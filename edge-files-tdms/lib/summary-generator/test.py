@@ -16,7 +16,7 @@ tdms_file = TdmsFile.read(sys.argv[1])
 logging.basicConfig(level=logging.DEBUG)
 logging.debug(f"Groups: {tdms_file.groups()}")
 
-with TdmsWriter("testSummaryEvery1000.tdms") as tdms_writer:
+with TdmsWriter("testSummaryEvery1500.tdms") as tdms_writer:
         parentArr = []
         groupArr = [] #declare dynamic list to hold group names
     
@@ -50,7 +50,7 @@ with TdmsWriter("testSummaryEvery1000.tdms") as tdms_writer:
                 #print(f"Channel length: {len(channel.data)}")
                 
                 #Loop through half of the data in the channel
-                for i in range(0, len(channel.data), 1000): #get every 1000th data point
+                for i in range(0, len(channel.data), 1500): #get every 1000th data point
                 #for i in range(0, len(channel.data)): 
                     #Append if the timestamp is between the start and end time
                     #if timestamps[i] >= timestamp_start and timestamps[i] <= timestamp_end:
@@ -105,4 +105,4 @@ testJSON = json.dumps(groupArr, indent=4, sort_keys=True, default=str) #json.dum
 # with open("jsonEvery1500Complete.json", "w") as outfile:
 #     outfile.write(testJSON)
 
-print(groupArr)
+print(testJSON)

@@ -25,6 +25,7 @@ class TDMSSummariser {
 console.log("TDMSSummariser: Initializing...");
 let folderPath = '../../../../TDMS_Examples/Fingerprint_2023-05-09-02-14-34.tdms';
 var summary;
+var parsedSummary;
 let child = spawn("python.exe", [".\\summary-generator\\test.py", folderPath]/*, {
       cwd: ".",
       shell: true,
@@ -48,12 +49,24 @@ let child = spawn("python.exe", [".\\summary-generator\\test.py", folderPath]/*,
       // } catch (error) {
       //   console.error('Error parsing JSON data:', error);
       // }
-      summary = data;
+      //console.log(data);
+      summary += data.toString();
+      //parsedSummary = JSON.parse(data);
+      //console.log('Summary:', summary);
       //Export as json file
-      fs.writeFileSync('summary.json', JSON.stringify(summary, null, 2));
+      
       //console.log(`Summary: ${summary}`);
       //console.log(summary[0]);
     });
+
+    // When child process exits, write summary to file
+    child.on("exit", function(code, signal) {
+      console.log(`Child process exited with code ${code} and signal ${signal}`);
+      
+      fs.writeFileSync('summary.json', summary);
+    });
+
+    
   
 
 export default TDMSSummariser;

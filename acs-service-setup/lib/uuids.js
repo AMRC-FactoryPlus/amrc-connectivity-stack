@@ -89,6 +89,7 @@ export const ACS = {
         Git:                    "626df296-8156-4c67-8aed-aac70161aa8b",
         Authentication:         "127cde3c-773a-4f61-b0ba-7412a2695253",
         Manager:                "2340e706-1280-420c-84a6-016547b55e95",
+        Files:                  "cb0ac52a-7622-4c75-aa95-ad4c700ae6fb",
     },
     /* XXX These should not be fixed. They should be replaced by
      * per-deployment accounts created by krbkeys, and

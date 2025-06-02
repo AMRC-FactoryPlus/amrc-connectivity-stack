@@ -11,7 +11,13 @@
                        :filters="[]"
                        :selected-objects="[]"
                        @row-click="e => objectClick(e.original)"
-  />
+  >
+    <template #toolbar-right>
+      <Button class="gap-2">
+        <span>Upload File</span>
+      </Button>
+    </template>
+  </DataTableSearchable>
 </template>
 <script>
 

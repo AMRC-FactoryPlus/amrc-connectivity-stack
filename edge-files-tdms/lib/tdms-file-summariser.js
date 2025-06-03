@@ -4,7 +4,7 @@ class TDMSSummariser {
   constructor(opts) {
     this.filePath = opts.filePath;
     this.eventManager = opts.eventManager;
-    this.targetPythonFile = ".\\summary-generator\\test.py";
+    this.targetPythonFile = ".\\summary-generator\\tdms_parser.py";
   }
 
   // Method to run the Python script and return the summary
@@ -40,9 +40,9 @@ class TDMSSummariser {
 export default TDMSSummariser;
 
 // for testing 
-// const tdmsSummariser = new TDMSSummariser({
-//   filePath: '../../../../TDMS_Examples/Fingerprint_2023-05-09-02-14-34.tdms'
-// });
+const tdmsSummariser = new TDMSSummariser({
+  filePath: '../../../../TDMS_Examples/Fingerprint_2023-05-09-02-14-34.tdms'
+});
 
-// let summary = await tdmsSummariser.run();
-// console.log('Summary length:', summary.length);
+let summary = await tdmsSummariser.run();
+console.log('Summary length:', summary.length);

@@ -8,9 +8,10 @@ import sys
 sys.path.append("./nptdms")
 
 #Read tdms file from command line argument, variable name is folderPath
-#return exception if no file is provided
+#return exception to stdio if no file is provided
 if len(sys.argv) < 2:
     raise Exception("No TDMS file provided. Please provide a TDMS file as a command line argument.")    
+
 tdms_file = TdmsFile.read(sys.argv[1])
 # logging.basicConfig(level=logging.DEBUG)
 # logging.debug(f"Groups: {tdms_file.groups()}")

@@ -28,6 +28,7 @@
     "deep-equal": "^2.2.3",
     "express-openapi-validator": "^4.13.2",
     "json-merge-patch": "^1.0.2",
+    "n3": "^1.26.0",
     "rxjs": "^7.8.1"
   },
   "devDependencies": {

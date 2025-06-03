@@ -25,6 +25,7 @@ export class APIv2 {
 
         this.routes = express.Router();
         this.model = opts.model;
+        this.ldf = opts.ldf;
 
         this.setup_routes();
     }
@@ -86,6 +87,8 @@ export class APIv2 {
             .patch(this.config_patch.bind(this));
 
         api.get("/save", this.dump_save.bind(this));
+
+        api.get("/ldf", this.ldf_query.bind(this));
     }
 
     async app_get(req, res) {
@@ -357,4 +360,21 @@ export class APIv2 {
         const dump = await this.model.dump_save();
         res.status(200).json(dump);
     }
+
+    async ldf_query (req, res) {
+        const {s, p, o} = req.query;
+
+        const base  = `${req.protocol}://${req.host}${req.baseUrl}`;
+
+        const ttl = await this.ldf.query({
+            auth:       req.auth,
+            template:   `${base}${req.path}{?s,p,o}`,
+            fragment:   `${base}${req.url}`,
+            query:      [s, p, o],
+        });
+
+        res.type("text/turtle");
+        res.send(ttl);
+    }
+
 }

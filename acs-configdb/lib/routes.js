@@ -28,6 +28,10 @@ export function routes (opts) {
         /* No fancy query-string parsing */
         app.set("query parser", "simple");
 
+        /* We need req.hostname to work correctly. These values are only
+         * reflected to the client to spoofing is not a problem. */
+        app.set("trust proxy", true);
+
         app.use(express.json({ type: "application/merge-patch+json" }));
 
         /* Serve the editor */

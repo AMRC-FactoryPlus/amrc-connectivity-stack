@@ -1,4 +1,9 @@
 /*
+ * if (!ok) return [];
+ *
+ * if (memb.uuid) {
+ *  const klasses = await this.model.
+ *
  * Copyright (c) University of Sheffield AMRC 2025.
  */
 
@@ -127,6 +132,14 @@ export default class Model extends EventEmitter {
         `, [uuid]);
     }
 
+    _obj_lookup (query, id, table) {
+        return _q_uuids(query, `
+            select distinct k.uuid
+            from ${table} r join object k on k.id = r.class
+            where r.id = $1
+        `, [id]);
+    }
+
     _app_id (query, app) { return this._obj_id(query, app); }
     _class_id (query, klass) { return this._obj_id(query, klass); }
 
@@ -137,6 +150,15 @@ export default class Model extends EventEmitter {
             where r.depth = $1
         `, [rank]);
         return dbr.rows[0]?.id;
+    }
+
+    async relation_lookup (table) {
+        return this.db.query(`
+            select o.uuid obj, c.uuid class
+            from ${table} r
+                join object o on o.id = r.id
+                join object c on c.id = r.class
+        `).then(dbr => dbr.rows.map(r => [r.obj, r.class]));
     }
 
     object_list() {
@@ -151,6 +173,14 @@ export default class Model extends EventEmitter {
                 join object o on o.id = r.id
             order by r.depth
         `);
+    }
+
+    object_lookup (obj, table) {
+        return this.db.txn({}, async query => {
+            const id = await this._obj_id(query, obj);
+            if (id == null) return;
+            return this._obj_lookup(query, id, table);
+        });
     }
 
     /* XXX This is the correct place to set the owner of the new object

@@ -40,9 +40,9 @@ class TDMSSummariser {
 export default TDMSSummariser;
 
 // for testing 
-const tdmsSummariser = new TDMSSummariser({
-  filePath: '../../../../TDMS_Examples/Fingerprint_2023-05-09-02-14-34.tdms'
-});
+// const tdmsSummariser = new TDMSSummariser({
+//   filePath: '../../../../TDMS_Examples/Fingerprint_2023-05-09-02-14-34.tdms'
+// });
 
-let summary = await tdmsSummariser.run();
-console.log('Summary length:', summary.length);
+// let summary = await tdmsSummariser.run();
+// console.log('Summary length:', summary.length);

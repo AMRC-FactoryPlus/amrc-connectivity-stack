@@ -1,12 +1,20 @@
 # ACS Edge ADS Driver
 
-> The [AMRC Connectivity Stack (ACS)](https://github.com/AMRC-FactoryPlus/amrc-connectivity-stack) is an open-source implementation of the AMRC's [Factory+ Framework](https://factoryplus.app.amrc.co.uk).
+> The [AMRC Connectivity Stack
+(ACS)](https://github.com/AMRC-FactoryPlus/amrc-connectivity-stack) is
+an open-source implementation of the AMRC's [Factory+
+Framework](https://factoryplus.app.amrc.co.uk).
 
-This `edge-ads` service is a driver for the ACS Edge Agent that enables communication with ADS (Automation Device Specification) devices, primarily Beckhoff TwinCAT PLCs. It translates ADS symbol data into Factory+ compatible Sparkplug messages, formatted according to the pre-configured schema for the device.
+This `edge-ads` service is a driver for the ACS Edge Agent that enables
+communication with ADS (Automation Device Specification) devices,
+primarily Beckhoff TwinCAT PLCs.
 
 ## Overview
 
-The ADS driver is built using the `@amrc-factoryplus/edge-driver` library and implements an asynchronous driver interface. It uses the `ads-client` library to establish subscriptions to PLC symbols and pushes data to the Edge Agent when values change.
+The ADS driver is built using the `@amrc-factoryplus/edge-driver`
+library and implements an asynchronous driver interface. It uses the
+`ads-client` library to establish subscriptions to PLC symbols and
+pushes data to the Edge Agent when values change.
 
 ## Features
 
@@ -17,20 +25,21 @@ The ADS driver is built using the `@amrc-factoryplus/edge-driver` library and im
 
 ## Configuration
 
-The driver configuration is managed through the ACS Manager and passed to the Edge Agent, which then configures the driver.
+The driver configuration is managed through the ACS Manager and passed
+to the Edge Agent, which then configures the driver.
 
 ### Connection Details
 
-| Property | Type | Required | Default | Description |
-|----------|------|----------|---------|-------------|
-| `targetAmsNetId` | string | Yes | - | AMS NetId of the target PLC (e.g., "172.16.48.37.1.1") |
-| `routerAddress` | string | Yes | - | IP address of the ADS router (usually the PLC) |
-| `targetAdsPort` | number | No | 851 | ADS port of the target (851 for TwinCAT runtime) |
-| `routerTcpPort` | number | No | 48898 | TCP port of the ADS router |
-| `localAmsNetId` | string | No | - | Local AMS NetId (auto-assigned if not specified) |
-| `localAdsPort` | number | No | - | Local ADS port (auto-assigned if not specified) |
-| `timeoutDelay` | number | No | 5000 | Connection timeout in milliseconds |
-| `hideConsoleWarnings` | boolean | No | true | Hide ADS client console warnings |
+| Property              | Type    | Required | Default | Description                                            |
+|-----------------------|---------|----------|---------|--------------------------------------------------------|
+| `targetAmsNetId`      | string  | Yes      | -       | AMS NetId of the target PLC (e.g., "172.16.48.37.1.1") |
+| `routerAddress`       | string  | Yes      | -       | IP address of the ADS router (usually the PLC)         |
+| `targetAdsPort`       | number  | No       | 851     | ADS port of the target (851 for TwinCAT runtime)       |
+| `routerTcpPort`       | number  | No       | 48898   | TCP port of the ADS router                             |
+| `localAmsNetId`       | string  | No       | -       | Local AMS NetId (auto-assigned if not specified)       |
+| `localAdsPort`        | number  | No       | -       | Local ADS port (auto-assigned if not specified)        |
+| `timeoutDelay`        | number  | No       | 5000    | Connection timeout in milliseconds                     |
+| `hideConsoleWarnings` | boolean | No       | true    | Hide ADS client console warnings                       |
 
 ### Address Format
 
@@ -51,7 +60,9 @@ Where:
 
 ## Data Types
 
-The driver automatically handles ADS data type conversion using the `ads-client` library. All data is converted to JSON format and then to buffers for transmission to the Edge Agent.
+The driver automatically handles ADS data type conversion using the
+`ads-client` library. All data is converted to JSON format and then to
+buffers for transmission to the Edge Agent.
 
 ## Development
 
@@ -100,12 +111,6 @@ docker build -t edge-ads .
 ```
 
 ## Troubleshooting
-
-### Common Issues
-
-1. **Connection Failed**: Check that the PLC is reachable and ADS is enabled
-2. **Symbol Not Found**: Verify the symbol name exists in the PLC project
-3. **Permission Denied**: Ensure the ADS route is configured on the PLC
 
 ### ADS Route Configuration
 

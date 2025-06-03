@@ -68,6 +68,7 @@ export class ADSHandler {
      * @returns {ADSHandler|undefined} - New handler instance or undefined if config is invalid
      */
     static create(driver, conf) {
+
         // Validate required configuration parameters
         // These are the minimum required to establish an ADS connection
         if (!conf.targetAmsNetId || !conf.routerAddress) {
@@ -304,8 +305,6 @@ export class ADSHandler {
         // Create callback function for value change notifications
         // This callback will be invoked by the ADS client whenever the symbol value changes
         const onValueChanged = (data, subscription) => {
-            this.log("Value changed for %s: %o", symbolName, data.value);
-
             // Forward the changed value to the Edge Agent
             // Use the original spec as the address identifier for proper routing
             this.data(spec, data.value);

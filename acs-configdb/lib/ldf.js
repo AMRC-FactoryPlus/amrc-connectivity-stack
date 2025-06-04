@@ -82,22 +82,6 @@ function to_fp (term) {
     return { ok: true, uuid: url.substring(9) };
 }
 
-class FPQuadStream extends Readable {
-    constructor (promise) {
-        super({ objectMode: true });
-        this.promise = promise;
-    }
-
-    async _construct (done) {
-        this.quads = await this.promise;
-        done();
-    }
-
-    _read (size) {
-        this.push(this.quads.shift());
-    }
-}
-
 class FPQuadSource {
     constructor (opts) {
         this.auth = opts.auth;
@@ -106,31 +90,33 @@ class FPQuadSource {
     }
 
     match (subj, pred, obj) {
-        return new FPQuadStream(this.evaluate(subj, pred, obj));
-    }
-
-    async evaluate (subj, pred, obj) {
-        if (!WK.type.equals(pred)) return [];
+        if (!WK.type.equals(pred)) 
+            return Readable.from([]);
         const rel = "all_membership";
 
         const memb = to_fp(subj);
         const klass = to_fp(obj);
-        if (!memb.ok || !klass.ok) return [];
+        if (!memb.ok || !klass.ok)
+            return Readable.from([]);
 
-        const aopts = klass.variable ? [UUIDs.Null, false] : [klass.uuid, true];
-        const ok = await this.auth.check_acl(this.princ, Perm.Manage_Obj, ...aopts);
-        if (!ok) return [];
+        return Readable.from([[memb, klass]])
+            .flatMap(async ([memb, klass]) => {
+                const aopts = klass.variable ? [UUIDs.Null, false] : [klass.uuid, true];
+                const ok = await this.auth.check_acl(this.princ, Perm.Manage_Obj, 
+                    ...aopts);
+                if (!ok) return [];
 
-        if (memb.uuid) {
-            const klasses = await this.model.object_lookup(memb.uuid, rel);
-            return klasses.map(k => quad(subj, WK.type, uuid(k)));
-        }
-        if (klass.uuid) {
-            const membs = await this.model.class_lookup(klass.uuid, rel);
-            return membs.map(o => quad(uuid(o), WK.type, obj));
-        }
-        const all = await this.model.relation_lookup(rel);
-        return all.map(([o, c]) => quad(uuid(o), WK.type, uuid(c)));
+                if (memb.uuid) {
+                    const klasses = await this.model.object_lookup(memb.uuid, rel);
+                    return klasses.map(k => quad(subj, WK.type, uuid(k)));
+                }
+                if (klass.uuid) {
+                    const membs = await this.model.class_lookup(klass.uuid, rel);
+                    return membs.map(o => quad(uuid(o), WK.type, obj));
+                }
+                const all = await this.model.relation_lookup(rel);
+                return all.map(([o, c]) => quad(uuid(o), WK.type, uuid(c)));
+            });
     }
 }
 

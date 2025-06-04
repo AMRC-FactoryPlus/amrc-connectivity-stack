@@ -4,6 +4,8 @@
  * Copyright 2025 University of Sheffield AMRC
  */
 
+import { Readable } from "stream";
+
 import N3 from "n3";
 
 import { UUIDs } from "@amrc-factoryplus/service-client";
@@ -80,26 +82,34 @@ function to_fp (term) {
     return { ok: true, uuid: url.substring(9) };
 }
 
-export class LDF {
+class FPQuadStream extends Readable {
+    constructor (promise) {
+        super({ objectMode: true });
+        this.promise = promise;
+    }
+
+    async _construct (done) {
+        this.quads = await this.promise;
+        done();
+    }
+
+    _read (size) {
+        this.push(this.quads.shift());
+    }
+}
+
+class FPQuadSource {
     constructor (opts) {
         this.auth = opts.auth;
         this.model = opts.model;
-
-        this.log = opts.debug.bound("ldf");
+        this.princ = opts.princ;
     }
 
-    control (template) {
-        return from_ttl(`
-            uuid:${DS} hydra:search [
-                hydra:template "${template}";
-                hydra:mapping [hydra:variable "s"; hydra:property rdf:subject],
-                    [hydra:variable "p"; hydra:property rdf:predicate],
-                    [hydra:variable "o"; hydra:property rdf:object];
-                ].
-        `);
+    match (subj, pred, obj) {
+        return new FPQuadStream(this.evaluate(subj, pred, obj));
     }
 
-    async evaluate (auth, [subj, pred, obj]) {
+    async evaluate (subj, pred, obj) {
         if (!WK.type.equals(pred)) return [];
         const rel = "all_membership";
 
@@ -108,7 +118,7 @@ export class LDF {
         if (!memb.ok || !klass.ok) return [];
 
         const aopts = klass.variable ? [UUIDs.Null, false] : [klass.uuid, true];
-        const ok = await this.auth.check_acl(auth, Perm.Manage_Obj, ...aopts);
+        const ok = await this.auth.check_acl(this.princ, Perm.Manage_Obj, ...aopts);
         if (!ok) return [];
 
         if (memb.uuid) {
@@ -122,6 +132,34 @@ export class LDF {
         const all = await this.model.relation_lookup(rel);
         return all.map(([o, c]) => quad(uuid(o), WK.type, uuid(c)));
     }
+}
+
+export class LDF {
+    constructor (opts) {
+        this.auth = opts.auth;
+        this.model = opts.model;
+
+        this.log = opts.debug.bound("ldf");
+    }
+
+    source (princ) {
+        return new FPQuadSource({
+            auth:   this.auth,
+            model:  this.model,
+            princ,
+        });
+    }
+
+    control (template) {
+        return from_ttl(`
+            uuid:${DS} hydra:search [
+                hydra:template "${template}";
+                hydra:mapping [hydra:variable "s"; hydra:property rdf:subject],
+                    [hydra:variable "p"; hydra:property rdf:predicate],
+                    [hydra:variable "o"; hydra:property rdf:object];
+                ].
+        `);
+    }
 
     async query (opts) {
         const q = opts.query.map(decode);
@@ -129,8 +167,10 @@ export class LDF {
         const quads = this.control(opts.template);
         this.log("Control: %o", quads);
         if (q.some(n => n.termType != "Variable")) {
-            const out = await this.evaluate(opts.auth, q);
+            const src = this.source(opts.auth);
+            const out = await src.match(...q).toArray();
             const frag = namedNode(opts.fragment);
+
             quads.push(...out,
                 quad(frag, iri("void:triples"), literal(out.length)),
                 quad(WK.ds, iri("void:subset"), frag));

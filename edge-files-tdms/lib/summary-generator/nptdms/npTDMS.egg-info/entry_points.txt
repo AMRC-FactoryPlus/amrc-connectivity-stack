@@ -1,2 +1,0 @@
-[console_scripts]
-tdmsinfo = nptdms.tdmsinfo:main

@@ -170,7 +170,7 @@ class ConfigWatch {
     }
 
     config_search (filter) {
-        const { model, app } = this;
+        const { app } = this;
 
         const search = rxx.rx(
             this.updates,

@@ -36,6 +36,7 @@ const DS = "0dd323cc-4070-11f0-838c-b741b85bb136";
 const WK = {
     ds:         iri(`uuid:${DS}`),
     type:       iri("rdf:type"),
+    subclass:   iri("rdfs:subClassOf"),
     triples:    iri("void:triples"),
     subset:     iri("void:subset"),
 };
@@ -109,9 +110,12 @@ class FPQuadSource {
         if (!pred || pred.termType == "Variable")
             return err_stream(403);
 
-        if (!WK.type.equals(pred)) 
+        const rel =
+            WK.type.equals(pred)        ? "all_membership"
+            : WK.subclass.equals(pred)  ? "all_subclass"
+            : null;
+        if (!rel) 
             return Readable.from([]);
-        const rel = "all_membership";
 
         const memb = to_fp(subj);
         const klass = to_fp(obj);

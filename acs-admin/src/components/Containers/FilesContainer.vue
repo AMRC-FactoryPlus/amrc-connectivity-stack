@@ -3,7 +3,7 @@
   -->
 
 <template>
-  <div class="flex flex-col h-[calc(100vh-64px)] ">
+  <div class="flex flex-col h-[calc(100vh-100px)] ">
     <div class="flex justify-end bg-white sticky border-b pb-4 z-10">
       <slot name="header"></slot>
     </div>

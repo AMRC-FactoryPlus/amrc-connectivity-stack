@@ -6,6 +6,7 @@
 
 import { Readable }         from "stream";
 
+import canonicalize         from "canonicalize";
 import N3                   from "n3";
 import { QueryEngine }      from "@comunica/query-sparql-rdfjs";
 
@@ -37,6 +38,7 @@ const WK = {
     ds:         iri(`uuid:${DS}`),
     type:       iri("rdf:type"),
     subclass:   iri("rdfs:subClassOf"),
+    json:       iri("rdf:JSON"),
     triples:    iri("void:triples"),
     subset:     iri("void:subset"),
 };
@@ -104,18 +106,23 @@ class FPQuadSource {
         this.auth = opts.auth;
         this.model = opts.model;
         this.princ = opts.princ;
+        this.log = opts.log;
     }
 
     match (subj, pred, obj) {
         if (!pred || pred.termType == "Variable")
             return err_stream(403);
 
+        return this.core_rel(subj, pred, obj)
+            || this.application(subj, pred, obj);
+    }
+
+    core_rel (subj, pred, obj) {
         const rel =
             WK.type.equals(pred)        ? "all_membership"
             : WK.subclass.equals(pred)  ? "all_subclass"
             : null;
-        if (!rel) 
-            return Readable.from([]);
+        if (!rel) return;
 
         const memb = to_fp(subj);
         const klass = to_fp(obj);
@@ -139,6 +146,35 @@ class FPQuadSource {
                 }
                 const all = await this.model.relation_lookup(rel);
                 return all.map(([o, c]) => quad(uuid(o), WK.type, uuid(c)));
+            });
+    }
+
+    application (subj, pred, filter) {
+        if (filter && filter.termType != "Variable")
+            return err_stream(403);
+
+        const obj = to_fp(subj);
+        if (!obj.ok) return Readable.from([]);
+
+        const app = to_fp(pred);
+        if (!app.ok) return Readable.from([]);
+
+        return Readable.from([1])
+            .flatMap(async () => {
+                const ok = await this.auth.check_acl(this.princ, Perm.Read_App,
+                    app.uuid, true);
+                if (!ok) return err_stream(403);
+
+                const objs = obj.uuid ? [obj.uuid]
+                    : await this.model.config_list(app.uuid);
+                this.log("OBJS: %o", objs);
+                return Promise.all(
+                    objs.map(o => {
+                        return this.model.config_get({app: app.uuid, object: o})
+                            .then(c => canonicalize(c.config))
+                            .then(j => literal(j, WK.json))
+                            .then(c => quad(uuid(o), pred, c))
+                    }));
             });
     }
 }
@@ -168,6 +204,7 @@ export class RDF {
             auth:   this.auth,
             model:  this.model,
             princ,
+            log:    this.log,
         });
     }
 

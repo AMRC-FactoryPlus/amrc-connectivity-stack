@@ -1,10 +1,11 @@
 import { spawn } from "child_process";
 import { EVENTS } from './tdms-file-events.js';
+import { isFileExist } from './utils.js';
 
 class TDMSSummariser {
   constructor(opts) {
     this.eventManager = opts.eventManager;
-    this.targetPythonFile = ".\\summary-generator\\tdms_parser.py";
+    this.targetPythonFile = ".\\lib\\summary-generator\\tdms_parser.py";
   }
 
   // Method to run the Python script and return the summary
@@ -14,6 +15,7 @@ class TDMSSummariser {
 
   bindToEvents() {
     this.eventManager.on(EVENTS.FILE_UPLOADED, this.handleFile.bind(this));
+    console.log('SUMMARISER: Preparing summary...');
   }
 
   async handleFile({filePath}) {
@@ -28,7 +30,6 @@ class TDMSSummariser {
      const child = spawn("python.exe", [this.targetPythonFile, filePath]);
         child.on("error", (err) => {
           console.error(`Error starting Python script: ${err.message}`);
-          //this.eventManager.emit("error", { error: err });
           throw err;
         });
 
@@ -37,13 +38,19 @@ class TDMSSummariser {
           summary += data.toString();  
         });
 
+        child.stderr.on('data', (data) => {
+          console.error(`SUMMARISER: python stderr - ${data}`);
+        });
+
         // When child process exits, return summary json
         return new Promise((resolve, reject) => {
           child.on("close", (code) => {
             if (code === 0) {
+              console.log('SUMMARISER: Python script completed successfully.');
+              // console.log('Summary:', summary);
               resolve(summary);
             } else {
-              reject(new Error(`Python script exited with code ${code}`));
+              reject(new Error(`SUMMARISER: Python script exited with code ${code}`));
             }
           });
         });
@@ -53,9 +60,14 @@ class TDMSSummariser {
       console.error(`SUMMARISER: Error summarising ${filePath}`, err);
       this.eventManager.emit(EVENTS.FILE_UPLOAD_FAILED, {filePath, error: err});
     }
+
+   
   }
+
+ 
 }   
-  
+ 
+
 
 export default TDMSSummariser;
 

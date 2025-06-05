@@ -391,16 +391,18 @@ export class APIv2 {
         if (spec["default-graph-uri"] || spec["named-graph-uri"])
             /* The SPARQL spec says to use 400 here. I don't think this
              * is right and it should be 403 or some such. */
-            return res.status(400);
+            return res.status(400).end();
 
         const types = this.rdf.sparql_types;
         const type = req.accepts(types);
         if (!type)
-            return res.status(406);
+            return res.status(406).end();
         
-        const out = await this.rdf.sparql_query(spec.query, req.auth, type);
+        const [st, data] = await this.rdf.sparql_query(spec.query, req.auth, type);
+        res.status(st);
+        if (st != 200)
+            return res.end();
         res.type(type);
-        res.status(200);
-        out.pipe(res);
+        data.pipe(res);
     }
 }

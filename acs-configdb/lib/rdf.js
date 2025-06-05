@@ -83,6 +83,21 @@ function to_fp (term) {
     return { ok: true, uuid: url.substring(9) };
 }
 
+class QueryError extends Error {
+    constructor (st) {
+        super(`RDF query error: ${st}`);
+        this.status = st;
+    }
+}
+
+function err_stream (st) {
+    return new Readable({
+        read () {
+            this.destroy(new QueryError(st));
+        }
+    });
+}
+
 class FPQuadSource {
     constructor (opts) {
         this.auth = opts.auth;
@@ -91,6 +106,9 @@ class FPQuadSource {
     }
 
     match (subj, pred, obj) {
+        if (!pred || pred.termType == "Variable")
+            return err_stream(403);
+
         if (!WK.type.equals(pred)) 
             return Readable.from([]);
         const rel = "all_membership";
@@ -105,7 +123,7 @@ class FPQuadSource {
                 const aopts = klass.variable ? [UUIDs.Null, false] : [klass.uuid, true];
                 const ok = await this.auth.check_acl(this.princ, Perm.Manage_Obj, 
                     ...aopts);
-                if (!ok) return [];
+                if (!ok) return err_stream(403);
 
                 if (memb.uuid) {
                     const klasses = await this.model.object_lookup(memb.uuid, rel);
@@ -178,14 +196,20 @@ export class RDF {
         return to_ttl(quads);
     }
 
-    async sparql_query (query, princ, type) {
+    sparql_query (query, princ, type) {
         const { engine } = this;
 
         const src = this.source(princ);
-        const res = await engine.query(query, {
+        return engine.query(query, {
             sources: [ src ],
-        });
-        const { data } = await engine.resultToString(res, type);
-        return data;
+        })  
+            .then(r => engine.resultToString(r, type))
+            .then(r => [200, r.data])
+            .catch(e => {
+                if (e instanceof QueryError)
+                    return [e.status];
+                this.log("Query error: %o", e);
+                return [500];
+            });
     }
 }

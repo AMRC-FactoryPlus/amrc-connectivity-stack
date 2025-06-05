@@ -12,7 +12,7 @@
         </div>
       </Button>
     </DialogTrigger>
-    <DialogContent class="sm:max-w-[550px]">
+    <DialogContent class="sm:max-w-[750px]">
       <DialogHeader>
         <DialogTitle>Create a new config entry</DialogTitle>
         <DialogDescription>Create a config entry for an object. The object can be an existing one or a new one.</DialogDescription>
@@ -76,8 +76,27 @@
         </ObjectSelector>
       </div>
       <div>
-        <div>Config Value (JSON)</div>
-        <textarea class="border border-slate-300" v-model="v$.config.$model"></textarea>
+        <div class="flex justify-between items-center mb-4">
+          <div>Config Value</div>
+          <div class="flex items-center gap-4">
+            <Button variant="outline" @click="toggleYaml">
+              <Checkbox :model-value="settings.useYaml" @click="toggleYaml" />
+              <div class="ml-2">Edit as Yaml</div>
+            </Button>
+          </div>
+        </div>
+        <MonacoEditor
+            v-if="v$.config.$model !== null"
+            class="editor h-[20em] w-full border b-slate-300"
+            :language="format"
+            :value="v$.config.$model"
+            @change="editorChange"
+            :options="{
+              lineNumbers: true,
+              tabCompletion: 'on',
+              glyphMargin: true
+            }"
+          />
       </div>
       <DialogFooter :title="v$?.$silentErrors[0]?.$message">
         <div class="flex justify-between gap-6">
@@ -113,10 +132,15 @@ import { required } from '@vuelidate/validators'
 import { useServiceClientStore } from '@store/serviceClientStore.js'
 import { toast } from 'vue-sonner'
 import { usePrincipalStore } from '@store/usePrincipalStore.js'
-import {defineAsyncComponent} from "vue";
+import {defineAsyncComponent, h} from "vue";
 import {UUIDs} from "@amrc-factoryplus/rx-client";
 import {Checkbox} from "@components/ui/checkbox/index.js";
 import {useRouter} from "vue-router";
+import MonacoEditor from "vue-monaco";
+import yaml from "yaml";
+import {useUserSettingsStore} from "@store/useUserSettingsStore.js";
+
+MonacoEditor.render = () => h('div')
 
 export default {
 
@@ -125,6 +149,7 @@ export default {
       v$: useVuelidate(),
       s: useServiceClientStore(),
       router: useRouter(),
+      settings: useUserSettingsStore(),
     }
   },
 
@@ -140,6 +165,7 @@ export default {
     DialogTrigger,
     VisuallyHidden,
     Input,
+    MonacoEditor,
     ObjectSelector: defineAsyncComponent(() => import('@components/ObjectSelector/ObjectSelector.vue')),
   },
 
@@ -181,6 +207,33 @@ export default {
   },
 
   methods: {
+    editorChange (e) {
+      if (typeof e === 'string' || e instanceof String) {
+        this.v$.config.$model = e
+      }
+    },
+
+    toggleYaml() {
+      this.settings.setUseYaml(!this.settings.useYaml)
+      if (this.config) {
+        const obj = this.parse(this.config)
+        this.format = this.settings.useYaml ? 'yaml' : 'json'
+        this.config = this.stringify(obj)
+      }
+    },
+
+    parse(s) {
+      return this.formats[this.format].parse(s)
+    },
+
+    stringify(o) {
+      return this.formats[this.format].stringify(o)
+    },
+
+    getDefaultConfig() {
+      const defaultObj = {}
+      return this.stringify(defaultObj)
+    },
     async formSubmit () {
       const isFormCorrect = await this.v$.$validate()
       if (!isFormCorrect) return
@@ -203,16 +256,18 @@ export default {
         newObjectUuid = this.objectUuid
       }
       try {
-        await this.s.client.ConfigDB.put_config(this.app, newObjectUuid, this.config)
+        const configData = this.parse(this.config)
+        await this.s.client.ConfigDB.put_config(this.app, newObjectUuid, configData)
         toast.success(`Config entry for ${this.objectName} created successfully.`)
       } catch (err) {
-        toast.error(`Unable to create entry for ${this.objectName}`)
+        toast.error(`Unable to create entry for ${this.objectName}: ${err.message}`)
         console.error(err)
       }
       this.objectName = null
       this.objectUuid = null
       this.classUuid = null
       this.selectedClass = []
+      this.config = this.getDefaultConfig()
       if (!this.createAnother) {
         this.dialogOpen = false
       }
@@ -234,7 +289,26 @@ export default {
       selectedObj: [],
       navigateAfter: false,
       createAnother: false,
+      format: this.settings?.useYaml ? 'yaml' : 'json',
+      formats: {
+        json: {
+          parse: JSON.parse,
+          stringify: (o) => JSON.stringify(o, null, 2),
+        },
+        yaml: {
+          parse: yaml.parse,
+          stringify: (o) => yaml.stringify(o, null, {
+            sortMapEntries:     true,
+            blockQuote:         "literal",
+            indent:             2,
+          }),
+        }
+      }
     }
+  },
+
+  mounted() {
+    this.config = this.getDefaultConfig()
   },
 
   validations: {

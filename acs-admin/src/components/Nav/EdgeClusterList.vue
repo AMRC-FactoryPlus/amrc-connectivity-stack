@@ -80,7 +80,7 @@ export default {
 
   computed: {
     clusters () {
-      return this.c.data
+      return this.c.data.toSorted((a, b) => b.name < a.name)
     },
   },
 

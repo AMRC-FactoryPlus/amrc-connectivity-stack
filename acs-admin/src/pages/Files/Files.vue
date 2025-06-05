@@ -10,7 +10,8 @@
         <span>Upload File</span>
       </Button>
     </template>
-    <DataTableSearchable
+    <Skeleton v-if="!file.ready" v-for="i in 10" class="h-16 rounded-lg mb-2"/>
+    <DataTableSearchable v-else
                          :columns="columns"
                          :data="files"
                          :limit-height="false"

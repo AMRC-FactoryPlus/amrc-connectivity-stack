@@ -7,7 +7,7 @@
 import { Readable }         from "stream";
 
 import N3                   from "n3";
-import { QueryEngine }      from "@comunica/sparql-query-rdfjs";
+import { QueryEngine }      from "@comunica/query-sparql-rdfjs";
 
 import { UUIDs }            from "@amrc-factoryplus/service-client";
 
@@ -73,7 +73,7 @@ function decode (q) {
 }
 
 function to_fp (term) {
-    if (term.termType == "Variable")
+    if (term == null || term.termType == "Variable")
         return { variable: true, ok: true };
     if (term.termType != "NamedNode")
         return { ok: false };
@@ -138,6 +138,7 @@ export class RDF {
             .filter(e => e[0].includes("/"))
             .toSorted((a, b) => b[1] - a[1])
             .map(e => e[0]);
+        return this;
     }
 
     source (princ) {

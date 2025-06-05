@@ -386,6 +386,8 @@ export class APIv2 {
         if (req.is("application/sparql-query"))
             spec.query = req.body;
 
+        this.log("SPARQL query: %o", spec);
+
         if (spec["default-graph-uri"] || spec["named-graph-uri"])
             /* The SPARQL spec says to use 400 here. I don't think this
              * is right and it should be 403 or some such. */
@@ -398,6 +400,7 @@ export class APIv2 {
         
         const out = await this.rdf.sparql_query(spec.query, req.auth, type);
         res.type(type);
-        res.status(200).send(out);
+        res.status(200);
+        out.pipe(res);
     }
 }

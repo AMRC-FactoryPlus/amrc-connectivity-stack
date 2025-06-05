@@ -4,6 +4,7 @@
 
 import type {ColumnDef} from '@tanstack/vue-table'
 import {h} from 'vue'
+import {formatFileSize} from '@/lib/utils'
 
 import DataTableColumnHeader from '@/components/ui/data-table/DataTableColumnHeader.vue'
 import FilesTableRowActions from "@pages/Files/TableData/FilesTableRowActions.vue";
@@ -17,6 +18,7 @@ export interface ApplicationMapping {
         original_file_name: string
         file_size: number
         date_uploaded: string
+        file_uuid: string
     }
 }
 
@@ -51,7 +53,14 @@ export const columns: ColumnDef<ApplicationMapping>[] = [
     {
     accessorKey: 'created',
     accessorFn: (row) => row?.filesConfiguration?.date_uploaded ?
-        new Date(row.filesConfiguration.date_uploaded).toLocaleDateString("en-GB") :
+        new Date(row.filesConfiguration.date_uploaded).toLocaleDateString("en-GB", {
+            year: 'numeric',
+            month: 'numeric',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+        }) :
         "--",
     header: ({column}) => h(DataTableColumnHeader, {
         column,
@@ -84,15 +93,3 @@ export const columns: ColumnDef<ApplicationMapping>[] = [
         }),
         cell: ({row}) => h(FilesTableRowActions, {row}),
     }]
-
-function formatFileSize(bytes, decimals = 2) {
-    if (bytes === 0) return '0 Bytes';
-
-    const k = 1024;
-    const dm = decimals < 0 ? 0 : decimals;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB'];
-
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
-}

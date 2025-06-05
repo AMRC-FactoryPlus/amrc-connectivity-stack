@@ -4,9 +4,6 @@ import json
 import numpy as np
 import sys
 
-#add nptdms to path
-sys.path.append("./nptdms")
-
 #Read tdms file from command line argument, variable name is folderPath
 #return exception to stdio if no file is provided
 if len(sys.argv) < 2:

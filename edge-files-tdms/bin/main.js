@@ -4,6 +4,7 @@ import { TDMSEventManager, EVENTS } from '../lib/tdms-file-events.js';
 import FolderWatcher from '../lib/folder-watcher.js';
 import StateManager from '../lib/state-manager.js';
 import TDMSSimulator from '../tests/simulator-generator-tdms.js';
+import TDMSSummariser from '../lib/tdms-file-summariser.js';
 
 const {
   SERVICE_USERNAME,
@@ -38,10 +39,15 @@ async function main() {
     eventManager,
   });
 
+  const tdmsSummariser = new TDMSSummariser({
+    eventManager,
+  });
+
 
   registerEventHandlers(stateManager, eventManager);
 
   await stateManager.run();
+  await tdmsSummariser.run();
   await uploader.run();
   await folderWatcher.run();
 

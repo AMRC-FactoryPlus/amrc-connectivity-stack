@@ -4,6 +4,32 @@
 
 <template>
   <div class="flex items-center">
+    <div class="flex items-center p-3">
+      <RouterLink :to="`/configdb/${currentApplication ? 'applications' : 'objects'}`">
+        <Button title="Go to application" variant="ghost" size="sm">
+          <div>{{currentApplication ? 'Applications' : 'Objects'}}</div>
+        </Button>
+      </RouterLink>
+      <DropdownMenu>
+        <DropdownMenuTrigger>
+          <Button title="Go to application" variant="ghost" size="plain" class="p-2">
+            <div class="flex flex-col">
+              <i style="font-size: 9pt" class="fa-solid fa-chevron-up -mb-0.5"></i>
+              <i style="font-size: 9pt" class="fa-solid fa-chevron-down -mt-0.5"></i>
+            </div>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent>
+          <RouterLink to="/configdb/applications">
+            <DropdownMenuItem class="cursor-pointer">Applications</DropdownMenuItem>
+          </RouterLink>
+          <RouterLink to="/configdb/objects">
+            <DropdownMenuItem class="cursor-pointer">Objects</DropdownMenuItem>
+          </RouterLink>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+    <span>/</span>
     <div v-if="currentApplication" class="flex items-center p-3">
       <RouterLink :to="`/configdb/applications/${currentApplication?.uuid}`">
         <Button title="Go to application" variant="ghost" size="sm">
@@ -121,8 +147,8 @@ export default {
       return useApplicationStore().data.find((application) => application.uuid === this.$route.params.application)
     },
 
-    // ║  Nodes  ║
-    // ╚═════════╝
+    // ║  Objects  ║
+    // ╚═══════════╝
     objects () {
       return this.appObjects || []
     },

@@ -25,7 +25,7 @@ export class APIv2 {
 
         this.routes = express.Router();
         this.model = opts.model;
-        this.ldf = opts.ldf;
+        this.rdf = opts.rdf;
 
         this.setup_routes();
     }
@@ -88,7 +88,10 @@ export class APIv2 {
 
         api.get("/save", this.dump_save.bind(this));
 
-        api.get("/ldf", this.ldf_query.bind(this));
+        api.get("/qpf", this.qpf_query.bind(this));
+        api.route("/sparql")
+            .get(this.sparql_query.bind(this))
+            .post(this.sparql_query.bind(this));
     }
 
     async app_get(req, res) {
@@ -361,12 +364,12 @@ export class APIv2 {
         res.status(200).json(dump);
     }
 
-    async ldf_query (req, res) {
+    async qpf_query (req, res) {
         const {s, p, o} = req.query;
 
         const base  = `${req.protocol}://${req.host}${req.baseUrl}`;
 
-        const ttl = await this.ldf.query({
+        const ttl = await this.rdf.qpf_query({
             auth:       req.auth,
             template:   `${base}${req.path}{?s,p,o}`,
             fragment:   `${base}${req.url}`,
@@ -377,4 +380,24 @@ export class APIv2 {
         res.send(ttl);
     }
 
+    async sparql_query (req, res) {
+        const spec = req.is("application/x-www-form-urlencoded")
+            ? req.body : {...req.query};
+        if (req.is("application/sparql-query"))
+            spec.query = req.body;
+
+        if (spec["default-graph-uri"] || spec["named-graph-uri"])
+            /* The SPARQL spec says to use 400 here. I don't think this
+             * is right and it should be 403 or some such. */
+            return res.status(400);
+
+        const types = this.rdf.sparql_types;
+        const type = req.accepts(types);
+        if (!type)
+            return res.status(406);
+        
+        const out = await this.rdf.sparql_query(spec.query, req.auth, type);
+        res.type(type);
+        res.status(200).send(out);
+    }
 }

@@ -33,6 +33,8 @@ export function routes (opts) {
         app.set("trust proxy", true);
 
         app.use(express.json({ type: "application/merge-patch+json" }));
+        app.use(express.urlencoded());
+        app.use(express.text({ type: "application/sparql-query" }));
 
         /* Serve the editor */
         const editor = url.fileURLToPath(new URL("../editor", import.meta.url));

@@ -4,13 +4,14 @@
  * Copyright 2025 University of Sheffield AMRC
  */
 
-import { Readable } from "stream";
+import { Readable }         from "stream";
 
-import N3 from "n3";
+import N3                   from "n3";
+import { QueryEngine }      from "@comunica/sparql-query-rdfjs";
 
-import { UUIDs } from "@amrc-factoryplus/service-client";
+import { UUIDs }            from "@amrc-factoryplus/service-client";
 
-import { Perm } from "./constants.js";
+import { Perm }             from "./constants.js";
 
 const { namedNode, literal, variable, quad } = N3.DataFactory;
 
@@ -120,12 +121,23 @@ class FPQuadSource {
     }
 }
 
-export class LDF {
+export class RDF {
     constructor (opts) {
         this.auth = opts.auth;
         this.model = opts.model;
 
         this.log = opts.debug.bound("ldf");
+
+        this.engine = new QueryEngine();
+    }
+
+    async init () {
+        /* Get SparqlEngine preferred content-types */
+        const types = await this.engine.getResultMediaTypes();
+        this.sparql_types = Object.entries(types)
+            .filter(e => e[0].includes("/"))
+            .toSorted((a, b) => b[1] - a[1])
+            .map(e => e[0]);
     }
 
     source (princ) {
@@ -147,7 +159,7 @@ export class LDF {
         `);
     }
 
-    async query (opts) {
+    async qpf_query (opts) {
         const q = opts.query.map(decode);
 
         const quads = this.control(opts.template);
@@ -163,5 +175,16 @@ export class LDF {
         }
         this.log("Turtle: %o", quads);
         return to_ttl(quads);
+    }
+
+    async sparql_query (query, princ, type) {
+        const { engine } = this;
+
+        const src = this.source(princ);
+        const res = await engine.query(query, {
+            sources: [ src ],
+        });
+        const { data } = await engine.resultToString(res, type);
+        return data;
     }
 }

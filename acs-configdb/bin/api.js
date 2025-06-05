@@ -14,7 +14,7 @@ import { Service, Version } from "../lib/constants.js";
 
 import { Auth } from "../lib/auth.js";
 import { BootstrapUUIDs } from "../lib/constants.js";
-import { LDF } from "../lib/ldf.js";
+import { RDF } from "../lib/rdf.js";
 import Model from "../lib/model.js";
 import MQTTCli from "../lib/mqttcli.js";
 import { CDBNotify } from "../lib/notify.js";
@@ -33,7 +33,10 @@ const model = await new Model({
 const auth = new Auth({ fplus });
 const mqtt = MQTTCli.fromEnv(fplus, env);
 
-const ldf = new LDF({ auth, model, debug: fplus.debug });
+const rdf = await new RDF({
+    auth, model, 
+    debug: fplus.debug,
+}).init();
 
 const api = await new WebAPI({
     ping:       {
@@ -54,7 +57,7 @@ const api = await new WebAPI({
     max_age:    env.CACHE_MAX_AGE,
     body_limit: env.BODY_LIMIT,
 
-    routes:     routes({ auth, ldf, model, fplus, mqtt }),
+    routes:     routes({ auth, rdf, model, fplus, mqtt }),
 }).init();
 
 const notify = new CDBNotify({

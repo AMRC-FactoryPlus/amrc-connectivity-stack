@@ -5,7 +5,7 @@ import { isFileExist } from './utils.js';
 class TDMSSummariser {
   constructor(opts) {
     this.eventManager = opts.eventManager;
-    this.targetPythonFile = ".\\lib\\summary-generator\\tdms_parser.py";
+    this.pythonSummariserScript = opts.pythonSummariserScript;
   }
 
   // Method to run the Python script and return the summary
@@ -27,7 +27,7 @@ class TDMSSummariser {
 
      var summary;
 
-     const child = spawn("python.exe", [this.targetPythonFile, filePath]);
+     const child = spawn("python.exe", [this.pythonSummariserScript, filePath]);
         child.on("error", (err) => {
           console.error(`Error starting Python script: ${err.message}`);
           throw err;
@@ -47,7 +47,7 @@ class TDMSSummariser {
           child.on("close", (code) => {
             if (code === 0) {
               console.log('SUMMARISER: Python script completed successfully.');
-              // console.log('Summary:', summary);
+              console.log('Summary:', summary);
               resolve(summary);
             } else {
               reject(new Error(`SUMMARISER: Python script exited with code ${code}`));

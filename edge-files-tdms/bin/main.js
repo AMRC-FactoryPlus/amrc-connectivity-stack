@@ -13,7 +13,8 @@ const {
   STATE_FILE,
   TDMS_DIR_TO_WATCH,
   TDMS_SRC_DIR,
-  NODE_ENV
+  NODE_ENV,
+  PYTHON_SUMMARISER_SCRIPT,
 } = process.env;
 
 async function main() {
@@ -41,6 +42,7 @@ async function main() {
 
   const tdmsSummariser = new TDMSSummariser({
     eventManager,
+    pythonSummariserScript: PYTHON_SUMMARISER_SCRIPT,
   });
 
 

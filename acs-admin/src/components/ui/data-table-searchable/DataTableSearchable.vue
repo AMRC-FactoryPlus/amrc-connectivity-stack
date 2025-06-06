@@ -108,7 +108,7 @@ const limitHeight = props.limitHeight
               @update:model-value="props.searchKey ? table.getColumn(props.searchKey)?.setFilterValue($event) : table.setGlobalFilter(String($event))"
           />
         </div>
-        <slot name="toolbar-right" :table="table"></slot>
+        <slot name="toolbar-right" :table="table" :selected-objects="table.getSelectedRowModel().rows.map(r => {return {...r.original, metaRowId: r.id}})"></slot>
       </template>
     </DataTableToolbar>
     <slot name="below-toolbar"></slot>

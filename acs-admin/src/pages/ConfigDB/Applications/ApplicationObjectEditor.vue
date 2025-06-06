@@ -17,7 +17,7 @@
       </div>
     </div>
     <MonacoEditor
-        v-if="v$.code.$model"
+        v-if="v$.code.$model !== null && v$.code.$model !== undefined"
         class="editor h-[40em] w-[95%] border b-slate-300"
         :language="format"
         :value="v$.code.$model"

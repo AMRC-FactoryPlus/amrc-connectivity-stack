@@ -53,7 +53,9 @@
       <div class="flex flex-col gap-2">
         <div class="flex flex-col w-full gap-1">
           <label class="text-sm font-medium">Type</label>
+          <Skeleton v-if="!objs" class="h-16 rounded-lg mb-2" />
           <ObjectSelector
+              v-else
               v-model="selectedClass"
               :store-data="objs"
               title="Select Class"
@@ -144,6 +146,7 @@ import { Switch } from '@/components/ui/switch'
 import MonacoEditor from 'vue-monaco'
 import yaml from 'yaml'
 import { useUserSettingsStore } from '@store/useUserSettingsStore.js'
+import {Skeleton} from "@components/ui/skeleton/index.js";
 
 MonacoEditor.render = () => h('div')
 
@@ -159,6 +162,7 @@ export default {
   },
 
   components: {
+    Skeleton,
     Switch,
     Checkbox,
     Button,

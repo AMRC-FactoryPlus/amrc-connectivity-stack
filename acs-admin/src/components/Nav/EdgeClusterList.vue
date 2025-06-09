@@ -80,7 +80,7 @@ export default {
 
   computed: {
     clusters () {
-      return this.c.data.toSorted((a, b) => b.name < a.name)
+      return this.c.data.toSorted((a, b) => a.name.localeCompare(b.name))
     },
   },
 

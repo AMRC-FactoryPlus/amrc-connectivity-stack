@@ -72,7 +72,7 @@ export default {
 
   computed: {
     nodes () {
-      return Array.isArray(this.s.data) ? this.s.data.filter(e => e.deployment?.cluster === this.cluster.uuid).toSorted((a, b) => b.name < a.name) : []
+      return Array.isArray(this.s.data) ? this.s.data.filter(e => e.deployment?.cluster === this.cluster.uuid).toSorted((a, b) => a.name.localeCompare(b.name)) : []
     },
 
   },

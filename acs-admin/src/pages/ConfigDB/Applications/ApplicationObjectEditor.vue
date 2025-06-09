@@ -6,7 +6,7 @@
     <Skeleton v-if="loading" v-for="i in 10" class="h-16 rounded-lg mb-2"/>
     <div v-else class="flex-1 h-full">
       <MonacoEditor
-          v-if="v$.code.$model"
+          v-if="v$.code.$model !== null && v$.code.$model !== undefined"
           class="editor h-full"
           :language="format"
           :value="v$.code.$model"
@@ -53,22 +53,22 @@
           <SidebarDetail
               icon="key"
               label="Object UUID"
-              :value="object.uuid"
+              :value="object?.uuid ?? ''"
           />
           <SidebarDetail
               icon="tag"
               label="Class"
-              :value="object.class?.name"
+              :value="object?.class?.name ?? ''"
           />
           <SidebarDetail
               icon="key"
               label="Class UUID"
-              :value="object.class?.uuid"
+              :value="object?.class?.uuid ?? ''"
           />
           <SidebarDetail
               icon="ranking-star"
               label="Rank"
-              :value="object.rank?.toString()"
+              :value="object?.rank?.toString() ?? ''"
           />
         </div>
 
@@ -77,12 +77,12 @@
           <SidebarDetail
               icon="puzzle-piece"
               label="Application"
-              :value="application?.name"
+              :value="application?.name ?? ''"
           />
           <SidebarDetail
               icon="key"
               label="Application UUID"
-              :value="application?.uuid"
+              :value="application?.uuid ?? ''"
           />
         </div>
       </div>

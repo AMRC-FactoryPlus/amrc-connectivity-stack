@@ -151,18 +151,18 @@
     <div class="w-96 flex-shrink-0 border-l -my-4 -mr-4">
       <div class="flex items-center justify-start border-b gap-2 p-4">
         <i :class="`fa-fw fa-solid fa-cube`"></i>
-        <div class="font-semibold text-xl">{{object.name}}</div>
+        <div class="font-semibold text-xl">{{object?.name ?? ''}}</div>
       </div>
       <div class="space-y-4 p-4">
         <SidebarDetail
             icon="key"
             label="Node UUID"
-            :value="object.uuid"
+            :value="object?.uuid ?? ''"
         />
         <SidebarDetail
             icon="ranking-star"
             label="Rank"
-            :value="object.rank"
+            :value="object?.rank.toString() ?? ''"
         />
       </div>
       <div class="font-semibold text-lg p-4 border-b">Class Information</div>
@@ -170,12 +170,12 @@
         <SidebarDetail
             icon="tag"
             label="Name"
-            :value="object.class.name"
+            :value="object?.class?.name ?? ''"
         />
         <SidebarDetail
             icon="key"
             label="UUID"
-            :value="object.class.uuid"
+            :value="object?.class?.uuid ?? ''"
         />
 
       </div>

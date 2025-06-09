@@ -214,6 +214,7 @@ jobs:
           - edge-modbus
           - edge-test
           - edge-tplink-smartplug
+          - edge-ads
     permissions:
       contents: read
       packages: write

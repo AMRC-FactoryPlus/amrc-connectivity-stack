@@ -89,6 +89,7 @@ export const ACS = {
         Git:                    "626df296-8156-4c67-8aed-aac70161aa8b",
         Authentication:         "127cde3c-773a-4f61-b0ba-7412a2695253",
         Manager:                "2340e706-1280-420c-84a6-016547b55e95",
+        Files:                  "cb0ac52a-7622-4c75-aa95-ad4c700ae6fb",
     },
     /* XXX These should not be fixed. They should be replaced by
      * per-deployment accounts created by krbkeys, and
@@ -121,6 +122,7 @@ export const ACS = {
         Modbus:                 "c355a44e-de4c-11ef-8a5a-e31f3872ed79",
         Test:                   "c8798cba-de4c-11ef-8a43-8766e8683af8",
         TPlinkSmartPlug:        "d46e1374-de4c-11ef-b469-c388a038fd5c",
+        ADS:                    "6764f1e5-fbe7-494c-8dbe-b80039c30c97",
 
         /* External driver */
         External:               "eb669a2c-e213-11ef-998e-a7fc6f4817b5",

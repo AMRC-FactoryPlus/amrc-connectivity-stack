@@ -28,7 +28,7 @@
         <Tabs v-else default-value="nodes" class="flex flex-col flex-1 z-50">
           <TabsContent value="nodes" class="flex-1 ">
             <div>
-              <DataTable :data="nodes" :columns="nodeColumns" :filters="[]" @rowClick="selectNode">
+              <DataTable :data="nodes" :columns="nodeColumns" :filters="[]" :default-sort="initialNameSort" @rowClick="selectNode">
                 <template #toolbar-left>
                   <div class="flex items-center justify-between gap-2">
                     <TabsList>
@@ -66,7 +66,7 @@
             </div>
           </TabsContent>
           <TabsContent value="deployments">
-            <DataTable :data="deployments" :columns="deploymentColumns" :filters="[]" @rowClick="selectDeployment">
+            <DataTable :data="deployments" :columns="deploymentColumns" :filters="[]" :default-sort="initialNameSort" @rowClick="selectDeployment">
               <template #toolbar-left>
                 <div class="flex items-center justify-between gap-2">
                   <TabsList>
@@ -103,7 +103,7 @@
             </DataTable>
           </TabsContent>
           <TabsContent value="hosts">
-            <DataTable :data="hosts" :columns="hostColumns" :filters="[]">
+            <DataTable :data="hosts" :columns="hostColumns" :filters="[]" :default-sort="initialHostSort">
               <template #toolbar-left>
                 <div class="flex items-center justify-between gap-2">
                   <TabsList>
@@ -182,9 +182,11 @@ import EmptyState from '@components/EmptyState.vue'
 import SidebarDetail from '@components/SidebarDetail.vue'
 import moment from 'moment'
 import { useDeploymentStore } from '@store/useDeploymentStore.js'
+import DataTableSearchable from "@components/ui/data-table-searchable/DataTableSearchable.vue";
 
 export default {
   components: {
+    DataTableSearchable,
     EmptyState,
     DetailCard,
     AlertDescription,
@@ -245,6 +247,20 @@ export default {
 
     bootstrapped () {
       return this.hosts?.length > 0
+    },
+
+    initialNameSort () {
+      return [{
+        id: 'name',
+        desc: false
+      }]
+    },
+
+    initialHostSort () {
+      return [{
+        id: 'hostname',
+        desc: false
+      }]
     },
   },
 

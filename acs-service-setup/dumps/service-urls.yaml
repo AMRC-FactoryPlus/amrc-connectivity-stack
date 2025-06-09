@@ -32,3 +32,6 @@ advertisements:
   - service: !u ACS.Service.Manager
     url: !acs "http://manager.${namespace}.svc.${k8sdomain}"
     device: !u ACS.Device.Manager
+  - service: !u Files.Service.Files
+    url: !acs "http://files.${namespace}.svc.${k8sdomain}"
+    device: !u ACS.Device.Files

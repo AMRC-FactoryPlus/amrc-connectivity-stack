@@ -5,11 +5,6 @@
 
 <template>
   <FilesContainer>
-    <template v-slot:header>
-      <Button class="gap-2">
-        <span>Upload File</span>
-      </Button>
-    </template>
     <Skeleton v-if="!file.ready" v-for="i in 10" class="h-16 rounded-lg mb-2"/>
     <DataTableSearchable v-else
                          :columns="columns"
@@ -21,7 +16,9 @@
                          @row-click="e => objectClick(e.original)"
     >
       <template #toolbar-right>
-
+        <Button class="gap-2">
+          <span>Upload File</span>
+        </Button>
       </template>
     </DataTableSearchable>
     <template v-slot:sidebar>

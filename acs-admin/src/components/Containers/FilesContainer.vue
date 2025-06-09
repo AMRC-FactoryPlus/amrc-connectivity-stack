@@ -4,10 +4,7 @@
 
 <template>
   <div class="flex flex-col h-[calc(100vh-100px)] ">
-    <div class="flex justify-end bg-white sticky border-b pb-4 z-10">
-      <slot name="header"></slot>
-    </div>
-    <div class="flex-1 pt-2 overflow-hidden">
+    <div class="flex-1 overflow-hidden">
       <div class="flex h-full">
         <div class="flex-1 overflow-auto" :class="[padding]">
           <slot></slot>

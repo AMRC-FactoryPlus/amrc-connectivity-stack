@@ -352,7 +352,7 @@ export default {
       objectName: null,
       objectUuid: null,
       classUuid: null,
-      config: null,
+      config: '',
       selectedClass: [],
       selectedObj: [],
       navigateAfter: false,

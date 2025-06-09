@@ -24,7 +24,7 @@
         <div class="flex items-center justify-between gap-2 w-full p-4 border-b">
           <div class="flex items-center justify-center gap-2">
             <i class="fa-fw fa-solid fa-puzzle-piece"></i>
-            <div class="font-semibold text-xl">{{application.name}}</div>
+            <div class="font-semibold text-xl">{{application?.name}}</div>
           </div>
 
         </div>
@@ -32,7 +32,7 @@
           <SidebarDetail
               icon="key"
               label="Application UUID"
-              :value="application.uuid"
+              :value="application?.uuid ?? ''"
           />
         </div>
       </div>

@@ -13,6 +13,9 @@ export const EVENTS = {
   FILE_UPLOADED: 'file:uploaded',
   FILE_UPLOAD_FAILED: 'file:uploadFailed',
 
+  FILE_ADDED_AS_CLASS_MEMBER: 'file:addedAsClassMember',
+  FILE_ADD_AS_CLASS_MEMBER_FAILED: 'file:addAsClassMemberFailed',
+
   FILE_SKIPPED: 'file:skipped',
 };
 

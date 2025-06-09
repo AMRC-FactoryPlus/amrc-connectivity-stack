@@ -1,6 +1,6 @@
 import fs from 'fs/promises';
-import { isFileExist, normalizePath } from './utils.js';
 import path from 'path';
+import { isFileExist, normalizePath } from './utils.js';
 
 class StateManager {
     constructor(opts) {
@@ -9,9 +9,9 @@ class StateManager {
         }
 
         this.stateFile = path.resolve(opts.stateFile);
+        this.tempStateFile = `${this.stateFile}.tmp`;
         this.seenFiles = new Map();
     }
-
 
     async run() {
         await this.loadSeenFiles();
@@ -39,7 +39,8 @@ class StateManager {
                     const normPath = normalizePath(file.path);
                     this.seenFiles.set(normPath, {
                         isUploaded: !!file.isUploaded,
-                        uuid: file.uuid || null
+                        uuid: file.uuid || null,
+                        isClassMember: !!file.isClassMember
                     });
                 } catch (e) {
                     console.warn(`STATE MANAGER: Skipped corrupt file entry: ${e.message}`);
@@ -63,7 +64,7 @@ class StateManager {
                 return;
             }
 
-            this.seenFiles.set(normPath, { isUploaded: false });
+            this.seenFiles.set(normPath, { isUploaded: false, uuid: null, isClassMember: false });
             await this.saveSeenFiles();
         } catch (err) {
             console.error(`STATE MANAGER: Failed to add new file ${filePath}: ${err.message}`);
@@ -85,9 +86,11 @@ class StateManager {
                 path: filePath,
                 isUploaded: !!meta.isUploaded,
                 uuid: meta.uuid || null,
+                isClassMember: !!meta.isClassMember
             }));
 
-            await fs.writeFile(this.stateFile, JSON.stringify(data, null, 2), 'utf-8');
+            await fs.writeFile(this.tempStateFile, JSON.stringify(data, null, 2), 'utf-8');
+            await fs.rename(this.tempStateFile, this.stateFile);
         } catch (err) {
             console.warn(`STATE MANAGER: Failed to save seen files: ${err.message}`);
         }
@@ -95,14 +98,13 @@ class StateManager {
 
     async updateAsUploaded(filePath) {
         try {
-            const normPath = normalizePath(filePath);
-            const state = this.seenFiles.get(normPath);
+            const state = this.getFileState(filePath);
 
             if (state) {
                 state.isUploaded = true;
                 await this.saveSeenFiles();
             } else {
-                console.warn(`STATE MANAGER: Tried to update isUploaded for unknown file ${normPath}`);
+                console.warn(`STATE MANAGER: Tried to update isUploaded for unknown file ${filePath}`);
             }
         } catch (err) {
             console.warn(`STATE MANAGER: updateAsUploaded failed: ${err.message}`);
@@ -116,26 +118,31 @@ class StateManager {
         }
 
         try {
-            const normPath = normalizePath(filePath);
-            const state = this.seenFiles.get(normPath);
+            const state = this.getFileState(filePath);
 
             if (state) {
                 state.uuid = fileUuid;
                 await this.saveSeenFiles();
             } else {
-                console.warn(`STATE MANAGER: Tried to update UUID for unknown file ${normPath}`);
+                console.warn(`STATE MANAGER: Tried to update UUID for unknown file ${filePath}`);
             }
         } catch (err) {
             console.warn(`STATE MANAGER: updateWithUuid failed: ${err.message}`);
         }
     }
 
-    getSeenFiles() {
-        return this.seenFiles;
-    }
-
-    getHandledFilePaths() {
-        return [...this.seenFiles.keys()];
+    async updateAsClassMember(filePath) {
+        try {
+            const state = this.getFileState(filePath);
+            if (state) {
+                state.isClassMember = true;
+                await this.saveSeenFiles();
+            } else {
+                console.warn(`STATE MANAGER: Tried to update isClassMember for unknown file ${filePath}`);
+            }
+        } catch (err) {
+            console.warn(`STATE MANAGER: updateAsClassMember failed: ${err.message}`);
+        }
     }
 
     getFileState(filePath) {
@@ -145,6 +152,14 @@ class StateManager {
         } catch {
             return undefined;
         }
+    }
+
+    getSeenFiles() {
+        return this.seenFiles;
+    }
+
+    getHandledFilePaths() {
+        return [...this.seenFiles.keys()];
     }
 }
 

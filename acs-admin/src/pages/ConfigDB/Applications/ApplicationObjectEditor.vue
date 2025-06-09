@@ -22,7 +22,7 @@
     <template #header>
       <div class="flex justify-between items-center mr-3">
         <div class="flex items-center gap-2">
-          <Button v-if="v$.$dirty" variant="destructive" :disabled="v$.$invalid" @click="formSubmit" class="shrink-0">
+          <Button variant="destructive" :disabled="!v$.$dirty || v$.$invalid" @click="formSubmit" class="shrink-0">
             <div class="flex items-center justify-center gap-1">
               <span>Save Changes</span>
               <i v-if="!saveLoading" class="fa-sharp fa-solid fa-save ml-2"></i>

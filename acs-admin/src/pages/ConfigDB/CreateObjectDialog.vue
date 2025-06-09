@@ -296,7 +296,7 @@ export default {
       objectName: null,
       objectUuid: null,
       classUuid: null,
-      config: null,
+      config: '',
       selectedClass: [],
       autoGenerateUuid: true,
       createAnother: false,

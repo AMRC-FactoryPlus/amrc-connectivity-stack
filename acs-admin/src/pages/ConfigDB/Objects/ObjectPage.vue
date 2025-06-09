@@ -6,6 +6,14 @@
   <div v-else class="flex h-full">
     <!-- Main content -->
     <div class="flex flex-col gap-4 pr-4 flex-1 overflow-auto">
+      <div>
+        <RouterLink  :to="`/configdb/objects`">
+          <Button size="sm" class="gap-2">
+            <i class="fa-solid fa-arrow-left"></i>
+            Back
+          </Button>
+        </RouterLink>
+      </div>
       <DataTable
           :data="isSubclassOf"
           :default-sort="initialSort"

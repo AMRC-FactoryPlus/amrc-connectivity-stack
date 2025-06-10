@@ -359,13 +359,14 @@ export class Metrics {
 
 /**
  * Processes a JSON batched payload and returns an array of values and timestamps
- * This function expects an array of objects with 'value' and 'timestamp' properties
+ * This function expects an array of objects and uses the metric's path to extract values
  * @param payload The JSON array payload to process
- * @param metric The metric to use for processing
+ * @param metric The metric to use for processing (including path configuration)
  * @returns An array of objects with value and timestamp properties
  */
 export function processJSONBatchedPayload(payload: any[], metric: sparkplugMetric): { value: any, timestamp?: number }[] {
     const results: { value: any, timestamp?: number }[] = [];
+    const path = (typeof metric.properties !== "undefined" && typeof metric.properties.path !== "undefined" ? metric.properties.path.value as string : "");
 
     // Validate that payload is an array
     if (!Array.isArray(payload)) {
@@ -375,24 +376,50 @@ export function processJSONBatchedPayload(payload: any[], metric: sparkplugMetri
 
     // Process each object in the array
     payload.forEach((item, index) => {
-        // Validate that each item is an object with required properties
+        // Validate that each item is an object
         if (typeof item !== 'object' || item === null) {
             log(`JSON (Batched) payload item ${index} must be an object`);
             return;
         }
 
-        if (!item.hasOwnProperty('value')) {
-            log(`JSON (Batched) payload item ${index} must have a 'value' property`);
+        let value;
+
+        // Extract value based on path or direct property
+        if (path) {
+            /* Work around a bug in the JSONPath library */
+            let newVal = path === "$" && item === false
+                ? [false]
+                : JSONPath({
+                    path: path,
+                    json: item
+                });
+
+            if (item === 0 || !Array.isArray(newVal)) {
+                value = 0;
+            } else {
+                if (newVal[0]?.type === "Buffer") {
+                    newVal[0] = Buffer.from(newVal[0].data);
+                }
+                value = parseTypeFromString(metric.type, newVal[0]);
+            }
+        } else if (item.hasOwnProperty('value')) {
+            // If no path is provided but the object has a 'value' property, use that
+            value = parseTypeFromString(metric.type, item.value);
+        } else {
+            // If no path and no 'value' property, log error and skip
+            log(`JSON (Batched) payload item ${index} has no path configured and no 'value' property`);
             return;
         }
 
-        // Extract and validate value
-        let value = parseTypeFromString(metric.type, item.value);
-
-        // Extract and validate timestamp
+        // Extract timestamp if available
         let timestamp: number | undefined;
         if (item.hasOwnProperty('timestamp')) {
             timestamp = item.timestamp;
+            if (timestamp && !isTimestampInMilliseconds(timestamp)) {
+                timestamp = timestamp * 1000;
+            }
+        } else if (item.hasOwnProperty('time')) {
+            timestamp = item.time;
             if (timestamp && !isTimestampInMilliseconds(timestamp)) {
                 timestamp = timestamp * 1000;
             }

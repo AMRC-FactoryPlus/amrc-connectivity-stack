@@ -15,5 +15,5 @@ export function normalizePath(filePath) {
     if (!filePath || typeof filePath !== 'string') {
         throw new Error(`Invalid file path: ${filePath}, could not normalize it.`);
     }
-    return path.resolve(filePath);
+    return path.normalize(path.resolve(filePath)).toLowerCase();
 }

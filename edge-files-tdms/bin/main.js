@@ -3,8 +3,12 @@ import Uploader from "../lib/uploader.js";
 import { TDMSEventManager, EVENTS } from '../lib/tdms-file-events.js';
 import FolderWatcher from '../lib/folder-watcher.js';
 import StateManager from '../lib/state-manager.js';
+import TDMSSummariser from '../lib/tdms-file-summariser.js';
 import TDMSSimulator from '../tests/simulator-generator-tdms.js';
-const retryCounts = new Map();
+
+const retryUploadCounts = new Map();
+const retrySummaryCounts = new Map();
+
 const MAX_RETRIES = 5;
 
 const {
@@ -14,7 +18,8 @@ const {
   STATE_FILE,
   TDMS_DIR_TO_WATCH,
   TDMS_SRC_DIR,
-  NODE_ENV
+  NODE_ENV,
+  PYTHON_SUMMARISER_SCRIPT,
 } = process.env;
 
 const FailureEvents = [
@@ -45,8 +50,14 @@ async function main() {
     eventManager,
   });
 
+  const tdmsSummariser = new TDMSSummariser({
+    eventManager,
+    pythonSummariserScript: PYTHON_SUMMARISER_SCRIPT,
+  });
+
   registerEventHandlers(stateManager, eventManager);
 
+  await tdmsSummariser.run();
   await uploader.run();
   await folderWatcher.run();
   await stateManager.run();
@@ -67,8 +78,13 @@ async function resumePendingUploads(stateManager, eventManager) {
       eventManager.emit(EVENTS.FILE_READY, { filePath });
       console.log(`Resumed pending upload for ${filePath}`);
     }
+    else if(!meta.hasSummary){
+      eventManager.emit(EVENTS.FILE_UPLOADED, {filePath});
+      console.log(`Resumed pending summary generation for ${filePath}`);
+    }
   }
 }
+
 
 function registerEventHandlers(stateManager, eventManager) {
   eventManager.on(EVENTS.FILE_DETECTED, async ({ filePath }) => {
@@ -88,36 +104,59 @@ function registerEventHandlers(stateManager, eventManager) {
 
   eventManager.on(EVENTS.FILE_UPLOADED, async ({ filePath }) => {
     await stateManager.updateAsUploaded(filePath);
-    retryCounts.delete(filePath);
+    retryUploadCounts.delete(filePath);
   });
 
   eventManager.on(EVENTS.FILE_ADDED_AS_CLASS_MEMBER, async ({ filePath }) => {
     await stateManager.updateAsClassMember(filePath);
   });
 
-  // Unified retry handler for all failure events
+  // Unified retry handler for Upload failure events
   FailureEvents.forEach(failureEvent => {
     eventManager.on(failureEvent, ({ filePath, error }) => {
       retryHandleFileReady(eventManager, filePath);
     });
   });
+
+
+  eventManager.on(EVENTS.FILE_SUMMARY_PREPARED, async({filePath}) => {
+    await stateManager.updateHasSummary(filePath);
+  });
+
+  eventManager.on(EVENTS.FILE_SUMMARY_FAILED, ({filePath, error}) => {
+    retryHandleFileUploaded(eventManager, filePath);
+  });
 }
 
-
 function retryHandleFileReady(eventManager, filePath) {
-  const retries = retryCounts.get(filePath) || 0;
+  const retries = retryUploadCounts.get(filePath) || 0;
 
   if (retries >= MAX_RETRIES) {
-    console.error(`RETRYING: Max retries reached for ${filePath}. Giving up.`);
+    console.error(`RETRYING UPLOAD: Max upload retries reached for ${filePath}. Giving up.`);
     return;
   }
 
-  retryCounts.set(filePath, retries + 1);
-  console.warn(`RETRYING: Attempt ${retries + 1} for ${filePath}, retrying in 5 seconds...`);
+  retryUploadCounts.set(filePath, retries + 1);
+  console.warn(`RETRYING UPLOAD: Attempt ${retries + 1} for ${filePath}, retrying in 5 seconds...`);
 
   setTimeout(() => {
     eventManager.emit(EVENTS.FILE_READY, { filePath });
   }, 5000);
+}
+
+function retryHandleFileUploaded(eventManager, filePath){
+  const retries = retrySummaryCounts.get(filePath) || 0;
+  if( retries >= MAX_RETRIES){
+    console.error(`RETRYING SUMMARY GEN: Max summary generation retries reached for ${filePath}. Giving up.`)
+    return;
+  }
+
+  retrySummaryCounts.set(filePath, retries + 1);
+  console.warn(`RETRYING SUMMARY GEN: Attempt ${retries + 1} for ${filePath}, retrying in 6 seconds...`);
+
+  setTimeout(() => {
+    eventManager.emit(EVENTS.FILE_UPLOADED, {filePath});
+  }, 6000);
 }
 
 main().catch(err => {

@@ -41,26 +41,15 @@ class Uploader {
 
     async uploadFileToFS(fileUuid, filePath) {
         try {
-            const response = await this.filesClient.upload_file_with_uuid(fileUuid, filePath);
+            const responseUuid = await this.filesClient.upload_file_with_uuid(fileUuid, filePath);
 
-            // if (!response.ok) {
-            //     // const errorText = await response.;
-
-            //     if (errorText.includes("EEXIST")) {
-            //         console.warn(`UPLOADER: File already exists on File Service for UUID ${fileUuid}, treating as uploaded.`);
-            //         this.eventManager.emit(EVENTS.FILE_UPLOADED, { filePath });
-            //         return true;
-            //     }
-
-            //     throw new Error(`HTTP ${response.status}: ${errorText}`);
-            // }
-
-            console.log(`UPLOADER: Successfully uploaded ${filePath}`);
+            console.log(`UPLOADER: Successfully uploaded ${filePath} with uuid ${responseUuid}`);
             this.eventManager.emit(EVENTS.FILE_UPLOADED, { filePath });
             return true;
 
         } catch (fsError) {
             if(fsError.status == 409){
+                console.warn(`UPLOADER: File already exists on File Service for UUID ${fileUuid}, updating local state as uploaded.`);
                 this.eventManager.emit(EVENTS.FILE_UPLOADED, { filePath });
                 return true;
             }

@@ -2,14 +2,13 @@
  * Copyright (c) University of Sheffield AMRC 2025.
  */
 
-import {log} from "./helpers/log.js";
+import { log } from "./helpers/log.js";
 import { SparkplugNode } from "./sparkplugNode.js";
 import {
     Metrics,
     parseTimeStampFromPayload,
     parseValueFromPayload,
-    processArrayPayload,
-    isArrayPayload,
+    processJSONBatchedPayload,
     serialisationType,
     sparkplugDataType,
     sparkplugMetric,
@@ -352,28 +351,28 @@ export class Device {
                     // value
                     if (!parseVals || (parseVals && ((typeof metric.properties.path !== "undefined" && metric.properties.path.value) || Object.keys(
                         obj).length == 1))) {
-                        // Check if this is a JSON array payload
-                        let payload: any;
-                        try {
-                            if (typeof obj[addr] === "string") {
-                                payload = JSON.parse(obj[addr]);
-                            } else if (Buffer.isBuffer(obj[addr])) {
-                                payload = JSON.parse(obj[addr].toString());
-                            } else {
-                                payload = obj[addr];
+                        // Handle JSON (Batched) format explicitly
+                        if (parseVals && this._payloadFormat === serialisationType.JSONBatched) {
+                            // Parse the payload as JSON
+                            let payload: any;
+                            try {
+                                if (typeof obj[addr] === "string") {
+                                    payload = JSON.parse(obj[addr]);
+                                } else if (Buffer.isBuffer(obj[addr])) {
+                                    payload = JSON.parse(obj[addr].toString());
+                                } else {
+                                    payload = obj[addr];
+                                }
+                            } catch (e) {
+                                log(`Failed to parse JSON (Batched) payload: ${e}`);
+                                return;
                             }
-                        } catch (e) {
-                            // Not a valid JSON, continue with normal processing
-                            payload = obj[addr];
-                        }
 
-                        // Check if this is an array payload
-                        if (parseVals && this._payloadFormat === serialisationType.JSON && isArrayPayload(payload)) {
-                            // Process each item in the array
-                            const arrayResults = processArrayPayload(payload, metric);
+                            // Process the batched payload
+                            const batchResults = processJSONBatchedPayload(payload, metric);
 
-                            // Create a metric for each item in the array
-                            arrayResults.forEach(result => {
+                            // Create a metric for each item in the batch
+                            batchResults.forEach(result => {
                                 const { value, timestamp } = result;
 
                                 // Test if the value is a bigint and convert it to a Long
@@ -394,7 +393,7 @@ export class Device {
                                 }
                             });
                         } else {
-                            // Standard processing for non-array payloads
+                            // Standard processing for all other payload formats
                             let newVal = parseVals ? parseValueFromPayload(obj[addr],
                                 metric,
                                 this._payloadFormat,
@@ -422,12 +421,12 @@ export class Device {
                                 );
 
                                 // Update the metric value and push it to the array of changed metrics
-                            changedMetrics.push({
-                                ...(this._metrics.setValueByAddrPath(addr,
+                                changedMetrics.push({
+                                    ...(this._metrics.setValueByAddrPath(addr,
                                         path,
                                         newVal,
-                                    timestamp))
-                            });
+                                        timestamp))
+                                });
                             }
                         }
                     }

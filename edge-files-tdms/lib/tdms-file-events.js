@@ -17,6 +17,9 @@ export const EVENTS = {
   FILE_ADD_AS_CLASS_MEMBER_FAILED: 'file:addAsClassMemberFailed',
 
   FILE_SKIPPED: 'file:skipped',
+
+  FILE_SUMMARY_PREPARED: 'file:summaryPrepared',
+  FILE_SUMMARY_FAILED: 'file:summaryFailed',
 };
 
 export class TDMSEventManager extends EventEmitter {}

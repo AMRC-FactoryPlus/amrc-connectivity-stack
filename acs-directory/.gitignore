@@ -6,6 +6,9 @@
 # Local build
 config.mk
 
+# Gitignore package-lock as it messes up cross-platform builds
+package-lock.json
+
 # Environment
 .env
 

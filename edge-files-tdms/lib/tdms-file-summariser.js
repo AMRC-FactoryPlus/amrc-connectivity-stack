@@ -14,11 +14,12 @@ class TDMSSummariser {
   }
 
   bindToEvents() {
-    this.eventManager.on(EVENTS.FILE_UPLOADED, this.handleFile.bind(this));
-    console.log('SUMMARISER: Preparing summary...');
+    this.eventManager.on(EVENTS.FILE_UPLOADED, this.handleFileSummary.bind(this));
+    this.eventManager.on(EVENTS.FILE_SUMMARY_PREPARED, this.handlePreparedSummary.bind(this));
+    this.eventManager.on(EVENTS.FILE_SUMMARY_FAILED, this.handlePreparedSummaryFailed.bind(this));
   }
 
-  async handleFile({filePath}) {
+  async handleFileSummary({filePath}) {
     try {
      if (!(await isFileExist(filePath))) {
       console.error(`SUMMARISER: Filepath ${filePath} does not exist.`);
@@ -42,29 +43,34 @@ class TDMSSummariser {
           console.error(`SUMMARISER: python stderr - ${data}`);
         });
 
-        // When child process exits, return summary json
-        return new Promise((resolve, reject) => {
-          child.on("close", (code) => {
+        child.on("close", (code) => {
             if (code === 0) {
               console.log('SUMMARISER: Python script completed successfully.');
-              console.log('Summary:', summary);
-              resolve(summary);
+              // console.log('Summary:', summary);
+              this.eventManager.emit(EVENTS.FILE_SUMMARY_PREPARED, {summary});  
             } else {
-              reject(new Error(`SUMMARISER: Python script exited with code ${code}`));
+              this.eventManager.emit(EVENTS.FILE_SUMMARY_FAILED, {filePath, error: new Error(`Python script exited with code ${code}`)});
             }
-          });
         });
+
     }
 
     catch (err) {
       console.error(`SUMMARISER: Error summarising ${filePath}`, err);
-      this.eventManager.emit(EVENTS.FILE_UPLOAD_FAILED, {filePath, error: err});
+      // this.eventManager.emit(EVENTS.FILE_SUMMARY_FAILED, {filePath, error: err});
     }
 
    
   }
 
- 
+  async handlePreparedSummary({summary}) {
+    // Handle summary data (upload to influxDB?)
+    console.log('SUMMARISER: Summary received:', summary);
+  }
+
+  handlePreparedSummaryFailed({filePath, error}) {
+    console.error(`SUMMARISER: Failed to prepare summary for ${filePath}`, error);
+  }
 }   
  
 

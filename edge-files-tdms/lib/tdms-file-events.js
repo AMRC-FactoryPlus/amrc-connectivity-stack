@@ -14,6 +14,9 @@ export const EVENTS = {
   FILE_UPLOAD_FAILED: 'file:uploadFailed',
 
   FILE_SKIPPED: 'file:skipped',
+
+  FILE_SUMMARY_PREPARED: 'file:summaryPrepared',
+  FILE_SUMMARY_FAILED: 'file:summaryFailed',
 };
 
 export class TDMSEventManager extends EventEmitter {}

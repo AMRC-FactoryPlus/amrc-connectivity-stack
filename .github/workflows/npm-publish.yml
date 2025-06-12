@@ -1,0 +1,62 @@
+name: Publish Package
+
+env:
+  REGISTRY: ghcr.io
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Extract and validate version
+        id: check_version
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          NAME="${TAG%%/*}"
+          PATTERN='^js-[-a-z]*\/v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'
+          echo "Release tag: $TAG"
+          if [[ "$TAG" =~ $PATTERN ]]; then
+            echo "Valid tag format."
+            echo "is_valid=true" >> $GITHUB_OUTPUT
+            echo "version=${TAG#${NAME}/v}" >> $GITHUB_OUTPUT
+            echo "name=${NAME}" >> $GITHUB_OUTPUT
+          else
+            echo "Invalid tag format."
+            echo "is_valid=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Set up Node.js
+        if: steps.check_version.outputs.is_valid == 'true' && steps.check_version.outputs.name != null
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16.x'
+
+      - name: Install Dependencies
+        if: steps.check_version.outputs.is_valid == 'true' && steps.check_version.outputs.name != null
+        working-directory: './lib/${{steps.check_version.outputs.name}}'
+        run: npm install --verbose
+
+      - name: Update version in package.json
+        if: steps.check_version.outputs.is_valid == 'true' && steps.check_version.outputs.name != null
+        working-directory: './lib/${{steps.check_version.outputs.name}}'
+        run: |
+          VERSION=${{ steps.check_version.outputs.version }}
+          echo "name: ${{steps.check_version.outputs.name}}"
+          echo "Updating version to: $VERSION"
+          jq ".version = \"$VERSION\"" package.json > package.json.tmp
+          mv package.json.tmp package.json
+
+      - name: Publish to npm
+        if: steps.check_version.outputs.is_valid == 'true' && steps.check_version.outputs.name != null
+        working-directory: './lib/${{steps.check_version.outputs.name}}'
+        run: |
+          echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
+          npm publish --dry-run
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

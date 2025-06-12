@@ -215,6 +215,7 @@ jobs:
           - edge-test
           - edge-openprotocol
           - edge-tplink-smartplug
+          - edge-ads
     permissions:
       contents: read
       packages: write

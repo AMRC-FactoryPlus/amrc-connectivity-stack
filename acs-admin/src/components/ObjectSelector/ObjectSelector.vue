@@ -26,7 +26,12 @@
             :clickable="!multiSelect"
             @row-click="e => {$emit('update:modelValue', [e.original]); updateOpen(false)}"
             :filters="[]">
-          <template #default="slotProps">
+          <template #toolbar-left="slotProps">
+            <div class="text-slate-500 whitespace-nowrap">
+              Showing {{slotProps.table.getFilteredRowModel().rows.length}} of {{slotProps.table.getPreFilteredRowModel().rows.length}}
+            </div>
+          </template>
+          <template #toolbar-right="slotProps">
             <div class="flex items-center justify-center gap-2">
               <div v-if="multiSelect" class="whitespace-nowrap mr-4">{{slotProps.selectedObjects.length}} selected</div>
               <slot name="actions"></slot>

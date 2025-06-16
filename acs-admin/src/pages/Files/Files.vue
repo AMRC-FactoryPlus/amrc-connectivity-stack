@@ -16,7 +16,7 @@
                          @row-click="e => objectClick(e.original)"
     >
       <template #toolbar-right>
-        <Button class="gap-2">
+        <Button class="gap-2" disabled>
           <span>Upload File</span>
         </Button>
       </template>

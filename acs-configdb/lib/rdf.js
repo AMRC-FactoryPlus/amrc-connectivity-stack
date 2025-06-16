@@ -43,6 +43,11 @@ const WK = {
     subset:     iri("void:subset"),
 };
 
+const Relations = [
+    [WK.type,       "all_membership"],
+    [WK.subclass,   "all_subclass"],
+];
+
 function from_ttl (ttl) {
     const ttlp = Object.entries(PREFIXES)
         .map(([p, u]) => `@prefix ${p}: <${u}>.`)

@@ -4,8 +4,7 @@ env:
   BASE_JS_VERSION: v4.0.0
 
 on:
-  release:
-    types: [ published ]
+  workflow_call: {}
 
 jobs:
   build-base-js:

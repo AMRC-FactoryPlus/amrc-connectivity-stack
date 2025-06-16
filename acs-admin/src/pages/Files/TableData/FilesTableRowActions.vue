@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type {Row} from '@tanstack/vue-table'
 import type {Alert} from './columns'
+import {useFileDownload} from "@composables/useFileDownload.js";
 import { useServiceClientStore } from '@/store/serviceClientStore.js'
 import {Button} from '@/components/ui/button'
 import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,} from '@/components/ui/dropdown-menu'
@@ -16,13 +17,11 @@ const s = useServiceClientStore();
 function copy(id: string) {
   navigator.clipboard.writeText(id)
 }
-function download(row){
-  const link = document.createElement('a');
-  link.href = `${s.scheme}://files.${s.baseUrl}/v1/file/${row.original.uuid}`;
-  link.target = '_blank';
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+async function download(row){
+  if(!row.original.uuid)
+    return;
+  const name = row?.original.filesConfiguration?.original_file_name ?? row.original.uuid;
+  await useFileDownload(s.client, name, row.original.uuid);
 }
 
 </script>

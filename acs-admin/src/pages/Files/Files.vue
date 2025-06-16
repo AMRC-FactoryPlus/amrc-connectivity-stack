@@ -91,6 +91,7 @@ import {useServiceClientStore} from "@store/serviceClientStore.js";
 import {formatFileSize} from '@/lib/utils'
 import {useDirectStore} from "@store/useDirectStore.js";
 import {useObjectStore} from "@store/useObjectStore.js";
+import {useFileDownload} from "@composables/useFileDownload.js";
 
 export default {
   emits: ['rowClick'],
@@ -103,7 +104,7 @@ export default {
       file: useFileStore(),
       columns: columns,
       router: useRouter(),
-      serviceClient: useServiceClientStore(),
+      s: useServiceClientStore(),
       directStore: useDirectStore(),
       objectStore: useObjectStore(),
     }
@@ -136,16 +137,11 @@ export default {
         return
       this.router.push({ path: `/configdb/applications/${UUIDs.App.FilesConfig}/${this.selectedRow.file_uuid}`})
     },
-    download(){
+    async download(){
       if(!this.selectedRow?.file_uuid)
-        return
-      const link = document.createElement('a');
-      link.href = `${this.serviceClient.scheme}://files.${this.serviceClient.baseUrl}/v1/file/${this.selectedRow.file_uuid}`;
-      link.target = '_blank';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
+        return;
+      const name = this.selectedRow.original_file_name ?? this.selectedRow.file_uuid;
+      await useFileDownload(this.s.client, name, this.selectedRow.file_uuid);
     },
     resolveType(){
       if(!this.selectedRow?.file_uuid)

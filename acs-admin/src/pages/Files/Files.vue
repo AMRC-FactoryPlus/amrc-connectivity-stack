@@ -35,7 +35,7 @@
                 <i class="fa-solid fa-external-link text-gray-400"></i>
               </Button>
             </div>
-            <Button class="flex mr-2" variant="outline" @click="download">
+            <Button class="flex mr-2" variant="outline" :disabled="!selectedRow.file_uuid" @click="download">
               <span>Download</span>
             </Button>
           </div>

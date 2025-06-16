@@ -13,6 +13,7 @@
                          :clickable="true"
                          :filters="[]"
                          :selected-objects="[]"
+                         :default-sort="initialSort"
                          @row-click="e => objectClick(e.original)"
     >
       <template #toolbar-right>
@@ -118,9 +119,12 @@ export default {
     files () {
       return this.file.data;
     },
-    filesLoading () {
-      return !this.file.ready || this.file.loading
-    },
+    initialSort () {
+      return [{
+        id: 'created',
+        desc: true
+      }]
+    }
   },
   methods: {
     formatFileSize,

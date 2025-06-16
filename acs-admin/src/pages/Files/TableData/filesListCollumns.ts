@@ -59,9 +59,15 @@ export const columns: ColumnDef<ApplicationMapping>[] = [
             day: 'numeric',
             hour: '2-digit',
             minute: '2-digit',
+            second: '2-digit',
             hour12: false
         }) :
         "--",
+    sortingFn: (rowA, rowB, columnId) => {
+        const dateA = new Date(rowA.original.filesConfiguration?.date_uploaded ?? 0);
+        const dateB = new Date(rowB.original.filesConfiguration?.date_uploaded ?? 0);
+        return dateA.getTime() - dateB.getTime();
+    },
     header: ({column}) => h(DataTableColumnHeader, {
         column,
         title: 'Created'

@@ -43,6 +43,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write
 
   js-lib:
     needs: choose-type

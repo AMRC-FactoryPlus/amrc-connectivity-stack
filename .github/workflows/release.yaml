@@ -41,7 +41,7 @@ jobs:
     if: ${{ needs.choose-type.outputs.type == 'acs' }}
     uses: ./.github/workflows/publish.yml
     permissions:
-      contents: read
+      contents: write
       packages: write
       id-token: write
 

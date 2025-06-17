@@ -40,4 +40,4 @@ jobs:
           npm install --verbose
 
           echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
-          npm publish --access=public --dry-run
+          npm publish --access=public

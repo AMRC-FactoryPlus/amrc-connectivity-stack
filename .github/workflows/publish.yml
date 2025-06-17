@@ -377,6 +377,8 @@ jobs:
     if: github.event_name == 'release'
     needs: build-helm-chart
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Install Helm
         run: |

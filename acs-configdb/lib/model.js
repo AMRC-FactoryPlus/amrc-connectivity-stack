@@ -155,29 +155,29 @@ export default class Model extends EventEmitter {
 
     /* XXX This is the correct place to set the owner of the new object
      * but I don't have access to that information yet. */
-    async _object_create_uuid (query, uuid, klass) {
+    async _object_create_uuid (query, uuid, klass, owner) {
         return _q_row(query, `
-            insert into object (uuid, class, rank)
-            select $1, c.id, c.rank - 1
+            insert into object (uuid, class, rank, owner)
+            select $1, c.id, c.rank - 1, $3
                 from object c
                 where c.id = $2
             returning id, uuid
-        `, [uuid, klass]);
+        `, [uuid, klass, owner]);
     }
 
-    async _object_create_new (query, klass) {
+    async _object_create_new (query, klass, owner) {
         /* Normally this loop will return first time round. On the
          * (astronomically) rare occasion that Pg generates a UUID which
          * conflicts with one already in the database we will retry. */
         for (;;) {
             const obj = await query(`
-                insert into object (class, rank)
-                select c.id, c.rank - 1
+                insert into object (class, rank, owner)
+                select c.id, c.rank - 1, $2
                     from object c
                     where c.id = $1
                 on conflict (uuid) do nothing
                 returning id, uuid
-            `, [klass]);
+            `, [klass, owner]);
             if (obj.rowCount)
                 return obj.rows[0];
         }
@@ -244,6 +244,10 @@ export default class Model extends EventEmitter {
         spec = merge_patch.apply({ ...info }, spec);
         if (deep_equal(info, spec))
             return 204;
+
+        /* Forbid all owner changes for now. */
+        if (spec.owner != info.owner)
+            return 403;
 
         if (spec.rank != info.rank) {
             const st = await this._update_rank(q, id, info, spec);
@@ -405,9 +409,14 @@ export default class Model extends EventEmitter {
         const c_id = await this._obj_id(q, spec.class);
         if (!c_id) return [404];
 
+        const o_id = spec.owner
+            ? await this._obj_id(q, spec.owner)
+            : ObjID.Unowned;
+        if (!o_id) return [404];
+
         const obj = await (spec.uuid
-            ? this._object_create_uuid(q, spec.uuid, c_id)
-            : this._object_create_new(q, c_id))
+            ? this._object_create_uuid(q, spec.uuid, c_id, o_id)
+            : this._object_create_new(q, c_id, o_id))
 
         await this._class_add(q, c_id, "membership", obj.id);
         await this._add_rank_superclass(q, obj.id);

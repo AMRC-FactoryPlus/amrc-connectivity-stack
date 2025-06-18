@@ -133,6 +133,7 @@ export class APIv2 {
             spec.class ?? UUIDs.Null, true);
         if (!ok) return res.status(403).end();
 
+        spec.owner = await this.fplus.Auth.resolve_identity("kerberos", req.auth);
         const [st, info] = await this.model.object_create(spec);
 
         if (st > 299)

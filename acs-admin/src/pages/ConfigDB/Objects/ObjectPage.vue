@@ -173,6 +173,11 @@
             label="Rank"
             :value="object?.rank.toString() ?? ''"
         />
+        <SidebarDetail
+            icon="user-shield"
+            label="Owner"
+            :value="object.owner.name"
+        />
         <div class="pt-2">
           <RouterLink :to="`/configdb/applications/${UUIDs.App.Info}/${object.uuid}`">
             <Button title="Go to object information" size="xs" class="flex gap-2 text-gray-500" variant="ghost">

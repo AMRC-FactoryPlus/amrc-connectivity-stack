@@ -50,6 +50,10 @@ export const useObjectStore = defineStore('object', {
                 uuid: reg.class,
                 name: name_of(reg.class),
               },
+              owner: {
+                uuid: reg.owner,
+                name: name_of(reg.owner),
+              },
             }));
         }),
         /* Allow multiple consumers without duplicating work */

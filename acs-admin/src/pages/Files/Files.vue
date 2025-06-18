@@ -31,7 +31,7 @@
                 <i class="fa-fw fa-solid fa-file"></i>
                 <div class="font-semibold text-xl">File</div>
               </div>
-              <Button title="Go to object" size="xs" class="flex gap-1" @click="goToObject" variant="ghost">
+              <Button title="Go to config entry" size="xs" class="flex gap-1" @click="goToObject" variant="ghost">
                 <i class="fa-solid fa-external-link text-gray-400"></i>
               </Button>
             </div>

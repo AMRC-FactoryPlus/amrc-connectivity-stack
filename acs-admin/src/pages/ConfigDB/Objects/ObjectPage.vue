@@ -127,7 +127,7 @@
           v-if="object.rank > 0">
         <template #toolbar-left>
           <div class="flex items-center justify-start gap-2 pl-1">
-            <i :class="`fa-fw fa-solid fa-users`"></i>
+            <i class="fa-fw fa-solid fa-users"></i>
             <div class="font-semibold text-xl">Members</div>
           </div>
         </template>
@@ -153,6 +153,7 @@
           </div>
         </template>
       </DataTable>
+      <div v-if="object.rank === 0" class="text-center text-gray-400">Objects of rank 0 cannot have members or subclasses, nor can they be subclasses.</div>
     </div>
 
     <!-- Sidebar -->

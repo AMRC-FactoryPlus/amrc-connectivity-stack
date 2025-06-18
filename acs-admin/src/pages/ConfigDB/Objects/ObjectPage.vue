@@ -173,6 +173,14 @@
             label="Rank"
             :value="object?.rank.toString() ?? ''"
         />
+        <div class="pt-2">
+          <RouterLink :to="`/configdb/applications/${UUIDs.App.Info}/${object.uuid}`">
+            <Button title="Go to object information" size="xs" class="flex gap-2 text-gray-500" variant="ghost">
+              <i class="fa-solid fa-external-link"></i>
+              Go to object information entry
+            </Button>
+          </RouterLink>
+        </div>
       </div>
       <div class="font-semibold text-lg p-4 border-b">Class Information</div>
       <div class="space-y-4 p-4">
@@ -186,7 +194,14 @@
             label="UUID"
             :value="object?.class?.uuid ?? ''"
         />
-
+        <div class="pt-2">
+          <RouterLink :to="`/configdb/applications/${UUIDs.App.Registration}/${object.uuid}`">
+            <Button title="Go to object registration" size="xs" class="flex gap-2 text-gray-500" variant="ghost">
+              <i class="fa-solid fa-external-link"></i>
+              Go to object registration entry
+            </Button>
+          </RouterLink>
+        </div>
       </div>
     </div>
   </div>
@@ -211,6 +226,7 @@ import { defineAsyncComponent } from 'vue'
 import { useServiceClientStore } from '@store/serviceClientStore.js'
 import { toast } from 'vue-sonner'
 import SidebarDetail from '@components/SidebarDetail.vue'
+import {UUIDs} from "@amrc-factoryplus/service-client";
 
 export default {
   emits: ['rowClick'],
@@ -227,6 +243,7 @@ export default {
       m: useMemberStore(),
       route: useRoute(),
       router: useRouter(),
+      UUIDs,
     }
   },
 

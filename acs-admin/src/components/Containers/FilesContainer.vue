@@ -3,10 +3,10 @@
   -->
 
 <template>
-  <div class="flex flex-col h-[calc(100vh-100px)] ">
+  <div class="flex flex-col h-[calc(100vh-100px)] -m-4">
     <div class="flex-1 overflow-hidden">
       <div class="flex h-full">
-        <div class="flex-1 overflow-auto" :class="[padding]">
+        <div class="flex-1 overflow-auto p-6">
           <slot></slot>
         </div>
         <slot name="sidebar"></slot>
@@ -20,11 +20,6 @@
 export default {
   name: 'FilesContainer',
   components: {
-
-    props: {
-      padding: {type: String, default: 'p-4'},
-    },
-
     setup() {
       return {}
     }

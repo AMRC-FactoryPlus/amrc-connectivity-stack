@@ -14,7 +14,7 @@ helm.package=	${repo}-${helm.version}.tgz
 all: package push
 
 package:
-	rm -f ${helm.package}
+	rm -f *.tgz
 	helm dependency build
 	helm package --version ${helm.version} .
 

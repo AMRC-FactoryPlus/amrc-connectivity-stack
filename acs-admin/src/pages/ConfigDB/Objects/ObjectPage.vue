@@ -6,6 +6,14 @@
   <div v-else class="flex h-full">
     <!-- Main content -->
     <div class="flex flex-col gap-4 pr-4 flex-1 overflow-auto">
+      <div>
+        <RouterLink  :to="`/configdb/objects`">
+          <Button size="sm" class="gap-2">
+            <i class="fa-solid fa-arrow-left"></i>
+            Back
+          </Button>
+        </RouterLink>
+      </div>
       <DataTable
           :data="isSubclassOf"
           :default-sort="initialSort"
@@ -119,7 +127,7 @@
           v-if="object.rank > 0">
         <template #toolbar-left>
           <div class="flex items-center justify-start gap-2 pl-1">
-            <i :class="`fa-fw fa-solid fa-users`"></i>
+            <i class="fa-fw fa-solid fa-users"></i>
             <div class="font-semibold text-xl">Members</div>
           </div>
         </template>
@@ -145,39 +153,55 @@
           </div>
         </template>
       </DataTable>
+      <div v-if="object.rank === 0" class="text-center text-gray-400">Objects of rank 0 cannot have members or subclasses, nor can they be subclasses.</div>
     </div>
 
     <!-- Sidebar -->
     <div class="w-96 flex-shrink-0 border-l -my-4 -mr-4">
       <div class="flex items-center justify-start border-b gap-2 p-4">
         <i :class="`fa-fw fa-solid fa-cube`"></i>
-        <div class="font-semibold text-xl">{{object.name}}</div>
+        <div class="font-semibold text-xl">{{object?.name ?? ''}}</div>
       </div>
       <div class="space-y-4 p-4">
         <SidebarDetail
             icon="key"
             label="Node UUID"
-            :value="object.uuid"
+            :value="object?.uuid ?? ''"
         />
         <SidebarDetail
             icon="ranking-star"
             label="Rank"
-            :value="object.rank"
+            :value="object?.rank.toString() ?? ''"
         />
+        <div class="pt-2">
+          <RouterLink :to="`/configdb/applications/${UUIDs.App.Info}/${object.uuid}`">
+            <Button title="Go to object information" size="xs" class="flex gap-2 text-gray-500" variant="ghost">
+              <i class="fa-solid fa-external-link"></i>
+              Go to object information entry
+            </Button>
+          </RouterLink>
+        </div>
       </div>
       <div class="font-semibold text-lg p-4 border-b">Class Information</div>
       <div class="space-y-4 p-4">
         <SidebarDetail
             icon="tag"
             label="Name"
-            :value="object.class.name"
+            :value="object?.class?.name ?? ''"
         />
         <SidebarDetail
             icon="key"
             label="UUID"
-            :value="object.class.uuid"
+            :value="object?.class?.uuid ?? ''"
         />
-
+        <div class="pt-2">
+          <RouterLink :to="`/configdb/applications/${UUIDs.App.Registration}/${object.uuid}`">
+            <Button title="Go to object registration" size="xs" class="flex gap-2 text-gray-500" variant="ghost">
+              <i class="fa-solid fa-external-link"></i>
+              Go to object registration entry
+            </Button>
+          </RouterLink>
+        </div>
       </div>
     </div>
   </div>
@@ -202,6 +226,7 @@ import { defineAsyncComponent } from 'vue'
 import { useServiceClientStore } from '@store/serviceClientStore.js'
 import { toast } from 'vue-sonner'
 import SidebarDetail from '@components/SidebarDetail.vue'
+import {UUIDs} from "@amrc-factoryplus/service-client";
 
 export default {
   emits: ['rowClick'],
@@ -218,6 +243,7 @@ export default {
       m: useMemberStore(),
       route: useRoute(),
       router: useRouter(),
+      UUIDs,
     }
   },
 

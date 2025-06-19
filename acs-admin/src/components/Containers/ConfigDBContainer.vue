@@ -5,23 +5,27 @@
 <template>
   <div class="flex flex-col h-[calc(100vh-64px)] -m-4">
     <div class="flex justify-between bg-white sticky top-[-1rem] border-b z-10">
-      <EdgeBreadcrumbs/>
+      <ConfigDBBreadcrumbs/>
       <slot name="header"></slot>
     </div>
-    <div class="flex-1 overflow-hidden" :class="[padding]">
-      <slot></slot>
+    <div class="flex-1 overflow-hidden">
+      <div class="flex h-full">
+        <div class="flex-1 overflow-auto" :class="[padding]">
+          <slot></slot>
+        </div>
+        <slot name="sidebar"></slot>
+      </div>
     </div>
   </div>
 </template>
 
 <script>
-import EdgeBreadcrumbs from '@components/Nav/EdgeBreadcrumbs.vue'
+import ConfigDBBreadcrumbs from '@components/Nav/ConfigDBBreadcrumbs.vue'
 
 export default {
-
-  name: 'EdgeContainer',
+  name: 'ConfigDBContainer',
   components: {
-    EdgeBreadcrumbs,
+    ConfigDBBreadcrumbs,
   },
 
   props: {

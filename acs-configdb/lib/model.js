@@ -568,7 +568,7 @@ export default class Model extends EventEmitter {
         });
     }
 
-    _config_list (app) {
+    config_list (app) {
         return this.db.txn({}, async query => {
             const app_id = await this._app_id(query, app);
             if (app_id == null) return null;
@@ -582,15 +582,8 @@ export default class Model extends EventEmitter {
         });
     }
 
-    async config_list(app) {
-        const special = this.special.get(app);
-        if (special && special.list)
-            return special.list();
-        return this._config_list(app);
-    }
-
-    async config_class_list(app, klass) {
-        return await this.db.txn({}, async query => {
+    config_class_list(app, klass) {
+        return this.db.txn({}, async query => {
             const app_id = await this._app_id(query, app);
             if (app_id == null) return null;
             const class_id = await this._class_id(query, klass);
@@ -616,12 +609,6 @@ export default class Model extends EventEmitter {
     }
 
     config_get(q) {
-        const special = this.special.get(q.app)
-        /* XXX This is not correct. We need to at least cache the result
-         * for PATCH. */
-        if (special && special.get)
-            return special.get(q.object);
-
         return _q_row(this.db.query.bind(this.db), `
             select c.json config, c.etag
             from config c
@@ -630,6 +617,20 @@ export default class Model extends EventEmitter {
             where a.uuid = $1
                 and o.uuid = $2
         `, [q.app, q.object]);
+    }
+
+    config_get_all (app) {
+        return this.db.txn({}, async query => {
+            const app_id = await this._app_id(query, app);
+            if (app_id == null) return null;
+
+            return _q_set(query, `
+                select o.uuid object, c.json config, c.etag
+                from config c
+                    join object o on o.id = c.object
+                where c.app = $1
+            `, [app_id]);
+        });
     }
 
     async _config_validate (query, { app, object, config, special }) {

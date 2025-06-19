@@ -83,7 +83,6 @@ export default class Model extends EventEmitter {
         ajv_formats(this.ajv);
 
         this.schemas = new Map();
-        this.special = new Map();
 
         /* { app, obj, etag, config }
          * config is undefined for a delete entry */
@@ -93,10 +92,20 @@ export default class Model extends EventEmitter {
     async init() {
         await this.db.init();
 
-        for (const Sp of SpecialApps)
-            this.special.set(Sp.application, new Sp(this));
-
         return this;
+    }
+
+    with_auth (auth) {
+        const rv = Object.create(this);
+        rv.auth = auth;
+        this.log("CREATED HANDLER: %o", rv);
+        return rv;
+    }
+
+    get_special (app) {
+        const Sp = SpecialApps.find(s => s.application == app);
+        if (!Sp) return;
+        return new Sp(this);
     }
 
     emit_change(params) {
@@ -246,6 +255,7 @@ export default class Model extends EventEmitter {
             return 204;
 
         /* Forbid all owner changes for now. */
+        this.log("OWNER CHANGE: %s %s %s", spec.owner, info.owner, this.auth);
         if (spec.owner != info.owner)
             return 403;
 
@@ -680,7 +690,7 @@ export default class Model extends EventEmitter {
     }
 
     async config_put(q, config, check_etag) {
-        const special = this.special.get(q.app);
+        const special = this.get_special(q.app);
 
         const rv = await this.db.txn({}, async query => {
             const appid = await this._app_id(query, q.app);
@@ -717,7 +727,7 @@ export default class Model extends EventEmitter {
     }
 
     async config_delete(q, check_etag) {
-        const special = this.special.get(q.app);
+        const special = this.get_special(q.app);
 
         const rv = await this.db.txn({}, async query => {
             const conf = await _q_row(query, `
@@ -752,7 +762,7 @@ export default class Model extends EventEmitter {
     }
 
     async config_merge_patch (q, patch, check_etag) {
-        const special = this.special.get(q.app);
+        const special = this.get_special(q.app);
 
         const [st, config] = await this.db.txn({}, async query => {
             const app = await this._app_id(query, q.app);

@@ -303,7 +303,8 @@ export class APIv2 {
         if (ok.includes(false))
             return res.status(403).end();
 
-        const st = await this.model.config_merge_patch(req.params, req.body,
+        const handler = this.model.with_auth(req.auth);
+        const st = await handler.config_merge_patch(req.params, req.body,
             etags.checker(req));
         res.status(st == 201 ? 204 : st).send();
     }

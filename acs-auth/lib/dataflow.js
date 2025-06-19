@@ -8,7 +8,8 @@ import imm from "immutable";
 import rx from "rxjs";
 import { v4 as uuidv4 } from "uuid";
 
-import * as rxx from "@amrc-factoryplus/rx-util";
+import { UUIDs }    from "@amrc-factoryplus/service-client";
+import * as rxx     from "@amrc-factoryplus/rx-util";
 
 import { Class, Special } from "./uuids.js";
 
@@ -30,6 +31,7 @@ export class DataFlow {
         this.identities = this._build_identities();
         this.grants = this._build_grants();
         this.groups = this._build_groups();
+        this.owned = this._build_owned();
     }
 
     _build_responses () {
@@ -98,6 +100,21 @@ export class DataFlow {
             rx.shareReplay(1));
     }
 
+    _build_owned () {
+        const { cdb } = this;
+        const { App } = UUIDs;
+
+        return rxx.rx(
+            cdb.search_app(App.Registration),
+            rx.map(es => es.entrySeq()
+                .map(([obj, inf]) => [obj, inf.owner])
+                .filter(([obj, owner]) => owner != Special.Unowned)
+                .groupBy(([obj, owner]) => owner)
+                .toMap()
+                .map(es => new imm.Set(es.map(e => e[0])))),
+            rx.shareReplay(1));
+    }
+
     run () {
         this.groups.subscribe(gs => this.log("GROUPS UPDATE"));
             //imm.Map(gs).toJS()));
@@ -129,9 +146,10 @@ export class DataFlow {
         return rxx.rx(
             rx.combineLatest({
                 groups:     this.groups,
-                grants:       this.grants,
+                grants:     this.grants,
+                owned:      this.owned,
             }),
-            rx.map(({ groups, grants }) => {
+            rx.map(({ groups, grants, owned }) => {
                 if (!groups.princ.has(principal))
                     return;
                 const accept_princ = groups.princ_grp
@@ -139,8 +157,9 @@ export class DataFlow {
                     .keySeq()
                     .concat(principal)
                     .toSet();
-                const expand = (grp, key, e) => {
-                    const ms = groups[grp].get(e[key]);
+                const expand = (e, key, grps) => {
+                    const ms = e[key] == Special.Mine
+                        ? owned.get(principal) : grps.get(e[key]);
                     return ms?.toArray()
                         ?.map(m => ({ ...e, [key]: m }))
                         ?? [];
@@ -148,8 +167,8 @@ export class DataFlow {
                 return grants
                     .filter(e => accept_princ.has(e.principal))
                     .flatMap(e => groups.perm.has(e.permission) ? [e]
-                        : expand("perm_grp", "permission", e))
-                    .flatMap(e => e.plural ? expand("targ_grp", "target", e) : [e])
+                        : expand(e, "permission", groups.perm_grp))
+                    .flatMap(e => e.plural ? expand(e, "target", groups.targ_grp) : [e])
                     .map(e => ({
                         permission: e.permission,
                         target:     e.target == Special.Self ? principal : e.target,

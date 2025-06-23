@@ -12,7 +12,7 @@ import rx from 'rxjs'
 
 import { DB } from '@amrc-factoryplus/pg-client'
 
-import { App, Class, Service, SpecialObj } from './constants.js'
+import { App, Class, Perm, Service, SpecialObj } from './constants.js'
 import { SpecialApps } from './special.js'
 
 const DB_Version = 11;
@@ -70,6 +70,7 @@ export default class Model extends EventEmitter {
         super();
         this.log = opts.debug.bound("model");
 
+        this.authz = opts.auth;
         this.db = new DB({
             debug:      opts.debug,
             version:    DB_Version,
@@ -95,11 +96,21 @@ export default class Model extends EventEmitter {
         return this;
     }
 
-    with_auth (auth) {
+    with_req (req) {
         const rv = Object.create(this);
-        rv.auth = auth;
-        this.log("CREATED HANDLER: %o", rv);
+        rv.upn = req.auth;
         return rv;
+    }
+
+    async check_acl (perm, targ) {
+        if (!this.upn)
+            return;
+        return this.authz.check_acl(this.upn, perm, targ, true);
+    }
+
+    async client_uuid () {
+        if (!this.upn) return;
+        return this._client_uuid ??= await this.authz.resolve_upn(this.upn);
     }
 
     get_special (app) {
@@ -254,10 +265,13 @@ export default class Model extends EventEmitter {
         if (deep_equal(info, spec))
             return 204;
 
-        /* Forbid all owner changes for now. */
-        this.log("OWNER CHANGE: %s %s %s", spec.owner, info.owner, this.auth);
-        if (spec.owner != info.owner)
-            return 403;
+        if (spec.uuid != info.uuid)
+            return 409;
+
+        if (spec.owner != info.owner) {
+            const st = await this._update_owner(q, id, info, spec);
+            if (st != 204) return st;
+        }
 
         if (spec.rank != info.rank) {
             const st = await this._update_rank(q, id, info, spec);
@@ -274,6 +288,25 @@ export default class Model extends EventEmitter {
             where id = $1
         `, [id, spec.deleted]);
 
+        return 204;
+    }
+
+    async _update_owner (q, id, from, to) {
+        this.log("OWNER CHANGE: %s %s", from.owner, to.owner);
+        /* We must have TakeFrom the old owner and GiveTo the new owner.
+         * Everyone implicitly has: TakeFrom Self; GiveTo Self, Unowned.
+         */
+        const f_ok = from.owner == await this.client_uuid()
+            || await this.check_acl(Perm.Take_From, from.owner);
+        const t_ok = to.owner == SpecialObj.Unowned
+            || to.owner == await this.client_uuid()
+            || await this.check_acl(Perm.Give_To, to.owner);
+        if (!f_ok || !t_ok) return 403;
+
+        const owner = await this._obj_id(q, to.owner);
+        if (!owner) return 409;
+
+        await q(`update object set owner = $2 where id = $1`, [id, owner]);
         return 204;
     }
 
@@ -417,12 +450,15 @@ export default class Model extends EventEmitter {
 
         if (!spec.class) return [422];
         const c_id = await this._obj_id(q, spec.class);
-        if (!c_id) return [404];
+        if (!c_id) return [409];
 
-        const o_id = spec.owner
-            ? await this._obj_id(q, spec.owner)
-            : ObjID.Unowned;
-        if (!o_id) return [404];
+        const ok = spec.owner == SpecialObj.Unowned
+            || spec.owner == await this.client_uuid()
+            || await this.check_acl(Perm.Give_To, spec.owner);
+        if (!ok) return [403];
+
+        const o_id = await this._obj_id(q, spec.owner);
+        if (!o_id) return [409];
 
         const obj = await (spec.uuid
             ? this._object_create_uuid(q, spec.uuid, c_id, o_id)
@@ -863,6 +899,9 @@ export default class Model extends EventEmitter {
     }
 
     async _dump_load_obj_v1 (dump) {
+        const creat = (u, c) => this.object_create({
+            uuid: u, class: c, owner: SpecialObj.Unowned });
+
         /* The order of loading here is important. This is why Classes
          * are handled separately from the others. */
         for (const uuid of dump.classes ?? []) {
@@ -871,7 +910,7 @@ export default class Model extends EventEmitter {
             if (uuid == Class.Class)
                 continue;
             this.log("LOAD v1 CLASS %s", uuid);
-            const [st] = await this.object_create({ uuid, class: Class.Class });
+            const [st] = await creat(uuid, Class.Class);
             if (st > 299) {
                 this.log("Dump failed [%s] on class %s", st, uuid);
                 return st;
@@ -880,7 +919,7 @@ export default class Model extends EventEmitter {
         for (const [klass, objs] of Object.entries(dump.objects ?? {})) {
             for (const uuid of objs) {
                 this.log("LOAD v1 OBJECT %s/%s", klass, uuid);
-                let [st] = await this.object_create({ uuid, class: klass });
+                let [st] = await creat(uuid, klass);
                 if (st > 299) {
                     this.log("Dump failed [%s] on object %s (%s)",
                         st, uuid, klass);
@@ -902,7 +941,7 @@ export default class Model extends EventEmitter {
     }
 
     /* The dump must have already been validated */
-    async dump_load(dump, overwrite) {
+    async dump_load(dump) {
         /* XXX This loads the dump in multiple transactions, which is
          * not ideal. But loading in one transaction, with the
          * additional logic involved, means reworking all the
@@ -918,9 +957,7 @@ export default class Model extends EventEmitter {
         for (const [app, objs] of Object.entries(dump.configs ?? {})) {
             for (const [object, conf] of Object.entries(objs)) {
                 this.log("LOAD CONFIG %s/%s", app, object);
-                const st = await this.config_put(
-                        {app, object, exclusive: !overwrite},
-                        conf);
+                const st = await this.config_put({app, object}, conf);
                 if (st > 299 && st != 409) {
                     this.log("Dump failed [%s] on config %s/%s", 
                         st, app, object);

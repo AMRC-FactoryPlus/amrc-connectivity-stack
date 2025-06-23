@@ -18,7 +18,13 @@ export class Auth {
         return acl(permission, target, wild);
     }
 
-    is_root (principal) {
-        return this.root &&  principal == this.root;
+    is_root (upn) {
+        return this.root && upn == this.root;
+    }
+
+    async resolve_upn (upn, maproot) {
+        if (this.is_root(upn))
+            return maproot;
+        return this.auth.resolve_identity("kerberos", upn);
     }
 }

@@ -89,7 +89,7 @@ export class APIv1 {
     }
 
     async apps_post(req, res) {
-        const ok = await this.auth.check_acl(req.auth, Perm.Manage_Obj, Class.App, true);
+        const ok = await this.auth.check_acl(req.auth, Perm.ManageObj, Class.App, true);
         if (!ok) return res.status(403).end();
 
         const uuid = req.body.uuid;
@@ -108,7 +108,7 @@ export class APIv1 {
     }
 
     async app_get(req, res) {
-        const ok = await this.auth.check_acl(req.auth, Perm.Manage_Obj, Class.App, true);
+        const ok = await this.auth.check_acl(req.auth, Perm.ManageObj, Class.App, true);
         if (!ok) return res.status(403).end();
 
         const uuid = req.params.app;
@@ -155,7 +155,7 @@ export class APIv1 {
 
     async config_search(req, res) {
         const {app, "class": klass} = req.params;
-        const ok = await this.auth.check_acl(req.auth, Perm.Read_App, app, true);
+        const ok = await this.auth.check_acl(req.auth, Perm.ReadApp, app, true);
         if (!ok) return res.status(403).end();
 
         const query = this.config_search_parse(req.query);
@@ -186,8 +186,8 @@ export class APIv1 {
     }
 
     async dump_save(req, res) {
-        const ok = await this.auth.check_acl(req.auth, Perm.Manage_Obj, UUIDs.Null)
-            && await this.auth.check_acl(req.auth, Perm.Read_App, UUIDs.Null);
+        const ok = await this.auth.check_acl(req.auth, Perm.ManageObj, UUIDs.Null)
+            && await this.auth.check_acl(req.auth, Perm.ReadApp, UUIDs.Null);
         if (!ok) return res.status(403).end();
 
         const dump = await this.model.dump_save();

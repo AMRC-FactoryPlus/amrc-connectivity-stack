@@ -92,7 +92,7 @@ class ConfigWatch {
             this.model.updates,
             rx.filter(u => u.type == "config"));
 
-        this.check_acl = acl_checker(this.session, Perm.Read_App, this.app, true);
+        this.check_acl = acl_checker(this.session, Perm.ReadApp, this.app, true);
     }
 
     single_config (object) {
@@ -199,7 +199,7 @@ class ConfigWatch {
 function class_watch (rel, session, klass) {
     const model = session.model;
 
-    const ck_acl = acl_checker(session, Perm.Manage_Obj, klass, true);
+    const ck_acl = acl_checker(session, Perm.ManageObj, klass, true);
 
     return rxx.rx(
         model.updates,

@@ -21,13 +21,26 @@ objects:
   # Directory perms are in directory.yaml
 
   !u ACS.PermGroup.ConfigDB:
-    !u ConfigDB.Perm.ReadConfig:      { name: "Read config for app" }
-    !u ConfigDB.Perm.WriteConfig:     { name: "Write config for app" }
-    !u ConfigDB.Perm.ManageAppSchema: { name: "Manage application schema" }
-    !u ConfigDB.Perm.ManageObjects:   { name: "Manage objects" }
-    !u ConfigDB.Perm.DeleteObjects:   { name: "Delete objects" }
-    !u ConfigDB.Perm.TakeFrom:        { name: "Take ownership from" }
-    !u ConfigDB.Perm.GiveTo:          { name: "Give ownership to" }
+    !u ConfigDB.Perm.ReadConfig:            { name: "Read config for app" }
+    !u ConfigDB.Perm.WriteConfig:           { name: "Write config for app" }
+
+    !u ConfigDB.Perm.ListObjects:           { name: "List objects" }
+    !u ConfigDB.Perm.CreateObject:          { name: "Create object" }
+    !u ConfigDB.Perm.CreateSpecificObject:  { name: "Create specific object" }
+    !u ConfigDB.Perm.ReadMembers:           { name: "Read class members" }
+    !u ConfigDB.Perm.WriteMembers:          { name: "Write class members" }
+    !u ConfigDB.Perm.WriteMemberships:      { name: "Write object memberships" }
+    !u ConfigDB.Perm.ReadSubclasses:        { name: "Read class subclasses" }
+    !u ConfigDB.Perm.WriteSubclasses:       { name: "Write class subclasses" }
+    !u ConfigDB.Perm.WriteSuperclasses:     { name: "Write class superclasses" }
+
+    # Unimplemented
+    #!u ConfigDB.Perm.ReadMemberships:      { name: "Read object memberships" }
+    #!u ConfigDB.Perm.ReadSuperclasses:     { name: "Read class superclasses" }
+
+    !u ConfigDB.Perm.DeleteObject:          { name: "Delete object" }
+    !u ConfigDB.Perm.TakeFrom:              { name: "Take ownership from" }
+    !u ConfigDB.Perm.GiveTo:                { name: "Give ownership to" }
 
   !u ACS.PermGroup.MQTT:
     !u MQTT.Perm.ReadNode:            { name: "Read Node" }

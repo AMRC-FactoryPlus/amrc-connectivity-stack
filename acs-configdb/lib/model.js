@@ -293,10 +293,10 @@ export default class Model extends EventEmitter {
          * Everyone implicitly has: TakeFrom Self; GiveTo Self, Unowned.
          */
         const f_ok = from.owner == await this.client_uuid()
-            || await this.check_acl(Perm.Take_From, from.owner);
+            || await this.check_acl(Perm.TakeFrom, from.owner);
         const t_ok = to.owner == SpecialObj.Unowned
             || to.owner == await this.client_uuid()
-            || await this.check_acl(Perm.Give_To, to.owner);
+            || await this.check_acl(Perm.GiveTo, to.owner);
         if (!f_ok || !t_ok) return 403;
 
         const owner = await this._obj_id(q, to.owner);
@@ -450,7 +450,7 @@ export default class Model extends EventEmitter {
 
         const ok = spec.owner == SpecialObj.Unowned
             || spec.owner == await this.client_uuid()
-            || await this.check_acl(Perm.Give_To, spec.owner);
+            || await this.check_acl(Perm.GiveTo, spec.owner);
         if (!ok) return [403];
 
         const o_id = await this._obj_id(q, spec.owner);

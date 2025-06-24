@@ -127,9 +127,9 @@ spec:
               value: "{{ .Values.configdb.bodyLimit }}"
             - name: BOOTSTRAP_ACL
               value: |
-                sv1auth@{{ .Values.identity.realm }}:Perm.Read_App:App.Registration
-                sv1auth@{{ .Values.identity.realm }}:Perm.Read_App:App.SparkplugAddress
-                sv1auth@{{ .Values.identity.realm }}:Perm.Manage_Obj:SpecialObj.Wildcard
+                sv1auth@{{ .Values.identity.realm }}:Perm.ReadApp:App.Registration
+                sv1auth@{{ .Values.identity.realm }}:Perm.ReadApp:App.SparkplugAddress
+                sv1auth@{{ .Values.identity.realm }}:Perm.ManageObj:SpecialObj.Wildcard
             - name: ROOT_PRINCIPAL
               value: admin@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
             # This is the value published via MQTT. The CDB editor does

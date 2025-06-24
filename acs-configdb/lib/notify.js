@@ -102,7 +102,7 @@ export class CDBNotify {
     single_config (session, app, object) {
         const { model } = this;
 
-        const ck_acl = this.acl_checker(session, Perm.Read_App, app, true);
+        const ck_acl = this.acl_checker(session, Perm.ReadApp, app, true);
 
         /* XXX Strictly there is a race condition here: the initial fetch
          * does not slot cleanly into the sequence of updates. This would be
@@ -121,7 +121,7 @@ export class CDBNotify {
     config_list (session, app) {
         const { model } = this;
 
-        const ck_acl = this.acl_checker(session, Perm.Read_App, app, true);
+        const ck_acl = this.acl_checker(session, Perm.ReadApp, app, true);
 
         /* Here we fetch the complete list every time. We could track
          * the list contents from changes but this is safer. */
@@ -149,7 +149,7 @@ export class CDBNotify {
     }
 
     config_search (session, app) {
-        const acl = this.acl_checker(session, Perm.Read_App, app, true);
+        const acl = this.acl_checker(session, Perm.ReadApp, app, true);
 
         const full = () => this.search_full(app);
         const updates = rxx.rx(
@@ -172,7 +172,7 @@ export class CDBNotify {
         const { model } = this;
 
         /* XXX We should check different perms for direct and derived */
-        const ck_acl = this.acl_checker(session, Perm.Manage_Obj, klass, true);
+        const ck_acl = this.acl_checker(session, Perm.ManageObj, klass, true);
 
         return rxx.rx(
             this.model.updates,

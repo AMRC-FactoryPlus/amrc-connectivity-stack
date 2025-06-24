@@ -98,6 +98,12 @@ export default class Model extends EventEmitter {
         return rv;
     }
 
+    async fetch_acl () {
+        if (!this.upn)
+            return () => false;
+        return this.authz.fetch_acl(this.upn);
+    }
+
     async check_acl (perm, targ) {
         if (!this.upn)
             return;

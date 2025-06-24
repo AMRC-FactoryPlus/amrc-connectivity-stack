@@ -78,52 +78,21 @@ export class APIv1 {
             });
         }
 
-        api.post("/app", this.apps_post.bind(this));
-        api.get("/app/:app", this.app_get.bind(this));
+        const deny = (req, res) => res.status(403).end();
+
+        /* Deny access to these compat endpoints at this point. Nothing
+         * is using them and it's awkward to keep them working. */
+        api.post("/app", deny);
+        api.get("/app/:app", deny);
 
         api.get("/app/:app/search", this.config_search.bind(this));
         api.get("/app/:app/class/:class/search", this.config_search.bind(this));
 
         api.post("/load", this.dump_load.bind(this));
-        api.get("/save", this.dump_save.bind(this));
-    }
 
-    async apps_post(req, res) {
-        const ok = await this.auth.check_acl(req.auth, Perm.ManageObj, Class.App, true);
-        if (!ok) return res.status(403).end();
-
-        const uuid = req.body.uuid;
-
-        let rv = await this.model.object_create(uuid, Class.App);
-
-        if (rv < 300) {
-            /* XXX this overwrites any existing information */
-            /* ignore errors */
-            await this.model.config_put(
-                {app: App.Info, object: uuid},
-                {name: req.body.name, primaryClass: Class.App});
-        }
-
-        res.status(rv).end();
-    }
-
-    async app_get(req, res) {
-        const ok = await this.auth.check_acl(req.auth, Perm.ManageObj, Class.App, true);
-        if (!ok) return res.status(403).end();
-
-        const uuid = req.params.app;
-        /* XXX What verification do we want here? Do we insist that an
-         * App-UUID is a member of Application, or do we allow any
-         * object? */
-        const klass = await this.model.object_class(uuid);
-        if (klass != Class.App)
-            res.status(404).end();
-
-        const info = await this.model.config_get(
-            {app: App.Info, object: uuid});
-        const name = info?.config?.name ?? "";
-
-        res.status(200).json({uuid, name});
+        /* Deny access to /save; it isn't useful until it can be
+         * reimplemented to support v2 dumps and ownerships. */
+        api.get("/save", deny);
     }
 
     config_search_parse(query) {
@@ -183,14 +152,5 @@ export class APIv1 {
 
         req.url = "/load";
         req.app.handle(req, res);
-    }
-
-    async dump_save(req, res) {
-        const ok = await this.auth.check_acl(req.auth, Perm.ManageObj, UUIDs.Null)
-            && await this.auth.check_acl(req.auth, Perm.ReadApp, UUIDs.Null);
-        if (!ok) return res.status(403).end();
-
-        const dump = await this.model.dump_save();
-        res.status(200).json(dump);
     }
 }

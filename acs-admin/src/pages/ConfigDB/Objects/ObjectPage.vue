@@ -4,6 +4,21 @@
 <template>
   <Skeleton v-if="!obj.ready || d.loading || m.loading" v-for="i in 10" class="h-16 rounded-lg mb-2"/>
   <div v-else class="flex h-full">
+    <!-- Dialogs -->
+    <ObjectSelector
+        v-model="ownerToChange"
+        v-model:open="showingOwnerDialog"
+        :store-data="availableOwners"
+        :multiSelect="false"
+        title="Select Owner"
+        subtitle="Select the principal who should own this object"
+        column1-header="Name"
+        column1-main-key="name"
+        column1-sub-key="uuid"
+        column2-header="Class"
+        column2-main-key="class.name"
+        column2-sub-key="class.uuid"
+    />
     <!-- Main content -->
     <div class="flex flex-col gap-4 pr-4 flex-1 overflow-auto">
       <div>
@@ -173,11 +188,6 @@
             label="Rank"
             :value="object?.rank.toString() ?? ''"
         />
-        <SidebarDetail
-            icon="user-shield"
-            label="Owner"
-            :value="object.owner.name"
-        />
         <div class="pt-2">
           <RouterLink :to="`/configdb/applications/${UUIDs.App.Info}/${object.uuid}`">
             <Button title="Go to object information" size="xs" class="flex gap-2 text-gray-500" variant="ghost">
@@ -207,6 +217,21 @@
             </Button>
           </RouterLink>
         </div>
+      </div>
+      <div class="flex items-center justify-between gap-2 p-4 border-b">
+        <div class="font-semibold text-lg">Owner</div>
+        <Button
+            @click="showOwnerDialog"
+            size="sm"
+            variant="ghost"
+            class="flex items-center justify-center gap-2"
+        >
+          <i class="fa-solid fa-sync text-sm"></i>
+        </Button>
+      </div>
+      <div class="space-y-4 p-4">
+        <SidebarDetail icon="tag" label="Name" :value="object.owner.name"/>
+        <SidebarDetail icon="key" label="UUID" :value="object.owner.uuid"/>
       </div>
     </div>
   </div>
@@ -361,7 +386,13 @@ export default {
       return this.obj.data  // All objects
         .filter(o => o.rank === this.object.rank-1) // All objects of a rank below
         .filter(o => !directMembers.includes(o.uuid)) // Objects of a rank below which are not already a direct member
-    }
+    },
+    availableOwners () {
+      const princs = this.m.data.find(c => c.uuid == UUIDs.Class.Principal);
+      const owners = new Set(princs?.members ?? []);
+      owners.add(UUIDs.Special.Unowned);
+      return this.obj.data.filter(o => owners.has(o.uuid));
+    },
   },
 
   watch: {
@@ -408,6 +439,10 @@ export default {
       }
 
       await this.updateData();
+    },
+    ownerToChange: async function(val, oldVal) {
+      if (!val.length) return;
+      await this.changeOwner(val[0]);
     },
   },
 
@@ -457,6 +492,19 @@ export default {
         console.error(`Unable to add ${member.name} to ${this.object.name}`, err)
       }
     },
+    showOwnerDialog () { 
+      this.showingOwnerDialog = true;
+    },
+    async changeOwner (owner) {
+      try {
+        await this.s.client.ConfigDB.patch_config(UUIDs.App.Registration,
+          this.object.uuid, "merge", { owner: owner.uuid })
+        toast.success(`Owner has been changed to ${owner.name}`)
+      } catch (err) {
+        toast.error(`Unable to change owner to ${owner.name}`)
+        console.error(`Unable to change owner to ${owner.name}`, err)
+      }
+    },
   },
 
   data() {
@@ -465,6 +513,8 @@ export default {
       membershipsToAdd: [],
       subclassesToAdd: [],
       membersToAdd: [],
+      ownerToChange: [],
+      showingOwnerDialog: false,
     }
   },
 

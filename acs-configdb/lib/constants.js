@@ -52,13 +52,32 @@ export const Device_Info = {
 
 export const Perm = {
     All: "c43c7157-a50b-4d2a-ac1a-86ff8e8e88c1",
+
     ReadApp: "4a339562-cd57-408d-9d1a-6529a383ea4b",
     WriteApp: "6c799ccb-d2ad-4715-a2a7-3c8728d6c0bf",
-    ManageObj: "f0b7917b-d475-4888-9d5a-2af96b3c26b6",
+
+    ListObj: "6b4d73ea-50f1-11f0-9333-132037a152a5",
+    CreateObj: "ae09e2ba-50ef-11f0-ac03-1f9f5e6548be",
+    CreateSpecificObj: "e3491b9c-50f1-11f0-8e16-e75c8f93227b",
+    ReadMembers: "d4fd61da-50ef-11f0-ad24-335234e4c8a2",
+    WriteMembers: "c2759f6e-50ef-11f0-8730-ef0ba0514a0e",
+    WriteMemberships: "e08d89bc-50ef-11f0-8352-83e3d3d35028",
+    ReadSubclasses: "e6bb9978-50ef-11f0-b3c2-b79b9f64d2ff",
+    WriteSubclasses: "ed11bd2a-50ef-11f0-9f85-df13a1dff9e6",
+    WriteSuperclasses: "fb8e5048-50ef-11f0-91c5-7fd3cb373fbb",
+
+    /* Unimplemented */
+    //ReadMemberships: "db9f5dae-50ef-11f0-b846-8393c17d1574",
+    //ReadSuperclasses: "f590e476-50ef-11f0-a120-e7c6d06d79ed",
+
     DeleteObj: "6957174b-7b08-45ca-ac5c-c03ab6928a6e",
-    ManageApp: "95c7cbcb-ce60-49ed-aa81-2fe3eec4559d",
     GiveTo: "4eaab346-4d1e-11f0-800e-dfdc061c6a63",
     TakeFrom: "6ad67652-5009-11f0-9404-73b79124c3d5",
+
+    /* Obsolete */
+    //ManageApp: "95c7cbcb-ce60-49ed-aa81-2fe3eec4559d",
+    // Reimplemented as a composite permission
+    //ManageObj: "f0b7917b-d475-4888-9d5a-2af96b3c26b6",
 };
 
 export const BootstrapUUIDs = { App, Perm, SpecialObj };

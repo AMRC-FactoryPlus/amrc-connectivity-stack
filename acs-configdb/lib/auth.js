@@ -13,8 +13,12 @@ export class Auth {
         this.log = opts.fplus.debug.bound("authz");
     }
 
-    async check_acl(principal, permission, target, wild) {
-        const acl = await this.auth.fetch_acl(principal, Perm.All);
+    fetch_acl (principal) {
+        return this.auth.fetch_acl(principal, Perm.All);
+    }
+
+    async check_acl (principal, permission, target, wild) {
+        const acl = await this.fetch_acl(principal);
         return acl(permission, target, wild);
     }
 

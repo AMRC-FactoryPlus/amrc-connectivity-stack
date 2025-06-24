@@ -32,6 +32,7 @@ export const ACS = {
             CmdEsc:             "dbd0c099-6c59-4bc6-aa92-4ba8a9b543f4",
             EdgeNode:           "87e4a5b7-9a89-4796-a216-39666a47b9d2",
             EdgeNodeConsumer:   "17a64293-b82d-4db4-af4d-63359bb62934",
+            ManageObjects:      "f0b7917b-d475-4888-9d5a-2af96b3c26b6",
             PrimaryApp:         "c0d17bcf-2a90-40e5-b244-07bf631f7417",
             Warehouse:          "6958c812-fbe2-4e6c-b997-6f850b89f679",
         },
@@ -157,11 +158,29 @@ export const ConfigDB = {
     Perm: {
         ReadConfig: "4a339562-cd57-408d-9d1a-6529a383ea4b",
         WriteConfig: "6c799ccb-d2ad-4715-a2a7-3c8728d6c0bf",
-        ManageAppSchema: "95c7cbcb-ce60-49ed-aa81-2fe3eec4559d",
-        ManageObjects: "f0b7917b-d475-4888-9d5a-2af96b3c26b6",
-        DeleteObjects: "6957174b-7b08-45ca-ac5c-c03ab6928a6e",
+
+        ListObjects: "6b4d73ea-50f1-11f0-9333-132037a152a5",
+        CreateObject: "ae09e2ba-50ef-11f0-ac03-1f9f5e6548be",
+        CreateSpecificObject: "e3491b9c-50f1-11f0-8e16-e75c8f93227b",
+        ReadMembers: "d4fd61da-50ef-11f0-ad24-335234e4c8a2",
+        WriteMembers: "c2759f6e-50ef-11f0-8730-ef0ba0514a0e",
+        WriteMemberships: "e08d89bc-50ef-11f0-8352-83e3d3d35028",
+        ReadSubclasses: "e6bb9978-50ef-11f0-b3c2-b79b9f64d2ff",
+        WriteSubclasses: "ed11bd2a-50ef-11f0-9f85-df13a1dff9e6",
+        WriteSuperclasses: "fb8e5048-50ef-11f0-91c5-7fd3cb373fbb",
+
+        /* Unimplemented */
+        //ReadMemberships: "db9f5dae-50ef-11f0-b846-8393c17d1574",
+        //ReadSuperclasses: "f590e476-50ef-11f0-a120-e7c6d06d79ed",
+
+        DeleteObject: "6957174b-7b08-45ca-ac5c-c03ab6928a6e",
         GiveTo: "4eaab346-4d1e-11f0-800e-dfdc061c6a63",
         TakeFrom: "6ad67652-5009-11f0-9404-73b79124c3d5",
+    
+        /* Obsolete */
+        //ManageAppSchema: "95c7cbcb-ce60-49ed-aa81-2fe3eec4559d",
+        /* Implemented as a composite permission */
+        //ManageObjects: "f0b7917b-d475-4888-9d5a-2af96b3c26b6",
     }
 };
 

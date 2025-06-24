@@ -43,6 +43,25 @@ objects:
       enum:
         - !u ACS.Perm.MQTT.ReadWholeNamespace
         - !u UUIDs.Permission.CmdEsc.Rebirth
+    !u ACS.Perm.Composite.ManageObjects:
+      name: "Manage objects"
+      subclassOf:
+        - !u UUIDs.Class.Permission
+      enum:
+        - !u ConfigDB.Perm.ListObjects
+        - !u ConfigDB.Perm.CreateObject
+        - !u ConfigDB.Perm.CreateSpecificObject
+        - !u ConfigDB.Perm.DeleteObject
+        - !u ConfigDB.Perm.ReadMembers
+        - !u ConfigDB.Perm.WriteMembers
+        - !u ConfigDB.Perm.WriteMemberships
+        - !u ConfigDB.Perm.ReadSubclasses
+        - !u ConfigDB.Perm.WriteSubclasses
+        - !u ConfigDB.Perm.WriteSuperclasses
+        # Unimplemented
+        #- !u ConfigDB.Perm.ReadMemberships
+        #- !u ConfigDB.Perm.ReadSuperclasses
+
 ---
 service: !u UUIDs.Service.Authentication
 version: 2

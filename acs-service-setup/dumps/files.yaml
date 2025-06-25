@@ -67,6 +67,3 @@ grants:
     !u ConfigDB.Perm.ManageObjects:
       !u Files.Class.File: false
 
-  !u ACS.Group.Administrator:
-    !u Files.Perm.All: null
-

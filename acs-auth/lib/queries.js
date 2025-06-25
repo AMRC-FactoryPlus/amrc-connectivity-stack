@@ -210,6 +210,16 @@ export default class Queries {
         `, [group]);
     }
 
+    dump_existing_perms (princs) {
+        return this.q_list(`
+            select distinct p.uuid
+            from unnest($1::uuid[]) q(uuid) 
+                join uuid u on u.uuid = q.uuid
+                join ace e on e.principal = u.id
+                join uuid p on p.id = e.permission
+        `, [princs]);
+    }
+
     dump_load_uuids (uuids) {
         return this.q_list(`
             insert into uuid (uuid)
@@ -217,7 +227,7 @@ export default class Queries {
             from unnest($1::uuid[]) u(uuid)
             on conflict do nothing
             returning uuid
-        `, [[...uuids]]);
+        `, [uuids]);
     }
 
     dump_load_krbs (krbs) {
@@ -243,8 +253,8 @@ export default class Queries {
             ),
             existing as (
                 select e.id 
-                from n_ace n join ace e
-                    on e.principal = n.princ
+                from n_ace n 
+                    join ace e on e.principal = n.princ
                         and e.permission = n.perm
                         and e.target = n.targ
             ),
@@ -256,11 +266,12 @@ export default class Queries {
             ),
             i_ace as (
                 insert into ace (principal, permission, target, plural)
+                select princ, perm, targ, plural from n_ace
                 on conflict (principal, permission, target) do update
                     set plural = excluded.plural
                     where ace.plural != excluded.plural
                 returning id
-            ),
+            )
             select id from d_ace
                 union all select id from i_ace
         `, [aces]);

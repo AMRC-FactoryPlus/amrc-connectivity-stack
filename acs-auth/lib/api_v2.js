@@ -144,6 +144,11 @@ export class APIv2 {
 
         const grant = req.method == "PUT" ? req.body : null;
         if (grant && !valid_grant(grant)) fail(422);
+        /* XXX There is a race condition here but I can't see how to
+         * avoid it. Our permitted list is built here, before the txn,
+         * so in principle is out of date by the time we use it. But we
+         * need to sample the ConfigDB information somewhere, and we
+         * don't have cross-service transactions. */
         const permitted = await this.data.check_targ(req.auth, Perm.WriteACL, true);
 
         const rv = await this.data.request({ type: "grant", uuid, grant, permitted });

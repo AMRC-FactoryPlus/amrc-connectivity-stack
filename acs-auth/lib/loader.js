@@ -38,29 +38,12 @@ export class Loader {
                         Object.entries(targs)
                             .flatMap(([target, plural]) =>
                                 ({ principal, permission, target, plural }))));
-        const uuids = new Set([
-            ...grants.map(g => g.principal),
-            ...grants.map(g => g.permission),
-            ...grants.map(g => g.target),
-            ...krbs.map(k => k.uuid),
-        ]);
+        const permitted = {
+            acl:    await data.check_targ(req.auth, Perm.WriteACL, true),
+            id:     await data.check_targ(req.auth, Perm.WriteACL, true),
+        };
 
-        const ids   = krbs.map(k => k.uuid);
-        const perms = new Set(grants.map(g => g.permission));
-
-        const perm_ok = await data.check_targ(req.auth, Perm.WriteACL, true);
-        const id_ok = await data.check_targ(req.auth, Perm.WriteKrb, true);
-
-        for (const id of ids) {
-            if (!id_ok?.(id))
-                req.fail(403, "Can't write identity for %s", id);
-        }
-        for (const perm of perms) {
-            if (!perm_ok?.(perm))
-                req.fail(403, "Can't grant permission for %s", perm);
-        }
-
-        const rv = await this.data.request({ type: "dump", grants, krbs, uuids });
+        const rv = await this.data.request({ type: "dump", grants, krbs, permitted });
         res.status(rv.status).end();
     }
 }

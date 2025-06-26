@@ -74,11 +74,13 @@ class FixupAccounts {
          * do this we need to extract the clusters from the UPNs. */
         const upns = await Promise.all([...krbkeys, ...edge]
             .map(u => auth.get_identity(u, "kerberos")
-                .then(upn => [u, /\.(.*)@/.exec(upn)?.[1]])));
+                .then(upn => [u, /^[^/]+\/([^/@]+)/.exec(upn)?.[1]])));
         const clusters = new Map(upns.filter(([u, c]) => c));
         this.log("CLUSTERS: %o", clusters);
 
-        const kk_c = new Map([...krbkeys].map(k => [clusters.get(k), k]));
+        const kk_c = new Map([...krbkeys]
+            .map(k => [clusters.get(k), k])
+            .filter(([k, v]) => k));
         this.log("KRBKEYS: %o", kk_c);
 
         for (const e of edge) {

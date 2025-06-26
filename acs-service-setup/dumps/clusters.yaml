@@ -416,8 +416,11 @@ grants:
       !u Git.App.Config: false
       !u UUIDs.App.SparkplugAddress: false
 
-    !u UUIDs.Permission.ConfigDB.ManageObjects:
+    !u ConfigDB.Perm.CreateObject:
       !u Clusters.Class.Account: false
+    !u ConfigDB.Perm.WriteMemberships:
+      !u UUIDs.Special.Mine: true
+    !u ConfigDB.Perm.WriteMembers:
       !u Clusters.Class.ClusterGroups: true
 
     !u Git.Perm.Pull:
@@ -430,27 +433,25 @@ grants:
       !u Clusters.Requirement.EdgeRepos: true
       !u Local.RepoGroup.Cluster: true
 
-  # XXX Do we still need this? KrbKeys sealed to edge clusters have been
-  # replaced with krbkeys generated on the edge.
-  !u ACS.ServiceAccount.KrbKeys:
-    !u Clusters.Perm.Secrets: null
-
   !u Local.Role.EdgeFlux:
     !u Git.Perm.Pull:
       !u Local.RepoGroup.Shared: true
 
   !u Local.Role.EdgeKrbkeys:
-    !u ConfigDB.Perm.ManageObjects:
-      # XXX Should this be removed? Or should these two be for different
-      # permissions?
+    !u ConfigDB.Perm.CreateObject:
       !u Auth.Class.EdgeService: false
+    !u ConfigDB.Perm.WriteMemberships:
+      !u UUIDs.Special.Mine: true
+    !u ConfigDB.Perm.WriteMembers:
       !u Edge.Group.EdgeGroup: true
+
     !u ConfigDB.Perm.ReadConfig:
       !u UUIDs.App.Info: false
       !u UUIDs.App.SparkplugAddress: false
     !u ConfigDB.Perm.WriteConfig:
       !u UUIDs.App.Info: false
       !u UUIDs.App.SparkplugAddress: false
+
     !u Auth.Perm.ReadKerberos: null
     # XXX This is root-equivalent
     !u Auth.Perm.ManageKerberos: null

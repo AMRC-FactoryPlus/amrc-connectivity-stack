@@ -125,9 +125,12 @@ metadata:
   name: service-setup-role
   namespace: {{ .Release.Namespace }}
 rules:
-  - apiGroups: [ "apps" ]
-    resources: [ "deployments" ]
-    verbs: [ "get", "patch", "update", "list", "watch" ]
+  - apiGroups: [apps]
+    resources: [deployments]
+    verbs: [get, patch, update, list, watch]
+  - apiGroups: [factoryplus.app.amrc.co.uk]
+    resources: [kerberos-keys]
+    verbs: [list, get]
 
 ---
 

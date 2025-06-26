@@ -13,6 +13,7 @@
   "license": "ISC",
   "dependencies": {
     "@amrc-factoryplus/service-client": "file:../lib/js-service-client",
+    "@kubernetes/client-node": "^1.3.0",
     "tsort": "^0.0.1",
     "uuid": "^11.1.0",
     "yaml": "^2.3.4"

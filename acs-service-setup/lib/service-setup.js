@@ -61,12 +61,12 @@ export class ServiceSetup {
         await this.wait_for(fplus.Auth, "2.0.0");
         await this.wait_for(fplus.ConfigDB, "2.0.0");
 
-        this.log("Running fixups");
-        await fixups(this);
-
         this.log("Creating local UUIDs");
         const local = await setup_local_uuids(this);
         this.dumps.set_local_uuids(local);
+
+        this.log("Running fixups");
+        await fixups(this, local);
 
         this.log("Loading service dump files");
         await this.dumps.load_dumps(false);

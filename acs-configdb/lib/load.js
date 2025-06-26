@@ -34,7 +34,13 @@ export class Loader {
          * an atomic create endpoint. OTOH, doing detailed and correct
          * permission checking will be difficult from within the dump
          * code. */
-        const perms = [Perm.ManageObj, Perm.TakeFrom, Perm.WriteApp];
+        const perms = [
+            Perm.CreateSpecificObj,
+            Perm.WriteMembers, Perm.WriteMemberships,
+            Perm.WriteSubclasses, Perm.WriteSuperclasses,
+            Perm.TakeFrom,
+            Perm.WriteApp,
+        ];
         for (const perm of perms) {
             const ok = await this.auth.check_acl(req.auth, perm, UUIDs.Null, false);
             if (!ok) {

@@ -11,38 +11,11 @@ import { UUIDs } from "@amrc-factoryplus/service-client";
 import * as etags from "./etags.js";
 
 import {App, Class, Perm, SpecialObj} from "./constants.js";
+import { Relations } from "./relations.js";
 
 const Valid = {
     uuid:   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
 };
-
-const Relations = [
-    {
-        path:   "member",
-        table:  "all_membership",
-        cperm:  Perm.ReadMembers,
-        //operm:  Perm.ReadMemberships,
-    }, {
-        path:   "direct/member",
-        table:  "membership",
-        cperm:  Perm.WriteMembers,
-        operm:  Perm.WriteMembership,
-        add:    m => m.class_add_member,
-        remove: m => m.class_remove_member,
-    }, {
-        path:   "subclass",
-        table:  "all_subclass",
-        cperm:  Perm.ReadSubclasses,
-        //operm:  Perm.ReadSuperclasses,
-    }, {
-        path:   "direct/subclass",
-        table:  "subclass",
-        cperm:  Perm.WriteSubclasses,
-        operm:  Perm.ReadSubclasses,
-        add:    m => m.class_add_subclass,
-        remove: m => m.class_remove_subclass,
-    },
-];
 
 export class APIv2 {
     constructor(opts) {

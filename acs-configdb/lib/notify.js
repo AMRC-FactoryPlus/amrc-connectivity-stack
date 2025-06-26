@@ -14,6 +14,7 @@ import {
 }  from "@amrc-factoryplus/service-api";
 
 import { Perm } from "./constants.js";
+import { Relations } from "./relations.js";
 import * as rxu from "./rx-util.js";
 
 const mk_res = (response, ix) => ({ status: ix ? 200 : 201, response });
@@ -196,10 +197,10 @@ class ConfigWatch {
  * lookup meaning we might miss notifications. It would be better to
  * pass the update in the sequence but I think that would mean caching
  * the whole class structure js-side. */
-function class_watch (rel, session, klass) {
+function class_watch (rel, perm, session, klass) {
     const model = session.model;
 
-    const ck_acl = acl_checker(session, Perm.ManageObj, klass, true);
+    const ck_acl = acl_checker(session, perm, klass, true);
 
     return rxx.rx(
         model.updates,
@@ -231,25 +232,14 @@ export class CDBNotify extends Notify {
                 handler:    (s, f, a) => new ConfigWatch(s, a).config_search(f),
             }),
         ];
+        const rel = r => new WatchFilter({
+            path:       `v2/class/:class/${r.path}/`,
+            handler:    class_watch.bind(null, r.table, r.cperm),
+        });
         return [
             ...v1_2("v1"),
             ...v1_2("v2"),
-            new WatchFilter({
-                path:       "v2/class/:class/member/",
-                handler:    class_watch.bind(null, "all_membership"),
-            }),
-            new WatchFilter({
-                path:       "v2/class/:class/subclass/",
-                handler:    class_watch.bind(null, "all_subclass"),
-            }),
-            new WatchFilter({
-                path:       "v2/class/:class/direct/member/",
-                handler:    class_watch.bind(null, "membership"),
-            }),
-            new WatchFilter({
-                path:       "v2/class/:class/direct/subclass/",
-                handler:    class_watch.bind(null, "subclass"),
-            }),
+            ...Relations.map(rel),
         ];
     }
     

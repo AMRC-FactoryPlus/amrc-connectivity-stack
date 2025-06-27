@@ -26,6 +26,8 @@ export const Perm = {
 export const Special = {
     Wildcard:       "00000000-0000-0000-0000-000000000000",
     Self:           "5855a1cc-46d8-4b16-84f8-ab3916ecb230",
+    Unowned:        "091e796a-65c0-4080-adff-c3ce01a65b2e",
+    Mine:           "724c0316-4cfd-11f0-b355-0b70840faae8",
 };
 
 export const IdKind = {

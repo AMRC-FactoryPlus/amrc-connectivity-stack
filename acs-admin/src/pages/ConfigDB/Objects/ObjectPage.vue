@@ -220,7 +220,7 @@
       </div>
       <div class="flex items-center justify-between gap-2 p-4 border-b">
         <div class="font-semibold text-lg">Owner</div>
-        <Button
+        <Button title="Change owner"
             @click="showOwnerDialog"
             size="sm"
             variant="ghost"

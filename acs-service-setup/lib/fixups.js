@@ -75,12 +75,15 @@ class FixupAccounts {
         const auth = this.fplus.Auth;
         const cdb = this.fplus.ConfigDB;
 
-        const clmgrs = await cdb.class_members(Clusters.Requirement.ServiceAccount);
-        if (clmgrs.length != 1)
-            throw new Error("Can't locate Cluster Manager service account");
+        const clmgrs = await cdb.class_members(Clusters.Requirement.ServiceAccount)
+            .catch(() => []);
+        if (clmgrs.length > 1)
+            throw new Error("Multiple Cluster Manager service accounts");
         const clmgr = clmgrs[0];
 
-        const members = c => cdb.class_members(c).then(l => new Set(l));
+        const members = c => cdb.class_members(c)
+            .then(l => new Set(l))
+            .catch(() => new Set());
 
         /* Edge Agents are owned by their creators. These will have to
          * be fixed manually as we have no way of knowing who they are.
@@ -97,9 +100,14 @@ class FixupAccounts {
         const for_cl = flux.union(krbkeys);
         const for_kk = service.difference(for_cl);
 
-        this.log("Setting ownership for Cluster Manager accounts");
-        for (const a of for_cl)
-            await this.set_owner(a, clmgr);
+        if (clmgr) {
+            this.log("Setting ownership for Cluster Manager accounts");
+            for (const a of for_cl)
+                await this.set_owner(a, clmgr);
+        }
+        else {
+            this.log("No Cluster Manager account");
+        }
 
         /* Now we have to place the edge accounts with their owners. To
          * do this we need to extract the clusters from the UPNs. */

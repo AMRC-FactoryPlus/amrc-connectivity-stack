@@ -23,7 +23,7 @@ export const Relations = [
         path:   "direct/member",
         table:  "membership",
         cperm:  Perm.WriteMembers,
-        operm:  Perm.WriteMembership,
+        operm:  Perm.WriteMemberships,
         add:    m => m.class_add_member,
         remove: m => m.class_remove_member,
     }, {

@@ -442,6 +442,8 @@ grants:
       !u Auth.Class.EdgeService: false
     !u ConfigDB.Perm.WriteMemberships:
       !u UUIDs.Special.Mine: true
+      # XXX This is too broad. Ideally we need a group per cluster.
+      !u Local.Role.EdgeAgent: true
     !u ConfigDB.Perm.WriteMembers:
       !u Edge.Group.EdgeGroup: true
 

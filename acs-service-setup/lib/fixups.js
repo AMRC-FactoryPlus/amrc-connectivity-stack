@@ -82,13 +82,20 @@ class FixupAccounts {
 
         const members = c => cdb.class_members(c).then(l => new Set(l));
 
-        const agent = await members(Auth.Class.EdgeAgent);
+        /* Edge Agents are owned by their creators. These will have to
+         * be fixed manually as we have no way of knowing who they are.
+         * For now the edge krbkeys have change-membership permission on
+         * all Edge Agents; this isn't ideal but I haven't worked out
+         * how to implement a class of Agents per cluster yet.
+         */
+        //const agent = await members(Auth.Class.EdgeAgent);
+        
         const service = await members(Auth.Class.EdgeService);
         const flux = await members(this.Local.Role.EdgeFlux);
         const krbkeys = await members(this.Local.Role.EdgeKrbkeys);
 
         const for_cl = flux.union(krbkeys);
-        const for_kk = service.difference(for_cl).union(agent);
+        const for_kk = service.difference(for_cl);
 
         this.log("Setting ownership for Cluster Manager accounts");
         for (const a of for_cl)

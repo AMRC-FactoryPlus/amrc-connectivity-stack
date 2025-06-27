@@ -183,7 +183,9 @@ export class APIv2 {
             return res.status(410).end();
 
         const acl = await this.auth.fetch_acl(req.auth);
-        const ok = acl(rel.cperm, klass, true) && acl(rel.operm, object, true);
+        this.log("Checking %s/%s and %s/%s", rel.cperm, klass, rel.operm, object);
+        const ok = (!rel.cperm || acl(rel.cperm, klass, true))
+            && (!rel.operm || acl(rel.operm, object, true));
         if (!ok) return res.status(403).end();
 
         const st = await action(this.model).call(this.model, klass, object);

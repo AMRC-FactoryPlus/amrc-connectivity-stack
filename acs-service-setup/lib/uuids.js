@@ -98,15 +98,18 @@ export const ACS = {
      * ServiceRequirement groups to grant them permissions. */
     ServiceAccount: {
         Auth:                   "1e1989ab-14e4-42bd-8171-495230acc406",
-        ClusterManager:         "127cde3c-773a-4f61-b0ba-7412a2695253",
         CmdEsc:                 "23d4e8f9-76c0-49d5-addc-00b6ac05ee58",
         ConfigDB:               "36861e8d-9152-40c4-8f08-f51c2d7e3c25",
         Directory:              "5cc3b068-938f-4bb2-8ceb-64338a02fbeb",
         Git:                    "626df296-8156-4c67-8aed-aac70161aa8b",
         KrbKeys:                "a04b4195-7db4-4480-b3f3-4d22c08b96ea",
-        Manager:                "2340e706-1280-420c-84a6-016547b55e95",
         MQTT:                   "2f42daeb-4521-4522-8e19-85dfb73db88e",
         Warehouse:              "388ddbdc-4eb4-4ae8-bbd0-9be32f3c31e8",
+
+        /* Obsolete: these are now dynamic */
+        ClusterManager:         "127cde3c-773a-4f61-b0ba-7412a2695253",
+        /* These accounts are obsolete */
+        Manager:                "2340e706-1280-420c-84a6-016547b55e95",
     },
     Driver: {
         /* Edge Agent internal drivers */

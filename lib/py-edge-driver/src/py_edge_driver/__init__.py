@@ -1,3 +1,5 @@
+# Copyright (c) University of Sheffield AMRC 2025.
+
 """
 AMRC Connectivity Stack - Python Edge Driver Library
 

@@ -1,3 +1,5 @@
+# Copyright (c) University of Sheffield AMRC 2025.
+
 from typing import assert_type
 import pytest
 from unittest.mock import MagicMock, AsyncMock

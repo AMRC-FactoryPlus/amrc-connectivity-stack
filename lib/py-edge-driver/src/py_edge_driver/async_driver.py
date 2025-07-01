@@ -1,3 +1,5 @@
+# Copyright (c) University of Sheffield AMRC 2025.
+
 import logging
 
 from typing import Dict, Any, Union

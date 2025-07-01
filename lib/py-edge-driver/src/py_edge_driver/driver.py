@@ -1,3 +1,5 @@
+# Copyright (c) University of Sheffield AMRC 2025.
+
 import logging
 import json
 from typing import Dict, Any, Optional, Callable, Type, Mapping, Set, Tuple, List

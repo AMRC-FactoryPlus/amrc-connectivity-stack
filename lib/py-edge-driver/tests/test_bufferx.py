@@ -1,3 +1,5 @@
+# Copyright (c) University of Sheffield AMRC 2025.
+
 import struct
 import pytest
 

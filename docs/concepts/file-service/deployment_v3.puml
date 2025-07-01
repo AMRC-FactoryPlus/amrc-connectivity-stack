@@ -1,4 +1,4 @@
-deployment_v2.puml@startuml
+deployment_v3.puml@startuml
 node "Device" as device
 
     rectangle "Central Cluster" {
@@ -22,23 +22,32 @@ node "Device" as device
     }
 
      rectangle "DAQ PC" {
-          rectangle "TDMS Driver" {
-            node "js-edge-driver" as jsdriver
-            node "Watcher" as dwatcher
-            node "Uploader" as duploader
-            node "Summary Generator" as dsummary
-          }
-
-          file "Directory" as dir
+        node "Watcher" as ewatcher
+        file "Directory" as dir
      }
 
-     rectangle "Edge Cluster" {
-                   node "Edge Agent" as fagent
-               }
+     rectangle "Gateway" {
+        node "Edge Agent" as fagent
+
+        rectangle "TDMS Driver" {
+          node "js-edge-driver" as jsdriver
+          node "Watcher" as dwatcher
+          node "Uploader" as duploader
+          node "Summary Generator" as dsummary
+          node "api" as dapi
+         }
+         file "Gatway Directory" as gdir
+        }
 
 device ---> dir : [1]
 
-dwatcher <--> dir : [2]
+ewatcher <--> dir : [2]
+
+ewatcher --> dapi
+
+dapi --> gdir
+
+dwatcher <--> gdir
 
 dwatcher --> duploader : [8]
 

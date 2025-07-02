@@ -4,7 +4,7 @@ import { TDMSEventManager, EVENTS } from '../lib/tdms-file-events.js';
 import FolderWatcher from '../lib/folder-watcher.js';
 import StateManager from '../lib/state-manager.js';
 import TDMSSummariser from '../lib/tdms-file-summariser.js';
-import TDMSSimulator from '../tests/simulator-generator-tdms.js';
+// import TDMSSimulator from '../tests/simulator-generator-tdms.js';
 
 const retryUploadCounts = new Map();
 const retrySummaryCounts = new Map();
@@ -17,8 +17,8 @@ const {
   FILES_SERVICE,
   STATE_FILE,
   TDMS_DIR_TO_WATCH,
-  TDMS_SRC_DIR,
-  NODE_ENV,
+  //TDMS_SRC_DIR,
+  //NODE_ENV,
   PYTHON_SUMMARISER_SCRIPT,
 } = process.env;
 
@@ -29,10 +29,16 @@ const FailureEvents = [
     EVENTS.FILE_READY_FAILED,
   ];
 
-async function main() {
+async function main(driver,conf) {
+
+  console.log("Initializing TDMS Edge Driver...");
+  console.log("Configuration:", conf);    
+  console.log("Driver:", driver);
+
   const fplus = await new ServiceClient({ env: process.env }).init();
 
   const eventManager = new TDMSEventManager();
+  console.log("Statemanager initialized with state file:", SERVICE_USERNAME, SERVICE_PASSWORD, FILES_SERVICE, STATE_FILE, TDMS_DIR_TO_WATCH, PYTHON_SUMMARISER_SCRIPT);
   const stateManager = new StateManager({ stateFile: STATE_FILE });
 
   const uploader = new Uploader({
@@ -53,6 +59,7 @@ async function main() {
   const tdmsSummariser = new TDMSSummariser({
     eventManager,
     pythonSummariserScript: PYTHON_SUMMARISER_SCRIPT,
+    driver: driver,
   });
 
   registerEventHandlers(stateManager, eventManager);
@@ -159,7 +166,9 @@ function retryHandleFileUploaded(eventManager, filePath){
   }, 6000);
 }
 
-main().catch(err => {
-  console.error("Fatal error in main:", err);
-  process.exit(1);
-});
+// main(driver,conf).catch(err => {
+//   console.error("Fatal error in main:", err);
+//   process.exit(1);
+// });
+
+export default main;

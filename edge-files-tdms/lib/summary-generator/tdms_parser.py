@@ -51,6 +51,9 @@ try:
 
     # convert all groups to json file
     testJSON = json.dumps(groupArr, indent=4, sort_keys=True, default=str) #json.dumps(group, indent=4, sort_keys=True, default=str)
+    #testJSON = json.dumps(groupArr, default=str)
+    with open("finalSummary.json", "w") as outfile:
+        outfile.write(testJSON)
     print(testJSON)
 
 except Exception as e:

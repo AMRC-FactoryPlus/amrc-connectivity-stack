@@ -1,11 +1,13 @@
 import { spawn } from "child_process";
 import { EVENTS } from './tdms-file-events.js';
 import { isFileExist } from './utils.js';
+import fs from 'node:fs'
 
 class TDMSSummariser {
   constructor(opts) {
     this.eventManager = opts.eventManager;
     this.pythonSummariserScript = opts.pythonSummariserScript;
+    this.driver = opts.driver; // Assuming driver is passed for data upload
   }
 
   // Method to run the Python script and return the summary
@@ -34,7 +36,8 @@ class TDMSSummariser {
 
         child.stdout.on("data", function(data){
           console.log('Summary data received from Python script:');
-          summary += data.toString();
+          //summary += JSON.parse(data.toString()); //data.toString();
+          //console.log(`SUMMARISER: Python script output - ${data}`);
         });
 
         child.stderr.on('data', (data) => {
@@ -66,19 +69,46 @@ class TDMSSummariser {
 
   async uploadToInflux(filePath, summary){
     // Handle summary data (upload to influxDB?)
+    let file = fs.readFileSync('./finalSummary.json', 'utf8');
+    //let summaryStr = Buffer.from(summary, "utf8");
     console.log(`Summary for ${filePath} is uploaded to InfluxDB.`);
-    return true;
+    
+    //turn summary into JSON object
+    let summaryJSON;
+    let summaryFileJSON;
+
+    try {
+      //summaryJSON = JSON.stringify(summary);
+     
+      summaryFileJSON = JSON.parse(file);
+      
+      //loop through the summaryJSON and log each key-value pair
+     
+      summaryFileJSON.forEach((obj) =>{
+        obj.channels.forEach((channel) => {
+          channel.forEach((item, index) => {
+            // console.log(`Item at index ${index}:`, item.data);
+
+            //get data and timestamps from each item if they exist
+
+            console.log(`Channel: ${item.name} Data: ${item.data} Timestamp: `, item.timestamps);
+            const buffer = JSON.stringify({
+                      timestamp: item.timestamps,
+                      value: item.data,
+                    });
+            //this.driver.data(item.name, buffer);
+          });
+        });
+      });
+      this.driver.data("TestTDMS", JSON.stringify({timestamp: "2025-01-01T00:00:00Z", value: 123}));
+      
+      return true; // Indicate successful upload
+    } catch (e) {
+      console.error(`SUMMARISER: Error parsing summary JSON for ${filePath}:`, e);
+      return false;
+    }
+    //return true;
   }
 }
 
-
-
 export default TDMSSummariser;
-
-// for testing
-// const tdmsSummariser = new TDMSSummariser({
-//   filePath: '../../../../TDMS_Examples/Fingerprint_2023-05-09-02-14-34.tdms'
-// });
-
-// let summary = await tdmsSummariser.run();
-// console.log('Summary length:', summary.length);

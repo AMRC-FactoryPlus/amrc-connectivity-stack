@@ -31,8 +31,8 @@ const api = await new WebAPI({
   },
   debug: fplus.debug,
   realm: env.REALM,
-  hostname: env.HOSTNAME,
-  keytab: env.SERVER_KEYTAB,
+  principal: env.PRINCIPAL,
+  keytab: env.CLIENT_KEYTAB,
   http_port: env.PORT,
   max_age: env.CACHE_MAX_AGE,
   routes: routes({

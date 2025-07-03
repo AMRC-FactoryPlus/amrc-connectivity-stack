@@ -175,6 +175,46 @@ visualiser:
     # -- The repository of the MQTT component
     repository: acs-visualiser
 
+opcuaServer:
+  # -- Whether or not to enable the OPC UA Server component
+  enabled: false
+  image:
+    # -- The repository of the OPC UA Server component
+    repository: acs-opcua-server
+  # -- Number of replicas for the OPC UA Server
+  replicas: 1
+  # -- Verbosity level for logging
+  verbose: ""
+  # -- InfluxDB configuration
+  influx:
+    url: "http://acs-influxdb2:8086"
+    tokenSecret: "influxdb-auth"
+    tokenKey: "admin-token"
+    org: "default"
+    bucket: "uns"
+  # -- Service configuration
+  service:
+    type: ClusterIP
+    # -- For LoadBalancer service type
+    # loadBalancerIP: ""
+    # loadBalancerSourceRanges: []
+    # -- For NodePort service type
+    # nodePort: 30840
+  # -- Ingress configuration for HTTP management interface
+  ingress:
+    enabled: false
+    annotations: {}
+    hosts: []
+    tls: []
+  # -- Resource limits and requests
+  resources: {}
+  # -- Node selector
+  nodeSelector: {}
+  # -- Affinity rules
+  affinity: {}
+  # -- Tolerations
+  tolerations: []
+
 cmdesc:
   # -- Whether or not to enable the Commands component
   enabled: true

@@ -25,6 +25,7 @@ export const ACS = {
         SparkplugNode:      "1d3121a0-aade-4376-8fa3-57ba1460ba76",
         ServicePermissions: "a31b1902-be03-11ef-8347-6f18501a5e9e",
         CentralMonitor:     "1bc3dbca-68fe-48d2-9590-3a528c111827",
+        OPCUAServer:        "9a8b7c6d-5e4f-3a2b-1c9d-8e7f6a5b4c3d",
     },
     Perm: {
         Composite: {
@@ -71,6 +72,7 @@ export const ACS = {
         ConfigDB:               "af15f175-78a0-4e05-97c0-2a0bb82b9f3b",
         CmdEsc:                 "78ea7071-24ac-4916-8351-aa3e549d8ccd",
         Git:                    "7adf4db0-2e7b-4a68-ab9d-376f4c5ce14b",
+        OPCUAServer:            "8e32801b-f35a-4cbf-a5c3-7a9f83dd9ddb",
     },
     Role: {
         EdgeNodeConsumer:       "17a64293-b82d-4db4-af4d-63359bb62934",
@@ -90,6 +92,7 @@ export const ACS = {
         Authentication:         "127cde3c-773a-4f61-b0ba-7412a2695253",
         Manager:                "2340e706-1280-420c-84a6-016547b55e95",
         Files:                  "cb0ac52a-7622-4c75-aa95-ad4c700ae6fb",
+        OPCUAServer:            "4f3e2d1c-0b9a-8765-4321-fedcba987654",
     },
     /* XXX These should not be fixed. They should be replaced by
      * per-deployment accounts created by krbkeys, and

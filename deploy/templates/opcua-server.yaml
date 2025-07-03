@@ -1,0 +1,173 @@
+{{- if .Values.opcuaServer.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: acs-opcua-server
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "amrc-connectivity-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: opcua-server
+spec:
+  replicas: {{ .Values.opcuaServer.replicas | default 1 }}
+  selector:
+    matchLabels:
+      {{- include "amrc-connectivity-stack.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: opcua-server
+  template:
+    metadata:
+      labels:
+        {{- include "amrc-connectivity-stack.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: opcua-server
+    spec:
+      serviceAccountName: {{ include "amrc-connectivity-stack.serviceAccountName" . }}
+      containers:
+        - name: opcua-server
+{{ include "amrc-connectivity-stack.image" (list . .Values.opcuaServer) | indent 10 }}
+          ports:
+            - name: opcua
+              containerPort: 4840
+              protocol: TCP
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: VERBOSE
+              value: {{ .Values.opcuaServer.verbose | default "" | quote }}
+            - name: DIRECTORY_URL
+              value: "http://acs-directory:8080"
+            - name: AUTHN_URL
+              value: "http://acs-auth:8080"
+            - name: CONFIGDB_URL
+              value: "http://acs-configdb:8080"
+            - name: MQTT_URL
+              value: "mqtt://acs-mqtt:1883"
+            - name: OPCUA_PORT
+              value: "4840"
+            - name: OPCUA_HOSTNAME
+              value: "0.0.0.0"
+            - name: INFLUX_URL
+              value: {{ .Values.opcuaServer.influx.url | default "http://acs-influxdb2:8086" | quote }}
+            - name: INFLUX_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.opcuaServer.influx.tokenSecret | default "influxdb-auth" }}
+                  key: {{ .Values.opcuaServer.influx.tokenKey | default "admin-token" }}
+            - name: INFLUX_ORG
+              value: {{ .Values.opcuaServer.influx.org | default "default" | quote }}
+            - name: INFLUX_BUCKET
+              value: {{ .Values.opcuaServer.influx.bucket | default "uns" | quote }}
+            - name: SERVICE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: acs-opcua-server
+                  key: username
+            - name: SERVICE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: acs-opcua-server
+                  key: password
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.opcuaServer.resources | nindent 12 }}
+      {{- with .Values.opcuaServer.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.opcuaServer.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.opcuaServer.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: acs-opcua-server
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "amrc-connectivity-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: opcua-server
+spec:
+  type: {{ .Values.opcuaServer.service.type | default "ClusterIP" }}
+  ports:
+    - port: 4840
+      targetPort: opcua
+      protocol: TCP
+      name: opcua
+    - port: 8080
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "amrc-connectivity-stack.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: opcua-server
+{{- if eq (.Values.opcuaServer.service.type | default "ClusterIP") "LoadBalancer" }}
+  {{- with .Values.opcuaServer.service.loadBalancerIP }}
+  loadBalancerIP: {{ . }}
+  {{- end }}
+  {{- with .Values.opcuaServer.service.loadBalancerSourceRanges }}
+  loadBalancerSourceRanges:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}
+{{- if eq (.Values.opcuaServer.service.type | default "ClusterIP") "NodePort" }}
+  {{- with .Values.opcuaServer.service.nodePort }}
+  nodePort: {{ . }}
+  {{- end }}
+{{- end }}
+---
+{{- if .Values.opcuaServer.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: acs-opcua-server
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "amrc-connectivity-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: opcua-server
+  {{- with .Values.opcuaServer.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.opcuaServer.ingress.tls }}
+  tls:
+    {{- range .Values.opcuaServer.ingress.tls }}
+    - hosts:
+        {{- range .hosts }}
+        - {{ . | quote }}
+        {{- end }}
+      secretName: {{ .secretName }}
+    {{- end }}
+  {{- end }}
+  rules:
+    {{- range .Values.opcuaServer.ingress.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ .path }}
+            pathType: {{ .pathType }}
+            backend:
+              service:
+                name: acs-opcua-server
+                port:
+                  number: 8080
+          {{- end }}
+    {{- end }}
+{{- end }}
+{{- end }}

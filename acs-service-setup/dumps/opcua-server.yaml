@@ -1,0 +1,37 @@
+# OPC UA Server service setup
+# This dump creates the service registration and permissions for the OPC UA Server
+#
+#-REQUIRE: auth uns
+---
+service: !u UUIDs.Service.ConfigDB
+version: 2
+objects:
+  !u Auth.Class.ServiceRole:
+    !u ACS.Group.OPCUAServer:
+      name: "OPC UA Server"
+      subclassOf:
+        - !u Auth.Class.CentralService
+        - !u UNS.Group.Reader
+
+  !u UUIDs.Class.Service:
+    !u ACS.Service.OPCUAServer:
+      name: "OPC UA Server"
+      
+configs:
+  !u UUIDs.App.SparkplugAddress:
+    !u ACS.Device.OPCUAServer:
+      group: "ACS"
+      node: "OPCUAServer"
+---
+service: !u UUIDs.Service.Authentication
+version: 2
+grants:
+  !u ACS.Group.OPCUAServer:
+    !u UNS.Perm.ReadEntireUNS: null
+---
+service: !u UUIDs.Service.Directory
+version: 2
+services:
+  !u ACS.Service.OPCUAServer:
+    type: !u UUIDs.Service.HTTP
+    url: "http://acs-opcua-server:8080"

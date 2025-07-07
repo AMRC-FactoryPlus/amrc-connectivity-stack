@@ -25,7 +25,7 @@ uploaded to ACS-Files. The TDMS Driver will run off cluster and use the JS-Servi
 authentication.
 
 ### Deployment Diagram 
-![Deployment Diagram](deployment_v2.png)
+![Deployment Diagram](deployment_v3.png)
 
 ### File Upload process
 1. The TDMS file is created by the data producer and stored in a directory on the local file system.  

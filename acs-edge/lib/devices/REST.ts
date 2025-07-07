@@ -1,11 +1,10 @@
 /*
- *  Factory+ / AMRC Connectivity Stack (ACS) Edge component
- *  Copyright 2023 AMRC
+ * Copyright (c) University of Sheffield AMRC 2025.
  */
 
-import {Device, DeviceConnection, deviceOptions} from "../device.js";
-import {log} from "../helpers/log.js";
-import {SparkplugNode} from "../sparkplugNode.js";
+import { Device, DeviceConnection, deviceOptions } from "../device.js";
+import { log } from "../helpers/log.js";
+import { SparkplugNode } from "../sparkplugNode.js";
 import {
     Metrics,
     restAuthMethod,
@@ -13,7 +12,7 @@ import {
     serialisationType,
     writeValuesToPayload
 } from "../helpers/typeHandler.js";
-import axios, {AxiosError, AxiosRequestConfig, AxiosResponse} from "axios";
+import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
 import * as crypto from "crypto";
 
 
@@ -56,7 +55,7 @@ export class RestConnection extends (
     async readMetrics(metrics: Metrics, payloadFormat?: string, delimiter?: string) {
         if (payloadFormat && payloadFormat !== "Defined by Protocol") {
             await Promise.all(metrics.addresses.filter(e => e !== 'undefined').map(async (addr) => {
-                let res: AxiosResponse = {data: [], status: -1, statusText: "", headers: "", config: {}};
+                let res: AxiosResponse = { data: [], status: -1, statusText: "", headers: "", config: {} };
                 let subAddr = addr.match(/\${(\d):(\w)}/);
                 if (subAddr && subAddr.length > 1) {
                     let foundLastSubAddr = false;
@@ -65,7 +64,7 @@ export class RestConnection extends (
                     do {
                         const subRes = await this.get(addr.replace(/\${.+}/g, counter.toString()));
                         if (subRes.status == 200) {
-                            res = {...subRes, data: [res.data, ...subRes.data]}
+                            res = { ...subRes, data: [res.data, ...subRes.data] }
                             counter++;
                         } else {
                             foundLastSubAddr = true;
@@ -134,8 +133,8 @@ export class RestConnection extends (
 
     async post(address: string, data: any, payloadFormat: string) {
         // Try to get a response
-        let options = {...this.#axiosOptions};
-        if (payloadFormat == serialisationType.JSON) {
+        let options = { ...this.#axiosOptions };
+        if (payloadFormat == serialisationType.JSON || payloadFormat == serialisationType.JSONBatched) {
             options.headers["Content-Type"] = "application/json";
         } else if (payloadFormat == serialisationType.XML) {
             options.headers["Content-Type"] = "application/xml";

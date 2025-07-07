@@ -14,9 +14,9 @@
     "test": "tests"
   },
   "scripts": {
-    "start": "dotenvx run -- node ./bin/main.js",
     "driver": "dotenvx run -- node ./bin/driver.js",
     "handler": "dotenvx run -- node ./bin/TDMSHandler.js",
+    "start": "dotenvx run -- node ./bin/api.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
@@ -24,6 +24,9 @@
     "@amrc-factoryplus/edge-driver": "file:../lib/js-edge-driver",
     "@dotenvx/dotenvx": "^1.43.0",
     "chokidar": "^4.0.3",
-    "utf8": "^3.0.0"
+    "utf8": "^3.0.0",
+    "@amrc-factoryplus/service-api": "file:../lib/js-service-api",
+    "express": "^4.21.2",
+    "stream-size": "^0.0.6"
   }
 }

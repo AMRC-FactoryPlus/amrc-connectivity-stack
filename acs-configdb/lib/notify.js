@@ -127,19 +127,16 @@ class ConfigWatch {
     async search_full (status) {
         const { model, app } = this;
 
-        const list = await model.config_list(app);
-        if (!list)
+        const entries = await model.config_get_all(app);
+        if (!entries)
             return { status, response: { status: 404 } };
 
-        const entries = await Promise.all(
-            list.map(object => model.config_get({ app, object })
-                .then(entry_response)
-                .then(res => [object, res])));
+        const children = Object.fromEntries(
+            entries.map(e => [e.object, entry_response(e)]));
 
         return {
-            status,
+            status, children,
             response:   { status: 204 },
-            children:   Object.fromEntries(entries),
         };
     }
 

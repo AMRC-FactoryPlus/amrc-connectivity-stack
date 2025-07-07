@@ -45,7 +45,13 @@ const sidebarNavItems: Item[] = [
       href: '/configdb',
       icon: 'gears',
       auth: true
-    }
+    },
+  {
+    title: 'Files',
+    href: '/files',
+    icon: 'file',
+    auth: true
+  }
 ]
 </script>
 

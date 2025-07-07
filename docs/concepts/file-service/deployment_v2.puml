@@ -1,4 +1,4 @@
-@startuml
+deployment_v2.puml@startuml
 node "Device" as device
 
     rectangle "Central Cluster" {

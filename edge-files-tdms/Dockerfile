@@ -1,6 +1,9 @@
 # syntax=docker/dockerfile:1
 
-FROM node:22-alpine AS build
+ARG base_version
+ARG base_prefix=ghcr.io/amrc-factoryplus/acs-base
+
+FROM ${base_prefix}-js-build:${base_version} AS build
 
 USER root
 
@@ -25,7 +28,7 @@ RUN touch /home/node/.npmrc \
 COPY --chown=node . .
 
 # Final stage for runtime
-FROM node:22-alpine AS run
+FROM ${base_prefix}-js-run:${base_version} AS run
 
 WORKDIR /home/node
 
@@ -35,4 +38,4 @@ COPY --from=build /home/node/app ./app/
 USER node
 WORKDIR /home/node/app
 
-CMD ["node", "bin/main.js"]
+CMD ["node", "bin/api.js"]

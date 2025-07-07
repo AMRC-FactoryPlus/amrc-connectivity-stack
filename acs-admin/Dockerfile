@@ -1,5 +1,6 @@
 # Stage 1: Build the application
 FROM oven/bun:1.2.0 AS builder
+ARG tag="(unknown version)"
 
 # Set working directory
 WORKDIR /app/acs-admin
@@ -10,6 +11,7 @@ RUN --mount=type=bind,from=lib,dst=/app/lib bun install --production
 
 # Copy the rest of the application code
 COPY . .
+RUN echo "export const ACS_VERSION = '${tag}';" >src/lib/version.js
 
 # Build the application
 RUN --mount=type=bind,from=lib,dst=/app/lib bun run build

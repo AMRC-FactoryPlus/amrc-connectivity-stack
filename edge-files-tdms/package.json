@@ -15,11 +15,15 @@
   },
   "scripts": {
     "start": "dotenvx run -- node ./bin/main.js",
+    "driver": "dotenvx run -- node ./bin/driver.js",
+    "handler": "dotenvx run -- node ./bin/TDMSHandler.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
+    "@amrc-factoryplus/service-client": "file:../lib/js-service-client",
+    "@amrc-factoryplus/edge-driver": "file:../lib/js-edge-driver",
     "@dotenvx/dotenvx": "^1.43.0",
     "chokidar": "^4.0.3",
-    "@amrc-factoryplus/service-client": "file:../lib/js-service-client"
+    "utf8": "^3.0.0"
   }
 }

@@ -2,7 +2,6 @@
  * Copyright (c) University of Sheffield AMRC 2025.
  */
 
-import * as imm from "immutable";
 import { defineStore } from 'pinia'
 import * as rx from 'rxjs'
 
@@ -50,6 +49,10 @@ export const useObjectStore = defineStore('object', {
               class: {
                 uuid: reg.class,
                 name: name_of(reg.class),
+              },
+              owner: {
+                uuid: reg.owner,
+                name: name_of(reg.owner),
               },
             }));
         }),

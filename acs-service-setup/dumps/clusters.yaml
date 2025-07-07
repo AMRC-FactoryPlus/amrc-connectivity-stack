@@ -420,6 +420,7 @@ grants:
       !u Clusters.Class.Account: false
     !u ConfigDB.Perm.WriteMemberships:
       !u UUIDs.Special.Mine: true
+      !u Clusters.Class.Cluster: true
     !u ConfigDB.Perm.WriteMembers:
       !u Clusters.Class.ClusterGroups: true
 

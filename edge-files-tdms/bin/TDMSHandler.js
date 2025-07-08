@@ -4,23 +4,22 @@ import main from "./main.js";
 
 
 export class TDMSHandler {
-  constructor(driver, config) {
+  constructor(driver, conf) {
     console.log("TDMSHandler: Constructor");
-    // this.eventManager = eventManager;
-    // this.stateManager = stateManager;
-    this.driver = driver; // Assuming driver is passed for data upload
-    this.config = config;
-    //this.log = driver.debug.bound("tdms-handler");
-    console.log("TDMSHandler: Initialized with config:", config);
+  
+    this.driver = driver; 
+    this.conf = conf;
+    
+    console.log(`TDMSHandler Conf: ${JSON.stringify(conf)}`);
     console.log("TDMSHandler: Driver instance:", driver);
   }
 
-  static create(driver, config) {
-    console.log("TDMSHandler: Creating instance with config:", config);
-    console.log("Handler called: conf %o", conf);
+  static create(driver, conf) {
+    console.log("TDMSHandler: Creating instance with config:", conf);
+   
     this.log("TDMSHandler: Creating instance");
-    //if (config.devicePath == null) return;
-    const tdmsHandler = new TDMSHandler(driver, config);
+    if (conf.devicePath == null) return;
+    const tdmsHandler = new TDMSHandler(driver, conf);
     console.log("tdmsHandler is ", tdmsHandler);
     return tdmsHandler;
   }
@@ -31,6 +30,8 @@ export class TDMSHandler {
     
     console.log("TDMSHandler: Connected");
     this.log("TDMSHandler: Connected to main process");
+
+    return "UP";
   }
 
   parseAddr(addr) {
@@ -43,7 +44,7 @@ export class TDMSHandler {
      console.log("TDMSHandler: Subscribing to specs:", specs);
 
     try {
-      this.main = await main(driver, config);
+      this.main = await main(driver, this.conf);
 
     }
 
@@ -54,14 +55,3 @@ export class TDMSHandler {
     }
   }
 }
-
-//const tdmhandler = new TDMSHandler();
-
-// const driver = new AsyncDriver({
-//   env: process.env,
-//   handler: TDMSHandler,
-// });
-
-// console.log(`Driver initialized: ${JSON.stringify(driver)}`);
-//driver.run();
-// driver.data("TestTDMS", JSON.stringify({timestamp: "2025-01-01T00:00:00Z", value: 123}));

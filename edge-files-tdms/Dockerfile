@@ -38,4 +38,4 @@ COPY --from=build /home/node/app ./app/
 USER node
 WORKDIR /home/node/app
 
-CMD ["node", "bin/api.js"]
+CMD ["node", "bin/driver.js"]

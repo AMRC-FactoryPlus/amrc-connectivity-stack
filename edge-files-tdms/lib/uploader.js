@@ -1,6 +1,6 @@
 import { EVENTS } from './tdms-file-events.js';
 import { Class, File_Type } from './constants.js';
-import { isFileExist } from './utils.js';
+import { waitForFileExist } from './utils.js';
 
 class Uploader {
     constructor(opts) {
@@ -75,7 +75,7 @@ class Uploader {
         console.log(`UPLOADER: Handling new file: ${filePath}.`);
 
         try {
-            if (!(await isFileExist(filePath))) {
+            if (!(await waitForFileExist(filePath))) {
                 console.error(`UPLOADER: Filepath ${filePath} does not exist.`);
                 this.eventManager.emit(EVENTS.FILE_READY_FAILED, { filePath, error: 'File does not exist' });
                 return;

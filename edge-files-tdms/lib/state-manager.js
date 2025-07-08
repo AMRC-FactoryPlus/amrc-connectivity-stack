@@ -15,6 +15,7 @@ class StateManager {
 
     async run() {
         await this.loadSeenFiles();
+        console.log(`STATE MANAGER: ${this.stateFile}`);
     }
 
     async loadSeenFiles() {

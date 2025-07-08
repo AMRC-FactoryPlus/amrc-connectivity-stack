@@ -3,7 +3,6 @@ import { TDMSEventManager, EVENTS } from './tdms-file-events.js';
 import FolderWatcher from './folder-watcher.js';
 import StateManager from './state-manager.js';
 import TDMSSummariser from './tdms-file-summariser.js';
-import TDMSSimulator from '../tests/simulator-generator-tdms.js';
 
 
 class IngesterRunner{
@@ -15,7 +14,7 @@ class IngesterRunner{
 
     this.STATE_FILE = opts.STATE_FILE;
     this.TDMS_DIR_TO_WATCH = opts.TDMS_DIR_TO_WATCH;
-    this.TDMS_SRC_DIR = opts.TDMS_SRC_DIR;
+
     this.NODE_ENV = opts.NODE_ENV;
     this.PYTHON_SUMMARISER_SCRIPT = opts.PYTHON_SUMMARISER_SCRIPT;
 
@@ -68,10 +67,6 @@ class IngesterRunner{
 
     await this.resumePendingUploads();
 
-    // if (this.NODE_ENV !== 'production') {
-    //   const simulator = new TDMSSimulator(this.TDMS_SRC_DIR, this.TDMS_DIR_TO_WATCH);
-    //   await simulator.run();
-    // }
     console.log(`Ingester is running.`);
   }
 

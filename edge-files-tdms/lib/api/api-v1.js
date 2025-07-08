@@ -5,8 +5,9 @@ import {parseSize} from "./parseSize.js";
 import streamSize  from "stream-size";
 const getSizeTransform = streamSize.default;
 import * as stream from "node:stream";
+import { normalizePath } from '../utils.js';
 
-const MAX_FILE_SIZE = parseSize(process.env.BODY_LIMIT || '10GB');
+const MAX_FILE_SIZE = parseSize(process.env.BODY_LIMIT || '15GB');
 
 export class APIv1 {
     constructor(opts) {
@@ -21,73 +22,74 @@ export class APIv1 {
     setup_routes() {
         let api = this.routes;
         api.post('/', this.post_file.bind(this));
+        api.get('/test', this.get_test.bind(this));
+    }
+
+    async get_test(req, res){
+        return res.status(200).json({ test: 'success_test' });
     }
 
     async post_file(req, res) {
-        const filename = req.params.filename;
+        try{
+            const filename = req.query.filename;
 
-        if(!filename){
-            return res.status(400).json({message: 'Filename is required.'});
-        }
+            if(!filename){
+                return res.status(400).json({message: 'Filename is required.'});
+            }
 
+            const filePath = normalizePath(path.join(this.uploadPath, filename));
+            const tempPath = normalizePath(path.join(this.uploadPath, `${filename}.temp`));
 
-        // Check we have a UUID to work with.
-        const fileName = req.params.filename;
-        if (!fileName){
-            return res.status(404).json({ message: 'FAILED: File Name not provided.' });
-        }
+            await fs.mkdir(this.uploadPath, { recursive: true });
 
-        const filePath = path.resolve(this.uploadPath, filename);
-        // Temporary path to use while writing to disk.
-        const tempPath = path.resolve(this.uploadPath, `${filename}.temp`);
+            // Check if the temporary file already exists.
+            let fileHandle;
+            try {
+                fileHandle = await fs.open(tempPath, 'wx');
+            } catch (error) {
+                const statusCode = error.code === 'EEXIST' ? 503 : 500;
+                return res.status(statusCode).json({ message: error.message });
+            }
 
-        await fs.mkdir(this.uploadPath, { recursive: true });
+            const writeStream = fileHandle.createWriteStream({ flush: true });
+            /* Now fileHandle belongs to the WriteStream; we mustn't touch it again */
+            const unlock_tempfile = async () => {
+                await new Promise(resolve => writeStream.close(resolve));
+                await fs.unlink(tempPath);
+            };
 
-        // Check if the temporary file already exists.
-        let fileHandle;
-        try {
-            fileHandle = await fs.open(tempPath, 'wx');
-        } catch (error) {
-            const statusCode = error.code === 'EEXIST' ? 503 : 500;
-            return res.status(statusCode).json({ message: error.message });
-        }
+            // Check if the file already exists.
+            const fileExists = await fs.access(filePath, fs.constants.F_OK)
+                .then(() => true, () => false);
+            if (fileExists){
+                await unlock_tempfile();
+                return res.status(409).json({ message: `File with UUID ${file_uuid} already exists.` });
+            }
 
-        const writeStream = fileHandle.createWriteStream({ flush: true });
-        /* Now fileHandle belongs to the WriteStream; we mustn't touch it again */
-        const unlock_tempfile = async () => {
-            await new Promise(resolve => writeStream.close(resolve));
-            await fs.unlink(tempPath);
-        };
+            this.log("Writing to temp file");
 
-        // Check if the file already exists.
-        const fileExists = await fs.access(filePath, fs.constants.F_OK)
-            .then(() => true, () => false);
-        if (fileExists){
-            await unlock_tempfile();
-            return res.status(409).json({ message: `File with UUID ${file_uuid} already exists.` });
-        }
+            const sizeLimit = getSizeTransform(MAX_FILE_SIZE);
 
-        this.log("Writing to temp file");
+            const [st, err] = await stream.promises.pipeline(req, sizeLimit, writeStream)
+                .then(() => [201])
+                .catch(e => [/^Stream exceeded maximum size/.test(e.message) ? 413 : 500, e]);
 
-        const sizeLimit = getSizeTransform(MAX_FILE_SIZE);
+            if (st != 201) {
+                this.log("File upload failed: %o", err);
+                await unlock_tempfile();
+                return res.status(st).json({ message: err.message });
+            }
 
-        const [st, err] = await stream.promises.pipeline(req, sizeLimit, writeStream)
-            .then(() => [201])
-            .catch(e => [/^Stream exceeded maximum size/.test(e.message) ? 413 : 500, e]);
-
-        if (st != 201) {
-            this.log("File upload failed: %o", err);
-            await unlock_tempfile();
-            return res.status(st).json({ message: err.message });
-        }
-
-
-        this.log("Renaming file.");
-        // Rename the temporary file now it's written to disk.
-        await fs.rename(tempPath, filePath);
+            this.log("Renaming file.");
+            // Rename the temporary file now it's written to disk.
+            await fs.rename(tempPath, filePath);
             return res.status(201).json({
                 message: 'File uploaded successfully.',
                 filename: filename,
-        });
+            });
+        }
+        catch(err){
+            return res.status(500).json({error: err.message});
+        }
     }
 }

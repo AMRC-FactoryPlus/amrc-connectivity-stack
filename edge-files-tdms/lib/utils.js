@@ -10,6 +10,14 @@ export async function isFileExist(filePath) {
     }
 }
 
+export async function waitForFileExist(filePath, retries = 5, delayMs = 500) {
+    for (let i = 0; i < retries; i++) {
+        if (await isFileExist(filePath)) return true;
+        await new Promise(res => setTimeout(res, delayMs));
+    }
+    return false;
+}
+
 
 export function normalizePath(filePath) {
     if (!filePath || typeof filePath !== 'string') {

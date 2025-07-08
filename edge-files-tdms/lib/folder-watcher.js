@@ -19,6 +19,7 @@ class FolderWatcher {
         stabilityThreshold: 2000,
         pollInterval: 100
       },
+      ignored: (path) => path.endsWith('.tmp')
     });
 
     watcher.on('ready', () => {
@@ -58,7 +59,7 @@ class FolderWatcher {
       console.warn(`WATCHER: File not ready - ${normalizedPath}: ${err.message}`);
 
       const retries = this.retryCounts.get(normalizedPath) || 0;
-      
+
       if (retries < MAX_RETRIES) {
         this.retryCounts.set(normalizedPath, retries + 1);
         console.log(`WATCHER: Retrying (${retries + 1}/${MAX_RETRIES}) - ${normalizedPath}`);

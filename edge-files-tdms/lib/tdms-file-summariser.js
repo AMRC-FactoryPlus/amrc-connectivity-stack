@@ -5,7 +5,7 @@ import { isFileExist } from './utils.js';
 class TDMSSummariser {
   constructor(opts) {
     this.eventManager = opts.eventManager;
-    this.pythonSummariserScript = opts.pythonSummariserScript;
+    this.pythonSummariserScript = opts.env.pythonSummariserScript;
   }
 
   // Method to run the Python script and return the summary

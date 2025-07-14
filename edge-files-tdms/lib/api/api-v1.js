@@ -5,7 +5,7 @@ import {parseSize} from "./parseSize.js";
 import streamSize  from "stream-size";
 const getSizeTransform = streamSize.default;
 import * as stream from "node:stream";
-import { normalizePath } from '../utils.js';
+import { normalizePath, sanityCheckFilename } from '../utils.js';
 
 const MAX_FILE_SIZE = parseSize(process.env.BODY_LIMIT || '15GB');
 
@@ -17,6 +17,7 @@ export class APIv1 {
         this.uploadPath = opts.uploadPath;
         this.routes = express.Router();
         this.setup_routes();
+        this.eventManager = opts.eventManager;
     }
 
     setup_routes() {
@@ -37,8 +38,17 @@ export class APIv1 {
                 return res.status(400).json({message: 'Filename is required.'});
             }
 
-            const filePath = normalizePath(path.join(this.uploadPath, filename));
-            const tempPath = normalizePath(path.join(this.uploadPath, `${filename}.temp`));
+            if(!sanityCheckFilename(filename)){
+                return res.status(400).json({message: 'Invalid filename.'});
+            }
+
+            const uploadDir = this.uploadPath;
+            const finalPath = normalizePath(path.join(uploadDir, filename));
+
+            // Generating secure random filename
+            const tempName = crypto.randomUUID();
+            const tempPath = normalizePath(path.join(this.uploadPath, `${tempName}.temp`));
+
 
             await fs.mkdir(this.uploadPath, { recursive: true });
 
@@ -53,13 +63,14 @@ export class APIv1 {
 
             const writeStream = fileHandle.createWriteStream({ flush: true });
             /* Now fileHandle belongs to the WriteStream; we mustn't touch it again */
+
             const unlock_tempfile = async () => {
                 await new Promise(resolve => writeStream.close(resolve));
                 await fs.unlink(tempPath);
             };
 
             // Check if the file already exists.
-            const fileExists = await fs.access(filePath, fs.constants.F_OK)
+            const fileExists = await fs.access(finalPath, fs.constants.F_OK)
                 .then(() => true, () => false);
             if (fileExists){
                 await unlock_tempfile();
@@ -82,7 +93,9 @@ export class APIv1 {
 
             this.log("Renaming file.");
             // Rename the temporary file now it's written to disk.
-            await fs.rename(tempPath, filePath);
+            await fs.rename(tempPath, finalPath);
+            this.eventManager.emit('file:detected', { filePath: finalPath });
+
             return res.status(201).json({
                 message: 'File uploaded successfully.',
                 filename: filename,

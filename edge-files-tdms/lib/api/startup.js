@@ -1,6 +1,5 @@
 import fs from "node:fs/promises";
 import path from 'path';
-import { normalizePath } from "../utils.js";
 
 export async function clean_up(opts) {
     const uploadPath = opts.path;
@@ -27,13 +26,12 @@ export async function clean_up(opts) {
         }
 
         const fullPath = path.join(uploadPath, file);
-        const normalizedPath = normalizePath(fullPath);
 
         try {
-            await fs.unlink(normalizedPath);
-            console.log(`Cleaned up temp file: ${normalizedPath}`);
+            await fs.unlink(fullPath);
+            console.log(`Cleaned up temp file: ${fullPath}`);
         } catch (err) {
-            console.warn(`Failed to remove temp file ${normalizedPath}: ${err.message}`);
+            console.warn(`Failed to remove temp file ${fullPath}: ${err.message}`);
         }
     }
 }

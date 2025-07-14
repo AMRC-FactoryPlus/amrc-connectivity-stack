@@ -25,3 +25,15 @@ export function normalizePath(filePath) {
     }
     return path.normalize(path.resolve(filePath)).toLowerCase();
 }
+
+
+export function sanityCheckFilename(filename){
+    const baseFilename = path.basename(filename);
+
+    const isValid = /^[a-zA-Z0-9._-]+$/.test(filename);
+
+    if (!isValid || baseFilename.includes('..') || path.isAbsolute(baseFilename)) {
+        return false;
+    }
+    return true;
+}

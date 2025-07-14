@@ -4,6 +4,7 @@ import { ServiceClient } from '@amrc-factoryplus/service-client';
 import { WebAPI } from '@amrc-factoryplus/service-api';
 import { routes } from '../lib/api/routes.js';
 import {clean_up} from "../lib/api/startup.js";
+import { TDMSEventManager } from '../lib/tdms-file-events.js';
 import IngesterRunner from '../lib/IngesterRunner.js';
 
 const { env } = process;
@@ -12,10 +13,13 @@ const fplus = await new ServiceClient({
   env,
 }).init();
 
-const uploadPath = env.TDMS_DIR_TO_WATCH;
+const localUploadPath = env.TDMS_DIR_TO_WATCH;
+
+
+const eventManager = new TDMSEventManager();
 
 await clean_up({
-  path : uploadPath,
+  path : localUploadPath,
 });
 
 const api = await new WebAPI({
@@ -35,24 +39,17 @@ const api = await new WebAPI({
   max_age: env.CACHE_MAX_AGE,
   routes: routes({
     fplus,
-    uploadPath: uploadPath,
+    uploadPath: localUploadPath,
+    eventManager: eventManager,
   }),
 }).init();
 
 const ingesterRunner = new IngesterRunner({
   fplus: fplus,
-  SERVICE_USERNAME: env.SERVICE_USERNAME,
-  SERVICE_PASSWORD: env.SERVICE_PASSWORD,
-  STATE_FILE: env.STATE_FILE,
-  TDMS_DIR_TO_WATCH: env.TDMS_DIR_TO_WATCH,
-  NODE_ENV: env.NODE_ENV,
-  PYTHON_SUMMARISER_SCRIPT: env.PYTHON_SUMMARISER_SCRIPT,
-}).init();
+  env: env,
+  eventManager: eventManager,
+});
 
 api.run();
 
-await ingesterRunner.run()
-.catch(err => {
-  console.error("Fatal error:", err);
-  process.exit(1);
-});
+await ingesterRunner.run();

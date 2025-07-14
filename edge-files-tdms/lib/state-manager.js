@@ -23,28 +23,34 @@ class StateManager {
 
         try {
             const data = await fs.readFile(this.stateFile, 'utf-8');
-            let files;
+            let parsed;
 
             try {
-                files = JSON.parse(data);
-                if (!Array.isArray(files)) throw new Error('State file does not contain an array');
+                parsed = JSON.parse(data);
+                if (!Array.isArray(parsed)) throw new Error('State file must be an array');
             } catch (jsonErr) {
                 console.warn(`STATE MANAGER: Invalid JSON in ${this.stateFile}: ${jsonErr.message}`);
                 process.exit(1);
             }
 
-            try{
-                const entries = await JSON.parse(data);
-                if(!Array.isArray(entries)) throw new Error('STATE MANAGER: State file must be an array.');
+            try {
+                const entries = parsed.map(entry => {
+                    if (!entry.path) throw new Error('Missing "path" in state entry');
+                    return [entry.path, {
+                        isUploaded: !!entry.isUploaded,
+                        uuid: entry.uuid || null,
+                        isClassMember: !!entry.isClassMember,
+                        hasSummary: !!entry.hasSummary
+                    }];
+                });
 
                 this.seenFiles = new Map(entries);
-            }
-            catch(err){
-                console.error(`STATE MANAGER: Corrupt state file ${err.message}`);
+            } catch (err) {
+                console.error(`STATE MANAGER: Corrupt state file: ${err.message}`);
                 process.exit(1);
             }
 
-            console.log(`STATE MANAGER: Loaded ${this.seenFiles.size} seen files ${this.seenFiles}`);
+            console.log(`STATE MANAGER: Loaded ${this.seenFiles.size} seen files`);
         } catch (err) {
             console.warn(`STATE MANAGER: Failed to load seen files: ${err.message}`);
             process.exit(1);

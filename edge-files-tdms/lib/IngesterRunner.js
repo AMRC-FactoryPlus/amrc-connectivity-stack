@@ -1,5 +1,4 @@
 import Uploader from "./uploader.js";
-import StateManager from './state-manager.js';
 // import TDMSSummariser from './tdms-file-summariser.js';
 
 
@@ -8,8 +7,8 @@ class IngesterRunner{
     this.fplus = opts.fplus;
     this.env = opts.env;
     this.eventManager = opts.eventManager;
+    this.stateManager = opts.stateManager;
 
-    this.stateManager = new StateManager({ env: this.env });
 
     this.uploader = new Uploader({
       fplus: this.fplus,
@@ -35,7 +34,6 @@ class IngesterRunner{
     this.baseDelay = 5 * 60 * 1000;
 
     console.log(`Ingester Initialised.`);
-
   }
 
 
@@ -55,7 +53,7 @@ class IngesterRunner{
     const seenFiles = this.stateManager.getSeenFiles();
 
     for (const [filePath, meta] of seenFiles) {
-      if (!meta.isUploaded) {
+      if (!meta?.isUploaded) {
         this.eventManager.emit('file:ready', { filePath });
         console.log(`Resumed pending upload for ${filePath}`);
       }
@@ -67,17 +65,6 @@ class IngesterRunner{
   }
 
   registerEventHandlers() {
-    this.eventManager.on('file:detected', async ({ filePath }) => {
-      if (!this.stateManager.hasSeenFile(filePath)) {
-        try{
-          await this.stateManager.addSeenFile(filePath);
-          this.eventManager.emit('file:ready', { filePath });
-        }catch(err){
-          console.error(`Failed to persist state for file ${filePath}:`, err);
-        }
-      }
-    });
-
     this.eventManager.on('file:uuidCreated', async ({ filePath, fileUuid }) => {
       if (fileUuid) {
         await this.stateManager.updateWithUuid(filePath, fileUuid);
@@ -113,33 +100,45 @@ class IngesterRunner{
   }
 
   retryHandleFileReady(filePath) {
-    const retries = this.retryUploadCounts.get(filePath) || 0;
+    if(!filePath){
+      console.error(`NOT RETRYING as filePath is ${filePath}`);
+      return;
+    }
+    else{
+      const retries = this.retryUploadCounts.get(filePath) || 0;
 
-    this.retryUploadCounts.set(filePath, retries + 1);
+      this.retryUploadCounts.set(filePath, retries + 1);
 
-    const jitter = Math.random() * 60 * 1000; // up to 1 extra minute
-    const delay = this.baseDelay + jitter;
+      const jitter = Math.random() * 60 * 1000; // up to 1 extra minute
+      const delay = this.baseDelay + jitter;
 
-    console.warn(`RETRYING UPLOAD: Attempt ${retries + 1} for ${filePath}, retrying in ${delay/1000}s...`);
+      console.warn(`RETRYING UPLOAD: Attempt ${retries + 1} for ${filePath}, retrying in ${delay/1000}s...`);
 
-    setTimeout(() => {
-      this.eventManager.emit('file:ready', { filePath });
-    }, delay);
+      setTimeout(() => {
+        this.eventManager.emit('file:ready', { filePath });
+      }, delay);
+    }
   }
 
   retryHandleFileUploaded(filePath){
-    const retries = this.retrySummaryCounts.get(filePath) || 0;
+    if(!filePath){
+      console.error(`NOT RETRYING as filePath is ${filePath}`);
+      return;
+    }
+    else{
+      const retries = this.retrySummaryCounts.get(filePath) || 0;
 
-    this.retrySummaryCounts.set(filePath, retries + 1);
+      this.retrySummaryCounts.set(filePath, retries + 1);
 
-    const jitter = Math.random() * 60 * 1000; // up to 1 extra minute
-    const delay = this.baseDelay + jitter;
+      const jitter = Math.random() * 60 * 1000; // up to 1 extra minute
+      const delay = this.baseDelay + jitter;
 
-    console.warn(`RETRYING SUMMARY GEN: Attempt ${retries + 1} for ${filePath}, retrying in ${delay/1000}s...`);
+      console.warn(`RETRYING SUMMARY GEN: Attempt ${retries + 1} for ${filePath}, retrying in ${delay/1000}s...`);
 
-    setTimeout(() => {
-      this.eventManager.emit('file:uploaded', {filePath});
-    }, delay);
+      setTimeout(() => {
+        this.eventManager.emit('file:uploaded', {filePath});
+      }, delay);
+    }
   }
 }
 

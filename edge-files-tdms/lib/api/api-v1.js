@@ -18,14 +18,18 @@ export class APIv1 {
         this.routes = express.Router();
         this.setup_routes();
         this.eventManager = opts.eventManager;
+        this.stateManager = opts.stateManager;
     }
 
     setup_routes() {
         let api = this.routes;
         api.post('/', this.post_file.bind(this));
+
+        // to be deleted
         api.get('/test', this.get_test.bind(this));
     }
 
+    // to be deleted
     async get_test(req, res){
         return res.status(200).json({ test: 'success_test' });
     }
@@ -47,8 +51,7 @@ export class APIv1 {
 
             // Generating secure random filename
             const tempName = crypto.randomUUID();
-            const tempPath = normalizePath(path.join(this.uploadPath, `${tempName}.temp`));
-
+            const tempPath = path.join(this.uploadPath, `${tempName}.temp`);
 
             await fs.mkdir(this.uploadPath, { recursive: true });
 
@@ -92,14 +95,25 @@ export class APIv1 {
             }
 
             this.log("Renaming file.");
+
             // Rename the temporary file now it's written to disk.
             await fs.rename(tempPath, finalPath);
-            this.eventManager.emit('file:detected', { filePath: finalPath });
 
-            return res.status(201).json({
-                message: 'File uploaded successfully.',
-                filename: filename,
-            });
+            if (!this.stateManager.hasSeenFile(finalPath)) {
+                try{
+                    await this.stateManager.addSeenFile(finalPath);
+
+                    this.eventManager.emit('file:ready', { filePath: finalPath });
+
+                    return res.status(201).json({
+                        message: 'File uploaded successfully to the driver.',
+                        filename: filename,
+                    });
+                }catch(err){
+                    console.error(`Failed to persist state for file ${finalPath}:`, err);
+                    return res.status(500).json({error: err.message});
+                }
+            }
         }
         catch(err){
             return res.status(500).json({error: err.message});

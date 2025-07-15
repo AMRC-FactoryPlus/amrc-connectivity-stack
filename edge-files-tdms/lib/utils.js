@@ -23,17 +23,29 @@ export function normalizePath(filePath) {
     if (!filePath || typeof filePath !== 'string') {
         throw new Error(`Invalid file path: ${filePath}, could not normalize it.`);
     }
-    return path.normalize(path.resolve(filePath)).toLowerCase();
+
+    const absolutePath = path.resolve(filePath);
+    const dir = path.dirname(absolutePath);
+    const file = path.basename(absolutePath).toLowerCase(); // Only lowercasing the filename
+
+    return path.join(dir, file);
 }
 
 
-export function sanityCheckFilename(filename){
-    const baseFilename = path.basename(filename);
+export function sanityCheckFilename(filename) {
+    if (typeof filename !== 'string') return false;
 
-    const isValid = /^[a-zA-Z0-9._-]+$/.test(filename);
+    // Reject path
+    if (filename.includes('/') || filename.includes('\\') || filename.includes('..')) return false;
 
-    if (!isValid || baseFilename.includes('..') || path.isAbsolute(baseFilename)) {
-        return false;
-    }
+    // Reject names starting with a dot
+    if (filename.startsWith('.')) return false;
+
+    // Reject names ending in .temp (case-insensitive)
+    if (filename.toLowerCase().endsWith('.temp')) return false;
+
+    // Ensure only safe characters
+    if (!/^\w[\w.-]*$/.test(filename)) return false;
+
     return true;
 }

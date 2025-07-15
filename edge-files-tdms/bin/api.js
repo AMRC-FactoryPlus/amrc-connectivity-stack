@@ -6,6 +6,7 @@ import { routes } from '../lib/api/routes.js';
 import {clean_up} from "../lib/api/startup.js";
 import { TDMSEventManager } from '../lib/tdms-file-events.js';
 import IngesterRunner from '../lib/IngesterRunner.js';
+import StateManager from '../lib/state-manager.js';
 
 const { env } = process;
 
@@ -13,13 +14,14 @@ const fplus = await new ServiceClient({
   env,
 }).init();
 
-const localUploadPath = env.TDMS_DIR_TO_WATCH;
-
+const uploadPath = env.TDMS_DIR_TO_WATCH;
 
 const eventManager = new TDMSEventManager();
+const stateManager = new StateManager({ env: env });
+
 
 await clean_up({
-  path : localUploadPath,
+  path : uploadPath,
 });
 
 const api = await new WebAPI({
@@ -39,8 +41,9 @@ const api = await new WebAPI({
   max_age: env.CACHE_MAX_AGE,
   routes: routes({
     fplus,
-    uploadPath: localUploadPath,
+    uploadPath: uploadPath,
     eventManager: eventManager,
+    stateManager: stateManager
   }),
 }).init();
 
@@ -48,6 +51,7 @@ const ingesterRunner = new IngesterRunner({
   fplus: fplus,
   env: env,
   eventManager: eventManager,
+  stateManager: stateManager
 });
 
 api.run();

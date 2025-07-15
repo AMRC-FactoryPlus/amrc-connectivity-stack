@@ -1,5 +1,5 @@
 import fs from 'fs/promises';
-import { isFileExist, normalizePath } from './utils.js';
+import { isFileExist } from './utils.js';
 
 class StateManager {
     constructor(opts) {
@@ -7,7 +7,7 @@ class StateManager {
             throw new Error('STATE MANAGER: stateFile path is required');
         }
 
-        this.stateFile = normalizePath(opts.env.STATE_FILE);
+        this.stateFile = opts.env.STATE_FILE;
         this.tempStateFile = `${this.stateFile}.tmp`;
         this.seenFiles = new Map();
     }
@@ -26,7 +26,7 @@ class StateManager {
             let parsed;
 
             try {
-                parsed = JSON.parse(data);
+                parsed = await JSON.parse(data);
                 if (!Array.isArray(parsed)) throw new Error('State file must be an array');
             } catch (jsonErr) {
                 console.warn(`STATE MANAGER: Invalid JSON in ${this.stateFile}: ${jsonErr.message}`);
@@ -34,15 +34,12 @@ class StateManager {
             }
 
             try {
-                const entries = parsed.map(entry => {
-                    if (!entry.path) throw new Error('Missing "path" in state entry');
-                    return [entry.path, {
-                        isUploaded: !!entry.isUploaded,
-                        uuid: entry.uuid || null,
-                        isClassMember: !!entry.isClassMember,
-                        hasSummary: !!entry.hasSummary
-                    }];
-                });
+                const entries = parsed.map(entry => [entry.path, {
+                    isUploaded: !!entry.isUploaded,
+                    uuid: entry.uuid || null,
+                    isClassMember: !!entry.isClassMember,
+                    hasSummary: !!entry.hasSummary
+                }]);
 
                 this.seenFiles = new Map(entries);
             } catch (err) {
@@ -60,21 +57,19 @@ class StateManager {
     }
 
     async addSeenFile(filePath) {
-        if (this.seenFiles.has(filePath)) {
+        if (this.hasSeenFile(filePath)) {
             console.warn(`STATE MANAGER: Skipping already seen file: ${filePath}`);
             return;
         }
+        else{
+            this.seenFiles.set(filePath, { isUploaded: false, uuid: null, isClassMember: false, hasSummary: false });
+            await this.saveSeenFiles();
+        }
 
-        this.seenFiles.set(filePath, { isUploaded: false, uuid: null, isClassMember: false, hasSummary: false });
-        await this.saveSeenFiles();
     }
 
     hasSeenFile(filePath) {
-        try {
-            return this.seenFiles.has(filePath);
-        } catch {
-            return false;
-        }
+        return this.seenFiles.has(filePath);
     }
 
     async saveSeenFiles() {
@@ -96,7 +91,7 @@ class StateManager {
 
     async updateSeenFiles(filePath, next) {
         try {
-            const state = this.getFileState(filePath);
+            const state = await this.getFileState(filePath);
 
             if (state) {
                 next(state);
@@ -130,12 +125,9 @@ class StateManager {
         await this.updateSeenFiles(filePath, s => s.hasSummary = true);
     }
 
-    getFileState(filePath) {
-        try {
-            return this.seenFiles.get(filePath);
-        } catch {
-            return undefined;
-        }
+    async getFileState(filePath) {
+        const state = await this.seenFiles.get(filePath);
+        return state;
     }
 
     getSeenFiles() {

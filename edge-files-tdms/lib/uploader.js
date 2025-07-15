@@ -17,7 +17,6 @@ class Uploader {
 
     bindToEvents() {
         this.eventManager.on('file:ready', this.handleFileReady.bind(this));
-        this.eventManager.on('file:readyFailed', this.handleFileReadyError.bind(this));
     }
 
     async createFileUuid(filePath) {
@@ -69,7 +68,7 @@ class Uploader {
     }
 
     async handleFileReady({ filePath }) {
-        console.log(`UPLOADER: Handling new file: ${filePath}.`);
+        console.log(`UPLOADER: Handling new file to upload: ${filePath}.`);
 
         try {
             if (!(await waitForFileExist(filePath))) {
@@ -82,7 +81,6 @@ class Uploader {
 
             if (fileState?.isUploaded) {
                 console.log(`UPLOADER: Skipping ${filePath}, already uploaded.`);
-                this.eventManager.emit('file:skipped', { filePath });
                 return;
             }
 
@@ -107,10 +105,6 @@ class Uploader {
             console.error(`UPLOADER: Error when handling file: ${err}`);
             this.eventManager.emit('file:readyFailed', { filePath, error: err });
         }
-    }
-
-    handleFileReadyError({ filePath, error }) {
-        console.error(`UPLOADER: File error on ${filePath}`, error);
     }
 }
 

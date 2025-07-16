@@ -1,4 +1,5 @@
 import Uploader from "./uploader.js";
+import Cleaner from "./cleaner.js";
 // import TDMSSummariser from './tdms-file-summariser.js';
 
 
@@ -14,6 +15,12 @@ class IngesterRunner{
       fplus: this.fplus,
       eventManager: this.eventManager,
       stateManager: this.stateManager,
+    });
+
+    this.cleaner = new Cleaner({
+      eventManager: this.eventManager,
+      stateManager: this.stateManager,
+      env: opts.env,
     });
 
     // this.tdmsSummariser = new TDMSSummariser({
@@ -41,8 +48,10 @@ class IngesterRunner{
     this.registerEventHandlers();
 
     // await this.tdmsSummariser.run();
+    await this.cleaner.run();
     await this.uploader.run();
     await this.stateManager.run();
+
 
     await this.resumePendingUploads();
 
@@ -76,6 +85,8 @@ class IngesterRunner{
     this.eventManager.on('file:uploaded', async ({ filePath }) => {
       await this.stateManager.updateAsUploaded(filePath);
       this.retryUploadCounts.delete(filePath);
+
+      this.eventManager.emit('file:delete', {filePath});
     });
 
     this.eventManager.on('file:addedAsClassMember', async ({ filePath }) => {

@@ -47,7 +47,7 @@ export class AuthNotify {
 //        api.get("/identity/:kind/:name", this.id_find.bind(this));
 
         notify.watch("v2/acl/:principal", this.get_acl.bind(this));
-        //notify.watch("v2/acl/kerberos/:upn", this.get_krb_acl.bind(this));
+        notify.watch("v2/acl/kerberos/:upn", this.get_krb_acl.bind(this));
 
         return notify;
     }
@@ -78,15 +78,11 @@ export class AuthNotify {
         );
     }
 
-    get_acl (sess, principal) {
-        const { data } = this;
-
-        if (!valid_uuid(principal)) return;
-
+    _get_acl (sess, src) {
         return rxx.rx(
             rx.combineLatest([
-                data.acl_for(principal),
-                data.permitted(sess.principal, Perm.ReadACL, true),
+                src,
+                this.data.permitted(sess.principal, Perm.ReadACL, true),
             ]),
             rx.map(([acl, tok]) => tok
                 ? rxx.Response.ok(acl.filter(e => tok(e.permission)))
@@ -95,15 +91,20 @@ export class AuthNotify {
             this.rxlog("ACL update: %o"));
     }
 
-//    async get_krb_acl (req, res) {
-//        const { upn } = req.params;
-//        if (!valid_krb(upn)) fail(410);
-//        
-//        const principal = await this.data.find_kerberos(upn);
-//        /* Don't return 404, we haven't checked ACLs */
-//        if (!principal)
-//            return res.status(200).json([]);
-//
-//        return this._get_acl(req, res, principal);
-//    }
+    get_acl (sess, principal) {
+        if (!valid_uuid(principal)) return;
+        return this._get_acl(sess, this.data.acl_for(principal));
+    }
+
+    get_krb_acl (sess, upn) {
+        const { data } = this;
+
+        if (!valid_krb(upn)) return;
+
+        const src = rxx.rx(
+            data.track_kerberos(upn),
+            rx.switchMap(p => data.acl_for(p)));
+
+        return this._get_acl(sess, src);
+    }
 }

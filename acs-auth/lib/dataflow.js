@@ -282,12 +282,14 @@ export class DataFlow {
             .orElse(Response.of(410));
     }
 
-    async find_kerberos (upn) {
-        const ids = await rx.firstValueFrom(this.identities);
-        const acc = ids
-            .filter(i => i.kind == "kerberos" && i.name == upn)
-            .map(i => i.uuid);
+    track_kerberos (upn) {
+        return rxx.rx(
+            this.identities,
+            rx.map(ids => ids.filter(i => i.kind == "kerberos" && i.name == upn)),
+            rx.map(acc => acc[0]?.uuid));
+    }
 
-        return acc[0];
+    find_kerberos (upn) {
+        return rx.firstValueFrom(this.track_kerberos(upn));
     }
 }

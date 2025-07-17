@@ -125,6 +125,10 @@ class StateManager {
         await this.updateSeenFiles(filePath, s => s.hasSummary = true);
     }
 
+    deleteState(filePath){
+        this.seenFiles.delete(filePath);
+    }
+
     async getFileState(filePath) {
         const state = await this.seenFiles.get(filePath);
         return state;

@@ -8,6 +8,9 @@ class Uploader {
         this.fplus = opts.fplus;
         this.configDb = this.fplus.ConfigDB;
         this.filesClient = this.fplus.Files;
+
+        this.queue = [];
+        this.isProcessing = false;
     }
 
     async run() {
@@ -16,7 +19,63 @@ class Uploader {
     }
 
     bindToEvents() {
-        this.eventManager.on('file:ready', this.handleFileReady.bind(this));
+        this.eventManager.on('file:ready', this.enqueueFile.bind(this));
+    }
+
+    enqueueFile({ filePath }) {
+        this.queue.push(filePath);
+        this.processQueue();
+    }
+
+    async processQueue() {
+        if (this.isProcessing) return;
+        this.isProcessing = true;
+
+        while (this.queue.length > 0) {
+            const filePath = this.queue.shift();
+            await this.processFile(filePath);
+        }
+
+        this.isProcessing = false;
+    }
+
+    async processFile(filePath) {
+        console.log(`UPLOADER: Handling new file to upload: ${filePath}.`);
+
+        try {
+            if (!(await waitForFileExist(filePath))) {
+                console.error(`UPLOADER: Filepath ${filePath} does not exist.`);
+                this.eventManager.emit('file:readyFailed', { filePath, error: 'File does not exist' });
+                return;
+            }
+
+            const fileState = await this.stateManager.getFileState(filePath);
+
+            if (fileState?.isUploaded) {
+                console.log(`UPLOADER: Skipping ${filePath}, already uploaded.`);
+                return;
+            }
+
+            let fileUuid = fileState?.uuid;
+
+            if (!fileUuid) {
+                fileUuid = await this.createFileUuid(filePath);
+                if (!fileUuid) return;
+            }
+
+            if (!fileState?.isClassMember) {
+                const added = await this.addAsClassMember(fileUuid, filePath);
+                if (!added) return;
+            }
+
+            const uploaded = await this.uploadFileToFS(fileUuid, filePath);
+            if (!uploaded) return;
+
+            console.log(`UPLOADER: Finished processing ${filePath}`);
+        } catch (err) {
+            console.error(`UPLOADER: Error when handling file: ${err}`);
+            this.eventManager.emit('file:readyFailed', { filePath, error: err });
+        }
     }
 
     async createFileUuid(filePath) {
@@ -42,9 +101,8 @@ class Uploader {
             console.log(`UPLOADER: Successfully uploaded ${filePath} with uuid ${responseUuid}`);
             this.eventManager.emit('file:uploaded', { filePath });
             return true;
-
         } catch (fsError) {
-            if(fsError.status == 409){
+            if (fsError.status === 409) {
                 console.warn(`UPLOADER: File already exists on File Service for UUID ${fileUuid}, updating local state as uploaded.`);
                 this.eventManager.emit('file:uploaded', { filePath });
                 return true;
@@ -64,46 +122,6 @@ class Uploader {
             console.error(`UPLOADER: Error adding class member for ${filePath}`, configErr);
             this.eventManager.emit('file:addAsClassMemberFailed', { filePath, error: configErr });
             return false;
-        }
-    }
-
-    async handleFileReady({ filePath }) {
-        console.log(`UPLOADER: Handling new file to upload: ${filePath}.`);
-
-        try {
-            if (!(await waitForFileExist(filePath))) {
-                console.error(`UPLOADER: Filepath ${filePath} does not exist.`);
-                this.eventManager.emit('file:readyFailed', { filePath, error: 'File does not exist' });
-                return;
-            }
-
-            const fileState = await this.stateManager.getFileState(filePath);
-
-            if (fileState?.isUploaded) {
-                console.log(`UPLOADER: Skipping ${filePath}, already uploaded.`);
-                return;
-            }
-
-            let fileUuid = fileState?.uuid;
-
-            if (!fileUuid) {
-                fileUuid = await this.createFileUuid(filePath);
-                if (!fileUuid) return; // Stop if failed
-            }
-
-            if (!fileState?.isClassMember) {
-                const added = await this.addAsClassMember(fileUuid, filePath);
-                if (!added) return; // Stop if failed
-            }
-
-            const uploaded = await this.uploadFileToFS(fileUuid, filePath);
-            if (!uploaded) return; // Stop if failed
-
-            console.log(`UPLOADER: Finished processing ${filePath}`);
-
-        } catch (err) {
-            console.error(`UPLOADER: Error when handling file: ${err}`);
-            this.eventManager.emit('file:readyFailed', { filePath, error: err });
         }
     }
 }

@@ -39,6 +39,10 @@ class Cleaner {
             if (this.isFileFullyProcessed(fState)) {
                 await fs.unlink(filePath);
                 console.log(`CLEANER: Deleted file: ${filePath}`);
+
+                this.stateManager.deleteState(filePath);
+                console.log(`CLEANER: Deleted from state ${filePath}`);
+
             } else {
                 console.log(`CLEANER: File not fully processed, skipping delete: ${filePath}`);
             }

@@ -1,0 +1,1 @@
+- hasReadPermission is defined but not used - currently all topics open?

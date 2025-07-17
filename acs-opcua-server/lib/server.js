@@ -1,11 +1,9 @@
 /*
- * Factory+ / AMRC Connectivity Stack (ACS) OPC UA Server component
- * OPC UA Server implementation
- * Copyright 2025 AMRC
+ * Copyright (c) University of Sheffield AMRC 2025.
  */
 
 import {
-    OPCUAServer,
+    OPCUAServer as NodeOPCUAServer,
     Variant,
     DataType,
     StatusCodes,
@@ -31,10 +29,10 @@ export class OPCUAServer {
     constructor(opts) {
         this.fplus = opts.fplus;
         this.log = this.fplus.debug.bound("opcua-server");
-        
-        this.port = process.env.OPCUA_PORT || 4840;
+
+        this.port = parseInt(process.env.OPCUA_PORT) || 4840;
         this.hostname = process.env.OPCUA_HOSTNAME || "0.0.0.0";
-        this.httpPort = process.env.HTTP_PORT || 8080;
+        this.httpPort = parseInt(process.env.HTTP_PORT) || 8080;
 
         this.influxClient = null;
         this.addressSpaceBuilder = null;
@@ -55,24 +53,24 @@ export class OPCUAServer {
         await this.authHandler.init();
 
         // Initialize address space builder
-        this.addressSpaceBuilder = new AddressSpaceBuilder({ 
+        this.addressSpaceBuilder = new AddressSpaceBuilder({
             fplus: this.fplus,
             influxClient: this.influxClient,
             authHandler: this.authHandler
         });
 
         // Create OPC UA server
-        this.server = new OPCUAServer({
+        this.server = new NodeOPCUAServer({
             port: this.port,
             hostname: this.hostname,
-            
+
             resourcePath: "/UA/FactoryPlusUNS",
             buildInfo: {
                 productName: "Factory+ UNS OPC UA Server",
                 buildNumber: "1.0.0",
                 buildDate: new Date()
             },
-            
+
             serverInfo: {
                 applicationUri: makeApplicationUrn(this.hostname, "FactoryPlusUNS"),
                 productUri: "urn:amrc:factoryplus:opcua-server",
@@ -96,13 +94,13 @@ export class OPCUAServer {
                 MessageSecurityMode.SignAndEncrypt
             ],
 
-            // User authentication
+            // User authentication - require Factory+ credentials
             userManager: {
                 isValidUser: this.authHandler.isValidUser.bind(this.authHandler),
                 getUserRoles: this.authHandler.getUserRoles.bind(this.authHandler)
             },
 
-            // Allow anonymous access (will be controlled by MQTT permissions)
+            // Temporarily allow anonymous access for debugging
             allowAnonymous: true
         });
 
@@ -155,7 +153,7 @@ export class OPCUAServer {
 
     setupDataSources() {
         const addressSpace = this.server.engine.addressSpace;
-        
+
         // Find all variable nodes in our namespace
         const namespace = addressSpace.getNamespace("urn:amrc:factoryplus:uns");
         if (!namespace) {
@@ -174,7 +172,7 @@ export class OPCUAServer {
     setupVariableDataSource(variableNode) {
         // Extract path information from the node
         const browsePath = this.getNodeBrowsePath(variableNode);
-        
+
         variableNode.setValueFromSource({
             get: async () => {
                 try {
@@ -194,7 +192,7 @@ export class OPCUAServer {
                     });
                 }
             },
-            
+
             timestamped_get: async () => {
                 try {
                     const result = await this.influxClient.getTimestampedValue(browsePath);
@@ -220,14 +218,14 @@ export class OPCUAServer {
     getNodeBrowsePath(node) {
         const path = [];
         let current = node;
-        
+
         while (current && current.browseName && current.browseName.name !== "Objects") {
             if (current.browseName.name !== "Root") {
                 path.unshift(current.browseName.name);
             }
             current = current.parent;
         }
-        
+
         return path.join("/");
     }
 

@@ -1,16 +1,12 @@
 /*
- * Factory+ / AMRC Connectivity Stack (ACS) OPC UA Server component
- * Authentication and authorization handler
- * Copyright 2025 AMRC
+ * Copyright (c) University of Sheffield AMRC 2025.
  */
-
-import { UUIDs } from "@amrc-factoryplus/service-client";
 
 export class AuthHandler {
     constructor(opts) {
         this.fplus = opts.fplus;
         this.log = this.fplus.debug.bound("auth-handler");
-        
+
         this.userSessions = new Map(); // Track user sessions and their permissions
     }
 
@@ -28,33 +24,54 @@ export class AuthHandler {
     async isValidUser(userName, password) {
         try {
             this.log(`Authenticating user: ${userName}`);
-            
-            // Use the Factory+ auth service to validate credentials
-            // This follows the same pattern as other ACS services
-            const client = userName.includes("@") 
-                ? userName 
-                : `${userName}@${this.fplus.realm || "FACTORYPLUS.APP.AMRC.CO.UK"}`;
 
-            // For now, we'll implement basic validation
-            // In a full implementation, this would integrate with the GSS/Kerberos system
-            // like the existing auth patterns in the codebase
-            
             if (!userName || !password) {
+                this.log("Missing username or password");
                 return false;
             }
 
-            // Store user session info for permission checking
-            this.userSessions.set(userName, {
-                principal: client,
-                authenticated: true,
-                loginTime: new Date()
-            });
+            // Construct the full principal name if not already provided
+            const principal = userName.includes("@")
+                ? userName
+                : `${userName}@${this.fplus.realm || "FACTORYPLUS.APP.AMRC.CO.UK"}`;
 
-            this.log(`User ${userName} authenticated successfully`);
-            return true;
-            
+            // Use Factory+ service client to validate credentials
+            // This creates a new service client with the provided credentials
+            // and attempts to authenticate with the Factory+ auth service
+            try {
+                const { ServiceClient } = await import("@amrc-factoryplus/service-client");
+
+                // Create a service client with the user's credentials
+                const userClient = await new ServiceClient({
+                    env: {
+                        ...process.env,
+                        SERVICE_USERNAME: principal,
+                        SERVICE_PASSWORD: password
+                    }
+                }).init();
+
+                console.log(userClient)
+
+                // If we get here, authentication was successful
+                this.log(`User ${userName} authenticated successfully as ${principal}`);
+
+                // Store user session info for permission checking
+                this.userSessions.set(userName, {
+                    principal: principal,
+                    authenticated: true,
+                    loginTime: new Date(),
+                    serviceClient: userClient
+                });
+
+                return true;
+
+            } catch (authError) {
+                this.log(`Factory+ authentication failed for ${principal}: ${authError.message}`);
+                return false;
+            }
+
         } catch (error) {
-            this.log(`Authentication failed for ${userName}: ${error.message}`);
+            this.log(`Authentication error for ${userName}: ${error.message}`);
             return false;
         }
     }
@@ -62,22 +79,23 @@ export class AuthHandler {
     /**
      * Get user roles for authorization
      * @param {string} userName - Username
-     * @returns {Promise<string[]>} Array of user roles
+     * @returns {Array} Array of role objects with namespace and value properties
      */
-    async getUserRoles(userName) {
+    getUserRoles(userName) {
         try {
             const session = this.userSessions.get(userName);
             if (!session) {
-                return ["Anonymous"];
+                // Return Anonymous role for unauthenticated users
+                return [{ namespace: 0, value: 1 }]; // Anonymous = 1
             }
 
-            // In a full implementation, this would query the auth service
-            // to get the user's actual roles and permissions
-            return ["AuthenticatedUser"];
-            
+            // Return AuthenticatedUser role for authenticated users
+            // Based on OPC UA Well-Known Roles: AuthenticatedUser = 2
+            return [{ namespace: 0, value: 2 }]; // AuthenticatedUser = 2
+
         } catch (error) {
             this.log(`Error getting roles for ${userName}: ${error.message}`);
-            return ["Anonymous"];
+            return [{ namespace: 0, value: 1 }]; // Anonymous = 1
         }
     }
 
@@ -102,7 +120,7 @@ export class AuthHandler {
             // Check MQTT permissions for the user
             // This would integrate with the existing MQTT permission system
             return await this.checkMQTTReadPermission(session.principal, path);
-            
+
         } catch (error) {
             this.log(`Error checking read permission for ${userName} on ${path}: ${error.message}`);
             return false;
@@ -115,8 +133,8 @@ export class AuthHandler {
      * @returns {Promise<boolean>} True if anonymous read is allowed
      */
     async checkAnonymousReadPermission(path) {
-        // For now, allow anonymous read access
-        // In production, this should be configurable and integrate with MQTT permissions
+        // Temporarily allow anonymous access for debugging data structure
+        this.log(`Allowing anonymous access to ${path} for debugging`);
         return true;
     }
 
@@ -130,16 +148,14 @@ export class AuthHandler {
         try {
             // Convert the OPC UA path to MQTT topic format
             const mqttTopic = this.pathToMQTTTopic(path);
-            
+
             // This would integrate with the existing MQTT permission checking
             // For now, we'll implement a basic check
-            
+
             // Check if user has UNS read permissions
             // This follows the pattern from the UNS permission dumps
-            const hasUNSRead = await this.checkUNSReadPermission(principal);
-            
-            return hasUNSRead;
-            
+            return await this.checkUNSReadPermission(principal);
+
         } catch (error) {
             this.log(`Error checking MQTT permission: ${error.message}`);
             return false;
@@ -157,7 +173,7 @@ export class AuthHandler {
             // the UNS.Perm.ReadEntireUNS permission or equivalent
             // For now, return true for authenticated users
             return true;
-            
+
         } catch (error) {
             this.log(`Error checking UNS read permission: ${error.message}`);
             return false;
@@ -173,7 +189,7 @@ export class AuthHandler {
         // Convert from OPC UA path format to UNS MQTT topic format
         // OPC UA: group/node/device/path/measurement
         // MQTT: UNS/v1/group/node/device/path/measurement
-        
+
         return `UNS/v1/${path}`;
     }
 
@@ -183,7 +199,7 @@ export class AuthHandler {
     cleanupSessions() {
         const now = new Date();
         const maxAge = 24 * 60 * 60 * 1000; // 24 hours
-        
+
         for (const [userName, session] of this.userSessions.entries()) {
             if (now - session.loginTime > maxAge) {
                 this.userSessions.delete(userName);

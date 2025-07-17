@@ -8,6 +8,9 @@ import * as rx from "rxjs";
 import * as rxx     from "@amrc-factoryplus/rx-util";
 import { Notify }   from "@amrc-factoryplus/service-api";
 
+import { Perm }                     from "./uuids.js";
+import { valid_krb, valid_uuid }    from "./validate.js";
+
 export class AuthNotify {
     constructor (opts) {
         this.data   = opts.data;
@@ -43,6 +46,9 @@ export class AuthNotify {
 //        api.get("/identity/:kind", this.id_list_kind.bind(this));
 //        api.get("/identity/:kind/:name", this.id_find.bind(this));
 
+        notify.watch("v2/acl/:principal", this.get_acl.bind(this));
+        //notify.watch("v2/acl/kerberos/:upn", this.get_krb_acl.bind(this));
+
         return notify;
     }
 
@@ -66,11 +72,38 @@ export class AuthNotify {
 
         return rxx.rx(
             idt.get(),
-            this.rxlog("Before uniq: %o"),
             rx.map(idr => idr.uniq(i => i.name)),
-            this.rxlog("After uniq: %o"),
             rx.map((res, ix) => res.toUpdate(ix)),
             this.rxlog("Update: %o"),
         );
     }
+
+    get_acl (sess, principal) {
+        const { data } = this;
+
+        if (!valid_uuid(principal)) return;
+
+        return rxx.rx(
+            rx.combineLatest([
+                data.acl_for(principal),
+                data.permitted(sess.principal, Perm.ReadACL, true),
+            ]),
+            rx.map(([acl, tok]) => tok
+                ? rxx.Response.ok(acl.filter(e => tok(e.permission)))
+                : rxx.Response.of(403)),
+            rx.map((r, i) => r.toUpdate(i)),
+            this.rxlog("ACL update: %o"));
+    }
+
+//    async get_krb_acl (req, res) {
+//        const { upn } = req.params;
+//        if (!valid_krb(upn)) fail(410);
+//        
+//        const principal = await this.data.find_kerberos(upn);
+//        /* Don't return 404, we haven't checked ACLs */
+//        if (!principal)
+//            return res.status(200).json([]);
+//
+//        return this._get_acl(req, res, principal);
+//    }
 }

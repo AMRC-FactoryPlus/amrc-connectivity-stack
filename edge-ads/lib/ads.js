@@ -78,6 +78,8 @@ export class ADSHandler {
         // Create the ADS client instance with our configuration
         this.client = new Client(clientConfig);
 
+        this.client.setDebugLevel(3);
+
         // Set up connection event handlers
         // These handlers manage the connection lifecycle and notify the Edge Agent
 

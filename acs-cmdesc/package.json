@@ -22,6 +22,8 @@
     "start": "node bin/cmdescd.js"
   },
   "dependencies": {
+    "@amrc-factoryplus/rx-client": "file:../lib/js-rx-client",
+    "@amrc-factoryplus/rx-util": "file:../lib/js-rx-util",
     "@amrc-factoryplus/service-client": "file:../lib/js-service-client",
     "@amrc-factoryplus/service-api": "file:../lib/js-service-api",
     "@isaacs/ttlcache": "^1.2.0",

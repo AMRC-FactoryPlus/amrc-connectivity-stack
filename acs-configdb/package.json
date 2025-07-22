@@ -23,6 +23,7 @@
     "@amrc-factoryplus/rx-client": "file:../lib/js-rx-client",
     "@amrc-factoryplus/rx-util": "file:../lib/js-rx-util",
     "@amrc-factoryplus/service-api": "file:../lib/js-service-api",
+    "@amrc-factoryplus/service-client": "file:../lib/js-service-client",
     "ajv": "^8.10.0",
     "ajv-formats": "^2.1.1",
     "deep-equal": "^2.2.3",

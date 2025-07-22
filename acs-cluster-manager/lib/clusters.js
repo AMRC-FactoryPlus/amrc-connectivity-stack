@@ -14,7 +14,8 @@ import JMP      from "json-merge-patch";
 import rx       from "rxjs";
 import Template from "json-templates";
 
-import { UUIDs }         from "@amrc-factoryplus/service-client";
+import * as rxx         from "@amrc-factoryplus/rx-util";
+import { UUIDs }        from "@amrc-factoryplus/service-client";
 
 import { Update, Delete }       from "./actions.js";
 import { Checkout }             from "./checkout.js";
@@ -34,9 +35,8 @@ export class Clusters {
 
     async init () {
         const { cdb } = this;
-        const watcher = await cdb.watcher();
 
-        await this._init_config(cdb, watcher);
+        await this._init_config(cdb);
 
         /* XXX We should track changes here, and update the cluster. */
         this.template = {
@@ -48,7 +48,7 @@ export class Clusters {
         /* [uuid, patch] requesting status updates */
         this.status_updates = new rx.Subject();
 
-        const clusters = this._init_clusters(cdb, watcher);
+        const clusters = cdb.search_app(Edge.App.Cluster);
 
         this.status = this._init_status(cdb);
         this.status_patches = this._init_status_patches(cdb);
@@ -63,9 +63,11 @@ export class Clusters {
         return Template(conf);
     }
 
-    async _init_config (cdb, watcher) {
+    /* XXX This is very crude and could be done much better now. */
+    async _init_config (cdb) {
         /* Exit and restart when service-setup runs */
-        watcher.application(UUIDs.App.ServiceConfig)
+        cdb.search_app(UUIDs.App.ServiceConfig)
+            .pipe(rx.skip(1))
             .subscribe(() => process.exit(0));
 
         this.config = await cdb.get_config(
@@ -87,21 +89,6 @@ export class Clusters {
             uuid:   this.config.repo.helm.uuid,
             path:   "flux-system/flux-system.yaml",
         });
-    }
-
-    /* Obs of Set(uuid) indicating the clusters in the ConfigDB */
-    _init_clusters (cdb, watcher) {
-        const app = Edge.App.Cluster;
-
-        return watcher.application(app).pipe(
-            /* Fetch regardless every 10 minutes */
-            rx.mergeWith(rx.timer(0, 10*60*1000).pipe(
-                /* Jitter fetches */
-                rx.delayWhen(() => rx.timer(Math.random() * 5000)))),
-            rx.switchMap(() => cdb.list_configs(app)),
-            rx.map(cs => Imm.Set(cs)),
-            rx.tap(cs => this.log("CLUSTERS: %o", cs.toJS())),
-        );
     }
 
     /* Obs of Map(uuid, status) tracking current cluster status */
@@ -156,10 +143,6 @@ export class Clusters {
     }
 
     _init_cluster_updates (clusters) {
-        /* XXX Currently `clusters` will refetch every 10 minutes and
-         * will emit a new value every time. This means the catch on the
-         * action below will not prevent clusters from reconciling.
-         * If/when this changes we will need retry-failed logic here. */
         return clusters.pipe(
             rx.withLatestFrom(this.status),
             rx.mergeMap(([clusters, status]) => {
@@ -167,16 +150,22 @@ export class Clusters {
                  * configuration. This is not allowed. To change a
                  * cluster, destroy it, wait for the status to go, and
                  * recreate it. */
+                /* XXX This should be fixed */
+
+                const want = clusters.keySeq().toSet();
                 const have = status.keySeq().toSet();
-                const deleted = have.subtract(clusters);
-                const created = clusters.subtract(have);
+
+                const deleted = have.subtract(want);
+                const created = want.subtract(have);
+
                 const unfinished = status
                     .filter((st, cl) => !st.ready && !deleted.has(cl))
                     .keySeq();
                 const updated = created.union(unfinished);
 
                 const expand = (set, Type) => set.toSeq()
-                    .map(uuid => new Type(this, uuid, status.get(uuid, {})));
+                    .map(uuid => new Type(this, uuid, 
+                        clusters.get(uuid), status.get(uuid, {})));
                 return rx.merge(
                     expand(updated, Update),
                     expand(deleted, Delete),
@@ -186,8 +175,10 @@ export class Clusters {
              * parallel per-cluster with groupBy but we need to ensure
              * that delete/create on a single cluster are not handled at
              * the same time. */
-            rx.concatMap(act => act.apply()
-                .catch(e => this.log("Cluster update failed: %s", e))),
+            rx.concatMap(act => rxx.rx(
+                rx.defer(() => act.apply()),
+                rxx.retryBackoff(10000,
+                    e => this.log("Cluster update failed: %s", e)))),
         );
     }
 

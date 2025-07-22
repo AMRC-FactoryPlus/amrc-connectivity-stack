@@ -4,8 +4,8 @@
  * Copyright 2022 AMRC
  */
 
-import { ServiceClient }    from "@amrc-factoryplus/service-client";
-import { WebAPI }           from "@amrc-factoryplus/service-api";
+import { RxClient }     from "@amrc-factoryplus/rx-client";
+import { WebAPI }       from "@amrc-factoryplus/service-api";
 
 import { GIT_VERSION } from "../lib/git-version.js";
 import ApiV1 from "../lib/api_v1.js";
@@ -18,7 +18,7 @@ const Version = "1.0.2";
 
 const Device_UUID = process.env.DEVICE_UUID;
 
-const fplus = await new ServiceClient({ env: process.env }).init();
+const fplus = await new RxClient({ env: process.env }).init();
 
 const cmdesc = await new CmdEscD({
     fplus,

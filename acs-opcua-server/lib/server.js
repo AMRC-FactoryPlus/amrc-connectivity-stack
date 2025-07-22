@@ -153,31 +153,48 @@ export class OPCUAServer {
 
     setupDataSources() {
         const addressSpace = this.server.engine.addressSpace;
-
-        // Find all variable nodes in our namespace
         const namespace = addressSpace.getNamespace("urn:amrc:factoryplus:uns");
         if (!namespace) {
             this.log("Warning: Factory+ UNS namespace not found");
             return;
         }
 
-        // Set up data source for all variable nodes
-        namespace.nodeIterator((node) => {
-            if (node.nodeClass === 2) { // Variable node
-                this.setupVariableDataSource(node);
-            }
-        });
+        const rootFolder = this.addressSpaceBuilder.getRootFolder();
+        if (!rootFolder) {
+            this.log("Could not find root UNS folder");
+            return;
+        }
+
+        this.traverseAndSetup(rootFolder);
+    }
+
+    traverseAndSetup(node) {
+        if (node.nodeClass === 2) { // Variable
+            this.setupVariableDataSource(node);
+        }
+
+        const children = node.getComponents();
+        for (const child of children) {
+            this.traverseAndSetup(child);
+        }
+
+        const organized = node.findReferencesAsObject("Organizes", true);
+        for (const child of organized) {
+            this.traverseAndSetup(child);
+        }
     }
 
     setupVariableDataSource(variableNode) {
-        // Extract path information from the node
-        const browsePath = this.getNodeBrowsePath(variableNode);
+        const browsePath = variableNode._fullPath;
 
-        variableNode.setValueFromSource({
-            get: async () => {
+        this.log(`Setting up data source for ${browsePath}`);
+
+        variableNode.bindVariable({
+            refreshFunc: async (callback) => {
                 try {
                     const value = await this.influxClient.getCurrentValue(browsePath);
-                    return new DataValue({
+
+                    const dataValue = new DataValue({
                         value: new Variant({
                             dataType: this.getDataType(value),
                             value: value
@@ -185,48 +202,16 @@ export class OPCUAServer {
                         statusCode: StatusCodes.Good,
                         sourceTimestamp: new Date()
                     });
-                } catch (error) {
-                    this.log(`Error reading value for ${browsePath}: ${error.message}`);
-                    return new DataValue({
-                        statusCode: StatusCodes.BadNoData
-                    });
-                }
-            },
 
-            timestamped_get: async () => {
-                try {
-                    const result = await this.influxClient.getTimestampedValue(browsePath);
-                    return new DataValue({
-                        value: new Variant({
-                            dataType: this.getDataType(result.value),
-                            value: result.value
-                        }),
-                        statusCode: StatusCodes.Good,
-                        sourceTimestamp: result.timestamp,
-                        serverTimestamp: new Date()
-                    });
+                    callback(null, dataValue);
                 } catch (error) {
-                    this.log(`Error reading timestamped value for ${browsePath}: ${error.message}`);
-                    return new DataValue({
+                    this.log(`Error refreshing value for ${browsePath}: ${error.message}`);
+                    callback(null, new DataValue({
                         statusCode: StatusCodes.BadNoData
-                    });
+                    }));
                 }
             }
         });
-    }
-
-    getNodeBrowsePath(node) {
-        const path = [];
-        let current = node;
-
-        while (current && current.browseName && current.browseName.name !== "Objects") {
-            if (current.browseName.name !== "Root") {
-                path.unshift(current.browseName.name);
-            }
-            current = current.parent;
-        }
-
-        return path.join("/");
     }
 
     getDataType(value) {

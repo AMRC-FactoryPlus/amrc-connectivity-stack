@@ -47,7 +47,6 @@ export class AddressSpaceBuilder {
 
         // Build the hierarchy: Groups -> Nodes -> Devices -> Paths -> Measurements
         await this.buildGroupHierarchy();
-        this.combineSubFolders();
 
         this.log("Address space built successfully");
     }
@@ -63,6 +62,8 @@ export class AddressSpaceBuilder {
             for (const group of groups) {
                 await this.buildGroupFolder(group);
             }
+
+            this.combineSubFolders();
         } catch (error) {
             this.log(`Error building group hierarchy: ${error.message}`);
         }
@@ -284,14 +285,6 @@ export class AddressSpaceBuilder {
                 displayName: measurementName,
                 description: `Measurement: ${measurementName} from ${fullPath}`,
                 dataType: dataType,
-                value: {
-                    get: () => {
-                        return new Variant({
-                            dataType: dataType,
-                            value: initialValue,
-                        });
-                    },
-                },
                 accessLevel:
                     AccessLevelFlag.CurrentRead | AccessLevelFlag.TimestampRead,
                 userAccessLevel:

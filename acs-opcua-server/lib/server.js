@@ -33,6 +33,8 @@ export class OPCUAServer {
         this.port = parseInt(process.env.OPCUA_PORT) || 4840;
         this.hostname = process.env.OPCUA_HOSTNAME || "0.0.0.0";
         this.httpPort = parseInt(process.env.HTTP_PORT) || 8080;
+        this.realm = opts.realm
+        this.keytab = opts.keytab
 
         this.influxClient = null;
         this.addressSpaceBuilder = null;
@@ -49,7 +51,7 @@ export class OPCUAServer {
         await this.influxClient.init();
 
         // Initialize auth handler
-        this.authHandler = new AuthHandler({ fplus: this.fplus });
+        this.authHandler = new AuthHandler({ fplus: this.fplus, realm: this.realm, hostname: this.hostname, keytab: this.keytab });
         await this.authHandler.init();
 
         // Initialize address space builder
@@ -101,7 +103,7 @@ export class OPCUAServer {
             },
 
             // Temporarily allow anonymous access for debugging
-            allowAnonymous: true
+            allowAnonymous: false
         });
 
         // Set up HTTP server for health checks

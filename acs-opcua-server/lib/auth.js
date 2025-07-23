@@ -2,10 +2,16 @@
  * Copyright (c) University of Sheffield AMRC 2025.
  */
 
+import GSS from "gssapi.js";
+
 export class AuthHandler {
     constructor(opts) {
         this.fplus = opts.fplus;
         this.log = this.fplus.debug.bound("auth-handler");
+
+        this.realm = opts.realm;
+        this.principal = `OPCUA/${opts.hostname}`;
+        this.keytab = opts.keytab;
 
         this.userSessions = new Map(); // Track user sessions and their permissions
     }
@@ -31,33 +37,39 @@ export class AuthHandler {
             }
 
             // Construct the full principal name if not already provided
-            const principal = userName.includes("@")
-                ? userName
-                : `${userName}@${this.fplus.realm || "FACTORYPLUS.APP.AMRC.CO.UK"}`;
+            const client = user.includes("@") ? user : `${user}@${this.realm}`;
 
             // Use Factory+ service client to validate credentials
             // This creates a new service client with the provided credentials
             // and attempts to authenticate with the Factory+ auth service
             try {
+
+                res = await GSS.verifyCredentials(client, password, {
+                    keytab: `FILE:${this.keytab}`,
+                    serverPrincipal: this.principal,
+                });
+
+                this.log("GSSAPI verify credentials reponse: %O", res);
+
                 const { ServiceClient } = await import("@amrc-factoryplus/service-client");
 
                 // Create a service client with the user's credentials
                 const userClient = await new ServiceClient({
                     env: {
                         ...process.env,
-                        SERVICE_USERNAME: principal,
+                        SERVICE_USERNAME: client,
                         SERVICE_PASSWORD: password
                     }
                 }).init();
 
-                console.log(userClient)
+                this.log(userClient)
 
                 // If we get here, authentication was successful
-                this.log(`User ${userName} authenticated successfully as ${principal}`);
+                this.log(`User ${userName} authenticated successfully as ${client}`);
 
                 // Store user session info for permission checking
                 this.userSessions.set(userName, {
-                    principal: principal,
+                    principal: client,
                     authenticated: true,
                     loginTime: new Date(),
                     serviceClient: userClient
@@ -66,7 +78,7 @@ export class AuthHandler {
                 return true;
 
             } catch (authError) {
-                this.log(`Factory+ authentication failed for ${principal}: ${authError.message}`);
+                this.log(`Factory+ authentication failed for ${client}: ${authError.message}`);
                 return false;
             }
 

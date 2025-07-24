@@ -10,8 +10,10 @@ import { v4 as uuidv4 } from "uuid";
 
 import { UUIDs }    from "@amrc-factoryplus/service-client";
 import * as rxx     from "@amrc-factoryplus/rx-util";
+import { Optional, Response } from "@amrc-factoryplus/rx-util";
 
-import { Class, Special } from "./uuids.js";
+import { Class, Perm, Special }     from "./uuids.js";
+import { valid_uuid, valid_krb }    from "./validate.js";
 
 export class DataFlow {
     constructor (opts) {
@@ -185,32 +187,13 @@ export class DataFlow {
         timeout:    1800000,
     });
 
-    async find_identities (cond) {
-        const ids = await rx.firstValueFrom(this.identities);
-        if (!cond) return ids;
-        const rv = ids.filter(cond);
-        return rv;
-    }
-
-    async whoami (upn) {
-        const acc = await this.find_identities(i =>
-            i.kind == "kerberos" && i.name == upn);
-        if (!acc.length) return;
-        return acc[0].uuid;
-    }
-
-    find_kerberos (upn) {
-        return rx.firstValueFrom(rxx.rx(
-            this.identities,
-            rx.first(),
-            rx.mergeMap(ids => ids
-                .filter(i => i.kind == "kerberos" && i.name == upn)
-                .map(i => i.uuid)),
-            rx.defaultIfEmpty(null)));
-    }
-
-    permitted (upn, perm) {
-        return rx.firstValueFrom(rxx.rx(
+    /** Track the targets for a given principal and permission.
+     * @param upn A principal's UPN
+     * @param perm A permission UUID
+     * @returns A seq of iSets of targets
+     */
+    track_targets (upn, perm) {
+        return rxx.rx(
             this.find_kerberos(upn),
             rx.mergeMap(p => p ? this.acl_for(p) : rx.of([])),
             rx.map(acl => imm.Seq(acl)
@@ -218,17 +201,95 @@ export class DataFlow {
                 .map(e => e.target)
                 .toSet()),
             rx.tap(ptd => 
-                this.log("Permitted %s for %s: %o", perm, upn, ptd.toJS()))));
+                this.log("Permitted %s for %s: %o", perm, upn, ptd.toJS())));
     }
 
-    async check_targ (upn, perm, wild) {
+    /** Track a permission, including wildcards.
+     * Returns a seq of functions. When the user does not have the given
+     * permission at all, emits null. Otherwise emits a function from
+     * target to boolean.
+     * @param upn The principal UPN
+     * @param perm The permission UUID
+     * @param wild Whether to treat Special.Wilcard as matching any target
+     */
+    permitted (upn, perm, wild) {
         if (upn == this.root)
-            return () => true;
-        const targs = await this.permitted(upn, perm);
-        if (!targs.size)
-            return;
-        if (wild && targs.has(Special.Wildcard))
-            return () => true;
-        return i => targs.has(i);
+            return rx.of(() => true);
+
+        return rxx.rx(
+            this.track_targets(upn, perm),
+            rx.map(targs =>
+                !targs.size ? null
+                : wild && targs.has(Special.Wildcard) ? () => true
+                : i => targs.has(i)));
+    }
+    
+    check_targ (upn, perm, wild) {
+        return rx.firstValueFrom(this.permitted(upn, perm, wild));
+    }
+
+    /** Backend for the `v2/principal` and `identity` endpoints.
+     *
+     * Searches for identity records matching a given condition. If the
+     * condition cannot be satisfied return an empty Optional, otherwise
+     * an Optional holding a sequence of Responses. Each successful
+     * Response holds an array of identity records.
+     *
+     * The filter is an object with keys `uuid`, `kind`, `name` and any
+     * keys supplied must match.
+     *
+     * @param upn The requesting principal UPN
+     * @param cond A filter to apply to the identity records
+     */
+    track_identities (upn, cond) {
+        cond ??= {};
+        if ((cond.uuid && !valid_uuid(cond.uuid))
+            || (cond.name && !cond.kind)
+            || (cond.kind == "kerberos" && cond.name && !valid_krb(cond.name))
+        )
+            return Optional.of();
+
+        const props = Object.entries(cond);
+        const filtered = rxx.rx(
+            this.identities,
+            rx.map(ids => 
+                ids.filter(id => 
+                    props.every(([k, v]) => id[k] == v))));
+
+        /* ReadKrb is repurposed here as 'read any identity' */
+        const permitted = this.permitted(upn, Perm.ReadKrb, true);
+
+        return Optional.of(rxx.rx(
+            rx.combineLatest(filtered, permitted),
+            rx.map(([ids, perm]) => cond.uuid
+                ? perm?.(cond.uuid)
+                    ? Response.ok(ids)
+                    : Response.of(403)
+                : perm
+                    ? Response.ok(ids.filter(id => perm(id.uuid)))
+                    : Response.of(403)),
+            rx.map(res => res.filter(ids => ids.length)),
+        ));
+    }
+
+    /* Pull one entry off `track_identities`.
+     *
+     * Returns a Response. Nonexistent endpoints return 410.
+     */
+    find_identities (upn, cond) {
+        return this.track_identities(upn, cond)
+            .map(rx.firstValueFrom)
+            .orElse(Response.of(410));
+    }
+
+    track_kerberos (upn) {
+        return rxx.rx(
+            this.identities,
+            rx.map(ids => ids.filter(i => i.kind == "kerberos" && i.name == upn)),
+            rx.map(acc => acc[0]?.uuid));
+    }
+
+    find_kerberos (upn) {
+        return rx.firstValueFrom(this.track_kerberos(upn));
     }
 }

@@ -176,44 +176,31 @@ export class APIv2 {
     /* XXX The permissions here only handle Kerberos identities. */
 
     async id_list (req, res) {
-        const tok = await this.data.check_targ(req.auth, Perm.ReadKrb, true);
-        if (!tok) fail(403);
+        const idr = await this.data.find_identities(req.auth);
 
-        const ids = await this.data.find_identities(i => tok(i.uuid));
-        const rv = [...new Set(ids.map(i => i.uuid))];
-
-        return res.status(200).json(rv);
+        idr.uniq(i => i.uuid).toExpress(res);
     }
 
-    async _id_get_all (uuid, res) {
-        const ids = await this.data.find_identities(i => i.uuid == uuid);
-        if (!ids.length) fail(404);
+    async _id_get_all (upn, uuid, res) {
+        const idr = await this.data.find_identities(upn, { uuid });
 
-        const rv = Object.fromEntries(
-            ids.map(i => [i.kind, i.name])
-                .concat([["uuid", uuid]]));
-        return res.status(200).json(rv);
+        idr.map(ids => 
+            Object.fromEntries(
+                ids.map(i => [i.kind, i.name])
+                    .concat([["uuid", uuid]])))
+            .toExpress(res);
     }
 
     async id_get_all (req, res) {
         const { uuid } = req.params;
-        if (!valid_uuid(uuid)) fail(410);
-
-        await this.check_acl(req, Perm.ReadKrb, uuid);
-
-        return this._id_get_all(uuid, res);
+        return this._id_get_all(req.auth, uuid, res);
     }
 
     async id_get (req, res) {
         const { uuid, kind } = req.params;
-        if (!valid_uuid(uuid)) fail(410);
 
-        await this.check_acl(req, Perm.ReadKrb, uuid);
-
-        const id = await this.data.find_identities(i => i.uuid == uuid && i.kind == kind);
-        if (!id.length) fail(404);
-
-        return res.status(200).json(id[0].name);
+        const idr = await this.data.find_identities(req.auth, { uuid, kind });
+        idr.single().map(id => id.name).toExpress(res);
     }
 
     async _id_put (name, req, res) {
@@ -235,38 +222,23 @@ export class APIv2 {
     }
 
     async id_kinds (req, res) {
-        const ids = await this.data.find_identities();
-        const rv = [...new Set(ids.map(i => i.kind))]
-        return res.status(200).json(rv);
+        /* XXX This should not be hardcoded. But it cannot change at
+         * runtime. */
+        return res.status(200).json(["kerberos"]);
     }
 
     async id_list_kind (req, res) {
         const { kind } = req.params;
 
-        const tok = await this.data.check_targ(req.auth, Perm.ReadKrb, true);
-        if (!tok) fail(403);
-        
-        const ids = await this.data.find_identities(i => i.kind == kind);
-        if (!ids.length) fail(404);
-
-        const rv = ids
-            .filter(i => tok(i.uuid))
-            .map(i => i.name);
-
-        return res.status(200).json(rv);
+        const idr = await this.data.find_identities(req.auth, { kind });
+        idr.uniq(i => i.name).toExpress(res);
     }
 
     async id_find (req, res) {
         const { kind, name } = req.params;
 
-        const tok = await this.data.check_targ(req.auth, Perm.ReadKrb, true);
-        if (!tok) fail(403);
-
-        const ids = await this.data.find_identities(i => 
-            i.kind == kind && i.name == name && tok(i.uuid));
-        if (!ids.length) fail(404);
-
-        return res.status(200).json(ids[0].uuid);
+        const idr = await this.data.find_identities(req.auth, { kind, name });
+        idr.single().map(id => id.uuid).toExpress(res);
     }
 
     /* There is no auth check here; any authenticated user can look up
@@ -274,13 +246,13 @@ export class APIv2 {
      * auth identity. */
 
     async id_whoami (req, res) {
-        const uuid = await this.data.whoami(req.auth);
+        const uuid = await this.data.find_kerberos(req.auth);
         if (!uuid) fail(404);
-        return this._id_get_all(uuid, res);
+        return this._id_get_all(this.data.root, uuid, res);
     }
 
     async id_whoami_uuid (req, res) {
-        const uuid = await this.data.whoami(req.auth);
+        const uuid = await this.data.find_kerberos(req.auth);
         if (!uuid) fail(404);
         return res.status(200).json(uuid);
     }

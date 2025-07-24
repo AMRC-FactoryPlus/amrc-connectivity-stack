@@ -3,16 +3,22 @@ import logging
 import json
 import numpy as np
 import sys
+# import os
+
+# cwd = os.getcwd()
+
+# print("Current Working Directory:", cwd)
 
 #Read tdms file from command line argument, variable name is folderPath
 #return exception to stdio if no file is provided
-if len(sys.argv) < 2:
-    print("No TDMS file provided. Please provide a TDMS file as a command line argument.")
-    #raise Exception("No TDMS file provided. Please provide a TDMS file as a command line argument.")    
+#if len(sys.argv) < 2:
+#    print("No TDMS file provided. Please provide a TDMS file as a command line argument.")
+#     #raise Exception("No TDMS file provided. Please provide a TDMS file as a command line argument.")    
 
 #try/catch block to handle errors in reading the TDMS file
 try:
-    tdms_file = TdmsFile.read(sys.argv[1])
+    #tdms_file = TdmsFile.read(sys.argv[1])
+    tdms_file = TdmsFile.read("./edge-files-tdms/dest/testSummary.tdms")  # For testing purposes, replace with sys.argv[1] when running in production
     # logging.basicConfig(level=logging.DEBUG)
     # logging.debug(f"Groups: {tdms_file.groups()}")
 
@@ -23,7 +29,12 @@ try:
         channelJArr = [] #declare dynamic list to hold channel names
         for channel in group.channels():
             cj_data = []                
-            timestamps = np.array(channel.time_track(True, 'ms')) #get the timestamps of the channel
+            timestamps = np.array(channel.time_track(True, 's')) #get the timestamps of the channel
+            #turn each timestamp into an integer
+            #if timestamps.size == 0:
+#timestamps = np.array([0])  
+            #:
+            timestamps = np.array(timestamps, dtype=np.int64)
                     
             # set first timestamp in array
             timestamp_start = channel.properties["wf_start_time"]                
@@ -35,7 +46,7 @@ try:
                     "name": channel.name,
                     "data": channel.data[i],
                     #"length": len(c_data),
-                    "timestamps": timestamps[i],
+                    "timestamps": timestamps[i].tolist(),  # Convert numpy int64 to Python int
                     "timestamp_start": timestamp_start,
                     "properties": channel.properties,             
                 }
@@ -52,7 +63,7 @@ try:
     # convert all groups to json file
     testJSON = json.dumps(groupArr, indent=4, sort_keys=True, default=str) #json.dumps(group, indent=4, sort_keys=True, default=str)
     #testJSON = json.dumps(groupArr, default=str)
-    with open("finalSummary.json", "w") as outfile:
+    with open("./edge-files-tdms/finalSummary.json", "w") as outfile:
         outfile.write(testJSON)
     print(testJSON)
 

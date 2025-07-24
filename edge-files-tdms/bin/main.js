@@ -32,8 +32,8 @@ const FailureEvents = [
 async function main(driver,conf) {
 
   console.log("Initializing TDMS Edge Driver...");
-  console.log("Configuration:", conf);    
-  console.log("Driver:", driver);
+  // console.log("Configuration:", conf);    
+  // console.log("Driver:", driver);
 
   const fplus = await new ServiceClient({ env: process.env }).init();
 
@@ -166,9 +166,9 @@ function retryHandleFileUploaded(eventManager, filePath){
   }, 6000);
 }
 
-// main(driver,conf).catch(err => {
-//   console.error("Fatal error in main:", err);
-//   process.exit(1);
-// });
+main().catch(err => {
+  console.error("Fatal error in main:", err);
+  process.exit(1);
+});
 
 export default main;

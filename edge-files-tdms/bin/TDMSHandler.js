@@ -1,6 +1,7 @@
 import { AsyncDriver } from "@amrc-factoryplus/edge-driver";
 import { BufferX } from "@amrc-factoryplus/edge-driver";
-import main from "./main.js";
+// import main from "./main.js";
+import TDMSSummariser from "../lib/tdms-file-summariser.js";
 
 
 export class TDMSHandler {
@@ -9,16 +10,20 @@ export class TDMSHandler {
   
     this.driver = driver; 
     this.conf = conf;
-    
-    console.log(`TDMSHandler Conf: ${JSON.stringify(conf)}`);
-    console.log("TDMSHandler: Driver instance:", driver);
+    //TDMSConn driver:eb669a2c-e213-11ef-998e-a7fc6f4817b5
+    // console.log(`TDMSHandler Conf: ${JSON.stringify(conf)}`);
+    //console.log("TDMSHandler: Driver instance:", driver);
+    this.summariser = new TDMSSummariser({
+      driver: driver,
+    });
   }
 
   static create(driver, conf) {
+    //console.log("TDMSHandler: driver is ", driver);
     console.log("TDMSHandler: Creating instance with config:", conf);
    
-    this.log("TDMSHandler: Creating instance");
-    if (conf.devicePath == null) return;
+    //this.log("TDMSHandler: Creating instance");
+    //if (conf.devicePath == null) return;
     const tdmsHandler = new TDMSHandler(driver, conf);
     console.log("tdmsHandler is ", tdmsHandler);
     return tdmsHandler;
@@ -29,9 +34,16 @@ export class TDMSHandler {
     console.log("TDMSHandler: Connecting");
     
     console.log("TDMSHandler: Connected");
-    this.log("TDMSHandler: Connected to main process");
+    //this.log("TDMSHandler: Connected to main process");
+    try{
+      // await this.summariser.uploadToInflux("TDMSTest", "specs.summary");
+      return "UP";
+    }catch (err) {
+      console.error("TDMSHandler: Connection error:", err);
+      return "AUTH";
+    }
 
-    return "UP";
+    
   }
 
   parseAddr(addr) {
@@ -40,16 +52,17 @@ export class TDMSHandler {
   }
 
   async subscribe(specs){
-     const { driver } = this;
+     //const { driver } = this;
      console.log("TDMSHandler: Subscribing to specs:", specs);
 
     try {
-      this.main = await main(driver, this.conf);
-
+      //this.main = await main(this.driver, this.conf);
+      await this.summariser.uploadToInflux(specs[0], "specs.summary"); 
+      console.log("TDMSHandler: Subscription should be successful");
     }
 
     catch (err) {
-      this.log("Subscription failed:", err);
+      console.log("Subscription failed:", err);
       driver.connFailed();
       return false;
     }

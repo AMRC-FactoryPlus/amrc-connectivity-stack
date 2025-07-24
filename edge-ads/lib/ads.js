@@ -78,6 +78,8 @@ export class ADSHandler {
         // Create the ADS client instance with our configuration
         this.client = new Client(clientConfig);
 
+        this.client.setDebugLevel(3);
+
         // Set up connection event handlers
         // These handlers manage the connection lifecycle and notify the Edge Agent
 
@@ -146,6 +148,13 @@ export class ADSHandler {
         const conf = this.conf;
 
         this.log("Connecting to ADS target %s at %s", conf.targetAmsNetId, conf.routerAddress);
+
+        try {
+            this.log("Disconnecting before connect...")
+            this.client.disconnect()
+        } catch (e) {
+            this.log("Could not disconnect before connect: %o", e);
+        }
 
         // Attempt connection to the ADS target
         // This returns a Promise that resolves with connection info or rejects with error

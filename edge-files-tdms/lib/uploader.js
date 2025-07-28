@@ -1,9 +1,11 @@
-import { Class, File_Type } from './constants.js';
 
 class Uploader {
     constructor(opts) {
         this.eventManager = opts.eventManager;
         this.stateManager = opts.stateManager;
+        this.fileTypeClass = opts.fileTypeClass;
+        this.fileClass = opts.fileClass;
+        
         this.fplus = opts.fplus;
         this.configDb = this.fplus.ConfigDB;
         this.filesClient = this.fplus.Files;
@@ -70,7 +72,7 @@ class Uploader {
 
     async createFileUuid(filePath) {
         try {
-            const fileUuid = await this.configDb.create_object(Class.File);
+            const fileUuid = await this.configDb.create_object(this.fileClass);
             if (!fileUuid) {
                 throw new Error(`ConfigDB returned null UUID for file ${filePath}`);
             }
@@ -86,7 +88,8 @@ class Uploader {
 
     async addAsClassMember(fileUuid, filePath) {
         try {
-            await this.fplus.ConfigDB.class_add_member(File_Type.TDMS, fileUuid);
+            // File_Type.TDMS
+            await this.fplus.ConfigDB.class_add_member(this.fileTypeClass, fileUuid);
             this.eventManager.emit('file:addedAsClassMember', { filePath });
         } catch (err) {
             console.error(`UPLOADER: Error adding class member for ${filePath}:`, err);

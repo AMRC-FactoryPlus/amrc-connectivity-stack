@@ -52,6 +52,10 @@ objects:
         name: "TXT"
         subclassOf:
           - !u Files.Class.File
+    !u Files.FileType.TDMS:
+        name: "TDMS"
+        subclassOf:
+          - !u Files.Class.File
 
 ---
 service: !u UUIDs.Service.Authentication

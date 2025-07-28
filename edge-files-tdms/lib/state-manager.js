@@ -1,14 +1,13 @@
 import fs from 'fs/promises';
-import path from 'path';
-import { isFileExist, normalizePath } from './utils.js';
+import { isFileExist } from './utils.js';
 
 class StateManager {
     constructor(opts) {
-        if (!opts?.stateFile) {
+        if (!opts?.env?.STATE_FILE) {
             throw new Error('STATE MANAGER: stateFile path is required');
         }
 
-        this.stateFile = path.normalize(path.resolve(opts.stateFile));
+        this.stateFile = opts.env.STATE_FILE;
         this.tempStateFile = `${this.stateFile}.tmp`;
         this.seenFiles = new Map();
     }
@@ -24,63 +23,53 @@ class StateManager {
 
         try {
             const data = await fs.readFile(this.stateFile, 'utf-8');
-            let files;
+            let parsed;
 
             try {
-                files = JSON.parse(data);
-                if (!Array.isArray(files)) throw new Error('State file does not contain an array');
+                parsed = await JSON.parse(data);
+                if (!Array.isArray(parsed)) throw new Error('State file must be an array');
             } catch (jsonErr) {
                 console.warn(`STATE MANAGER: Invalid JSON in ${this.stateFile}: ${jsonErr.message}`);
-                return this.seenFiles;
+                process.exit(1);
             }
 
-            for (const file of files) {
-                try {
-                    const normPath = normalizePath(file.path);
-                    this.seenFiles.set(normPath, {
-                        isUploaded: !!file.isUploaded,
-                        uuid: file.uuid || null,
-                        isClassMember: !!file.isClassMember,
-                        hasSummary: !!file.hasSummary
-                    });
-                } catch (e) {
-                    console.warn(`STATE MANAGER: Skipped corrupt file entry: ${e.message}`);
-                }
+            try {
+                const entries = parsed.map(entry => [entry.path, {
+                    isUploaded: !!entry.isUploaded,
+                    uuid: entry.uuid || null,
+                    isClassMember: !!entry.isClassMember,
+                    hasSummary: !!entry.hasSummary
+                }]);
+
+                this.seenFiles = new Map(entries);
+            } catch (err) {
+                console.error(`STATE MANAGER: Corrupt state file: ${err.message}`);
+                process.exit(1);
             }
 
-            console.log(`STATE MANAGER: Loaded ${this.seenFiles.size} seen files ${this.seenFiles}`);
+            console.log(`STATE MANAGER: Loaded ${this.seenFiles.size} seen files`);
         } catch (err) {
             console.warn(`STATE MANAGER: Failed to load seen files: ${err.message}`);
+            process.exit(1);
         }
 
         return this.seenFiles;
     }
 
     async addSeenFile(filePath) {
-        try {
-
-            const normPath = normalizePath(filePath);
-            console.log(normPath);
-            if (this.seenFiles.has(normPath)) {
-                console.warn(`STATE MANAGER: Skipping already seen file: ${normPath}`);
-                return;
-            }
-            else{
-                this.seenFiles.set(normPath, { isUploaded: false, uuid: null, isClassMember: false, hasSummary: false });
-                await this.saveSeenFiles();
-            }
-        } catch (err) {
-            console.error(`STATE MANAGER: Failed to add new file ${filePath}: ${err.message}`);
+        if (this.hasSeenFile(filePath)) {
+            console.warn(`STATE MANAGER: Skipping already seen file: ${filePath}`);
+            return;
         }
+        else{
+            this.seenFiles.set(filePath, { isUploaded: false, uuid: null, isClassMember: false, hasSummary: false });
+            await this.saveSeenFiles();
+        }
+
     }
 
     hasSeenFile(filePath) {
-        try {
-            const normPath = normalizePath(filePath);
-            return this.seenFiles.has(normPath);
-        } catch {
-            return false;
-        }
+        return this.seenFiles.has(filePath);
     }
 
     async saveSeenFiles() {
@@ -100,12 +89,12 @@ class StateManager {
         }
     }
 
-    async updateAsUploaded(filePath) {
+    async updateSeenFiles(filePath, next) {
         try {
-            const state = this.getFileState(filePath);
+            const state = await this.getFileState(filePath);
 
             if (state) {
-                state.isUploaded = true;
+                next(state);
                 await this.saveSeenFiles();
             } else {
                 console.warn(`STATE MANAGER: Tried to update isUploaded for unknown file ${filePath}`);
@@ -115,61 +104,34 @@ class StateManager {
         }
     }
 
+    async updateAsUploaded(filePath) {
+        await this.updateSeenFiles(filePath, s => s.isUploaded = true);
+    }
+
     async updateWithUuid(filePath, fileUuid) {
         if (!fileUuid) {
             console.warn(`STATE MANAGER: UUID is invalid for file ${filePath}`);
             return;
         }
 
-        try {
-            const state = this.getFileState(filePath);
-
-            if (state) {
-                state.uuid = fileUuid;
-                await this.saveSeenFiles();
-            } else {
-                console.warn(`STATE MANAGER: Tried to update UUID for unknown file ${filePath}`);
-            }
-        } catch (err) {
-            console.warn(`STATE MANAGER: updateWithUuid failed: ${err.message}`);
-        }
+        await this.updateSeenFiles(filePath, s => s.uuid = fileUuid);
     }
 
     async updateAsClassMember(filePath) {
-        try {
-            const state = this.getFileState(filePath);
-            if (state) {
-                state.isClassMember = true;
-                await this.saveSeenFiles();
-            } else {
-                console.warn(`STATE MANAGER: Tried to update isClassMember for unknown file ${filePath}`);
-            }
-        } catch (err) {
-            console.warn(`STATE MANAGER: updateAsClassMember failed: ${err.message}`);
-        }
+        await this.updateSeenFiles(filePath, s => s.isClassMember = true);
     }
 
     async updateHasSummary(filePath) {
-        try {
-            const state = this.getFileState(filePath);
-            if (state) {
-                state.hasSummary = true;
-                await this.saveSeenFiles();
-            } else {
-                console.warn(`STATE MANAGER: Tried to update hasSummary for unknown file ${filePath}`);
-            }
-        } catch (err) {
-            console.warn(`STATE MANAGER: updateHasSummary failed: ${err.message}`);
-        }
+        await this.updateSeenFiles(filePath, s => s.hasSummary = true);
     }
 
-    getFileState(filePath) {
-        try {
-            const normPath = normalizePath(filePath);
-            return this.seenFiles.get(normPath);
-        } catch {
-            return undefined;
-        }
+    deleteState(filePath){
+        this.seenFiles.delete(filePath);
+    }
+
+    async getFileState(filePath) {
+        const state = await this.seenFiles.get(filePath);
+        return state;
     }
 
     getSeenFiles() {

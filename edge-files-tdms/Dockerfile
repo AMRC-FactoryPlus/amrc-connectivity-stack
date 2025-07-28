@@ -35,6 +35,9 @@ WORKDIR /home/node
 # Copy built app from build stage
 COPY --from=build /home/node/app ./app/
 
+# ensure node owns the app folder in the final image
+RUN chown -R node:node /home/node/app
+
 USER node
 WORKDIR /home/node/app
 

@@ -355,6 +355,7 @@ export const Files = {
     CAD: 'ff7c1a80-7866-48a7-aa2b-c4beb1878a4b',
     CSV: 'd006b2ab-0df2-4f99-abd9-e15d8c9cd359',
     TXT: '68a241cc-5ea7-45df-a1c4-87a35079795d',
+    TDMS: '55d5807d-3ee7-4f0a-97a1-fd2b6458ff2f',
   },
   Perm: {
     All: '09cce2eb-dc82-4a5a-b2ec-bca12f456ab8',

@@ -6,7 +6,7 @@ import fs from 'node:fs'
 class TDMSSummariser {
   constructor(opts) {
     // this.eventManager = opts.eventManager;
-    // this.pythonSummariserScript = opts.pythonSummariserScript;
+    // this.pythonSummariserScript = opts.env.pythonSummariserScript;
     this.driver = opts.driver; // Assuming driver is passed for data upload
   }
 

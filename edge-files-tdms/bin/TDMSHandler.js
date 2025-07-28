@@ -52,7 +52,8 @@ export class TDMSHandler {
   }
 
   async subscribe(specs){
-     //const { driver } = this;
+     const { driver } = this;
+     console.log("TDMSHandler: driver is ", driver);
      console.log("TDMSHandler: Subscribing to specs:", specs);
 
     try {

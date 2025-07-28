@@ -39,7 +39,7 @@ acs:
     image:
       registry: ghcr.io
       repository: amrc-factoryplus/acs-schemas
-      tag: v1.1.1
+      tag: v1.3.0
 
 coredns:
   # -- An option to enable the redirecting of external URL's back

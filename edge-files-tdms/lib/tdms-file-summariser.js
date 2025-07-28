@@ -93,9 +93,11 @@ class TDMSSummariser {
 
             //console.log(`Channel: ${item.name} Data: ${item.data} Timestamp: `, item.timestamps);
             const buffer = JSON.stringify({
-                      timestamp: item.name,
-                      tsint: item.timestamps,//1710393600000, //item.timestamps,
-                      val: item.data,
+                      channel: { 
+                        name: item.name, 
+                        timestamp: item.timestamps, 
+                        data: item.data }
+                      //val: item.data,
                     });
             this.driver.data(filePath, buffer);
           });

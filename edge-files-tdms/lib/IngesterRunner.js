@@ -10,7 +10,6 @@ class IngesterRunner{
     this.eventManager = opts.eventManager;
     this.stateManager = opts.stateManager;
 
-
     this.uploader = new Uploader({
       fplus: this.fplus,
       eventManager: this.eventManager,
@@ -31,18 +30,10 @@ class IngesterRunner{
     this.retryUploadCounts = new Map();
     this.retrySummaryCounts = new Map();
 
-    this.FailureEvents = [
-      'file:uploadFailed',
-      'file:addAsClassMemberFailed',
-      'file:uuidFailed',
-      'file:readyFailed',
-    ];
-
     this.baseDelay = 5 * 60 * 1000;
 
     console.log(`Ingester Initialised.`);
   }
-
 
   async run() {
     this.registerEventHandlers();
@@ -93,24 +84,20 @@ class IngesterRunner{
       await this.stateManager.updateAsClassMember(filePath);
     });
 
-    // Unified retry handler for Upload failure events
-    this.FailureEvents.forEach(failureEvent => {
-      this.eventManager.on(failureEvent, ({ filePath, error }) => {
-        this.retryHandleFileReady(filePath);
-      });
-    });
-
-
     this.eventManager.on('file:summaryPrepared', async({filePath}) => {
       await this.stateManager.updateHasSummary(filePath);
     });
 
+    this.eventManager.on('file:uploadFailed', ({ filePath, error }) => {
+      this.retryHandleUploadFailed(filePath);
+    });
+
     this.eventManager.on('file:summaryFailed', ({filePath, error}) => {
-      this.retryHandleFileUploaded(filePath);
+      this.retryHandleSummaryFailed(filePath);
     });
   }
 
-  retryHandleFileReady(filePath) {
+  retryHandleUploadFailed(filePath) {
     if(!filePath){
       console.error(`NOT RETRYING as filePath is ${filePath}`);
       return;
@@ -131,7 +118,7 @@ class IngesterRunner{
     }
   }
 
-  retryHandleFileUploaded(filePath){
+  retryHandleSummaryFailed(filePath){
     if(!filePath){
       console.error(`NOT RETRYING as filePath is ${filePath}`);
       return;

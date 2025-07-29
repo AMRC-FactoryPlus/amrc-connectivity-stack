@@ -19,34 +19,45 @@ spec:
         {{- include "amrc-connectivity-stack.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: opcua-server
     spec:
+      volumes:
+        - name: krb5-conf
+          configMap:
+            name: krb5-conf
+        - name: krb5-keytabs
+          secret:
+            secretName: opcua-server-secrets
       serviceAccountName: {{ include "amrc-connectivity-stack.serviceAccountName" . }}
       containers:
         - name: opcua-server
 {{ include "amrc-connectivity-stack.image" (list . .Values.opcuaServer) | indent 10 }}
           ports:
             - name: opcua
-              containerPort: 4840
+              containerPort: {{ .Values.opcuaServer.opcuaPort | default "4840" }}
               protocol: TCP
             - name: http
-              containerPort: 8080
+              containerPort: {{ .Values.opcuaServer.httpPort | default "8080" }}
               protocol: TCP
           env:
+            - name: KRB5_CONFIG
+              value: /config/krb5-conf/krb5.conf
+            - name: CLIENT_KEYTAB
+              value: /keytabs/client
+            - name: SERVER_KEYTAB
+              value: /keytabs/server
+            - name: REALM
+              value: {{ .Values.identity.realm | required "values.identity.realm is required!" }}
             - name: VERBOSE
               value: {{ .Values.opcuaServer.verbose | default "" | quote }}
             - name: DIRECTORY_URL
-              value: "http://acs-directory:8080"
-            - name: AUTHN_URL
-              value: "http://acs-auth:8080"
-            - name: CONFIGDB_URL
-              value: "http://acs-configdb:8080"
+              value: "{{ .Values.acs.secure | ternary "https://" "http://" }}directory.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"
             - name: MQTT_URL
-              value: "mqtt://acs-mqtt:1883"
+              value: "{{ .Values.acs.secure | ternary "mqtts://" "mqtt://" }}mqtt.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"
             - name: OPCUA_PORT
-              value: "4840"
+              value: {{ .Values.opcuaServer.port | default "4840" }}
             - name: OPCUA_HOSTNAME
-              value: "0.0.0.0"
+              value: "opc.tcp://opcua-server.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"
             - name: INFLUX_URL
-              value: {{ .Values.opcuaServer.influx.url | default "http://acs-influxdb2:8086" | quote }}
+              value: "{{ .Values.acs.secure | ternary "https://" "http://" }}influxdb.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"
             - name: INFLUX_TOKEN
               valueFrom:
                 secretKeyRef:
@@ -55,17 +66,10 @@ spec:
             - name: INFLUX_ORG
               value: {{ .Values.opcuaServer.influx.org | default "default" | quote }}
             - name: INFLUX_BUCKET
-              value: {{ .Values.opcuaServer.influx.bucket | default "uns" | quote }}
-            - name: SERVICE_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: acs-opcua-server
-                  key: username
-            - name: SERVICE_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: acs-opcua-server
-                  key: password
+              value: {{ .Values.opcuaServer.influx.bucket | default "default" | quote }}
+          volumeMounts:
+            - mountPath: /keytabs
+              name: krb5-keytabs
           livenessProbe:
             httpGet:
               path: /ping
@@ -104,11 +108,11 @@ metadata:
 spec:
   type: {{ .Values.opcuaServer.service.type | default "ClusterIP" }}
   ports:
-    - port: 4840
+    - port: {{ .Values.opcuaServer.opcuaPort | default "4840" }}
       targetPort: opcua
       protocol: TCP
       name: opcua
-    - port: 8080
+    - port: {{ .Values.opcuaServer.httpPort | default "8080" }}
       targetPort: http
       protocol: TCP
       name: http
@@ -166,8 +170,20 @@ spec:
               service:
                 name: acs-opcua-server
                 port:
-                  number: 8080
+                  number: {{ .Values.opcuaServer.httpPort | default "8080" }}
           {{- end }}
     {{- end }}
 {{- end }}
-{{- end }}
+---
+apiVersion: factoryplus.app.amrc.co.uk/v1
+kind: KerberosKey
+metadata:
+  name: opcua.opcua-server
+  namespace: {{ .Release.Namespace }}
+spec:
+  type: Random
+  secret: opcua-server-secrets/server
+  principal: OPCUA/opcua-server.{{ .Release.Namespace }}.svc.cluster.local@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+  additionalPrincipals:
+    - OPCUA/opcua-server.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+{{- end -}}

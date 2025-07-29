@@ -10,7 +10,7 @@ export class AuthHandler {
         this.log = this.fplus.debug.bound("auth-handler");
 
         this.realm = opts.realm;
-        this.principal = `OPCUA/${opts.hostname}`;
+        this.principal = `OPCUA/opcua-server.${this.realm}`;
         this.keytab = opts.keytab;
 
         this.userSessions = new Map(); // Track user sessions and their permissions
@@ -37,7 +37,9 @@ export class AuthHandler {
             }
 
             // Construct the full principal name if not already provided
-            const client = user.includes("@") ? user : `${user}@${this.realm}`;
+            const client = userName.includes("@") ? userName : `${userName}@${this.realm}`;
+
+            this.log(`Client principal: ${client}`);
 
             // Use Factory+ service client to validate credentials
             // This creates a new service client with the provided credentials

@@ -33,8 +33,8 @@ export class OPCUAServer {
         this.port = parseInt(process.env.OPCUA_PORT) || 4840;
         this.hostname = process.env.OPCUA_HOSTNAME || "0.0.0.0";
         this.httpPort = parseInt(process.env.HTTP_PORT) || 8080;
-        this.realm = opts.realm
-        this.keytab = opts.keytab
+        this.realm = process.env.REALM
+        this.keytab = process.env.SERVER_KEYTAB
 
         this.influxClient = null;
         this.addressSpaceBuilder = null;

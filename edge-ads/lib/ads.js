@@ -149,12 +149,12 @@ export class ADSHandler {
 
         this.log("Connecting to ADS target %s at %s", conf.targetAmsNetId, conf.routerAddress);
 
-        try {
-            this.log("Disconnecting before connect...")
-            this.client.disconnect()
-        } catch (e) {
-            this.log("Could not disconnect before connect: %o", e);
-        }
+        // try {
+        //     this.log("Disconnecting before connect...")
+        //     this.client.disconnect()
+        // } catch (e) {
+        //     this.log("Could not disconnect before connect: %o", e);
+        // }
 
         // Attempt connection to the ADS target
         // This returns a Promise that resolves with connection info or rejects with error

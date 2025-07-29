@@ -31,10 +31,10 @@ spec:
 {{ include "amrc-connectivity-stack.image" (list . .Values.opcuaServer) | indent 10 }}
           ports:
             - name: opcua
-              containerPort: {{ .Values.opcuaServer.opcuaPort | default "4840" }}
+              containerPort: {{ .Values.opcuaServer.opcuaPort | default 4840 }}
               protocol: TCP
             - name: http
-              containerPort: {{ .Values.opcuaServer.httpPort | default "8080" }}
+              containerPort: {{ .Values.opcuaServer.httpPort | default 8080 }}
               protocol: TCP
           env:
             - name: KRB5_CONFIG
@@ -52,7 +52,7 @@ spec:
             - name: MQTT_URL
               value: "{{ .Values.acs.secure | ternary "mqtts://" "mqtt://" }}mqtt.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"
             - name: OPCUA_PORT
-              value: {{ .Values.opcuaServer.port | default "4840" }}
+              value: {{ .Values.opcuaServer.port | default "4840" | quote }}
             - name: OPCUA_HOSTNAME
               value: "opc.tcp://opcua-server.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"
             - name: INFLUX_URL
@@ -107,11 +107,11 @@ metadata:
 spec:
   type: {{ .Values.opcuaServer.service.type | default "ClusterIP" }}
   ports:
-    - port: {{ .Values.opcuaServer.opcuaPort | default "4840" }}
+    - port: {{ .Values.opcuaServer.opcuaPort | default 4840 }}
       targetPort: opcua
       protocol: TCP
       name: opcua
-    - port: {{ .Values.opcuaServer.httpPort | default "8080" }}
+    - port: {{ .Values.opcuaServer.httpPort | default 8080 }}
       targetPort: http
       protocol: TCP
       name: http
@@ -169,7 +169,7 @@ spec:
               service:
                 name: acs-opcua-server
                 port:
-                  number: {{ .Values.opcuaServer.httpPort | default "8080" }}
+                  number: {{ .Values.opcuaServer.httpPort | default 8080 }}
           {{- end }}
     {{- end }}
 {{- end }}

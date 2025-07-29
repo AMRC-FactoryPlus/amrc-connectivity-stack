@@ -26,7 +26,6 @@ spec:
         - name: krb5-keytabs
           secret:
             secretName: opcua-server-secrets
-      serviceAccountName: {{ include "amrc-connectivity-stack.serviceAccountName" . }}
       containers:
         - name: opcua-server
 {{ include "amrc-connectivity-stack.image" (list . .Values.opcuaServer) | indent 10 }}

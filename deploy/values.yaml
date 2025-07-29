@@ -177,7 +177,7 @@ visualiser:
 
 opcuaServer:
   # -- Whether or not to enable the OPC UA Server component
-  enabled: false
+  enabled: true
   image:
     # -- The repository of the OPC UA Server component
     repository: acs-opcua-server
@@ -191,7 +191,7 @@ opcuaServer:
     tokenSecret: "influxdb-auth"
     tokenKey: "admin-token"
     org: "default"
-    bucket: "uns"
+    bucket: "default"
   # -- Service configuration
   service:
     type: ClusterIP
@@ -214,6 +214,10 @@ opcuaServer:
   affinity: {}
   # -- Tolerations
   tolerations: []
+  # -- Port for exposing OPCUA server
+  opcuaPort: "4840"
+  # -- Port for exposing HTTP healthcheck endpoint
+  httpPort: "8080"
 
 cmdesc:
   # -- Whether or not to enable the Commands component

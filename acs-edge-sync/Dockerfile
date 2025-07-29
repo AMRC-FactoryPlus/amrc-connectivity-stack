@@ -13,22 +13,20 @@ ARG revision=unknown
 USER root
 RUN <<'SHELL'
     install -d -o node -g node /home/node/app
+    mkdir /home/node/lib
     cd /tmp
     tar="kubeseal-${kubeseal_version}-${TARGETOS}-${TARGETARCH}.tar.gz"
     wget "https://github.com/bitnami-labs/sealed-secrets/releases/download/v${kubeseal_version}/${tar}"
     tar -xvf "${tar}" -C /usr/local/bin kubeseal
 SHELL
+COPY --from=lib . /home/node/lib/
+
 WORKDIR /home/node/app
 USER node
 COPY package*.json ./
 RUN <<'SHELL'
     touch /home/node/.npmrc
-    if [ "${acs_npm}" != NO ]
-    then
-        npm config set @amrc-factoryplus:registry "${acs_npm}"
-    fi
-
-    npm install --save=false
+    npm install --save=false --install-links
 SHELL
 COPY --chown=node . .
 RUN <<'SHELL'

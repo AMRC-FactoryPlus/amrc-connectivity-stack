@@ -262,14 +262,12 @@ export class Deployments {
     }
 
     async _init_config () {
-        const watcher = await this.fplus.ConfigDB.watcher();
+        const cdb = this.fplus.ConfigDB;
         const app = Edge.App.HelmRelease;
 
         /* XXX Also watch our config (app, cluster) and merge onto the
          * global config? */
-        return watcher.watch_config(app, app).pipe(
-            // Only emit when the config changes
-            rx.distinctUntilChanged(deep_equal),
+        return cdb.watch_config(app, app).pipe(
             rx.map(conf => {
                 // Extract the resource types we need to reconcile
                 const resources = imm.Set(conf.resources.map(r => Resource(r)));
@@ -293,17 +291,14 @@ export class Deployments {
     async _init_deployments () {
         const { Deployments, HelmChart } = Edge.App;
         const cdb = this.fplus.ConfigDB;
-        const watcher = await cdb.watcher();
 
         /* Take a list of Deployment entry UUIDs. Look up the Deployment
          * entries (preserving the entry UUID), and then look up and
          * compile the Helm Chart templates referenced from there.
          * Returns an array of individual charts which need to be
          * deployed. */
-        const lookup = list => rx.from(list).pipe(
-            // For each deployment UUID, get the deployment config
-            rx.mergeMap(agent => cdb.get_config(Deployments, agent)
-                .then(spec => ({ uuid: agent, spec }))),
+        const lookup = map => rx.from(map).pipe(
+            rx.map(([uuid, spec]) => ({ uuid, spec })),
             // Extract the chart UUIDs from the deployment
             rx.map(dep => {
                 const { spec } = dep;
@@ -320,9 +315,8 @@ export class Deployments {
             // For each chart UUID, get the chart template and extract the source
             rx.mergeMap(([deployment, charts]) => charts.pipe(
                 // Get the chart template configuration using the chart UUID
+                /* XXX We should track these via notify */
                 rx.mergeMap(ch => cdb.get_config(HelmChart, ch)),
-                /* XXX We could cache (against an etag) to avoid
-                 * recompiling every time... */
                 // Pass the template directly to the deployment object
                 // We'll extract the source in create_manifests
                 rx.map(tmpl => ({
@@ -334,7 +328,7 @@ export class Deployments {
         );
 
         // Watch for deployments targeting this cluster
-        return watcher
+        return cdb
             .watch_search(Deployments, { cluster: this.cluster })
             .pipe(rx.switchMap(lookup));
     }

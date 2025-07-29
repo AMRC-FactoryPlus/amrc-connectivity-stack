@@ -1,12 +1,25 @@
-ARG base_version=latest
-FROM ghcr.io/amrc-factoryplus/acs-base-js-build:${base_version} as build
+FROM node:18-slim
 
-# Install the node application on the build container where we can
-# compile the native modules.
-RUN install-app acs-opcua-server
+WORKDIR /app
 
-FROM ghcr.io/amrc-factoryplus/acs-base-js-run:${base_version}
-RUN runuser -u node -g node install-app acs-opcua-server
+# Install Kerberos and build dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    python3 \
+    cmake \
+    git \
+    libkrb5-dev \
+ && rm -rf /var/lib/apt/lists/*
+
+# Install TypeScript globally (needed for gssapi.js build)
+RUN npm install -g typescript
+
+COPY package*.json ./
+
+RUN npm install
+
+COPY . .
+
 USER node
 EXPOSE 4840
 CMD ["node", "bin/opcua-server.js"]

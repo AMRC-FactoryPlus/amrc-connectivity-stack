@@ -629,6 +629,16 @@ configs:
               order: 7
             title: Timeout Delay (ms)
             type: number
+          allowHalfOpen:
+            default: false
+            description: Allow a half-open connection
+            title: Allow Half-Open
+            type: boolean
+          rawClient:
+            default: false
+            description: Connect to a system without a PLC runtime
+            title: Raw client
+            type: boolean
         required:
           - targetAmsNetId
           - routerAddress

@@ -5,19 +5,17 @@ metadata:
   name: acs-opcua-server
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "amrc-connectivity-stack.labels" . | nindent 4 }}
-    app.kubernetes.io/component: opcua-server
+    component: opcua-server
 spec:
-  replicas: {{ .Values.opcuaServer.replicas | default 1 }}
+  replicas: 1
   selector:
     matchLabels:
-      {{- include "amrc-connectivity-stack.selectorLabels" . | nindent 6 }}
-      app.kubernetes.io/component: opcua-server
+      component: opcua-server
   template:
     metadata:
       labels:
-        {{- include "amrc-connectivity-stack.selectorLabels" . | nindent 8 }}
-        app.kubernetes.io/component: opcua-server
+        component: opcua-server
+        factory-plus.service: opcua-server
     spec:
       volumes:
         - name: krb5-conf
@@ -25,16 +23,16 @@ spec:
             name: krb5-conf
         - name: krb5-keytabs
           secret:
-            secretName: opcua-server-secrets
+            secretName: opcua-server-keytabs
       containers:
         - name: opcua-server
 {{ include "amrc-connectivity-stack.image" (list . .Values.opcuaServer) | indent 10 }}
           ports:
             - name: opcua
-              containerPort: {{ .Values.opcuaServer.opcuaPort | default 4840 }}
+              containerPort: default 4840
               protocol: TCP
             - name: http
-              containerPort: {{ .Values.opcuaServer.httpPort | default 8080 }}
+              containerPort: 8080
               protocol: TCP
           env:
             - name: KRB5_CONFIG
@@ -46,15 +44,15 @@ spec:
             - name: REALM
               value: {{ .Values.identity.realm | required "values.identity.realm is required!" }}
             - name: VERBOSE
-              value: {{ .Values.opcuaServer.verbose | default "" | quote }}
+              value: {{ .Values.opcuaServer.verbose | default "ALL" | quote }}
             - name: DIRECTORY_URL
               value: "{{ .Values.acs.secure | ternary "https://" "http://" }}directory.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"
             - name: MQTT_URL
               value: "{{ .Values.acs.secure | ternary "mqtts://" "mqtt://" }}mqtt.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"
             - name: OPCUA_PORT
-              value: {{ .Values.opcuaServer.port | default "4840" | quote }}
+              value: 4840
             - name: OPCUA_HOSTNAME
-              value: "opc.tcp://opcua-server.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"
+              value: "opcua-server.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"
             - name: INFLUX_URL
               value: "{{ .Values.acs.secure | ternary "https://" "http://" }}influxdb.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"
             - name: INFLUX_TOKEN
@@ -102,77 +100,20 @@ metadata:
   name: acs-opcua-server
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "amrc-connectivity-stack.labels" . | nindent 4 }}
-    app.kubernetes.io/component: opcua-server
+    component: opcua-server
 spec:
-  type: {{ .Values.opcuaServer.service.type | default "ClusterIP" }}
+  type: ClusterIP
   ports:
-    - port: {{ .Values.opcuaServer.opcuaPort | default 4840 }}
-      targetPort: opcua
+    - port: 4840
+      targetPort: 4840
       protocol: TCP
       name: opcua
-    - port: {{ .Values.opcuaServer.httpPort | default 8080 }}
-      targetPort: http
+    - port: 8080
+      targetPort: 80
       protocol: TCP
       name: http
   selector:
-    {{- include "amrc-connectivity-stack.selectorLabels" . | nindent 4 }}
-    app.kubernetes.io/component: opcua-server
-{{- if eq (.Values.opcuaServer.service.type | default "ClusterIP") "LoadBalancer" }}
-  {{- with .Values.opcuaServer.service.loadBalancerIP }}
-  loadBalancerIP: {{ . }}
-  {{- end }}
-  {{- with .Values.opcuaServer.service.loadBalancerSourceRanges }}
-  loadBalancerSourceRanges:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
-{{- end }}
-{{- if eq (.Values.opcuaServer.service.type | default "ClusterIP") "NodePort" }}
-  {{- with .Values.opcuaServer.service.nodePort }}
-  nodePort: {{ . }}
-  {{- end }}
-{{- end }}
----
-{{- if .Values.opcuaServer.ingress.enabled }}
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: acs-opcua-server
-  namespace: {{ .Release.Namespace }}
-  labels:
-    {{- include "amrc-connectivity-stack.labels" . | nindent 4 }}
-    app.kubernetes.io/component: opcua-server
-  {{- with .Values.opcuaServer.ingress.annotations }}
-  annotations:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
-spec:
-  {{- if .Values.opcuaServer.ingress.tls }}
-  tls:
-    {{- range .Values.opcuaServer.ingress.tls }}
-    - hosts:
-        {{- range .hosts }}
-        - {{ . | quote }}
-        {{- end }}
-      secretName: {{ .secretName }}
-    {{- end }}
-  {{- end }}
-  rules:
-    {{- range .Values.opcuaServer.ingress.hosts }}
-    - host: {{ .host | quote }}
-      http:
-        paths:
-          {{- range .paths }}
-          - path: {{ .path }}
-            pathType: {{ .pathType }}
-            backend:
-              service:
-                name: acs-opcua-server
-                port:
-                  number: {{ .Values.opcuaServer.httpPort | default 8080 }}
-          {{- end }}
-    {{- end }}
-{{- end }}
+    factory-plus.service: opcua-server
 ---
 apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey
@@ -181,8 +122,9 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   type: Random
-  secret: opcua-server-secrets/server
-  principal: OPCUA/opcua-server.{{ .Release.Namespace }}.svc.cluster.local@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+  secret: opcua-server-keytabs/server
+  principal: OPCUA/acs-opcua-server.{{ .Release.Namespace }}.svc.cluster.local@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
   additionalPrincipals:
-    - OPCUA/opcua-server.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+    - OPCUA/acs-opcua-server.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
 {{- end -}}
+

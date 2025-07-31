@@ -1,23 +1,16 @@
 {{ if .Values.opcuaServer.enabled }}
 apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
+kind: IngressRouteTCP
 metadata:
-  name: opcua-server-ingressroute
+  name: opcua-ingressroute
   namespace: {{ .Release.Namespace }}
 spec:
   entryPoints:
-    - {{ .Values.acs.secure | ternary "websecure" "web" }}
+    - opcua
   routes:
-    - match: Host(`opcua-server.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}`)
-      kind: Rule
+    - match: HostSNI(`*`)
       services:
-        - name: opcua-server
-          port: 80
+        - name: acs-opcua-server
+          port: 4840
           namespace: {{ .Release.Namespace }}
-  {{- if .Values.acs.secure }}
-  tls:
-    secretName: {{ coalesce .Values.opcuaServer.tlsSecretName .Values.acs.tlsSecretName }}
-    domains:
-      - main: opcua-server.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
-  {{- end -}}
 {{- end -}}

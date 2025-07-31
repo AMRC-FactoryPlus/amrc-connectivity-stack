@@ -187,7 +187,6 @@ opcuaServer:
   verbose: ""
   # -- InfluxDB configuration
   influx:
-    url: "http://acs-influxdb2:8086"
     tokenSecret: "influxdb-auth"
     tokenKey: "admin-token"
     org: "default"
@@ -214,10 +213,6 @@ opcuaServer:
   affinity: {}
   # -- Tolerations
   tolerations: []
-  # -- Port for exposing OPCUA server
-  opcuaPort: "4840"
-  # -- Port for exposing HTTP healthcheck endpoint
-  httpPort: "8080"
 
 cmdesc:
   # -- Whether or not to enable the Commands component
@@ -344,6 +339,11 @@ traefik:
       port: 8749
       expose: true
       exposedPort: 749
+      protocol: TCP
+    opcua:
+      port: 4840
+      expose: true
+      exposedPort: 4840
       protocol: TCP
   additionalArguments:
     - --metrics.prometheus=true

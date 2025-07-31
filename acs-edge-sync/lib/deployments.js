@@ -7,7 +7,7 @@ import * as imm         from "immutable";
 import * as k8s         from "@kubernetes/client-node";
 import jmp              from "json-merge-patch";
 import rx               from "rxjs";
-import template         from "json-templates";
+import compile_template from "json-templates";
 
 import * as rxx         from "@amrc-factoryplus/rx-util";
 
@@ -127,16 +127,13 @@ export class Deployments {
          * chance the ACS deployment ever changes. */
         const git = rxx.rx(
             rx.timer(0, 2*60*60*1000),
-            rx.tap(() => this.log("Fetching Git base URL")),
             rx.exhaustMap(() => this.fplus.Git.base_url()),
             rx.distinctUntilChanged(),
             rx.tap(b => this.log("New Git base: %s", b)),
-            rx.map(base => uuid => new URL(`uuid/${uuid}`, base).toString()),
-            rx.tap(f => this.log("Git base map: %o", f)));
+            rx.map(base => uuid => new URL(`uuid/${uuid}`, base).toString()));
 
         const k8s = rxx.rx(
             cdb.watch_config(app, app),
-            rx.tap(v => this.log("Raw config: %o", v)),
             rx.map(conf => ({
                 /* We must explicitly list the resource types we are
                  * managing to handle the case where all resources of a
@@ -148,7 +145,7 @@ export class Deployments {
                         apiVersion: "source.toolkit.fluxcd.io/v1",
                         kind: "GitRepository",
                     })),
-                template:   template(conf.template),
+                template:   compile_template(conf.template),
             })),
             rx.tap(c => this.log("Config: %o", c)));
 
@@ -159,54 +156,49 @@ export class Deployments {
         const { Deployments, HelmChart } = Edge.App;
         const cdb = this.fplus.ConfigDB;
 
-        /* Take a list of Deployment entry UUIDs. Look up the Deployment
-         * entries (preserving the entry UUID), and then look up and
-         * compile the Helm Chart templates referenced from there.
-         * Returns an array of individual charts which need to be
-         * deployed. */
-        const lookup = map => rx.from(map).pipe(
-            rx.map(([uuid, spec]) => ({ uuid, spec })),
-            // Extract the chart UUIDs from the deployment
-            rx.map(dep => {
-                const { spec } = dep;
-                // XXX - The support for the charts key is deprecated
-                // and will be removed in a future version. This is here
-                // for backward compatibility. New deployments should
-                // use the chart key instead.
-                //
-                // Handle both single chart and multiple charts
-                const charts =
-                    spec.chart ? rx.of(spec.chart) : rx.from(spec.charts ?? []);
-                return [dep, charts];
-            }),
-            // For each chart UUID, get the chart template and extract the source
-            rx.mergeMap(([deployment, charts]) => charts.pipe(
-                // Get the chart template configuration using the chart UUID
-                /* XXX We should track these via notify */
-                rx.mergeMap(ch => cdb.get_config(HelmChart, ch)),
-                rx.map(tmpl => ({
-                    ...deployment,
-                    chart: template(tmpl),
-                })))),
-            rx.toArray(),
-        );
+        /* Take a Map of Deployment entries. Look up the chart
+         * templates. Returns an array of individual charts which need
+         * to be deployed. */
+        /* XXX This is now all sync and could be done with imm rather
+         * than rx. */
+        const lookup = ({ deployments, templates }) => rxx.rx(
+            rx.from(deployments),
+            // XXX - The support for the charts key is deprecated
+            // and will be removed in a future version. This is here
+            // for backward compatibility. New deployments should
+            // use the chart key instead.
+            rx.mergeMap(([uuid, spec]) => rxx.rx(
+                spec.chart ? rx.of(spec.chart) : rx.from(spec.charts ?? []),
+                rx.map(chart => ({ uuid, spec, chart })))),
+            rx.map(({ uuid, spec, chart }) => ({
+                uuid, spec,
+                chart: templates.get(chart),     
+            })),
+            rx.filter(d => d.chart),
+            rx.toArray());
 
-        // Watch for deployments targeting this cluster
+        /* Track deployments targetting this cluster */
+        const deployments = cdb.search_app(Deployments, { cluster: this.cluster });
+        
+        /* Track and compile Helm Chart templates */
+        const templates = rxx.rx(
+            cdb.search_app(HelmChart),
+            rx.map(charts => charts.map(compile_template)));
+
         return rxx.rx(
-            cdb.search_app(Deployments, { cluster: this.cluster }),
-            rx.tap(ds => this.log("DEPLOYMENTS: %o", ds.toJS())),
+            rx.combineLatest({ templates, deployments }),
             rx.switchMap(lookup));
     }
 
     _init_manifests (config, deployments) {
         return rx.combineLatest({ config, deployments }).pipe(
-            rx.tap(opts => this.log("Reconcile needed: %o", opts)),
+            //rx.tap(opts => this.log("Reconcile needed: %o", opts)),
             rx.map(opts => ({
                 resources:  opts.config.resources,
                 manifests:  this.create_manifests(opts),
             })),
-            rx.tap(o => this.log("Resources: %o, Manifests: %o",
-                o.resources.toJS(), o.manifests.toJS())),
+            //rx.tap(o => this.log("Resources: %o, Manifests: %o",
+            //    o.resources.toJS(), o.manifests.toJS())),
             rx.tap({ error: e => this.log("Error: %s", e) }),
             rx.retry({ delay: 5000 }),
         );
@@ -219,7 +211,7 @@ export class Deployments {
     create_manifests ({ config, deployments }) {
         return imm.List(deployments)
             .flatMap(deployment => {
-                const { uuid, spec, tmpl } = deployment;
+                const { uuid, spec } = deployment;
                 const chart = deployment.chart({
                     uuid,
                     name:       spec.name,

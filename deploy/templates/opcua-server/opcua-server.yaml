@@ -29,7 +29,7 @@ spec:
 {{ include "amrc-connectivity-stack.image" (list . .Values.opcuaServer) | indent 10 }}
           ports:
             - name: opcua
-              containerPort: default 4840
+              containerPort: 4840
               protocol: TCP
             - name: http
               containerPort: 8080

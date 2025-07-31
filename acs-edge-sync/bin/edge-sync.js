@@ -7,7 +7,7 @@
  */
 
 import { RxClient }         from "@amrc-factoryplus/rx-client";
-import k8s                  from "@kubernetes/client-node";
+import * as k8s             from "@kubernetes/client-node";
 
 import { GIT_VERSION } from "../lib/git-version.js";
 import { Edge } from "../lib/uuids.js";

@@ -4,7 +4,7 @@
 
 import deep_equal       from "deep-equal";
 import * as imm         from "immutable";
-import k8s              from "@kubernetes/client-node";
+import * as k8s         from "@kubernetes/client-node";
 import jmp              from "json-merge-patch";
 import rx               from "rxjs";
 import template         from "json-templates";
@@ -53,7 +53,7 @@ class Reconciliation {
         // issues with overwriting fields used by Flux.
         for (const [name, man] of this.want) {
             this.log("UPDATE: %s", name);
-            await this.check(this.objs.patch(
+            await this.objs.patch(
                 jmp.merge(man, {
                     metadata: {
                         namespace:  this.deploy.namespace,
@@ -64,7 +64,7 @@ class Reconciliation {
                 /*fieldManager*/LABELS.sync,
                 /*force*/true,
                 /*strategy*/"application/apply-patch+yaml",
-            ));
+            );
             this.log("Finished update for %s", name);
         }
 
@@ -73,32 +73,22 @@ class Reconciliation {
             if (this.want.has(name))
                 continue;
             this.log("DELETE: %s", name);
-            await this.check(this.objs.delete(man));
+            await this.objs.delete(man);
             this.log("Finished delete");
         }
-    }
-
-    async check (pr) {
-        const { response, body } = await pr;
-        const st = response.statusCode;
-        this.log("K8s status: %s", st);
-        if (st < 200 || st > 299)
-            throw `Can't update ${this.resource}: ${st}`;
     }
 
     async get_resources () {
         /* We appear to have no choice but to list the full contents of
          * all resources. There doesn't appear to be any way to just
          * list e.g. names. */
-        const { response, body } = await this.objs.list(
+        const body = await this.objs.list(
             this.resource.apiVersion, this.resource.kind,
             this.deploy.namespace,
             /*pretty*/undefined, /*exact*/undefined,
             /*exportt*/undefined, /*fieldSelector*/undefined,
             /*labelSelector*/`${LABELS.managed}=${LABELS.sync}`,
         );
-        if (response.statusCode != 200)
-            throw `Can't list ${this.resource}: ${response.statusCode}`;
         return imm.List(body.items);
     }
 }

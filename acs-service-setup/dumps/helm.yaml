@@ -115,6 +115,8 @@ configs:
         kind: HelmRelease
         metadata:
           name: "{{prefix}}-{{uuid}}"
+          labels:
+            "factoryplus.app.amrc.co.uk/uuid": "{{uuid}}"
         spec:
           chart:
             spec:

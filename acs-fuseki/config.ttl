@@ -42,7 +42,7 @@ acl:DatasetFPAcl ja:assembler "uk.co.amrc.factoryplus.fuseki.FPAclDatasetAssembl
     ];
     f:endpoint [
         f:operation f:update;
-        f:name "update"
+        f:name "sparql"
     ];
     
     f:dataset :ds;

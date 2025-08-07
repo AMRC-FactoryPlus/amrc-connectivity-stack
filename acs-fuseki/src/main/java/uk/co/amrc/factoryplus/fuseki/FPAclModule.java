@@ -31,7 +31,7 @@ class FPAclModule implements FusekiModule {
         var srv = dap.getDataService();
         var ds = srv.getDataset();
         log.info("Found DS class {}", ds.getClass());
-        if (!(ds instanceof FPDatasetGraph)) {
+        if (!(ds instanceof FPDatasetGraph.Builder)) {
             log.info("Not an FPDatasetGraph, skipping");
             return;
         }

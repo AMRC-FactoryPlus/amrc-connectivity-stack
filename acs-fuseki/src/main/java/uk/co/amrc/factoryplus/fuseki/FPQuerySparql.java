@@ -30,8 +30,8 @@ public class FPQuerySparql extends SPARQL_QueryDataset {
         var princ = findPrincipal(action);
         log.info("decideDataset for {}", princ);
 
-        var ds = (FPDatasetGraph)getDataset(action);
-        var ads = ds.withAclFor(princ);
+        var ds = (FPDatasetGraph.Builder)getDataset(action);
+        var ads = ds.withPrincipal(princ);
 
         return Pair.create(ads, query);
     }

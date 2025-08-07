@@ -36,7 +36,7 @@ public class FPAclDatasetAssembler extends DatasetAssembler implements Assembler
     public DatasetGraph createDataset(Assembler a, Resource root) {
         var base = createBaseDataset(root, DatasetAssemblerVocab.pDataset);
         log.info("Created base dataset: {}", base);
-        var ds = new FPDatasetGraph(base);
+        var ds = FPDatasetGraph.withBase(base);
         log.info("Wrapped dataset: {}", ds);
         return ds;
     }

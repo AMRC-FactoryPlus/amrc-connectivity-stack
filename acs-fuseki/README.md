@@ -83,6 +83,26 @@ Currently a very small subset of ShEx is supported, consisting of:
 Cardinalities other than 'exactly one' are not supported, nor are the
 logical operations or any conditions on literals.
 
+## Example
+
+An example user account with some permission grants might be:
+
+    prefix ex: <http://example.org#> .
+
+    ex:user acl:username "user";
+        acl:readTriple [
+            a acl:ShexCondition;
+            acl:subject [
+                a shex:TripleConstraint;
+                shex:predicate rdf:type;
+                shex:valueExpr [
+                    a shex:NodeConstraint;
+                    shex:values (ex:Class);
+        ]]].
+
+This permits the `user` user to read any triples with a subject in the
+class `ex:Class`.
+
 ## Implementation
 
 The ACL layer is implemented primarily in a DatasetGraph subclass; this

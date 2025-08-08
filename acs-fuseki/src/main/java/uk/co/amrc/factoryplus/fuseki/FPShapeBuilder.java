@@ -9,7 +9,6 @@ package uk.co.amrc.factoryplus.fuseki;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import org.apache.jena.graph.*;
 import org.apache.jena.rdf.model.*;
@@ -22,7 +21,6 @@ class FPShapeBuilder {
     private Model model;
     private List<ShexShape> shapes;
     private List<Triple> mayRead;
-    private Optional<ShexSchema> schema;
 
     class InvalidShape extends RuntimeException {
         public InvalidShape (Resource r) {
@@ -39,36 +37,23 @@ class FPShapeBuilder {
         this.model = ModelFactory.createModelForGraph(g);
         this.shapes = new ArrayList<ShexShape>();
         this.mayRead = new ArrayList<Triple>();
-        this.schema = Optional.empty();
     }
 
-    public boolean hasSchema () {
-        return schema.isPresent();
-    }
-
-    public List<Triple> getMayRead () {
-        schema.orElseThrow();
-        return mayRead;
-    }
-
-    public ShexSchema getSchema () {
-        return schema.orElseThrow();
-    }
-
-    public FPShapeBuilder buildSchema () {
+    public FPShapeEvaluator build () {
         var prefixes = new PrefixMapFactory().create();
         prefixes.add("rdf", RDF.getURI());
         prefixes.add("shex", ShEx.NS);
         prefixes.add("acl", Vocab.NS);
 
-        schema = Optional.of(ShexSchema.shapes(
+        var schema = ShexSchema.shapes(
             /*source*/"", /*baseURI*/"",
             prefixes, /*startShape*/null,
             shapes, 
             /*imports*/List.of(), 
             /*semActs*/List.of(), 
-            /*tripleRefs*/Map.of()));
-        return this;
+            /*tripleRefs*/Map.of());
+
+        return new FPShapeEvaluator(schema, List.copyOf(mayRead));
     }
 
     public FPShapeBuilder withPrincipal (String user) {

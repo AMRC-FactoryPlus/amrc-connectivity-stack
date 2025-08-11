@@ -9,6 +9,7 @@ package uk.co.amrc.factoryplus.fuseki;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import org.apache.jena.graph.*;
 import org.apache.jena.rdf.model.*;
@@ -65,7 +66,7 @@ class FPShapeBuilder {
         return this;
     }
 
-    public Resource getIriForUser (String user) {
+    Resource getIriForUser (String user) {
         var princs = model.listResourcesWithProperty(Vocab.username, user)
             .toList();
         if (princs.size() > 1)
@@ -75,7 +76,7 @@ class FPShapeBuilder {
         return princs.get(0);
     }
 
-    public void addCondition (List<Triple> acl, Resource r) {
+    void addCondition (List<Triple> acl, Resource r) {
         var tr = Triple.create(
             addShapeFor(r, Vocab.subject),
             addShapeFor(r, Vocab.predicate),
@@ -83,7 +84,7 @@ class FPShapeBuilder {
         acl.add(tr);
     }
 
-    public Node addShapeFor (Resource r, Property p) {
+    Node addShapeFor (Resource r, Property p) {
         var obj = model.getProperty(r, p);
         if (obj == null)
             return Node.ANY;
@@ -96,29 +97,38 @@ class FPShapeBuilder {
         return label;
     }
 
-    public ShapeExpression buildExpr (Resource r) {
-        if (model.contains(r, RDF.type, ShEx.TripleConstraint))
+    ShapeExpression buildExpr (Resource r) {
+        if (r.hasProperty(RDF.type, ShEx.TripleConstraint))
             return buildTripleConstraint(r);
-        if (model.contains(r, RDF.type, ShEx.NodeConstraint))
+        if (r.hasProperty(RDF.type, ShEx.NodeConstraint))
             return buildNodeConstraint(r);
         throw new InvalidShape(r);
     }
 
-    public ShapeExpression buildTripleConstraint (Resource r) {
-        var pred = model.getRequiredProperty(r, ShEx.predicate)
+    int readCardinality (Resource r, Property p) {
+        return Optional.ofNullable(r.getProperty(p))
+            .map(s -> s.getInt())
+            .orElse(1);
+    }
+
+    ShapeExpression buildTripleConstraint (Resource r) {
+        var pred = r.getRequiredProperty(ShEx.predicate)
             .getObject().asNode();
-        var expr = buildExpr(model
-            .getProperty(r, ShEx.valueExpr)
-            .getObject().asResource());
-        var tc = new TripleConstraint(r.asNode(), pred, false, expr,
-            new Cardinality("", 1, 1), null);
+        var expr = buildExpr(r.getProperty(ShEx.valueExpr)
+            .getResource());
+        var inverse = r.hasLiteral(ShEx.inverse, true);
+        var min = readCardinality(r, ShEx.min);
+        var max = readCardinality(r, ShEx.max);
+
+        var tc = new TripleConstraint(r.asNode(), pred, inverse,
+            expr, new Cardinality("", min, max), null);
         return ShapeExprTripleExpr.newBuilder()
             .label(r.asNode())
             .shapeExpr(tc)
             .build();
     }
 
-    public ShapeExpression buildNodeConstraint (Resource r) {
+    ShapeExpression buildNodeConstraint (Resource r) {
         var values = model.getRequiredProperty(r, ShEx.values)
             .getList()
             .mapWith(n -> n.asResource().getURI())

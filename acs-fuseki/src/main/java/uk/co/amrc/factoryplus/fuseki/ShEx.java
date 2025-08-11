@@ -23,6 +23,9 @@ public class ShEx {
     public static final Resource NodeConstraint     = iri("NodeConstraint");
     public static final Resource TripleConstraint   = iri("TripleConstraint");
 
+    public static final Property inverse            = prop("inverse");
+    public static final Property max                = prop("max");
+    public static final Property min                = prop("min");
     public static final Property predicate          = prop("predicate");
     public static final Property valueExpr          = prop("valueExpr");
     public static final Property values             = prop("values");

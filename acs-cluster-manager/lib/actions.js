@@ -108,7 +108,7 @@ export class Update extends Action {
         }
 
         if (!changes.size) return;
-        const patch = Object.fromEntries(m.entries());
+        const patch = Object.fromEntries(changes.entries());
         this.update(patch);
         /* this.status is not live */
         jmp.apply(status, patch);

@@ -1,0 +1,30 @@
+{
+  "name": "edge-focas",
+  "version": "0.0.0",
+  "description": "ACS Edge Agent driver for Fanuc FOCAS (FANUC Open CNC API Specification)",
+  "main": "index.js",
+  "type": "module",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "fanuc",
+    "focas",
+    "cnc",
+    "automation",
+    "edge",
+    "driver"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@amrc-factoryplus/edge-driver": "file:../lib/js-edge-driver",
+    "ffi-napi": "^4.0.3",
+    "ref-napi": "^3.0.3",
+    "ref-struct-di": "^1.1.1",
+    "ref-array-di": "^1.2.2"
+  }
+}

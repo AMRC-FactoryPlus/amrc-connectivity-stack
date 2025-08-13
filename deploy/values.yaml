@@ -342,6 +342,8 @@ grafana:
       header_name: X-Auth-Principal
       header_property: username
       auto_sign_up: true
+    dashboards:
+      min_refresh_interval: 500ms
   sidecar:
     datasources:
       enabled: true

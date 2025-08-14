@@ -14,8 +14,7 @@ class IngesterRunner{
       fplus: this.fplus,
       eventManager: this.eventManager,
       stateManager: this.stateManager,
-      fileTypeClass: opts.fileTypeClass,
-      fileClass: opts.fileClass,
+      env: opts.env,
     });
 
     this.cleaner = new Cleaner({

@@ -3,9 +3,10 @@ class Uploader {
     constructor(opts) {
         this.eventManager = opts.eventManager;
         this.stateManager = opts.stateManager;
-        this.fileTypeClass = opts.fileTypeClass;
-        this.fileClass = opts.fileClass;
-        
+
+        this.fileTypeClass = opts.env.FILE_TYPE_UUID;
+        this.fileClass = opts.env.FILE_CLASS_UUID;
+
         this.fplus = opts.fplus;
         this.configDb = this.fplus.ConfigDB;
         this.filesClient = this.fplus.Files;

@@ -1,17 +1,18 @@
 import json
+from textwrap import indent
 
 from dwdat2py import wrappers as dw
 from datetime import datetime, timedelta
-#import tracemalloc
+import tracemalloc
 
 # Parses the DXD file and creates a subsampled dataset of all channels in the file
 def parse_dxd(file_path, sub_sample_percentage):
-    #tracemalloc.start()
+    tracemalloc.start()
     dw.init()
     dh = dw.open_data_file(file_path.encode())
     # Memory after opening (mostly header + metadata)
-    #current, peak = tracemalloc.get_traced_memory()
-    #print(f"After open_data_file: Current={current / 1024:.1f} KB, Peak={peak / 1024:.1f} KB")
+    current, peak = tracemalloc.get_traced_memory()
+    print(f"After open_data_file: Current={current / 1024:.1f} KB, Peak={peak / 1024:.1f} KB")
     print(dh)
     # Get list of channels
     ch_list = dw.get_channel_list()
@@ -22,25 +23,30 @@ def parse_dxd(file_path, sub_sample_percentage):
     samples = int(dh.sample_rate * dh.duration)
     summary_data = []
     sample_factor = int(100 / sub_sample_percentage)
-    for ch in ch_list:
-        for i in range(0, samples, sample_factor):
-            scaled = dw.get_scaled_samples(ch.index, i, 1)
-            #print(f"After reading samples: Current={current / 1024:.1f} KB, Peak={peak / 1024:.1f} KB")
-            timestamp = scaled[0][0]
-            value = scaled[1][0]
-            entry = {
-                "timestamp": timestamp,
-                "value": value,
-                "channel": ch.name,
-            }
-            summary_data.append(entry)
+    with open("data.json", "w") as file:
+        file.write('[')
+        for ch in ch_list:
+            for i in range(0, samples, sample_factor):
+                scaled = dw.get_scaled_samples(ch.index, i, 1)
+                current, peak = tracemalloc.get_traced_memory()
+                print(f"After reading samples: Current={current / 1024:.1f} KB, Peak={peak / 1024:.1f} KB")
+                timestamp = scaled[0][0]
+                value = scaled[1][0]
+                entry = {
+                    "timestamp": timestamp,
+                    "value": value,
+                    "channel": ch.name,
+                }
+                file.write(json.dumps(entry))
+                if i + sample_factor >= samples and ch.index == len(ch_list) -1:
+                    file.write("\n")
+                else:
+                    file.write(",\n")
+        file.write(']' + "\n")
     dw.close_data_file()
     dw.de_init()
 
     print("Finished")
-    #print(summary_data)
-    with open("data.json", "w") as file:
-        json.dump(summary_data, file)
 
 # Creates a subsample of the original dataset
 def sub_sample(file_start, values, timestamps, sub_sample_percentage):

@@ -1,15 +1,14 @@
 /*
- * Factory+ / AMRC Connectivity Stack (ACS) Git server
- * Auto-pull from external repos
- * Copyright 2024 AMRC
+ * Copyright (c) University of Sheffield AMRC 2025.
  */
 
 import fs           from "fs";
+import path from "path";
 
 import duration     from "parse-duration";
 import imm          from "immutable";
 import git          from "isomorphic-git";
-import http         from "isomorphic-git/http/node/index.js";
+import http         from "isomorphic-git/http/node";
 import rx           from "rxjs";
 
 import * as rxx     from "@amrc-factoryplus/rx-util";
@@ -23,6 +22,7 @@ class PullSpec extends imm.Record({
     ref:        "main",
     interval:   null,
     ff:         null,
+    auth: null,
 }) {
     static of (uuid, branch, conf) {
         return new PullSpec({
@@ -30,6 +30,7 @@ class PullSpec extends imm.Record({
             uuid, branch,
             interval:   duration_or_never(conf.interval ?? "1h"),
             ff:         conf.merge,
+            auth: conf.auth,
         });
     }
 
@@ -41,14 +42,103 @@ export class AutoPull {
         this.fplus  = opts.fplus;
         this.data   = opts.data;
         this.status = opts.status;
+        this.secrets_dir = opts.secrets_dir || "/run/secrets";
 
         this.log = this.fplus.debug.bound("pull");
+        this.credentials_cache = new Map();
     }
 
     async init () {
         this.pulls = this._init_pulls();
 
         return this;
+    }
+
+    /**
+     * Read a secret from the filesystem
+     * @param {string} name - The name of the secret
+     * @returns {Promise<string|null>} - The secret value or null if not found
+     */
+    async readSecret(name) {
+        try {
+            // Try direct path first
+            const secretPath = path.join(this.secrets_dir, name);
+            try {
+                const content = await fs.promises.readFile(secretPath, 'utf8');
+                return content.toString().trim();
+            } catch (err) {
+                if (err.code !== "ENOENT") {
+                    this.log("Error reading secret [%s]: %o", name, err);
+                    return null;
+                }
+
+                // If not found, try to find it in subdirectories
+                const entries = await fs.promises.readdir(this.secrets_dir, { withFileTypes: true });
+                for (const entry of entries) {
+                    if (entry.isDirectory()) {
+                        try {
+                            const nestedPath = path.join(this.secrets_dir, entry.name, name);
+                            const content = await fs.promises.readFile(nestedPath, 'utf8');
+                            return content.toString().trim();
+                        } catch (nestedErr) {
+                            // Ignore ENOENT errors for nested paths
+                            if (nestedErr.code !== "ENOENT") {
+                                this.log("Error reading nested secret [%s/%s]: %o", entry.name, name, nestedErr);
+                            }
+                        }
+                    }
+                }
+            }
+
+            this.log("Secret not found in any location: %s", name);
+            return null;
+        } catch (err) {
+            this.log("Error accessing secrets directory: %o", err);
+            return null;
+        }
+    }
+
+    /**
+     * Get credentials from a secret
+     * @param {string} secretRef - The secret reference (name)
+     * @returns {Promise<{username: string, password: string}|null>} - The credentials or null
+     */
+    async getCredentials(secretRef) {
+        // Check cache first
+        if (this.credentials_cache.has(secretRef)) {
+            return this.credentials_cache.get(secretRef);
+        }
+
+        const content = await this.readSecret(secretRef);
+        if (!content) {
+            this.log("Secret not found: %s", secretRef);
+            return null;
+        }
+
+        try {
+            // Try to parse as JSON
+            const credentials = JSON.parse(content);
+            if (credentials.username && credentials.password) {
+                // Cache the credentials
+                this.credentials_cache.set(secretRef, credentials);
+                return credentials;
+            }
+        } catch (e) {
+            // If not JSON, try to parse as username:password format
+            const parts = content.split(':');
+            if (parts.length === 2) {
+                const credentials = {
+                    username: parts[0],
+                    password: parts[1]
+                };
+                // Cache the credentials
+                this.credentials_cache.set(secretRef, credentials);
+                return credentials;
+            }
+        }
+
+        this.log("Invalid credentials format in secret: %s", secretRef);
+        return null;
     }
 
     _init_pulls () {
@@ -78,12 +168,12 @@ export class AutoPull {
         );
     }
 
-    async update (spec) {
-        const gitdir    = `${this.data}/${spec.uuid}`;
-        const remote    = `_update_${spec.branch}`;
+    async update(spec) {
+        const gitdir = `${this.data}/${spec.uuid}`;
+        const remote = `_update_${spec.branch}`;
 
         const get_ref = ref => git.resolveRef({ fs, gitdir, ref })
-            .catch(e => e instanceof git.Errors.NotFoundError ? null 
+            .catch(e => e instanceof git.Errors.NotFoundError ? null
                 : Promise.reject(e))
         const before = await get_ref(spec.branch);
 
@@ -101,16 +191,64 @@ export class AutoPull {
          * which would then lead to leakage of remotes, or to implement
          * some sort of lock on the repo.) */
         await git.addRemote({ fs, gitdir, remote, url: spec.url, force: true });
-        const mirror = await git.fetch({
+
+        // Set up authentication if specified
+        const fetchOptions = {
             fs, gitdir, http, remote,
-            singleBranch:   true,
-            ref:            spec.ref,
-        });
+            singleBranch: true,
+            ref: spec.ref,
+        };
+
+        // Handle authentication if configured
+        if (spec.auth && spec.auth.secretRef) {
+            this.log("Using authentication for %s from secret %s", spec.desc, spec.auth.secretRef);
+            this.log("Secrets directory is: %s", this.secrets_dir);
+
+            try {
+                // List available secrets for debugging
+                const files = await fs.promises.readdir(this.secrets_dir);
+                this.log("Available files in secrets directory: %o", files);
+
+                // Get credentials from the secret
+                const credentials = await this.getCredentials(spec.auth.secretRef);
+
+                if (credentials) {
+                    this.log("Successfully loaded credentials for %s (username: %s)",
+                        spec.desc, credentials.username);
+
+                    // Add onAuth handler to provide credentials
+                    fetchOptions.onAuth = () => {
+                        this.log("Authentication requested for %s", spec.url);
+                        return {
+                            username: credentials.username,
+                            password: credentials.password,
+                        };
+                    };
+
+                    // Add onAuthFailure to handle auth failures
+                    fetchOptions.onAuthFailure = (url, auth) => {
+                        this.log("Authentication failed for %s with username %s",
+                            spec.desc, auth?.username || 'unknown');
+                        // Clear cache to force reload on next attempt
+                        this.credentials_cache.delete(spec.auth.secretRef);
+                        return null; // Return null to abort the fetch
+                    };
+                } else {
+                    this.log("WARNING: Authentication configured but credentials not found for %s", spec.desc);
+                    this.log("Secret reference: %s", spec.auth.secretRef);
+                }
+            } catch (err) {
+                this.log("ERROR setting up authentication for %s: %o", spec.desc, err);
+            }
+        }
+
+        // Perform the fetch with authentication if configured
+        const mirror = await git.fetch(fetchOptions);
         const sha1 = mirror.fetchHead;
 
         const set_branch = ref => {
             this.log("Updating %s branch %s to %s", spec.uuid, ref, sha1);
-            return git.branch({ fs, gitdir, ref, object: sha1, force:  true });
+            return git.branch({ fs, gitdir, ref, object: sha1, force: true });
         };
         await set_branch(spec.branch);
         if (spec.ff) {

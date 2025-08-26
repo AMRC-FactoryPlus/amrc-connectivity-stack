@@ -6,6 +6,7 @@
 
 import { Buffer }   from "buffer";
 import fs           from "fs";
+import timers       from "timers/promises";
 import util         from "util";
 
 import imm          from "immutable";
@@ -101,18 +102,30 @@ export class RepoStatus {
             while (!stop[0]) {
                 const st = await fh.read(buf, end, 1024-end);
                 end += st.bytesRead;
+                /* This is a belt-and-braces safety check. We previously
+                 * had a bug that resulted in a tight loop here. */
+                if (st.bytesRead == 0) {
+                    this.log("EOF ON FIFO, SLEEPING");
+                    await timers.setTimeout(5000);
+                }
                 while (end > 36) {
                     if (buf[36] != 10)
                         throw new Error(util.format("Bad read from fifo: [%s]", 
                             buf.toString("utf8", 0, 37)));
-                    obs.next(buf.toString("utf8", 0, 36));
+                    const uuid = buf.toString("utf8", 0, 36);
+                    obs.next(uuid);
                     buf.copy(buf, 0, 37, end);
                     end -= 37;
                 }
             }
         };
 
-        return rx.defer(() => fsp.open(this.fifo)).pipe(
+        return rxx.rx(
+            /* The git push hook opens and closes the write end of the
+             * FIFO. We must also hold the write end open, without
+             * writing, as otherwise we get EOF on every read instead of
+             * blocking. */
+            rx.defer(() => fsp.open(this.fifo, "r+")),
             rx.mergeMap(fh => new rx.Observable(obs => {
                 const stop = [false];
                 read_fifo(fh, stop, obs);

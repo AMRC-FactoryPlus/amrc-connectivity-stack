@@ -1,0 +1,27 @@
+{
+  "name": "edge-ads",
+  "version": "0.0.0",
+  "description": "ACS Edge Agent driver for ADS (Automation Device Specification)",
+  "main": "index.js",
+  "type": "module",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "ads",
+    "twincat",
+    "beckhoff",
+    "automation",
+    "edge",
+    "driver"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@amrc-factoryplus/edge-driver": "^0.0.5",
+    "ads-client": "^2.1.0"
+  }
+}

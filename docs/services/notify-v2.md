@@ -255,11 +255,13 @@ keys:
 * `headers` (optional): An object or array containing headers.
 * `body` (optional): The JSON value of the response body.
 
-The `method`, `headers` and `body` keys will not normally be required or
-valid, as only idempotent requests are permitted. These are interpreted
-as for HTTP responses in updates; note that it is only possible to
-submit a JSON request body. If a Content-Type header is not supplied it
-must default to `application/json`.
+Note that the `url` property is a relative URL and so will be subject to
+URL-decoding where necessary. The `method`, `headers` and `body` keys
+will not normally be required or valid, as only idempotent requests are
+permitted. These are interpreted as for HTTP responses in updates; note
+that it is only possible to submit a JSON request body. If a
+Content-Type header is not supplied it must default to
+`application/json`.
 
 ### SEARCH
 

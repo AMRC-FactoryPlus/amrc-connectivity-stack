@@ -2,19 +2,20 @@
  * Copyright (c) University of Sheffield AMRC 2025.
  */
 
-import {JSONPath} from "jsonpath-plus";
+import { JSONPath } from "jsonpath-plus";
 import * as xpath from "xpath";
-import {DOMParser} from "@xmldom/xmldom";
+import { DOMParser } from "@xmldom/xmldom";
 import * as jsonpointer from 'jsonpointer';
 import * as Long from "long";
-import {MessageSecurityMode, SecurityPolicy} from "node-opcua";
-import {Address} from "@amrc-factoryplus/utilities";
-import {log} from "./log.js";
+import { MessageSecurityMode, SecurityPolicy } from "node-opcua";
+import { Address } from "@amrc-factoryplus/utilities";
+import { log } from "./log.js";
 
 export enum serialisationType {
     ignored = "Defined by Protocol",
     delimited = "Delimited String",
     JSON = "JSON",
+    JSONBatched = "JSON (Batched)",
     XML = "XML",
     fixedBuffer = "Buffer",
     serialisedBuffer = "Buffer"
@@ -250,7 +251,7 @@ export class Metrics {
             this.#nameIndex[metric.name || ""] = i;
             // this.#aliasIndex[metric.alias as number] = i;
             const props = metric.properties;
-            const addr = props?.address?.value as string|undefined;
+            const addr = props?.address?.value as string | undefined;
             const path = (props?.path?.value ?? "") as string;
             const meth = (props?.method?.value ?? "") as string;
             if (addr != null && /GET/.test(meth)) {
@@ -354,6 +355,84 @@ export class Metrics {
     // }
 }
 
+
+
+/**
+ * Processes a JSON batched payload and returns an array of values and timestamps
+ * This function expects an array of objects and uses the metric's path to extract values
+ * @param payload The JSON array payload to process
+ * @param metric The metric to use for processing (including path configuration)
+ * @returns An array of objects with value and timestamp properties
+ */
+export function processJSONBatchedPayload(payload: any[], metric: sparkplugMetric): { value: any, timestamp?: number }[] {
+    const results: { value: any, timestamp?: number }[] = [];
+    const path = (typeof metric.properties !== "undefined" && typeof metric.properties.path !== "undefined" ? metric.properties.path.value as string : "");
+
+    // Validate that payload is an array
+    if (!Array.isArray(payload)) {
+        log('JSON (Batched) payload must be an array');
+        return results;
+    }
+
+    // Process each object in the array
+    payload.forEach((item, index) => {
+        // Validate that each item is an object
+        if (typeof item !== 'object' || item === null) {
+            log(`JSON (Batched) payload item ${index} must be an object`);
+            return;
+        }
+
+        let value;
+
+        // Extract value based on path or direct property
+        if (path) {
+            /* Work around a bug in the JSONPath library */
+            let newVal = path === "$" && item === false
+                ? [false]
+                : JSONPath({
+                    path: path,
+                    json: item
+                });
+
+            if (item === 0 || !Array.isArray(newVal)) {
+                value = 0;
+            } else {
+                if (newVal[0]?.type === "Buffer") {
+                    newVal[0] = Buffer.from(newVal[0].data);
+                }
+                value = parseTypeFromString(metric.type, newVal[0]);
+            }
+        } else if (item.hasOwnProperty('value')) {
+            // If no path is provided but the object has a 'value' property, use that
+            value = parseTypeFromString(metric.type, item.value);
+        } else {
+            // If no path and no 'value' property, log error and skip
+            log(`JSON (Batched) payload item ${index} has no path configured and no 'value' property`);
+            return;
+        }
+
+        // Extract timestamp if available
+        let timestamp: number | undefined;
+        if (item.hasOwnProperty('timestamp')) {
+            timestamp = item.timestamp;
+            if (timestamp && !isTimestampInMilliseconds(timestamp)) {
+                timestamp = timestamp * 1000;
+            }
+        } else if (item.hasOwnProperty('time')) {
+            timestamp = item.time;
+            if (timestamp && !isTimestampInMilliseconds(timestamp)) {
+                timestamp = timestamp * 1000;
+            }
+        }
+
+        results.push({ value, timestamp });
+    });
+
+    return results;
+}
+
+
+
 export function parseValueFromPayload(msg: any, metric: sparkplugMetric, payloadFormat: serialisationType | string, delimiter?: string) {
     let payload: any;
     const path = (typeof metric.properties !== "undefined" && typeof metric.properties.path !== "undefined" ? metric.properties.path.value as string : "");
@@ -382,6 +461,9 @@ export function parseValueFromPayload(msg: any, metric: sparkplugMetric, payload
                 log('Failed to parse JSON data')
             }
 
+            // Note: Array payloads are now handled in _handleData using processArrayPayload
+            // This function only processes non-array payloads or is called for a single item
+
             if (path) {
                 /* Work around a bug in the JSONPath library */
                 let newVal = path === "$" && payload === false
@@ -400,7 +482,7 @@ export function parseValueFromPayload(msg: any, metric: sparkplugMetric, payload
                 }
             } else {
                 if (metric.type == sparkplugDataType.dataSet) {
-                    let newVal: sparkplugDataSet = {...metric.value as sparkplugDataSet};
+                    let newVal: sparkplugDataSet = { ...metric.value as sparkplugDataSet };
                     if (!Array.isArray(payload)) {
                         payload = [payload];
                     }
@@ -415,9 +497,17 @@ export function parseValueFromPayload(msg: any, metric: sparkplugMetric, payload
 
                     newVal.rows = dataSet;
                     return newVal;
+                } else if (typeof payload === 'object' && payload.hasOwnProperty('value')) {
+                    // If no path is provided but the object has a 'value' property, use that
+                    return parseTypeFromString(metric.type, payload.value);
                 }
             }
             break;
+        case serialisationType.JSONBatched:
+            // JSON (Batched) format should not be processed by this function
+            // It should be handled directly in _handleData using processJSONBatchedPayload
+            log('JSON (Batched) payloads should not be processed by parseValueFromPayload');
+            return null;
         case serialisationType.XML:
             if (path) {
                 const doc = new DOMParser().parseFromString(msg.toString());
@@ -472,6 +562,10 @@ export function parseTimeStampFromPayload(msg: any, metric: sparkplugMetric, pay
                 log('Failed to parse JSON data')
             }
 
+            // Note: Array payloads are now handled in _handleData using processArrayPayload
+            // This function only processes non-array payloads
+
+            // Extract timestamp from the payload
             const timestamp = JSONPath({
                 path: '$.timestamp',
                 json: payload
@@ -490,6 +584,27 @@ export function parseTimeStampFromPayload(msg: any, metric: sparkplugMetric, pay
                 }
 
                 return extractedTimestamp * 1000;
+            }
+
+            // If no timestamp found in the standard location, check if the payload itself has a timestamp or time property
+            if (typeof payload === 'object') {
+                if (payload.hasOwnProperty('timestamp')) {
+                    const directTimestamp = payload.timestamp;
+                    if (directTimestamp) {
+                        if (isTimestampInMilliseconds(directTimestamp)) {
+                            return directTimestamp;
+                        }
+                        return directTimestamp * 1000;
+                    }
+                } else if (payload.hasOwnProperty('time')) {
+                    const directTimestamp = payload.time;
+                    if (directTimestamp) {
+                        if (isTimestampInMilliseconds(directTimestamp)) {
+                            return directTimestamp;
+                        }
+                        return directTimestamp * 1000;
+                    }
+                }
             }
 
             return undefined;
@@ -570,6 +685,13 @@ export function writeValuesToPayload(metrics: sparkplugMetric[], payloadFormat: 
                     jsonpointer.set(payload, valPointer, metric.value);
                 }
             })
+            return JSON.stringify(payload);
+        case serialisationType.JSONBatched:
+            // JSON (Batched) format creates an array of objects with value and timestamp
+            payload = metrics.map((metric) => ({
+                value: metric.value,
+                timestamp: metric.timestamp || Date.now()
+            }));
             return JSON.stringify(payload);
         case serialisationType.fixedBuffer:
             payload = Buffer.alloc(0);
@@ -689,6 +811,7 @@ export function writeValToBuffer(metric: sparkplugMetric): Buffer {
     try {
         switch (metric.type) {
             case sparkplugDataType.boolean:
+                len = buf.writeUInt8(metric.value ? 1 : 0);
                 break;
             case sparkplugDataType.int8:
                 len = buf.writeInt8(metric.value as number);

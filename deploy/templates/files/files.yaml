@@ -7,6 +7,10 @@ metadata:
   labels:
     component: files
 spec:
+  # Don't perform rolling updates; stop and restart. This prevents more than
+  # one instance from trying to access the storage at a time.
+  strategy:
+    type: Recreate
   replicas: 1
   selector:
     matchLabels:
@@ -93,6 +97,8 @@ apiVersion: v1
 metadata:
   name: files-storage
   namespace: {{ .Release.Namespace }}
+  annotations:
+    "helm.sh/resource-policy": keep
   labels:
     component: files
 spec:

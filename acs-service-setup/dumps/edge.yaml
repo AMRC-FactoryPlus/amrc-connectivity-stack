@@ -51,6 +51,7 @@ objects:
     !u ACS.Driver.Test:             { name: "Test" }
     !u ACS.Driver.TPlinkSmartPlug:  { name: "TP-Link smart plug" }
     !u ACS.Driver.External:         { name: "External driver" }
+    !u ACS.Driver.ADS:              { name: "ADS" }
 
 configs:
   # Driver Definition Configuration
@@ -483,7 +484,9 @@ configs:
           icon: "server"
           placeholder: "e.g. 1,holding,0,1"
         path:
-          hidden: true
+          title: "Path"
+          description: "Set this to 0"
+          placeholder: "e.g. 0 (must be set to 0)"
       image:
         repository: edge-modbus
       schema:
@@ -500,6 +503,15 @@ configs:
             type: number
             options:
               order: 2
+          protocol:
+            default: tcp
+            enum:
+              - tcp
+            minLength: 1
+            title: Protocol
+            type: string
+            options:
+              order: 3
         required:
           - host
         title: Modbus Connection Details
@@ -551,6 +563,76 @@ configs:
         required:
           - host
         title: TP-Link Smart Plug Details
+        type: object
+    !u ACS.Driver.ADS:
+      image:
+        repository: edge-ads
+      polled: false
+      presentation:
+        address:
+          description: "The TwinCAT symbol name with optional cycle time (format:
+            symbol_name[,cycle_time_ms])"
+          icon: microchip
+          placeholder: e.g. Global_IO.iAnalogue,500
+          title: Symbol Name
+        path:
+          description: Must be set to $
+          icon: code
+          placeholder: Must be set to $
+          title: Path
+      schema:
+        properties:
+          localAdsPort:
+            description: Local ADS port (auto-assigned if not specified)
+            options:
+              order: 6
+            title: Local ADS Port (Optional)
+            type: number
+          localAmsNetId:
+            description: Local AMS NetId (auto-assigned if not specified)
+            options:
+              order: 5
+            title: Local AMS NetId (Optional)
+            type: string
+          routerAddress:
+            description: IP address of the ADS router (usually the PLC)
+            minLength: 1
+            options:
+              order: 2
+            title: Router Address
+            type: string
+          routerTcpPort:
+            default: 48898
+            description: TCP port of the ADS router
+            options:
+              order: 4
+            title: Router TCP Port
+            type: number
+          targetAdsPort:
+            default: 851
+            description: ADS port of the target (851 for TwinCAT runtime)
+            options:
+              order: 3
+            title: Target ADS Port
+            type: number
+          targetAmsNetId:
+            description: AMS NetId of the target PLC (e.g. 172.16.48.37.1.1)
+            minLength: 1
+            options:
+              order: 1
+            title: Target AMS NetId
+            type: string
+          timeoutDelay:
+            default: 5000
+            description: Connection timeout in milliseconds
+            options:
+              order: 7
+            title: Timeout Delay (ms)
+            type: number
+        required:
+          - targetAmsNetId
+          - routerAddress
+        title: ADS Connection Details
         type: object
 
     !u ACS.Driver.External:

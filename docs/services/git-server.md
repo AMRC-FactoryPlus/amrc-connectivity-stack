@@ -12,7 +12,9 @@ Auth service.
 
 The server has the ability to automatically mirror external repos into
 an internal repo. This is useful when the central cluster can contact
-the Internet but the edge clusters cannot.
+the Internet but the edge clusters cannot. The server supports authentication
+for private external repositories - see [Git Repository Authentication](git-auth.md)
+for details.
 
 ## Git Repository Configuration ConfigDB Application
 
@@ -43,6 +45,10 @@ properties:
       remote, or `never` to pull only once at server startup.
     * `merge` (optional): The name of another branch to merge pulls
       into.
+    * `auth` (optional): Authentication configuration for private repositories.
+      This should be an object with these properties:
+      * `secretRef`: The name of a secret key containing credentials.
+        See [Git Repository Authentication](git-auth.md) for details.
 
 Branches named by `merge` are handled as follows: if the `merge` branch
 sits at the same commit as the pulled branch before a pull operation, it

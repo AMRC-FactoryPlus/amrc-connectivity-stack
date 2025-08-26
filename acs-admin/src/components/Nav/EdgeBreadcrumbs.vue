@@ -120,7 +120,7 @@ export default {
     // ║  Edge Clusters  ║
     // ╚═════════════════╝
     edgeClusters () {
-      return useEdgeClusterStore().data
+      return useEdgeClusterStore().data.toSorted((a, b) => a.name.localeCompare(b.name))
     },
     currentEdgeCluster () {
       return useEdgeClusterStore().data.find((edgeCluster) => edgeCluster.uuid === this.$route.params.clusteruuid)
@@ -129,7 +129,7 @@ export default {
     // ║  Nodes  ║
     // ╚═════════╝
     nodes () {
-      return useNodeStore().data.filter((node) => node.deployment.cluster === this.$route.params.clusteruuid)
+      return useNodeStore().data.filter((node) => node.deployment?.cluster === this.$route.params.clusteruuid).toSorted((a, b) => a.name.localeCompare(b.name))
     },
     currentNode () {
       if (useNodeStore().data instanceof Array) {
@@ -140,7 +140,7 @@ export default {
     // ║  Devices  ║
     // ╚═══════════╝
     devices () {
-      return useDeviceStore().data.filter((device) => device.deviceInformation.node === this.$route.params.nodeuuid)
+      return useDeviceStore().data.filter((device) => device.deviceInformation?.node === this.$route.params.nodeuuid).toSorted((a, b) => a.name.localeCompare(b.name))
     },
     currentDevice () {
       if (useDeviceStore().data instanceof Array) {

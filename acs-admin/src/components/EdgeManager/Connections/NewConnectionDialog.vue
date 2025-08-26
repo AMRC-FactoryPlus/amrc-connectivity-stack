@@ -175,6 +175,7 @@ const PAYLOAD_FORMATS = [
   "Defined by Protocol",
   "Delimited String",
   "JSON",
+  "JSON (Batched)",
   "XML",
   "Buffer"
 ];
@@ -412,13 +413,26 @@ export default {
   },
 
   methods: {
+    random() {
+      if (crypto.randomUUID)
+        return crypto.randomUUID();
+
+      const buf = new Uint8Array(16);
+      crypto.getRandomValues(buf);
+      return buf.toHex();
+    },
+
     async encryptSensitiveInfo(value) {
       if (!this.node) throw new Error('No node selected')
 
       // Generate a unique identifier for this sensitive info
-      const key = '__FPSI__' + crypto.randomUUID()
-      const cluster = this.node.cluster;
-      const namespace = this.c.data.find(c => c.uuid === cluster)?.namespace;
+      const key = '__FPSI__' + this.random()
+      const cluster = this.node.deployment.cluster;
+      const config = this.c.data.find(c => c.uuid === cluster)
+      const namespace = config?.configuration?.namespace;
+
+      console.debug("Node: %o, cluster: %o, config: %o, ns: %o",
+          this.node, cluster, config, namespace);
 
       if (!namespace) throw new Error('No namespace found for cluster')
 
@@ -571,8 +585,7 @@ export default {
               },
               topology: {
                 cluster: this.node.cluster,
-                host: this.node.hostname,
-                node: this.node.uuid,
+                hostname: this.node.hostname,
               },
             })
           ])
@@ -614,8 +627,7 @@ export default {
             },
             topology: {
               cluster: this.node.cluster,
-              host: this.node.hostname,
-              node: this.node.uuid,
+              hostname: this.node.hostname,
             },
           }
 

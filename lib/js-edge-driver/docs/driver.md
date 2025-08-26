@@ -195,6 +195,17 @@ changed the list of addresses it is interested in. The method is passed
 an Array of specs as returned from `parseAddr`. The handler can use this
 to set up subscriptions to the southbound device.
 
+### `cmd`
+
+	await handler.cmd(commandName, data);
+
+This method is optional.
+
+If this method exists it is called whenever the device is sent a CMD.
+The method is passed the name of the command and the data object, which
+is a buffer. It is the responsibility of the southbound driver to parse
+the buffer depending on the command.
+
 ### `close`
 
     await handler.close();

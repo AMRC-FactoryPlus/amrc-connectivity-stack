@@ -8,7 +8,6 @@ import express from "express";
 import { UUIDs } from "@amrc-factoryplus/service-client";
 
 import {App, Class, Perm} from "./constants.js";
-import { dump_schema } from "./dump-schema.js";
 
 export class APIv1 {
     constructor(opts) {
@@ -171,48 +170,19 @@ export class APIv1 {
         return res.status(200).json(json);
     }
 
-    /* This is different from /load in that it accepts an overwrite
-     * query parameter. */
+    /* This is different from /load in that it only accepts v1 dumps.
+     * The overwrite query parameter is now ignored: all dumps are
+     * authoritative and overwrite existing data. */
     async dump_load(req, res) {
         const dump = req.body;
-        const booleans = {
-            "true": true, "false": false,
-            "1": true, "0": false,
-            on: true, off: false,
-            yes: true, no: false,
-        };
 
-        const overwrite = booleans[req.query.overwrite];
-        if (overwrite == undefined)
-            return res.status(410).end();
-
-        if (!dump_schema(dump)) {
-            this.log("Dump failed to validate: %o", this.model.dump_validate.errors);
-            return res.status(422).end();
-        }
-        if (dump.version != 1) {
+        if (typeof dump != "object" || dump?.version != 1) {
             this.log("/v1/load can only load version 1 dumps");
             return res.status(422).end();
         }
 
-        const perms = {
-            classes: Perm.Manage_Obj,
-            objects: Perm.Manage_Obj,
-            configs: Perm.Write_App,
-        };
-        for (const [key, perm] of Object.entries(perms)) {
-            if (key in dump) {
-                const ok = await this.auth.check_acl(
-                    req.auth, perm, UUIDs.Null, false);
-                if (!ok) {
-                    this.log("Refusing dump (%s)", key);
-                    return res.status(403).end();
-                }
-            }
-        }
-
-        const st = await this.model.dump_load(dump, !!overwrite);
-        res.status(st).end();
+        req.url = "/load";
+        req.app.handle(req, res);
     }
 
     async dump_save(req, res) {

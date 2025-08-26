@@ -16,7 +16,7 @@ import { Perm } from "../lib/uuids.js";
 import { GIT_VERSION } from "../lib/git-version.js";
 
 /* This is the version of the service spec we support. */
-const Version = "1.0.0";
+const Version = "1.1.0";
 
 const fplus = new ServiceClient({
     env:    process.env,

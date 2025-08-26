@@ -25,6 +25,7 @@ import ConfigDB from "@pages/ConfigDB/ConfigDB.vue";
 import ApplicationEditor from "@pages/ConfigDB/Applications/ApplicationEditor.vue";
 import ApplicationObjectEditor from "@pages/ConfigDB/Applications/ApplicationObjectEditor.vue";
 import ObjectPage from "@pages/ConfigDB/Objects/ObjectPage.vue";
+import Files from "@pages/Files/Files.vue";
 
 // Create an event bus
 window.events = mitt()
@@ -110,6 +111,7 @@ const routes = [
     }
   },
   {
+    name: 'ApplicationObjectEditor',
     path: '/configdb/applications/:application/:object',
     component: ApplicationObjectEditor,
     meta: {
@@ -125,6 +127,14 @@ const routes = [
       icon: 'gears'
     }
   },
+  {
+    path: '/files',
+    component: Files,
+    meta: {
+      name: 'Files',
+      icon: 'file'
+    }
+  }
 ]
 
 const router = createRouter({

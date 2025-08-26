@@ -7,7 +7,7 @@ Normally an installation of ACS will clone a copy of this repo into its
 internal on-prem Git server. From there the edge clusters will pull the
 Helm charts using Flux.
 
-Helm charts are made available from the Manager by creating 
+Helm charts are made available from the Manager by creating
 _Helm chart template_ (`729fe070-5e67-4bc7-94b5-afd75cb42b03`) ConfigDB
 entries. It is possible for multiple config entries to reference the
 same chart with different configurations. There are several layers of
@@ -16,18 +16,20 @@ templating involved.
 ## Deployment process
 
 When a deployment is created in the Manager (or otherwise), this results
-in the creation of an _Edge deployment_ 
+in the creation of an _Edge deployment_
 (`f2b9417a-ef7f-421f-b387-bb8183a48cdb`) ConfigDB entry. This is what
 actually causes the deployment to be pushed to the edge.
 
 These entries contain:
 
-* `charts`: A list of charts to deploy. These are UUIDs referencing
-  _Helm chart template_ entries.
+* `charts`: A chart to deploy. This is a UUID referencing a
+  _Helm chart template_ entry.
 * `cluster`: The UUID of the cluster to deploy to.
 * `hostname`: (optional) The hostname of the machine to deploy to.
 * `name`: A string name for the deployment. For Edge Agents this becomes
   the Node name.
+* `source`: (optional) The UUID of the Git repository containing the Helm charts.
+  If not specified, the default "helm-charts" repository is used.
 
 No other configuration is currently possible at this level (this is not
 ideal). These values, along with the UUID of the deployment itself, are
@@ -37,7 +39,8 @@ with these properties:
 
 * `chart`: The name of the directory in this repo holding the chart to
   deploy.
-* `source`: Currently ignored.
+* `source`: The UUID of the Git repository containing the Helm chart. If not specified,
+  the default "helm-charts" repository is used.
 * `values`: The Helm `values.yaml` to use for the deployment.
 
 The contents of the `values` object are then used used by Helm to expand
@@ -48,7 +51,7 @@ expansion above, is rather more complicated.
 ## Creating a new chart template
 
 To deploy an existing chart with different values, start by creating a
-new ConfigDB object in the _Helm chart_ 
+new ConfigDB object in the _Helm chart_
 (`f9be0334-0ff7-43d3-9d8a-188d3e4d472b`) class. This UUID is what you
 will use in the `charts` array of your deployment.
 
@@ -160,12 +163,17 @@ file.
 
 ### Deploying the chart to the edge
 
-Once the chart is written, commit it to Git and get it pushed to your
-internal Git server. There are three ways to accomplish this:
+Once the chart is written, there are several ways to get it deployed to your edge clusters:
 
 * Changes that are accepted into an ACS release will be pushed to all
   installations which are using the default settings. Untested charts
   are unlikely to be accepted into a release.
+
+* Use the multiple chart sources feature to deploy charts from your own Git repository:
+  1. Create a Git repository configuration entry in the ConfigDB for your repository
+  2. When creating an Edge deployment, specify the `source` field with the UUID of your Git repository
+  This approach allows you to maintain your charts separately while still benefiting from
+  updates to the core ACS charts.
 
 * Push to a branch on this repo, a clone on public Github, or a clone
   created on your own infrastructure. Change the service-setup config of

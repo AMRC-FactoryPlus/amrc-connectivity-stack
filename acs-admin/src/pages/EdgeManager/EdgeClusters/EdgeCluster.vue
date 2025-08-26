@@ -28,15 +28,15 @@
         <Tabs v-else default-value="nodes" class="flex flex-col flex-1 z-50">
           <TabsContent value="nodes" class="flex-1 ">
             <div>
-              <DataTable :data="nodes" :columns="nodeColumns" :filters="[]" @rowClick="selectNode">
+              <DataTable :data="nodes" :columns="nodeColumns" :filters="[]" :default-sort="initialNameSort" @rowClick="selectNode">
                 <template #toolbar-left>
                   <div class="flex items-center justify-between gap-2">
                     <TabsList>
                       <TabsTrigger value="nodes">
                         {{nodes.length ? `${nodes.length}  Node${nodes.length > 1 ? 's' : ''}` : 'No Nodes'}}
                       </TabsTrigger>
-                      <TabsTrigger value="deployments" disabled>
-                        Deployments
+                      <TabsTrigger value="deployments">
+                        {{deployments.length ? `${deployments.length}  Deployment${deployments.length > 1 ? 's' : ''}` : 'No Deployments'}}
                       </TabsTrigger>
                       <TabsTrigger value="hosts" :disabled="hosts.length === 0">
                         {{hosts.length ? `${hosts.length} Host${hosts.length > 1 ? 's' : ''}` : 'No Hosts'}}
@@ -66,17 +66,52 @@
             </div>
           </TabsContent>
           <TabsContent value="deployments">
-          </TabsContent>
-          <TabsContent value="hosts">
-            <DataTable :data="hosts" :columns="hostColumns" :filters="[]">
+            <DataTable :data="deployments" :columns="deploymentColumns" :filters="[]" :default-sort="initialNameSort" @rowClick="selectDeployment">
               <template #toolbar-left>
                 <div class="flex items-center justify-between gap-2">
                   <TabsList>
                     <TabsTrigger value="nodes">
                       {{nodes.length ? `${nodes.length}  Node${nodes.length > 1 ? 's' : ''}` : 'No Nodes'}}
                     </TabsTrigger>
-                    <TabsTrigger value="deployments" disabled>
-                      Deployments
+                    <TabsTrigger value="deployments">
+                      {{deployments.length ? `${deployments.length}  Deployment${deployments.length > 1 ? 's' : ''}` : 'No Deployments'}}
+                    </TabsTrigger>
+                    <TabsTrigger value="hosts" :disabled="hosts.length === 0">
+                      {{hosts.length ? `${hosts.length} Host${hosts.length > 1 ? 's' : ''}` : 'No Hosts'}}
+                    </TabsTrigger>
+                  </TabsList>
+                </div>
+              </template>
+              <template #toolbar-right>
+                <Button
+                    @click="newDeployment"
+                    size="sm"
+                    class="ml-auto hidden lg:flex items-center justify-center gap-1.5"
+                >
+                  <i class="fa-solid fa-plus"></i>
+                  New Edge Deployment
+                </Button>
+              </template>
+              <template #empty>
+                <EmptyState
+                    title="No Edge Deployments"
+                    :description="`No edge deployments have been added to the ${cluster.name} cluster yet.`"
+                    button-text="New Edge Deployment"
+                    button-icon="plus"
+                    @button-click="newDeployment"/>
+              </template>
+            </DataTable>
+          </TabsContent>
+          <TabsContent value="hosts">
+            <DataTable :data="hosts" :columns="hostColumns" :filters="[]" :default-sort="initialHostSort">
+              <template #toolbar-left>
+                <div class="flex items-center justify-between gap-2">
+                  <TabsList>
+                    <TabsTrigger value="nodes">
+                      {{nodes.length ? `${nodes.length}  Node${nodes.length > 1 ? 's' : ''}` : 'No Nodes'}}
+                    </TabsTrigger>
+                    <TabsTrigger value="deployments">
+                      {{deployments.length ? `${deployments.length}  Deployment${deployments.length > 1 ? 's' : ''}` : 'No Deployments'}}
                     </TabsTrigger>
                     <TabsTrigger value="hosts" :disabled="hosts.length === 0">
                       {{hosts.length ? `${hosts.length} Host${hosts.length > 1 ? 's' : ''}` : 'No Hosts'}}
@@ -137,6 +172,7 @@ import { Button } from '@components/ui/button/index.js'
 import DataTable from '@components/ui/data-table/DataTable.vue'
 import { hostColumns } from './hostColumns.ts'
 import { nodeColumns } from './nodeColumns.ts'
+import { deploymentColumns } from './deploymentColumns.ts'
 import { Alert, AlertDescription, AlertTitle } from '@components/ui/alert/index.js'
 import { toast } from 'vue-sonner'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card/index.js'
@@ -145,9 +181,12 @@ import DetailCard from '@components/DetailCard.vue'
 import EmptyState from '@components/EmptyState.vue'
 import SidebarDetail from '@components/SidebarDetail.vue'
 import moment from 'moment'
+import { useDeploymentStore } from '@store/useDeploymentStore.js'
+import DataTableSearchable from "@components/ui/data-table-searchable/DataTableSearchable.vue";
 
 export default {
   components: {
+    DataTableSearchable,
     EmptyState,
     DetailCard,
     AlertDescription,
@@ -176,9 +215,11 @@ export default {
   setup () {
     return {
       e: useEdgeClusterStore(),
+      dp: useDeploymentStore(),
       n: useNodeStore(),
       hostColumns,
       nodeColumns,
+      deploymentColumns,
       moment
     }
   },
@@ -193,7 +234,11 @@ export default {
     },
 
     nodes () {
-      return Array.isArray(this.n.data) ? this.n.data.filter(e => e.deployment.cluster === this.cluster.uuid) : []
+      return Array.isArray(this.n.data) ? this.n.data.filter(e => e.deployment?.cluster === this.cluster.uuid) : []
+    },
+
+    deployments () {
+      return Array.isArray(this.dp.data) ? this.dp.data.filter(e => e.deployment?.cluster === this.cluster.uuid) : []
     },
 
     hosts () {
@@ -203,6 +248,20 @@ export default {
     bootstrapped () {
       return this.hosts?.length > 0
     },
+
+    initialNameSort () {
+      return [{
+        id: 'name',
+        desc: false
+      }]
+    },
+
+    initialHostSort () {
+      return [{
+        id: 'hostname',
+        desc: false
+      }]
+    },
   },
 
   methods: {
@@ -211,12 +270,26 @@ export default {
       window.events.emit('show-new-node-dialog-for-cluster', this.cluster)
     },
 
+    newDeployment () {
+      window.events.emit('show-new-deployment-dialog-for-cluster', this.cluster)
+    },
+
     selectNode: function (e) {
       this.$router.push({
         name: 'Node',
         params: {
           nodeuuid: e.original.uuid,
           clusteruuid: e.original.cluster,
+        },
+      })
+    },
+
+    selectDeployment: function (e) {
+      this.$router.push({
+        name: 'ApplicationObjectEditor',
+        params: {
+          application: UUIDs.App.EdgeAgentDeployment,
+          object: e.original.uuid,
         },
       })
     },
@@ -252,7 +325,7 @@ export default {
         this.copyingBootstrap = false
         if (responseJson) {
           toast.warning(
-            `Unable to copy bootstrap script, likely due to an insecure deployment. Manually run the following command on the edge node to bootstrap the first node of the cluster: ${responseJson}`)
+            `Unable to copy bootstrap script, likely due to an insecure deployment. Manually run the following command on the edge node to bootstrap the first node of the cluster: curl ${responseJson} | sh -`)
         }
         else {
           toast.error('The bootstrap script is not ready yet. Please wait a few moments and try again.')

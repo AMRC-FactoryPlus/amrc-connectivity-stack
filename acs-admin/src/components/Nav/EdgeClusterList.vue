@@ -47,6 +47,8 @@ import { useDeviceStore } from '@store/useDeviceStore.js'
 import NodeList from './NodeList.vue'
 import { useObjectStore } from '@store/useObjectStore.js'
 import { useDriverStore } from '@store/useDriverStore.js'
+import { useDeploymentStore } from '@store/useDeploymentStore.js'
+import { useHelmChartStore } from '@store/useHelmChartStore.js'
 
 export default {
 
@@ -56,7 +58,9 @@ export default {
       c: useEdgeClusterStore(),
       n: useNodeStore(),
       d: useDeviceStore(),
-      dr: useDriverStore()
+      dr: useDriverStore(),
+      dp: useDeploymentStore(),
+      hc: useHelmChartStore(),
     }
   },
 
@@ -76,7 +80,7 @@ export default {
 
   computed: {
     clusters () {
-      return this.c.data
+      return this.c.data.toSorted((a, b) => a.name.localeCompare(b.name))
     },
   },
 
@@ -85,6 +89,8 @@ export default {
     await this.c.start()
     await this.d.start()
     await this.dr.start()
+    await this.dp.start()
+    await this.hc.start()
   },
 
   methods: {

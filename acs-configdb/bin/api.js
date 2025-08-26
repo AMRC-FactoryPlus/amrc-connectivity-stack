@@ -25,11 +25,12 @@ const fplus = await new ServiceClient({
     env,
     bootstrap_uuids:    BootstrapUUIDs,
 }).init();
+const auth = new Auth({ fplus });
 const model = await new Model({
+    auth,
     debug:  fplus.debug,
 }).init();
 
-const auth = new Auth({ fplus });
 const mqtt = MQTTCli.fromEnv(fplus, env);
 
 const api = await new WebAPI({
@@ -56,7 +57,7 @@ const api = await new WebAPI({
 
 const notify = new CDBNotify({
     auth, api, model,
-    log:    fplus.debug.bound("notify"),
+    debug:  fplus.debug,
 });
 
 mqtt?.run();

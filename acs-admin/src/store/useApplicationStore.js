@@ -43,7 +43,10 @@ export const useApplicationStore = defineStore('application', {
 
       this.rxsub = details.subscribe(apps => {
         console.debug("APPS UPDATE: %o", apps);
-        this.data = apps;
+        // Sort applications alphabetically by name
+        this.data = apps.sort((a, b) =>
+          a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+        );
         this.loading = false;
       });
     },

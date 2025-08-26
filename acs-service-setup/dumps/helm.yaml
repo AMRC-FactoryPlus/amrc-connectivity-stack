@@ -49,11 +49,13 @@ objects:
       subclassOf:
         - !u Auth.Class.EdgeService
 
-  !u Clusters.Class.HelmChart:
+  !u Clusters.Class.SystemHelmChart:
     !u Local.Chart.EdgeAgent:
       name: "Edge Agent"
     !u Local.Chart.Cluster:
       name: "Edge cluster"
+
+  !u Clusters.Class.HelmChart:
     !u Local.Chart.ModbusRest:
       name: "Modbus-REST adapter"
     !u Local.Chart.MQTT:
@@ -69,6 +71,9 @@ configs:
       properties:
         chart:
           description: Path to the Helm chart within the source repo.
+          type: string
+        prefix:
+          description: Kubernetes-compatible prefix to add to the chart name. Must be specified if the chart name contains slashes.
           type: string
         source:
           description: Source to pull the Helm chart from.
@@ -109,7 +114,7 @@ configs:
         apiVersion: helm.toolkit.fluxcd.io/v2beta1
         kind: HelmRelease
         metadata:
-          name: "{{chart}}-{{uuid}}"
+          name: "{{prefix}}-{{uuid}}"
         spec:
           chart:
             spec:
@@ -117,7 +122,7 @@ configs:
               reconcileStrategy: Revision
               sourceRef:
                 kind: GitRepository
-                name: helm-charts
+                name: "{{source}}"
           install:
             crds: CreateReplace
           upgrade:
@@ -129,7 +134,6 @@ configs:
   !u Clusters.App.HelmTemplate:
     !u Local.Chart.Cluster:
       chart:  "edge-cluster"
-      source: "helm-charts"
       values:
         krb5: { realm: !acs "${realm}" }
         uuid:
@@ -145,7 +149,6 @@ configs:
           directory: !acs "${directory}"
     !u Local.Chart.EdgeAgent:
       chart:  "edge-agent"
-      source: "helm-charts"
       values:
         name:   "{{name}}"
         uuid:   "{{uuid}}"

@@ -1,7 +1,5 @@
 /*
- * Factory+ / AMRC Connectivity Stack (ACS) Edge Deployment operator
- * Cluster actions
- * Copyright 2023 AMRC
+ * Copyright (c) University of Sheffield AMRC 2025.
  */
 
 import jmp from "json-merge-patch";
@@ -110,7 +108,7 @@ export class Update extends Action {
         }
 
         if (!changes.size) return;
-        const patch = Object.fromEntries(m.entries());
+        const patch = Object.fromEntries(changes.entries());
         this.update(patch);
         /* this.status is not live */
         jmp.apply(status, patch);
@@ -209,7 +207,13 @@ export class Update extends Action {
         const cluster = cluster_template({ uuid, name });
         const values = jmp.merge(cluster.values, spec.values ?? {});
         /* Build the cluster HelmRelease manifest */
-        const helm = template.helm({ ...cluster, uuid, values }).template;
+        const helm = template.helm({
+            ...cluster,
+            uuid,
+            values,
+            prefix: "edge-cluster",
+            source: "helm-charts"
+        }).template;
         helm.metadata.namespace = spec.namespace;
         /* Build the initial repo contents */
         const flux = template.flux({

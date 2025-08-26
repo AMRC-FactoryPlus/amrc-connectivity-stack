@@ -1,16 +1,18 @@
+<!--
+  - Copyright (c) University of Sheffield AMRC 2025.
+  -->
 
 <template>
-  <div class="flex flex-1 items-center justify-center">
+  <div class="h-svh flex items-center justify-center">
     <LoginDialog/>
   </div>
-
 </template>
 
 <script>
 
 
-import {defineComponent} from "vue";
-import LoginDialog from "@components/LoginDialog.vue";
+import { defineComponent } from 'vue'
+import LoginDialog from '@components/LoginDialog.vue'
 
 export default defineComponent({
   name: 'Login',

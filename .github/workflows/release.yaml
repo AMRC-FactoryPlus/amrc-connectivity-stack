@@ -1,0 +1,57 @@
+# GH Actions workflow file
+# ACS monorepo release action
+#
+# This workflow runs every time a release is published from the ACS
+# monorepo. Its function is to choose what form of release we are making
+# based on the syntax of the release tag. These forms are recognised;
+# here vSEMVER is a semver version string with an initial 'v'.
+#
+#   vSEMVER               Publish a release of ACS itself
+#   js/some-lib/vSEMVER   Publish an in-tree JS library to NPM
+
+name: Choose release type
+
+on:
+  release:
+    types: [ published ]
+
+jobs:
+  choose-type:
+    runs-on: ubuntu-latest
+    outputs:
+      type: ${{ steps.choose.outputs.type }}
+      library: ${{ steps.choose.outputs.library }}
+      version: ${{ steps.choose.outputs.version }}
+    steps:
+      - id: choose
+        run: |
+          tag="${GITHUB_REF#refs/tags/}"
+          echo "version=$(basename "$tag")" >>"$GITHUB_OUTPUT"
+          prefix="$(dirname "$tag")"
+          if [ "$prefix" = "." ]
+          then
+            echo "type=acs" >>"$GITHUB_OUTPUT"
+          else
+            echo "type=$(dirname "$prefix")" >>"$GITHUB_OUTPUT"
+            echo "library=$(basename "$prefix")" >>"$GITHUB_OUTPUT"
+          fi
+
+  acs:
+    needs: choose-type
+    if: ${{ needs.choose-type.outputs.type == 'acs' }}
+    uses: ./.github/workflows/publish.yml
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
+
+  js-lib:
+    needs: choose-type
+    if: ${{ needs.choose-type.outputs.type == 'js' }}
+    uses: ./.github/workflows/js-lib.yaml
+    with:
+      libdir: "lib/js-${{ needs.choose-type.outputs.library }}"
+      version: "${{ needs.choose-type.outputs.version }}"
+    secrets: inherit
+
+

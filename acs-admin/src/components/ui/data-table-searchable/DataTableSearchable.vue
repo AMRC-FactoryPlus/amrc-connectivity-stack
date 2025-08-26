@@ -9,6 +9,7 @@ import {Input} from '@/components/ui/input'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow,} from '@/components/ui/table'
 import {valueUpdater} from '@/lib/utils'
 import {ref} from 'vue'
+import DataTableToolbar from "@components/ui/data-table/DataTableToolbar.vue";
 
 interface DataTableProps<T> {
     columns: ColumnDef<T, any>[]
@@ -32,17 +33,17 @@ const expanded = ref<ExpandedState>({})
 
 // Write a method to toggle the expanded state of a row
 const toggle = (row: any) => {
-  row.toggleSelected()
+    row.toggleSelected()
 }
 
 const emit = defineEmits(['row-click'])
 
 const rowClick = function(row: any) {
-  if (props.clickable) {
-    emit('row-click', row)
-  } else {
-    toggle(row)
-  }
+    if (props.clickable) {
+        emit('row-click', row)
+    } else {
+        toggle(row)
+    }
 }
 
 const table = useVueTable({
@@ -83,7 +84,7 @@ const table = useVueTable({
 
 const existingSelection = {}
 props.selectedObjects.forEach(s => {
-  existingSelection[s.metaRowId] = true
+    existingSelection[s.metaRowId] = true
 })
 
 valueUpdater(existingSelection, rowSelection)
@@ -92,23 +93,25 @@ const limitHeight = props.limitHeight
 </script>
 
 <template>
-  <div class="w-full">
-    <div class="flex gap-2 items-center justify-between py-4">
-      <div class="flex gap-2 items-center">
-        <Input
-            class="max-w-sm"
-            placeholder="Filter..."
-            :model-value="props.searchKey ? table.getColumn(props.searchKey)?.getFilterValue() as string : table.getState().globalFilter"
-            @update:model-value="props.searchKey ? table.getColumn(props.searchKey)?.setFilterValue($event) : table.setGlobalFilter(String($event))"
-        />
-        <div class="text-slate-500 whitespace-nowrap">
-          Showing {{table.getFilteredRowModel().rows.length}} of {{table.getPreFilteredRowModel().rows.length}}
+  <div class="space-y-2">
+    <DataTableToolbar :filters="filters" :table="table">
+      <template #left>
+        <slot name="toolbar-left" :table="table"></slot>
+      </template>
+      <template #right>
+        <div class="relative">
+          <Input
+              class="max-w-sm"
+              icon="search"
+              placeholder="Search..."
+              :model-value="props.searchKey ? table.getColumn(props.searchKey)?.getFilterValue() as string : table.getState().globalFilter"
+              @update:model-value="props.searchKey ? table.getColumn(props.searchKey)?.setFilterValue($event) : table.setGlobalFilter(String($event))"
+          />
         </div>
-      </div>
-      <div>
-        <slot :selected-objects="table.getSelectedRowModel().rows.map(r => {return {...r.original, metaRowId: r.id}})"></slot>
-      </div>
-    </div>
+        <slot name="toolbar-right" :table="table" :selected-objects="table.getSelectedRowModel().rows.map(r => {return {...r.original, metaRowId: r.id}})"></slot>
+      </template>
+    </DataTableToolbar>
+    <slot name="below-toolbar"></slot>
     <div class="rounded-md border" :class="{'max-h-[50vh] overflow-auto': limitHeight}">
       <Table>
         <TableHeader>

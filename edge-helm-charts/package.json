@@ -11,7 +11,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@amrc-factoryplus/service-client": "^1.3.6",
-    "isomorphic-git": "^1.27.1"
+    "@amrc-factoryplus/service-client": "../lib/js-service-client",
+    "isomorphic-git": "^1.32.2"
   }
 }

@@ -1,9 +1,8 @@
 /*
- *  Factory+ / AMRC Connectivity Stack (ACS) Edge component
- *  Copyright 2024 AMRC
+ * Copyright (c) University of Sheffield AMRC 2025.
  */
 
-import { EventEmitter } from "events";
+import {EventEmitter} from "events";
 import fs from "fs/promises";
 import net from "net";
 import util from "util";
@@ -11,11 +10,11 @@ import util from "util";
 import Aedes from "aedes";
 
 const prefix = "fpEdge1";
-const topicrx = new RegExp(`^${prefix}/(\\w+)/(\\w+)(?:/(\\w+))?$`);
+const topicrx = new RegExp(`^${prefix}/([\\w-]+)/(\\w+)(?:/(\\w+))?$`);
 
 function log (f, ...a) {
     const msg = util.format(f, ...a);
-    console.log("DRIVER: %s", msg);
+    console.log("driver: %s", msg);
 }
 
 interface ACL {
@@ -107,7 +106,7 @@ export class DriverBroker extends EventEmitter {
             publish: new RegExp(
                 `^${prefix}/${id}/(?:status|data/\\w+|err/\\w+)$`),
             subscribe: new RegExp(
-                `^${prefix}/${id}/(?:active|conf|addr|cmd/\\w+|poll)$`),
+                `^${prefix}/${id}/(?:active|conf|addr|cmd/#|poll)$`),
         });
 
         callback(null, true);

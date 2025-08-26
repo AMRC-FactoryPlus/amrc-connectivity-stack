@@ -13,6 +13,8 @@ acs:
     email: ''
     # -- Whether or not to use the staging environment for Let's Encrypt
     staging: false
+    # -- A list of additional DNS names to use for the certificate
+    additionalDnsNames: []
   # -- The name of the secret holding the wildcard certificate for the
   # above domain. It will be used for every service unless that service
   # specifies its own tlsSecretName.
@@ -37,7 +39,17 @@ acs:
     image:
       registry: ghcr.io
       repository: amrc-factoryplus/acs-schemas
-      tag: v1.0.0
+      tag: v1.4.0
+
+coredns:
+  # -- An option to enable the redirecting of external URL's back
+  # to the internal Traefik service. This is done through a config map
+  # override to coredns in the kube-system namespace. The override rewrites
+  # queries matching .*.<baseURL> to acs-traefik.<namespace>.svc.cluster.local,
+  # ensuring correct internal service resolution. ACS deployments without
+  # external DNS should enable this.
+  traefikRedirect:
+    enabled: false
 
 identity:
   # -- Whether or not to enable the Identity component
@@ -317,6 +329,8 @@ grafana:
   enabled: true
   persistence:
     enabled: true
+    annotations:
+      "helm.sh/resource-policy": "keep"
   envFromSecret: influxdb-auth
   admin:
     existingSecret: grafana-admin-user

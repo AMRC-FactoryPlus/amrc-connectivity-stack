@@ -1,6 +1,5 @@
-/* ACS service setup
- * UUIDs used by the services
- * Copyright 2023 AMRC
+/*
+ * Copyright (c) University of Sheffield AMRC 2025.
  */
 
 export const ACS = {
@@ -90,6 +89,7 @@ export const ACS = {
         Git:                    "626df296-8156-4c67-8aed-aac70161aa8b",
         Authentication:         "127cde3c-773a-4f61-b0ba-7412a2695253",
         Manager:                "2340e706-1280-420c-84a6-016547b55e95",
+        Files:                  "cb0ac52a-7622-4c75-aa95-ad4c700ae6fb",
     },
     /* XXX These should not be fixed. They should be replaced by
      * per-deployment accounts created by krbkeys, and
@@ -122,6 +122,7 @@ export const ACS = {
         Modbus:                 "c355a44e-de4c-11ef-8a5a-e31f3872ed79",
         Test:                   "c8798cba-de4c-11ef-8a43-8766e8683af8",
         TPlinkSmartPlug:        "d46e1374-de4c-11ef-b469-c388a038fd5c",
+        ADS:                    "6764f1e5-fbe7-494c-8dbe-b80039c30c97",
 
         /* External driver */
         External:               "eb669a2c-e213-11ef-998e-a7fc6f4817b5",
@@ -157,6 +158,8 @@ export const ConfigDB = {
         ManageAppSchema: "95c7cbcb-ce60-49ed-aa81-2fe3eec4559d",
         ManageObjects: "f0b7917b-d475-4888-9d5a-2af96b3c26b6",
         DeleteObjects: "6957174b-7b08-45ca-ac5c-c03ab6928a6e",
+        GiveTo: "4eaab346-4d1e-11f0-800e-dfdc061c6a63",
+        TakeFrom: "6ad67652-5009-11f0-9404-73b79124c3d5",
     }
 };
 
@@ -247,6 +250,7 @@ export const Clusters = {
         Cluster:            "f24d354d-abc1-4e32-98e1-0667b3e40b61",
         Account:            "97756c9a-38e6-4238-b78c-3df6f227a6c9",
         HelmChart:          "f9be0334-0ff7-43d3-9d8a-188d3e4d472b",
+        SystemHelmChart: "a5c54a2e-8f7b-4b2a-9e8d-3f7c9e7d1c6a",
         ClusterGroups:      "979f7fd9-bbc7-4810-a774-6082c7394db6",
     },
     Service: {

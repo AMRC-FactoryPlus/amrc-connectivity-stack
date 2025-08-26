@@ -1,49 +1,37 @@
 /*
- *  Factory+ / AMRC Connectivity Stack (ACS) Edge component
- *  Copyright 2023 AMRC
+ * Copyright (c) University of Sheffield AMRC 2025.
  */
 
-import { EventEmitter } from "events";
-import * as MQTT from "mqtt";
-import { v5 as uuidv5 } from "uuid";
+import {EventEmitter} from "events";
+import {v5 as uuidv5} from "uuid";
 
-import {
-    Address, 
-    ServiceClient, 
-} from "@amrc-factoryplus/utilities";
+import {ServiceClient} from "@amrc-factoryplus/utilities";
 
-import { log, logf } from "./helpers/log.js";
-import {
-    metricIndex,
-    Metrics,
-    sparkplugConfig,
-    sparkplugDataType,
-    sparkplugMetric,
-    sparkplugPayload,
-} from "./helpers/typeHandler.js";
+import {log, logf} from "./helpers/log.js";
+import {metricIndex, Metrics, sparkplugConfig, sparkplugDataType, sparkplugMetric, sparkplugPayload,} from "./helpers/typeHandler.js";
 import * as UUIDs from "./uuids.js";
 
 class InstanceBuilder {
     #uuid: string
 
-    constructor (uuid: string) {
+    constructor(uuid: string) {
         this.#uuid = uuid;
     }
 
-    fp_v5_uuid (...args: string[]) {
+    fp_v5_uuid(...args: string[]) {
         return uuidv5(args.join(":"), UUIDs.Special.FactoryPlus);
     }
 
-    mk_instance (schema: string, prefix: string) {
-        const instance = this.fp_v5_uuid(UUIDs.Special.V5Metric, 
+    mk_instance(schema: string, prefix: string) {
+        const instance = this.fp_v5_uuid(UUIDs.Special.V5Metric,
             this.#uuid, prefix);
         return [
-            { 
+            {
                 name: `${prefix}/Schema_UUID`,
                 type: sparkplugDataType.uuid,
                 value: schema,
             },
-            {   
+            {
                 name: `${prefix}/Instance_UUID`,
                 type: sparkplugDataType.uuid,
                 value: instance,
@@ -51,9 +39,9 @@ class InstanceBuilder {
         ];
     }
 
-    build_alert (typ: string, name: string, value: boolean) {
+    build_alert(typ: string, name: string, value: boolean) {
         const prefix = `Alerts/${name}`;
-        
+
         return [
             ...this.mk_instance(UUIDs.Schema.Alert, prefix),
             {
@@ -96,18 +84,19 @@ export class SparkplugNode extends (
         this.isOnline = false; // Whether client is online or not
     }
 
-    async init () {
-         // Generate randomized client ID
+    async init() {
+        // Generate randomized client ID
         const address = this.#conf.address;
-        const clientId = address.group + '-' + address.node + '-' 
+        const clientId = address.group + '-' + address.node + '-'
             + (Math.random() * 1e17).toString(36);
 
         // conf.keepalive = 10;
         this.#client = await this.#fplus.MQTT.basic_sparkplug_node({
             address,
             clientId,
-            publishDeath:   true,
+            publishDeath: true,
         });
+
         this.#client.connect();
 
         // What to do when the client connects
@@ -117,13 +106,15 @@ export class SparkplugNode extends (
 
 
         // What to do when a DCMD message is received
-        this.#client.on("dcmd", (deviceId: string, payload: sparkplugPayload) =>
-            this.emit("dcmd", deviceId, payload)
+        this.#client.on("dcmd", (deviceId: string, payload: sparkplugPayload) => {
+                this.emit("dcmd", deviceId, payload);
+            }
         );
         // What to do when an NCMD message is received
         this.#client.on("ncmd", (payload: sparkplugPayload) => {
             this.#handleNCmd(payload);
         });
+
         // What to do when the client is trying to reconnect
         this.#client.on("reconnect", () => this.onReconnect());
         // What to do when the client goes offline

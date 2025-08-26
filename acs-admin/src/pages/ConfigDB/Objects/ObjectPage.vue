@@ -1,121 +1,241 @@
 <!--
-  - Copyright (c) University of Sheffield AMRC 2024.
+  - Copyright (c) University of Sheffield AMRC 2025.
   -->
 <template>
   <Skeleton v-if="!obj.ready || d.loading || m.loading" v-for="i in 10" class="h-16 rounded-lg mb-2"/>
-  <div v-else>
-    <div class="flex items-center justify-between">
-      <Card>
-        <CardHeader class="p-2 pt-0 md:p-4">
-          <CardTitle>{{object.name}}</CardTitle>
-          <CardDescription>
-            <Copyable :text="object.uuid">{{object.uuid}}</Copyable>
-          </CardDescription>
-        </CardHeader>
-        <CardContent class="p-2 pt-0 md:p-4 md:pt-0">
-          <div>Rank {{object.rank}}</div>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader class="p-2 pt-0 md:p-4">
-          <CardTitle>Class Info</CardTitle>
-          <CardDescription>
-          </CardDescription>
-        </CardHeader>
-        <CardContent class="p-2 pt-0 md:p-4 md:pt-0">
-          <RouterLink :to="`/configdb/objects/${object.class.uuid}`" class="font-semibold">{{object.class.name}}</RouterLink>
-          <Copyable class="text-slate-500" :text="object.class.uuid">{{object.class.uuid}}</Copyable>
-        </CardContent>
-      </Card>
+  <div v-else class="flex h-full">
+    <!-- Dialogs -->
+    <ObjectSelector
+        v-model="ownerToChange"
+        v-model:open="showingOwnerDialog"
+        :store-data="availableOwners"
+        :multiSelect="false"
+        title="Select Owner"
+        subtitle="Select the principal who should own this object"
+        column1-header="Name"
+        column1-main-key="name"
+        column1-sub-key="uuid"
+        column2-header="Class"
+        column2-main-key="class.name"
+        column2-sub-key="class.uuid"
+    />
+    <!-- Main content -->
+    <div class="flex flex-col gap-4 pr-4 flex-1 overflow-auto">
+      <div>
+        <RouterLink  :to="`/configdb/objects`">
+          <Button size="sm" class="gap-2">
+            <i class="fa-solid fa-arrow-left"></i>
+            Back
+          </Button>
+        </RouterLink>
+      </div>
+      <DataTable
+          :data="isSubclassOf"
+          :default-sort="initialSort"
+          :columns="subclassOfColumns"
+          :filters="[]"
+          @row-click="e => objectClicked(e.original)"
+          v-if="object.rank > 0">
+        <template #toolbar-left>
+          <div class="flex items-center justify-start gap-2 pl-1">
+            <i :class="`fa-fw fa-solid fa-sitemap`"></i>
+            <div class="font-semibold text-xl">Subclass Of</div>
+          </div>
+        </template>
+        <template #toolbar-right>
+          <div class="flex justify-between items-end flex-grow">
+            <ObjectSelector
+                v-model="subclassOfToAdd"
+                :store-data="availableSubclassOf"
+                title="Select Classifications"
+                subtitle="Select the objects which this object should become a subclass of"
+                column1-header="Name"
+                column1-main-key="name"
+                column1-sub-key="uuid"
+                column2-header="Class"
+                column2-main-key="class.name"
+                column2-sub-key="class.uuid"
+            >
+              <Button size="sm" class="gap-2">
+                <i class="fa-solid fa-plus"></i>
+                Add Classification
+              </Button>
+            </ObjectSelector>
+          </div>
+        </template>
+      </DataTable>
+      <DataTable
+          :data="isMemberOf"
+          :default-sort="initialSort"
+          :columns="memberOfColumns"
+          :filters="[]"
+          @row-click="e => objectClicked(e.original)">
+        <template #toolbar-left>
+          <div class="flex items-center justify-start gap-2 pl-1">
+            <i :class="`fa-fw fa-solid fa-users`"></i>
+            <div class="font-semibold text-xl">Member Of</div>
+          </div>
+        </template>
+        <template #toolbar-right>
+          <div class="flex justify-between items-end flex-grow">
+            <ObjectSelector
+                v-model="membershipsToAdd"
+                :store-data="availableMemberships"
+                title="Select Memberships"
+                subtitle="Select the objects which this object should become a member of"
+                column1-header="Name"
+                column1-main-key="name"
+                column1-sub-key="uuid"
+                column2-header="Class"
+                column2-main-key="class.name"
+                column2-sub-key="class.uuid"
+            >
+              <Button size="sm" class="gap-2">
+                <i class="fa-solid fa-plus"></i>
+                Add Membership
+              </Button>
+            </ObjectSelector>
+          </div>
+        </template>
+      </DataTable>
+      <DataTable class="mt-4"
+          :data="subclasses"
+          :default-sort="initialSort"
+          :columns="subclassColumns"
+          :filters="[]"
+          @row-click="e => objectClicked(e.original)"
+          v-if="object.rank > 0">
+        <template #toolbar-left>
+          <div class="flex items-center justify-start gap-2 pl-1">
+            <i :class="`fa-fw fa-solid fa-sitemap`"></i>
+            <div class="font-semibold text-xl">Subclasses</div>
+          </div>
+        </template>
+        <template #toolbar-right>
+          <div class="flex justify-between items-end flex-grow">
+            <ObjectSelector
+                v-model="subclassesToAdd"
+                :store-data="availableSubclasses"
+                title="Select new Subclasses"
+                subtitle="Select the objects which become a subclass of this object"
+                column1-header="Name"
+                column1-main-key="name"
+                column1-sub-key="uuid"
+                column2-header="Class"
+                column2-main-key="class.name"
+                column2-sub-key="class.uuid"
+            >
+              <Button size="sm" class="gap-2">
+                <i class="fa-solid fa-plus"></i>
+                Add Subclass
+              </Button>
+            </ObjectSelector>
+          </div>
+        </template>
+      </DataTable>
+      <DataTable class="mt-4"
+          :data="members"
+          :default-sort="initialSort"
+          :columns="membersColumns"
+          :filters="[]"
+          @row-click="e => objectClicked(e.original)"
+          v-if="object.rank > 0">
+        <template #toolbar-left>
+          <div class="flex items-center justify-start gap-2 pl-1">
+            <i class="fa-fw fa-solid fa-users"></i>
+            <div class="font-semibold text-xl">Members</div>
+          </div>
+        </template>
+        <template #toolbar-right>
+          <div class="flex justify-between items-end flex-grow">
+            <ObjectSelector
+                v-model="membersToAdd"
+                :store-data="availableMembers"
+                title="Select new Members"
+                subtitle="Select the objects which become a member of this object"
+                column1-header="Name"
+                column1-main-key="name"
+                column1-sub-key="uuid"
+                column2-header="Class"
+                column2-main-key="class.name"
+                column2-sub-key="class.uuid"
+            >
+              <Button size="sm" class="gap-2">
+                <i class="fa-solid fa-plus"></i>
+                Add Member
+              </Button>
+            </ObjectSelector>
+          </div>
+        </template>
+      </DataTable>
+      <div v-if="object.rank === 0" class="text-center text-gray-400">Objects of rank 0 cannot have members or subclasses, nor can they be subclasses.</div>
     </div>
-    <!-- currently not functional
-    <Button class="mt-2" disabled>Add Object of Class</Button>
-    -->
-    <DataTable class="mt-4" :data="isSubclassOf" :default-sort="initialSort" :columns="subclassOfColumns" :filters="[]" @row-click="e => objectClicked(e.original)" v-if="object.rank > 0">
-      <template #toolbar-left>
-        <div class="flex justify-between items-end flex-grow mr-4">
-          <div class="font-semibold">This object is a subclass of:</div>
-          <ObjectSelector
-              v-model="subclassOfToAdd"
-              :store-data="availableSubclassOf"
-              title="Select Classifications"
-              subtitle="Select the objects which this object should become a subclass of"
-              column1-header="Name"
-              column1-main-key="name"
-              column1-sub-key="uuid"
-              column2-header="Class"
-              column2-main-key="class.name"
-              column2-sub-key="class.uuid"
-          >
-            <Button>Add Classification</Button>
-          </ObjectSelector>
+
+    <!-- Sidebar -->
+    <div class="w-96 flex-shrink-0 border-l -my-4 -mr-4">
+      <div class="flex items-center justify-start border-b gap-2 p-4">
+        <i :class="`fa-fw fa-solid fa-cube`"></i>
+        <div class="font-semibold text-xl">{{object?.name ?? ''}}</div>
+      </div>
+      <div class="space-y-4 p-4">
+        <SidebarDetail
+            icon="key"
+            label="Node UUID"
+            :value="object?.uuid ?? ''"
+        />
+        <SidebarDetail
+            icon="ranking-star"
+            label="Rank"
+            :value="object?.rank.toString() ?? ''"
+        />
+        <div class="pt-2">
+          <RouterLink :to="`/configdb/applications/${UUIDs.App.Info}/${object.uuid}`">
+            <Button title="Go to object information" size="xs" class="flex gap-2 text-gray-500" variant="ghost">
+              <i class="fa-solid fa-external-link"></i>
+              Go to object information entry
+            </Button>
+          </RouterLink>
         </div>
-      </template>
-    </DataTable>
-    <DataTable class="mt-4" :data="isMemberOf" :default-sort="initialSort" :columns="memberOfColumns" :filters="[]" @row-click="e => objectClicked(e.original)">
-      <template #toolbar-left>
-        <div class="flex justify-between items-end flex-grow mr-4">
-          <div class="font-semibold">This object is a member of:</div>
-          <ObjectSelector
-              v-model="membershipsToAdd"
-              :store-data="availableMemberships"
-              title="Select Memberships"
-              subtitle="Select the objects which this object should become a member of"
-              column1-header="Name"
-              column1-main-key="name"
-              column1-sub-key="uuid"
-              column2-header="Class"
-              column2-main-key="class.name"
-              column2-sub-key="class.uuid"
-          >
-            <Button>Add Membership</Button>
-          </ObjectSelector>
+      </div>
+      <div class="font-semibold text-lg p-4 border-b">Class Information</div>
+      <div class="space-y-4 p-4">
+        <SidebarDetail
+            icon="tag"
+            label="Name"
+            :value="object?.class?.name ?? ''"
+        />
+        <SidebarDetail
+            icon="key"
+            label="UUID"
+            :value="object?.class?.uuid ?? ''"
+        />
+        <div class="pt-2">
+          <RouterLink :to="`/configdb/applications/${UUIDs.App.Registration}/${object.uuid}`">
+            <Button title="Go to object registration" size="xs" class="flex gap-2 text-gray-500" variant="ghost">
+              <i class="fa-solid fa-external-link"></i>
+              Go to object registration entry
+            </Button>
+          </RouterLink>
         </div>
-      </template>
-    </DataTable>
-    <DataTable class="mt-4" :data="subclasses" :default-sort="initialSort" :columns="subclassColumns" :filters="[]" @row-click="e => objectClicked(e.original)" v-if="object.rank > 0">
-      <template #toolbar-left>
-        <div class="flex justify-between items-end flex-grow mr-4">
-          <div class="font-semibold">Direct subclasses of this object:</div>
-          <ObjectSelector
-              v-model="subclassesToAdd"
-              :store-data="availableSubclasses"
-              title="Select new Subclasses"
-              subtitle="Select the objects which become a subclass of this object"
-              column1-header="Name"
-              column1-main-key="name"
-              column1-sub-key="uuid"
-              column2-header="Class"
-              column2-main-key="class.name"
-              column2-sub-key="class.uuid"
-          >
-            <Button>Add a Subclass</Button>
-          </ObjectSelector>
-        </div>
-      </template>
-    </DataTable>
-    <DataTable class="mt-4" :data="members" :default-sort="initialSort" :columns="membersColumns" :filters="[]" @row-click="e => objectClicked(e.original)" v-if="object.rank > 0">
-      <template #toolbar-left>
-        <div class="flex justify-between items-end flex-grow mr-4">
-          <div class="font-semibold">Members of this object:</div>
-          <ObjectSelector
-              v-model="membersToAdd"
-              :store-data="availableMembers"
-              title="Select new Members"
-              subtitle="Select the objects which become a member of this object"
-              column1-header="Name"
-              column1-main-key="name"
-              column1-sub-key="uuid"
-              column2-header="Class"
-              column2-main-key="class.name"
-              column2-sub-key="class.uuid"
-          >
-            <Button>Add a Member</Button>
-          </ObjectSelector>
-        </div>
-      </template>
-    </DataTable>
+      </div>
+      <div class="flex items-center justify-between gap-2 p-4 border-b">
+        <div class="font-semibold text-lg">Owner</div>
+        <Button title="Change owner"
+            @click="showOwnerDialog"
+            size="sm"
+            variant="ghost"
+            class="flex items-center justify-center gap-2"
+        >
+          <i class="fa-solid fa-sync text-sm"></i>
+        </Button>
+      </div>
+      <div class="space-y-4 p-4">
+        <SidebarDetail icon="tag" label="Name" :value="object.owner.name"/>
+        <SidebarDetail icon="key" label="UUID" :value="object.owner.uuid"/>
+      </div>
+    </div>
   </div>
+
 </template>
 
 <script>
@@ -125,17 +245,18 @@ import { memberOfColumns } from './TableData/objectMemberOfListColumns.ts'
 import { membersColumns } from './TableData/objectMembersListColumns.ts'
 import { subclassOfColumns } from './TableData/objectSubclassOfListColumns.ts'
 import { subclassColumns } from './TableData/objectSubclassListColumns.ts'
-import {Card, CardContent, CardDescription, CardHeader, CardTitle} from "@components/ui/card/index.js";
-import {useObjectStore} from "@store/useObjectStore.js";
-import {useGroupStore} from "@store/useGroupStore.js";
-import {useRoute, useRouter} from "vue-router";
-import {useDirectStore} from "@store/useDirectStore.js";
-import {Button} from "@components/ui/button/index.js";
-import Copyable from "@components/Copyable.vue";
-import {useMemberStore} from "@store/useMemberStore.js";
-import {defineAsyncComponent} from "vue";
-import {useServiceClientStore} from "@store/serviceClientStore.js";
-import {toast} from "vue-sonner";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@components/ui/card/index.js'
+import { useObjectStore } from '@store/useObjectStore.js'
+import { useRoute, useRouter } from 'vue-router'
+import { useDirectStore } from '@store/useDirectStore.js'
+import { Button } from '@components/ui/button/index.js'
+import Copyable from '@components/Copyable.vue'
+import { useMemberStore } from '@store/useMemberStore.js'
+import { defineAsyncComponent } from 'vue'
+import { useServiceClientStore } from '@store/serviceClientStore.js'
+import { toast } from 'vue-sonner'
+import SidebarDetail from '@components/SidebarDetail.vue'
+import {UUIDs} from "@amrc-factoryplus/service-client";
 
 export default {
   emits: ['rowClick'],
@@ -152,6 +273,7 @@ export default {
       m: useMemberStore(),
       route: useRoute(),
       router: useRouter(),
+      UUIDs,
     }
   },
 
@@ -162,6 +284,7 @@ export default {
     Skeleton,
     DataTable,
     ObjectSelector: defineAsyncComponent(() => import('@components/ObjectSelector/ObjectSelector.vue')),
+    SidebarDetail,
   },
 
   computed: {
@@ -243,27 +366,33 @@ export default {
     availableSubclassOf () {
       const subclassOfUUIDs = this.isSubclassOf.map(m => m.uuid)
       return this.obj.data  // All objects
-          .filter(o => o.rank === this.object.rank) // All objects of the same rank
-          .filter(o => !subclassOfUUIDs.includes(o.uuid)) // Objects of the same rank which are we are note already a subclass of
+        .filter(o => o.rank === this.object.rank) // All objects of the same rank
+        .filter(o => !subclassOfUUIDs.includes(o.uuid)) // Objects of the same rank which are we are note already a subclass of
     },
     availableMemberships () {
       const directMemberships = this.d.data.filter(group => group.directMembers.includes(this.object.uuid)).map(m => m.uuid)
       return this.obj.data  // All objects
-          .filter(o => o.rank === this.object.rank+1) // All objects of a rank above
-          .filter(o => !directMemberships.includes(o.uuid)) // Objects of a rank above which it's not already a direct member of
+        .filter(o => o.rank === this.object.rank+1) // All objects of a rank above
+        .filter(o => !directMemberships.includes(o.uuid)) // Objects of a rank above which it's not already a direct member of
     },
     availableSubclasses () {
       const subclasses = this.relationships?.directSubclasses ?? []
       return this.obj.data  // All objects
-          .filter(o => o.rank === this.object.rank) // All objects of the same rank
-          .filter(o => !subclasses.includes(o.uuid)) // Objects of the same rank which are not already a subclass
+        .filter(o => o.rank === this.object.rank) // All objects of the same rank
+        .filter(o => !subclasses.includes(o.uuid)) // Objects of the same rank which are not already a subclass
     },
     availableMembers () {
       const directMembers = this.relationships?.directMembers ?? []
       return this.obj.data  // All objects
-          .filter(o => o.rank === this.object.rank-1) // All objects of a rank below
-          .filter(o => !directMembers.includes(o.uuid)) // Objects of a rank below which are not already a direct member
-    }
+        .filter(o => o.rank === this.object.rank-1) // All objects of a rank below
+        .filter(o => !directMembers.includes(o.uuid)) // Objects of a rank below which are not already a direct member
+    },
+    availableOwners () {
+      const princs = this.m.data.find(c => c.uuid == UUIDs.Class.Principal);
+      const owners = new Set(princs?.members ?? []);
+      owners.add(UUIDs.Special.Unowned);
+      return this.obj.data.filter(o => owners.has(o.uuid));
+    },
   },
 
   watch: {
@@ -310,6 +439,10 @@ export default {
       }
 
       await this.updateData();
+    },
+    ownerToChange: async function(val, oldVal) {
+      if (!val.length) return;
+      await this.changeOwner(val[0]);
     },
   },
 
@@ -359,6 +492,19 @@ export default {
         console.error(`Unable to add ${member.name} to ${this.object.name}`, err)
       }
     },
+    showOwnerDialog () { 
+      this.showingOwnerDialog = true;
+    },
+    async changeOwner (owner) {
+      try {
+        await this.s.client.ConfigDB.patch_config(UUIDs.App.Registration,
+          this.object.uuid, "merge", { owner: owner.uuid })
+        toast.success(`Owner has been changed to ${owner.name}`)
+      } catch (err) {
+        toast.error(`Unable to change owner to ${owner.name}`)
+        console.error(`Unable to change owner to ${owner.name}`, err)
+      }
+    },
   },
 
   data() {
@@ -367,6 +513,8 @@ export default {
       membershipsToAdd: [],
       subclassesToAdd: [],
       membersToAdd: [],
+      ownerToChange: [],
+      showingOwnerDialog: false,
     }
   },
 

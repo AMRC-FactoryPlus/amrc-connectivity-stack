@@ -12,7 +12,7 @@
           <Tabs default-value="devices" class="flex flex-col flex-1 h-full">
             <TabsContent value="devices" class="flex-1">
               <div>
-                <DataTable :data="devices" :columns="deviceColumns" :filters="[]" @rowClick="selectDevice">
+                <DataTable :data="devices" :columns="deviceColumns" :filters="[]" :default-sort="initialNameSort" @rowClick="selectDevice">
                   <template #toolbar-left>
                     <div class="flex items-center justify-between gap-2">
                       <TabsList>
@@ -47,7 +47,7 @@
               </div>
             </TabsContent>
             <TabsContent value="connections" class="flex-1">
-              <DataTable :data="connections" :columns="connectionColumns" :filters="[]" @rowClick="selectConnection">
+              <DataTable :data="connections" :columns="connectionColumns" :filters="[]" :default-sort="initialNameSort" @rowClick="selectConnection">
                 <template #empty>
                   <EmptyState
                       title="No Connections"
@@ -202,7 +202,7 @@ export default {
     },
 
     cluster() {
-      return this.c.data.find(e => e.uuid === this.node.cluster)?.name
+      return this.c.data.find(e => e.uuid === this.node.deployment?.cluster)?.name
     },
 
     devices () {
@@ -217,7 +217,14 @@ export default {
     },
 
     hostname() {
-      return this.node.hostname ?? 'Floating'
+      return this.node.deployment.hostname ?? 'Floating'
+    },
+
+    initialNameSort () {
+      return [{
+        id: 'name',
+        desc: false
+      }]
     },
   },
 

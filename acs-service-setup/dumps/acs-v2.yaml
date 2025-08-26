@@ -26,6 +26,8 @@ objects:
     !u ConfigDB.Perm.ManageAppSchema: { name: "Manage application schema" }
     !u ConfigDB.Perm.ManageObjects:   { name: "Manage objects" }
     !u ConfigDB.Perm.DeleteObjects:   { name: "Delete objects" }
+    !u ConfigDB.Perm.TakeFrom:        { name: "Take ownership from" }
+    !u ConfigDB.Perm.GiveTo:          { name: "Give ownership to" }
 
   !u ACS.PermGroup.MQTT:
     !u MQTT.Perm.ReadNode:            { name: "Read Node" }

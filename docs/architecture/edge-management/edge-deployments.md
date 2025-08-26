@@ -17,13 +17,15 @@ this removes the need to keep pushing more drivers into the Edge Agent
 codebase itself.
 
 Services that can be deployed to the edge must be packaged in the form
-of a [Helm](https://helm.sh) chart. These Helm charts live in another
-Git repo on the central cluster, from where the Flux installations on
-the edge clusters can pull them. A default installation of ACS will pull
-the on-prem Helm charts repo from the `edge-helm-charts` repo on the
-AMRC-FactoryPlus Github, but this can be changed in the ACS
-`values.yaml`. Currently all deployable Helm charts must be present in
-the `main` branch of the single Helm charts repo.
+of a [Helm](https://helm.sh) chart. These Helm charts live in Git repositories
+on the central cluster, from where the Flux installations on the edge clusters
+can pull them. A default installation of ACS will pull the on-prem Helm charts
+repo from the `edge-helm-charts` repo on the AMRC-FactoryPlus Github, but this
+can be changed in the ACS `values.yaml`.
+
+Helm charts can be deployed from multiple Git repositories by specifying the
+`source` field in the Edge deployment entry. This allows you to maintain your
+own chart repositories separately from the core ACS charts.
 
 In order to allow for deploying the same chart in different
 configurations, the ConfigDB contains a set of 'Helm chart template'
@@ -40,7 +42,9 @@ ConfigDB detailing what is to be deployed and where. These entries live
 under the 'Edge deployment' Application and use the UUID of the Edge
 Agent as their Object. The entry specifies the Helm charts to deploy,
 the cluster to deploy to, and a name for the deployment; if this is an
-Edge Agent then the name will become the Sparkplug Node-ID.
+Edge Agent then the name will become the Sparkplug Node-ID. The entry
+can also specify a `source` field that references a Git repository UUID,
+which allows deploying charts from different repositories.
 
 The deployment entry also specifies which host on the cluster to deploy
 to, for deployments that target a specific host. It is possible to omit
@@ -104,8 +108,16 @@ Entries are JSON objects with the following properties:
   deployment should be deployed to.
 * `name`: A name for the the deployment. For Edge Agents this will
   become the Sparkplug Node-ID.
-* `charts`: An array of UUIDs listing the charts to deploy. These
-  reference entries under the 'Helm chart template' Application.
+* `chart`: A UUID representing the Helm chart to deploy. This
+  references an entry under the 'Helm chart template' Application.
+* `source` (optional): The UUID of the Git repository containing the Helm
+  charts to deploy. If not specified, the default "helm-charts" repository
+  is used.
+
+> Note: When creating Git repository configuration entries for 
+> custom edge helm charts, make sure to use the `Shared repo` class 
+> as it has the correct permissions for the edge components to 
+> access it.
 
 The Edge Sync operators will pick up changes to these entries via the
 ConfigDB MQTT interface. If an update appears to have been missed then
@@ -122,9 +134,14 @@ creating a cluster or an Edge Agent.
 
 Entries are JSON objects with the following properties:
 
-* `chart`: The name of the directory in the internal Helm Charts git
-  repo containing the chart to deploy.
-* `source` (optional): Currently ignored.
+* `chart`: The name of the chart to deploy. This is path from the 
+  top level of the checked out repo.
+* `source` (optional): The UUID of the Git repository containing the Helm
+  chart. If not specified, the default "helm-charts" repository is used.
+* `prefix` (optional): A kubernetes-compatible prefix to add to the 
+  chart name. If not provided the chart value will be used. Must be 
+  specified if the chart name has slashes in it otherwise the name 
+  generated will not be kubernetes-compatible.
 * `values`: An object equivalent to a Helm `values.yaml` file.
 
 The `values` object will be scanned recursively for strings of the form
@@ -183,19 +200,19 @@ cluster.
 KerberosKeys objects at the edge are deployed by the Helm charts. The
 'Edge cluster' chart deploys four: `krbkeys` itself, Flux, the Edge Sync
 operator, and the Edge Monitor. The Edge Agent chart deploys an
-additional KerberosKey for each Edge Agent. 
+additional KerberosKey for each Edge Agent.
 
 KerberosKeys which create an account in the Factory+ services have an
 `account` section. This may have the following properties:
 
 * `uuid` (not with `class`): This is the UUID to use for the account.
-  The object for the account must already exist in the ConfigDB. 
+  The object for the account must already exist in the ConfigDB.
 * `class` (not with `uuid`): This is the UUID of the class to use to
   create a new account.
 * `name` (only with `class`): The General Information name of the
   generated account object.
 * `groups`: An array of group UUIDs to add the account to in the Auth
-  service. 
+  service.
 * `aces`: An array of objects with `permission` and `target` properties
   indicating explicit ACEs to grant to the account.
 * `sparkplug`: Requests creation of a `Sparkplug address information`
@@ -240,6 +257,67 @@ resource, named after the UUID of the Node it is monitoring. This Device
 will publish an Alert if the Monitor cannot get a response from the Node
 after repeated attempts. The Device will publish `DDEATH` if the
 SparkplugNode resource is removed.
+
+## Multiple Chart Sources
+
+ACS supports deploying Helm charts from multiple Git repositories. This allows
+you to maintain your own chart repositories separately from the core ACS charts.
+
+### How It Works
+
+1. Create a Git repository configuration entry in the ConfigDB:
+   ```json
+   {
+     "path": "shared/my-charts",
+     "pull": {
+       "main": {
+         "url": "https://github.com/myorg/my-charts.git",
+         "ref": "main",
+         "auth": {
+            "secretRef": "github_credentials"
+         },
+         "interval": "5m"
+       }
+     }
+   }
+   ```
+   
+Note: the `secretRef` key references the **key** in the Kubernetes 
+secret, not the secret name itself. The secret name is defined in 
+the values file as `git.credentialsSecrets`.
+
+2. When creating a Helm Chart Template, specify the `source` field with the UUID
+   of your Git repository and optionally the `prefix` field for subdirectories:
+   ```json
+    {
+      "chart": "charts/my-chart",
+      "prefix": "my-chart",
+      "source": "<UUID of Git Repo>",
+      "values": {
+        "hostname": "{{hostname}}",
+        "name": "{{name}}",
+        "uuid": "{{uuid}}"
+      }
+    }
+   ```
+
+3. The Edge Sync operator will:
+   - Extract the `source` and `prefix` fields from the Helm Chart Template
+   - Look up the repository URL for the source UUID
+   - Create a GitRepository resource on the edge cluster for each unique source
+   - Update HelmRelease resources to reference the correct source and path
+
+4. Flux on the edge cluster will pull the Helm charts from the specified Git
+   repository and deploy them.
+
+### Implementation Details
+
+The Edge Sync operator creates GitRepository resources for each unique source
+used by deployments targeting the current cluster. It then creates HelmRelease
+resources that reference the correct GitRepository source.
+
+Existing chart templates without a `source` field will continue to work with the
+default "helm-charts" source.
 
 ## Next Steps
 

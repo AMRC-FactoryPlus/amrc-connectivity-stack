@@ -33,6 +33,16 @@ spec:
         - name: data
           persistentVolumeClaim:
             claimName: git-storage
+        # Optional volume for git credentials
+        {{- if .Values.git.credentialsSecrets }}
+        - name: git-credentials
+          projected:
+            sources:
+            {{- range .Values.git.credentialsSecrets }}
+            - secret:
+                name: {{ . }}
+            {{- end }}
+        {{- end }}
 
       initContainers:
         # Do as little work as possible as root... We need to chown the storage
@@ -99,6 +109,8 @@ spec:
               value: {{ .Values.acs.secure | ternary "https" "http" }}://git.{{ .Values.acs.baseUrl }}
             - name: DIRECTORY_URL
               value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
+            - name: SECRETS_DIR
+              value: /git-secrets
           volumeMounts:
             - mountPath: /config/krb5-conf
               name: krb5-conf
@@ -106,6 +118,10 @@ spec:
               name: keytabs
             - mountPath: /data
               name: data
+            {{- if .Values.git.credentialsSecrets }}
+            - mountPath: /git-secrets
+              name: git-credentials
+            {{- end }}
 ---
 apiVersion: v1
 kind: Service
@@ -125,6 +141,8 @@ kind: PersistentVolumeClaim
 metadata:
   name: git-storage
   namespace: {{ .Release.Namespace }}
+  annotations:
+    "helm.sh/resource-policy": keep
   labels:
     component: git
 spec:

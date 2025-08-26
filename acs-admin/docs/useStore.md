@@ -1,6 +1,8 @@
 # useStore
 
-The `useStore` utility creates reactive stores for Factory+ objects with automatic binding resolution. It supports both eager (immediate) and lazy (on-demand) binding of related data.
+The `useStore` utility creates reactive stores for Factory+ objects with
+automatic binding resolution. It supports both eager (immediate) and
+lazy (on-demand) binding of related data.
 
 ## Basic Usage
 

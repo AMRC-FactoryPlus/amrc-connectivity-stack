@@ -4,8 +4,11 @@
 
 <template>
   <Tabs @update:modelValue="changeTab" :default-value="activeTab">
-    <div class="flex items-center justify-between gap-2 mb-6">
-      <div class="flex gap-2 items-center">
+    <TabsContent value="objects">
+      <ObjectList @rowClick="e => objectClicked(e.original)">
+        <template #toolbar-right>
+          <CreateObjectDialog v-if="activeTab==='objects'" :objs="obj.data" />
+        </template>
         <TabsList>
           <TabsTrigger value="applications">
             Applications
@@ -14,18 +17,25 @@
             Objects
           </TabsTrigger>
         </TabsList>
-        <div v-if="!obj.ready || app.loading"><i class="fa-solid fa-circle-notch animate-spin"></i></div>
-      </div>
-      <!-- currently not functional
-      <Button disabled v-if="activeTab==='applications'">Add Application</Button>
-      -->
-      <CreateObjectDialog v-if="activeTab==='objects'" :objs="obj.data" />
-    </div>
-    <TabsContent value="applications">
-      <ApplicationList @rowClick="e => objectClicked(e.original)"></ApplicationList>
+      </ObjectList>
     </TabsContent>
-    <TabsContent value="objects">
-      <ObjectList @rowClick="e => objectClicked(e.original)"></ObjectList>
+    <TabsContent value="applications">
+      <ApplicationList @rowClick="e => objectClicked(e.original)">
+        <template #toolbar-right>
+          <Button title="Currently not implemented" disabled v-if="activeTab==='applications'" class="gap-2">
+            <i class="fa-solid fa-plus"></i>
+            <span>Create Application</span>
+          </Button>
+        </template>
+        <TabsList>
+          <TabsTrigger value="applications">
+            Applications
+          </TabsTrigger>
+          <TabsTrigger value="objects">
+            Objects
+          </TabsTrigger>
+        </TabsList>
+      </ApplicationList>
     </TabsContent>
   </Tabs>
 </template>
@@ -87,7 +97,7 @@ export default {
     },
     async objectSelected (object) {
       if (await this.s.client.ConfigDB.class_has_member("ac0d5288-6136-4ced-a372-325fbbcdd70d", object.uuid) ||
-          await this.s.client.ConfigDB.class_has_member("c0157038-ccff-11ef-a4db-63c6212e998f", object.uuid)
+        await this.s.client.ConfigDB.class_has_member("c0157038-ccff-11ef-a4db-63c6212e998f", object.uuid)
       ) {
         // Permission Group
         // Principal Group
@@ -172,7 +182,15 @@ export default {
     },
     activeSelection () {
       return this.route.params.selected || null
-    }
+    },
+
+    objectsLoading () {
+      return !this.obj.ready || this.obj.loading
+    },
+
+    applicationsLoading () {
+      return !this.app.ready || this.app.loading
+    },
   },
 
   async mounted () {

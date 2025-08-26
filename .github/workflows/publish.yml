@@ -1,13 +1,10 @@
 name: Build & Release ACS
 
 env:
-  BASE_JS_VERSION: v3.0.0
-  BASE_PHP_VERSION: v3.0.0
-  BUILD_PHP_VERSION: v3.0.0
+  BASE_JS_VERSION: v4.0.0
 
 on:
-  release:
-    types: [ published ]
+  workflow_call: {}
 
 jobs:
   build-base-js:
@@ -173,7 +170,6 @@ jobs:
       contents: read
       packages: write
       id-token: write
-      pull-requests: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -216,11 +212,11 @@ jobs:
           - edge-modbus
           - edge-test
           - edge-tplink-smartplug
+          - edge-ads
     permissions:
       contents: read
       packages: write
       id-token: write
-      pull-requests: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -265,7 +261,6 @@ jobs:
       contents: read
       packages: write
       id-token: write
-      pull-requests: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -303,7 +298,6 @@ jobs:
       contents: read
       packages: write
       id-token: write
-      pull-requests: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -383,6 +377,8 @@ jobs:
     if: github.event_name == 'release'
     needs: build-helm-chart
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Install Helm
         run: |

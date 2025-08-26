@@ -20,18 +20,18 @@ export class TDMSHandler {
 
   static create(driver, conf) {
     //console.log("TDMSHandler: driver is ", driver);
-    console.log("TDMSHandler: Creating instance with config:", conf);
+    //console.log("TDMSHandler: Creating instance with config:", conf);
    
     //this.log("TDMSHandler: Creating instance");
     //if (conf.devicePath == null) return;
     const tdmsHandler = new TDMSHandler(driver, conf);
-    console.log("tdmsHandler is ", tdmsHandler);
+    //console.log("tdmsHandler is ", tdmsHandler);
     return tdmsHandler;
   }
 
   async connect() {
     const { driver } = this;
-    console.log("TDMSHandler: Connecting");
+    //console.log("TDMSHandler: Connecting");
     
     console.log("TDMSHandler: Connected");
     //this.log("TDMSHandler: Connected to main process");
@@ -53,7 +53,7 @@ export class TDMSHandler {
 
   async subscribe(specs){
      const { driver } = this;
-     console.log("TDMSHandler: driver is ", driver);
+     //console.log("TDMSHandler: driver is ", driver);
      console.log("TDMSHandler: Subscribing to specs:", specs);
 
     try {

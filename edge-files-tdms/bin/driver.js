@@ -11,7 +11,7 @@ const driver = new AsyncDriver({
   handler: TDMSHandler,
 });
 
-console.log(`Driver initialized: ${JSON.stringify(driver)}`);
+//console.log(`Driver initialized: ${JSON.stringify(driver)}`);
 
 driver.run();
 console.log("\n\nDriver running...\n\n");

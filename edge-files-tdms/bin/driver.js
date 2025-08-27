@@ -4,11 +4,11 @@
  */
 
 import { AsyncDriver } from "@amrc-factoryplus/edge-driver";
-import { TDMSHandler } from "./TDMSHandler.js";
+import { Handler } from "./TDMSHandler.js";
 
 const driver = new AsyncDriver({
   env: process.env,
-  handler: TDMSHandler,
+  handler: Handler,
 });
 
 //console.log(`Driver initialized: ${JSON.stringify(driver)}`);

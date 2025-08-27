@@ -1,6 +1,6 @@
 import Uploader from "./uploader.js";
 import Cleaner from "./cleaner.js";
-// import TDMSSummariser from './tdms-file-summariser.js';
+import TDMSSummariser from './tdms-file-summariser.js';
 
 
 class IngesterRunner{
@@ -23,10 +23,11 @@ class IngesterRunner{
       env: opts.env,
     });
 
-    // this.tdmsSummariser = new TDMSSummariser({
-    //   eventManager: this.eventManager,
-    //   env: this.env,
-    // });
+    this.tdmsSummariser = new TDMSSummariser({
+      eventManager: this.eventManager,
+      env: opts.env,
+      driver: opts.driver,
+    });
 
     this.retryUploadCounts = new Map();
     this.retrySummaryCounts = new Map();
@@ -39,7 +40,7 @@ class IngesterRunner{
   async run() {
     this.registerEventHandlers();
 
-    // await this.tdmsSummariser.run();
+    await this.tdmsSummariser.run();
     await this.cleaner.run();
     await this.uploader.run();
     await this.stateManager.run();

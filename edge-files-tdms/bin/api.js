@@ -7,7 +7,6 @@ import {clean_up} from "../lib/api/startup.js";
 import { TDMSEventManager } from '../lib/tdms-file-events.js';
 import IngesterRunner from '../lib/IngesterRunner.js';
 import StateManager from '../lib/state-manager.js';
-import { Class, File_Type } from '../lib/constants.js';
 
 const { env } = process;
 
@@ -53,8 +52,6 @@ const ingesterRunner = new IngesterRunner({
   env: env,
   eventManager: eventManager,
   stateManager: stateManager,
-  fileTypeClass: File_Type.TDMS,
-  fileClass: Class.File,
 });
 
 api.run();

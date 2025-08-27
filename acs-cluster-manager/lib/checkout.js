@@ -10,7 +10,7 @@ import path from "path";
 import util from "util";
 
 import git from "isomorphic-git";
-import http from "isomorphic-git/http/node/index.js";
+import http from "isomorphic-git/http/node";
 import yaml from "yaml";
 
 import { UUIDs } from "@amrc-factoryplus/service-client";

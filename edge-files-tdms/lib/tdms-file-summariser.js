@@ -17,7 +17,7 @@ class TDMSSummariser {
   }
 
   bindToEvents() {
-    this.eventManager.on(EVENTS.FILE_UPLOADED, this.handleFileSummary.bind(this));
+    this.eventManager.on('file:uploaded', this.handleFileSummary.bind(this));
   }
 
   async handleFileSummary({filePath}) {
@@ -51,13 +51,13 @@ class TDMSSummariser {
               // console.log('Summary:', summary);
               const isSummaryUploaded = await this.uploadToInflux(filePath, summary);
               if(isSummaryUploaded){
-                this.eventManager.emit(EVENTS.FILE_SUMMARY_PREPARED, {filePath: filePath});
+                this.eventManager.emit('file:summaryPrepared', {filePath: filePath});
               }else{
-                this.eventManager.emit(EVENTS.FILE_SUMMARY_FAILED, {filePath, error: new Error(`Python script exited with code ${code}`)});
+                this.eventManager.emit('file:summaryFailed', {filePath, error: new Error(`Python script exited with code ${code}`)});
               }
 
             } else {
-              this.eventManager.emit(EVENTS.FILE_SUMMARY_FAILED, {filePath, error: new Error(`Python script exited with code ${code}`)});
+              this.eventManager.emit('file:summaryFailed', {filePath, error: new Error(`Python script exited with code ${code}`)});
             }
         });
     }

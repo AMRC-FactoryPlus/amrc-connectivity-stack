@@ -77,7 +77,7 @@ class TDMSSummariser {
     //   return true; // Indicate successful upload
     // }
     // Handle summary data (upload to influxDB?)
-    let file = fs.readFileSync('./finalSummary.json', 'utf8');
+    let file = fs.readFileSync('./summary.json', 'utf8');
     //let summaryStr = Buffer.from(summary, "utf8");
     //console.log(`Summary for ${filePath} is uploaded to InfluxDB.`);
     
@@ -106,7 +106,7 @@ class TDMSSummariser {
                         //name: item.name, 
                         //timestamp: item.timestamps, 
                         data: item.data },
-                      timestamp: item.timestamps
+                      timestamp: item.timestamp
                       //val: item.data,
                      };
             //let bufferStr = JSON.stringify(buffer);

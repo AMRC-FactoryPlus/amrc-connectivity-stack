@@ -38,4 +38,6 @@ COPY --from=build /home/node/app ./app/
 USER node
 WORKDIR /home/node/app
 
+ENV NODE_OPTIONS=--max_old_space_size=2048
+
 CMD ["node", "bin/driver.js"]

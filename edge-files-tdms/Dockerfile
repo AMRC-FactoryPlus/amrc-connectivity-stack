@@ -41,4 +41,6 @@ RUN chown -R node:node /home/node/app
 USER node
 WORKDIR /home/node/app
 
+ENV NODE_OPTIONS=--max_old_space_size=2048
+
 CMD ["node", "bin/driver.js"]

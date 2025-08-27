@@ -3,6 +3,7 @@ import logging
 import json
 import numpy as np
 import sys
+from datetime import datetime
 # import os
 
 # cwd = os.getcwd()
@@ -18,7 +19,7 @@ import sys
 #try/catch block to handle errors in reading the TDMS file
 try:
     #tdms_file = TdmsFile.read(sys.argv[1])
-    tdms_file = TdmsFile.read("./edge-files-tdms/dest/testSummary.tdms")  # For testing purposes, replace with sys.argv[1] when running in production
+    tdms_file = TdmsFile.read("./edge-files-tdms/dest/Fingerprint_2023-09-08-06-50-40.tdms")  # For testing purposes, replace with sys.argv[1] when running in production
     # logging.basicConfig(level=logging.DEBUG)
     # logging.debug(f"Groups: {tdms_file.groups()}")
 
@@ -30,25 +31,30 @@ try:
         for channel in group.channels():
             cj_data = []                
             timestamps = np.array(channel.time_track(True, 's')) #get the timestamps of the channel
+            datetime_timestamps = timestamps.astype('datetime64[s]').astype(datetime)  # Convert numpy array to datetime objects
+            unix_timestamps = np.array([dt.timestamp() for dt in datetime_timestamps])
             #turn each timestamp into an integer
             #if timestamps.size == 0:
 #timestamps = np.array([0])  
             #:
-            timestamps = np.array(timestamps, dtype=np.int64)
+            #timestamps = np.array(timestamps, dtype=int)
+            #convert to seconds
+            
+            
                     
             # set first timestamp in array
             timestamp_start = channel.properties["wf_start_time"]                
                     
             #Loop through the channel
-            for i in range(0, len(channel.data), 1000): #get every 1000th data point                    
+            for i in range(0, len(channel.data), 1000): #get every 1000th data point                  
                 channelJSON = {
                     "group": group.name,
                     "name": channel.name,
                     "data": channel.data[i],
                     #"length": len(c_data),
-                    "timestamps": timestamps[i].tolist(),  # Convert numpy int64 to Python int
+                    "timestamps": unix_timestamps[i], #.tolist(),  # Convert numpy int64 to Python int
                     "timestamp_start": timestamp_start,
-                    "properties": channel.properties,             
+                    #"properties": channel.properties,             
                 }
                 cj_data.append(channelJSON)
                 

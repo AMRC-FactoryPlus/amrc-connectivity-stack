@@ -1,6 +1,7 @@
 import { spawn } from "child_process";
 import { EVENTS } from './tdms-file-events.js';
 import { isFileExist } from './utils.js';
+import { BufferX } from "@amrc-factoryplus/edge-driver";
 import fs from 'node:fs'
 
 class TDMSSummariser {
@@ -68,8 +69,15 @@ class TDMSSummariser {
   // }
 
   async uploadToInflux(filePath, summary){
+    //check if filePath exists
+    // let testState = fs.readFileSync('./testState.json', 'utf8');
+    // let testStateJSON = JSON.parse(testState);
+    // if(testStateJSON.summaryUploaded){
+    //   console.log(`SUMMARISER: Summary for ${filePath} already uploaded.`);
+    //   return true; // Indicate successful upload
+    // }
     // Handle summary data (upload to influxDB?)
-    let file = fs.readFileSync('./finalSummary.json', 'utf8');
+    let file = fs.readFileSync('./summary.json', 'utf8');
     //let summaryStr = Buffer.from(summary, "utf8");
     //console.log(`Summary for ${filePath} is uploaded to InfluxDB.`);
     
@@ -83,6 +91,7 @@ class TDMSSummariser {
       summaryFileJSON = JSON.parse(file);
       
       //loop through the summaryJSON and log each key-value pair
+      let summaryArr =[];
      
       summaryFileJSON.forEach((obj) =>{
         obj.channels.forEach((channel) => {
@@ -92,23 +101,46 @@ class TDMSSummariser {
             //get data and timestamps from each item if they exist
 
             //console.log(`Channel: ${item.name} Data: ${item.data} Timestamp: `, item.timestamps);
-            const buffer = JSON.stringify({
-                      channel: { 
-                        name: item.name, 
-                        timestamp: item.timestamps, 
-                        data: item.data }
+            const buffer = {
+                      [item.name]: { 
+                        //name: item.name, 
+                        //timestamp: item.timestamps, 
+                        data: item.data },
+                      timestamp: item.timestamp
                       //val: item.data,
-                    });
-            this.driver.data(filePath, buffer);
+                     };
+            //let bufferStr = JSON.stringify(buffer);
+            //this.driver.data(filePath, bufferStr);
+             summaryArr.push(buffer);
+            
           });
         });
       });
-      // this.driver.data(filePath, JSON.stringify({timestamp: "2025-01-01T00:00:00Z", tsint: 1704067200000, val: 600.00})); //timestamp: "2025-01-01T00:00:00Z",
-      // this.driver.data(filePath, JSON.stringify({timestamp: "2025-07-16T00:00:00Z", tsint: 1710393600000, val: 200.00}));
-      // this.driver.data(filePath, JSON.stringify({val: 723.00})); //timestamp: "2025-01-01T00:00:00Z",
-      // this.driver.data(filePath, JSON.stringify({val: 550.00})); //timestamp: "2025-01-01T00:00:00Z",
-      // this.driver.data(filePath, JSON.stringify({"Data":{"val": 323.00}})); //timestamp: "2025-01-01T00:00:00Z",
-      // this.driver.data(filePath, JSON.stringify({"Data":{"TDMSTest": 423.00}})); //timestamp: "2025-01-01T00:00:00Z",
+
+      let summaryArrStr = JSON.stringify(summaryArr);
+      this.driver.data(filePath, summaryArrStr);
+
+      //split array in half
+      // let midIndex = Math.floor(summaryArr.length / 2);
+      // let firstHalf = summaryArr.slice(0, midIndex);
+      // let secondHalf = summaryArr.slice(midIndex);
+
+      // let summaryArrStr = JSON.stringify(firstHalf);
+      //let summaryArrStr = JSON.stringify(summaryArr);
+      //this.driver.data(filePath, summaryArrStr);
+
+      //delay for 30 seconds to ensure data is ready
+      // await new Promise(resolve => setTimeout(resolve, 30000));
+
+      // console.log("Posting second half of summary to InfluxDB");
+      // summaryArrStr = JSON.stringify(secondHalf);
+      // this.driver.data(filePath, summaryArrStr);
+     
+      //Update testState to indicate summary is uploaded
+      // testStateJSON.summaryUploaded = true;
+      // fs.writeFileSync('./testState.json', JSON.stringify(testStateJSON, null, 2));
+      console.log(`SUMMARISER: Summary for ${filePath} uploaded to InfluxDB.`);
+      //this.eventManager.emit(EVENTS.FILE_SUMMARY_PREPARED, {
       
       return true; // Indicate successful upload
     } catch (e) {

@@ -2,12 +2,11 @@
  * Universal Robot RTDE Edge Agent driver
  * Copyright 2025 AMRC
  */
-
-const net = require("net");
-const rtde = require("./ur.js");
+import net from "net";
+import rtde from "./ur.js";
 
 // RTDEHandler class for Universal Robot RTDE protocol
-class RTDEHandler {
+export class RTDEHandler {
   constructor(driver, conf) {
     this.driver = driver;
     this.conf = conf;
@@ -75,4 +74,3 @@ class RTDEHandler {
   }
 }
 
-module.exports = RTDEHandler;

@@ -1,5 +1,4 @@
 import { spawn } from "child_process";
-import { EVENTS } from './tdms-file-events.js';
 import { isFileExist } from './utils.js';
 import { BufferX } from "@amrc-factoryplus/edge-driver";
 import fs from 'node:fs'

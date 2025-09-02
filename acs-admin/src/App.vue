@@ -14,7 +14,7 @@
                 <img src="/favicon.svg">
               </div>
               <div class="flex flex-col gap-0.5 leading-none">
-                <h1 class="font-bold text-base h-4">ACS</h1>
+                <h1 class="font-bold text-base h-4">ACS {{acs_version}}</h1>
                 <h2 class="text-gray-500 text-sm">{{s.username}}</h2>
               </div>
             </div>
@@ -97,6 +97,7 @@ import NewClusterDialog from '@components/EdgeManager/EdgeClusters/NewClusterDia
 import NewEdgeDeploymentDialog from '@components/EdgeManager/Nodes/NewEdgeDeploymentDialog.vue'
 import NewConnectionDialog from '@components/EdgeManager/Connections/NewConnectionDialog.vue'
 import NewDeviceDialog from '@components/EdgeManager/Devices/NewDeviceDialog.vue'
+import { ACS_VERSION } from '@/lib/version.js'
 
 export default {
   name: 'App',
@@ -105,6 +106,7 @@ export default {
     const { escape } = useMagicKeys()
 
     return {
+      acs_version: ACS_VERSION,
       s: useServiceClientStore(),
       l: useLayoutStore(),
       escape,

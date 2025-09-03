@@ -143,6 +143,7 @@ export class Handler{
       this.api = api;
       console.log("Handler: api is ", this.api);
       this.ingester = ingesterRunner;
+      this.api.run();
     }
 
     static create(driver, conf) {

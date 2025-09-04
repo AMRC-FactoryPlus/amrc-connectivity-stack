@@ -3,7 +3,7 @@
  * Copyright 2025 AMRC
  */
 import net from "net";
-import rtde from "./ur.js";
+import ur from "./ur.js";
 
 // RTDEHandler class for Universal Robot RTDE protocol
 export class RTDEHandler {
@@ -12,7 +12,9 @@ export class RTDEHandler {
     this.conf = conf;
     this.log = driver.debug.bound("rtde");
     this.client = null;
-    this.samples = conf.samples || 5;
+    //this.samples = conf.samples || 5;
+    this.polling = conf.polling || 1000; // Default polling interval (ms)
+    this.lastPoll = 0;
     this.tmp = 0;
     this.on_close = () => {
       this.log("RTDE connection closed");
@@ -39,7 +41,7 @@ export class RTDEHandler {
       });
 
       this.client.on("data", (data) => {
-        this.handleData(data);
+        this.poll(data);
       });
 
       this.client.on("error", (err) => {
@@ -59,18 +61,24 @@ export class RTDEHandler {
     if (done) done();
   }
 
-  handleData(data) {
-    // Parse RTDE data using ur.js
-    const res = new rtde().onData(data);
+  parseAddr(addr) {
+    
+  }
+
+
+  poll(data) {
+    // Polling logic: only forward data at the configured interval
+        // Parse RTDE data using ur.js
+    const res = new ur().onData(data);
     if (res !== undefined) {
-      this.log("RTDE data: %s", JSON.stringify(res));
+      //this.log("RTDE data: %s", JSON.stringify(res));
       // Forward parsed data to driver if needed
       if (this.driver.data) this.driver.data(res);
     }
-    this.tmp++;
-    if (this.tmp >= this.samples) {
-      this.client.destroy();
-    }
+    //this.tmp++;
+    //if (this.tmp >= this.samples) {
+    //  this.client.destroy();
+    //}
   }
 }
 

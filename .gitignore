@@ -7,3 +7,4 @@ config.mk
 .vscode
 .DS_Store
 /edge-ads/node_modules
+spirit-schemas/

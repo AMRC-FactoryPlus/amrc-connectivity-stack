@@ -1,5 +1,5 @@
-const int64 = require("node-int64");
-const urState = require("./urState");
+import int64 from "node-int64";
+import * as urState from "./urState.js";
 
 class ur {
   constructor() {
@@ -331,7 +331,7 @@ class ur {
   }
 }
 
-module.exports = ur;
+export default ur;
 
 (function () {
   Buffer.prototype.readInt64BE = function (offset) {

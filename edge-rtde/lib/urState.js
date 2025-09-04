@@ -1,4 +1,4 @@
-class urState {
+export class urState {
   initRobotStatePacket(type) {
     switch (type) {
       case 0:
@@ -154,9 +154,9 @@ class urState {
   }
 }
 
-exports.urState = urState;
 
-class urJoint {
+
+export class urJoint {
   constructor() {
     this.codeId = null;
     this.positionActual = null;
@@ -176,9 +176,9 @@ class urJoint {
   }
 }
 
-exports.urJoint = urJoint;
 
-class jointModes {
+
+export class jointModes {
   constructor() {
     this.jointModes = [
       { number: 235, description: "JOINT_MODE_RESET" },
@@ -208,9 +208,9 @@ class jointModes {
     return undefined;
   }
 }
-exports.jointModes = jointModes;
 
-class robotModes {
+
+export class robotModes {
   constructor() {
     this.robotModes = [
       { number: -1, description: "ROBOT_MODE_NO_CONTROLLER" },
@@ -234,9 +234,9 @@ class robotModes {
     return undefined;
   }
 }
-exports.robotModes = robotModes;
 
-class controlModes {
+
+export class controlModes {
   constructor() {
     this.controlModes = [
       { number: 0, description: "CONTROL_MODE_POSITION" },
@@ -254,9 +254,9 @@ class controlModes {
     return undefined;
   }
 }
-exports.controlModes = controlModes;
 
-class toolModes {
+
+export class toolModes {
   constructor() {
     this.toolModes = [
       { number: 235, description: "JOINT_MODE_RESET" },
@@ -279,9 +279,9 @@ class toolModes {
     return undefined;
   }
 }
-exports.toolModes = toolModes;
 
-class safetyModes {
+
+export class safetyModes {
   constructor() {
     this.safetyModes = [
       { number: 11, description: "SAFETY_MODE_UNDEFINED_SAFETY_MODE" },
@@ -306,4 +306,4 @@ class safetyModes {
     return undefined;
   }
 }
-exports.safetyModes = safetyModes;
+

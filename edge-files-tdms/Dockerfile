@@ -30,6 +30,9 @@ COPY --chown=node . .
 # Final stage for runtime
 FROM ${base_prefix}-js-run:${base_version} AS run
 
+# Install Python3, pip and build tools for compiling numpy
+RUN apk add --no-cache python3 py3-pip py3-numpy
+
 WORKDIR /home/node
 
 # Copy built app from build stage

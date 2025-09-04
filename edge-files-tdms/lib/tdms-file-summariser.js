@@ -28,7 +28,7 @@ class TDMSSummariser {
 
      let summary;
 
-     const child = spawn("python.exe", [this.pythonSummariserScript, filePath]);
+     const child = spawn("/usr/bin/python3", [this.pythonSummariserScript, filePath]);
         child.on("error", (err) => {
           console.error(`Error starting Python script: ${err.message}`);
           throw err;

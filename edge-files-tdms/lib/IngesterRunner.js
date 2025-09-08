@@ -76,10 +76,11 @@ class IngesterRunner{
     });
 
     this.eventManager.on('file:uploaded', async ({ filePath }) => {
+      console.log('STATE MANAGER: Marking file as uploaded:', filePath);
       await this.stateManager.updateAsUploaded(filePath);
       this.retryUploadCounts.delete(filePath);
 
-      this.eventManager.emit('file:delete', {filePath});
+      // this.eventManager.emit('file:delete', {filePath});
     });
 
     this.eventManager.on('file:addedAsClassMember', async ({ filePath }) => {
@@ -87,7 +88,10 @@ class IngesterRunner{
     });
 
     this.eventManager.on('file:summaryPrepared', async({filePath}) => {
+      console.log('STATE MANAGER: Marking file as having summary:', filePath);
       await this.stateManager.updateHasSummary(filePath);
+
+      this.eventManager.emit('file:delete', {filePath});
     });
 
     this.eventManager.on('file:uploadFailed', ({ filePath, error }) => {

@@ -30,8 +30,17 @@ COPY --chown=node . .
 # Final stage for runtime
 FROM ${base_prefix}-js-run:${base_version} AS run
 
-# Install Python3, pip and build tools for compiling numpy
-RUN apk add --no-cache python3 py3-pip py3-numpy
+# Install Python and venv tools
+RUN apk add --no-cache python3 py3-pip 
+
+# Create virtual environment
+RUN python3 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Install Python packages into venv
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir numpy nptdms
+
 
 WORKDIR /home/node
 

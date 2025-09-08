@@ -6,8 +6,12 @@ import fs from 'node:fs'
 class TDMSSummariser {
   constructor(opts) {
     this.eventManager = opts.eventManager;
-    this.pythonSummariserScript = opts.env.pythonSummariserScript;
+    this.env = opts.env;
+    this.pythonSummariserScript = this.env.PYTHON_SUMMARISER_SCRIPT;
     this.driver = opts.driver; // Assuming driver is passed for data upload
+
+    
+    // console.log(`SUMMARISER: Driver initialised: ${this.driver}`);
   }
 
   // Method to run the Python script and return the summary
@@ -19,35 +23,52 @@ class TDMSSummariser {
     this.eventManager.on('file:uploaded', this.handleFileSummary.bind(this));
   }
 
-  async handleFileSummary({filePath}) {
+  handleFileSummary = async ({filePath}) => {
     try {
+      //console.log("SUMMARISER: env is ", this.env);
+      console.log(`SUMMARISER: Generating summary for ${filePath} using ${this.pythonSummariserScript}`);
      if (!(await isFileExist(filePath))) {
+      console.log(`SUMMARISER: Filepath ${filePath} does not exist.`);
       console.error(`SUMMARISER: Filepath ${filePath} does not exist.`);
       return;
      }
 
      let summary;
 
-     const child = spawn("/usr/bin/python3", [this.pythonSummariserScript, filePath]);
+     const child = spawn("/opt/venv/bin/python3", [this.pythonSummariserScript, filePath]);
         child.on("error", (err) => {
-          console.error(`Error starting Python script: ${err.message}`);
+          console.log(`SUMMARISER: Error starting Python script: ${err.message}`);
+          console.error(`SUMMARISER: Error starting Python script: ${err.message}`);
           throw err;
         });
 
+        child.on("spawn", () => {
+          console.log('SUMMARISER: Python script started successfully.');
+        });
+
         child.stdout.on("data", function(data){
-          console.log('Summary data received from Python script:');
-          //summary += JSON.parse(data.toString()); //data.toString();
+          console.log('SUMMARISER: Summary data received from Python script:', data.toString());
+          summary += JSON.parse(data.toString()); //data.toString();
           //console.log(`SUMMARISER: Python script output - ${data}`);
         });
 
         child.stderr.on('data', (data) => {
+          console.log(`SUMMARISER: python stderr - ${data}`);
           console.error(`SUMMARISER: python stderr - ${data}`);
+        });
+
+        child.stdout.on('end', () => {
+          console.log('SUMMARISER: Python script stdout stream ended.');
+        }); 
+
+        child.stdout.on('exit', (code) => {
+          console.log(`SUMMARISER: Python script stdout stream exited with code ${code}.`);
         });
 
         child.on("close", async (code) => {
             if (code === 0) {
               console.log('SUMMARISER: Python script completed successfully.');
-              // console.log('Summary:', summary);
+              console.log('Summary:', summary);
               const isSummaryUploaded = await this.uploadToInflux(filePath, summary);
               if(isSummaryUploaded){
                 this.eventManager.emit('file:summaryPrepared', {filePath: filePath});
@@ -62,6 +83,7 @@ class TDMSSummariser {
     }
 
     catch (err) {
+      console.log(`SUMMARISER: Error summarising ${filePath}`, err);
       console.error(`SUMMARISER: Error summarising ${filePath}`, err);
       // this.eventManager.emit(EVENTS.FILE_SUMMARY_FAILED, {filePath, error: err});
     }
@@ -76,7 +98,7 @@ class TDMSSummariser {
     //   return true; // Indicate successful upload
     // }
     // Handle summary data (upload to influxDB?)
-    let file = fs.readFileSync('./finalSummary.json', 'utf8');
+    let file = fs.readFileSync('finalSummary.json', 'utf8');
     //let summaryStr = Buffer.from(summary, "utf8");
     //console.log(`Summary for ${filePath} is uploaded to InfluxDB.`);
     

@@ -153,7 +153,8 @@ export class Handler{
     console.log("Handler: Creating instance");
     if (conf.devicePath == null) return;
     const handler = new Handler(driver, conf);
-    console.log("Handler is ", handler);
+    
+    //console.log("Handler is ", handler);
     return handler;
   }
 

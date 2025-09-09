@@ -25,6 +25,7 @@ class IngesterRunner{
 
     this.tdmsSummariser = new TDMSSummariser({
       eventManager: this.eventManager,
+      stateManager: this.stateManager,
       env: opts.env,
       driver: opts.driver,
     });

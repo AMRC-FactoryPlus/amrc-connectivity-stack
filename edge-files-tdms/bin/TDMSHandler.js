@@ -141,16 +141,17 @@ export class Handler{
 
 
       this.api = api;
-      console.log("Handler: api is ", this.api);
+      // console.log("Handler: api is ", this.api);
       this.ingester = ingesterRunner;
       this.api.run();
+      this.ingester.run();
     }
 
     static create(driver, conf) {
     //console.log("Handler: driver is ", driver);
     //console.log("TDMSHandler: Creating instance with config:", conf);
    
-    console.log("Handler: Creating instance");
+    // console.log("Handler: Creating instance");
     if (conf.devicePath == null) return;
     const handler = new Handler(driver, conf);
     
@@ -162,16 +163,16 @@ export class Handler{
     const { driver } = this;
     
     
-    console.log("Handler: Connected");
+    // console.log("Handler: Connected");
     
     try{
       // await this.summariser.uploadToInflux("TDMSTest", "specs.summary");
       //this.api.run();
 
-      await this.ingester.run();
+      //await this.ingester.run();
       return "UP";
     }catch (err) {
-      console.error("TDMSHandler: Connection error:", err);
+      // console.error("TDMSHandler: Connection error:", err);
       return "AUTH";
     }
 
@@ -186,16 +187,16 @@ export class Handler{
     async subscribe(specs){
       const { driver } = this;
       //console.log("TDMSHandler: driver is ", driver);
-      console.log("Handler: Subscribing to specs:", specs);
+      // console.log("Handler: Subscribing to specs:", specs);
 
       try {
         //this.main = await main(this.driver, this.conf);
         // await this.summariser.uploadToInflux(specs[0], "specs.summary"); 
-        console.log("Handler: Subscription should be successful");
+        // console.log("Handler: Subscription should be successful");
       }
 
       catch (err) {
-        console.log("Subscription failed:", err);
+        // console.log("Subscription failed:", err);
         driver.connFailed();
         return false;
       }

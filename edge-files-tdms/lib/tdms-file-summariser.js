@@ -10,7 +10,7 @@ class TDMSSummariser {
     this.env = opts.env;
     this.pythonSummariserScript = this.env.PYTHON_SUMMARISER_SCRIPT;
     this.driver = opts.driver; // Assuming driver is passed for data upload
-
+    this.specs = null;
     
     // console.log(`SUMMARISER: Driver initialised: ${this.driver}`);
   }
@@ -21,7 +21,14 @@ class TDMSSummariser {
   }
 
   bindToEvents() {
+    this.eventManager.on('driver:ready', this.handleDriverReady.bind(this));
     this.eventManager.on('file:uploaded', this.handleFileSummary.bind(this));
+  }
+
+  handleDriverReady = async (specs) => {
+    console.log(`SUMMARISER: Driver is ready with specs: ${JSON.stringify(specs)}`);
+    this.specs = specs;
+    
   }
 
   handleFileSummary = async ({filePath}) => {
@@ -50,7 +57,7 @@ class TDMSSummariser {
         });
 
         child.stdout.on("data", function(data){
-          // console.log('SUMMARISER: Summary data received from Python script:', data.toString());
+          console.log('SUMMARISER: Summary data received from Python script: \n', data.toString());
           // summary += JSON.parse(data.toString()); //data.toString();
           //console.log(`SUMMARISER: Python script output - ${data}`);
         });
@@ -107,6 +114,7 @@ class TDMSSummariser {
     //   return true; // Indicate successful upload
     // }
     // Handle summary data (upload to influxDB?)
+    console.log("SUMMARISER: specs are ", this.specs);
     let file = fs.readFileSync('./summary_' + fileUuid + '.json', 'utf8');
     //let summaryStr = Buffer.from(summary, "utf8");
     //console.log(`Summary for ${filePath} is uploaded to InfluxDB.`);
@@ -139,16 +147,25 @@ class TDMSSummariser {
                       timestamp: item.timestamp
                       //val: item.data,
                      };
-            //let bufferStr = JSON.stringify(buffer);
-            //this.driver.data(filePath, bufferStr);
+            let bufferStr = JSON.stringify(buffer);
+            this.driver.data(this.specs, bufferStr);
              summaryArr.push(buffer);
             
           });
         });
       });
 
-      let summaryArrStr = JSON.stringify(summaryArr);
-      this.driver.data(filePath, summaryArrStr);
+      // const buffer ={
+      //   "Ambient - RTD":{
+      //     data: 999999
+      //   },
+      //   timestamp: 1726009200
+      // };
+      // let bufferStr = JSON.stringify(buffer);
+      // this.driver.data(filePath, bufferStr);
+
+      // let summaryArrStr = JSON.stringify(summaryArr);
+      //this.driver.data(filePath, summaryArrStr);
       // console.log(`SUMMARISER: Posting summary - ${summaryArrStr}`);
 
       //split array in half

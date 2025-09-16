@@ -67,6 +67,10 @@ class IngesterRunner{
     }
   }
 
+  async setDriverSpecs(specs) {
+    this.eventManager.emit('driver:ready', specs);
+  }
+
   registerEventHandlers() {
     this.eventManager.on('file:uuidCreated', async ({ filePath, fileUuid }) => {
       if (fileUuid) {
@@ -102,6 +106,8 @@ class IngesterRunner{
     this.eventManager.on('file:summaryFailed', ({filePath, error}) => {
       this.retryHandleSummaryFailed(filePath);
     });
+
+    
   }
 
   retryHandleUploadFailed(filePath) {

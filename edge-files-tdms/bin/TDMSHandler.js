@@ -148,8 +148,8 @@ export class Handler{
     }
 
     static create(driver, conf) {
-    //console.log("Handler: driver is ", driver);
-    //console.log("TDMSHandler: Creating instance with config:", conf);
+    console.log("Handler: driver is ", driver);
+    console.log("TDMSHandler: Creating instance with config:", conf);
    
     // console.log("Handler: Creating instance");
     if (conf.devicePath == null) return;
@@ -181,13 +181,15 @@ export class Handler{
 
     parseAddr(addr) {
       // It's easier to keep the addresses as just the whole nodeIds.
+      console.log("Handler: parseAddr called with addr:", addr);
       return addr;
     }
 
     async subscribe(specs){
       const { driver } = this;
       //console.log("TDMSHandler: driver is ", driver);
-      // console.log("Handler: Subscribing to specs:", specs);
+      console.log("Handler: Subscribing to specs:", specs);
+      await this.ingester.setDriverSpecs(specs);
 
       try {
         //this.main = await main(this.driver, this.conf);
@@ -196,7 +198,7 @@ export class Handler{
       }
 
       catch (err) {
-        // console.log("Subscription failed:", err);
+        console.log("Subscription failed:", err);
         driver.connFailed();
         return false;
       }

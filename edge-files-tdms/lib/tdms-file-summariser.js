@@ -114,7 +114,7 @@ class TDMSSummariser {
     //   return true; // Indicate successful upload
     // }
     // Handle summary data (upload to influxDB?)
-    console.log("SUMMARISER: specs are ", this.specs);
+    
     let file = fs.readFileSync('./summary_' + fileUuid + '.json', 'utf8');
     //let summaryStr = Buffer.from(summary, "utf8");
     //console.log(`Summary for ${filePath} is uploaded to InfluxDB.`);
@@ -130,6 +130,11 @@ class TDMSSummariser {
       
       //loop through the summaryJSON and log each key-value pair
       let summaryArr =[];
+
+      if(this.specs == null){
+        console.log("SUMMARISER: Specs not set, cannot upload summary.");
+        return false;
+      }
      
       summaryFileJSON.forEach((obj) =>{
         obj.channels.forEach((channel) => {
@@ -143,7 +148,8 @@ class TDMSSummariser {
                       [item.name]: { 
                         //name: item.name, 
                         //timestamp: item.timestamps, 
-                        data: item.data },
+                        data: item.data 
+                      },
                       timestamp: item.timestamp
                       //val: item.data,
                      };
@@ -155,38 +161,20 @@ class TDMSSummariser {
         });
       });
 
-      // const buffer ={
-      //   "Ambient - RTD":{
-      //     data: 999999
-      //   },
-      //   timestamp: 1726009200
-      // };
-      // let bufferStr = JSON.stringify(buffer);
-      // this.driver.data(filePath, bufferStr);
+      const buffer ={
+        "channel":{
+          data: 999
+        },
+        timestamp: 1663338093
+      };
+      let bufferStr = JSON.stringify(buffer);
+      this.driver.data(this.specs, bufferStr);
 
       // let summaryArrStr = JSON.stringify(summaryArr);
       //this.driver.data(filePath, summaryArrStr);
       // console.log(`SUMMARISER: Posting summary - ${summaryArrStr}`);
 
-      //split array in half
-      // let midIndex = Math.floor(summaryArr.length / 2);
-      // let firstHalf = summaryArr.slice(0, midIndex);
-      // let secondHalf = summaryArr.slice(midIndex);
-
-      // let summaryArrStr = JSON.stringify(firstHalf);
-      //let summaryArrStr = JSON.stringify(summaryArr);
-      //this.driver.data(filePath, summaryArrStr);
-
-      //delay for 30 seconds to ensure data is ready
-      // await new Promise(resolve => setTimeout(resolve, 30000));
-
-      // console.log("Posting second half of summary to InfluxDB");
-      // summaryArrStr = JSON.stringify(secondHalf);
-      // this.driver.data(filePath, summaryArrStr);
-     
-      //Update testState to indicate summary is uploaded
-      // testStateJSON.summaryUploaded = true;
-      // fs.writeFileSync('./testState.json', JSON.stringify(testStateJSON, null, 2));
+      console.log("SUMMARISER: specs are ", this.specs);
       console.log(`SUMMARISER: Summary for ${filePath} uploaded to InfluxDB.`);
       //this.eventManager.emit(EVENTS.FILE_SUMMARY_PREPARED, {
       

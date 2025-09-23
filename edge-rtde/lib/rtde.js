@@ -3,7 +3,7 @@
  * Copyright 2025 AMRC
  */
 import net from "net";
-import ur from "./ur.js";
+import ur from "ur-rtde";
 
 // RTDEHandler class for Universal Robot RTDE protocol
 export class RTDEHandler {
@@ -64,7 +64,6 @@ export class RTDEHandler {
   parseAddr(addr) {
     
   }
-
 
   poll(data) {
     // Polling logic: only forward data at the configured interval

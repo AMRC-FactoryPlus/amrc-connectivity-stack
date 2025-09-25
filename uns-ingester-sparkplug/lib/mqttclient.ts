@@ -1,12 +1,14 @@
 /*
- * AMRC ACS UNS Ingester (Sparkplug)
- * Copyright "2024" AMRC
+ * Copyright (c) University of Sheffield AMRC 2025.
  */
 
-import {ServiceClient, SpB, Topic, UUIDs} from "@amrc-factoryplus/service-client";
-import {Reader} from "protobufjs";
-import {logger} from "../bin/ingester.js";
+import { ServiceClient, SpB, Topic, UUIDs } from "@amrc-factoryplus/service-client";
+import { Reader } from "protobufjs";
+import { logger } from "../bin/ingester.js";
 import Long from "long";
+
+import { randomUUID } from "crypto";
+import mqtt from "mqtt";
 
 interface UnsMetric {
     value: string,
@@ -21,7 +23,15 @@ interface UnsMetricCustomProperties {
     Unit: string,
     Type: string,
     InstanceUUIDPath: string,
-    SchemaUUIDPath: string
+    SchemaUUIDPath: string,
+    Enterprise: string,
+    Site: string,
+    Area: string,
+    WorkCenter: string,
+    WorkUnit: string,
+    Device: string,
+    Node: string,
+    Group: string,
 }
 
 interface MetricContainer {
@@ -31,7 +41,7 @@ interface MetricContainer {
 
 let dotenv: any = null;
 try {
-    dotenv = await import ('dotenv')
+    dotenv = await import('dotenv')
 } catch (e) {
 }
 
@@ -48,8 +58,9 @@ export default class MQTTClient {
     private aliasResolver = {};
     private birthDebounce = {};
     private sparkplugBroker: any;
+    private metricsBroker: any;
 
-    constructor({e}: MQTTClientConstructorParams) {
+    constructor({ e }: MQTTClientConstructorParams) {
         this.serviceClient = e.serviceClient;
     }
 
@@ -64,6 +75,29 @@ export default class MQTTClient {
         this.sparkplugBroker.on("reconnect", this.onReconnect.bind(this));
 
         logger.info("Connecting to MQTT Broker...");
+
+        // Optionally connect a secondary broker for publishing uns/metrics
+        const metricsUrl = process.env.METRICS_MQTT_URL;
+        if (metricsUrl) {
+            try {
+                const options: mqtt.IClientOptions = {};
+                if (process.env.METRICS_MQTT_USERNAME) options.username = process.env.METRICS_MQTT_USERNAME;
+                if (process.env.METRICS_MQTT_PASSWORD) options.password = process.env.METRICS_MQTT_PASSWORD;
+                if (process.env.METRICS_MQTT_CLIENT_ID) options.clientId = process.env.METRICS_MQTT_CLIENT_ID;
+                if (process.env.METRICS_MQTT_REJECT_UNAUTHORIZED != null) {
+                    options.rejectUnauthorized = process.env.METRICS_MQTT_REJECT_UNAUTHORIZED !== 'false';
+                }
+                this.metricsBroker = mqtt.connect(metricsUrl, options);
+                this.metricsBroker.on("connect", () => logger.info(`🔌 Connected to metrics MQTT broker (${metricsUrl})`));
+                this.metricsBroker.on("reconnect", () => logger.warn("⚠️ Reconnecting to metrics MQTT broker..."));
+                this.metricsBroker.on("close", () => logger.warn("❌ Disconnected from metrics MQTT broker"));
+                this.metricsBroker.on("error", (err) => logger.error("🚨 Metrics MQTT error: %o", err));
+            } catch (e) {
+                logger.error(`🔥 Failed to initialise metrics MQTT broker (${metricsUrl}): ${e?.message ?? e}`);
+            }
+        } else {
+            logger.info("Metrics MQTT broker not configured; publishing uns/metrics to Factory+ broker only");
+        }
     }
 
     onConnect() {
@@ -283,11 +317,26 @@ export default class MQTTClient {
                     return acc;
                 }, {}));
 
+                // Capture a human-readable device name from Device_Information if present
+                try {
+                    const deviceNameMetric =
+                        payload.metrics.find((m) => m.name === "Device_Information/Name") ||
+                        payload.metrics.find((m) => m.name?.endsWith("Device_Information/Name")) ||
+                        payload.metrics.find((m) => m.name?.includes("Device_Information") && m.name?.endsWith("/Name")) ||
+                        payload.metrics.find((m) => m.name === "Device_Information/Device_Name") ||
+                        payload.metrics.find((m) => m.name?.includes("Device_Information") && m.name?.endsWith("/Device_Name"));
+                    const deviceNameVal = deviceNameMetric?.value ?? topic.address.device;
+                    this.aliasResolver[topic.address.group][topic.address.node][topic.address.device]._deviceName = deviceNameVal;
+                } catch (_) {
+                    // ignore; fall back to device address later
+                }
+
+
                 // Clear the debounce
                 delete this.birthDebounce?.[topic.address.group]?.[topic.address.node]?.[topic.address.device];
 
                 // Publish values to UNS
-                this.publishToUNS(payload, topic);
+                // this.publishToUNS(payload, topic);
 
                 break;
             case "DEATH":
@@ -387,7 +436,15 @@ export default class MQTTClient {
                 Unit: birth.unit,
                 InstanceUUID: birth.instance.top,
                 SchemaUUID: birth.schema.top,
-                Transient: birth.transient
+                Transient: birth.transient,
+                Enterprise: birth.isa95.enterprise,
+                Site: birth.isa95.site,
+                Area: birth.isa95.area,
+                WorkCenter: birth.isa95.workCenter,
+                WorkUnit: birth.isa95.workUnit,
+                Device: topic.address.device,
+                Node: topic.address.node,
+                Group: topic.address.group,
             }
 
             // Here we can access the ISA95 hierarchy information from the birth.isa95 object. This object contains the following keys:
@@ -498,6 +555,50 @@ export default class MQTTClient {
                     }
                 }
             });
+
+            // Publish to uns/metrics
+            let unsBroker;
+            if (this.metricsBroker) {
+                unsBroker = this.metricsBroker;
+            } else {
+                unsBroker = this.sparkplugBroker;
+            }
+
+            // Get the metric name from the topic (last part of the topic)
+            const metricName = topic.split('/').pop() as string;
+
+            // Create the uns/metrics message
+            const msg = {
+                version: "1",
+                id: randomUUID(),
+                timestamp: new Date().toISOString(),
+                metricName: metricName,
+                metricId: metricContainers[0]?.customProperties.SchemaUUID,
+                value: payload.value,
+                unit: metricContainers[0]?.customProperties.Unit ?? '',
+                source: {
+                    sourceType: "Factory+ Device",
+                    id: metricContainers[0]?.customProperties.InstanceUUID,
+                    name: metricContainers[0]?.customProperties.Device ?? '',
+                    payloadType: metricContainers[0]?.customProperties.SchemaUUID,
+                    enterprise: metricContainers[0]?.customProperties.Enterprise ?? '',
+                    site: metricContainers[0]?.customProperties.Site ?? '',
+                    area: metricContainers[0]?.customProperties.Area ?? '',
+                    workCenter: metricContainers[0]?.customProperties.WorkCenter ?? '',
+                    workUnit: metricContainers[0]?.customProperties.WorkUnit ?? '',
+                    annotations: {
+                        customProperties: {
+                            ...metricContainers[0]?.customProperties,
+                            FullPath: topic
+                        }
+                    }
+                },
+                inputs: [],
+                transformation: {},
+                annotations: {}
+            };
+
+            unsBroker.publish('uns/metrics', JSON.stringify(msg));
         })
     }
 

@@ -188,8 +188,15 @@ export class Handler{
     async subscribe(specs){
       const { driver } = this;
       //console.log("TDMSHandler: driver is ", driver);
-      console.log("Handler: Subscribing to specs:", specs);
-      await this.ingester.setDriverSpecs(specs);
+      if (specs.length != 1) {
+        console.log("Handler: Edge Agent has subscribed to %s addrs",
+          specs.length);
+        return false;
+      }
+
+      const spec = specs[0];
+      console.log("Handler: Subscribing to spec:", spec);
+      await this.ingester.setDriverSpecs(spec);
 
       try {
         //this.main = await main(this.driver, this.conf);

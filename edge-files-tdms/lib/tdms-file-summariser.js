@@ -147,7 +147,7 @@ class TDMSSummariser {
                       timestamp: item.timestamp
                       //val: item.data,
                      };
-            let bufferStr = JSON.stringify(buffer);
+            let bufferStr = BufferX.fromJSON(buffer);
             this.driver.data(this.specs, bufferStr);
              summaryArr.push(buffer);
             

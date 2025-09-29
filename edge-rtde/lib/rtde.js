@@ -4,6 +4,7 @@
  */
 import net from "net";
 import ur from "ur-rtde";
+import { BufferX } from "@amrc-factoryplus/edge-driver"
 
 // RTDEHandler class for Universal Robot RTDE protocol
 export class RTDEHandler {
@@ -36,13 +37,13 @@ export class RTDEHandler {
     });
   }
 
-  subscribe(_specs) {
+  subscribe(specs) {
     // The library requires us to subscribe to all data on the device
     this.client.on("data", (data) => {
       // This constructs a new urState object
       const state = new ur().onData(data);
       if (state !== undefined) {
-        this.handleData(state);
+        this.handleData(state, specs);
       }
     });
   }
@@ -58,8 +59,15 @@ export class RTDEHandler {
     });
   }
 
-  handleData(urState) {
-    // TODO: handle urState data
+  handleData(urState, specs) {
+    // We return the same JSON object for all addresses.
+    // Upstream, the user should extract values from this object with JSON paths.
+    const urStateJSON = JSON.stringify(urState);
+    const urStateBuffer = BufferX.fromJSON(urStateJSON);
+    for (const spec in specs) {
+      this.driver.data(urStateBuffer, spec)
+    }
+    this.driver.data(urState)
   }
 }
 

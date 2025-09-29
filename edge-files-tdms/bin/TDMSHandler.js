@@ -91,9 +91,9 @@ export class Handler{
     
     try{
       // await this.summariser.uploadToInflux("TDMSTest", "specs.summary");
-      //this.api.run();
+      // this.api.run();
 
-      //await this.ingester.run();
+      // await this.ingester.run();
       return "UP";
     }catch (err) {
       // console.error("TDMSHandler: Connection error:", err);

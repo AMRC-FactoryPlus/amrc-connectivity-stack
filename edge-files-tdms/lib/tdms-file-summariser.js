@@ -7,8 +7,8 @@ class TDMSSummariser {
   constructor(opts) {
     this.eventManager = opts.eventManager;
     this.stateManager = opts.stateManager;
-    this.env = opts.env;
-    this.pythonSummariserScript = this.env.PYTHON_SUMMARISER_SCRIPT;
+    //this.env = opts.env;
+    this.pythonSummariserScript = opts.env.PYTHON_SUMMARISER_SCRIPT;
     this.driver = opts.driver; // Assuming driver is passed for data upload
     this.specs = null;
     
@@ -147,31 +147,59 @@ class TDMSSummariser {
             const buffer = {
                       [item.name]: { 
                         //name: item.name, 
-                        //timestamp: item.timestamps, 
+                        timestamp: item.timestamp, 
                         data: item.data 
                       },
                       timestamp: item.timestamp
                       //val: item.data,
                      };
-            let bufferStr = JSON.stringify(buffer);
+            let bufferStr = BufferX.fromJSON(buffer);
             this.driver.data(this.specs, bufferStr);
-             summaryArr.push(buffer);
+            // summaryArr.push(buffer);
             
           });
         });
       });
 
       const buffer ={
-        "channel":{
-          data: 999
+        "Ambient - RTD":{
+          "name": "Ambient - RTD"
+        },
+        "data": 999,
+        "timestamp": 1663338093
+      };
+
+      const buffer2 ={
+        channel:{
+          data: 899,
         },
         timestamp: 1663338093
       };
-      let bufferStr = JSON.stringify(buffer);
-      this.driver.data(this.specs, bufferStr);
+
+      const buffer3 ={
+        channel:{
+          data: 799,
+          timestamp: 1663338093
+        },
+      };
+
+      const buffer4 ={
+        channel:{
+          data: 1699
+        },
+      };
+
+      //upload a few test points
+      this.driver.data(this.specs, JSON.stringify(buffer));
+      this.driver.data(this.specs, JSON.stringify(buffer2));
+      this.driver.data(this.specs, JSON.stringify(buffer3));
+      this.driver.data(this.specs, JSON.stringify(buffer4));
+      
+      // let bufferStr = JSON.stringify(buffer);
+      // this.driver.data(this.specs, bufferStr);
 
       // let summaryArrStr = JSON.stringify(summaryArr);
-      //this.driver.data(filePath, summaryArrStr);
+      // this.driver.data(this.specs, summaryArrStr);
       // console.log(`SUMMARISER: Posting summary - ${summaryArrStr}`);
 
       console.log("SUMMARISER: specs are ", this.specs);

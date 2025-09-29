@@ -195,11 +195,11 @@ export class Handler{
         //this.main = await main(this.driver, this.conf);
         // await this.summariser.uploadToInflux(specs[0], "specs.summary"); 
         // console.log("Handler: Subscription should be successful");
+        return true;
       }
 
       catch (err) {
         console.log("Subscription failed:", err);
-        driver.connFailed();
         return false;
       }
     }

@@ -242,6 +242,12 @@ curl:
     repository: appropriate/curl
     tag: latest
 
+kubectl:
+  image:
+    registry: docker.io
+    repository: alpine/kubectl
+    tag: 1.33.4
+
 minio:
   # -- Whether or not to enable MinIO
   enabled: true

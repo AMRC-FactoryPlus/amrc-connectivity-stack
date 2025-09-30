@@ -109,23 +109,4 @@ export class Handler{
       return addr;
     }
 
-    async subscribe(specs){
-      const { driver } = this;
-      
-      console.log("Handler: Subscribing to specs:", specs);
-      await this.ingester.setDriverSpecs(specs);
-
-      try {
-        
-        console.log("Handler: Subscription should be successful");
-        return true;
-      }
-
-      catch (err) {
-        console.log("Subscription failed:", err);
-        driver.connFailed();
-        return false;
-      }
-    }
-
 }

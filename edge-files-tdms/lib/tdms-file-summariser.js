@@ -21,15 +21,15 @@ class TDMSSummariser {
   }
 
   bindToEvents() {
-    this.eventManager.on('driver:ready', this.handleDriverReady.bind(this));
+    // this.eventManager.on('driver:ready', this.handleDriverReady.bind(this));
     this.eventManager.on('file:uploaded', this.handleFileSummary.bind(this));
   }
 
-  handleDriverReady = async (specs) => {
-    console.log(`SUMMARISER: Driver is ready with specs: ${JSON.stringify(specs)}`);
-    this.specs = specs;
+  // handleDriverReady = async (specs) => {
+  //   console.log(`SUMMARISER: Driver is ready with specs: ${JSON.stringify(specs)}`);
+  //   this.specs = specs;
     
-  }
+  // }
 
   handleFileSummary = async ({filePath}) => {
     try {
@@ -106,13 +106,8 @@ class TDMSSummariser {
   }
 
   async uploadToInflux(filePath, fileUuid){
-    //check if filePath exists
-    // let testState = fs.readFileSync('./testState.json', 'utf8');
-    // let testStateJSON = JSON.parse(testState);
-    // if(testStateJSON.summaryUploaded){
-    //   console.log(`SUMMARISER: Summary for ${filePath} already uploaded.`);
-    //   return true; // Indicate successful upload
-    // }
+    
+    
     // Handle summary data (upload to influxDB?)
     
     let file = fs.readFileSync('./summary_' + fileUuid + '.json', 'utf8');
@@ -138,6 +133,8 @@ class TDMSSummariser {
      
       summaryFileJSON.forEach((obj) =>{
         obj.channels.forEach((channel) => {
+          let channelName = "";
+          summaryArr = [];
           channel.forEach((item, index) => {
             // console.log(`Item at index ${index}:`, item.data);
 
@@ -145,19 +142,23 @@ class TDMSSummariser {
 
             //console.log(`Channel: ${item.name} Data: ${item.data} Timestamp: `, item.timestamps);
             const buffer = {
-                      [item.name]: { 
+                      //[item.name]: 
+                      //{ 
                         //name: item.name, 
-                        timestamp: item.timestamp, 
-                        data: item.data 
-                      },
-                      timestamp: item.timestamp
-                      //val: item.data,
+                        //timestamp: item.timestamp, 
+                      //  data: item.data },
+                      timestamp: item.timestamp,
+                      //data: item.data
+                      value: item.data,
                      };
             let bufferStr = BufferX.fromJSON(buffer);
-            this.driver.data(this.specs, bufferStr);
-            // summaryArr.push(buffer);
+            channelName = item.name;
+            // this.driver.data(this.specs, bufferStr);
+            summaryArr.push(buffer);
             
           });
+          let bufferArr = BufferX.fromJSON(summaryArr);
+          this.driver.data(channelName, bufferArr);
         });
       });
 

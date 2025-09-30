@@ -185,30 +185,4 @@ export class Handler{
       return addr;
     }
 
-    async subscribe(specs){
-      const { driver } = this;
-      //console.log("TDMSHandler: driver is ", driver);
-      if (specs.length != 1) {
-        console.log("Handler: Edge Agent has subscribed to %s addrs",
-          specs.length);
-        return false;
-      }
-
-      const spec = specs[0];
-      console.log("Handler: Subscribing to spec:", spec);
-      await this.ingester.setDriverSpecs(spec);
-
-      try {
-        //this.main = await main(this.driver, this.conf);
-        // await this.summariser.uploadToInflux(specs[0], "specs.summary"); 
-        // console.log("Handler: Subscription should be successful");
-        return true;
-      }
-
-      catch (err) {
-        console.log("Subscription failed:", err);
-        return false;
-      }
-    }
-
 }

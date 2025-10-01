@@ -83,7 +83,7 @@ export class AuthNotify {
             rx.combineLatest([
                 src,
                 this.data.permitted(sess.principal, Perm.ReadACL, true),
-                sess.principal,
+                rx.of(sess.principal),
             ]),
             this.rxlog("ACL perm check: %o"),
             rx.map(([acl, tok]) => tok

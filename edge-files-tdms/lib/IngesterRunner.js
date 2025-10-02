@@ -104,6 +104,8 @@ class IngesterRunner{
     });
 
     this.eventManager.on('file:summaryFailed', ({filePath, error}) => {
+      if(error)
+        console.error(`SUMMARISER: Error summarising ${filePath}`, error);
       this.retryHandleSummaryFailed(filePath);
     });
 

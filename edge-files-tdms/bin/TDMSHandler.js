@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 import { ServiceClient } from '@amrc-factoryplus/service-client';
 import { WebAPI } from '@amrc-factoryplus/service-api';
 import { routes } from '../lib/api/routes.js';

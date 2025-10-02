@@ -11,7 +11,7 @@ spec:
       serviceAccountName: post-delete-cleanup
       containers:
         - name: script-runner
-          image: bitnami/kubectl:latest
+{{ include "amrc-connectivity-stack.image" (list . .Values.kubectl) | indent 10 }}
           command:
             - /bin/sh
             - -c

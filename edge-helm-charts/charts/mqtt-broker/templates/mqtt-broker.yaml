@@ -36,9 +36,9 @@ spec:
         # This prevents back-offs that might occur during cluster scaling operations
         cluster-autoscaler.kubernetes.io/safe-to-evict: "true"
 
-        # This annotation disables AppArmor restrictions for the mosquitto container
+        # This annotation disables AppArmor restrictions for the mqtt-broker container
         # This prevents security-related back-offs that might occur due to AppArmor policies
-        container.apparmor.security.beta.kubernetes.io/mosquitto: "unconfined"
+        container.apparmor.security.beta.kubernetes.io/mqtt-broker: "unconfined"
     spec:
       # Setting restartPolicy to Always ensures the pod will be restarted if it exits
       # While this doesn't directly disable back-offs, it works with other settings

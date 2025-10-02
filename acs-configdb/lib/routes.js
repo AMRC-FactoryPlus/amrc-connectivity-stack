@@ -1,7 +1,5 @@
 /*
- * ACS ConfigDB
- * Express routing
- * Copyright 2024 University of Sheffield AMRC
+ * Copyright (c) University of Sheffield AMRC 2025.
  */
 
 import url from "url";
@@ -27,8 +25,6 @@ export function routes (opts) {
     return app => {
         /* No fancy query-string parsing */
         app.set("query parser", "simple");
-
-        app.use(express.json({ type: "application/merge-patch+json" }));
 
         /* Serve the editor */
         const editor = url.fileURLToPath(new URL("../editor", import.meta.url));

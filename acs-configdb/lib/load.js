@@ -28,19 +28,18 @@ export class Loader {
             return res.status(422).end();
         }
 
-        const perms = {
-            classes: Perm.Manage_Obj,
-            objects: Perm.Manage_Obj,
-            configs: Perm.Write_App,
-        };
-        for (const [key, perm] of Object.entries(perms)) {
-            if (key in dump) {
-                const ok = await this.auth.check_acl(
-                    req.auth, perm, UUIDs.Null, false);
-                if (!ok) {
-                    this.log("Refusing dump (%s)", key);
-                    return res.status(403).end();
-                }
+        /* XXX These permission checks are very restrictive; they are
+         * basically admin-only. If we are going to keep this strategy
+         * then it won't be possible for ordinary users to use /load as
+         * an atomic create endpoint. OTOH, doing detailed and correct
+         * permission checking will be difficult from within the dump
+         * code. */
+        const perms = [Perm.Manage_Obj, Perm.Take_From, Perm.Write_App];
+        for (const perm of perms) {
+            const ok = await this.auth.check_acl(req.auth, perm, UUIDs.Null, false);
+            if (!ok) {
+                this.log("Refusing dump (%s)", perm);
+                return res.status(403).end();
             }
         }
 

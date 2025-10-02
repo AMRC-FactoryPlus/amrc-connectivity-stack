@@ -3,7 +3,7 @@
   -->
 
 <template>
-  <div class="flex flex-col border-red-500 h-[calc(100vh-64px)] -m-4">
+  <div class="flex flex-col h-[calc(100vh-64px)] -m-4">
     <div class="flex justify-between bg-white sticky top-[-1rem] border-b z-10">
       <EdgeBreadcrumbs/>
       <slot name="header"></slot>

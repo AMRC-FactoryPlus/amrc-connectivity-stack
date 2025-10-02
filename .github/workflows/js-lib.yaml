@@ -1,0 +1,43 @@
+name: Publish JS lib
+
+on:
+  workflow_call:
+    inputs:
+      libdir:
+        description: "Lib dir to publish"
+        required: true
+        type: string
+      version:
+        description: "Version to publish as"
+        required: true
+        type: string
+    secrets:
+      NPM_TOKEN:
+        description: "NPM access token"
+        required: true
+          
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+
+      - name: Publish package
+        working-directory: ${{ inputs.libdir }}
+        run: |
+          version="${{ inputs.version }}"
+          version="${version#v}"
+          echo "Updating version to: $version"
+          jq ".version = \"$version\"" package.json > package.json.tmp
+          mv package.json.tmp package.json
+
+          npm install --verbose
+
+          echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
+          npm publish --access=public

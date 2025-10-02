@@ -8,9 +8,12 @@ import imm from "immutable";
 import rx from "rxjs";
 import { v4 as uuidv4 } from "uuid";
 
-import * as rxx from "@amrc-factoryplus/rx-util";
+import { UUIDs }    from "@amrc-factoryplus/service-client";
+import * as rxx     from "@amrc-factoryplus/rx-util";
+import { Optional, Response } from "@amrc-factoryplus/rx-util";
 
-import { Class, Special } from "./uuids.js";
+import { Class, Perm, Special }     from "./uuids.js";
+import { valid_uuid, valid_krb }    from "./validate.js";
 
 export class DataFlow {
     constructor (opts) {
@@ -30,6 +33,7 @@ export class DataFlow {
         this.identities = this._build_identities();
         this.grants = this._build_grants();
         this.groups = this._build_groups();
+        this.owned = this._build_owned();
     }
 
     _build_responses () {
@@ -98,6 +102,21 @@ export class DataFlow {
             rx.shareReplay(1));
     }
 
+    _build_owned () {
+        const { cdb } = this;
+        const { App } = UUIDs;
+
+        return rxx.rx(
+            cdb.search_app(App.Registration),
+            rx.map(es => es.entrySeq()
+                .map(([obj, inf]) => [obj, inf.owner])
+                .filter(([obj, owner]) => owner != Special.Unowned)
+                .groupBy(([obj, owner]) => owner)
+                .toMap()
+                .map(es => new imm.Set(es.map(e => e[0])))),
+            rx.shareReplay(1));
+    }
+
     run () {
         this.groups.subscribe(gs => this.log("GROUPS UPDATE"));
             //imm.Map(gs).toJS()));
@@ -129,9 +148,10 @@ export class DataFlow {
         return rxx.rx(
             rx.combineLatest({
                 groups:     this.groups,
-                grants:       this.grants,
+                grants:     this.grants,
+                owned:      this.owned,
             }),
-            rx.map(({ groups, grants }) => {
+            rx.map(({ groups, grants, owned }) => {
                 if (!groups.princ.has(principal))
                     return;
                 const accept_princ = groups.princ_grp
@@ -139,8 +159,9 @@ export class DataFlow {
                     .keySeq()
                     .concat(principal)
                     .toSet();
-                const expand = (grp, key, e) => {
-                    const ms = groups[grp].get(e[key]);
+                const expand = (e, key, grps) => {
+                    const ms = e[key] == Special.Mine
+                        ? owned.get(principal) : grps.get(e[key]);
                     return ms?.toArray()
                         ?.map(m => ({ ...e, [key]: m }))
                         ?? [];
@@ -148,8 +169,8 @@ export class DataFlow {
                 return grants
                     .filter(e => accept_princ.has(e.principal))
                     .flatMap(e => groups.perm.has(e.permission) ? [e]
-                        : expand("perm_grp", "permission", e))
-                    .flatMap(e => e.plural ? expand("targ_grp", "target", e) : [e])
+                        : expand(e, "permission", groups.perm_grp))
+                    .flatMap(e => e.plural ? expand(e, "target", groups.targ_grp) : [e])
                     .map(e => ({
                         permission: e.permission,
                         target:     e.target == Special.Self ? principal : e.target,
@@ -166,32 +187,13 @@ export class DataFlow {
         timeout:    1800000,
     });
 
-    async find_identities (cond) {
-        const ids = await rx.firstValueFrom(this.identities);
-        if (!cond) return ids;
-        const rv = ids.filter(cond);
-        return rv;
-    }
-
-    async whoami (upn) {
-        const acc = await this.find_identities(i =>
-            i.kind == "kerberos" && i.name == upn);
-        if (!acc.length) return;
-        return acc[0].uuid;
-    }
-
-    find_kerberos (upn) {
-        return rx.firstValueFrom(rxx.rx(
-            this.identities,
-            rx.first(),
-            rx.mergeMap(ids => ids
-                .filter(i => i.kind == "kerberos" && i.name == upn)
-                .map(i => i.uuid)),
-            rx.defaultIfEmpty(null)));
-    }
-
-    permitted (upn, perm) {
-        return rx.firstValueFrom(rxx.rx(
+    /** Track the targets for a given principal and permission.
+     * @param upn A principal's UPN
+     * @param perm A permission UUID
+     * @returns A seq of iSets of targets
+     */
+    track_targets (upn, perm) {
+        return rxx.rx(
             this.find_kerberos(upn),
             rx.mergeMap(p => p ? this.acl_for(p) : rx.of([])),
             rx.map(acl => imm.Seq(acl)
@@ -199,17 +201,95 @@ export class DataFlow {
                 .map(e => e.target)
                 .toSet()),
             rx.tap(ptd => 
-                this.log("Permitted %s for %s: %o", perm, upn, ptd.toJS()))));
+                this.log("Permitted %s for %s: %o", perm, upn, ptd.toJS())));
     }
 
-    async check_targ (upn, perm, wild) {
+    /** Track a permission, including wildcards.
+     * Returns a seq of functions. When the user does not have the given
+     * permission at all, emits null. Otherwise emits a function from
+     * target to boolean.
+     * @param upn The principal UPN
+     * @param perm The permission UUID
+     * @param wild Whether to treat Special.Wilcard as matching any target
+     */
+    permitted (upn, perm, wild) {
         if (upn == this.root)
-            return () => true;
-        const targs = await this.permitted(upn, perm);
-        if (!targs.size)
-            return;
-        if (wild && targs.has(Special.Wildcard))
-            return () => true;
-        return i => targs.has(i);
+            return rx.of(() => true);
+
+        return rxx.rx(
+            this.track_targets(upn, perm),
+            rx.map(targs =>
+                !targs.size ? null
+                : wild && targs.has(Special.Wildcard) ? () => true
+                : i => targs.has(i)));
+    }
+    
+    check_targ (upn, perm, wild) {
+        return rx.firstValueFrom(this.permitted(upn, perm, wild));
+    }
+
+    /** Backend for the `v2/principal` and `identity` endpoints.
+     *
+     * Searches for identity records matching a given condition. If the
+     * condition cannot be satisfied return an empty Optional, otherwise
+     * an Optional holding a sequence of Responses. Each successful
+     * Response holds an array of identity records.
+     *
+     * The filter is an object with keys `uuid`, `kind`, `name` and any
+     * keys supplied must match.
+     *
+     * @param upn The requesting principal UPN
+     * @param cond A filter to apply to the identity records
+     */
+    track_identities (upn, cond) {
+        cond ??= {};
+        if ((cond.uuid && !valid_uuid(cond.uuid))
+            || (cond.name && !cond.kind)
+            || (cond.kind == "kerberos" && cond.name && !valid_krb(cond.name))
+        )
+            return Optional.of();
+
+        const props = Object.entries(cond);
+        const filtered = rxx.rx(
+            this.identities,
+            rx.map(ids => 
+                ids.filter(id => 
+                    props.every(([k, v]) => id[k] == v))));
+
+        /* ReadKrb is repurposed here as 'read any identity' */
+        const permitted = this.permitted(upn, Perm.ReadKrb, true);
+
+        return Optional.of(rxx.rx(
+            rx.combineLatest(filtered, permitted),
+            rx.map(([ids, perm]) => cond.uuid
+                ? perm?.(cond.uuid)
+                    ? Response.ok(ids)
+                    : Response.of(403)
+                : perm
+                    ? Response.ok(ids.filter(id => perm(id.uuid)))
+                    : Response.of(403)),
+            rx.map(res => res.filter(ids => ids.length)),
+        ));
+    }
+
+    /* Pull one entry off `track_identities`.
+     *
+     * Returns a Response. Nonexistent endpoints return 410.
+     */
+    find_identities (upn, cond) {
+        return this.track_identities(upn, cond)
+            .map(rx.firstValueFrom)
+            .orElse(Response.of(410));
+    }
+
+    track_kerberos (upn) {
+        return rxx.rx(
+            this.identities,
+            rx.map(ids => ids.filter(i => i.kind == "kerberos" && i.name == upn)),
+            rx.map(acc => acc[0]?.uuid));
+    }
+
+    find_kerberos (upn) {
+        return rx.firstValueFrom(this.track_kerberos(upn));
     }
 }

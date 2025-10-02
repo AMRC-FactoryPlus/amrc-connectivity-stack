@@ -8,7 +8,7 @@ import path from "path";
 import duration     from "parse-duration";
 import imm          from "immutable";
 import git          from "isomorphic-git";
-import http         from "isomorphic-git/http/node/index.js";
+import http         from "isomorphic-git/http/node";
 import rx           from "rxjs";
 
 import * as rxx     from "@amrc-factoryplus/rx-util";

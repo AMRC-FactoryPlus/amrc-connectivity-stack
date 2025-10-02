@@ -16,6 +16,7 @@ import AuthZ from "../lib/authz.js";
 import { DataFlow } from "../lib/dataflow.js";
 import { Loader } from "../lib/loader.js";
 import Model from "../lib/model.js";
+import { AuthNotify } from "../lib/notify.js";
 import Editor from "../lib/editor.js";
 
 import { GIT_VERSION } from "../lib/git-version.js";
@@ -25,6 +26,8 @@ const Version = "2.0.0";
 
 const fplus = new RxClient({ env: process.env });
 const debug = fplus.debug;
+
+debug.log("app", "Starting acs-auth revision %s", GIT_VERSION);
 
 const model  = await new Model({ debug, }).init();
 const data = new DataFlow({
@@ -73,5 +76,14 @@ const api = await new WebAPI({
     },
 }).init();
     
+const notify = new AuthNotify({
+    api, data,
+    debug:      fplus.debug,
+});
+
+debug.log("app", "Running data");
 data.run();
+debug.log("app", "Running notify");
+notify.run();
+debug.log("app", "Running api");
 api.run();

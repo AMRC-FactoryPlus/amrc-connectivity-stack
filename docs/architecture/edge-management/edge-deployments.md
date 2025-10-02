@@ -273,23 +273,32 @@ you to maintain your own chart repositories separately from the core ACS charts.
        "main": {
          "url": "https://github.com/myorg/my-charts.git",
          "ref": "main",
+         "auth": {
+            "secretRef": "github_credentials"
+         },
          "interval": "5m"
        }
      }
    }
    ```
+   
+Note: the `secretRef` key references the **key** in the Kubernetes 
+secret, not the secret name itself. The secret name is defined in 
+the values file as `git.credentialsSecrets`.
 
 2. When creating a Helm Chart Template, specify the `source` field with the UUID
    of your Git repository and optionally the `prefix` field for subdirectories:
    ```json
-   {
-     "chart": "my-custom-chart",
-     "source": "e6d41259-ac54-42e0-b2b5-8c447001d42f",
-     "prefix": "charts",
-     "values": {
-       "host": "localhost"
-     }
-   }
+    {
+      "chart": "charts/my-chart",
+      "prefix": "my-chart",
+      "source": "<UUID of Git Repo>",
+      "values": {
+        "hostname": "{{hostname}}",
+        "name": "{{name}}",
+        "uuid": "{{uuid}}"
+      }
+    }
    ```
 
 3. The Edge Sync operator will:

@@ -2,12 +2,13 @@
  * Copyright (c) University of Sheffield AMRC 2025.
  */
 
-import {log} from "./helpers/log.js";
+import { log } from "./helpers/log.js";
 import { SparkplugNode } from "./sparkplugNode.js";
 import {
     Metrics,
     parseTimeStampFromPayload,
     parseValueFromPayload,
+    processJSONBatchedPayload,
     serialisationType,
     sparkplugDataType,
     sparkplugMetric,
@@ -350,40 +351,83 @@ export class Device {
                     // value
                     if (!parseVals || (parseVals && ((typeof metric.properties.path !== "undefined" && metric.properties.path.value) || Object.keys(
                         obj).length == 1))) {
-                        // Get new value either directly or by parsing
-                        let newVal = parseVals ? parseValueFromPayload(obj[addr],
-                            metric,
-                            this._payloadFormat,
-                            this._delimiter
-                        ) : obj[addr];
+                        // Handle JSON (Batched) format explicitly
+                        if (parseVals && this._payloadFormat === serialisationType.JSONBatched) {
+                            // Parse the payload as JSON
+                            let payload: any;
+                            try {
+                                if (typeof obj[addr] === "string") {
+                                    payload = JSON.parse(obj[addr]);
+                                } else if (Buffer.isBuffer(obj[addr])) {
+                                    payload = JSON.parse(obj[addr].toString());
+                                } else {
+                                    payload = obj[addr];
+                                }
+                            } catch (e) {
+                                log(`Failed to parse JSON (Batched) payload: ${e}`);
+                                return;
+                            }
 
-                        // Test if the value is a bigint and convert it to a Long. This is a hack to ensure that the
-                        // Tahu library works - it only accepts Longs, not bigints.
-                        if (typeof newVal === "bigint") {
-                            newVal = Long.fromString(newVal.toString());
-                        }
+                            // Process the batched payload
+                            const batchResults = processJSONBatchedPayload(payload, metric);
 
-                        // If it has a sensible value...
-                        // + Use the deadband here
+                            // Create a metric for each item in the batch
+                            batchResults.forEach(result => {
+                                const { value, timestamp } = result;
 
-                        if (
-                            (newVal || newVal == 0)
-                            && (metric.value !== newVal)
-                        ) {
-                            // If timestamp is provided in data package
-                            const timestamp = parseTimeStampFromPayload(obj[addr],
+                                // Test if the value is a bigint and convert it to a Long
+                                let processedValue = value;
+                                if (typeof processedValue === "bigint") {
+                                    processedValue = Long.fromString(processedValue.toString());
+                                }
+
+                                // If it has a sensible value and is different from the current value
+                                if ((processedValue || processedValue === 0) && (metric.value !== processedValue)) {
+                                    // Create a copy of the metric with the new value and timestamp
+                                    const updatedMetric = {
+                                        ...this._metrics.setValueByAddrPath(addr, path, processedValue, timestamp || Date.now())
+                                    };
+
+                                    // Add to the list of changed metrics
+                                    changedMetrics.push(updatedMetric);
+                                }
+                            });
+                        } else {
+                            // Standard processing for all other payload formats
+                            let newVal = parseVals ? parseValueFromPayload(obj[addr],
                                 metric,
                                 this._payloadFormat,
                                 this._delimiter
-                            );
+                            ) : obj[addr];
 
-                            // Update the metric value and push it to the array of changed metrics
-                            changedMetrics.push({
-                                ...(this._metrics.setValueByAddrPath(addr,
-                                    path,
-                                    newVal,
-                                    timestamp))
-                            });
+                            // Test if the value is a bigint and convert it to a Long. This is a hack to ensure that the
+                            // Tahu library works - it only accepts Longs, not bigints.
+                            if (typeof newVal === "bigint") {
+                                newVal = Long.fromString(newVal.toString());
+                            }
+
+                            // If it has a sensible value...
+                            // + Use the deadband here
+
+                            if (
+                                (newVal || newVal == 0)
+                                && (metric.value !== newVal)
+                            ) {
+                                // If timestamp is provided in data package
+                                const timestamp = parseTimeStampFromPayload(obj[addr],
+                                    metric,
+                                    this._payloadFormat,
+                                    this._delimiter
+                                );
+
+                                // Update the metric value and push it to the array of changed metrics
+                                changedMetrics.push({
+                                    ...(this._metrics.setValueByAddrPath(addr,
+                                        path,
+                                        newVal,
+                                        timestamp))
+                                });
+                            }
                         }
                     }
                 }

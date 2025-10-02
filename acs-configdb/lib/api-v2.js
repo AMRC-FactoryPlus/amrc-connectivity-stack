@@ -10,7 +10,7 @@ import { UUIDs } from "@amrc-factoryplus/service-client";
 
 import * as etags from "./etags.js";
 
-import {App, Class, Perm} from "./constants.js";
+import {App, Class, Perm, SpecialObj} from "./constants.js";
 
 const Valid = {
     uuid:   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
@@ -133,7 +133,11 @@ export class APIv2 {
             spec.class ?? UUIDs.Null, true);
         if (!ok) return res.status(403).end();
 
-        const [st, info] = await this.model.object_create(spec);
+        spec.owner ??= await this.auth.resolve_upn(req.auth, SpecialObj.Unowned);
+        if (!spec.owner) return res.status(503).end();
+
+        const handler = this.model.with_req(req);
+        const [st, info] = await handler.object_create(spec);
 
         if (st > 299)
             return res.status(st).end();
@@ -265,7 +269,8 @@ export class APIv2 {
          * the database normalises the JSON so we can't guarantee that.
          * A PUT ETag is only useful for If-Match, and a weak etag can't
          * be used for that. */
-        let st = await this.model.config_put({ app, object }, req.body,
+        const handler = this.model.with_req(req);
+        const st = await handler.config_put({ app, object }, req.body,
             etags.checker(req));
         res.status(st).send();
     }
@@ -298,7 +303,8 @@ export class APIv2 {
         if (ok.includes(false))
             return res.status(403).end();
 
-        const st = await this.model.config_merge_patch(req.params, req.body,
+        const handler = this.model.with_req(req);
+        const st = await handler.config_merge_patch(req.params, req.body,
             etags.checker(req));
         res.status(st == 201 ? 204 : st).send();
     }

@@ -175,6 +175,7 @@ const PAYLOAD_FORMATS = [
   "Defined by Protocol",
   "Delimited String",
   "JSON",
+  "JSON (Batched)",
   "XML",
   "Buffer"
 ];

@@ -158,6 +158,8 @@ export const ConfigDB = {
         ManageAppSchema: "95c7cbcb-ce60-49ed-aa81-2fe3eec4559d",
         ManageObjects: "f0b7917b-d475-4888-9d5a-2af96b3c26b6",
         DeleteObjects: "6957174b-7b08-45ca-ac5c-c03ab6928a6e",
+        GiveTo: "4eaab346-4d1e-11f0-800e-dfdc061c6a63",
+        TakeFrom: "6ad67652-5009-11f0-9404-73b79124c3d5",
     }
 };
 

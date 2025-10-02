@@ -93,7 +93,7 @@
           <!-- Schema section -->
           <div class="flex items-center justify-between gap-2 p-4 border-b">
             <div class="font-semibold text-lg">Schema</div>
-            <Button
+            <Button title="Change schema"
                 v-if="device.deviceInformation?.schema"
                 @click="changeSchema"
                 size="sm"
@@ -118,7 +118,7 @@
           <!-- Connection section -->
           <div class="flex items-center justify-between gap-2 p-4 border-b">
             <div class="font-semibold text-lg">Connection</div>
-            <Button
+            <Button title="Change connection"
                 v-if="device.deviceInformation?.connection"
                 @click="changeConnection"
                 size="sm"

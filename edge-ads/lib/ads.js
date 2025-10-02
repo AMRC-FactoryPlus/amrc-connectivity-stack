@@ -54,51 +54,6 @@ export class ADSHandler {
         // Reconnection management
         this.reconnectTimer = null;
         this.reconnectDelay = 5000; // 5 seconds between reconnection attempts
-    }
-
-    /**
-     * Factory method to create and validate an ADS handler instance
-     *
-     * This static method is called by the Edge Agent driver framework to create
-     * a new handler instance. It validates the required configuration parameters
-     * before creating the handler.
-     *
-     * @param {Object} driver - The Edge Agent driver instance
-     * @param {Object} conf - Configuration object (see constructor for details)
-     * @returns {ADSHandler|undefined} - New handler instance or undefined if config is invalid
-     */
-    static create(driver, conf) {
-
-        // Validate required configuration parameters
-        // These are the minimum required to establish an ADS connection
-        if (!conf.targetAmsNetId || !conf.routerAddress) {
-            driver.log("Missing required ADS configuration: targetAmsNetId and routerAddress are required");
-            return; // Return undefined to indicate configuration rejection
-        }
-
-        return new ADSHandler(driver, conf);
-    }
-
-    /**
-     * Establishes connection to the ADS target device
-     *
-     * This method creates and configures the ADS client, sets up event handlers,
-     * and attempts to connect to the target PLC. It handles both synchronous
-     * configuration validation and asynchronous connection establishment.
-     *
-     * Connection Flow:
-     * 1. Build client configuration with defaults
-     * 2. Create ADS client instance
-     * 3. Set up event handlers (connect, disconnect, error)
-     * 4. Attempt connection
-     * 5. Return status or schedule reconnection on failure
-     *
-     * @returns {Promise<string>|string} - Connection status ("UP", "CONN", etc.)
-     */
-    connect() {
-        const { driver, conf } = this;
-
-        this.log("Connecting to ADS target %s at %s", conf.targetAmsNetId, conf.routerAddress);
 
         // Build client configuration with sensible defaults
         // These defaults match standard TwinCAT/ADS configurations
@@ -145,6 +100,52 @@ export class ADSHandler {
             driver.connFailed();
             this.scheduleReconnect();
         });
+    }
+
+    /**
+     * Factory method to create and validate an ADS handler instance
+     *
+     * This static method is called by the Edge Agent driver framework to create
+     * a new handler instance. It validates the required configuration parameters
+     * before creating the handler.
+     *
+     * @param {Object} driver - The Edge Agent driver instance
+     * @param {Object} conf - Configuration object (see constructor for details)
+     * @returns {ADSHandler|undefined} - New handler instance or undefined if config is invalid
+     */
+    static create(driver, conf) {
+
+        // Validate required configuration parameters
+        // These are the minimum required to establish an ADS connection
+        if (!conf.targetAmsNetId || !conf.routerAddress) {
+            driver.log("Missing required ADS configuration: targetAmsNetId and routerAddress are required");
+            return; // Return undefined to indicate configuration rejection
+        }
+
+        return new ADSHandler(driver, conf);
+    }
+
+    /**
+     * Establishes connection to the ADS target device
+     *
+     * This method creates and configures the ADS client, sets up event handlers,
+     * and attempts to connect to the target PLC. It handles both synchronous
+     * configuration validation and asynchronous connection establishment.
+     *
+     * Connection Flow:
+     * 1. Build client configuration with defaults
+     * 2. Create ADS client instance
+     * 3. Set up event handlers (connect, disconnect, error)
+     * 4. Attempt connection
+     * 5. Return status or schedule reconnection on failure
+     *
+     * @returns {Promise<string>|string} - Connection status ("UP", "CONN", etc.)
+     */
+    connect() {
+
+        const conf = this.conf;
+
+        this.log("Connecting to ADS target %s at %s", conf.targetAmsNetId, conf.routerAddress);
 
         // Attempt connection to the ADS target
         // This returns a Promise that resolves with connection info or rejects with error

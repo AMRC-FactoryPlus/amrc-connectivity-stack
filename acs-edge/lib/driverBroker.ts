@@ -10,7 +10,7 @@ import util from "util";
 import Aedes from "aedes";
 
 const prefix = "fpEdge1";
-const topicrx = new RegExp(`^${prefix}/(\\w+)/(\\w+)(?:/(\\w+))?$`);
+const topicrx = new RegExp(`^${prefix}/([\\w-]+)/(\\w+)(?:/(\\w+))?$`);
 
 function log (f, ...a) {
     const msg = util.format(f, ...a);

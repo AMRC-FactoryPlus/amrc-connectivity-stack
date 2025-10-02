@@ -10,9 +10,11 @@ objects:
     - !u UUIDs.Special.Null
     - !u UUIDs.Special.FactoryPlus
     - !u UUIDs.Special.Self
+    - !u UUIDs.Special.Mine
 configs:
   !u UUIDs.App.Info:
     !u UUIDs.Class.Special:       { name: "Special UUIDs" }
     !u UUIDs.Special.Null:        { name: "Wildcard" }
     !u UUIDs.Special.FactoryPlus: { name: "Factory+" }
     !u UUIDs.Special.Self:        { name: "Self" }
+    !u UUIDs.Special.Mine:        { name: "Mine" }

@@ -35,6 +35,7 @@ objects:
 
   !u ConfigDB.Class.R1Class:
     !u Files.Class.File: { name: "File" }
+  !u Files.Class.FileType:
     !u Files.FileType.PDF:
         name: "PDF"
         subclassOf:

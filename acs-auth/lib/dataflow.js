@@ -197,7 +197,7 @@ export class DataFlow {
      */
     track_targets (upn, perm) {
         return rxx.rx(
-            this.find_kerberos(upn),
+            this.track_kerberos(upn),
             rx.mergeMap(p => {
                 this.log("TRACK ACL [%s]: principal %s", upn, p);
                 return p ? this.acl_for(p) : rx.of([]);

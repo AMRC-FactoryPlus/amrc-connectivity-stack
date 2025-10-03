@@ -5,16 +5,6 @@ import numpy as np
 import sys
 import tracemalloc
 
-# cwd = os.getcwd()
-
-# print("Current Working Directory:", cwd)
-
-#Read tdms file from command line argument, variable name is folderPath
-#return exception to stdio if no file is provided
-#if len(sys.argv) < 2:
-#    print("No TDMS file provided. Please provide a TDMS file as a command line argument.")
-#     #raise Exception("No TDMS file provided. Please provide a TDMS file as a command line argument.")    
-
 def summarise(file_path, step):
     #try/catch block to handle errors in reading the TDMS file
     try:

@@ -7,7 +7,6 @@ class TDMSSummariser {
   constructor(opts) {
     this.eventManager = opts.eventManager;
     this.stateManager = opts.stateManager;
-    //this.env = opts.env;
     this.pythonSummariserScript = opts.env.PYTHON_SUMMARISER_SCRIPT;
     this.driver = opts.driver; // Assuming driver is passed for data upload
     
@@ -73,21 +72,12 @@ class TDMSSummariser {
   }
 
   async uploadToInflux(filePath, fileUuid) {
-
-
     // Handle summary data (upload to influxDB?)
 
     let file = fs.readFileSync('./summary_' + fileUuid + '.json', 'utf8');
-    //let summaryStr = Buffer.from(summary, "utf8");
-    //console.log(`Summary for ${filePath} is uploaded to InfluxDB.`);
-
-    //turn summary into JSON object
-    let summaryJSON;
     let summaryFileJSON;
 
     try {
-      //summaryJSON = JSON.stringify(summary);
-
       summaryFileJSON = JSON.parse(file);
 
       //loop through the summaryJSON and log each key-value pair
@@ -98,11 +88,7 @@ class TDMSSummariser {
           let channelName = "";
           summaryArr = [];
           channel.forEach((item, index) => {
-            // console.log(`Item at index ${index}:`, item.data);
-
             //get data and timestamps from each item if they exist
-
-            //console.log(`Channel: ${item.name} Data: ${item.data} Timestamp: `, item.timestamps);
             const buffer = {
               timestamp: item.timestamp,
               value: item.data
@@ -118,22 +104,22 @@ class TDMSSummariser {
           this.driver.data(channelName, bufferArr);
         });
       });
-      //get earliest timestamp from totalSummaryArr
       let earliestTimestamp = Math.min(...totalSummaryArr.map(o => o.timestamp));
+      let latestTimestamp = Math.max(...totalSummaryArr.map(o => o.timestamp));
       console.log(`SUMMARISER: Earliest timestamp for ${filePath} is ${earliestTimestamp}`);
+      console.log(`SUMMARISER: Latest timestamp for ${filePath} is ${latestTimestamp}`);
 
       this.driver.data("FileUUID", BufferX.fromJSON([{ timestamp: earliestTimestamp, value: fileUuid }]));
+      this.driver.data("FileUUID", BufferX.fromJSON([{ timestamp: latestTimestamp, value: "null" }]));
 
       console.log(`SUMMARISER: Summary for ${filePath} uploaded to InfluxDB.`);
-      //this.eventManager.emit(EVENTS.FILE_SUMMARY_PREPARED, {
 
       return true; // Indicate successful upload
     } catch (e) {
-      //console.error(`SUMMARISER: Error parsing summary JSON for ${filePath}:`, e);
       console.error(`SUMMARISER: Error parsing summary JSON for ${filePath}:`, e);
       return false;
     }
-    //return true;
+    
   }
 }
 

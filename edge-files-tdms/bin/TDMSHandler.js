@@ -80,8 +80,6 @@ export class Handler{
     // console.log("Handler: Creating instance");
     if (conf.devicePath == null) return;
     const handler = new Handler(driver, conf);
-    
-    //console.log("Handler is ", handler);
     return handler;
   }
 
@@ -92,10 +90,6 @@ export class Handler{
     console.log("Handler: Connected");
     
     try{
-      // await this.summariser.uploadToInflux("TDMSTest", "specs.summary");
-      // this.api.run();
-
-      // await this.ingester.run();
       return "UP";
     }catch (err) {
       // console.error("TDMSHandler: Connection error:", err);

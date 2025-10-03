@@ -121,6 +121,7 @@ export class DataFlow {
         this.groups.subscribe(gs => this.log("GROUPS UPDATE"));
             //imm.Map(gs).toJS()));
         this.grants.subscribe(es => this.log("GRANT UPDATE"));
+        this.identities.subscribe(is => this.log("IDENTITIES UPDATE: %o", is));
     }
 
     /** Request a change to the database.

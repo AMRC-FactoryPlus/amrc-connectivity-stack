@@ -6,7 +6,7 @@
  * Copyright 2021 AMRC.
  */
 
-import { ServiceClient, UUIDs } from "@amrc-factoryplus/service-client";
+import { RxClient, UUIDs }      from "@amrc-factoryplus/rx-client";
 import { WebAPI }               from "@amrc-factoryplus/service-api";
 
 import Model from "../lib/model.js";
@@ -18,7 +18,7 @@ import { GIT_VERSION } from "../lib/git-version.js";
 /* This is the version of the service spec we support. */
 const Version = "1.1.0";
 
-const fplus = new ServiceClient({
+const fplus = new RxClient({
     env:    process.env,
     permission_group:   Perm.All,
 });

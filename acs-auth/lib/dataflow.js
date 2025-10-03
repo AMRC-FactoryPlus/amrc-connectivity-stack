@@ -121,6 +121,7 @@ export class DataFlow {
         this.groups.subscribe(gs => this.log("GROUPS UPDATE"));
             //imm.Map(gs).toJS()));
         this.grants.subscribe(es => this.log("GRANT UPDATE"));
+        this.identities.subscribe(is => this.log("IDENTITIES UPDATE: %o", is));
     }
 
     /** Request a change to the database.
@@ -152,8 +153,10 @@ export class DataFlow {
                 owned:      this.owned,
             }),
             rx.map(({ groups, grants, owned }) => {
-                if (!groups.princ.has(principal))
+                if (!groups.princ.has(principal)) {
+                    this.log("UUID %s is not a Principal: %o", principal, groups.princ);
                     return;
+                }
                 const accept_princ = groups.princ_grp
                     .filter(ms => ms.has(principal))
                     .keySeq()
@@ -194,8 +197,12 @@ export class DataFlow {
      */
     track_targets (upn, perm) {
         return rxx.rx(
-            this.find_kerberos(upn),
-            rx.mergeMap(p => p ? this.acl_for(p) : rx.of([])),
+            this.track_kerberos(upn),
+            rx.mergeMap(p => {
+                this.log("TRACK ACL [%s]: principal %s", upn, p);
+                return p ? this.acl_for(p) : rx.of([]);
+            }),
+            rx.tap(acl => this.log("ACL UPDATE [%s]: %o", upn, acl)),
             rx.map(acl => imm.Seq(acl)
                 .filter(e => e.permission == perm)
                 .map(e => e.target)

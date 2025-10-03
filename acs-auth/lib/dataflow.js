@@ -194,7 +194,7 @@ export class DataFlow {
      */
     track_targets (upn, perm) {
         return rxx.rx(
-            this.find_kerberos(upn),
+            this.track_kerberos(upn),
             rx.mergeMap(p => p ? this.acl_for(p) : rx.of([])),
             rx.map(acl => imm.Seq(acl)
                 .filter(e => e.permission == perm)

@@ -11,7 +11,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@amrc-factoryplus/rx-util": "^0.0.3",
+    "@amrc-factoryplus/service-client": "file:../lib/js-service-client",
+    "@amrc-factoryplus/rx-util": "file:../lib/js-rx-util",
     "content-type": "^1.0.5",
     "cors": "^2.8.5",
     "deep-equal": "^2.2.3",

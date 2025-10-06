@@ -171,14 +171,23 @@ export class Clusters {
                     expand(deleted, Delete),
                 );
             }),
-            /* XXX This handles all updates serially. We could go
-             * parallel per-cluster with groupBy but we need to ensure
-             * that delete/create on a single cluster are not handled at
-             * the same time. */
-            rx.concatMap(act => rxx.rx(
-                rx.defer(() => act.apply()),
-                rxx.retryBackoff(10000,
-                    e => this.log("Cluster update failed: %s", e)))),
+            /* We must serialise the actions for each cluster, and
+             * abandon retries if a new action is required. */
+            /* XXX We could improve retry behaviour by splitting out the
+             * steps taken by each action and running them under Rx
+             * rather than under an async function. Then we could retry
+             * each step individually rather than the whole action. */
+            rx.groupBy(act => act.uuid, {
+                /* Attach retry logic to each action */
+                element:    act => rxx.rx(
+                    rx.defer(() => act.apply()),
+                    rxx.retryBackoff(10000,
+                        e => this.log("Cluster update failed: %s", e))),
+                /* Switch through the actions and close the group when
+                 * we have nothing left to do. The switch will emit
+                 * the first time we get a successful completion. */
+                duration:   acts => acts.pipe(rx.switchAll()),
+            }),
         );
     }
 

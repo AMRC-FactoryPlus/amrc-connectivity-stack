@@ -67,10 +67,6 @@ class IngesterRunner{
     }
   }
 
-  async setDriverSpecs(specs) {
-    this.eventManager.emit('driver:ready', specs);
-  }
-
   registerEventHandlers() {
     this.eventManager.on('file:uuidCreated', async ({ filePath, fileUuid }) => {
       if (fileUuid) {

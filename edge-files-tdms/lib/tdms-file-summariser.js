@@ -8,12 +8,9 @@ class TDMSSummariser {
     this.eventManager = opts.eventManager;
     this.stateManager = opts.stateManager;
     this.pythonSummariserScript = opts.env.PYTHON_SUMMARISER_SCRIPT;
-    this.driver = opts.driver; // Assuming driver is passed for data upload
-    
-    // console.log(`SUMMARISER: Driver initialised: ${this.driver}`);
+    this.driver = opts.driver; // Assuming driver is passed for data upload    
   }
 
-  // Method to run the Python script and return the summary
   async run() {
     this.bindToEvents();
   }
@@ -23,8 +20,7 @@ class TDMSSummariser {
   }
 
   handleFileSummary = async ({ filePath }) => {
-    try {
-      //console.log("SUMMARISER: env is ", this.env);
+    try {     
       console.log(`SUMMARISER: Generating summary for ${filePath} using ${this.pythonSummariserScript}`);
       if (!(await isFileExist(filePath))) {
         console.log(`SUMMARISER: Filepath ${filePath} does not exist.`);
@@ -66,8 +62,7 @@ class TDMSSummariser {
     }
 
     catch (err) {
-      this.eventManager.emit('file:summaryFailed', { filePath, error: err });
-      // this.eventManager.emit(EVENTS.FILE_SUMMARY_FAILED, {filePath, error: err});
+      this.eventManager.emit('file:summaryFailed', { filePath, error: err });     
     }
   }
 
@@ -88,7 +83,7 @@ class TDMSSummariser {
           let channelName = "";
           summaryArr = [];
           channel.forEach((item, index) => {
-            //get data and timestamps from each item if they exist
+            
             const buffer = {
               timestamp: item.timestamp,
               value: item.data
@@ -114,7 +109,7 @@ class TDMSSummariser {
 
       console.log(`SUMMARISER: Summary for ${filePath} uploaded to InfluxDB.`);
 
-      return true; // Indicate successful upload
+      return true; 
     } catch (e) {
       console.error(`SUMMARISER: Error parsing summary JSON for ${filePath}:`, e);
       return false;

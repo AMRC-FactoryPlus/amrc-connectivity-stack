@@ -7,11 +7,13 @@
 import express from "express";
 import * as rx from "rxjs";
 
+import { APIError } from "@amrc-factoryplus/service-api";
+
 import { Perm } from "./uuids.js";
 import { valid_grant, valid_krb, valid_uuid } from "./validate.js";
 
-function fail (status) {
-    throw { status };
+function fail (status, message) {
+    throw new APIError(status);
 }
 
 /* XXX This code is inconsistent about use of native JS vs Rx vs

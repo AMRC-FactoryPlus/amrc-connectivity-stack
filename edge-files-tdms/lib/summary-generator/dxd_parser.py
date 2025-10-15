@@ -21,11 +21,13 @@ def parse_dxd(file_path, sub_sample_percentage):
     print("Channels found:", [ch.name for ch in ch_list])
 
     samples = int(dh.sample_rate * dh.duration)
-    summary_data = []
     sample_factor = int(100 / sub_sample_percentage)
     with open("data.json", "w") as file:
-        file.write('[')
+        file.write('[' + "\n")
+        file.write('{' + "\n")
+        file.write('"channels": [' + "\n")
         for ch in ch_list:
+            file.write('[' + "\n")
             for i in range(0, samples, sample_factor):
                 scaled = dw.get_scaled_samples(ch.index, i, 1)
                 current, peak = tracemalloc.get_traced_memory()
@@ -34,14 +36,21 @@ def parse_dxd(file_path, sub_sample_percentage):
                 value = scaled[1][0]
                 entry = {
                     "timestamp": timestamp,
-                    "value": value,
-                    "channel": ch.name,
+                    "data": value,
+                    "name": ch.name,
                 }
                 file.write(json.dumps(entry))
-                if i + sample_factor >= samples and ch.index == len(ch_list) -1:
+                if i + sample_factor >= samples:
                     file.write("\n")
                 else:
                     file.write(",\n")
+            # if the channel index is the last one don't add the comma.
+            if ch.index == len(ch_list) - 1:
+                file.write(']' + "\n")
+            else:
+                file.write('],' + "\n")
+        file.write(']' + "\n")
+        file.write('}')
         file.write(']' + "\n")
     dw.close_data_file()
     dw.de_init()

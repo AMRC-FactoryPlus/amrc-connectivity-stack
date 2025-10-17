@@ -4,7 +4,12 @@
  * Copyright 2022 AMRC
  */
 
-import {Address, UUIDs,} from "@amrc-factoryplus/service-client";
+import * as rx              from "rxjs";
+
+import {Address, UUIDs,}    from "@amrc-factoryplus/service-client";
+import * as rxx             from "@amrc-factoryplus/rx-util";
+
+import { MqttCli }          from "./mqttcli.js";
 
 const CCL_Perms = "9584ee09-a35a-4278-bc13-21a8be1f007c";
 const CCL_Template = "60e99f28-67fe-4344-a6ab-b1edb8b8e810";
@@ -14,105 +19,59 @@ export default class CmdEscD {
         this.fplus = opts.fplus;
         this.root = this.fplus.Auth.root_principal;
         this.log = this.fplus.debug.log.bind(this.fplus.debug);
+
+        this.mqtt = new MqttCli({
+            fplus:  this.fplus,
+            cmdesc: this,
+        });
+
+        const cdb = this.fplus.ConfigDB;
+        this.addresses = rxx.rx(
+            cdb.search_app(UUIDs.App.SparkplugAddress),
+            rx.map(as => as.map(a => 
+                new Address(a.group_id, a.node_id, a.device_id))),
+            rx.shareReplay(1));
+        this.templates = rxx.rx(
+            cdb.search_app(CCL_Template),
+            rx.shareReplay(1));
     }
 
-    async init() {
-        return this;
-    }
+    run () { this.mqtt.run(); }
 
-    set_mqtt(m) {
-        this.mqtt = m;
-    }
+    decode_principal (princ, addrs) {
+        if (!(princ instanceof Address))
+            return ["kerberos", princ];
 
-    async find_principal_for_address(from) {
-        if (from.isDevice()) {
+        if (princ.isDevice()) {
             this.log("cmdesc", "Cannot authorise request from a Device");
             return;
         }
 
-        const res = await this.fplus.fetch({
-            service: UUIDs.Service.Registry,
-            url: `/v1/app/${UUIDs.App.SparkplugAddress}/search`,
-            query: {
-                group_id: JSON.stringify(from.group),
-                node_id: JSON.stringify(from.node),
-            },
-        });
-        if (!res.ok) {
-            this.log("cmdesc", `Failed to look up address ${from}: ${res.status}`);
-            return;
-        }
-        const json = await res.json();
+        const uuids = addrs.toSeq()
+            .filter(a => a.equals(princ))
+            .keySeq();
+        
+        if (uuids.isEmpty())
+            return this.log("cmdesc", "No UUID found for address %s", princ);
+        if (uuids.count() > 1)
+            return this.log("cmdesc", "More than one UUID for address %s", princ);
 
-        switch (json.length) {
-            case 0:
-                this.log("cmdesc", `No UUID found for address ${from}`);
-                return;
-            case 1:
-                break;
-            default:
-                this.log("cmdesc", `More than one UUID found for address ${from}`);
-                return;
-        }
-
-        this.log("cmdesc", `Request from ${from} = ${json[0]}`);
-        return json[0];
-    }
-
-    async fetch_acl(princ, by_uuid) {
-        const res = await this.fplus.fetch({
-            service: UUIDs.Service.Authentication,
-            url: "/authz/acl",
-            query: {
-                principal: princ,
-                permission: CCL_Perms,
-                "by-uuid": !!by_uuid,
-            },
-        });
-        if (!res.ok) {
-            this.log("acl", `Can't get ACL for ${princ}: ${res.status}`);
-            return [];
-        }
-
-        return await res.json();
+        return ["uuid", uuids.first()];
     }
 
     async expand_acl(princ) {
-        let acl;
-        if (princ instanceof Address) {
-            const uuid = await this.find_principal_for_address(princ);
-            if (!uuid) return [];
-            acl = await this.fetch_acl(uuid, true);
-        } else {
-            acl = await this.fetch_acl(princ, false);
-        }
+        const addrs = await rx.firstValueFrom(this.addresses);
+        const tmpls = await rx.firstValueFrom(this.templates);
 
-        /* Fetch the CDB entries we need. Don't fetch any entry more
-         * than once, the HTTP caching logic can't return a cached
-         * result for a request still in flight. */
-        const perms = new Map(acl.map(a => [a.permission, null]));
-        const targs = new Map(
-            /* We don't need to look up the wildcard address. */
-            acl.filter(a => a.target != UUIDs.Null)
-                .map(a => [a.target, null]));
+        const query = this.decode_principal(princ, addrs);
+        if (!query) return [];
 
-        await Promise.all([
-            ...[...perms.keys()].map(perm =>
-                this.fplus.fetch_configdb(CCL_Template, perm)
-                    .then(tmpl => perms.set(perm, tmpl))),
+        const acl = await this.fplus.Auth.fetch_auth_acl(...query);
 
-            ...[...targs.keys()].map(targ =>
-                this.fplus.fetch_configdb(UUIDs.App.SparkplugAddress, targ)
-                    .then(a => a
-                        ? new Address(a.group_id, a.node_id, a.device_id)
-                        : null)
-                    .then(addr => targs.set(targ, addr))),
-        ]);
-
-        const res_targ = t => t == UUIDs.Null ? true : targs.get(t);
+        const res_targ = t => t == UUIDs.Null ? true : addrs.get(t);
 
         return acl.flatMap(ace => {
-            const tags = perms.get(ace.permission);
+            const tags = tmpls.get(ace.permission);
             const address = res_targ(ace.target);
             return tags && address ? [{tags, address}] : [];
         });

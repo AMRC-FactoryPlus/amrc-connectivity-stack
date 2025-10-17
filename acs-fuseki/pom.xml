@@ -27,6 +27,7 @@
     <plugin.deploy>3.1.4</plugin.deploy>
     <plugin.enforcer>3.5.0</plugin.enforcer>
     <plugin.gpg>3.2.7</plugin.gpg>
+    <plugin.graal>0.11.1</plugin.graal>
     <plugin.install>3.1.4</plugin.install>
     <plugin.jacoco>0.8.12</plugin.jacoco>
     <plugin.jar>3.4.2</plugin.jar>
@@ -147,6 +148,28 @@
             </goals>
           </execution>
         </executions>
+      </plugin>
+
+      <plugin>
+        <groupId>org.graalvm.buildtools</groupId>
+        <artifactId>native-maven-plugin</artifactId>
+        <version>${plugin.graal}</version>
+        <extensions>true</extensions>
+        <executions>
+          <execution>
+            <id>build-native</id>
+            <goals>
+              <goal>compile-no-fork</goal>
+            </goals>
+            <phase>package</phase>
+          </execution>
+        </executions>
+        <configuration>
+          <mainClass>uk.co.amrc.factoryplus.fuseki.RunFuseki</mainClass>
+          <buildArgs>
+            <buildArg>--exact-reachability-metadata</buildArg>
+          </buildArgs>
+        </configuration>
       </plugin>
     </plugins>
   </build>

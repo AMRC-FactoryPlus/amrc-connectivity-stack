@@ -18,19 +18,17 @@ const Version = "1.0.2";
 
 const Device_UUID = process.env.DEVICE_UUID;
 
-const fplus = await new RxClient({ env: process.env }).init();
+const fplus = new RxClient({ env: process.env });
 
-const cmdesc = await new CmdEscD({
+const cmdesc = new CmdEscD({
     fplus,
-}).init();
-
-const mqtt = await new MqttCli({
-    fplus,
-    sparkplug_address:  process.env.SPARKPLUG_ADDRESS,
-    device_uuid:        Device_UUID,
-    service:            Service_Cmdesc,
-    http_url:           process.env.HTTP_API_URL,
-}).init();
+    mqtt: {
+        sparkplug_address:  process.env.SPARKPLUG_ADDRESS,
+        device_uuid:        Device_UUID,
+        service:            Service_Cmdesc,
+        http_url:           process.env.HTTP_API_URL,
+    },
+});
 
 const v1 = await new ApiV1({
     cmdesc,

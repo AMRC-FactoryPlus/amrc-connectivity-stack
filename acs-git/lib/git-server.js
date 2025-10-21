@@ -56,8 +56,8 @@ export class GitServer {
 
         const app = this.routes;
 
-        app.all("/git/:group/:repo/:rest(*)", this.wrap(this.by_path));
-        app.all("/uuid/:uuid/:rest(*)", this.wrap(this.by_uuid));
+        app.all("/git/:group/:repo/*rest", this.wrap(this.by_path));
+        app.all("/uuid/:uuid/*rest", this.wrap(this.by_uuid));
         app.get("/v1/storage", this.wrap(this.storage_list));
         app.delete("/v1/storage/:uuid", this.wrap(this.storage_delete));
         app.get("/v1/status", this.repo_status.bind(this));
@@ -74,15 +74,16 @@ export class GitServer {
     }
 
     async by_path (req, res, next) {
-        const { group, repo, rest } = req.params;
-        const { service } = req.query;
+        const { group, repo } = req.params;
         const path = `${group}/${repo}`;
 
         const uuid = await this._resolve_uuid(Git.Class.Repo, path);
         this.log("Resolved path %s to %s", path, uuid);
 
-        const qs = service ? `?service=${service}` : "";
-        req.url = `/uuid/${uuid}/${rest}${qs}`;
+        const fwd = req.url.replace(`/git/${path}/`, `/uuid/${uuid}/`);
+        if (fwd == req.url)
+            throw new Error(`Redirect loop for ${fwd}`);
+        req.url = fwd;
         next("route");
     }
 

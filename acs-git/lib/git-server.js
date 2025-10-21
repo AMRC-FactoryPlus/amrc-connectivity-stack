@@ -11,6 +11,7 @@ import process from "process";
 import cgi from "cgi";
 import express from "express";
 import git from "isomorphic-git";
+import * as rx from "rxjs";
 
 import { UUIDs } from "@amrc-factoryplus/service-client";
 
@@ -20,7 +21,7 @@ export class GitServer {
     constructor (opts) {
         this.data = opts.data;
         this.fplus = opts.fplus;
-        this.http_url = opts.http_url;
+        this.status = opts.status;
 
         this.log = this.fplus.debug.bound("git");
 
@@ -59,6 +60,8 @@ export class GitServer {
         app.all("/uuid/:uuid/:rest(*)", this.wrap(this.by_uuid));
         app.get("/v1/storage", this.wrap(this.storage_list));
         app.delete("/v1/storage/:uuid", this.wrap(this.storage_delete));
+        app.get("/v1/status", this.repo_status.bind(this));
+        app.get("/v1/status/:uuid", this.repo_status.bind(this));
 
         return this;
     }
@@ -132,4 +135,14 @@ export class GitServer {
         return res.status(204).end();
     }
 
+    async repo_status (req, res) {
+        const { uuid } = req.params;
+        const st = await rx.firstValueFrom(this.status);
+
+        if (uuid == null)
+            return res.status(200).json([...st.keys()]);
+        if (!st.has(uuid))
+            return res.status(404);
+        return res.status(200).json(st.get(uuid).toJS());
+    }
 }

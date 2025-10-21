@@ -1,6 +1,6 @@
 /* AMRC Connectivity Stack
  * Universal Robot RTDE Edge Agent driver
- * Copyright 2025 AMRC
+ * Copyright 2025 University of Sheffield AMRC
  */
 import net from "net";
 import { createRequire } from "module";
@@ -18,7 +18,7 @@ export class RTDEHandler {
     this.driver = driver;
     this.conf = conf;
     this.log = driver.debug.bound("rtde");
-    
+
     // Create ur instance for parsing RTDE data
     this.urParser = new ur();
 
@@ -55,7 +55,7 @@ export class RTDEHandler {
 
   connect() {
     const { host, port } = this.conf;
-    
+
     // Set up data handler BEFORE connecting
     this.client.on("data", (data) => {
       // Parse RTDE data using the ur parser
@@ -64,7 +64,7 @@ export class RTDEHandler {
         this.handleData(state);
       }
     });
-    
+
     this.client.connect(port, host, () => {
       this.log(`✅ Connected to RTDE on ${host}:${port}`);
       this.driver.connUp();
@@ -79,7 +79,7 @@ export class RTDEHandler {
   handleData(urState) {
     // Publish complete state
     this.driver.data("json/state", BufferX.fromJSON(urState));
-    
+
     // Publish individual sections for more granular access
     if (urState.jointData) {
       this.driver.data("json/jointData", BufferX.fromJSON(urState.jointData));

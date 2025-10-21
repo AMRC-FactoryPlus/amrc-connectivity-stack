@@ -12,7 +12,7 @@ communication with RTDE (Real-Time Data Exchange) devices, primarily Universal R
 
 The RTDE driver is built using the `@amrc-factoryplus/edge-driver`
 library and implements an asynchronous driver interface. It uses the
-`ur-rtde` npm package to parse RTDE protocol data streams and
+[`ur-rtde`](https://www.npmjs.com/package/ur-rtde) npm package to parse RTDE protocol data streams and
 publishes data to the Edge Agent as it arrives from the robot.
 
 ## Features
@@ -34,7 +34,7 @@ The driver requires `host` and `port` configuration values to connect to the rob
 | Property | Type   | Required | Default | Description                                    |
 |----------|--------|----------|---------|------------------------------------------------|
 | `host`   | string | Yes      | -       | IP address of the robot controller            |
-| `port`   | number | Yes      | 30004   | RTDE port (typically 30004 for UR robots)     |
+| `port`   | number | Yes      | -       | RTDE port (typically 30004 for UR robots)     |
 
 ### Addresses
 
@@ -89,7 +89,8 @@ Testing has been completed with:
 - Direct Node.js execution against a Universal Robots controller
 - Docker containerization
 - Local Edge Agent and Driver connected to F+ Instance
-- Full ACS deployment integration is pending
+
+A local test script is included in `./bin/test.rtde.js`.
 
 ## Dependencies
 

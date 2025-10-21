@@ -123,6 +123,7 @@ export const ACS = {
         Test:                   "c8798cba-de4c-11ef-8a43-8766e8683af8",
         TPlinkSmartPlug:        "d46e1374-de4c-11ef-b469-c388a038fd5c",
         ADS:                    "6764f1e5-fbe7-494c-8dbe-b80039c30c97",
+        RTDE:                   "9f4e8f3a-0b1f-11f0-8c5e-3f2c5d3c5e8f",
 
         /* External driver */
         External:               "eb669a2c-e213-11ef-998e-a7fc6f4817b5",

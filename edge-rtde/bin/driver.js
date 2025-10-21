@@ -1,5 +1,5 @@
 /*
- * Copyright (c) University of Sheffield AMRC 2025.
+ * Copyright University of Sheffield AMRC 2025.
  */
 
 // Load environment variables from .env file if available (for local development)

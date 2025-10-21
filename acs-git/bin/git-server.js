@@ -14,6 +14,7 @@ import { WebAPI }           from "@amrc-factoryplus/service-api";
 import { GIT_VERSION }      from "../lib/git-version.js";
 import { GitServer }        from "../lib/git-server.js";
 import { AutoPull }         from "../lib/auto-pull.js";
+import { GitNotify }        from "../lib/notify.js";
 import { SparkplugNode }    from "../lib/sparkplug.js";
 import { RepoStatus }       from "../lib/status.js";
 import { Git }              from "../lib/uuids.js";
@@ -78,9 +79,15 @@ const sparkplug = await new SparkplugNode({
     fplus, status,
 }).init();
 
+const notify = new GitNotify({
+    api, status,
+    debug:      fplus.debug,
+});
+
 /* Sparkplug must run first as it sets the MQTT Will */
 await sparkplug.run();
 
 api.run();
 status.run();
 pulls.run();
+notify.run();

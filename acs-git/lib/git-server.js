@@ -138,7 +138,7 @@ export class GitServer {
 
     async repo_status (req, res) {
         const { uuid } = req.params;
-        const st = await rx.firstValueFrom(this.status);
+        const st = await rx.firstValueFrom(this.status.status);
 
         if (uuid == null)
             return res.status(200).json([...st.keys()]);

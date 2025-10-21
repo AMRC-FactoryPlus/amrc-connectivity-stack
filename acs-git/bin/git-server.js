@@ -38,8 +38,13 @@ const fplus = await new ServiceClient({
     permission_group:   Git.Perm.All,
 }).init();
 
-const git = await new GitServer({
+const status = await new RepoStatus({
     fplus, data,
+    pushes:         process.env.DATA_CHANGED_FIFO,
+}).init();
+
+const git = await new GitServer({
+    fplus, data, status,
     git_exec:   process.env.GIT_EXEC_PATH,
     http_url:   process.env.HTTP_API_URL,
 }).init();
@@ -62,11 +67,6 @@ const api = await new WebAPI({
     routes: app => {
         app.use("/", git.routes);
     },
-}).init();
-
-const status = await new RepoStatus({
-    fplus, data,
-    pushes:         process.env.DATA_CHANGED_FIFO,
 }).init();
 
 const pulls = await new AutoPull({

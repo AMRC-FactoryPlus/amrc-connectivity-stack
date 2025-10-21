@@ -1,0 +1,19 @@
+{
+  "name": "edge-rtde",
+  "version": "1.0.0",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@amrc-factoryplus/edge-driver": "^0.1.0",
+    "dotenv": "^17.2.3",
+    "node-int64": "^0.4.0",
+    "ur-rtde": "^1.0.0"
+  }
+}

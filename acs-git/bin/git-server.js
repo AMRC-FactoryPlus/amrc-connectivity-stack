@@ -12,12 +12,14 @@ import { ServiceClient }    from "@amrc-factoryplus/service-client";
 import { WebAPI }           from "@amrc-factoryplus/service-api";
 
 import { GIT_VERSION }      from "../lib/git-version.js";
-import { GitServer }        from "../lib/git-server.js";
+import { Git }              from "../lib/uuids.js";
+
 import { AutoPull }         from "../lib/auto-pull.js";
 import { GitNotify }        from "../lib/notify.js";
-import { SparkplugNode }    from "../lib/sparkplug.js";
+import { GitServer }        from "../lib/git-server.js";
+import { Hooks }            from "../lib/hooks.js";
 import { RepoStatus }       from "../lib/status.js";
-import { Git }              from "../lib/uuids.js";
+import { SparkplugNode }    from "../lib/sparkplug.js";
 
 console.log("Starting acs-git version %s", GIT_VERSION);
 
@@ -32,7 +34,9 @@ process.on("uncaughtException", (err, origin) => {
     process.kill(process.pid);
 });
 
-const data = process.env.DATA_DIR;
+/* We now have more than just the repos in the data dir */
+const root = process.env.DATA_DIR;
+const data = `${root}/repo`;
 
 const fplus = await new ServiceClient({
     env:                process.env,
@@ -41,7 +45,7 @@ const fplus = await new ServiceClient({
 
 const status = await new RepoStatus({
     fplus, data,
-    pushes:         process.env.DATA_CHANGED_FIFO,
+    pushes:     process.env.DATA_CHANGED_FIFO,
 }).init();
 
 const git = await new GitServer({
@@ -75,6 +79,11 @@ const pulls = await new AutoPull({
     secrets_dir: process.env.SECRETS_DIR || "/run/secrets",
 }).init();
 
+const hooks = new Hooks({
+    fplus, status,
+    state:  `${root}/hook-state`,
+});
+
 const sparkplug = await new SparkplugNode({
     fplus, status,
 }).init();
@@ -90,4 +99,5 @@ await sparkplug.run();
 api.run();
 status.run();
 pulls.run();
+hooks.run();
 notify.run();

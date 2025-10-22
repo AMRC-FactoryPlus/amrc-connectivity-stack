@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { ServiceClient } from '@amrc-factoryplus/service-client';
+import { RxClient } from '@amrc-factoryplus/rx-client';
 import { WebAPI } from '@amrc-factoryplus/service-api';
 import { routes } from '../lib/routes.js';
 import { Version, Service } from '../lib/constants.js';
@@ -8,7 +8,7 @@ import {clean_up} from "../lib/startup.js";
 
 const { env } = process;
 
-const fplus = await new ServiceClient({
+const fplus = await new RxClient({
   env,
 }).init();
 

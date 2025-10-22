@@ -9,7 +9,6 @@ import util from "util";
 class QueryError extends Error {
     constructor (sql, bind, msg, ...args) {
         super(util.format(msg, ...args));
-        this.status = 500;
         this.sql = sql;
         this.bind = bind;
     }

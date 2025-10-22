@@ -14,10 +14,11 @@ export default class CmdEscD {
         this.fplus = opts.fplus;
         this.root = this.fplus.Auth.root_principal;
         this.log = this.fplus.debug.log.bind(this.fplus.debug);
-    }
 
-    async init() {
-        return this;
+        this.mqtt = new MqttCli({
+            fplus,
+        });
+
     }
 
     set_mqtt(m) {

@@ -11,14 +11,10 @@ const Valid = {
     Tag: /^[A-Za-z0-9_ \/]+$/,
 };
 
-/* Currently we are a Sparkplug Node; this is only so we can advertise
- * ourselves to the Directory over MQTT. Should we instead push a service
- * advert to the Directory over HTTP, and then we don't need node
- * credentials? */
-
 export default class MqttCli {
     constructor(opts) {
         this.fplus = opts.fplus;
+        this.cmdesc = opts.cmdesc;
         this.address = Address.parse(opts.sparkplug_address);
         this.device_uuid = opts.device_uuid;
         this.http_url = opts.http_url;

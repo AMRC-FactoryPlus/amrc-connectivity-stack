@@ -18,6 +18,8 @@ import * as rx from "rxjs";
 
 import * as rxx from "@amrc-factoryplus/rx-util";
 
+//import { Schemas }      from "./hooks/schemas.js";
+
 const Instance = imm.Record({ 
     hook: null,
     repo: null,
@@ -55,6 +57,15 @@ export class Hooks {
                 { leading: true, trailing: true }));
     }
 
+    async update_done (update) {
+        this.done = update(this.done);
+        const h_st = this.done.entrySeq()
+            .map(([inst, commit]) => ({ commit, ...inst.toJS() }))
+            .toArray();
+        await fsp.writeFile(this.hook_state, JSON.stringify(h_st), "utf8");
+        this.log("Rewrite hook-state: %o", h_st);
+    }
+
     /* Accepts the current state of the server.
      * Calculates which hooks need to run and runs them. We keep a state
      * file recording what has been run. This looks like
@@ -64,41 +75,52 @@ export class Hooks {
     async run_hooks ({ configs, status }) {
         const { done } = this;
 
+        /* NOTE: some callbacks take (key, value) and some (value, key). */
+
         /* Calculate the changes we need to make. */
-        const want = configs.entrySeq()
-            .filter(([repo, conf]) => conf.hooks)
-            .flatMap(([repo, conf]) => imm.Seq(conf.hooks)
-                .entrySeq()
-                .map(([branch, hook]) => Instance({ repo, branch, hook })))
-            .map(inst => [inst, status.get(inst.repo)?.get(inst.branch)]);
+        const want = configs
+            .filter(conf => conf.hooks)
+            .flatMap((conf, repo) => imm.Map(conf.hooks)
+                .mapKeys((branch, hook) => Instance({ repo, branch, hook })))
+            .map((hook, inst) => status.get(inst.repo)?.get(inst.branch));
+
         this.log("Want: %o", want.toJS());
         this.log("Done: %o", done.toJS());
-        const changes = want.filter(([inst, commit]) => done.get(inst) != commit);
-        this.log("Changed: %o", changes.toJS());
 
-        for (const [inst, commit] of changes) {
-            const msg = format("hook %s for %s branch %s",
-                inst.hook, inst.repo, inst.branch);
-            //const hook = this.hooks.get(inst.hook);
-            //if (!hook) {
-            //    this.log("Undefined %s", msg);
-            //    continue;
-            //}
+        const removed = done.keySeq().filter(inst => want.has(inst));
+        this.log("Removed: %o", removed.toJS());
+        await this.update_done(d => d.deleteAll(removed));
 
-            this.log("Running %s", msg);
-            await setTimeout(6000);
-            //const err = await hook(inst.repo, commit)
-            //    .then(() => null, e => e);
-            //if (err)
-            //    this.log("Error running %s: %s", msg, err);
-            this.log("Finished %s", msg);
+        const changed = want.filter((commit, inst) => done.get(inst) != commit);
+        this.log("Changed: %o", changed.toJS());
 
-            this.done = this.done.set(inst, commit);
-            const h_st = this.done.entrySeq()
-                .map(([inst, commit]) => ({ commit, ...inst.toJS() }))
-                .toArray();
-            await fsp.writeFile(this.hook_state, JSON.stringify(h_st), "utf8");
-        }
+        for (const [inst, commit] of changed)
+            await this.run_hook(inst, commit);
+    }
+
+    async run_hook (inst, commit) {
+        const msg = format("hook %s for %s branch %s",
+            inst.hook, inst.repo, inst.branch);
+
+        //const hook = this.hooks.get(inst.hook);
+        //if (!hook) {
+        //    this.log("Undefined %s", msg);
+        //    return;
+        //}
+
+        /* XXX Should we retry on error? I'm not sure here. In general
+         * an error is unlikely to be resolved by retrying, but there
+         * are some limited circumstances such as service-setup not run
+         * yet where errors have external causes and can be fixed.
+         * Perhaps we should distinguish permanent problems with the
+         * repo contents from temporary service errors? */
+        this.log("Running %s", msg);
+        await setTimeout(6000);
+        //await hook(inst.repo, commit)
+        //    .then(() => this.log("Finished %s", msg))
+        //    .catch(err => this.log("Error running %s: %s", msg, err));
+        
+        await this.update_done(d => d.set(inst, commit));
     }
 }
 

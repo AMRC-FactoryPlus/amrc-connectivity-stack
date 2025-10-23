@@ -92,7 +92,7 @@ spec:
             - name: VERBOSE
               value: {{.Values.git.verbosity | quote | required "values.git.verbosity is required!"}}
             - name: DATA_DIR
-              value: /data/repo
+              value: /data
             - name: DATA_CHANGED_FIFO
               value: /data/changed
             - name: GIT_EXEC_PATH

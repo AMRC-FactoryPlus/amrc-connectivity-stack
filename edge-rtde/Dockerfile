@@ -30,4 +30,4 @@ FROM node:22-alpine AS run
 WORKDIR /home/node/app
 COPY --from=build --chown=root:root /home/node/app ./
 USER node
-CMD ["node", "bin/test.rtde.js"]
+CMD node bin/driver.js

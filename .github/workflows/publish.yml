@@ -213,6 +213,7 @@ jobs:
           - edge-test
           - edge-tplink-smartplug
           - edge-ads
+          - edge-rtde
     permissions:
       contents: read
       packages: write

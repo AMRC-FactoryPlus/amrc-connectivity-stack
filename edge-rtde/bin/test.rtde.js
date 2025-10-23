@@ -36,7 +36,7 @@ const driver = {
 
 // Configuration for RTDE connection
 const conf = {
-    host: '192.168.56.140', // Set to your URSim/UR robot IP
+    host: '<robot_ip>', // Set to your URSim/UR robot IP
     port: 30003             // Robot state port (30001=primary, 30002=secondary, 30003=realtime)
 };
 

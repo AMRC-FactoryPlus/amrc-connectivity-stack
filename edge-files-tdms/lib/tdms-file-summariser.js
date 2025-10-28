@@ -27,38 +27,43 @@ class TDMSSummariser {
         throw new Error(`Filepath ${filePath} does not exist.`);
       }
 
-      let summary;
-      const fileState = await this.stateManager.getFileState(filePath);
-      let fileUuid = fileState?.uuid;
+      //Check file extension
+      if (filePath.endsWith('.tdms')) {
+      
 
-      const child = spawn("/opt/venv/bin/python3", [this.pythonSummariserScript, filePath, fileUuid]);
+        let summary;
+        const fileState = await this.stateManager.getFileState(filePath);
+        let fileUuid = fileState?.uuid;
 
-      child.on("spawn", () => {
-        console.log('SUMMARISER: Python script started successfully.');
-      });
+        const child = spawn("/opt/venv/bin/python3", [this.pythonSummariserScript, filePath, fileUuid]);
 
-      child.stderr.on('data', (data) => {
-        console.log(`SUMMARISER: python stderr - ${data}`);
-      });
+        child.on("spawn", () => {
+          console.log('SUMMARISER: Python script started successfully.');
+        });
 
-      child.on("close", async (code) => {
-        if (code === 0) {
-          console.log('SUMMARISER: Python script completed successfully. File exported to summary_' + fileUuid + '.json');
-          const isSummaryUploaded = await this.uploadToInflux(filePath, fileUuid);
-          if (isSummaryUploaded) {
-            this.eventManager.emit('file:summaryPrepared', { filePath: filePath });
+        child.stderr.on('data', (data) => {
+          console.log(`SUMMARISER: python stderr - ${data}`);
+        });
+
+        child.on("close", async (code) => {
+          if (code === 0) {
+            console.log('SUMMARISER: Python script completed successfully. File exported to summary_' + fileUuid + '.json');
+            const isSummaryUploaded = await this.uploadToInflux(filePath, fileUuid);
+            if (isSummaryUploaded) {
+              this.eventManager.emit('file:summaryPrepared', { filePath: filePath });
+            } else {
+              this.eventManager.emit('file:summaryFailed');
+            }
+
           } else {
-            this.eventManager.emit('file:summaryFailed');
+            this.eventManager.emit('file:summaryFailed', { filePath, error: new Error(`Python script exited with code ${code}`) });
           }
+        });
 
-        } else {
-          this.eventManager.emit('file:summaryFailed', { filePath, error: new Error(`Python script exited with code ${code}`) });
-        }
-      });
-
-      child.on("error", (err) => {
-        this.eventManager.emit('file:summaryFailed', { filePath, error: err });
-      });
+        child.on("error", (err) => {
+          this.eventManager.emit('file:summaryFailed', { filePath, error: err });
+        });
+      }
     }
 
     catch (err) {

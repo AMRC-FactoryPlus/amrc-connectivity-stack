@@ -8,10 +8,8 @@ import deep_equal from "deep-equal";
 import * as imm from "immutable";
 import * as rx from "rxjs";
 
-import * as rxx                 from "@amrc-factoryplus/rx-util";
-import { 
-    Notify, WatchFilter, SearchFilter
-}  from "@amrc-factoryplus/service-api";
+import * as rxx         from "@amrc-factoryplus/rx-util";
+import { Notify }       from "@amrc-factoryplus/service-api";
 
 import { Perm } from "./constants.js";
 import * as rxu from "./rx-util.js";
@@ -43,26 +41,6 @@ function set_contents (lookup) {
         rx.map(mk_res));
 }
 
-/* XXX This is not right. Until we have a push Auth API we will need
- * to check ACLs for every update, but we should avoid sending more
- * updates after a 403 until we get an ACL change. */
-function acl_checker (session, ...args) {
-    const check = async update => {
-        const ok = await session.check_acl(...args);
-        if (ok)
-            return update;
-
-        return {
-            status: update.status,
-            response: {
-                status: 403,
-            },
-        };
-    };
-
-    return rx.concatMap(check);
-}
-
 function jmp_match (cand, filter) {
     if (filter === null || typeof(filter) != "object")
         return cand === filter;
@@ -82,21 +60,70 @@ function jmp_match (cand, filter) {
     return true;
 }
 
-class ConfigWatch {
-    constructor (session, app) {
-        this.session = session;
-        this.model = session.model;
-        this.app = app;
+export class CDBNotify {
+    constructor (opts) {
+        this.auth   = opts.auth;
+        this.model  = opts.model;
+        this.log    = opts.debug.bound("notify");
 
-        this.updates = rxx.rx(
+        this.config_updates = rxx.rx(
             this.model.updates,
-            rx.filter(u => u.type == "config"));
+            rx.filter(u => u.type == "config"),
+            rx.share());
 
-        this.check_acl = acl_checker(this.session, Perm.Read_App, this.app, true);
+        this.notify = this.build_notify(opts.api);
     }
 
-    single_config (object) {
-        const { model, app } = this;
+    build_notify (api) {
+        const notify = new Notify({
+            api,
+            log:    this.log,
+        });
+
+        for (const vers of ["v1", "v2"]) {
+            notify.watch(`${vers}/app/:app/object/:obj`, this.single_config.bind(this));
+            notify.watch(`${vers}/app/:app/object/`, this.config_list.bind(this));
+            notify.search(`${vers}/app/:app/object/`, this.config_search.bind(this));
+        }
+
+        notify.watch("v2/class/:class/member/",
+            this.class_watch.bind(this, "all_membership"));
+        notify.watch("v2/class/:class/subclass/",
+            this.class_watch.bind(this, "all_subclass"));
+        notify.watch("v2/class/:class/direct/member/",
+            this.class_watch.bind(this, "membership"));
+        notify.watch("v2/class/:class/direct/subclass/",
+            this.class_watch.bind(this, "subclass"));
+
+        return notify;
+    }
+
+    run () { this.notify.run(); }
+    
+    /* XXX This is not right. Until we have a push Auth API we will need
+     * to check ACLs for every update, but we should avoid sending more
+     * updates after a 403 until we get an ACL change. */
+    acl_checker (session, ...args) {
+        const check = async update => {
+            const ok = await this.auth.check_acl(session.principal, ...args);
+            if (ok)
+                return update;
+
+            return {
+                status: update.status,
+                response: {
+                    status: 403,
+                },
+            };
+        };
+
+        return rx.concatMap(check);
+    }
+
+    single_config (session, app, object) {
+        const { model } = this;
+
+        const ck_acl = this.acl_checker(session, Perm.Read_App, app, true);
 
         /* XXX Strictly there is a race condition here: the initial fetch
          * does not slot cleanly into the sequence of updates. This would be
@@ -105,27 +132,29 @@ class ConfigWatch {
             rx.concat(
                 model.config_get({ app, object }),
                 rxx.rx(
-                    this.updates,
+                    this.config_updates,
                     rx.filter(u => u.app == app && u.object == object))),
             rx.map(entry_response),
             rx.map(mk_res),
-            this.check_acl);
+            ck_acl);
     }
 
-    config_list () {
-        const { model, app } = this;
+    config_list (session, app) {
+        const { model } = this;
+
+        const ck_acl = this.acl_checker(session, Perm.Read_App, app, true);
 
         /* Here we fetch the complete list every time. We could track
          * the list contents from changes but this is safer. */
         return rxx.rx(
-            this.updates,
+            this.config_updates,
             rx.filter(u => u.app == app),
             set_contents(() => model.config_list(app)),
-            this.check_acl);
+            ck_acl);
     }
 
-    async search_full (status) {
-        const { model, app } = this;
+    async search_full (app, status) {
+        const { model } = this;
 
         const entries = await model.config_get_all(app);
         if (!entries)
@@ -140,117 +169,40 @@ class ConfigWatch {
         };
     }
 
-    search_filter (seq, filter) {
-        const want = r => r.status < 300 && jmp_match(r.body, filter)
-        return rxx.rx(
-            seq,
-            rxu.withState(imm.Set(), (okids, u) => {
-                if (!u.child) {
-                    /* Don't touch no-access updates */
-                    if (!u.children)
-                        return [imm.Set(), rx.of(u)];
-                    const entries = imm.Seq(u.children).filter(want);
-                    return [
-                        entries.keySeq().toSet(),
-                        rx.of({ ...u, children: entries.toJS() }),
-                    ];
-                }
-                const child = u.child;
-                const nkids = want(u.response) ? okids.add(child) : okids.delete(child);
-                const nu = nkids.has(child) ? rx.of(u)
-                    : okids.has(child)
-                        ? rx.of({ status: 200, child, response: { status: 412 } })
-                    : rx.EMPTY;
-                return [nkids, nu];
-            }),
-            rx.mergeAll());
-    }
+    config_search (session, app) {
+        const acl = this.acl_checker(session, Perm.Read_App, app, true);
 
-    config_search (filter) {
-        const { model, app } = this;
-
-        const search = rxx.rx(
-            this.updates,
+        const full = () => this.search_full(app);
+        const updates = rxx.rx(
+            this.config_updates,
             rx.filter(u => u.app == app),
             rx.map(entry => ({
                 status:     200,
                 child:      entry.object,
                 response:   entry_response(entry),
-            })),
-            /* This will always be replaced with a full update */
-            rx.startWith({ status: 201, child: true }),
-            /* This will send a parent 403 if the ACL check fails */
-            this.check_acl,
-            rxu.asyncState(false, async (child_ok, u) => {
-                const rv = u.child && !child_ok
-                    ? await this.search_full(u.status)
-                    : u;
-                return [rv.child || rv.children, rv];
-            }));
+            })));
 
-        return filter ? this.search_filter(search, filter) : search;
-    }
-}
-
-/* XXX This is not ideal. There is a race between the update and the
- * lookup meaning we might miss notifications. It would be better to
- * pass the update in the sequence but I think that would mean caching
- * the whole class structure js-side. */
-function class_watch (rel, session, klass) {
-    const model = session.model;
-
-    const ck_acl = acl_checker(session, Perm.Manage_Obj, klass, true);
-
-    return rxx.rx(
-        model.updates,
-        rx.filter(u => u.type == "class"),
-        rx.tap(v => model.log("CLASS UPDATE: %s %s", rel, klass)),
-        set_contents(() => model.class_lookup(klass, rel)),
-        ck_acl,
-        rx.tap(l => model.log("SENDING CLASS UPDATE: %s %s: %o", rel, klass, l)));
-}
-
-export class CDBNotify extends Notify {
-    constructor (opts) {
-        super(opts);
-        this.model = opts.model;
+        return { acl, full, updates };
     }
 
-    build_handlers () {
-        const v1_2 = vers => [
-            new WatchFilter({
-                path:       `${vers}/app/:app/object/:obj`,
-                handler:    (s, a, o) => new ConfigWatch(s, a).single_config(o),
-            }),
-            new WatchFilter({
-                path:       `${vers}/app/:app/object/`,
-                handler:    (s, a) => new ConfigWatch(s, a).config_list(),
-            }),
-            new SearchFilter({
-                path:       `${vers}/app/:app/object/`,
-                handler:    (s, f, a) => new ConfigWatch(s, a).config_search(f),
-            }),
-        ];
-        return [
-            ...v1_2("v1"),
-            ...v1_2("v2"),
-            new WatchFilter({
-                path:       "v2/class/:class/member/",
-                handler:    class_watch.bind(null, "all_membership"),
-            }),
-            new WatchFilter({
-                path:       "v2/class/:class/subclass/",
-                handler:    class_watch.bind(null, "all_subclass"),
-            }),
-            new WatchFilter({
-                path:       "v2/class/:class/direct/member/",
-                handler:    class_watch.bind(null, "membership"),
-            }),
-            new WatchFilter({
-                path:       "v2/class/:class/direct/subclass/",
-                handler:    class_watch.bind(null, "subclass"),
-            }),
-        ];
+    /* XXX This is not ideal. There is a race between the update and the
+     * lookup meaning we might miss notifications. It would be better to
+     * pass the update in the sequence but I think that would mean caching
+     * the whole class structure js-side. */
+    class_watch (rel, session, klass) {
+        const { model } = this;
+
+        /* XXX We should check different perms for direct and derived */
+        const ck_acl = this.acl_checker(session, Perm.Manage_Obj, klass, true);
+
+        return rxx.rx(
+            this.model.updates,
+            rx.filter(u => u.type == "class"),
+            /* This line opens a txn per update per watcher. This is not
+             * good. Perhaps have a shared seq querying the full
+             * relation set on every update? Or just track changes
+             * properly... */
+            set_contents(() => model.class_lookup(klass, rel)),
+            ck_acl);
     }
-    
 }

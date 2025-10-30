@@ -52,6 +52,7 @@ objects:
     !u ACS.Driver.TPlinkSmartPlug:  { name: "TP-Link smart plug" }
     !u ACS.Driver.External:         { name: "External driver" }
     !u ACS.Driver.ADS:              { name: "ADS" }
+    !u ACS.Driver.RTDE:             { name: "RTDE" }
 
 configs:
   # Driver Definition Configuration
@@ -633,6 +634,43 @@ configs:
           - targetAmsNetId
           - routerAddress
         title: ADS Connection Details
+        type: object
+
+    !u ACS.Driver.RTDE:
+      image:
+        repository: edge-rtde
+      polled: false
+      presentation:
+        address:
+          description: "The Metric Address to subscribe to. Available addresses: json/state (complete robot state), json/jointData (joint positions/velocities/currents), json/cartesianInfo (TCP position/orientation), json/robotModeData (robot mode/speeds/emergency stop), json/toolData (tool I/O/voltage/current), json/masterboardData (master board I/O/safety mode), json/forceModeFrame (force mode data), json/additionalInfo (freedrive button status), json/toolCommunicationInfo (tool communication settings)"
+          icon: "exchange-alt"
+          placeholder: "e.g. json/jointData"
+          title: "Metric Address"
+        path:
+          description: "JSONPath notation to extract specific values from the message payload. Examples: $[0].positionActual (joint 0 position), $.toolVectorX (TCP X position), $.robotMode (robot mode), $.toolVoltage48V (tool voltage), $.freedriveButtonPressed (freedrive button status)"
+          icon: "code"
+          placeholder: "e.g. $[0].positionActual"
+          title: "JSON Path"
+      schema:
+        properties:
+          host:
+            minLength: 1
+            options:
+              order: 1
+            title: "Hostname/IP"
+            type: string
+          port:
+            default: 30001
+            description: "RTDE interface port. Common ports: 30001 (RTDE configuration/setup), 30002 (Dashboard server), 30003 (Primary/Secondary interface), 30004 (RTDE data exchange - most common for real-time streaming)"
+            minLength: 1
+            options:
+              order: 2
+            title: "Port"
+            type: number
+        required:
+          - host
+          - port
+        title: "RTDE Connection Details"
         type: object
 
     !u ACS.Driver.External:

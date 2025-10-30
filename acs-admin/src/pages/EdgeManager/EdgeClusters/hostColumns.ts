@@ -14,6 +14,7 @@ export interface Host {
     control_plane: boolean,
     os_version: string,
     ready: boolean,
+    specialised: string,
 }
 
 export const hostColumns: ColumnDef<Host>[] = [
@@ -72,6 +73,20 @@ export const hostColumns: ColumnDef<Host>[] = [
         }),
         cell: ({row}) => {
             return h('div', {class: 'max-w-[500px] truncate'}, row.getValue('k8s_version'))
+        },
+        filterFn: (row, id, value) => {
+            return value.includes(row.getValue(id))
+        },
+    },
+    {
+        accessorKey: 'specialised',
+        accessorFn: (row) => row.specialised,
+        header: ({column}) => h(DataTableColumnHeader, {
+            column,
+            title: 'Taint'
+        }),
+        cell: ({row}) => {
+            return h('div', {class: 'max-w-[500px] truncate'}, row.getValue('specialised'))
         },
         filterFn: (row, id, value) => {
             return value.includes(row.getValue(id))

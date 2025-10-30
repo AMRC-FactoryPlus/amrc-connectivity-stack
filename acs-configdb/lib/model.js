@@ -61,10 +61,6 @@ function _q_uuids (...args) {
     return _q_set(...args).then(rs => rs.map(r => r.uuid));
 }
 
-function _q_exists (...args) {
-    return _q_set(...args).then(rs => rs.length != 0);
-}
-
 export default class Model extends EventEmitter {
     constructor(opts) {
         super();

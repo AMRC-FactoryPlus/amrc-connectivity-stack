@@ -1,7 +1,6 @@
 {
-  "name": "edge-helm-charts",
-  "version": "0.0.0",
-  "description": "",
+  "name": "edge-rtde",
+  "version": "1.0.0",
   "main": "index.js",
   "type": "module",
   "scripts": {
@@ -10,8 +9,11 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
+  "description": "",
   "dependencies": {
-    "@amrc-factoryplus/service-client": "../lib/js-service-client",
-    "isomorphic-git": "^1.32.2"
+    "@amrc-factoryplus/edge-driver": "^0.1.0",
+    "dotenv": "^17.2.3",
+    "node-int64": "^0.4.0",
+    "ur-rtde": "^1.0.0"
   }
 }

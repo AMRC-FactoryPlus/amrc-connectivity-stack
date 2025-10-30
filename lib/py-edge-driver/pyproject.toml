@@ -1,9 +1,9 @@
 [project]
-name = "py-edge-driver"
+name = "amrc.factoryplus.edge_driver"
 version = "0.1.0"
 description = "An Edge Agent driver library for Factory+."
 authors = [{ name = "KavanPrice", email = "kavanprice@gmail.com" }]
-license = { text = "MIT" }
+license = "MIT"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = ["paho-mqtt (>=2.1.0,<3.0.0)", "asyncio (>=3.4.3,<4.0.0)"]
@@ -12,6 +12,11 @@ dependencies = ["paho-mqtt (>=2.1.0,<3.0.0)", "asyncio (>=3.4.3,<4.0.0)"]
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+packages = [
+    { include = "amrc", from = "src" }
+]
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.5"

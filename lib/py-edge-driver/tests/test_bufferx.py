@@ -3,7 +3,7 @@
 import struct
 import pytest
 
-import py_edge_driver.bufferx as BufferX
+import amrc.factoryplus.edge_driver.bufferx as BufferX
 
 def test_from_int8():
     """

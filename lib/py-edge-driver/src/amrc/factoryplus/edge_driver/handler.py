@@ -1,25 +1,21 @@
 # Copyright (c) University of Sheffield AMRC 2025.
 
-"""
-Handler Protocol Module
+from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING, ClassVar, Optional, Set, Any, Dict, Callable, Union, Awaitable
 
-This module defines the protocol (interface) that all device handlers must implement.
-Handlers are responsible for the device-specific logic and communication details.
-"""
-
-from typing import TYPE_CHECKING, Protocol, ClassVar, Optional, Set, Any, Dict, Callable, Union, Awaitable
 if TYPE_CHECKING:
     from .driver import Driver
 
-class HandlerProtocol(Protocol):
-    """
-    Protocol defining the interface for device handlers.
 
-    Any class implementing this protocol can be used as a device handler
-    with the Driver class.
+class Handler(ABC):
+    """
+    Abstract base class defining the interface for device handlers.
+
+    Any class implementing this interface can be used as a device handler
+    with the Driver class. This class cannot be instantiated directly.
     """
 
-    validAddrs: ClassVar[Optional[Set[Any]]]
+    validAddrs: ClassVar[Optional[Set[Any]]] = None
     """Set of valid addresses that this handler can manage, or None if any address is valid."""
 
     def parseAddr(self, addr: Any) -> Any:
@@ -32,8 +28,9 @@ class HandlerProtocol(Protocol):
         Returns:
             The parsed address, or a falsy value if parsing failed
         """
-        ...
+        return addr
 
+    @abstractmethod
     def close(self, callback: Optional[Callable[[], None]] = None) -> Any:
         """
         Close the handler and clean up any resources.
@@ -44,8 +41,9 @@ class HandlerProtocol(Protocol):
         Returns:
             An optional result that may be used by the driver
         """
-        ...
+        pass
 
+    @abstractmethod
     def connect(self) -> Union[Awaitable[str], None]:
         """
         Connect to the southbound device.
@@ -53,7 +51,7 @@ class HandlerProtocol(Protocol):
         Returns:
             A string representing the connection status or None if using callbacks.
         """
-        ...
+        pass
 
     def cmd(self, command_name: Any, payload: Any) -> None:
         """
@@ -63,9 +61,11 @@ class HandlerProtocol(Protocol):
             command_name: Name of the command to execute. To be parsed by the handler.
             payload: Payload for the command to use. To be parsed by the handler.
         """
+        pass
 
     @classmethod
-    def create(cls, driver: 'Driver', conf: Dict[str, Any]) -> Optional['HandlerProtocol']:
+    @abstractmethod
+    def create(cls, driver: 'Driver', conf: Dict[str, Any]) -> 'Handler':
         """
         Create a new handler instance for the given driver and configuration.
 
@@ -76,7 +76,7 @@ class HandlerProtocol(Protocol):
         Returns:
             A new handler instance, or None if creation failed
         """
-        ...
+        pass
 
     def poll(self, spec: Any) -> Union[Any, Awaitable[Any]]:
         """
@@ -91,4 +91,4 @@ class HandlerProtocol(Protocol):
             The polled data (can be bytes, string, or any serializable data),
             or an awaitable that resolves to the data. Returns None if no data available.
         """
-        ...
+        return None

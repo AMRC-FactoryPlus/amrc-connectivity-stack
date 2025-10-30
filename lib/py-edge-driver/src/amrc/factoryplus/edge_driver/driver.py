@@ -7,7 +7,7 @@ import paho.mqtt.client as mqtt # type: ignore
 from paho.mqtt.enums import CallbackAPIVersion
 import asyncio
 
-from .handler_protocol import HandlerProtocol
+from .handler import Handler
 
 # Permitted status returns from Handler.connect.
 CONNECT_STATUS: Set[str] = {"UP", "CONN", "AUTH"}
@@ -15,7 +15,7 @@ CONNECT_STATUS: Set[str] = {"UP", "CONN", "AUTH"}
 class Driver:
     def __init__(
             self,
-            handler: Type[HandlerProtocol],
+            handler: Type[Handler] | None,
             edge_username: str,
             edge_mqtt: str,
             edge_password: str,
@@ -31,7 +31,7 @@ class Driver:
             edge_password: Password to connect to edge MQTT
             reconnect_delay: Delay in reconnecting to the southbound device
         """
-        self.HandlerClass: Type[HandlerProtocol] = handler
+        self.HandlerClass: Type[Handler] | None = handler
 
         self.status = "DOWN"
         self.clear_addrs()
@@ -133,26 +133,25 @@ class Driver:
             True if the handler was successfully set up, False otherwise
         """
         if not conf:
+            self.log.error("No config provided for the handler.")
             return False
 
         if not self.HandlerClass:
+            self.log.error("No handler class for the driver to use.")
             return False
 
         self.handler = self.HandlerClass.create(self, conf)
 
-        valid = getattr(self.handler.__class__, 'validAddrs', None)
-        parse = getattr(self.handler, 'parseAddr', lambda a: a)
-
         def handle_addrs(addrs):
                 entries = list(addrs.items())
 
-                if valid:
-                    bad_entries = [(t, a) for t, a in entries if a not in valid]
+                if self.handler.validAddrs:
+                    bad_entries = [(t, a) for t, a in entries if a not in self.handler.validAddrs]
                     if bad_entries:
                         self.log.error(f"Invalid addresses: {bad_entries}")
                         return False
 
-                parsed_entries = [(t, parse(a)) for t, a in entries]
+                parsed_entries = [(t, self.handler.parseAddr(a)) for t, a in entries]
 
                 bad_addresses = [addrs[t] for t, s in parsed_entries if not s]
                 if bad_addresses:
@@ -397,48 +396,49 @@ class Driver:
 
     def setup_message_handlers(self) -> None:
         """Set up handlers for different message types."""
-        def active_handler(payload, _=None):
-            if str(payload) == "ONLINE":
-                self.set_status("READY")
 
-        def conf_handler(payload, _=None):
-            conf = self.json(payload)
-            self.log.debug(f"CONF: {conf}")
+        self.message("active", self.active_handler)
+        self.message("conf", self.conf_handler)
+        self.message("addr", self.addr_handler)
+        self.message("cmd/#", self.cmd_handler)
 
-            self.clear_addrs()
-            old = getattr(self, 'handler', None)
+    def active_handler(self, payload, _=None):
+        if str(payload) == "ONLINE":
+            self.set_status("READY")
 
-            if self.setup_handler(conf):
-                if old and hasattr(old, 'close'):
-                    self._run_async(self._handle_close(old))
-                else:
-                    self._run_async(self.connect_handler())
+    def conf_handler(self, payload, _=None):
+        conf = self.json(payload)
+        self.log.debug(f"CONF: {conf}")
+
+        self.clear_addrs()
+        old = getattr(self, 'handler', None)
+
+        if self.setup_handler(conf):
+            if old and hasattr(old, 'close'):
+                self._run_async(self._handle_close(old))
             else:
-                self.log.error("Handler rejected driver configuration!")
-                self.set_status("CONF")
+                self._run_async(self.connect_handler())
+        else:
+            self.log.error("Handler rejected driver configuration!")
+            self.set_status("CONF")
 
-        def addr_handler(payload, _=None):
-            addr_config = self.json(payload)
-            if not addr_config:
+    def addr_handler(self, payload, _=None):
+        addr_config = self.json(payload)
+        if not addr_config:
+            self.set_status("ADDR")
+            return
+
+        async def process_addrs():
+            if not await self.set_addrs(addr_config):
                 self.set_status("ADDR")
-                return
 
-            async def process_addrs():
-                if not await self.set_addrs(addr_config):
-                    self.set_status("ADDR")
+        self._run_async(process_addrs())
 
-            self._run_async(process_addrs())
-
-        def cmd_handler(payload, command_name=None):
-            if hasattr(self, 'handler') and hasattr(self.handler, 'cmd') and self.handler:
-                self.handler.cmd(command_name, payload)
-            else:
-                self.log.error(f"Command handler for '{command_name}' does not exist.")
-
-        self.message("active", active_handler)
-        self.message("conf", conf_handler)
-        self.message("addr", addr_handler)
-        self.message("cmd/#", cmd_handler)
+    def cmd_handler(self, payload, command_name=None):
+        if self.handler:
+            self.handler.cmd(command_name, payload)
+        else:
+            self.log.error(f"Command handler for '{command_name}' does not exist.")
 
     def get_mqtt_details(self, broker: str) -> Tuple[str, int]:
         """

@@ -6,13 +6,13 @@ from typing import Dict, Union, Type
 
 from .driver import Driver
 
-from .handler_protocol import HandlerProtocol
+from .handler import Handler
 
 
 class AsyncDriver(Driver):
     def __init__(
         self,
-        handler: Type[HandlerProtocol],
+        handler: Type[Handler],
         edge_username: str,
         edge_mqtt: str,
         edge_password: str,

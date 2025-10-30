@@ -5,7 +5,7 @@ from typing import Dict, Any, Optional, Callable, List, Type
 
 from .driver import Driver
 
-from .handler_protocol import HandlerProtocol
+from .handler import Handler
 
 Q_TIMEOUT = 30.0  # 30 seconds
 Q_MAX = 20
@@ -14,7 +14,7 @@ class PolledDriver(Driver):
 
     def __init__(
         self,
-        handler: Type[HandlerProtocol],
+        handler: Type[Handler],
         edge_username: str,
         edge_mqtt: str,
         edge_password: str,
@@ -191,11 +191,6 @@ class PolledDriver(Driver):
 
             try:
                 self.log.debug(f"READ {spec}")
-
-                # Call handler's poll method
-                if not self.handler or not hasattr(self.handler, 'poll'):
-                    self.log.warning("Handler doesn't support polling")
-                    continue
 
                 poll_result = self.handler.poll(spec)
 

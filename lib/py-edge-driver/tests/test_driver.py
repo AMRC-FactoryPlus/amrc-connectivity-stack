@@ -7,11 +7,11 @@ from unittest.mock import MagicMock, AsyncMock
 import paho.mqtt.client
 
 from amrc.factoryplus.edge_driver.driver import Driver
-from amrc.factoryplus.edge_driver.handler_protocol import HandlerProtocol
+from amrc.factoryplus.edge_driver.handler import Handler
 
 @pytest.fixture
 def mock_handler_class(mocker):
-    return mocker.MagicMock(spec=HandlerProtocol)
+    return mocker.MagicMock(spec=Handler)
 
 @pytest.fixture
 def basic_driver_instance(mock_handler_class):

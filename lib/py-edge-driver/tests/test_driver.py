@@ -54,3 +54,17 @@ def test_driver_json(basic_driver_instance):
     json_data2 = '{"bool1": true, "bool2": false}'
     decoded_data2 = basic_driver_instance.json(json_data2)
     assert decoded_data2 == {"bool1": True, "bool2": False}
+
+def test_driver_mqtt_url(basic_driver_instance):
+    assert basic_driver_instance.get_mqtt_details("mqtts://localhost:8883") == ("localhost", 8883)
+    assert basic_driver_instance.get_mqtt_details("mqtt://my.example.com:1883") == ("my.example.com", 1883)
+
+    with pytest.raises(ValueError, match="Scheme must be mqtt or mqtts"):
+        basic_driver_instance.get_mqtt_details("http://my.example.com:1883")
+
+    with pytest.raises(ValueError, match="Hostname not found"):
+        basic_driver_instance.get_mqtt_details("mqtts://:1883")
+
+    with pytest.raises(ValueError, match="Port not found"):
+        basic_driver_instance.get_mqtt_details("mqtt://my.example.com")
+

@@ -6,6 +6,7 @@ from typing import Dict, Any, Optional, Callable, Type, Mapping, Set, Tuple, Lis
 import paho.mqtt.client as mqtt # type: ignore
 from paho.mqtt.enums import CallbackAPIVersion
 import asyncio
+import urllib.parse
 
 from .handler import Handler
 
@@ -445,16 +446,26 @@ class Driver:
         Parse the MQTT broker URL to extract host and port.
 
         Args:
-            broker: MQTT broker URL in format "mqtt://host:port" or "host:port"
+            broker: MQTT broker URL in format "mqtt://host:port" or "mqtts://host:port"
 
         Returns:
             A tuple containing (host, port) as strings
-        """
-        if broker.startswith("mqtt://"):
-            broker = broker[7:]
 
-        host_and_port = broker.split(":")
-        return host_and_port[0], int(host_and_port[1])
+        Raises:
+            ValueError: If the URL is invalid or port not found
+        """
+        parsed = urllib.parse.urlparse(broker)
+
+        if parsed.scheme not in ("mqtt", "mqtts", ""):
+            raise ValueError(f"Invalid MQTT URL: Scheme must be mqtt or mqtts but found {parsed.scheme}.")
+
+        if not parsed.hostname:
+            raise ValueError(f"Invalid MQTT URL: Hostname not found.")
+
+        if not parsed.port:
+            raise ValueError(f"Invalid MQTT URL: Port not found.")
+
+        return parsed.hostname, parsed.port
 
     async def _async_cleanup(self):
         """Cleanup async resources when shutting down"""

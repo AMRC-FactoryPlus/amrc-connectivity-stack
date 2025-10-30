@@ -1,5 +1,13 @@
 # Copyright (c) University of Sheffield AMRC 2025.
 
+"""
+Binary packing utilities.
+
+These are convenience wrappers around struct.pack() for common data types.
+
+Familiar users can use `struct.pack()` directly: `fromInt32LE(42)` is equivalent to `struct.pack('<i', 42)`
+"""
+
 import struct
 import json
 

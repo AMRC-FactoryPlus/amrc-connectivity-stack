@@ -370,8 +370,7 @@ class Driver:
             return
 
         try:
-            if isinstance(payload, bytes):
-                payload = payload.decode("utf-8")
+            payload = payload.decode("utf-8")
             handler(payload, data)
         except Exception as e:
             self.log.error(f"Error handling message {msg}: {e}")

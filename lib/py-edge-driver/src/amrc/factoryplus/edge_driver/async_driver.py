@@ -2,21 +2,34 @@
 
 import logging
 
-from typing import Dict, Any, Union
+from typing import Dict, Union, Type
 
 from .driver import Driver
 
+from .handler_protocol import HandlerProtocol
+
+
 class AsyncDriver(Driver):
-    def __init__(self, opts: Dict[str, Any]):
+    def __init__(
+        self,
+        handler: Type[HandlerProtocol],
+        edge_username: str,
+        edge_mqtt: str,
+        edge_password: str,
+        reconnect_delay: int = 500,
+    ):
         """
         Initialize the Async Driver with the provided options.
 
         Args:
-            opts: Configuration options including:
-                - handler: Handler class for device-specific logic
-                - env: Environment configuration
+
+            handler: Handler class for device-specific logic
+            edge_username: Username to connect to edge MQTT
+            edge_mqtt: Edge MQTT host
+            edge_password: Password to connect to edge MQTT
+            reconnect_delay: Delay in reconnecting to the southbound device
         """
-        super().__init__(opts)
+        super().__init__(handler, edge_username, edge_mqtt, edge_password, reconnect_delay)
 
     async def data(self, spec, buf):
         self.log.debug(f"DATA {buf}")
@@ -27,5 +40,7 @@ class AsyncDriver(Driver):
         mtopic = self.topic("data", dtopic)
         return self.publish_async(mtopic, buf)
 
-    def publish_async(self, topic: str, payload: Union[str, bytes, bytearray, int, float, None]):
+    def publish_async(
+        self, topic: str, payload: Union[str, bytes, bytearray, int, float, None]
+    ):
         return self.mqtt.publish(topic, payload)

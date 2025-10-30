@@ -13,32 +13,40 @@ from .handler_protocol import HandlerProtocol
 CONNECT_STATUS: Set[str] = {"UP", "CONN", "AUTH"}
 
 class Driver:
-    def __init__(self, opts: Dict[str, Any]):
+    def __init__(
+            self,
+            handler: Type[HandlerProtocol],
+            edge_username: str,
+            edge_mqtt: str,
+            edge_password: str,
+            reconnect_delay: int = 500
+    ):
         """
         Initialize the Driver with the provided options.
 
         Args:
-            opts: Configuration options including:
-                - handler: Handler class for device-specific logic
-                - env: Environment configuration
+            handler: Handler class for device-specific logic
+            edge_username: Username to connect to edge MQTT
+            edge_mqtt: Edge MQTT host
+            edge_password: Password to connect to edge MQTT
+            reconnect_delay: Delay in reconnecting to the southbound device
         """
-        self.HandlerClass: Type[HandlerProtocol] | None = opts.get("handler")
+        self.HandlerClass: Type[HandlerProtocol] = handler
 
         self.status = "DOWN"
         self.clear_addrs()
 
-        env = opts.get("env", {})
         self.log = logging.getLogger("driver")
 
-        self.id = env.get("EDGE_USERNAME")
+        self.id = edge_username
 
-        self.mqtt_host, self.mqtt_port = self.get_mqtt_details(env.get("EDGE_MQTT"))
-        self.mqtt = self.create_mqtt_client(env.get("EDGE_PASSWORD"))
+        self.mqtt_host, self.mqtt_port = self.get_mqtt_details(edge_mqtt)
+        self.mqtt = self.create_mqtt_client(edge_password)
 
         self.message_handlers: Dict[str, Callable] = {}
         self.setup_message_handlers()
 
-        self.reconnect = 5000
+        self.reconnect = reconnect_delay
         self.reconnecting = False
 
         # Create an asyncio event loop for running async tasks in sync contexts

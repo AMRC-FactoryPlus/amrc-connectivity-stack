@@ -1,27 +1,41 @@
 # Copyright (c) University of Sheffield AMRC 2025.
 
 import asyncio
-from typing import Dict, Any, Optional, Callable, List
+from typing import Dict, Any, Optional, Callable, List, Type
 
 from .driver import Driver
+
+from .handler_protocol import HandlerProtocol
 
 Q_TIMEOUT = 30.0  # 30 seconds
 Q_MAX = 20
 
 class PolledDriver(Driver):
-    def __init__(self, opts: Dict[str, Any]):
+
+    def __init__(
+        self,
+        handler: Type[HandlerProtocol],
+        edge_username: str,
+        edge_mqtt: str,
+        edge_password: str,
+        reconnect_delay: int = 500,
+        serial: bool = False,
+    ):
         """
-        Initialize the PolledDriver with the provided options.
+        Initialize the Async Driver with the provided options.
 
         Args:
-            opts: Configuration options including:
-                - handler: Handler class for device-specific logic
-                - env: Environment configuration
-                - serial: Whether to use serial polling (queue-based) or parallel
-        """
-        super().__init__(opts)
 
-        self.serial_mode = opts.get("serial", False)
+            handler: Handler class for device-specific logic
+            edge_username: Username to connect to edge MQTT
+            edge_mqtt: Edge MQTT host
+            edge_password: Password to connect to edge MQTT
+            reconnect_delay: Delay in reconnecting to the southbound device
+            serial: Whether to use serial polling (queue-based) or parallel
+        """
+        super().__init__(handler, edge_username, edge_mqtt, edge_password, reconnect_delay)
+
+        self.serial_mode = serial
         self.poller = self.create_poller()
 
         # For serial mode, we need a queue

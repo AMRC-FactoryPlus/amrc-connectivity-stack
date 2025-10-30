@@ -14,19 +14,15 @@ def mock_handler_class(mocker):
     return mocker.MagicMock(spec=HandlerProtocol)
 
 @pytest.fixture
-def basic_driver_instance():
+def basic_driver_instance(mock_handler_class):
     return Driver(
-        {
-            "handler": mock_handler_class,
-            "env": {
-                "EDGE_MQTT": "mqtt://localhost:1883",
-                "EDGE_USERNAME": "test_user",
-                "EDGE_PASSWORD": "test_password"
-            }
-        }
+        mock_handler_class,
+        "test_user",
+        "mqtt://localhost:1883",
+        "test_password",
     )
 
-def test_driver_init(basic_driver_instance):
+def test_driver_init(basic_driver_instance, mock_handler_class):
     """
     Test that the driver instance is initialized correctly with basic properties.
     """

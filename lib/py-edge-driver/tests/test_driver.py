@@ -8,11 +8,6 @@ import paho.mqtt.client
 
 from amrc.factoryplus.edge_driver.driver import Driver
 from amrc.factoryplus.edge_driver.handler_protocol import HandlerProtocol
-from amrc.factoryplus.edge_driver.debug import Debug
-
-@pytest.fixture
-def mock_debug_class(mocker):
-    return mocker.MagicMock(spec=Debug)
 
 @pytest.fixture
 def mock_handler_class(mocker):

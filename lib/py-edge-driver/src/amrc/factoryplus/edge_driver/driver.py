@@ -7,7 +7,6 @@ import paho.mqtt.client as mqtt # type: ignore
 from paho.mqtt.enums import CallbackAPIVersion
 import asyncio
 
-from .debug import Debug
 from .handler_protocol import HandlerProtocol
 
 # Permitted status returns from Handler.connect.
@@ -29,8 +28,7 @@ class Driver:
         self.clear_addrs()
 
         env = opts.get("env", {})
-        self.debug = Debug(env.get("VERBOSE", ""))
-        self.log = self.debug.bound("driver")
+        self.log = logging.getLogger("driver")
 
         self.id = env.get("EDGE_USERNAME")
 
@@ -85,7 +83,7 @@ class Driver:
         try:
             return json.loads(str(buf))
         except Exception as e:
-            self.log("JSON parse error: %s", e)
+            self.log.error("JSON parse error: %s", e)
             return None
 
     def create_mqtt_client(self, password: str) -> mqtt.Client:
@@ -143,14 +141,14 @@ class Driver:
                 if valid:
                     bad_entries = [(t, a) for t, a in entries if a not in valid]
                     if bad_entries:
-                        self.log(f"Invalid addresses: {bad_entries}")
+                        self.log.error(f"Invalid addresses: {bad_entries}")
                         return False
 
                 parsed_entries = [(t, parse(a)) for t, a in entries]
 
                 bad_addresses = [addrs[t] for t, s in parsed_entries if not s]
                 if bad_addresses:
-                    self.log(f"Invalid addresses: {bad_addresses}")
+                    self.log.error(f"Invalid addresses: {bad_addresses}")
                     return False
 
                 return parsed_entries
@@ -187,7 +185,7 @@ class Driver:
 
         After successful connection, this method subscribes to relevant topics.
         """
-        self.log("Connecting handler")
+        self.log.info("Connecting handler")
         if not self.handler:
             return
 
@@ -201,7 +199,7 @@ class Driver:
         if status in CONNECT_STATUS:
             self.set_status(status)
         else:
-            self.log(f"Handler.connect returned invalid value: {status}")
+            self.log.error(f"Handler.connect returned invalid value: {status}")
 
         if status != "UP":
             self._run_async(self.reconnect_handler())
@@ -237,11 +235,11 @@ class Driver:
         Attempt to reconnect the handler to the southbound device.
         """
         if self.reconnecting:
-            self.log("Handler already reconnecting")
+            self.log.warning("Handler already reconnecting")
             return
 
         self.reconnecting = True
-        self.log("Handler disconnected")
+        self.log.info("Handler disconnected")
         await asyncio.sleep(self.reconnect)
         self.reconnecting = False
         self._run_async(self.connect_handler())
@@ -263,13 +261,13 @@ class Driver:
             True if addresses were successfully set, False otherwise
         """
         if not self.handler:
-            self.log("Received addrs without handler")
+            self.log.error("Received addrs without handler")
             return False
 
         self.clear_addrs()
 
         if pkt.get("version") != 1:
-            self.log(f"Bad ddr config version: {pkt.get('version')}")
+            self.log.error(f"Bad ddr config version: {pkt.get('version')}")
             return False
 
         parsed = self.handle_addrs(pkt.get("addrs", {}))
@@ -278,7 +276,7 @@ class Driver:
 
         self.addrs = dict(parsed)
         self.topics = {addr: topic for topic, addr in parsed}
-        self.log(f"Set addrs: {self.addrs}")
+        self.log.info(f"Set addrs: {self.addrs}")
 
         self._run_async(self.subscribe())
 
@@ -298,11 +296,11 @@ class Driver:
             return False
 
         if self.status != "UP":
-            self.log("Handler not UP")
+            self.log.error("Handler not UP")
             return False
 
         if not self.addrs:
-            self.log("Addresses not configured or none available")
+            self.log.error("Addresses not configured or none available")
             return False
 
         specs = list(self.addrs.values())
@@ -317,10 +315,10 @@ class Driver:
                     success = result
 
                 if not success:
-                    self.log("Handler subscription failed")
+                    self.log.error("Handler subscription failed")
                     return False
             except Exception as e:
-                self.log(f"Handler subscription error: {e}")
+                self.log.error(f"Handler subscription error: {e}")
                 return False
 
         return True
@@ -332,7 +330,7 @@ class Driver:
         if topics:
             result, mid = self.mqtt.subscribe(topics)
             if result != mqtt.MQTT_ERR_SUCCESS:
-                self.log(f"Failed to subscribe to topics: {result}")
+                self.log.error(f"Failed to subscribe to topics: {result}")
 
         self.set_status("READY")
 
@@ -354,7 +352,7 @@ class Driver:
 
         topic_parts = topic.split("/")
         if len(topic_parts) < 3:
-            self.log(f"Invalid topic format: {topic}")
+            self.log.error(f"Invalid topic format: {topic}")
             return
 
         msg = topic_parts[2]
@@ -368,7 +366,7 @@ class Driver:
 
         handler = self.message_handlers.get(handler_key)
         if not handler:
-            self.log(f"Unhandled driver message: {msg}")
+            self.log.warning(f"Unhandled driver message: {msg}")
             return
 
         try:
@@ -376,7 +374,7 @@ class Driver:
                 payload = payload.decode('utf-8')
             handler(payload, data)
         except Exception as e:
-            self.log(f"Error handling message {msg}: {e}")
+            self.log.error(f"Error handling message {msg}: {e}")
 
     def message(self, msg: str, handler: Callable) -> None:
         """
@@ -397,7 +395,7 @@ class Driver:
 
         def conf_handler(payload, _=None):
             conf = self.json(payload)
-            self.log(f"CONF: {conf}")
+            self.log.debug(f"CONF: {conf}")
 
             self.clear_addrs()
             old = getattr(self, 'handler', None)
@@ -408,7 +406,7 @@ class Driver:
                 else:
                     self._run_async(self.connect_handler())
             else:
-                self.log("Handler rejected driver configuration!")
+                self.log.error("Handler rejected driver configuration!")
                 self.set_status("CONF")
 
         def addr_handler(payload, _=None):
@@ -427,7 +425,7 @@ class Driver:
             if hasattr(self, 'handler') and hasattr(self.handler, 'cmd') and self.handler:
                 self.handler.cmd(command_name, payload)
             else:
-                self.log(f"Command handler for '{command_name}' does not exist.")
+                self.log.error(f"Command handler for '{command_name}' does not exist.")
 
         self.message("active", active_handler)
         self.message("conf", conf_handler)

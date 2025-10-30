@@ -19,7 +19,7 @@ class AsyncDriver(Driver):
         super().__init__(opts)
 
     async def data(self, spec, buf):
-        self.log(f"DATA {buf}")
+        self.log.debug(f"DATA {buf}")
         dtopic = self.topics.get(spec) if self.topics else None
         if not dtopic:
             return

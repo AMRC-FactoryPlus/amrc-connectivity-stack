@@ -1,10 +1,7 @@
 # Copyright (c) University of Sheffield AMRC 2025.
 
 import asyncio
-import logging
 from typing import Dict, Any, Optional, Callable, List
-from concurrent.futures import Future
-import time
 
 from .driver import Driver
 
@@ -128,7 +125,7 @@ class PolledDriver(Driver):
         Args:
             e: The error that occurred during polling
         """
-        self.log(f"POLL ERR: {e}")
+        self.log.error(f"POLL ERR: {e}")
 
     def setup_message_handlers(self) -> None:
         """Set up message handlers including the poll handler."""
@@ -140,10 +137,10 @@ class PolledDriver(Driver):
                 topics = str(payload).strip().split('\n')
                 # Filter out empty topics
                 topics = [t.strip() for t in topics if t.strip()]
-                self.log(f"POLL {topics}")
+                self.log.debug(f"POLL {topics}")
 
                 if not self.poller:
-                    self.log("Can't poll, no poller!")
+                    self.log.error("Can't poll, no poller!")
                     return
 
                 self.poller(topics)
@@ -161,7 +158,7 @@ class PolledDriver(Driver):
             topics: List of topic names to poll
         """
         if not self.addrs:
-            self.log("Can't poll, no addrs! Is the device config invalid?")
+            self.log.error("Can't poll, no addrs! Is the device config invalid?")
             return
 
         # Build specs for polling
@@ -179,11 +176,11 @@ class PolledDriver(Driver):
             spec = spec_info['spec']
 
             try:
-                self.log(f"READ {spec}")
+                self.log.debug(f"READ {spec}")
 
                 # Call handler's poll method
                 if not self.handler or not hasattr(self.handler, 'poll'):
-                    self.log("Handler doesn't support polling")
+                    self.log.warning("Handler doesn't support polling")
                     continue
 
                 poll_result = self.handler.poll(spec)
@@ -195,17 +192,17 @@ class PolledDriver(Driver):
                 else:
                     buf = poll_result
 
-                self.log(f"DATA {buf}")
+                self.log.debug(f"DATA {buf}")
 
                 # Publish data if we got something
                 if buf is not None:
                     if self.mqtt.is_connected():
                         self.mqtt.publish(data_topic, buf)
                     else:
-                        self.log("MQTT not connected, skipping publish")
+                        self.log.warning("MQTT not connected, skipping publish")
 
             except Exception as e:
-                self.log(f"Error polling spec {spec}: {e}")
+                self.log.error(f"Error polling spec {spec}: {e}")
 
     async def _async_cleanup(self):
         """Override cleanup to handle queue processor task."""

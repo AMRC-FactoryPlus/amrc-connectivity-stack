@@ -2,8 +2,8 @@
 
 import logging
 import json
-from typing import Dict, Any, Optional, Callable, Type, Mapping, Set, Tuple, List
-import paho.mqtt.client as mqtt # type: ignore
+from typing import Dict, Optional, Callable, Type, Set, Tuple
+import paho.mqtt.client as mqtt  # type: ignore
 from paho.mqtt.enums import CallbackAPIVersion
 import asyncio
 import urllib.parse
@@ -13,14 +13,15 @@ from .handler import Handler
 # Permitted status returns from Handler.connect.
 CONNECT_STATUS: Set[str] = {"UP", "CONN", "AUTH"}
 
+
 class Driver:
     def __init__(
-            self,
-            handler: Type[Handler] | None,
-            edge_username: str,
-            edge_mqtt: str,
-            edge_password: str,
-            reconnect_delay: int = 500
+        self,
+        handler: Type[Handler] | None,
+        edge_username: str,
+        edge_mqtt: str,
+        edge_password: str,
+        reconnect_delay: int = 500,
     ):
         """
         Initialize the Driver with the provided options.
@@ -50,33 +51,24 @@ class Driver:
         self.reconnect = reconnect_delay
         self.reconnecting = False
 
-        # Create an asyncio event loop for running async tasks in sync contexts
-        self.loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(self.loop)
-
-        # Create event loop executor
         self._background_tasks = set()
 
-    def run(self) -> None:
+    async def run(self) -> None:
         """Run the driver. This connects to the MQTT broker and starts the
         MQTT loop."""
         self.mqtt.connect_async(self.mqtt_host, self.mqtt_port)
         self.mqtt.loop_start()
 
         try:
-            self.loop.run_until_complete(self.connect_handler())
-            self.loop.run_forever()
+            await self.connect_handler()
         except KeyboardInterrupt:
-            pass
-        finally:
-            self.loop.run_until_complete(self._async_cleanup())
-            self.loop.close()
+            self.log.info("Driver stopped.")
 
     def topic(self, msg, data=None) -> str:
         """Construct a topic string for the given message and data."""
         return f"fpEdge1/{self.id}/{msg}" + (f"/{data}" if data else "")
 
-    def json(self, buf: str|bytes|bytearray) -> Optional[dict]:
+    def json(self, buf: str | bytes | bytearray) -> Optional[dict]:
         """
         Parse a JSON string or buffer into a Python dictionary.
 
@@ -144,22 +136,24 @@ class Driver:
         self.handler = self.HandlerClass.create(self, conf)
 
         def handle_addrs(addrs):
-                entries = list(addrs.items())
+            entries = list(addrs.items())
 
-                if self.handler.validAddrs:
-                    bad_entries = [(t, a) for t, a in entries if a not in self.handler.validAddrs]
-                    if bad_entries:
-                        self.log.error(f"Invalid addresses: {bad_entries}")
-                        return False
-
-                parsed_entries = [(t, self.handler.parseAddr(a)) for t, a in entries]
-
-                bad_addresses = [addrs[t] for t, s in parsed_entries if not s]
-                if bad_addresses:
-                    self.log.error(f"Invalid addresses: {bad_addresses}")
+            if self.handler.validAddrs:
+                bad_entries = [
+                    (t, a) for t, a in entries if a not in self.handler.validAddrs
+                ]
+                if bad_entries:
+                    self.log.error(f"Invalid addresses: {bad_entries}")
                     return False
 
-                return parsed_entries
+            parsed_entries = [(t, self.handler.parseAddr(a)) for t, a in entries]
+
+            bad_addresses = [addrs[t] for t, s in parsed_entries if not s]
+            if bad_addresses:
+                self.log.error(f"Invalid addresses: {bad_addresses}")
+                return False
+
+            return parsed_entries
 
         self.handle_addrs = handle_addrs
 
@@ -210,33 +204,33 @@ class Driver:
             self.log.error(f"Handler.connect returned invalid value: {status}")
 
         if status != "UP":
-            self._run_async(self.reconnect_handler())
+            await self.reconnect_handler()
 
-        self._run_async(self.subscribe())
+        await self.subscribe()
 
-    def conn_up(self) -> None:
+    async def conn_up(self) -> None:
         """
         Set the handler status to UP.
         Used by the handler to notify the driver.
         """
         self.set_status("UP")
-        self._run_async(self.subscribe())
+        await self.subscribe()
 
-    def conn_failed(self) -> None:
+    async def conn_failed(self) -> None:
         """
         Set the handler status to CONN.
         Used by the handler to notify the driver.
         """
         self.set_status("CONN")
-        self._run_async(self.reconnect_handler())
+        await self.reconnect_handler()
 
-    def conn_unauth(self) -> None:
+    async def conn_unauth(self) -> None:
         """
         Set the handler status to AUTH.
         Used by the handler to notify the driver.
         """
         self.set_status("AUTH")
-        self._run_async(self.reconnect_handler())
+        await self.reconnect_handler()
 
     async def reconnect_handler(self) -> None:
         """
@@ -250,8 +244,7 @@ class Driver:
         self.log.info("Handler disconnected")
         await asyncio.sleep(self.reconnect)
         self.reconnecting = False
-        self._run_async(self.connect_handler())
-
+        await self.connect_handler()
 
     def clear_addrs(self) -> None:
         """Reset device addresses and topics to an empty state."""
@@ -286,7 +279,7 @@ class Driver:
         self.topics = {addr: topic for topic, addr in parsed}
         self.log.info(f"Set addrs: {self.addrs}")
 
-        self._run_async(self.subscribe())
+        await self.subscribe()
 
         return True
 
@@ -335,10 +328,9 @@ class Driver:
         """Subscribe to topics and set ready status."""
         topics = [(self.topic(t), 0) for t in self.message_handlers.keys()]
 
+        # Do non-blocking subscriptions. Paho does them sychronously.
         if topics:
-            result, mid = self.mqtt.subscribe(topics)
-            if result != mqtt.MQTT_ERR_SUCCESS:
-                self.log.error(f"Failed to subscribe to topics: {result}")
+            asyncio.create_task(self.__subscribe_async(topics))
 
         self.set_status("READY")
 
@@ -379,7 +371,7 @@ class Driver:
 
         try:
             if isinstance(payload, bytes):
-                payload = payload.decode('utf-8')
+                payload = payload.decode("utf-8")
             handler(payload, data)
         except Exception as e:
             self.log.error(f"Error handling message {msg}: {e}")
@@ -407,23 +399,23 @@ class Driver:
         if str(payload) == "ONLINE":
             self.set_status("READY")
 
-    def conf_handler(self, payload, _=None):
+    async def conf_handler(self, payload, _=None):
         conf = self.json(payload)
         self.log.debug(f"CONF: {conf}")
 
         self.clear_addrs()
-        old = getattr(self, 'handler', None)
+        old = getattr(self, "handler", None)
 
         if self.setup_handler(conf):
-            if old and hasattr(old, 'close'):
-                self._run_async(self._handle_close(old))
+            if old and hasattr(old, "close"):
+                await self.__handle_close(old)
             else:
-                self._run_async(self.connect_handler())
+                await self.connect_handler()
         else:
             self.log.error("Handler rejected driver configuration!")
             self.set_status("CONF")
 
-    def addr_handler(self, payload, _=None):
+    async def addr_handler(self, payload, _=None):
         addr_config = self.json(payload)
         if not addr_config:
             self.set_status("ADDR")
@@ -433,7 +425,7 @@ class Driver:
             if not await self.set_addrs(addr_config):
                 self.set_status("ADDR")
 
-        self._run_async(process_addrs())
+        await process_addrs()
 
     def cmd_handler(self, payload, command_name=None):
         if self.handler:
@@ -457,7 +449,9 @@ class Driver:
         parsed = urllib.parse.urlparse(broker)
 
         if parsed.scheme not in ("mqtt", "mqtts", ""):
-            raise ValueError(f"Invalid MQTT URL: Scheme must be mqtt or mqtts but found {parsed.scheme}.")
+            raise ValueError(
+                f"Invalid MQTT URL: Scheme must be mqtt or mqtts but found {parsed.scheme}."
+            )
 
         if not parsed.hostname:
             raise ValueError(f"Invalid MQTT URL: Hostname not found.")
@@ -467,20 +461,12 @@ class Driver:
 
         return parsed.hostname, parsed.port
 
-    async def _async_cleanup(self):
-        """Cleanup async resources when shutting down"""
-        for task in self._background_tasks:
-            task.cancel()
-            if self._background_tasks:
-                await asyncio.gather(*self._background_tasks, return_exceptions=True)
+    async def __subscribe_async(self, topics):
+        result, _ = await asyncio.to_thread(self.mqtt.subscribe, topics)
+        if result != mqtt.MQTT_ERR_SUCCESS:
+            self.log.error(f"Failed to subscribe to topics: {result}")
 
-    def _run_async(self, coro):
-        """Run a coroutine from a synchronous context, tracking the task"""
-        task = self.loop.create_task(coro)
-        self._background_tasks.add(task)
-        task.add_done_callback(self._background_tasks.discard)
-
-    async def _handle_close(self, old_handler):
+    async def __handle_close(self, old_handler):
         """Handle closing the old handler and connect the new one."""
         close_method = old_handler.close
 
@@ -497,7 +483,7 @@ class Driver:
 
         # If it returned a result, it might be awaitable
         if result is not None:
-            if hasattr(result, '__await__'):
+            if hasattr(result, "__await__"):
                 await result
             close_event.set()
         else:

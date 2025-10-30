@@ -22,14 +22,15 @@ class AsyncDriver(Driver):
         Initialize the Async Driver with the provided options.
 
         Args:
-
             handler: Handler class for device-specific logic
             edge_username: Username to connect to edge MQTT
             edge_mqtt: Edge MQTT host
             edge_password: Password to connect to edge MQTT
             reconnect_delay: Delay in reconnecting to the southbound device
         """
-        super().__init__(handler, edge_username, edge_mqtt, edge_password, reconnect_delay)
+        super().__init__(
+            handler, edge_username, edge_mqtt, edge_password, reconnect_delay
+        )
 
     async def data(self, spec, buf):
         self.log.debug(f"DATA {buf}")

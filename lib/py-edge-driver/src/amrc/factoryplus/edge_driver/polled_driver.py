@@ -1,14 +1,14 @@
 # Copyright (c) University of Sheffield AMRC 2025.
 
 import asyncio
-from typing import Dict, Any, Optional, Callable, List, Type
+from typing import Any, List, Type
 
 from .driver import Driver
-
 from .handler import Handler
 
 Q_TIMEOUT = 30.0  # 30 seconds
 Q_MAX = 20
+
 
 class PolledDriver(Driver):
 
@@ -22,10 +22,9 @@ class PolledDriver(Driver):
         serial: bool = False,
     ):
         """
-        Initialize the Async Driver with the provided options.
+        Initialize the Polled Driver with the provided options.
 
         Args:
-
             handler: Handler class for device-specific logic
             edge_username: Username to connect to edge MQTT
             edge_mqtt: Edge MQTT host
@@ -33,29 +32,30 @@ class PolledDriver(Driver):
             reconnect_delay: Delay in reconnecting to the southbound device
             serial: Whether to use serial polling (queue-based) or parallel
         """
-        super().__init__(handler, edge_username, edge_mqtt, edge_password, reconnect_delay)
+        super().__init__(
+            handler, edge_username, edge_mqtt, edge_password, reconnect_delay
+        )
 
         self.serial_mode = serial
-        self.poller = self.create_poller()
 
         # For serial mode, we need a queue
         if self.serial_mode:
-            self.poll_queue = asyncio.Queue(maxsize=Q_MAX)
-            self.queue_processor_task: Optional[asyncio.Task] = None
+            self.poll_queue: asyncio.Queue[List[str]] = asyncio.Queue(maxsize=Q_MAX)
 
-    def create_poller(self) -> Callable:
+    async def run(self) -> None:
         """
-        Create the polling function based on configuration.
+        Run the polled driver asynchronously.
 
-        Returns:
-            A callable that handles polling either serially or in parallel
+        This starts the queue processor for serial mode and then runs the base driver.
+        Should be called with asyncio.run(driver.run())
         """
+        # Start queue processor if in serial mode
         if self.serial_mode:
-            return self._serial_poller
-        else:
-            return self._parallel_poller
+            asyncio.create_task(self.__process_poll_queue())
 
-    def _serial_poller(self, topics: List[str]) -> None:
+        await super().run()
+
+    async def __serial_poller(self, topics: List[str]) -> None:
         """
         Handle serial polling by adding topics to a queue.
 
@@ -65,60 +65,55 @@ class PolledDriver(Driver):
         try:
             # Check if queue is too full
             if self.poll_queue.qsize() >= Q_MAX:
-                self.poll_err("Poll queue size exceeded. We're polling too fast for the device!")
+                self.poll_err(
+                    "Poll queue size exceeded. We're polling too fast for the device!"
+                )
                 return
 
-            # Start queue processor if not running
-            if not self.queue_processor_task or self.queue_processor_task.done():
-                self.queue_processor_task = self._run_async(self._process_poll_queue())
-
-            # Add topics to queue (non-blocking)
-            self._run_async(self._add_to_queue(topics))
+            # Add topics to queue (non-blocking with timeout)
+            try:
+                await asyncio.wait_for(self.poll_queue.put(topics), timeout=1.0)
+            except asyncio.TimeoutError:
+                self.poll_err("Timeout adding topics to poll queue")
 
         except Exception as e:
             self.poll_err(e)
 
-    def _parallel_poller(self, topics: List[str]) -> None:
+    async def __parallel_poller(self, topics: List[str]) -> None:
         """
         Handle parallel polling by directly executing the poll.
 
         Args:
             topics: List of topic names to poll
         """
-        # Create a task with timeout and error handling
-        self._run_async(self._poll_with_timeout(topics))
+        await self.__poll_with_timeout(topics)
 
-    async def _add_to_queue(self, topics: List[str]) -> None:
-        """Add topics to the poll queue."""
-        try:
-            await self.poll_queue.put(topics)
-        except asyncio.QueueFull:
-            self.poll_err("Poll queue is full")
-
-    async def _process_poll_queue(self) -> None:
+    async def __process_poll_queue(self) -> None:
         """Process items from the poll queue serially."""
+        self.log.info("Starting serial poll queue processor")
+
         while True:
             try:
                 # Get topics from queue with timeout
                 topics = await asyncio.wait_for(
-                    self.poll_queue.get(),
-                    timeout=1.0  # Check periodically if we should continue
+                    self.poll_queue.get(), timeout=1.0  # Check periodically
                 )
 
                 # Process the poll with timeout
-                await self._poll_with_timeout(topics)
+                await self.__poll_with_timeout(topics)
 
                 # Mark task as done
                 self.poll_queue.task_done()
 
             except asyncio.TimeoutError:
-                # No items in queue, continue waiting
                 continue
+            except asyncio.CancelledError:
+                self.log.info("Poll queue processor cancelled")
+                break
             except Exception as e:
                 self.poll_err(f"Queue processor error: {e}")
-                # Continue processing even if one item fails
 
-    async def _poll_with_timeout(self, topics: List[str]) -> None:
+    async def __poll_with_timeout(self, topics: List[str]) -> None:
         """
         Execute poll with timeout handling.
 
@@ -148,16 +143,20 @@ class PolledDriver(Driver):
         def poll_handler(payload, _=None):
             """Handle poll messages."""
             try:
-                topics = str(payload).strip().split('\n')
+                topics = str(payload).strip().split("\n")
                 # Filter out empty topics
                 topics = [t.strip() for t in topics if t.strip()]
                 self.log.debug(f"POLL {topics}")
 
-                if not self.poller:
-                    self.log.error("Can't poll, no poller!")
+                if not topics:
+                    self.log.warning("Poll message contained no valid topics")
                     return
 
-                self.poller(topics)
+                # Create task for polling based on mode
+                if self.serial_mode:
+                    asyncio.create_task(self.__serial_poller(topics))
+                else:
+                    asyncio.create_task(self.__parallel_poller(topics))
 
             except Exception as e:
                 self.poll_err(f"Error in poll handler: {e}")
@@ -175,19 +174,24 @@ class PolledDriver(Driver):
             self.log.error("Can't poll, no addrs! Is the device config invalid?")
             return
 
+        if not self.handler:
+            self.log.error("Can't poll, no handler configured")
+            return
+
         # Build specs for polling
         specs = []
         for topic in topics:
             if topic in self.addrs:
-                specs.append({
-                    'data': self.topic("data", topic),
-                    'spec': self.addrs[topic]
-                })
+                specs.append(
+                    {"data": self.topic("data", topic), "spec": self.addrs[topic]}
+                )
+            else:
+                self.log.warning(f"Topic '{topic}' not found in configured addresses")
 
         # Poll each spec
         for spec_info in specs:
-            data_topic = spec_info['data']
-            spec = spec_info['spec']
+            data_topic = spec_info["data"]
+            spec = spec_info["spec"]
 
             try:
                 self.log.debug(f"READ {spec}")
@@ -196,7 +200,7 @@ class PolledDriver(Driver):
 
                 # Handle both sync and async poll methods
                 buf: Any = None
-                if hasattr(poll_result, '__await__'):
+                if hasattr(poll_result, "__await__"):
                     buf = await poll_result
                 else:
                     buf = poll_result
@@ -212,16 +216,3 @@ class PolledDriver(Driver):
 
             except Exception as e:
                 self.log.error(f"Error polling spec {spec}: {e}")
-
-    async def _async_cleanup(self):
-        """Override cleanup to handle queue processor task."""
-        # Cancel queue processor if running
-        if self.queue_processor_task is not None and not self.queue_processor_task.done():
-            self.queue_processor_task.cancel()
-            try:
-                await self.queue_processor_task
-            except asyncio.CancelledError:
-                pass
-
-        # Call parent cleanup
-        await super()._async_cleanup()

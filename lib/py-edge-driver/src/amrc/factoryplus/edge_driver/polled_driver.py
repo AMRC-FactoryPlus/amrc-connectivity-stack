@@ -12,15 +12,7 @@ Q_MAX = 20
 
 class PolledDriver(Driver):
 
-    def __init__(
-        self,
-        handler: Type[Handler],
-        edge_username: str,
-        edge_mqtt: str,
-        edge_password: str,
-        reconnect_delay: int = 500,
-        serial: bool = False,
-    ):
+    def __init__(self, serial: bool = False, **opts):
         """
         Initialize the Polled Driver with the provided options.
 
@@ -32,10 +24,7 @@ class PolledDriver(Driver):
             reconnect_delay: Delay in reconnecting to the southbound device
             serial: Whether to use serial polling (queue-based) or parallel
         """
-        super().__init__(
-            handler, edge_username, edge_mqtt, edge_password, reconnect_delay
-        )
-
+        super().__init__(**opts)
         self.serial_mode = serial
 
         # For serial mode, we need a queue

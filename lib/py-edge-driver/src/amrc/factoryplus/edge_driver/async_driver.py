@@ -10,14 +10,7 @@ from .handler import Handler
 
 
 class AsyncDriver(Driver):
-    def __init__(
-        self,
-        handler: Type[Handler],
-        edge_username: str,
-        edge_mqtt: str,
-        edge_password: str,
-        reconnect_delay: int = 500,
-    ):
+    def __init__(self, **opts):
         """
         Initialize the Async Driver with the provided options.
 
@@ -28,9 +21,7 @@ class AsyncDriver(Driver):
             edge_password: Password to connect to edge MQTT
             reconnect_delay: Delay in reconnecting to the southbound device
         """
-        super().__init__(
-            handler, edge_username, edge_mqtt, edge_password, reconnect_delay
-        )
+        super().__init__(**opts)
 
     async def data(self, spec, buf):
         self.log.debug(f"DATA {buf}")

@@ -127,7 +127,7 @@ class Driver:
         Returns:
             True if the handler was successfully set up, False otherwise
         """
-        if not conf:
+        if conf is None:
             self.log.error("No config provided for the handler.")
             return False
 

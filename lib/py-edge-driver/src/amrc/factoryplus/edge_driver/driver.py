@@ -36,6 +36,7 @@ class Driver:
         self.HandlerClass: Type[Handler] | None = handler
 
         self.status = "DOWN"
+        self.handler: Handler | None = None
         self.clear_addrs()
 
         self.log = logging.getLogger("driver")
@@ -56,6 +57,7 @@ class Driver:
     async def run(self) -> None:
         """Run the driver. This connects to the MQTT broker and starts the
         MQTT loop."""
+        self._loop = asyncio.get_running_loop()
         self.mqtt.connect_async(self.mqtt_host, self.mqtt_port)
         self.mqtt.loop_start()
 
@@ -328,9 +330,10 @@ class Driver:
         """Subscribe to topics and set ready status."""
         topics = [(self.topic(t), 0) for t in self.message_handlers.keys()]
 
-        # Do non-blocking subscriptions. Paho does them sychronously.
         if topics:
-            asyncio.create_task(self.__subscribe_async(topics))
+            result, mid = self.mqtt.subscribe(topics)
+            if result != mqtt.MQTT_ERR_SUCCESS:
+                self.log.error(f"Failed to subscribe to topics: {result}")
 
         self.set_status("READY")
 
@@ -371,7 +374,11 @@ class Driver:
 
         try:
             payload = payload.decode("utf-8")
-            handler(payload, data)
+            if asyncio.iscoroutinefunction(handler):
+                if self._loop:
+                    asyncio.run_coroutine_threadsafe(handler(payload, data), self._loop)
+            else:
+                handler(payload, data)
         except Exception as e:
             self.log.error(f"Error handling message {msg}: {e}")
 
@@ -455,10 +462,9 @@ class Driver:
         if not parsed.hostname:
             raise ValueError(f"Invalid MQTT URL: Hostname not found.")
 
-        if not parsed.port:
-            raise ValueError(f"Invalid MQTT URL: Port not found.")
+        port = parsed.port or 1883
 
-        return parsed.hostname, parsed.port
+        return parsed.hostname, port
 
     async def __subscribe_async(self, topics):
         result, _ = await asyncio.to_thread(self.mqtt.subscribe, topics)

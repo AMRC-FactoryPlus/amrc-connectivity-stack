@@ -65,7 +65,7 @@ class Handler(ABC):
 
     @classmethod
     @abstractmethod
-    def create(cls, driver: 'Driver', conf: Dict[str, Any]) -> 'Handler':
+    def create(cls, driver, conf: Dict[str, Any]) -> 'Handler':
         """
         Create a new handler instance for the given driver and configuration.
 

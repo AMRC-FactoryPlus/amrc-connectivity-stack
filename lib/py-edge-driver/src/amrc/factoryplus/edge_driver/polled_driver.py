@@ -40,11 +40,11 @@ class PolledDriver(Driver):
         """
         # Start queue processor if in serial mode
         if self.serial_mode:
-            asyncio.create_task(self.__process_poll_queue())
+            asyncio.create_task(self._process_poll_queue())
 
         await super().run()
 
-    async def __serial_poller(self, topics: List[str]) -> None:
+    async def _serial_poller(self, topics: List[str]) -> None:
         """
         Handle serial polling by adding topics to a queue.
 
@@ -68,16 +68,16 @@ class PolledDriver(Driver):
         except Exception as e:
             self.poll_err(e)
 
-    async def __parallel_poller(self, topics: List[str]) -> None:
+    async def _parallel_poller(self, topics: List[str]) -> None:
         """
         Handle parallel polling by directly executing the poll.
 
         Args:
             topics: List of topic names to poll
         """
-        await self.__poll_with_timeout(topics)
+        await self._poll_with_timeout(topics)
 
-    async def __process_poll_queue(self) -> None:
+    async def _process_poll_queue(self) -> None:
         """Process items from the poll queue serially."""
         self.log.info("Starting serial poll queue processor")
 
@@ -89,7 +89,7 @@ class PolledDriver(Driver):
                 )
 
                 # Process the poll with timeout
-                await self.__poll_with_timeout(topics)
+                await self._poll_with_timeout(topics)
 
                 # Mark task as done
                 self.poll_queue.task_done()
@@ -102,7 +102,7 @@ class PolledDriver(Driver):
             except Exception as e:
                 self.poll_err(f"Queue processor error: {e}")
 
-    async def __poll_with_timeout(self, topics: List[str]) -> None:
+    async def _poll_with_timeout(self, topics: List[str]) -> None:
         """
         Execute poll with timeout handling.
 
@@ -141,11 +141,11 @@ class PolledDriver(Driver):
                     self.log.warning("Poll message contained no valid topics")
                     return
 
-                # Create task for polling based on mode
-                if self.serial_mode:
-                    asyncio.create_task(self.__serial_poller(topics))
-                else:
-                    asyncio.create_task(self.__parallel_poller(topics))
+                if self._loop:
+                    if self.serial_mode:
+                        asyncio.run_coroutine_threadsafe(self._serial_poller(topics), self._loop)
+                    else:
+                        asyncio.run_coroutine_threadsafe(self._parallel_poller(topics), self._loop)
 
             except Exception as e:
                 self.poll_err(f"Error in poll handler: {e}")

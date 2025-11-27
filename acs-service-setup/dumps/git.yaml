@@ -41,15 +41,16 @@ configs:
         pull:
           additionalProperties:
             type: object
-            required: [ref, url, interval]
+            required: [ref, url]
             properties:
-              ref: { type: string }
               url: { type: string }
+              ref: { type: string }
+              interval: { type: string }
+              merge: { type: string }
               auth:
                 type: object
                 properties:
                   secretRef: { type: string }
-              interval: { type: string }
         hooks:
           type: object
           additionalProperties:

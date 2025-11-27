@@ -38,6 +38,22 @@ configs:
       required: [path]
       properties:
         path: { type: string }
+        pull:
+          additionalProperties:
+            type: object
+            required: [ref, url, interval]
+            properties:
+              ref: { type: string }
+              url: { type: string }
+              auth:
+                type: object
+                properties:
+                  secretRef: { type: string }
+              interval: { type: string }
+        hooks:
+          type: object
+          additionalProperties:
+            type: string
 ---
 service: !u UUIDs.Service.Authentication
 version: 2
@@ -49,5 +65,12 @@ grants:
       !u Git.Perm.All: true
     !u UUIDs.Permission.ConfigDB.ReadConfig:
       !u Git.App.Config: false
+      !u ACS.App.SchemaMetadata: false
+    !u UUIDs.Permission.ConfigDB.WriteConfig:
+      !u UUIDs.App.Info: false
+      !u ACS.App.JsonSchema: false
+      !u ACS.App.SchemaMetadata: false
+    !u UUIDs.Permission.ConfigDB.ManageObjects:
+      !u UUIDs.Class.Schema: false
     !u ACS.Role.EdgeNodeConsumer:
       !u ACS.Device.ConfigDB: false

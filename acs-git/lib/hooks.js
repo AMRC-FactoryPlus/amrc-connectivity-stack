@@ -10,7 +10,6 @@
  */
 
 import fsp              from "fs/promises";
-import { setTimeout }   from "timers/promises";
 import { format }       from "util";
 
 import * as imm from "immutable";
@@ -102,11 +101,11 @@ export class Hooks {
         const msg = format("hook %s for %s branch %s",
             inst.hook, inst.repo, inst.branch);
 
-        //const hook = this.hooks.get(inst.hook);
-        //if (!hook) {
-        //    this.log("Undefined %s", msg);
-        //    return;
-        //}
+        const hook = this.hooks.get(inst.hook);
+        if (!hook) {
+            this.log("Undefined %s", msg);
+            return;
+        }
 
         /* XXX Should we retry on error? I'm not sure here. In general
          * an error is unlikely to be resolved by retrying, but there
@@ -115,10 +114,9 @@ export class Hooks {
          * Perhaps we should distinguish permanent problems with the
          * repo contents from temporary service errors? */
         this.log("Running %s", msg);
-        await setTimeout(6000);
-        //await hook(inst.repo, commit)
-        //    .then(() => this.log("Finished %s", msg))
-        //    .catch(err => this.log("Error running %s: %s", msg, err));
+        await hook(inst.repo, commit)
+            .then(() => this.log("Finished %s", msg))
+            .catch(err => this.log("Error running %s: %s", msg, err));
         
         await this.update_done(d => d.set(inst, commit));
     }

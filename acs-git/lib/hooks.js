@@ -87,7 +87,7 @@ export class Hooks {
         this.log("Want: %o", want.toJS());
         this.log("Done: %o", done.toJS());
 
-        const removed = done.keySeq().filter(inst => want.has(inst));
+        const removed = done.keySeq().filter(inst => !want.has(inst));
         this.log("Removed: %o", removed.toJS());
         await this.update_done(d => d.deleteAll(removed));
 

@@ -32,9 +32,9 @@ const load_yaml = async f => YAML.parse(
 
 export class Schemas {
     constructor (opts) {
-        this.dir    = opts.dir;
+        this.dir    = opts.workdir;
         this.gitdir = opts.gitdir;
-        this.source = opts.remote;
+        this.source = opts.url;
 
         this.cdb    = opts.fplus.ConfigDB;
         this.log    = opts.fplus.debug.bound("schemas");
@@ -46,9 +46,10 @@ export class Schemas {
         await this.load_schemas(schemas);
     }
 
-    async find_yamls (schemas) {
+    async find_yamls () {
         const yamls = new Map();
 
+        const schemas = $path.join(this.dir, "schemas");
         await Walk.walk(schemas, async (err, fullpath, dirent) => {
             if (err) throw err;
 
@@ -82,7 +83,7 @@ export class Schemas {
 
             const changes = (await git.log({
                 fs:         $fs,
-                gitdir:     this.girdir,
+                gitdir:     this.gitdir,
                 filepath:   `schemas/${path}`,
             })).map(l => l.commit.author.timestamp);
 

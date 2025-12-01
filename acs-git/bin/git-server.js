@@ -80,8 +80,9 @@ const pulls = await new AutoPull({
 }).init();
 
 const hooks = new Hooks({
-    fplus, status,
-    state:  `${root}/hook-state`,
+    fplus, status, data,
+    state:      `${root}/hook-state`,
+    checkouts:  `${root}/checkouts`,
 });
 
 const sparkplug = await new SparkplugNode({

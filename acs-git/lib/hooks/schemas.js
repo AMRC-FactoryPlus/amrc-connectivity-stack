@@ -25,7 +25,7 @@ const App = {
 };
 ///const source = process.env.source_repo;
 
-const path_rx = RegExp(`([\\w/_]+)-v(\\d+).yaml$`);
+const path_rx = /^([\w/_]+)-v(\d+).yaml$/;
 
 const load_yaml = async f => YAML.parse(
     await $fsp.readFile(f, { encoding: "utf8" }));
@@ -51,17 +51,21 @@ export default class Schemas {
 
         const schemas = $path.join(this.dir, "schemas");
         await Walk.walk(schemas, async (err, fullpath, dirent) => {
-            if (err) throw err;
+            const path = $path.relative(schemas, fullpath);
+
+            if (err)
+                return this.log("Error loading %s: %s", path, err);
 
             if (dirent.isDirectory()) return;
+            if (!path.endsWith(".yaml"))
+                return this.log("Skipping %s", path);
 
-            const path = $path.relative(schemas, fullpath);
             const matches = path.match(path_rx);
             if (!matches)
-                throw `Bad schema filename: ${path}`;
+                return this.log("Bad schema filename: %s", path);
             const [, name, version] = matches;
             if (!name || !version)
-                throw `Bad name or version for ${path}`;
+                return this.log("Bad name or version for %s", path);
 
             yamls.set(path, { 
                 meta:       { name, version },

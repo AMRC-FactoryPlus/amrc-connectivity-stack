@@ -63,7 +63,12 @@ export default class Schemas {
             if (!name || !version)
                 throw `Bad name or version for ${path}`;
 
-            yamls.set(path, { name, version });
+            yamls.set(path, { 
+                meta:       { name, version },
+                fullpath,
+                /* This must be Unix format as it's for git */
+                gitpath:    `schemas/${path}`,
+            });
         });
 
         return yamls;
@@ -71,10 +76,10 @@ export default class Schemas {
 
     async find_schemas (yamls) {
         const configs = new Map();
-        for (const [path, meta] of yamls.entries()) {
+        for (const [path, info] of yamls.entries()) {
             this.log("Processing %s", path);
 
-            const schema = await load_yaml(path);
+            const schema = await load_yaml(info.fullpath);
 
             const uuid = schema.properties?.Schema_UUID?.const;
             if (schema.$id != `urn:uuid:${uuid}`)
@@ -84,12 +89,12 @@ export default class Schemas {
             const changes = (await git.log({
                 fs:         $fs,
                 gitdir:     this.gitdir,
-                filepath:   `schemas/${path}`,
+                filepath:   info.gitpath,
             })).map(l => l.commit.author.timestamp);
 
             configs.set(uuid, {
                 metadata: {
-                    ...meta,
+                    ...info.meta,
                     created:    changes.at(-1),
                     modified:   changes.at(0),
                     source:     this.source,

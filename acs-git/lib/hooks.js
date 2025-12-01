@@ -110,8 +110,10 @@ export class Hooks {
         const changed = want.filter((commit, inst) => done.get(inst) != commit);
         this.log("Changed: %o", changed.toJS());
 
-        for (const [inst, commit] of changed) 
-            await this.run_hook(inst, commit);
+        for (const [inst, commit] of changed) {
+            const pull = configs.getIn([inst.repo, "pull", inst.branch]);
+            await this.run_hook(inst, commit, pull);
+        }
     }
 
     async checkout_for_hook (gitdir, ref) {
@@ -125,7 +127,7 @@ export class Hooks {
         return dir;
     }
 
-    async run_hook (inst, commit) {
+    async run_hook (inst, commit, pull) {
         const msg = format("hook %s for %s branch %s (%s)",
             inst.hook, inst.repo, inst.branch, commit);
 
@@ -137,6 +139,7 @@ export class Hooks {
 
         const gitdir = path.join(this.data, inst.repo);
         const workdir = await this.checkout_for_hook(gitdir, commit);
+        this.log("Using WD %s for %s", workdir, msg);
 
         /* XXX Should we retry on error? I'm not sure here. In general
          * an error is unlikely to be resolved by retrying, but there
@@ -145,7 +148,7 @@ export class Hooks {
          * Perhaps we should distinguish permanent problems with the
          * repo contents from temporary service errors? */
         this.log("Running %s", msg);
-        await new Hook({ ...inst, gitdir, workdir, fplus: this.fplus })
+        await new Hook({ ...inst, pull, gitdir, workdir, fplus: this.fplus })
             .run()
             .then(() => this.log("Finished %s", msg))
             .catch(err => this.log("Error running %s: %s", msg, err));

@@ -34,7 +34,7 @@ export default class Schemas {
     constructor (opts) {
         this.dir    = opts.workdir;
         this.gitdir = opts.gitdir;
-        this.source = opts.url;
+        this.source = opts.pull?.url;
 
         this.cdb    = opts.fplus.ConfigDB;
         this.log    = opts.fplus.debug.bound("schemas");

@@ -30,7 +30,7 @@ const path_rx = RegExp(`([\\w/_]+)-v(\\d+).yaml$`);
 const load_yaml = async f => YAML.parse(
     await $fsp.readFile(f, { encoding: "utf8" }));
 
-export class Schemas {
+export default class Schemas {
     constructor (opts) {
         this.dir    = opts.workdir;
         this.gitdir = opts.gitdir;

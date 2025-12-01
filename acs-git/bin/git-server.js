@@ -8,7 +8,7 @@
 import fs from "fs";
 import process from "process";
 
-import { ServiceClient }    from "@amrc-factoryplus/service-client";
+import { RxClient }         from "@amrc-factoryplus/rx-client";
 import { WebAPI }           from "@amrc-factoryplus/service-api";
 
 import { GIT_VERSION }      from "../lib/git-version.js";
@@ -38,7 +38,7 @@ process.on("uncaughtException", (err, origin) => {
 const root = process.env.DATA_DIR;
 const data = `${root}/repo`;
 
-const fplus = await new ServiceClient({
+const fplus = await new RxClient({
     env:                process.env,
     permission_group:   Git.Perm.All,
 }).init();

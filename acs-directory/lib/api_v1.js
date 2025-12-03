@@ -230,7 +230,7 @@ export default class API {
     }
 
     acl (principal) {
-        return this.fplus.Auth.fetch_raw_acl("kerberos", principal);
+        return this.fplus.Auth.fetch_auth_acl("kerberos", principal);
     }
 
     async alert_list (active_only, req, res) {

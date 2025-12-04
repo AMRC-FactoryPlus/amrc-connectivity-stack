@@ -5,14 +5,12 @@
  */
 
 import deep_equal from "deep-equal";
-import * as imm from "immutable";
 import * as rx from "rxjs";
 
 import * as rxx         from "@amrc-factoryplus/rx-util";
 import { Notify }       from "@amrc-factoryplus/service-api";
 
 import { Perm } from "./constants.js";
-import * as rxu from "./rx-util.js";
 
 const mk_res = (response, ix) => ({ status: ix ? 200 : 201, response });
 
@@ -39,25 +37,6 @@ function set_contents (lookup) {
         rx.distinctUntilChanged(deep_equal),
         rx.map(list_response),
         rx.map(mk_res));
-}
-
-function jmp_match (cand, filter) {
-    if (filter === null || typeof(filter) != "object")
-        return cand === filter;
-    if (Array.isArray(filter))
-        return deep_equal(cand, filter);
-
-    for (const [k, v] of Object.entries(filter)) {
-        if (v === null) {
-            if (k in cand)
-                return false;
-        }
-        else {
-            if (!(k in cand) || !jmp_match(cand[k], v))
-                return false;
-        }
-    }
-    return true;
 }
 
 export class CDBNotify {

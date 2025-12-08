@@ -36,7 +36,7 @@ int pykadmin_xdr_osa_princ_ent_rec(XDR *xdrs, osa_princ_ent_rec *entry) {
   if (!xdr_array(xdrs, (caddr_t *) &entry->old_keys, (unsigned int *) &entry->old_key_len, ~0, sizeof(osa_pw_hist_ent), pykadmin_xdr_osa_pw_hist_ent))
    	goto done;
 
-	result = 1;
+  result = 1;
 
 done:
 	
@@ -109,8 +109,8 @@ done:
 	return result;
 }
 
-int pykadmin_xdr_krb5_key_data(XDR *xdrs, krb5_key_data *key_data) {
-    
+int pykadmin_xdr_krb5_key_data(XDR *xdrs, void *data) {
+    krb5_key_data *key_data = (krb5_key_data *)data;
     int result = 0;
     unsigned int temp;
 
@@ -145,9 +145,9 @@ done:
 	return result;
 }
 
-int pykadmin_xdr_osa_pw_hist_ent(XDR *xdrs, osa_pw_hist_ent *pw_hist) {
-    
-	int result = 0;
+int pykadmin_xdr_osa_pw_hist_ent(XDR *xdrs, void *data) {
+    osa_pw_hist_ent *pw_hist = (osa_pw_hist_ent *)data;
+    int result = 0;
     if (!xdr_array(xdrs, (caddr_t *) &pw_hist->key_data, (unsigned int *) &pw_hist->n_key_data, ~0, sizeof(krb5_key_data), pykadmin_xdr_krb5_key_data))
     	goto done;
 

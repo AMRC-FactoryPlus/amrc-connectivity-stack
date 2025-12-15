@@ -321,6 +321,9 @@ configs:
         cd /
         rm -rf "$wd"
   !u Clusters.App.Flux:
+    # XXX Should this be reworked in terms of the K8sTemplate configs?
+    # Instead of a detailed manifest each file could hold an array of
+    # { resource, name, values } objects.
     !u Clusters.App.Flux:
       edge-cluster.yaml:
         - "{{ helm }}"

@@ -121,6 +121,7 @@ export class Deployments {
     _init_config () {
         const cdb = this.fplus.ConfigDB;
         const app = Edge.App.HelmRelease;
+        const res = Clusters.Resource;
 
         /* This is a Directory lookup, and we don't yet have notify on
          * the Directory. So just do a lookup every 2h on the very slim
@@ -133,7 +134,7 @@ export class Deployments {
             rx.map(base => uuid => new URL(`uuid/${uuid}`, base).toString()));
 
         const k8s = rxx.rx(
-            cdb.watch_config(app, app),
+            cdb.search_app(app, app),
             rx.map(conf => ({
                 /* We must explicitly list the resource types we are
                  * managing to handle the case where all resources of a
@@ -219,6 +220,7 @@ export class Deployments {
                 });
                 const manifests = [config.template({
                     uuid,
+                    name:   spec.name,
                     chart:  chart.chart,
                     source: "helm-" + (chart.source ?? "charts"),
                     prefix: chart.prefix ?? chart.chart,
@@ -233,26 +235,6 @@ export class Deployments {
                 return manifests;
             })
             .groupBy(Resource);
-    }
-
-    /** Create a GitRepository resource */
-    /* XXX This should be templated like the HelmReleases */
-    create_gitrepo (name, url) {
-        return {
-            apiVersion: "source.toolkit.fluxcd.io/v1",
-            kind: "GitRepository",
-            metadata: { name },
-            spec: {
-                interval: "3m",
-                ref: {
-                    branch: "main"
-                },
-                secretRef: {
-                    name: "flux-secrets"
-                },
-                url
-            }
-        };
     }
 
     async reconcile_manifests({ resources, manifests }) {

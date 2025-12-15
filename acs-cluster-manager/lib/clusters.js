@@ -38,17 +38,19 @@ export class Clusters {
 
         await this._init_config(cdb);
 
+        const { App, Resource } = Edge;
+
         /* XXX We should track changes here, and update the cluster. */
         this.template = {
-            flux:       await this.config_template(Edge.App.Flux),
-            helm:       await this.config_template(Edge.App.HelmRelease),
-            bootstrap:  await this.config_template(Edge.App.Bootstrap),
+            flux:       await this.config_template(App.Flux),
+            helm:       await this.config_template(App.K8sTemplate, Resource.HelmRelease),
+            bootstrap:  await this.config_template(App.Bootstrap),
         };
 
         /* [uuid, patch] requesting status updates */
         this.status_updates = new rx.Subject();
 
-        const clusters = cdb.search_app(Edge.App.Cluster);
+        const clusters = cdb.search_app(App.Cluster);
 
         this.status = this._init_status(cdb);
         this.status_patches = this._init_status_patches(cdb);

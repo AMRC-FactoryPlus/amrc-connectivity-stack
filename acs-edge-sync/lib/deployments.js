@@ -120,7 +120,7 @@ export class Deployments {
 
     _init_config () {
         const cdb = this.fplus.ConfigDB;
-        const app = Edge.App.HelmRelease;
+        const app = Edge.App.K8sTemplate;
 
         /* This is a Directory lookup, and we don't yet have notify on
          * the Directory. So just do a lookup every 2h on the very slim
@@ -133,23 +133,20 @@ export class Deployments {
             rx.map(base => uuid => new URL(`uuid/${uuid}`, base).toString()));
 
         const k8s = rxx.rx(
-            cdb.watch_config(app, app),
-            rx.map(conf => ({
+            cdb.search_app(Edge.App.K8sTemplate),
+            rx.map(confs => ({
                 /* We must explicitly list the resource types we are
                  * managing to handle the case where all resources of a
-                 * type should be deleted. XXX This could be done
-                 * better, the mix of ConfigDB and hardcoded templates
-                 * is very messy. */
-                resources:  imm.Set(conf.resources.map(Resource))
-                    .add(Resource({
-                        apiVersion: "source.toolkit.fluxcd.io/v1",
-                        kind: "GitRepository",
-                    })),
-                template:   compile_template(conf.template),
+                 * type should be deleted. */
+                resources:  confs.valueSeq()
+                    .flatMap(c => c.resources)
+                    .map(Resource)
+                    .toSet(),
+                templates:  confs.map(c => compile_template(c.template)),
             })),
-            rx.tap(c => this.log("Config: %o", c)));
+            rx.tap(c => this.log("K8S CONFIG: %o", c)));
 
-        return rx.combineLatest(k8s, git, (k8s, git) => ({ ...k8s, git }));
+        return rx.combineLatest(k8s, git, (k8s, git) => ({ k8s, git }));
     }
 
     async _init_deployments () {
@@ -191,11 +188,11 @@ export class Deployments {
     }
 
     _init_manifests (config, deployments) {
-        return rx.combineLatest({ config, deployments }).pipe(
-            //rx.tap(opts => this.log("Reconcile needed: %o", opts)),
-            rx.map(opts => ({
-                resources:  opts.config.resources,
-                manifests:  this.create_manifests(opts),
+        return rx.combineLatest(config, deployments).pipe(
+            rx.tap(opts => this.log("Reconcile needed: %o", opts)),
+            rx.map(([conf, deps]) => ({
+                resources:  conf.k8s.resources,
+                manifests:  this.create_manifests(conf, deps),
             })),
             //rx.tap(o => this.log("Resources: %o, Manifests: %o",
             //    o.resources.toJS(), o.manifests.toJS())),
@@ -208,7 +205,12 @@ export class Deployments {
      * Some GitRepo resources may be duplicated.
      * @returns a Map from Resource to List of manifests
      */
-    create_manifests ({ config, deployments }) {
+    create_manifests (config, deployments) {
+        const res = Edge.Resource;
+        const { templates } = config.k8s;
+
+        this.log("CREATE MANIFESTS: t %o, d %o",
+            templates, deployments);
         return imm.List(deployments)
             .flatMap(deployment => {
                 const { uuid, spec } = deployment;
@@ -217,42 +219,29 @@ export class Deployments {
                     name:       spec.name,
                     hostname:   spec.hostname,
                 });
-                const manifests = [config.template({
+                const hr = templates.get(res.HelmRelease)({
                     uuid,
+                    name:   spec.name,
                     chart:  chart.chart,
                     source: "helm-" + (chart.source ?? "charts"),
                     prefix: chart.prefix ?? chart.chart,
                     values: [this.values, chart.values, spec.values]
                         .map(v => v ?? {})
                         .reduce(jmp.merge),
-                })];
-                if (chart.source) {
-                    const url = config.git(chart.source);
-                    manifests.push(this.create_gitrepo(`helm-${chart.source}`, url));
-                }
-                return manifests;
+                });
+                if (!chart.source)
+                    return [hr];
+
+                const url = config.git(chart.source);
+                const gitrepo = templates.get(res.GitRepo)({
+                    uuid:       chart.source,
+                    prefix:     "helm",
+                    url,
+                });
+
+                return [hr, gitrepo];
             })
             .groupBy(Resource);
-    }
-
-    /** Create a GitRepository resource */
-    /* XXX This should be templated like the HelmReleases */
-    create_gitrepo (name, url) {
-        return {
-            apiVersion: "source.toolkit.fluxcd.io/v1",
-            kind: "GitRepository",
-            metadata: { name },
-            spec: {
-                interval: "3m",
-                ref: {
-                    branch: "main"
-                },
-                secretRef: {
-                    name: "flux-secrets"
-                },
-                url
-            }
-        };
     }
 
     async reconcile_manifests({ resources, manifests }) {

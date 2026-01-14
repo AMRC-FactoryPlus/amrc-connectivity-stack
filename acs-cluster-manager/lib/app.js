@@ -4,8 +4,8 @@
  * Copyright 2023 AMRC
  */
 
-import { ServiceClient }    from "@amrc-factoryplus/service-client";
-import { WebAPI }           from "@amrc-factoryplus/service-api";      
+import { RxClient }     from "@amrc-factoryplus/rx-client";
+import { WebAPI }       from "@amrc-factoryplus/service-api";      
 
 import { Clusters }     from "./clusters.js";
 import { GIT_VERSION }  from "./git-version.js";
@@ -14,7 +14,7 @@ import { Edge }         from "./uuids.js";
 
 export class App {
     constructor (env) {
-        const fplus = this.fplus = new ServiceClient({
+        const fplus = this.fplus = new RxClient({
             env,
             permission_group:   Edge.Perm.All,
             git_checkouts:      env.GIT_CHECKOUTS_DIR,

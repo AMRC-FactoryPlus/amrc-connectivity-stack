@@ -8,15 +8,18 @@
 import fs from "fs";
 import process from "process";
 
-import { ServiceClient }    from "@amrc-factoryplus/service-client";
+import { RxClient }         from "@amrc-factoryplus/rx-client";
 import { WebAPI }           from "@amrc-factoryplus/service-api";
 
 import { GIT_VERSION }      from "../lib/git-version.js";
-import { GitServer }        from "../lib/git-server.js";
-import { AutoPull }         from "../lib/auto-pull.js";
-import { SparkplugNode }    from "../lib/sparkplug.js";
-import { RepoStatus }       from "../lib/status.js";
 import { Git }              from "../lib/uuids.js";
+
+import { AutoPull }         from "../lib/auto-pull.js";
+import { GitNotify }        from "../lib/notify.js";
+import { GitServer }        from "../lib/git-server.js";
+import { Hooks }            from "../lib/hooks.js";
+import { RepoStatus }       from "../lib/status.js";
+import { SparkplugNode }    from "../lib/sparkplug.js";
 
 console.log("Starting acs-git version %s", GIT_VERSION);
 
@@ -31,15 +34,22 @@ process.on("uncaughtException", (err, origin) => {
     process.kill(process.pid);
 });
 
-const data = process.env.DATA_DIR;
+/* We now have more than just the repos in the data dir */
+const root = process.env.DATA_DIR;
+const data = `${root}/repo`;
 
-const fplus = await new ServiceClient({
+const fplus = await new RxClient({
     env:                process.env,
     permission_group:   Git.Perm.All,
 }).init();
 
-const git = await new GitServer({
+const status = await new RepoStatus({
     fplus, data,
+    pushes:     process.env.DATA_CHANGED_FIFO,
+}).init();
+
+const git = await new GitServer({
+    fplus, data, status,
     git_exec:   process.env.GIT_EXEC_PATH,
     http_url:   process.env.HTTP_API_URL,
 }).init();
@@ -64,19 +74,25 @@ const api = await new WebAPI({
     },
 }).init();
 
-const status = await new RepoStatus({
-    fplus, data,
-    pushes:         process.env.DATA_CHANGED_FIFO,
-}).init();
-
 const pulls = await new AutoPull({
     fplus, data, status,
     secrets_dir: process.env.SECRETS_DIR || "/run/secrets",
 }).init();
 
+const hooks = new Hooks({
+    fplus, status, data,
+    state:      `${root}/hook-state`,
+    checkouts:  `${root}/checkouts`,
+});
+
 const sparkplug = await new SparkplugNode({
     fplus, status,
 }).init();
+
+const notify = new GitNotify({
+    api, status,
+    debug:      fplus.debug,
+});
 
 /* Sparkplug must run first as it sets the MQTT Will */
 await sparkplug.run();
@@ -84,3 +100,5 @@ await sparkplug.run();
 api.run();
 status.run();
 pulls.run();
+hooks.run();
+notify.run();

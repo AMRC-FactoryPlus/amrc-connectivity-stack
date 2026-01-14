@@ -19,6 +19,8 @@
     "webapi": "node bin/directory-webapi"
   },
   "dependencies": {
+    "@amrc-factoryplus/rx-client": "file:../lib/js-rx-client",
+    "@amrc-factoryplus/rx-util": "file:../lib/js-rx-util",
     "@amrc-factoryplus/service-client": "file:../lib/js-service-client",
     "@amrc-factoryplus/service-api": "file:../lib/js-service-api",
     "@amrc-factoryplus/pg-client": "file:../lib/js-pg-client",

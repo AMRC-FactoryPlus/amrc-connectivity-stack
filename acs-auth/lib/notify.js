@@ -84,9 +84,10 @@ export class AuthNotify {
                 src,
                 this.data.permitted(sess.principal, Perm.ReadACL, true),
             ]),
-            rx.map(([acl, tok]) => tok
-                ? rxx.Response.ok(acl.filter(e => tok(e.permission)))
-                : rxx.Response.of(403)),
+            rx.map(([acl, tok]) => 
+                !tok    ? rxx.Response.of(403)
+                : !acl  ? rxx.Response.of(404)
+                : rxx.Response.ok(acl.filter(e => tok(e.permission)))),
             rx.map((r, i) => r.toUpdate(i)),
             this.rxlog("ACL update: %o"));
     }

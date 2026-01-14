@@ -230,19 +230,14 @@ export default class API {
     }
 
     acl (principal) {
-        /* We can't use the library method as that is too specialised
-         * for the normal use case. So just do a straight fetch. */
-        return this.fplus.Auth.fetch({
-            url:    "authz/acl",
-            query:  { principal, permission: Perm.All },
-        });
+        return this.fplus.Auth.fetch_auth_acl("kerberos", principal);
     }
 
     async alert_list (active_only, req, res) {
         const {type} = req.params;
 
-        const [st, acl] = await this.acl(req.auth);
-        if (st != 200)
+        const acl = await this.acl(req.auth);
+        if (!acl)
             return res.status(503).end();
 
         const perm = p => acl.filter(a => a.permission == p)
@@ -282,8 +277,8 @@ export default class API {
     async link_list (req, res) {
         const { params } = req;
 
-        const [st, acl] = await this.acl(req.auth);
-        if (st != 200) return res.status(503).end();
+        const acl = await this.acl(req.auth);
+        if (!acl) return res.status(503).end();
 
         const mod = this.model;
         const links = await (

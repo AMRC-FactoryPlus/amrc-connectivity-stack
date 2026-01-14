@@ -7,9 +7,10 @@ export const ACS = {
         EdgeDeployment:     "e6f6a6e6-f6b2-422a-bc86-2dcb417a362a",
     },
     App: {
+        JsonSchema:         "b16e85fb-53c2-49f9-8d83-cdf6763304ba",
+        SchemaMetadata:     "32093857-9d29-470e-a897-d2b56d5aa978",
         SchemaIcon:         "65c0ccba-151d-48d3-97b4-d0026a811900",
         MQTTPermTemplate:   "1266ddf1-156c-4266-9808-d6949418b185",
-
     },
     /* XXX These might really be Applications? For now they are
      * well-known to the Auth service; they are perhaps 'classes of
@@ -123,6 +124,7 @@ export const ACS = {
         Test:                   "c8798cba-de4c-11ef-8a43-8766e8683af8",
         TPlinkSmartPlug:        "d46e1374-de4c-11ef-b469-c388a038fd5c",
         ADS:                    "6764f1e5-fbe7-494c-8dbe-b80039c30c97",
+        RTDE:                   "9f4e8f3a-0b1f-11f0-8c5e-3f2c5d3c5e8f",
 
         /* External driver */
         External:               "eb669a2c-e213-11ef-998e-a7fc6f4817b5",

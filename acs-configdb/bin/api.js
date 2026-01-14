@@ -6,7 +6,7 @@
  * Copyright 2021 AMRC.
  */
 
-import { ServiceClient }    from "@amrc-factoryplus/service-client";
+import { RxClient }         from "@amrc-factoryplus/rx-client";
 import { WebAPI }           from "@amrc-factoryplus/service-api";
 
 import { GIT_VERSION } from "../lib/git-version.js";
@@ -21,7 +21,7 @@ import { routes } from "../lib/routes.js";
 
 const { env } = process;
 
-const fplus = await new ServiceClient({
+const fplus = await new RxClient({
     env,
     bootstrap_uuids:    BootstrapUUIDs,
 }).init();

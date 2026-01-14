@@ -32,9 +32,10 @@ function svc_catch (...codes) {
 }
 
 class Action {
-    constructor (op, uuid, status) {
+    constructor (op, uuid, spec, status) {
         this.op = op;
         this.uuid = uuid;
+        this.spec = spec;
         this.status = status;
 
         this.fplus = op.fplus;
@@ -48,6 +49,8 @@ class Action {
     }
 
     update (patch) {
+        /* this.status is not live */
+        jmp.apply(this.status, patch);
         this.op.status_updates.next([this.uuid, patch]);
     }
 
@@ -71,15 +74,9 @@ class Action {
 
 export class Update extends Action {
     async apply () {
-        const { cdb, status, uuid } = this;
+        const { cdb, spec, status, uuid } = this;
 
         this.fixup_account_status();
-
-        this.spec = await cdb.get_config(Edge.App.Cluster, uuid);
-        if (!this.spec) {
-            this.log("Cluster %s has disappeared!", uuid);
-            return;
-        }
 
         if (status.ready) {
             this.log("Cluster %s is already set up", uuid);
@@ -87,7 +84,7 @@ export class Update extends Action {
         }
 
         this.log("Setting up cluster %s (%s)", this.name(), uuid);
-        this.update({ spec: this.spec });
+        this.update({ spec });
         await this.address();
         await this.accounts();
         await this.repo();
@@ -110,8 +107,6 @@ export class Update extends Action {
         if (!changes.size) return;
         const patch = Object.fromEntries(changes.entries());
         this.update(patch);
-        /* this.status is not live */
-        jmp.apply(status, patch);
     }
 
     async address () {

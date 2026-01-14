@@ -400,6 +400,15 @@ export class Device {
                                 this._delimiter
                             ) : obj[addr];
 
+                            // If metric type is String and newVal is an object, stringify it
+                            if (metric.type === sparkplugDataType.string && typeof newVal === 'object' && newVal !== null && !Buffer.isBuffer(newVal)) {
+                                try {
+                                    newVal = JSON.stringify(newVal);
+                                } catch (e) {
+                                    log(`Failed to stringify object for metric ${metric.name}: ${e}`);
+                                }
+                            }
+
                             // Test if the value is a bigint and convert it to a Long. This is a hack to ensure that the
                             // Tahu library works - it only accepts Longs, not bigints.
                             if (typeof newVal === "bigint") {

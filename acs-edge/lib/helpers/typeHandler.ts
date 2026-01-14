@@ -500,6 +500,14 @@ export function parseValueFromPayload(msg: any, metric: sparkplugMetric, payload
                 } else if (typeof payload === 'object' && payload.hasOwnProperty('value')) {
                     // If no path is provided but the object has a 'value' property, use that
                     return parseTypeFromString(metric.type, payload.value);
+                } else if (metric.type === sparkplugDataType.string && typeof payload === 'object' && payload !== null) {
+                    // If metric type is String and payload is an object (no path), stringify it
+                    try {
+                        return JSON.stringify(payload);
+                    } catch (e) {
+                        log(`Failed to stringify JSON payload for metric ${metric.name}: ${e}`);
+                        return null;
+                    }
                 }
             }
             break;

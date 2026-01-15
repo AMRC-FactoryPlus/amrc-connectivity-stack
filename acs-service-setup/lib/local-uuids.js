@@ -1,6 +1,5 @@
-/* ACS service setup
- * Local UUID creation
- * Copyright 2025 University of Sheffield AMRC
+/*
+ * Copyright (c) University of Sheffield AMRC 2026.
  */
 
 import { ServiceError, UUIDs }         from "@amrc-factoryplus/service-client";
@@ -121,12 +120,12 @@ class LocalUUIDs {
 
         await this.create_objects(
             ["Chart", Clusters.Class.HelmChart,
-                "EdgeAgent", "Cluster", "ModbusRest", "MQTT"],
+                "EdgeAgent", "Cluster", "ModbusRest", "MQTT", "UNSBridge"],
             ["Repo", Git.Class.Repo, "HelmCharts"],
             ["RepoGroup", Git.Class.Group,
                 "Cluster", "Shared"],
             ["Role", Auth.Class.EdgeRole,
-                "EdgeAgent", "EdgeFlux", "EdgeKrbkeys", "EdgeMonitor", "EdgeSync"],
+                "EdgeAgent", "EdgeFlux", "EdgeKrbkeys", "EdgeMonitor", "EdgeSync", "UNSBridge"],
         );
 
         await this.put_conf(ServiceConfig, this.local);
@@ -139,4 +138,4 @@ class LocalUUIDs {
 export function setup_local_uuids (ss) {
     return new LocalUUIDs(ss).setup_uuids();
 }
-    
+

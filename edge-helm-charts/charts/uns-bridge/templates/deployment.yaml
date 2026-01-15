@@ -1,0 +1,98 @@
+{{- $k8sname := include "uns-bridge.k8sname" .Values.name }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: uns-bridge-{{ $k8sname }}
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    factory-plus.app/disable-backoff: "true"
+  labels:
+    factory-plus.app: uns-bridge
+    factory-plus.uuid: {{ .Values.uuid }}
+    factory-plus.name: {{ .Values.name }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      factory-plus.app: uns-bridge
+      factory-plus.uuid: {{ .Values.uuid }}
+  template:
+    metadata:
+      labels:
+        factory-plus.app: uns-bridge
+        factory-plus.uuid: {{ .Values.uuid }}
+        factory-plus.name: {{ .Values.name }}
+      annotations:
+        cluster-autoscaler.kubernetes.io/safe-to-evict: "true"
+    spec:
+      restartPolicy: Always
+{{- if .Values.hostname }}
+      nodeSelector:
+        kubernetes.io/hostname: {{ .Values.hostname | quote }}
+      tolerations: {{ .Values.tolerations.specific | toYaml | nindent 8 }}
+{{- else }}
+      tolerations: {{ .Values.tolerations.floating | toYaml | nindent 8 }}
+{{- end }}
+      volumes:
+        - name: config
+          configMap:
+            name: uns-bridge-{{ $k8sname }}
+        - name: local-credentials
+          secret:
+            secretName: uns-bridge-secrets.{{ $k8sname }}
+{{- if .Values.remote.secretName }}
+        - name: remote-credentials
+          secret:
+            secretName: {{ .Values.remote.secretName }}
+{{- end }}
+      containers:
+        - name: mosquitto
+{{ list . "mosquitto" | include "uns-bridge.image" | indent 10 }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              # Read credentials
+              LOCAL_PASSWORD=$(cat /secrets/local/keytab)
+{{- if .Values.remote.secretName }}
+              REMOTE_USERNAME=$(cat /secrets/remote/{{ .Values.remote.usernameKey }})
+              REMOTE_PASSWORD=$(cat /secrets/remote/{{ .Values.remote.passwordKey }})
+{{- end }}
+              # Substitute credentials into mosquitto config using sed
+              sed -e "s|\${LOCAL_PASSWORD}|${LOCAL_PASSWORD}|g" \
+{{- if .Values.remote.secretName }}
+                  -e "s|\${REMOTE_USERNAME}|${REMOTE_USERNAME}|g" \
+                  -e "s|\${REMOTE_PASSWORD}|${REMOTE_PASSWORD}|g" \
+{{- end }}
+                  /config/mosquitto.conf.template > /tmp/mosquitto.conf
+              exec mosquitto -c /tmp/mosquitto.conf
+          startupProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - "true"
+            initialDelaySeconds: 1
+            periodSeconds: 1
+            failureThreshold: 9999999
+          resources:
+            limits:
+              memory: {{ .Values.limits.memory | quote }}
+            requests:
+              cpu: {{ .Values.limits.cpu | quote }}
+              memory: {{ .Values.limits.memory | quote }}
+          volumeMounts:
+            - mountPath: /config
+              name: config
+              readOnly: true
+            - mountPath: /secrets/local
+              name: local-credentials
+              readOnly: true
+{{- if .Values.remote.secretName }}
+            - mountPath: /secrets/remote
+              name: remote-credentials
+              readOnly: true
+{{- end }}
+

@@ -517,13 +517,13 @@ export function parseValueFromPayload(msg: any, metric: sparkplugMetric, payload
             }
             break;
         case serialisationType.fixedBuffer:
-            // Split the path into path.bit if bit. This may not always match but the bit is required if the data is a boolean
+            // Parse path:bit or start:end format
             let _path = path;
             let bit: number | undefined;
             if (path.includes(':')) {
                 const splitPath = path.split(':');
                 _path = splitPath[0];
-                bit = parseInt(splitPath[1]);
+                bit = splitPath[1] ? parseInt(splitPath[1]) : undefined;
             }
             return parseValFromBuffer(
                 metric.type,
@@ -760,6 +760,22 @@ export function typeLens(type: string): number {
 export function parseValFromBuffer(type: sparkplugDataType, endianness: byteOrder, byteAddr: number, buf: Buffer, bit?: number): any {
 
     switch (type) {
+        case sparkplugDataType.string:
+            // For String type, byteAddr is start, bit is end (if provided)
+            // This allows extracting string from buffer using start:end syntax
+            try {
+                if (bit !== undefined) {
+                    // bit is repurposed as end position for strings
+                    return buf.subarray(byteAddr, bit).toString('utf8');
+                } else {
+                    // Read from byteAddr to end of buffer
+                    return buf.subarray(byteAddr).toString('utf8');
+                }
+            } catch (e) {
+                log(`ERROR - Failed to extract string from buffer: ${e}`);
+                return null;
+            }
+            
         case sparkplugDataType.boolean:
             if (bit != null) {
                 return (!!(buf[byteAddr] & (1 << bit)));

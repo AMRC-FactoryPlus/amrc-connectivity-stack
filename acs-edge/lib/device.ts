@@ -400,6 +400,13 @@ export class Device {
                                 this._delimiter
                             ) : obj[addr];
 
+                            // Detect misconfiguration: String metric received an object
+                            if (metric.type === sparkplugDataType.string && typeof newVal === 'object' && newVal !== null && !Buffer.isBuffer(newVal)) {
+                                log(`⚠️ ERROR - Misconfiguration: Metric '${metric.name}' expects String but received object. Check payloadFormat and path config.`);
+                                log(`   Object received: ${JSON.stringify(newVal).substring(0, 100)}...`);
+                                newVal = null; // Publish null to indicate error
+                            }
+
                             // Test if the value is a bigint and convert it to a Long. This is a hack to ensure that the
                             // Tahu library works - it only accepts Longs, not bigints.
                             if (typeof newVal === "bigint") {

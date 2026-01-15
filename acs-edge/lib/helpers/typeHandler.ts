@@ -525,7 +525,27 @@ export function parseValueFromPayload(msg: any, metric: sparkplugMetric, payload
             }
             break;
         case serialisationType.fixedBuffer:
-            // Split the path into path.bit if bit. This may not always match but the bit is required if the data is a boolean
+            // Handle String type with start:end byte range
+            if (metric.type === sparkplugDataType.string && path.includes(':')) {
+                const [startStr, endStr] = path.split(':');
+                const start = parseInt(startStr);
+                const end = endStr ? parseInt(endStr) : undefined;
+                
+                try {
+                    if (end !== undefined) {
+                        // Extract start:end range
+                        return (msg as Buffer).subarray(start, end).toString('utf8');
+                    } else {
+                        // Extract from start to end of buffer
+                        return (msg as Buffer).subarray(start).toString('utf8');
+                    }
+                } catch (e) {
+                    log(`ERROR - String extraction failure: ${e}`);
+                    return null;
+                }
+            }
+            
+            // Original path:bit handling for booleans and numeric types
             let _path = path;
             let bit: number | undefined;
             if (path.includes(':')) {
@@ -768,6 +788,22 @@ export function typeLens(type: string): number {
 export function parseValFromBuffer(type: sparkplugDataType, endianness: byteOrder, byteAddr: number, buf: Buffer, bit?: number): any {
 
     switch (type) {
+        case sparkplugDataType.string:
+            // For String type, byteAddr is start, bit is end (if provided)
+            // This allows extracting string from buffer using start:end syntax
+            try {
+                if (bit !== undefined) {
+                    // bit is repurposed as end position for strings
+                    return buf.subarray(byteAddr, bit).toString('utf8');
+                } else {
+                    // Read from byteAddr to end of buffer
+                    return buf.subarray(byteAddr).toString('utf8');
+                }
+            } catch (e) {
+                log(`ERROR - Failed to extract string from buffer: ${e}`);
+                return null;
+            }
+            
         case sparkplugDataType.boolean:
             if (bit != null) {
                 return (!!(buf[byteAddr] & (1 << bit)));

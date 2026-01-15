@@ -1,5 +1,5 @@
 # Set up for the edge-sync Helm deployments
-#-REQUIRE: auth edge sparkplug
+#-REQUIRE: auth edge sparkplug uns
 ---
 service: !u UUIDs.Service.ConfigDB
 version: 2
@@ -52,6 +52,14 @@ objects:
         - !u Edge.Group.EdgeGroup
       subclassOf:
         - !u Auth.Class.EdgeService
+    !u Local.Role.UNSBridge:
+      name: "UNS Bridge"
+      memberOf:
+        - !u Auth.Class.EdgeRole
+        - !u Edge.Group.EdgeGroup
+      subclassOf:
+        - !u Auth.Class.EdgeService
+        - !u UNS.Group.Reader
 
   !u Clusters.Class.SystemHelmChart:
     !u Local.Chart.EdgeAgent:
@@ -64,6 +72,8 @@ objects:
       name: "Modbus-REST adapter"
     !u Local.Chart.MQTT:
       name: "Edge MQTT broker"
+    !u Local.Chart.UNSBridge:
+      name: "UNS Bridge"
 
   !u Clusters.Class.K8sResource:
     !u Clusters.Resource.GitRepo:
@@ -195,6 +205,14 @@ configs:
         name:   "{{name}}"
         uuid:   "{{uuid}}"
         hostname: "{{hostname}}"
+    !u Local.Chart.UNSBridge:
+      chart:  "uns-bridge"
+      values:
+        name:   "{{name}}"
+        uuid:   "{{uuid}}"
+        hostname: "{{hostname}}"
+        authGroup:
+          unsReader: !u UNS.Group.Reader
 ---
 service: !u UUIDs.Service.Authentication
 version: 2

@@ -1,0 +1,17 @@
+{{- $k8sname := include "uns-bridge.k8sname" .Values.name }}
+apiVersion: factoryplus.app.amrc.co.uk/v1
+kind: KerberosKey
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: uns-bridge.{{ $k8sname }}
+spec:
+  type: Password
+  principal: br1/{{ .Values.cluster }}/{{ .Values.name }}@{{ .Values.realm }}
+  secret: uns-bridge-secrets.{{ $k8sname }}/keytab
+  account:
+    uuid: {{ .Values.uuid | quote }}
+    class: "e463b4ae-a322-46cc-8976-4ba76838e908"
+    name: "UNS Bridge: {{ .Values.name }}"
+    groups:
+      - {{ .Values.authGroup.unsReader | quote }}
+

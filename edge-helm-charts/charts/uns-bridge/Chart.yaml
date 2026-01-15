@@ -1,0 +1,5 @@
+apiVersion: v2
+name: uns-bridge
+version: "0.0.1"
+description: "ACS UNS Bridge - bridges UNS topics from local ACS broker to remote broker"
+

@@ -10,7 +10,7 @@ spec:
   secret: uns-bridge-secrets.{{ $k8sname }}/keytab
   account:
     uuid: {{ .Values.uuid | quote }}
-    class: "e463b4ae-a322-46cc-8976-4ba76838e908"
+    class: {{ .Values.authGroup.edgeService | quote }}
     name: "UNS Bridge: {{ .Values.name }}"
     groups:
       - {{ .Values.authGroup.unsReader | quote }}

@@ -400,13 +400,11 @@ export class Device {
                                 this._delimiter
                             ) : obj[addr];
 
-                            // If metric type is String and newVal is an object, stringify it
+                            // Detect misconfiguration: String metric received an object
                             if (metric.type === sparkplugDataType.string && typeof newVal === 'object' && newVal !== null && !Buffer.isBuffer(newVal)) {
-                                try {
-                                    newVal = JSON.stringify(newVal);
-                                } catch (e) {
-                                    log(`ERROR - Stringify failure: ${e}`);
-                                }
+                                log(`⚠️ ERROR - Misconfiguration: Metric '${metric.name}' expects String but received object. Check payloadFormat and path config.`);
+                                log(`   Object received: ${JSON.stringify(newVal).substring(0, 100)}...`);
+                                newVal = null; // Publish null to indicate error
                             }
 
                             // Test if the value is a bigint and convert it to a Long. This is a hack to ensure that the

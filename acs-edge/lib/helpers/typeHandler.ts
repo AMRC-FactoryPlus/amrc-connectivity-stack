@@ -500,14 +500,6 @@ export function parseValueFromPayload(msg: any, metric: sparkplugMetric, payload
                 } else if (typeof payload === 'object' && payload.hasOwnProperty('value')) {
                     // If no path is provided but the object has a 'value' property, use that
                     return parseTypeFromString(metric.type, payload.value);
-                } else if (metric.type === sparkplugDataType.string && typeof payload === 'object' && payload !== null) {
-                    // If metric type is String and payload is an object (no path), stringify it
-                    try {
-                        return JSON.stringify(payload);
-                    } catch (e) {
-                        log(`ERROR - Stringify failure: ${e}`);
-                        return null;
-                    }
                 }
             }
             break;
@@ -525,33 +517,13 @@ export function parseValueFromPayload(msg: any, metric: sparkplugMetric, payload
             }
             break;
         case serialisationType.fixedBuffer:
-            // Handle String type with start:end byte range
-            if (metric.type === sparkplugDataType.string && path.includes(':')) {
-                const [startStr, endStr] = path.split(':');
-                const start = parseInt(startStr);
-                const end = endStr ? parseInt(endStr) : undefined;
-                
-                try {
-                    if (end !== undefined) {
-                        // Extract start:end range
-                        return (msg as Buffer).subarray(start, end).toString('utf8');
-                    } else {
-                        // Extract from start to end of buffer
-                        return (msg as Buffer).subarray(start).toString('utf8');
-                    }
-                } catch (e) {
-                    log(`ERROR - String extraction failure: ${e}`);
-                    return null;
-                }
-            }
-            
-            // Original path:bit handling for booleans and numeric types
+            // Parse path:bit or start:end format
             let _path = path;
             let bit: number | undefined;
             if (path.includes(':')) {
                 const splitPath = path.split(':');
                 _path = splitPath[0];
-                bit = parseInt(splitPath[1]);
+                bit = splitPath[1] ? parseInt(splitPath[1]) : undefined;
             }
             return parseValFromBuffer(
                 metric.type,

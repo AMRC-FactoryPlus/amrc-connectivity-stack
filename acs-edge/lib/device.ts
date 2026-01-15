@@ -405,7 +405,7 @@ export class Device {
                                 try {
                                     newVal = JSON.stringify(newVal);
                                 } catch (e) {
-                                    log(`Failed to stringify object for metric ${metric.name}: ${e}`);
+                                    log(`ERROR - Stringify failure: ${e}`);
                                 }
                             }
 

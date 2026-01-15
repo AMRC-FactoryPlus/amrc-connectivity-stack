@@ -67,21 +67,7 @@ export class MQTTConnection extends DeviceConnection {
         this.#client.on("message", (topic, msg) => {
             // this.emit("asyncData", topic, msg);
             let obj: any = {};
-            // If the message is a Buffer, try to parse it as JSON or convert to string
-            if (Buffer.isBuffer(msg)) {
-                try {
-                    // Try parsing as JSON first
-                    obj[topic] = JSON.parse(msg.toString());
-                } catch (e) {
-                    // If not JSON, keep as buffer
-                    obj[topic] = msg;
-                }
-            } else if (typeof msg === 'object' && msg !== null) {
-                // If it's already an object, keep it
                 obj[topic] = msg;
-            } else {
-                obj[topic] = msg;
-            }
             this.emit('data', obj);
         });
 

@@ -505,7 +505,7 @@ export function parseValueFromPayload(msg: any, metric: sparkplugMetric, payload
                     try {
                         return JSON.stringify(payload);
                     } catch (e) {
-                        log(`Failed to stringify JSON payload for metric ${metric.name}: ${e}`);
+                        log(`ERROR - Stringify failure: ${e}`);
                         return null;
                     }
                 }

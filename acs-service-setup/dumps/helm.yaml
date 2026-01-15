@@ -212,6 +212,7 @@ configs:
         uuid:   "{{uuid}}"
         hostname: "{{hostname}}"
         authGroup:
+          edgeService: !u Auth.Class.EdgeService
           unsReader: !u UNS.Group.Reader
 ---
 service: !u UUIDs.Service.Authentication

@@ -210,6 +210,16 @@ export default class Queries {
         `, [group]);
     }
 
+    dump_existing_perms (princs) {
+        return this.q_list(`
+            select distinct p.uuid
+            from unnest($1::uuid[]) q(uuid) 
+                join uuid u on u.uuid = q.uuid
+                join ace e on e.principal = u.id
+                join uuid p on p.id = e.permission
+        `, [princs]);
+    }
+
     dump_load_uuids (uuids) {
         return this.q_list(`
             insert into uuid (uuid)
@@ -217,7 +227,7 @@ export default class Queries {
             from unnest($1::uuid[]) u(uuid)
             on conflict do nothing
             returning uuid
-        `, [[...uuids]]);
+        `, [uuids]);
     }
 
     dump_load_krbs (krbs) {
@@ -231,26 +241,39 @@ export default class Queries {
         `, [krbs]);
     }
 
-    /* XXX This form of loading gives no way for a revised version of a
-     * dump to remove old grants. This is a problem across the board
-     * with our dump loading logic but is more important here. I think
-     * the only solution that works is to introduce a 'source' for these
-     * entries such that loading a new dumps clears old data from that
-     * source. Moving the grants into the ConfigDB would make it easier
-     * to solve this in general. */
     dump_load_aces (aces) {
         return this.q_rows(`
-            insert into ace (principal, permission, target, plural)
-            select u.id, p.id, t.id, 
-                coalesce((g.g->'plural')::boolean, false)
-            from unnest($1::jsonb[]) g(g)
-                join uuid u on u.uuid::text = g.g->>'principal'
-                join uuid p on p.uuid::text = g.g->>'permission'
-                join uuid t on t.uuid::text = g.g->>'target'
-            on conflict (principal, permission, target) do update
-                set plural = excluded.plural
-                where ace.plural != excluded.plural
-            returning principal, permission, target
+            with n_ace as (
+                select u.id princ, p.id perm, t.id targ,
+                    coalesce((g.g->'plural')::boolean, false) plural
+                from unnest($1::jsonb[]) g(g)
+                    join uuid u on u.uuid = (g.g->>'principal')::uuid
+                    join uuid p on p.uuid = (g.g->>'permission')::uuid
+                    join uuid t on t.uuid = (g.g->>'target')::uuid
+            ),
+            existing as (
+                select e.id 
+                from n_ace n 
+                    join ace e on e.principal = n.princ
+                        and e.permission = n.perm
+                        and e.target = n.targ
+            ),
+            d_ace as (
+                delete from ace
+                where principal in (select princ from n_ace)
+                    and id not in (select id from existing)
+                returning id
+            ),
+            i_ace as (
+                insert into ace (principal, permission, target, plural)
+                select princ, perm, targ, plural from n_ace
+                on conflict (principal, permission, target) do update
+                    set plural = excluded.plural
+                    where ace.plural != excluded.plural
+                returning id
+            )
+            select id from d_ace
+                union all select id from i_ace
         `, [aces]);
     }
 }

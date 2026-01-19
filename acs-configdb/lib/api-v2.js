@@ -11,6 +11,7 @@ import { UUIDs } from "@amrc-factoryplus/service-client";
 import * as etags from "./etags.js";
 
 import {App, Class, Perm, SpecialObj} from "./constants.js";
+import { Relations } from "./relations.js";
 
 const Valid = {
     uuid:   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
@@ -59,22 +60,19 @@ export class APIv2 {
 
         api.get("/class/:class", this.class_info.bind(this));
 
-        const clookup = (path, table) => {
-            const lookup = this.class_lookup.bind(this, table);
-            api.get(`/class/:class/${path}`, lookup);
-            api.get(`/class/:class/${path}/:object`, lookup);
-        };
-        clookup("direct/member", "membership");
-        clookup("direct/subclass", "subclass");
-        clookup("member", "all_membership");
-        clookup("subclass", "all_subclass");
+        for (const r of Relations) {
+            const prefix = `/class/:class/${r.path}`;
 
-        api.route("/class/:class/direct/member/:object")
-            .put(this.class_rel.bind(this, m => m.class_add_member))
-            .delete(this.class_rel.bind(this, m => m.class_remove_member));
-        api.route("/class/:class/direct/subclass/:object")
-            .put(this.class_rel.bind(this, m => m.class_add_subclass))
-            .delete(this.class_rel.bind(this, m => m.class_remove_subclass));
+            const lookup = this.class_lookup.bind(this, r.cperm, r.table);
+            api.get(prefix, lookup);
+            api.get(`${prefix}/:object`, lookup);
+
+            if (r.add) {
+                api.route(`${prefix}/:object`)
+                    .put(this.class_rel.bind(this, r, r.add))
+                    .delete(this.class_rel.bind(this, r, r.remove));
+            }
+        }
 
         api.get("/app/:app/object", this.config_list.bind(this));
         api.get("/app/:app/class/:class", this.config_list.bind(this));
@@ -84,34 +82,16 @@ export class APIv2 {
             .put(this.config_put.bind(this))
             .delete(this.config_delete.bind(this))
             .patch(this.config_patch.bind(this));
+        
+        const deny = (req, res) => res.status(403).end();
 
-        api.get("/save", this.dump_save.bind(this));
-    }
-
-    async app_get(req, res) {
-        if (!Valid.uuid.test(req.params.app))
-            return res.status(410).end();
-
-        const ok = await this.auth.check_acl(req.auth, Perm.Manage_Obj, Class.App, true);
-        if (!ok) return res.status(403).end();
-
-        const uuid = req.params.app;
-        /* XXX What verification do we want here? Do we insist that an
-         * App-UUID is a member of Application, or do we allow any
-         * object? */
-        const klass = await this.model.object_class(uuid);
-        if (klass != Class.App)
-            res.status(404).end();
-
-        const info = await this.model.config_get(
-            {app: App.Info, object: uuid});
-        const name = info?.config?.name ?? "";
-
-        res.status(200).json({uuid, name});
+        /* Deny /save for now; the dumps are useless until we can
+         * generate v2 dumps and ownerships. */
+        api.get("/save", deny);
     }
 
     async object_list(req, res) {
-        const ok = await this.auth.check_acl(req.auth, Perm.Manage_Obj, UUIDs.Null);
+        const ok = await this.auth.check_acl(req.auth, Perm.ListObj, UUIDs.Null);
         if (!ok) return res.status(403).end();
 
         let list = await this.model.object_list();
@@ -119,7 +99,7 @@ export class APIv2 {
     }
 
     async object_ranks (req, res) {
-        const ok = await this.auth.check_acl(req.auth, Perm.Manage_Obj, UUIDs.Null);
+        const ok = await this.auth.check_acl(req.auth, Perm.ListObj, UUIDs.Null);
         if (!ok) return res.status(403).end();
 
         const list = await this.model.object_ranks();
@@ -129,8 +109,9 @@ export class APIv2 {
     async object_create(req, res) {
         const spec = req.body;
 
-        const ok = await this.auth.check_acl(req.auth, Perm.Manage_Obj, 
-            spec.class ?? UUIDs.Null, true);
+        const ok = await this.auth.check_acl(req.auth, 
+            spec.uuid ? Perm.CreateSpecificObj : Perm.CreateObj, 
+            spec.class, true);
         if (!ok) return res.status(403).end();
 
         spec.owner ??= await this.auth.resolve_upn(req.auth, SpecialObj.Unowned);
@@ -150,7 +131,7 @@ export class APIv2 {
         if (!Valid.uuid.test(object))
             return res.status(410).end();
 
-        const ok = await this.auth.check_acl(req.auth, Perm.Delete_Obj, object, true);
+        const ok = await this.auth.check_acl(req.auth, Perm.DeleteObj, object, true);
         if (!ok) return res.status(403).end();
 
         const [st, rv] = await this.model.object_delete(object);
@@ -159,19 +140,14 @@ export class APIv2 {
         rv ? res.json(rv) : res.end();
     }
 
-    async class_list(req, res) {
-        const ok = await this.auth.check_acl(req.auth, Perm.Manage_Obj, UUIDs.Null);
-        if (!ok) return res.status(403).end();
-        const list = await this.model.class_list();
-        return res.status(200).json(list);
-    }
-
     async class_info (req, res) {
         const klass = req.params.class;
         if (!Valid.uuid.test(klass))
             return res.status(410).end();
 
-        const ok = await this.auth.check_acl(req.auth, Perm.Manage_Obj, klass, true);
+        const acl = await this.auth.fetch_acl(req.auth);
+        const ok = [Perm.ReadMembers, Perm.ReadSubclasses]
+            .every(p => acl(p, klass, true));
         if (!ok) return res.status(403).end();
 
         const members = await this.model.class_lookup(klass, "membership");
@@ -183,12 +159,12 @@ export class APIv2 {
         return res.status(200).json({ members, subclasses });
     }
 
-    async class_lookup (rel, req, res) {
+    async class_lookup (perm, rel, req, res) {
         const { class: klass, object } = req.params;
         if (!Valid.uuid.test(klass) || (object && !Valid.uuid.test(object)))
             return res.status(410).end();
 
-        const ok = await this.auth.check_acl(req.auth, Perm.Manage_Obj, klass, true);
+        const ok = await this.auth.check_acl(req.auth, perm, klass, true);
         if (!ok) return res.status(403).end();
 
         if (object) {
@@ -201,12 +177,15 @@ export class APIv2 {
         return res.status(200).json(list);
     }
 
-    async class_rel (action, req, res) {
+    async class_rel (rel, action, req, res) {
         const { class: klass, object } = req.params;
         if (!Valid.uuid.test(klass) || !Valid.uuid.test(object))
             return res.status(410).end();
 
-        const ok = await this.auth.check_acl(req.auth, Perm.Manage_Obj, klass, true);
+        const acl = await this.auth.fetch_acl(req.auth);
+        this.log("Checking %s/%s and %s/%s", rel.cperm, klass, rel.operm, object);
+        const ok = (!rel.cperm || acl(rel.cperm, klass, true))
+            && (!rel.operm || acl(rel.operm, object, true));
         if (!ok) return res.status(403).end();
 
         const st = await action(this.model).call(this.model, klass, object);
@@ -218,7 +197,7 @@ export class APIv2 {
         if (!Valid.uuid.test(app) || (klass && !Valid.uuid.test(klass)))
             return res.status(410).end();
 
-        const ok = await this.auth.check_acl(req.auth, Perm.Read_App, app, true);
+        const ok = await this.auth.check_acl(req.auth, Perm.ReadApp, app, true);
         if (!ok) return res.status(403).end();
 
         let list = klass
@@ -236,7 +215,7 @@ export class APIv2 {
         if (!Valid.uuid.test(app) || !Valid.uuid.test(object))
             return res.status(410).end();
 
-        const ok = await this.auth.check_acl(req.auth, Perm.Read_App,
+        const ok = await this.auth.check_acl(req.auth, Perm.ReadApp,
             req.params.app, true);
         if (!ok) return res.status(403).end();
 
@@ -259,7 +238,7 @@ export class APIv2 {
         const { app, object } = req.params;
         if (!Valid.uuid.test(app) || !Valid.uuid.test(object))
             return res.status(410).end();
-        const ok = await this.auth.check_acl(req.auth, Perm.Write_App,
+        const ok = await this.auth.check_acl(req.auth, Perm.WriteApp,
             req.params.app, true);
         if (!ok) return res.status(403).end();
 
@@ -279,7 +258,7 @@ export class APIv2 {
         const { app, object } = req.params;
         if (!Valid.uuid.test(app) || !Valid.uuid.test(object))
             return res.status(410).end();
-        const ok = await this.auth.check_acl(req.auth, Perm.Write_App,
+        const ok = await this.auth.check_acl(req.auth, Perm.WriteApp,
             req.params.app, true);
         if (!ok) return res.status(403).end();
 
@@ -298,7 +277,7 @@ export class APIv2 {
             return res.status(415).end();
 
         const ok = await Promise.all(
-            [Perm.Read_App, Perm.Write_App]
+            [Perm.ReadApp, Perm.WriteApp]
             .map(p => this.auth.check_acl(req.auth, p, app, true)));
         if (ok.includes(false))
             return res.status(403).end();
@@ -340,7 +319,7 @@ export class APIv2 {
         const {app, "class": klass} = req.params;
         if (!Valid.uuid.test(app) || (klass && !Valid.uuid.test(klass)))
             return res.status(410).end();
-        const ok = await this.auth.check_acl(req.auth, Perm.Read_App, app, true);
+        const ok = await this.auth.check_acl(req.auth, Perm.ReadApp, app, true);
         if (!ok) return res.status(403).end();
 
         const query = this.config_search_parse(req.query);
@@ -353,14 +332,5 @@ export class APIv2 {
             : Object.fromEntries(results.map(r => [r.uuid, r.results]));
 
         return res.status(200).json(json);
-    }
-
-    async dump_save(req, res) {
-        const ok = await this.auth.check_acl(req.auth, Perm.Manage_Obj, UUIDs.Null)
-            && await this.auth.check_acl(req.auth, Perm.Read_App, UUIDs.Null);
-        if (!ok) return res.status(403).end();
-
-        const dump = await this.model.dump_save();
-        res.status(200).json(dump);
     }
 }

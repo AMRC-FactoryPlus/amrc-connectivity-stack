@@ -204,8 +204,7 @@ export class Update extends Action {
         /* Build the cluster HelmRelease manifest */
         const helm = template.helm({
             ...cluster,
-            uuid,
-            values,
+            uuid, name, values,
             prefix: "edge-cluster",
             source: "helm-charts"
         }).template;

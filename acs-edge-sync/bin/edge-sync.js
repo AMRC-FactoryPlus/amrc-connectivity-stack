@@ -6,8 +6,8 @@
  * Copyright 2023 AMRC
  */
 
-import { ServiceClient }    from "@amrc-factoryplus/service-client";
-import k8s                  from "@kubernetes/client-node";
+import { RxClient }         from "@amrc-factoryplus/rx-client";
+import * as k8s             from "@kubernetes/client-node";
 
 import { GIT_VERSION } from "../lib/git-version.js";
 import { Edge } from "../lib/uuids.js";
@@ -18,7 +18,7 @@ import { Nodes } from "../lib/nodes.js";
 
 const cluster = process.env.CLUSTER_UUID;
 
-const fplus = await new ServiceClient({
+const fplus = await new RxClient({
     env:                process.env,
     permission_group:   Edge.Perm.All,
 }).init();

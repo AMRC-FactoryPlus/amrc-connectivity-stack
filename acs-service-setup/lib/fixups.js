@@ -3,7 +3,7 @@
  * Copyright 2023 AMRC
  */
 
-import k8s from "@kubernetes/client-node";
+import * as k8s from "@kubernetes/client-node";
 
 import { UUIDs } from "@amrc-factoryplus/service-client";
 
@@ -53,11 +53,9 @@ class FixupAccounts {
         const namespace = kc.getContextObject(kc.currentContext).namespace;
         const objs = k8s.KubernetesObjectApi.makeApiClient(kc);
         
-        const { response, body } = await objs.list(APIVERSION, "KerberosKey", namespace);
-        if (response.statusCode != 200)
-            throw new Error(`Can't list KerberosKeys: ${response.statusCode}`);
+        const kks = await objs.list(APIVERSION, "KerberosKey", namespace);
 
-        const accounts = body.items
+        const accounts = kks.items
             .map(k => k.metadata?.annotations?.[ACCUUID])
             .filter(v => v != null);
 

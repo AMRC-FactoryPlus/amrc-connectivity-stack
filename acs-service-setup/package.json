@@ -13,14 +13,14 @@
   "license": "ISC",
   "dependencies": {
     "@amrc-factoryplus/service-client": "file:../lib/js-service-client",
-    "@kubernetes/client-node": "^0.19.0",
+    "@kubernetes/client-node": "^1.4.0",
     "tsort": "^0.0.1",
     "uuid": "^11.1.0",
-    "yaml": "^2.3.4"
+    "yaml": "^2.8.2"
   },
   "devDependencies": {
     "@eslint/js": "^9.16.0",
-    "eslint": "^9.16.0",
-    "globals": "^15.13.0"
+    "eslint": "^9.39.2",
+    "globals": "^15.15.0"
   }
 }

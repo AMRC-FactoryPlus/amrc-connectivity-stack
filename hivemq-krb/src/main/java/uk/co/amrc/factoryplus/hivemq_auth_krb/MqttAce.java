@@ -19,7 +19,7 @@ import io.reactivex.rxjava3.core.*;
 import com.hivemq.extension.sdk.api.auth.parameter.*;
 import com.hivemq.extension.sdk.api.services.builder.Builders;
 
-import uk.co.amrc.factoryplus.*;
+import uk.co.amrc.factoryplus.client.*;
 
 class MqttAce {
     private static final Logger log = LoggerFactory.getLogger(MqttAce.class);

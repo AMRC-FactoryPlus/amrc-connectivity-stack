@@ -10,7 +10,7 @@ import java.net.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import uk.co.amrc.factoryplus.*;
+import uk.co.amrc.factoryplus.client.*;
 
 class BadToken extends Exception
 {

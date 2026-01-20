@@ -17,8 +17,6 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import org.ietf.jgss.*;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,7 +32,7 @@ import com.hivemq.extension.sdk.api.packets.connect.*;
 import com.hivemq.extension.sdk.api.packets.general.*;
 import com.hivemq.extension.sdk.api.services.Services;
 
-import uk.co.amrc.factoryplus.Attempt;
+import uk.co.amrc.factoryplus.client.Attempt;
 
 public class FPKrbAuth implements EnhancedAuthenticator {
 
@@ -212,8 +210,7 @@ public class FPKrbAuth implements EnhancedAuthenticator {
                 /* We could handle this case, but I don't think with the
                  * Kerberos mech there is ever any need. */
                 if (!ctx.isEstablished())
-                    return Single.<AuthResult>error(
-                        new Exception("GSS login took more than one step!"));
+                    throw new Exception("GSS login took more than one step!");
 
                 String client_name = ctx.getSrcName().toString();
                 log.info("Authenticated client {}", client_name);

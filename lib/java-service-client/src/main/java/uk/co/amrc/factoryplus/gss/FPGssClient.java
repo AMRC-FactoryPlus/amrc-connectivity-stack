@@ -26,7 +26,7 @@ import org.slf4j.LoggerFactory;
 import org.ietf.jgss.*;
 import org.json.*;
 
-import uk.co.amrc.factoryplus.Attempt;
+import uk.co.amrc.factoryplus.client.Attempt;
 
 /** GSS client credentials.
  */

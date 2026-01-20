@@ -3,7 +3,7 @@
  * Copyright 2023 AMRC.
  */
 
-package uk.co.amrc.factoryplus;
+package uk.co.amrc.factoryplus.client;
 
 import java.net.*;
 import java.util.Map;

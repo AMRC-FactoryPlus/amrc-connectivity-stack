@@ -23,7 +23,7 @@ import org.slf4j.LoggerFactory;
 import org.ietf.jgss.*;
 import org.json.*;
 
-import uk.co.amrc.factoryplus.Attempt;
+import uk.co.amrc.factoryplus.client.Attempt;
 
 public class FPGssServer extends FPGssPrincipal {
     private static final Logger log = LoggerFactory.getLogger(FPGssServer.class);

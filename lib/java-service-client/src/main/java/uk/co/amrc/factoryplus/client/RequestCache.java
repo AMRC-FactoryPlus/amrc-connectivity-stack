@@ -6,7 +6,7 @@
 /* This is used to cache HTTP bearer tokens and to cache service URL
  * lookups. */
 
-package uk.co.amrc.factoryplus;
+package uk.co.amrc.factoryplus.client;
 
 import java.net.URI;
 import java.util.concurrent.ConcurrentHashMap;

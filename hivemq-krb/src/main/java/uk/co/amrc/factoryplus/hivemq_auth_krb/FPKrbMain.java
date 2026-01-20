@@ -10,10 +10,9 @@ import com.hivemq.extension.sdk.api.annotations.NotNull;
 import com.hivemq.extension.sdk.api.events.EventRegistry;
 import com.hivemq.extension.sdk.api.parameter.*;
 import com.hivemq.extension.sdk.api.services.Services;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import uk.co.amrc.factoryplus.*;
 
 public class FPKrbMain implements ExtensionMain {
 

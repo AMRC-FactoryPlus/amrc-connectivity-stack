@@ -10,6 +10,10 @@ objects:
     #  name: "Helm chart"
     !u ACS.Class.EdgeDeployment:
       name: "Edge deployment"
+    !u ACS.Class.Bridge:
+      name: "UNS Bridge"
+      subclassOf:
+        - !u ACS.Class.EdgeDeployment
 
   !u ConfigDB.Class.R2Class:
     !u Clusters.Class.K8sResource:

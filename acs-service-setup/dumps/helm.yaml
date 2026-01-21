@@ -122,7 +122,9 @@ configs:
         apiVersion: source.toolkit.fluxcd.io/v1
         kind: GitRepository
         metadata: 
-          name: "{{prefix}}-{{uuid}"
+          name: "{{name}}"
+          labels:
+            "factoryplus.app.amrc.co.uk/uuid": "{{uuid}}"
         spec:
             interval: "3m"
             ref:
@@ -138,7 +140,7 @@ configs:
         apiVersion: helm.toolkit.fluxcd.io/v2beta1
         kind: HelmRelease
         metadata:
-          name: "{{prefix}}-{{name}}"
+          name: "{{name}}"
           labels:
             "factoryplus.app.amrc.co.uk/uuid": "{{uuid}}"
         spec:

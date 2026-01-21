@@ -20,6 +20,15 @@ Resource.prototype.toString = function () {
     return `${this.apiVersion}/${this.kind}`;
 };
 
+/* Join the parts with hyphens, lowercase and remove special chars. This
+ * matches the k8sname definitions in the edge helm charts. */
+function k8sname (...parts) {
+    return parts.join("-")
+        .toLowerCase()
+        .replace(/[^a-z0-9-]+/g, "-")
+        .replace(/^-|-$/g, "");
+}
+
 /**
  * Base class for reconciling Kubernetes resources
  * Handles comparing existing resources with desired state and making necessary changes
@@ -209,8 +218,6 @@ export class Deployments {
         const res = Edge.Resource;
         const { templates } = config.k8s;
 
-        this.log("CREATE MANIFESTS: t %o, d %o",
-            templates, deployments);
         return imm.List(deployments)
             .flatMap(deployment => {
                 const { uuid, spec } = deployment;
@@ -219,12 +226,14 @@ export class Deployments {
                     name:       spec.name,
                     hostname:   spec.hostname,
                 });
+                const hr_name = k8sname(chart.prefix ?? chart.chart, spec.name);
+                const gr_name = k8sname("helm", chart.source ?? "charts");
+
                 const hr = templates.get(res.HelmRelease)({
                     uuid,
-                    name:   spec.name,
+                    name:   hr_name,
                     chart:  chart.chart,
-                    source: "helm-" + (chart.source ?? "charts"),
-                    prefix: chart.prefix ?? chart.chart,
+                    source: gr_name,
                     values: [this.values, chart.values, spec.values]
                         .map(v => v ?? {})
                         .reduce(jmp.merge),
@@ -235,7 +244,7 @@ export class Deployments {
                 const url = config.git(chart.source);
                 const gitrepo = templates.get(res.GitRepo)({
                     uuid:       chart.source,
-                    prefix:     "helm",
+                    name:       gr_name,
                     url,
                 });
 

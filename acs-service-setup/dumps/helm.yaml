@@ -185,7 +185,7 @@ configs:
         hostname: "{{hostname}}"
         authGroup:
           edgeService: !u Auth.Class.EdgeService
-          unsReader: !u UNS.Group.Reader
+          unsReader: !u Local.Role.UNSBridge
 ---
 service: !u UUIDs.Service.Authentication
 version: 2

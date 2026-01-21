@@ -9,7 +9,6 @@ spec:
   principal: br1/{{ .Values.cluster }}/{{ .Values.name }}@{{ .Values.realm }}
   secret: uns-bridge-secrets.{{ $k8sname }}/keytab
   account:
-    uuid: {{ .Values.uuid | quote }}
     class: {{ .Values.authGroup.edgeService | quote }}
     name: "UNS Bridge: {{ .Values.name }}"
     groups:

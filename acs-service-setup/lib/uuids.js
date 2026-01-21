@@ -1,10 +1,11 @@
 /*
- * Copyright (c) University of Sheffield AMRC 2025.
+ * Copyright (c) University of Sheffield AMRC 2026.
  */
 
 export const ACS = {
     Class: {
         EdgeDeployment:     "e6f6a6e6-f6b2-422a-bc86-2dcb417a362a",
+        Bridge:             "178506d2-af52-4c79-8e5d-4958ae7ddfa9",
     },
     App: {
         JsonSchema:         "b16e85fb-53c2-49f9-8d83-cdf6763304ba",

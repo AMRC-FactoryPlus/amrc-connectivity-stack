@@ -33,7 +33,7 @@ class OnlyOneError extends QueryError {
  * the database directly, and sometimes we need to query using a query
  * function for a transaction. The model inherits from this class. */
 export default class Queries {
-    static DBVersion = 2;
+    static DBVersion = 3;
 
     constructor (query) {
         this.query = query;

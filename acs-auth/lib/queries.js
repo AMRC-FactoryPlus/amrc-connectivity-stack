@@ -257,6 +257,7 @@ export default class Queries {
                     join ace e on e.principal = n.princ
                         and e.permission = n.perm
                         and e.target = n.targ
+                        and e.plural = n.plural
             ),
             d_ace as (
                 delete from ace
@@ -267,9 +268,7 @@ export default class Queries {
             i_ace as (
                 insert into ace (principal, permission, target, plural)
                 select princ, perm, targ, plural from n_ace
-                on conflict (principal, permission, target) do update
-                    set plural = excluded.plural
-                    where ace.plural != excluded.plural
+                on conflict (principal, permission, target, plural) do nothing
                 returning id
             )
             select id from d_ace

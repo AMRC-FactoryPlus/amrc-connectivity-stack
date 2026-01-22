@@ -11,10 +11,11 @@ endif
 
 helm.package=	${repo}-${helm.version}.tgz
 
+.PHONY: package push helm.lint helm.clean
+
 all: package push
 
-package:
-	rm -f *.tgz
+package: helm.clean
 	helm dependency build
 	helm package --version ${helm.version} .
 
@@ -25,3 +26,8 @@ lint: helm.lint
 
 helm.lint:
 	helm lint .
+
+clean: helm.clean
+
+helm.clean:
+	rm -f *.tgz

@@ -3,7 +3,7 @@ entries:
   amrc-connectivity-stack:
   - apiVersion: v2
     appVersion: 4.5.0-rc.1
-    created: "2026-01-21T14:52:05.024453983Z"
+    created: "2026-01-22T12:30:27.736072656Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -51,7 +51,7 @@ entries:
     version: 4.5.0-rc.1
   - apiVersion: v2
     appVersion: 4.5.0-dev.5
-    created: "2026-01-21T14:52:05.010642093Z"
+    created: "2026-01-22T12:30:27.72187979Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -99,7 +99,7 @@ entries:
     version: 4.5.0-dev.5
   - apiVersion: v2
     appVersion: 4.5.0-dev.4
-    created: "2026-01-21T14:52:04.996196336Z"
+    created: "2026-01-22T12:30:27.707637042Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -147,7 +147,7 @@ entries:
     version: 4.5.0-dev.4
   - apiVersion: v2
     appVersion: 4.5.0-dev.3
-    created: "2026-01-21T14:52:04.983539739Z"
+    created: "2026-01-22T12:30:27.694114163Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -195,7 +195,7 @@ entries:
     version: 4.5.0-dev.3
   - apiVersion: v2
     appVersion: 4.5.0-dev.1
-    created: "2026-01-21T14:52:04.969795177Z"
+    created: "2026-01-22T12:30:27.679809829Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -242,8 +242,56 @@ entries:
     - https://amrc-factoryplus.github.io/amrc-connectivity-stack/build/amrc-connectivity-stack-4.5.0-dev.1.tgz
     version: 4.5.0-dev.1
   - apiVersion: v2
+    appVersion: 4.5.0-bmz.1
+    created: "2026-01-22T12:30:27.666891285Z"
+    dependencies:
+    - condition: traefik.enabled
+      name: traefik
+      repository: https://helm.traefik.io/traefik
+      version: 23.1.0
+    - condition: grafana.enabled
+      name: grafana
+      repository: https://grafana.github.io/helm-charts
+      version: 6.52.4
+    - condition: minio.enabled
+      name: operator
+      repository: https://alexgodbehere.github.io/helm-repository
+      version: 5.0.4
+    - condition: minio.enabled
+      name: tenant
+      repository: https://operator.min.io
+      version: 5.0.3
+    - condition: influxdb2.enabled
+      name: influxdb2
+      repository: https://helm.influxdata.com/
+      version: 2.1.1
+    - condition: acs.letsEncrypt.enabled
+      name: cert-manager
+      repository: https://charts.jetstack.io
+      version: v1.14.4
+    description: The AMRC Connectivity Stack (ACS) is a collection of open-source
+      services developed by the AMRC that enables an end-to-end implementation of
+      the Factory+ framework.
+    digest: ad96107a160e67922a47f8f872f507802671102085c3b7add5e9f297bbd8a210
+    home: factoryplus.app.amrc.co.uk
+    icon: https://www.sheffield.ac.uk/themes/custom/uos/favicon.svg
+    keywords:
+    - factoryplus
+    - sheffield
+    - mqtt
+    - sparkplug
+    - iiot
+    maintainers:
+    - email: alex.godbehere@amrc.co.uk
+      name: Alex Godbehere
+    name: amrc-connectivity-stack
+    type: application
+    urls:
+    - https://amrc-factoryplus.github.io/amrc-connectivity-stack/build/amrc-connectivity-stack-4.5.0-bmz.1.tgz
+    version: 4.5.0-bmz.1
+  - apiVersion: v2
     appVersion: 4.4.1-rc.1
-    created: "2026-01-21T14:52:04.955766447Z"
+    created: "2026-01-22T12:30:27.653264484Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -291,7 +339,7 @@ entries:
     version: 4.4.1-rc.1
   - apiVersion: v2
     appVersion: 4.4.0
-    created: "2026-01-21T14:52:04.943461822Z"
+    created: "2026-01-22T12:30:27.638923161Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -339,7 +387,7 @@ entries:
     version: 4.4.0
   - apiVersion: v2
     appVersion: 4.4.0-rc.3
-    created: "2026-01-21T14:52:04.93087398Z"
+    created: "2026-01-22T12:30:27.625162058Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -387,7 +435,7 @@ entries:
     version: 4.4.0-rc.3
   - apiVersion: v2
     appVersion: 4.4.0-rc.2
-    created: "2026-01-21T14:52:04.917489604Z"
+    created: "2026-01-22T12:30:27.610792202Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -435,7 +483,7 @@ entries:
     version: 4.4.0-rc.2
   - apiVersion: v2
     appVersion: 4.3.3
-    created: "2026-01-21T14:52:04.903542441Z"
+    created: "2026-01-22T12:30:27.597739999Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -483,7 +531,7 @@ entries:
     version: 4.3.3
   - apiVersion: v2
     appVersion: 4.3.2
-    created: "2026-01-21T14:52:04.890135591Z"
+    created: "2026-01-22T12:30:27.584055902Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -531,7 +579,7 @@ entries:
     version: 4.3.2
   - apiVersion: v2
     appVersion: 4.3.1
-    created: "2026-01-21T14:52:04.87619667Z"
+    created: "2026-01-22T12:30:27.569184001Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -579,7 +627,7 @@ entries:
     version: 4.3.1
   - apiVersion: v2
     appVersion: 4.3.1-dev.3
-    created: "2026-01-21T14:52:04.863775862Z"
+    created: "2026-01-22T12:30:27.556239429Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -627,7 +675,7 @@ entries:
     version: 4.3.1-dev.3
   - apiVersion: v2
     appVersion: 4.3.1-dev.2
-    created: "2026-01-21T14:52:04.851087499Z"
+    created: "2026-01-22T12:30:27.542809654Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -675,7 +723,7 @@ entries:
     version: 4.3.1-dev.2
   - apiVersion: v2
     appVersion: 4.3.0
-    created: "2026-01-21T14:52:04.83758312Z"
+    created: "2026-01-22T12:30:27.527935007Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -723,7 +771,7 @@ entries:
     version: 4.3.0
   - apiVersion: v2
     appVersion: 4.2.5
-    created: "2026-01-21T14:52:04.823227561Z"
+    created: "2026-01-22T12:30:27.514721405Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -771,7 +819,7 @@ entries:
     version: 4.2.5
   - apiVersion: v2
     appVersion: 4.2.4
-    created: "2026-01-21T14:52:04.810648466Z"
+    created: "2026-01-22T12:30:27.501719747Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -819,7 +867,7 @@ entries:
     version: 4.2.4
   - apiVersion: v2
     appVersion: 4.2.3
-    created: "2026-01-21T14:52:04.796851516Z"
+    created: "2026-01-22T12:30:27.487684514Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -867,7 +915,7 @@ entries:
     version: 4.2.3
   - apiVersion: v2
     appVersion: 4.2.3-dev.1
-    created: "2026-01-21T14:52:04.783332418Z"
+    created: "2026-01-22T12:30:27.473685087Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -915,7 +963,7 @@ entries:
     version: 4.2.3-dev.1
   - apiVersion: v2
     appVersion: 4.2.2
-    created: "2026-01-21T14:52:04.770327378Z"
+    created: "2026-01-22T12:30:27.460855861Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -963,7 +1011,7 @@ entries:
     version: 4.2.2
   - apiVersion: v2
     appVersion: 4.2.1
-    created: "2026-01-21T14:52:04.756861616Z"
+    created: "2026-01-22T12:30:27.447198451Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -1011,7 +1059,7 @@ entries:
     version: 4.2.1
   - apiVersion: v2
     appVersion: 4.2.1-dev.3
-    created: "2026-01-21T14:52:04.743209216Z"
+    created: "2026-01-22T12:30:27.433439683Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -1059,7 +1107,7 @@ entries:
     version: 4.2.1-dev.3
   - apiVersion: v2
     appVersion: 4.2.0
-    created: "2026-01-21T14:52:04.730250824Z"
+    created: "2026-01-22T12:30:27.419803903Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -1107,7 +1155,7 @@ entries:
     version: 4.2.0
   - apiVersion: v2
     appVersion: 4.2.0-dev.1
-    created: "2026-01-21T14:52:04.716658987Z"
+    created: "2026-01-22T12:30:27.405725079Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -1155,7 +1203,7 @@ entries:
     version: 4.2.0-dev.1
   - apiVersion: v2
     appVersion: 4.1.1
-    created: "2026-01-21T14:52:04.7033233Z"
+    created: "2026-01-22T12:30:27.392908836Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -1203,7 +1251,7 @@ entries:
     version: 4.1.1
   - apiVersion: v2
     appVersion: 4.1.0
-    created: "2026-01-21T14:52:04.689498115Z"
+    created: "2026-01-22T12:30:27.378958172Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -1251,7 +1299,7 @@ entries:
     version: 4.1.0
   - apiVersion: v2
     appVersion: 4.1.0-rc.2
-    created: "2026-01-21T14:52:04.67681176Z"
+    created: "2026-01-22T12:30:27.364932165Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -1299,7 +1347,7 @@ entries:
     version: 4.1.0-rc.2
   - apiVersion: v2
     appVersion: 4.1.0-rc.1
-    created: "2026-01-21T14:52:04.663444781Z"
+    created: "2026-01-22T12:30:27.351444663Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -1347,7 +1395,7 @@ entries:
     version: 4.1.0-rc.1
   - apiVersion: v2
     appVersion: 4.0.2
-    created: "2026-01-21T14:52:04.649363671Z"
+    created: "2026-01-22T12:30:27.337265472Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -1395,7 +1443,7 @@ entries:
     version: 4.0.2
   - apiVersion: v2
     appVersion: 4.0.1
-    created: "2026-01-21T14:52:04.6364839Z"
+    created: "2026-01-22T12:30:27.324695268Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -1443,7 +1491,7 @@ entries:
     version: 4.0.1
   - apiVersion: v2
     appVersion: 4.0.0
-    created: "2026-01-21T14:52:04.623976576Z"
+    created: "2026-01-22T12:30:27.310866028Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -1491,7 +1539,7 @@ entries:
     version: 4.0.0
   - apiVersion: v2
     appVersion: 4.0.0-rc.7
-    created: "2026-01-21T14:52:04.610423011Z"
+    created: "2026-01-22T12:30:27.296368835Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -1539,7 +1587,7 @@ entries:
     version: 4.0.0-rc.7
   - apiVersion: v2
     appVersion: 4.0.0-rc.6
-    created: "2026-01-21T14:52:04.596963544Z"
+    created: "2026-01-22T12:30:27.282631587Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -1587,7 +1635,7 @@ entries:
     version: 4.0.0-rc.6
   - apiVersion: v2
     appVersion: 4.0.0-rc.5
-    created: "2026-01-21T14:52:04.584164824Z"
+    created: "2026-01-22T12:30:27.269699167Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -1635,7 +1683,7 @@ entries:
     version: 4.0.0-rc.5
   - apiVersion: v2
     appVersion: 4.0.0-rc.4
-    created: "2026-01-21T14:52:04.570423634Z"
+    created: "2026-01-22T12:30:27.256967233Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -1683,7 +1731,7 @@ entries:
     version: 4.0.0-rc.4
   - apiVersion: v2
     appVersion: 4.0.0-rc.3
-    created: "2026-01-21T14:52:04.55809842Z"
+    created: "2026-01-22T12:30:27.24416251Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -1731,7 +1779,7 @@ entries:
     version: 4.0.0-rc.3
   - apiVersion: v2
     appVersion: 4.0.0-rc.2
-    created: "2026-01-21T14:52:04.545686927Z"
+    created: "2026-01-22T12:30:27.229566944Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -1779,7 +1827,7 @@ entries:
     version: 4.0.0-rc.2
   - apiVersion: v2
     appVersion: 4.0.0-rc.1
-    created: "2026-01-21T14:52:04.532352814Z"
+    created: "2026-01-22T12:30:27.215956093Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -1827,7 +1875,7 @@ entries:
     version: 4.0.0-rc.1
   - apiVersion: v2
     appVersion: 4.0.0-dn.1
-    created: "2026-01-21T14:52:04.517941027Z"
+    created: "2026-01-22T12:30:27.202013773Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -1875,7 +1923,7 @@ entries:
     version: 4.0.0-dn.1
   - apiVersion: v2
     appVersion: 4.0.0-dev.5
-    created: "2026-01-21T14:52:04.504403614Z"
+    created: "2026-01-22T12:30:27.18769347Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -1923,7 +1971,7 @@ entries:
     version: 4.0.0-dev.5
   - apiVersion: v2
     appVersion: 4.0.0-dev.4
-    created: "2026-01-21T14:52:04.490743142Z"
+    created: "2026-01-22T12:30:27.173888534Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -1971,7 +2019,7 @@ entries:
     version: 4.0.0-dev.4
   - apiVersion: v2
     appVersion: 4.0.0-dev.3
-    created: "2026-01-21T14:52:04.477437196Z"
+    created: "2026-01-22T12:30:27.158900548Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -2019,7 +2067,7 @@ entries:
     version: 4.0.0-dev.3
   - apiVersion: v2
     appVersion: 4.0.0-bmz.1
-    created: "2026-01-21T14:52:04.463048429Z"
+    created: "2026-01-22T12:30:27.145459942Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -2067,7 +2115,7 @@ entries:
     version: 4.0.0-bmz.1
   - apiVersion: v2
     appVersion: 4.0.0-ago.1
-    created: "2026-01-21T14:52:04.448089645Z"
+    created: "2026-01-22T12:30:27.129553706Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -2115,7 +2163,7 @@ entries:
     version: 4.0.0-ago.1
   - apiVersion: v2
     appVersion: 3.6.4
-    created: "2026-01-21T14:52:04.434537667Z"
+    created: "2026-01-22T12:30:27.114229985Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -2163,7 +2211,7 @@ entries:
     version: 3.6.4
   - apiVersion: v2
     appVersion: 3.6.3
-    created: "2026-01-21T14:52:04.420995252Z"
+    created: "2026-01-22T12:30:27.101494461Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -2211,7 +2259,7 @@ entries:
     version: 3.6.3
   - apiVersion: v2
     appVersion: 3.6.2
-    created: "2026-01-21T14:52:04.406712807Z"
+    created: "2026-01-22T12:30:27.08888286Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -2259,7 +2307,7 @@ entries:
     version: 3.6.2
   - apiVersion: v2
     appVersion: 3.6.1
-    created: "2026-01-21T14:52:04.392988214Z"
+    created: "2026-01-22T12:30:27.075507845Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -2307,7 +2355,7 @@ entries:
     version: 3.6.1
   - apiVersion: v2
     appVersion: 3.6.0
-    created: "2026-01-21T14:52:04.378603253Z"
+    created: "2026-01-22T12:30:27.060287335Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -2355,7 +2403,7 @@ entries:
     version: 3.6.0
   - apiVersion: v2
     appVersion: 3.5.2
-    created: "2026-01-21T14:52:04.365518926Z"
+    created: "2026-01-22T12:30:27.045187551Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -2403,7 +2451,7 @@ entries:
     version: 3.5.2
   - apiVersion: v2
     appVersion: 3.5.2-rc.3
-    created: "2026-01-21T14:52:04.351618876Z"
+    created: "2026-01-22T12:30:27.027037627Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -2451,7 +2499,7 @@ entries:
     version: 3.5.2-rc.3
   - apiVersion: v2
     appVersion: 3.5.1
-    created: "2026-01-21T14:52:04.337148806Z"
+    created: "2026-01-22T12:30:27.013075742Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -2499,7 +2547,7 @@ entries:
     version: 3.5.1
   - apiVersion: v2
     appVersion: 3.5.0
-    created: "2026-01-21T14:52:04.324422496Z"
+    created: "2026-01-22T12:30:26.997723005Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -2547,7 +2595,7 @@ entries:
     version: 3.5.0
   - apiVersion: v2
     appVersion: 3.5.0-rc.2
-    created: "2026-01-21T14:52:04.311883536Z"
+    created: "2026-01-22T12:30:26.979735514Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -2595,7 +2643,7 @@ entries:
     version: 3.5.0-rc.2
   - apiVersion: v2
     appVersion: 3.5.0-rc.1
-    created: "2026-01-21T14:52:04.297845096Z"
+    created: "2026-01-22T12:30:26.96379894Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -2643,7 +2691,7 @@ entries:
     version: 3.5.0-rc.1
   - apiVersion: v2
     appVersion: 3.4.5-rc.1
-    created: "2026-01-21T14:52:04.284043102Z"
+    created: "2026-01-22T12:30:26.941497997Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -2691,7 +2739,7 @@ entries:
     version: 3.4.5-rc.1
   - apiVersion: v2
     appVersion: 3.4.5-dn.2
-    created: "2026-01-21T14:52:04.270624949Z"
+    created: "2026-01-22T12:30:26.918279897Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -2739,7 +2787,7 @@ entries:
     version: 3.4.5-dn.2
   - apiVersion: v2
     appVersion: 3.4.4
-    created: "2026-01-21T14:52:04.256625008Z"
+    created: "2026-01-22T12:30:26.898369616Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -2787,7 +2835,7 @@ entries:
     version: 3.4.4
   - apiVersion: v2
     appVersion: 3.4.4-bmz.1
-    created: "2026-01-21T14:52:04.243216636Z"
+    created: "2026-01-22T12:30:26.885012214Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -2835,7 +2883,7 @@ entries:
     version: 3.4.4-bmz.1
   - apiVersion: v2
     appVersion: 3.4.3
-    created: "2026-01-21T14:52:04.229086294Z"
+    created: "2026-01-22T12:30:26.871716349Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -2883,7 +2931,7 @@ entries:
     version: 3.4.3
   - apiVersion: v2
     appVersion: 3.4.2
-    created: "2026-01-21T14:52:04.215581324Z"
+    created: "2026-01-22T12:30:26.857939988Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -2931,7 +2979,7 @@ entries:
     version: 3.4.2
   - apiVersion: v2
     appVersion: 3.4.2-rc.2
-    created: "2026-01-21T14:52:04.201632642Z"
+    created: "2026-01-22T12:30:26.842054551Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -2979,7 +3027,7 @@ entries:
     version: 3.4.2-rc.2
   - apiVersion: v2
     appVersion: 3.4.2-rc.1
-    created: "2026-01-21T14:52:04.188828199Z"
+    created: "2026-01-22T12:30:26.823032652Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -3027,7 +3075,7 @@ entries:
     version: 3.4.2-rc.1
   - apiVersion: v2
     appVersion: 3.4.2-bmz.6
-    created: "2026-01-21T14:52:04.175224928Z"
+    created: "2026-01-22T12:30:26.805993057Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -3075,7 +3123,7 @@ entries:
     version: 3.4.2-bmz.6
   - apiVersion: v2
     appVersion: 3.4.2-bmz.5
-    created: "2026-01-21T14:52:04.161027216Z"
+    created: "2026-01-22T12:30:26.791993771Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -3123,7 +3171,7 @@ entries:
     version: 3.4.2-bmz.5
   - apiVersion: v2
     appVersion: 3.4.1
-    created: "2026-01-21T14:52:04.148482981Z"
+    created: "2026-01-22T12:30:26.779004114Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -3171,7 +3219,7 @@ entries:
     version: 3.4.1
   - apiVersion: v2
     appVersion: 3.4.0
-    created: "2026-01-21T14:52:04.135956432Z"
+    created: "2026-01-22T12:30:26.765943987Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -3219,7 +3267,7 @@ entries:
     version: 3.4.0
   - apiVersion: v2
     appVersion: 3.4.0-dn.1
-    created: "2026-01-21T14:52:04.122019411Z"
+    created: "2026-01-22T12:30:26.752348292Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -3267,7 +3315,7 @@ entries:
     version: 3.4.0-dn.1
   - apiVersion: v2
     appVersion: 3.3.4
-    created: "2026-01-21T14:52:04.107496887Z"
+    created: "2026-01-22T12:30:26.737302469Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -3315,7 +3363,7 @@ entries:
     version: 3.3.4
   - apiVersion: v2
     appVersion: 3.3.4-dn.7
-    created: "2026-01-21T14:52:04.095097535Z"
+    created: "2026-01-22T12:30:26.717568866Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -3363,7 +3411,7 @@ entries:
     version: 3.3.4-dn.7
   - apiVersion: v2
     appVersion: 3.3.4-dn.6
-    created: "2026-01-21T14:52:04.081576312Z"
+    created: "2026-01-22T12:30:26.703823021Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -3411,7 +3459,7 @@ entries:
     version: 3.3.4-dn.6
   - apiVersion: v2
     appVersion: 3.3.4-dn.5
-    created: "2026-01-21T14:52:04.067791698Z"
+    created: "2026-01-22T12:30:26.688286514Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -3459,7 +3507,7 @@ entries:
     version: 3.3.4-dn.5
   - apiVersion: v2
     appVersion: 3.3.4-dn.4
-    created: "2026-01-21T14:52:04.055005159Z"
+    created: "2026-01-22T12:30:26.670024751Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -3507,7 +3555,7 @@ entries:
     version: 3.3.4-dn.4
   - apiVersion: v2
     appVersion: 3.3.4-dn.3
-    created: "2026-01-21T14:52:04.041398079Z"
+    created: "2026-01-22T12:30:26.655841342Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -3555,7 +3603,7 @@ entries:
     version: 3.3.4-dn.3
   - apiVersion: v2
     appVersion: 3.3.4-dn.2
-    created: "2026-01-21T14:52:04.027437135Z"
+    created: "2026-01-22T12:30:26.640794956Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -3603,7 +3651,7 @@ entries:
     version: 3.3.4-dn.2
   - apiVersion: v2
     appVersion: 3.3.4-dn.1
-    created: "2026-01-21T14:52:04.014997498Z"
+    created: "2026-01-22T12:30:26.624633777Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -3651,7 +3699,7 @@ entries:
     version: 3.3.4-dn.1
   - apiVersion: v2
     appVersion: 3.3.4-bmz.2
-    created: "2026-01-21T14:52:04.00254672Z"
+    created: "2026-01-22T12:30:26.606833463Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -3699,7 +3747,7 @@ entries:
     version: 3.3.4-bmz.2
   - apiVersion: v2
     appVersion: 3.3.3
-    created: "2026-01-21T14:52:03.988346426Z"
+    created: "2026-01-22T12:30:26.586177523Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -3747,7 +3795,7 @@ entries:
     version: 3.3.3
   - apiVersion: v2
     appVersion: 3.3.2
-    created: "2026-01-21T14:52:03.974259294Z"
+    created: "2026-01-22T12:30:26.568332075Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -3795,7 +3843,7 @@ entries:
     version: 3.3.2
   - apiVersion: v2
     appVersion: 3.3.1
-    created: "2026-01-21T14:52:03.960588866Z"
+    created: "2026-01-22T12:30:26.553596308Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -3843,7 +3891,7 @@ entries:
     version: 3.3.1
   - apiVersion: v2
     appVersion: 3.3.1-agtls.2
-    created: "2026-01-21T14:52:03.947337219Z"
+    created: "2026-01-22T12:30:26.537297882Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -3891,7 +3939,7 @@ entries:
     version: 3.3.1-agtls.2
   - apiVersion: v2
     appVersion: 3.3.1-agtls.1
-    created: "2026-01-21T14:52:03.932968099Z"
+    created: "2026-01-22T12:30:26.519451934Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -3939,7 +3987,7 @@ entries:
     version: 3.3.1-agtls.1
   - apiVersion: v2
     appVersion: 3.3.0
-    created: "2026-01-21T14:52:03.920508024Z"
+    created: "2026-01-22T12:30:26.506254952Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -3987,7 +4035,7 @@ entries:
     version: 3.3.0
   - apiVersion: v2
     appVersion: 3.3.0-dev.4
-    created: "2026-01-21T14:52:03.90704655Z"
+    created: "2026-01-22T12:30:26.493205474Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -4035,7 +4083,7 @@ entries:
     version: 3.3.0-dev.4
   - apiVersion: v2
     appVersion: 3.3.0-dev.2
-    created: "2026-01-21T14:52:03.893007804Z"
+    created: "2026-01-22T12:30:26.478881495Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -4083,7 +4131,7 @@ entries:
     version: 3.3.0-dev.2
   - apiVersion: v2
     appVersion: 3.3.0-dev.1
-    created: "2026-01-21T14:52:03.880284387Z"
+    created: "2026-01-22T12:30:26.463518069Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -4131,7 +4179,7 @@ entries:
     version: 3.3.0-dev.1
   - apiVersion: v2
     appVersion: 3.2.1
-    created: "2026-01-21T14:52:03.866566007Z"
+    created: "2026-01-22T12:30:26.449582621Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -4179,7 +4227,7 @@ entries:
     version: 3.2.1
   - apiVersion: v2
     appVersion: 3.2.1-dn.4
-    created: "2026-01-21T14:52:03.852753326Z"
+    created: "2026-01-22T12:30:26.434574127Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -4227,7 +4275,7 @@ entries:
     version: 3.2.1-dn.4
   - apiVersion: v2
     appVersion: 3.2.1-dn.1
-    created: "2026-01-21T14:52:03.839079551Z"
+    created: "2026-01-22T12:30:26.417720706Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -4275,7 +4323,7 @@ entries:
     version: 3.2.1-dn.1
   - apiVersion: v2
     appVersion: 3.2.1-dev.4
-    created: "2026-01-21T14:52:03.824899369Z"
+    created: "2026-01-22T12:30:26.400304618Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -4323,7 +4371,7 @@ entries:
     version: 3.2.1-dev.4
   - apiVersion: v2
     appVersion: 3.2.1-dev.3
-    created: "2026-01-21T14:52:03.811837403Z"
+    created: "2026-01-22T12:30:26.378951401Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -4371,7 +4419,7 @@ entries:
     version: 3.2.1-dev.3
   - apiVersion: v2
     appVersion: 3.2.1-dev.2
-    created: "2026-01-21T14:52:03.798107949Z"
+    created: "2026-01-22T12:30:26.363332901Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -4419,7 +4467,7 @@ entries:
     version: 3.2.1-dev.2
   - apiVersion: v2
     appVersion: 3.2.1-dev.1
-    created: "2026-01-21T14:52:03.78425228Z"
+    created: "2026-01-22T12:30:26.3504276Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -4467,7 +4515,7 @@ entries:
     version: 3.2.1-dev.1
   - apiVersion: v2
     appVersion: 3.2.0
-    created: "2026-01-21T14:52:03.77024068Z"
+    created: "2026-01-22T12:30:26.337497317Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -4515,7 +4563,7 @@ entries:
     version: 3.2.0
   - apiVersion: v2
     appVersion: 3.2.0-rc.3
-    created: "2026-01-21T14:52:03.757581235Z"
+    created: "2026-01-22T12:30:26.323141447Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -4563,7 +4611,7 @@ entries:
     version: 3.2.0-rc.3
   - apiVersion: v2
     appVersion: 3.2.0-rc.2
-    created: "2026-01-21T14:52:03.744571968Z"
+    created: "2026-01-22T12:30:26.308891775Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -4611,7 +4659,7 @@ entries:
     version: 3.2.0-rc.2
   - apiVersion: v2
     appVersion: 3.2.0-rc.1
-    created: "2026-01-21T14:52:03.73076967Z"
+    created: "2026-01-22T12:30:26.29582321Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -4659,7 +4707,7 @@ entries:
     version: 3.2.0-rc.1
   - apiVersion: v2
     appVersion: 3.1.2
-    created: "2026-01-21T14:52:03.716851783Z"
+    created: "2026-01-22T12:30:26.282917912Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -4703,7 +4751,7 @@ entries:
     version: 3.1.2
   - apiVersion: v2
     appVersion: 3.1.1
-    created: "2026-01-21T14:52:03.705990348Z"
+    created: "2026-01-22T12:30:26.270014818Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -4747,7 +4795,7 @@ entries:
     version: 3.1.1
   - apiVersion: v2
     appVersion: 3.1.1-rc.2
-    created: "2026-01-21T14:52:03.69621709Z"
+    created: "2026-01-22T12:30:26.257561721Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -4791,7 +4839,7 @@ entries:
     version: 3.1.1-rc.2
   - apiVersion: v2
     appVersion: 3.1.1-rc.1
-    created: "2026-01-21T14:52:03.6862077Z"
+    created: "2026-01-22T12:30:26.247077721Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -4835,7 +4883,7 @@ entries:
     version: 3.1.1-rc.1
   - apiVersion: v2
     appVersion: 3.1.0
-    created: "2026-01-21T14:52:03.676406415Z"
+    created: "2026-01-22T12:30:26.231476011Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -4879,7 +4927,7 @@ entries:
     version: 3.1.0
   - apiVersion: v2
     appVersion: 3.1.0-rc.4
-    created: "2026-01-21T14:52:03.666509903Z"
+    created: "2026-01-22T12:30:26.215729923Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -4923,7 +4971,7 @@ entries:
     version: 3.1.0-rc.4
   - apiVersion: v2
     appVersion: 3.1.0-rc.3
-    created: "2026-01-21T14:52:03.656340246Z"
+    created: "2026-01-22T12:30:26.200144724Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -4967,7 +5015,7 @@ entries:
     version: 3.1.0-rc.3
   - apiVersion: v2
     appVersion: 3.1.0-rc.2
-    created: "2026-01-21T14:52:03.646478972Z"
+    created: "2026-01-22T12:30:26.184828296Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -5011,7 +5059,7 @@ entries:
     version: 3.1.0-rc.2
   - apiVersion: v2
     appVersion: 3.1.0-rc.1
-    created: "2026-01-21T14:52:03.636320273Z"
+    created: "2026-01-22T12:30:26.172382482Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -5055,7 +5103,7 @@ entries:
     version: 3.1.0-rc.1
   - apiVersion: v2
     appVersion: 3.1.0-dev.10
-    created: "2026-01-21T14:52:03.556674677Z"
+    created: "2026-01-22T12:30:26.064512806Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -5099,7 +5147,7 @@ entries:
     version: 3.1.0-dev.10
   - apiVersion: v2
     appVersion: 3.1.0-dev.9
-    created: "2026-01-21T14:52:03.62637635Z"
+    created: "2026-01-22T12:30:26.157575363Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -5143,7 +5191,7 @@ entries:
     version: 3.1.0-dev.9
   - apiVersion: v2
     appVersion: 3.1.0-dev.8
-    created: "2026-01-21T14:52:03.616315203Z"
+    created: "2026-01-22T12:30:26.140897239Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -5187,7 +5235,7 @@ entries:
     version: 3.1.0-dev.8
   - apiVersion: v2
     appVersion: 3.1.0-dev.7
-    created: "2026-01-21T14:52:03.606584736Z"
+    created: "2026-01-22T12:30:26.127537252Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -5231,7 +5279,7 @@ entries:
     version: 3.1.0-dev.7
   - apiVersion: v2
     appVersion: 3.1.0-dev.4
-    created: "2026-01-21T14:52:03.596678032Z"
+    created: "2026-01-22T12:30:26.11635333Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -5279,7 +5327,7 @@ entries:
     version: 3.1.0-dev.4
   - apiVersion: v2
     appVersion: 3.1.0-dev.3
-    created: "2026-01-21T14:52:03.583323638Z"
+    created: "2026-01-22T12:30:26.09840431Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -5327,7 +5375,7 @@ entries:
     version: 3.1.0-dev.3
   - apiVersion: v2
     appVersion: 3.1.0-dev.2
-    created: "2026-01-21T14:52:03.569561148Z"
+    created: "2026-01-22T12:30:26.08123965Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -5375,7 +5423,7 @@ entries:
     version: 3.1.0-dev.2
   - apiVersion: v2
     appVersion: 3.0.1-rc.4
-    created: "2026-01-21T14:52:03.546774598Z"
+    created: "2026-01-22T12:30:26.054740531Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -5419,7 +5467,7 @@ entries:
     version: 3.0.1-rc.4
   - apiVersion: v2
     appVersion: 3.0.1-rc.3
-    created: "2026-01-21T14:52:03.537007778Z"
+    created: "2026-01-22T12:30:26.039360334Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -5463,7 +5511,7 @@ entries:
     version: 3.0.1-rc.3
   - apiVersion: v2
     appVersion: 3.0.0
-    created: "2026-01-21T14:52:03.526870679Z"
+    created: "2026-01-22T12:30:26.0286339Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -5507,7 +5555,7 @@ entries:
     version: 3.0.0
   - apiVersion: v2
     appVersion: 3.0.0-rc.12
-    created: "2026-01-21T14:52:03.436084837Z"
+    created: "2026-01-22T12:30:25.924641774Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -5551,7 +5599,7 @@ entries:
     version: 3.0.0-rc.12
   - apiVersion: v2
     appVersion: 3.0.0-rc.11
-    created: "2026-01-21T14:52:03.425100796Z"
+    created: "2026-01-22T12:30:25.913935922Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -5595,7 +5643,7 @@ entries:
     version: 3.0.0-rc.11
   - apiVersion: v2
     appVersion: 3.0.0-rc.10
-    created: "2026-01-21T14:52:03.415042615Z"
+    created: "2026-01-22T12:30:25.898096239Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -5639,7 +5687,7 @@ entries:
     version: 3.0.0-rc.10
   - apiVersion: v2
     appVersion: 3.0.0-rc.9
-    created: "2026-01-21T14:52:03.516103533Z"
+    created: "2026-01-22T12:30:26.018530058Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -5683,7 +5731,7 @@ entries:
     version: 3.0.0-rc.9
   - apiVersion: v2
     appVersion: 3.0.0-rc.8
-    created: "2026-01-21T14:52:03.505551089Z"
+    created: "2026-01-22T12:30:26.008322923Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -5727,7 +5775,7 @@ entries:
     version: 3.0.0-rc.8
   - apiVersion: v2
     appVersion: 3.0.0-rc.7
-    created: "2026-01-21T14:52:03.495293385Z"
+    created: "2026-01-22T12:30:25.998151586Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -5771,7 +5819,7 @@ entries:
     version: 3.0.0-rc.7
   - apiVersion: v2
     appVersion: 3.0.0-rc.6
-    created: "2026-01-21T14:52:03.485689571Z"
+    created: "2026-01-22T12:30:25.984024802Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -5815,7 +5863,7 @@ entries:
     version: 3.0.0-rc.6
   - apiVersion: v2
     appVersion: 3.0.0-rc.5
-    created: "2026-01-21T14:52:03.476146243Z"
+    created: "2026-01-22T12:30:25.968095794Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -5859,7 +5907,7 @@ entries:
     version: 3.0.0-rc.5
   - apiVersion: v2
     appVersion: 3.0.0-rc.4
-    created: "2026-01-21T14:52:03.466517611Z"
+    created: "2026-01-22T12:30:25.955651944Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -5903,7 +5951,7 @@ entries:
     version: 3.0.0-rc.4
   - apiVersion: v2
     appVersion: 3.0.0-rc.3
-    created: "2026-01-21T14:52:03.456693318Z"
+    created: "2026-01-22T12:30:25.945588467Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -5947,7 +5995,7 @@ entries:
     version: 3.0.0-rc.3
   - apiVersion: v2
     appVersion: 3.0.0-rc.2
-    created: "2026-01-21T14:52:03.446707953Z"
+    created: "2026-01-22T12:30:25.935549194Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -5991,7 +6039,7 @@ entries:
     version: 3.0.0-rc.2
   - apiVersion: v2
     appVersion: 3.0.0-rc.1
-    created: "2026-01-21T14:52:03.405042927Z"
+    created: "2026-01-22T12:30:25.888871303Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -6035,7 +6083,7 @@ entries:
     version: 3.0.0-rc.1
   - apiVersion: v2
     appVersion: 3.0.0-dev.14
-    created: "2026-01-21T14:52:03.200925804Z"
+    created: "2026-01-22T12:30:25.649170064Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -6091,7 +6139,7 @@ entries:
     version: 3.0.0-dev.14
   - apiVersion: v2
     appVersion: 3.0.0-dev.13
-    created: "2026-01-21T14:52:03.177235971Z"
+    created: "2026-01-22T12:30:25.613295837Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -6147,7 +6195,7 @@ entries:
     version: 3.0.0-dev.13
   - apiVersion: v2
     appVersion: 3.0.0-dev.12
-    created: "2026-01-21T14:52:03.152508124Z"
+    created: "2026-01-22T12:30:25.580013477Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -6203,7 +6251,7 @@ entries:
     version: 3.0.0-dev.12
   - apiVersion: v2
     appVersion: 3.0.0-dev.11
-    created: "2026-01-21T14:52:03.128552884Z"
+    created: "2026-01-22T12:30:25.555565889Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -6259,7 +6307,7 @@ entries:
     version: 3.0.0-dev.11
   - apiVersion: v2
     appVersion: 3.0.0-dev.10
-    created: "2026-01-21T14:52:03.106052057Z"
+    created: "2026-01-22T12:30:25.524004652Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -6315,7 +6363,7 @@ entries:
     version: 3.0.0-dev.10
   - apiVersion: v2
     appVersion: 3.0.0-dev.9
-    created: "2026-01-21T14:52:03.394632862Z"
+    created: "2026-01-22T12:30:25.877120202Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -6371,7 +6419,7 @@ entries:
     version: 3.0.0-dev.9
   - apiVersion: v2
     appVersion: 3.0.0-dev.8
-    created: "2026-01-21T14:52:03.370655218Z"
+    created: "2026-01-22T12:30:25.844955354Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -6427,7 +6475,7 @@ entries:
     version: 3.0.0-dev.8
   - apiVersion: v2
     appVersion: 3.0.0-dev.7
-    created: "2026-01-21T14:52:03.346050458Z"
+    created: "2026-01-22T12:30:25.8138459Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -6483,7 +6531,7 @@ entries:
     version: 3.0.0-dev.7
   - apiVersion: v2
     appVersion: 3.0.0-dev.6
-    created: "2026-01-21T14:52:03.321747053Z"
+    created: "2026-01-22T12:30:25.786099357Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -6539,7 +6587,7 @@ entries:
     version: 3.0.0-dev.6
   - apiVersion: v2
     appVersion: 3.0.0-dev.5
-    created: "2026-01-21T14:52:03.297344613Z"
+    created: "2026-01-22T12:30:25.758217413Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -6595,7 +6643,7 @@ entries:
     version: 3.0.0-dev.5
   - apiVersion: v2
     appVersion: 3.0.0-dev.4
-    created: "2026-01-21T14:52:03.273069027Z"
+    created: "2026-01-22T12:30:25.728161511Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -6651,7 +6699,7 @@ entries:
     version: 3.0.0-dev.4
   - apiVersion: v2
     appVersion: 3.0.0-dev.3
-    created: "2026-01-21T14:52:03.249109339Z"
+    created: "2026-01-22T12:30:25.701500359Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -6707,7 +6755,7 @@ entries:
     version: 3.0.0-dev.3
   - apiVersion: v2
     appVersion: 3.0.0-dev.2
-    created: "2026-01-21T14:52:03.224424795Z"
+    created: "2026-01-22T12:30:25.674761372Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -6763,7 +6811,7 @@ entries:
     version: 3.0.0-dev.2
   - apiVersion: v2
     appVersion: 3.0.0-dev.1
-    created: "2026-01-21T14:52:03.082104835Z"
+    created: "2026-01-22T12:30:25.490471076Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -6819,7 +6867,7 @@ entries:
     version: 3.0.0-dev.1
   - apiVersion: v2
     appVersion: 3.0.0-alpha.8
-    created: "2026-01-21T14:52:03.056757998Z"
+    created: "2026-01-22T12:30:25.463834461Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -6863,7 +6911,7 @@ entries:
     version: 3.0.0-alpha.8
   - apiVersion: v2
     appVersion: 2.5.1
-    created: "2026-01-21T14:52:03.047635197Z"
+    created: "2026-01-22T12:30:25.451405508Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -6919,7 +6967,7 @@ entries:
     version: 2.5.1
   - apiVersion: v2
     appVersion: 2.5.0
-    created: "2026-01-21T14:52:03.023124973Z"
+    created: "2026-01-22T12:30:25.417115383Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -6975,7 +7023,7 @@ entries:
     version: 2.5.0
   - apiVersion: v2
     appVersion: 2.5.0-rc.1
-    created: "2026-01-21T14:52:02.99941962Z"
+    created: "2026-01-22T12:30:25.383151302Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -7031,7 +7079,7 @@ entries:
     version: 2.5.0-rc.1
   - apiVersion: v2
     appVersion: 2.4.7
-    created: "2026-01-21T14:52:02.976414367Z"
+    created: "2026-01-22T12:30:25.356876761Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -7087,7 +7135,7 @@ entries:
     version: 2.4.7
   - apiVersion: v2
     appVersion: 2.4.7-dev.8
-    created: "2026-01-21T14:52:02.953086169Z"
+    created: "2026-01-22T12:30:25.325025125Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -7143,7 +7191,7 @@ entries:
     version: 2.4.7-dev.8
   - apiVersion: v2
     appVersion: 2.4.7-dev.7
-    created: "2026-01-21T14:52:02.929604357Z"
+    created: "2026-01-22T12:30:25.292399439Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -7199,7 +7247,7 @@ entries:
     version: 2.4.7-dev.7
   - apiVersion: v2
     appVersion: 2.4.7-dev.6
-    created: "2026-01-21T14:52:02.906168438Z"
+    created: "2026-01-22T12:30:25.264227002Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -7255,7 +7303,7 @@ entries:
     version: 2.4.7-dev.6
   - apiVersion: v2
     appVersion: 2.4.7-dev.5
-    created: "2026-01-21T14:52:02.881685513Z"
+    created: "2026-01-22T12:30:25.240297999Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -7311,7 +7359,7 @@ entries:
     version: 2.4.7-dev.5
   - apiVersion: v2
     appVersion: 2.4.7-dev.4
-    created: "2026-01-21T14:52:02.856254384Z"
+    created: "2026-01-22T12:30:25.215459271Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -7367,7 +7415,7 @@ entries:
     version: 2.4.7-dev.4
   - apiVersion: v2
     appVersion: 2.4.7-dev.3
-    created: "2026-01-21T14:52:02.832363484Z"
+    created: "2026-01-22T12:30:25.189729082Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -7423,7 +7471,7 @@ entries:
     version: 2.4.7-dev.3
   - apiVersion: v2
     appVersion: 2.4.7-dev.2
-    created: "2026-01-21T14:52:02.809610677Z"
+    created: "2026-01-22T12:30:25.165340232Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -7479,7 +7527,7 @@ entries:
     version: 2.4.7-dev.2
   - apiVersion: v2
     appVersion: 2.4.7-dev.1
-    created: "2026-01-21T14:52:02.78713783Z"
+    created: "2026-01-22T12:30:25.139928948Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -7535,7 +7583,7 @@ entries:
     version: 2.4.7-dev.1
   - apiVersion: v2
     appVersion: 2.4.6
-    created: "2026-01-21T14:52:02.761473078Z"
+    created: "2026-01-22T12:30:25.115523948Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -7591,7 +7639,7 @@ entries:
     version: 2.4.6
   - apiVersion: v2
     appVersion: 2.4.6-rc.1
-    created: "2026-01-21T14:52:02.735503033Z"
+    created: "2026-01-22T12:30:25.092465325Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -7647,7 +7695,7 @@ entries:
     version: 2.4.6-rc.1
   - apiVersion: v2
     appVersion: 2.4.5
-    created: "2026-01-21T14:52:02.71159721Z"
+    created: "2026-01-22T12:30:25.068823294Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -7703,7 +7751,7 @@ entries:
     version: 2.4.5
   - apiVersion: v2
     appVersion: 2.4.5-rc.2
-    created: "2026-01-21T14:52:02.688100232Z"
+    created: "2026-01-22T12:30:25.045029352Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -7759,7 +7807,7 @@ entries:
     version: 2.4.5-rc.2
   - apiVersion: v2
     appVersion: 2.4.5-rc.1
-    created: "2026-01-21T14:52:02.66463413Z"
+    created: "2026-01-22T12:30:25.021336616Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -7815,7 +7863,7 @@ entries:
     version: 2.4.5-rc.1
   - apiVersion: v2
     appVersion: 2.4.4
-    created: "2026-01-21T14:52:02.640769739Z"
+    created: "2026-01-22T12:30:24.997685839Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -7871,7 +7919,7 @@ entries:
     version: 2.4.4
   - apiVersion: v2
     appVersion: 2.4.3
-    created: "2026-01-21T14:52:02.617205255Z"
+    created: "2026-01-22T12:30:24.974784469Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -7927,7 +7975,7 @@ entries:
     version: 2.4.3
   - apiVersion: v2
     appVersion: 2.4.2
-    created: "2026-01-21T14:52:02.593099892Z"
+    created: "2026-01-22T12:30:24.951317305Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -7983,7 +8031,7 @@ entries:
     version: 2.4.2
   - apiVersion: v2
     appVersion: 2.4.1
-    created: "2026-01-21T14:52:02.56847626Z"
+    created: "2026-01-22T12:30:24.92758086Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -8039,7 +8087,7 @@ entries:
     version: 2.4.1
   - apiVersion: v2
     appVersion: 2.4.0
-    created: "2026-01-21T14:52:02.544393777Z"
+    created: "2026-01-22T12:30:24.904689378Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -8095,7 +8143,7 @@ entries:
     version: 2.4.0
   - apiVersion: v2
     appVersion: 2.3.0
-    created: "2026-01-21T14:52:02.521099999Z"
+    created: "2026-01-22T12:30:24.881395155Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -8151,7 +8199,7 @@ entries:
     version: 2.3.0
   - apiVersion: v2
     appVersion: 2.2.0
-    created: "2026-01-21T14:52:02.496662288Z"
+    created: "2026-01-22T12:30:24.857229711Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -8207,7 +8255,7 @@ entries:
     version: 2.2.0
   - apiVersion: v2
     appVersion: 2.2.0-rc.3
-    created: "2026-01-21T14:52:02.472968228Z"
+    created: "2026-01-22T12:30:24.831813708Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -8263,7 +8311,7 @@ entries:
     version: 2.2.0-rc.3
   - apiVersion: v2
     appVersion: 2.2.0-rc.2
-    created: "2026-01-21T14:52:02.449009858Z"
+    created: "2026-01-22T12:30:24.808369344Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -8319,7 +8367,7 @@ entries:
     version: 2.2.0-rc.2
   - apiVersion: v2
     appVersion: 2.2.0-rc.1
-    created: "2026-01-21T14:52:02.426672682Z"
+    created: "2026-01-22T12:30:24.783909783Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -8375,7 +8423,7 @@ entries:
     version: 2.2.0-rc.1
   - apiVersion: v2
     appVersion: 2.1.0
-    created: "2026-01-21T14:52:02.396566749Z"
+    created: "2026-01-22T12:30:24.749307494Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -8431,7 +8479,7 @@ entries:
     version: 2.1.0
   - apiVersion: v2
     appVersion: 2.0.2
-    created: "2026-01-21T14:52:02.373137948Z"
+    created: "2026-01-22T12:30:24.725906164Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -8483,7 +8531,7 @@ entries:
     version: 2.0.2
   - apiVersion: v2
     appVersion: 2.0.2-rc9
-    created: "2026-01-21T14:52:02.353413319Z"
+    created: "2026-01-22T12:30:24.706500743Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -8539,7 +8587,7 @@ entries:
     version: 2.0.2-rc9
   - apiVersion: v2
     appVersion: 2.0.2-rc8
-    created: "2026-01-21T14:52:02.333413737Z"
+    created: "2026-01-22T12:30:24.688157858Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -8595,7 +8643,7 @@ entries:
     version: 2.0.2-rc8
   - apiVersion: v2
     appVersion: 2.0.2-rc7
-    created: "2026-01-21T14:52:02.31441392Z"
+    created: "2026-01-22T12:30:24.668789355Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -8651,7 +8699,7 @@ entries:
     version: 2.0.2-rc7
   - apiVersion: v2
     appVersion: 2.0.2-rc6
-    created: "2026-01-21T14:52:02.294303225Z"
+    created: "2026-01-22T12:30:24.648391836Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -8707,7 +8755,7 @@ entries:
     version: 2.0.2-rc6
   - apiVersion: v2
     appVersion: 2.0.2-rc5
-    created: "2026-01-21T14:52:02.273840829Z"
+    created: "2026-01-22T12:30:24.628570059Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -8763,7 +8811,7 @@ entries:
     version: 2.0.2-rc5
   - apiVersion: v2
     appVersion: 2.0.2-rc4
-    created: "2026-01-21T14:52:02.25419718Z"
+    created: "2026-01-22T12:30:24.607190021Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -8819,7 +8867,7 @@ entries:
     version: 2.0.2-rc4
   - apiVersion: v2
     appVersion: 2.0.2-rc3
-    created: "2026-01-21T14:52:02.234988834Z"
+    created: "2026-01-22T12:30:24.587508466Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -8875,7 +8923,7 @@ entries:
     version: 2.0.2-rc3
   - apiVersion: v2
     appVersion: 2.0.2-rc2
-    created: "2026-01-21T14:52:02.216123185Z"
+    created: "2026-01-22T12:30:24.568172433Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -8931,7 +8979,7 @@ entries:
     version: 2.0.2-rc2
   - apiVersion: v2
     appVersion: 2.0.2-rc12
-    created: "2026-01-21T14:52:02.196574248Z"
+    created: "2026-01-22T12:30:24.547032391Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -8983,7 +9031,7 @@ entries:
     version: 2.0.2-rc12
   - apiVersion: v2
     appVersion: 2.0.2-rc11
-    created: "2026-01-21T14:52:02.177021747Z"
+    created: "2026-01-22T12:30:24.526911407Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -9039,7 +9087,7 @@ entries:
     version: 2.0.2-rc11
   - apiVersion: v2
     appVersion: 2.0.2-rc10
-    created: "2026-01-21T14:52:02.156307988Z"
+    created: "2026-01-22T12:30:24.506846319Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -9095,7 +9143,7 @@ entries:
     version: 2.0.2-rc10
   - apiVersion: v2
     appVersion: 2.0.2-rc1
-    created: "2026-01-21T14:52:02.138083442Z"
+    created: "2026-01-22T12:30:24.488494899Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -9151,7 +9199,7 @@ entries:
     version: 2.0.2-rc1
   - apiVersion: v2
     appVersion: 2.0.1
-    created: "2026-01-21T14:52:02.118729737Z"
+    created: "2026-01-22T12:30:24.468941242Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -9207,7 +9255,7 @@ entries:
     version: 2.0.1
   - apiVersion: v2
     appVersion: 2.0.0
-    created: "2026-01-21T14:52:02.098480712Z"
+    created: "2026-01-22T12:30:24.448869369Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -9263,7 +9311,7 @@ entries:
     version: 2.0.0
   - apiVersion: v2
     appVersion: 2.0.0-rc.3
-    created: "2026-01-21T14:52:02.079441389Z"
+    created: "2026-01-22T12:30:24.429666033Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -9319,7 +9367,7 @@ entries:
     version: 2.0.0-rc.3
   - apiVersion: v2
     appVersion: v2.0.0-rc.2
-    created: "2026-01-21T14:52:05.096254247Z"
+    created: "2026-01-22T12:30:27.811810014Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -9375,7 +9423,7 @@ entries:
     version: v2.0.0-rc.2
   - apiVersion: v2
     appVersion: v2.0.0-rc.1
-    created: "2026-01-21T14:52:05.076690385Z"
+    created: "2026-01-22T12:30:27.791601106Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -9431,7 +9479,7 @@ entries:
     version: v2.0.0-rc.1
   - apiVersion: v2
     appVersion: v1.0.4-dev.4
-    created: "2026-01-21T14:52:05.057150475Z"
+    created: "2026-01-22T12:30:27.771183641Z"
     dependencies:
     - condition: traefik.enabled
       name: traefik
@@ -9487,7 +9535,7 @@ entries:
     version: v1.0.4-dev.4
   - apiVersion: v2
     appVersion: v1.0.3
-    created: "2026-01-21T14:52:05.040488237Z"
+    created: "2026-01-22T12:30:27.753964399Z"
     dependencies:
     - name: traefik
       repository: https://helm.traefik.io/traefik
@@ -9533,4 +9581,4 @@ entries:
     urls:
     - https://amrc-factoryplus.github.io/amrc-connectivity-stack/build/amrc-connectivity-stack-v1.0.3.tgz
     version: v1.0.3
-generated: "2026-01-21T14:52:02.05994328Z"
+generated: "2026-01-22T12:30:24.41020063Z"

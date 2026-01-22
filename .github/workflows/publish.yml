@@ -322,6 +322,7 @@ jobs:
           echo "krb_zipfile=hivemq-auth-krb-${ver}-distribution.zip" >>"$GITHUB_ENV"
       - name: Build with Maven
         run: |
+          (cd lib/java-service-client; mvn -B deploy)
           cd hivemq-krb
           mvn -B package
           cp "target/${krb_zipfile}" "../${{ steps.prepare.outputs.service-name }}"

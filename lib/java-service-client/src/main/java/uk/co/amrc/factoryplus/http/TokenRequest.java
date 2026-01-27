@@ -20,7 +20,7 @@ import org.apache.hc.core5.http.ProtocolException;
 
 import io.reactivex.rxjava3.core.Single;
 
-import uk.co.amrc.factoryplus.*;
+import uk.co.amrc.factoryplus.client.*;
 
 class TokenRequest
 {

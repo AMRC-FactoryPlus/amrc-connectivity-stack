@@ -1,4 +1,4 @@
-package uk.co.amrc.factoryplus;
+package uk.co.amrc.factoryplus.client;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

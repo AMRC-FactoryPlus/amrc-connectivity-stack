@@ -29,7 +29,7 @@ import org.json.*;
 import io.reactivex.rxjava3.functions.Function;
 import io.reactivex.rxjava3.functions.Supplier;
 
-import uk.co.amrc.factoryplus.Attempt;
+import uk.co.amrc.factoryplus.client.Attempt;
 
 /** A GSS principal (client or server).
  */

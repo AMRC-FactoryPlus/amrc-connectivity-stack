@@ -52,7 +52,7 @@ import org.json.*;
 
 import io.reactivex.rxjava3.core.Single;
 
-import uk.co.amrc.factoryplus.*;
+import uk.co.amrc.factoryplus.client.*;
 import uk.co.amrc.factoryplus.gss.*;
 
 /** HTTP (REST) client.

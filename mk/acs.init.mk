@@ -17,12 +17,14 @@ all:
 
 # Define do-nothing standard targets.
 
-.PHONY: build lint setup
+.PHONY: build lint setup clean
 
 build:
 
 lint:
 
 setup:
+
+clean:
 
 endif

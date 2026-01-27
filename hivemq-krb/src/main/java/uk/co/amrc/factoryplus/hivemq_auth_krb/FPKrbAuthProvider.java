@@ -26,11 +26,10 @@ import org.slf4j.LoggerFactory;
 
 import org.ietf.jgss.*;
 import org.json.*;
-import org.apache.hc.core5.net.URIBuilder;
 
 import io.reactivex.rxjava3.core.*;
 
-import uk.co.amrc.factoryplus.*;
+import uk.co.amrc.factoryplus.client.*;
 
 import com.hivemq.extension.sdk.api.annotations.NotNull;
 import com.hivemq.extension.sdk.api.annotations.Nullable;

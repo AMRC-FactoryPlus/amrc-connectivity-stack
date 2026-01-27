@@ -3,7 +3,7 @@
  * Copyright 2024 AMRC.
  */
 
-package uk.co.amrc.factoryplus;
+package uk.co.amrc.factoryplus.client;
 
 import java.util.UUID;
 

@@ -5,7 +5,7 @@
  */
 
 import deep_equal       from "deep-equal";
-import k8s              from "@kubernetes/client-node";
+import * as k8s         from "@kubernetes/client-node";
 import rx               from "rxjs";
 
 import * as rxx         from "@amrc-factoryplus/rx-util";

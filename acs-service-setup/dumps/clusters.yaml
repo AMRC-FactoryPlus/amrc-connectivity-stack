@@ -60,7 +60,6 @@ objects:
     !u Clusters.App.Cluster: { name: "Edge cluster configuration" }
     !u Clusters.App.Flux:           { name: "Flux template" }
     !u Clusters.App.HelmChart: { name: "Helm chart template" }
-    !u Clusters.App.HelmRelease: { name: "HelmRelease template" }
     !u Clusters.App.Status: { name: "Edge cluster setup status" }
   !u UUIDs.Class.Service:
     !u Clusters.Service.ClusterManager: { name: "Cluster manager" }
@@ -321,6 +320,9 @@ configs:
         cd /
         rm -rf "$wd"
   !u Clusters.App.Flux:
+    # XXX Should this be reworked in terms of the K8sTemplate configs?
+    # Instead of a detailed manifest each file could hold an array of
+    # { resource, name, values } objects.
     !u Clusters.App.Flux:
       edge-cluster.yaml:
         - "{{ helm }}"
@@ -406,7 +408,7 @@ grants:
       !u Clusters.App.EdgeStatus: false
       !u Clusters.App.Flux: false
       !u Clusters.App.HelmChart: false
-      !u Clusters.App.HelmRelease: false
+      !u Clusters.App.K8sTemplate: false
       !u Clusters.App.Bootstrap: false
       !u UUIDs.App.SparkplugAddress: false
 

@@ -11,9 +11,13 @@ objects:
     !u ACS.Class.EdgeDeployment:
       name: "Edge deployment"
 
+  !u ConfigDB.Class.R2Class:
+    !u Clusters.Class.K8sResource:
+      name: "K8s resource kind"
+
   !u UUIDs.Class.App:
-    !u Clusters.App.HelmRelease:
-      name: "HelmRelease template"
+    !u Clusters.App.K8sTemplate:
+      name: "K8s resource template"
     !u Clusters.App.HelmTemplate:
       name: "Helm chart template"
 
@@ -61,6 +65,12 @@ objects:
     !u Local.Chart.MQTT:
       name: "Edge MQTT broker"
 
+  !u Clusters.Class.K8sResource:
+    !u Clusters.Resource.GitRepo:
+      name: "GitRepository"
+    !u Clusters.Resource.HelmRelease:
+      name: "HelmRelease"
+
 configs:
   !u UUIDs.App.ConfigSchema:
     !u Clusters.App.HelmTemplate:
@@ -82,8 +92,8 @@ configs:
           description: >
             Helm values to apply. {{Templates}} will be expanded.
           type: object
-    !u Clusters.App.HelmRelease:
-      title: Flux HelmRelease manifest template
+    !u Clusters.App.K8sTemplate:
+      title: K8s resource manifest template
       type: object
       required: [template, resources]
       additionalProperties: false
@@ -93,7 +103,7 @@ configs:
           type: object
           required: [apiVersion, kind]
         resources:
-          description: Resource types which represent Helm charts
+          description: Resource types which we replace
           type: array
           items:
             type: object
@@ -103,10 +113,26 @@ configs:
               apiVersion: { type: string }
               kind: { type: string }
 
-  # XXX These single-object configs don't give the user any opportunity
-  # to override the configuration. But where is an override specified?
-  !u Clusters.App.HelmRelease:
-    !u Clusters.App.HelmRelease:
+  !u Clusters.App.K8sTemplate:
+    !u Clusters.Resource.GitRepo:
+      resources:
+        - apiVersion: source.toolkit.fluxcd.io/v1
+          kind: GitRepository
+      template:
+        apiVersion: source.toolkit.fluxcd.io/v1
+        kind: GitRepository
+        metadata: 
+          name: "{{name}}"
+          labels:
+            "factoryplus.app.amrc.co.uk/uuid": "{{uuid}}"
+        spec:
+            interval: "3m"
+            ref:
+                branch: "main"
+            secretRef:
+                name: "flux-secrets"
+            url: "{{url}}"
+    !u Clusters.Resource.HelmRelease:
       resources:
         - apiVersion: helm.toolkit.fluxcd.io/v2beta1
           kind: HelmRelease
@@ -114,7 +140,9 @@ configs:
         apiVersion: helm.toolkit.fluxcd.io/v2beta1
         kind: HelmRelease
         metadata:
-          name: "{{prefix}}-{{uuid}}"
+          name: "{{name}}"
+          labels:
+            "factoryplus.app.amrc.co.uk/uuid": "{{uuid}}"
         spec:
           chart:
             spec:
@@ -176,7 +204,7 @@ grants:
       !u Edge.App.AgentConfig: false
   !u Local.Role.EdgeSync:
     !u ConfigDB.Perm.ReadConfig:
-      !u Clusters.App.HelmRelease: false
+      !u Clusters.App.K8sTemplate: false
       !u Clusters.App.HelmTemplate: false
       !u Edge.App.Deployment: false
       !u Edge.App.ClusterStatus: false

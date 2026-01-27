@@ -3,21 +3,37 @@
  * Copyright 2023 AMRC
  */
 
-import k8s from "@kubernetes/client-node";
+import * as k8s from "@kubernetes/client-node";
 
-import { UUIDs } from "@amrc-factoryplus/service-client";
+import { ServiceError, UUIDs } from "@amrc-factoryplus/service-client";
 
 import { ACS, Auth, Clusters } from "./uuids.js";
 
 const APIVERSION = "factoryplus.app.amrc.co.uk/v1";
 const ACCUUID = "krbkeys.factoryplus.app.amrc.co.uk/account-uuid";
 
+const Removed = [
+    [Clusters.App.K8sTemplate,  Clusters.App.K8sTemplate],
+];
+
 export async function fixups (ss, local) {
     const { fplus } = ss;
 
+    await delete_old_entries(fplus);
     await new FixupAccounts(fplus, local).run();
 
     return;
+}
+
+async function delete_old_entries (fplus) {
+    const cdb = fplus.ConfigDB;
+    const log = fplus.debug.bound("delete");
+
+    for (const [app, obj] of Removed) {
+        log("Deleting config entry %s for %s", app, obj);
+        await cdb.delete_config(app, obj)
+            .catch(ServiceError.check(404));
+    }
 }
 
 class FixupAccounts {
@@ -53,11 +69,9 @@ class FixupAccounts {
         const namespace = kc.getContextObject(kc.currentContext).namespace;
         const objs = k8s.KubernetesObjectApi.makeApiClient(kc);
         
-        const { response, body } = await objs.list(APIVERSION, "KerberosKey", namespace);
-        if (response.statusCode != 200)
-            throw new Error(`Can't list KerberosKeys: ${response.statusCode}`);
+        const kks = await objs.list(APIVERSION, "KerberosKey", namespace);
 
-        const accounts = body.items
+        const accounts = kks.items
             .map(k => k.metadata?.annotations?.[ACCUUID])
             .filter(v => v != null);
 

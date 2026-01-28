@@ -1,6 +1,8 @@
 # Git Repository Authentication
 
-The ACS Git server supports automatic mirroring of external Git repositories. When these repositories require authentication, you can configure credentials using Kubernetes secrets.
+The ACS Git server supports automatic mirroring of external Git
+repositories. When these repositories require authentication, you can
+configure credentials using Kubernetes secrets.
 
 ## Configuring Authentication for External Repositories
 

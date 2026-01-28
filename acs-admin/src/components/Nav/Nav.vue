@@ -1,5 +1,5 @@
 <!--
-  - Copyright (c) University of Sheffield AMRC 2025.
+  - Copyright (c) University of Sheffield AMRC 2026.
   -->
 
 <script setup lang="ts">
@@ -50,6 +50,12 @@ const sidebarNavItems: Item[] = [
     title: 'Files',
     href: '/files',
     icon: 'file',
+    auth: true
+  },
+  {
+    title: 'Bridges',
+    href: '/bridges',
+    icon: 'arrow-down-up-across-line',
     auth: true
   }
 ]

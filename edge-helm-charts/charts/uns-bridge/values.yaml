@@ -1,0 +1,68 @@
+# UNS Bridge configuration
+name: "bridge"  # Bridge name (required, override this)
+uuid: "00000000-0000-0000-0000-000000000000"  # Bridge UUID (required, override this)
+
+# Kerberos realm for local authentication
+realm: "REALM.EXAMPLE.COM"  # Override this
+
+# Cluster name for principal construction (e.g., br1/<cluster>/<name>)
+cluster: "cluster-name"  # Override this
+
+# Auth group to add the bridge account to
+authGroup:
+  unsReader: "d6a4d87c-cd02-11ef-9a87-2f86ebe5ee08"  # UNS.Group.Reader - grants UNS read permissions
+
+# Directory URL for service discovery (not currently used)
+directory_url: "http://directory.namespace.svc.cluster.local"
+
+# UNS topics to bridge (list of topic filters)
+# Each topic gets an ACE granting subscribe permission
+topics: []
+# - UNS/v1/site/area/#
+# - UNS/v1/another/topic
+
+# Local ACS MQTT broker connection
+local:
+  # Host of the local ACS MQTT broker
+  host: "mqtt.namespace.svc.cluster.local"  # Override this
+  port: 1883
+
+# Remote MQTT broker connection
+remote:
+  host: "remote-mqtt.example.com"  # Override this
+  port: 8883
+  # Use TLS for remote connection
+  tls: true
+  # Name of the secret containing remote credentials
+  # This secret should be created via SealedSecret
+  secretName: ""
+  # Keys in the secret for username and password
+  usernameKey: username
+  passwordKey: password
+
+# Image configuration
+image:
+  default:
+    pullPolicy: IfNotPresent
+  mosquitto:
+    registry: docker.io
+    repository: eclipse-mosquitto
+    tag: "2.0"
+
+# Tolerations for pod scheduling
+tolerations:
+  # Tolerations to apply to pods deployed to a specific host
+  specific:
+    - key: factoryplus.app.amrc.co.uk/specialised
+      operator: Exists
+  # Tolerations to apply to floating pods
+  floating: []
+
+# This deploys to a specific host
+# hostname: foo
+
+# Resource limits
+limits:
+  cpu: "50m"
+  memory: "64Mi"
+

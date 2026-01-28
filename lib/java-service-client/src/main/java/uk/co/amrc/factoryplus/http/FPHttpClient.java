@@ -25,11 +25,7 @@ import org.slf4j.LoggerFactory;
 import org.apache.commons.lang3.tuple.Pair;
 
 import org.apache.hc.client5.http.HttpResponseException;
-import org.apache.hc.client5.http.fluent.Request;
-import org.apache.hc.client5.http.fluent.Response;
 import org.apache.hc.client5.http.impl.cache.CacheConfig;
-import org.apache.hc.client5.http.impl.cache.CachingHttpClients;
-import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.core5.http.ContentType;
 import org.apache.hc.core5.net.URIBuilder;
 
@@ -62,7 +58,7 @@ public class FPHttpClient {
 
     private FPServiceClient fplus;
     private FPDiscovery discovery;
-    private CloseableHttpClient http_client;
+
     private CloseableHttpAsyncClient async_client;
     private RequestCache<URI, String> tokens;
 
@@ -73,9 +69,6 @@ public class FPHttpClient {
 
         CacheConfig cache_config = CacheConfig.custom()
             .setSharedCache(false)
-            .build();
-        http_client = CachingHttpClients.custom()
-            .setCacheConfig(cache_config)
             .build();
 
         tokens = new RequestCache<URI, String>(this::tokenFor);

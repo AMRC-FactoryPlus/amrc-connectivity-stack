@@ -14,6 +14,7 @@
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <maven.compiler.release>17</maven.compiler.release>
+    <jettyVersion>12.1.5</jettyVersion>
   </properties>
 
   <distributionManagement>
@@ -64,6 +65,17 @@
       <groupId>io.reactivex.rxjava3</groupId>
       <artifactId>rxjava</artifactId>
       <version>3.1.12</version>
+    </dependency>
+    <!-- Jetty client -->
+    <dependency>
+      <groupId>org.eclipse.jetty</groupId>
+      <artifactId>jetty-client</artifactId>
+      <version>${jettyVersion}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.jetty.websocket</groupId>
+      <artifactId>jetty-websocket-jetty-client</artifactId>
+      <version>${jettyVersion}</version>
     </dependency>
 
     <dependency>

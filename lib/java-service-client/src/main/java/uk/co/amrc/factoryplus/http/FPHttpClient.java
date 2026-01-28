@@ -44,6 +44,8 @@ import org.apache.hc.core5.io.CloseMode;
 import org.apache.hc.core5.reactor.IOReactorConfig;
 import org.apache.hc.core5.util.Timeout;
 
+import org.eclipse.jetty.websocket.client.WebSocketClient;
+
 import org.json.*;
 
 import io.reactivex.rxjava3.core.Single;
@@ -61,6 +63,8 @@ public class FPHttpClient {
 
     private CloseableHttpAsyncClient async_client;
     private RequestCache<URI, String> tokens;
+
+    private WebSocketClient ws_client;
 
     /** Internal; construct via {@link FPServiceClient}. */
     public FPHttpClient (FPServiceClient fplus)
@@ -81,6 +85,8 @@ public class FPHttpClient {
             .setCacheConfig(cache_config)
             .setIOReactorConfig(ioReactorConfig)
             .build();
+
+        ws_client = new WebSocketClient();
     }
 
     /** Start the async client threads.
@@ -97,6 +103,14 @@ public class FPHttpClient {
 
         //FPThreadUtil.logId("Running async HTTP client");
         async_client.start();
+
+        /* grr */
+        try {
+            ws_client.start();
+        }
+        catch (Exception e) {
+            throw new ServiceConfigurationError("Cannot start WebSocket client", e);
+        }
     }
 
     /** Creates a new request.

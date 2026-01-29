@@ -44,11 +44,16 @@ import org.apache.hc.core5.io.CloseMode;
 import org.apache.hc.core5.reactor.IOReactorConfig;
 import org.apache.hc.core5.util.Timeout;
 
+import org.eclipse.jetty.websocket.api.Callback;
+import org.eclipse.jetty.websocket.api.Session;
+import org.eclipse.jetty.websocket.api.util.WSURI;
 import org.eclipse.jetty.websocket.client.WebSocketClient;
 
 import org.json.*;
 
-import io.reactivex.rxjava3.core.Single;
+import io.reactivex.rxjava3.core.*;
+import io.reactivex.rxjava3.disposables.*;
+import io.reactivex.rxjava3.subjects.*;
 
 import uk.co.amrc.factoryplus.client.*;
 import uk.co.amrc.factoryplus.gss.*;
@@ -157,6 +162,68 @@ public class FPHttpClient {
                 .flatMap(r -> r.getBodyObject())
                 .orElseThrow(() -> new Exception("Invalid token response")))
             .map(o -> o.getString("token"));
+    }
+
+    /* If this is created as an anon class we get an
+     * IllegalAccessException when Jetty tries to use it. I don't
+     * understand why.
+     */
+    public static class WS_Listener implements Session.Listener.AutoDemanding
+    {
+        Observable<String> send;
+        Observer<String> recv;
+        Disposable sub;
+
+        WS_Listener (Observable<String> send, Observer<String> recv)
+        {
+            this.send = send;
+            this.recv = recv;
+        }
+
+        public void onWebSocketOpen (Session sess) {
+            sess.addIdleTimeoutListener(e -> false);
+            sub = send
+                .concatMapCompletable(msg -> {
+                    var cf = new Callback.Completable();
+                    sess.sendText(msg, cf);
+                    return Completable.fromCompletionStage(cf);
+                })
+                .doFinally(() -> sess.close())
+                .subscribe(() -> {}, e -> recv.onError(e));
+        }
+
+        public void onWebSocketClose (int sc, String r, Callback done) {
+            if (sub != null) sub.dispose();
+            recv.onComplete();
+        }
+
+        public void onWebSocketError (Throwable e) {
+            recv.onError(e);
+        }
+
+        public void onWebSocketText (String msg) {
+            recv.onNext(msg);
+        }
+    }
+
+    public Single<Duplex<String, String>> websocket (URI uri)
+    {
+        return Single.create(obs -> {
+            var ws_uri = WSURI.toWebsocket(uri);
+            var send = UnicastSubject.<String>create();
+            var recv = PublishSubject.<String>create();
+
+            var ep = new WS_Listener(send, recv);
+            var cf = this.ws_client.connect(ep, ws_uri);
+
+            obs.setDisposable(Disposable.fromFuture(cf));
+            cf.whenComplete((ok, err) -> {
+                if (ok != null) 
+                    obs.onSuccess(Duplex.of(send, recv));
+                else
+                    obs.tryOnError(err);
+            });
+        });
     }
 
     public Single<SimpleHttpResponse> fetch (SimpleHttpRequest req)

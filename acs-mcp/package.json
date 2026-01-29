@@ -1,0 +1,55 @@
+{
+  "name": "@amrc-factoryplus/mcp",
+  "version": "1.0.0",
+  "description": "MCP server for AMRC Connectivity Stack (ACS) - enables AI agents to interact with Factory+ services",
+  "author": "AMRC",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "amrc-factoryplus-mcp": "./dist/index.js"
+  },
+  "files": [
+    "dist/",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "amrc",
+    "factory-plus",
+    "factoryplus",
+    "acs",
+    "mcp",
+    "model-context-protocol",
+    "configdb",
+    "ai",
+    "claude",
+    "cursor"
+  ],
+  "scripts": {
+    "start": "node dist/index.js",
+    "build": "tsc",
+    "dev": "npm run build && npm run start",
+    "clean": "tsc --build --clean",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@amrc-factoryplus/service-client": "^1.6.0",
+    "dotenv": "^16.0.3",
+    "zod": "^3.23.0"
+  },
+  "optionalDependencies": {
+    "gssapi.js": "^2.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
+}

@@ -103,7 +103,8 @@ public class FPHttpClient {
      */
     public void start ()
     {
-        /* This can throw if the directory url is missing */
+        /* This can throw if the directory url is missing, so don't call
+         * in the constructor. */
         this.discovery = fplus.discovery();
 
         //FPThreadUtil.logId("Running async HTTP client");

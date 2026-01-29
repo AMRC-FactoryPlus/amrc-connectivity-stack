@@ -72,6 +72,15 @@ public class FPServiceClient {
         this.config = config;
     }
 
+    /** Start the client.
+     *
+     * This must be called before calling anything else.
+     */
+    public void start ()
+    {
+        this.http().start();
+    }
+
     /** Gets a configuration parameter.
      *
      * If an override was supplied it will be returned. Otherwise the

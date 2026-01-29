@@ -1,5 +1,5 @@
 <!--
-  - Copyright (c) University of Sheffield AMRC 2025.
+  - Copyright (c) University of Sheffield AMRC 2026.
   -->
 
 <template>
@@ -73,6 +73,7 @@
         <NewEdgeDeploymentDialog/>
         <NewDeviceDialog/>
         <NewConnectionDialog/>
+        <NewBridgeDialog/>
         <RouterView/>
       </main>
     </SidebarInset>
@@ -97,6 +98,7 @@ import NewClusterDialog from '@components/EdgeManager/EdgeClusters/NewClusterDia
 import NewEdgeDeploymentDialog from '@components/EdgeManager/Nodes/NewEdgeDeploymentDialog.vue'
 import NewConnectionDialog from '@components/EdgeManager/Connections/NewConnectionDialog.vue'
 import NewDeviceDialog from '@components/EdgeManager/Devices/NewDeviceDialog.vue'
+import NewBridgeDialog from '@components/Bridges/NewBridgeDialog.vue'
 import { ACS_VERSION } from '@/lib/version.js'
 
 export default {
@@ -152,6 +154,7 @@ export default {
     EdgeClusterList,
     Toaster,
     NewConnectionDialog,
+    NewBridgeDialog,
   },
 
   watch: {

@@ -21,7 +21,7 @@ import io.reactivex.rxjava3.core.Single;
  */
 public class FPHttpRequest {
     /* XXX ResolvedRequest needs friend access */
-    private FPHttpClient client;
+    FPHttpClient client;
     UUID service;
     String method;
     String path;

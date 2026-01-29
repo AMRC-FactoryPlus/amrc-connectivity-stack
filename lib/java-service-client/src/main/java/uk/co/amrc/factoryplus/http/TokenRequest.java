@@ -22,7 +22,7 @@ import io.reactivex.rxjava3.core.Single;
 
 import uk.co.amrc.factoryplus.client.*;
 
-class TokenRequest
+class TokenRequest extends JsonRequest
 {
     private static final Logger log = LoggerFactory.getLogger(TokenRequest.class);
 
@@ -32,15 +32,17 @@ class TokenRequest
     private URI server;
     private GSSContext ctx;
 
-    public TokenRequest (URI server, GSSContext ctx)
+    public TokenRequest (FPHttpClient client, URI server, GSSContext ctx)
     {
+        super(client);
+
         this.server = server;
         this.ctx = ctx;
     }
 
     /* This method is blocking and stateful. This is unavoidable with
      * the GSSAPI. */
-    public SimpleHttpRequest buildRequest ()
+    protected SimpleHttpRequest buildRequest ()
         throws GSSException
     {
         //FPThreadUtil.logId("getting gss token");
@@ -62,7 +64,7 @@ class TokenRequest
         return Single.<JsonResponse>error(new Exception(msg));
     }
 
-    public Single<JsonResponse> handleResponse (JsonResponse res)
+    protected Single<JsonResponse> handleResponse (JsonResponse res)
         throws ProtocolException, GSSException
     {
         if (res.getCode() == 401)

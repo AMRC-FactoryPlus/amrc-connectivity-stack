@@ -132,8 +132,7 @@ public class FPHttpClient {
             .get(fpr.service)
             .flatMap(base -> tokens.get(base)
                 .map(tok -> fpr.resolveWith(base, tok)))
-            .flatMap(rrq -> fetch(rrq.buildRequest())
-                .flatMap(res -> rrq.handleResponse(res)))
+            .flatMap(rrq -> rrq.perform())
             .retry(2, ex -> 
                 (ex instanceof BadToken)
                     && ((BadToken)ex).invalidate(tokens));
@@ -149,10 +148,9 @@ public class FPHttpClient {
                     .createContextHB("HTTP@" + service.getHost())
                     .orElseThrow();
             })
-            .map(ctx -> new TokenRequest(service, ctx))
-                /* buildRequest is blocking */
-            .flatMap(req -> fetch(req.buildRequest())
-                .flatMap(res -> req.handleResponse(res)))
+            .map(ctx -> new TokenRequest(this, service, ctx))
+                /* perform is blocking */
+            .flatMap(req -> req.perform())
             .subscribeOn(fplus.getScheduler())
             /* fetch moves calls below here to the http thread pool */
             .map(res -> res.ifOk()
@@ -161,37 +159,33 @@ public class FPHttpClient {
             .map(o -> o.getString("token"));
     }
 
-    private Single<JsonResponse> fetch (SimpleHttpRequest req)
+    public Single<SimpleHttpResponse> fetch (SimpleHttpRequest req)
     {
         //FPThreadUtil.logId("fetch called");
-        final var context = HttpCacheContext.create();
-        return Single.<SimpleHttpResponse>create(obs ->
-                async_client.execute(req, context,
-                    new FutureCallback<SimpleHttpResponse>() {
-                        public void completed (SimpleHttpResponse res) {
-                            //FPThreadUtil.logId("fetch success");
-                            String uri = "???";
-                            try { uri = req.getUri().toString(); }
-                            catch (Exception e) { }
-                            log.info("Cache {} ({}) for {}",
-                                context.getCacheResponseStatus(),
-                                res.getCode(), uri);
-                            obs.onSuccess(res);
-                        }
+        return Single.<SimpleHttpResponse>create(obs -> {
+            final var context = HttpCacheContext.create();
+            async_client.execute(req, context,
+                new FutureCallback<SimpleHttpResponse>() {
+                    public void completed (SimpleHttpResponse res) {
+                        //FPThreadUtil.logId("fetch success");
+                        String uri = "???";
+                        try { uri = req.getUri().toString(); }
+                        catch (Exception e) { }
+                        log.info("Cache {} ({}) for {}",
+                            context.getCacheResponseStatus(),
+                            res.getCode(), uri);
+                        obs.onSuccess(res);
+                    }
 
-                        public void failed (Exception ex) {
-                            //FPThreadUtil.logId("fetch failure");
-                            obs.onError(ex);
-                        }
+                    public void failed (Exception ex) {
+                        //FPThreadUtil.logId("fetch failure");
+                        obs.onError(ex);
+                    }
 
-                        public void cancelled () {
-                            obs.onError(new Exception("HTTP future cancelled"));
-                        }
-                    }))
-            //.doOnSuccess(res -> {
-            //    FPThreadUtil.logId("handling fetch response");
-            //    log.info("Fetch response {}: {}", req.getUri(), res.getCode());
-            //})
-            .map(res -> new JsonResponse(res));
+                    public void cancelled () {
+                        obs.onError(new Exception("HTTP future cancelled"));
+                    }
+                });
+        });
     }
 }

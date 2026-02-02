@@ -6,9 +6,9 @@
 
 package uk.co.amrc.factoryplus.http;
 
-import java.util.function.Function;
-
 import io.reactivex.rxjava3.core.*;
+import io.reactivex.rxjava3.functions.Function;
+import io.reactivex.rxjava3.observers.DisposableObserver;
 
 public class Duplex<S, R>
 {
@@ -29,13 +29,53 @@ public class Duplex<S, R>
     public Observer<S> getSender () { return this.sender; }
     public Observable<R> getReceiver () { return this.receiver; }
 
-    public <T> Duplex<T, R> lift (Function<Observer<S>, Observer<T>> map)
+    public interface ObserverMap<A, B>
     {
-        return Duplex.of(map.apply(this.sender), this.receiver);
+        Observer<B> apply (Observer<A> observer);
+    }
+    public interface ObservableMap<A, B>
+    {
+        Observable<B> apply (Observable<A> observable);
     }
 
-    public <T> Duplex<S, T> compose (Function<Observable<R>, Observable<T>> map)
+    public <S2, R2> Duplex<S2, R2> compose (
+        ObserverMap<S, S2> mapSender,
+        ObservableMap<R, R2> mapReceiver)
     {
-        return Duplex.of(this.sender, map.apply(this.receiver));
+        return Duplex.<S2, R2>of(mapSender.apply(this.sender),
+            mapReceiver.apply(this.receiver));
+    }
+
+    static class MapObserver<Up, Down> extends DisposableObserver<Up>
+    {
+        private final Observer<Down> dest;
+        private final Function<Up, Down> mapper;
+
+        public MapObserver (Observer<Down> dest, Function<Up, Down> mapper)
+        {
+            this.dest = dest;
+            this.mapper = mapper;
+        }
+
+        @Override public void onNext (Up value)
+        {
+            try {
+                dest.onNext(mapper.apply(value));
+            }
+            catch (Throwable e) {
+                onError(e);
+            }
+        }
+
+        @Override public void onComplete () { dest.onComplete(); }
+        @Override public void onError (Throwable err) { dest.onError(err); }
+    }
+
+    public <S2, R2> Duplex<S2, R2> map (
+        Function<S2, S> mapSender, Function<R, R2> mapReceiver)
+    {
+        return this.compose(
+            obs -> new MapObserver(obs, mapSender),
+            seq -> seq.map(mapReceiver));
     }
 }

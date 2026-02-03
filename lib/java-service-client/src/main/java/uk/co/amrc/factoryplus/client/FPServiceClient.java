@@ -67,7 +67,7 @@ public class FPServiceClient {
      *
      * @param config Configuration overrides.
      */
-    public FPServiceClient (Map config)
+    public FPServiceClient (Map<String, String> config)
     {
         this.config = config;
     }

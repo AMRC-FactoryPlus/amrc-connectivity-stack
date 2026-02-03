@@ -10,22 +10,7 @@ import java.util.function.Function;
 
 import io.reactivex.rxjava3.core.Single;
 
-abstract class PerformableRequest<Req, Res, Out>
+interface PerformableRequest<Res>
 {
-    public PerformableRequest ()
-    {
-    }
-
-    public Single<Out> perform ()
-        throws Throwable
-    {
-        return this.fetch(this.buildRequest())
-            .map(res -> this.translateResponse(res))
-            .flatMap(res -> this.handleResponse(res));
-    }
-
-    protected abstract Single<Res> fetch (Req r) throws Throwable;
-    protected abstract Req buildRequest () throws Throwable;
-    protected abstract Out translateResponse (Res res) throws Throwable;
-    protected abstract Single<Out> handleResponse (Out res) throws Throwable;
+    public Single<Res> perform (FPHttpClient client);
 }

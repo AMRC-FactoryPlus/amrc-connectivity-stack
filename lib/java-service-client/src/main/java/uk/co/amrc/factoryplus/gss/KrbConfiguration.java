@@ -26,7 +26,7 @@ class KrbConfiguration extends Configuration {
 
     public AppConfigurationEntry[] getAppConfigurationEntry(String name)
     {
-        HashMap<String,String> opts = new HashMap();
+        var opts = new HashMap<String, String>();
 
         switch (name) {
         case "server":

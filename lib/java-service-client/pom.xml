@@ -134,6 +134,11 @@
         <plugin>
           <artifactId>maven-compiler-plugin</artifactId>
           <version>3.14.1</version>
+          <configuration>
+            <compilerArgs>
+              <arg>-Xlint:unchecked</arg>
+            </compilerArgs>
+          </configuration>
         </plugin>
         <plugin>
           <artifactId>maven-surefire-plugin</artifactId>
@@ -163,6 +168,9 @@
           <groupId>com.github.johnpoth</groupId>
           <artifactId>jshell-maven-plugin</artifactId>
           <version>1.4</version>
+          <configuration>
+            <testClasspath>true</testClasspath>
+          </configuration>
         </plugin>
       </plugins>
     </pluginManagement>

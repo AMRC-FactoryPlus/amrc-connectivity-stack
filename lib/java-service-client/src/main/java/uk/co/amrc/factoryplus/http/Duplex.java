@@ -23,7 +23,7 @@ public class Duplex<S, R>
 
     static <S, R> Duplex<S, R> of (Observer<S> sender, Observable<R> receiver)
     {
-        return new Duplex(sender, receiver);
+        return new Duplex<>(sender, receiver);
     }
 
     public Observer<S> getSender () { return this.sender; }
@@ -42,7 +42,7 @@ public class Duplex<S, R>
         ObserverMap<S, S2> mapSender,
         ObservableMap<R, R2> mapReceiver)
     {
-        return Duplex.<S2, R2>of(mapSender.apply(this.sender),
+        return Duplex.of(mapSender.apply(this.sender),
             mapReceiver.apply(this.receiver));
     }
 
@@ -75,7 +75,7 @@ public class Duplex<S, R>
         Function<S2, S> mapSender, Function<R, R2> mapReceiver)
     {
         return this.compose(
-            obs -> new MapObserver(obs, mapSender),
+            obs -> new MapObserver<>(obs, mapSender),
             seq -> seq.map(mapReceiver));
     }
 }

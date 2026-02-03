@@ -11,25 +11,22 @@ import org.apache.hc.client5.http.async.methods.SimpleHttpResponse;
 
 import io.reactivex.rxjava3.core.Single;
 
-abstract class JsonRequest 
-    extends PerformableRequest<SimpleHttpRequest, SimpleHttpResponse, JsonResponse>
+abstract class JsonRequest implements PerformableRequest<JsonResponse>
 {
-    FPHttpClient client;
-
-    public JsonRequest (FPHttpClient client)
+    public Single<JsonResponse> perform (FPHttpClient client)
     {
-        this.client = client;
+        return Single.fromSupplier(this::buildRequest)
+            .flatMap(client::fetch)
+            .map(JsonResponse::new)
+            .flatMap(this::handleJson);
     }
 
-    @Override
-    protected Single<SimpleHttpResponse> fetch (SimpleHttpRequest req)
+    protected abstract SimpleHttpRequest buildRequest () throws Throwable;
+
+    protected Single<JsonResponse> handleJson (JsonResponse res)
+        throws Throwable
     {
-        return client.fetch(req);
+        return Single.just(res);
     }
 
-    @Override
-    protected JsonResponse translateResponse (SimpleHttpResponse res)
-    {
-        return new JsonResponse(res);
-    }
 }

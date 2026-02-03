@@ -26,8 +26,6 @@ class ResolvedRequest extends JsonRequest
 
     public ResolvedRequest (FPHttpRequest source, URI base, String token)
     {
-        super(source.client);
-
         this.source = source;
         this.base = base;
         this.token = token;
@@ -52,7 +50,7 @@ class ResolvedRequest extends JsonRequest
     }
 
     @Override
-    protected Single<JsonResponse> handleResponse (JsonResponse res)
+    protected Single<JsonResponse> handleJson (JsonResponse res)
     {
         return res.getCode() == 401
             ? Single.error(() -> new BadToken(base, token))

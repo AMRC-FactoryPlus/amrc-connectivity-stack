@@ -19,7 +19,8 @@ import io.reactivex.rxjava3.core.Single;
  * An object of this class is used to build up the definition of a
  * request before fetching it.
  */
-public class FPHttpRequest {
+public class FPHttpRequest implements ResolvableRequest<JsonResponse>
+{
     /* XXX ResolvedRequest needs friend access */
     FPHttpClient client;
     UUID service;
@@ -34,6 +35,8 @@ public class FPHttpRequest {
         this.service = service;
         this.method = method;
     }
+
+    public UUID getService () { return this.service; }
 
     /** Sets the path.
      *

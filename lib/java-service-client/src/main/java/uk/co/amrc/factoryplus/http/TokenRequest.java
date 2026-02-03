@@ -32,16 +32,15 @@ class TokenRequest extends JsonRequest
     private URI server;
     private GSSContext ctx;
 
-    public TokenRequest (FPHttpClient client, URI server, GSSContext ctx)
+    public TokenRequest (URI server, GSSContext ctx)
     {
-        super(client);
-
         this.server = server;
         this.ctx = ctx;
     }
 
     /* This method is blocking and stateful. This is unavoidable with
      * the GSSAPI. */
+    @Override
     protected SimpleHttpRequest buildRequest ()
         throws GSSException
     {
@@ -64,7 +63,8 @@ class TokenRequest extends JsonRequest
         return Single.<JsonResponse>error(new Exception(msg));
     }
 
-    protected Single<JsonResponse> handleResponse (JsonResponse res)
+    @Override
+    protected Single<JsonResponse> handleJson (JsonResponse res)
         throws ProtocolException, GSSException
     {
         if (res.getCode() == 401)

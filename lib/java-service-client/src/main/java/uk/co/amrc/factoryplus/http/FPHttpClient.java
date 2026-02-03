@@ -131,14 +131,14 @@ public class FPHttpClient {
     }
 
     /** Internal; use {@link FPHttpRequest#fetch()}. */
-    public Single<JsonResponse> execute (FPHttpRequest fpr)
+    public <Res> Single<Res> execute (ResolvableRequest<Res> req)
     {
         //FPThreadUtil.logId("execute called");
         return discovery
-            .get(fpr.service)
+            .get(req.getService())
             .flatMap(base -> tokens.get(base)
-                .map(tok -> fpr.resolveWith(base, tok)))
-            .flatMap(rrq -> rrq.perform())
+                .map(tok -> req.resolveWith(base, tok)))
+            .flatMap(rrq -> rrq.perform(this))
             .retry(2, ex -> 
                 (ex instanceof BadToken)
                     && ((BadToken)ex).invalidate(tokens));
@@ -154,9 +154,9 @@ public class FPHttpClient {
                     .createContextHB("HTTP@" + service.getHost())
                     .orElseThrow();
             })
-            .map(ctx -> new TokenRequest(this, service, ctx))
+            .map(ctx -> new TokenRequest(service, ctx))
                 /* perform is blocking */
-            .flatMap(req -> req.perform())
+            .flatMap(req -> req.perform(this))
             .subscribeOn(fplus.getScheduler())
             /* fetch moves calls below here to the http thread pool */
             .map(res -> res.ifOk()
@@ -165,56 +165,30 @@ public class FPHttpClient {
             .map(o -> o.getString("token"));
     }
 
-    /* If this is created as an anon class we get an
-     * IllegalAccessException when Jetty tries to use it. I don't
-     * understand why.
+    /** Opens a WebSocket.
+     *
+     * The sending side of the Duplex will send text msgs to the WS.
+     * Received text msgs are emitted by the receiving side. Received
+     * binary msgs will be ignored.
+     *
+     * Completing the send side will close the WS. An error emitted to
+     * the send side will close the WS and then reflect the error to the
+     * receiving side. 
+     *
+     * The send side relies on the Rx contract that onNext is called in
+     * a serial fashion. Failure to respect this will cause Jetty WS
+     * errors.
+     *
+     * @param uri URI of the WS to open
      */
-    public static class WS_Listener implements Session.Listener.AutoDemanding
-    {
-        Observable<String> send;
-        Observer<String> recv;
-        Disposable sub;
-
-        WS_Listener (Observable<String> send, Observer<String> recv)
-        {
-            this.send = send;
-            this.recv = recv;
-        }
-
-        public void onWebSocketOpen (Session sess) {
-            sess.addIdleTimeoutListener(e -> false);
-            sub = send
-                .concatMapCompletable(msg -> {
-                    var cf = new Callback.Completable();
-                    sess.sendText(msg, cf);
-                    return Completable.fromCompletionStage(cf);
-                })
-                .doFinally(() -> sess.close())
-                .subscribe(() -> {}, e -> recv.onError(e));
-        }
-
-        public void onWebSocketClose (int sc, String r, Callback done) {
-            if (sub != null) sub.dispose();
-            recv.onComplete();
-        }
-
-        public void onWebSocketError (Throwable e) {
-            recv.onError(e);
-        }
-
-        public void onWebSocketText (String msg) {
-            recv.onNext(msg);
-        }
-    }
-
-    public Single<Duplex<String, String>> websocket (URI uri)
+    public Single<Duplex<String, String>> textWebsocket (URI uri)
     {
         return Single.create(obs -> {
             var ws_uri = WSURI.toWebsocket(uri);
             var send = UnicastSubject.<String>create();
             var recv = PublishSubject.<String>create();
 
-            var ep = new WS_Listener(send, recv);
+            var ep = new WsListener(send, recv);
             var cf = this.ws_client.connect(ep, ws_uri);
 
             obs.setDisposable(Disposable.fromFuture(cf));
@@ -225,6 +199,18 @@ public class FPHttpClient {
                     obs.tryOnError(err);
             });
         });
+    }
+
+    /** Opens a F+ WebSocket.
+     *
+     * The path will be resolved relative to the service base URI. Once
+     * the WS has opened, the F+ authentication exchange will be carried
+     * out. The returned Duplex encodes objects to/from JSON using the
+     * org.json encoders.
+     */
+    public Single<Duplex<Object, Object>> jsonWebsocket (UUID service, String path)
+    {
+        return this.execute(new WsRequest(service, path));
     }
 
     public Single<SimpleHttpResponse> fetch (SimpleHttpRequest req)

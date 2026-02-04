@@ -436,6 +436,12 @@ EOF</code></pre>
             requiredIf(() => this.bridgeType === 'outgoing')
           ),
         },
+        topics: {
+          hasAtLeastOneTopic: helpers.withMessage(
+            'At least one topic is required',
+            (value) => this.bridgeType !== 'outgoing' || value.some(t => t.trim() !== '')
+          ),
+        },
         remoteHost: {
           requiredIfOutgoing: helpers.withMessage(
             'Remote host is required for outgoing bridges',

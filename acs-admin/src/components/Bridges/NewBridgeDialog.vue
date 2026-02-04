@@ -354,8 +354,10 @@ EOF</code></pre>
 
           // Only create deployment config for outgoing bridges
           if (this.bridgeType === 'outgoing') {
-            // Filter out empty topics
-            const filteredTopics = this.topics.filter(t => t.trim() !== '')
+            // Filter out empty topics and convert to object keyed by topic
+            const topicsObject = this.topics
+              .filter(t => t.trim() !== '')
+              .reduce((acc, topic) => ({ ...acc, [topic]: {} }), {})
 
             // Create sealed secret for credentials
             const secretName = `bridge-${this.sanitizedName}-remote-creds`
@@ -363,7 +365,7 @@ EOF</code></pre>
             await this.encryptSensitiveInfo(secretName, 'password', this.remotePassword)
 
             const values = {
-              topics: filteredTopics,
+              topics: topicsObject,
               local: {
                 host: 'mqtt.factory-plus.svc.cluster.local',
                 port: 1883

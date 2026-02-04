@@ -15,11 +15,11 @@ authGroup:
 # Directory URL for service discovery (not currently used)
 directory_url: "http://directory.namespace.svc.cluster.local"
 
-# UNS topics to bridge (list of topic filters)
-# Each topic gets an ACE granting subscribe permission
-topics: []
-# - UNS/v1/site/area/#
-# - UNS/v1/another/topic
+# UNS topics to bridge (object keyed by topic filter)
+# Values are currently ignored but reserved for future direction/qos settings
+topics: {}
+# "UNS/v1/site/area/#": {}
+# "UNS/v1/another/topic": {}
 
 # Local ACS MQTT broker connection
 local:

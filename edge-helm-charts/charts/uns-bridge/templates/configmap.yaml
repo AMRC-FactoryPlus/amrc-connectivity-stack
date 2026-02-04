@@ -30,8 +30,8 @@ data:
     notifications false
 
     # Subscribe to UNS topics from local ACS (in = subscribe from remote, publish locally)
-{{- range .Values.topics }}
-    topic {{ . }} in 1
+{{- range $topic, $opts := .Values.topics }}
+    topic {{ $topic }} in 1
 {{- end }}
 
 {{- if .Values.remote.secretName }}
@@ -52,8 +52,8 @@ data:
     notifications false
 
     # Forward topics to remote broker (out = subscribe locally, publish to remote)
-{{- range .Values.topics }}
-    topic {{ . }} out 1
+{{- range $topic, $opts := .Values.topics }}
+    topic {{ $topic }} out 1
 {{- end }}
 {{- end }}
 

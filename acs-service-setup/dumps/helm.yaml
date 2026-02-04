@@ -66,14 +66,14 @@ objects:
       name: "Edge Agent"
     !u Local.Chart.Cluster:
       name: "Edge cluster"
+    !u Local.Chart.UNSBridge:
+      name: "UNS Bridge"
 
   !u Clusters.Class.HelmChart:
     !u Local.Chart.ModbusRest:
       name: "Modbus-REST adapter"
     !u Local.Chart.MQTT:
       name: "Edge MQTT broker"
-    !u Local.Chart.UNSBridge:
-      name: "UNS Bridge"
 
 configs:
   !u UUIDs.App.ConfigSchema:

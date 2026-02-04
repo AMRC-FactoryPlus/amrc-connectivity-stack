@@ -3,22 +3,12 @@
  */
 
 import jmp from "json-merge-patch";
-import rx from "rxjs";
 import yaml from "yaml";
 
-import { UUIDs, ServiceError } from "@amrc-factoryplus/service-client";
+import { UUIDs, ServiceError, k8sname } from "@amrc-factoryplus/service-client";
 
 import { Checkout } from "./checkout.js";
 import { Git, Edge } from "./uuids.js";
-
-/* Join the parts with hyphens, lowercase and remove special chars. This
- * matches the k8sname definitions in the edge helm charts. */
-function k8sname(...parts) {
-    return parts.join("-")
-        .toLowerCase()
-        .replace(/[^a-z0-9-]+/g, "-")
-        .replace(/^-|-$/g, "");
-}
 
 const README = `
 This repo is managed by the Edge Deployment Operator.

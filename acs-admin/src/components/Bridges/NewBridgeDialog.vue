@@ -204,7 +204,6 @@ EOF</code></pre>
   import { Alert, AlertDescription, AlertTitle } from '@components/ui/alert'
   import { useServiceClientStore } from '@store/serviceClientStore.js'
   import { useEdgeClusterStore } from '@store/useEdgeClusterStore.js'
-  import { useHelmChartStore } from '@store/useHelmChartStore.js'
   import useVuelidate from '@vuelidate/core'
   import { helpers, required, numeric, requiredIf } from '@vuelidate/validators'
   import { toast } from 'vue-sonner'
@@ -225,7 +224,6 @@ EOF</code></pre>
         v$: useVuelidate(),
         s: useServiceClientStore(),
         c: useEdgeClusterStore(),
-        h: useHelmChartStore(),
       }
     },
 
@@ -250,9 +248,16 @@ EOF</code></pre>
       AlertTitle,
     },
 
-    mounted() {
+    async mounted() {
       this.c.start()
-      this.h.start()
+
+      // Fetch the UNS Bridge chart UUID from Service Config
+      try {
+        const managerConfig = await this.s.client.ConfigDB.get_config(UUIDs.App.ServiceConfig, UUIDs.Service.Manager)
+        this.unsChartUuid = managerConfig?.helm?.unsBridge
+      } catch (err) {
+        console.error('Failed to fetch Manager config:', err)
+      }
 
       window.events.on('show-new-bridge-dialog', () => {
         this.isOpen = true
@@ -268,14 +273,6 @@ EOF</code></pre>
       },
       sanitizedName() {
         return sanitizeName(this.name) || crypto.randomUUID()
-      },
-      unsChartUuid() {
-        // Find the UNS Bridge helm chart
-        const unsChart = this.h.data.find(chart =>
-          chart.name === 'UNS Bridge' ||
-          chart.deployment?.chart === 'uns-bridge'
-        )
-        return unsChart?.uuid
       },
       realm() {
         // Extract realm from baseUrl by uppercasing it. Bad practice but will do for now.
@@ -418,6 +415,7 @@ EOF</code></pre>
         remoteUsername: null,
         remotePassword: null,
         isSubmitting: false,
+        unsChartUuid: null,
       }
     },
 

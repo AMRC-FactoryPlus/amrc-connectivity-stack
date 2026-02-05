@@ -182,20 +182,18 @@ public class FPHttpClient {
      *
      * @param uri URI of the WS to open
      */
-    public Single<Duplex<String, String>> textWebsocket (URI uri)
+    public Single<TextWebsocket> textWebsocket (URI uri)
     {
         return Single.create(obs -> {
             var ws_uri = WSURI.toWebsocket(uri);
-            var send = UnicastSubject.<String>create();
-            var recv = PublishSubject.<String>create();
 
-            var ep = new WsListener(send, recv);
-            var cf = this.ws_client.connect(ep, ws_uri);
+            var ws = TextWebsocket.create();
+            var cf = this.ws_client.connect(ws.getEndpoint(), ws_uri);
 
             obs.setDisposable(Disposable.fromFuture(cf));
             cf.whenComplete((ok, err) -> {
                 if (ok != null) 
-                    obs.onSuccess(Duplex.of(send, recv));
+                    obs.onSuccess(ws);
                 else
                     obs.tryOnError(err);
             });
@@ -207,7 +205,7 @@ public class FPHttpClient {
      * The path will be resolved relative to the service base URI. Once
      * the WS has opened, the F+ authentication exchange will be carried
      * out. */
-    public Single<Duplex<String, String>> authWebsocket (UUID service, String path)
+    public Single<TextWebsocket> authWebsocket (UUID service, String path)
     {
         return this.execute(new WsRequest(service, path));
     }

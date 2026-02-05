@@ -19,7 +19,7 @@ import io.reactivex.rxjava3.core.*;
 import uk.co.amrc.factoryplus.client.FPServiceException;
 import uk.co.amrc.factoryplus.util.Duplex;
 
-class WsRequest implements ResolvableRequest<Duplex<String, String>>
+class WsRequest implements ResolvableRequest<TextWebsocket>
 {
     private static final Logger log = LoggerFactory.getLogger(WsRequest.class);
 
@@ -43,7 +43,7 @@ class WsRequest implements ResolvableRequest<Duplex<String, String>>
         return this.new Resolved(uri, base, token);
     }
 
-    class Resolved implements PerformableRequest<Duplex<String, String>>
+    class Resolved implements PerformableRequest<TextWebsocket>
     {
         private URI uri;
         private URI base;
@@ -56,7 +56,7 @@ class WsRequest implements ResolvableRequest<Duplex<String, String>>
             this.token = token;
         }
 
-        public Single<Duplex<String, String>> perform (FPHttpClient client)
+        public Single<TextWebsocket> perform (FPHttpClient client)
         {
             return client.textWebsocket(this.uri)
                 .flatMap(raw -> {

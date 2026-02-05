@@ -206,10 +206,8 @@ public class FPHttpClient {
      *
      * The path will be resolved relative to the service base URI. Once
      * the WS has opened, the F+ authentication exchange will be carried
-     * out. The returned Duplex encodes objects to/from JSON using the
-     * org.json encoders.
-     */
-    public Single<Duplex<Object, Object>> jsonWebsocket (UUID service, String path)
+     * out. */
+    public Single<Duplex<String, String>> authWebsocket (UUID service, String path)
     {
         return this.execute(new WsRequest(service, path));
     }

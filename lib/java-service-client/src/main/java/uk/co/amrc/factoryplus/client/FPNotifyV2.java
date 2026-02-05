@@ -24,7 +24,7 @@ public class FPNotifyV2
 
     private FPHttpClient http;
     private UUID service;
-    private Observable<Duplex<Object, Object>> notify;
+    private Observable<Duplex<String, String>> notify;
 
     public FPNotifyV2 (FPServiceClient fplus, UUID service)
     {
@@ -35,12 +35,12 @@ public class FPNotifyV2
     }
 
     // This might not be needed
-    public Observable<Duplex<Object, Object>> getNotify () { return notify; }
+    public Observable<Duplex<String, String>> getNotify () { return notify; }
 
-    private Observable<Duplex<Object, Object>> _build_notify ()
+    private Observable<Duplex<String, String>> _build_notify ()
     {
         /* This gives us a new WebSocket every time we subscribe */
-        final var ws_src = this.http.jsonWebsocket(this.service, "notify/v2");
+        final var ws_src = this.http.authWebsocket(this.service, "notify/v2");
 
         return Observable.fromSingle(ws_src)
             /* Send the WS down the seq, and then wait for the receive

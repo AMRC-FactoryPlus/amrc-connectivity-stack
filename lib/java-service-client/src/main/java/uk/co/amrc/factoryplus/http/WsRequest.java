@@ -20,6 +20,7 @@ import org.json.JSONStringer;
 import org.json.JSONTokener;
 
 import uk.co.amrc.factoryplus.client.FPServiceException;
+import uk.co.amrc.factoryplus.util.Duplex;
 
 class WsRequest implements ResolvableRequest<Duplex<Object, Object>>
 {
@@ -75,7 +76,7 @@ class WsRequest implements ResolvableRequest<Duplex<Object, Object>>
 
                     if (status.equals("200"))
                         return Single.just(
-                            raw.map(JSONStringer::valueToString,
+                            raw.map(JSONWriter::valueToString,
                                 s -> new JSONTokener(s).nextValue()));
 
                     if (status.equals("401"))

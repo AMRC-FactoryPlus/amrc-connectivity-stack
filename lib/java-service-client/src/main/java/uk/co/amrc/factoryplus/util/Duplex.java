@@ -4,7 +4,7 @@
  * Copyright 2026 University of Sheffield AMRC
  */
 
-package uk.co.amrc.factoryplus.http;
+package uk.co.amrc.factoryplus.util;
 
 import io.reactivex.rxjava3.core.*;
 import io.reactivex.rxjava3.functions.Function;
@@ -21,7 +21,7 @@ public class Duplex<S, R>
         this.receiver = receiver;
     }
 
-    static <S, R> Duplex<S, R> of (Observer<S> sender, Observable<R> receiver)
+    public static <S, R> Duplex<S, R> of (Observer<S> sender, Observable<R> receiver)
     {
         return new Duplex<>(sender, receiver);
     }

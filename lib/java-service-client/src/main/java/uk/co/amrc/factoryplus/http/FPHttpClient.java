@@ -57,6 +57,7 @@ import io.reactivex.rxjava3.subjects.*;
 
 import uk.co.amrc.factoryplus.client.*;
 import uk.co.amrc.factoryplus.gss.*;
+import uk.co.amrc.factoryplus.util.Duplex;
 
 /** HTTP (REST) client.
  */

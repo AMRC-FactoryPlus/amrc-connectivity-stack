@@ -170,6 +170,10 @@
           <version>1.4</version>
           <configuration>
             <testClasspath>true</testClasspath>
+            <options>
+              <option>-R-Dorg.slf4j.simpleLogger.showThreadName=false</option>
+              <option>-R-Dorg.slf4j.simpleLogger.showShortLogName=true</option>
+            </options>
           </configuration>
         </plugin>
       </plugins>

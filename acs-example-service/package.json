@@ -1,0 +1,25 @@
+{
+  "name": "acs-example-service",
+  "version": "1.0.0",
+  "description": "This is an example new service for getting and updating names of objects.",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@amrc-factoryplus/rx-client": "file:../lib/js-rx-client",
+    "@amrc-factoryplus/rx-util": "file:../lib/js-rx-util",
+    "@amrc-factoryplus/service-api": "file:../lib/js-service-api",
+    "@amrc-factoryplus/service-client": "file:../lib/js-service-client",
+    "@dotenvx/dotenvx": "^1.39.0",
+    "express": "^4.21.2",
+    "stream-size": "^0.0.6",
+    "uuid": "^11.0.5"
+  },
+  "devDependencies": {
+    "eslint": "^9.23.0"
+  }
+}

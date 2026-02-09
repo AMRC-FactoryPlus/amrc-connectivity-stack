@@ -186,14 +186,14 @@ public class FPHttpClient {
     {
         return Single.create(obs -> {
             var ws_uri = WSURI.toWebsocket(uri);
+            var ep = new TextWebsocket.Endpoint();
 
-            var ws = TextWebsocket.create();
-            var cf = this.ws_client.connect(ws.getEndpoint(), ws_uri);
+            var cf = this.ws_client.connect(ep, ws_uri);
 
             obs.setDisposable(Disposable.fromFuture(cf));
             cf.whenComplete((ok, err) -> {
                 if (ok != null) 
-                    obs.onSuccess(ws);
+                    obs.onSuccess(ep.getDuplex());
                 else
                     obs.tryOnError(err);
             });

@@ -12,45 +12,42 @@ import org.eclipse.jetty.websocket.api.Session;
 import io.reactivex.rxjava3.core.*;
 import io.reactivex.rxjava3.disposables.SerialDisposable;
 import io.reactivex.rxjava3.subjects.*;
+import io.reactivex.rxjava3.observers.*;
 
 import uk.co.amrc.factoryplus.util.Duplex;
 
 public class TextWebsocket 
     extends Duplex.Base<String, String>
 {
-    private Session.Listener ep;
-
-    private TextWebsocket (Observer<String> send, Observable<String> recv,
-        Session.Listener ep)
+    public TextWebsocket (Observer<String> send, Observable<String> recv)
     {
         super(send, recv);
-        this.ep = ep;
     }
-
-    static TextWebsocket create ()
-    {
-        final var send = UnicastSubject.<String>create();
-        final var recv = PublishSubject.<String>create();
-        final var ep = new Endpoint(send, recv);
-
-        return new TextWebsocket(send, recv, ep);
-    }
-
-    Session.Listener getEndpoint() { return ep; }
 
     public static class Endpoint implements Session.Listener.AutoDemanding
     {
-        private Observable<String> send;
-        private Observer<String> recv;
+        private Subject<String> send;
+        private ObservableEmitter<String> recv;
+        private TextWebsocket duplex;
         private SerialDisposable sub;
 
-        Endpoint (Observable<String> send, Observer<String> recv)
+        public Endpoint ()
         {
-            this.send = send;
-            this.recv = recv;
-
+            this.send = UnicastSubject.<String>create();
             this.sub = new SerialDisposable();
+
+            /* It seems silly to create a cold Observable just in order
+             * to convert it to a hot Observable, but RxJava doesn't
+             * have the fromEvent* constructors. */
+            final var cobs = Observable.<String>create(
+                    em -> this.recv = em.serialize())
+                .publish();
+            cobs.connect();
+
+            this.duplex = new TextWebsocket(send, cobs);
         }
+
+        public TextWebsocket getDuplex () { return duplex; }
 
         public void onWebSocketOpen (Session sess) {
             sess.addIdleTimeoutListener(e -> false);
@@ -61,7 +58,7 @@ public class TextWebsocket
                     return Completable.fromCompletionStage(cf);
                 })
                 .doFinally(() -> sess.close())
-                .subscribe(() -> {}, e -> recv.onError(e)));
+                .subscribe(() -> {}, e -> recv.tryOnError(e)));
 
         }
 
@@ -71,7 +68,7 @@ public class TextWebsocket
         }
 
         public void onWebSocketError (Throwable e) {
-            recv.onError(e);
+            recv.tryOnError(e);
         }
 
         public void onWebSocketText (String msg) {

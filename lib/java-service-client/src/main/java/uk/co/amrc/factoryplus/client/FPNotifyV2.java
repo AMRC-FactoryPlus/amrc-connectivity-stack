@@ -69,11 +69,13 @@ public class FPNotifyV2
 
         return Observable.fromSingle(ws_src)
             /* Send the WS down the seq, and then wait for the receive
-             * side to complete which shows the WS has closed. If we are
-             * unsubscribed then close the sending side. */
+             * side to complete which shows the WS has closed. */
             .flatMap(ws -> Observable.merge(
-                    Observable.just(ws),
+                    /* Errors are handled in the outer Observable */
+                    Observable.just(ws.compose(TextWebsocket::new,
+                        s -> s, r -> r.onErrorComplete())),
                     ws.getReceiver().ignoreElements().toObservable())
+                /* When we are unsubscribed close the sending side. */
                 .doOnDispose(() -> ws.getSender().onComplete()))
             /* Do JSON coding */
             .map(NotifyWs::of)
@@ -92,8 +94,7 @@ public class FPNotifyV2
             .repeatWhen(stops -> stops
                 .switchMap(stop -> Observable.timer(
                     5000 + (long)(2000*Math.random()), TimeUnit.MILLISECONDS)))
-            .doOnNext(v -> log.info("Notify socket {}",
-                v.isEmpty() ? "closed" : "open"))
+            .doOnNext(v -> log.info("Notify socket {}", v.isEmpty() ? "closed" : "open"))
             /* Share the seq, making the last value immediately
              * available, while we have subscribers, and then keep it
              * for 5s in case someone reconnects. */

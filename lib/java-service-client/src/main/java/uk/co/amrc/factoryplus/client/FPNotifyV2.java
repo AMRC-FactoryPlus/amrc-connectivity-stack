@@ -27,10 +27,9 @@ public class FPNotifyV2
     private static final Logger log = LoggerFactory.getLogger(FPNotifyV2.class);
 
     public static class NotifyWs
-        extends Duplex.Base<JSONObject, Map<String, Object>>
+        extends Duplex.Base<JSONObject, FPNotifyUpdate>
     {
-        public NotifyWs (Observer<JSONObject> send, 
-            Observable<Map<String, Object>> recv)
+        public NotifyWs (Observer<JSONObject> send, Observable<FPNotifyUpdate> recv)
         {
             super(send, recv);
         }
@@ -42,7 +41,7 @@ public class FPNotifyV2
                 obj -> obj.toString(),
                 json -> {
                     var obj = new JSONTokener(json).nextValue();
-                    return ((JSONObject)obj).toMap();
+                    return FPNotifyUpdate.ofJSON(obj);
                 });
         }
     }
@@ -104,24 +103,32 @@ public class FPNotifyV2
             .mapOptional(o -> o);
     }
 
-    public Observable<Map<String, Object>> request (Map<String, Object> req)
+    public Observable<FPNotifyUpdate> request (FPNotifyRequest req)
     {
         return this.notify
             .switchMap(ws -> {
-                final var uuid = UUID.randomUUID().toString();
+                final var uuid = UUID.randomUUID();
                 return ws.getReceiver()
-                    .filter(u -> u.get("uuid").equals(uuid))
+                    .filter(u -> u.getUUID().equals(uuid))
                     .doOnSubscribe(d -> {
-                        var obj = new JSONObject(req).put("uuid", uuid);
-                        ws.getSender().onNext(obj);
+                        log.info("Notify request [{}]: {}", uuid, req);
+                        ws.getSender()
+                            .onNext(req.toJSONWithUUID(uuid));
                     })
                     .doFinally(() -> {
-                        var obj = new JSONObject()
-                            .put("method", "CLOSE")
-                            .put("uuid", uuid);
-                        ws.getSender().onNext(obj);
+                        log.info("Notify close [{}]", uuid);
+                        ws.getSender()
+                            .onNext(FPNotifyRequest.close(uuid));
                     });
             })
-            .takeWhile(u -> !u.get("status").equals(410));
+            .takeWhile(u -> u.getStatus() != 410)
+            .flatMap(u -> {
+                if (u.isOK())
+                    return Observable.just(u);
+                var status = u.getStatus();
+                log.info("Notify error: {}", status);
+                return Observable.error(
+                    new FPNotifyException(service, status, req));
+            });
     }
 }

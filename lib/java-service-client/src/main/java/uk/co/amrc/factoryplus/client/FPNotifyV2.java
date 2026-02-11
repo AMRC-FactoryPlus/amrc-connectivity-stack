@@ -6,10 +6,12 @@
 
 package uk.co.amrc.factoryplus.client;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,6 +23,7 @@ import org.json.*;
 import uk.co.amrc.factoryplus.http.FPHttpClient;
 import uk.co.amrc.factoryplus.http.TextWebsocket;
 import uk.co.amrc.factoryplus.util.Duplex;
+import uk.co.amrc.factoryplus.util.Response;
 
 public class FPNotifyV2
 {
@@ -36,13 +39,7 @@ public class FPNotifyV2
 
         public static NotifyWs of (TextWebsocket ws)
         {
-            return ws.map(
-                NotifyWs::new,
-                obj -> obj.toString(),
-                json -> {
-                    var obj = new JSONTokener(json).nextValue();
-                    return FPNotifyUpdate.ofJSON(obj);
-                });
+            return ws.map(NotifyWs::new, Object::toString, FPNotifyUpdate::ofJSON);
         }
     }
 
@@ -130,5 +127,90 @@ public class FPNotifyV2
                 return Observable.error(
                     new FPNotifyException(service, status, req));
             });
+    }
+
+    public Observable<Response<Object>> watchFull (FPNotifyRequest.Watch req)
+    {
+        return this.request(req)
+            .map(u -> u.getContent().getJSONObject("response"))
+            .map(Response::fromJSON);
+    }
+
+    public Observable<Optional<Object>> watch (Object... parts)
+    {
+        return watchFull(FPNotifyRequest.watch(parts))
+            .map(r -> r.ifOK(b -> Optional.of(b), s -> Optional.empty()));
+    }
+
+    private interface SearchUpdate
+    {
+        /* this is ridiculous */
+        Response<Map<String, Response<Object>>> applyTo (
+            Response<Map<String, Response<Object>>> old);
+
+        static SearchUpdate ofUpdate (FPNotifyUpdate update)
+        {
+            var json = update.getContent();
+            var child = json.optString("child", null);
+            var res = Response.fromJSON(json.getJSONObject("response"));
+
+            log.info("SEARCH child {} response {}", child, res);
+
+            if (child != null)
+                return st -> {
+                    var rv = st.map(kids -> {
+                        var nk = new HashMap<String, Response<Object>>(kids);
+                        if (res.isEmpty())
+                            nk.remove(child);
+                        else
+                            nk.put(child, res);
+                        return (Map<String, Response<Object>>)nk;
+                    });
+                    log.info("Update [{}] response {}", child, rv);
+                    return rv;
+                };
+
+            /* For a full update we ignore the parent body. Possibly the
+             * protocol should have put the full map under .body
+             * instead? We also ignore the existing state. */
+            return st -> {
+                var rv = res.map(b -> {
+                    var kids = json.getJSONObject("children");
+                    var nk = new HashMap<String, Response<Object>>(kids.length());
+                    kids.keys().forEachRemaining(key -> {
+                        var kid = Response.fromJSON(kids.getJSONObject(key));
+                        nk.put(key, kid);
+                    });
+                    return (Map<String, Response<Object>>)nk;
+                });
+                log.info("Full response {}", rv);
+                return rv;
+            };
+        }
+    }
+
+    public Observable<Response<Map<String, Response<Object>>>> searchFull (
+        FPNotifyRequest.Search req)
+    {
+        return this.request(req)
+            .map(SearchUpdate::ofUpdate)
+            .scan(Response.empty(), 
+                (state, update) -> update.applyTo(state));
+    }
+
+    public Observable<Map<UUID, Object>> search (Object... parts)
+    {
+        return this.searchFull(FPNotifyRequest.search(parts))
+            .flatMap(res -> res
+                .map(kids -> {
+                    var nk = new HashMap<UUID, Object>(kids.size());
+                    kids.forEach((key, kid) -> {
+                        var uuid = UUID.fromString(key);
+                        kid.doIfOK(b -> nk.put(uuid, b));
+                    });
+                    return nk;
+                })
+                .map(Observable::just)
+                .orElse(Observable.empty()));
     }
 }

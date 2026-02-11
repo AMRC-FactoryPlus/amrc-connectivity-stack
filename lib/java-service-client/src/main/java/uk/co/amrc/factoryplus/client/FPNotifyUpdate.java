@@ -15,9 +15,9 @@ public class FPNotifyUpdate
 {
     private UUID uuid;
     private int status;
-    private Map<String, Object> content;
+    private JSONObject content;
 
-    private FPNotifyUpdate (UUID uuid, int status, Map<String, Object> content)
+    private FPNotifyUpdate (UUID uuid, int status, JSONObject content)
     {
         this.uuid = uuid;
         this.status = status;
@@ -30,7 +30,7 @@ public class FPNotifyUpdate
     public boolean isOK () { return status < 300; }
 
     /* XXX We need the request type to decode the content. */
-    public Map<String, Object> content () { return content; }
+    public JSONObject getContent () { return content; }
 
     public String toString ()
     {
@@ -38,15 +38,15 @@ public class FPNotifyUpdate
             + content.toString();
     }
 
-    public static FPNotifyUpdate ofJSON (Object value) throws Throwable
+    public static FPNotifyUpdate ofJSON (String json) throws JSONException
     {
-        var json = (JSONObject)value;
-        var uuid = UUID.fromString(json.getString("uuid"));
-        var status = json.getInt("status");
+        var content = new JSONObject(json);
 
-        /* XXX We could strip out the keys we've used here, but that's
-         * more trouble than it's worth... */
-        var content = json.toMap();
+        var uuid = UUID.fromString(content.getString("uuid"));
+        var status = content.getInt("status");
+
+        content.remove("uuid");
+        content.remove("status");
 
         return new FPNotifyUpdate(uuid, status, content);
     }

@@ -14,6 +14,7 @@ import java.util.stream.Collectors;
 
 import java.util.function.*;
 
+import org.json.*;
 
 /* This is to map headers. We don't need use this client-side yet but
  * the ConfigDB server-side should use it. I think this should be
@@ -64,10 +65,21 @@ public abstract class Response<T> {
         return Response.of(500);
     }
 
+    public static <V> Response<V> ofNullable (V v)
+    {
+        return v == null ? Response.empty() : Response.ok(v);
+    }
+
     public static <V> Response<V> ofOptional (Optional<V> opt)
     {
         return opt.map(Response::ok)
             .orElseGet(Response::empty);
+    }
+
+    public static Response<Object> fromJSON (JSONObject obj)
+        throws JSONException
+    {
+        return Response.of(obj.getInt("status"), obj.opt("body"));
     }
 
     public String toString ()
@@ -117,6 +129,18 @@ public abstract class Response<T> {
         return this.ifOK(success, () -> failure.apply(404), failure);
     }
 
+    public void doIfOK (Consumer<T> success, Consumer<Integer> failure)
+    {
+        this.<Object>ifOK(v -> { success.accept(v); return null; },
+            () -> { failure.accept(404); return null; },
+            s -> { failure.accept(s); return null; });
+    }
+
+    public void doIfOK (Consumer<T> success)
+    {
+        this.doIfOK(success, s -> {});
+    }
+
     public Response<T> orWith (int st, T body)
     {
         return this.or(() -> Response.of(st, body));
@@ -127,6 +151,16 @@ public abstract class Response<T> {
     public Response<T> filter (Predicate<T> pred)
     {
         return this.flatMap(b -> pred.test(b) ? this : Response.empty());
+    }
+
+    public <V> Response<V> map (Function<T, V> mapper)
+    {
+        return this.flatMap(b -> this.withBody(mapper.apply(b)));
+    }
+
+    public <C> Response<C> cast (Class<C> klass)
+    {
+        return this.map(klass::cast);
     }
 
     static class Success<T> extends Response<T>
@@ -141,7 +175,8 @@ public abstract class Response<T> {
 
         public String toString ()
         {
-            return super.toString() + ": " + body.toString();
+            return super.toString() + ": " + 
+                (body == null ? "null" : body.toString());
         }
 
         public Response<T> withStatus (int status)

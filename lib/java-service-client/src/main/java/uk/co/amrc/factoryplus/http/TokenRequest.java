@@ -76,7 +76,8 @@ class TokenRequest extends JsonRequest
 
         var matcher = negotiateAuth.matcher(optAuth.get());
         if (!matcher.matches())
-            return mkerr("Bad GSS WWW-Auth response");
+            return mkerr("Bad GSS WWW-Auth response: ["
+                + optAuth.get() + "]");
 
         var tok64 = matcher.group(1);
         var tok = Base64.getDecoder().decode(tok64);

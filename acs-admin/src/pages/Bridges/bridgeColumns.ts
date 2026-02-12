@@ -50,7 +50,7 @@ export const bridgeColumns: ColumnDef<Bridge>[] = [
         accessorKey: 'topics',
         accessorFn: (row) => {
             const topics = row.deployment?.values?.topics ?? []
-            return topics.join(', ') || 'No topics'
+            return Object.keys(topics).join(', ') || 'No topics'
         },
         header: ({ column }) => h(DataTableColumnHeader, {
             column,
@@ -61,7 +61,7 @@ export const bridgeColumns: ColumnDef<Bridge>[] = [
             if (topics.length === 0) {
                 return h('div', { class: 'text-gray-400' }, 'No topics')
             }
-            return h('div', { class: 'max-w-[300px] truncate' }, topics.join(', '))
+            return h('div', { class: 'max-w-[300px] truncate' }, Object.keys(topics).join(', '))
         },
     },
     {

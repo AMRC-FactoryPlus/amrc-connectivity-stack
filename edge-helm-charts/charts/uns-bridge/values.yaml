@@ -47,7 +47,7 @@ image:
   mosquitto:
     registry: docker.io
     repository: eclipse-mosquitto
-    tag: "2.0"
+    tag: "2.0.22-openssl"
 
 # Tolerations for pod scheduling
 tolerations:

@@ -41,6 +41,7 @@ data:
     address {{ .Values.remote.host }}:{{ .Values.remote.port }}
     remote_username ${REMOTE_USERNAME}
     remote_password ${REMOTE_PASSWORD}
+    remote_clientid ${REMOTE_USERNAME}-{{ .Values.uuid }}
 {{- if .Values.remote.tls }}
     bridge_capath /etc/ssl/certs
     bridge_tls_version tlsv1.2

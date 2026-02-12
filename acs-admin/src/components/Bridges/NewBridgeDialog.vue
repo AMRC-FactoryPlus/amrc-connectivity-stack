@@ -374,7 +374,7 @@ EOF</code></pre>
                 port: 1883
               },
               remote: {
-                host: this.remoteHost,
+                host: this.remoteHost.replace(/^[a-zA-Z]+:\/\//, ''),
                 port: parseInt(this.remotePort),
                 tls: this.remoteTls,
                 secretName: secretName,

@@ -11,6 +11,7 @@ import { registerConfigDBTools } from "./tools/configdb.js";
 import { registerDocsTools } from "./tools/docs.js";
 import { registerAuthTools } from "./tools/auth.js";
 import { registerDirectoryTools } from "./tools/directory.js";
+import { registerInfluxDBTools } from "./tools/influxdb.js";
 
 // Load environment variables from .env in development
 let dotenv: any = null;
@@ -44,6 +45,7 @@ registerConfigDBTools(server, serviceClient);
 registerDocsTools(server);
 registerAuthTools(server, serviceClient);
 registerDirectoryTools(server, serviceClient);
+registerInfluxDBTools(server);
 
 // Connect to stdio transport
 const transport = new StdioServerTransport();

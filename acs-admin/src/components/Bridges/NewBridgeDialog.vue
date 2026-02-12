@@ -208,6 +208,7 @@ EOF</code></pre>
   import { helpers, required, numeric, requiredIf } from '@vuelidate/validators'
   import { toast } from 'vue-sonner'
   import { UUIDs } from '@amrc-factoryplus/service-client'
+  import { serviceClientReady } from '@store/useServiceClientReady.js'
 
   // Sanitize name for Kubernetes
   function sanitizeName(name) {
@@ -251,6 +252,12 @@ EOF</code></pre>
     async mounted() {
       this.c.start()
 
+      window.events.on('show-new-bridge-dialog', () => {
+        this.isOpen = true
+      })
+
+      await serviceClientReady()
+
       // Fetch the UNS Bridge chart UUID from Service Config
       try {
         const managerConfig = await this.s.client.ConfigDB.get_config(UUIDs.App.ServiceConfig, UUIDs.Service.Manager)
@@ -258,10 +265,6 @@ EOF</code></pre>
       } catch (err) {
         console.error('Failed to fetch Manager config:', err)
       }
-
-      window.events.on('show-new-bridge-dialog', () => {
-        this.isOpen = true
-      })
     },
 
     computed: {
@@ -423,6 +426,9 @@ EOF</code></pre>
 
     validations() {
       return {
+        unsChartUuid: {
+          required: helpers.withMessage('UNS Bridge chart UUID is required. If this is invalid then it hasn\'t been correctly fetched and this is a bug.', required),
+        },
         name: {
           required,
           alphaNumUnderscoreSpace: helpers.withMessage(

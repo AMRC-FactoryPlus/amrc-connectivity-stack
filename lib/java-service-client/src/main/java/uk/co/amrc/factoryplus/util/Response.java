@@ -16,6 +16,9 @@ import java.util.function.*;
 
 import org.json.*;
 
+import io.reactivex.rxjava3.core.Observable;
+import io.vavr.collection.List;
+
 /* This is to map headers. We don't need use this client-side yet but
  * the ConfigDB server-side should use it. I think this should be
  * another subclass, SuccessWithHeaders, I don't think failures need
@@ -86,6 +89,18 @@ public abstract class Response<T> {
     {
         return "Response [" + status + "]";
     }
+    public Optional<T> toOptional ()
+    {
+        return this.ifOK(Optional::of, Optional::empty);
+    }
+    public Observable<T> toObservable ()
+    {
+        return this.ifOK(Observable::just, Observable::empty);
+    }
+    public List<T> toVavrList ()
+    {
+        return this.ifOK(List::of, List::empty);
+    }
 
     public boolean isOK () { return false; }
     public boolean isEmpty() { return false; }
@@ -128,6 +143,10 @@ public abstract class Response<T> {
     {
         return this.ifOK(success, () -> failure.apply(404), failure);
     }
+    public <R> R ifOK (Function<T, R> success, Supplier<R> failure)
+    {
+        return this.ifOK(success, failure, s -> failure.get());
+    }
 
     public void doIfOK (Consumer<T> success, Consumer<Integer> failure)
     {
@@ -135,11 +154,11 @@ public abstract class Response<T> {
             () -> { failure.accept(404); return null; },
             s -> { failure.accept(s); return null; });
     }
-
     public void doIfOK (Consumer<T> success)
     {
         this.doIfOK(success, s -> {});
     }
+    /* Java doesn't seem to have a Thunk (function from void to void) type */
 
     public Response<T> orWith (int st, T body)
     {

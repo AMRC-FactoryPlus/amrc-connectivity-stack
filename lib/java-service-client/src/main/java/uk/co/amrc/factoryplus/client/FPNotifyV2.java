@@ -6,17 +6,21 @@
 
 package uk.co.amrc.factoryplus.client;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import io.reactivex.rxjava3.core.*;
+
+import io.vavr.Tuple2;
+import io.vavr.collection.HashMap;
+import io.vavr.collection.List;
+import io.vavr.collection.Map;
 
 import org.json.*;
 
@@ -91,6 +95,7 @@ public class FPNotifyV2
                 .switchMap(stop -> Observable.timer(
                     5000 + (long)(2000*Math.random()), TimeUnit.MILLISECONDS)))
             .doOnNext(v -> log.info("Notify socket {}", v.isEmpty() ? "closed" : "open"))
+            .doOnDispose(() -> log.info("Notify socket dropped"))
             /* Share the seq, making the last value immediately
              * available, while we have subscribers, and then keep it
              * for 5s in case someone reconnects. */
@@ -109,13 +114,11 @@ public class FPNotifyV2
                     .filter(u -> u.getUUID().equals(uuid))
                     .doOnSubscribe(d -> {
                         log.info("Notify request [{}]: {}", uuid, req);
-                        ws.getSender()
-                            .onNext(req.toJSONWithUUID(uuid));
+                        ws.getSender().onNext(req.toJSONWithUUID(uuid));
                     })
                     .doFinally(() -> {
                         log.info("Notify close [{}]", uuid);
-                        ws.getSender()
-                            .onNext(FPNotifyRequest.close(uuid));
+                        ws.getSender().onNext(FPNotifyRequest.close(uuid));
                     });
             })
             .takeWhile(u -> u.getStatus() != 410)
@@ -139,78 +142,52 @@ public class FPNotifyV2
     public Observable<Optional<Object>> watch (Object... parts)
     {
         return watchFull(FPNotifyRequest.watch(parts))
-            .map(r -> r.ifOK(b -> Optional.of(b), s -> Optional.empty()));
+            .map(Response::toOptional);
     }
 
-    private interface SearchUpdate
+    /* this is ridiculous */
+    private static UnaryOperator<Response<Map<String, Response<Object>>>>
+        handleSearchUpdate (FPNotifyUpdate update)
     {
-        /* this is ridiculous */
-        Response<Map<String, Response<Object>>> applyTo (
-            Response<Map<String, Response<Object>>> old);
+        var json = update.getContent();
+        var child = json.optString("child", null);
+        var res = Response.fromJSON(json.getJSONObject("response"));
 
-        static SearchUpdate ofUpdate (FPNotifyUpdate update)
-        {
-            var json = update.getContent();
-            var child = json.optString("child", null);
-            var res = Response.fromJSON(json.getJSONObject("response"));
+        /* We cannot use ifOK as we want to preserve error Responses */
+        if (child != null)
+            return st -> st.map(kids ->
+                res.isEmpty() ? kids.remove(child) : kids.put(child, res));
 
-            log.info("SEARCH child {} response {}", child, res);
-
-            if (child != null)
-                return st -> {
-                    var rv = st.map(kids -> {
-                        var nk = new HashMap<String, Response<Object>>(kids);
-                        if (res.isEmpty())
-                            nk.remove(child);
-                        else
-                            nk.put(child, res);
-                        return (Map<String, Response<Object>>)nk;
-                    });
-                    log.info("Update [{}] response {}", child, rv);
-                    return rv;
-                };
-
-            /* For a full update we ignore the parent body. Possibly the
-             * protocol should have put the full map under .body
-             * instead? We also ignore the existing state. */
-            return st -> {
-                var rv = res.map(b -> {
-                    var kids = json.getJSONObject("children");
-                    var nk = new HashMap<String, Response<Object>>(kids.length());
-                    kids.keys().forEachRemaining(key -> {
-                        var kid = Response.fromJSON(kids.getJSONObject(key));
-                        nk.put(key, kid);
-                    });
-                    return (Map<String, Response<Object>>)nk;
-                });
-                log.info("Full response {}", rv);
-                return rv;
-            };
-        }
+        /* For a full update we ignore the parent body. Possibly the
+         * protocol should have put the full map under .body
+         * instead? We also ignore the existing state. */
+        return st -> res.map(b -> json.getJSONObject("children"))
+            .map(kids -> kids.keySet().stream()
+                .map(key -> new Tuple2<>(key, key))
+                .collect(HashMap.collector())
+                .transform(Map::narrow)
+                .mapValues(kids::getJSONObject)
+                .mapValues(Response::fromJSON));
     }
 
     public Observable<Response<Map<String, Response<Object>>>> searchFull (
         FPNotifyRequest.Search req)
     {
         return this.request(req)
-            .map(SearchUpdate::ofUpdate)
+            .map(FPNotifyV2::handleSearchUpdate)
             .scan(Response.empty(), 
-                (state, update) -> update.applyTo(state));
+                (state, update) -> update.apply(state));
     }
 
     public Observable<Map<UUID, Object>> search (Object... parts)
     {
         return this.searchFull(FPNotifyRequest.search(parts))
             .flatMap(res -> res
-                .map(kids -> {
-                    var nk = new HashMap<UUID, Object>(kids.size());
-                    kids.forEach((key, kid) -> {
-                        var uuid = UUID.fromString(key);
-                        kid.doIfOK(b -> nk.put(uuid, b));
-                    });
-                    return nk;
-                })
-                .map(Observable::just)
-                .orElse(Observable.empty()));
+                .map(kids -> kids
+                    .flatMap((key, kres) -> kres
+                        .map(b -> new Tuple2<>(key, b))
+                        .toVavrList())
+                    .mapKeys(UUID::fromString))
+                .toObservable());
     }
 }

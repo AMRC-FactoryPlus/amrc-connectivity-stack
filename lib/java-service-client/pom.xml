@@ -71,6 +71,12 @@
       <artifactId>rxjava</artifactId>
       <version>3.1.12</version>
     </dependency>
+    <!-- Vavr (immutable/persistent data structures) -->
+    <dependency>
+      <groupId>io.vavr</groupId>
+      <artifactId>vavr</artifactId>
+      <version>1.0.0</version>
+    </dependency>
     <!-- Jetty client -->
     <dependency>
       <groupId>org.eclipse.jetty</groupId>

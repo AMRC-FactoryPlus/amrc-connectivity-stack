@@ -30,6 +30,7 @@ export class Server {
         this.port = opts.port;
         this.username = opts.username;
         this.password = opts.password;
+        this.allowAnonymous = opts.allowAnonymous ?? false;
 
         this.server = null;
     }
@@ -54,11 +55,20 @@ export class Server {
             serverCertificateManager: certificateManager,
 
             /* For an edge deployment, certificate-based security is
-             * not practical.  Allow anonymous connections and rely on
-             * the username/password check. */
-            securityPolicies: [SecurityPolicy.None],
-            securityModes: [MessageSecurityMode.None],
-            allowAnonymous: true,
+             * not practical. We still need SignAndEncrypt with a real
+             * security policy so that username/password tokens can be
+             * transmitted securely. SecurityPolicy.None is kept so
+             * that anonymous browsing without encryption is possible
+             * when allowAnonymous is true. */
+            securityPolicies: [
+                SecurityPolicy.None,
+                SecurityPolicy.Basic256Sha256,
+            ],
+            securityModes: [
+                MessageSecurityMode.None,
+                MessageSecurityMode.SignAndEncrypt,
+            ],
+            allowAnonymous: this.allowAnonymous,
 
             userManager: {
                 isValidUser: (user, pass) => {
@@ -108,37 +118,39 @@ export class Server {
             const leafName = parts[parts.length - 1];
             const currentTopic = topic;
 
-            ns.addVariable({
+            const entry = this.dataStore.get(currentTopic);
+            const initValue = entry
+                ? new DataValue({
+                    value: this.toVariant(entry.value),
+                    statusCode: StatusCodes.Good,
+                    sourceTimestamp: new Date(entry.timestamp),
+                    serverTimestamp: new Date(),
+                })
+                : new DataValue({
+                    value: new Variant({ dataType: DataType.Null }),
+                    statusCode: StatusCodes.UncertainInitialValue,
+                    sourceTimestamp: new Date(),
+                    serverTimestamp: new Date(),
+                });
+
+            const variable = ns.addVariable({
                 componentOf: parent,
                 browseName: leafName,
                 displayName: leafName,
                 description: `UNS topic: ${topic}`,
                 dataType: DataType.Variant,
                 accessLevel: makeAccessLevelFlag("CurrentRead"),
+                value: initValue,
+                minimumSamplingInterval: 0,
+            });
 
-                value: {
-                    timestamped_get: () => {
-                        const entry = this.dataStore.get(currentTopic);
-
-                        if (!entry) {
-                            return new DataValue({
-                                value: new Variant({
-                                    dataType: DataType.Null,
-                                }),
-                                statusCode: StatusCodes.UncertainInitialValue,
-                                sourceTimestamp: new Date(),
-                                serverTimestamp: new Date(),
-                            });
-                        }
-
-                        return new DataValue({
-                            value: this.toVariant(entry.value),
-                            statusCode: StatusCodes.Good,
-                            sourceTimestamp: new Date(entry.timestamp),
-                            serverTimestamp: new Date(),
-                        });
-                    },
-                },
+            this.dataStore.on("change", (changedTopic, changedEntry) => {
+                if (changedTopic !== currentTopic) return;
+                variable.setValueFromSource(
+                    this.toVariant(changedEntry.value),
+                    StatusCodes.Good,
+                    new Date(changedEntry.timestamp),
+                );
             });
         }
     }

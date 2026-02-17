@@ -2,7 +2,6 @@
  * Copyright (c) University of Sheffield AMRC 2026.
  */
 
-#!/usr/bin/env node
 /*
  * ACS Edge OPC UA Server - Entry Point
  *
@@ -57,6 +56,7 @@ const server = new Server({
     dataStore,
     username: opcuaUsername,
     password: opcuaPassword,
+    allowAnonymous: config.opcua.allowAnonymous ?? false,
 });
 
 /* Start everything. */

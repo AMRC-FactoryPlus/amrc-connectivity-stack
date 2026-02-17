@@ -33,6 +33,7 @@ RUN sh -x <<'SHELL'
         -e"s!%%PULLPOLICY%%!${pullpolicy}!g" \
         charts/edge-agent/values.yaml \
         charts/edge-cluster/values.yaml \
+        charts/opcua-server/values.yaml \
 
 SHELL
 FROM ${base_prefix}-js-run:${base_version} AS run

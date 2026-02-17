@@ -6,14 +6,14 @@
   <BridgesContainer>
     <Skeleton v-if="!bridge.ready" v-for="i in 10" class="h-16 rounded-lg mb-2"/>
     <DataTableSearchable v-else
-        :columns="columns"
-        :data="bridges"
-        :limit-height="false"
-        :clickable="true"
-        :filters="[]"
-        :selected-objects="[]"
-        :default-sort="initialSort"
-        @row-click="e => bridgeClick(e.original)"
+      :columns="columns"
+      :data="bridges"
+      :limit-height="false"
+      :clickable="true"
+      :filters="[]"
+      :selected-objects="[]"
+      :default-sort="initialSort"
+      @row-click="e => bridgeClick(e.original)"
     >
       <template #toolbar-right>
         <Button class="gap-2" @click="newBridge">
@@ -23,11 +23,11 @@
       </template>
       <template #empty>
         <EmptyState
-            title="No Bridges"
-            description="No UNS bridges have been configured yet. Create a bridge to forward messages between your local MQTT broker and remote brokers."
-            button-text="New Bridge"
-            button-icon="plus"
-            @button-click="newBridge"/>
+          title="No Bridges"
+          description="No UNS bridges have been configured yet. Create a bridge to forward messages between your local MQTT broker and remote brokers."
+          button-text="New Bridge"
+          button-icon="plus"
+          @button-click="newBridge"/>
       </template>
     </DataTableSearchable>
     <template v-slot:sidebar>
@@ -42,46 +42,52 @@
             <Button v-if="selectedBridge.uuid" title="Go to deployment" size="xs" class="flex gap-1 ml-auto" @click="goToDeployment" variant="ghost">
               <i class="fa-solid fa-external-link text-gray-400"></i>
             </Button>
+            <Button v-if="selectedBridge.uuid" title="Edit Bridge" size="xs" class="flex gap-1" @click="editBridge" variant="ghost">
+              <i class="fa-solid fa-pen text-gray-400"></i>
+            </Button>
+            <Button v-if="selectedBridge.uuid" title="Delete Bridge" size="xs" class="flex gap-1" @click="deleteBridge" variant="ghost">
+              <i class="fa-solid fa-trash text-red-400"></i>
+            </Button>
           </div>
         </div>
         <div v-if="selectedBridge.uuid" class="space-y-4 p-4">
           <SidebarDetail
-              icon="key"
-              label="Bridge UUID"
-              :value="selectedBridge.uuid"
+            icon="key"
+            label="Bridge UUID"
+            :value="selectedBridge.uuid"
           />
           <SidebarDetail
-              icon="tag"
-              label="Name"
-              :value="selectedBridge.name"
+            icon="tag"
+            label="Name"
+            :value="selectedBridge.name"
           />
           <SidebarDetail
-              icon="arrows-left-right"
-              label="Type"
-              :value="bridgeType"
+            icon="arrows-left-right"
+            label="Type"
+            :value="bridgeType"
           />
           <SidebarDetail
-              icon="hashtag"
-              label="Topics"
-              :value="topics"
+            icon="hashtag"
+            label="Topics"
+            :value="topics"
           />
           <SidebarDetail
-              v-if="remoteHost"
-              icon="server"
-              label="Remote Broker"
-              :value="remoteHost"
+            v-if="remoteHost"
+            icon="server"
+            label="Remote Broker"
+            :value="remoteHost"
           />
           <SidebarDetail
-              icon="server"
-              label="Host"
-              :value="selectedBridge.deployment?.hostname ?? 'Floating'"
+            icon="server"
+            label="Host"
+            :value="selectedBridge.deployment?.hostname ?? 'Floating'"
           />
           <SidebarDetail
-              v-if="selectedBridge.deployment?.createdAt"
-              icon="clock"
-              label="Created"
-              :value="moment(selectedBridge.deployment.createdAt).fromNow()"
-              :title="selectedBridge.deployment.createdAt"
+            v-if="selectedBridge.deployment?.createdAt"
+            icon="clock"
+            label="Created"
+            :value="moment(selectedBridge.deployment.createdAt).fromNow()"
+            :title="selectedBridge.deployment.createdAt"
           />
         </div>
         <div v-else class="p-4 text-gray-400 text-center">
@@ -105,6 +111,9 @@ import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { UUIDs } from "@amrc-factoryplus/service-client";
 import moment from 'moment';
+import { useDialog } from '@/composables/useDialog';
+import { useServiceClientStore } from "@store/serviceClientStore";
+import { toast } from "vue-sonner";
 
 export default {
   emits: ['rowClick'],
@@ -118,6 +127,7 @@ export default {
       columns: bridgeColumns,
       router: useRouter(),
       moment,
+      s: useServiceClientStore(),
     }
   },
 
@@ -165,6 +175,29 @@ export default {
           application: UUIDs.App.EdgeAgentDeployment,
           object: this.selectedBridge.uuid,
         },
+      })
+    },
+    editBridge() {
+      window.events.emit('show-new-bridge-dialog', this.selectedBridge)
+    },
+    deleteBridge() {
+      useDialog({
+        title: 'Delete Bridge',
+        message: `Are you sure you want to delete the bridge "${this.selectedBridge.name}"? This action cannot be undone.`,
+        confirmText: 'Delete',
+        onConfirm: async () => {
+          try {
+            await this.s.client.ConfigDB.delete_object(this.selectedBridge.uuid)
+            toast.success('Bridge deleted successfully')
+            this.selectedBridge = {}
+            await this.bridge.fetch() 
+          } catch (err) {
+            console.error('Failed to delete bridge:', err)
+            toast.error('Failed to delete bridge', {
+              description: err.message || 'An unexpected error occurred'
+            })
+          }
+        }
       })
     },
   },

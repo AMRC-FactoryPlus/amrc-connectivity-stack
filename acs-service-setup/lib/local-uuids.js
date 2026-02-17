@@ -121,12 +121,14 @@ class LocalUUIDs {
 
         await this.create_objects(
             ["Chart", Clusters.Class.HelmChart,
-                "EdgeAgent", "Cluster", "ModbusRest", "MQTT", "UNSBridge"],
+                "EdgeAgent", "Cluster", "ModbusRest", "MQTT", "UNSBridge",
+                "OPCUAServer"],
             ["Repo", Git.Class.Repo, "HelmCharts"],
             ["RepoGroup", Git.Class.Group,
                 "Cluster", "Shared"],
             ["Role", Auth.Class.EdgeRole,
-                "EdgeAgent", "EdgeFlux", "EdgeKrbkeys", "EdgeMonitor", "EdgeSync", "UNSBridge"],
+                "EdgeAgent", "EdgeFlux", "EdgeKrbkeys", "EdgeMonitor", "EdgeSync",
+                "UNSBridge", "OPCUAServer"],
         );
 
         await this.put_conf(ServiceConfig, this.local);

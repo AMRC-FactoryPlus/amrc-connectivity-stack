@@ -39,11 +39,11 @@ opcua:
 # Image configuration
 image:
   default:
-    pullPolicy: IfNotPresent
+    registry: %%REGISTRY%%
+    tag: %%TAG%%
+    pullPolicy: %%PULLPOLICY%%
   opcua:
-    registry: ghcr.io/amrc-factoryplus
     repository: acs-opcua-server-edge
-    tag: latest
 
 # Persistent storage for last-value cache
 persistence:

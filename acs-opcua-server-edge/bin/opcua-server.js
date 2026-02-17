@@ -25,6 +25,8 @@ const config = JSON.parse(fs.readFileSync(configFile, "utf-8"));
 const mqttPasswordFile = process.env.MQTT_PASSWORD_FILE ?? "/secrets/mqtt/keytab";
 const mqttUsername = process.env.MQTT_USERNAME ?? "opcua-edge";
 const mqttPassword = fs.readFileSync(mqttPasswordFile, "utf-8").trim();
+const mqttCaFile = process.env.MQTT_CA_FILE ?? null;
+const mqttCa = mqttCaFile ? fs.readFileSync(mqttCaFile) : null;
 
 const opcuaUsernameFile = process.env.OPCUA_USERNAME_FILE ?? "/secrets/opcua/username";
 const opcuaPasswordFile = process.env.OPCUA_PASSWORD_FILE ?? "/secrets/opcua/password";
@@ -44,6 +46,8 @@ dataStore.start();
 const mqttClient = new MqttClient({
     host: config.mqtt.host,
     port: config.mqtt.port,
+    tls: config.mqtt.tls,
+    ca: mqttCa,
     username: mqttUsername,
     password: mqttPassword,
     topics: config.topics,
@@ -62,7 +66,7 @@ const server = new Server({
 await mqttClient.start();
 await server.start();
 
-console.log(`OPC UA server ready. Serving ${config.topics.length} topics.`);
+console.log(`OPC UA server ready. Subscribed to ${config.topics.length} MQTT topic pattern(s).`);
 
 /* Graceful shutdown. */
 const shutdown = async (signal) => {

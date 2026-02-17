@@ -19,21 +19,30 @@ export class MqttClient {
         this.password = opts.password;
         this.topics = opts.topics;
         this.dataStore = opts.dataStore;
+        this.tls = opts.tls ?? (this.port === 8883);
+        this.ca = opts.ca ?? null;
 
         this.client = null;
     }
 
     async start() {
-        const url = `mqtt://${this.host}:${this.port}`;
+        const protocol = this.tls ? "mqtts" : "mqtt";
+        const url = `${protocol}://${this.host}:${this.port}`;
         console.log(`Connecting to MQTT broker at ${url} as ${this.username}`);
 
-        this.client = mqtt.connect(url, {
+        const connectOpts = {
             username: this.username,
             password: this.password,
             clientId: this.username,
             clean: false,
             reconnectPeriod: 5000,
-        });
+        };
+
+        if (this.tls && this.ca) {
+            connectOpts.ca = [this.ca];
+        }
+
+        this.client = mqtt.connect(url, connectOpts);
 
         this.client.on("connect", () => {
             console.log("Connected to MQTT broker");

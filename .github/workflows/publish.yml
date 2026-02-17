@@ -166,6 +166,7 @@ jobs:
           - historian-sparkplug
           - historian-uns
           - uns-ingester-sparkplug
+          - acs-opcua-server-edge
     permissions:
       contents: read
       packages: write

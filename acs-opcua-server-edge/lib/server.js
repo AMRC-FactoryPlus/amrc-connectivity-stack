@@ -5,10 +5,10 @@
 /*
  * ACS Edge OPC UA Server - OPC UA Server
  *
- * Creates an OPC UA server with an address space derived from the
- * configured UNS topics. Each topic path becomes a folder hierarchy
- * with the leaf as a Variable node. Values are served from the data
- * store, reporting null until a UNS message has been received.
+ * Creates an OPC UA server with a dynamic address space. Topic paths
+ * are mapped to an OPC UA folder hierarchy with Variable nodes at the
+ * leaves. Nodes are created on the fly as new topics arrive from the
+ * data store, supporting MQTT wildcard subscriptions.
  */
 
 import {
@@ -25,7 +25,6 @@ import {
 
 export class Server {
     constructor(opts) {
-        this.topics = opts.topics;
         this.dataStore = opts.dataStore;
         this.port = opts.port;
         this.username = opts.username;
@@ -33,6 +32,8 @@ export class Server {
         this.allowAnonymous = opts.allowAnonymous ?? false;
 
         this.server = null;
+        /* Track which topics already have OPC UA variable nodes. */
+        this.variables = new Map();
     }
 
     async start() {
@@ -79,80 +80,90 @@ export class Server {
         });
 
         await this.server.initialize();
-        this.buildAddressSpace();
+
+        this.addressSpace = this.server.engine.addressSpace;
+        this.ns = this.addressSpace.getOwnNamespace();
+
+        /* Create nodes for any values already in the data store
+         * (e.g. restored from the persistent cache). */
+        for (const topic of this.dataStore.topics()) {
+            this.ensureVariable(topic);
+        }
+
+        /* Dynamically create nodes as new topics arrive. */
+        this.dataStore.on("change", (topic, entry) => {
+            const variable = this.ensureVariable(topic);
+            variable.setValueFromSource(
+                this.toVariant(entry.value),
+                StatusCodes.Good,
+                new Date(entry.timestamp),
+            );
+        });
+
         await this.server.start();
 
         const endpoint = this.server.getEndpointUrl();
         console.log(`OPC UA server listening at ${endpoint}`);
     }
 
-    buildAddressSpace() {
-        const addressSpace = this.server.engine.addressSpace;
-        const ns = addressSpace.getOwnNamespace();
-
-        /* For each topic, create the folder hierarchy and a variable
-         * at the leaf.  Topic paths use / as separator, which maps
-         * naturally to OPC UA folder structure. */
-        for (const topic of this.topics) {
-            const parts = topic.split("/");
-            let parent = addressSpace.rootFolder.objects;
-
-            /* Walk/create folders for all parts except the last. */
-            for (let i = 0; i < parts.length - 1; i++) {
-                const name = parts[i];
-                const existing = parent.getFolderElements?.()?.find(
-                    n => n.browseName.name === name);
-
-                if (existing) {
-                    parent = existing;
-                }
-                else {
-                    parent = ns.addFolder(parent, {
-                        browseName: name,
-                        displayName: name,
-                    });
-                }
-            }
-
-            /* Create a variable node for the leaf. */
-            const leafName = parts[parts.length - 1];
-            const currentTopic = topic;
-
-            const entry = this.dataStore.get(currentTopic);
-            const initValue = entry
-                ? new DataValue({
-                    value: this.toVariant(entry.value),
-                    statusCode: StatusCodes.Good,
-                    sourceTimestamp: new Date(entry.timestamp),
-                    serverTimestamp: new Date(),
-                })
-                : new DataValue({
-                    value: new Variant({ dataType: DataType.Null }),
-                    statusCode: StatusCodes.UncertainInitialValue,
-                    sourceTimestamp: new Date(),
-                    serverTimestamp: new Date(),
-                });
-
-            const variable = ns.addVariable({
-                componentOf: parent,
-                browseName: leafName,
-                displayName: leafName,
-                description: `UNS topic: ${topic}`,
-                dataType: DataType.Variant,
-                accessLevel: makeAccessLevelFlag("CurrentRead"),
-                value: initValue,
-                minimumSamplingInterval: 0,
-            });
-
-            this.dataStore.on("change", (changedTopic, changedEntry) => {
-                if (changedTopic !== currentTopic) return;
-                variable.setValueFromSource(
-                    this.toVariant(changedEntry.value),
-                    StatusCodes.Good,
-                    new Date(changedEntry.timestamp),
-                );
-            });
+    /* Ensure a topic has a corresponding OPC UA variable node,
+     * creating the folder hierarchy and variable if needed. */
+    ensureVariable(topic) {
+        if (this.variables.has(topic)) {
+            return this.variables.get(topic);
         }
+
+        const parts = topic.split("/");
+        let parent = this.addressSpace.rootFolder.objects;
+
+        /* Walk/create folders for all parts except the last. */
+        for (let i = 0; i < parts.length - 1; i++) {
+            const name = parts[i];
+            const existing = parent.getFolderElements?.()?.find(
+                n => n.browseName.name === name);
+
+            if (existing) {
+                parent = existing;
+            }
+            else {
+                parent = this.ns.addFolder(parent, {
+                    browseName: name,
+                    displayName: name,
+                });
+            }
+        }
+
+        const leafName = parts[parts.length - 1];
+
+        const entry = this.dataStore.get(topic);
+        const initValue = entry
+            ? new DataValue({
+                value: this.toVariant(entry.value),
+                statusCode: StatusCodes.Good,
+                sourceTimestamp: new Date(entry.timestamp),
+                serverTimestamp: new Date(),
+            })
+            : new DataValue({
+                value: new Variant({ dataType: DataType.Null }),
+                statusCode: StatusCodes.UncertainInitialValue,
+                sourceTimestamp: new Date(),
+                serverTimestamp: new Date(),
+            });
+
+        const variable = this.ns.addVariable({
+            componentOf: parent,
+            browseName: leafName,
+            displayName: leafName,
+            description: `UNS topic: ${topic}`,
+            dataType: DataType.Variant,
+            accessLevel: makeAccessLevelFlag("CurrentRead"),
+            value: initValue,
+            minimumSamplingInterval: 0,
+        });
+
+        this.variables.set(topic, variable);
+        console.log(`New OPC UA variable: ${topic}`);
+        return variable;
     }
 
     toVariant(value) {

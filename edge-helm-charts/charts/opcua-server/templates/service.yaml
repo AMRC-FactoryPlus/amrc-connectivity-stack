@@ -1,0 +1,22 @@
+{{- $k8sname := include "opcua-server.k8sname" .Values.name }}
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: opcua-server-{{ $k8sname }}
+  labels:
+    factory-plus.app: opcua-server
+    factory-plus.uuid: {{ .Values.uuid }}
+spec:
+  type: NodePort
+  selector:
+    factory-plus.app: opcua-server
+    factory-plus.uuid: {{ .Values.uuid }}
+  ports:
+    - name: opcua
+      protocol: TCP
+      port: {{ .Values.opcua.port }}
+      targetPort: opcua
+{{- if .Values.nodePort }}
+      nodePort: {{ .Values.nodePort }}
+{{- end }}

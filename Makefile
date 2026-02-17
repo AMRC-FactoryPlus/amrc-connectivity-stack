@@ -52,6 +52,7 @@ subdirs+= acs-krb-keys-operator
 subdirs+= acs-krb-utils
 subdirs+= acs-monitor
 subdirs+= acs-mqtt
+subdirs+= acs-opcua-server-edge
 subdirs+= acs-service-setup
 subdirs+= acs-visualiser
 subdirs+= deploy

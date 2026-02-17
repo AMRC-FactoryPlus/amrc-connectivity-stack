@@ -1,0 +1,4 @@
+apiVersion: v2
+name: opcua-server
+version: "0.0.1"
+description: "ACS OPC UA Server - exposes select UNS topics as OPC UA tags"

@@ -3,7 +3,6 @@
  */
 
 #!/usr/bin/env node
-
 /*
  * ACS Edge OPC UA Server - Entry Point
  *
@@ -32,6 +31,12 @@ const opcuaUsernameFile = process.env.OPCUA_USERNAME_FILE ?? "/secrets/opcua/use
 const opcuaPasswordFile = process.env.OPCUA_PASSWORD_FILE ?? "/secrets/opcua/password";
 const opcuaUsername = fs.readFileSync(opcuaUsernameFile, "utf-8").trim();
 const opcuaPassword = fs.readFileSync(opcuaPasswordFile, "utf-8").trim();
+
+/* Ensure PKI directory exists and is writable */
+const pkiDir = `${dataDir}/pki`;
+if (!fs.existsSync(pkiDir)) {
+    fs.mkdirSync(pkiDir, { recursive: true, mode: 0o755 });
+}
 
 /* Initialise components. */
 const dataStore = new DataStore({ dataDir });

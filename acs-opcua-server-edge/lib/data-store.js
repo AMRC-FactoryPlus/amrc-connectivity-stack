@@ -51,10 +51,10 @@ export class DataStore {
         this.flush();
     }
 
-    set(topic, value) {
+    set(topic, value, timestamp) {
         this.values.set(topic, {
             value,
-            timestamp: new Date().toISOString(),
+            timestamp: timestamp ?? new Date().toISOString(),
         });
         this.dirty = true;
     }

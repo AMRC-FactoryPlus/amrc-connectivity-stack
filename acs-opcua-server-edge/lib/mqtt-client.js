@@ -68,16 +68,34 @@ export class MqttClient {
         try {
             /* Try to parse as JSON first; fall back to string. */
             let value;
+            let timestamp;
             const text = payload.toString();
 
             try {
-                value = JSON.parse(text);
+                const parsed = JSON.parse(text);
+                /* Heuristic: if it's an object with a 'value' property, unwrap it.
+                 * Also look for 'timestamp'. */
+                if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+                    if ("value" in parsed) {
+                        value = parsed.value;
+                    }
+                    else {
+                        value = parsed;
+                    }
+
+                    if ("timestamp" in parsed) {
+                        timestamp = parsed.timestamp;
+                    }
+                }
+                else {
+                    value = parsed;
+                }
             }
             catch {
                 value = text;
             }
 
-            this.dataStore.set(topic, value);
+            this.dataStore.set(topic, value, timestamp);
         }
         catch (err) {
             console.error(`Error handling message on ${topic}: ${err.message}`);

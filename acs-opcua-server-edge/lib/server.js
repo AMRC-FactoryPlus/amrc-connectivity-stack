@@ -20,6 +20,7 @@ import {
     makeAccessLevelFlag,
     SecurityPolicy,
     MessageSecurityMode,
+    OPCUACertificateManager,
 } from "node-opcua";
 
 export class Server {
@@ -34,6 +35,12 @@ export class Server {
     }
 
     async start() {
+        /* Create certificate manager using /data/pki (writable volume) */
+        const certificateManager = new OPCUACertificateManager({
+            automaticallyAcceptUnknownCertificate: true,
+            rootFolder: "/data/pki",
+        });
+
         this.server = new OPCUAServer({
             port: this.port,
             resourcePath: "/UA/ACSEdge",
@@ -44,12 +51,14 @@ export class Server {
                 buildDate: new Date(),
             },
 
+            serverCertificateManager: certificateManager,
+
             /* For an edge deployment, certificate-based security is
              * not practical.  Allow anonymous connections and rely on
              * the username/password check. */
             securityPolicies: [SecurityPolicy.None],
             securityModes: [MessageSecurityMode.None],
-            allowAnonymous: false,
+            allowAnonymous: true,
 
             userManager: {
                 isValidUser: (user, pass) => {

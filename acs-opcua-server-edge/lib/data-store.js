@@ -68,6 +68,10 @@ export class DataStore extends EventEmitter {
         return entry ?? null;
     }
 
+    topics() {
+        return this.values.keys();
+    }
+
     flush() {
         if (!this.dirty) return;
 

@@ -52,7 +52,6 @@ const mqttClient = new MqttClient({
 
 const server = new Server({
     port: config.opcua.port,
-    topics: config.topics,
     dataStore,
     username: opcuaUsername,
     password: opcuaPassword,

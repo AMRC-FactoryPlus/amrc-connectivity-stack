@@ -9,11 +9,13 @@
  * JSON file so values survive pod restarts.
  */
 
+import { EventEmitter } from "node:events";
 import fs from "node:fs";
 import path from "node:path";
 
-export class DataStore {
+export class DataStore extends EventEmitter {
     constructor(opts) {
+        super();
         this.dataDir = opts.dataDir;
         this.cacheFile = path.join(this.dataDir, "last-values.json");
         this.flushInterval = opts.flushInterval ?? 5000;
@@ -52,11 +54,13 @@ export class DataStore {
     }
 
     set(topic, value, timestamp) {
-        this.values.set(topic, {
+        const entry = {
             value,
             timestamp: timestamp ?? new Date().toISOString(),
-        });
+        };
+        this.values.set(topic, entry);
         this.dirty = true;
+        this.emit("change", topic, entry);
     }
 
     get(topic) {

@@ -64,6 +64,14 @@ objects:
       subclassOf:
         - !u Auth.Class.EdgeService
         - !u UNS.Group.Reader
+    !u Local.Role.OPCUAServer:
+      name: "OPC UA Server"
+      memberOf:
+        - !u Auth.Class.EdgeRole
+        - !u Edge.Group.EdgeGroup
+      subclassOf:
+        - !u Auth.Class.EdgeService
+        - !u UNS.Group.Reader
 
   !u Clusters.Class.SystemHelmChart:
     !u Local.Chart.EdgeAgent:
@@ -78,6 +86,8 @@ objects:
       name: "Modbus-REST adapter"
     !u Local.Chart.MQTT:
       name: "Edge MQTT broker"
+    !u Local.Chart.OPCUAServer:
+      name: "OPC UA Server"
 
   !u Clusters.Class.K8sResource:
     !u Clusters.Resource.GitRepo:
@@ -218,6 +228,15 @@ configs:
         authGroup:
           edgeService: !u Auth.Class.EdgeService
           unsReader: !u Local.Role.UNSBridge
+    !u Local.Chart.OPCUAServer:
+      chart:  "opcua-server"
+      values:
+        name:   "{{name}}"
+        uuid:   "{{uuid}}"
+        hostname: "{{hostname}}"
+        authGroup:
+          edgeService: !u Auth.Class.EdgeService
+          unsReader: !u Local.Role.OPCUAServer
 ---
 service: !u UUIDs.Service.Authentication
 version: 2

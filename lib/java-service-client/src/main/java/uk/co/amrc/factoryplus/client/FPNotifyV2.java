@@ -10,7 +10,6 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.function.UnaryOperator;
-import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,6 +27,7 @@ import uk.co.amrc.factoryplus.http.FPHttpClient;
 import uk.co.amrc.factoryplus.http.TextWebsocket;
 import uk.co.amrc.factoryplus.util.Duplex;
 import uk.co.amrc.factoryplus.util.Response;
+import uk.co.amrc.factoryplus.util.UrlPath;
 
 public class FPNotifyV2
 {
@@ -139,13 +139,15 @@ public class FPNotifyV2
             .map(Response::fromJSON);
     }
 
-    public Observable<Optional<Object>> watch (Object... parts)
+    public Observable<Optional<Object>> watch (String path)
     {
-        return watchFull(FPNotifyRequest.watch(parts))
+        return watchFull(FPNotifyRequest.watch(path))
             .map(Response::toOptional);
     }
 
-    /* this is ridiculous */
+    /* These generic types are ridiculous. What I really want is a type
+     * alias for R<M<S,R<O>>> but Java can't do that. Trying to
+     * implement a type alias with a subclass just gets really messy. */
     private static UnaryOperator<Response<Map<String, Response<Object>>>>
         handleSearchUpdate (FPNotifyUpdate update)
     {
@@ -161,7 +163,8 @@ public class FPNotifyV2
         /* For a full update we ignore the parent body. Possibly the
          * protocol should have put the full map under .body
          * instead? We also ignore the existing state. */
-        return st -> res.map(b -> json.getJSONObject("children"))
+        return st -> res
+            .map(b -> json.getJSONObject("children"))
             .map(kids -> kids.keySet().stream()
                 .map(key -> new Tuple2<>(key, key))
                 .collect(HashMap.collector())
@@ -179,15 +182,21 @@ public class FPNotifyV2
                 (state, update) -> update.apply(state));
     }
 
-    public Observable<Map<UUID, Object>> search (Object... parts)
+    public Observable<Map<UUID, Object>> search (String path)
     {
-        return this.searchFull(FPNotifyRequest.search(parts))
+        return this.searchFull(FPNotifyRequest.search(path))
             .flatMap(res -> res
                 .map(kids -> kids
                     .flatMap((key, kres) -> kres
                         .map(b -> new Tuple2<>(key, b))
                         .toVavrList())
                     .mapKeys(UUID::fromString))
-                .toObservable());
+                .orItem(HashMap::empty)
+                .ifOK(Observable::just, Observable::empty));
+    }
+
+    public Observable<Map<UUID, Object>> search (List<Object> parts)
+    {
+        return this.search(UrlPath.join(parts, true));
     }
 }

@@ -6,13 +6,9 @@
 
 package uk.co.amrc.factoryplus.client;
 
-import java.lang.StringBuilder;
-import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 import org.json.*;
 
@@ -30,14 +26,14 @@ public abstract class FPNotifyRequest
      */
     protected abstract JSONObject toJSON ();
 
-    public static FPNotifyRequest.Watch watch (Object... args)
+    public static FPNotifyRequest.Watch watch (String path)
     {
-        return new Watch(urljoin(args));
+        return new Watch(path);
     }
 
-    public static FPNotifyRequest.Search search (Object... args)
+    public static FPNotifyRequest.Search search (String path)
     {
-        return new Search(urljoin(args) + "/", Optional.empty());
+        return new Search(path, Optional.empty());
     }
 
     static JSONObject close (UUID uuid)
@@ -45,41 +41,6 @@ public abstract class FPNotifyRequest
         return new JSONObject()
             .put("method", "CLOSE")
             .put("uuid", uuid.toString());
-    }
-
-    /* This is ridiculous. Neither the JRE nor Jetty have a correct
-     * equivalent to encodeURIComponent. */
-    private static final String HEX = "0123456789abcdef";
-
-    private static String encodeURIComponent (String str)
-    {
-        var bytes = str.getBytes(StandardCharsets.UTF_8);
-        var builder = new StringBuilder(bytes.length);
-
-        for (var c : bytes) {
-            var safe =
-                c >= 'a' ? c <= 'z' || c == '~' :
-                c >= 'A' ? c <= 'Z' || c == '_' :
-                c >= '0' ? c <= '9' :
-                c == '-' || c == '.';
-
-            if (safe)
-                builder.append((char)c);
-            else
-                builder.append('%')
-                    .append(HEX.charAt(c >> 4 & 0xf))
-                    .append(HEX.charAt(c & 0xf));
-        }
-
-        return builder.toString();
-    }
-
-    private static String urljoin (Object... args)
-    {
-        return Arrays.stream(args)
-            .map(Object::toString)
-            .map(FPNotifyRequest::encodeURIComponent)
-            .collect(Collectors.joining("/"));
     }
 
     public static class Watch extends FPNotifyRequest

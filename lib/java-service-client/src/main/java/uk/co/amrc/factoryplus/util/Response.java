@@ -93,10 +93,6 @@ public abstract class Response<T> {
     {
         return this.ifOK(Optional::of, Optional::empty);
     }
-    public Observable<T> toObservable ()
-    {
-        return this.ifOK(Observable::just, Observable::empty);
-    }
     public List<T> toVavrList ()
     {
         return this.ifOK(List::of, List::empty);
@@ -122,6 +118,11 @@ public abstract class Response<T> {
     {
         return this;
     }
+    public Response<T> orItem (Supplier<T> supp)
+    {
+        return this.or(() -> Response.ok(supp.get()));
+    }
+
     public Response<T> handle (Function<Integer, Response<T>> handler)
     {
         return this;

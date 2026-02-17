@@ -40,8 +40,9 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0",
     "@amrc-factoryplus/service-client": "^1.6.0",
+    "@influxdata/influxdb-client": "^1.35.0",
+    "@modelcontextprotocol/sdk": "^1.0.0",
     "dotenv": "^16.0.3",
     "zod": "^3.23.0"
   },

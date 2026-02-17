@@ -14,11 +14,16 @@ npx -y @amrc-factoryplus/mcp
 
 Set the following environment variables:
 
-| Variable           | Required | Description                      |
-|--------------------|----------|----------------------------------|
-| `DIRECTORY_URL`    | Yes      | URL of the ACS Directory service |
-| `SERVICE_USERNAME` | Yes      | Service account username         |
-| `SERVICE_PASSWORD` | Yes      | Service account password         |
+| Variable           | Required | Description                                 |
+|--------------------|----------|---------------------------------------------|
+| `DIRECTORY_URL`    | Yes      | URL of the ACS Directory service            |
+| `SERVICE_USERNAME` | Yes      | Service account username                    |
+| `SERVICE_PASSWORD` | Yes      | Service account password                    |
+| `INFLUX_URL`       | No       | InfluxDB URL (e.g. `http://localhost:8086`) |
+| `INFLUX_TOKEN`     | No       | InfluxDB authentication token               |
+| `INFLUX_ORG`       | No       | InfluxDB organisation name                  |
+| `INFLUX_BUCKET`    | No       | Default bucket name (default: `default`)    |
+
 
 ## Usage with MCP Clients
 
@@ -99,6 +104,19 @@ You may need to use the full path to npx and include PATH:
 | `search_portal`    | Search Factory+ documentation portal |
 | `read_portal_page` | Read a Factory+ portal page          |
 
+### InfluxDB Tools (optional — requires `INFLUX_*` env vars)
+
+| Tool                       | Description                                                        |
+|----------------------------|--------------------------------------------------------------------|
+| `influx_query`             | Execute a raw Flux query                                           |
+| `influx_list_buckets`      | List available InfluxDB buckets                                    |
+| `influx_list_measurements` | List measurements in a bucket (with optional ACS tag filters)      |
+| `influx_get_latest`        | Get latest value(s) filtered by ACS tags (device, schema, ISA-95)  |
+| `influx_get_history`       | Get historical data with time range, aggregation, and tag filters  |
+| `influx_list_tag_values`   | List unique values for any ACS tag (groups, devices, schemas, etc) |
+
+All InfluxDB tools understand ACS conventions: Sparkplug addressing (`group`/`node`/`device`), Schema and Instance UUIDs, ISA-95 hierarchy tags, and the `metricName:typeSuffix` measurement naming pattern.
+
 ## Development
 
 ```bash
@@ -112,6 +130,35 @@ npm run build
 # Run locally
 npm run start
 ```
+
+### Using a Local Build with MCP Clients
+
+To point your MCP client at your local build instead of the published npm package, use `node` directly with the built entry point instead of `npx`:
+
+```json
+{
+    "mcpServers": {
+        "acs-configdb": {
+            "command": "/path/to/node",
+            "args": [
+                "/path/to/amrc-connectivity-stack/acs-mcp/dist/index.js"
+            ],
+            "env": {
+                "PATH": "/path/to/node/bin:/usr/bin:/bin",
+                "DIRECTORY_URL": "http://directory.your-acs.example.com",
+                "SERVICE_USERNAME": "your-service-account",
+                "SERVICE_PASSWORD": "your-password",
+                "INFLUX_URL": "http://influxdb.your-acs.example.com",
+                "INFLUX_TOKEN": "your-influx-token",
+                "INFLUX_ORG": "default",
+                "INFLUX_BUCKET": "default"
+            }
+        }
+    }
+}
+```
+
+> **Note:** Remember to run `npm run build` after making changes — the MCP client runs the compiled `dist/index.js`, not the TypeScript source.
 
 ## Publishing
 

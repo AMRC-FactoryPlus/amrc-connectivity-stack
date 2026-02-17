@@ -214,17 +214,16 @@ public class FPHttpClient {
     {
         //FPThreadUtil.logId("fetch called");
         return Single.<SimpleHttpResponse>create(obs -> {
-            final var context = HttpCacheContext.create();
-            async_client.execute(req, context,
+            //final var context = HttpCacheContext.create();
+            async_client.execute(req, //context,
                 new FutureCallback<SimpleHttpResponse>() {
                     public void completed (SimpleHttpResponse res) {
                         //FPThreadUtil.logId("fetch success");
                         String uri = "???";
                         try { uri = req.getUri().toString(); }
                         catch (Exception e) { }
-                        log.info("Cache {} ({}) for {}",
-                            context.getCacheResponseStatus(),
-                            res.getCode(), uri);
+                        //log.info("Cache {} ({}) for {}",
+                        //    context.getCacheResponseStatus(), res.getCode(), uri);
                         obs.onSuccess(res);
                     }
 

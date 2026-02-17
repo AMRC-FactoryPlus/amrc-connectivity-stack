@@ -2,7 +2,6 @@ services:
   opcua-server:
     image: acs-opcua-server-edge:local
     platform: linux/amd64
-    user: root
     ports:
       - "4840:4840"
     environment:

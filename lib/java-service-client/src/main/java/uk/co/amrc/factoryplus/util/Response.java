@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import java.util.function.*;
@@ -17,7 +18,10 @@ import java.util.function.*;
 import org.json.*;
 
 import io.reactivex.rxjava3.core.Observable;
+import io.reactivex.rxjava3.core.Maybe;
 import io.vavr.collection.List;
+
+import uk.co.amrc.factoryplus.client.FPServiceException;
 
 /* This is to map headers. We don't need use this client-side yet but
  * the ConfigDB server-side should use it. I think this should be
@@ -29,6 +33,17 @@ import io.vavr.collection.List;
 //                .filter(e -> KNOWN_HEADERS.contains(e.getKey()))
 //                .collect(Collectors.toMap(e -> e.getKey(), e -> e.getValue())))
 //            .orElse(Map.of());
+
+/* XXX This should be refactored to hold a Throwable in the error case.
+ * I think perhaps
+ *  - we only hold a status code in the success case,
+ *  - we hold a Throwable in the error case,
+ *  - the factories build an HTTPError with a status code in
+ *  - but this can be mapped to other error types as needed.
+ * We also need to deal better with empty bodies. If we remove the
+ * status field from the superclass this makes the constructor handling
+ * easier; and in fact we can become an interface.
+ */
 
 public abstract class Response<T> {
     protected int status;
@@ -96,6 +111,15 @@ public abstract class Response<T> {
     public List<T> toVavrList ()
     {
         return this.ifOK(List::of, List::empty);
+    }
+    public Maybe<T> toMaybe (Function<Integer, Throwable> mkerror)
+    {
+        return this.ifOK(Maybe::just, Maybe::empty,
+            st -> Maybe.error(mkerror.apply(st)));
+    }
+    public Maybe<T> toMaybe ()
+    {
+        return this.toMaybe(HTTPError::new);
     }
 
     public boolean isOK () { return false; }
@@ -257,7 +281,17 @@ public abstract class Response<T> {
             this.status = status;
         }
 
+        public HTTPError (int status)
+        {
+            this(status, "HTTP error " + status);
+        }
+
         public int getStatus () { return status; }
+
+        public FPServiceException toServiceError (UUID service)
+        {
+            return new FPServiceException(service, status, getMessage());
+        }
     }
 
     static class Failure<T> extends Response<T>
@@ -283,8 +317,13 @@ public abstract class Response<T> {
             throw new HTTPError(this.status, msg);
         }
 
-        public T get () throws HTTPError { throwIfError(""); return null; }
-        public T orElse (T v) throws HTTPError { throwIfError(""); return null; }
+        private HTTPError _mkerr ()
+        {
+            return new HTTPError(this.status);
+        }
+
+        public T get () throws HTTPError { throw _mkerr(); }
+        public T orElse (T v) throws HTTPError { throw _mkerr(); }
 
         public <R> R ifOK (Function<T, R> success,
             Supplier<R> empty, Function<Integer, R> failure)

@@ -37,10 +37,17 @@ export class Server {
     }
 
     async start() {
-        /* Create certificate manager using /data/pki (writable volume) */
-        const certificateManager = new OPCUACertificateManager({
+        /* Both certificate managers must use the writable /data volume.
+         * Without an explicit userCertificateManager node-opcua will
+         * try to create one under ~/.config which is read-only in the
+         * container image. */
+        const serverCertificateManager = new OPCUACertificateManager({
             automaticallyAcceptUnknownCertificate: true,
-            rootFolder: "/data/pki",
+            rootFolder: "/data/pki/server",
+        });
+        const userCertificateManager = new OPCUACertificateManager({
+            automaticallyAcceptUnknownCertificate: true,
+            rootFolder: "/data/pki/user",
         });
 
         this.server = new OPCUAServer({
@@ -53,7 +60,8 @@ export class Server {
                 buildDate: new Date(),
             },
 
-            serverCertificateManager: certificateManager,
+            serverCertificateManager,
+            userCertificateManager,
 
             /* For an edge deployment, certificate-based security is
              * not practical. We still need SignAndEncrypt with a real

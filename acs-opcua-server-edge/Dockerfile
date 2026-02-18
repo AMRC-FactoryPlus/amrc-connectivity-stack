@@ -11,7 +11,9 @@ ARG TARGETARCH
 USER root
 RUN <<'SHELL'
     install -d -o node -g node /home/node/app
+    mkdir /home/node/lib
 SHELL
+COPY --from=lib . /home/node/lib/
 
 WORKDIR /home/node/app
 USER node

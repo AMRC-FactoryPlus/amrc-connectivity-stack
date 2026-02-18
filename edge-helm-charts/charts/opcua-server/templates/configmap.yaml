@@ -10,10 +10,6 @@ metadata:
 data:
   config.json: |
     {
-      "mqtt": {
-        "host": {{ .Values.local.host | quote }},
-        "port": {{ .Values.local.port }}
-      },
       "opcua": {
         "port": {{ .Values.opcua.port }}
       },

@@ -11,7 +11,7 @@
     "author": "AMRC",
     "license": "MIT",
     "dependencies": {
-        "mqtt": "^5.10.0",
+        "@amrc-factoryplus/service-client": "file:../lib/js-service-client",
         "node-opcua": "^2.145.0"
     }
 }

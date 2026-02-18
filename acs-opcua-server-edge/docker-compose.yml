@@ -2,18 +2,19 @@ services:
   opcua-server:
     image: acs-opcua-server-edge:local
     platform: linux/amd64
+    user: root
     ports:
       - "4840:4840"
     environment:
       CONFIG_FILE: /config/config.json
       DATA_DIR: /data
-      MQTT_USERNAME: admin
-      MQTT_PASSWORD_FILE: /secrets/mqtt/password
+      SERVICE_USERNAME: username
+      SERVICE_PASSWORD: password
+      DIRECTORY_URL: https://directory.baseUrl
       OPCUA_USERNAME_FILE: /secrets/opcua/username
       OPCUA_PASSWORD_FILE: /secrets/opcua/password
     volumes:
       - ./test/config.json:/config/config.json:ro
-      - ./test/mqtt-password:/secrets/mqtt/password:ro
       - ./test/opcua-username:/secrets/opcua/username:ro
       - ./test/opcua-password:/secrets/opcua/password:ro
       - opcua-data:/data

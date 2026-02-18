@@ -1,0 +1,17 @@
+{
+    "name": "acs-opcua-server-edge",
+    "version": "0.0.1",
+    "description": "ACS Edge OPC UA Server - exposes UNS topics as OPC UA tags",
+    "main": "bin/opcua-server.js",
+    "type": "module",
+    "scripts": {
+        "start": "node bin/opcua-server.js"
+    },
+    "keywords": [],
+    "author": "AMRC",
+    "license": "MIT",
+    "dependencies": {
+        "@amrc-factoryplus/service-client": "file:../lib/js-service-client",
+        "node-opcua": "^2.145.0"
+    }
+}

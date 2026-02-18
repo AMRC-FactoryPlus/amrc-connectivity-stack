@@ -1,0 +1,98 @@
+{{- $k8sname := include "opcua-server.k8sname" .Values.name }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: opcua-server-{{ $k8sname }}
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    factory-plus.app/disable-backoff: "true"
+  labels:
+    factory-plus.app: opcua-server
+    factory-plus.uuid: {{ .Values.uuid }}
+    factory-plus.name: {{ .Values.name }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      factory-plus.app: opcua-server
+      factory-plus.uuid: {{ .Values.uuid }}
+  template:
+    metadata:
+      labels:
+        factory-plus.app: opcua-server
+        factory-plus.uuid: {{ .Values.uuid }}
+        factory-plus.name: {{ .Values.name }}
+      annotations:
+        cluster-autoscaler.kubernetes.io/safe-to-evict: "true"
+    spec:
+      restartPolicy: Always
+{{- if .Values.hostname }}
+      nodeSelector:
+        kubernetes.io/hostname: {{ .Values.hostname | quote }}
+      tolerations: {{ .Values.tolerations.specific | toYaml | nindent 8 }}
+{{- else }}
+      tolerations: {{ .Values.tolerations.floating | toYaml | nindent 8 }}
+{{- end }}
+      volumes:
+        - name: config
+          configMap:
+            name: opcua-server-{{ $k8sname }}
+        - name: data
+          persistentVolumeClaim:
+            claimName: opcua-server-data-{{ $k8sname }}
+      containers:
+        - name: opcua-server
+{{ list . "opcua" | include "opcua-server.image" | indent 10 }}
+          ports:
+            - name: opcua
+              containerPort: {{ .Values.opcua.port }}
+              protocol: TCP
+          env:
+            - name: SERVICE_USERNAME
+              value: "opcua1/{{ .Values.cluster }}/{{ .Values.name }}"
+            - name: SERVICE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: opcua-server-mqtt-secrets.{{ $k8sname }}
+                  key: keytab
+            - name: DIRECTORY_URL
+              value: "{{ .Values.directory_url }}"
+            - name: OPCUA_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: opcua-server-opcua-creds.{{ $k8sname }}
+                  key: username
+            - name: OPCUA_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: opcua-server-opcua-creds.{{ $k8sname }}
+                  key: password
+            - name: CONFIG_FILE
+              value: "/config/config.json"
+            - name: DATA_DIR
+              value: "/data"
+          startupProbe:
+            tcpSocket:
+              port: opcua
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 60
+          livenessProbe:
+            tcpSocket:
+              port: opcua
+            periodSeconds: 30
+            failureThreshold: 3
+          resources:
+            limits:
+              memory: {{ .Values.limits.memory | quote }}
+            requests:
+              cpu: {{ .Values.limits.cpu | quote }}
+              memory: {{ .Values.limits.memory | quote }}
+          volumeMounts:
+            - mountPath: /config
+              name: config
+              readOnly: true
+            - mountPath: /data
+              name: data

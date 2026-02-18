@@ -25,11 +25,7 @@ import org.slf4j.LoggerFactory;
 import org.apache.commons.lang3.tuple.Pair;
 
 import org.apache.hc.client5.http.HttpResponseException;
-import org.apache.hc.client5.http.fluent.Request;
-import org.apache.hc.client5.http.fluent.Response;
 import org.apache.hc.client5.http.impl.cache.CacheConfig;
-import org.apache.hc.client5.http.impl.cache.CachingHttpClients;
-import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.core5.http.ContentType;
 import org.apache.hc.core5.net.URIBuilder;
 
@@ -48,12 +44,20 @@ import org.apache.hc.core5.io.CloseMode;
 import org.apache.hc.core5.reactor.IOReactorConfig;
 import org.apache.hc.core5.util.Timeout;
 
+import org.eclipse.jetty.websocket.api.Callback;
+import org.eclipse.jetty.websocket.api.Session;
+import org.eclipse.jetty.websocket.api.util.WSURI;
+import org.eclipse.jetty.websocket.client.WebSocketClient;
+
 import org.json.*;
 
-import io.reactivex.rxjava3.core.Single;
+import io.reactivex.rxjava3.core.*;
+import io.reactivex.rxjava3.disposables.*;
+import io.reactivex.rxjava3.subjects.*;
 
 import uk.co.amrc.factoryplus.client.*;
 import uk.co.amrc.factoryplus.gss.*;
+import uk.co.amrc.factoryplus.util.Duplex;
 
 /** HTTP (REST) client.
  */
@@ -62,9 +66,11 @@ public class FPHttpClient {
 
     private FPServiceClient fplus;
     private FPDiscovery discovery;
-    private CloseableHttpClient http_client;
+
     private CloseableHttpAsyncClient async_client;
     private RequestCache<URI, String> tokens;
+
+    private WebSocketClient ws_client;
 
     /** Internal; construct via {@link FPServiceClient}. */
     public FPHttpClient (FPServiceClient fplus)
@@ -73,9 +79,6 @@ public class FPHttpClient {
 
         CacheConfig cache_config = CacheConfig.custom()
             .setSharedCache(false)
-            .build();
-        http_client = CachingHttpClients.custom()
-            .setCacheConfig(cache_config)
             .build();
 
         tokens = new RequestCache<URI, String>(this::tokenFor);
@@ -88,6 +91,8 @@ public class FPHttpClient {
             .setCacheConfig(cache_config)
             .setIOReactorConfig(ioReactorConfig)
             .build();
+
+        ws_client = new WebSocketClient();
     }
 
     /** Start the async client threads.
@@ -99,11 +104,20 @@ public class FPHttpClient {
      */
     public void start ()
     {
-        /* This can throw if the directory url is missing */
+        /* This can throw if the directory url is missing, so don't call
+         * in the constructor. */
         this.discovery = fplus.discovery();
 
         //FPThreadUtil.logId("Running async HTTP client");
         async_client.start();
+
+        /* grr */
+        try {
+            ws_client.start();
+        }
+        catch (Exception e) {
+            throw new ServiceConfigurationError("Cannot start WebSocket client", e);
+        }
     }
 
     /** Creates a new request.
@@ -118,15 +132,14 @@ public class FPHttpClient {
     }
 
     /** Internal; use {@link FPHttpRequest#fetch()}. */
-    public Single<JsonResponse> execute (FPHttpRequest fpr)
+    public <Res> Single<Res> execute (ResolvableRequest<Res> req)
     {
         //FPThreadUtil.logId("execute called");
         return discovery
-            .get(fpr.service)
+            .get(req.getService())
             .flatMap(base -> tokens.get(base)
-                .map(tok -> fpr.resolveWith(base, tok)))
-            .flatMap(rrq -> fetch(rrq.buildRequest())
-                .flatMap(res -> rrq.handleResponse(res)))
+                .map(tok -> req.resolveWith(base, tok)))
+            .flatMap(rrq -> rrq.perform(this))
             .retry(2, ex -> 
                 (ex instanceof BadToken)
                     && ((BadToken)ex).invalidate(tokens));
@@ -143,9 +156,8 @@ public class FPHttpClient {
                     .orElseThrow();
             })
             .map(ctx -> new TokenRequest(service, ctx))
-                /* buildRequest is blocking */
-            .flatMap(req -> fetch(req.buildRequest())
-                .flatMap(res -> req.handleResponse(res)))
+                /* perform is blocking */
+            .flatMap(req -> req.perform(this))
             .subscribeOn(fplus.getScheduler())
             /* fetch moves calls below here to the http thread pool */
             .map(res -> res.ifOk()
@@ -154,37 +166,76 @@ public class FPHttpClient {
             .map(o -> o.getString("token"));
     }
 
-    private Single<JsonResponse> fetch (SimpleHttpRequest req)
+    /** Opens a WebSocket.
+     *
+     * The sending side of the Duplex will send text msgs to the WS.
+     * Received text msgs are emitted by the receiving side. Received
+     * binary msgs will be ignored.
+     *
+     * Completing the send side will close the WS. An error emitted to
+     * the send side will close the WS and then reflect the error to the
+     * receiving side. 
+     *
+     * The send side relies on the Rx contract that onNext is called in
+     * a serial fashion. Failure to respect this will cause Jetty WS
+     * errors.
+     *
+     * @param uri URI of the WS to open
+     */
+    public Single<TextWebsocket> textWebsocket (URI uri)
+    {
+        return Single.create(obs -> {
+            var ws_uri = WSURI.toWebsocket(uri);
+            var ep = new TextWebsocket.Endpoint();
+
+            var cf = this.ws_client.connect(ep, ws_uri);
+
+            obs.setDisposable(Disposable.fromFuture(cf));
+            cf.whenComplete((ok, err) -> {
+                if (ok != null) 
+                    obs.onSuccess(ep.getDuplex());
+                else
+                    obs.tryOnError(err);
+            });
+        });
+    }
+
+    /** Opens a F+ WebSocket.
+     *
+     * The path will be resolved relative to the service base URI. Once
+     * the WS has opened, the F+ authentication exchange will be carried
+     * out. */
+    public Single<TextWebsocket> authWebsocket (UUID service, String path)
+    {
+        return this.execute(new WsRequest(service, path));
+    }
+
+    public Single<SimpleHttpResponse> fetch (SimpleHttpRequest req)
     {
         //FPThreadUtil.logId("fetch called");
-        final var context = HttpCacheContext.create();
-        return Single.<SimpleHttpResponse>create(obs ->
-                async_client.execute(req, context,
-                    new FutureCallback<SimpleHttpResponse>() {
-                        public void completed (SimpleHttpResponse res) {
-                            //FPThreadUtil.logId("fetch success");
-                            String uri = "???";
-                            try { uri = req.getUri().toString(); }
-                            catch (Exception e) { }
-                            log.info("Cache {} ({}) for {}",
-                                context.getCacheResponseStatus(),
-                                res.getCode(), uri);
-                            obs.onSuccess(res);
-                        }
+        return Single.<SimpleHttpResponse>create(obs -> {
+            //final var context = HttpCacheContext.create();
+            async_client.execute(req, //context,
+                new FutureCallback<SimpleHttpResponse>() {
+                    public void completed (SimpleHttpResponse res) {
+                        //FPThreadUtil.logId("fetch success");
+                        String uri = "???";
+                        try { uri = req.getUri().toString(); }
+                        catch (Exception e) { }
+                        //log.info("Cache {} ({}) for {}",
+                        //    context.getCacheResponseStatus(), res.getCode(), uri);
+                        obs.onSuccess(res);
+                    }
 
-                        public void failed (Exception ex) {
-                            //FPThreadUtil.logId("fetch failure");
-                            obs.onError(ex);
-                        }
+                    public void failed (Exception ex) {
+                        //FPThreadUtil.logId("fetch failure");
+                        obs.onError(ex);
+                    }
 
-                        public void cancelled () {
-                            obs.onError(new Exception("HTTP future cancelled"));
-                        }
-                    }))
-            //.doOnSuccess(res -> {
-            //    FPThreadUtil.logId("handling fetch response");
-            //    log.info("Fetch response {}: {}", req.getUri(), res.getCode());
-            //})
-            .map(res -> new JsonResponse(res));
+                    public void cancelled () {
+                        obs.onError(new Exception("HTTP future cancelled"));
+                    }
+                });
+        });
     }
 }

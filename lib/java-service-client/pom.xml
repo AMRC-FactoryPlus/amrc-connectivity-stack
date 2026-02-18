@@ -14,6 +14,7 @@
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <maven.compiler.release>17</maven.compiler.release>
+    <jettyVersion>12.1.5</jettyVersion>
   </properties>
 
   <distributionManagement>
@@ -37,6 +38,11 @@
   </dependencyManagement>
 
   <dependencies>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+      <version>2.0.17</version>
+    </dependency>
     <!-- JSON -->
     <dependency>
       <groupId>org.json</groupId>
@@ -56,11 +62,6 @@
     </dependency>
     <dependency>
       <groupId>org.apache.httpcomponents.client5</groupId>
-      <artifactId>httpclient5-fluent</artifactId>
-      <version>5.6</version>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.httpcomponents.client5</groupId>
       <artifactId>httpclient5-cache</artifactId>
       <version>5.6</version>
     </dependency>
@@ -69,6 +70,23 @@
       <groupId>io.reactivex.rxjava3</groupId>
       <artifactId>rxjava</artifactId>
       <version>3.1.12</version>
+    </dependency>
+    <!-- Vavr (immutable/persistent data structures) -->
+    <dependency>
+      <groupId>io.vavr</groupId>
+      <artifactId>vavr</artifactId>
+      <version>1.0.0</version>
+    </dependency>
+    <!-- Jetty client -->
+    <dependency>
+      <groupId>org.eclipse.jetty</groupId>
+      <artifactId>jetty-client</artifactId>
+      <version>${jettyVersion}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.jetty.websocket</groupId>
+      <artifactId>jetty-websocket-jetty-client</artifactId>
+      <version>${jettyVersion}</version>
     </dependency>
 
     <dependency>
@@ -80,6 +98,12 @@
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter-params</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-simple</artifactId>
+      <version>2.0.17</version>
       <scope>test</scope>
     </dependency>
   </dependencies>
@@ -116,6 +140,12 @@
         <plugin>
           <artifactId>maven-compiler-plugin</artifactId>
           <version>3.14.1</version>
+          <configuration>
+            <compilerArgs>
+              <arg>-Xlint:unchecked</arg>
+            </compilerArgs>
+            <release>17</release>
+          </configuration>
         </plugin>
         <plugin>
           <artifactId>maven-surefire-plugin</artifactId>
@@ -140,6 +170,18 @@
         <plugin>
           <artifactId>maven-project-info-reports-plugin</artifactId>
           <version>3.9.0</version>
+        </plugin>
+        <plugin>
+          <groupId>com.github.johnpoth</groupId>
+          <artifactId>jshell-maven-plugin</artifactId>
+          <version>1.4</version>
+          <configuration>
+            <testClasspath>true</testClasspath>
+            <options>
+              <option>-R-Dorg.slf4j.simpleLogger.showThreadName=false</option>
+              <option>-R-Dorg.slf4j.simpleLogger.showShortLogName=true</option>
+            </options>
+          </configuration>
         </plugin>
       </plugins>
     </pluginManagement>

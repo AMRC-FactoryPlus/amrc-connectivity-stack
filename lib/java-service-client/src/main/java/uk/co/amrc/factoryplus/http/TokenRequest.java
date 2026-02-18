@@ -22,12 +22,12 @@ import io.reactivex.rxjava3.core.Single;
 
 import uk.co.amrc.factoryplus.client.*;
 
-class TokenRequest
+class TokenRequest extends JsonRequest
 {
     private static final Logger log = LoggerFactory.getLogger(TokenRequest.class);
 
     private static final Pattern negotiateAuth = Pattern.compile(
-        "^Negotiate +([A-Za-z0-9+/]+)$");
+        "^Negotiate +([A-Za-z0-9+/]+)=* *$");
 
     private URI server;
     private GSSContext ctx;
@@ -40,7 +40,8 @@ class TokenRequest
 
     /* This method is blocking and stateful. This is unavoidable with
      * the GSSAPI. */
-    public SimpleHttpRequest buildRequest ()
+    @Override
+    protected SimpleHttpRequest buildRequest ()
         throws GSSException
     {
         //FPThreadUtil.logId("getting gss token");
@@ -57,33 +58,33 @@ class TokenRequest
         return req;
     }
 
-    private static Single<JsonResponse> mkerr (String msg)
+    private static ProtocolException mkerr (String msg)
     {
-        return Single.<JsonResponse>error(new Exception(msg));
+        return new ProtocolException(msg);
     }
 
-    public Single<JsonResponse> handleResponse (JsonResponse res)
+    @Override
+    protected Single<JsonResponse> handleJson (JsonResponse res)
         throws ProtocolException, GSSException
     {
         if (res.getCode() == 401)
-            return mkerr("Server rejected GSSAPI auth");
+            throw mkerr("Server rejected GSSAPI auth");
 
-        var optAuth = res.getHeader("WWW-Authenticate");
-        if (optAuth.isEmpty())
-            return mkerr("No GSS token from server");
+        var auth = res.getHeader("WWW-Authenticate")
+            .orElseThrow(() -> mkerr("No GSS token from server"));
 
-        var matcher = negotiateAuth.matcher(optAuth.get());
+        var matcher = negotiateAuth.matcher(auth);
         if (!matcher.matches())
-            return mkerr("Bad GSS WWW-Auth response");
+            throw mkerr("Bad GSS WWW-Auth response");
 
         var tok64 = matcher.group(1);
         var tok = Base64.getDecoder().decode(tok64);
         var out = ctx.initSecContext(tok, 0, tok.length);
 
         if (out != null)
-            return mkerr("GSSAPI wants to send a second token");
+            throw mkerr("GSSAPI wants to send a second token");
         if (!ctx.isEstablished())
-            return mkerr("Cannot establish server's identity");
+            throw mkerr("Cannot establish server's identity");
 
         //log.info("Accepted GSS response from {}", ctx.getTargName());
         ctx.dispose();

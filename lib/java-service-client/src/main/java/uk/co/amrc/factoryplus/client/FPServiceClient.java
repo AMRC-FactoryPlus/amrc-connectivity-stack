@@ -67,9 +67,18 @@ public class FPServiceClient {
      *
      * @param config Configuration overrides.
      */
-    public FPServiceClient (Map config)
+    public FPServiceClient (Map<String, String> config)
     {
         this.config = config;
+    }
+
+    /** Start the client.
+     *
+     * This must be called before calling anything else.
+     */
+    public void start ()
+    {
+        this.http().start();
     }
 
     /** Gets a configuration parameter.

@@ -16,7 +16,7 @@ import org.apache.hc.client5.http.async.methods.SimpleHttpResponse;
 
 import io.reactivex.rxjava3.core.Single;
 
-class ResolvedRequest
+class ResolvedRequest extends JsonRequest
 {
     private static final Logger log = LoggerFactory.getLogger(ResolvedRequest.class);
 
@@ -31,7 +31,8 @@ class ResolvedRequest
         this.token = token;
     }
 
-    public SimpleHttpRequest buildRequest ()
+    @Override
+    protected SimpleHttpRequest buildRequest ()
     {
         URI uri = base.resolve(source.path);
 
@@ -48,7 +49,8 @@ class ResolvedRequest
         return req;
     }
 
-    public Single<JsonResponse> handleResponse (JsonResponse res)
+    @Override
+    protected Single<JsonResponse> handleJson (JsonResponse res)
     {
         return res.getCode() == 401
             ? Single.error(() -> new BadToken(base, token))

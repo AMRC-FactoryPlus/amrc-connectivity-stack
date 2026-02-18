@@ -657,20 +657,41 @@ configs:
             minLength: 1
             options:
               order: 1
-            title: "Hostname/IP"
+            title: Hostname/IP
             type: string
+          pollInt:
+            default: 500
+            description: Set throttle frequency.
+            options:
+              dependencies:
+                throttleEnabled: true
+              order: 4
+            title: Throttle Frequency
+            type: number
           port:
             default: 30001
-            description: "RTDE interface port. Common ports: 30001 (RTDE configuration/setup), 30002 (Dashboard server), 30003 (Primary/Secondary interface), 30004 (RTDE data exchange - most common for real-time streaming)"
+            description: "RTDE interface port. Common ports: 30001 (RTDE
+              configuration/setup), 30002 (Dashboard server), 30003 (Primary/Secondary
+              interface), 30004 (RTDE data exchange - most common for real-time
+              streaming)"
             minLength: 1
             options:
               order: 2
-            title: "Port"
+            title: Port
             type: number
+          throttleEnabled:
+            default: false
+            description: Enable throttle to limit frequency of data packets.
+            format: checkbox
+            options:
+              order: 3
+            title: Throttle
+            type: boolean
         required:
           - host
           - port
-        title: "RTDE Connection Details"
+          - throttleEnabled
+        title: RTDE Connection Details
         type: object
 
     !u ACS.Driver.External:

@@ -1,8 +1,7 @@
 /*
- * Copyright (c) University of Sheffield AMRC 2025.
+ * Copyright (c) University of Sheffield AMRC 2026.
  */
 
-import deep_equal       from "deep-equal";
 import * as imm         from "immutable";
 import * as k8s         from "@kubernetes/client-node";
 import jmp              from "json-merge-patch";
@@ -11,23 +10,15 @@ import compile_template from "json-templates";
 
 import * as rxx         from "@amrc-factoryplus/rx-util";
 
-import { Edge }             from "./uuids.js";
-import { LABELS }           from "./metadata.js";
+import { Edge }         from "./uuids.js";
+import { LABELS }       from "./metadata.js";
+import { k8sname }      from "@amrc-factoryplus/service-client";
 
 // Define a record type for Kubernetes resources to help with grouping
 const Resource = imm.Record({ apiVersion: null, kind: null });
 Resource.prototype.toString = function () {
     return `${this.apiVersion}/${this.kind}`;
 };
-
-/* Join the parts with hyphens, lowercase and remove special chars. This
- * matches the k8sname definitions in the edge helm charts. */
-function k8sname (...parts) {
-    return parts.join("-")
-        .toLowerCase()
-        .replace(/[^a-z0-9-]+/g, "-")
-        .replace(/^-|-$/g, "");
-}
 
 /**
  * Base class for reconciling Kubernetes resources
@@ -178,14 +169,14 @@ export class Deployments {
                 rx.map(chart => ({ uuid, spec, chart })))),
             rx.map(({ uuid, spec, chart }) => ({
                 uuid, spec,
-                chart: templates.get(chart),     
+                chart: templates.get(chart),
             })),
             rx.filter(d => d.chart),
             rx.toArray());
 
         /* Track deployments targetting this cluster */
         const deployments = cdb.search_app(Deployments, { cluster: this.cluster });
-        
+
         /* Track and compile Helm Chart templates */
         const templates = rxx.rx(
             cdb.search_app(HelmChart),

@@ -1,5 +1,5 @@
 # Set up for the edge-sync Helm deployments
-#-REQUIRE: auth edge sparkplug
+#-REQUIRE: auth edge sparkplug uns
 ---
 service: !u UUIDs.Service.ConfigDB
 version: 2
@@ -10,6 +10,10 @@ objects:
     #  name: "Helm chart"
     !u ACS.Class.EdgeDeployment:
       name: "Edge deployment"
+    !u ACS.Class.Bridge:
+      name: "UNS Bridge"
+      subclassOf:
+        - !u ACS.Class.EdgeDeployment
 
   !u ConfigDB.Class.R2Class:
     !u Clusters.Class.K8sResource:
@@ -52,12 +56,22 @@ objects:
         - !u Edge.Group.EdgeGroup
       subclassOf:
         - !u Auth.Class.EdgeService
+    !u Local.Role.UNSBridge:
+      name: "UNS Bridge"
+      memberOf:
+        - !u Auth.Class.EdgeRole
+        - !u Edge.Group.EdgeGroup
+      subclassOf:
+        - !u Auth.Class.EdgeService
+        - !u UNS.Group.Reader
 
   !u Clusters.Class.SystemHelmChart:
     !u Local.Chart.EdgeAgent:
       name: "Edge Agent"
     !u Local.Chart.Cluster:
       name: "Edge cluster"
+    !u Local.Chart.UNSBridge:
+      name: "UNS Bridge"
 
   !u Clusters.Class.HelmChart:
     !u Local.Chart.ModbusRest:
@@ -195,6 +209,15 @@ configs:
         name:   "{{name}}"
         uuid:   "{{uuid}}"
         hostname: "{{hostname}}"
+    !u Local.Chart.UNSBridge:
+      chart:  "uns-bridge"
+      values:
+        name:   "{{name}}"
+        uuid:   "{{uuid}}"
+        hostname: "{{hostname}}"
+        authGroup:
+          edgeService: !u Auth.Class.EdgeService
+          unsReader: !u Local.Role.UNSBridge
 ---
 service: !u UUIDs.Service.Authentication
 version: 2

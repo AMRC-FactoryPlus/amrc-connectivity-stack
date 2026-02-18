@@ -13,7 +13,7 @@ authGroup:
   edgeService: ""  # Auth.Class.EdgeService - set by deployment
   unsReader: "d6a4d87c-cd02-11ef-9a87-2f86ebe5ee08"  # UNS.Group.Reader - grants UNS read permissions
 
-# Directory URL for service discovery (not currently used)
+# Directory URL for ServiceClient service discovery
 directory_url: "http://directory.namespace.svc.cluster.local"
 
 # UNS topics to expose via OPC UA (object keyed by topic filter)
@@ -22,12 +22,6 @@ directory_url: "http://directory.namespace.svc.cluster.local"
 topics: {}
 # "UNS/v1/site/area/workcentre/Axes/1/Position/Actual": {}
 # "UNS/v1/site/area/workcentre/Temperature/Current": {}
-
-# Local ACS MQTT broker connection
-local:
-  # Host of the local ACS MQTT broker
-  host: "mqtt.namespace.svc.cluster.local"  # Override this
-  port: 1883
 
 # OPC UA server configuration
 opcua:

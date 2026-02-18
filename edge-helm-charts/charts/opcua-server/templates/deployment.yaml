@@ -39,9 +39,6 @@ spec:
         - name: config
           configMap:
             name: opcua-server-{{ $k8sname }}
-        - name: mqtt-credentials
-          secret:
-            secretName: opcua-server-mqtt-secrets.{{ $k8sname }}
         - name: opcua-credentials
           secret:
             secretName: opcua-server-opcua-creds.{{ $k8sname }}
@@ -56,10 +53,15 @@ spec:
               containerPort: {{ .Values.opcua.port }}
               protocol: TCP
           env:
-            - name: MQTT_USERNAME
+            - name: SERVICE_USERNAME
               value: "opcua1/{{ .Values.cluster }}/{{ .Values.name }}"
-            - name: MQTT_PASSWORD_FILE
-              value: "/secrets/mqtt/keytab"
+            - name: SERVICE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: opcua-server-mqtt-secrets.{{ $k8sname }}
+                  key: keytab
+            - name: DIRECTORY_URL
+              value: "{{ .Values.directory_url }}"
             - name: OPCUA_USERNAME_FILE
               value: "/secrets/opcua/username"
             - name: OPCUA_PASSWORD_FILE
@@ -88,9 +90,6 @@ spec:
           volumeMounts:
             - mountPath: /config
               name: config
-              readOnly: true
-            - mountPath: /secrets/mqtt
-              name: mqtt-credentials
               readOnly: true
             - mountPath: /secrets/opcua
               name: opcua-credentials

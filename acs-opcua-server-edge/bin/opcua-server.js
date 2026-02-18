@@ -6,10 +6,13 @@
  * ACS Edge OPC UA Server - Entry Point
  *
  * Reads configuration from mounted files (ConfigMap + Secrets),
- * initialises the data store, MQTT client, and OPC UA server.
+ * initialises the data store, MQTT client (via ServiceClient), and
+ * OPC UA server.
  */
 
 import fs from "node:fs";
+
+import { ServiceClient } from "@amrc-factoryplus/service-client";
 
 import { DataStore } from "../lib/data-store.js";
 import { MqttClient } from "../lib/mqtt-client.js";
@@ -21,13 +24,7 @@ const dataDir = process.env.DATA_DIR ?? "/data";
 
 const config = JSON.parse(fs.readFileSync(configFile, "utf-8"));
 
-/* Read credentials from mounted secrets. */
-const mqttPasswordFile = process.env.MQTT_PASSWORD_FILE ?? "/secrets/mqtt/keytab";
-const mqttUsername = process.env.MQTT_USERNAME ?? "opcua-edge";
-const mqttPassword = fs.readFileSync(mqttPasswordFile, "utf-8").trim();
-const mqttCaFile = process.env.MQTT_CA_FILE ?? null;
-const mqttCa = mqttCaFile ? fs.readFileSync(mqttCaFile) : null;
-
+/* Read OPC UA credentials from mounted secrets. */
 const opcuaUsernameFile = process.env.OPCUA_USERNAME_FILE ?? "/secrets/opcua/username";
 const opcuaPasswordFile = process.env.OPCUA_PASSWORD_FILE ?? "/secrets/opcua/password";
 const opcuaUsername = fs.readFileSync(opcuaUsernameFile, "utf-8").trim();
@@ -39,17 +36,16 @@ if (!fs.existsSync(pkiDir)) {
     fs.mkdirSync(pkiDir, { recursive: true, mode: 0o755 });
 }
 
+/* Build ServiceClient - reads SERVICE_USERNAME, SERVICE_PASSWORD,
+ * DIRECTORY_URL, MQTT_URL, VERBOSE from process.env. */
+const fplus = await new ServiceClient({ env: process.env }).init();
+
 /* Initialise components. */
 const dataStore = new DataStore({ dataDir });
 dataStore.start();
 
 const mqttClient = new MqttClient({
-    host: config.mqtt.host,
-    port: config.mqtt.port,
-    tls: config.mqtt.tls,
-    ca: mqttCa,
-    username: mqttUsername,
-    password: mqttPassword,
+    fplus,
     topics: config.topics,
     dataStore,
 });

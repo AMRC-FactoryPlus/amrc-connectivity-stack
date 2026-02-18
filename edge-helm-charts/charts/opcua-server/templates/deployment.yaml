@@ -39,9 +39,6 @@ spec:
         - name: config
           configMap:
             name: opcua-server-{{ $k8sname }}
-        - name: opcua-credentials
-          secret:
-            secretName: opcua-server-opcua-creds.{{ $k8sname }}
         - name: data
           persistentVolumeClaim:
             claimName: opcua-server-data-{{ $k8sname }}
@@ -62,10 +59,16 @@ spec:
                   key: keytab
             - name: DIRECTORY_URL
               value: "{{ .Values.directory_url }}"
-            - name: OPCUA_USERNAME_FILE
-              value: "/secrets/opcua/username"
-            - name: OPCUA_PASSWORD_FILE
-              value: "/secrets/opcua/password"
+            - name: OPCUA_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: opcua-server-opcua-creds.{{ $k8sname }}
+                  key: username
+            - name: OPCUA_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: opcua-server-opcua-creds.{{ $k8sname }}
+                  key: password
             - name: CONFIG_FILE
               value: "/config/config.json"
             - name: DATA_DIR
@@ -90,9 +93,6 @@ spec:
           volumeMounts:
             - mountPath: /config
               name: config
-              readOnly: true
-            - mountPath: /secrets/opcua
-              name: opcua-credentials
               readOnly: true
             - mountPath: /data
               name: data

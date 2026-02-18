@@ -11,12 +11,10 @@ services:
       SERVICE_USERNAME: username
       SERVICE_PASSWORD: password
       DIRECTORY_URL: https://directory.baseUrl
-      OPCUA_USERNAME_FILE: /secrets/opcua/username
-      OPCUA_PASSWORD_FILE: /secrets/opcua/password
+      OPCUA_USERNAME: opcua
+      OPCUA_PASSWORD: test123
     volumes:
       - ./test/config.json:/config/config.json:ro
-      - ./test/opcua-username:/secrets/opcua/username:ro
-      - ./test/opcua-password:/secrets/opcua/password:ro
       - opcua-data:/data
     networks:
       - opcua-test

@@ -5,9 +5,9 @@
 /*
  * ACS Edge OPC UA Server - Entry Point
  *
- * Reads configuration from mounted files (ConfigMap + Secrets),
- * initialises the data store, MQTT client (via ServiceClient), and
- * OPC UA server.
+ * Reads configuration from a mounted ConfigMap file and credentials
+ * from environment variables, initialises the data store, MQTT client
+ * (via ServiceClient), and OPC UA server.
  */
 
 import fs from "node:fs";
@@ -24,20 +24,17 @@ const dataDir = process.env.DATA_DIR ?? "/data";
 
 const config = JSON.parse(fs.readFileSync(configFile, "utf-8"));
 
-/* Read OPC UA credentials from mounted secrets. */
-const opcuaUsernameFile = process.env.OPCUA_USERNAME_FILE ?? "/secrets/opcua/username";
-const opcuaPasswordFile = process.env.OPCUA_PASSWORD_FILE ?? "/secrets/opcua/password";
-const opcuaUsername = fs.readFileSync(opcuaUsernameFile, "utf-8").trim();
-const opcuaPassword = fs.readFileSync(opcuaPasswordFile, "utf-8").trim();
+/* Read OPC UA credentials from environment variables. */
+const opcuaUsername = process.env.OPCUA_USERNAME;
+const opcuaPassword = process.env.OPCUA_PASSWORD;
 
-/* Ensure PKI directory exists and is writable */
-const pkiDir = `${dataDir}/pki`;
-if (!fs.existsSync(pkiDir)) {
-    fs.mkdirSync(pkiDir, { recursive: true, mode: 0o755 });
+if (!opcuaUsername || !opcuaPassword) {
+    console.error("OPCUA_USERNAME and OPCUA_PASSWORD must be set");
+    process.exit(1);
 }
 
 /* Build ServiceClient - reads SERVICE_USERNAME, SERVICE_PASSWORD,
- * DIRECTORY_URL, MQTT_URL, VERBOSE from process.env. */
+ * DIRECTORY_URL, VERBOSE from process.env. */
 const fplus = await new ServiceClient({ env: process.env }).init();
 
 /* Initialise components. */

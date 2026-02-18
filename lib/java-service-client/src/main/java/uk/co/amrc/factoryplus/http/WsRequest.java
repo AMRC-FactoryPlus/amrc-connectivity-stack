@@ -23,8 +23,14 @@ class WsRequest implements ResolvableRequest<TextWebsocket>
 {
     private static final Logger log = LoggerFactory.getLogger(WsRequest.class);
 
-    private Predicate<String> VALID_STATUS 
+    /* Note these must end in a single space */
+    private static final String AUTH_BEARER = "Bearer ";
+
+    private static final Predicate<String> VALID_STATUS 
         = Pattern.compile("[1-5][0-9][0-9]").asMatchPredicate();
+
+    private static final String STATUS_OK = "200";
+    private static final String STATUS_UNAUTH = "401";
 
     private UUID service;
     private String path;
@@ -64,12 +70,10 @@ class WsRequest implements ResolvableRequest<TextWebsocket>
                     final var rv = raw.getReceiver()
                         .firstOrError()
                         .flatMap(status -> {
-                            log.info("WS auth response: {}", status);
-
-                            if (status.equals("200"))
+                            if (status.equals(STATUS_OK))
                                 return Single.just(raw);
 
-                            if (status.equals("401"))
+                            if (status.equals(STATUS_UNAUTH))
                                 throw new BadToken(base, token);
 
                             final int code = VALID_STATUS.test(status)
@@ -80,7 +84,7 @@ class WsRequest implements ResolvableRequest<TextWebsocket>
                                 "Failed to authenticate to WebSocket");
                         });
 
-                    raw.getSender().onNext("Bearer " + token);
+                    raw.getSender().onNext(AUTH_BEARER + token);
                     return rv;
                 });
         }

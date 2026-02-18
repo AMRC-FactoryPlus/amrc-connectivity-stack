@@ -8,12 +8,16 @@ package uk.co.amrc.factoryplus.util;
 
 import java.lang.StringBuilder;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 
 import io.vavr.collection.List;
 
 public final class UrlPath
 {
     private static final String HEX = "0123456789abcdef";
+    private static final byte[] SAFE =
+        "!'()*-.0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz~"
+            .getBytes(StandardCharsets.US_ASCII);
 
     /* This is ridiculous. Neither the JRE nor Jetty have a correct
      * equivalent to encodeURIComponent. */
@@ -23,13 +27,7 @@ public final class UrlPath
         var builder = new StringBuilder(bytes.length);
 
         for (var c : bytes) {
-            var safe =
-                c >= 'a' ? c <= 'z' || c == '~' :
-                c >= 'A' ? c <= 'Z' || c == '_' :
-                c >= '0' ? c <= '9' :
-                c == '-' || c == '.';
-
-            if (safe)
+            if (Arrays.binarySearch(SAFE, c) >= 0)
                 builder.append((char)c);
             else
                 builder.append('%')

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) University of Sheffield AMRC 2025.
+ * Copyright (c) University of Sheffield AMRC 2026.
  */
 
 import './assets/main.css'
@@ -16,7 +16,7 @@ import Home from '@pages/Home.vue'
 import Activity from '@pages/Activity.vue'
 import Alerts from '@pages/Alerts/Alerts.vue'
 import AccessControl from '@pages/AccessControl/AccessControl.vue'
-import {useServiceClientStore} from "@store/serviceClientStore.js";
+import { useServiceClientStore } from "@store/serviceClientStore.js";
 import Login from "@pages/Login.vue";
 import EdgeCluster from '@pages/EdgeManager/EdgeClusters/EdgeCluster.vue'
 import Node from '@pages/EdgeManager/Nodes/Node.vue'
@@ -26,6 +26,7 @@ import ApplicationEditor from "@pages/ConfigDB/Applications/ApplicationEditor.vu
 import ApplicationObjectEditor from "@pages/ConfigDB/Applications/ApplicationObjectEditor.vue";
 import ObjectPage from "@pages/ConfigDB/Objects/ObjectPage.vue";
 import Files from "@pages/Files/Files.vue";
+import Bridges from "@pages/Bridges/Bridges.vue";
 
 // Create an event bus
 window.events = mitt()
@@ -99,7 +100,7 @@ const routes = [
       icon: 'gears'
     },
     children: [
-      {path: ':selected?', component: ConfigDB, meta: {}}
+      { path: ':selected?', component: ConfigDB, meta: {} }
     ]
   },
   {
@@ -134,6 +135,14 @@ const routes = [
       name: 'Files',
       icon: 'file'
     }
+  },
+  {
+    path: '/bridges',
+    component: Bridges,
+    meta: {
+      name: 'Bridges',
+      icon: 'arrow-down-up-across-line'
+    }
   }
 ]
 
@@ -163,7 +172,7 @@ router.beforeEach(async (to, from, next) => {
   if (!optsString) {
     // Make sure we go to login
     if (to.path !== "/login") {
-      next({path: "/login"})
+      next({ path: "/login" })
       return
     }
     // Allow through to the login page
@@ -181,7 +190,7 @@ router.beforeEach(async (to, from, next) => {
     // Login failed, lets remove opts and login again
     useServiceClientStore().logout()
     console.error("Login with stored credentials failed, credentials reset", e)
-    next({path: "/login"})
+    next({ path: "/login" })
     return
   }
 })

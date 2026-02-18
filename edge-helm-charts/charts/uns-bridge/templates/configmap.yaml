@@ -1,0 +1,60 @@
+{{- $k8sname := include "uns-bridge.k8sname" .Values.name }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: uns-bridge-{{ $k8sname }}
+  labels:
+    factory-plus.app: uns-bridge
+    factory-plus.uuid: {{ .Values.uuid }}
+data:
+  mosquitto.conf.template: |
+    # UNS Bridge Mosquitto configuration
+    # This bridges UNS topics from local ACS broker to remote broker
+
+    # Local listener for receiving bridged messages
+    listener 1883 127.0.0.1
+    allow_anonymous true
+
+    # Bridge to local ACS MQTT broker
+    # Subscribe to UNS topics and bring them into this bridge instance
+    connection local-acs
+    address {{ .Values.local.host }}:{{ .Values.local.port }}
+    remote_username br1/{{ .Values.cluster }}/{{ .Values.name }}
+    remote_password ${LOCAL_PASSWORD}
+    remote_clientid br1/{{ .Values.cluster }}/{{ .Values.name }}
+    bridge_protocol_version mqttv50
+    cleansession false
+    start_type automatic
+    try_private false
+    notifications false
+
+    # Subscribe to UNS topics from local ACS (in = subscribe from remote, publish locally)
+{{- range $topic, $opts := .Values.topics }}
+    topic {{ $topic }} in 1
+{{- end }}
+
+{{- if .Values.remote.secretName }}
+    # Bridge to remote MQTT broker
+    # Forward the bridged topics to the remote
+    connection remote-broker
+    address {{ .Values.remote.host }}:{{ .Values.remote.port }}
+    remote_username ${REMOTE_USERNAME}
+    remote_password ${REMOTE_PASSWORD}
+    remote_clientid ${REMOTE_USERNAME}-{{ .Values.uuid }}
+{{- if .Values.remote.tls }}
+    bridge_capath /etc/ssl/certs
+    bridge_tls_version tlsv1.2
+{{- end }}
+    bridge_protocol_version mqttv50
+    cleansession false
+    start_type automatic
+    try_private false
+    notifications false
+
+    # Forward topics to remote broker (out = subscribe locally, publish to remote)
+{{- range $topic, $opts := .Values.topics }}
+    topic {{ $topic }} out 1
+{{- end }}
+{{- end }}
+

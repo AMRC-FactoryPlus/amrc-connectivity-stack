@@ -32,8 +32,6 @@ The server runs a Node.js application that:
 Provide these in the deployment dialog:
 
 ```yaml
-local:
-  host: "mqtt.namespace.svc.cluster.local"  # Local MQTT broker hostname
 topics:
   "UNS/v1/AMRC/#": {}                        # Topic patterns to subscribe to
 ```

@@ -7,17 +7,15 @@ on:
   workflow_call: {}
 
 jobs:
-  build-base-js:
+  build-base-js-amd64:
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
-      # This is used to complete the identity challenge
-      # with sigstore/fulcio when running outside of PRs.
       id-token: write
     strategy:
       matrix:
-        type: 
+        type:
           - js-build
           - js-run
     steps:
@@ -40,23 +38,96 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           file: ./acs-base-images/Dockerfile.${{ matrix.type }}
           push: true
-          tags: ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}-${{ matrix.type }}:${{ env.BASE_JS_VERSION }}
+          tags: ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}-${{ matrix.type }}:${{ env.BASE_JS_VERSION }}-amd64
           labels: ${{ steps.prepare.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+  build-base-js-arm64:
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    strategy:
+      matrix:
+        type:
+          - js-build
+          - js-run
+    steps:
+      - name: Check if build required
+        id: check
+        run: |
+          docker manifest inspect ghcr.io/amrc-factoryplus/acs-base-${{ matrix.type }}:${{ env.BASE_JS_VERSION }} || echo "needs-build=true" >> $GITHUB_OUTPUT
+      - name: Checkout
+        if: steps.check.outputs.needs-build == 'true'
+        uses: actions/checkout@v4
+      - uses: ./.github/actions/prepare
+        if: steps.check.outputs.needs-build == 'true'
+        id: prepare
+        with:
+          service-name: acs-base
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build
+        id: build-and-push
+        if: steps.check.outputs.needs-build == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/arm64
+          file: ./acs-base-images/Dockerfile.${{ matrix.type }}
+          push: true
+          tags: ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}-${{ matrix.type }}:${{ env.BASE_JS_VERSION }}-arm64
+          labels: ${{ steps.prepare.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+  build-base-js-merge:
+    runs-on: ubuntu-latest
+    needs: [build-base-js-amd64, build-base-js-arm64]
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    strategy:
+      matrix:
+        type:
+          - js-build
+          - js-run
+    steps:
+      - name: Check if build required
+        id: check
+        run: |
+          docker manifest inspect ghcr.io/amrc-factoryplus/acs-base-${{ matrix.type }}:${{ env.BASE_JS_VERSION }} || echo "needs-build=true" >> $GITHUB_OUTPUT
+      - name: Checkout
+        if: steps.check.outputs.needs-build == 'true'
+        uses: actions/checkout@v4
+      - uses: ./.github/actions/prepare
+        if: steps.check.outputs.needs-build == 'true'
+        id: prepare
+        with:
+          service-name: acs-base
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create multi-arch manifest
+        id: merge
+        if: steps.check.outputs.needs-build == 'true'
+        run: |
+          docker buildx imagetools create -t ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}-${{ matrix.type }}:${{ env.BASE_JS_VERSION }} \
+            ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}-${{ matrix.type }}:${{ env.BASE_JS_VERSION }}-amd64 \
+            ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}-${{ matrix.type }}:${{ env.BASE_JS_VERSION }}-arm64
+          digest=$(docker buildx imagetools inspect ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}-${{ matrix.type }}:${{ env.BASE_JS_VERSION }} --format '{{.Manifest.Digest}}')
+          echo "digest=${digest}" >> $GITHUB_OUTPUT
       - uses: ./.github/actions/cleanup
         id: cleanup
         if: steps.check.outputs.needs-build == 'true'
         with:
           version: ${{ steps.prepare.outputs.version }}
           service-name: ${{ steps.prepare.outputs.service-name }}-${{ matrix.type }}
-          digest: ${{ steps.build-and-push.outputs.digest }}
+          digest: ${{ steps.merge.outputs.digest }}
   build-base-pg-build:
     runs-on: ubuntu-latest
-    needs: build-base-js
+    needs: build-base-js-merge
     permissions:
       contents: read
       packages: write
@@ -145,7 +216,7 @@ jobs:
           service-name: ${{ steps.prepare.outputs.service-name }}-pg-run
           digest: ${{ steps.build-and-push.outputs.digest }}
   build-x86-js:
-    needs: [ build-base-js ]
+    needs: [ build-base-js-merge ]
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -201,8 +272,8 @@ jobs:
           version: ${{ steps.prepare.outputs.version }}
           service-name: ${{ steps.prepare.outputs.service-name }}
           digest: ${{ steps.build-and-push.outputs.digest }}
-  build-arm-js:
-    needs: [ build-base-js ]
+  build-arm-js-amd64:
+    needs: [build-base-js-merge]
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -231,24 +302,97 @@ jobs:
         id: build-and-push
         with:
           context: ./${{ steps.prepare.outputs.service-name }}
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           push: true
           build-args: |
             revision=${{ steps.prepare.outputs.version }} (${{ github.sha }})
             base_version=${{ env.BASE_JS_VERSION }}
-          tags: ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}:${{ steps.prepare.outputs.version }}
-          labels: ${{  steps.prepare.outputs.labels }}
+          tags: ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}:${{ steps.prepare.outputs.version }}-amd64
+          labels: ${{ steps.prepare.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-contexts: |
             lib=./lib
-
+  build-arm-js-arm64:
+    needs: [build-base-js-merge]
+    runs-on: ubuntu-24.04-arm
+    strategy:
+      matrix:
+        service:
+          - acs-edge
+          - edge-bacnet
+          - edge-modbus
+          - edge-test
+          - edge-tplink-smartplug
+          - edge-ads
+          - edge-rtde
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - uses: ./.github/actions/prepare
+        id: prepare
+        with:
+          service-name: ${{ matrix.service }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build
+        uses: docker/build-push-action@v6
+        id: build-and-push
+        with:
+          context: ./${{ steps.prepare.outputs.service-name }}
+          platforms: linux/arm64
+          push: true
+          build-args: |
+            revision=${{ steps.prepare.outputs.version }} (${{ github.sha }})
+            base_version=${{ env.BASE_JS_VERSION }}
+          tags: ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}:${{ steps.prepare.outputs.version }}-arm64
+          labels: ${{ steps.prepare.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-contexts: |
+            lib=./lib
+  build-arm-js-merge:
+    needs: [build-arm-js-amd64, build-arm-js-arm64]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - acs-edge
+          - edge-bacnet
+          - edge-modbus
+          - edge-test
+          - edge-tplink-smartplug
+          - edge-ads
+          - edge-rtde
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - uses: ./.github/actions/prepare
+        id: prepare
+        with:
+          service-name: ${{ matrix.service }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create multi-arch manifest
+        id: merge
+        run: |
+          docker buildx imagetools create -t ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}:${{ steps.prepare.outputs.version }} \
+            ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}:${{ steps.prepare.outputs.version }}-amd64 \
+            ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}:${{ steps.prepare.outputs.version }}-arm64
+          digest=$(docker buildx imagetools inspect ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}:${{ steps.prepare.outputs.version }} --format '{{.Manifest.Digest}}')
+          echo "digest=${digest}" >> $GITHUB_OUTPUT
       - uses: ./.github/actions/cleanup
         id: cleanup
         with:
           version: ${{ steps.prepare.outputs.version }}
           service-name: ${{ steps.prepare.outputs.service-name }}
-          digest: ${{ steps.build-and-push.outputs.digest }}
+          digest: ${{ steps.merge.outputs.digest }}
   build-x86-pg:
     needs: [ build-base-pg-run ]
     runs-on: ubuntu-latest
@@ -346,7 +490,7 @@ jobs:
           digest: ${{ steps.build-and-push.outputs.digest }}
   build-helm-chart:
     if: github.event_name == 'release'
-    needs: [ 'build-x86-js', 'build-arm-js', 'build-x86-pg', 'build-mqtt' ]
+    needs: [ 'build-x86-js', 'build-arm-js-merge', 'build-x86-pg', 'build-mqtt' ]
     runs-on: ubuntu-latest
     steps:
       - name: Install Helm

@@ -62,12 +62,12 @@ spec:
             - name: OPCUA_USERNAME
               valueFrom:
                 secretKeyRef:
-                  name: opcua-server-opcua-creds.{{ $k8sname }}
+                  name: opcua-server-opcua-username.{{ $k8sname }}
                   key: username
             - name: OPCUA_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: opcua-server-opcua-creds.{{ $k8sname }}
+                  name: opcua-server-opcua-password.{{ $k8sname }}
                   key: password
             - name: CONFIG_FILE
               value: "/config/config.json"

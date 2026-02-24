@@ -148,10 +148,15 @@ configs:
             url: "{{url}}"
     !u Clusters.Resource.HelmRelease:
       resources:
-        - apiVersion: helm.toolkit.fluxcd.io/v2beta1
+        # We do NOT list old versions here. Kubernetes converts between
+        # versions (or assumes identity conversions) so listing old
+        # versions will cause problems. If the group or kind changes
+        # then the old group/kind must be listed here so the old
+        # resources are cleared out correctly.
+        - apiVersion: helm.toolkit.fluxcd.io/v2
           kind: HelmRelease
       template:
-        apiVersion: helm.toolkit.fluxcd.io/v2beta1
+        apiVersion: helm.toolkit.fluxcd.io/v2
         kind: HelmRelease
         metadata:
           name: "{{name}}"

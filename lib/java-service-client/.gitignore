@@ -1,6 +1,10 @@
 # Maven rubbish
 .mvn/
 
+# sbt rubbish
+.bsp/
+project/
+
 # Build files
 dependency-reduced-pom.xml
 target/

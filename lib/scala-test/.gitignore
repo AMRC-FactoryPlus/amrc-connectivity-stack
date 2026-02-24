@@ -1,0 +1,6 @@
+# sbt rubbish
+.bsp/
+project/
+
+# build files
+target/

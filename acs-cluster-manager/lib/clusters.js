@@ -148,24 +148,14 @@ export class Clusters {
         return clusters.pipe(
             rx.withLatestFrom(this.status),
             rx.mergeMap(([clusters, status]) => {
-                /* We do not attempt to handle changes to a cluster
-                 * configuration. This is not allowed. To change a
-                 * cluster, destroy it, wait for the status to go, and
-                 * recreate it. */
-                /* XXX This should be fixed */
+                /* We check all clusters for updates when anything
+                 * changes. This will be a quick do-nothing check most
+                 * of the time but it is all local information. */
+                const updated = clusters.keySeq();
+                const deleted = status.keySeq()
+                    .filter(cl => !clusters.has(cl));
 
-                const want = clusters.keySeq().toSet();
-                const have = status.keySeq().toSet();
-
-                const deleted = have.subtract(want);
-                const created = want.subtract(have);
-
-                const unfinished = status
-                    .filter((st, cl) => !st.ready && !deleted.has(cl))
-                    .keySeq();
-                const updated = created.union(unfinished);
-
-                const expand = (set, Type) => set.toSeq()
+                const expand = (seq, Type) => seq
                     .map(uuid => new Type(this, uuid, 
                         clusters.get(uuid), status.get(uuid, {})));
                 return rx.merge(

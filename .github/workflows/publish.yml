@@ -22,7 +22,7 @@ jobs:
       - name: Check if build required
         id: check
         run: |
-          docker manifest inspect ghcr.io/amrc-factoryplus/acs-base-${{ matrix.type }}:${{ env.BASE_JS_VERSION }} || echo "needs-build=true" >> $GITHUB_OUTPUT
+          docker manifest inspect ghcr.io/amrc-factoryplus/acs-base-${{ matrix.type }}:${{ env.BASE_JS_VERSION }}-amd64 || echo "needs-build=true" >> $GITHUB_OUTPUT
       - name: Checkout
         if: steps.check.outputs.needs-build == 'true'
         uses: actions/checkout@v4
@@ -60,7 +60,7 @@ jobs:
       - name: Check if build required
         id: check
         run: |
-          docker manifest inspect ghcr.io/amrc-factoryplus/acs-base-${{ matrix.type }}:${{ env.BASE_JS_VERSION }} || echo "needs-build=true" >> $GITHUB_OUTPUT
+          docker manifest inspect ghcr.io/amrc-factoryplus/acs-base-${{ matrix.type }}:${{ env.BASE_JS_VERSION }}-arm64 || echo "needs-build=true" >> $GITHUB_OUTPUT
       - name: Checkout
         if: steps.check.outputs.needs-build == 'true'
         uses: actions/checkout@v4
@@ -116,7 +116,7 @@ jobs:
           docker buildx imagetools create -t ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}-${{ matrix.type }}:${{ env.BASE_JS_VERSION }} \
             ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}-${{ matrix.type }}:${{ env.BASE_JS_VERSION }}-amd64 \
             ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}-${{ matrix.type }}:${{ env.BASE_JS_VERSION }}-arm64
-          digest=$(docker buildx imagetools inspect ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}-${{ matrix.type }}:${{ env.BASE_JS_VERSION }} --format '{{.Manifest.Digest}}')
+          digest=$(docker buildx imagetools inspect ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}-${{ matrix.type }}:${{ env.BASE_JS_VERSION }} --format '{{json .Manifest.Digest}}' | tr -d '"')
           echo "digest=${digest}" >> $GITHUB_OUTPUT
       - uses: ./.github/actions/cleanup
         id: cleanup
@@ -385,7 +385,7 @@ jobs:
           docker buildx imagetools create -t ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}:${{ steps.prepare.outputs.version }} \
             ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}:${{ steps.prepare.outputs.version }}-amd64 \
             ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}:${{ steps.prepare.outputs.version }}-arm64
-          digest=$(docker buildx imagetools inspect ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}:${{ steps.prepare.outputs.version }} --format '{{.Manifest.Digest}}')
+          digest=$(docker buildx imagetools inspect ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}:${{ steps.prepare.outputs.version }} --format '{{json .Manifest.Digest}}' | tr -d '"')
           echo "digest=${digest}" >> $GITHUB_OUTPUT
       - uses: ./.github/actions/cleanup
         id: cleanup

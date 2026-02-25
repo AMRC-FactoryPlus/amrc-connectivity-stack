@@ -217,7 +217,12 @@ export class Deployments {
                     name:       spec.name,
                     hostname:   spec.hostname,
                 });
-                const hr_name = k8sname(chart.prefix ?? chart.chart, spec.name);
+                /* It would be better to use a more sensible name here.
+                 * But this breaks back-compat; flux is unable to handle
+                 * a situation where one HelmRelease is replaced by
+                 * another with a different name but they deploy the
+                 * same resources. */
+                const hr_name = k8sname(chart.prefix ?? chart.chart, uuid);
                 const gr_name = k8sname("helm", chart.source ?? "charts");
 
                 const hr = templates.get(res.HelmRelease)({

@@ -186,6 +186,8 @@ configs:
             crds: CreateReplace
           interval: 2m0s
           maxHistory: 1
+          driftDetection:
+            mode: enabled
           values: "{{values}}"
 
   !u Clusters.App.HelmTemplate:

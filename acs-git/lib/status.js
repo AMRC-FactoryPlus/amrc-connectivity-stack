@@ -25,7 +25,9 @@ export class RepoStatus {
 
         this.log = this.fplus.debug.bound("status");
 
-        this.configs = this._init_configs();
+        this.configs = rxx.rx(
+            this.fplus.ConfigDB.search_app(Git.App.Config),
+            rxx.shareLatest());
         this.changed = new rx.Subject();
         this.pushes = this._init_pushes();
         this.status = this._init_status();
@@ -39,30 +41,6 @@ export class RepoStatus {
         this.configs.subscribe(cs => this.log("CONFIGS: %o", cs.toJS()));
         this.status.subscribe(st => this.log("STATUS: %o", st.toJS()));
         this.pushes.subscribe(p => this.log("PUSH: %s", p));
-    }
-
-    /* A sequence returning our current set of config entries. This
-     * returns an imm.Map and doesn't remove duplicates. */
-    _init_configs () {
-        const app = Git.App.Config;
-        const cdb = this.fplus.ConfigDB;
-
-        const fetch = () => rx.from(cdb.list_configs(app)).pipe(
-            rx.mergeAll(),
-            rx.mergeMap(uuid => cdb.get_config(app, uuid)
-                .then(conf => [uuid, conf])),
-            rx.reduce((map, kv) => map.set(...kv), imm.Map()),
-        );
-
-        return rx.defer(() => cdb.watcher()).pipe(
-            rx.mergeMap(w => w.application(Git.App.Config)),
-            /* Fetch regardless every 10 minutes */
-            rx.mergeWith(rx.timer(0, 10*60*1000).pipe(
-                /* Jitter fetches */
-                rx.delayWhen(() => rx.timer(Math.random() * 5000)))),
-            rx.switchMap(fetch),
-            rxx.shareLatest(),
-        );
     }
 
     _init_status () {

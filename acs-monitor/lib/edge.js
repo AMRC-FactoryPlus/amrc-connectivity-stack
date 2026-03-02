@@ -5,7 +5,7 @@
 
 import imm          from "immutable";
 import rx           from "rxjs";
-import k8s          from "@kubernetes/client-node";
+import * as k8s     from "@kubernetes/client-node";
 
 import * as rxx     from "@amrc-factoryplus/rx-util";
 

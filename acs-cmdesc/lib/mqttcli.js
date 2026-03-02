@@ -11,51 +11,18 @@ const Valid = {
     Tag: /^[A-Za-z0-9_ \/]+$/,
 };
 
-/* Currently we are a Sparkplug Node; this is only so we can advertise
- * ourselves to the Directory over MQTT. Should we instead push a service
- * advert to the Directory over HTTP, and then we don't need node
- * credentials? */
-
-export default class MqttCli {
+export class MqttCli {
     constructor(opts) {
         this.fplus = opts.fplus;
-        this.address = Address.parse(opts.sparkplug_address);
-        this.device_uuid = opts.device_uuid;
-        this.http_url = opts.http_url;
-        this.service = opts.service;
+        this.cmdesc = opts.cmdesc;
 
         this.log = this.fplus.debug.log.bind(this.fplus.debug);
 
         this.seq = 0;
     }
 
-    async init() {
-        return this;
-    }
-
-    set_cmdesc(c) {
-        this.cmdesc = c;
-    }
-
-    will() {
-        const ndeath = {
-            timestamp: Date.now(),
-            metrics: MetricBuilder.death.node([]),
-        };
-        const will = SpB.encodePayload(ndeath);
-
-        return {
-            topic: this.address.topic("DEATH"),
-            payload: will,
-            qos: 0,
-            retain: false,
-        };
-    }
-
     async run() {
-        const mqtt = await this.fplus.mqtt_client({
-            will: this.will(),
-        });
+        const mqtt = await this.fplus.mqtt_client({});
         this.mqtt = mqtt;
 
         mqtt.on("error", this.on_error.bind(this));
@@ -90,20 +57,11 @@ export default class MqttCli {
         }
 
         switch (topic.type) {
-            case "BIRTH":
-                //this.on_birth(addr, payload);
-                break;
-            case "DEATH":
-                //this.on_death(addr, payload);
-                break;
             case "DATA":
                 this.on_data(addr, payload);
                 break;
-            case "CMD":
-                // this.on_command(addr, payload);
-                break;
             default:
-                this.log("mqtt", `Unknown Sparkplug message type ${topic.type}!`);
+                this.log("mqtt", `Unexpected Sparkplug message type ${topic.type}!`);
         }
     }
 

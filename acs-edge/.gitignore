@@ -35,3 +35,4 @@ local_secrets
 
 edge_agent_config.yaml
 driver-passwords
+scripts/

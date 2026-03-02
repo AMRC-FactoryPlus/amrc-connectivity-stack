@@ -1,0 +1,17 @@
+# Source files
+src/
+*.ts
+!*.d.ts
+
+# Development files
+.env
+.env.*
+tsconfig.json
+.gitignore
+
+# Editor/IDE
+.vscode/
+.idea/
+
+# Test artifacts
+*.tgz

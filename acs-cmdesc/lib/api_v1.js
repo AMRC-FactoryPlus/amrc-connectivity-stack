@@ -13,19 +13,20 @@ export default class ApiV1 {
     constructor(opts) {
         this.cmdesc = opts.cmdesc;
 
-        this.routes = express.Router();
+        this.routes = this.build_routes();
     }
 
     async init() {
-        this.setup_routes();
         return this;
     }
 
-    setup_routes() {
-        const api = this.routes;
+    build_routes() {
+        const api = express.Router();
 
         api.post("/address/:group/:node", this.by_address.bind(this));
         api.post("/address/:group/:node/:device", this.by_address.bind(this));
+
+        return api;
     }
 
     async by_address(req, res) {

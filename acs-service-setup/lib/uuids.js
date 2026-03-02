@@ -1,15 +1,17 @@
 /*
- * Copyright (c) University of Sheffield AMRC 2025.
+ * Copyright (c) University of Sheffield AMRC 2026.
  */
 
 export const ACS = {
     Class: {
         EdgeDeployment:     "e6f6a6e6-f6b2-422a-bc86-2dcb417a362a",
+        Bridge:             "178506d2-af52-4c79-8e5d-4958ae7ddfa9",
     },
     App: {
+        JsonSchema:         "b16e85fb-53c2-49f9-8d83-cdf6763304ba",
+        SchemaMetadata:     "32093857-9d29-470e-a897-d2b56d5aa978",
         SchemaIcon:         "65c0ccba-151d-48d3-97b4-d0026a811900",
         MQTTPermTemplate:   "1266ddf1-156c-4266-9808-d6949418b185",
-
     },
     /* XXX These might really be Applications? For now they are
      * well-known to the Auth service; they are perhaps 'classes of
@@ -31,6 +33,7 @@ export const ACS = {
             CmdEsc:             "dbd0c099-6c59-4bc6-aa92-4ba8a9b543f4",
             EdgeNode:           "87e4a5b7-9a89-4796-a216-39666a47b9d2",
             EdgeNodeConsumer:   "17a64293-b82d-4db4-af4d-63359bb62934",
+            ManageObjects:      "f0b7917b-d475-4888-9d5a-2af96b3c26b6",
             PrimaryApp:         "c0d17bcf-2a90-40e5-b244-07bf631f7417",
             Warehouse:          "6958c812-fbe2-4e6c-b997-6f850b89f679",
         },
@@ -96,15 +99,18 @@ export const ACS = {
      * ServiceRequirement groups to grant them permissions. */
     ServiceAccount: {
         Auth:                   "1e1989ab-14e4-42bd-8171-495230acc406",
-        ClusterManager:         "127cde3c-773a-4f61-b0ba-7412a2695253",
         CmdEsc:                 "23d4e8f9-76c0-49d5-addc-00b6ac05ee58",
         ConfigDB:               "36861e8d-9152-40c4-8f08-f51c2d7e3c25",
         Directory:              "5cc3b068-938f-4bb2-8ceb-64338a02fbeb",
         Git:                    "626df296-8156-4c67-8aed-aac70161aa8b",
         KrbKeys:                "a04b4195-7db4-4480-b3f3-4d22c08b96ea",
-        Manager:                "2340e706-1280-420c-84a6-016547b55e95",
         MQTT:                   "2f42daeb-4521-4522-8e19-85dfb73db88e",
         Warehouse:              "388ddbdc-4eb4-4ae8-bbd0-9be32f3c31e8",
+
+        /* Obsolete: these are now dynamic */
+        ClusterManager:         "127cde3c-773a-4f61-b0ba-7412a2695253",
+        /* These accounts are obsolete */
+        Manager:                "2340e706-1280-420c-84a6-016547b55e95",
     },
     Driver: {
         /* Edge Agent internal drivers */
@@ -123,6 +129,7 @@ export const ACS = {
         Test:                   "c8798cba-de4c-11ef-8a43-8766e8683af8",
         TPlinkSmartPlug:        "d46e1374-de4c-11ef-b469-c388a038fd5c",
         ADS:                    "6764f1e5-fbe7-494c-8dbe-b80039c30c97",
+        RTDE:                   "9f4e8f3a-0b1f-11f0-8c5e-3f2c5d3c5e8f",
 
         /* External driver */
         External:               "eb669a2c-e213-11ef-998e-a7fc6f4817b5",
@@ -155,11 +162,29 @@ export const ConfigDB = {
     Perm: {
         ReadConfig: "4a339562-cd57-408d-9d1a-6529a383ea4b",
         WriteConfig: "6c799ccb-d2ad-4715-a2a7-3c8728d6c0bf",
-        ManageAppSchema: "95c7cbcb-ce60-49ed-aa81-2fe3eec4559d",
-        ManageObjects: "f0b7917b-d475-4888-9d5a-2af96b3c26b6",
-        DeleteObjects: "6957174b-7b08-45ca-ac5c-c03ab6928a6e",
+
+        ListObjects: "6b4d73ea-50f1-11f0-9333-132037a152a5",
+        CreateObject: "ae09e2ba-50ef-11f0-ac03-1f9f5e6548be",
+        CreateSpecificObject: "e3491b9c-50f1-11f0-8e16-e75c8f93227b",
+        ReadMembers: "d4fd61da-50ef-11f0-ad24-335234e4c8a2",
+        WriteMembers: "c2759f6e-50ef-11f0-8730-ef0ba0514a0e",
+        WriteMemberships: "e08d89bc-50ef-11f0-8352-83e3d3d35028",
+        ReadSubclasses: "e6bb9978-50ef-11f0-b3c2-b79b9f64d2ff",
+        WriteSubclasses: "ed11bd2a-50ef-11f0-9f85-df13a1dff9e6",
+        WriteSuperclasses: "fb8e5048-50ef-11f0-91c5-7fd3cb373fbb",
+
+        /* Unimplemented */
+        //ReadMemberships: "db9f5dae-50ef-11f0-b846-8393c17d1574",
+        //ReadSuperclasses: "f590e476-50ef-11f0-a120-e7c6d06d79ed",
+
+        DeleteObject: "6957174b-7b08-45ca-ac5c-c03ab6928a6e",
         GiveTo: "4eaab346-4d1e-11f0-800e-dfdc061c6a63",
         TakeFrom: "6ad67652-5009-11f0-9404-73b79124c3d5",
+    
+        /* Obsolete */
+        //ManageAppSchema: "95c7cbcb-ce60-49ed-aa81-2fe3eec4559d",
+        /* Implemented as a composite permission */
+        //ManageObjects: "f0b7917b-d475-4888-9d5a-2af96b3c26b6",
     }
 };
 
@@ -242,29 +267,34 @@ export const Clusters = {
         EdgeStatus:         "747a62c9-1b66-4a2e-8dd9-0b70a91b6b75",
         Flux:               "72804a19-636b-4836-b62b-7ad1476f2b86",
         HelmChart:          "729fe070-5e67-4bc7-94b5-afd75cb42b03",
-        HelmRelease:        "88436128-09a3-4c9c-b7f4-b0e495137265",
+        K8sTemplate:        "88436128-09a3-4c9c-b7f4-b0e495137265",
         HelmTemplate:       "729fe070-5e67-4bc7-94b5-afd75cb42b03",
         Status:             "f6c67e6f-e48e-4f69-b4bb-bfbddcc2a517",
     },
     Class: {
-        Cluster:            "f24d354d-abc1-4e32-98e1-0667b3e40b61",
         Account:            "97756c9a-38e6-4238-b78c-3df6f227a6c9",
-        HelmChart:          "f9be0334-0ff7-43d3-9d8a-188d3e4d472b",
-        SystemHelmChart: "a5c54a2e-8f7b-4b2a-9e8d-3f7c9e7d1c6a",
+        Cluster:            "f24d354d-abc1-4e32-98e1-0667b3e40b61",
         ClusterGroups:      "979f7fd9-bbc7-4810-a774-6082c7394db6",
-    },
-    Service: {
-        ClusterManager:     "2706aa43-a826-441e-9cec-cd3d4ce623c2",
+        HelmChart:          "f9be0334-0ff7-43d3-9d8a-188d3e4d472b",
+        K8sResource:        "487c20bc-d4d8-11f0-b591-7fa91b119c9d",
+        SystemHelmChart:    "a5c54a2e-8f7b-4b2a-9e8d-3f7c9e7d1c6a",
     },
     Perm: {
         All:                "9e07fd33-6400-4662-92c4-4dff1f61f990",
         Clusters:           "a40acff8-0c61-4251-bef3-d8d53e50cdd0",
         Secrets:            "07fba27a-0d01-4c07-875b-d25345261d3a",
     },
+    Resource: {
+        GitRepo:        "03827afc-d4dc-11f0-9645-dfc5bcb16bc6",
+        HelmRelease:    "0c92f608-d4dc-11f0-b2a0-1bc42be2ebc8",
+    },
     Requirement: {
         ServiceAccount:     "26d192cf-73c1-4c14-93cf-1e63743bab08",
         EdgeRepos:          "3a58340c-d4ec-453d-99c3-0cf6ab7d8fa9",
         FluxAccounts:       "4eeb8156-856d-4251-a4a4-4c1b2f3d3e2c",
+    },
+    Service: {
+        ClusterManager:     "2706aa43-a826-441e-9cec-cd3d4ce623c2",
     },
 };
 

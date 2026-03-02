@@ -1,5 +1,5 @@
 /*
- * Copyright (c) University of Sheffield AMRC 2025.
+ * Copyright (c) University of Sheffield AMRC 2026.
  */
 
 import { cva } from 'class-variance-authority'
@@ -15,7 +15,7 @@ export const buttonVariants = cva(
           "bg-slate-900 text-slate-50 hover:bg-slate-900/90 dark:bg-slate-50 dark:text-slate-900 dark:hover:bg-slate-50/90",
         destructive:
           "bg-red-500 text-slate-50 hover:bg-red-500/90 dark:bg-red-900 dark:text-slate-50 dark:hover:bg-red-900/90",
-        outline: "border border-slate-200 bg-white hover:bg-slate-100 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-950 dark:hover:bg-slate-800 dark:hover:text-slate-50",
+        outline: "ring-1 ring-slate-200 bg-white hover:bg-slate-100 hover:text-slate-900 dark:ring-slate-800 dark:bg-slate-950 dark:hover:bg-slate-800 dark:hover:text-slate-50",
         destructiveOutline:
           "border border-red-500 bg-white hover:bg-red-500 hover:text-slate-50 dark:border-red-900 dark:bg-slate-950 dark:hover:bg-red-900 dark:hover:text-slate-50",
         destructiveGhost:

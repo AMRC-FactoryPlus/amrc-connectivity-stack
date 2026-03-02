@@ -22,7 +22,7 @@ class PullSpec extends imm.Record({
     ref:        "main",
     interval:   null,
     ff:         null,
-    auth: null,
+    secret:     null,
 }) {
     static of (uuid, branch, conf) {
         return new PullSpec({
@@ -30,7 +30,7 @@ class PullSpec extends imm.Record({
             uuid, branch,
             interval:   duration_or_never(conf.interval ?? "1h"),
             ff:         conf.merge,
-            auth: conf.auth,
+            secret:     conf.auth.secretRef,
         });
     }
 
@@ -141,6 +141,51 @@ export class AutoPull {
         return null;
     }
 
+    async gitAuth (spec) {
+        this.log("Using authentication for %s from secret %s", spec.desc, spec.secret);
+        this.log("Secrets directory is: %s", this.secrets_dir);
+
+        try {
+            // List available secrets for debugging
+            const files = await fs.promises.readdir(this.secrets_dir);
+            this.log("Available files in secrets directory: %o", files);
+
+            // Get credentials from the secret
+            const credentials = await this.getCredentials(spec.secret);
+
+            if (!credentials) {
+                this.log("WARNING: Authentication configured but credentials not found for %s", spec.desc);
+                this.log("Secret reference: %s", spec.secret);
+                return {};
+            }
+
+            this.log("Successfully loaded credentials for %s (username: %s)",
+                spec.desc, credentials.username);
+
+            return {
+                // Add onAuth handler to provide credentials
+                onAuth: () => {
+                    this.log("Authentication requested for %s", spec.url);
+                    return {
+                        username: credentials.username,
+                        password: credentials.password,
+                    };
+                },
+                // Add onAuthFailure to handle auth failures
+                onAuthFailure: (url, auth) => {
+                    this.log("Authentication failed for %s with username %s",
+                        spec.desc, auth?.username || 'unknown');
+                    // Clear cache to force reload on next attempt
+                    this.credentials_cache.delete(spec.secret);
+                    return null; // Return null to abort the fetch
+                },
+            };
+        } catch (err) {
+            this.log("ERROR setting up authentication for %s: %o", spec.desc, err);
+            return {};
+        }
+    }
+
     _init_pulls () {
         const updates = spec => rx.defer(() => rx.of(Math.random()*5000)).pipe(
             rx.mergeMap(jitter => rx.timer(jitter, spec.interval)),
@@ -197,50 +242,8 @@ export class AutoPull {
             fs, gitdir, http, remote,
             singleBranch: true,
             ref: spec.ref,
+            ...(spec.secret ? await this.gitAuth(spec) : {}),
         };
-
-        // Handle authentication if configured
-        if (spec.auth && spec.auth.secretRef) {
-            this.log("Using authentication for %s from secret %s", spec.desc, spec.auth.secretRef);
-            this.log("Secrets directory is: %s", this.secrets_dir);
-
-            try {
-                // List available secrets for debugging
-                const files = await fs.promises.readdir(this.secrets_dir);
-                this.log("Available files in secrets directory: %o", files);
-
-                // Get credentials from the secret
-                const credentials = await this.getCredentials(spec.auth.secretRef);
-
-                if (credentials) {
-                    this.log("Successfully loaded credentials for %s (username: %s)",
-                        spec.desc, credentials.username);
-
-                    // Add onAuth handler to provide credentials
-                    fetchOptions.onAuth = () => {
-                        this.log("Authentication requested for %s", spec.url);
-                        return {
-                            username: credentials.username,
-                            password: credentials.password,
-                        };
-                    };
-
-                    // Add onAuthFailure to handle auth failures
-                    fetchOptions.onAuthFailure = (url, auth) => {
-                        this.log("Authentication failed for %s with username %s",
-                            spec.desc, auth?.username || 'unknown');
-                        // Clear cache to force reload on next attempt
-                        this.credentials_cache.delete(spec.auth.secretRef);
-                        return null; // Return null to abort the fetch
-                    };
-                } else {
-                    this.log("WARNING: Authentication configured but credentials not found for %s", spec.desc);
-                    this.log("Secret reference: %s", spec.auth.secretRef);
-                }
-            } catch (err) {
-                this.log("ERROR setting up authentication for %s: %o", spec.desc, err);
-            }
-        }
 
         // Perform the fetch with authentication if configured
         const mirror = await git.fetch(fetchOptions);

@@ -76,8 +76,30 @@ export default class Model extends Queries {
     }
 
     dump_request (r) {
+        const uuids = [...new Set([
+            ...r.grants.map(g => g.principal),
+            ...r.grants.map(g => g.permission),
+            ...r.grants.map(g => g.target),
+            ...r.krbs.map(k => k.uuid),
+        ])];
+
+        const ids = r.krbs.map(k => k.uuid);
+        if (!ids.every(u => r.permitted.id?.(u)))
+            return { status: 403 };
+
+        const gto = [...new Set(r.grants.map(g => g.principal))];
+
         return this.txn(async q => {
-            const n_uuid = await q.dump_load_uuids(r.uuids);
+            const existing = await q.dump_existing_perms(gto);
+            const perms = [...new Set([
+                ...existing,
+                ...r.grants.map(g => g.permission),
+            ])];
+            this.log("Need WriteACL on %o", perms);
+            if (!perms.every(p => r.permitted.acl?.(p)))
+                return { status: 403 };
+
+            const n_uuid = await q.dump_load_uuids(uuids);
             if (n_uuid.length)
                 this.log("Inserted new UUIDs: %o", n_uuid);
 

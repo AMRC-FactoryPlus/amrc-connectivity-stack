@@ -10,7 +10,7 @@ export const Edge = {
         EdgeStatus:     "747a62c9-1b66-4a2e-8dd9-0b70a91b6b75",
         Flux:           "72804a19-636b-4836-b62b-7ad1476f2b86",
         HelmChart:      "729fe070-5e67-4bc7-94b5-afd75cb42b03",
-        HelmRelease:    "88436128-09a3-4c9c-b7f4-b0e495137265",
+        K8sTemplate:    "88436128-09a3-4c9c-b7f4-b0e495137265",
         Bootstrap:      "a807d8fc-63ff-48bb-85c7-82b93beb606e",
     },
     Class: {
@@ -25,6 +25,10 @@ export const Edge = {
         All:        "9e07fd33-6400-4662-92c4-4dff1f61f990",
         Clusters:   "a40acff8-0c61-4251-bef3-d8d53e50cdd0",
         Secrets:    "07fba27a-0d01-4c07-875b-d25345261d3a",
+    },
+    Resource: {
+        GitRepo:        "03827afc-d4dc-11f0-9645-dfc5bcb16bc6",
+        HelmRelease:    "0c92f608-d4dc-11f0-b2a0-1bc42be2ebc8",
     },
     Requirement: {
         ServiceAccount: "26d192cf-73c1-4c14-93cf-1e63743bab08",

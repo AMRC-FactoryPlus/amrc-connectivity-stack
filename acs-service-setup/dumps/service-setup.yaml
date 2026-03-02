@@ -28,6 +28,8 @@ objects:
         - !u Clusters.Class.HelmChart
     !u Git.Class.Repo:
       name: "Git repository"
+      memberOf:
+        - !u Git.Class.Group
 
   !u UUIDs.Class.App:
     !u UUIDs.App.ServiceConfig:

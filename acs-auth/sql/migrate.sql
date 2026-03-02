@@ -46,6 +46,7 @@ BEGIN;
 
 \ir v1.sql
 \ir v2.sql
+\ir v3.sql
 
 \ir grants.sql
 

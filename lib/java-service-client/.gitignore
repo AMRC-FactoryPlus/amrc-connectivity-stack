@@ -1,0 +1,7 @@
+# Maven rubbish
+.mvn/
+
+# Build files
+dependency-reduced-pom.xml
+target/
+ver

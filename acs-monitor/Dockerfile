@@ -11,18 +11,16 @@ ARG TARGETARCH
 USER root
 RUN <<'SHELL'
     install -d -o node -g node /home/node/app
+    mkdir /home/node/lib
 SHELL
+COPY --from=lib . /home/node/lib/
+
 WORKDIR /home/node/app
 USER node
 COPY package*.json ./
 RUN <<'SHELL'
     touch /home/node/.npmrc
-    if [ "${acs_npm}" != NO ]
-    then
-        npm config set @amrc-factoryplus:registry "${acs_npm}"
-    fi
-
-    npm install --save=false --omit=dev
+    npm install --save=false --omit=dev --install-links
 SHELL
 COPY --chown=node . .
 

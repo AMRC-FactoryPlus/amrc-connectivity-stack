@@ -40,8 +40,12 @@ objects:
   !u UUIDs.Class.Class:
     !u Auth.Class.Principal:
       name: "Principal"
+      memberOf:
+        - !u Auth.Class.PrincipalGroup
     !u UUIDs.Class.Permission:
       name: "Permission"
+      memberOf:
+        - !u Auth.Class.PermissionGroup
 
   !u Auth.Class.PrincipalType:
     !u Auth.Class.HumanUser:

@@ -4,15 +4,16 @@
  * Copyright 2024 University of Sheffield
  */
 
-import deep_equal from "deep-equal";
-import * as imm from "immutable";
-import * as rx from "rxjs";
+import deep_equal       from "deep-equal";
+import * as imm         from "immutable";
+import * as rx          from "rxjs";
 
 import * as rxx         from "@amrc-factoryplus/rx-util";
 import { Notify }       from "@amrc-factoryplus/service-api";
 
-import { Perm } from "./constants.js";
-import * as rxu from "./rx-util.js";
+import { Perm }         from "./constants.js";
+import { Relations }    from "./relations.js";
+import * as rxu         from "./rx-util.js";
 
 const mk_res = (response, ix) => ({ status: ix ? 200 : 201, response });
 
@@ -41,25 +42,6 @@ function set_contents (lookup) {
         rx.map(mk_res));
 }
 
-function jmp_match (cand, filter) {
-    if (filter === null || typeof(filter) != "object")
-        return cand === filter;
-    if (Array.isArray(filter))
-        return deep_equal(cand, filter);
-
-    for (const [k, v] of Object.entries(filter)) {
-        if (v === null) {
-            if (k in cand)
-                return false;
-        }
-        else {
-            if (!(k in cand) || !jmp_match(cand[k], v))
-                return false;
-        }
-    }
-    return true;
-}
-
 export class CDBNotify {
     constructor (opts) {
         this.auth   = opts.auth;
@@ -86,14 +68,10 @@ export class CDBNotify {
             notify.search(`${vers}/app/:app/object/`, this.config_search.bind(this));
         }
 
-        notify.watch("v2/class/:class/member/",
-            this.class_watch.bind(this, "all_membership"));
-        notify.watch("v2/class/:class/subclass/",
-            this.class_watch.bind(this, "all_subclass"));
-        notify.watch("v2/class/:class/direct/member/",
-            this.class_watch.bind(this, "membership"));
-        notify.watch("v2/class/:class/direct/subclass/",
-            this.class_watch.bind(this, "subclass"));
+        for (const rel of Relations) {
+            notify.watch(`v2/class/:class/${rel.path}/`,
+                this.class_watch.bind(this, rel.table, rel.cperm));
+        }
 
         return notify;
     }
@@ -123,7 +101,7 @@ export class CDBNotify {
     single_config (session, app, object) {
         const { model } = this;
 
-        const ck_acl = this.acl_checker(session, Perm.Read_App, app, true);
+        const ck_acl = this.acl_checker(session, Perm.ReadApp, app, true);
 
         /* XXX Strictly there is a race condition here: the initial fetch
          * does not slot cleanly into the sequence of updates. This would be
@@ -142,7 +120,7 @@ export class CDBNotify {
     config_list (session, app) {
         const { model } = this;
 
-        const ck_acl = this.acl_checker(session, Perm.Read_App, app, true);
+        const ck_acl = this.acl_checker(session, Perm.ReadApp, app, true);
 
         /* Here we fetch the complete list every time. We could track
          * the list contents from changes but this is safer. */
@@ -170,7 +148,7 @@ export class CDBNotify {
     }
 
     config_search (session, app) {
-        const acl = this.acl_checker(session, Perm.Read_App, app, true);
+        const acl = this.acl_checker(session, Perm.ReadApp, app, true);
 
         const full = () => this.search_full(app);
         const updates = rxx.rx(
@@ -189,11 +167,10 @@ export class CDBNotify {
      * lookup meaning we might miss notifications. It would be better to
      * pass the update in the sequence but I think that would mean caching
      * the whole class structure js-side. */
-    class_watch (rel, session, klass) {
+    class_watch (rel, perm, session, klass) {
         const { model } = this;
 
-        /* XXX We should check different perms for direct and derived */
-        const ck_acl = this.acl_checker(session, Perm.Manage_Obj, klass, true);
+        const ck_acl = this.acl_checker(session, perm, klass, true);
 
         return rxx.rx(
             this.model.updates,

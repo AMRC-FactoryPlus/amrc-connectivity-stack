@@ -681,7 +681,7 @@ static PyObject *PyKAdminPrincipal_kt_add(PyKAdminPrincipalObject *self, PyObjec
     if (!PyArg_ParseTuple(args, "s", &keytab_str))
         return NULL;
 
-    if (*keytab_str == NULL) {
+    if (keytab_str == NULL) {
         PyKAdminError_raise_error(1, "empty keytab");
         result = NULL;
         return result;

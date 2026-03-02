@@ -27,7 +27,7 @@ class Auth (ServiceInterface):
 
     def find_principal (self, kind, name):
         quoted = urlquote(name, safe="")
-        st, uuid = self.fetch(f"v2/identity/{kind}/{name}")
+        st, uuid = self.fetch(f"v2/identity/{kind}/{quoted}")
         if st == 200:
             return UUID(uuid)
         if st == 404:

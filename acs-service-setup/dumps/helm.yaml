@@ -1,5 +1,5 @@
 # Set up for the edge-sync Helm deployments
-#-REQUIRE: auth edge sparkplug
+#-REQUIRE: auth edge sparkplug uns
 ---
 service: !u UUIDs.Service.ConfigDB
 version: 2
@@ -10,10 +10,18 @@ objects:
     #  name: "Helm chart"
     !u ACS.Class.EdgeDeployment:
       name: "Edge deployment"
+    !u ACS.Class.Bridge:
+      name: "UNS Bridge"
+      subclassOf:
+        - !u ACS.Class.EdgeDeployment
+
+  !u ConfigDB.Class.R2Class:
+    !u Clusters.Class.K8sResource:
+      name: "K8s resource kind"
 
   !u UUIDs.Class.App:
-    !u Clusters.App.HelmRelease:
-      name: "HelmRelease template"
+    !u Clusters.App.K8sTemplate:
+      name: "K8s resource template"
     !u Clusters.App.HelmTemplate:
       name: "Helm chart template"
 
@@ -48,18 +56,34 @@ objects:
         - !u Edge.Group.EdgeGroup
       subclassOf:
         - !u Auth.Class.EdgeService
+    !u Local.Role.UNSBridge:
+      name: "UNS Bridge"
+      memberOf:
+        - !u Auth.Class.EdgeRole
+        - !u Edge.Group.EdgeGroup
+      subclassOf:
+        - !u Auth.Class.EdgeService
+        - !u UNS.Group.Reader
 
   !u Clusters.Class.SystemHelmChart:
     !u Local.Chart.EdgeAgent:
       name: "Edge Agent"
     !u Local.Chart.Cluster:
       name: "Edge cluster"
+    !u Local.Chart.UNSBridge:
+      name: "UNS Bridge"
 
   !u Clusters.Class.HelmChart:
     !u Local.Chart.ModbusRest:
       name: "Modbus-REST adapter"
     !u Local.Chart.MQTT:
       name: "Edge MQTT broker"
+
+  !u Clusters.Class.K8sResource:
+    !u Clusters.Resource.GitRepo:
+      name: "GitRepository"
+    !u Clusters.Resource.HelmRelease:
+      name: "HelmRelease"
 
 configs:
   !u UUIDs.App.ConfigSchema:
@@ -82,8 +106,8 @@ configs:
           description: >
             Helm values to apply. {{Templates}} will be expanded.
           type: object
-    !u Clusters.App.HelmRelease:
-      title: Flux HelmRelease manifest template
+    !u Clusters.App.K8sTemplate:
+      title: K8s resource manifest template
       type: object
       required: [template, resources]
       additionalProperties: false
@@ -93,7 +117,7 @@ configs:
           type: object
           required: [apiVersion, kind]
         resources:
-          description: Resource types which represent Helm charts
+          description: Resource types which we replace
           type: array
           items:
             type: object
@@ -103,10 +127,26 @@ configs:
               apiVersion: { type: string }
               kind: { type: string }
 
-  # XXX These single-object configs don't give the user any opportunity
-  # to override the configuration. But where is an override specified?
-  !u Clusters.App.HelmRelease:
-    !u Clusters.App.HelmRelease:
+  !u Clusters.App.K8sTemplate:
+    !u Clusters.Resource.GitRepo:
+      resources:
+        - apiVersion: source.toolkit.fluxcd.io/v1
+          kind: GitRepository
+      template:
+        apiVersion: source.toolkit.fluxcd.io/v1
+        kind: GitRepository
+        metadata: 
+          name: "{{name}}"
+          labels:
+            "factoryplus.app.amrc.co.uk/uuid": "{{uuid}}"
+        spec:
+            interval: "3m"
+            ref:
+                branch: "main"
+            secretRef:
+                name: "flux-secrets"
+            url: "{{url}}"
+    !u Clusters.Resource.HelmRelease:
       resources:
         - apiVersion: helm.toolkit.fluxcd.io/v2beta1
           kind: HelmRelease
@@ -114,7 +154,9 @@ configs:
         apiVersion: helm.toolkit.fluxcd.io/v2beta1
         kind: HelmRelease
         metadata:
-          name: "{{prefix}}-{{uuid}}"
+          name: "{{name}}"
+          labels:
+            "factoryplus.app.amrc.co.uk/uuid": "{{uuid}}"
         spec:
           chart:
             spec:
@@ -167,6 +209,15 @@ configs:
         name:   "{{name}}"
         uuid:   "{{uuid}}"
         hostname: "{{hostname}}"
+    !u Local.Chart.UNSBridge:
+      chart:  "uns-bridge"
+      values:
+        name:   "{{name}}"
+        uuid:   "{{uuid}}"
+        hostname: "{{hostname}}"
+        authGroup:
+          edgeService: !u Auth.Class.EdgeService
+          unsReader: !u Local.Role.UNSBridge
 ---
 service: !u UUIDs.Service.Authentication
 version: 2
@@ -176,7 +227,7 @@ grants:
       !u Edge.App.AgentConfig: false
   !u Local.Role.EdgeSync:
     !u ConfigDB.Perm.ReadConfig:
-      !u Clusters.App.HelmRelease: false
+      !u Clusters.App.K8sTemplate: false
       !u Clusters.App.HelmTemplate: false
       !u Edge.App.Deployment: false
       !u Edge.App.ClusterStatus: false

@@ -34,6 +34,9 @@
 top=.
 include ${top}/mk/acs.init.mk
 
+# lib must come first. Other subdirs depend on it.
+subdirs+= lib
+
 subdirs+= acs-admin
 subdirs+= acs-auth
 subdirs+= acs-cluster-manager
@@ -61,15 +64,4 @@ subdirs+= historian-sparkplug
 subdirs+= historian-uns
 subdirs+= uns-ingester-sparkplug
 
-recurse=	env MAKE="${MAKE}" ${tools}/recurse
-
-all: git.prepare
-	+${recurse} all ${subdirs}
-
-setup: git.prepare
-	+${recurse} setup ${subdirs}
-
-lint: git.prepare
-	+${recurse} lint ${subdirs}
-
-include ${mk}/acs.git.mk
+include ${mk}/acs.subdirs.mk

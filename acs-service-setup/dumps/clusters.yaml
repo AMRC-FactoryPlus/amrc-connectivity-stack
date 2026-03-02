@@ -60,7 +60,6 @@ objects:
     !u Clusters.App.Cluster: { name: "Edge cluster configuration" }
     !u Clusters.App.Flux:           { name: "Flux template" }
     !u Clusters.App.HelmChart: { name: "Helm chart template" }
-    !u Clusters.App.HelmRelease: { name: "HelmRelease template" }
     !u Clusters.App.Status: { name: "Edge cluster setup status" }
   !u UUIDs.Class.Service:
     !u Clusters.Service.ClusterManager: { name: "Cluster manager" }
@@ -321,6 +320,9 @@ configs:
         cd /
         rm -rf "$wd"
   !u Clusters.App.Flux:
+    # XXX Should this be reworked in terms of the K8sTemplate configs?
+    # Instead of a detailed manifest each file could hold an array of
+    # { resource, name, values } objects.
     !u Clusters.App.Flux:
       edge-cluster.yaml:
         - "{{ helm }}"
@@ -406,7 +408,7 @@ grants:
       !u Clusters.App.EdgeStatus: false
       !u Clusters.App.Flux: false
       !u Clusters.App.HelmChart: false
-      !u Clusters.App.HelmRelease: false
+      !u Clusters.App.K8sTemplate: false
       !u Clusters.App.Bootstrap: false
       !u UUIDs.App.SparkplugAddress: false
 
@@ -416,8 +418,12 @@ grants:
       !u Git.App.Config: false
       !u UUIDs.App.SparkplugAddress: false
 
-    !u UUIDs.Permission.ConfigDB.ManageObjects:
+    !u ConfigDB.Perm.CreateObject:
       !u Clusters.Class.Account: false
+    !u ConfigDB.Perm.WriteMemberships:
+      !u UUIDs.Special.Mine: true
+      !u Clusters.Class.Cluster: true
+    !u ConfigDB.Perm.WriteMembers:
       !u Clusters.Class.ClusterGroups: true
 
     !u Git.Perm.Pull:
@@ -430,27 +436,27 @@ grants:
       !u Clusters.Requirement.EdgeRepos: true
       !u Local.RepoGroup.Cluster: true
 
-  # XXX Do we still need this? KrbKeys sealed to edge clusters have been
-  # replaced with krbkeys generated on the edge.
-  !u ACS.ServiceAccount.KrbKeys:
-    !u Clusters.Perm.Secrets: null
-
   !u Local.Role.EdgeFlux:
     !u Git.Perm.Pull:
       !u Local.RepoGroup.Shared: true
 
   !u Local.Role.EdgeKrbkeys:
-    !u ConfigDB.Perm.ManageObjects:
-      # XXX Should this be removed? Or should these two be for different
-      # permissions?
+    !u ConfigDB.Perm.CreateObject:
       !u Auth.Class.EdgeService: false
+    !u ConfigDB.Perm.WriteMemberships:
+      !u UUIDs.Special.Mine: true
+      # XXX This is too broad. Ideally we need a group per cluster.
+      !u Auth.Class.EdgeAgent: true
+    !u ConfigDB.Perm.WriteMembers:
       !u Edge.Group.EdgeGroup: true
+
     !u ConfigDB.Perm.ReadConfig:
       !u UUIDs.App.Info: false
       !u UUIDs.App.SparkplugAddress: false
     !u ConfigDB.Perm.WriteConfig:
       !u UUIDs.App.Info: false
       !u UUIDs.App.SparkplugAddress: false
+
     !u Auth.Perm.ReadKerberos: null
     # XXX This is root-equivalent
     !u Auth.Perm.ManageKerberos: null

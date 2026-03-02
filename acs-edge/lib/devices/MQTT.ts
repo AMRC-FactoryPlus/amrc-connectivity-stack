@@ -67,7 +67,7 @@ export class MQTTConnection extends DeviceConnection {
         this.#client.on("message", (topic, msg) => {
             // this.emit("asyncData", topic, msg);
             let obj: any = {};
-            obj[topic] = msg;
+                obj[topic] = msg;
             this.emit('data', obj);
         });
 

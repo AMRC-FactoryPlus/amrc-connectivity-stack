@@ -201,10 +201,14 @@ export class Update extends Action {
         const cluster = cluster_template({ uuid, name });
         const values = jmp.merge(cluster.values, spec.values ?? {});
         /* Build the cluster HelmRelease manifest */
+        /* It would be better to use a more sensible name here. But this
+         * breaks back-compat; flux is unable to handle a situation
+         * where one HelmRelease is replaced by another with a different
+         * name but they deploy the same resources. */
         const helm = template.helm({
             ...cluster,
             uuid, values,
-            name: k8sname("edge-cluster", name),
+            name: k8sname("edge-cluster", uuid),
             prefix: "edge-cluster",
             source: "helm-charts"
         }).template;

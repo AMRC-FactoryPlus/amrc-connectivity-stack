@@ -8,3 +8,4 @@ config.mk
 .DS_Store
 /edge-ads/node_modules
 spirit-schemas/
+/acs-opcua-server-edge/test/

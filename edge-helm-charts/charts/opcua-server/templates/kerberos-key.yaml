@@ -1,0 +1,15 @@
+{{- $k8sname := include "opcua-server.k8sname" .Values.name }}
+apiVersion: factoryplus.app.amrc.co.uk/v1
+kind: KerberosKey
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: opcua-server.{{ $k8sname }}
+spec:
+  type: Password
+  principal: opcua1/{{ .Values.cluster }}/{{ .Values.name }}@{{ .Values.realm }}
+  secret: opcua-server-mqtt-secrets.{{ $k8sname }}/keytab
+  account:
+    class: {{ .Values.authGroup.edgeService | quote }}
+    name: "OPC UA Server: {{ .Values.name }}"
+    groups:
+      - {{ .Values.authGroup.unsReader | quote }}

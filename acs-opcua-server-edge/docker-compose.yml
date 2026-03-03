@@ -1,0 +1,26 @@
+services:
+  opcua-server:
+    image: acs-opcua-server-edge:local
+    platform: linux/amd64
+    user: root
+    ports:
+      - "4840:4840"
+    environment:
+      CONFIG_FILE: /config/config.json
+      DATA_DIR: /data
+      SERVICE_USERNAME: username
+      SERVICE_PASSWORD: password
+      DIRECTORY_URL: https://directory.baseUrl
+      OPCUA_USERNAME: opcua
+      OPCUA_PASSWORD: test123
+    volumes:
+      - ./test/config.json:/config/config.json:ro
+      - opcua-data:/data
+    networks:
+      - opcua-test
+
+networks:
+  opcua-test:
+
+volumes:
+  opcua-data:

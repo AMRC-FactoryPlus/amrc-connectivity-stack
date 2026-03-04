@@ -1,0 +1,153 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+<modelVersion>4.0.0</modelVersion>
+
+  <groupId>uk.co.amrc.factoryplus.fuseki</groupId>
+  <artifactId>acs-fuseki</artifactId>
+  <version>0.0.1</version>
+
+  <packaging>jar</packaging>
+  <name>acs-fuseki</name>
+
+  <url>https://github.com/amrc-factoryplus</url>
+
+  <properties>
+    <!-- Build properties -->
+    <build.time.xsd>${maven.build.timestamp}</build.time.xsd>
+    <automatic.module.name>uk.co.amrc.factoryplus.fuseki</automatic.module.name>
+
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <java.version>17</java.version>
+
+    <!-- Maven Plugins -->
+    <plugin.clean>3.4.1</plugin.clean>
+    <plugin.compiler>3.14.0</plugin.compiler>
+    <plugin.cyclonedx>2.9.1</plugin.cyclonedx>
+    <plugin.dependency>3.8.1</plugin.dependency>
+    <plugin.deploy>3.1.4</plugin.deploy>
+    <plugin.enforcer>3.5.0</plugin.enforcer>
+    <plugin.gpg>3.2.7</plugin.gpg>
+    <plugin.install>3.1.4</plugin.install>
+    <plugin.jacoco>0.8.12</plugin.jacoco>
+    <plugin.jar>3.4.2</plugin.jar>
+    <plugin.javadoc>3.11.2</plugin.javadoc>
+    <plugin.nexus>1.7.0</plugin.nexus>
+    <plugin.resources>3.3.1</plugin.resources>
+    <plugin.shade>3.6.0</plugin.shade>
+    <plugin.site>3.21.0</plugin.site>
+    <plugin.source>3.3.1</plugin.source>
+    <plugin.surefire>3.5.2</plugin.surefire>
+
+    <!-- Dependency Plugins -->
+    <dependency.jena>5.3.0</dependency.jena>
+    <dependency.assert>3.27.3</dependency.assert>
+    <dependency.log4j2>2.24.3</dependency.log4j2>
+    <dependency.slf4j>2.0.17</dependency.slf4j>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.apache.jena</groupId>
+      <artifactId>apache-jena-libs</artifactId>
+      <version>${dependency.jena}</version>
+      <type>pom</type>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.jena</groupId>
+      <artifactId>jena-fuseki-main</artifactId>
+      <version>${dependency.jena}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.jena</groupId>
+      <artifactId>jena-cmds</artifactId>
+      <version>${dependency.jena}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.logging.log4j</groupId>
+      <artifactId>log4j-core</artifactId>
+      <version>${dependency.log4j2}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.logging.log4j</groupId>
+      <artifactId>log4j-slf4j2-impl</artifactId>
+      <version>${dependency.log4j2}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+      <version>${dependency.slf4j}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <version>3.8.1</version>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins> 
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>${plugin.compiler}</version>
+        <configuration>
+          <release>${java.version}</release>
+        </configuration>
+      </plugin>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <version>${plugin.shade}</version>
+        <configuration>
+          <shadedArtifactAttached>false</shadedArtifactAttached>
+          <transformers>
+            <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+              <mainClass>uk.co.amrc.factoryplus.fuseki.RunFuseki</mainClass>
+              <manifestEntries>
+                <Multi-Release>true</Multi-Release>
+              </manifestEntries>
+            </transformer>
+            <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
+            <transformer implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer" />
+            <transformer implementation="org.apache.maven.plugins.shade.resource.ApacheNoticeResourceTransformer">
+              <addHeader>false</addHeader>
+            </transformer>
+          </transformers>
+
+          <filters>
+            <filter>
+              <artifact>*:*</artifact>
+              <excludes>
+                <!-- Don't include signing files. -->
+                <exclude>META-INF/*.SF</exclude>
+                <exclude>META-INF/*.DSA</exclude>
+                <exclude>META-INF/*.RSA</exclude>
+                <exclude>META-INF/DEPENDENCIES</exclude>
+                <exclude>META-INF/MANIFEST.MF</exclude>
+                <!-- Don't include modules ("Shading will break its strong encapsulation.") -->
+                <exclude>**/module-info.class</exclude>
+              </excludes>
+            </filter>
+          </filters>
+        </configuration>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <!--<phase /><!- - Switch off -->
+            <goals>
+              <goal>shade</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

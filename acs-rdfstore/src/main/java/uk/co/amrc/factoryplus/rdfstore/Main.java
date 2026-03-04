@@ -15,24 +15,31 @@ import org.glassfish.jersey.grizzly2.httpserver.GrizzlyHttpServerFactory;
 import org.glassfish.jersey.inject.hk2.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
 
-import org.apache.jena.query.*;
+import org.apache.jena.query.Dataset;
+import org.apache.jena.query.DatasetFactory;
+import org.apache.jena.rdf.model.ModelFactory;
+import org.apache.jena.tdb2.TDB2Factory;
 
 public final class Main {
     public static void main (String[] args) throws Throwable
     {
         final int port = Integer.parseUnsignedInt(System.getenv("PORT"));
+        final String data = System.getenv("DATA_DIR");
 
-        final var app = new Main(port);
+        final var app = new Main(port, data);
         app.start();
     }
 
     private int port;
+    private String data;
     private HttpServer server;
     private Dataset model;
 
-    private Main (int port)
+    private Main (int port, String data)
     {
         this.port = port;
+        this.data = data;
+
         this.model = createModel();
         this.server = createServer();
     }
@@ -51,9 +58,14 @@ public final class Main {
         }
     }
 
+    /* For now we only support one graph. I can't see how to apply RDFS
+     * over all graphs in a dataset. */
     private Dataset createModel ()
     {
-        return DatasetFactory.create();
+        var tdb = TDB2Factory.connectDataset(this.data);
+        var model = tdb.getDefaultModel();
+        var rdfs = ModelFactory.createRDFSModel(model);
+        return DatasetFactory.create(rdfs);
     }
 
     private HttpServer createServer ()

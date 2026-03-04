@@ -1,10 +1,13 @@
-top=../..
+top=..
 include ${top}/mk/acs.init.mk
 
 include ${mk}/acs.mvn.mk
 
 all:
-	${mvn} -B deploy
+	${mvn} -B compile
 
-shell:
-	${mvn} compile && ${mvn} jshell:run
+shell: all
+	${mvn} jshell:run
+
+run: all
+	${mvn} exec:java

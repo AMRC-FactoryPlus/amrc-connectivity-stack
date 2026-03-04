@@ -156,6 +156,15 @@
             </options>
           </configuration>
         </plugin>
+        <plugin>
+          <groupId>org.codehaus.mojo</groupId>
+          <artifactId>exec-maven-plugin</artifactId>
+          <version>3.6.3</version>
+          <configuration>
+            <classpathScope>test</classpathScope>
+            <mainClass>uk.co.amrc.factoryplus.rdfstore.Main</mainClass>
+          </configuration>
+        </plugin>
       </plugins>
     </pluginManagement>
   </build>

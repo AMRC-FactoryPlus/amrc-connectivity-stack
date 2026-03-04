@@ -15,6 +15,7 @@ import jakarta.ws.rs.core.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.jena.graph.*;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.query.*;
 import org.apache.jena.riot.Lang;
@@ -28,7 +29,7 @@ import io.vavr.control.*;
 
 @Path("v2/sparql")
 public class Sparql {
-    @Inject private Dataset ds;
+    @Inject private Dataset dataset;
     @Inject private Request req;
 
     private static final Logger log = LoggerFactory.getLogger(Sparql.class);
@@ -78,7 +79,12 @@ public class Sparql {
         QueryType.CONSTRUCT,
         new Handler(RDF_TYPES, RDFLanguages::contentTypeToLang,
             (qe, l) -> {
-                Model rs = qe.execConstruct();
+                /* We need to copy the results while we are inside the
+                 * transaction. The execConstruct method returns a Model
+                 * which is only valid within the txn. */
+                var trips = qe.execConstructTriples();
+                var rs = GraphMemFactory.createDefaultGraph();
+                GraphUtil.add(rs, trips);
                 return os -> RDFDataMgr.write(os, rs, l);
             }));
 
@@ -86,7 +92,8 @@ public class Sparql {
     @Consumes("application/sparql-update")
     public void update (String update)
     {
-        UpdateAction.parseExecute(update, ds);
+        dataset.executeWrite(() ->
+            UpdateAction.parseExecute(update, dataset));
     }
 
     @POST
@@ -106,12 +113,11 @@ public class Sparql {
             .map(handler.ctToLang())
             .orElseThrow(() -> new WebApplicationException(406));
 
-        try (var qexec = QueryExecutionFactory.create(query, ds)) {
-            return handler.handle().apply(qexec, lang);
-        }
-        catch (Exception e) {
-            throw new WebApplicationException(e, 500);
-        }
+        return dataset.calculateRead(() -> {
+            try (var qexec = QueryExecutionFactory.create(query, dataset)) {
+                return handler.handle().apply(qexec, lang);
+            }
+        });
     }
 
     @GET

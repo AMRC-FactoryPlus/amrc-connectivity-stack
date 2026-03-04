@@ -3,7 +3,10 @@ package uk.co.amrc.factoryplus.rdfstore;
 import java.io.ByteArrayOutputStream;
 import java.io.OutputStream;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 
 import jakarta.inject.*;
 import jakarta.ws.rs.*;
@@ -54,6 +57,31 @@ public class Sparql {
             .asJava();
     }
 
+    private record Handler (
+        List<Variant> accept,
+        Function<String, Lang> ctToLang,
+        BiFunction<QueryExecution, Lang, StreamingOutput> handle) { };
+
+    private Map<QueryType, Handler> HANDLERS = Map.of(
+        QueryType.ASK,
+        new Handler(RS_TYPES, WebContent::contentTypeToLangResultSet,
+            (qe, l) -> {
+                boolean rs = qe.execAsk();
+                return os -> ResultSetFormatter.output(os, rs, l);
+            }),
+        QueryType.SELECT,
+        new Handler(RS_TYPES, WebContent::contentTypeToLangResultSet,
+            (qe, l) -> {
+                ResultSet rs = qe.execSelect().materialise();
+                return os -> ResultSetFormatter.output(os, rs, l);
+            }),
+        QueryType.CONSTRUCT,
+        new Handler(RDF_TYPES, RDFLanguages::contentTypeToLang,
+            (qe, l) -> {
+                Model rs = qe.execConstruct();
+                return os -> RDFDataMgr.write(os, rs, l);
+            }));
+
     @POST
     @Consumes("application/sparql-update")
     public void update (String update)
@@ -61,107 +89,40 @@ public class Sparql {
         UpdateAction.parseExecute(update, ds);
     }
 
-    private abstract class Handler {
-        protected Optional<Lang> lang;
-
-        public Handler () {
-            var vrn = req.selectVariant(acceptList());
-            log.info("Selected Variant: {}", vrn);
-
-            lang = Optional.ofNullable(vrn)
-                .map(v -> v.getMediaType().toString())
-                .map(WebContent::contentTypeToLangResultSet);
-            log.info("Selected Lang: {}", lang);
-        }
-
-        public boolean acceptable () { return lang.isPresent(); }
-        public abstract void handle (QueryExecution qe, OutputStream os);
-
-        protected abstract List<Variant> acceptList ();
-        protected abstract Lang contentTypeToLang (String ct);
-    }
-    private abstract class RsHandler extends Handler {
-        protected List<Variant> acceptList () { return RS_TYPES; }
-
-        protected Lang contentTypeToLang (String ct)
-        {
-            return WebContent.contentTypeToLangResultSet(ct);
-        }
-    }
-    private class AskHandler extends RsHandler {
-        public void handle (QueryExecution qe, OutputStream os)
-        {
-            boolean rs = qe.execAsk();
-            ResultSetFormatter.output(os, rs, lang.get());
-        }
-    }
-    private class SelectHandler extends RsHandler {
-        public void handle (QueryExecution qe, OutputStream os)
-        {
-            ResultSet rs = qe.execSelect();
-            ResultSetFormatter.output(os, rs, lang.get());
-        }
-    }
-    public class ConstructHandler extends Handler {
-        protected List<Variant> acceptList () { return RDF_TYPES; }
-
-        protected Lang contentTypeToLang (String ct)
-        {
-            return RDFLanguages.contentTypeToLang(ct);
-        }
-
-        public void handle (QueryExecution qe, OutputStream os)
-        {
-            Model rs = qe.execConstruct();
-            RDFDataMgr.write(os, rs, lang.get());
-        }
-    }
-
     @POST
     @Consumes("application/sparql-query")
-    public byte[] sparql (String queryString) throws WebApplicationException
+    public StreamingOutput sparql (String queryString) throws WebApplicationException
     {
         var query = Try.of(() -> QueryFactory.create(queryString))
             .getOrElseThrow(e -> new WebApplicationException(400));
 
-        Handler handler;
-        switch (query.queryType()) {
-            case ASK:
-                handler = this.new AskHandler();
-                break;
-            case CONSTRUCT:
-                handler = this.new ConstructHandler();
-                break;
-            case SELECT:
-                handler = this.new SelectHandler();
-                break;
-            default:
-                throw new WebApplicationException(422);
-        }
+        Handler handler = HANDLERS.get(query.queryType());
+        if (handler == null)
+            throw new WebApplicationException(422);
 
-        if (!handler.acceptable())
-            throw new WebApplicationException(406);
+        var lang = Optional.ofNullable(
+                req.selectVariant(handler.accept()))
+            .map(v -> v.getMediaType().toString())
+            .map(handler.ctToLang())
+            .orElseThrow(() -> new WebApplicationException(406));
 
-        final var os = new ByteArrayOutputStream();
         try (var qexec = QueryExecutionFactory.create(query, ds)) {
-            handler.handle(qexec, os);
+            return handler.handle().apply(qexec, lang);
         }
         catch (Exception e) {
             throw new WebApplicationException(e, 500);
         }
-
-        return os.toByteArray();
     }
 
     @GET
-    public byte[] sparqlGet (@QueryParam("query") String qs)
+    public StreamingOutput sparqlGet (@QueryParam("query") String qs)
     {
         return sparql(qs);
     }
 
     @POST
     @Consumes("application/x-www-form-urlencoded")
-    public byte[] sparqlForm (@FormParam("query") String qs)
+    public StreamingOutput sparqlForm (@FormParam("query") String qs)
     {
         return sparql(qs);
     }

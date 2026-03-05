@@ -18,6 +18,7 @@ import org.glassfish.jersey.server.ResourceConfig;
 import org.apache.jena.query.Dataset;
 import org.apache.jena.query.DatasetFactory;
 import org.apache.jena.rdf.model.ModelFactory;
+import org.apache.jena.rdf.model.Model;
 import org.apache.jena.tdb2.TDB2Factory;
 
 public final class Main {
@@ -58,14 +59,21 @@ public final class Main {
         }
     }
 
-    /* For now we only support one graph. I can't see how to apply RDFS
-     * over all graphs in a dataset. */
+    /* We build a Dataset out of these named graphs:
+     * - G_direct: this is G_direct from the TDB.
+     * - G_derived: this is RDFS(G_direct).
+     * - default: this is equal to G_derived.
+     */
     private Dataset createModel ()
     {
-        var tdb = TDB2Factory.connectDataset(this.data);
-        var model = tdb.getDefaultModel();
-        var rdfs = ModelFactory.createRDFSModel(model);
-        return DatasetFactory.create(rdfs);
+        var tdb     = TDB2Factory.connectDataset(this.data);
+        var direct  = tdb.getNamedModel(Vocab.G_direct);
+        var rdfs    = ModelFactory.createRDFSModel(direct);
+
+        var ds = DatasetFactory.create(rdfs);
+        ds.addNamedModel(Vocab.G_direct, direct);
+        ds.addNamedModel(Vocab.G_derived, rdfs);
+        return ds;
     }
 
     private HttpServer createServer ()

@@ -1,6 +1,12 @@
+/*
+ * Factory+ RDF store
+ * SPARQL query endpoints
+ * Copyright 2026 University of Sheffield AMRC
+ */ 
+
 package uk.co.amrc.factoryplus.rdfstore;
 
-import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.List;
 import java.util.Map;
@@ -27,10 +33,11 @@ import org.apache.jena.update.*;
 
 import io.vavr.control.*;
 
-@Path("v2/sparql")
+@Path("v2")
 public class Sparql {
     @Inject private Dataset dataset;
     @Inject private Request req;
+    @Inject private UriInfo uriInfo;
 
     private static final Logger log = LoggerFactory.getLogger(Sparql.class);
 
@@ -58,26 +65,51 @@ public class Sparql {
             .asJava();
     }
 
-    private record Handler (
+    private static record ContentHandler (
         List<Variant> accept,
-        Function<String, Lang> ctToLang,
+        Function<String, Lang> ctToLang)
+    {
+        public Lang acceptLang (Request req) throws WebApplicationException
+        {
+            return Optional.ofNullable(req.selectVariant(accept))
+                .map(v -> v.getMediaType().toString())
+                .map(ctToLang)
+                .orElseThrow(() -> new WebApplicationException(406));
+        }
+
+        public Lang contentLang (String ct) throws WebApplicationException
+        {
+            var lang = ctToLang.apply(ct);
+            if (lang == null)
+                throw new WebApplicationException(415);
+            return lang;
+        }
+    }
+
+    private static final ContentHandler RS_HANDLER = 
+        new ContentHandler(RS_TYPES, WebContent::contentTypeToLangResultSet);
+    private static final ContentHandler RDF_HANDLER =
+        new ContentHandler(RDF_TYPES, RDFLanguages::contentTypeToLang);
+
+    private static record QueryHandler (
+        ContentHandler content,
         BiFunction<QueryExecution, Lang, StreamingOutput> handle) { };
 
-    private Map<QueryType, Handler> HANDLERS = Map.of(
+    private static Map<QueryType, QueryHandler> HANDLERS = Map.of(
         QueryType.ASK,
-        new Handler(RS_TYPES, WebContent::contentTypeToLangResultSet,
+        new QueryHandler(RS_HANDLER,
             (qe, l) -> {
                 boolean rs = qe.execAsk();
                 return os -> ResultSetFormatter.output(os, rs, l);
             }),
         QueryType.SELECT,
-        new Handler(RS_TYPES, WebContent::contentTypeToLangResultSet,
+        new QueryHandler(RS_HANDLER,
             (qe, l) -> {
                 ResultSet rs = qe.execSelect().materialise();
                 return os -> ResultSetFormatter.output(os, rs, l);
             }),
         QueryType.CONSTRUCT,
-        new Handler(RDF_TYPES, RDFLanguages::contentTypeToLang,
+        new QueryHandler(RDF_HANDLER,
             (qe, l) -> {
                 /* We need to copy the results while we are inside the
                  * transaction. The execConstruct method returns a Model
@@ -88,7 +120,7 @@ public class Sparql {
                 return os -> RDFDataMgr.write(os, rs, l);
             }));
 
-    @POST
+    @POST @Path("sparql")
     @Consumes("application/sparql-update")
     public void update (String update)
     {
@@ -96,22 +128,18 @@ public class Sparql {
             UpdateAction.parseExecute(update, dataset));
     }
 
-    @POST
+    @POST @Path("sparql")
     @Consumes("application/sparql-query")
     public StreamingOutput sparql (String queryString) throws WebApplicationException
     {
         var query = Try.of(() -> QueryFactory.create(queryString))
             .getOrElseThrow(e -> new WebApplicationException(400));
 
-        Handler handler = HANDLERS.get(query.queryType());
+        QueryHandler handler = HANDLERS.get(query.queryType());
         if (handler == null)
             throw new WebApplicationException(422);
 
-        var lang = Optional.ofNullable(
-                req.selectVariant(handler.accept()))
-            .map(v -> v.getMediaType().toString())
-            .map(handler.ctToLang())
-            .orElseThrow(() -> new WebApplicationException(406));
+        var lang = handler.content().acceptLang(req);
 
         return dataset.calculateRead(() -> {
             try (var qexec = QueryExecutionFactory.create(query, dataset)) {
@@ -120,16 +148,80 @@ public class Sparql {
         });
     }
 
-    @GET
+    @GET @Path("sparql")
     public StreamingOutput sparqlGet (@QueryParam("query") String qs)
     {
         return sparql(qs);
     }
 
-    @POST
+    @POST @Path("sparql")
     @Consumes("application/x-www-form-urlencoded")
     public StreamingOutput sparqlForm (@FormParam("query") String qs)
     {
         return sparql(qs);
+    }
+
+    private Model resolveGraph (boolean create)
+    {
+        var headers = uriInfo.getQueryParameters();
+        var isDef = headers.getFirst("default");
+        var graph = headers.getFirst("graph");
+
+        if (isDef != null) {
+            if (graph != null || isDef != "")
+                throw new WebApplicationException(400);
+            return dataset.getDefaultModel();
+        }
+
+        if (graph == null || graph == "")
+            throw new WebApplicationException(400);
+        if (!create && !dataset.containsNamedModel(graph))
+            throw new WebApplicationException(404);
+        return dataset.getNamedModel(graph);
+    }
+
+    @GET @Path("rdf")
+    public StreamingOutput graphGet ()
+    {
+        var lang = RDF_HANDLER.acceptLang(req);
+        var model = resolveGraph(false);
+
+        /* We must do explict txn handling here as otherwise we will
+         * need to copy the complete graph in memory. */
+        dataset.begin(TxnType.READ);
+        return os -> {
+            try {
+                RDFDataMgr.write(os, model, lang);
+            }
+            finally {
+                dataset.end();
+            }
+        };
+    }
+
+    @POST @Path("rdf")
+    public void graphPost (
+        InputStream rdf,
+        @HeaderParam("content-type") String type)
+    {
+        var lang = RDF_HANDLER.contentLang(type);
+        var model = resolveGraph(true);
+
+        dataset.executeWrite(() -> RDFDataMgr.read(model, rdf, lang));
+    }
+
+    @PUT @Path("rdf")
+    public void graphPut (
+        InputStream rdf,
+        @HeaderParam("content-type") String type)
+    {
+        var lang = RDF_HANDLER.contentLang(type);
+        var model = resolveGraph(true);
+
+        dataset.executeWrite(() -> {
+            model.removeAll();
+            try { RDFDataMgr.read(model, rdf, lang); }
+            catch (Throwable e) { throw new WebApplicationException(422); }
+        });
     }
 }

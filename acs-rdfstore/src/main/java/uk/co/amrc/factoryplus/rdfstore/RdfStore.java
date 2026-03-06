@@ -10,6 +10,8 @@ import java.util.function.Supplier;
 import java.util.Optional;
 import java.util.UUID;
 
+import jakarta.ws.rs.WebApplicationException;
+
 import org.apache.jena.query.Dataset;
 import org.apache.jena.query.DatasetFactory;
 import org.apache.jena.rdf.model.*;
@@ -65,5 +67,14 @@ class RdfStore
             throw new CorruptionException("UUID does not name a URI", uuid);
 
         return Optional.of(klass);
+    }
+
+    /* I don't entirely like this being here, it's a layer violation for
+     * this class to know about HTTP errors. But it's too annoying
+     * otherwise, and we are a REST webservice implementation. */
+    public Resource findObjectOr404 (UUID uuid)
+    {
+        return findObject(uuid)
+            .orElseThrow(() -> new WebApplicationException(404));
     }
 }

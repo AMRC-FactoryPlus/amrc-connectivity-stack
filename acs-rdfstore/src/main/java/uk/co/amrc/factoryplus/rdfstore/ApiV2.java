@@ -26,45 +26,20 @@ import io.vavr.control.*;
 
 @Path("v2")
 public class ApiV2 {
-    @Inject private Dataset dataset;
+    @Inject private RdfStore store;
 
     private static final Logger log = LoggerFactory.getLogger(ApiV2.class);
 
-    @GET @Path("object")
-    public JsonArray listObjects ()
+    private Resource findObject (UUID uuid)
     {
-        var objs = dataset.calculateRead(() ->
-            dataset.getDefaultModel()
-                .listObjectsOfProperty(Vocab.uuid)
-                .filterKeep(n -> n.isLiteral())
-                .mapWith(o -> o.asLiteral().getValue())
-                .toList());
-
-        return Json.createArrayBuilder(objs).build();
-    }
-
-    /* Must be called within a txn */
-    private Resource _findObject (Model model, UUID uuid)
-    {
-        var klasses = model
-            .listResourcesWithProperty(Vocab.uuid, uuid.toString())
-            .toList();
-        if (klasses.isEmpty())
-            throw new WebApplicationException(404);
-        if (klasses.size() > 1)
-            throw new CorruptionException("More than one candidate", uuid);
-        
-        var klass = klasses.get(0);
-        if (!klass.isURIResource())
-            throw new CorruptionException("UUID does not name a URI", uuid);
-
-        return klass;
+        return store.findObject(uuid)
+            .orElseThrow(() -> new WebApplicationException(404));
     }
 
     private JsonArray _list (Model model, UUID uuid, Property prop)
     {
-        var members = dataset.calculateRead(() -> {
-            var klass = _findObject(model, uuid);
+        var members = store.calculateRead(() -> {
+            var klass = findObject(uuid);
             return model
                 .listResourcesWithProperty(prop, klass)
                 .mapWith(r -> r.getProperty(Vocab.uuid))
@@ -76,40 +51,55 @@ public class ApiV2 {
         return Json.createArrayBuilder(members).build();
     }
 
+    @GET @Path("object")
+    public JsonArray listObjects ()
+    {
+        var objs = store.calculateRead(() ->
+            store.derived()
+                .listObjectsOfProperty(Vocab.uuid)
+                .filterKeep(n -> n.isLiteral())
+                .mapWith(o -> o.asLiteral().getValue())
+                .toList());
+
+        return Json.createArrayBuilder(objs).build();
+    }
+
     @GET @Path("class/{class}/direct/member")
     public JsonArray listDirectMembers (@PathParam("class") UUID klass)
     {
-        return _list(dataset.getNamedModel(Vocab.G_direct), klass, RDF.type);
+        return _list(store.direct(), klass, RDF.type);
     }
 
     @GET @Path("class/{class}/member")
     public JsonArray listMembers (@PathParam("class") UUID klass)
     {
-        return _list(dataset.getDefaultModel(), klass, RDF.type);
+        return _list(store.derived(), klass, RDF.type);
     }
 
     @GET @Path("class/{class}/direct/subclass")
     public JsonArray listDirectSubclasses (@PathParam("class") UUID klass)
     {
-        return _list(dataset.getNamedModel(Vocab.G_direct), klass, RDFS.subClassOf);
+        return _list(store.direct(), klass, RDFS.subClassOf);
     }
 
     @GET @Path("class/{class}/subclass")
     public JsonArray listSubclasses (@PathParam("class") UUID klass)
     {
-        return _list(dataset.getDefaultModel(), klass, RDFS.subClassOf);
+        return _list(store.derived(), klass, RDFS.subClassOf);
     }
 
     @GET @Path("app/{app}/object/{object}")
     public JsonValue getEntry (@PathParam("app") UUID app, 
         @PathParam("object") UUID obj)
     {
-        var vals = dataset.calculateRead(() -> {
-            var model = dataset.getDefaultModel();
-            var appP = _findObject(model, app).as(Property.class);
-            var objR = _findObject(model, obj);
+        log.info("Get config for {}/{}", app, obj);
+        var vals = store.calculateRead(() -> {
+            var appP = findObject(app).as(Property.class);
+            var objR = findObject(obj);
 
-            return model.listObjectsOfProperty(objR, appP)
+            /* We fetch from the derived graph */
+            return store.derived()
+                .listObjectsOfProperty(objR, appP)
                 .toList();
         });
 

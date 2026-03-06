@@ -34,6 +34,9 @@ public class Vocab
     public static final Resource G_direct   = graph("direct");
     public static final Resource G_derived  = graph("derived");
 
+    public static final UUID U_RDFStore     = UUID.fromString(
+        "8abf031c-193f-11f1-b047-d762a2934dfc");
+
     public static Resource fromUuid (UUID uuid)
     {
         return ResourceFactory.createResource(

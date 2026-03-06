@@ -1,0 +1,54 @@
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+
+@base <http://factoryplus.app.amrc.co.uk/rdf/> .
+@prefix uuid: <uuid/> .
+@prefix : <core/> .
+@prefix app: <app/> .
+@prefix srv: <service/> .
+
+:Object a rdfs:Class.
+
+:uuid a rdf:Property;
+    rdfs:domain :Object; rdfs:range xsd:string.
+
+:R3Class a :Object; rdfs:subClassOf :Object;
+    :uuid "52b80183-6998-4bf9-9b30-132755e7dede";
+    :rank 3.
+:R2Class a :R3Class; rdfs:subClassOf :Object;
+    :uuid "705888ce-53fa-434d-afee-274b331d4642";
+    :rank 2.
+:R1Class a :R2Class; rdfs:subClassOf :Object;
+    :uuid "04a1c90d-2295-4cbe-b33a-74eded62cbf1";
+    :rank 1.
+:Individual a :R1Class; rdfs:subClassOf :Object;
+    :uuid "2494ae9b-cd87-4c01-98db-437a303b43e9";
+    :rank 0.
+
+:Application a :R1Class; rdfs:subClassOf :Individual, rdf:Property;
+    :uuid "d319bd87-f42b-4b66-be4f-f82ff48b93f0".
+
+app:Registration a :Application; :uuid "cb40bed5-49ad-4443-a7f5-08c75009da8f".
+app:Info a :Application; :uuid "64a8bfa9-7772-45c4-9d1a-9e6290690957".
+
+:R3Class app:Info """{"name":"Rank 3 class"}"""^^rdf:JSON.
+:R2Class app:Info """{"name":"Rank 2 class"}"""^^rdf:JSON.
+:R1Class app:Info """{"name":"Rank 1 class"}"""^^rdf:JSON.
+:Individual app:Info """{"name":"Individual"}"""^^rdf:JSON.
+
+:Application app:Info """{"name":"Application"}"""^^rdf:JSON.
+app:Registration app:Info """{"name":"Object registration"}"""^^rdf:JSON.
+app:Info app:Info """{"name":"General information"}"""^^rdf:JSON.
+
+:Service a :R1Class; rdfs:subClassOf :Individual;
+    :uuid "265d481f-87a7-4f93-8fc6-53fa64dc11bb".
+srv:Directory a :Service; :uuid "af4a1d66-e6f7-43c4-8a67-0fa3be2b1cf9".
+srv:ConfigDB a :Service; :uuid "af15f175-78a0-4e05-97c0-2a0bb82b9f3b".
+srv:Auth a :Service; :uuid "cab2642a-f7d9-42e5-8845-8f35affe1fd4".
+
+:Service app:Info """{"name":"F+ Service function"}"""^^rdf:JSON.
+srv:Directory app:Info """{"name":"Directory service"}"""^^rdf:JSON.
+srv:ConfigDB app:Info """{"name":"ConfigDB service"}"""^^rdf:JSON.
+srv:Auth app:Info """{"name":"Auth service"}"""^^rdf:JSON.

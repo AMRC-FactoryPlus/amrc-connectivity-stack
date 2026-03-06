@@ -35,7 +35,7 @@ import io.vavr.control.*;
 
 @Path("v2")
 public class Sparql {
-    @Inject private Dataset dataset;
+    @Inject private RdfStore store;
     @Inject private Request req;
     @Inject private UriInfo uriInfo;
 
@@ -124,8 +124,8 @@ public class Sparql {
     @Consumes("application/sparql-update")
     public void update (String update)
     {
-        dataset.executeWrite(() ->
-            UpdateAction.parseExecute(update, dataset));
+        store.executeWrite(() ->
+            UpdateAction.parseExecute(update, store.dataset()));
     }
 
     @POST @Path("sparql")
@@ -141,8 +141,8 @@ public class Sparql {
 
         var lang = handler.content().acceptLang(req);
 
-        return dataset.calculateRead(() -> {
-            try (var qexec = QueryExecutionFactory.create(query, dataset)) {
+        return store.calculateRead(() -> {
+            try (var qexec = QueryExecutionFactory.create(query, store.dataset())) {
                 return handler.handle().apply(qexec, lang);
             }
         });
@@ -163,6 +163,7 @@ public class Sparql {
 
     private Model resolveGraph (boolean create)
     {
+        var dataset = store.dataset();
         var headers = uriInfo.getQueryParameters();
         var isDef = headers.getFirst("default");
         var graph = headers.getFirst("graph");
@@ -183,15 +184,16 @@ public class Sparql {
     @GET @Path("rdf")
     public StreamingOutput graphGet ()
     {
+        var dataset = store.dataset();
         var lang = RDF_HANDLER.acceptLang(req);
-        var model = resolveGraph(false);
+        var graph = resolveGraph(false);
 
         /* We must do explict txn handling here as otherwise we will
          * need to copy the complete graph in memory. */
         dataset.begin(TxnType.READ);
         return os -> {
             try {
-                RDFDataMgr.write(os, model, lang);
+                RDFDataMgr.write(os, graph, lang);
             }
             finally {
                 dataset.end();
@@ -205,9 +207,9 @@ public class Sparql {
         @HeaderParam("content-type") String type)
     {
         var lang = RDF_HANDLER.contentLang(type);
-        var model = resolveGraph(true);
+        var graph = resolveGraph(true);
 
-        dataset.executeWrite(() -> RDFDataMgr.read(model, rdf, lang));
+        store.executeWrite(() -> RDFDataMgr.read(graph, rdf, lang));
     }
 
     @PUT @Path("rdf")
@@ -216,11 +218,11 @@ public class Sparql {
         @HeaderParam("content-type") String type)
     {
         var lang = RDF_HANDLER.contentLang(type);
-        var model = resolveGraph(true);
+        var graph = resolveGraph(true);
 
-        dataset.executeWrite(() -> {
-            model.removeAll();
-            try { RDFDataMgr.read(model, rdf, lang); }
+        store.executeWrite(() -> {
+            graph.removeAll();
+            try { RDFDataMgr.read(graph, rdf, lang); }
             catch (Throwable e) { throw new WebApplicationException(422); }
         });
     }

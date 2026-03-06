@@ -15,12 +15,6 @@ import org.glassfish.jersey.grizzly2.httpserver.GrizzlyHttpServerFactory;
 import org.glassfish.jersey.inject.hk2.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
 
-import org.apache.jena.query.Dataset;
-import org.apache.jena.query.DatasetFactory;
-import org.apache.jena.rdf.model.ModelFactory;
-import org.apache.jena.rdf.model.Model;
-import org.apache.jena.tdb2.TDB2Factory;
-
 public final class Main {
     public static void main (String[] args) throws Throwable
     {
@@ -32,16 +26,14 @@ public final class Main {
     }
 
     private int port;
-    private String data;
     private HttpServer server;
-    private Dataset model;
+    private RdfStore model;
 
     private Main (int port, String data)
     {
         this.port = port;
-        this.data = data;
 
-        this.model = createModel();
+        this.model = new RdfStore(data);
         this.server = createServer();
     }
 
@@ -59,23 +51,6 @@ public final class Main {
         }
     }
 
-    /* We build a Dataset out of these named graphs:
-     * - G_direct: this is G_direct from the TDB.
-     * - G_derived: this is RDFS(G_direct).
-     * - default: this is equal to G_derived.
-     */
-    private Dataset createModel ()
-    {
-        var tdb     = TDB2Factory.connectDataset(this.data);
-        var direct  = tdb.getNamedModel(Vocab.G_direct);
-        var rdfs    = ModelFactory.createRDFSModel(direct);
-
-        var ds = DatasetFactory.create(rdfs);
-        ds.addNamedModel(Vocab.G_direct, direct);
-        ds.addNamedModel(Vocab.G_derived, rdfs);
-        return ds;
-    }
-
     private HttpServer createServer ()
     {
         final URI listen = orSCE(
@@ -87,7 +62,7 @@ public final class Main {
             .packages("uk.co.amrc.factoryplus.rdfstore")
             .register(new AbstractBinder () {
                 protected void configure () {
-                    bind(model).to(Dataset.class);
+                    bind(model).to(RdfStore.class);
                 }
             });
 

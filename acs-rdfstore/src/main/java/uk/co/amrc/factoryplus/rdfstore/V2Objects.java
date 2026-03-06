@@ -25,21 +25,15 @@ import org.apache.jena.vocabulary.*;
 import io.vavr.control.*;
 
 @Path("v2")
-public class ApiV2 {
+public class V2Objects {
     @Inject private RdfStore store;
 
-    private static final Logger log = LoggerFactory.getLogger(ApiV2.class);
-
-    private Resource findObject (UUID uuid)
-    {
-        return store.findObject(uuid)
-            .orElseThrow(() -> new WebApplicationException(404));
-    }
+    private static final Logger log = LoggerFactory.getLogger(V2Objects.class);
 
     private JsonArray _list (Model model, UUID uuid, Property prop)
     {
         var members = store.calculateRead(() -> {
-            var klass = findObject(uuid);
+            var klass = store.findObjectOr404(uuid);
             return model
                 .listResourcesWithProperty(prop, klass)
                 .mapWith(r -> r.getProperty(Vocab.uuid))
@@ -86,35 +80,6 @@ public class ApiV2 {
     public JsonArray listSubclasses (@PathParam("class") UUID klass)
     {
         return _list(store.derived(), klass, RDFS.subClassOf);
-    }
-
-    @GET @Path("app/{app}/object/{object}")
-    public JsonValue getEntry (@PathParam("app") UUID app, 
-        @PathParam("object") UUID obj)
-    {
-        log.info("Get config for {}/{}", app, obj);
-        var vals = store.calculateRead(() -> {
-            var appP = findObject(app).as(Property.class);
-            var objR = findObject(obj);
-
-            /* We fetch from the derived graph */
-            return store.derived()
-                .listObjectsOfProperty(objR, appP)
-                .toList();
-        });
-
-        if (vals.isEmpty())
-            throw new WebApplicationException(404);
-        if (vals.size() > 1)
-            throw new CorruptionException("Duplicated config entries", app);
-
-        var val = vals.get(0).asLiteral();
-        if (val.getDatatype() != RDF.dtRDFJSON)
-            throw new CorruptionException("Non-JSON config entry", app);
-
-        return Json.createReader(
-                new StringReader(val.getString()))
-            .readValue();
     }
 }
 

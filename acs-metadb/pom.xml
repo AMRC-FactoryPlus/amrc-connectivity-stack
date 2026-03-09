@@ -4,10 +4,10 @@
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>io.github.amrc-factoryplus</groupId>
-  <artifactId>acs-rdfstore</artifactId>
+  <artifactId>acs-metadb</artifactId>
   <version>0.1-SNAPSHOT</version>
 
-  <name>acs-rdfstore</name>
+  <name>acs-metadb</name>
   <!-- FIXME change it to the project's website -->
   <url>http://factoryplus.app.amrc.co.uk</url>
 
@@ -172,7 +172,7 @@
           <version>3.6.3</version>
           <configuration>
             <classpathScope>test</classpathScope>
-            <mainClass>uk.co.amrc.factoryplus.rdfstore.Main</mainClass>
+            <mainClass>uk.co.amrc.factoryplus.metadb.Main</mainClass>
           </configuration>
         </plugin>
       </plugins>

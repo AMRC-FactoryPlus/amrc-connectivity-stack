@@ -4,7 +4,7 @@
  * Copyright 2026 University of Sheffield AMRC
  */ 
 
-package uk.co.amrc.factoryplus.rdfstore;
+package uk.co.amrc.factoryplus.metadb;
 
 import java.io.InputStream;
 import java.io.OutputStream;

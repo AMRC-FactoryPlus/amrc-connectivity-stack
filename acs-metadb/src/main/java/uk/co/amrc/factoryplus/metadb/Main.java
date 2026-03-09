@@ -4,7 +4,7 @@
  * Copyright 2026 University of Sheffield AMRC
  */
 
-package uk.co.amrc.factoryplus.rdfstore;
+package uk.co.amrc.factoryplus.metadb;
 
 import java.io.IOException;
 import java.net.URI;
@@ -59,7 +59,7 @@ public final class Main {
 
         final var model = this.model;
         final var rc = new ResourceConfig()
-            .packages("uk.co.amrc.factoryplus.rdfstore")
+            .packages("uk.co.amrc.factoryplus.metadb")
             .register(new AbstractBinder () {
                 protected void configure () {
                     bind(model).to(RdfStore.class);

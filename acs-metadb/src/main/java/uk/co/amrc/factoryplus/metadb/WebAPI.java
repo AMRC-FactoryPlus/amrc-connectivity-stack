@@ -8,7 +8,7 @@
  * work. Properly this wants moving into a WebAPI class in a service-api
  * module like in JS. */
 
-package uk.co.amrc.factoryplus.rdfstore;
+package uk.co.amrc.factoryplus.metadb;
 
 import java.security.SecureRandom;
 import java.time.Instant;

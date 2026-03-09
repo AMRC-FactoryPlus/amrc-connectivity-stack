@@ -1,4 +1,4 @@
-package uk.co.amrc.factoryplus.rdfstore;
+package uk.co.amrc.factoryplus.metadb;
 
 import jakarta.ws.rs.*;
 

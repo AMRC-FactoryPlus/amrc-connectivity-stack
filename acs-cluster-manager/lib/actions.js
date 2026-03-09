@@ -10,6 +10,8 @@ import { UUIDs, ServiceError, k8sname } from "@amrc-factoryplus/service-client";
 import { Checkout } from "./checkout.js";
 import { Git, Edge } from "./uuids.js";
 
+const FLUX_VERSION = "2.7.5";
+
 const README = `
 This repo is managed by the Edge Deployment Operator.
 As such some conventions need to be observed.
@@ -75,7 +77,10 @@ export class Update extends Action {
     async apply() {
         const { cdb, spec, status, uuid } = this;
 
-        this.fixup_account_status();
+        if (status.ready) {
+            this.fixup_account_status();
+            this.check_flux_version();
+        }
 
         if (status.ready) {
             this.log("Cluster %s is already set up", uuid);
@@ -87,7 +92,7 @@ export class Update extends Action {
         await this.address();
         await this.accounts();
         await this.repo();
-        this.update({ ready: true });
+        this.update({ ready: true, fluxVersion: FLUX_VERSION });
         this.log("Cluster %s is ready", this.name());
     }
 
@@ -106,6 +111,16 @@ export class Update extends Action {
         if (!changes.size) return;
         const patch = Object.fromEntries(changes.entries());
         this.update(patch);
+    }
+
+    check_flux_version () {
+        const { uuid, status } = this;
+
+        if (status.fluxVersion == FLUX_VERSION)
+            return;
+
+        this.log("Flux for %s is out of date, updating", uuid);
+        this.update({ ready: false });
     }
 
     async address() {

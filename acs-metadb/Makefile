@@ -10,4 +10,4 @@ shell: all
 	${mvn} jshell:run
 
 run: all
-	${mvn} exec:java
+	${mvn} exec:exec

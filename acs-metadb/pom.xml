@@ -172,7 +172,16 @@
           <version>3.6.3</version>
           <configuration>
             <classpathScope>test</classpathScope>
-            <mainClass>uk.co.amrc.factoryplus.metadb.Main</mainClass>
+            <executable>java</executable>
+            <arguments>
+              <argument>-cp</argument>
+              <classpath/>
+              <argument>uk.co.amrc.factoryplus.metadb.Main</argument>
+            </arguments>
+            <environmentVariables>
+              <PORT>8080</PORT>
+              <DATA_DIR>tmp/tdb</DATA_DIR>
+            </environmentVariables>
           </configuration>
         </plugin>
       </plugins>

@@ -9,3 +9,4 @@ config.mk
 /edge-ads/node_modules
 spirit-schemas/
 /acs-opcua-server-edge/test/
+/.mcp.json

@@ -47,6 +47,11 @@ spec:
           secret:
             secretName: {{ .Values.remote.secretName }}
 {{- end }}
+{{- if .Values.remote.caConfigMapName }}
+        - name: remote-ca
+          configMap:
+            name: {{ .Values.remote.caConfigMapName }}
+{{- end }}
       containers:
         - name: mosquitto
 {{ list . "mosquitto" | include "uns-bridge.image" | indent 10 }}
@@ -54,6 +59,10 @@ spec:
             - /bin/sh
             - -c
             - |
+              # Install custom CA certificate if provided
+{{- if .Values.remote.caConfigMapName }}
+              cp /ca/ca.crt /etc/ssl/certs/custom-remote-ca.crt
+{{- end }}
               # Read credentials
               LOCAL_PASSWORD=$(cat /secrets/local/keytab)
 {{- if .Values.remote.secretName }}
@@ -93,6 +102,11 @@ spec:
 {{- if .Values.remote.secretName }}
             - mountPath: /secrets/remote
               name: remote-credentials
+              readOnly: true
+{{- end }}
+{{- if .Values.remote.caConfigMapName }}
+            - mountPath: /ca
+              name: remote-ca
               readOnly: true
 {{- end }}
 

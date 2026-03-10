@@ -270,7 +270,7 @@ postgres:
 kubegres:
   kubeProxy:
     image:
-      registry: gcr.io
+      registry: registry.k8s.io
       repository: kubebuilder/kube-rbac-proxy
       tag: v0.13.0
   kubegres:

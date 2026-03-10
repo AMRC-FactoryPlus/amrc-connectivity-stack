@@ -2,6 +2,7 @@
 config.mk
 */config.mk
 .env
+.mcp.json
 
 */.npm_install_done
 .vscode

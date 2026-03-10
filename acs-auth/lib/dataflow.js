@@ -256,18 +256,16 @@ export class DataFlow {
                 ids.filter(id => 
                     props.every(([k, v]) => id[k] == v))));
 
-        /* ReadKrb is repurposed here as 'read any identity' */
-        const permitted = this.permitted(upn, Perm.ReadKrb, true);
+        /* ReadKrb is repurposed here as 'read any identity'. This is
+         * now a blanket permission which can only be granted on
+         * Wildcard. It permits reading all identity records, and
+         * listing all identities. Anything else is very difficult to
+         * make work with lookups and lists from both directions. */
+        const permitted = this.permitted(upn, Perm.ReadKrb, false);
 
         return Optional.of(rxx.rx(
             rx.combineLatest(filtered, permitted),
-            rx.map(([ids, perm]) => cond.uuid
-                ? perm?.(cond.uuid)
-                    ? Response.ok(ids)
-                    : Response.of(403)
-                : perm
-                    ? Response.ok(ids.filter(id => perm(id.uuid)))
-                    : Response.of(403)),
+            rx.map(([ids, perm]) => perm ? Response.ok(ids) : Response.of(403)),
             rx.map(res => res.filter(ids => ids.length)),
         ));
     }

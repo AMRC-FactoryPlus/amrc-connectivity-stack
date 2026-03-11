@@ -7,23 +7,36 @@
 package uk.co.amrc.factoryplus.metadb;
 
 import java.util.function.Supplier;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
+import jakarta.json.*;
 import jakarta.ws.rs.WebApplicationException;
 
-import org.apache.jena.query.Dataset;
-import org.apache.jena.query.DatasetFactory;
+import org.apache.jena.query.*;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.tdb2.TDB2Factory;
+import org.apache.jena.vocabulary.*;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import io.vavr.*;
+import io.vavr.control.*;
 
 /* This class is not called Model because of the conflict with Jena's
  * Model class. */
-class RdfStore
+public class RdfStore
 {
+    private static final Logger log = LoggerFactory.getLogger(RdfStore.class);
+
     private Model       direct;
     private Model       derived;
     private Dataset     dataset;
+
+    private Map<String, Query> queries = new ConcurrentHashMap<>();
 
     /* We build a Dataset out of these named graphs:
      * - G_direct: this is G_direct from the TDB.
@@ -39,6 +52,15 @@ class RdfStore
 
         dataset.addNamedModel(Vocab.G_direct, direct);
         dataset.addNamedModel(Vocab.G_derived, derived);
+    }
+
+    public QueryExecutionBuilder getQuery (String key, String sparql)
+    {
+        var query = queries.computeIfAbsent(key,
+            k -> QueryFactory.create(sparql, Vocab.NS));
+
+        return QueryExecution.dataset(dataset)
+            .query(query);
     }
 
     public Dataset dataset () { return dataset; }
@@ -71,10 +93,18 @@ class RdfStore
 
     /* I don't entirely like this being here, it's a layer violation for
      * this class to know about HTTP errors. But it's too annoying
-     * otherwise, and we are a REST webservice implementation. */
+     * otherwise, and we are a REST webservice implementation.
+     * XXX The correct resolution here is to throw a custom UUIDNotFound
+     * exception and then use an exception mapper.
+     */
     public Resource findObjectOr404 (UUID uuid)
     {
         return findObject(uuid)
             .orElseThrow(() -> new WebApplicationException(404));
+    }
+
+    public Optional<ConfigEntry.Value> getConfig (UUID app, UUID obj)
+    {
+        return new ConfigEntry(this, app, obj).getValue();
     }
 }

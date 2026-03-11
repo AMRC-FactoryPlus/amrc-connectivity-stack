@@ -6,7 +6,7 @@
 
 package uk.co.amrc.factoryplus.metadb;
 
-import java.io.StringReader;
+import java.util.Date;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
@@ -14,6 +14,7 @@ import java.util.function.Supplier;
 import jakarta.inject.*;
 import jakarta.json.*;
 import jakarta.ws.rs.*;
+import jakarta.ws.rs.core.*;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,69 +30,34 @@ public class V2Config {
     private static final Logger log = LoggerFactory.getLogger(V2Config.class);
 
     @Inject                 RdfStore store;
-    @PathParam("app")       UUID app;
-    @PathParam("object")    UUID obj;
+    @PathParam("app")       String appS;
+    @PathParam("object")    String objS;
 
-    private Property appP;
-    private Resource objR;
+    private UUID app;
+    private UUID obj;
 
-    /* TXN */
     private void resolveUUIDs ()
     {
-        appP = store.findObjectOr404(app).as(Property.class);
-        objR = store.findObjectOr404(obj);
-    }
-
-    /* TXN UUIDs */
-    private Optional<JsonValue> getConfig ()
-    {
-        /* We fetch from the derived graph */
-        var entries = store.derived()
-            .listObjectsOfProperty(objR, appP)
-            .toList();
-
-        if (entries.isEmpty())
-            return Optional.empty();
-
-        return Try.success(entries)
-            .filter(l -> l.size() == 1,
-                l -> new CorruptionException("Duplicated config entries", app))
-            .map(l -> l.get(0).asLiteral())
-            .filter(v -> v.getDatatype() == RDF.dtRDFJSON,
-                v -> new CorruptionException("Non-JSON config entry", app))
-            .flatMap(v -> Try.success(v.getString())
-                .map(StringReader::new)
-                .map(r -> Json.createReader(r).readValue())
-                .recoverWith(e -> {
-                    log.warn("JSON decode failed", e);
-                    return Try.failure(new CorruptionException("Bad JSON", app));
-                }))
-            /* We can't use toJavaOptional here, we need to throw errors */
-            .map(Optional::of)
-            .get();
-    }
-
-    /* TXN UUIDs */
-    private void putConfig (JsonValue config)
-    {
-        /* We store to the direct graph */
-        var model = store.direct();
-        var confL = model.createTypedLiteral(
-            config.toString(), RDF.dtRDFJSON);
-
-        model.removeAll(objR, appP, null);
-        model.add(objR, appP, confL);
+        app = Vocab.parseUUID(appS)
+            .orElseThrow(() -> new WebApplicationException(410));
+        obj = Vocab.parseUUID(objS)
+            .orElseThrow(() -> new WebApplicationException(410));
     }
 
     @GET 
-    public JsonValue get ()
+    public Response get ()
     {
+        resolveUUIDs();
         log.info("Get config for {}/{}", app, obj);
         var entry = store.calculateRead(() -> {
-            resolveUUIDs();
-            return getConfig();
+            return store.getConfig(app, obj);
         });
-        return entry.orElseThrow(() -> new WebApplicationException(404));
+        return entry
+            .map(e -> Response.ok(e.value())
+                .tag(e.etag())
+                .lastModified(Date.from(e.mtime()))
+                .build())
+            .orElseThrow(() -> new WebApplicationException(404));
     }
 
     /* XXX The default JsonValue entity parser will accept and silently
@@ -101,30 +67,32 @@ public class V2Config {
     @PUT 
     public void put (JsonValue config)
     {
+        resolveUUIDs();
         log.info("Put config for {}/{}", app, obj);
         store.executeWrite(() -> {
-            resolveUUIDs();
-            putConfig(config);
+            //putConfig(config);
         });
     }
 
     @DELETE
     public void delete ()
     {
+        resolveUUIDs();
         log.info("Delete config for {}/{}", app, obj);
         store.executeWrite(() -> {
-            resolveUUIDs();
-            store.direct().removeAll(objR, appP, null);
+            //store.direct().removeAll(objR, appP, null);
         });
     }
 
     @PATCH @Consumes("application/merge-patch+json")
     public void mergePatch (JsonValue json)
     {
+        resolveUUIDs();
         var patch = Json.createMergePatch(json);
         store.executeWrite(() -> {
             resolveUUIDs();
-            var o_conf = getConfig()
+            var o_conf = store.getConfig(app, obj)
+                .map(e -> e.value())
                 .orElse(JsonValue.EMPTY_JSON_OBJECT);
             /* Safety: applying merge-patch to a non-object destroys the
              * whole thing. */
@@ -132,7 +100,7 @@ public class V2Config {
                 throw new WebApplicationException(409);
 
             var n_conf = patch.apply(o_conf);
-            putConfig(n_conf);
+            //putConfig(n_conf);
         });
     }
 }

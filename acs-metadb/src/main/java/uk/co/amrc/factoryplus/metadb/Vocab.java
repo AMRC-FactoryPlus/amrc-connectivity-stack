@@ -20,36 +20,50 @@ public class Vocab
     public static final String NS_uuid      = NS + "uuid/";
     public static final String NS_core      = NS + "core/";
     public static final String NS_graph     = NS + "graph/";
+    public static final String NS_app       = NS + "app/";
 
-    private static Property coreP (String p) {
-        return ResourceFactory.createProperty(NS_core + p);
+    public static Resource res (String r) {
+        return ResourceFactory.createResource(NS + r);
+    }
+    public static Property prop (String p) {
+        return ResourceFactory.createProperty(NS + p);
     }
 
-    public static final Property uuid       = coreP("uuid");
+    public static final Property uuid       = prop("core/uuid");
+    public static final Property rank       = prop("core/rank");
+    public static final Property start      = prop("core/start");
 
-    private static Resource graph (String g) {
-        return ResourceFactory.createResource(NS_graph + g);
-    }
+    public static final Property forP       = prop("app/for");
+    public static final Property value      = prop("app/value");
 
-    public static final Resource G_direct   = graph("direct");
-    public static final Resource G_derived  = graph("derived");
+    public static final Resource G_direct   = res("graph/direct");
+    public static final Resource G_derived  = res("graph/derived");
 
     public static final UUID U_RDFStore     = UUID.fromString(
         "8abf031c-193f-11f1-b047-d762a2934dfc");
 
-    public static Resource fromUuid (UUID uuid)
+    public static Optional<UUID> parseUUID (String uuid)
+    {
+        /* Initial length check as UUID.fromString is too lenient. */
+        if (uuid.length() != 36)
+            return Optional.empty();
+
+        try {
+            return Optional.of(UUID.fromString(uuid)); 
+        }
+        catch (IllegalArgumentException e) {
+            return Optional.empty();
+        }
+    }
+    
+    public static Literal uuidLiteral (UUID uuid)
+    {
+        return ResourceFactory.createPlainLiteral(uuid.toString());
+    }
+
+    public static Resource uuidResource (UUID uuid)
     {
         return ResourceFactory.createResource(
             NS_uuid + uuid.toString());
-    }
-
-    public static Optional<UUID> uuidFromUri (String uri)
-    {
-        return Optional.of(uri)
-            .filter(u -> u.startsWith(NS_uuid))
-            .map(u -> u.substring(NS_uuid.length()))
-            .flatMap(u -> Try.success(u)
-                .mapTry(UUID::fromString)
-                .toJavaOptional());
     }
 }

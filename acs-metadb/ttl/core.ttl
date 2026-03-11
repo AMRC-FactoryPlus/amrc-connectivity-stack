@@ -85,7 +85,14 @@ app:Info a :Application; rdfs:subClassOf :ConfigEntry;
 
 <uuid/09aa4958-1d36-11f1-a9a6-bff44d0575de> a :Instant;
     :uuid "09aa4958-1d36-11f1-a9a6-bff44d0575de";
-    :timestamp "2026-03-11T10:35:51Z"^^xsd:datetime.
+    :timestamp "2026-03-11T10:35:51Z"^^xsd:dateTime.
+
+# select ?value ?etag
+# where {
+#   ?config a ?app; app:for ?obj.
+#   ?config app:value ?value.
+#   ?config :start/:uuid ?etag.
+# }
 
 [] a app:Info; app:for :Individual;
     app:value """{"name": "Individual"}"""^^rdf:JSON;

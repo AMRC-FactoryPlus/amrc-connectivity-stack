@@ -134,6 +134,18 @@
               <label for="tls" class="text-sm font-medium cursor-pointer">Use TLS</label>
             </div>
 
+            <div v-if="remoteTls" class="flex flex-col gap-1 mt-3">
+              <label class="text-sm font-medium">CA Certificate ConfigMap</label>
+              <Input
+                placeholder="e.g. corporate-ca"
+                v-model="caConfigMapName"
+              />
+              <p class="text-xs text-gray-500">
+                Optional. Name of a Kubernetes ConfigMap containing a custom CA certificate (key: <code>ca.crt</code>).
+                Required when the remote broker uses a certificate signed by a private CA (e.g. corporate TLS inspection).
+              </p>
+            </div>
+
             <div class="grid grid-cols-2 gap-4 mt-4">
               <div class="flex flex-col gap-1">
                 <label class="text-sm font-medium">Username <span class="text-red-500">*</span></label>
@@ -321,6 +333,7 @@ export default {
       this.remoteTls = true
       this.remoteUsername = null
       this.remotePassword = null
+      this.caConfigMapName = null
       this.isSubmitting = false
       this.v$.$reset()
     },
@@ -345,6 +358,7 @@ export default {
           this.remoteHost = values.remote.host
           this.remotePort = values.remote.port
           this.remoteTls = values.remote.tls
+          this.caConfigMapName = values.remote.caConfigMapName || null
         }
       }
     },
@@ -418,7 +432,8 @@ export default {
               tls: this.remoteTls,
               secretName: secretName,
               usernameKey: 'username',
-              passwordKey: 'password'
+              passwordKey: 'password',
+              ...(this.caConfigMapName ? { caConfigMapName: this.caConfigMapName } : {}),
             }
           }
 
@@ -459,6 +474,7 @@ export default {
       remoteTls: true,
       remoteUsername: null,
       remotePassword: null,
+      caConfigMapName: null,
       isSubmitting: false,
       unsChartUuid: null,
     }

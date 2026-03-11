@@ -258,13 +258,6 @@ kubectl:
     repository: alpine/kubectl
     tag: 1.33.4
 
-minio:
-  # -- Whether or not to enable MinIO
-  enabled: true
-  # -- Whether or not to expose the MinIO console outside of the cluster
-  exposeConsole: false
-
-
 postgres:
   # -- Whether or not to enable Postgres
   enabled: true
@@ -280,7 +273,7 @@ postgres:
 kubegres:
   kubeProxy:
     image:
-      registry: gcr.io
+      registry: registry.k8s.io
       repository: kubebuilder/kube-rbac-proxy
       tag: v0.13.0
   kubegres:
@@ -369,29 +362,6 @@ grafana:
         folder: 'Factory+'
         disableDelete: true
       searchNamespace: ALL
-
-tenant:
-  tenant:
-    name: fplus-minio-core
-    # Disable TLS on the MinIO level because we terminate TLS at Traefik
-    certificate:
-      externalCaCertSecret: { }
-      externalCertSecret: { }
-      requestAutoCert: false
-      certConfig: { }
-    pools:
-      - servers: 1
-        name: pool-0
-        volumesPerServer: 1
-        size: 20Gi
-    ## List of bucket names to create during tenant provisioning
-    buckets:
-      - name: "device-configurations"
-      - name: "device-connections"
-      - name: "edge-agent-configs"
-    ## List of secret names to use for generating MinIO users during tenant provisioning
-    users:
-      - name: "manager-minio-secret"
 
 influxdb2:
   enabled: true

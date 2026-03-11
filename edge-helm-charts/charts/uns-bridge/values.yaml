@@ -39,6 +39,10 @@ remote:
   # Keys in the secret for username and password
   usernameKey: username
   passwordKey: password
+  # Name of a ConfigMap containing a custom CA certificate (key: ca.crt)
+  # Use this when the remote broker uses a certificate signed by a private CA
+  # (e.g. corporate TLS inspection proxies)
+  caConfigMapName: ""
 
 # Image configuration
 image:

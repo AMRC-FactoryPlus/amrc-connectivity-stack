@@ -64,6 +64,14 @@ objects:
       subclassOf:
         - !u Auth.Class.EdgeService
         - !u UNS.Group.Reader
+    !u Local.Role.OPCUAServer:
+      name: "OPC UA Server"
+      memberOf:
+        - !u Auth.Class.EdgeRole
+        - !u Edge.Group.EdgeGroup
+      subclassOf:
+        - !u Auth.Class.EdgeService
+        - !u UNS.Group.Reader
 
   !u Clusters.Class.SystemHelmChart:
     !u Local.Chart.EdgeAgent:
@@ -78,6 +86,8 @@ objects:
       name: "Modbus-REST adapter"
     !u Local.Chart.MQTT:
       name: "Edge MQTT broker"
+    !u Local.Chart.OPCUAServer:
+      name: "OPC UA Server"
 
   !u Clusters.Class.K8sResource:
     !u Clusters.Resource.GitRepo:
@@ -148,10 +158,15 @@ configs:
             url: "{{url}}"
     !u Clusters.Resource.HelmRelease:
       resources:
-        - apiVersion: helm.toolkit.fluxcd.io/v2beta1
+        # We do NOT list old versions here. Kubernetes converts between
+        # versions (or assumes identity conversions) so listing old
+        # versions will cause problems. If the group or kind changes
+        # then the old group/kind must be listed here so the old
+        # resources are cleared out correctly.
+        - apiVersion: helm.toolkit.fluxcd.io/v2
           kind: HelmRelease
       template:
-        apiVersion: helm.toolkit.fluxcd.io/v2beta1
+        apiVersion: helm.toolkit.fluxcd.io/v2
         kind: HelmRelease
         metadata:
           name: "{{name}}"
@@ -171,6 +186,8 @@ configs:
             crds: CreateReplace
           interval: 2m0s
           maxHistory: 1
+          driftDetection:
+            mode: enabled
           values: "{{values}}"
 
   !u Clusters.App.HelmTemplate:
@@ -218,6 +235,15 @@ configs:
         authGroup:
           edgeService: !u Auth.Class.EdgeService
           unsReader: !u Local.Role.UNSBridge
+    !u Local.Chart.OPCUAServer:
+      chart:  "opcua-server"
+      values:
+        name:   "{{name}}"
+        uuid:   "{{uuid}}"
+        hostname: "{{hostname}}"
+        authGroup:
+          edgeService: !u Auth.Class.EdgeService
+          unsReader: !u Local.Role.OPCUAServer
 ---
 service: !u UUIDs.Service.Authentication
 version: 2

@@ -1,0 +1,17 @@
+{{- $k8sname := include "opcua-server.k8sname" .Values.name }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: opcua-server-{{ $k8sname }}
+  labels:
+    factory-plus.app: opcua-server
+    factory-plus.uuid: {{ .Values.uuid }}
+data:
+  config.json: |
+    {
+      "opcua": {
+        "port": {{ .Values.opcua.port }}
+      },
+      "topics": {{ keys .Values.topics | toJson }}
+    }

@@ -312,10 +312,13 @@ A full update contains the complete current state of all children. The
 initial 201 update must be a full update. The `children` key must be an
 object mapping each existing child path to an HTTP response for that
 child. The `response` key must contain a response for the parent
-resource, which should normally just be `{ status: 204 }`. For
-consistency, where the client can discover the existence of a child
+resource, which should normally just be `{ status: 204 }`.
+
+For consistency, where the client can discover the existence of a child
 which will return a 403 response, this child should be included in
-`children` (with a 403 HTTP status).
+`children` (with a 403 HTTP status). This means that allowing 'blind'
+lookups which may return 403 also means allowing listing all children,
+including children to which access is denied.
 
 A child update notifies the client of a change to a single child. The
 `child` key contains the child path of that child, and the `response`

@@ -1,0 +1,141 @@
+
+service: !u UUIDs.Service.ConfigDB
+version: 1
+objects:
+
+  !u UUIDs.Class.Service:
+    !u DataAccess.Service.DataAccess:
+      name: "Data Access Service"
+    
+  !u UUIDs.ConfigDB.R1Class:
+    !u DataAccess.App.DatasetDefinition:
+      name: "Dataset Definition"
+      subclassOf:
+        - !u UUIDs.Class.App
+      !u DataAccess.App.UnionComponents:
+        name: "Union Components"
+      !u DataAccess.App.SessionLimits:
+        name: "Session Limits"
+
+    !u DataAccess.App.DatasetMetadata:
+      name: "Dataset Metadata"
+      subclassOf:
+        - !u UUIDs.Class.App
+      !u DataAccess.App.MESIdentifiers:
+        name: "MES Identifiers"
+        
+
+    !u DataAccess.Requirement.ServiceRole:
+      name: "Data Access Service Role"
+      subclassOf:
+        - !u Auth.Class.CentralService
+        - !u Auth.Class.Principal
+      memberOf:
+        - !u Auth.Class.ServiceRole
+        - !u Auth.Class.PrincipalGroup
+
+    !u DataAccess.Perm.All:
+      name: "Data Access Permission"
+      memberOf:
+        - !u Auth.Class.ServicePerms
+      !u DataAccess.Perm.CreateDataset:
+        name: "Create Dataset"
+        memberOf:
+        - !u Auth.Class.Permission
+      !u DataAccess.Perm.IncludeInUnion:
+        name: "Include In Union"
+        memberOf:
+        - !u Auth.Class.Permission
+      !u DataAccess.Perm.ReadDataset:
+        name: "Read Dataset"
+        memberOf:
+        - !u Auth.Class.Permission
+      !u DataAccess.Perm.UseForSession:
+        name: "Use for Session"
+        memberOf:
+        - !u Auth.Class.Permission
+      !u DataAccess.Perm.EditDataset:
+        name: "Edit Dataset"
+        memberOf:
+        - !u Auth.Class.Permission
+      
+
+  !u UUIDs.ConfigDB.R2Class:
+    !u DataAccess.Class.Dataset:
+      name: "Dataset"
+      memberOf:
+        - !u UUIDs.DataAccess.Group.DatasetGroup
+      !u DataAccess.Class.Measurement:
+      name: "Measurement"
+      subclassOf:
+        - !u UUIDs.ConfigDB.Individual
+      memberOf:
+        - !u UUIDs.ConfigDB.Class.R1Class
+    
+    !u DataAccess.Class.Published:
+      name: "Published"
+      memberOf:
+        - !u UUIDs.DataAccess.Group.FunctionalDatasetGroup
+    !u DataAccess.Class.Partial:
+      name: "Partial"
+      memberOf:
+        - !u UUIDs.DataAccess.Group.FunctionalDatasetGroup
+    !u DataAccess.Class.MESDataset:
+      name: "MESDataset"
+      memberOf:
+        - !u UUIDs.DataAccess.Group.FunctionalDatasetGroup
+
+      
+  !u UUIDs.ConfigDB.R3Class:
+    !u DataAccess.Group.DatasetGroup:
+      name: "Dataset Group"
+    !u DataAccess.Group.DatasetRoleGroup:
+      name: "Dataset Role Group"
+      subclassOf:
+        - !u DataAccess.Group.DatasetGroup
+      
+      !u DataAccess.Group.StructuralDatasetGroup:
+        name: "Structural Dataset Group"
+        subclassOf:
+          - !u DataAccess.Group.DatasetGroup
+        !u DataAccess.Class.SparkplugDevice:
+          name: "Sparkplug Device"
+          memberOf:
+            - !u UUIDs.ConfigDB.R2Class
+        !u DataAccess.Class.Session:
+          name: "Session"
+          memberOf:
+            - !u UUIDs.ConfigDB.R2Class
+        !u DataAccess.Class.Union:
+          name: "Union"
+          memberOf:
+            - !u UUIDs.ConfigDB.R2Class
+
+    !u DataAccess.Group.FunctionalDatasetGroup:
+      name: "Functional Dataset Group"
+      subclassOf:
+        - !u DataAccess.Group.DatasetGroup
+      !u DataAccess.Class.Equipment:
+        name: "Equipment"
+        memberOf:
+          - !u UUIDs.ConfigDB.R2Class
+        subclassOf:
+          - !u DataAccess.Class.MESDataset
+      !u DataAccess.Class.WorkOrder:
+        name: "WorkOrder"
+        memberOf:
+          - !u UUIDs.ConfigDB.R2Class
+        subclassOf:
+          - !u DataAccess.Class.MESDataset
+      !u DataAccess.Class.Product:
+        name: "Product"
+        memberOf:
+          - !u UUIDs.ConfigDB.R2Class
+        subclassOf:
+          - !u DataAccess.Class.MESDataset
+      !u DataAccess.Class.Operation:
+        name: "Operation"
+        memberOf:
+          - !u UUIDs.ConfigDB.R2Class
+        subclassOf:
+          - !u DataAccess.Class.MESDataset

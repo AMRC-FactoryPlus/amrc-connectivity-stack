@@ -9,38 +9,106 @@
 @prefix app: <app/> .
 @prefix srv: <service/> .
 
+# These are proper classes and sit outside the rank structure.
 :Object a rdfs:Class.
+:Class a rdfs:Class; rdfs:subClassOf :Object, rdfs:Class.
 
 :uuid a rdf:Property;
     rdfs:domain :Object; rdfs:range xsd:string.
+:rank a rdf:Property;
+    rdfs:domain :Object; rdfs:range xsd:integer.
 
-:R3Class a :Object; rdfs:subClassOf :Object;
-    :uuid "52b80183-6998-4bf9-9b30-132755e7dede";
-    :rank 3.
-:R2Class a :R3Class; rdfs:subClassOf :Object;
-    :uuid "705888ce-53fa-434d-afee-274b331d4642";
-    :rank 2.
-:R1Class a :R2Class; rdfs:subClassOf :Object;
-    :uuid "04a1c90d-2295-4cbe-b33a-74eded62cbf1";
-    :rank 1.
+# This is purely informational at the moment.
+:powersetOf a rdf:Property;
+    rdfs:domain :Class; rdfs:range :Class.
+
+## these need to be forward rules, I think
+# a ∈ b, b ⊂ c ⇒ a ∈ c
+# a ∈ b, b ∈ p, p ℙ c ⇒ a ∈ c
+#
+# x ⊂ y, y ⊂ z ⇒ x ⊂ z
+# x ∈ m, m ℙ y, y ∈ n, n ℙ z ⇒ x ∈ r, r ℙ z
+## r = n as powersets are unique
+# x ∈ m, m ℙ y, y ∈ n, n ℙ z ⇒ x ∈ n
+## z is not needed
+# x ∈ m, m ℙ y, y ∈ n ⇒ x ∈ n
+#
+## then also (backward rules?):
+# p ℙ a ⇒ a ∈ p
+# a ∈ p, p ℙ b ⇒ a ⊂ p
+# a R b, R ∈ p, p ℙ S ⇒ a S b
+
 :Individual a :R1Class; rdfs:subClassOf :Object;
     :uuid "2494ae9b-cd87-4c01-98db-437a303b43e9";
     :rank 0.
+:R1Class a :R2Class; rdfs:subClassOf :Class;
+    :uuid "04a1c90d-2295-4cbe-b33a-74eded62cbf1";
+    :rank 1; :powersetOf :Individual.
+:R2Class a :R3Class; rdfs:subClassOf :Class;
+    :uuid "705888ce-53fa-434d-afee-274b331d4642";
+    :rank 2; :powersetOf :R1Class.
+:R3Class a :Class; rdfs:subClassOf :Class;
+    :uuid "52b80183-6998-4bf9-9b30-132755e7dede";
+    :rank 3; :powersetof :R2Class.
 
-:Application a :R1Class; rdfs:subClassOf :Individual, rdf:Property;
+:Instant a :R1Class; rdfs:subClassOf :Individual;
+    :uuid "600bc688-1d35-11f1-80e6-d7c35e61c3ce".
+# XXX Long-term this needs to go in favour of measurements against a
+# particular clock. But for now it's a useful simplification.
+:timestamp a rdf:Property;
+    rdfs:domain :Instant; rdfs:range xsd:datetime.
+
+:State a :R1Class; rdfs:subClassOf :Individual;
+    :uuid "c73d94e4-1d35-11f1-88e0-bf4ed4b22d09".
+# We don't do full 4D state modelling yet. We only record the current
+# state and the starting Instant.
+:start a rdf:Property;
+    rdfs:domain :State; rdfs:range :Instant.
+
+app:ConfigEntry a :R1Class; rdfs:subClassOf :State;
+    :uuid "86d6f3d0-1c9c-11f1-9d4d-3b787922d771".
+app:ConfigEntryGroup a :R2Class; rdfs:subClassOf :R1Class;
+    :uuid "62314906-1c9f-11f1-9bf0-bb3086d1330d";
+    :powersetOf app:ConfigEntry.
+:Application a :R2Class; rdfs:subClassOf :ConfigEntryGroup;
     :uuid "d319bd87-f42b-4b66-be4f-f82ff48b93f0".
 
-app:Registration a :Application; :uuid "cb40bed5-49ad-4443-a7f5-08c75009da8f".
-app:Info a :Application; :uuid "64a8bfa9-7772-45c4-9d1a-9e6290690957".
+app:for a rdf:Property;
+    rdfs:domain app:ConfigEntry; rdfs:range :Object.
+app:value a rdf:Property;
+    rdfs:domain app:ConfigEntry; rdfs:range rdf:JSON.
 
-:R3Class app:Info """{"name":"Rank 3 class"}"""^^rdf:JSON.
-:R2Class app:Info """{"name":"Rank 2 class"}"""^^rdf:JSON.
-:R1Class app:Info """{"name":"Rank 1 class"}"""^^rdf:JSON.
-:Individual app:Info """{"name":"Individual"}"""^^rdf:JSON.
+app:Registration a :Application; rdfs:subClassOf :ConfigEntry;
+    :uuid "cb40bed5-49ad-4443-a7f5-08c75009da8f".
+app:Info a :Application; rdfs:subClassOf :ConfigEntry;
+    :uuid "64a8bfa9-7772-45c4-9d1a-9e6290690957".
 
-:Application app:Info """{"name":"Application"}"""^^rdf:JSON.
-app:Registration app:Info """{"name":"Object registration"}"""^^rdf:JSON.
-app:Info app:Info """{"name":"General information"}"""^^rdf:JSON.
+<uuid/09aa4958-1d36-11f1-a9a6-bff44d0575de> a :Instant;
+    :uuid "09aa4958-1d36-11f1-a9a6-bff44d0575de";
+    :timestamp "2026-03-11T10:35:51Z"^^xsd:datetime.
+
+[] a app:Info; app:for :Individual;
+    app:value """{"name": "Individual"}"""^^rdf:JSON;
+    :start <uuid/09aa4958-1d36-11f1-a9a6-bff44d0575de>.
+[] a app:Info; app:for :R1Class;
+    app:value """{"name": "Rank 1 class"}"""^^rdf:JSON;
+    :start <uuid/09aa4958-1d36-11f1-a9a6-bff44d0575de>.
+[] a app:Info; app:for :R2Class;
+    app:value """{"name": "Rank 2 class"}"""^^rdf:JSON;
+    :start <uuid/09aa4958-1d36-11f1-a9a6-bff44d0575de>.
+[] a app:Info; app:for :R3Class;
+    app:value """{"name": "Rank 3 class"}"""^^rdf:JSON;
+    :start <uuid/09aa4958-1d36-11f1-a9a6-bff44d0575de>.
+
+[] a app:Info; app:for app:ConfigEntry;
+    app:value """{"name": "Config entry"}"""^^rdf:JSON;
+    :start <uuid/09aa4958-1d36-11f1-a9a6-bff44d0575de>.
+[] a app:Info; app:for app:ConfigEntryGroup;
+    app:value """{"name": "Config entry group"}"""^^rdf:JSON;
+    :start <uuid/09aa4958-1d36-11f1-a9a6-bff44d0575de>.
+[] a app:Info; app:for app:Application;
+    app:value """{"name": "APplication"}"""^^rdf:JSON;
+    :start <uuid/09aa4958-1d36-11f1-a9a6-bff44d0575de>.
 
 :Service a :R1Class; rdfs:subClassOf :Individual;
     :uuid "265d481f-87a7-4f93-8fc6-53fa64dc11bb".
@@ -48,7 +116,3 @@ srv:Directory a :Service; :uuid "af4a1d66-e6f7-43c4-8a67-0fa3be2b1cf9".
 srv:ConfigDB a :Service; :uuid "af15f175-78a0-4e05-97c0-2a0bb82b9f3b".
 srv:Auth a :Service; :uuid "cab2642a-f7d9-42e5-8845-8f35affe1fd4".
 
-:Service app:Info """{"name":"F+ Service function"}"""^^rdf:JSON.
-srv:Directory app:Info """{"name":"Directory service"}"""^^rdf:JSON.
-srv:ConfigDB app:Info """{"name":"ConfigDB service"}"""^^rdf:JSON.
-srv:Auth app:Info """{"name":"Auth service"}"""^^rdf:JSON.

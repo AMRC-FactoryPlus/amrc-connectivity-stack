@@ -201,6 +201,21 @@ public class Sparql {
         };
     }
 
+    /* TXN */
+    private void readToGraph (Model graph, InputStream rdf, Lang lang)
+    {
+        try {
+            RDFDataMgr.read(graph, rdf, lang);
+        }
+        catch (Throwable e) {
+            var res = Response.status(422)
+                .type("text/plain")
+                .entity(e.getMessage() + "\r\n")
+                .build();
+            throw new WebApplicationException(res); 
+        }
+    }
+
     @POST @Path("rdf")
     public void graphPost (
         InputStream rdf,
@@ -209,7 +224,7 @@ public class Sparql {
         var lang = RDF_HANDLER.contentLang(type);
         var graph = resolveGraph(true);
 
-        store.executeWrite(() -> RDFDataMgr.read(graph, rdf, lang));
+        store.executeWrite(() -> readToGraph(graph, rdf, lang));
     }
 
     @PUT @Path("rdf")
@@ -222,8 +237,7 @@ public class Sparql {
 
         store.executeWrite(() -> {
             graph.removeAll();
-            try { RDFDataMgr.read(graph, rdf, lang); }
-            catch (Throwable e) { throw new WebApplicationException(422); }
+            readToGraph(graph, rdf, lang);
         });
     }
 }

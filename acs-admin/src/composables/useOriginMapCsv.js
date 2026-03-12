@@ -43,21 +43,18 @@ function collectMetricRows(schema, model, pathSegments = []) {
         const currentPath = [...pathSegments, key];
 
         if (type === 'metric') {
-            // Only include metrics that exist in the model
+            // Include all metric leaf nodes from the schema.
+            // Populate with current model values if they exist, empty otherwise.
+            const metricSchema = {
+                ...prop.allOf[0]?.properties,
+                ...prop.allOf[1]?.properties,
+            };
             const modelValue = model?.[key];
-            if (modelValue && typeof modelValue === 'object') {
-                // Merge allOf[0].properties and allOf[1].properties to get the
-                // full metric schema (types, defaults, descriptions, etc.)
-                const metricSchema = {
-                    ...prop.allOf[0]?.properties,
-                    ...prop.allOf[1]?.properties,
-                };
-                rows.push({
-                    tagPath: currentPath.join('/'),
-                    metricSchema,
-                    modelValues: modelValue,
-                });
-            }
+            rows.push({
+                tagPath: currentPath.join('/'),
+                metricSchema,
+                modelValues: (modelValue && typeof modelValue === 'object') ? modelValue : {},
+            });
         } else if (type === 'object') {
             // Recurse into the child object
             rows.push(...collectMetricRows(prop, model?.[key], currentPath));

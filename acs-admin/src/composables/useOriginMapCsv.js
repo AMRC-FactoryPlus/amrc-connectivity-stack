@@ -138,7 +138,7 @@ function metricToRow(row, headerInfo) {
     const { hidePathField } = headerInfo;
 
     // Allowed Sparkplug types from the schema enum, pipe-separated
-    const allowedTypes = metricSchema?.Sparkplug_Type?.enum?.join('|') ?? '';
+    const allowedTypes = metricSchema?.Sparkplug_Type?.enum?.filter(t => t !== '').join('|') ?? '';
 
     const cells = [
         tagPath,

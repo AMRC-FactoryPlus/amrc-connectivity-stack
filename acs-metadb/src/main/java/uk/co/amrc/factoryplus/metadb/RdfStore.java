@@ -36,8 +36,6 @@ public class RdfStore
     private Model       derived;
     private Dataset     dataset;
 
-    private Map<String, Query> queries = new ConcurrentHashMap<>();
-
     /* We build a Dataset out of these named graphs:
      * - G_direct: this is G_direct from the TDB.
      * - G_derived: this is RDFS(G_direct).
@@ -52,15 +50,6 @@ public class RdfStore
 
         dataset.addNamedModel(Vocab.G_direct, direct);
         dataset.addNamedModel(Vocab.G_derived, derived);
-    }
-
-    public QueryExecutionBuilder getQuery (String key, String sparql)
-    {
-        var query = queries.computeIfAbsent(key,
-            k -> QueryFactory.create(sparql, Vocab.NS));
-
-        return QueryExecution.dataset(dataset)
-            .query(query);
     }
 
     public Dataset dataset () { return dataset; }

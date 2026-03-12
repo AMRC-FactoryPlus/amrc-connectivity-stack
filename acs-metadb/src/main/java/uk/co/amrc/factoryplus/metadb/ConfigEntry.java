@@ -79,7 +79,7 @@ public class ConfigEntry
             .get();
     }
 
-    private static final String Q_getValue = """
+    private static final Query Q_getValue = QueryFactory.create("""
         select ?value ?etag ?mtime
         where {
             ?appI <core/uuid> ?app.
@@ -91,11 +91,12 @@ public class ConfigEntry
             ?instant <core/uuid> ?etag;
                 <core/timestamp> ?mtime.
         }
-    """;
+    """, Vocab.NS);
 
     public Optional<Value> getValue ()
     {
-        var exec = store.getQuery("config/get", Q_getValue)
+        var exec = QueryExecution.dataset(store.dataset())
+            .query(Q_getValue)
             .substitution("app", Vocab.uuidLiteral(app))
             .substitution("obj", Vocab.uuidLiteral(object))
             .build();

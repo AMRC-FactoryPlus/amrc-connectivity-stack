@@ -22,6 +22,27 @@
               :regex="Object.keys(newObjectContext[newObjectContext.length-1]?.value?.patternProperties || {})[0] || '.*'"></NewObjectOverlayForm>
         </DialogContent>
       </Dialog>
+      <Dialog :open="csvDialogOpen" @update:open="(open) => { if (!open) { csvDialogOpen = false; csvParsedData = null } }">
+        <DialogContent class="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle class="flex items-center gap-2">
+              <TriangleAlert class="size-5 text-amber-500" />
+              Import CSV
+            </DialogTitle>
+            <DialogDescription>
+              This will overwrite all current metric values in the origin map with values from the CSV file.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter class="flex gap-2 sm:justify-start">
+            <Button variant="destructive" @click="handleCsvSave">
+              Save
+            </Button>
+            <Button variant="outline" @click="handleCsvReview">
+              Review
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <!-- Sidebar with fixed height and independent scrolling -->
       <Sidebar collapsible="none" class="flex flex-col ml-3 my-3 bg-gray-100/50 border rounded-lg">
         <SidebarContent class="flex flex-col h-auto">
@@ -54,6 +75,23 @@
               <i class="fa-sharp fa-solid fa-circle-notch fa-spin ml-2"></i>
             </div>
           </Button>
+          <div class="flex gap-2 mx-3 mb-3">
+            <Button variant="outline" class="flex-1" @click="handleDownloadCsv" :disabled="!schema">
+              <Download class="size-4 mr-1" />
+              Download CSV
+            </Button>
+            <Button variant="outline" class="flex-1" @click="$refs.csvFileInput.click()" :disabled="!schema">
+              <Upload class="size-4 mr-1" />
+              Upload CSV
+            </Button>
+          </div>
+          <input
+            ref="csvFileInput"
+            type="file"
+            accept=".csv"
+            class="hidden"
+            @change="handleCsvFileSelected"
+          />
         </SidebarContent>
         <SidebarRail/>
       </Sidebar>
@@ -119,6 +157,9 @@ import _ from 'lodash'
 import NewObjectOverlayForm from './NewObjectOverlayForm.vue'
 import { updateEdgeAgentConfig } from '@/utils/edgeAgentConfigUpdater'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { DialogFooter } from '@/components/ui/dialog'
+import { generateCsv, downloadCsv, parseCsv, applyCsvToModel } from '@/composables/useOriginMapCsv.js'
+import { Upload, Download, TriangleAlert } from 'lucide-vue-next'
 import Ajv from 'ajv'
 import addFormats from 'ajv-formats'
 
@@ -158,6 +199,10 @@ export default {
     DialogHeader,
     DialogTitle,
     DialogDescription,
+    DialogFooter,
+    Upload,
+    Download,
+    TriangleAlert,
     SidebarHeader,
     Sidebar,
     SidebarContent,
@@ -930,6 +975,79 @@ export default {
       }
     },
 
+    getDriverPresentation () {
+      const connectionUuid = this.device.deviceInformation?.connection
+      if (!connectionUuid) return null
+      const connectionInfo = this.conn.data.find(c => c.uuid === connectionUuid)
+      return connectionInfo?.configuration?.driver?.presentation || null
+    },
+
+    handleDownloadCsv () {
+      const driverPresentation = this.getDriverPresentation()
+      const csvString = generateCsv(this.model, this.schema, driverPresentation)
+      const deviceName = this.device.name || this.device.uuid || 'device'
+      const safeName = deviceName.replace(/[^a-zA-Z0-9_-]/g, '_')
+      downloadCsv(csvString, `${safeName}_origin_map.csv`)
+    },
+
+    handleCsvFileSelected (event) {
+      const file = event.target.files?.[0]
+      if (!file) return
+
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        const csvString = e.target.result
+        const driverPresentation = this.getDriverPresentation()
+        const { rows } = parseCsv(csvString, driverPresentation)
+
+        if (rows.length === 0) {
+          toast.error('No data rows found in CSV')
+          return
+        }
+
+        this.csvParsedData = rows
+        this.csvDialogOpen = true
+      }
+      reader.readAsText(file)
+
+      // Reset input so the same file can be re-selected
+      this.$refs.csvFileInput.value = ''
+    },
+
+    applyParsedCsv () {
+      if (!this.csvParsedData) return { applied: 0, skipped: 0 }
+      const result = applyCsvToModel(this.csvParsedData, this.model)
+
+      if (result.skipped > 0) {
+        toast.warning(`${result.skipped} row${result.skipped === 1 ? '' : 's'} skipped`, {
+          description: 'Paths not found in schema.',
+        })
+      }
+
+      this.markDirty()
+      this.groupRerenderTrigger = +new Date()
+      this.rerenderTrigger = +new Date()
+      this.selectedMetric = null
+
+      return result
+    },
+
+    async handleCsvSave () {
+      this.applyParsedCsv()
+      this.csvDialogOpen = false
+      this.csvParsedData = null
+      await this.save()
+    },
+
+    handleCsvReview () {
+      this.applyParsedCsv()
+      this.csvDialogOpen = false
+      this.csvParsedData = null
+      toast.info('CSV imported', {
+        description: 'Review changes and save manually.',
+      })
+    },
+
     async save () {
       if (this.loading) {
         return
@@ -1012,6 +1130,9 @@ export default {
       showOnlyPopulated: false,
 
       newObjectContext: null,
+
+      csvDialogOpen: false,
+      csvParsedData: null,
     }
   },
 }

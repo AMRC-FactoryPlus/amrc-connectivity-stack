@@ -1,0 +1,11 @@
+{
+  "planPath": "docs/plans/2026-03-12-csv-origin-map-import-export.md",
+  "tasks": [
+    {"id": 1, "subject": "Task 1: Install PapaParse dependency", "status": "pending"},
+    {"id": 2, "subject": "Task 2: Create useOriginMapCsv composable — tree walker and CSV generation", "status": "pending", "blockedBy": [1]},
+    {"id": 3, "subject": "Task 3: Add CSV parsing and model application to composable", "status": "pending", "blockedBy": [2]},
+    {"id": 4, "subject": "Task 4: Add Download/Upload CSV buttons and dialog to OriginMapEditor", "status": "pending", "blockedBy": [3]},
+    {"id": 5, "subject": "Task 5: Manual testing and edge case verification", "status": "pending", "blockedBy": [4]}
+  ],
+  "lastUpdated": "2026-03-12T00:00:00Z"
+}

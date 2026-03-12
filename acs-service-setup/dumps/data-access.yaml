@@ -1,0 +1,127 @@
+
+service: !u UUIDs.Service.ConfigDB
+version: 2
+objects:
+
+  !u UUIDs.Class.Service:
+    !u DataAccess.Service.DataAccess:
+      name: "Data Access Service"
+  
+  !u Auth.Class.ServiceRole:
+    !u DataAccess.Requirement.ServiceRole:
+      name: "Data Access Service Role"
+      subclassOf:
+        - !u Auth.Class.CentralService
+
+  !u ConfigDB.Class.R3Class:
+    !u DataAccess.Group.DatasetGroup:
+      name: "Dataset Group"
+    !u DataAccess.Group.DatasetRoleGroup:
+      name: "Dataset Role Group"
+      subclassOf:
+        - !u DataAccess.Group.DatasetGroup
+    !u DataAccess.Group.StructuralDatasetType:
+      name: "Structural Dataset Type"
+      subclassOf:
+        - !u DataAccess.Group.DatasetGroup
+    !u DataAccess.Group.FunctionalDatasetGroup:
+      name: "Functional Dataset Group"
+      subclassOf:
+        - !u DataAccess.Group.DatasetGroup
+      
+  !u DataAccess.Group.DatasetGroup:
+    !u DataAccess.Class.Dataset:
+      name: "Dataset"
+  
+  !u DataAccess.Group.StructuralDatasetType:
+    !u DataAccess.Class.SparkplugDevice:
+      name: "Sparkplug Device"
+      subclassOf: 
+        - !u DataAccess.Class.Dataset
+    !u DataAccess.Class.Session:
+      name: "Session"
+      subclassOf: 
+        - !u DataAccess.Class.Dataset
+    !u DataAccess.Class.Union:
+      name: "Union"
+      subclassOf: 
+        - !u DataAccess.Class.Dataset
+
+
+  !u DataAccess.Group.FunctionalDatasetGroup:
+    !u DataAccess.Class.Published:
+      name: "Published"
+      subclassOf:
+        - !u DataAccess.Class.Dataset
+    !u DataAccess.Class.Partial:
+      name: "Partial"
+      subclassOf:
+        - !u DataAccess.Class.Dataset
+    !u DataAccess.Class.MESDataset:
+      name: "MES Dataset"
+      subclassOf:
+        - !u DataAccess.Class.Dataset
+    !u DataAccess.Class.Equipment:
+      name: "Equipment"
+      subclassOf:
+        - !u DataAccess.Class.MESDataset
+    !u DataAccess.Class.WorkOrder:
+      name: "WorkOrder"
+      subclassOf:
+        - !u DataAccess.Class.MESDataset
+    !u DataAccess.Class.Product:
+      name: "Product"
+      subclassOf:
+        - !u DataAccess.Class.MESDataset
+    !u DataAccess.Class.Operation:
+      name: "Operation"
+      subclassOf:
+        - !u DataAccess.Class.MESDataset
+
+  !u ConfigDB.Class.R1Class:
+    !u DataAccess.Class.Measurement:
+      name: "Measurement"
+    !u DataAccess.Class.MES:
+      name: "MES"
+    
+    !u DataAccess.App.DatasetDefinition:
+      name: "Dataset Definition"
+      subclassOf:
+        - !u UUIDs.Class.App
+    !u DataAccess.App.DatasetMetadata:
+      name: "Dataset Metadata"
+      subclassOf:
+        - !u UUIDs.Class.App
+
+  !u DataAccess.App.DatasetDefinition:
+    !u DataAccess.App.UnionComponents:
+      name: "Union Components"
+    !u DataAccess.App.SessionLimits:
+      name: "Session Limits"
+
+  !u DataAccess.App.DatasetMetadata:
+    !u DataAccess.App.MESIdentifiers:
+      name: "MES Identifiers"  
+
+
+# Permissions
+  !u Auth.Class.ServicePerms:
+    !u DataAccess.Perm.All:
+      name: "Data Access Permission"
+      subclassOf:
+        - !u Auth.Class.Permission
+
+  !u DataAccess.Perm.All:
+    !u DataAccess.Perm.CreateDataset:
+      name: "Create Dataset"
+    !u DataAccess.Perm.IncludeInUnion:
+      name: "Include In Union"
+    !u DataAccess.Perm.ReadDataset:
+      name: "Read Dataset"
+    !u DataAccess.Perm.UseForSession:
+      name: "Use for Session"
+    !u DataAccess.Perm.EditDataset:
+      name: "Edit Dataset"
+
+      
+

@@ -253,3 +253,125 @@ export function downloadCsv(csvString, filename) {
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
 }
+
+/**
+ * Build a reverse mapping from CSV column headers to canonical field names.
+ *
+ * @param {string[]} headers - The CSV column headers
+ * @param {object|null} driverPresentation - Driver presentation config
+ * @returns {Object<string, string>} Map from CSV column name to canonical field name
+ */
+function buildHeaderMap(headers, driverPresentation) {
+    const addressLabel = driverPresentation?.address?.title || 'Device Address';
+    const pathLabel = driverPresentation?.path?.title || 'Metric Path';
+
+    const map = {};
+
+    for (const header of headers) {
+        if (header === addressLabel) {
+            map[header] = 'Address';
+        } else if (header === pathLabel) {
+            map[header] = 'Path';
+        } else {
+            map[header] = header;
+        }
+    }
+
+    return map;
+}
+
+/**
+ * Parse a CSV string and return structured rows with canonical field names.
+ *
+ * @param {string} csvString - The CSV content to parse
+ * @param {object|null} driverPresentation - Driver presentation config
+ *   (i.e. driverInfo.presentation), or null for defaults.
+ * @returns {{ rows: Array<{ tagPath: string, fields: Object }> }}
+ */
+export function parseCsv(csvString, driverPresentation) {
+    const parsed = Papa.parse(csvString, { header: true, skipEmptyLines: true });
+    const headerMap = buildHeaderMap(parsed.meta.fields || [], driverPresentation);
+
+    const rows = [];
+
+    for (const row of parsed.data) {
+        // Check if the first value starts with "---" (delimiter for help section)
+        const firstValue = Object.values(row)[0];
+        if (typeof firstValue === 'string' && firstValue.startsWith('---')) {
+            break;
+        }
+
+        const tagPath = row['Tag_Path'];
+        if (!tagPath || tagPath.trim() === '') {
+            continue;
+        }
+
+        const fields = {};
+        for (const [csvCol, value] of Object.entries(row)) {
+            const canonicalName = headerMap[csvCol] || csvCol;
+
+            // Skip non-writable fields
+            if (canonicalName === 'Tag_Path' || canonicalName === 'Allowed_Sparkplug_Types') {
+                continue;
+            }
+
+            fields[canonicalName] = value;
+        }
+
+        rows.push({ tagPath, fields });
+    }
+
+    return { rows };
+}
+
+/**
+ * Apply parsed CSV rows to the origin map model in place.
+ *
+ * @param {Array<{ tagPath: string, fields: Object }>} rows - Parsed CSV rows
+ * @param {object} model - The origin map model to update in place
+ * @returns {{ applied: number, skipped: number }}
+ */
+export function applyCsvToModel(rows, model) {
+    let applied = 0;
+    let skipped = 0;
+
+    for (const { tagPath, fields } of rows) {
+        const segments = tagPath.split('/');
+        let current = model;
+        let found = true;
+
+        for (const segment of segments) {
+            if (current == null || typeof current !== 'object' || !(segment in current)) {
+                found = false;
+                break;
+            }
+            current = current[segment];
+        }
+
+        if (!found || current == null || typeof current !== 'object') {
+            skipped++;
+            continue;
+        }
+
+        for (const [field, value] of Object.entries(fields)) {
+            if (value === '' || value === null || value === undefined) {
+                delete current[field];
+            } else if (field === 'Record_To_Historian') {
+                current[field] = value.toLowerCase() === 'true';
+            } else if (field === 'Eng_Low' || field === 'Eng_High' || field === 'Deadband') {
+                const num = Number(value);
+                if (!isNaN(num)) {
+                    current[field] = num;
+                } else {
+                    current[field] = value.trim();
+                }
+            } else {
+                current[field] = value.trim();
+            }
+        }
+
+        applied++;
+    }
+
+    return { applied, skipped };
+}

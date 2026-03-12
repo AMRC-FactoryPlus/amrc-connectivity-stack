@@ -156,15 +156,13 @@ import { useConnectionStore } from '@store/useConnectionStore.js'
 import _ from 'lodash'
 import NewObjectOverlayForm from './NewObjectOverlayForm.vue'
 import { updateEdgeAgentConfig } from '@/utils/edgeAgentConfigUpdater'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { DialogFooter } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { generateCsv, downloadCsv, parseCsv, applyCsvToModel } from '@/composables/useOriginMapCsv.js'
-import { Upload, Download, TriangleAlert } from 'lucide-vue-next'
 import Ajv from 'ajv'
 import addFormats from 'ajv-formats'
 
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarInset, SidebarMenu, SidebarMenuBadge, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarRail, SidebarTrigger } from '@/components/ui/sidebar'
-import { File } from 'lucide-vue-next'
+import { Download, File, TriangleAlert, Upload } from 'lucide-vue-next'
 import Tree from './Tree.vue'
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
 import { Separator } from '@/components/ui/separator'
@@ -1026,6 +1024,10 @@ export default {
     applyParsedCsv () {
       if (!this.csvParsedData) return { applied: 0, skipped: 0 }
       const result = applyCsvToModel(this.csvParsedData, this.model)
+
+      if (result.applied > 0) {
+        toast.success(`${result.applied} metric${result.applied === 1 ? '' : 's'} updated from CSV`)
+      }
 
       if (result.skipped > 0) {
         toast.warning(`${result.skipped} row${result.skipped === 1 ? '' : 's'} skipped`, {

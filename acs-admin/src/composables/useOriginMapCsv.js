@@ -135,11 +135,15 @@ function metricToRow(row, headerInfo) {
     const { hidePathField } = headerInfo;
 
     // Allowed Sparkplug types from the schema enum, pipe-separated
-    const allowedTypes = metricSchema?.Sparkplug_Type?.enum?.filter(t => t !== '').join('|') ?? '';
+    const allowedTypesList = metricSchema?.Sparkplug_Type?.enum?.filter(t => t !== '') ?? [];
+    const allowedTypes = allowedTypesList.join('|');
+
+    // Default Sparkplug_Type to the first allowed type if not yet set
+    const sparkplugType = modelValues.Sparkplug_Type || allowedTypesList[0] || '';
 
     const cells = [
         tagPath,
-        modelValues.Sparkplug_Type ?? '',
+        sparkplugType,
         allowedTypes,
         modelValues.Address ?? '',
     ];

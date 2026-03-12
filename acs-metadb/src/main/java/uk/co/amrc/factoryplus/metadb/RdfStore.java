@@ -71,11 +71,11 @@ public class RdfStore
         if (klasses.isEmpty())
             return Optional.empty();
         if (klasses.size() > 1)
-            throw new CorruptionException("More than one candidate", uuid);
+            throw new Err.CorruptRDF("More than one candidate", uuid);
         
         var klass = klasses.get(0);
         if (!klass.isURIResource())
-            throw new CorruptionException("UUID does not name a URI", uuid);
+            throw new Err.CorruptRDF("UUID does not name a URI", uuid);
 
         return Optional.of(klass);
     }
@@ -89,7 +89,7 @@ public class RdfStore
     public Resource findObjectOr404 (UUID uuid)
     {
         return findObject(uuid)
-            .orElseThrow(() -> new WebApplicationException(404));
+            .orElseThrow(() -> new Err.NotFound(uuid.toString()));
     }
 
     public Optional<ConfigEntry.Value> getConfig (UUID app, UUID obj)

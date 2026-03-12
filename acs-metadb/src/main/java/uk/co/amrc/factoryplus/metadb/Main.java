@@ -14,6 +14,7 @@ import org.glassfish.grizzly.http.server.HttpServer;
 import org.glassfish.jersey.grizzly2.httpserver.GrizzlyHttpServerFactory;
 import org.glassfish.jersey.inject.hk2.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
+import org.glassfish.jersey.server.ServerProperties;
 
 public final class Main {
     public static void main (String[] args) throws Throwable
@@ -59,6 +60,7 @@ public final class Main {
 
         final var model = this.model;
         final var rc = new ResourceConfig()
+            .property(ServerProperties.PROCESSING_RESPONSE_ERRORS_ENABLED, true)
             .packages("uk.co.amrc.factoryplus.metadb")
             .register(new AbstractBinder () {
                 protected void configure () {

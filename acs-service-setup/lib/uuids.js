@@ -443,12 +443,13 @@ export const DataAccess = {
         WorkOrder: "b416e44c-c57e-4486-9431-64c425f1b2c6",
         Product: "4a089748-b26b-4f12-8f1a-164bfba97809",
         Operation: "bd0354eb-b8f7-4bd9-8407-0588e545603c",
+        MES: "2c691583-89fe-4421-bf2c-64e34e663711"
     },
 
     Group: {
         DatasetGroup: "17e37253-8626-4031-b217-28c6a03e91c1",
         DatasetRoleGroup: "56c52f70-0649-4962-8526-9ec9d1c85ca4",
-        StructuralDatasetGroup: "70ff7bea-bb2d-48c2-88fd-4f7a79b1aa3c", 
+        StructuralDatasetType: "70ff7bea-bb2d-48c2-88fd-4f7a79b1aa3c", 
         FunctionalDatasetGroup: "86e5b048-e956-4820-939e-3abf3eda4e03", 
     }, 
     

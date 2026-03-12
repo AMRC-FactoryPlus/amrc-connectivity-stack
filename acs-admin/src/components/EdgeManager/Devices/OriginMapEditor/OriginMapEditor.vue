@@ -994,7 +994,16 @@ export default {
       const file = event.target.files?.[0]
       if (!file) return
 
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error('CSV file is too large', { description: 'Maximum file size is 5 MB.' })
+        this.$refs.csvFileInput.value = ''
+        return
+      }
+
       const reader = new FileReader()
+      reader.onerror = () => {
+        toast.error('Failed to read file')
+      }
       reader.onload = (e) => {
         const csvString = e.target.result
         const driverPresentation = this.getDriverPresentation()

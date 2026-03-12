@@ -1067,6 +1067,10 @@ export default {
         toast.success(`${result.applied} metric${result.applied === 1 ? '' : 's'} updated from CSV`)
       }
 
+      if (result.applied > 0) {
+        toast.success(`${result.applied} metric${result.applied === 1 ? '' : 's'} updated from CSV`)
+      }
+
       if (result.skipped > 0) {
         toast.warning(`${result.skipped} row${result.skipped === 1 ? '' : 's'} skipped`, {
           description: 'Paths not found in schema.',

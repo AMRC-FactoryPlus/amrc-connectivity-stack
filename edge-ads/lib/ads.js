@@ -38,6 +38,8 @@ export class ADSHandler {
      * @param {number} [conf.localAdsPort] - Local ADS port (auto-assigned if not specified)
      * @param {number} [conf.timeoutDelay=5000] - Connection timeout in milliseconds
      * @param {boolean} [conf.hideConsoleWarnings=true] - Hide ADS client console warnings
+     * @param {boolean} [conf.allowHalfOpen=false] - Allow half-open connections
+     * @param {boolean} [conf.rawClient=false] - Use raw client mode (no automatic reconnection)
      */
     constructor(driver, conf) {
         this.driver = driver;
@@ -64,6 +66,8 @@ export class ADSHandler {
             routerTcpPort: conf.routerTcpPort || 48898, // Default: ADS router port
             timeoutDelay: conf.timeoutDelay || 5000,    // Default: 5 second timeout
             hideConsoleWarnings: conf.hideConsoleWarnings !== false, // Default: hide warnings
+            allowHalfOpen: conf.allowHalfOpen || false,  // Default: don't allow half-open
+            rawClient: conf.rawClient || false,  // Default: don't use raw client
         };
 
         // Add optional local AMS configuration if specified
@@ -77,6 +81,8 @@ export class ADSHandler {
 
         // Create the ADS client instance with our configuration
         this.client = new Client(clientConfig);
+
+        this.client.setDebugLevel(3);
 
         // Set up connection event handlers
         // These handlers manage the connection lifecycle and notify the Edge Agent
@@ -146,6 +152,13 @@ export class ADSHandler {
         const conf = this.conf;
 
         this.log("Connecting to ADS target %s at %s", conf.targetAmsNetId, conf.routerAddress);
+
+        // try {
+        //     this.log("Disconnecting before connect...")
+        //     this.client.disconnect()
+        // } catch (e) {
+        //     this.log("Could not disconnect before connect: %o", e);
+        // }
 
         // Attempt connection to the ADS target
         // This returns a Promise that resolves with connection info or rejects with error

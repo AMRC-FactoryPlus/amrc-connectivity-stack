@@ -43,23 +43,10 @@ public class ConfigEntry
 
     public record Value (JsonValue value, String etag, Instant mtime) {}
 
-    public static class Error extends CorruptionException
-    {
-        private UUID app;
-
-        public Error (String msg, UUID app, UUID obj)
-        {
-            super(msg, obj);
-            this.app = app;
-        }
-
-        public UUID app () { return app; }
-    }
-
-    private Error error (String fmt, Object... args)
+    private Err.Config error (String fmt, Object... args)
     {
         String msg = String.format(fmt, args);
-        return new Error(msg, app, object);
+        return new Err.Config(msg, app, object);
     }
 
     private <T> T extractLiteral (RDFNode node, Resource type, 

@@ -30,24 +30,12 @@ public class V2Config {
     private static final Logger log = LoggerFactory.getLogger(V2Config.class);
 
     @Inject                 RdfStore store;
-    @PathParam("app")       String appS;
-    @PathParam("object")    String objS;
-
-    private UUID app;
-    private UUID obj;
-
-    private void resolveUUIDs ()
-    {
-        app = Vocab.parseUUID(appS)
-            .orElseThrow(() -> new WebApplicationException(410));
-        obj = Vocab.parseUUID(objS)
-            .orElseThrow(() -> new WebApplicationException(410));
-    }
+    @PathParam("app")       UUID app;
+    @PathParam("object")    UUID obj;
 
     @GET 
     public Response get ()
     {
-        resolveUUIDs();
         log.info("Get config for {}/{}", app, obj);
         var entry = store.calculateRead(() -> {
             return store.getConfig(app, obj);
@@ -67,7 +55,6 @@ public class V2Config {
     @PUT 
     public void put (JsonValue config)
     {
-        resolveUUIDs();
         log.info("Put config for {}/{}", app, obj);
         store.executeWrite(() -> {
             //putConfig(config);
@@ -77,7 +64,6 @@ public class V2Config {
     @DELETE
     public void delete ()
     {
-        resolveUUIDs();
         log.info("Delete config for {}/{}", app, obj);
         store.executeWrite(() -> {
             //store.direct().removeAll(objR, appP, null);
@@ -87,10 +73,8 @@ public class V2Config {
     @PATCH @Consumes("application/merge-patch+json")
     public void mergePatch (JsonValue json)
     {
-        resolveUUIDs();
         var patch = Json.createMergePatch(json);
         store.executeWrite(() -> {
-            resolveUUIDs();
             var o_conf = store.getConfig(app, obj)
                 .map(e -> e.value())
                 .orElse(JsonValue.EMPTY_JSON_OBJECT);

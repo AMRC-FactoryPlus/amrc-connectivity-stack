@@ -13,3 +13,10 @@ tokio = { version = "1", features = ["full"] }
 tracing = "0.1"
 thiserror = "2"
 url = "2"
+
+[dev-dependencies]
+tracing-subscriber = "0.3"
+
+[[example]]
+name = "test_driver"
+path = "examples/test_driver.rs"

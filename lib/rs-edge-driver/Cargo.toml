@@ -8,6 +8,8 @@ async-trait = "0.1"
 bytes = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+rumqttc = "0.24"
 tokio = { version = "1", features = ["full"] }
 tracing = "0.1"
 thiserror = "2"
+url = "2"

@@ -2,10 +2,12 @@ use std::collections::HashMap;
 use std::marker::PhantomData;
 
 use bytes::Bytes;
+use rumqttc::{AsyncClient, Event, Incoming, MqttOptions, QoS};
+use serde::Deserialize;
 use tokio::sync::mpsc;
 
 use crate::config::DriverConfig;
-use crate::error::Error;
+use crate::error::{ConnectError, Error};
 use crate::handler::Handler;
 use crate::status::Status;
 
@@ -43,6 +45,13 @@ impl DriverHandle {
             payload: data,
         });
     }
+}
+
+/// The address configuration packet sent by the edge agent.
+#[derive(Deserialize)]
+struct AddrConfig {
+    version: u32,
+    addrs: HashMap<String, String>,
 }
 
 /// The driver runtime. Manages the MQTT connection to the edge agent,
@@ -87,6 +96,16 @@ impl<H: Handler> Driver<H> {
         }
     }
 
+    /// Build the `fpEdge1/{id}/{msg}` topic string.
+    fn topic(&self, msg: &str) -> String {
+        format!("fpEdge1/{}/{}", self.config.username, msg)
+    }
+
+    /// Build the `fpEdge1/{id}/{msg}/{data}` topic string.
+    fn topic_with(&self, msg: &str, data: &str) -> String {
+        format!("fpEdge1/{}/{}/{}", self.config.username, msg, data)
+    }
+
     /// Run the driver's main event loop.
     ///
     /// This connects to the edge agent's MQTT broker, listens for
@@ -104,28 +123,396 @@ impl<H: Handler> Driver<H> {
     ///    **Async**: call `Handler::subscribe`, receive data via `DriverHandle::publish`
     /// 6. On reconfiguration: call `Handler::close`, restart from step 2
     pub async fn run(&mut self) -> Result<(), Error> {
-        // TODO: implement MQTT connection and event loop
-        //
-        // This will involve:
-        // - Connecting to the MQTT broker at self.config.mqtt_url
-        // - Setting last-will to fpEdge1/{id}/status → "DOWN"
-        // - Subscribing to fpEdge1/{id}/active, conf, addr, poll, cmd/#
-        // - Publishing status updates
-        // - Dispatching incoming messages to handler methods
-        // - Managing reconnection on device connection failures
-
         tracing::info!(
             mqtt = %self.config.mqtt_url,
             id = %self.config.username,
             "driver starting"
         );
 
-        todo!("MQTT event loop not yet implemented")
+        let (tx, mut rx) = mpsc::unbounded_channel::<DriverEvent>();
+        self.run_loop(&tx, &mut rx).await
+    }
+
+    async fn run_loop(
+        &mut self,
+        tx: &mpsc::UnboundedSender<DriverEvent>,
+        rx: &mut mpsc::UnboundedReceiver<DriverEvent>,
+    ) -> Result<(), Error> {
+        loop {
+            tracing::info!("connecting to MQTT broker");
+            let result = self.mqtt_session(tx, rx).await;
+            match result {
+                Ok(()) => {
+                    tracing::info!("MQTT session ended cleanly");
+                }
+                Err(e) => {
+                    tracing::error!(%e, "MQTT session error");
+                }
+            }
+
+            // Clean up handler on disconnect
+            if let Some(handler) = self.handler.as_mut() {
+                handler.close().await;
+            }
+            self.handler = None;
+            self.clear_addrs();
+            self.status = Status::Down;
+
+            tracing::info!(
+                delay = ?self.config.reconnect_delay,
+                "reconnecting to MQTT broker"
+            );
+            tokio::time::sleep(self.config.reconnect_delay).await;
+        }
+    }
+
+    /// Run a single MQTT session. Returns when the connection is lost.
+    async fn mqtt_session(
+        &mut self,
+        tx: &mpsc::UnboundedSender<DriverEvent>,
+        rx: &mut mpsc::UnboundedReceiver<DriverEvent>,
+    ) -> Result<(), Error> {
+        let (client, mut eventloop) = self.connect_mqtt()?;
+
+        // Subscribe to our control topics
+        let subs = ["active", "conf", "addr", "poll", "cmd/#"];
+        for sub in &subs {
+            client
+                .subscribe(self.topic(sub), QoS::AtMostOnce)
+                .await
+                .map_err(|e| Error::Mqtt(e.to_string()))?;
+        }
+
+        self.publish_status(&client).await;
+
+        // Main event loop: select between MQTT events and handler data
+        loop {
+            tokio::select! {
+                event = eventloop.poll() => {
+                    match event {
+                        Ok(Event::Incoming(incoming)) => {
+                            self.handle_incoming(&client, tx, incoming).await?;
+                        }
+                        Ok(_) => {}
+                        Err(e) => {
+                            return Err(Error::Mqtt(e.to_string()));
+                        }
+                    }
+                }
+                Some(event) = rx.recv() => {
+                    self.handle_driver_event(&client, event).await;
+                }
+            }
+        }
+    }
+
+    /// Create the MQTT client and set up connection options.
+    fn connect_mqtt(&self) -> Result<(AsyncClient, rumqttc::EventLoop), Error> {
+        let url = url::Url::parse(&self.config.mqtt_url)
+            .map_err(|e| Error::Mqtt(format!("invalid MQTT URL: {e}")))?;
+
+        let host = url
+            .host_str()
+            .ok_or_else(|| Error::Mqtt("MQTT URL has no host".into()))?;
+        let port = url.port().unwrap_or(1883);
+
+        let mut opts = MqttOptions::new(&self.config.username, host, port);
+        opts.set_credentials(&self.config.username, &self.config.password);
+        opts.set_last_will(rumqttc::LastWill::new(
+            self.topic("status"),
+            "DOWN",
+            QoS::AtLeastOnce,
+            true,
+        ));
+        opts.set_keep_alive(std::time::Duration::from_secs(30));
+
+        let (client, eventloop) = AsyncClient::new(opts, 64);
+        Ok((client, eventloop))
+    }
+
+    /// Handle an incoming MQTT message.
+    async fn handle_incoming(
+        &mut self,
+        client: &AsyncClient,
+        tx: &mpsc::UnboundedSender<DriverEvent>,
+        incoming: Incoming,
+    ) -> Result<(), Error> {
+        let publish = match incoming {
+            Incoming::Publish(p) => p,
+            Incoming::ConnAck(_) => {
+                self.set_status(Status::Ready);
+                self.publish_status(client).await;
+                return Ok(());
+            }
+            _ => return Ok(()),
+        };
+
+        let prefix = self.topic("");
+        let suffix = publish
+            .topic
+            .strip_prefix(&prefix)
+            .unwrap_or(&publish.topic);
+
+        // Split into message type and optional data
+        let (msg, data) = match suffix.split_once('/') {
+            Some((m, d)) => (m, Some(d)),
+            None => (suffix, None),
+        };
+
+        match msg {
+            "active" => self.on_active(&publish.payload),
+            "conf" => self.on_conf(client, tx, &publish.payload).await,
+            "addr" => self.on_addr(client, &publish.payload).await,
+            "poll" => self.on_poll(client, &publish.payload).await,
+            "cmd" => {
+                if let Some(name) = data {
+                    self.on_cmd(name, Bytes::from(publish.payload.to_vec()))
+                        .await;
+                }
+            }
+            other => {
+                tracing::warn!(msg = other, "unhandled message type");
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Handle `active` message from the edge agent.
+    fn on_active(&mut self, payload: &[u8]) {
+        if payload == b"ONLINE" {
+            tracing::info!("edge agent online");
+            self.set_status(Status::Ready);
+        }
+    }
+
+    /// Handle `conf` message — create a new handler.
+    async fn on_conf(
+        &mut self,
+        client: &AsyncClient,
+        tx: &mpsc::UnboundedSender<DriverEvent>,
+        payload: &[u8],
+    ) {
+        let conf: serde_json::Value = match serde_json::from_slice(payload) {
+            Ok(v) => v,
+            Err(e) => {
+                tracing::error!(%e, "failed to parse conf JSON");
+                self.set_status(Status::Conf);
+                self.publish_status(client).await;
+                return;
+            }
+        };
+
+        tracing::debug!(?conf, "received device configuration");
+
+        // Close old handler
+        if let Some(handler) = self.handler.as_mut() {
+            handler.close().await;
+        }
+        self.handler = None;
+        self.clear_addrs();
+
+        // Create new handler
+        let handle = DriverHandle::new(tx.clone());
+        match H::create(handle, conf) {
+            Ok(handler) => {
+                self.handler = Some(handler);
+                self.connect_handler(client).await;
+            }
+            Err(e) => {
+                tracing::error!(reason = %e, "handler rejected configuration");
+                self.set_status(Status::Conf);
+                self.publish_status(client).await;
+            }
+        }
+    }
+
+    /// Attempt to connect the handler to its southbound device,
+    /// retrying on failure after the configured delay.
+    async fn connect_handler(&mut self, client: &AsyncClient) {
+        loop {
+            let handler = match self.handler.as_mut() {
+                Some(h) => h,
+                None => return,
+            };
+
+            match handler.connect().await {
+                Ok(()) => {
+                    self.set_status(Status::Up);
+                    self.publish_status(client).await;
+                    self.try_subscribe().await;
+                    return;
+                }
+                Err(ConnectError::ConnectionFailed) => {
+                    tracing::warn!("handler connection failed, retrying");
+                    self.set_status(Status::Conn);
+                    self.publish_status(client).await;
+                }
+                Err(ConnectError::AuthFailed) => {
+                    tracing::warn!("handler auth failed, retrying");
+                    self.set_status(Status::Auth);
+                    self.publish_status(client).await;
+                }
+            }
+
+            tokio::time::sleep(self.config.reconnect_delay).await;
+        }
+    }
+
+    /// Handle `addr` message — parse and store address mappings.
+    async fn on_addr(&mut self, client: &AsyncClient, payload: &[u8]) {
+        let pkt: AddrConfig = match serde_json::from_slice(payload) {
+            Ok(v) => v,
+            Err(e) => {
+                tracing::error!(%e, "failed to parse addr JSON");
+                self.set_status(Status::Addr);
+                self.publish_status(client).await;
+                return;
+            }
+        };
+
+        if pkt.version != 1 {
+            tracing::error!(version = pkt.version, "unsupported addr config version");
+            self.set_status(Status::Addr);
+            self.publish_status(client).await;
+            return;
+        }
+
+        let handler = match self.handler.as_ref() {
+            Some(h) => h,
+            None => {
+                tracing::warn!("received addrs without handler");
+                return;
+            }
+        };
+
+        // Parse all addresses into a temporary vec first to avoid
+        // holding an immutable borrow on self.handler while mutating
+        // self.addrs/topics.
+        let mut parsed_addrs = Vec::with_capacity(pkt.addrs.len());
+        for (topic, raw_addr) in &pkt.addrs {
+            match handler.parse_addr(raw_addr) {
+                Some(parsed) => {
+                    parsed_addrs.push((topic.clone(), parsed));
+                }
+                None => {
+                    tracing::error!(addr = raw_addr, "handler rejected address");
+                    self.clear_addrs();
+                    self.set_status(Status::Addr);
+                    self.publish_status(client).await;
+                    return;
+                }
+            }
+        }
+
+        self.clear_addrs();
+        for (topic, parsed) in parsed_addrs {
+            self.topics.insert(parsed.clone(), topic.clone());
+            self.addrs.insert(topic, parsed);
+        }
+
+        tracing::info!(count = self.addrs.len(), "addresses configured");
+        self.try_subscribe().await;
+    }
+
+    /// Handle `poll` message — poll the handler for each requested topic.
+    async fn on_poll(&mut self, client: &AsyncClient, payload: &[u8]) {
+        let payload_str = match std::str::from_utf8(payload) {
+            Ok(s) => s,
+            Err(_) => return,
+        };
+
+        // Collect (topic, addr) pairs first so we don't hold a borrow
+        // on self.addrs while also borrowing self.handler mutably.
+        let polls: Vec<(String, H::Addr)> = payload_str
+            .lines()
+            .filter_map(|line| {
+                let topic = line.trim();
+                if topic.is_empty() {
+                    return None;
+                }
+                match self.addrs.get(topic) {
+                    Some(a) => Some((topic.to_owned(), a.clone())),
+                    None => {
+                        tracing::warn!(topic, "poll for unknown topic");
+                        None
+                    }
+                }
+            })
+            .collect();
+
+        let handler = match self.handler.as_mut() {
+            Some(h) => h,
+            None => return,
+        };
+
+        let id = &self.config.username;
+        for (topic, addr) in &polls {
+            if let Some(data) = handler.poll(addr).await {
+                let mtopic = format!("fpEdge1/{id}/data/{topic}");
+                if let Err(e) = client.publish(&mtopic, QoS::AtMostOnce, false, data).await {
+                    tracing::error!(%e, %topic, "failed to publish poll data");
+                }
+            }
+        }
+    }
+
+    /// Handle `cmd` message — forward to handler.
+    async fn on_cmd(&mut self, command: &str, payload: Bytes) {
+        if let Some(handler) = self.handler.as_mut() {
+            handler.cmd(command, payload).await;
+        }
+    }
+
+    /// Try to call handler.subscribe() if we're UP and have addresses.
+    async fn try_subscribe(&mut self) {
+        if self.status != Status::Up || self.addrs.is_empty() {
+            return;
+        }
+
+        let specs: Vec<H::Addr> = self.addrs.values().cloned().collect();
+
+        if let Some(handler) = self.handler.as_mut() {
+            if !handler.subscribe(&specs).await {
+                tracing::error!("handler subscription failed");
+            }
+        }
+    }
+
+    /// Handle a DriverEvent from the handler channel (async data publish).
+    async fn handle_driver_event(&self, client: &AsyncClient, event: DriverEvent) {
+        match event {
+            DriverEvent::Data { topic, payload } => {
+                // Look up the MQTT data topic from the address topic
+                let mtopic = self.topic_with("data", &topic);
+                if let Err(e) = client
+                    .publish(&mtopic, QoS::AtMostOnce, false, payload)
+                    .await
+                {
+                    tracing::error!(%e, topic, "failed to publish async data");
+                }
+            }
+        }
+    }
+
+    fn clear_addrs(&mut self) {
+        self.addrs.clear();
+        self.topics.clear();
     }
 
     fn set_status(&mut self, status: Status) {
         self.status = status;
         tracing::info!(%status, "driver status changed");
-        // TODO: publish to fpEdge1/{id}/status
+    }
+
+    async fn publish_status(&self, client: &AsyncClient) {
+        let topic = self.topic("status");
+        let payload = self.status.to_string();
+        if let Err(e) = client
+            .publish(&topic, QoS::AtLeastOnce, true, payload)
+            .await
+        {
+            tracing::error!(%e, "failed to publish status");
+        }
     }
 }

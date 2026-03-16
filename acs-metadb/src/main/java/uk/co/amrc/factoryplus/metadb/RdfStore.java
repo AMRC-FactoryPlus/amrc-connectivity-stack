@@ -33,7 +33,7 @@ public class RdfStore
     private static final Logger log = LoggerFactory.getLogger(RdfStore.class);
 
     private Model       direct;
-    private Model       derived;
+    private InfModel    derived;
     private Dataset     dataset;
 
     /* We build a Dataset out of these named graphs:
@@ -54,7 +54,7 @@ public class RdfStore
 
     public Dataset dataset () { return dataset; }
     public Model direct () { return direct; }
-    public Model derived () { return derived; }
+    public InfModel derived () { return derived; }
 
     public void executeRead (Runnable r) { dataset.executeRead(r); }
     public void executeWrite (Runnable r) { dataset.executeWrite(r); }

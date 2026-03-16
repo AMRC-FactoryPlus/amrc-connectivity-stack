@@ -224,7 +224,14 @@ public class Sparql {
         var lang = RDF_HANDLER.contentLang(type);
         var graph = resolveGraph(true);
 
-        store.executeWrite(() -> readToGraph(graph, rdf, lang));
+        store.executeWrite(() -> {
+            readToGraph(graph, rdf, lang);
+            /* This refreshes the inferences because we have been poking
+             * around behind its back. Strictly this is only needed when
+             * we load to a graph which is a source for the inference,
+             * but graph load will not be a common operation. */
+            store.derived().rebind();
+        });
     }
 
     @PUT @Path("rdf")
@@ -238,6 +245,7 @@ public class Sparql {
         store.executeWrite(() -> {
             graph.removeAll();
             readToGraph(graph, rdf, lang);
+            store.derived().rebind();
         });
     }
 }

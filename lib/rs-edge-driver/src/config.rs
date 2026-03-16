@@ -16,6 +16,10 @@ pub struct DriverConfig {
     pub password: String,
     /// How long to wait before retrying a failed device connection.
     pub reconnect_delay: Duration,
+    /// Whether to poll addresses serially (one at a time) rather than
+    /// in parallel. Serial mode is needed for protocols like Modbus
+    /// that cannot handle concurrent requests.
+    pub serial_poll: bool,
 }
 
 impl DriverConfig {
@@ -29,6 +33,7 @@ impl DriverConfig {
             username: required_env("EDGE_USERNAME")?,
             password: required_env("EDGE_PASSWORD")?,
             reconnect_delay: Duration::from_secs(5),
+            serial_poll: false,
         })
     }
 }

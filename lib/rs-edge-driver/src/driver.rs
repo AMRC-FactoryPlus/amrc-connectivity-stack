@@ -1,15 +1,24 @@
 use std::collections::HashMap;
 use std::marker::PhantomData;
+use std::sync::Arc;
+use std::time::Duration;
 
 use bytes::Bytes;
 use rumqttc::{AsyncClient, Event, Incoming, MqttOptions, QoS};
 use serde::Deserialize;
-use tokio::sync::mpsc;
+use tokio::sync::{Mutex, mpsc};
 
 use crate::config::DriverConfig;
 use crate::error::{ConnectError, Error};
 use crate::handler::Handler;
 use crate::status::Status;
+
+/// Maximum number of poll batches that can queue before we start
+/// dropping requests (backpressure). Matches the JS/Python versions.
+const POLL_QUEUE_MAX: usize = 20;
+
+/// Timeout for a single poll operation.
+const POLL_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// A handle given to [`Handler`] implementations so they can push
 /// data back to the driver asynchronously.
@@ -75,7 +84,7 @@ struct AddrConfig {
 pub struct Driver<H: Handler> {
     config: DriverConfig,
     status: Status,
-    handler: Option<H>,
+    handler: Option<Arc<Mutex<H>>>,
     /// topic → parsed address
     addrs: HashMap<String, H::Addr>,
     /// parsed address → topic (reverse lookup for async publishing)
@@ -83,7 +92,7 @@ pub struct Driver<H: Handler> {
     _marker: PhantomData<H>,
 }
 
-impl<H: Handler> Driver<H> {
+impl<H: Handler + 'static> Driver<H> {
     /// Create a new driver with the given configuration.
     pub fn new(config: DriverConfig) -> Self {
         Self {
@@ -181,17 +190,35 @@ impl<H: Handler> Driver<H> {
 
         self.set_status(Status::Ready, &client).await;
 
+        // Create the bounded poll channel for this session
+        let (poll_tx, poll_rx) = mpsc::channel::<Vec<(String, H::Addr)>>(POLL_QUEUE_MAX);
+
+        // Shared handler reference for the poll worker. Updated by
+        // on_conf when a new handler is created.
+        let poll_handler: Arc<Mutex<Option<Arc<Mutex<H>>>>> = Arc::new(Mutex::new(None));
+
+        // Spawn the poll worker task
+        let poll_worker = tokio::spawn(Self::poll_worker(
+            poll_rx,
+            poll_handler.clone(),
+            client.clone(),
+            self.config.username.clone(),
+            self.config.serial_poll,
+        ));
+
         // Main event loop: select between MQTT events and handler data
-        loop {
+        let result: Result<(), Error> = loop {
             tokio::select! {
                 event = eventloop.poll() => {
                     match event {
                         Ok(Event::Incoming(incoming)) => {
-                            self.handle_incoming(&client, tx, incoming).await?;
+                            self.handle_incoming(
+                                &client, tx, &poll_tx, &poll_handler, incoming,
+                            ).await?;
                         }
                         Ok(_) => {}
                         Err(e) => {
-                            return Err(Error::Mqtt(e.to_string()));
+                            break Err(Error::Mqtt(e.to_string()));
                         }
                     }
                 }
@@ -199,7 +226,105 @@ impl<H: Handler> Driver<H> {
                     self.handle_driver_event(&client, event).await;
                 }
             }
+        };
+
+        // Clean up the poll worker when the session ends
+        poll_worker.abort();
+        result
+    }
+
+    /// Background task that processes poll requests from the channel.
+    async fn poll_worker(
+        mut poll_rx: mpsc::Receiver<Vec<(String, H::Addr)>>,
+        handler_ref: Arc<Mutex<Option<Arc<Mutex<H>>>>>,
+        client: AsyncClient,
+        id: String,
+        serial: bool,
+    ) {
+        while let Some(polls) = poll_rx.recv().await {
+            let handler_arc = {
+                let guard = handler_ref.lock().await;
+                match guard.clone() {
+                    Some(h) => h,
+                    None => continue,
+                }
+            };
+
+            if serial {
+                Self::poll_serial(&handler_arc, &client, &id, &polls).await;
+            } else {
+                Self::poll_parallel(&handler_arc, &client, &id, polls).await;
+            }
         }
+    }
+
+    /// Poll addresses one at a time, holding the handler lock for each.
+    async fn poll_serial(
+        handler: &Arc<Mutex<H>>,
+        client: &AsyncClient,
+        id: &str,
+        polls: &[(String, H::Addr)],
+    ) {
+        for (topic, addr) in polls {
+            let result = tokio::time::timeout(POLL_TIMEOUT, async {
+                let mut h = handler.lock().await;
+                h.poll(addr).await
+            })
+            .await;
+
+            match result {
+                Ok(Some(data)) => {
+                    let mtopic = format!("fpEdge1/{id}/data/{topic}");
+                    if let Err(e) = client.publish(&mtopic, QoS::AtMostOnce, false, data).await {
+                        tracing::error!(%e, %topic, "failed to publish poll data");
+                    }
+                }
+                Ok(None) => {}
+                Err(_) => {
+                    tracing::warn!(%topic, "poll timed out");
+                }
+            }
+        }
+    }
+
+    /// Poll all addresses concurrently, each in its own task.
+    async fn poll_parallel(
+        handler: &Arc<Mutex<H>>,
+        client: &AsyncClient,
+        id: &str,
+        polls: Vec<(String, H::Addr)>,
+    ) {
+        let mut tasks = Vec::with_capacity(polls.len());
+
+        for (topic, addr) in polls {
+            let handler = handler.clone();
+            let client = client.clone();
+            let id = id.to_owned();
+
+            tasks.push(tokio::spawn(async move {
+                let result = tokio::time::timeout(POLL_TIMEOUT, async {
+                    let mut h = handler.lock().await;
+                    h.poll(&addr).await
+                })
+                .await;
+
+                match result {
+                    Ok(Some(data)) => {
+                        let mtopic = format!("fpEdge1/{id}/data/{topic}");
+                        if let Err(e) = client.publish(&mtopic, QoS::AtMostOnce, false, data).await
+                        {
+                            tracing::error!(%e, %topic, "failed to publish poll data");
+                        }
+                    }
+                    Ok(None) => {}
+                    Err(_) => {
+                        tracing::warn!(%topic, "poll timed out");
+                    }
+                }
+            }));
+        }
+
+        futures::future::join_all(tasks).await;
     }
 
     /// Create the MQTT client and set up connection options.
@@ -231,6 +356,8 @@ impl<H: Handler> Driver<H> {
         &mut self,
         client: &AsyncClient,
         tx: &mpsc::UnboundedSender<DriverEvent>,
+        poll_tx: &mpsc::Sender<Vec<(String, H::Addr)>>,
+        poll_handler: &Arc<Mutex<Option<Arc<Mutex<H>>>>>,
         incoming: Incoming,
     ) -> Result<(), Error> {
         let publish = match incoming {
@@ -256,9 +383,12 @@ impl<H: Handler> Driver<H> {
 
         match msg {
             "active" => self.on_active(client, &publish.payload).await,
-            "conf" => self.on_conf(client, tx, &publish.payload).await,
+            "conf" => {
+                self.on_conf(client, tx, poll_handler, &publish.payload)
+                    .await;
+            }
             "addr" => self.on_addr(client, &publish.payload).await,
-            "poll" => self.on_poll(client, &publish.payload).await,
+            "poll" => self.on_poll(poll_tx, &publish.payload),
             "cmd" => {
                 if let Some(name) = data {
                     self.on_cmd(name, Bytes::from(publish.payload.to_vec()))
@@ -286,6 +416,7 @@ impl<H: Handler> Driver<H> {
         &mut self,
         client: &AsyncClient,
         tx: &mpsc::UnboundedSender<DriverEvent>,
+        poll_handler: &Arc<Mutex<Option<Arc<Mutex<H>>>>>,
         payload: &[u8],
     ) {
         let conf: serde_json::Value = match serde_json::from_slice(payload) {
@@ -300,12 +431,16 @@ impl<H: Handler> Driver<H> {
         tracing::debug!(?conf, "received device configuration");
 
         self.close_handler().await;
+        // Clear the poll worker's handler reference
+        *poll_handler.lock().await = None;
 
         // Create new handler
         let handle = DriverHandle::new(tx.clone());
         match H::create(handle, conf) {
             Ok(handler) => {
-                self.handler = Some(handler);
+                let handler = Arc::new(Mutex::new(handler));
+                self.handler = Some(handler.clone());
+                *poll_handler.lock().await = Some(handler);
                 self.connect_handler(client).await;
             }
             Err(e) => {
@@ -319,12 +454,13 @@ impl<H: Handler> Driver<H> {
     /// retrying on failure after the configured delay.
     async fn connect_handler(&mut self, client: &AsyncClient) {
         loop {
-            let handler = match self.handler.as_mut() {
+            let handler = match self.handler.as_ref() {
                 Some(h) => h,
                 None => return,
             };
 
-            match handler.connect().await {
+            let result = handler.lock().await.connect().await;
+            match result {
                 Ok(()) => {
                     self.set_status(Status::Up, client).await;
                     self.try_subscribe().await;
@@ -369,23 +505,25 @@ impl<H: Handler> Driver<H> {
             }
         };
 
-        // Parse all addresses into a temporary vec first to avoid
-        // holding an immutable borrow on self.handler while mutating
-        // self.addrs/topics.
+        // Parse all addresses while holding the handler lock, collecting
+        // into a temporary vec to release the lock before mutating self.
+        let guard = handler.lock().await;
         let mut parsed_addrs = Vec::with_capacity(pkt.addrs.len());
         for (topic, raw_addr) in &pkt.addrs {
-            match handler.parse_addr(raw_addr) {
+            match guard.parse_addr(raw_addr) {
                 Some(parsed) => {
                     parsed_addrs.push((topic.clone(), parsed));
                 }
                 None => {
                     tracing::error!(addr = raw_addr, "handler rejected address");
+                    drop(guard);
                     self.clear_addrs();
                     self.set_status(Status::Addr, client).await;
                     return;
                 }
             }
         }
+        drop(guard);
 
         self.clear_addrs();
         for (topic, parsed) in parsed_addrs {
@@ -397,15 +535,17 @@ impl<H: Handler> Driver<H> {
         self.try_subscribe().await;
     }
 
-    /// Handle `poll` message — poll the handler for each requested topic.
-    async fn on_poll(&mut self, client: &AsyncClient, payload: &[u8]) {
+    /// Handle `poll` message — resolve topics and send to the poll worker.
+    ///
+    /// This returns immediately without awaiting any handler calls,
+    /// keeping the MQTT event loop responsive. If the poll queue is
+    /// full, the request is dropped (backpressure).
+    fn on_poll(&self, poll_tx: &mpsc::Sender<Vec<(String, H::Addr)>>, payload: &[u8]) {
         let payload_str = match std::str::from_utf8(payload) {
             Ok(s) => s,
             Err(_) => return,
         };
 
-        // Collect (topic, addr) pairs first so we don't hold a borrow
-        // on self.addrs while also borrowing self.handler mutably.
         let polls: Vec<(String, H::Addr)> = payload_str
             .lines()
             .filter_map(|line| {
@@ -423,26 +563,19 @@ impl<H: Handler> Driver<H> {
             })
             .collect();
 
-        let handler = match self.handler.as_mut() {
-            Some(h) => h,
-            None => return,
-        };
+        if polls.is_empty() {
+            return;
+        }
 
-        let id = &self.config.username;
-        for (topic, addr) in &polls {
-            if let Some(data) = handler.poll(addr).await {
-                let mtopic = format!("fpEdge1/{id}/data/{topic}");
-                if let Err(e) = client.publish(&mtopic, QoS::AtMostOnce, false, data).await {
-                    tracing::error!(%e, %topic, "failed to publish poll data");
-                }
-            }
+        if poll_tx.try_send(polls).is_err() {
+            tracing::warn!("poll queue full, dropping request");
         }
     }
 
     /// Handle `cmd` message — forward to handler.
     async fn on_cmd(&mut self, command: &str, payload: Bytes) {
-        if let Some(handler) = self.handler.as_mut() {
-            handler.cmd(command, payload).await;
+        if let Some(handler) = self.handler.as_ref() {
+            handler.lock().await.cmd(command, payload).await;
         }
     }
 
@@ -454,8 +587,8 @@ impl<H: Handler> Driver<H> {
 
         let specs: Vec<H::Addr> = self.addrs.values().cloned().collect();
 
-        if let Some(handler) = self.handler.as_mut() {
-            if !handler.subscribe(&specs).await {
+        if let Some(handler) = self.handler.as_ref() {
+            if !handler.lock().await.subscribe(&specs).await {
                 tracing::error!("handler subscription failed");
             }
         }
@@ -465,7 +598,6 @@ impl<H: Handler> Driver<H> {
     async fn handle_driver_event(&self, client: &AsyncClient, event: DriverEvent) {
         match event {
             DriverEvent::Data { topic, payload } => {
-                // Look up the MQTT data topic from the address topic
                 let mtopic = self.topic_with("data", &topic);
                 if let Err(e) = client
                     .publish(&mtopic, QoS::AtMostOnce, false, payload)
@@ -484,10 +616,9 @@ impl<H: Handler> Driver<H> {
 
     /// Close the current handler (if any) and reset address state.
     async fn close_handler(&mut self) {
-        if let Some(handler) = self.handler.as_mut() {
-            handler.close().await;
+        if let Some(handler) = self.handler.take() {
+            handler.lock().await.close().await;
         }
-        self.handler = None;
         self.clear_addrs();
     }
 

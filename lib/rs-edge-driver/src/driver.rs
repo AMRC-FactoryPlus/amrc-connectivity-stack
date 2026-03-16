@@ -151,11 +151,7 @@ impl<H: Handler> Driver<H> {
             }
 
             // Clean up handler on disconnect
-            if let Some(handler) = self.handler.as_mut() {
-                handler.close().await;
-            }
-            self.handler = None;
-            self.clear_addrs();
+            self.close_handler().await;
             self.status = Status::Down;
 
             tracing::info!(
@@ -183,7 +179,7 @@ impl<H: Handler> Driver<H> {
                 .map_err(|e| Error::Mqtt(e.to_string()))?;
         }
 
-        self.publish_status(&client).await;
+        self.set_status(Status::Ready, &client).await;
 
         // Main event loop: select between MQTT events and handler data
         loop {
@@ -240,8 +236,7 @@ impl<H: Handler> Driver<H> {
         let publish = match incoming {
             Incoming::Publish(p) => p,
             Incoming::ConnAck(_) => {
-                self.set_status(Status::Ready);
-                self.publish_status(client).await;
+                self.set_status(Status::Ready, client).await;
                 return Ok(());
             }
             _ => return Ok(()),
@@ -260,7 +255,7 @@ impl<H: Handler> Driver<H> {
         };
 
         match msg {
-            "active" => self.on_active(&publish.payload),
+            "active" => self.on_active(client, &publish.payload).await,
             "conf" => self.on_conf(client, tx, &publish.payload).await,
             "addr" => self.on_addr(client, &publish.payload).await,
             "poll" => self.on_poll(client, &publish.payload).await,
@@ -279,10 +274,10 @@ impl<H: Handler> Driver<H> {
     }
 
     /// Handle `active` message from the edge agent.
-    fn on_active(&mut self, payload: &[u8]) {
+    async fn on_active(&mut self, client: &AsyncClient, payload: &[u8]) {
         if payload == b"ONLINE" {
             tracing::info!("edge agent online");
-            self.set_status(Status::Ready);
+            self.set_status(Status::Ready, client).await;
         }
     }
 
@@ -297,20 +292,14 @@ impl<H: Handler> Driver<H> {
             Ok(v) => v,
             Err(e) => {
                 tracing::error!(%e, "failed to parse conf JSON");
-                self.set_status(Status::Conf);
-                self.publish_status(client).await;
+                self.set_status(Status::Conf, client).await;
                 return;
             }
         };
 
         tracing::debug!(?conf, "received device configuration");
 
-        // Close old handler
-        if let Some(handler) = self.handler.as_mut() {
-            handler.close().await;
-        }
-        self.handler = None;
-        self.clear_addrs();
+        self.close_handler().await;
 
         // Create new handler
         let handle = DriverHandle::new(tx.clone());
@@ -321,8 +310,7 @@ impl<H: Handler> Driver<H> {
             }
             Err(e) => {
                 tracing::error!(reason = %e, "handler rejected configuration");
-                self.set_status(Status::Conf);
-                self.publish_status(client).await;
+                self.set_status(Status::Conf, client).await;
             }
         }
     }
@@ -338,20 +326,17 @@ impl<H: Handler> Driver<H> {
 
             match handler.connect().await {
                 Ok(()) => {
-                    self.set_status(Status::Up);
-                    self.publish_status(client).await;
+                    self.set_status(Status::Up, client).await;
                     self.try_subscribe().await;
                     return;
                 }
                 Err(ConnectError::ConnectionFailed) => {
                     tracing::warn!("handler connection failed, retrying");
-                    self.set_status(Status::Conn);
-                    self.publish_status(client).await;
+                    self.set_status(Status::Conn, client).await;
                 }
                 Err(ConnectError::AuthFailed) => {
                     tracing::warn!("handler auth failed, retrying");
-                    self.set_status(Status::Auth);
-                    self.publish_status(client).await;
+                    self.set_status(Status::Auth, client).await;
                 }
             }
 
@@ -365,16 +350,14 @@ impl<H: Handler> Driver<H> {
             Ok(v) => v,
             Err(e) => {
                 tracing::error!(%e, "failed to parse addr JSON");
-                self.set_status(Status::Addr);
-                self.publish_status(client).await;
+                self.set_status(Status::Addr, client).await;
                 return;
             }
         };
 
         if pkt.version != 1 {
             tracing::error!(version = pkt.version, "unsupported addr config version");
-            self.set_status(Status::Addr);
-            self.publish_status(client).await;
+            self.set_status(Status::Addr, client).await;
             return;
         }
 
@@ -398,8 +381,7 @@ impl<H: Handler> Driver<H> {
                 None => {
                     tracing::error!(addr = raw_addr, "handler rejected address");
                     self.clear_addrs();
-                    self.set_status(Status::Addr);
-                    self.publish_status(client).await;
+                    self.set_status(Status::Addr, client).await;
                     return;
                 }
             }
@@ -500,14 +482,20 @@ impl<H: Handler> Driver<H> {
         self.topics.clear();
     }
 
-    fn set_status(&mut self, status: Status) {
-        self.status = status;
-        tracing::info!(%status, "driver status changed");
+    /// Close the current handler (if any) and reset address state.
+    async fn close_handler(&mut self) {
+        if let Some(handler) = self.handler.as_mut() {
+            handler.close().await;
+        }
+        self.handler = None;
+        self.clear_addrs();
     }
 
-    async fn publish_status(&self, client: &AsyncClient) {
+    async fn set_status(&mut self, status: Status, client: &AsyncClient) {
+        self.status = status;
+        tracing::info!(%status, "driver status changed");
         let topic = self.topic("status");
-        let payload = self.status.to_string();
+        let payload = status.to_string();
         if let Err(e) = client
             .publish(&topic, QoS::AtLeastOnce, true, payload)
             .await

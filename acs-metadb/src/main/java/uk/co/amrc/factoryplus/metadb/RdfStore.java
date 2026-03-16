@@ -6,6 +6,7 @@
 
 package uk.co.amrc.factoryplus.metadb;
 
+import java.time.Instant;
 import java.util.function.Supplier;
 import java.util.Map;
 import java.util.Optional;
@@ -15,9 +16,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import jakarta.json.*;
 import jakarta.ws.rs.WebApplicationException;
 
+import org.apache.jena.datatypes.xsd.XSDDatatype;
 import org.apache.jena.query.*;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.tdb2.TDB2Factory;
+import org.apache.jena.update.*;
 import org.apache.jena.vocabulary.*;
 
 import org.slf4j.Logger;
@@ -61,35 +64,97 @@ public class RdfStore
     public <T> T calculateRead (Supplier<T> s) { return dataset.calculateRead(s); }
     public <T> T calculateWrite (Supplier<T> s) { return dataset.calculateWrite(s); }
 
-    /* Must be called within a txn */
-    public Optional<Resource> findObject (UUID uuid)
-    {
-        /* We always resolve UUIDs within the direct graph. */
-        var klasses = direct
-            .listResourcesWithProperty(Vocab.uuid, uuid.toString())
-            .toList();
-        if (klasses.isEmpty())
-            return Optional.empty();
-        if (klasses.size() > 1)
-            throw new Err.CorruptRDF("More than one candidate", uuid);
-        
-        var klass = klasses.get(0);
-        if (!klass.isURIResource())
-            throw new Err.CorruptRDF("UUID does not name a URI", uuid);
+    public record FPObject (Resource node, UUID uuid) { }
 
-        return Optional.of(klass);
+    /** Find a single resource within the direct graph. */
+    public Optional<Resource> findResource (Property pred, RDFNode obj)
+    {
+        var subjs = direct
+            .listResourcesWithProperty(pred, obj)
+            .toList();
+        if (subjs.isEmpty())
+            return Optional.empty();
+        if (subjs.size() > 1)
+            throw new Err.CorruptRDF(String.format(
+                "More than one candidate with %s/%s", pred, obj));
+        
+        return Optional.of(subjs.get(0));
     }
 
-    /* I don't entirely like this being here, it's a layer violation for
-     * this class to know about HTTP errors. But it's too annoying
-     * otherwise, and we are a REST webservice implementation.
-     * XXX The correct resolution here is to throw a custom UUIDNotFound
-     * exception and then use an exception mapper.
-     */
+    /* Must be called within a txn */
+    /* XXX should return FPObject? */
+    public Optional<Resource> findObject (UUID uuid)
+    {
+        return findResource(Vocab.uuid, Vocab.uuidLiteral(uuid));
+    }
+
     public Resource findObjectOr404 (UUID uuid)
     {
         return findObject(uuid)
             .orElseThrow(() -> new Err.NotFound(uuid.toString()));
+    }
+
+    public Optional<Resource> findRankClass (int rank)
+    {
+        return findResource(Vocab.rank, direct.createTypedLiteral(rank));
+    }
+
+    private static final Query Q_findRank = Vocab.query("""
+        select ?rank
+        where { ?obj rdf:type/<core/rank> ?rank }
+    """);
+
+    public Optional<Integer> findRank (Resource obj)
+    {
+        var exec = QueryExecution.dataset(dataset)
+            .query(Q_findRank)
+            .substitution("obj", obj)
+            .build();
+        var rs = exec.execSelect();
+        
+        if (!rs.hasNext())
+            return Optional.empty();
+        var binding = rs.next();
+        if (rs.hasNext())
+            throw new Err.CorruptRDF("Duplicate ranks");
+
+        var rank = Util.decodeLiteral(binding.get("rank"), XSD.xint, Integer::valueOf);
+        return Optional.of(rank);
+    }
+
+    /* TXN */
+    public FPObject createObject (Resource klass)
+    {
+        UUID uuid;
+        while (true) {
+            uuid = UUID.randomUUID();
+            var existing = findObject(uuid);
+            if (existing.isEmpty())
+                break;
+        }
+
+        var obj = derived.createResource();
+        derived.add(obj, Vocab.uuid, uuid.toString());
+        derived.add(obj, Vocab.primary, klass);
+
+        var rank = findRank(obj)
+            .orElseThrow(() -> new Err.CorruptRDF("Cannot find rank of new object"));
+        if (rank > 0) {
+            var rk = findRankClass(rank - 1)
+                .orElseThrow(() -> new Err.CorruptRDF("Cannot find rank class"));
+            derived.add(obj, RDFS.subClassOf, rk);
+        }
+
+        return new FPObject(obj, uuid);
+    }
+
+    /* TXN */
+    public Resource createInstant ()
+    {
+        var inst = createObject(Vocab.Instant).node();
+        var stamp = derived.createTypedLiteral(Instant.now(), XSDDatatype.XSDdateTime);
+        derived.add(inst, Vocab.timestamp, stamp);
+        return inst;
     }
 
     public Optional<ConfigEntry.Value> getConfig (UUID app, UUID obj)

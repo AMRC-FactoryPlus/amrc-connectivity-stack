@@ -17,27 +17,25 @@ public class Err extends Error
 
     public static class CorruptRDF extends Err
     {
-        private UUID uuid;
-
-        public CorruptRDF (String msg, UUID uuid)
+        public CorruptRDF (String msg)
         {
             super(msg);
-            this.uuid = uuid;
         }
-
-        public UUID uuid () { return uuid; }
     }
     public static class Config extends CorruptRDF
     {
         private UUID app;
+        private UUID obj;
 
         public Config (String msg, UUID app, UUID obj)
         {
-            super(msg, obj);
+            super(msg);
             this.app = app;
+            this.obj = obj;
         }
 
         public UUID app () { return app; }
+        public UUID obj () { return obj; }
     }
 
     public static abstract class ClientError extends Err

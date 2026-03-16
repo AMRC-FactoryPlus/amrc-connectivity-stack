@@ -18,6 +18,7 @@ import io.vavr.control.*;
 
 import org.apache.jena.query.*;
 import org.apache.jena.rdf.model.*;
+import org.apache.jena.update.*;
 import org.apache.jena.vocabulary.*;
 
 import org.slf4j.Logger;
@@ -49,24 +50,7 @@ public class ConfigEntry
         return new Err.Config(msg, app, object);
     }
 
-    private <T> T extractLiteral (RDFNode node, Resource type, 
-        CheckedFunction1<String, T> extract)
-    {
-        return Try.success(node)
-            .map(n -> n.asLiteral())
-            .filter(l -> l.getDatatypeURI().equals(type.getURI()),
-                l -> error("Incorrect literal type (%s vs %s)",
-                    l.getDatatypeURI(), type.getURI()))
-            .flatMap(l -> Try.success(l.getString())
-                .mapTry(extract)
-                .recoverWith(e -> {
-                    log.warn("Failed to decode literal", e);
-                    return Try.failure(error("Bad literal"));
-                }))
-            .get();
-    }
-
-    private static final Query Q_getValue = QueryFactory.create("""
+    private static final Query Q_getValue = Vocab.query("""
         select ?value ?etag ?mtime
         where {
             ?appI <core/uuid> ?app.
@@ -78,7 +62,7 @@ public class ConfigEntry
             ?instant <core/uuid> ?etag;
                 <core/timestamp> ?mtime.
         }
-    """, Vocab.NS);
+    """);
 
     public Optional<Value> getValue ()
     {
@@ -96,10 +80,10 @@ public class ConfigEntry
         if (rs.hasNext())
             throw error("Duplicate config entries");
 
-        var val = extractLiteral(binding.get("value"), RDF.JSON,
+        var val = Util.decodeLiteral(binding.get("value"), RDF.JSON,
             s -> Json.createReader(new StringReader(s)).readValue());
-        var etag = extractLiteral(binding.get("etag"), XSD.xstring, s -> s);
-        var mtime = extractLiteral(binding.get("mtime"), XSD.dateTime, 
+        var etag = Util.decodeLiteral(binding.get("etag"), XSD.xstring, s -> s);
+        var mtime = Util.decodeLiteral(binding.get("mtime"), XSD.dateTime, 
             Instant::parse);
 
         return Optional.of(new Value(val, etag, mtime));

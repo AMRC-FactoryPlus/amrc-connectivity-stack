@@ -13,6 +13,10 @@ import java.net.URI;
 import io.vavr.control.Try;
 
 import org.apache.jena.rdf.model.*;
+import org.apache.jena.shared.PrefixMapping;
+import org.apache.jena.sparql.core.Prologue;
+import org.apache.jena.query.*;
+import org.apache.jena.update.*;
 
 public class Vocab
 {
@@ -31,7 +35,11 @@ public class Vocab
 
     public static final Property uuid       = prop("core/uuid");
     public static final Property rank       = prop("core/rank");
+    public static final Property primary    = prop("core/pc");
     public static final Property start      = prop("core/start");
+
+    public static final Resource Instant    = res("core/Instant");
+    public static final Property timestamp  = prop("core/timestamp");
 
     public static final Property forP       = prop("app/for");
     public static final Property value      = prop("app/value");
@@ -66,4 +74,24 @@ public class Vocab
         return ResourceFactory.createResource(
             NS_uuid + uuid.toString());
     }
+
+    public static Query query (String sparql)
+    {
+        var pro = new Prologue(PrefixMapping.Standard)
+            .copy();
+        var query = new Query(pro);
+        return QueryFactory.parse(query, sparql, NS, Syntax.defaultQuerySyntax);
+    }
+
+    public static UpdateRequest update (String sparql)
+    {
+        /* The APIs here are annoyingly different */
+        var prefixes = PrefixMapping.Factory.create()
+            .setNsPrefixes(PrefixMapping.Standard);
+        var update = new UpdateRequest();
+        update.setPrefixMapping(prefixes);
+        UpdateFactory.parse(update, sparql, NS);
+        return update;
+    }
 }
+

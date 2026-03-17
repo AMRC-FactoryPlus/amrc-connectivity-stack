@@ -343,7 +343,7 @@ impl<H: Handler + 'static> Driver<H> {
             self.topic("status"),
             "DOWN",
             QoS::AtLeastOnce,
-            true,
+            false,
         ));
         opts.set_keep_alive(std::time::Duration::from_secs(30));
 
@@ -628,7 +628,7 @@ impl<H: Handler + 'static> Driver<H> {
         let topic = self.topic("status");
         let payload = status.to_string();
         if let Err(e) = client
-            .publish(&topic, QoS::AtLeastOnce, true, payload)
+            .publish(&topic, QoS::AtLeastOnce, false, payload)
             .await
         {
             tracing::error!(%e, "failed to publish status");

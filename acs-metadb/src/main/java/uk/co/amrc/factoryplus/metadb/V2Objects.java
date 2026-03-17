@@ -33,9 +33,9 @@ public class V2Objects {
     private JsonArray _list (Model model, UUID uuid, Property prop)
     {
         var members = store.calculateRead(() -> {
-            var klass = store.findObjectOr404(uuid);
+            var klass = store.findObjectOrError(uuid);
             return model
-                .listResourcesWithProperty(prop, klass)
+                .listResourcesWithProperty(prop, klass.node())
                 .mapWith(r -> r.getProperty(Vocab.uuid))
                 .filterKeep(s -> s != null)
                 .mapWith(s -> s.getString())

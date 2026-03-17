@@ -29,34 +29,37 @@ public class ConfigEntry
     private static final Logger log = LoggerFactory.getLogger(ConfigEntry.class);
 
     private RdfStore store;
-    private UUID app;
-    private UUID object;
+    private FPObject app;
+    private FPObject obj;
 
-    public ConfigEntry (RdfStore store, UUID app, UUID object)
+    private ConfigEntry (RdfStore store, FPObject app, FPObject obj)
     {
         this.store = store;
         this.app = app;
-        this.object = object;
+        this.obj = obj;
     }
 
-    public UUID app () { return app; }
-    public UUID object () { return object; }
+    public static ConfigEntry create (RdfStore store, UUID app, UUID obj)
+    {
+        var appO = store.findObjectOrError(app);
+        var objO = store.findObjectOrError(obj);
+
+        return new ConfigEntry(store, appO, objO);
+    }
 
     public record Value (JsonValue value, String etag, Instant mtime) {}
 
     private Err.Config error (String fmt, Object... args)
     {
         String msg = String.format(fmt, args);
-        return new Err.Config(msg, app, object);
+        return new Err.Config(msg, app.uuid(), obj.uuid());
     }
 
     private static final Query Q_getValue = Vocab.query("""
         select ?value ?etag ?mtime
         where {
-            ?appI <core/uuid> ?app.
-            ?objI <core/uuid> ?obj.
-            ?config a ?appI;
-                <app/for> ?objI;
+            ?config a ?app;
+                <app/for> ?obj;
                 <app/value> ?value.
             ?config <core/start> ?instant.
             ?instant <core/uuid> ?etag;
@@ -68,8 +71,8 @@ public class ConfigEntry
     {
         var exec = QueryExecution.dataset(store.dataset())
             .query(Q_getValue)
-            .substitution("app", Vocab.uuidLiteral(app))
-            .substitution("obj", Vocab.uuidLiteral(object))
+            .substitution("app", app.node())
+            .substitution("obj", obj.node())
             .build();
         var rs = exec.execSelect();
         
@@ -77,7 +80,7 @@ public class ConfigEntry
             return Optional.empty();
         var binding = rs.next();
 
-        if (rs.hasNext())
+        if (rs.hasNext()) 
             throw error("Duplicate config entries");
 
         var val = Util.decodeLiteral(binding.get("value"), RDF.JSON,
@@ -87,6 +90,45 @@ public class ConfigEntry
             Instant::parse);
 
         return Optional.of(new Value(val, etag, mtime));
+    }
+
+    /* This removes an existing ConfigEntry. For a more 4D approach we
+     * could instead set an :end Instant and adjust getValue to only
+     * look for entries without an end. */
+    private static final UpdateRequest U_removeValue = Vocab.update("""
+        delete {
+            ?entry ?p ?o.
+        }
+        where {
+            ?entry a ?app; <app/for> ?obj.
+            ?entry ?p ?o.
+        }
+    """);
+
+    public void removeValue ()
+    {
+        UpdateExecution.dataset(store.dataset())
+            .update(U_removeValue)
+            .substitution("app", app.node())
+            .substitution("obj", obj.node())
+            .execute();
+    }
+
+    public void putValue (JsonValue value)
+    {
+        removeValue();
+
+        var json = ResourceFactory.createTypedLiteral(
+            value.toString(), RDF.dtRDFJSON);
+
+        var graph   = store.derived();
+        var entry   = graph.createResource();
+        var inst    = store.createInstant();
+
+        graph.add(entry, RDF.type, app.node());
+        graph.add(entry, Vocab.forP, obj.node());
+        graph.add(entry, Vocab.value, json);
+        graph.add(entry, Vocab.start, inst);
     }
 }
 

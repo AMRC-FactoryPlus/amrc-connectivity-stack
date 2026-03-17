@@ -76,7 +76,7 @@ app:ConfigEntry :pc :R1Class; rdfs:subClassOf :State;
 app:ConfigEntryGroup :pc :R2Class; rdfs:subClassOf :R1Class;
     :uuid "62314906-1c9f-11f1-9bf0-bb3086d1330d";
     :powersetOf app:ConfigEntry.
-:Application :pc :R2Class; rdfs:subClassOf :ConfigEntryGroup;
+app:Application :pc :R2Class; rdfs:subClassOf :ConfigEntryGroup;
     :uuid "d319bd87-f42b-4b66-be4f-f82ff48b93f0".
 
 app:for a rdf:Property;

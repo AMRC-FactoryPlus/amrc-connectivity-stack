@@ -33,12 +33,17 @@ public class V2Config {
     @PathParam("app")       UUID app;
     @PathParam("object")    UUID obj;
 
+    private ConfigEntry configEntry ()
+    {
+        return store.configEntry(app, obj);
+    }
+
     @GET 
     public Response get ()
     {
         log.info("Get config for {}/{}", app, obj);
         var entry = store.calculateRead(() -> {
-            return store.getConfig(app, obj);
+            return configEntry().getValue();
         });
         return entry
             .map(e -> Response.ok(e.value())
@@ -57,7 +62,7 @@ public class V2Config {
     {
         log.info("Put config for {}/{}", app, obj);
         store.executeWrite(() -> {
-            //putConfig(config);
+            configEntry().putValue(config);
         });
     }
 
@@ -66,7 +71,7 @@ public class V2Config {
     {
         log.info("Delete config for {}/{}", app, obj);
         store.executeWrite(() -> {
-            //store.direct().removeAll(objR, appP, null);
+            configEntry().removeValue();
         });
     }
 
@@ -75,7 +80,9 @@ public class V2Config {
     {
         var patch = Json.createMergePatch(json);
         store.executeWrite(() -> {
-            var o_conf = store.getConfig(app, obj)
+            var entry = configEntry();
+
+            var o_conf = entry.getValue()
                 .map(e -> e.value())
                 .orElse(JsonValue.EMPTY_JSON_OBJECT);
             /* Safety: applying merge-patch to a non-object destroys the
@@ -84,7 +91,7 @@ public class V2Config {
                 throw new WebApplicationException(409);
 
             var n_conf = patch.apply(o_conf);
-            //putConfig(n_conf);
+            entry.putValue(n_conf);
         });
     }
 }

@@ -64,8 +64,6 @@ public class RdfStore
     public <T> T calculateRead (Supplier<T> s) { return dataset.calculateRead(s); }
     public <T> T calculateWrite (Supplier<T> s) { return dataset.calculateWrite(s); }
 
-    public record FPObject (Resource node, UUID uuid) { }
-
     /** Find a single resource within the direct graph. */
     public Optional<Resource> findResource (Property pred, RDFNode obj)
     {
@@ -81,14 +79,14 @@ public class RdfStore
         return Optional.of(subjs.get(0));
     }
 
-    /* Must be called within a txn */
-    /* XXX should return FPObject? */
-    public Optional<Resource> findObject (UUID uuid)
+    /* TXN */
+    public Optional<FPObject> findObject (UUID uuid)
     {
-        return findResource(Vocab.uuid, Vocab.uuidLiteral(uuid));
+        return findResource(Vocab.uuid, Vocab.uuidLiteral(uuid))
+            .map(node -> new FPObject(node, uuid));
     }
 
-    public Resource findObjectOr404 (UUID uuid)
+    public FPObject findObjectOrError (UUID uuid)
     {
         return findObject(uuid)
             .orElseThrow(() -> new Err.NotFound(uuid.toString()));
@@ -157,8 +155,8 @@ public class RdfStore
         return inst;
     }
 
-    public Optional<ConfigEntry.Value> getConfig (UUID app, UUID obj)
+    public ConfigEntry configEntry (UUID app, UUID obj)
     {
-        return new ConfigEntry(this, app, obj).getValue();
+        return ConfigEntry.create(this, app, obj);
     }
 }

@@ -124,4 +124,34 @@ objects:
       name: "Edit Dataset"
 
       
+---
+service: !u UUIDs.Service.Authentication
+version: 2
+grants:
+  !u DataAccess.Requirement.ServiceRole:
+    !u UUIDs.Permission.Directory.AdvertiseService:
+      !u DataAccess.Service.DataAccess: false
+    !u UUIDs.Permission.Auth.ReadACL:
+      !u DataAccess.Perm.All: true
+    !u UUIDs.Permission.ConfigDB.ReadConfig:
+      !u DataAccess.App.DatasetDefinition: true
+      !u DataAccess.App.DatasetMetadata: true
+    !u UUIDs.Permission.ConfigDB.WriteConfig:
+      !u DataAccess.App.DatasetDefinition: true
+    !u ConfigDB.Perm.CreateObject:
+      !u DataAccess.Group.StructuralDatasetType: true
+    !u ConfigDB.Perm.ReadMembers:
+      !u DataAccess.App.DatasetDefinition: false
+      !u DataAccess.App.DatasetMetadata: false
+      !u DataAccess.Group.StructuralDatasetType: "both"
+      !u DataAccess.Group.FunctionalDatasetGroup: "both"
+    !u ConfigDB.Perm.WriteMembers:
+      !u DataAccess.Group.StructuralDatasetType: true
+    !u ConfigDB.Perm.WriteMemberships:
+      !u DataAccess.Class.Dataset: true
+    !u ConfigDB.Perm.WriteSubclasses:
+      !u DataAccess.Class.Dataset: true
+    !u ConfigDB.Perm.WriteSuperclasses:
+      !u DataAccess.Class.Dataset: true
+
 

@@ -28,7 +28,8 @@
 :powersetOf a rdf:Property;
     rdfs:domain :Class; rdfs:range :Class.
 
-## these need to be forward rules, I think
+## Implementation of subsets in terms of powersets.
+## These need to be forward rules, I think.
 # a ∈ b, b ⊂ c ⇒ a ∈ c
 # a ∈ b, b ∈ p, p ℙ c ⇒ a ∈ c
 #

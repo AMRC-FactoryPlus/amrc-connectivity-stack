@@ -65,4 +65,18 @@ public class Err extends Error
 
         public int statusCode () { return 410; }
     }
+    public static class RankMismatch extends ClientError
+    {
+        private UUID first;
+        private UUID second;
+
+        public RankMismatch (UUID first, UUID second)
+        {
+            super("Rank mismatch");
+            this.first = first;
+            this.second = second;
+        }
+
+        public int statusCode () { return 409; }
+    }
 }

@@ -18,12 +18,6 @@ import jakarta.json.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.jena.query.*;
-import org.apache.jena.rdf.model.*;
-import org.apache.jena.vocabulary.*;
-
-import io.vavr.control.*;
-
 @Path("v2")
 public class V2Objects {
     @Inject private RdfStore db;
@@ -33,40 +27,15 @@ public class V2Objects {
     @GET @Path("object")
     public JsonArray listObjects ()
     {
-        var objs = db.calculateRead(() ->
-            db.derived()
-                .listObjectsOfProperty(Vocab.uuid)
-                .filterKeep(n -> n.isLiteral())
-                .mapWith(o -> o.asLiteral().getValue())
-                .toList());
-
+        var objs = db.objectStructure().listObjects();
         return Json.createArrayBuilder(objs).build();
     }
 
-    private record Relation (Property prop, int offset)
-    {
-        public static Relation of (String relation)
-        {
-            switch (relation) {
-                case "member":      return new Relation(RDF.type, 1);
-                case "subclass":    return new Relation(RDFS.subClassOf, 0);
-                default:            throw new Err.NotFound("No such relation");
-            }
-        }
-    }
 
-    private JsonArray listRelation (Model graph, UUID uuid, String relation)
+    private JsonArray listRelation (String graph, UUID uuid, String relation)
     {
-        var rel = Relation.of(relation);
-        var members = db.calculateRead(() -> {
-            var klass = db.findObjectOrError(uuid);
-            return graph
-                .listResourcesWithProperty(rel.prop(), klass.node())
-                .mapWith(r -> r.getProperty(Vocab.uuid))
-                .filterKeep(s -> s != null)
-                .mapWith(s -> s.getString())
-                .toList();
-        });
+        var members = db.objectStructure()
+            .listRelation(graph, uuid, relation);
 
         return Json.createArrayBuilder(members).build();
     }
@@ -76,7 +45,7 @@ public class V2Objects {
         @PathParam("class") UUID uuid,
         @PathParam("relation") String relation)
     {
-        return listRelation(db.derived(), uuid, relation);
+        return listRelation("derived", uuid, relation);
     }
 
     /* This duplication is a bug in the API design. If we had
@@ -87,21 +56,13 @@ public class V2Objects {
         @PathParam("class") UUID uuid,
         @PathParam("relation") String relation)
     {
-        return listRelation(db.direct(), uuid, relation);
+        return listRelation("direct", uuid, relation);
     }
 
-    private Response testRelation (Model graph, UUID klass, String relation, UUID object)
+    private Response testRelation (String graph, UUID klass, String relation, UUID object)
     {
-        var rel = Relation.of(relation);
-        var rv = db.calculateRead(() -> {
-            var kres = db.findObjectOrError(klass).node();
-            var ores = db.findObjectOrError(object).node();
-            /* We cannot use methods on ores as this is always from the
-             * direct graph. */
-            return graph.listStatements(ores, rel.prop(), kres)
-                .toList()
-                .isEmpty();
-        });
+        var rv = db.objectStructure()
+            .testRelation(graph, klass, relation, object);
 
         return Response.status(rv ? 204 : 404).build();
     }
@@ -112,7 +73,7 @@ public class V2Objects {
         @PathParam("relation") String relation,
         @PathParam("object") UUID object)
     {
-        return testRelation(db.derived(), klass, relation, object);
+        return testRelation("derived", klass, relation, object);
     }
 
     @GET @Path("class/{class}/direct/{relation}/{object}")
@@ -121,7 +82,7 @@ public class V2Objects {
         @PathParam("relation") String relation,
         @PathParam("object") UUID object)
     {
-        return testRelation(db.direct(), klass, relation, object);
+        return testRelation("direct", klass, relation, object);
     }
 
     @PUT @Path("class/{class}/direct/{relation}/{object}")
@@ -130,18 +91,7 @@ public class V2Objects {
         @PathParam("relation") String relation,
         @PathParam("object") UUID object)
     {
-        var rel = Relation.of(relation);
-        db.executeWrite(() -> {
-            var kres = db.findObjectOrError(klass).node();
-            var ores = db.findObjectOrError(object).node();
-
-            var krank = db.findRank(kres);
-            var orank = db.findRank(ores);
-            if (krank != orank + rel.offset())
-                throw new WebApplicationException(409);
-
-            db.direct().add(ores, rel.prop(), kres);
-        });
+        db.objectStructure().putRelation(klass, relation, object);
     }
 
     @DELETE @Path("class/{class}/direct/{relation}/{object}")
@@ -150,12 +100,7 @@ public class V2Objects {
         @PathParam("relation") String relation,
         @PathParam("object") UUID object)
     {
-        var rel = Relation.of(relation);
-        db.executeWrite(() -> {
-            var kres = db.findObjectOrError(klass).node();
-            var ores = db.findObjectOrError(object).node();
-            db.direct().remove(ores, rel.prop(), kres);
-        });
+        db.objectStructure().delRelation(klass, relation, object);
     }
 
 }

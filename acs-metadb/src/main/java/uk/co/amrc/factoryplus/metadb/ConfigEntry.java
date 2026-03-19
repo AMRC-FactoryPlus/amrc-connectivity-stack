@@ -24,27 +24,26 @@ import org.apache.jena.vocabulary.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class ConfigEntry
+public class ConfigEntry extends RequestHandler
 {
     private static final Logger log = LoggerFactory.getLogger(ConfigEntry.class);
 
-    private RdfStore store;
     private FPObject app;
     private FPObject obj;
 
-    private ConfigEntry (RdfStore store, FPObject app, FPObject obj)
+    private ConfigEntry (RdfStore db, FPObject app, FPObject obj)
     {
-        this.store = store;
+        super(db);
         this.app = app;
         this.obj = obj;
     }
 
-    public static ConfigEntry create (RdfStore store, UUID app, UUID obj)
+    public static ConfigEntry create (RdfStore db, UUID app, UUID obj)
     {
-        var appO = store.findObjectOrError(app);
-        var objO = store.findObjectOrError(obj);
+        var appO = db.findObjectOrError(app);
+        var objO = db.findObjectOrError(obj);
 
-        return new ConfigEntry(store, appO, objO);
+        return new ConfigEntry(db, appO, objO);
     }
 
     public record Value (JsonValue value, String etag, Instant mtime) {}
@@ -69,7 +68,7 @@ public class ConfigEntry
 
     public Optional<Value> getValue ()
     {
-        var exec = QueryExecution.dataset(store.dataset())
+        var exec = QueryExecution.dataset(db.dataset())
             .query(Q_getValue)
             .substitution("app", app.node())
             .substitution("obj", obj.node())
@@ -107,7 +106,7 @@ public class ConfigEntry
 
     public void removeValue ()
     {
-        UpdateExecution.dataset(store.dataset())
+        UpdateExecution.dataset(db.dataset())
             .update(U_removeValue)
             .substitution("app", app.node())
             .substitution("obj", obj.node())
@@ -121,9 +120,9 @@ public class ConfigEntry
         var json = ResourceFactory.createTypedLiteral(
             value.toString(), RDF.dtRDFJSON);
 
-        var graph   = store.derived();
+        var graph   = db.derived();
         var entry   = graph.createResource();
-        var inst    = store.createInstant();
+        var inst    = db.createInstant();
 
         graph.add(entry, RDF.type, app.node());
         graph.add(entry, Vocab.forP, obj.node());

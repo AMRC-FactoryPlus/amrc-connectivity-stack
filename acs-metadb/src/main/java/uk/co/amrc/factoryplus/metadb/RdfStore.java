@@ -153,6 +153,11 @@ public class RdfStore
         return inst;
     }
 
+    public ObjectStructure objectStructure ()
+    {
+        return ObjectStructure.create(this);
+    }
+
     public ConfigEntry configEntry (UUID app, UUID obj)
     {
         return ConfigEntry.create(this, app, obj);

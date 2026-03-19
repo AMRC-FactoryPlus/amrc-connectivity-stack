@@ -18,9 +18,10 @@
 :rank a rdf:Property;
     rdfs:domain :Object; rdfs:range xsd:integer.
 
-# Factory+ primary class
-:pc a rdf:Property;
-    rdfs:subPropertyOf rdf:type;
+# Factory+ primary class. This is not a subproperty of rdf:type as we
+# need to track all memberships in the direct graph. Enforcement that
+# the primary class is actually a class happens in the API.
+:primary a rdf:Property;
     rdfs:domain :Object; rdfs:range :Class.
 
 # This is purely informational at the moment.
@@ -43,13 +44,16 @@
 # a ∈ p, p ℙ b ⇒ a ⊂ p
 # a R b, R ∈ p, p ℙ S ⇒ a S b
 
-:Individual :pc :R1Class; rdfs:subClassOf :Object;
+:Individual a :R1Class; :primary :R1Class;
+    rdfs:subClassOf :Object;
     :uuid "2494ae9b-cd87-4c01-98db-437a303b43e9";
     :rank "0"^^xsd:int.
-:R1Class :pc :R2Class; rdfs:subClassOf :Class;
+:R1Class a :R2Class; :primary :R2Class;
+    rdfs:subClassOf :Class;
     :uuid "04a1c90d-2295-4cbe-b33a-74eded62cbf1";
     :rank "1"^^xsd:int; :powersetOf :Individual.
-:R2Class :pc :R3Class; rdfs:subClassOf :Class;
+:R2Class a :R3Class; :primary :R3Class;
+    rdfs:subClassOf :Class;
     :uuid "705888ce-53fa-434d-afee-274b331d4642";
     :rank "2"^^xsd:int; :powersetOf :R1Class.
 # The top rank class has no primary class
@@ -57,26 +61,29 @@
     :uuid "52b80183-6998-4bf9-9b30-132755e7dede";
     :rank "3"^^xsd:int; :powersetof :R2Class.
 
-:Instant :pc :R1Class; rdfs:subClassOf :Individual;
+:Instant a :R1Class; :primary :R1Class; 
+    rdfs:subClassOf :Individual;
     :uuid "600bc688-1d35-11f1-80e6-d7c35e61c3ce".
 # XXX Long-term this needs to go in favour of measurements against a
 # particular clock. But for now it's a useful simplification.
 :timestamp a rdf:Property;
     rdfs:domain :Instant; rdfs:range xsd:datetime.
 
-:State :pc :R1Class; rdfs:subClassOf :Individual;
+:State a :R1Class; :primary :R1Class;
+    rdfs:subClassOf :Individual;
     :uuid "c73d94e4-1d35-11f1-88e0-bf4ed4b22d09".
 # We don't do full 4D state modelling yet. We only record the current
 # state and the starting Instant.
 :start a rdf:Property;
     rdfs:domain :State; rdfs:range :Instant.
 
-app:ConfigEntry :pc :R1Class; rdfs:subClassOf :State;
+app:ConfigEntry a :R1Class; :primary :R1Class;
+    rdfs:subClassOf :State;
     :uuid "86d6f3d0-1c9c-11f1-9d4d-3b787922d771".
-app:ConfigEntryGroup :pc :R2Class; rdfs:subClassOf :R1Class;
+app:ConfigEntryGroup a :R2Class; :primary :R2Class; rdfs:subClassOf :R1Class;
     :uuid "62314906-1c9f-11f1-9bf0-bb3086d1330d";
     :powersetOf app:ConfigEntry.
-app:Application :pc :R2Class; rdfs:subClassOf :ConfigEntryGroup;
+:Application a :R2Class; :primary :R2Class; rdfs:subClassOf :ConfigEntryGroup;
     :uuid "d319bd87-f42b-4b66-be4f-f82ff48b93f0".
 
 app:for a rdf:Property;
@@ -84,12 +91,12 @@ app:for a rdf:Property;
 app:value a rdf:Property;
     rdfs:domain app:ConfigEntry; rdfs:range rdf:JSON.
 
-app:Registration :pc :Application; rdfs:subClassOf :ConfigEntry;
+app:Registration a :Application; :primary :Application; rdfs:subClassOf :ConfigEntry;
     :uuid "cb40bed5-49ad-4443-a7f5-08c75009da8f".
-app:Info :pc :Application; rdfs:subClassOf :ConfigEntry;
+app:Info a :Application; :primary :Application; rdfs:subClassOf :ConfigEntry;
     :uuid "64a8bfa9-7772-45c4-9d1a-9e6290690957".
 
-<uuid/09aa4958-1d36-11f1-a9a6-bff44d0575de> :pc :Instant;
+<uuid/09aa4958-1d36-11f1-a9a6-bff44d0575de> a :Instant; :primary :Instant;
     :uuid "09aa4958-1d36-11f1-a9a6-bff44d0575de";
     :timestamp "2026-03-11T10:35:51Z"^^xsd:dateTime.
 
@@ -122,13 +129,14 @@ app:Info :pc :Application; rdfs:subClassOf :ConfigEntry;
 [] a app:Info; app:for app:ConfigEntryGroup;
     app:value """{"name": "Config entry group"}"""^^rdf:JSON;
     :start <uuid/09aa4958-1d36-11f1-a9a6-bff44d0575de>.
-[] a app:Info; app:for app:Application;
-    app:value """{"name": "APplication"}"""^^rdf:JSON;
+[] a app:Info; app:for :Application;
+    app:value """{"name": "Application"}"""^^rdf:JSON;
     :start <uuid/09aa4958-1d36-11f1-a9a6-bff44d0575de>.
 
-:Service :pc :R1Class; rdfs:subClassOf :Individual;
+:Service a :R1Class; :primary :R1Class;
+    rdfs:subClassOf :Individual;
     :uuid "265d481f-87a7-4f93-8fc6-53fa64dc11bb".
-srv:Directory :pc :Service; :uuid "af4a1d66-e6f7-43c4-8a67-0fa3be2b1cf9".
-srv:ConfigDB :pc :Service; :uuid "af15f175-78a0-4e05-97c0-2a0bb82b9f3b".
-srv:Auth :pc :Service; :uuid "cab2642a-f7d9-42e5-8845-8f35affe1fd4".
+srv:Directory a :Service; :primary :Service; :uuid "af4a1d66-e6f7-43c4-8a67-0fa3be2b1cf9".
+srv:ConfigDB a :Service; :primary :Service; :uuid "af15f175-78a0-4e05-97c0-2a0bb82b9f3b".
+srv:Auth a :Service; :primary :Service; :uuid "cab2642a-f7d9-42e5-8845-8f35affe1fd4".
 

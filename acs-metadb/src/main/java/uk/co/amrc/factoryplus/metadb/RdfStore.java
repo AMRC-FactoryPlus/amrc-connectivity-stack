@@ -92,9 +92,10 @@ public class RdfStore
             .orElseThrow(() -> new Err.NotFound(uuid.toString()));
     }
 
-    public Optional<Resource> findRankClass (int rank)
+    public Resource findRankClass (int rank)
     {
-        return findResource(Vocab.rank, direct.createTypedLiteral(rank));
+        return findResource(Vocab.rank, direct.createTypedLiteral(rank))
+            .orElseThrow(() -> new Err.CorruptRDF("Cannot find rank class"));
     }
 
     private static final Query Q_findRank = Vocab.query("""
@@ -102,7 +103,7 @@ public class RdfStore
         where { ?obj rdf:type/<core/rank> ?rank }
     """);
 
-    public Optional<Integer> findRank (Resource obj)
+    public int findRank (Resource obj)
     {
         var exec = QueryExecution.dataset(dataset)
             .query(Q_findRank)
@@ -111,13 +112,12 @@ public class RdfStore
         var rs = exec.execSelect();
         
         if (!rs.hasNext())
-            return Optional.empty();
+            throw new Err.CorruptRDF("Cannot find rank of object");
         var binding = rs.next();
         if (rs.hasNext())
             throw new Err.CorruptRDF("Duplicate ranks");
 
-        var rank = Util.decodeLiteral(binding.get("rank"), XSD.xint, Integer::valueOf);
-        return Optional.of(rank);
+        return Util.decodeLiteral(binding.get("rank"), XSD.xint, Integer::parseInt);
     }
 
     /* TXN */
@@ -135,11 +135,9 @@ public class RdfStore
         derived.add(obj, Vocab.uuid, uuid.toString());
         derived.add(obj, Vocab.primary, klass);
 
-        var rank = findRank(obj)
-            .orElseThrow(() -> new Err.CorruptRDF("Cannot find rank of new object"));
+        var rank = findRank(obj);
         if (rank > 0) {
-            var rk = findRankClass(rank - 1)
-                .orElseThrow(() -> new Err.CorruptRDF("Cannot find rank class"));
+            var rk = findRankClass(rank - 1);
             derived.add(obj, RDFS.subClassOf, rk);
         }
 

@@ -26,16 +26,42 @@ import io.vavr.control.*;
 
 @Path("v2")
 public class V2Objects {
-    @Inject private RdfStore store;
+    @Inject private RdfStore db;
 
     private static final Logger log = LoggerFactory.getLogger(V2Objects.class);
 
-    private JsonArray _list (Model model, UUID uuid, Property prop)
+    @GET @Path("object")
+    public JsonArray listObjects ()
     {
-        var members = store.calculateRead(() -> {
-            var klass = store.findObjectOrError(uuid);
-            return model
-                .listResourcesWithProperty(prop, klass.node())
+        var objs = db.calculateRead(() ->
+            db.derived()
+                .listObjectsOfProperty(Vocab.uuid)
+                .filterKeep(n -> n.isLiteral())
+                .mapWith(o -> o.asLiteral().getValue())
+                .toList());
+
+        return Json.createArrayBuilder(objs).build();
+    }
+
+    private record Relation (Property prop, int offset)
+    {
+        public static Relation of (String relation)
+        {
+            switch (relation) {
+                case "member":      return new Relation(RDF.type, 1);
+                case "subclass":    return new Relation(RDFS.subClassOf, 0);
+                default:            throw new Err.NotFound("No such relation");
+            }
+        }
+    }
+
+    private JsonArray listRelation (Model graph, UUID uuid, String relation)
+    {
+        var rel = Relation.of(relation);
+        var members = db.calculateRead(() -> {
+            var klass = db.findObjectOrError(uuid);
+            return graph
+                .listResourcesWithProperty(rel.prop(), klass.node())
                 .mapWith(r -> r.getProperty(Vocab.uuid))
                 .filterKeep(s -> s != null)
                 .mapWith(s -> s.getString())
@@ -45,41 +71,92 @@ public class V2Objects {
         return Json.createArrayBuilder(members).build();
     }
 
-    @GET @Path("object")
-    public JsonArray listObjects ()
+    @GET @Path("class/{class}/{relation}")
+    public JsonArray listDerivedRelation (
+        @PathParam("class") UUID uuid,
+        @PathParam("relation") String relation)
     {
-        var objs = store.calculateRead(() ->
-            store.derived()
-                .listObjectsOfProperty(Vocab.uuid)
-                .filterKeep(n -> n.isLiteral())
-                .mapWith(o -> o.asLiteral().getValue())
-                .toList());
-
-        return Json.createArrayBuilder(objs).build();
+        return listRelation(db.derived(), uuid, relation);
     }
 
-    @GET @Path("class/{class}/direct/member")
-    public JsonArray listDirectMembers (@PathParam("class") UUID klass)
+    /* This duplication is a bug in the API design. If we had
+     * graph/{graph}/class/… instead then we could just redispatch to a
+     * graph-specific subresource. */
+    @GET @Path("class/{class}/direct/{relation}")
+    public JsonArray listDirectRelation (
+        @PathParam("class") UUID uuid,
+        @PathParam("relation") String relation)
     {
-        return _list(store.direct(), klass, RDF.type);
+        return listRelation(db.direct(), uuid, relation);
     }
 
-    @GET @Path("class/{class}/member")
-    public JsonArray listMembers (@PathParam("class") UUID klass)
+    private Response testRelation (Model graph, UUID klass, String relation, UUID object)
     {
-        return _list(store.derived(), klass, RDF.type);
+        var rel = Relation.of(relation);
+        var rv = db.calculateRead(() -> {
+            var kres = db.findObjectOrError(klass).node();
+            var ores = db.findObjectOrError(object).node();
+            /* We cannot use methods on ores as this is always from the
+             * direct graph. */
+            return graph.listStatements(ores, rel.prop(), kres)
+                .toList()
+                .isEmpty();
+        });
+
+        return Response.status(rv ? 204 : 404).build();
     }
 
-    @GET @Path("class/{class}/direct/subclass")
-    public JsonArray listDirectSubclasses (@PathParam("class") UUID klass)
+    @GET @Path("class/{class}/{relation}/{object}")
+    public Response handleDerivedRelation (
+        @PathParam("class") UUID klass,
+        @PathParam("relation") String relation,
+        @PathParam("object") UUID object)
     {
-        return _list(store.direct(), klass, RDFS.subClassOf);
+        return testRelation(db.derived(), klass, relation, object);
     }
 
-    @GET @Path("class/{class}/subclass")
-    public JsonArray listSubclasses (@PathParam("class") UUID klass)
+    @GET @Path("class/{class}/direct/{relation}/{object}")
+    public Response handleDirectRelation (
+        @PathParam("class") UUID klass,
+        @PathParam("relation") String relation,
+        @PathParam("object") UUID object)
     {
-        return _list(store.derived(), klass, RDFS.subClassOf);
+        return testRelation(db.direct(), klass, relation, object);
     }
+
+    @PUT @Path("class/{class}/direct/{relation}/{object}")
+    public void putRelation (
+        @PathParam("class") UUID klass,
+        @PathParam("relation") String relation,
+        @PathParam("object") UUID object)
+    {
+        var rel = Relation.of(relation);
+        db.executeWrite(() -> {
+            var kres = db.findObjectOrError(klass).node();
+            var ores = db.findObjectOrError(object).node();
+
+            var krank = db.findRank(kres);
+            var orank = db.findRank(ores);
+            if (krank != orank + rel.offset())
+                throw new WebApplicationException(409);
+
+            db.direct().add(ores, rel.prop(), kres);
+        });
+    }
+
+    @DELETE @Path("class/{class}/direct/{relation}/{object}")
+    public void delRelation (
+        @PathParam("class") UUID klass,
+        @PathParam("relation") String relation,
+        @PathParam("object") UUID object)
+    {
+        var rel = Relation.of(relation);
+        db.executeWrite(() -> {
+            var kres = db.findObjectOrError(klass).node();
+            var ores = db.findObjectOrError(object).node();
+            db.direct().remove(ores, rel.prop(), kres);
+        });
+    }
+
 }
 

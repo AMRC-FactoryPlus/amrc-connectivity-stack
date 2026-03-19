@@ -1,0 +1,27 @@
+{
+  "name": "acs-mes-collation",
+  "version": "0.1.0",
+  "description": "MES Collation service for the AMRC Connectivity Stack",
+  "author": "AMRC",
+  "license": "MIT",
+  "keywords": [
+    "amrc",
+    "factory-plus",
+    "factoryplus",
+    "acs",
+    "amrc-connectivity-stack",
+    "mes"
+  ],
+  "scripts": {
+    "start": "k5start -Uf ${CLIENT_KEYTAB} node bin/api.js"
+  },
+  "type": "module",
+  "dependencies": {
+    "@amrc-factoryplus/rx-client": "file:../lib/js-rx-client",
+    "@amrc-factoryplus/rx-util": "file:../lib/js-rx-util",
+    "@amrc-factoryplus/service-api": "file:../lib/js-service-api",
+    "@amrc-factoryplus/service-client": "file:../lib/js-service-client",
+    "express": "^5.0.1",
+    "rxjs": "^7.8.1"
+  }
+}

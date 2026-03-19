@@ -4,7 +4,7 @@
  * Copyright 2026 University of Sheffield AMRC
  */
 
-package uk.co.amrc.factoryplus.metadb;
+package uk.co.amrc.factoryplus.metadb.db;
 
 /* Eventually these objects will need to be associated with a txn, and a
  * request, and contain the request UPN and the current txn Instant and

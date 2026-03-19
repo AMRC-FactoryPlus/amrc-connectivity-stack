@@ -4,7 +4,7 @@
  * Copyright 2026 University of Sheffield AMRC
  */
 
-package uk.co.amrc.factoryplus.metadb;
+package uk.co.amrc.factoryplus.metadb.api;
 
 import java.util.Date;
 import java.util.Optional;
@@ -23,6 +23,8 @@ import org.apache.jena.rdf.model.*;
 import org.apache.jena.vocabulary.*;
 
 import io.vavr.control.*;
+
+import uk.co.amrc.factoryplus.metadb.db.*;
 
 @Path("v2/app/{app}/object/{object}")
 @Consumes("application/json")

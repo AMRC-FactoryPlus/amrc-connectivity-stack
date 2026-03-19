@@ -4,7 +4,7 @@
  * Copyright 2026 University of Sheffield AMRC
  */
 
-package uk.co.amrc.factoryplus.metadb;
+package uk.co.amrc.factoryplus.metadb.api;
 
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.*;
@@ -12,6 +12,8 @@ import jakarta.ws.rs.ext.*;
 
 import org.glassfish.hk2.api.MultiException;
 import org.glassfish.jersey.server.spi.ResponseErrorMapper;
+
+import uk.co.amrc.factoryplus.metadb.db.Err;
 
 public class ErrorMapper
 {

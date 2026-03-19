@@ -4,7 +4,7 @@
  * Copyright 2026 University of Sheffield AMRC
  */
 
-package uk.co.amrc.factoryplus.metadb;
+package uk.co.amrc.factoryplus.metadb.main;
 
 import java.io.IOException;
 import java.net.URI;
@@ -15,6 +15,8 @@ import org.glassfish.jersey.grizzly2.httpserver.GrizzlyHttpServerFactory;
 import org.glassfish.jersey.inject.hk2.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.server.ServerProperties;
+
+import uk.co.amrc.factoryplus.metadb.db.RdfStore;
 
 public final class Main {
     public static void main (String[] args) throws Throwable
@@ -61,7 +63,7 @@ public final class Main {
         final var model = this.model;
         final var rc = new ResourceConfig()
             .property(ServerProperties.PROCESSING_RESPONSE_ERRORS_ENABLED, true)
-            .packages("uk.co.amrc.factoryplus.metadb")
+            .packages("uk.co.amrc.factoryplus.metadb.api")
             .register(new AbstractBinder () {
                 protected void configure () {
                     bind(model).to(RdfStore.class);

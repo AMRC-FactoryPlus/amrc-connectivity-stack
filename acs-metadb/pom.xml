@@ -176,7 +176,7 @@
             <arguments>
               <argument>-cp</argument>
               <classpath/>
-              <argument>uk.co.amrc.factoryplus.metadb.Main</argument>
+              <argument>uk.co.amrc.factoryplus.metadb.main.Main</argument>
             </arguments>
             <environmentVariables>
               <PORT>8080</PORT>

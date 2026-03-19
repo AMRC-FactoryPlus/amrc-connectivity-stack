@@ -4,7 +4,7 @@
  * Copyright 2026 University of Sheffield AMRC
  */
 
-package uk.co.amrc.factoryplus.metadb;
+package uk.co.amrc.factoryplus.metadb.db;
 
 import org.apache.jena.rdf.model.*;
 

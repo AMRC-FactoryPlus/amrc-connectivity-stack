@@ -4,7 +4,7 @@
  * Copyright 2026 University of Sheffield AMRC
  */
 
-package uk.co.amrc.factoryplus.metadb;
+package uk.co.amrc.factoryplus.metadb.api;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Type;
@@ -13,6 +13,8 @@ import java.util.UUID;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.*;
 import jakarta.ws.rs.ext.*;
+
+import uk.co.amrc.factoryplus.metadb.db.*;
 
 @Provider
 public class ParamMapper implements ParamConverterProvider

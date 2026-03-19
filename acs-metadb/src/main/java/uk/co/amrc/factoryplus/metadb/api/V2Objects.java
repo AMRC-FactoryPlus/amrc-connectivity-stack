@@ -4,7 +4,7 @@
  * Copyright 2026 University of Sheffield AMRC
  */
 
-package uk.co.amrc.factoryplus.metadb;
+package uk.co.amrc.factoryplus.metadb.api;
 
 import java.io.StringReader;
 import java.util.UUID;
@@ -17,6 +17,8 @@ import jakarta.json.*;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import uk.co.amrc.factoryplus.metadb.db.*;
 
 @Path("v2")
 public class V2Objects {

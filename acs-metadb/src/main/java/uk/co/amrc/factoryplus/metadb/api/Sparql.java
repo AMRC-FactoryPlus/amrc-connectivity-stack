@@ -4,7 +4,7 @@
  * Copyright 2026 University of Sheffield AMRC
  */ 
 
-package uk.co.amrc.factoryplus.metadb;
+package uk.co.amrc.factoryplus.metadb.api;
 
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -32,6 +32,8 @@ import org.apache.jena.sparql.resultset.SPARQLResult;
 import org.apache.jena.update.*;
 
 import io.vavr.control.*;
+
+import uk.co.amrc.factoryplus.metadb.db.*;
 
 @Path("v2")
 public class Sparql {

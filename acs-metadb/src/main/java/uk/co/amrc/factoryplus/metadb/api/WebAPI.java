@@ -8,7 +8,7 @@
  * work. Properly this wants moving into a WebAPI class in a service-api
  * module like in JS. */
 
-package uk.co.amrc.factoryplus.metadb;
+package uk.co.amrc.factoryplus.metadb.api;
 
 import java.security.SecureRandom;
 import java.time.Instant;
@@ -17,6 +17,8 @@ import java.util.Base64;
 import jakarta.inject.Singleton;
 import jakarta.json.*;
 import jakarta.ws.rs.*;
+
+import uk.co.amrc.factoryplus.metadb.db.Vocab;
 
 @Singleton @Path("")
 public class WebAPI

@@ -35,6 +35,18 @@ spec:
   principal: sv1cmdesc@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
 {{- end }}
 ---
+{{- if .Values.mesCollation.enabled }}
+apiVersion: factoryplus.app.amrc.co.uk/v1
+kind: KerberosKey
+metadata:
+  name: sv1mescollation
+  namespace: {{ .Release.Namespace }}
+spec:
+  type: Random
+  principal: sv1mescollation@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+  secret: mes-collation-keytabs/client
+{{- end }}
+---
 {{- if .Values.configdb.enabled }}
 apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey

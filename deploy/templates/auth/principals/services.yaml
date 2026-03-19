@@ -36,6 +36,20 @@ spec:
     - HTTP/cmdesc.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
 {{- end }}
 ---
+{{- if .Values.mesCollation.enabled }}
+apiVersion: factoryplus.app.amrc.co.uk/v1
+kind: KerberosKey
+metadata:
+  name: http.mes-collation
+  namespace: {{ .Release.Namespace }}
+spec:
+  type: Random
+  principal: HTTP/mes-collation.{{ .Release.Namespace }}.svc.cluster.local@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+  additionalPrincipals:
+    - HTTP/mes-collation.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+  secret: mes-collation-keytabs/server
+{{- end }}
+---
 {{- if .Values.configdb.enabled }}
 apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey

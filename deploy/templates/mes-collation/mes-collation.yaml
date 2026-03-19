@@ -25,14 +25,9 @@ spec:
         - name: krb5-conf
           configMap:
             name: krb5-conf
-        - name: krb5-keytabs
+        - name: keytabs
           secret:
-            secretName: krb5-keytabs
-            items:
-              - key: sv1mescollation
-                path: client
-              - key: http.mes-collation
-                path: server
+            secretName: mes-collation-keytabs
 
       containers:
         - name: mes-collation
@@ -65,7 +60,7 @@ spec:
             - mountPath: /config/krb5-conf
               name: krb5-conf
             - mountPath: /keytabs
-              name: krb5-keytabs
+              name: keytabs
 ---
 apiVersion: v1
 kind: Service

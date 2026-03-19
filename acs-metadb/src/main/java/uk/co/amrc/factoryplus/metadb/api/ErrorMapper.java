@@ -6,6 +6,7 @@
 
 package uk.co.amrc.factoryplus.metadb.api;
 
+import jakarta.json.*;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.*;
 import jakarta.ws.rs.ext.*;
@@ -19,8 +20,10 @@ public class ErrorMapper
 {
     public static Response clientError (Err.ClientError err)
     {
+        /* XXX we should allow the error to include more fields here */
+        var json = Json.createValue(err.getMessage());
         return Response.status(err.statusCode())
-            .entity(err.getMessage() + "\r\n")
+            .entity(json)
             .build();
     }
 

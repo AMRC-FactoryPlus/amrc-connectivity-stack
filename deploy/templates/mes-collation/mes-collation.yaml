@@ -1,0 +1,82 @@
+{{- if .Values.mesCollation.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mes-collation
+  namespace: {{ .Release.Namespace }}
+  labels:
+    component: mes-collation
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: mes-collation
+  template:
+    metadata:
+      labels:
+        component: mes-collation
+        factory-plus.service: mes-collation
+    spec:
+      {{- with .Values.acs.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: krb5-conf
+          configMap:
+            name: krb5-conf
+        - name: krb5-keytabs
+          secret:
+            secretName: krb5-keytabs
+            items:
+              - key: sv1mescollation
+                path: client
+              - key: http.mes-collation
+                path: server
+
+      containers:
+        - name: mes-collation
+{{ include "amrc-connectivity-stack.image" (list . .Values.mesCollation) | indent 10 }}
+          command: [ "/usr/bin/k5start", "-Uf", "/keytabs/client" ]
+          args: [ "node", "bin/api.js" ]
+          env:
+            - name: KRB5_CONFIG
+              value: /config/krb5-conf/krb5.conf
+            - name: CLIENT_KEYTAB
+              value: /keytabs/client
+            - name: SERVER_KEYTAB
+              value: /keytabs/server
+            - name: HOSTNAME
+              value: mes-collation.{{ .Release.Namespace }}.svc.cluster.local
+            - name: REALM
+              value: {{ .Values.identity.realm | required "values.identity.realm is required!" }}
+            - name: ROOT_PRINCIPAL
+              value: admin@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+            - name: VERBOSE
+              value: {{ .Values.mesCollation.verbosity | quote | required "values.mesCollation.verbosity is required!" }}
+            - name: HTTP_API_URL
+              value: http://mes-collation.{{ .Release.Namespace }}.svc.cluster.local
+            - name: PORT
+              value: "8080"
+{{ include "amrc-connectivity-stack.cache-max-age" (list . "mesCollation") | indent 12 }}
+            - name: DIRECTORY_URL
+              value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
+          volumeMounts:
+            - mountPath: /config/krb5-conf
+              name: krb5-conf
+            - mountPath: /keytabs
+              name: krb5-keytabs
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mes-collation
+  namespace: {{ .Release.Namespace }}
+spec:
+  ports:
+    - name: "web"
+      port: 80
+      targetPort: 8080
+  selector:
+    factory-plus.service: mes-collation
+{{- end -}}

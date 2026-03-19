@@ -10,7 +10,7 @@ acs:
     # certificates for the services
     enabled: false
     # -- The email address to use for Let's Encrypt
-    email: ''
+    email: ""
     # -- Whether or not to use the staging environment for Let's Encrypt
     staging: false
     # -- A list of additional DNS names to use for the certificate
@@ -62,7 +62,7 @@ identity:
   # meaning.
   kadminUsers: []
   # -- Enable support for cross-realm authentication
-  crossRealm: [ ]
+  crossRealm: []
   # crossRealm:
   #   - realm: MYOTHERREALM.COM
   #     domain: myotherrealm.com
@@ -191,6 +191,15 @@ cmdesc:
   # -- Possible values are either 1 to enable all possible debugging, or a comma-separated list of debug tags (the tags printed before the log lines). No logging is specified as an empty string.
   verbosity: 1
 
+mesCollation:
+  # -- Whether or not to enable the MES Collation component
+  enabled: false
+  image:
+    # -- The repository of the MES Collation component
+    repository: acs-mes-collation
+  # -- Possible values are either 1 to enable all possible debugging, or a comma-separated list of debug tags (the tags printed before the log lines). No logging is specified as an empty string.
+  verbosity: 1
+
 historians:
   uns:
     enabled: false
@@ -243,7 +252,7 @@ shell:
     repository: acs-krb-utils
 
 # XXX This should probably be included in acs-krb-utils
-curl: 
+curl:
   image:
     registry: docker.io
     repository: appropriate/curl
@@ -313,8 +322,8 @@ traefik:
   ingressRoute:
     dashboard:
       enabled: false
-#   -- [AZURE] Enable the below section to expose your instance of Factory+/ACS over the internet, replacing the <Value>
-#   -- tags with the details of your pre-configured load balancer.
+    #   -- [AZURE] Enable the below section to expose your instance of Factory+/ACS over the internet, replacing the <Value>
+    #   -- tags with the details of your pre-configured load balancer.
     service:
       spec:
         loadBalancerIP: <External IP address here>
@@ -356,7 +365,7 @@ grafana:
     dashboards:
       enabled: true
       provider:
-        folder: 'Factory+'
+        folder: "Factory+"
         disableDelete: true
       searchNamespace: ALL
 

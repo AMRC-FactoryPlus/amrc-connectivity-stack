@@ -13,9 +13,6 @@ import java.util.UUID;
 
 import jakarta.json.*;
 
-import io.vavr.*;
-import io.vavr.control.*;
-
 import org.apache.jena.query.*;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.update.*;
@@ -28,10 +25,10 @@ public class ConfigEntry extends RequestHandler
 {
     private static final Logger log = LoggerFactory.getLogger(ConfigEntry.class);
 
-    private FPObject app;
-    private FPObject obj;
+    private Resource app;
+    private Resource obj;
 
-    private ConfigEntry (RdfStore db, FPObject app, FPObject obj)
+    public ConfigEntry (RdfStore db, Resource app, Resource obj)
     {
         super(db);
         this.app = app;
@@ -43,16 +40,10 @@ public class ConfigEntry extends RequestHandler
         var appO = db.findObjectOrError(app);
         var objO = db.findObjectOrError(obj);
 
-        return new ConfigEntry(db, appO, objO);
+        return new ConfigEntry(db, appO.node(), objO.node());
     }
 
     public record Value (JsonValue value, String etag, Instant mtime) {}
-
-    private Err.Config error (String fmt, Object... args)
-    {
-        String msg = String.format(fmt, args);
-        return new Err.Config(msg, app.uuid(), obj.uuid());
-    }
 
     private static final Query Q_getValue = Vocab.query("""
         select ?value ?etag ?mtime
@@ -68,20 +59,8 @@ public class ConfigEntry extends RequestHandler
 
     public Optional<Value> getValue ()
     {
-        var exec = QueryExecution.dataset(db.dataset())
-            .query(Q_getValue)
-            .substitution("app", app.node())
-            .substitution("obj", obj.node())
-            .build();
-        var rs = exec.execSelect();
+        var binding = db.singleQuery(Q_getValue, "app", app, "obj", obj);
         
-        if (!rs.hasNext())
-            return Optional.empty();
-        var binding = rs.next();
-
-        if (rs.hasNext()) 
-            throw error("Duplicate config entries");
-
         var val = Util.decodeLiteral(binding.get("value"), RDF.JSON,
             s -> Json.createReader(new StringReader(s)).readValue());
         var etag = Util.decodeLiteral(binding.get("etag"), XSD.xstring, s -> s);
@@ -106,11 +85,7 @@ public class ConfigEntry extends RequestHandler
 
     public void removeValue ()
     {
-        UpdateExecution.dataset(db.dataset())
-            .update(U_removeValue)
-            .substitution("app", app.node())
-            .substitution("obj", obj.node())
-            .execute();
+        db.runUpdate(U_removeValue, "app", app, "obj", obj);
     }
 
     public void putValue (JsonValue value)
@@ -124,8 +99,8 @@ public class ConfigEntry extends RequestHandler
         var entry   = graph.createResource();
         var inst    = db.createInstant();
 
-        graph.add(entry, RDF.type, app.node());
-        graph.add(entry, Vocab.forP, obj.node());
+        graph.add(entry, RDF.type, app);
+        graph.add(entry, Vocab.forP, obj);
         graph.add(entry, Vocab.value, json);
         graph.add(entry, Vocab.start, inst);
     }

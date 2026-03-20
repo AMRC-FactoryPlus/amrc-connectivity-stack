@@ -26,8 +26,7 @@ import org.apache.jena.vocabulary.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import io.vavr.*;
-import io.vavr.control.*;
+import io.vavr.collection.Iterator;
 
 /* This class is not called Model because of the conflict with Jena's
  * Model class. */
@@ -64,19 +63,36 @@ public class RdfStore
     public <T> T calculateRead (Supplier<T> s) { return dataset.calculateRead(s); }
     public <T> T calculateWrite (Supplier<T> s) { return dataset.calculateWrite(s); }
 
+    public ResultSet selectQuery (Query query, Object... substs)
+    {
+        var exec = QueryExecution.dataset(dataset)
+            .query(query);
+        Iterator.of(substs)
+            .grouped(2)
+            .forEach(sq -> exec.substitution((String)sq.get(0), (RDFNode)sq.get(1)));
+        return exec.build().execSelect();
+    }
+
+    public QuerySolution singleQuery (Query query, Object... substs)
+    {
+        return Util.singleOrError(selectQuery(query, substs));
+    }
+
+    public void runUpdate (UpdateRequest update, Object... substs)
+    {
+        var exec = UpdateExecution.dataset(dataset)
+            .update(update);
+        Iterator.of(substs)
+            .grouped(2)
+            .forEach(sq -> exec.substitution((String)sq.get(0), (RDFNode)sq.get(1)));
+        exec.execute();
+    }
+
     /** Find a single resource within the direct graph. */
     public Optional<Resource> findResource (Property pred, RDFNode obj)
     {
-        var subjs = direct
-            .listResourcesWithProperty(pred, obj)
-            .toList();
-        if (subjs.isEmpty())
-            return Optional.empty();
-        if (subjs.size() > 1)
-            throw new Err.CorruptRDF(String.format(
-                "More than one candidate with %s/%s", pred, obj));
-        
-        return Optional.of(subjs.get(0));
+        return Util.single(
+            direct.listResourcesWithProperty(pred, obj));
     }
 
     /* TXN */
@@ -105,18 +121,7 @@ public class RdfStore
 
     public int findRank (Resource obj)
     {
-        var exec = QueryExecution.dataset(dataset)
-            .query(Q_findRank)
-            .substitution("obj", obj)
-            .build();
-        var rs = exec.execSelect();
-        
-        if (!rs.hasNext())
-            throw new Err.CorruptRDF("Cannot find rank of object");
-        var binding = rs.next();
-        if (rs.hasNext())
-            throw new Err.CorruptRDF("Duplicate ranks");
-
+        var binding = singleQuery(Q_findRank, "obj", obj);
         return Util.decodeLiteral(binding.get("rank"), XSD.xint, Integer::parseInt);
     }
 

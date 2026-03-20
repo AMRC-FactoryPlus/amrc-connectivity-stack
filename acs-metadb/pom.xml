@@ -176,6 +176,8 @@
             <arguments>
               <argument>-cp</argument>
               <classpath/>
+              <argument>-Dorg.slf4j.simpleLogger.showThreadName=false</argument>
+              <argument>-Dorg.slf4j.simpleLogger.showShortLogName=true</argument>
               <argument>uk.co.amrc.factoryplus.metadb.main.Main</argument>
             </arguments>
             <environmentVariables>

@@ -13,20 +13,23 @@
 :Object a rdfs:Class.
 :Class a rdfs:Class; rdfs:subClassOf :Object, rdfs:Class.
 
-:uuid a rdf:Property;
-    rdfs:domain :Object; rdfs:range xsd:string.
-:rank a rdf:Property;
-    rdfs:domain :Object; rdfs:range xsd:integer.
+# We are using these instead of rdfs:{domain,range} as we definitely
+# don't want the inference those imply, at least not over F+ objects.
+# For now they are informational only; ideally they would be implemented
+# with some sort of validation layer, rather than as inferences.
+:from a rdf:Property; rdfs:domain rdf:Property.
+:to a rdf:Property; rdfs:domain rdf:Property.
+
+:uuid :from :Object; :to xsd:string.
+:rank :from :Object; :to xsd:integer.
 
 # Factory+ primary class. This is not a subproperty of rdf:type as we
 # need to track all memberships in the direct graph. Enforcement that
 # the primary class is actually a class happens in the API.
-:primary a rdf:Property;
-    rdfs:domain :Object; rdfs:range :Class.
+:primary :from :Object; :to :Class.
 
 # This is purely informational at the moment.
-:powersetOf a rdf:Property;
-    rdfs:domain :Class; rdfs:range :Class.
+:powersetOf :from :Class; :to :Class.
 
 ## Implementation of subsets in terms of powersets.
 ## These need to be forward rules, I think.
@@ -62,21 +65,30 @@
     :uuid "52b80183-6998-4bf9-9b30-132755e7dede";
     :rank "3"^^xsd:int; :powersetof :R2Class.
 
+# XXX These are definitely not R0. They are perhaps names, which are R1?
+:Special a :R1Class; :primary :R1Class;
+    rdfs:subClassOf :Individual;
+    :uuid "ddb132e4-5cdd-49c8-b9b1-2f35879eab6d".
+# There is some logic in saying this should be :Object.
+:Wildcard a :Special; :primary :Special;
+    :uuid "00000000-0000-0000-0000-000000000000".
+# This makes no logical sense. We should omit the owner instead.
+:Unowned a :Special; :primary :Special;
+    :uuid "091e796a-65c0-4080-adff-c3ce01a65b2e".
+
 :Instant a :R1Class; :primary :R1Class; 
     rdfs:subClassOf :Individual;
     :uuid "600bc688-1d35-11f1-80e6-d7c35e61c3ce".
 # XXX Long-term this needs to go in favour of measurements against a
 # particular clock. But for now it's a useful simplification.
-:timestamp a rdf:Property;
-    rdfs:domain :Instant; rdfs:range xsd:datetime.
+:timestamp :from :Instant; :to xsd:datetime.
 
 :State a :R1Class; :primary :R1Class;
     rdfs:subClassOf :Individual;
     :uuid "c73d94e4-1d35-11f1-88e0-bf4ed4b22d09".
 # We don't do full 4D state modelling yet. We only record the current
 # state and the starting Instant.
-:start a rdf:Property;
-    rdfs:domain :State; rdfs:range :Instant.
+:start :from :State; :to :Instant.
 
 app:ConfigEntry a :R1Class; :primary :R1Class;
     rdfs:subClassOf :State;
@@ -84,55 +96,72 @@ app:ConfigEntry a :R1Class; :primary :R1Class;
 app:ConfigEntryGroup a :R2Class; :primary :R2Class; rdfs:subClassOf :R1Class;
     :uuid "62314906-1c9f-11f1-9bf0-bb3086d1330d";
     :powersetOf app:ConfigEntry.
-:Application a :R2Class; :primary :R2Class; rdfs:subClassOf :ConfigEntryGroup;
+
+# Currently we have Application a class of ConfigEntry. This means Apps
+# fit meaningfully into the well-founded class structure but makes them
+# a little harder to handle in RDF. We cannot have App a function from
+# Object to JSON, as we need metadata on the config entry; but
+# potentially from Object to ConfigEntry? We would need to decide how to
+# handle functions within the well-founded structure: Applications must
+# be F+ objects with UUIDs. The standard Kuratowski construction gives a
+# rank of max(rank(domain), rank(range)) + 2, which inflates the ranks
+# rather fast and also requires non-strict ranks to be usable. A
+# pragmatic alternative would be to allow 'proper class' and 'function'
+# as ranks outside the numerical system.
+:Application a :R2Class; :primary :R2Class; rdfs:subClassOf app:ConfigEntryGroup;
     :uuid "d319bd87-f42b-4b66-be4f-f82ff48b93f0".
 
-app:for a rdf:Property;
-    rdfs:domain app:ConfigEntry; rdfs:range :Object.
-app:value a rdf:Property;
-    rdfs:domain app:ConfigEntry; rdfs:range rdf:JSON.
+app:for :from app:ConfigEntry; :to :Object.
+app:value :from app:ConfigEntry; :to rdf:JSON.
 
-app:Registration a :Application; :primary :Application; rdfs:subClassOf :ConfigEntry;
+app:Registration a :Application; :primary :Application; 
+    rdfs:subClassOf app:ConfigEntry;
     :uuid "cb40bed5-49ad-4443-a7f5-08c75009da8f".
-app:Info a :Application; :primary :Application; rdfs:subClassOf :ConfigEntry;
+app:Info a :Application; :primary :Application;
+    rdfs:subClassOf app:ConfigEntry;
     :uuid "64a8bfa9-7772-45c4-9d1a-9e6290690957".
+app:ConfigSchema a :Application; :primary :Application; 
+    rdfs:subClassOf app:ConfigEntry;
+    :uuid "dbd8a535-52ba-4f6e-b4f8-9b71aefe09d3".
 
-<uuid/09aa4958-1d36-11f1-a9a6-bff44d0575de> a :Instant; :primary :Instant;
+# Properly an ACS release iss an Activity; in HQDM terms these Instants
+# should be Events which are caused by the release Activity. Whether the
+# objects below should share one Event or have individual Events all
+# caused by ACS 5.0.2 is an open question. It's also not really true
+# that the new config entries below began with ACS 5.0.2; nor even that
+# they will begin with whichever release includes this code.
+<acs/4.0.0> a :Instant; :primary :Instant;
+    :uuid "948ad49c-2444-11f1-a870-df20b1e545e4";
+    :timestamp "2025-05-07T13:27:48Z"^^xsd:dateTime.
+<acs/v5.0.2> a :Instant; :primary :Instant;
     :uuid "09aa4958-1d36-11f1-a9a6-bff44d0575de";
-    :timestamp "2026-03-11T10:35:51Z"^^xsd:dateTime.
-
-# select ?value ?etag
-# where {
-#   ?config a ?app; app:for ?obj.
-#   ?config app:value ?value.
-#   ?config :start/:uuid ?etag.
-# }
+    :timestamp "2026-03-10T17:21:05Z"^^xsd:dateTime.
 
 # ConfigEntries are not F+ objects for the moment; they don't have
 # UUIDs. This is to avoid infinite regress with the _Object
 # registration_ entries.
 [] a app:Info; app:for :Individual;
     app:value """{"name": "Individual"}"""^^rdf:JSON;
-    :start <uuid/09aa4958-1d36-11f1-a9a6-bff44d0575de>.
+    :start <acs/v4.0.0>.
 [] a app:Info; app:for :R1Class;
     app:value """{"name": "Rank 1 class"}"""^^rdf:JSON;
-    :start <uuid/09aa4958-1d36-11f1-a9a6-bff44d0575de>.
+    :start <acs/v4.0.0>.
 [] a app:Info; app:for :R2Class;
     app:value """{"name": "Rank 2 class"}"""^^rdf:JSON;
-    :start <uuid/09aa4958-1d36-11f1-a9a6-bff44d0575de>.
+    :start <acs/v4.0.0>.
 [] a app:Info; app:for :R3Class;
     app:value """{"name": "Rank 3 class"}"""^^rdf:JSON;
-    :start <uuid/09aa4958-1d36-11f1-a9a6-bff44d0575de>.
+    :start <acs/v4.0.0>.
 
 [] a app:Info; app:for app:ConfigEntry;
     app:value """{"name": "Config entry"}"""^^rdf:JSON;
-    :start <uuid/09aa4958-1d36-11f1-a9a6-bff44d0575de>.
+    :start <acs/v5.0.2>.
 [] a app:Info; app:for app:ConfigEntryGroup;
     app:value """{"name": "Config entry group"}"""^^rdf:JSON;
-    :start <uuid/09aa4958-1d36-11f1-a9a6-bff44d0575de>.
+    :start <acs/v5.0.2>.
 [] a app:Info; app:for :Application;
     app:value """{"name": "Application"}"""^^rdf:JSON;
-    :start <uuid/09aa4958-1d36-11f1-a9a6-bff44d0575de>.
+    :start <acs/v4.0.0>.
 
 :Service a :R1Class; :primary :R1Class;
     rdfs:subClassOf :Individual;

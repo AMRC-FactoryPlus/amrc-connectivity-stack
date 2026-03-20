@@ -59,15 +59,16 @@ public class ConfigEntry extends RequestHandler
 
     public Optional<Value> getValue ()
     {
-        var binding = db.singleQuery(Q_getValue, "app", app, "obj", obj);
-        
-        var val = Util.decodeLiteral(binding.get("value"), RDF.JSON,
-            s -> Json.createReader(new StringReader(s)).readValue());
-        var etag = Util.decodeLiteral(binding.get("etag"), XSD.xstring, s -> s);
-        var mtime = Util.decodeLiteral(binding.get("mtime"), XSD.dateTime, 
-            Instant::parse);
+        return db.optionalQuery(Q_getValue, "app", app, "obj", obj)
+            .map(binding -> {
+                var val = Util.decodeLiteral(binding.get("value"), RDF.JSON,
+                    s -> Json.createReader(new StringReader(s)).readValue());
+                var etag = Util.decodeLiteral(binding.get("etag"), XSD.xstring, s -> s);
+                var mtime = Util.decodeLiteral(binding.get("mtime"), XSD.dateTime, 
+                    Instant::parse);
 
-        return Optional.of(new Value(val, etag, mtime));
+                return new Value(val, etag, mtime);
+            });
     }
 
     /* This removes an existing ConfigEntry. For a more 4D approach we

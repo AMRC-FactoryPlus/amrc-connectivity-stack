@@ -73,6 +73,11 @@ public class RdfStore
         return exec.build().execSelect();
     }
 
+    public Optional<QuerySolution> optionalQuery (Query query, Object... substs)
+    {
+        return Util.single(selectQuery(query, substs));
+    }
+
     public QuerySolution singleQuery (Query query, Object... substs)
     {
         return Util.singleOrError(selectQuery(query, substs));

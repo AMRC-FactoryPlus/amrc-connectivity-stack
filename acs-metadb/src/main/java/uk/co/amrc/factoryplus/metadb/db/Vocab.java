@@ -35,20 +35,29 @@ public class Vocab
 
     public static final Property uuid       = prop("core/uuid");
     public static final Property rank       = prop("core/rank");
-    public static final Property primary    = prop("core/pc");
+    public static final Property primary    = prop("core/primary");
     public static final Property start      = prop("core/start");
+
+    public static final Resource Special    = res("core/Special");
+    public static final Resource Wildcard   = res("core/Wildcard");
+    public static final Resource Unowned    = res("core/Unowned");
 
     public static final Resource Instant    = res("core/Instant");
     public static final Property timestamp  = prop("core/timestamp");
 
-    public static final Property forP       = prop("app/for");
-    public static final Property value      = prop("app/value");
+    public static final Resource Application    = res("core/Application");
+    public static final Property forP           = prop("app/for");
+    public static final Property value          = prop("app/value");
+    public static final Resource Registration   = res("app/Registration");
+    public static final Resource ConfigSchema   = res("app/ConfigSchema");
 
     public static final Resource G_direct   = res("graph/direct");
     public static final Resource G_derived  = res("graph/derived");
 
     public static final UUID U_RDFStore     = UUID.fromString(
         "8abf031c-193f-11f1-b047-d762a2934dfc");
+    public static final UUID U_Unowned      = UUID.fromString(
+        "091e796a-65c0-4080-adff-c3ce01a65b2e");
 
     public static Optional<UUID> parseUUID (String uuid)
     {

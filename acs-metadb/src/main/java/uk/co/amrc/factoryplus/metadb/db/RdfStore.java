@@ -136,8 +136,15 @@ public class RdfStore
                 break;
         }
 
+        return createObject(klass, uuid);
+    }
+
+    /* TXN */
+    public FPObject createObject (Resource klass, UUID uuid)
+    {
         var obj = derived.createResource();
         derived.add(obj, Vocab.uuid, uuid.toString());
+        derived.add(obj, RDF.type, klass);
         derived.add(obj, Vocab.primary, klass);
 
         var rank = findRank(obj);

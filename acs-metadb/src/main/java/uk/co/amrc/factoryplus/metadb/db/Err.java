@@ -67,16 +67,29 @@ public class Err extends Error
     }
     public static class RankMismatch extends ClientError
     {
-        private UUID first;
-        private UUID second;
-
-        public RankMismatch (UUID first, UUID second)
+        public RankMismatch ()
         {
             super("Rank mismatch");
-            this.first = first;
-            this.second = second;
         }
 
         public int statusCode () { return 409; }
+    }
+    public static class InUse extends ClientError
+    {
+        public InUse ()
+        {
+            super("Object in use");
+        }
+
+        public int statusCode () { return 409; }
+    }
+    public static class Immutable extends ClientError
+    {
+        public Immutable ()
+        {
+            super("Object is immutable");
+        }
+
+        public int statusCode () { return 405; }
     }
 }

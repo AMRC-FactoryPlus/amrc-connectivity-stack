@@ -7,6 +7,7 @@
 package uk.co.amrc.factoryplus.metadb.api;
 
 import java.io.StringReader;
+import java.util.Optional;
 import java.util.UUID;
 
 import jakarta.inject.*;
@@ -33,6 +34,43 @@ public class V2Objects {
         return Json.createArrayBuilder(objs).build();
     }
 
+    private UUID jsonUUID (Optional<JsonValue> val)
+    {
+        return val
+            .filter(v -> v instanceof JsonString)
+            .map(v -> ((JsonString)v).getString())
+            .flatMap(Vocab::parseUUID)
+            .orElseThrow(() -> new WebApplicationException(422));
+    }
+
+    @POST @Path("object")
+    public JsonValue createObject (JsonObject spec)
+    {
+        var klass = jsonUUID(Optional.ofNullable(spec.get("class")));
+        var uuid = Optional.ofNullable(spec.get("uuid"))
+            .filter(v -> !v.equals(JsonValue.NULL))
+            .map(v -> jsonUUID(Optional.of(v)));
+
+        log.info("Create object {}, {}", klass, uuid);
+
+        /* We don't accept any other parameters. The ServiceClient
+         * doesn't pass any anyway. */
+
+        return db.objectStructure().createObject(klass, uuid);
+    }
+
+    @DELETE @Path("object/{object}")
+    public void deleteObject (@PathParam("object") UUID uuid)
+    {
+        db.objectStructure().deleteObject(uuid);
+    }
+
+    @GET @Path("object/rank")
+    public JsonArray listRanks ()
+    {
+        var ranks = db.objectStructure().listRanks();
+        return Json.createArrayBuilder(ranks).build();
+    }
 
     private JsonArray listRelation (String graph, UUID uuid, String relation)
     {

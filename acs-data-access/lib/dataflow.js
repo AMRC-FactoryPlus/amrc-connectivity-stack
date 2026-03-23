@@ -2,15 +2,19 @@
 * ACS Data Access Service
 * Data-Flow / sequence management
 */
+import rx from 'rxjs';
 
+import * as rxx     from "@amrc-factoryplus/rx-util";
 import { RxClient, UUIDs } from '@amrc-factoryplus/rx-client';
+
 import { DataAccess } from './constants.js';
+
+
+
 
 export class DataFlow {
   constructor(opts) {
     const { fplus } = opts;
-
-    // this.root = opts.root_principal; // names of the kerberos principal that overrides all ACL checks. comes from the environment. Always set to the admin principal name. Override principal. 
 
     this.log = fplus.debug.bound("data");
     this.cdb = fplus.ConfigDB;
@@ -29,14 +33,17 @@ export class DataFlow {
     this.responses = this._build_responses();
     this.metadata = this._build_metadata();
 
+    // combine these into map ??? with key = structural dataset class UUID
     this.sessions = this.cdb.search_app(DataAccess.App.SessionLimits);
+    this.unions = this.cdb.search_app(DataAccess.App.UnionComponents);
 
-    this.names = this._build_names();
+
+    // this.names = this._build_names();
   }
 
 
   _build_metadata(){
-    
+
   }
 
   update_name(r) {
@@ -47,7 +54,7 @@ export class DataFlow {
   
   _build_names() {
     return rxx.rx(
-      cdb.search_app(UUIDs.App.Info),
+      this.cdb.search_app(UUIDs.App.Info),
       // rx.map acts on the sequence of responses, entries.map acts on the entries maps
       rx.map(entries => entries.map(entry => entry.name)),
       // Cache the map (1 refers to 1 previous value)
@@ -84,6 +91,8 @@ export class DataFlow {
    */
   run() {
     this.sessions.subscribe(ss => this.log("SESSION UPDATE %o", ss.toJS()));
+    this.unions.subscribe(ss => this.log("UNION UPDATE %o", ss.toJS()));
+
   }
 
 

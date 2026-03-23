@@ -9,7 +9,7 @@
 import { RxClient, UUIDs } from '@amrc-factoryplus/rx-client';
 import { WebAPI } from '@amrc-factoryplus/service-api';
 import { routes } from '../lib/routes.js';
-import { Version, Service } from '../lib/constants.js';
+// import { Version, Service } from '../lib/constants.js';
 import {DataFlow} from '../lib/dataflow.js';
 
 const { env } = process;
@@ -20,7 +20,7 @@ const fplus = await new RxClient({
 
 
 const debug = fplus.debug;
-debug.log("app", "Starting acs-data-service revision %s", GIT_VERSION);
+debug.log("app", "Starting acs-data-service revision %s");
 
 // the dataflow object is full of sequences that does most of the work of this service. Sequence means an RX observable.
 const data = new DataFlow({

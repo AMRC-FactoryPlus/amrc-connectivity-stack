@@ -63,7 +63,7 @@
 # The top rank class has no primary class
 :R3Class a :Class; rdfs:subClassOf :Class;
     :uuid "52b80183-6998-4bf9-9b30-132755e7dede";
-    :rank "3"^^xsd:int; :powersetof :R2Class.
+    :rank "3"^^xsd:int; :powersetOf :R2Class.
 
 # XXX These are definitely not R0. They are perhaps names, which are R1?
 :Special a :R1Class; :primary :R1Class;
@@ -130,7 +130,7 @@ app:ConfigSchema a :Application; :primary :Application;
 # caused by ACS 5.0.2 is an open question. It's also not really true
 # that the new config entries below began with ACS 5.0.2; nor even that
 # they will begin with whichever release includes this code.
-<acs/4.0.0> a :Instant; :primary :Instant;
+<acs/v4.0.0> a :Instant; :primary :Instant;
     :uuid "948ad49c-2444-11f1-a870-df20b1e545e4";
     :timestamp "2025-05-07T13:27:48Z"^^xsd:dateTime.
 <acs/v5.0.2> a :Instant; :primary :Instant;

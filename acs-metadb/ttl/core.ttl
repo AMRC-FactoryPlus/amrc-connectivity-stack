@@ -97,6 +97,9 @@ app:ConfigEntryGroup a :R2Class; :primary :R2Class; rdfs:subClassOf :R1Class;
     :uuid "62314906-1c9f-11f1-9bf0-bb3086d1330d";
     :powersetOf app:ConfigEntry.
 
+app:for :from app:ConfigEntry; :to :Object.
+app:value :from app:ConfigEntry; :to rdf:JSON.
+
 # Currently we have Application a class of ConfigEntry. This means Apps
 # fit meaningfully into the well-founded class structure but makes them
 # a little harder to handle in RDF. We cannot have App a function from
@@ -110,19 +113,26 @@ app:ConfigEntryGroup a :R2Class; :primary :R2Class; rdfs:subClassOf :R1Class;
 # as ranks outside the numerical system.
 :Application a :R2Class; :primary :R2Class; rdfs:subClassOf app:ConfigEntryGroup;
     :uuid "d319bd87-f42b-4b66-be4f-f82ff48b93f0".
+app:AppGroup a :R3Class; :primary :R3Class; rdfs:subClassOf :R2Class;
+    :uuid "75b030ca-2463-11f1-8bc8-372c7503501b";
+    :powersetOf :Application.
+app:Structured a app:AppGroup; :primary app:AppGroup; rdfs:subClassOf :Application;
+    :uuid "912771e2-2463-11f1-b0e8-83e356c50fc8".
 
-app:for :from app:ConfigEntry; :to :Object.
-app:value :from app:ConfigEntry; :to rdf:JSON.
+app:appliesTo :from :Application; :to :Class.
 
-app:Registration a :Application; :primary :Application; 
+app:Registration a app:Structured; :primary :Application; 
     rdfs:subClassOf app:ConfigEntry;
-    :uuid "cb40bed5-49ad-4443-a7f5-08c75009da8f".
+    :uuid "cb40bed5-49ad-4443-a7f5-08c75009da8f";
+    app:appliesTo :Object.
 app:Info a :Application; :primary :Application;
     rdfs:subClassOf app:ConfigEntry;
-    :uuid "64a8bfa9-7772-45c4-9d1a-9e6290690957".
+    :uuid "64a8bfa9-7772-45c4-9d1a-9e6290690957";
+    app:appliesTo :Object.
 app:ConfigSchema a :Application; :primary :Application; 
     rdfs:subClassOf app:ConfigEntry;
-    :uuid "dbd8a535-52ba-4f6e-b4f8-9b71aefe09d3".
+    :uuid "dbd8a535-52ba-4f6e-b4f8-9b71aefe09d3";
+    app:appliesTo :Application.
 
 # Properly an ACS release iss an Activity; in HQDM terms these Instants
 # should be Events which are caused by the release Activity. Whether the

@@ -59,9 +59,42 @@ public class RdfStore
     public InfModel derived () { return derived; }
 
     public void executeRead (Runnable r) { dataset.executeRead(r); }
-    public void executeWrite (Runnable r) { dataset.executeWrite(r); }
     public <T> T calculateRead (Supplier<T> s) { return dataset.calculateRead(s); }
-    public <T> T calculateWrite (Supplier<T> s) { return dataset.calculateWrite(s); }
+
+    public <T> T calculateWrite (Supplier<T> s)
+    {
+        T rv;
+
+        var updater = new AppUpdater(this);
+        dataset.begin(ReadWrite.WRITE);
+        //var listener = new NotifyListener();
+
+        try {
+            //direct.register(listener);
+            rv = s.get();
+            //listener.commit();
+            updater.update();
+            dataset.commit();
+        }
+        catch (Throwable e) {
+            //listener.abort();
+            dataset.abort();
+            throw e;
+        }
+        finally {
+            //direct.unregister(listener);
+            //listener.end();
+            dataset.end();
+        }
+
+        updater.publish();
+        return rv;
+    }
+
+    public void executeWrite (Runnable r) 
+    {
+        calculateWrite(() -> { r.run(); return 1; });
+    }
 
     public ResultSet selectQuery (Query query, Object... substs)
     {
@@ -178,5 +211,9 @@ public class RdfStore
     public ConfigEntry configEntry (UUID app, UUID obj)
     {
         return ConfigEntry.create(this, app, obj);
+    }
+    public ConfigEntry configEntry (Resource app, Resource obj)
+    {
+        return new ConfigEntry(this, app, obj);
     }
 }

@@ -46,6 +46,7 @@ public class Vocab
     public static final Property timestamp  = prop("core/timestamp");
 
     public static final Resource Application    = res("core/Application");
+    public static final Resource appStructured  = res("app/Structured");
     public static final Property forP           = prop("app/for");
     public static final Property value          = prop("app/value");
     public static final Resource Registration   = res("app/Registration");

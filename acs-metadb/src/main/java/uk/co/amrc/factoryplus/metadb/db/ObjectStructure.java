@@ -106,9 +106,9 @@ public class ObjectStructure extends RequestHandler
     """);
 
     /* TXN */
-    private JsonValue objectRegistration (FPObject obj)
+    public JsonValue objectRegistration (Resource obj)
     {
-        var rs = db.singleQuery(Q_objectRegistration, "obj", obj.node());
+        var rs = db.singleQuery(Q_objectRegistration, "obj", obj);
 
         String uuid = Util.decodeLiteral(rs.get("uuid"), XSD.xstring, s -> s);
         String klass = Util.decodeLiteral(rs.get("class"), XSD.xstring, s -> s);
@@ -166,7 +166,7 @@ public class ObjectStructure extends RequestHandler
                     .orElseGet(() -> db.createObject(kres, u)))
                 .orElseGet(() -> db.createObject(kres));
 
-            return objectRegistration(obj);
+            return objectRegistration(obj.node());
         });
     }
 

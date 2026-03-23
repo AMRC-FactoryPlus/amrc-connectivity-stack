@@ -166,17 +166,17 @@ public class Sparql {
     private Model resolveGraph (boolean create)
     {
         var dataset = store.dataset();
-        var headers = uriInfo.getQueryParameters();
-        var isDef = headers.getFirst("default");
-        var graph = headers.getFirst("graph");
+        var params = uriInfo.getQueryParameters();
+        var isDef = params.getFirst("default");
+        var graph = params.getFirst("graph");
 
         if (isDef != null) {
-            if (graph != null || isDef != "")
+            if (graph != null || !isDef.equals(""))
                 throw new WebApplicationException(400);
             return dataset.getDefaultModel();
         }
 
-        if (graph == null || graph == "")
+        if (graph == null || graph.equals(""))
             throw new WebApplicationException(400);
         if (!create && !dataset.containsNamedModel(graph))
             throw new WebApplicationException(404);

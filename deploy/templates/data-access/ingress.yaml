@@ -1,4 +1,4 @@
-{{ if .Values.data-access.enabled }}
+{{ if .Values.dataAccess.enabled }}
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
@@ -16,7 +16,7 @@ spec:
           namespace: {{ .Release.Namespace }}
   {{- if .Values.acs.secure }}
   tls:
-    secretName: {{ coalesce .Values.data-access.tlsSecretName .Values.acs.tlsSecretName }}
+    secretName: {{ coalesce .Values.dataAccess.tlsSecretName .Values.acs.tlsSecretName }}
     domains:
       - main: data-access.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
   {{- end -}}

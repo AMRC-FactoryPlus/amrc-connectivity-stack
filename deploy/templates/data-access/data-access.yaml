@@ -1,4 +1,4 @@
-{{- if .Values.data-access.enabled }}
+{{- if .Values.dataAccess.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -31,7 +31,7 @@ spec:
 
       containers:
         - name: data-access
-{{ include "amrc-connectivity-stack.image" (list . .Values.data-access) | indent 10 }}
+{{ include "amrc-connectivity-stack.image" (list . .Values.dataAccess) | indent 10 }}
           command: [ "/usr/bin/k5start", "-Uf", "/keytabs/client" ]
           args: [ "node", "bin/api.js" ]
           env:
@@ -48,10 +48,10 @@ spec:
             - name: ROOT_PRINCIPAL
               value: admin@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
             - name: VERBOSE
-              value: {{.Values.data-access.verbosity | quote | required "values.data-access.verbosity is required!"}}
+              value: {{.Values.dataAccess.verbosity | quote | required "values.dataAccess.verbosity is required!"}}
             - name: PORT
               value: "8080"
-{{ include "amrc-connectivity-stack.cache-max-age" (list . "data-access") | indent 12 }}
+{{ include "amrc-connectivity-stack.cache-max-age" (list . "dataAccess") | indent 12 }}
             - name: DIRECTORY_URL
               value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
           volumeMounts:

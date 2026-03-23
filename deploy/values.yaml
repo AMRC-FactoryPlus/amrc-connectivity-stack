@@ -123,6 +123,15 @@ monitor:
     repository: acs-monitor
   verbosity: "ALL,!service,!token"
 
+dataAccess:
+  # -- Whether or not to enable the Configuration Store component
+  enabled: true
+  image:
+    # -- The repository of the Configuration Store component
+    repository: acs-data-access
+  verbosity: "ALL,!service,!token"
+
+
 # -- The service-setup component loads ACS-specific configuration into
 # the ACS services when the Helm chart is deployed or upgraded.
 serviceSetup:

@@ -1,0 +1,23 @@
+{{ if .Values.data-access.enabled }}
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: data-access-ingressroute
+  namespace: {{ .Release.Namespace }}
+spec:
+  entryPoints:
+    - {{ .Values.acs.secure | ternary "websecure" "web" }}
+  routes:
+    - match: Host(`data-access.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}`)
+      kind: Rule
+      services:
+        - name: data-access
+          port: 80
+          namespace: {{ .Release.Namespace }}
+  {{- if .Values.acs.secure }}
+  tls:
+    secretName: {{ coalesce .Values.data-access.tlsSecretName .Values.acs.tlsSecretName }}
+    domains:
+      - main: data-access.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
+  {{- end -}}
+{{- end -}}

@@ -21,26 +21,26 @@ import org.apache.jena.vocabulary.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class ConfigEntry extends RequestHandler
+public class ConfigEntry extends RequestHandler.Component
 {
     private static final Logger log = LoggerFactory.getLogger(ConfigEntry.class);
 
     private Resource app;
     private Resource obj;
 
-    public ConfigEntry (RdfStore db, Resource app, Resource obj)
+    public ConfigEntry (RequestHandler req, Resource app, Resource obj)
     {
-        super(db);
+        super(req);
         this.app = app;
         this.obj = obj;
     }
 
-    public static ConfigEntry create (RdfStore db, UUID app, UUID obj)
+    public static ConfigEntry create (RequestHandler req, UUID app, UUID obj)
     {
-        var appO = db.findObjectOrError(app);
-        var objO = db.findObjectOrError(obj);
+        var appO = req.db().findObjectOrError(app);
+        var objO = req.db().findObjectOrError(obj);
 
-        return new ConfigEntry(db, appO.node(), objO.node());
+        return new ConfigEntry(req, appO.node(), objO.node());
     }
 
     public record Value (JsonValue value, String etag, Instant mtime) {}
@@ -59,7 +59,7 @@ public class ConfigEntry extends RequestHandler
 
     public Optional<Value> getValue ()
     {
-        return db.optionalQuery(Q_getValue, "app", app, "obj", obj)
+        return db().optionalQuery(Q_getValue, "app", app, "obj", obj)
             .map(binding -> {
                 var val = Util.decodeLiteral(binding.get("value"), RDF.JSON,
                     s -> Json.createReader(new StringReader(s)).readValue());
@@ -86,7 +86,7 @@ public class ConfigEntry extends RequestHandler
 
     public void removeValue ()
     {
-        db.runUpdate(U_removeValue, "app", app, "obj", obj);
+        db().runUpdate(U_removeValue, "app", app, "obj", obj);
     }
 
     public boolean putValue (JsonValue value)
@@ -104,9 +104,9 @@ public class ConfigEntry extends RequestHandler
         var json = ResourceFactory.createTypedLiteral(
             value.toString(), RDF.dtRDFJSON);
 
-        var graph   = db.derived();
+        var graph   = db().derived();
         var entry   = graph.createResource();
-        var inst    = db.createInstant();
+        var inst    = request().getInstant();
 
         graph.add(entry, RDF.type, app);
         graph.add(entry, Vocab.forP, obj);

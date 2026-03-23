@@ -16,60 +16,65 @@ import org.slf4j.LoggerFactory;
 import org.apache.jena.query.*;
 import org.apache.jena.rdf.model.*;
 
-public class AppUpdater
+public class AppUpdater extends RequestHandler.Component
 {
     private static final Logger log = LoggerFactory.getLogger(AppUpdater.class);
 
-    private record Config (UUID app, UUID obj) {}
+    private record Config (Resource app, Resource obj) {}
 
-    private RdfStore db;
     private ObjectStructure objs;
     private Set<Config> updated;
 
-    public AppUpdater (RdfStore db)
+    public AppUpdater (RequestHandler req)
     {
-        this.db = db;
-        this.objs = db.objectStructure();
+        super(req);
+        this.objs = request().objectStructure();
         this.updated = new HashSet<>();
     }
 
     private static final Query Q_findUpdates = Vocab.query("""
-        select ?app ?obj ?appUUID ?objUUID
+        select ?app ?obj
         where {
             ?app a <app/Structured>;
-                <core/uuid> ?appUUID;
                 <app/appliesTo> ?domain.
             ?obj a ?domain;
-                <core/uuid> ?objUUID.
+                <core/uuid> ?uuid.
         }
     """);
 
     public void update ()
     {
-        var updates = db.selectQuery(Q_findUpdates)
+        var updates = db().selectQuery(Q_findUpdates)
             .materialise();
 
         updates.forEachRemaining(update -> {
             var app = update.getResource("app");
             var obj = update.getResource("obj");
-
-            if (!app.equals(Vocab.Registration)) {
-                log.info("Can't update app {}", app);
-                return;
-            }
-            log.info("Updating {} {}", app, obj);
-            var newVal = objs.objectRegistration(obj);
-            var changed = db.configEntry(app, obj).putValue(newVal);
-
-            if (changed) {
-                var appUUID = UUID.fromString(
-                    update.getLiteral("appUUID").getString());
-                var objUUID = UUID.fromString(
-                    update.getLiteral("objUUID").getString());
-
-                updated.add(new Config(appUUID, objUUID));
-            }
+            updateEntry(app, obj);
         });
+
+        /* We may have created the current instant in order to update a
+         * config entry. In this case it may not have been captured by
+         * the first pass through the changes. But we don't want to
+         * store an Instant if we don't need one. */
+        if (!updated.isEmpty()) {
+            var now = request().getInstant();
+            updateEntry(Vocab.Registration, now);
+        }
+    }
+
+    private void updateEntry (Resource app, Resource obj)
+    {
+        if (!app.equals(Vocab.Registration)) {
+            log.info("Can't update app {}", app);
+            return;
+        }
+        log.info("Updating {} {}", app, obj);
+        var newVal = objs.objectRegistration(obj);
+        var changed = request().configEntry(app, obj).putValue(newVal);
+
+        if (changed)
+            updated.add(new Config(app, obj));
     }
     
     public void publish ()

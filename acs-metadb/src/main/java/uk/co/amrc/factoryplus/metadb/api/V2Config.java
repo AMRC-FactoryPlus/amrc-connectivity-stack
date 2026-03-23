@@ -35,17 +35,12 @@ public class V2Config {
     @PathParam("app")       UUID app;
     @PathParam("object")    UUID obj;
 
-    private ConfigEntry configEntry ()
-    {
-        return store.configEntry(app, obj);
-    }
-
     @GET 
     public Response get ()
     {
         log.info("Get config for {}/{}", app, obj);
-        var entry = store.calculateRead(() -> {
-            return configEntry().getValue();
+        var entry = store.requestRead(req -> {
+            return req.configEntry(app, obj).getValue();
         });
         return entry
             .map(e -> Response.ok(e.value())
@@ -63,8 +58,8 @@ public class V2Config {
     public void put (JsonValue config)
     {
         log.info("Put config for {}/{}", app, obj);
-        store.executeWrite(() -> {
-            configEntry().putValue(config);
+        store.requestExecute(req -> {
+            req.configEntry(app, obj).putValue(config);
         });
     }
 
@@ -72,8 +67,8 @@ public class V2Config {
     public void delete ()
     {
         log.info("Delete config for {}/{}", app, obj);
-        store.executeWrite(() -> {
-            configEntry().removeValue();
+        store.requestExecute(req -> {
+            req.configEntry(app, obj).removeValue();
         });
     }
 
@@ -81,8 +76,8 @@ public class V2Config {
     public void mergePatch (JsonValue json)
     {
         var patch = Json.createMergePatch(json);
-        store.executeWrite(() -> {
-            var entry = configEntry();
+        store.requestExecute(req -> {
+            var entry = req.configEntry(app, obj);
 
             var o_conf = entry.getValue()
                 .map(e -> e.value())

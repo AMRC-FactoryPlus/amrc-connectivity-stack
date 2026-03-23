@@ -7,6 +7,8 @@
 package uk.co.amrc.factoryplus.metadb.db;
 
 import java.time.Instant;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.Map;
 import java.util.Optional;
@@ -61,39 +63,30 @@ public class RdfStore
     public void executeRead (Runnable r) { dataset.executeRead(r); }
     public <T> T calculateRead (Supplier<T> s) { return dataset.calculateRead(s); }
 
-    public <T> T calculateWrite (Supplier<T> s)
+    public void executeWrite (Runnable r) { dataset.executeWrite(r); }
+    public <T> T calculateWrite (Supplier<T> s) { return dataset.calculateWrite(s); }
+
+    public <T> T requestRead (Function<RequestHandler, T> cb)
     {
-        T rv;
+        return calculateRead(() -> cb.apply(new RequestHandler(this)));
+    }
+    public <T> T requestWrite (Function<RequestHandler, T> cb)
+    {
+        var req = new RequestHandler(this);
+        var updater = req.appUpdater();
 
-        var updater = new AppUpdater(this);
-        dataset.begin(ReadWrite.WRITE);
-        //var listener = new NotifyListener();
-
-        try {
-            //direct.register(listener);
-            rv = s.get();
-            //listener.commit();
+        T rv = calculateWrite(() -> {
+            var rv2 = cb.apply(req);
             updater.update();
-            dataset.commit();
-        }
-        catch (Throwable e) {
-            //listener.abort();
-            dataset.abort();
-            throw e;
-        }
-        finally {
-            //direct.unregister(listener);
-            //listener.end();
-            dataset.end();
-        }
+            return rv2;
+        });
 
         updater.publish();
         return rv;
     }
-
-    public void executeWrite (Runnable r) 
+    public void requestExecute (Consumer<RequestHandler> cb)
     {
-        calculateWrite(() -> { r.run(); return 1; });
+        requestWrite(req -> { cb.accept(req); return 1; });
     }
 
     public ResultSet selectQuery (Query query, Object... substs)
@@ -203,17 +196,4 @@ public class RdfStore
         return inst;
     }
 
-    public ObjectStructure objectStructure ()
-    {
-        return ObjectStructure.create(this);
-    }
-
-    public ConfigEntry configEntry (UUID app, UUID obj)
-    {
-        return ConfigEntry.create(this, app, obj);
-    }
-    public ConfigEntry configEntry (Resource app, Resource obj)
-    {
-        return new ConfigEntry(this, app, obj);
-    }
 }

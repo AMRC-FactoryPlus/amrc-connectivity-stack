@@ -89,8 +89,16 @@ public class ConfigEntry extends RequestHandler
         db.runUpdate(U_removeValue, "app", app, "obj", obj);
     }
 
-    public void putValue (JsonValue value)
+    public boolean putValue (JsonValue value)
     {
+        var existing = getValue()
+            .map(Value::value)
+            .filter(v -> v.equals(value));
+        if (existing.isPresent()) {
+            log.info("Duplicate config update suppressed");
+            return false;
+        }
+
         removeValue();
 
         var json = ResourceFactory.createTypedLiteral(
@@ -104,6 +112,8 @@ public class ConfigEntry extends RequestHandler
         graph.add(entry, Vocab.forP, obj);
         graph.add(entry, Vocab.value, json);
         graph.add(entry, Vocab.start, inst);
+
+        return true;
     }
 }
 

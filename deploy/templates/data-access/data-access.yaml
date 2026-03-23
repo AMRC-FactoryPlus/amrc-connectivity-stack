@@ -1,0 +1,75 @@
+{{- if .Values.data-access.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: data-access
+  namespace: {{ .Release.Namespace }}
+  labels:
+    component: data-access
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: data-access
+  template:
+    metadata:
+      labels:
+        component: data-access
+        factory-plus.service: data-access
+    spec:
+      {{- with .Values.acs.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: krb5-conf
+          configMap:
+            name: krb5-conf
+        - name: krb5-keytabs
+          secret:
+            secretName: data-access-keytabs
+
+      containers:
+        - name: data-access
+{{ include "amrc-connectivity-stack.image" (list . .Values.data-access) | indent 10 }}
+          command: [ "/usr/bin/k5start", "-Uf", "/keytabs/client" ]
+          args: [ "node", "bin/api.js" ]
+          env:
+            - name: KRB5_CONFIG
+              value: /config/krb5-conf/krb5.conf
+            - name: CLIENT_KEYTAB
+              value: /keytabs/client
+            - name: SERVER_KEYTAB
+              value: /keytabs/server
+            - name: HOSTNAME
+              value: data-access.{{ .Release.Namespace }}.svc.cluster.local
+            - name: REALM
+              value: {{ .Values.identity.realm | required "values.identity.realm is required!" }}
+            - name: ROOT_PRINCIPAL
+              value: admin@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+            - name: VERBOSE
+              value: {{.Values.data-access.verbosity | quote | required "values.data-access.verbosity is required!"}}
+            - name: PORT
+              value: "8080"
+{{ include "amrc-connectivity-stack.cache-max-age" (list . "data-access") | indent 12 }}
+            - name: DIRECTORY_URL
+              value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
+          volumeMounts:
+            - mountPath: /config/krb5-conf
+              name: krb5-conf
+            - mountPath: /keytabs
+              name: krb5-keytabs
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: data-access
+  namespace: {{ .Release.Namespace }}
+spec:
+  ports:
+    - name: "web"
+      port: 80
+      targetPort: 8080
+  selector:
+    factory-plus.service: data-access
+{{- end -}}

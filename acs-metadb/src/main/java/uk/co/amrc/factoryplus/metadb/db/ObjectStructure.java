@@ -99,9 +99,11 @@ public class ObjectStructure extends RequestHandler
     private static final Query Q_objectRegistration = Vocab.query("""
         select ?uuid ?rank ?class
         where {
-            ?obj <core/uuid> ?uuid;
-                rdf:type/<core/rank> ?rank;
-                <core/primary>/<core/uuid> ?class.
+            ?obj <core/uuid> ?uuid.
+            optional {
+                ?obj rdf:type/<core/rank> ?rank;
+                    <core/primary>/<core/uuid> ?class.
+            }
         }
     """);
 
@@ -111,18 +113,24 @@ public class ObjectStructure extends RequestHandler
         var rs = db.singleQuery(Q_objectRegistration, "obj", obj);
 
         String uuid = Util.decodeLiteral(rs.get("uuid"), XSD.xstring, s -> s);
-        String klass = Util.decodeLiteral(rs.get("class"), XSD.xstring, s -> s);
-        int rank = Util.decodeLiteral(rs.get("rank"), XSD.xint, Integer::valueOf);
+        var rank = Optional.ofNullable(rs.get("rank"))
+            .map(l -> Util.decodeLiteral(l, XSD.xint, Integer::valueOf))
+            .<JsonValue>map(Json::createValue)
+            .orElse(JsonValue.NULL);
+        var klass = Optional.ofNullable(rs.get("class"))
+            .map(l -> Util.decodeLiteral(rs.get("class"), XSD.xstring, s -> s))
+            .<JsonValue>map(Json::createValue)
+            .orElse(JsonValue.NULL);
 
-        return Json.createObjectBuilder()
+        var rv = Json.createObjectBuilder()
             .add("uuid", uuid)
             .add("rank", rank)
             .add("class", klass)
             /* These entries are fake, for now */
             .add("owner", Vocab.U_Unowned.toString())
             .add("strict", true)
-            .add("deleted", false)
-            .build();
+            .add("deleted", false);
+        return rv.build();
     }
 
     /* TXN */

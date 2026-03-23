@@ -224,6 +224,7 @@ jobs:
           - acs-admin
           - acs-cluster-manager
           - acs-cmdesc
+          - acs-data-access
           - acs-edge-sync
           - acs-files
           - acs-git

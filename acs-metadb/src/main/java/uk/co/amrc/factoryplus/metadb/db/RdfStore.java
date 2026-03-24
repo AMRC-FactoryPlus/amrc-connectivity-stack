@@ -40,6 +40,8 @@ public class RdfStore
     private InfModel    derived;
     private Dataset     dataset;
 
+    private AppMapper   appMapper;
+
     /* We build a Dataset out of these named graphs:
      * - G_direct: this is G_direct from the TDB.
      * - G_derived: this is RDFS(G_direct).
@@ -54,11 +56,15 @@ public class RdfStore
 
         dataset.addNamedModel(Vocab.G_direct, direct);
         dataset.addNamedModel(Vocab.G_derived, derived);
+
+        appMapper = new AppMapper(this);
     }
 
     public Dataset dataset () { return dataset; }
     public Model direct () { return direct; }
     public InfModel derived () { return derived; }
+
+    public AppMapper appMapper () { return appMapper; }
 
     public void executeRead (Runnable r) { dataset.executeRead(r); }
     public <T> T calculateRead (Supplier<T> s) { return dataset.calculateRead(s); }

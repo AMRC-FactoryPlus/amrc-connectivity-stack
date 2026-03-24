@@ -133,7 +133,7 @@ public class ObjectStructure extends RequestHandler.Component
                 .orElseGet(() -> db().createObject(kres, u)))
             .orElseGet(() -> db().createObject(kres));
 
-        return request().appUpdater()
+        return db().appMapper()
             .generateConfig(Vocab.Registration, obj.node())
             .orElseThrow(() -> new Err.CorruptRDF("Cannot find object registration"));
     }

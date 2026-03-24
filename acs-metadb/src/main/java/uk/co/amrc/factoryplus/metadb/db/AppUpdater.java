@@ -12,6 +12,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.BiFunction;
+import java.util.function.Function;
 
 import jakarta.json.*;
 
@@ -22,16 +23,11 @@ import org.apache.jena.query.*;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.vocabulary.*;
 
+import io.vavr.control.Try;
+
 public class AppUpdater extends RequestHandler.Component
 {
     private static final Logger log = LoggerFactory.getLogger(AppUpdater.class);
-
-    /* XXX This is hardcoded for now. */
-    private static final Map<Resource,
-            BiFunction<AppUpdater, Resource, Optional<JsonValue>>> generators = 
-        Map.of(
-            Vocab.Registration,     AppUpdater::objectRegistration,
-            Vocab.Info,             AppUpdater::generalInfo);
 
     private record Config (Resource app, Resource obj) {}
 
@@ -76,6 +72,20 @@ public class AppUpdater extends RequestHandler.Component
         }
     }
 
+    public void publish ()
+    {
+        log.info("Config updates:");
+        for (var c : updated)
+            log.info("  {} {}", c.app(), c.obj());
+    }
+
+    public Optional<JsonValue> generateConfig (Resource app, Resource obj)
+    {
+        return Optional.of(generators.get(app))
+            .flatMap(q -> db().optionalQuery(q, "obj", obj))
+            .map(this::solutionToJson);
+    }
+
     private void updateEntry (Resource app, Resource obj)
     {
         log.info("Updating {} {}", app, obj);
@@ -87,58 +97,70 @@ public class AppUpdater extends RequestHandler.Component
             updated.add(new Config(app, obj));
     }
 
-    public Optional<JsonValue> generateConfig (Resource app, Resource obj)
+    /* We have to bypass Jena's RDFDatatype system here and provide our
+     * own mappings. We cannot map arbitrary objects to JSON, and the
+     * JSON creation functions will not accept Object. */
+    private static final Map<Resource, 
+            Function<String, Optional<JsonValue>>> toJson = Map.of(
+        XSD.xstring,    s -> Optional.of(Json.createValue(s)),
+        XSD.xint,       s -> Try.of(() -> Integer.parseInt(s))
+                                .toJavaOptional()
+                                .map(Json::createValue),
+        XSD.xboolean,   s -> s.equals("true") ? Optional.of(JsonValue.TRUE)
+                            : s.equals("false") ? Optional.of(JsonValue.FALSE)
+                            : Optional.empty(),
+        RDF.JSON,       Util::readJson);
+
+    /* Currently this does dynamic decoding based on what was returned
+     * from the RDF. Once we have query generation we should be able to
+     * use the <core/to> properties to know what we are expecting. */
+    private JsonValue literalToJson (RDFNode node)
     {
-        return Optional.of(generators.get(app))
-            .flatMap(gen -> gen.apply(this, obj));
+        /* This should probably be selected based on optional/nullable
+         * properties in the schema. */
+        if (node == null) return JsonValue.NULL;
+
+        if (!node.isLiteral())
+            throw new Err.NotLiteral(node);
+        
+        var lit = node.asLiteral();
+        var typ = ResourceFactory.createResource(lit.getDatatypeURI());
+
+        return Optional.ofNullable(toJson.get(typ))
+            .flatMap(d -> d.apply(lit.getLexicalForm()))
+            .orElseThrow(() -> new Err.BadLiteral(lit));
     }
 
-    public void publish ()
+    private JsonValue solutionToJson (QuerySolution rs)
     {
-        log.info("Config updates:");
-        for (var c : updated)
-            log.info("  {} {}", c.app(), c.obj());
+        var jobj = Json.createObjectBuilder();
+        rs.varNames().forEachRemaining(n ->
+            jobj.add(n, literalToJson(rs.get(n))));
+
+        return jobj.build();
     }
 
     /* Specific updaters for individual Apps. These should be replaced
      * with queries generated from schema entries. */
 
     private static final Query Q_objectRegistration = Vocab.query("""
-        select ?uuid ?rank ?class
+        select ?uuid ?rank ?class ?owner ?strict ?deleted
         where {
             ?obj <core/uuid> ?uuid.
             optional {
                 ?obj rdf:type/<core/rank> ?rank;
                     <core/primary>/<core/uuid> ?class.
             }
+
+            optional { ?obj <core/owner>/<core/uuid> ?_1. }
+            bind(coalesce(?_1, "091e796a-65c0-4080-adff-c3ce01a65b2e") as ?owner)
+
+            optional { ?obj <core/deleted> ?_2. }
+            bind(coalesce(?_2, false) as ?deleted)
+
+            bind(true as ?strict)
         }
     """);
-
-    private Optional<JsonValue> objectRegistration (Resource obj)
-    {
-        return db().optionalQuery(Q_objectRegistration, "obj", obj)
-            .map(rs -> {
-                String uuid = Util.decodeLiteral(rs.get("uuid"), XSD.xstring, s -> s);
-                var rank = Optional.ofNullable(rs.get("rank"))
-                    .map(l -> Util.decodeLiteral(l, XSD.xint, Integer::valueOf))
-                    .<JsonValue>map(Json::createValue)
-                    .orElse(JsonValue.NULL);
-                var klass = Optional.ofNullable(rs.get("class"))
-                    .map(l -> Util.decodeLiteral(rs.get("class"), XSD.xstring, s -> s))
-                    .<JsonValue>map(Json::createValue)
-                    .orElse(JsonValue.NULL);
-
-                var rv = Json.createObjectBuilder()
-                    .add("uuid", uuid)
-                    .add("rank", rank)
-                    .add("class", klass)
-                    /* These entries are fake, for now */
-                    .add("owner", Vocab.U_Unowned.toString())
-                    .add("strict", true)
-                    .add("deleted", false);
-                return rv.build();
-            });
-    }
 
     private static final Query Q_generalInfo = Vocab.query("""
         select ?name
@@ -147,15 +169,8 @@ public class AppUpdater extends RequestHandler.Component
         }
     """);
 
-    private Optional<JsonValue> generalInfo (Resource obj)
-    {
-        return db().optionalQuery(Q_generalInfo, "obj", obj)
-            .map(rs -> {
-                String name = Util.decodeLiteral(rs.get("name"), XSD.xstring, s -> s);
-
-                return Json.createObjectBuilder()
-                    .add("name", name)
-                    .build();
-            });
-    }
+    /* XXX This is hardcoded for now. */
+    private static final Map<Resource, Query> generators = Map.of(
+        Vocab.Registration,     Q_objectRegistration,
+        Vocab.Info,             Q_generalInfo);
 }

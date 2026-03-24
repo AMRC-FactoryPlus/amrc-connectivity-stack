@@ -8,6 +8,8 @@ package uk.co.amrc.factoryplus.metadb.db;
 
 import java.util.UUID;
 
+import org.apache.jena.rdf.model.*;
+
 public class Err extends Error
 {
     public Err (String msg)
@@ -36,6 +38,20 @@ public class Err extends Error
 
         public UUID app () { return app; }
         public UUID obj () { return obj; }
+    }
+    public static class NotLiteral extends CorruptRDF
+    {
+        public NotLiteral (RDFNode n)
+        {
+            super("Expecting literal, not " + n.toString());
+        }
+    }
+    public static class BadLiteral extends CorruptRDF
+    {
+        public BadLiteral (Literal l)
+        {
+            super("Cannot decode literal: " + l.toString());
+        }
     }
 
     public static abstract class ClientError extends Err

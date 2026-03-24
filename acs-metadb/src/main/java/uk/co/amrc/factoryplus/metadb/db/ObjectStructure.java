@@ -93,43 +93,6 @@ public class ObjectStructure extends RequestHandler.Component
             .toJavaList();
     }
 
-    private static final Query Q_objectRegistration = Vocab.query("""
-        select ?uuid ?rank ?class
-        where {
-            ?obj <core/uuid> ?uuid.
-            optional {
-                ?obj rdf:type/<core/rank> ?rank;
-                    <core/primary>/<core/uuid> ?class.
-            }
-        }
-    """);
-
-    /* TXN */
-    public JsonValue objectRegistration (Resource obj)
-    {
-        var rs = db().singleQuery(Q_objectRegistration, "obj", obj);
-
-        String uuid = Util.decodeLiteral(rs.get("uuid"), XSD.xstring, s -> s);
-        var rank = Optional.ofNullable(rs.get("rank"))
-            .map(l -> Util.decodeLiteral(l, XSD.xint, Integer::valueOf))
-            .<JsonValue>map(Json::createValue)
-            .orElse(JsonValue.NULL);
-        var klass = Optional.ofNullable(rs.get("class"))
-            .map(l -> Util.decodeLiteral(rs.get("class"), XSD.xstring, s -> s))
-            .<JsonValue>map(Json::createValue)
-            .orElse(JsonValue.NULL);
-
-        var rv = Json.createObjectBuilder()
-            .add("uuid", uuid)
-            .add("rank", rank)
-            .add("class", klass)
-            /* These entries are fake, for now */
-            .add("owner", Vocab.U_Unowned.toString())
-            .add("strict", true)
-            .add("deleted", false);
-        return rv.build();
-    }
-
     /* TXN */
     private FPObject updateRegistration (FPObject obj, Resource klass)
     {
@@ -170,7 +133,9 @@ public class ObjectStructure extends RequestHandler.Component
                 .orElseGet(() -> db().createObject(kres, u)))
             .orElseGet(() -> db().createObject(kres));
 
-        return objectRegistration(obj.node());
+        return request().appUpdater()
+            .generateConfig(Vocab.Registration, obj.node())
+            .orElseThrow(() -> new Err.CorruptRDF("Cannot find object registration"));
     }
 
     private static UpdateRequest U_deleteConfigs = Vocab.update("""

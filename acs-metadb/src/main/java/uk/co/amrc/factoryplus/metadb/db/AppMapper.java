@@ -52,8 +52,10 @@ public class AppMapper {
     private static final UpdateRequest U_generalInfo = Vocab.update("""
         delete { ?obj <core/name> ?1. }
         insert { ?obj <core/name> ?name. }
-        where {}
+        where { ?obj <core/name> ?1. }
     """);
+
+    
 
     /* We have to bypass Jena's RDFDatatype system here and provide our
      * own mappings. We cannot map arbitrary objects to JSON, and the
@@ -81,7 +83,7 @@ public class AppMapper {
 
     public Optional<JsonValue> generateConfig (Resource app, Resource obj)
     {
-        return Optional.of(generators.get(app))
+        return Optional.ofNullable(generators.get(app))
             .flatMap(q -> db.optionalQuery(q, "obj", obj))
             .map(AppMapper::solutionToJson);
     }

@@ -8,6 +8,8 @@
 @prefix : <core/> .
 @prefix app: <app/> .
 @prefix srv: <service/> .
+@prefix sp: <sparkplug/> .
+@prefix usr: <principal/> .
 
 # These are proper classes and sit outside the rank structure.
 :Object a rdfs:Class.
@@ -151,6 +153,35 @@ app:ConfigSchema a :Application; :primary :Application;
     :uuid "dbd8a535-52ba-4f6e-b4f8-9b71aefe09d3";
     :name "Application config schema";
     app:appliesTo :Application.
+app:SparkplugAddress a app:Structured; :primary :Application;
+    rdfs:subClassOf app:ConfigEntry;
+    :uuid "8e32801b-f35a-4cbf-a5c3-2af64d3debd7";
+    :name "Sparkplug address";
+    app:appliesTo sp:Entity.
+
+# These are things which can have a Sparkplug address. _Edge cluster_,
+# _Sparkplug Node_ and _Sparkplug Device_ are all subclasses. Properly
+# we should have Group/Node subclasses here as well, because:
+# * _Edge cluster_ != _Sparkplug Group_ because `*-Service-Core` is not
+#   an _Edge cluster_.
+# * _Sparkplug Node_ is currently a _Client role_. Not all entities with
+#   a Node address should currently be permitted to use it. cf _Edge
+#   Agent_ vs _Active Edge Agent_.
+sp:Entity a :R1Class; :primary :R1Class;
+    rdfs:subClassOf :Individual;
+    :uuid "3ef49486-278d-11f1-b52f-f742bd9bbc94";
+    :name "Sparkplug entity".
+sp:Device a :R1Class; :primary :R1Class;
+    rdfs:subClassOf sp:Entity;
+    :uuid "18773d6d-a70d-443a-b29a-3f1583195290";
+    :name "Sparkplug Device".
+# This is very crude for now and represents group/node/device separately
+# and redundantly. Properly we should link Device→Node→Group and derive
+# the address from that. Probably we could use only a single sp:name
+# property for the actual names.
+sp:groupId :from sp:Entity; :to xsd:string.
+sp:nodeId :from sp:Entity; :to xsd:string.
+sp:deviceId :from sp:Entity; :to xsd:string.
 
 :Service a :R1Class; :primary :R1Class;
     rdfs:subClassOf :Individual;
@@ -165,4 +196,35 @@ srv:ConfigDB a :Service; :primary :Service;
 srv:Auth a :Service; :primary :Service;
     :uuid "cab2642a-f7d9-42e5-8845-8f35affe1fd4";
     :name "Auth service".
+# These are for representing Directory information.
+srv:Provider a :R1Class; :primary :R1Class;
+    rdfs:subClassOf :Individual;
+    :uuid "0fdf17ce-2793-11f1-a869-6fd7319ec1a3";
+    :name "Service provider".
+srv:provides :from srv:Provider; :to :Service.
+srv:url :from srv:Provider; :to xsd:string.
 
+:Principal a :R1Class; :primary :R1Class;
+    rdfs:subClassOf :Individual;
+    :uuid "11614546-b6d7-11ef-aebd-8fbb45451d7c";
+    :name "Principal".
+usr:PrincipalGroup a :R2Class; :primary :R2Class;
+    rdfs:subClassOf :R1Class; :powersetOf :Principal;
+    :uuid "c0157038-ccff-11ef-a4db-63c6212e998f";
+    :name "Principal group".
+usr:PrincipalType a :R2Class; :primary :R2Class;
+    rdfs:subClassOf usr:PrincipalGroup;
+    :uuid "ae17afe0-ccff-11ef-bb70-67807cb4a9df";
+    :name "Principal type".
+usr:CentralService a usr:PrincipalType; :primary usr:PrincipalType;
+    rdfs:subClassOf :Principal;
+    :uuid "e463b4ae-a322-46cc-8976-4ba76838e908";
+    :name "Central service".
+
+usr:ConfigDB a usr:CentralService, sp:Entity, srv:Provider;
+    :primary usr:CentralService;
+    :uuid "36861e8d-9152-40c4-8f08-f51c2d7e3c25";
+    :name "ConfigDB";
+    srv:provides srv:ConfigDB;
+    sp:groupId "AMRC-Service-Core";
+    sp:nodeId "ConfigDB".

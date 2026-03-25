@@ -75,16 +75,17 @@
               <i class="fa-sharp fa-solid fa-circle-notch fa-spin ml-2"></i>
             </div>
           </Button>
-          <div class="flex gap-2 mx-3 mb-3">
-            <Button variant="outline" class="flex-1" @click="handleDownloadCsv" :disabled="!schema">
+          <!-- <div class="flex gap-2 mx-3 mb-3"> -->
+            <Button variant="outline" class="shrink-0 mx-3" @click="handleDownloadCsv" :disabled="!schema">
               <Download class="size-4 mr-1" />
               Download CSV
             </Button>
-            <Button variant="outline" class="flex-1" @click="$refs.csvFileInput.click()" :disabled="!schema">
+            <Button variant="outline" class="shrink-0 m-3" @click="$refs.csvFileInput.click()" :disabled="!schema">
               <Upload class="size-4 mr-1" />
               Upload CSV
             </Button>
-          </div>
+          <!-- </div> -->
+
           <input
             ref="csvFileInput"
             type="file"

@@ -8,6 +8,8 @@ package uk.co.amrc.factoryplus.metadb.db;
 
 import java.util.UUID;
 
+import jakarta.json.*;
+
 import org.apache.jena.rdf.model.*;
 
 public class Err extends Error
@@ -80,6 +82,15 @@ public class Err extends Error
         }
 
         public int statusCode () { return 410; }
+    }
+    public static class BadJson extends ClientError
+    {
+        public BadJson (JsonValue val)
+        {
+            super("Unexpected JSON value: " + val.toString());
+        }
+
+        public int statusCode () { return 422; }
     }
     public static class RankMismatch extends ClientError
     {

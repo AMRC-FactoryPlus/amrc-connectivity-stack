@@ -52,6 +52,7 @@ public class Vocab
     public static final Resource Registration   = res("app/Registration");
     public static final Resource ConfigSchema   = res("app/ConfigSchema");
     public static final Resource Info           = res("app/Info");
+    public static final Resource SparkplugAddr  = res("app/SparkplugAddress");
 
     public static final Resource G_direct   = res("graph/direct");
     public static final Resource G_derived  = res("graph/derived");

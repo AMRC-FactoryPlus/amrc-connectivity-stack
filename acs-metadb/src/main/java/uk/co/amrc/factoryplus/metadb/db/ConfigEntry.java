@@ -45,6 +45,11 @@ public class ConfigEntry extends RequestHandler.Component
 
     public record Value (JsonValue value, String etag, Instant mtime) {}
 
+    private boolean isStructured ()
+    {
+        return db().derived().contains(app, RDF.type, Vocab.appStructured);
+    }
+
     private static final Query Q_getValue = Vocab.query("""
         select ?value ?etag ?mtime
         where {
@@ -86,10 +91,26 @@ public class ConfigEntry extends RequestHandler.Component
 
     public void removeValue ()
     {
+        if (isStructured())
+            db().appMapper().deleteConfig(app, obj);
+        else
+            removeRawValue();
+    }
+
+    public void removeRawValue ()
+    {
         db().runUpdate(U_removeValue, "app", app, "obj", obj);
     }
 
-    public boolean putValue (JsonValue value)
+    public void putValue (JsonValue value)
+    {
+        if (isStructured())
+            db().appMapper().updateConfig(app, obj, value);
+        else
+            putRawValue(value);
+    }
+
+    public boolean putRawValue (JsonValue value)
     {
         var existing = getValue()
             .map(Value::value)
@@ -99,7 +120,7 @@ public class ConfigEntry extends RequestHandler.Component
             return false;
         }
 
-        removeValue();
+        removeRawValue();
 
         var json = ResourceFactory.createTypedLiteral(
             value.toString(), RDF.dtRDFJSON);

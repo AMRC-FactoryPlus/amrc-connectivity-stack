@@ -48,14 +48,33 @@ public class AppMapper {
             ?obj <core/name> ?name.
         }
     """);
-
+    private static final UpdateRequest D_generalInfo = Vocab.update("""
+        delete where { ?obj <core/name> ?1. };
+    """);
     private static final UpdateRequest U_generalInfo = Vocab.update("""
-        delete { ?obj <core/name> ?1. }
-        insert { ?obj <core/name> ?name. }
-        where { ?obj <core/name> ?1. }
+        insert { ?obj <core/name> ?name. } where {};
     """);
 
-    
+    private static final Query Q_sparkplugAddress = Vocab.query("""
+        select ?group_id ?node_id ?device_id
+        where {
+            ?obj <sparkplug/groupId> ?group_id.
+            optional { ?obj <sparkplug/nodeId> ?node_id. }
+            optional { ?obj <sparkplug/deviceId> ?device_id. }
+        }
+    """);
+    private static final UpdateRequest D_sparkplugAddress = Vocab.update("""
+        delete where { ?obj <sparkplug/groupId> ?1. };
+        delete where { ?obj <sparkplug/nodeId> ?2. };
+        delete where { ?obj <sparkplug/deviceId> ?3. };
+    """);
+    private static final UpdateRequest U_sparkplugAddress = Vocab.update("""
+        insert {
+            ?obj <sparkplug/groupId> ?group_id;
+                <sparkplug/nodeId> ?node_id;
+                <sparkplug/deviceId> ?device_id.
+        } where {};
+    """);
 
     /* We have to bypass Jena's RDFDatatype system here and provide our
      * own mappings. We cannot map arbitrary objects to JSON, and the
@@ -72,9 +91,17 @@ public class AppMapper {
         RDF.JSON,       Util::readJson);
 
     private RdfStore db;
+
     private Map<Resource, Query> generators = Map.of(
         Vocab.Registration,     Q_objectRegistration,
-        Vocab.Info,             Q_generalInfo);
+        Vocab.Info,             Q_generalInfo,
+        Vocab.SparkplugAddr,    Q_sparkplugAddress);
+    private Map<Resource, UpdateRequest> deleters = Map.of(
+        Vocab.Info,             D_generalInfo,
+        Vocab.SparkplugAddr,    D_sparkplugAddress);
+    private Map<Resource, UpdateRequest> updaters = Map.of(
+        Vocab.Info,             U_generalInfo,
+        Vocab.SparkplugAddr,    U_sparkplugAddress);
 
     public AppMapper (RdfStore db)
     {
@@ -86,6 +113,32 @@ public class AppMapper {
         return Optional.ofNullable(generators.get(app))
             .flatMap(q -> db.optionalQuery(q, "obj", obj))
             .map(AppMapper::solutionToJson);
+    }
+
+    public void deleteConfig (Resource app, Resource obj)
+    {
+        if (app.equals(Vocab.Registration))
+            throw new Err.Immutable();
+
+        Optional.ofNullable(deleters.get(app))
+            .ifPresent(d -> db.runUpdate(d, "obj", obj));
+    }
+
+    public void updateConfig (Resource app, Resource obj, JsonValue config)
+    {
+        /* XXX Reg can be updated but needs special handling */
+        if (app.equals(Vocab.Registration))
+            throw new Err.Immutable();
+
+        var sol = jsonToSolution(config);
+
+        deleteConfig(app, obj);
+        Optional.ofNullable(updaters.get(app))
+            .ifPresent(u -> UpdateExecution.dataset(db.dataset())
+                .update(u)
+                .substitution(sol)
+                .substitution("obj", obj)
+                .execute());
     }
 
     /* Currently this does dynamic decoding based on what was returned
@@ -115,5 +168,30 @@ public class AppMapper {
             jobj.add(n, literalToJson(rs.get(n))));
 
         return jobj.build();
+    }
+
+    /* XXX This can only convert strings for now. In general we will
+     * need expected type information as RDF has a richer type system
+     * than JSON. */
+    private static Literal jsonToLiteral (JsonValue val)
+    {
+        if (!(val instanceof JsonString))
+            throw new Err.BadJson(val);
+
+        return ResourceFactory.createPlainLiteral(
+            ((JsonString)val).getString());
+    }
+
+    /* This can only decode flat objects for now */
+    private static QuerySolution jsonToSolution (JsonValue val)
+    {
+        if (!(val instanceof JsonObject))
+            throw new Err.BadJson(val);
+
+        var qsol = new QuerySolutionMap();
+        ((JsonObject)val).forEach(
+            (k, v) -> qsol.add(k, jsonToLiteral(v)));
+
+        return qsol;
     }
 }

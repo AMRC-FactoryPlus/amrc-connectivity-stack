@@ -81,9 +81,11 @@ public class AppUpdater extends RequestHandler.Component
 
     private void updateEntry (Resource app, Resource obj)
     {
+        /* XXX We need to remove redundant entries */
+
         log.info("Updating {} {}", app, obj);
         var changed = mapper.generateConfig(app, obj)
-            .map(v -> request().configEntry(app, obj).putValue(v))
+            .map(v -> request().configEntry(app, obj).putRawValue(v))
             .orElse(false);
 
         if (changed)

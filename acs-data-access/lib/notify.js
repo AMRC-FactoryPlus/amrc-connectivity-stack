@@ -3,7 +3,6 @@
 * DataAccessNotify
 */
 
-
 import * as rx from "rxjs";
 
 import * as rxx from "@amrc-factoryplus/rx-util";
@@ -13,7 +12,6 @@ export class DataAccessNotify {
   constructor(opts) {
     this.data = opts.data;
     this.log = opts.debug.bound("notify");
-
     this.notify = this.build_notify(opts.api);
   }
 
@@ -22,35 +20,45 @@ export class DataAccessNotify {
     this.notify.run();
   }
 
-  /**
-   * constructs a Notify object 
-   * acts as an express router
-   * routes notify requests to methods you give it.
-   */
   build_notify(api) {
     const notify = new Notify({
       api,
       log: this.log,
     });
 
-    // This is basically Express. This is more strict in that directories must end with a "/". It won't redirect.
+    notify.watch("v1/metadata/", this.metadata_list.bind(this));
+    notify.watch("v1/metadata/:uuid", this.metadata_uuid.bind(this));
+    notify.search("v1/metadata/", this.metadata_search.bind(this));
+    
+    notify.watch("v1/structure/", this.structure_list.bind(this));
+    notify.watch("v1/structure/:uuid", this.structure_uuid.bind(this));
+    notify.search("v1/structure/", this.structure_search.bind(this));
 
-    notify.watch("v1/metadata", this.metadata_list.bind(this));
-    notify.watch("v1/metadata/:uuid", )
-    notify.search("v1/metadata/", )
-    
-    notify.watch("v1/structure/", )
-    notify.watch("v1/structure/:uuid", )
-    notify.search("v1/structure/", )
-    
     return notify;
   }
 
-  /**
-   * Returns a list of Dataset UUIDs the client has access to
-   */
   metadata_list(sess){
     
+  }
+
+  metadata_uuid(sess){
+
+  }
+
+  metadata_search(sess){
+
+  }
+
+  structure_list(sess){
+
+  }
+
+  structure_uuid(sess){
+
+  }
+  
+  structure_search(sess){
+
   }
 
   /**
@@ -67,13 +75,5 @@ export class DataAccessNotify {
       rx.map(
         // You need to build your response objects here
       ));
-  }
-
-
-  /**
-  * Get changes to the name of a particular object `obj`.
-  */
-  object_name(sess, obj) {
-    // Do similar to `name_list` here.
   }
 }

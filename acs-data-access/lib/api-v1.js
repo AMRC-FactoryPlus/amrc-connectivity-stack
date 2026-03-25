@@ -3,8 +3,12 @@
 * APIV1
 */
 
+import express from "express";
+import * as rx from "rxjs";
 
 import { APIError } from "@amrc-factoryplus/service-api";
+import { DataAccess } from "./constants.js";
+import { valid_grant, valid_krb, valid_uuid } from "./validate.js";
 
 function fail(status, message) {
   throw new APIError(status);
@@ -13,9 +17,9 @@ function fail(status, message) {
 export class APIv1 {
   constructor(opts) {
     this.data = opts.data;
-    this.fplus = opts.fplus;
-    this.auth = this.fplus.Auth;
-    this.log = this.fplus.debug.bound("api-v1");
+    
+    this.log = opts.debug.bound("apiv1");
+
     this.routes = this.setup_routes();
   }
 
@@ -23,15 +27,25 @@ export class APIv1 {
     let api = express.Router();
 
     api.route("/metadata")
-      .get(this.metadata_get_list.bind(this));
+      .get(this.metadata_list.bind(this));
 
     api.route("/metadata/:uuid")
-      .get(this.metadata_get.bind(this));
+      .get(this.metadata_uuid.bind(this));
 
-
+    
     api.route("/data/:uuid")
-      .post(this.data_get.bind(this));
+      .post(this.dataset_data.bind(this));
 
+    
+    api.route("/structure")
+      .get(this.structure_list.bind(this))
+      .post(this.structure_create.bind(this));
+
+    api.route("/structure/:uuid")
+      .get(this.structure_uuid.bind(this))
+      .put(this.structure_update.bind(this))
+
+    
 
     return api;
   }
@@ -42,21 +56,13 @@ export class APIv1 {
    * @param from {date} (optional, inclusive) query param
    * @param to {date} (optional, inclusive) query param
   */
-  async metadata_get_list(req, res){
+  async metadata_list(req, res){
     const principal = req.auth;
-    const {from, to} = req.query;
 
-    // 1. If from and/or to provided - check their format
-    // 2. Check the client is authenticated 
-    // 3. Retrieve the list of metadata UUIDs from ConfigDB and return
-
-    const response = await this.auth.fetch_auth_acl(principal_type, principal);
-
+    // const response = await this.data.find_metadata(principal);
+    return res.status(200).json(principal);
 
   }
-
-
-
 
 
 
@@ -72,7 +78,7 @@ export class APIv1 {
                     * metadata {object} - Map of metadata configs keyed by Application UUID - contains all config entries for dataset which use applications in the Dataset metadata class
                     * parts {array} - Subset datasets - contains UUIDs of all subclasses of dataset the client has READ access to.
    */
-  async metadata_get(req, res){
+  async metadata_uuid(req, res){
     const {uuid} = req.params
 
 
@@ -91,7 +97,7 @@ export class APIv1 {
               * value - actual data value
               * unit - Engineering unit (if available)
    */
-  async data_get(req, res){
+  async dataset_data(req, res){
     
   }
 
@@ -101,7 +107,7 @@ export class APIv1 {
    * @param {*} res 
    * @returns list of dataset UUIDs the client has permission to EDIT
    */
-  async structure_get_list(req, res){
+  async structure_list(req, res){
 
   }
 
@@ -116,7 +122,7 @@ export class APIv1 {
       * class {UUID} - Structural class: Sparkplug device, Union Dataset, Session
       * config {any} - Structural definition: "not visible", Union components, Session limits
    */
-  async structure_get(req, res){
+  async structure_uuid(req, res){
     
   }
 
@@ -138,6 +144,9 @@ export class APIv1 {
   async structure_update(req, res){
 
   }
+
+
+
 
 
   async name_get(req, res) {

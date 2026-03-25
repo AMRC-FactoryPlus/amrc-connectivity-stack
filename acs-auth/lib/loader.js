@@ -36,16 +36,8 @@ export class Loader {
                     .map(([p, t]) => [p, t ?? { [Special.Wildcard]: false }])
                     .flatMap(([permission, targs]) =>
                         Object.entries(targs)
-                            .flatMap(([target, plural]) => {
-                                if (plural === "both"){
-                                    return [
-                                        { principal, permission, target, plural: true },
-                                        { principal, permission, target, plural: false }
-                                    ];
-                                }
-                                return { principal, permission, target, plural };
-                            })
-                        ));
+                            .flatMap(([target, plural]) =>
+                                ({ principal, permission, target, plural }))));
         const permitted = {
             acl:    await data.check_targ(req.auth, Perm.WriteACL, true),
             id:     await data.check_targ(req.auth, Perm.WriteACL, true),

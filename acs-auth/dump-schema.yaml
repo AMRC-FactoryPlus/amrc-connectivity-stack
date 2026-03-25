@@ -42,5 +42,3 @@ oneOf:
                     - type: boolean
                     - type: string
                       enum: ["both"]
-              - type: string
-                enum: ["both"]

@@ -34,8 +34,8 @@ objects:
       name: "Dataset"
   
   !u DataAccess.Group.StructuralDatasetType:
-    !u DataAccess.Class.SparkplugDevice:
-      name: "Sparkplug Device"
+    !u DataAccess.Class.Sparkplug:
+      name: "Sparkplug Dataset"
       subclassOf: 
         - !u DataAccess.Class.Dataset
     !u DataAccess.Class.Session:
@@ -94,6 +94,8 @@ objects:
         - !u UUIDs.Class.App
 
   !u DataAccess.App.DatasetDefinition:
+    !u DataAccess.App.SparkplugSrc:
+      name: "Sparkplug source"
     !u DataAccess.App.UnionComponents:
       name: "Union Components"
     !u DataAccess.App.SessionLimits:
@@ -103,6 +105,9 @@ objects:
     !u DataAccess.App.MESIdentifiers:
       name: "MES Identifiers"  
 
+  !u UUIDs.Class.Special:
+    !u DataAccess.Special.InvalidDataset:
+      name: "Structurally invalid dataset"
 
 # Permissions
   !u Auth.Class.ServicePerms:
@@ -122,6 +127,8 @@ objects:
       name: "Use for Session"
     !u DataAccess.Perm.EditDataset:
       name: "Edit Dataset"
+    !u DataAccess.Perm.UseSparkplug:
+      name: "Use Sparkplug data"
 
       
 ---

@@ -5,27 +5,27 @@ objects:
 
   !u UUIDs.Class.Service:
     !u DataAccess.Service.DataAccess:
-      name: "Data Access Service"
+      name: "Data Access service"
   
   !u Auth.Class.ServiceRole:
     !u DataAccess.Requirement.ServiceRole:
-      name: "Data Access Service Role"
+      name: "Data Access service role"
       subclassOf:
         - !u Auth.Class.CentralService
 
   !u ConfigDB.Class.R3Class:
     !u DataAccess.Group.DatasetGroup:
-      name: "Dataset Group"
+      name: "Dataset group"
     !u DataAccess.Group.DatasetRoleGroup:
-      name: "Dataset Role Group"
+      name: "Dataset role"
       subclassOf:
         - !u DataAccess.Group.DatasetGroup
     !u DataAccess.Group.StructuralDatasetType:
-      name: "Structural Dataset Type"
+      name: "Structural dataset type"
       subclassOf:
         - !u DataAccess.Group.DatasetGroup
     !u DataAccess.Group.FunctionalDatasetGroup:
-      name: "Functional Dataset Group"
+      name: "Functional dataset group"
       subclassOf:
         - !u DataAccess.Group.DatasetGroup
       
@@ -35,46 +35,46 @@ objects:
   
   !u DataAccess.Group.StructuralDatasetType:
     !u DataAccess.Class.Sparkplug:
-      name: "Sparkplug Dataset"
+      name: "Sparkplug dataset"
       subclassOf: 
         - !u DataAccess.Class.Dataset
     !u DataAccess.Class.Session:
-      name: "Session"
+      name: "Session dataset"
       subclassOf: 
         - !u DataAccess.Class.Dataset
     !u DataAccess.Class.Union:
-      name: "Union"
+      name: "Union dataset"
       subclassOf: 
         - !u DataAccess.Class.Dataset
 
 
   !u DataAccess.Group.FunctionalDatasetGroup:
     !u DataAccess.Class.Published:
-      name: "Published"
+      name: "Published dataset"
       subclassOf:
         - !u DataAccess.Class.Dataset
     !u DataAccess.Class.Partial:
-      name: "Partial"
+      name: "Partial dataset"
       subclassOf:
         - !u DataAccess.Class.Dataset
     !u DataAccess.Class.MESDataset:
-      name: "MES Dataset"
+      name: "MES dataset"
       subclassOf:
         - !u DataAccess.Class.Dataset
     !u DataAccess.Class.Equipment:
-      name: "Equipment"
+      name: "MES equipment"
       subclassOf:
         - !u DataAccess.Class.MESDataset
     !u DataAccess.Class.WorkOrder:
-      name: "WorkOrder"
+      name: "MES work order"
       subclassOf:
         - !u DataAccess.Class.MESDataset
     !u DataAccess.Class.Product:
-      name: "Product"
+      name: "MES product"
       subclassOf:
         - !u DataAccess.Class.MESDataset
     !u DataAccess.Class.Operation:
-      name: "Operation"
+      name: "MES operation"
       subclassOf:
         - !u DataAccess.Class.MESDataset
 
@@ -85,11 +85,11 @@ objects:
       name: "MES"
     
     !u DataAccess.App.DatasetDefinition:
-      name: "Dataset Definition"
+      name: "Dataset definition"
       subclassOf:
         - !u UUIDs.Class.App
     !u DataAccess.App.DatasetMetadata:
-      name: "Dataset Metadata"
+      name: "Dataset metadata"
       subclassOf:
         - !u UUIDs.Class.App
 
@@ -97,13 +97,13 @@ objects:
     !u DataAccess.App.SparkplugSrc:
       name: "Sparkplug source"
     !u DataAccess.App.UnionComponents:
-      name: "Union Components"
+      name: "Union components"
     !u DataAccess.App.SessionLimits:
-      name: "Session Limits"
+      name: "Session limits"
 
   !u DataAccess.App.DatasetMetadata:
     !u DataAccess.App.MESIdentifiers:
-      name: "MES Identifiers"  
+      name: "MES identifiers"  
 
   !u UUIDs.Class.Special:
     !u DataAccess.Special.InvalidDataset:
@@ -112,21 +112,21 @@ objects:
 # Permissions
   !u Auth.Class.ServicePerms:
     !u DataAccess.Perm.All:
-      name: "Data Access Permission"
+      name: "Data Access permission"
       subclassOf:
         - !u Auth.Class.Permission
 
   !u DataAccess.Perm.All:
     !u DataAccess.Perm.CreateDataset:
-      name: "Create Dataset"
+      name: "Create dataset"
     !u DataAccess.Perm.IncludeInUnion:
-      name: "Include In Union"
+      name: "Include in union"
     !u DataAccess.Perm.ReadDataset:
-      name: "Read Dataset"
+      name: "Read dataset"
     !u DataAccess.Perm.UseForSession:
-      name: "Use for Session"
+      name: "Use for session"
     !u DataAccess.Perm.EditDataset:
-      name: "Edit Dataset"
+      name: "Edit dataset"
     !u DataAccess.Perm.UseSparkplug:
       name: "Use Sparkplug data"
 

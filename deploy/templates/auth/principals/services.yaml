@@ -100,7 +100,7 @@ spec:
   secret: git-keytabs/server
 {{- end }}
 
-
+---
 {{- if .Values.dataAccess.enabled }}
 apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey

@@ -3,7 +3,7 @@
 * Data-Flow / sequence management
 */
 
-import imm from "immutable";
+import { Map as IMap } from "immutable";
 import rx from "rxjs";
 
 // import { UUIDs }    from "@amrc-factoryplus/service-client";
@@ -22,27 +22,19 @@ export class DataFlow {
     this.cdb = fplus.ConfigDB;
     this.auth = fplus.Auth;
 
-    this.metadata = this._build_metadata();
+    this.dataset_definitions = this._build_dataset_definitions();
   }
 
-  _build_metadata() {
+  _build_dataset_definitions() {
     return rxx.rx(
       rx.combineLatest([
-          this.cdb.search_app(Constants.App.SessionLimits),
-          this.cdb.search_app(Constants.App.UnionComponents)
+        this.cdb.search_app(Constants.App.SessionLimits),
+        this.cdb.search_app(Constants.App.UnionComponents)
       ]),
       rx.map(([sessions, unions]) => {
-        const sessionDatasets = sessions.keySeq().toList();
-
-        const unionDatasets = unions
-          .valueSeq()     // all arrays
-          .flatten()      // flatten arrays
-          .toSet()        // dedupe
-          .toList();
-
-        return imm.Map({
-          [Constants.Class.Session]: sessionDatasets,
-          [Constants.Class.Union]: unionDatasets,
+        return IMap({
+          [Constants.Class.Session]: sessions,
+          [Constants.Class.Union]: unions,
         });
       }),
 
@@ -50,20 +42,14 @@ export class DataFlow {
     );
   }
 
-
   run() {
-    this.metadata.subscribe(ss => this.log("METADATA UPDATE %o", ss.toJS()));
-    
+    this.dataset_definitions.subscribe(ss => 
+      this.log("Dataset Definitions UPDATE %o", ss.toJS())
+    );
   }
 
-
-  // Track list of datasets for principal with permission
-  track_metadata(principal, permission){
-    
+  get_dataset_definitions(){
+    this.dataset_definitions;
   }
 
-
-  find_metadata(principal){
-
-  }
 }

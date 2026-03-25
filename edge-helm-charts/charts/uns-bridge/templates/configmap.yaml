@@ -43,7 +43,11 @@ data:
     remote_password ${REMOTE_PASSWORD}
     remote_clientid ${REMOTE_USERNAME}-{{ .Values.uuid }}
 {{- if .Values.remote.tls }}
+{{- if .Values.remote.caFile }}
+    bridge_cafile /ca/{{ .Values.remote.caFile }}
+{{- else }}
     bridge_capath /etc/ssl/certs
+{{- end }}
     bridge_tls_version tlsv1.2
 {{- end }}
     bridge_protocol_version mqttv50

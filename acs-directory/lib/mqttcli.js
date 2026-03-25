@@ -321,6 +321,12 @@ export default class MQTTCli {
 
         if (notify.length)
             this.publish_changed(notify);
+
+        /* Clean up old sessions now we've finished the change-notify.
+         * Only do this for the current session; the old session's
+         * notify will also fire but we skip it here. */
+        if (session.next_for_device == null)
+            await this.model.cleanup_old_sessions(id);
     }
 
     async on_service_notify(id) {

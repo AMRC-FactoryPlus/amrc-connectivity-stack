@@ -42,14 +42,16 @@ export class DataFlow {
     );
   }
 
+  get_dataset_definitions(){
+    return this.dataset_definitions;
+  }
+
   run() {
     this.dataset_definitions.subscribe(ss => 
       this.log("Dataset Definitions UPDATE %o", ss.toJS())
     );
   }
 
-  get_dataset_definitions(){
-    this.dataset_definitions;
-  }
+
 
 }

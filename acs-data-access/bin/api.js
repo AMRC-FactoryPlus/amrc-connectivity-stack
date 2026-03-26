@@ -30,7 +30,7 @@ const data = new DataFlow({
 });
 
 
-const apiv1 = new APIv1({ data, debug });
+const apiv1 = new APIv1({ data, debug, auth: fplus.Auth });
 
 const api = await new WebAPI({
   debug: fplus.debug,
@@ -54,16 +54,20 @@ const api = await new WebAPI({
 
 
 const notify = new DataAccessNotify({
-  api, data, debug
+  api, data, debug,
+  auth: fplus.Auth
 });
 
 debug.log("app", "Running Data Access DataFlow");
 data.run();
 
-// debug.log("app", "Running Data Access Notify");
-// notify.run();
+debug.log("app", "Running Data Access Notify");
+notify.run();
 
 debug.log("app", "Running Data Access WebAPI")
 api.run();
+
+
+
 
 

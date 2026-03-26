@@ -321,6 +321,12 @@ export default class MQTTCli {
 
         if (notify.length)
             this.publish_changed(notify);
+
+        /* Clean up old sessions now we've finished the change-notify.
+         * Only do this for the current session; the old session's
+         * notify will also fire but we skip it here. */
+        if (session.next_for_device == null)
+            await this.model.cleanup_old_sessions(id);
     }
 
     async on_service_notify(id) {
@@ -446,7 +452,7 @@ export default class MQTTCli {
 
     async on_birth(address, payload) {
         this.log("device", `Registering BIRTH for ${address}`);
-        this.online.add(address);
+        this.online.add(address.toString());
 
         let tree;
         if (payload.uuid === UUIDs.FactoryPlus) {
@@ -479,7 +485,7 @@ export default class MQTTCli {
         this.log("device", `Registering DEATH for ${address}`);
 
         this.alerts.delete(address);
-        this.online.delete(address);
+        this.online.delete(address.toString());
         await this.model.death({address, time});
 
         this.log("device", `Finished DEATH for ${address}`);
@@ -546,7 +552,7 @@ export default class MQTTCli {
          * rebirth any device we haven't seen a birth for, even if the
          * database says it's online. This is important because we might
          * have the wrong schema information. */
-        if (this.online.has(addr) || pending[addr]) return false;
+        if (this.online.has(addr.toString()) || pending[addr]) return false;
 
         /* Mark that we're working on this device and wait 5-10s to see if
          * it rebirths on its own. */
@@ -555,7 +561,7 @@ export default class MQTTCli {
 
         /* Clear our marker first so we retry next time */
         delete (pending[addr]);
-        if (this.online.has(addr)) return false;
+        if (this.online.has(addr.toString())) return false;
 
         sent[addr] = Date.now();
         return true;

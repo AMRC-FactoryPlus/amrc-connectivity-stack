@@ -36,6 +36,7 @@ public class Vocab
     public static final Property uuid       = prop("core/uuid");
     public static final Property rank       = prop("core/rank");
     public static final Property primary    = prop("core/primary");
+    public static final Property deleted    = prop("core/deleted");
     public static final Property start      = prop("core/start");
 
     public static final Resource Special    = res("core/Special");

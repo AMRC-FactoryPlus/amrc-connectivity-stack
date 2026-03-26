@@ -65,6 +65,15 @@ public class Err extends Error
 
         public abstract int statusCode ();
     }
+    public static class Forbidden extends ClientError
+    {
+        public Forbidden ()
+        {
+            super("Access denied");
+        }
+
+        public int statusCode () { return 403; }
+    }
     public static class NotFound extends ClientError
     {
         public NotFound (String res)
@@ -94,29 +103,22 @@ public class Err extends Error
     }
     public static class RankMismatch extends ClientError
     {
-        public RankMismatch ()
-        {
-            super("Rank mismatch");
-        }
-
+        public RankMismatch () { super("Rank mismatch"); }
+        public int statusCode () { return 409; }
+    }
+    public static class NotMember extends ClientError
+    {
+        public NotMember () { super("Not a member of a required class"); }
         public int statusCode () { return 409; }
     }
     public static class InUse extends ClientError
     {
-        public InUse ()
-        {
-            super("Object in use");
-        }
-
+        public InUse () { super("Object in use"); }
         public int statusCode () { return 409; }
     }
     public static class Immutable extends ClientError
     {
-        public Immutable ()
-        {
-            super("Object is immutable");
-        }
-
+        public Immutable () { super("Object is immutable"); }
         public int statusCode () { return 405; }
     }
 }

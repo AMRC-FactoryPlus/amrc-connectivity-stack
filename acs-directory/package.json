@@ -16,21 +16,16 @@
   "type": "module",
   "scripts": {
     "mqtt": "node bin/directory-mqtt",
-    "webapi": "node bin/directory-webapi",
-    "test": "vitest run"
+    "webapi": "node bin/directory-webapi"
   },
   "dependencies": {
-    "@amrc-factoryplus/pg-client": "file:../lib/js-pg-client",
     "@amrc-factoryplus/rx-client": "file:../lib/js-rx-client",
     "@amrc-factoryplus/rx-util": "file:../lib/js-rx-util",
-    "@amrc-factoryplus/service-api": "file:../lib/js-service-api",
     "@amrc-factoryplus/service-client": "file:../lib/js-service-client",
+    "@amrc-factoryplus/service-api": "file:../lib/js-service-api",
+    "@amrc-factoryplus/pg-client": "file:../lib/js-pg-client",
     "async": "^3.2.4",
     "express": "^4.17.1",
-    "express-openapi-validator": "^4.13.2",
-    "long": "^5.3.2"
-  },
-  "devDependencies": {
-    "vitest": "^3.0.4"
+    "express-openapi-validator": "^4.13.2"
   }
 }

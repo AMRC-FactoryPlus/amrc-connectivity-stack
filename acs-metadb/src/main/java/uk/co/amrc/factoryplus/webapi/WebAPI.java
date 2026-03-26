@@ -10,24 +10,26 @@
 
 package uk.co.amrc.factoryplus.webapi;
 
-import java.security.SecureRandom;
-import java.time.Instant;
-import java.util.Base64;
-
 import jakarta.inject.Singleton;
 import jakarta.json.*;
 import jakarta.ws.rs.*;
+import jakarta.ws.rs.core.*;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import uk.co.amrc.factoryplus.metadb.db.AuthProvider;
 import uk.co.amrc.factoryplus.metadb.db.Vocab;
 
 @Singleton @Path("")
 public class WebAPI
 {
-    public static final long sessionLength = 3*3600*1000;
+    private static final Logger log = LoggerFactory.getLogger(WebAPI.class);
+
+    @Context private AuthProvider authProvider;
+    @Context private SecurityContext auth;
 
     private JsonValue pingResult;
-    private SecureRandom rng;
-    private Base64.Encoder base64;
 
     public WebAPI ()
     {
@@ -35,8 +37,6 @@ public class WebAPI
             .add("service", Vocab.U_RDFStore.toString())
             .add("version", "2.0.0")
             .build();
-        rng = new SecureRandom();
-        base64 = Base64.getEncoder();
     }
 
     @GET @Path("ping")
@@ -48,14 +48,17 @@ public class WebAPI
     @POST @Path("token")
     public JsonValue token ()
     {
-        var token = new byte[66];
-        rng.nextBytes(token);
+        /* We do not allow refreshing a token from a token. */
+        if (auth.getAuthenticationScheme().equals("token"))
+            throw new WebApplicationException(403);
 
-        long expiry = Instant.now().toEpochMilli() + sessionLength;
+        var upn = auth.getUserPrincipal().getName();
+        var sess = authProvider.newSession(upn);
+        log.info("New token for {}: {}...", upn, sess.token().substring(0, 5));
         
         return Json.createObjectBuilder()
-            .add("token", base64.encodeToString(token))
-            .add("expiry", expiry)
+            .add("token", sess.token())
+            .add("expiry", sess.expiry().toEpochMilli())
             .build();
     }
 }

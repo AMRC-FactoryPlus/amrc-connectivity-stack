@@ -21,8 +21,7 @@ import org.glassfish.jersey.server.ServerProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import uk.co.amrc.factoryplus.metadb.db.Dataflow;
-import uk.co.amrc.factoryplus.metadb.db.RdfStore;
+import uk.co.amrc.factoryplus.metadb.db.*;
 
 public final class Main {
     private static final Logger log = LoggerFactory.getLogger(Main.class);
@@ -39,12 +38,14 @@ public final class Main {
     private int port;
     private Server server;
     private RdfStore model;
+    private AuthProvider auth;
 
     private Main (int port, String dataDir)
     {
         this.port = port;
 
         this.model = new RdfStore(dataDir);
+        this.auth = new AuthProvider();
         this.server = createServer();
     }
 
@@ -64,6 +65,7 @@ public final class Main {
             .register(new AbstractBinder () {
                 protected void configure () {
                     bind(model).to(RdfStore.class);
+                    bind(auth).to(AuthProvider.class);
                 }
             });
         var v2api = new ContextHandler(

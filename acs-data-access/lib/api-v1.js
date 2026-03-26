@@ -7,8 +7,9 @@ import express from "express";
 import * as rx from "rxjs";
 
 import { APIError } from "@amrc-factoryplus/service-api";
-import { DataAccess } from "./constants.js";
+import { DataAccess as Constants } from "./constants.js";
 import { valid_grant, valid_krb, valid_uuid } from "./validate.js";
+
 
 function fail(status, message) {
   throw new APIError(status);
@@ -17,6 +18,7 @@ function fail(status, message) {
 export class APIv1 {
   constructor(opts) {
     this.data = opts.data;
+    this.auth = opts.auth;
     
     this.log = opts.debug.bound("apiv1");
 
@@ -50,18 +52,41 @@ export class APIv1 {
     return api;
   }
 
+
   /** GET. Returns a list of Dataset UUIDs that the client has READ access to.
    * The dataset can be optionally restricted by from and to dates. 
    * Dates must be in the format ISO date-time string in UTC 2025-11-13T09:33:18.000Z
    * @param from {date} (optional, inclusive) query param
    * @param to {date} (optional, inclusive) query param
   */
-  async metadata_list(req, res){
+  async metadata_list(req, res) {
     const principal = req.auth;
 
-    // const response = await this.data.find_metadata(principal);
-    return res.status(200).json(principal);
+    const result = await rx.firstValueFrom(
+      rx.combineLatest([
+        this.data.get_dataset_definitions(),
+        this.auth.watch_acl_with_perm(principal, Constants.Perm.ReadDataset)
+      ]).pipe(
+        rx.map(([datasets, targets]) => {
+          const output = [];
 
+          datasets.forEach((value) => {
+            const obj = value.toJS ? value.toJS() : value;
+
+            Object.entries(obj).forEach(([key, val]) => {
+              // key is the dataset UUID
+              if (targets.has(key)) {
+                output.push(key);
+              }
+            });
+          });
+
+          return output;
+        })
+      )
+    );
+
+    return res.status(200).json(result);
   }
 
 

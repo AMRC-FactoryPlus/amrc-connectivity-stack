@@ -183,14 +183,6 @@ export default class Queries {
         return dbr.rows.map(r => r.uuid);
     }
 
-    async cleanup_old_sessions(session_id) {
-        await this.query(`
-            delete from session
-            where device = (select device from session where id = $1)
-              and next_for_device is not null
-        `, [session_id]);
-    }
-
     async record_schema(session, schema) {
         const schid = await this.find_or_create("schema", schema);
         if (schid == null) return;

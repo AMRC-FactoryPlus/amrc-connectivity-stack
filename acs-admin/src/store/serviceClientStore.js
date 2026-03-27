@@ -17,6 +17,9 @@ export const useServiceClientStore = defineStore('service-client', {
       ready: false
     }
   },
+  getters: {
+    realm: (state) => state.baseUrl ? state.baseUrl.toUpperCase() : null,
+  },
   actions: {
     // since we rely on `this`, we cannot use an arrow function
     async login (opts) {
@@ -27,8 +30,9 @@ export const useServiceClientStore = defineStore('service-client', {
         this.username = opts.username;
         this.client  = client;
         this.loaded = true;
-        this.scheme  = import.meta.env.SCHEME;
-        this.baseUrl = import.meta.env.BASEURL;
+        const directoryUrl = new URL(opts.directory_url);
+        this.scheme  = import.meta.env.SCHEME  ?? directoryUrl.protocol.replace(/:$/, '');
+        this.baseUrl = import.meta.env.BASEURL ?? directoryUrl.hostname.replace(/^directory\./, '');
         // Save opts to local storage for use on page reload
         // Here we should store a token rather than the actual credentials
         localStorage.setItem('opts', JSON.stringify(opts));

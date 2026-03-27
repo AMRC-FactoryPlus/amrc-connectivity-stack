@@ -14,7 +14,7 @@
                 <img src="/favicon.svg">
               </div>
               <div class="flex flex-col gap-0.5 leading-none">
-                <h2 class="text-gray-500 text-sm">{{realm}}</h2>
+                <h2 class="text-gray-500 text-sm">{{s.realm}}</h2>
                 <h1 class="font-bold text-base h-4">ACS {{acs_version}}</h1>
                 <h2 class="text-gray-500 text-sm">{{s.username}}</h2>
               </div>
@@ -156,12 +156,6 @@ export default {
     Toaster,
     NewConnectionDialog,
     NewBridgeDialog,
-  },
-
-  computed: {
-    realm () {
-      return this.s.baseUrl ? this.s.baseUrl.toUpperCase() : ''
-    },
   },
 
   watch: {

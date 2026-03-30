@@ -47,13 +47,17 @@ public class Vocab
     public static final Property timestamp  = prop("core/timestamp");
 
     public static final Resource Application    = res("core/Application");
-    public static final Resource appStructured  = res("app/Structured");
-    public static final Property forP           = prop("app/for");
-    public static final Property value          = prop("app/value");
-    public static final Resource Registration   = res("app/Registration");
-    public static final Resource ConfigSchema   = res("app/ConfigSchema");
-    public static final Resource Info           = res("app/Info");
-    public static final Resource SparkplugAddr  = res("app/SparkplugAddress");
+
+    public static class App {
+        public static final Resource Structured     = res("app/Structured");
+        public static final Resource Registration   = res("app/Registration");
+        public static final Resource ConfigSchema   = res("app/ConfigSchema");
+        public static final Resource Info           = res("app/Info");
+        public static final Resource SparkplugAddr  = res("app/SparkplugAddress");
+
+        public static final Property forP           = prop("app/for");
+        public static final Property value          = prop("app/value");
+    }
 
     public static final Resource G_direct   = res("graph/direct");
     public static final Resource G_derived  = res("graph/derived");

@@ -47,7 +47,7 @@ public class ConfigEntry extends RequestHandler.Component
 
     private boolean isStructured ()
     {
-        return db().derived().contains(app, RDF.type, Vocab.appStructured);
+        return db().derived().contains(app, RDF.type, Vocab.App.Structured);
     }
 
     private static final Query Q_getValue = Vocab.query("""
@@ -130,8 +130,8 @@ public class ConfigEntry extends RequestHandler.Component
         var inst    = request().getInstant();
 
         graph.add(entry, RDF.type, app);
-        graph.add(entry, Vocab.forP, obj);
-        graph.add(entry, Vocab.value, json);
+        graph.add(entry, Vocab.App.forP, obj);
+        graph.add(entry, Vocab.App.value, json);
         graph.add(entry, Vocab.start, inst);
 
         return true;

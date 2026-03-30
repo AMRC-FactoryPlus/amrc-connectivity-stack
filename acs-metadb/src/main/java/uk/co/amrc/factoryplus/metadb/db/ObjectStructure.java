@@ -54,7 +54,7 @@ public class ObjectStructure extends RequestHandler.Component
 
     private static final Set<Resource> IMMUTABLE = Set.of(
         Vocab.Application, Vocab.Special,
-        Vocab.Registration, Vocab.ConfigSchema,
+        Vocab.App.Registration, Vocab.App.ConfigSchema,
         Vocab.Wildcard, Vocab.Unowned);
 
     private Model findGraph (String name)
@@ -134,7 +134,7 @@ public class ObjectStructure extends RequestHandler.Component
             .orElseGet(() -> db().createObject(kres));
 
         return db().appMapper()
-            .generateConfig(Vocab.Registration, obj.node())
+            .generateConfig(Vocab.App.Registration, obj.node())
             .orElseThrow(() -> new Err.CorruptRDF("Cannot find object registration"));
     }
 

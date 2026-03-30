@@ -68,7 +68,7 @@ public class AppUpdater extends RequestHandler.Component
          * store an Instant if we don't need one. */
         if (!updated.isEmpty()) {
             var now = request().getInstant();
-            updateEntry(Vocab.Registration, now);
+            updateEntry(Vocab.App.Registration, now);
         }
     }
 

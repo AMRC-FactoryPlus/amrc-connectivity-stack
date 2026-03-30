@@ -98,15 +98,15 @@ public class AppMapper {
     private RdfStore db;
 
     private Map<Resource, Query> generators = Map.of(
-        Vocab.Registration,     Q_objectRegistration,
-        Vocab.Info,             Q_generalInfo,
-        Vocab.SparkplugAddr,    Q_sparkplugAddress);
+        Vocab.App.Registration,     Q_objectRegistration,
+        Vocab.App.Info,             Q_generalInfo,
+        Vocab.App.SparkplugAddr,    Q_sparkplugAddress);
     private Map<Resource, UpdateRequest> deleters = Map.of(
-        Vocab.Info,             D_generalInfo,
-        Vocab.SparkplugAddr,    D_sparkplugAddress);
+        Vocab.App.Info,             D_generalInfo,
+        Vocab.App.SparkplugAddr,    D_sparkplugAddress);
     private Map<Resource, UpdateRequest> updaters = Map.of(
-        Vocab.Info,             U_generalInfo,
-        Vocab.SparkplugAddr,    U_sparkplugAddress);
+        Vocab.App.Info,             U_generalInfo,
+        Vocab.App.SparkplugAddr,    U_sparkplugAddress);
 
     public AppMapper (RdfStore db)
     {
@@ -122,7 +122,7 @@ public class AppMapper {
 
     public void deleteConfig (Resource app, Resource obj)
     {
-        if (app.equals(Vocab.Registration))
+        if (app.equals(Vocab.App.Registration))
             throw new Err.Immutable();
 
         Optional.ofNullable(deleters.get(app))
@@ -131,8 +131,7 @@ public class AppMapper {
 
     public void updateConfig (Resource app, Resource obj, JsonValue config)
     {
-        /* XXX Reg can be updated but needs special handling */
-        if (app.equals(Vocab.Registration)) {
+        if (app.equals(Vocab.App.Registration)) {
             updateRegistration(obj, (JsonObject)config);
             return;
         }

@@ -48,6 +48,35 @@ public class AppUpdater extends RequestHandler.Component
                 <app/appliesTo> ?domain.
             ?obj a ?domain;
                 <core/uuid> ?uuid.
+
+            # We do not generate Reg entries here, they must be done in
+            # a second pass.
+            filter(?app != <app/Registration>)
+        }
+    """);
+    private static Query Q_findObjects = Vocab.query("""
+        select ?obj
+        where {
+            ?obj <core/uuid> ?uuid.
+
+            # We don't generate Reg entries for Reg entries.
+            filter not exists {
+                ?obj a <app/Registration>.
+            }
+        }
+    """);
+    /* This query assumes we do not have sub-apps, so that a given
+     * ConfigEntry is a member of only one App. If SPARQL had DELETE
+     * RETURNING this could be an UpdateRequest: we must know what was
+     * removed to send notify updates.
+     */
+    private static Query Q_orphanConfigs = Vocab.query("""
+        select ?conf ?app ?obj 
+        where {
+            ?conf a ?app; <app/for> ?obj.
+            ?app <app/appliesTo> ?domain.
+
+            filter not exists { ?obj a ?domain. }
         }
     """);
 
@@ -55,21 +84,30 @@ public class AppUpdater extends RequestHandler.Component
     {
         var updates = db().selectQuery(Q_findUpdates)
             .materialise();
-
-        updates.forEachRemaining(update -> {
-            var app = update.getResource("app");
-            var obj = update.getResource("obj");
+        updates.forEachRemaining(row -> {
+            var app = row.getResource("app");
+            var obj = row.getResource("obj");
             updateEntry(app, obj);
         });
 
-        /* We may have created the current instant in order to update a
-         * config entry. In this case it may not have been captured by
-         * the first pass through the changes. But we don't want to
-         * store an Instant if we don't need one. */
-        if (!updated.isEmpty()) {
-            var now = request().getInstant();
-            updateEntry(Vocab.App.Registration, now);
-        }
+        /* We update Reg entries in a second pass, as updating the other
+         * entries will have created registered objects. */
+        var objects = db().selectQuery(Q_findObjects)
+            .materialise();
+        objects.forEachRemaining(row -> {
+            var obj = row.getResource("obj");
+            updateEntry(Vocab.App.Registration, obj);
+        });
+
+        var orphans = db().selectQuery(Q_orphanConfigs)
+            .materialise();
+        orphans.forEachRemaining(row -> {
+            var conf = row.getResource("conf");
+            db().removeResource(conf);
+            var app = row.getResource("app");
+            var obj = row.getResource("obj");
+            updated.add(new Config(app, obj));
+        });
     }
 
     public void publish ()

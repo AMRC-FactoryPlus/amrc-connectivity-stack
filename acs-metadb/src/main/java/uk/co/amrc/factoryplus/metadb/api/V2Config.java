@@ -43,10 +43,13 @@ public class V2Config {
             return req.configEntry(app, obj).getValue();
         });
         return entry
-            .map(e -> Response.ok(e.value())
-                .tag(e.etag())
-                .lastModified(Date.from(e.mtime()))
-                .build())
+            .map(e -> {
+                var res = Response.ok(e.value())
+                    .tag(e.etag());
+                e.mtime().ifPresent(t ->
+                    res.lastModified(Date.from(t)));
+                return res.build();
+            })
             .orElseThrow(() -> new WebApplicationException(404));
     }
 

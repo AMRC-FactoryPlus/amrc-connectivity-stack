@@ -132,7 +132,16 @@ public class RdfStore
             direct.listResourcesWithProperty(pred, obj));
     }
 
-    /* TXN */
+    public void removeResource (Resource node)
+    {
+        derived.removeAll(node, null, null);
+        derived.removeAll(null, null, node);
+
+        /* We don't do this yet but we may in the future. */
+        if (node.canAs(Property.class))
+            derived.removeAll(null, node.as(Property.class), null);
+    }
+
     public Optional<FPObject> findObject (UUID uuid)
     {
         return findResource(Vocab.uuid, Vocab.uuidLiteral(uuid))
@@ -162,7 +171,6 @@ public class RdfStore
         return Util.decodeLiteral(binding.get("rank"), XSD.xint, Integer::parseInt);
     }
 
-    /* TXN */
     public FPObject createObject (Resource klass)
     {
         UUID uuid;
@@ -176,7 +184,6 @@ public class RdfStore
         return createObject(klass, uuid);
     }
 
-    /* TXN */
     public FPObject createObject (Resource klass, UUID uuid)
     {
         var obj = Vocab.uuidResource(uuid);
@@ -193,12 +200,11 @@ public class RdfStore
         return new FPObject(obj, uuid);
     }
 
-    /* TXN */
     public Resource createInstant ()
     {
-        var inst = createObject(Vocab.Instant).node();
+        var inst = createObject(Vocab.Time.Instant).node();
         var stamp = derived.createTypedLiteral(Instant.now(), XSDDatatype.XSDdateTime);
-        derived.add(inst, Vocab.timestamp, stamp);
+        derived.add(inst, Vocab.Time.timestamp, stamp);
         return inst;
     }
 

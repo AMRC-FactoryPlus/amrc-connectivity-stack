@@ -37,18 +37,26 @@ public class Vocab
     public static final Property rank       = prop("core/rank");
     public static final Property primary    = prop("core/primary");
     public static final Property deleted    = prop("core/deleted");
-    public static final Property start      = prop("core/start");
 
     public static final Resource Special    = res("core/Special");
     public static final Resource Wildcard   = res("core/Wildcard");
     public static final Resource Unowned    = res("core/Unowned");
 
-    public static final Resource Instant    = res("core/Instant");
-    public static final Property timestamp  = prop("core/timestamp");
+    public static class Time {
+        public static final Resource Instant        = res("time/Instant");
 
-    public static final Resource Application    = res("core/Application");
+        public static final Property start          = prop("time/start");
+        public static final Property timestamp      = prop("time/timestamp");
+    }
+
+    public static class Doc {
+        public static final Resource Document       = res("doc/Document");
+
+        public static final Property content        = prop("doc/content");
+    }
 
     public static class App {
+        public static final Resource Application    = res("app/Application");
         public static final Resource Structured     = res("app/Structured");
         public static final Resource Registration   = res("app/Registration");
         public static final Resource ConfigSchema   = res("app/ConfigSchema");

@@ -53,7 +53,7 @@ public class ObjectStructure extends RequestHandler.Component
     }
 
     private static final Set<Resource> IMMUTABLE = Set.of(
-        Vocab.Application, Vocab.Special,
+        Vocab.App.Application, Vocab.Special,
         Vocab.App.Registration, Vocab.App.ConfigSchema,
         Vocab.Wildcard, Vocab.Unowned);
 

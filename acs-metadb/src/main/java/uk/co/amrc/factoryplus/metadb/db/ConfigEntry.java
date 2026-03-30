@@ -43,7 +43,7 @@ public class ConfigEntry extends RequestHandler.Component
         return new ConfigEntry(req, appO.node(), objO.node());
     }
 
-    public record Value (JsonValue value, String etag, Instant mtime) {}
+    public record Value (JsonValue value, String etag, Optional<Instant> mtime) {}
 
     private boolean isStructured ()
     {
@@ -51,14 +51,12 @@ public class ConfigEntry extends RequestHandler.Component
     }
 
     private static final Query Q_getValue = Vocab.query("""
-        select ?value ?etag ?mtime
+        select ?value ?etag
         where {
             ?config a ?app;
                 <app/for> ?obj;
-                <app/value> ?value.
-            ?config <core/start> ?instant.
-            ?instant <core/uuid> ?etag;
-                <core/timestamp> ?mtime.
+                <core/uuid> ?etag;
+                <doc/content> ?value.
         }
     """);
 
@@ -69,10 +67,10 @@ public class ConfigEntry extends RequestHandler.Component
                 var val = Util.decodeLiteral(binding.get("value"), RDF.JSON,
                     s -> Json.createReader(new StringReader(s)).readValue());
                 var etag = Util.decodeLiteral(binding.get("etag"), XSD.xstring, s -> s);
-                var mtime = Util.decodeLiteral(binding.get("mtime"), XSD.dateTime, 
-                    Instant::parse);
+                //var mtime = Util.decodeLiteral(binding.get("mtime"), XSD.dateTime, 
+                //    Instant::parse);
 
-                return new Value(val, etag, mtime);
+                return new Value(val, etag, Optional.empty());
             });
     }
 
@@ -126,13 +124,12 @@ public class ConfigEntry extends RequestHandler.Component
             value.toString(), RDF.dtRDFJSON);
 
         var graph   = db().derived();
-        var entry   = graph.createResource();
-        var inst    = request().getInstant();
+        var entry   = db().createObject(app).node();
+        //var inst    = request().getInstant();
 
-        graph.add(entry, RDF.type, app);
         graph.add(entry, Vocab.App.forP, obj);
-        graph.add(entry, Vocab.App.value, json);
-        graph.add(entry, Vocab.start, inst);
+        graph.add(entry, Vocab.Doc.content, json);
+        //graph.add(entry, Vocab.Time.start, inst);
 
         return true;
     }

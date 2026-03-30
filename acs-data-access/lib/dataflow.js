@@ -46,6 +46,22 @@ export class DataFlow {
     return this.dataset_definitions;
   }
 
+  get_dataset_by_uuid(uuid) {
+    return this.dataset_definitions.pipe(
+      rx.map(defs => {
+        const js = defs.toJS(); // convert Imm.Map to JS obj
+
+        for (const group of Object.values(js)) {
+          if (group[uuid]) {
+            return group[uuid];
+          }
+        }
+
+        return null; // not found
+      })
+    );
+  }
+
   run() {
     this.dataset_definitions.subscribe(ss => 
       this.log("Dataset Definitions UPDATE %o", ss.toJS())

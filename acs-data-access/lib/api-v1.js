@@ -10,7 +10,6 @@ import { APIError } from "@amrc-factoryplus/service-api";
 import { DataAccess as Constants } from "./constants.js";
 import { valid_grant, valid_krb, valid_uuid } from "./validate.js";
 
-
 function fail(status, message) {
   throw new APIError(status);
 }
@@ -19,9 +18,7 @@ export class APIv1 {
   constructor(opts) {
     this.data = opts.data;
     this.auth = opts.auth;
-    
     this.log = opts.debug.bound("apiv1");
-
     this.routes = this.setup_routes();
   }
 
@@ -33,12 +30,10 @@ export class APIv1 {
 
     api.route("/metadata/:uuid")
       .get(this.metadata_uuid.bind(this));
-
     
     api.route("/data/:uuid")
       .post(this.dataset_data.bind(this));
 
-    
     api.route("/structure")
       .get(this.structure_list.bind(this))
       .post(this.structure_create.bind(this));
@@ -47,13 +42,10 @@ export class APIv1 {
       .get(this.structure_uuid.bind(this))
       .put(this.structure_update.bind(this))
 
-    
-
     return api;
   }
 
-
-  async _get_dataset_uuid_list(principal, permission){
+  async _get_dataset_uuids(principal, permission){
   const result = await rx.firstValueFrom(
           rx.combineLatest([
             this.data.get_dataset_definitions(),
@@ -150,9 +142,29 @@ export class APIv1 {
       * class {UUID} - Structural class: Sparkplug device, Union Dataset, Session
       * config {any} - Structural definition: "not visible", Union components, Session limits
    */
-  async structure_uuid(req, res){
-    
-  }
+  async structure_uuid(req, res) {
+    const { uuid } = req.params;
+
+    if (!valid_uuid(uuid)) return fail(410);
+
+    const ok = await this.auth.check_acl(
+      req.auth,
+      Constants.Perm.EditDataset,
+      uuid,
+      true,
+    );
+
+    if (!ok) return fail(403);
+
+    const result = await rx.firstValueFrom(
+      this.data.get_dataset_by_uuid(uuid)
+    );
+
+    if (!result) return fail(404);
+
+    return res.status(200).json(result);
+  } 
+  
 
   /** POST. Creates a new dataset. 
    * 

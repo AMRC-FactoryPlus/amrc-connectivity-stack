@@ -179,7 +179,7 @@ public class RdfStore
     /* TXN */
     public FPObject createObject (Resource klass, UUID uuid)
     {
-        var obj = derived.createResource();
+        var obj = Vocab.uuidResource(uuid);
         derived.add(obj, Vocab.uuid, uuid.toString());
         derived.add(obj, RDF.type, klass);
         derived.add(obj, Vocab.primary, klass);

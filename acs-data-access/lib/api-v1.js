@@ -53,6 +53,33 @@ export class APIv1 {
   }
 
 
+  async _get_dataset_uuid_list(principal, permission){
+  const result = await rx.firstValueFrom(
+          rx.combineLatest([
+            this.data.get_dataset_definitions(),
+            this.auth.watch_acl_with_perm(principal, permission)
+          ]).pipe(
+            rx.map(([datasets, targets]) => {
+              const output = [];
+
+              datasets.forEach((value) => {
+                const obj = value.toJS ? value.toJS() : value;
+
+                Object.entries(obj).forEach(([key, val]) => {
+                  // key is the dataset UUID
+                  if (targets.has(key)) {
+                    output.push(key);
+                  }
+                });
+              });
+
+              return output;
+            })
+          )
+        );
+      return result;
+  }
+
   /** GET. Returns a list of Dataset UUIDs that the client has READ access to.
    * The dataset can be optionally restricted by from and to dates. 
    * Dates must be in the format ISO date-time string in UTC 2025-11-13T09:33:18.000Z
@@ -60,31 +87,7 @@ export class APIv1 {
    * @param to {date} (optional, inclusive) query param
   */
   async metadata_list(req, res) {
-    const principal = req.auth;
-
-    const result = await rx.firstValueFrom(
-      rx.combineLatest([
-        this.data.get_dataset_definitions(),
-        this.auth.watch_acl_with_perm(principal, Constants.Perm.ReadDataset)
-      ]).pipe(
-        rx.map(([datasets, targets]) => {
-          const output = [];
-
-          datasets.forEach((value) => {
-            const obj = value.toJS ? value.toJS() : value;
-
-            Object.entries(obj).forEach(([key, val]) => {
-              // key is the dataset UUID
-              if (targets.has(key)) {
-                output.push(key);
-              }
-            });
-          });
-
-          return output;
-        })
-      )
-    );
+    const result = await this._get_dataset_uuid_list(req.auth, Constants.Perm.ReadDataset);
 
     return res.status(200).json(result);
   }
@@ -105,9 +108,7 @@ export class APIv1 {
    */
   async metadata_uuid(req, res){
     const {uuid} = req.params
-
-
-    // 
+    if (!valid_uuid(uuid)) fail(410);
   }
 
 
@@ -123,7 +124,7 @@ export class APIv1 {
               * unit - Engineering unit (if available)
    */
   async dataset_data(req, res){
-    
+    // 
   }
 
   /** GET. 
@@ -133,7 +134,9 @@ export class APIv1 {
    * @returns list of dataset UUIDs the client has permission to EDIT
    */
   async structure_list(req, res){
+    const result = await this._get_dataset_uuid_list(req.auth, Constants.Perm.EditDataset);
 
+    return res.status(200).json(result);
   }
 
   /** GET. Fetches structural definition of dataset

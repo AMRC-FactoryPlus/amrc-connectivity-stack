@@ -8,7 +8,6 @@ package uk.co.amrc.factoryplus.metadb.db;
 
 import java.io.StringReader;
 import java.util.Iterator;
-import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -35,14 +34,14 @@ final class Util {
 
     /* This will silently ignore trailing garbage. I think this could be
      * cured by using JsonParser instead but it's not straightforward. */
-    public static Optional<JsonValue> readJson (String json)
+    public static Option<JsonValue> readJson (String json)
     {
         var sr = new StringReader(json);
         var jr = Json.createReader(sr);
 
         return Try.of(jr::readValue)
             .andFinally(jr::close)
-            .toJavaOptional();
+            .toOption();
     }
 
     public static <T> T decodeLiteral (RDFNode node, Resource type, 
@@ -61,10 +60,10 @@ final class Util {
             .get();
     }
 
-    public static <T> Optional<T> single (Iterator<T> it)
+    public static <T> Option<T> single (Iterator<T> it)
     {
         if (!it.hasNext())
-            return Optional.empty();
+            return Option.none();
         var rv = it.next();
 
         if (it.hasNext()) {
@@ -81,13 +80,13 @@ final class Util {
             throw new Err.CorruptRDF("Expected single result, found multiple");
         }
 
-        return Optional.of(rv);
+        return Option.some(rv);
     }
 
     public static <T> T singleOrError (Iterator<T> it)
     {
         return single(it)
-            .orElseThrow(() -> 
+            .getOrElseThrow(() -> 
                 new Err.CorruptRDF("Expected single result, found nothing"));
     }
 }

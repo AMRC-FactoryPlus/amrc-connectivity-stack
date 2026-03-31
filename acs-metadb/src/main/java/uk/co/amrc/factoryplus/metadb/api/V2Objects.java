@@ -7,7 +7,6 @@
 package uk.co.amrc.factoryplus.metadb.api;
 
 import java.io.StringReader;
-import java.util.Optional;
 import java.util.UUID;
 
 import jakarta.inject.*;
@@ -15,6 +14,8 @@ import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.*;
 
 import jakarta.json.*;
+
+import io.vavr.control.Option;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,22 +36,22 @@ public class V2Objects {
         return Json.createArrayBuilder(objs).build();
     }
 
-    private UUID jsonUUID (Optional<JsonValue> val)
+    private UUID jsonUUID (JsonValue val)
     {
-        return val
+        return Option.of(val)
             .filter(v -> v instanceof JsonString)
             .map(v -> ((JsonString)v).getString())
             .flatMap(Vocab::parseUUID)
-            .orElseThrow(() -> new WebApplicationException(422));
+            .getOrElseThrow(() -> new WebApplicationException(422));
     }
 
     @POST @Path("object")
     public JsonValue createObject (JsonObject spec)
     {
-        var klass = jsonUUID(Optional.ofNullable(spec.get("class")));
-        var uuid = Optional.ofNullable(spec.get("uuid"))
+        var klass = jsonUUID(spec.get("class"));
+        var uuid = Option.of(spec.get("uuid"))
             .filter(v -> !v.equals(JsonValue.NULL))
-            .map(v -> jsonUUID(Optional.of(v)));
+            .map(this::jsonUUID);
 
         log.info("Create object {}, {}", klass, uuid);
 

@@ -8,7 +8,6 @@ package uk.co.amrc.factoryplus.metadb.db;
 
 import java.util.HashSet;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.BiFunction;
@@ -107,7 +106,7 @@ public class AppUpdater extends RequestHandler.Component
     {
         //log.info("Updating {} {}", app, obj);
         mapper.generateConfig(app, obj)
-            .ifPresent(j -> request()
+            .peek(j -> request()
                 .configEntry(app, obj)
                 .putRawValue(j));
     }

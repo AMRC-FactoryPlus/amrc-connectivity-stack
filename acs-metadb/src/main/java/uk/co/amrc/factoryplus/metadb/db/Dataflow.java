@@ -6,10 +6,10 @@
 
 package uk.co.amrc.factoryplus.metadb.db;
 
-import java.util.Optional;
-
 import io.reactivex.rxjava3.core.*;
 import io.reactivex.rxjava3.subjects.*;
+
+import io.vavr.control.Option;
 
 import org.apache.jena.query.*;
 import org.apache.jena.rdf.model.*;
@@ -68,7 +68,7 @@ public class Dataflow
                 em.onComplete();
             }))
             .map(sol -> {
-                var val = Optional.of(sol)
+                var val = Option.some(sol)
                     .filter(s -> s.contains("value"))
                     .map(ConfigEntry.Value::ofQuerySolution);
                 return new Update.Config(

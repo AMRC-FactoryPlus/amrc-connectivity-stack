@@ -6,7 +6,7 @@
 
 package uk.co.amrc.factoryplus.metadb.db;
 
-import java.util.Optional;
+import io.vavr.control.Option;
 
 import org.apache.jena.rdf.model.*;
 
@@ -15,7 +15,7 @@ public interface Update
     public record Config (
             Resource app,
             Resource obj,
-            Optional<ConfigEntry.Value> value)
+            Option<ConfigEntry.Value> value)
         implements Update
     { }
 

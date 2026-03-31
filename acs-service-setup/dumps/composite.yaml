@@ -61,13 +61,3 @@ objects:
         # Unimplemented
         #- !u ConfigDB.Perm.ReadMemberships
         #- !u ConfigDB.Perm.ReadSuperclasses
-
----
-service: !u UUIDs.Service.Authentication
-version: 2
-grants:
-# XXX These should be replaced with individual grants.
-  !u ACS.ServiceAccount.CmdEsc:
-    !u ACS.Perm.Composite.CmdEsc: null
-  !u ACS.ServiceAccount.Warehouse:
-    !u ACS.Perm.Composite.Warehouse: null

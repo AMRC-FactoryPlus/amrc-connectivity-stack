@@ -6,9 +6,14 @@
 
 package uk.co.amrc.factoryplus.metadb.db;
 
+import java.util.concurrent.TimeUnit;
+
+import jakarta.json.JsonValue;
+
 import io.reactivex.rxjava3.core.*;
 import io.reactivex.rxjava3.subjects.*;
 
+import io.vavr.collection.*;
 import io.vavr.control.Option;
 
 import org.apache.jena.query.*;
@@ -23,8 +28,15 @@ public class Dataflow
 {
     private static final Logger log = LoggerFactory.getLogger(Dataflow.class);
 
+    private RdfStore db;
+
     private Subject<Dataset> modelUpdates = PublishSubject.create();
     private Observable<Update.Config> configUpdates = buildConfigUpdates();
+
+    public Dataflow (RdfStore db)
+    {
+        this.db = db;
+    }
 
     public void modelUpdate (Dataset update)
     {
@@ -43,7 +55,6 @@ public class Dataflow
                     union { 
                         graph <graph/removed> { [] a ?app; <app/for> ?obj. } }
             } }
-
 
             graph <graph/derived> { ?app a <app/Application>. }
             # We must select out the current value from the derived
@@ -77,7 +88,63 @@ public class Dataflow
             .share();
     }
 
-    public void run ()
+    public Observable<Update.Config> configUpdates () { return configUpdates; }
+
+    public Observable<Update.Config> appUpdates (Resource app)
+    {
+        return configUpdates
+            .filter(u -> u.app().equals(app));
+    }
+
+    /* XXX These find-entry queries have a lot of dupliction. I'm not
+     * sure how best to avoid that; I don't really want to fall back to
+     * iterating over a list all the time. */
+    private static final Query Q_appState = Vocab.query("""
+        select ?obj ?value ?etag
+        where {
+            ?conf a ?app; <app/for> ?obj;
+                <doc/content> ?value;
+                <core/uuid> ?etag.
+        }
+    """);
+
+    private Map<Resource, ConfigEntry.Value> appState (Resource app)
+    {
+        return db.calculateRead(() -> 
+            Iterator.ofAll(db.selectQuery(Q_appState, "app", app))
+                .toMap(qs -> qs.getResource("obj"),
+                    ConfigEntry.Value::ofQuerySolution));
+    }
+
+    private CacheSeq<Resource, Map<Resource, ConfigEntry.Value>> _cacheAppValues
+        = CacheSeq.builder(this::_buildAppValues)
+            .withReplay()
+            .build();
+
+    private Observable<Map<Resource, ConfigEntry.Value>> _buildAppValues (Resource app)
+    {
+        return appUpdates(app)
+            .scanWith(() -> appState(app), (st, upd) -> 
+                upd.value().fold(
+                    () -> st.remove(upd.obj()),
+                    val -> st.put(upd.obj(), val)))
+            /* Include a half-second debounce as this will always be
+             * what we want. */
+            .debounce(500, TimeUnit.MILLISECONDS);
+    }
+
+    private Observable<Map<Resource, ConfigEntry.Value>> appValues (Resource app)
+    {
+        return _cacheAppValues.get(app);
+    }
+
+    public Observable<Map<Resource, JsonValue>> appEntries (Resource app)
+    {
+        return appValues(app)
+            .map(es -> es.mapValues(v -> v.value()));
+    }
+
+    public void start ()
     {
         configUpdates.subscribe(u -> log.info("CONFIG UPDATE: {}", u));
         log.info("SUBSCRIBED CONFIG UPDATES");

@@ -176,6 +176,38 @@
     :name "Sparkplug address";
     <app/appliesTo> <sparkplug/Entity>.
 
+<uuid/beb7d97c-2c0a-11f1-97ae-9bf4285ba7b1> 
+    a <app/ConfigSchema>; :primary <app/ConfigSchema>;
+    :uuid "beb7d97c-2c0a-11f1-97ae-9bf4285ba7b1";
+    <app/for> <app/Registration>;
+    <doc/content> """
+        {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["uuid", "rank", "class", "deleted", "owner"],
+            "properties": {
+                "uuid": { "type": "string", "format": "uuid" },
+                "rank": { "type": "integer", "minimum": 0 },
+                "class": { "type": "string", "format": "uuid" },
+                "deleted": { "type": "boolean" },
+                "owner": { "type": "string", "format": "uuid" },
+                "strict": { "type": "boolean", "const": true }
+            }
+        }
+    """^^rdf:JSON.
+<uuid/37718a06-2c0c-11f1-9ef8-e3f79d7f6db2>
+    a <app/ConfigSchema>; :primary <app/ConfigSchema>;
+    :uuid "37718a06-2c0c-11f1-9ef8-e3f79d7f6db2";
+    <app/for> <app/Info>; 
+    <doc/content> """
+        { 
+            "type": "object",
+            "properties": {
+                "name": { "type": "string" }
+            }
+        }
+    """^^rdf:JSON.
+
 # These are things which can have a Sparkplug address. _Edge cluster_,
 # _Sparkplug Node_ and _Sparkplug Device_ are all subclasses. Properly
 # we should have Group/Node subclasses here as well, because:

@@ -32,14 +32,12 @@ public final class Main {
     private int port;
     private HttpServer server;
     private RdfStore model;
-    private Dataflow dataflow;
 
     private Main (int port, String dataDir)
     {
         this.port = port;
 
-        this.dataflow = new Dataflow();
-        this.model = new RdfStore(dataDir, dataflow);
+        this.model = new RdfStore(dataDir);
         this.server = createServer();
     }
 
@@ -79,7 +77,7 @@ public final class Main {
 
     private void start () throws Throwable
     {
-        dataflow.run();
+        model.start();
         server.start();
     }
 }

@@ -27,18 +27,14 @@ public class AppUpdater extends RequestHandler.Component
 {
     private static final Logger log = LoggerFactory.getLogger(AppUpdater.class);
 
-    private record Config (Resource app, Resource obj) {}
-
     private ObjectStructure objs;
     private AppMapper mapper;
-    private Set<Config> updated;
 
     public AppUpdater (RequestHandler req)
     {
         super(req);
         this.objs = request().objectStructure();
         this.mapper = db().appMapper();
-        this.updated = new HashSet<>();
     }
 
     private static final Query Q_findUpdates = Vocab.query("""
@@ -71,7 +67,7 @@ public class AppUpdater extends RequestHandler.Component
      * removed to send notify updates.
      */
     private static Query Q_orphanConfigs = Vocab.query("""
-        select ?conf ?app ?obj 
+        select ?conf
         where {
             ?conf a ?app; <app/for> ?obj.
             ?app <app/appliesTo> ?domain.
@@ -104,30 +100,16 @@ public class AppUpdater extends RequestHandler.Component
         orphans.forEachRemaining(row -> {
             var conf = row.getResource("conf");
             db().removeResource(conf);
-            var app = row.getResource("app");
-            var obj = row.getResource("obj");
-            updated.add(new Config(app, obj));
         });
-    }
-
-    public void publish ()
-    {
-        log.info("Config updates:");
-        for (var c : updated)
-            log.info("  {} {}", c.app(), c.obj());
     }
 
     private void updateEntry (Resource app, Resource obj)
     {
-        /* XXX We need to remove redundant entries */
-
-        log.info("Updating {} {}", app, obj);
-        var changed = mapper.generateConfig(app, obj)
-            .map(v -> request().configEntry(app, obj).putRawValue(v))
-            .orElse(false);
-
-        if (changed)
-            updated.add(new Config(app, obj));
+        //log.info("Updating {} {}", app, obj);
+        mapper.generateConfig(app, obj)
+            .ifPresent(j -> request()
+                .configEntry(app, obj)
+                .putRawValue(j));
     }
 
 }

@@ -16,6 +16,7 @@ import org.glassfish.jersey.inject.hk2.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.server.ServerProperties;
 
+import uk.co.amrc.factoryplus.metadb.db.Dataflow;
 import uk.co.amrc.factoryplus.metadb.db.RdfStore;
 
 public final class Main {
@@ -31,12 +32,14 @@ public final class Main {
     private int port;
     private HttpServer server;
     private RdfStore model;
+    private Dataflow dataflow;
 
-    private Main (int port, String data)
+    private Main (int port, String dataDir)
     {
         this.port = port;
 
-        this.model = new RdfStore(data);
+        this.dataflow = new Dataflow();
+        this.model = new RdfStore(dataDir, dataflow);
         this.server = createServer();
     }
 
@@ -76,6 +79,7 @@ public final class Main {
 
     private void start () throws Throwable
     {
+        dataflow.run();
         server.start();
     }
 }

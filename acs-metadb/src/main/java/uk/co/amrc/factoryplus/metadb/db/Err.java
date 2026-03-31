@@ -101,6 +101,15 @@ public class Err extends Error
 
         public int statusCode () { return 422; }
     }
+    public static class BadConfig extends ClientError
+    {
+        public BadConfig (Resource app, JsonValue val)
+        {
+            super("Invalid config entry for " + app + ": " + val);
+        }
+
+        public int statusCode () { return 422; }
+    }
     public static class RankMismatch extends ClientError
     {
         public RankMismatch () { super("Rank mismatch"); }

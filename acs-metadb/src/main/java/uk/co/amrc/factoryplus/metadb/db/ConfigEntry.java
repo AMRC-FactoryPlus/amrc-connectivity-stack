@@ -107,6 +107,10 @@ public class ConfigEntry extends RequestHandler.Component
 
     public void putValue (JsonValue value)
     {
+        var schemas = db().schemaTracker();
+        if (!schemas.validate(app, value))
+            throw new Err.BadConfig(app, value);
+
         if (isStructured())
             db().appMapper().updateConfig(app, obj, value);
         else

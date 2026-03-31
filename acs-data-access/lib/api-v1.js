@@ -46,30 +46,30 @@ export class APIv1 {
   }
 
   async _get_dataset_uuids(principal, permission){
-  const result = await rx.firstValueFrom(
-          rx.combineLatest([
-            this.data.get_dataset_definitions(),
-            this.auth.watch_acl_with_perm(principal, permission)
-          ]).pipe(
-            rx.map(([datasets, targets]) => {
-              const output = [];
+    const result = await rx.firstValueFrom(
+      rx.combineLatest([
+        this.data.get_dataset_definitions(),
+        this.auth.watch_acl_with_perm(principal, permission)
+      ]).pipe(
+        rx.map(([datasets, targets]) => {
+          const output = [];
 
-              datasets.forEach((value) => {
-                const obj = value.toJS ? value.toJS() : value;
+          datasets.forEach((value) => {
+            const obj = value.toJS ? value.toJS() : value;
 
-                Object.entries(obj).forEach(([key, val]) => {
-                  // key is the dataset UUID
-                  if (targets.has(key)) {
-                    output.push(key);
-                  }
-                });
-              });
+            Object.entries(obj).forEach(([key, val]) => {
+              // key is the dataset UUID
+              if (targets.has(key)) {
+                output.push(key);
+              }
+            });
+          });
 
-              return output;
-            })
-          )
-        );
-      return result;
+          return output;
+        })
+      )
+    );
+    return result;
   }
 
   /** GET. Returns a list of Dataset UUIDs that the client has READ access to.
@@ -80,11 +80,8 @@ export class APIv1 {
   */
   async metadata_list(req, res) {
     const result = await this._get_dataset_uuid_list(req.auth, Constants.Perm.ReadDataset);
-
     return res.status(200).json(result);
   }
-
-
 
   /** GET. Accepts Dataset UUID and returns metadata about a Published dataset.
    * @param uuid {request param}
@@ -99,6 +96,7 @@ export class APIv1 {
                     * parts {array} - Subset datasets - contains UUIDs of all subclasses of dataset the client has READ access to.
    */
   async metadata_uuid(req, res){
+    // To be implemented
     const {uuid} = req.params
     if (!valid_uuid(uuid)) fail(410);
   }
@@ -116,7 +114,7 @@ export class APIv1 {
               * unit - Engineering unit (if available)
    */
   async dataset_data(req, res){
-    // 
+    // To be implemented using influxdb-client-js
   }
 
   /** GET. 
@@ -127,7 +125,6 @@ export class APIv1 {
    */
   async structure_list(req, res){
     const result = await this._get_dataset_uuid_list(req.auth, Constants.Perm.EditDataset);
-
     return res.status(200).json(result);
   }
 
@@ -144,7 +141,7 @@ export class APIv1 {
    */
   async structure_uuid(req, res) {
     const { uuid } = req.params;
-
+    
     if (!valid_uuid(uuid)) return fail(410);
 
     const ok = await this.auth.check_acl(
@@ -173,7 +170,7 @@ export class APIv1 {
    * @returns new dataset's UUID - JSON string 
    */
   async structure_create(req, res){
-
+    // To be implemented
   }
 
   /** PUT. Updates dataset definition. 
@@ -182,7 +179,7 @@ export class APIv1 {
    * @param {*} res 
    */
   async structure_update(req, res){
-
+    // To be implemented
   }
 
 

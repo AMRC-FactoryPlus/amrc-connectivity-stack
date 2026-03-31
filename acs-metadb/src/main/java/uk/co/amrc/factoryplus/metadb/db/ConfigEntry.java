@@ -43,7 +43,19 @@ public class ConfigEntry extends RequestHandler.Component
         return new ConfigEntry(req, appO.node(), objO.node());
     }
 
-    public record Value (JsonValue value, String etag, Optional<Instant> mtime) {}
+    public record Value (JsonValue value, String etag, Optional<Instant> mtime)
+    {
+        public static Value ofQuerySolution (QuerySolution sol)
+        {
+            var val = Util.decodeLiteral(sol.get("value"), RDF.JSON,
+                s -> Json.createReader(new StringReader(s)).readValue());
+            var etag = Util.decodeLiteral(sol.get("etag"), XSD.xstring, s -> s);
+            //var mtime = Util.decodeLiteral(binding.get("mtime"), XSD.dateTime, 
+            //    Instant::parse);
+
+            return new Value(val, etag, Optional.empty());
+        }
+    }
 
     private boolean isStructured ()
     {
@@ -63,15 +75,7 @@ public class ConfigEntry extends RequestHandler.Component
     public Optional<Value> getValue ()
     {
         return db().optionalQuery(Q_getValue, "app", app, "obj", obj)
-            .map(binding -> {
-                var val = Util.decodeLiteral(binding.get("value"), RDF.JSON,
-                    s -> Json.createReader(new StringReader(s)).readValue());
-                var etag = Util.decodeLiteral(binding.get("etag"), XSD.xstring, s -> s);
-                //var mtime = Util.decodeLiteral(binding.get("mtime"), XSD.dateTime, 
-                //    Instant::parse);
-
-                return new Value(val, etag, Optional.empty());
-            });
+            .map(Value::ofQuerySolution);
     }
 
     /* This removes an existing ConfigEntry. For a more 4D approach we
@@ -108,14 +112,16 @@ public class ConfigEntry extends RequestHandler.Component
             putRawValue(value);
     }
 
-    public boolean putRawValue (JsonValue value)
+    /* Returns a Value if we made an update. Returns empty() if the
+     * value has not changed and we didn't update it. */
+    public Optional<Value> putRawValue (JsonValue value)
     {
         var existing = getValue()
             .map(Value::value)
             .filter(v -> v.equals(value));
         if (existing.isPresent()) {
-            log.info("Duplicate config update suppressed");
-            return false;
+            //log.info("Duplicate config update suppressed");
+            return Optional.empty();
         }
 
         removeRawValue();
@@ -124,14 +130,15 @@ public class ConfigEntry extends RequestHandler.Component
             value.toString(), RDF.dtRDFJSON);
 
         var graph   = db().derived();
-        var entry   = db().createObject(app).node();
+        var entry   = db().createObject(app);
         //var inst    = request().getInstant();
 
-        graph.add(entry, Vocab.App.forP, obj);
-        graph.add(entry, Vocab.Doc.content, json);
+        graph.add(entry.node(), Vocab.App.forP, obj);
+        graph.add(entry.node(), Vocab.Doc.content, json);
         //graph.add(entry, Vocab.Time.start, inst);
 
-        return true;
+        return Optional.of(new Value(
+            value, entry.uuid().toString(), Optional.empty()));
     }
 }
 

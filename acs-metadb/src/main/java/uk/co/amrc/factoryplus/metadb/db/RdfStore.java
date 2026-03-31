@@ -40,6 +40,7 @@ public class RdfStore
     private InfModel    derived;
     private Dataset     dataset;
 
+    private Dataflow    dataflow;
     private AppMapper   appMapper;
 
     /* We build a Dataset out of these named graphs:
@@ -47,7 +48,7 @@ public class RdfStore
      * - G_derived: this is RDFS(G_direct).
      * - default: this is equal to G_derived.
      */
-    public RdfStore (String data)
+    public RdfStore (String data, Dataflow dataflow)
     {
         var tdb     = TDB2Factory.connectDataset(data);
         direct      = tdb.getNamedModel(Vocab.G_direct);
@@ -57,6 +58,7 @@ public class RdfStore
         dataset.addNamedModel(Vocab.G_direct, direct);
         dataset.addNamedModel(Vocab.G_derived, derived);
 
+        this.dataflow   = dataflow;
         appMapper = new AppMapper(this);
     }
 
@@ -76,18 +78,61 @@ public class RdfStore
     {
         return calculateRead(() -> cb.apply(new RequestHandler(this)));
     }
+
+    /* Jena ModelChangedListeners do not appear to respect inference
+     * when reporting additions, but do when reporting removals. This is
+     * surely a bug but one we have to work with for now. For
+     * consistency we watch the direct model, and rely on the derived
+     * model not making use of any RDFS except rdfs:subClassOf. In
+     * particular:
+     * - No use of rdfs:subPropertyOf.
+     * - No use of rdfs:{domain,range} to infer rdf:type.
+     *
+     * Subproperties could probably be handled by maintaining a cache of
+     * the subproperty tree, and firing derived statements by hand. This
+     * might be difficult when removing statements as we won't know
+     * whether the derived statement is still present via another route.
+     * As long as our interface is 'there may have been a change in this
+     * property' this won't matter. Subproperties of rdf:type/
+     * rdfs:subClassOf are likely to be the most important case, and
+     * could perhaps be handled specially.
+     *
+     * We could optimise the class structure handling by notifying the
+     * rank of the changed class. With strict ranks it is not possible
+     * for a change in one rank to propagate into other ranks. If we
+     * introduced inference for powertypes this would change.
+     */
     public <T> T requestWrite (Function<RequestHandler, T> cb)
     {
         var req = new RequestHandler(this);
-        var updater = req.appUpdater();
+        var listener = new ModelUpdate();
+        T rv;
 
-        T rv = calculateWrite(() -> {
-            var rv2 = cb.apply(req);
-            updater.update();
-            return rv2;
-        });
+        try {
+            dataset.begin(ReadWrite.WRITE);
+            direct.register(listener);
+            rv = cb.apply(req);
+            /* This updates all structured entries by iteration over
+             * the domains. This could be optimised by using the
+             * change-notify information collected up to this point. */
+            req.appUpdater().update();
+            dataset.commit();
+        }
+        catch (Throwable e) {
+            dataset.abort();
+            throw e;
+        }
+        finally {
+            direct.unregister(listener);
+            dataset.end();
+        }
 
-        updater.publish();
+        var update = listener.dataset(derived);
+        /* It is important that all dataflow processing that queries the
+         * update dataset happens syncronously. Otherwise it won't be in
+         * this transaction. */
+        update.executeRead(() -> dataflow.modelUpdate(update));
+
         return rv;
     }
     public void requestExecute (Consumer<RequestHandler> cb)

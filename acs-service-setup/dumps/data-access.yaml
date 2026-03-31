@@ -1,0 +1,164 @@
+
+service: !u UUIDs.Service.ConfigDB
+version: 2
+objects:
+
+  !u UUIDs.Class.Service:
+    !u DataAccess.Service.DataAccess:
+      name: "Data Access service"
+  
+  !u Auth.Class.ServiceRole:
+    !u DataAccess.Requirement.ServiceRole:
+      name: "Data Access service role"
+      subclassOf:
+        - !u Auth.Class.CentralService
+
+  !u ConfigDB.Class.R3Class:
+    !u DataAccess.Group.DatasetGroup:
+      name: "Dataset group"
+    !u DataAccess.Group.DatasetRoleGroup:
+      name: "Dataset role"
+      subclassOf:
+        - !u DataAccess.Group.DatasetGroup
+    !u DataAccess.Group.StructuralDatasetType:
+      name: "Structural dataset type"
+      subclassOf:
+        - !u DataAccess.Group.DatasetGroup
+    !u DataAccess.Group.FunctionalDatasetGroup:
+      name: "Functional dataset group"
+      subclassOf:
+        - !u DataAccess.Group.DatasetGroup
+      
+  !u DataAccess.Group.DatasetGroup:
+    !u DataAccess.Class.Dataset:
+      name: "Dataset"
+  
+  !u DataAccess.Group.StructuralDatasetType:
+    !u DataAccess.Class.Sparkplug:
+      name: "Sparkplug dataset"
+      subclassOf: 
+        - !u DataAccess.Class.Dataset
+    !u DataAccess.Class.Session:
+      name: "Session dataset"
+      subclassOf: 
+        - !u DataAccess.Class.Dataset
+    !u DataAccess.Class.Union:
+      name: "Union dataset"
+      subclassOf: 
+        - !u DataAccess.Class.Dataset
+
+
+  !u DataAccess.Group.FunctionalDatasetGroup:
+    !u DataAccess.Class.Published:
+      name: "Published dataset"
+      subclassOf:
+        - !u DataAccess.Class.Dataset
+    !u DataAccess.Class.Partial:
+      name: "Partial dataset"
+      subclassOf:
+        - !u DataAccess.Class.Dataset
+    !u DataAccess.Class.MESDataset:
+      name: "MES dataset"
+      subclassOf:
+        - !u DataAccess.Class.Dataset
+    !u DataAccess.Class.Equipment:
+      name: "MES equipment"
+      subclassOf:
+        - !u DataAccess.Class.MESDataset
+    !u DataAccess.Class.WorkOrder:
+      name: "MES work order"
+      subclassOf:
+        - !u DataAccess.Class.MESDataset
+    !u DataAccess.Class.Product:
+      name: "MES product"
+      subclassOf:
+        - !u DataAccess.Class.MESDataset
+    !u DataAccess.Class.Operation:
+      name: "MES operation"
+      subclassOf:
+        - !u DataAccess.Class.MESDataset
+
+  !u ConfigDB.Class.R1Class:
+    !u DataAccess.Class.Measurement:
+      name: "Measurement"
+    !u DataAccess.Class.MES:
+      name: "MES"
+    
+    !u DataAccess.App.DatasetDefinition:
+      name: "Dataset definition"
+      subclassOf:
+        - !u UUIDs.Class.App
+    !u DataAccess.App.DatasetMetadata:
+      name: "Dataset metadata"
+      subclassOf:
+        - !u UUIDs.Class.App
+
+  !u DataAccess.App.DatasetDefinition:
+    !u DataAccess.App.SparkplugSrc:
+      name: "Sparkplug source"
+    !u DataAccess.App.UnionComponents:
+      name: "Union components"
+    !u DataAccess.App.SessionLimits:
+      name: "Session limits"
+
+  !u DataAccess.App.DatasetMetadata:
+    !u DataAccess.App.MESIdentifiers:
+      name: "MES identifiers"  
+
+  !u UUIDs.Class.Special:
+    !u DataAccess.Special.InvalidDataset:
+      name: "Structurally invalid dataset"
+
+# Permissions
+  !u Auth.Class.ServicePerms:
+    !u DataAccess.Perm.All:
+      name: "Data Access permission"
+      subclassOf:
+        - !u Auth.Class.Permission
+
+  !u DataAccess.Perm.All:
+    !u DataAccess.Perm.CreateDataset:
+      name: "Create dataset"
+    !u DataAccess.Perm.IncludeInUnion:
+      name: "Include in union"
+    !u DataAccess.Perm.ReadDataset:
+      name: "Read dataset"
+    !u DataAccess.Perm.UseForSession:
+      name: "Use for session"
+    !u DataAccess.Perm.EditDataset:
+      name: "Edit dataset"
+    !u DataAccess.Perm.UseSparkplug:
+      name: "Use Sparkplug data"
+
+      
+---
+service: !u UUIDs.Service.Authentication
+version: 2
+grants:
+  !u DataAccess.Requirement.ServiceRole:
+    !u UUIDs.Permission.Directory.AdvertiseService:
+      !u DataAccess.Service.DataAccess: false
+    !u UUIDs.Permission.Auth.ReadACL:
+      !u DataAccess.Perm.All: true
+    !u UUIDs.Permission.ConfigDB.ReadConfig:
+      !u DataAccess.App.DatasetDefinition: true
+      !u DataAccess.App.DatasetMetadata: true
+    !u UUIDs.Permission.ConfigDB.WriteConfig:
+      !u DataAccess.App.DatasetDefinition: true
+    !u ConfigDB.Perm.CreateObject:
+      !u DataAccess.Group.StructuralDatasetType: true
+    !u ConfigDB.Perm.ReadMembers:
+      !u DataAccess.App.DatasetDefinition: false
+      !u DataAccess.App.DatasetMetadata: false
+      !u DataAccess.Group.StructuralDatasetType: "both"
+      !u DataAccess.Group.FunctionalDatasetGroup: "both"
+    !u ConfigDB.Perm.WriteMembers:
+      !u DataAccess.Group.StructuralDatasetType: true
+    !u ConfigDB.Perm.WriteMemberships:
+      !u DataAccess.Class.Dataset: true
+    !u ConfigDB.Perm.WriteSubclasses:
+      !u DataAccess.Class.Dataset: true
+    !u ConfigDB.Perm.WriteSuperclasses:
+      !u DataAccess.Class.Dataset: true
+
+

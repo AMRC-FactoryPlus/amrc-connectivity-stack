@@ -32,6 +32,8 @@ import io.vavr.control.Option;
 
 /* This class is not called Model because of the conflict with Jena's
  * Model class. */
+/* XXX I think this is two or possibly three classes: a component
+ * locator, a Dataset wrapper, and a F+ object creator. */
 public class RdfStore
 {
     private static final Logger log = LoggerFactory.getLogger(RdfStore.class);
@@ -40,15 +42,16 @@ public class RdfStore
     private InfModel    derived;
     private Dataset     dataset;
 
-    private Dataflow    dataflow;
-    private AppMapper   appMapper;
+    private Dataflow        dataflow;
+    private AppMapper       appMapper;
+    private SchemaTracker   schemaTracker;
 
     /* We build a Dataset out of these named graphs:
      * - G_direct: this is G_direct from the TDB.
      * - G_derived: this is RDFS(G_direct).
      * - default: this is equal to G_derived.
      */
-    public RdfStore (String data, Dataflow dataflow)
+    public RdfStore (String data)
     {
         var tdb     = TDB2Factory.connectDataset(data);
         direct      = tdb.getNamedModel(Vocab.G_direct);
@@ -58,15 +61,24 @@ public class RdfStore
         dataset.addNamedModel(Vocab.G_direct, direct);
         dataset.addNamedModel(Vocab.G_derived, derived);
 
-        this.dataflow   = dataflow;
-        appMapper = new AppMapper(this);
+        dataflow        = new Dataflow(this);
+        appMapper       = new AppMapper(this);
+        schemaTracker   = new SchemaTracker(this);
     }
 
     public Dataset dataset () { return dataset; }
     public Model direct () { return direct; }
     public InfModel derived () { return derived; }
 
+    public Dataflow dataflow () { return dataflow; }
     public AppMapper appMapper () { return appMapper; }
+    public SchemaTracker schemaTracker () { return schemaTracker; }
+
+    public void start ()
+    {
+        dataflow.start();
+        schemaTracker.start();
+    }
 
     public void executeRead (Runnable r) { dataset.executeRead(r); }
     public <T> T calculateRead (Supplier<T> s) { return dataset.calculateRead(s); }

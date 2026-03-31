@@ -8,10 +8,11 @@ package uk.co.amrc.factoryplus.metadb.db;
 
 import java.io.StringReader;
 import java.time.Instant;
-import java.util.Optional;
 import java.util.UUID;
 
 import jakarta.json.*;
+
+import io.vavr.control.Option;
 
 import org.apache.jena.query.*;
 import org.apache.jena.rdf.model.*;
@@ -43,7 +44,7 @@ public class ConfigEntry extends RequestHandler.Component
         return new ConfigEntry(req, appO.node(), objO.node());
     }
 
-    public record Value (JsonValue value, String etag, Optional<Instant> mtime)
+    public record Value (JsonValue value, String etag, Option<Instant> mtime)
     {
         public static Value ofQuerySolution (QuerySolution sol)
         {
@@ -53,7 +54,7 @@ public class ConfigEntry extends RequestHandler.Component
             //var mtime = Util.decodeLiteral(binding.get("mtime"), XSD.dateTime, 
             //    Instant::parse);
 
-            return new Value(val, etag, Optional.empty());
+            return new Value(val, etag, Option.none());
         }
     }
 
@@ -72,7 +73,7 @@ public class ConfigEntry extends RequestHandler.Component
         }
     """);
 
-    public Optional<Value> getValue ()
+    public Option<Value> getValue ()
     {
         return db().optionalQuery(Q_getValue, "app", app, "obj", obj)
             .map(Value::ofQuerySolution);
@@ -114,14 +115,14 @@ public class ConfigEntry extends RequestHandler.Component
 
     /* Returns a Value if we made an update. Returns empty() if the
      * value has not changed and we didn't update it. */
-    public Optional<Value> putRawValue (JsonValue value)
+    public Option<Value> putRawValue (JsonValue value)
     {
         var existing = getValue()
             .map(Value::value)
             .filter(v -> v.equals(value));
-        if (existing.isPresent()) {
+        if (existing.isDefined()) {
             //log.info("Duplicate config update suppressed");
-            return Optional.empty();
+            return Option.none();
         }
 
         removeRawValue();
@@ -137,8 +138,8 @@ public class ConfigEntry extends RequestHandler.Component
         graph.add(entry.node(), Vocab.Doc.content, json);
         //graph.add(entry, Vocab.Time.start, inst);
 
-        return Optional.of(new Value(
-            value, entry.uuid().toString(), Optional.empty()));
+        return Option.some(new Value(
+            value, entry.uuid().toString(), Option.none()));
     }
 }
 

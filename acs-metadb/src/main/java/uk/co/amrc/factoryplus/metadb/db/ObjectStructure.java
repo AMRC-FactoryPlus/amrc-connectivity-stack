@@ -7,7 +7,6 @@
 package uk.co.amrc.factoryplus.metadb.db;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -19,6 +18,7 @@ import org.apache.jena.update.*;
 import org.apache.jena.vocabulary.*;
 
 import io.vavr.collection.Iterator;
+import io.vavr.control.Option;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -122,7 +122,7 @@ public class ObjectStructure extends RequestHandler.Component
      * the required information, but it would make a mess of the return
      * value of this method. The most sensible option would be to return
      * a Jakarta Response, which is a clear layer violation. */
-    public JsonValue createObject (UUID klass, Optional<UUID> uuid)
+    public JsonValue createObject (UUID klass, Option<UUID> uuid)
     {
         var kres = db().findObjectOrError(klass).node();
 
@@ -130,12 +130,12 @@ public class ObjectStructure extends RequestHandler.Component
             .map(u -> db().findObject(u)
                 .map(o -> { log.info("Found object {}", o); return o; })
                 .map(o -> updateRegistration(o, kres))
-                .orElseGet(() -> db().createObject(kres, u)))
-            .orElseGet(() -> db().createObject(kres));
+                .getOrElse(() -> db().createObject(kres, u)))
+            .getOrElse(() -> db().createObject(kres));
 
         return db().appMapper()
             .generateConfig(Vocab.App.Registration, obj.node())
-            .orElseThrow(() -> new Err.CorruptRDF("Cannot find object registration"));
+            .getOrElseThrow(() -> new Err.CorruptRDF("Cannot find object registration"));
     }
 
     private static UpdateRequest U_deleteConfigs = Vocab.update("""

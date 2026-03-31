@@ -11,7 +11,6 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -29,6 +28,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import io.vavr.collection.Iterator;
+import io.vavr.control.Option;
 
 /* This class is not called Model because of the conflict with Jena's
  * Model class. */
@@ -150,7 +150,7 @@ public class RdfStore
         return exec.build().execSelect();
     }
 
-    public Optional<QuerySolution> optionalQuery (Query query, Object... substs)
+    public Option<QuerySolution> optionalQuery (Query query, Object... substs)
     {
         return Util.single(selectQuery(query, substs));
     }
@@ -171,7 +171,7 @@ public class RdfStore
     }
 
     /** Find a single resource within the direct graph. */
-    public Optional<Resource> findResource (Property pred, RDFNode obj)
+    public Option<Resource> findResource (Property pred, RDFNode obj)
     {
         return Util.single(
             direct.listResourcesWithProperty(pred, obj));
@@ -187,7 +187,7 @@ public class RdfStore
             derived.removeAll(null, node.as(Property.class), null);
     }
 
-    public Optional<FPObject> findObject (UUID uuid)
+    public Option<FPObject> findObject (UUID uuid)
     {
         return findResource(Vocab.uuid, Vocab.uuidLiteral(uuid))
             .map(node -> new FPObject(node, uuid));
@@ -196,13 +196,13 @@ public class RdfStore
     public FPObject findObjectOrError (UUID uuid)
     {
         return findObject(uuid)
-            .orElseThrow(() -> new Err.NotFound(uuid.toString()));
+            .getOrElseThrow(() -> new Err.NotFound(uuid.toString()));
     }
 
     public Resource findRankClass (int rank)
     {
         return findResource(Vocab.rank, direct.createTypedLiteral(rank))
-            .orElseThrow(() -> new Err.CorruptRDF("Cannot find rank class"));
+            .getOrElseThrow(() -> new Err.CorruptRDF("Cannot find rank class"));
     }
 
     private static final Query Q_findRank = Vocab.query("""

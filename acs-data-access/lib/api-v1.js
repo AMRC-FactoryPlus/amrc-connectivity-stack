@@ -79,7 +79,7 @@ export class APIv1 {
    * @param to {date} (optional, inclusive) query param
   */
   async metadata_list(req, res) {
-    const result = await this._get_dataset_uuid_list(req.auth, Constants.Perm.ReadDataset);
+    const result = await this._get_dataset_uuids(req.auth, Constants.Perm.ReadDataset);
     return res.status(200).json(result);
   }
 
@@ -124,7 +124,7 @@ export class APIv1 {
    * @returns list of dataset UUIDs the client has permission to EDIT
    */
   async structure_list(req, res){
-    const result = await this._get_dataset_uuid_list(req.auth, Constants.Perm.EditDataset);
+    const result = await this._get_dataset_uuids(req.auth, Constants.Perm.EditDataset);
     return res.status(200).json(result);
   }
 
@@ -170,7 +170,14 @@ export class APIv1 {
    * @returns new dataset's UUID - JSON string 
    */
   async structure_create(req, res){
-    // To be implemented
+    const ok = await this.auth.check_acl(
+      req.auth,
+      Constants.Perm.CreateDataset,
+      uuid,
+      true,
+    );
+
+    if (!ok) return fail(403);
   }
 
   /** PUT. Updates dataset definition. 

@@ -132,7 +132,7 @@ public class AppMapper {
     public void updateConfig (Resource app, Resource obj, JsonValue config)
     {
         if (app.equals(Vocab.App.Registration)) {
-            updateRegistration(obj, (JsonObject)config);
+            updateRegistration(obj, config);
             return;
         }
 
@@ -150,8 +150,12 @@ public class AppMapper {
     /* XXX This assumes JSON schema validation has been performed.
      * Currently this is not implemented nor is a schema installed for
      * the Registration app. */
-    private void updateRegistration (Resource obj, JsonObject spec)
+    private void updateRegistration (Resource obj, JsonValue config)
     {
+        if (!(config instanceof JsonObject))
+            throw new Err.BadJson(config);
+        var spec = (JsonObject)config;
+
         if (!spec.getBoolean("strict")) {
             log.info("Objects must be strict");
             throw new Err.BadJson(spec.get("strict"));

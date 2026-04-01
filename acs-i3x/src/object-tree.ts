@@ -43,6 +43,8 @@ export class ObjectTree {
     private objectTypes: Map<string, I3xObjectType> = new Map();
     private objects: Map<string, I3xObject> = new Map();
     private children: Map<string, Set<string>> = new Map();
+    // Maps device Instance_UUID → ConfigDB UUID (for parent linking)
+    private instanceToDevice: Map<string, string> = new Map();
 
     constructor(opts: ObjectTreeOpts) {
         this.fplus = opts.fplus;
@@ -63,6 +65,7 @@ export class ObjectTree {
         this.objectTypes.clear();
         this.objects.clear();
         this.children.clear();
+        this.instanceToDevice.clear();
         await this.loadDevices();
     }
 
@@ -150,12 +153,43 @@ export class ObjectTree {
 
     /* ---- UNS composition ---- */
 
+    /**
+     * Register a mapping from a device's Instance_UUID to its ConfigDB UUID.
+     * Called when we first see a UNS message for a device.
+     */
+    registerDeviceInstance(instanceUuid: string, configDbUuid: string): void {
+        this.instanceToDevice.set(instanceUuid, configDbUuid);
+    }
+
     addCompositionFromUns(
         _deviceUuid: string,
         instanceUuidPath: string[],
         schemaUuidPath: string[],
         displayNames: string[],
     ): void {
+        // Index 0 is the device's Instance_UUID. Resolve to ConfigDB UUID
+        // so the parent chain connects to the device object in the tree.
+        const deviceInstanceUuid = instanceUuidPath[0];
+        let deviceConfigDbUuid = this.instanceToDevice.get(deviceInstanceUuid);
+
+        // Auto-detect mapping: if we haven't seen this Instance_UUID before,
+        // find the matching root device object.
+        // TODO: This heuristic matches on schema type — won't work correctly
+        // if multiple devices share the same top-level schema. Fix by using
+        // the Sparkplug device address from UNS topic to match via Directory.
+        if (!deviceConfigDbUuid) {
+            const deviceSchemaUuid = schemaUuidPath[0];
+            for (const obj of this.objects.values()) {
+                if (obj.parentId === null
+                    && !this.instanceToDevice.has(obj.elementId)
+                    && obj.typeElementId === deviceSchemaUuid) {
+                    this.instanceToDevice.set(deviceInstanceUuid, obj.elementId);
+                    deviceConfigDbUuid = obj.elementId;
+                    break;
+                }
+            }
+        }
+
         // Index 0 is the device itself, already in tree. Start from 1.
         for (let i = 1; i < instanceUuidPath.length; i++) {
             const elementId = instanceUuidPath[i];
@@ -163,7 +197,9 @@ export class ObjectTree {
             // Idempotent: skip if already exists
             if (this.objects.has(elementId)) continue;
 
-            const parentId = instanceUuidPath[i - 1];
+            const rawParentId = instanceUuidPath[i - 1];
+            // For the first child (i=1), parent is the device — use ConfigDB UUID
+            const parentId = (i === 1 && deviceConfigDbUuid) ? deviceConfigDbUuid : rawParentId;
             const typeElementId = schemaUuidPath[i];
             const displayName = displayNames[i];
 

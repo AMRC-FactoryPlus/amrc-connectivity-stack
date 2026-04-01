@@ -17,24 +17,31 @@ const { env } = process;
 const logger = pino({ name: "acs-i3x", level: env.LOG_LEVEL || "info" });
 
 logger.info("Starting acs-i3x service...");
+logger.debug({ directoryUrl: env.DIRECTORY_URL, realm: env.REALM, user: env.SERVICE_USERNAME }, "Configuration");
 
 // Init Factory+ service client
+logger.debug("Initialising ServiceClient...");
 const fplus = await new ServiceClient({ env }).init();
+logger.debug("ServiceClient initialised");
 
 // Build object tree from ConfigDB + Directory
+logger.debug("Building object tree from ConfigDB + Directory...");
 const objectTree = await new ObjectTree({
     fplus,
     namespaceName: env.I3X_NAMESPACE_NAME || "Default",
     namespaceUri: env.I3X_NAMESPACE_URI || "https://example.com",
     logger,
 }).init();
+logger.debug("Object tree built");
 
 // Start value cache (subscribes to UNS/v1/#)
+logger.debug("Starting value cache (subscribing to UNS/v1/#)...");
 const valueCache = await new ValueCache({
     objectTree,
     staleThreshold: parseInt(env.I3X_STALE_THRESHOLD || "300000"),
     logger,
 }).init(fplus);
+logger.debug("Value cache started");
 
 // History module (InfluxDB)
 const history = new History({

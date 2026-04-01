@@ -162,6 +162,10 @@ public class ObjectStructure extends RequestHandler.Component
          * dependents we should also have no indirect. This relies
          * on no use of rdfs:domain etc. to infer memberships. */
         var model = db().direct();
+        if (model.contains(obj, Vocab.rank)) {
+            log.info("Object {} is a rank class", obj);
+            throw new Err.Immutable();
+        }
 
         /* This will also catch configs-of-app. If we want to return
          * UUIDs in the 409 we will need to handle these separately. */

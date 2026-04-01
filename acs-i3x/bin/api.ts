@@ -52,6 +52,12 @@ const subscriptions = new SubscriptionManager({
 });
 
 // Start HTTP server via WebAPI
+// In dev mode, make all paths public (no Kerberos keytab needed)
+const devNoAuth = env.DEV_NO_AUTH === "true";
+if (devNoAuth) {
+    logger.warn("DEV_NO_AUTH is set — all endpoints are unauthenticated. Do not use in production.");
+}
+
 const api = await new WebAPI({
     ping: {
         version: Version,
@@ -68,7 +74,7 @@ const api = await new WebAPI({
     hostname: env.HOSTNAME,
     keytab: env.SERVER_KEYTAB,
     http_port: env.PORT || 8080,
-    public: "/v1/info",
+    public: devNoAuth ? "(.*)" : "/v1/info",
     routes: routes({
         objectTree,
         valueCache,

@@ -64,7 +64,6 @@ export class APIv1 {
         /* ---- /info router (unauthenticated) ---- */
 
         this.infoRoute = Router();
-        this.infoRoute.use(i3xEnvelope);
         this.infoRoute.get("/info", (_req: Request, res: Response) => {
             res.json({
                 specVersion: I3X_SPEC_VERSION,
@@ -77,8 +76,6 @@ export class APIv1 {
                 },
             });
         });
-        this.infoRoute.use(i3xErrorHandler);
-
         /* ---- Main router (authenticated) ---- */
 
         this.routes = Router();

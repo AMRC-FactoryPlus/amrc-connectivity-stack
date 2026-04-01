@@ -62,7 +62,7 @@ const objCnc1: I3xObject = {
     elementId: "obj-cnc-1",
     displayName: "CNC-001",
     typeElementId: "type-cnc",
-    parentId: null,
+    parentId: "/",
     isComposition: true,
     isExtended: false,
 };
@@ -71,7 +71,7 @@ const objCnc2: I3xObject = {
     elementId: "obj-cnc-2",
     displayName: "CNC-002",
     typeElementId: "type-cnc",
-    parentId: null,
+    parentId: "/",
     isComposition: true,
     isExtended: false,
 };
@@ -214,7 +214,7 @@ function createPreloadedMocks() {
         getObjects: jest.fn<(opts?: any) => I3xObject[]>()
             .mockImplementation((opts?: any) => {
                 let result = [...allObjects];
-                if (opts?.root) result = result.filter(o => o.parentId === null);
+                if (opts?.root) result = result.filter(o => o.parentId === "/");
                 if (opts?.typeElementId) result = result.filter(o => o.typeElementId === opts.typeElementId);
                 return result;
             }),
@@ -495,7 +495,7 @@ describe("E2E Compliance Tests", () => {
             const objects = res.body.result;
             expect(objects).toHaveLength(2);
             for (const o of objects) {
-                expect(o.parentId).toBeNull();
+                expect(o.parentId).toBe("/");
             }
         });
 

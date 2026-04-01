@@ -114,7 +114,7 @@ const sampleObject: I3xObject = {
     elementId: "obj-1",
     displayName: "Sensor1",
     typeElementId: "type-1",
-    parentId: null,
+    parentId: "/",
     isComposition: true,
     isExtended: false,
 };

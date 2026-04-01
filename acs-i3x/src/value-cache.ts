@@ -55,12 +55,24 @@ export class ValueCache {
     }
 
     async init(fplus: any): Promise<this> {
+        this.logger.debug?.("ValueCache: requesting MQTT client from ServiceClient...");
         const mqtt = await fplus.mqtt_client();
+        this.logger.debug?.("ValueCache: MQTT client obtained, subscribing to UNS/v1/#...");
         mqtt.subscribe("UNS/v1/#");
         mqtt.on("message", (topic: string, payload: Buffer, packet: any) => {
             this.onUnsMessage(topic, payload, packet);
         });
+        mqtt.on("connect", () => {
+            this.logger.debug?.("ValueCache: MQTT connected");
+        });
+        mqtt.on("error", (err: any) => {
+            this.logger.error?.({ err }, "ValueCache: MQTT error");
+        });
+        mqtt.on("close", () => {
+            this.logger.debug?.("ValueCache: MQTT connection closed");
+        });
         this.ready = true;
+        this.logger.debug?.("ValueCache: initialised and subscribed");
         return this;
     }
 

@@ -61,9 +61,12 @@ export class ObjectTree {
     }
 
     async init(): Promise<this> {
+        this.logger.debug?.("ObjectTree: building namespace and relationship types");
         this.buildNamespace();
         this.buildRelationshipTypes();
+        this.logger.debug?.("ObjectTree: loading devices from ConfigDB + Directory...");
         await this.loadDevices();
+        this.logger.debug?.({ objectCount: this.objects.size, typeCount: this.objectTypes.size }, "ObjectTree: init complete");
         this.ready = true;
         return this;
     }
@@ -334,29 +337,38 @@ export class ObjectTree {
     }
 
     private async loadDevices(): Promise<void> {
+        this.logger.debug?.("loadDevices: fetching Device class members from ConfigDB...");
         const deviceUuids: string[] = await this.fplus.ConfigDB.class_members(DEVICE_CLASS_UUID);
+        this.logger.debug?.({ count: deviceUuids.length }, "loadDevices: found devices");
 
         // For each device, get its class via the Registration app
         const classMap = new Map<string, string>(); // deviceUuid -> classUuid
         const classUuids = new Set<string>();
 
         for (const uuid of deviceUuids) {
+            this.logger.debug?.({ uuid }, "loadDevices: fetching registration for device");
             const reg = await this.fplus.ConfigDB.get_config(REGISTRATION_APP_UUID, uuid);
             if (reg?.class) {
                 classMap.set(uuid, reg.class);
                 classUuids.add(reg.class);
+                this.logger.debug?.({ uuid, class: reg.class }, "loadDevices: device class resolved");
+            } else {
+                this.logger.debug?.({ uuid }, "loadDevices: no class found for device");
             }
         }
 
         // For each unique class, get its JSON schema and name, create ObjectType
+        this.logger.debug?.({ count: classUuids.size }, "loadDevices: loading schemas for unique classes");
         for (const classUuid of classUuids) {
             if (this.objectTypes.has(classUuid)) continue;
 
+            this.logger.debug?.({ classUuid }, "loadDevices: fetching schema and info for class");
             const [schema, info] = await Promise.all([
                 this.fplus.ConfigDB.get_config(CONFIG_SCHEMA_APP_UUID, classUuid).catch(() => null),
                 this.fplus.ConfigDB.get_config(INFO_APP_UUID, classUuid).catch(() => null),
             ]);
             const displayName = info?.name ?? schema?.title ?? classUuid;
+            this.logger.debug?.({ classUuid, displayName }, "loadDevices: created ObjectType");
             const objType = toI3xObjectType(
                 classUuid,
                 displayName,
@@ -368,10 +380,12 @@ export class ObjectTree {
         }
 
         // For each device, get Directory info and name, create Object
+        this.logger.debug?.("loadDevices: creating device objects...");
         for (const uuid of deviceUuids) {
             const classUuid = classMap.get(uuid);
             if (!classUuid) continue;
 
+            this.logger.debug?.({ uuid }, "loadDevices: fetching directory info and name");
             const [, info] = await Promise.all([
                 this.fplus.Directory.get_device_info(uuid).catch(() => null),
                 this.fplus.ConfigDB.get_config(INFO_APP_UUID, uuid).catch(() => null),

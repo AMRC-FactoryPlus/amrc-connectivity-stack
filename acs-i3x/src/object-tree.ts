@@ -158,6 +158,62 @@ export class ObjectTree {
         return childSet ? Array.from(childSet) : [];
     }
 
+    /* ---- ISA-95 hierarchy ---- */
+
+    /**
+     * Ensure ISA-95 hierarchy objects exist above a device.
+     * Creates Enterprise → Site → Area → WorkCenter → WorkUnit chain
+     * using deterministic v5 UUIDs, and re-parents the device under
+     * the deepest ISA-95 level.
+     *
+     * isa95Segments: e.g. ["AMRC", "Factory 2050", "MK1"]
+     * deviceElementId: the ConfigDB UUID of the device
+     */
+    ensureIsa95Hierarchy(isa95Segments: string[], deviceElementId: string): void {
+        let parentId = "/";
+
+        for (const segment of isa95Segments) {
+            const elementId = uuidv5(`isa95:${parentId}:${segment}`, I3X_UUID_NAMESPACE);
+
+            if (!this.objects.has(elementId)) {
+                const obj = toI3xObject(
+                    elementId,
+                    segment,
+                    "isa95-level",  // synthetic type for ISA-95 nodes
+                    parentId,
+                    true,           // isComposition
+                );
+                this.objects.set(elementId, obj);
+
+                if (!this.children.has(parentId)) {
+                    this.children.set(parentId, new Set());
+                }
+                this.children.get(parentId)!.add(elementId);
+            }
+
+            parentId = elementId;
+        }
+
+        // Re-parent the device under the deepest ISA-95 level
+        const device = this.objects.get(deviceElementId);
+        if (device && device.parentId !== parentId) {
+            // Remove from old parent's children
+            const oldParent = device.parentId;
+            if (oldParent) {
+                this.children.get(oldParent)?.delete(deviceElementId);
+            }
+
+            // Update device parentId
+            (device as any).parentId = parentId;
+
+            // Add to new parent's children
+            if (!this.children.has(parentId)) {
+                this.children.set(parentId, new Set());
+            }
+            this.children.get(parentId)!.add(deviceElementId);
+        }
+    }
+
     /* ---- UNS composition ---- */
 
     /**
@@ -168,29 +224,40 @@ export class ObjectTree {
         this.instanceToDevice.set(instanceUuid, configDbUuid);
     }
 
+    /** Check if a parentId points to an ISA-95 hierarchy node */
+    private isIsa95Child(parentId: string | null): boolean {
+        if (!parentId || parentId === "/") return false;
+        const parent = this.objects.get(parentId);
+        return parent?.typeElementId === "isa95-level";
+    }
+
     addCompositionFromUns(
         _deviceUuid: string,
         instanceUuidPath: string[],
         schemaUuidPath: string[],
         metricSegments: string[],
+        isa95Segments?: string[],
     ): string | null {
         // Resolve the device Instance_UUID to ConfigDB UUID.
         const deviceInstanceUuid = instanceUuidPath[0];
         let deviceConfigDbUuid = this.instanceToDevice.get(deviceInstanceUuid);
 
         // Auto-detect mapping on first encounter.
-        // Match any unmatched root device object.
-        // TODO: For multiple devices, match using Sparkplug device address
-        // from the UNS topic via Directory lookup.
+        // Match any unmatched root device object (could be at "/" or under ISA-95 hierarchy).
         if (!deviceConfigDbUuid) {
             for (const obj of this.objects.values()) {
-                if (obj.parentId === "/"
+                if ((obj.parentId === "/" || this.isIsa95Child(obj.parentId))
                     && !Array.from(this.instanceToDevice.values()).includes(obj.elementId)) {
                     this.instanceToDevice.set(deviceInstanceUuid, obj.elementId);
                     deviceConfigDbUuid = obj.elementId;
                     break;
                 }
             }
+        }
+
+        // Build ISA-95 hierarchy above the device if segments provided
+        if (isa95Segments && isa95Segments.length > 0 && deviceConfigDbUuid) {
+            this.ensureIsa95Hierarchy(isa95Segments, deviceConfigDbUuid);
         }
 
         // Build the full tree from metric segments.

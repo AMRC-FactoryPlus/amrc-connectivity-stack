@@ -1,0 +1,41 @@
+# i3X northbound API service
+# Needs: ConfigDB read (schemas, registration), Directory read (devices,
+# links), UNS MQTT read (live values), Auth ACL check (incoming requests).
+#
+#-REQUIRE: auth directory sparkplug uns
+---
+service: !u UUIDs.Service.ConfigDB
+version: 2
+objects:
+  !u Auth.Class.ServiceRole:
+    !u I3X.Requirement.ServiceRole:
+      name: "i3X API service"
+      subclassOf:
+        - !u Auth.Class.CentralService
+        - !u UNS.Group.Reader
+
+  !u UUIDs.Class.Service:
+    !u I3X.Service.I3X: { name: "i3X REST API" }
+---
+service: !u UUIDs.Service.Authentication
+version: 2
+grants:
+  !u I3X.Requirement.ServiceRole:
+    # Advertise our service endpoint in the Directory
+    !u Directory.Perm.AdvertiseService:
+      !u I3X.Service.I3X: false
+
+    # Read ConfigDB: object registration (class membership) and schemas
+    !u ConfigDB.Perm.ReadConfig:
+      !u UUIDs.App.Registration: false
+      !u UUIDs.App.ConfigSchema: false
+      !u UUIDs.App.Info: false
+
+    # Read ConfigDB: list class members and subclasses
+    !u ConfigDB.Perm.ReadMembers: null
+    !u ConfigDB.Perm.ReadSubclasses: null
+
+    # Read Directory: device links and relationships
+    !u Directory.Perm.ReadDeviceLinks: null
+    !u Directory.Perm.ReadLinkRelation: null
+    !u Directory.Perm.ReadDeviceAlerts: null

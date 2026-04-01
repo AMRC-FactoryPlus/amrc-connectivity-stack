@@ -167,13 +167,13 @@ describe("ObjectTree", () => {
             const obj1 = tree.getObject(dev1);
             expect(obj1).toBeDefined();
             expect(obj1!.typeElementId).toBe(class1);
-            expect(obj1!.parentId).toBeNull();
+            expect(obj1!.parentId).toBe("/");
             expect(obj1!.isComposition).toBe(true);
 
             const obj2 = tree.getObject(dev2);
             expect(obj2).toBeDefined();
             expect(obj2!.typeElementId).toBe(class2);
-            expect(obj2!.parentId).toBeNull();
+            expect(obj2!.parentId).toBe("/");
             expect(obj2!.isComposition).toBe(true);
         });
 
@@ -196,7 +196,7 @@ describe("ObjectTree", () => {
             const roots = tree.getObjects({ root: true });
             expect(roots).toHaveLength(2);
             for (const obj of roots) {
-                expect(obj.parentId).toBeNull();
+                expect(obj.parentId).toBe("/");
             }
         });
 

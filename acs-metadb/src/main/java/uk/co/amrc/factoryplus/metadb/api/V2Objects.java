@@ -30,7 +30,8 @@ public class V2Objects {
     @GET @Path("object")
     public JsonArray listObjects ()
     {
-        var objs = db.objectStructure().listObjects();
+        var objs = db.requestRead(req ->
+            req.objectStructure().listObjects());
         return Json.createArrayBuilder(objs).build();
     }
 
@@ -56,26 +57,28 @@ public class V2Objects {
         /* We don't accept any other parameters. The ServiceClient
          * doesn't pass any anyway. */
 
-        return db.objectStructure().createObject(klass, uuid);
+        return db.requestWrite(req ->
+            req.objectStructure().createObject(klass, uuid));
     }
 
     @DELETE @Path("object/{object}")
     public void deleteObject (@PathParam("object") UUID uuid)
     {
-        db.objectStructure().deleteObject(uuid);
+        db.requestExecute(req -> req.objectStructure().deleteObject(uuid));
     }
 
     @GET @Path("object/rank")
     public JsonArray listRanks ()
     {
-        var ranks = db.objectStructure().listRanks();
+        var ranks = db.requestRead(req -> req.objectStructure().listRanks());
         return Json.createArrayBuilder(ranks).build();
     }
 
     private JsonArray listRelation (String graph, UUID uuid, String relation)
     {
-        var members = db.objectStructure()
-            .listRelation(graph, uuid, relation);
+        var members = db.requestRead(req ->
+            req.objectStructure()
+                .listRelation(graph, uuid, relation));
 
         return Json.createArrayBuilder(members).build();
     }
@@ -101,8 +104,9 @@ public class V2Objects {
 
     private Response testRelation (String graph, UUID klass, String relation, UUID object)
     {
-        var rv = db.objectStructure()
-            .testRelation(graph, klass, relation, object);
+        var rv = db.requestRead(req ->
+            req.objectStructure()
+                .testRelation(graph, klass, relation, object));
 
         return Response.status(rv ? 204 : 404).build();
     }
@@ -131,7 +135,8 @@ public class V2Objects {
         @PathParam("relation") String relation,
         @PathParam("object") UUID object)
     {
-        db.objectStructure().putRelation(klass, relation, object);
+        db.requestExecute(req ->
+            req.objectStructure().putRelation(klass, relation, object));
     }
 
     @DELETE @Path("class/{class}/direct/{relation}/{object}")
@@ -140,8 +145,8 @@ public class V2Objects {
         @PathParam("relation") String relation,
         @PathParam("object") UUID object)
     {
-        db.objectStructure().delRelation(klass, relation, object);
+        db.requestExecute(req ->
+            req.objectStructure().delRelation(klass, relation, object));
     }
-
 }
 

@@ -126,7 +126,7 @@ public class Sparql {
     @Consumes("application/sparql-update")
     public void update (String update)
     {
-        store.executeWrite(() ->
+        store.requestExecute(req ->
             UpdateAction.parseExecute(update, store.dataset()));
     }
 
@@ -143,7 +143,7 @@ public class Sparql {
 
         var lang = handler.content().acceptLang(req);
 
-        return store.calculateRead(() -> {
+        return store.requestRead(req -> {
             try (var qexec = QueryExecutionFactory.create(query, store.dataset())) {
                 return handler.handle().apply(qexec, lang);
             }
@@ -226,7 +226,7 @@ public class Sparql {
         var lang = RDF_HANDLER.contentLang(type);
         var graph = resolveGraph(true);
 
-        store.executeWrite(() -> {
+        store.requestExecute(req -> {
             readToGraph(graph, rdf, lang);
             /* This refreshes the inferences because we have been poking
              * around behind its back. Strictly this is only needed when
@@ -244,7 +244,7 @@ public class Sparql {
         var lang = RDF_HANDLER.contentLang(type);
         var graph = resolveGraph(true);
 
-        store.executeWrite(() -> {
+        store.requestExecute(req -> {
             graph.removeAll();
             readToGraph(graph, rdf, lang);
             store.derived().rebind();

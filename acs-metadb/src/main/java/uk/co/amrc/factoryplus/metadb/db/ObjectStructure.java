@@ -23,18 +23,18 @@ import io.vavr.collection.Iterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class ObjectStructure extends RequestHandler
+public class ObjectStructure extends RequestHandler.Component
 {
     private static final Logger log = LoggerFactory.getLogger(ObjectStructure.class);
 
-    private ObjectStructure (RdfStore db)
+    private ObjectStructure (RequestHandler req)
     {
-        super(db);
+        super(req);
     }
 
-    public static ObjectStructure create (RdfStore db)
+    public static ObjectStructure create (RequestHandler req)
     {
-        return new ObjectStructure(db);
+        return new ObjectStructure(req);
     }
 
     /* XXX Ideally both of these switch statements would become
@@ -53,15 +53,15 @@ public class ObjectStructure extends RequestHandler
     }
 
     private static final Set<Resource> IMMUTABLE = Set.of(
-        Vocab.Application, Vocab.Special,
-        Vocab.Registration, Vocab.ConfigSchema,
+        Vocab.App.Application, Vocab.Special,
+        Vocab.App.Registration, Vocab.App.ConfigSchema,
         Vocab.Wildcard, Vocab.Unowned);
 
     private Model findGraph (String name)
     {
         switch (name) {
-            case "direct":      return db.direct();
-            case "derived":     return db.derived();
+            case "direct":      return db().direct();
+            case "derived":     return db().derived();
             default:            throw new Err.NotFound("No such graph");
         }
     }
@@ -69,12 +69,11 @@ public class ObjectStructure extends RequestHandler
     /* These could return UUIDs, but it seems silly. */
     public List<String> listObjects ()
     {
-        return db.calculateRead(() ->
-            db.derived()
-                .listObjectsOfProperty(Vocab.uuid)
-                .filterKeep(n -> n.isLiteral())
-                .mapWith(o -> o.asLiteral().getString())
-                .toList());
+        return db().derived()
+            .listObjectsOfProperty(Vocab.uuid)
+            .filterKeep(n -> n.isLiteral())
+            .mapWith(o -> o.asLiteral().getString())
+            .toList();
     }
 
     private static final Query Q_listRanks = Vocab.query("""
@@ -88,41 +87,10 @@ public class ObjectStructure extends RequestHandler
 
     public List<String> listRanks ()
     {
-        return db.calculateRead(() -> {
-            var rs = db.selectQuery(Q_listRanks);
-            return Iterator.ofAll(rs)
-                .map(s -> s.getLiteral("uuid").getString())
-                .toJavaList();
-        });
-    }
-
-    private static final Query Q_objectRegistration = Vocab.query("""
-        select ?uuid ?rank ?class
-        where {
-            ?obj <core/uuid> ?uuid;
-                rdf:type/<core/rank> ?rank;
-                <core/primary>/<core/uuid> ?class.
-        }
-    """);
-
-    /* TXN */
-    private JsonValue objectRegistration (FPObject obj)
-    {
-        var rs = db.singleQuery(Q_objectRegistration, "obj", obj.node());
-
-        String uuid = Util.decodeLiteral(rs.get("uuid"), XSD.xstring, s -> s);
-        String klass = Util.decodeLiteral(rs.get("class"), XSD.xstring, s -> s);
-        int rank = Util.decodeLiteral(rs.get("rank"), XSD.xint, Integer::valueOf);
-
-        return Json.createObjectBuilder()
-            .add("uuid", uuid)
-            .add("rank", rank)
-            .add("class", klass)
-            /* These entries are fake, for now */
-            .add("owner", Vocab.U_Unowned.toString())
-            .add("strict", true)
-            .add("deleted", false)
-            .build();
+        var rs = db().selectQuery(Q_listRanks);
+        return Iterator.ofAll(rs)
+            .map(s -> s.getLiteral("uuid").getString())
+            .toJavaList();
     }
 
     /* TXN */
@@ -130,13 +98,13 @@ public class ObjectStructure extends RequestHandler
     {
         log.info("Update registration: {}, {}", obj, klass);
 
-        var orank = db.findRank(obj.node());
-        var krank = db.findRank(klass);
+        var orank = db().findRank(obj.node());
+        var krank = db().findRank(klass);
 
         if (krank != orank + 1)
             throw new Err.RankMismatch();
 
-        var model = db.derived();
+        var model = db().derived();
         model.removeAll(obj.node(), Vocab.primary, null);
         model.add(obj.node(), Vocab.primary, klass);
         if (!model.contains(obj.node(), RDF.type, klass))
@@ -156,18 +124,18 @@ public class ObjectStructure extends RequestHandler
      * a Jakarta Response, which is a clear layer violation. */
     public JsonValue createObject (UUID klass, Optional<UUID> uuid)
     {
-        return db.calculateWrite(() -> {
-            var kres = db.findObjectOrError(klass).node();
+        var kres = db().findObjectOrError(klass).node();
 
-            var obj = uuid
-                .map(u -> db.findObject(u)
-                    .map(o -> { log.info("Found object {}", o); return o; })
-                    .map(o -> updateRegistration(o, kres))
-                    .orElseGet(() -> db.createObject(kres, u)))
-                .orElseGet(() -> db.createObject(kres));
+        var obj = uuid
+            .map(u -> db().findObject(u)
+                .map(o -> { log.info("Found object {}", o); return o; })
+                .map(o -> updateRegistration(o, kres))
+                .orElseGet(() -> db().createObject(kres, u)))
+            .orElseGet(() -> db().createObject(kres));
 
-            return objectRegistration(obj);
-        });
+        return db().appMapper()
+            .generateConfig(Vocab.App.Registration, obj.node())
+            .orElseThrow(() -> new Err.CorruptRDF("Cannot find object registration"));
     }
 
     private static UpdateRequest U_deleteConfigs = Vocab.update("""
@@ -182,39 +150,37 @@ public class ObjectStructure extends RequestHandler
 
     public void deleteObject (UUID uuid)
     {
-        db.executeWrite(() -> {
-            log.info("Delete object {}", uuid);
-            var obj = db.findObjectOrError(uuid).node();
-            log.info("Found node {}", obj);
-            if (IMMUTABLE.contains(obj)) {
-                log.info("Object {} is immutable", obj);
-                throw new Err.Immutable();
-            }
+        log.info("Delete object {}", uuid);
+        var obj = db().findObjectOrError(uuid).node();
+        log.info("Found node {}", obj);
+        if (IMMUTABLE.contains(obj)) {
+            log.info("Object {} is immutable", obj);
+            throw new Err.Immutable();
+        }
 
-            /* We only check for direct dependents. If we have no direct
-             * dependents we should also have no indirect. This relies
-             * on no use of rdfs:domain etc. to infer memberships. */
-            var model = db.direct();
+        /* We only check for direct dependents. If we have no direct
+         * dependents we should also have no indirect. This relies
+         * on no use of rdfs:domain etc. to infer memberships. */
+        var model = db().direct();
 
-            /* This will also catch configs-of-app. If we want to return
-             * UUIDs in the 409 we will need to handle these separately. */
-            var members = model.listResourcesWithProperty(RDF.type, obj);
-            if (members.hasNext()) {
-                log.info("Object {} has members:", uuid);
-                members.forEachRemaining(m -> log.info("  {}", m));
-                throw new Err.InUse();
-            }
+        /* This will also catch configs-of-app. If we want to return
+         * UUIDs in the 409 we will need to handle these separately. */
+        var members = model.listResourcesWithProperty(RDF.type, obj);
+        if (members.hasNext()) {
+            log.info("Object {} has members:", uuid);
+            members.forEachRemaining(m -> log.info("  {}", m));
+            throw new Err.InUse();
+        }
 
-            var subclasses = model.listResourcesWithProperty(RDFS.subClassOf, obj);
-            if (subclasses.hasNext()) {
-                log.info("Object {} has subclasses:", uuid);
-                subclasses.forEachRemaining(m -> log.info("  {}", m));
-                throw new Err.InUse();
-            }
+        var subclasses = model.listResourcesWithProperty(RDFS.subClassOf, obj);
+        if (subclasses.hasNext()) {
+            log.info("Object {} has subclasses:", uuid);
+            subclasses.forEachRemaining(m -> log.info("  {}", m));
+            throw new Err.InUse();
+        }
 
-            db.runUpdate(U_deleteConfigs, "obj", obj);
-            model.removeAll(obj, null, null);
-        });
+        db().runUpdate(U_deleteConfigs, "obj", obj);
+        model.removeAll(obj, null, null);
     }
 
     public List<String> listRelation (String gname, UUID uuid, String relation)
@@ -222,15 +188,13 @@ public class ObjectStructure extends RequestHandler
         var graph = findGraph(gname);
         var rel = Relation.of(relation);
 
-        return db.calculateRead(() -> {
-            var klass = db.findObjectOrError(uuid);
-            return graph
-                .listResourcesWithProperty(rel.prop(), klass.node())
-                .mapWith(r -> r.getProperty(Vocab.uuid))
-                .filterKeep(s -> s != null)
-                .mapWith(s -> s.getString())
-                .toList();
-        });
+        var klass = db().findObjectOrError(uuid);
+        return graph
+            .listResourcesWithProperty(rel.prop(), klass.node())
+            .mapWith(r -> r.getProperty(Vocab.uuid))
+            .filterKeep(s -> s != null)
+            .mapWith(s -> s.getString())
+            .toList();
     }
 
     public boolean testRelation (String gname, UUID klass, String relation, UUID object)
@@ -238,40 +202,34 @@ public class ObjectStructure extends RequestHandler
         var graph = findGraph(gname);
         var rel = Relation.of(relation);
 
-        return db.calculateRead(() -> {
-            var kres = db.findObjectOrError(klass).node();
-            var ores = db.findObjectOrError(object).node();
-            /* We cannot use methods on ores as this is always from the
-             * direct graph. */
-            return !graph.listStatements(ores, rel.prop(), kres)
-                .toList()
-                .isEmpty();
-        });
+        var kres = db().findObjectOrError(klass).node();
+        var ores = db().findObjectOrError(object).node();
+        /* We cannot use methods on ores as this is always from the
+         * direct graph. */
+        return !graph.listStatements(ores, rel.prop(), kres)
+            .toList()
+            .isEmpty();
     }
 
     public void putRelation (UUID klass, String relation, UUID object)
     {
         var rel = Relation.of(relation);
-        db.executeWrite(() -> {
-            var kres = db.findObjectOrError(klass).node();
-            var ores = db.findObjectOrError(object).node();
+        var kres = db().findObjectOrError(klass).node();
+        var ores = db().findObjectOrError(object).node();
 
-            var krank = db.findRank(kres);
-            var orank = db.findRank(ores);
-            if (krank != orank + rel.offset())
-                throw new Err.RankMismatch();
+        var krank = db().findRank(kres);
+        var orank = db().findRank(ores);
+        if (krank != orank + rel.offset())
+            throw new Err.RankMismatch();
 
-            db.direct().add(ores, rel.prop(), kres);
-        });
+        db().direct().add(ores, rel.prop(), kres);
     }
 
     public void delRelation (UUID klass, String relation, UUID object)
     {
         var rel = Relation.of(relation);
-        db.executeWrite(() -> {
-            var kres = db.findObjectOrError(klass).node();
-            var ores = db.findObjectOrError(object).node();
-            db.direct().remove(ores, rel.prop(), kres);
-        });
+        var kres = db().findObjectOrError(klass).node();
+        var ores = db().findObjectOrError(object).node();
+        db().direct().remove(ores, rel.prop(), kres);
     }
 }

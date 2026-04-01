@@ -7,6 +7,8 @@
 package uk.co.amrc.factoryplus.metadb.db;
 
 import java.time.Instant;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.Map;
 import java.util.Optional;
@@ -38,6 +40,8 @@ public class RdfStore
     private InfModel    derived;
     private Dataset     dataset;
 
+    private AppMapper   appMapper;
+
     /* We build a Dataset out of these named graphs:
      * - G_direct: this is G_direct from the TDB.
      * - G_derived: this is RDFS(G_direct).
@@ -52,16 +56,44 @@ public class RdfStore
 
         dataset.addNamedModel(Vocab.G_direct, direct);
         dataset.addNamedModel(Vocab.G_derived, derived);
+
+        appMapper = new AppMapper(this);
     }
 
     public Dataset dataset () { return dataset; }
     public Model direct () { return direct; }
     public InfModel derived () { return derived; }
 
+    public AppMapper appMapper () { return appMapper; }
+
     public void executeRead (Runnable r) { dataset.executeRead(r); }
-    public void executeWrite (Runnable r) { dataset.executeWrite(r); }
     public <T> T calculateRead (Supplier<T> s) { return dataset.calculateRead(s); }
+
+    public void executeWrite (Runnable r) { dataset.executeWrite(r); }
     public <T> T calculateWrite (Supplier<T> s) { return dataset.calculateWrite(s); }
+
+    public <T> T requestRead (Function<RequestHandler, T> cb)
+    {
+        return calculateRead(() -> cb.apply(new RequestHandler(this)));
+    }
+    public <T> T requestWrite (Function<RequestHandler, T> cb)
+    {
+        var req = new RequestHandler(this);
+        var updater = req.appUpdater();
+
+        T rv = calculateWrite(() -> {
+            var rv2 = cb.apply(req);
+            updater.update();
+            return rv2;
+        });
+
+        updater.publish();
+        return rv;
+    }
+    public void requestExecute (Consumer<RequestHandler> cb)
+    {
+        requestWrite(req -> { cb.accept(req); return 1; });
+    }
 
     public ResultSet selectQuery (Query query, Object... substs)
     {
@@ -100,7 +132,16 @@ public class RdfStore
             direct.listResourcesWithProperty(pred, obj));
     }
 
-    /* TXN */
+    public void removeResource (Resource node)
+    {
+        derived.removeAll(node, null, null);
+        derived.removeAll(null, null, node);
+
+        /* We don't do this yet but we may in the future. */
+        if (node.canAs(Property.class))
+            derived.removeAll(null, node.as(Property.class), null);
+    }
+
     public Optional<FPObject> findObject (UUID uuid)
     {
         return findResource(Vocab.uuid, Vocab.uuidLiteral(uuid))
@@ -130,7 +171,6 @@ public class RdfStore
         return Util.decodeLiteral(binding.get("rank"), XSD.xint, Integer::parseInt);
     }
 
-    /* TXN */
     public FPObject createObject (Resource klass)
     {
         UUID uuid;
@@ -144,10 +184,9 @@ public class RdfStore
         return createObject(klass, uuid);
     }
 
-    /* TXN */
     public FPObject createObject (Resource klass, UUID uuid)
     {
-        var obj = derived.createResource();
+        var obj = Vocab.uuidResource(uuid);
         derived.add(obj, Vocab.uuid, uuid.toString());
         derived.add(obj, RDF.type, klass);
         derived.add(obj, Vocab.primary, klass);
@@ -161,22 +200,12 @@ public class RdfStore
         return new FPObject(obj, uuid);
     }
 
-    /* TXN */
     public Resource createInstant ()
     {
-        var inst = createObject(Vocab.Instant).node();
+        var inst = createObject(Vocab.Time.Instant).node();
         var stamp = derived.createTypedLiteral(Instant.now(), XSDDatatype.XSDdateTime);
-        derived.add(inst, Vocab.timestamp, stamp);
+        derived.add(inst, Vocab.Time.timestamp, stamp);
         return inst;
     }
 
-    public ObjectStructure objectStructure ()
-    {
-        return ObjectStructure.create(this);
-    }
-
-    public ConfigEntry configEntry (UUID app, UUID obj)
-    {
-        return ConfigEntry.create(this, app, obj);
-    }
 }

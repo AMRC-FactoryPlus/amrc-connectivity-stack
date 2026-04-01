@@ -21,53 +21,56 @@ import org.apache.jena.vocabulary.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class ConfigEntry extends RequestHandler
+public class ConfigEntry extends RequestHandler.Component
 {
     private static final Logger log = LoggerFactory.getLogger(ConfigEntry.class);
 
     private Resource app;
     private Resource obj;
 
-    public ConfigEntry (RdfStore db, Resource app, Resource obj)
+    public ConfigEntry (RequestHandler req, Resource app, Resource obj)
     {
-        super(db);
+        super(req);
         this.app = app;
         this.obj = obj;
     }
 
-    public static ConfigEntry create (RdfStore db, UUID app, UUID obj)
+    public static ConfigEntry create (RequestHandler req, UUID app, UUID obj)
     {
-        var appO = db.findObjectOrError(app);
-        var objO = db.findObjectOrError(obj);
+        var appO = req.db().findObjectOrError(app);
+        var objO = req.db().findObjectOrError(obj);
 
-        return new ConfigEntry(db, appO.node(), objO.node());
+        return new ConfigEntry(req, appO.node(), objO.node());
     }
 
-    public record Value (JsonValue value, String etag, Instant mtime) {}
+    public record Value (JsonValue value, String etag, Optional<Instant> mtime) {}
+
+    private boolean isStructured ()
+    {
+        return db().derived().contains(app, RDF.type, Vocab.App.Structured);
+    }
 
     private static final Query Q_getValue = Vocab.query("""
-        select ?value ?etag ?mtime
+        select ?value ?etag
         where {
             ?config a ?app;
                 <app/for> ?obj;
-                <app/value> ?value.
-            ?config <core/start> ?instant.
-            ?instant <core/uuid> ?etag;
-                <core/timestamp> ?mtime.
+                <core/uuid> ?etag;
+                <doc/content> ?value.
         }
     """);
 
     public Optional<Value> getValue ()
     {
-        return db.optionalQuery(Q_getValue, "app", app, "obj", obj)
+        return db().optionalQuery(Q_getValue, "app", app, "obj", obj)
             .map(binding -> {
                 var val = Util.decodeLiteral(binding.get("value"), RDF.JSON,
                     s -> Json.createReader(new StringReader(s)).readValue());
                 var etag = Util.decodeLiteral(binding.get("etag"), XSD.xstring, s -> s);
-                var mtime = Util.decodeLiteral(binding.get("mtime"), XSD.dateTime, 
-                    Instant::parse);
+                //var mtime = Util.decodeLiteral(binding.get("mtime"), XSD.dateTime, 
+                //    Instant::parse);
 
-                return new Value(val, etag, mtime);
+                return new Value(val, etag, Optional.empty());
             });
     }
 
@@ -86,24 +89,49 @@ public class ConfigEntry extends RequestHandler
 
     public void removeValue ()
     {
-        db.runUpdate(U_removeValue, "app", app, "obj", obj);
+        if (isStructured())
+            db().appMapper().deleteConfig(app, obj);
+        else
+            removeRawValue();
+    }
+
+    public void removeRawValue ()
+    {
+        db().runUpdate(U_removeValue, "app", app, "obj", obj);
     }
 
     public void putValue (JsonValue value)
     {
-        removeValue();
+        if (isStructured())
+            db().appMapper().updateConfig(app, obj, value);
+        else
+            putRawValue(value);
+    }
+
+    public boolean putRawValue (JsonValue value)
+    {
+        var existing = getValue()
+            .map(Value::value)
+            .filter(v -> v.equals(value));
+        if (existing.isPresent()) {
+            log.info("Duplicate config update suppressed");
+            return false;
+        }
+
+        removeRawValue();
 
         var json = ResourceFactory.createTypedLiteral(
             value.toString(), RDF.dtRDFJSON);
 
-        var graph   = db.derived();
-        var entry   = graph.createResource();
-        var inst    = db.createInstant();
+        var graph   = db().derived();
+        var entry   = db().createObject(app).node();
+        //var inst    = request().getInstant();
 
-        graph.add(entry, RDF.type, app);
-        graph.add(entry, Vocab.forP, obj);
-        graph.add(entry, Vocab.value, json);
-        graph.add(entry, Vocab.start, inst);
+        graph.add(entry, Vocab.App.forP, obj);
+        graph.add(entry, Vocab.Doc.content, json);
+        //graph.add(entry, Vocab.Time.start, inst);
+
+        return true;
     }
 }
 

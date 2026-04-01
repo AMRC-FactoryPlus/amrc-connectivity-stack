@@ -17,7 +17,7 @@
   "scripts": {
     "build": "tsc",
     "clean": "tsc --build --clean",
-    "start": "node --es-module-specifier-resolution=node dist/bin/api.js",
+    "start": "node --preserve-symlinks --preserve-symlinks-main --es-module-specifier-resolution=node dist/bin/api.js",
     "start:shell": "k5start -Uf $CLIENT_KEYTAB npm run start",
     "dev": "npm run build && npm run start",
     "test": "NODE_OPTIONS=--experimental-vm-modules npx jest",
@@ -25,11 +25,13 @@
     "lint:fix": "npm run lint -- --fix"
   },
   "dependencies": {
+    "@amrc-factoryplus/rx-util": "file:../lib/js-rx-util",
     "@amrc-factoryplus/service-api": "file:../lib/js-service-api",
     "@amrc-factoryplus/service-client": "file:../lib/js-service-client",
     "@influxdata/influxdb-client": "^1.33.2",
     "compression": "^1.7.4",
     "express": "^5.2.1",
+    "gssapi.js": "^2.0.1",
     "pino": "^8.11.0",
     "uuid": "^9.0.0"
   },

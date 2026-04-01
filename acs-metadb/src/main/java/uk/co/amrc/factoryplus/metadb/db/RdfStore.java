@@ -225,7 +225,7 @@ public class RdfStore
     public int findRank (Resource obj)
     {
         var binding = singleQuery(Q_findRank, "obj", obj);
-        return Util.decodeLiteral(binding.get("rank"), XSD.xint, Integer::parseInt);
+        return Util.decodeLiteral(binding.get("rank"), Integer.class);
     }
 
     public FPObject createObject (Resource klass)

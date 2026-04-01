@@ -1,0 +1,19 @@
+{
+  "planPath": "acs-i3x/docs/2026-04-01-acs-i3x.md",
+  "tasks": [
+    {"id": 1, "subject": "Task 1: Project Scaffold", "status": "pending"},
+    {"id": 2, "subject": "Task 2: i3X Type Definitions and Constants", "status": "pending", "blockedBy": [1]},
+    {"id": 3, "subject": "Task 3: Mapping Functions (TDD)", "status": "pending", "blockedBy": [2]},
+    {"id": 4, "subject": "Task 4: Quality Derivation (TDD)", "status": "pending", "blockedBy": [2]},
+    {"id": 5, "subject": "Task 5: Response Envelope Middleware (TDD)", "status": "pending", "blockedBy": [2]},
+    {"id": 6, "subject": "Task 6: Object Tree (TDD)", "status": "pending", "blockedBy": [3, 4, 5]},
+    {"id": 7, "subject": "Task 7: Value Cache (TDD)", "status": "pending", "blockedBy": [6]},
+    {"id": 8, "subject": "Task 8: History Module (TDD)", "status": "pending", "blockedBy": [6]},
+    {"id": 9, "subject": "Task 9: Subscription Manager (TDD)", "status": "pending", "blockedBy": [7]},
+    {"id": 10, "subject": "Task 10: API v1 Router", "status": "pending", "blockedBy": [6, 7, 8, 9]},
+    {"id": 11, "subject": "Task 11: Routes and Entry Point", "status": "pending", "blockedBy": [10]},
+    {"id": 12, "subject": "Task 12: npm install and Verify Build", "status": "pending", "blockedBy": [11]},
+    {"id": 13, "subject": "Task 13: End-to-End Compliance Tests", "status": "pending", "blockedBy": [12]}
+  ],
+  "lastUpdated": "2026-04-01T14:30:00Z"
+}

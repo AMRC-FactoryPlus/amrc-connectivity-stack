@@ -91,7 +91,7 @@
 # that owner, where the Unowned set has no owner reference.
 :Unowned a :Special; :primary :Special;
     :uuid "091e796a-65c0-4080-adff-c3ce01a65b2e";
-    :name "Unownded".
+    :name "Unowned".
 
 <time/Instant> a :R1Class; :primary :R1Class; 
     rdfs:subClassOf :Individual;

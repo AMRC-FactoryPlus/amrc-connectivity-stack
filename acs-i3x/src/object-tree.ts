@@ -90,7 +90,7 @@ export class ObjectTree {
 
     /* ---- Objects ---- */
 
-    getObjects(opts?: { typeElementId?: string; root?: boolean }): I3xObject[] {
+    getObjects(opts?: { typeElementId?: string; root?: boolean; includeMetadata?: boolean }): I3xObject[] {
         let all = Array.from(this.objects.values());
         if (opts?.typeElementId !== undefined) {
             all = all.filter(o => o.typeElementId === opts.typeElementId);

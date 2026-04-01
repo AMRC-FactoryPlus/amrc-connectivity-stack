@@ -29,6 +29,7 @@ import {
 const DEVICE_CLASS_UUID = "18773d6d-a70d-443a-b29a-3f1583195290";
 const REGISTRATION_APP_UUID = "cb40bed5-49ad-4443-a7f5-08c75009da8f";
 const CONFIG_SCHEMA_APP_UUID = "dbd8a535-52ba-4f6e-b4f8-9b71aefe09d3";
+const INFO_APP_UUID = "64a8bfa9-7772-45c4-9d1a-9e6290690957";
 
 interface ObjectTreeOpts {
     fplus: any;
@@ -280,14 +281,18 @@ export class ObjectTree {
             }
         }
 
-        // For each unique class, get its JSON schema and create ObjectType
+        // For each unique class, get its JSON schema and name, create ObjectType
         for (const classUuid of classUuids) {
             if (this.objectTypes.has(classUuid)) continue;
 
-            const schema = await this.fplus.ConfigDB.get_config(CONFIG_SCHEMA_APP_UUID, classUuid);
+            const [schema, info] = await Promise.all([
+                this.fplus.ConfigDB.get_config(CONFIG_SCHEMA_APP_UUID, classUuid).catch(() => null),
+                this.fplus.ConfigDB.get_config(INFO_APP_UUID, classUuid).catch(() => null),
+            ]);
+            const displayName = info?.name ?? schema?.title ?? classUuid;
             const objType = toI3xObjectType(
                 classUuid,
-                classUuid, // use class UUID as displayName for now
+                displayName,
                 this.namespaceUri,
                 classUuid,
                 schema ?? {},
@@ -295,18 +300,20 @@ export class ObjectTree {
             this.objectTypes.set(classUuid, objType);
         }
 
-        // For each device, get Directory info and create Object
+        // For each device, get Directory info and name, create Object
         for (const uuid of deviceUuids) {
             const classUuid = classMap.get(uuid);
             if (!classUuid) continue;
 
-            // Get directory info (we don't currently use it in the object,
-            // but we call it as specified)
-            await this.fplus.Directory.get_device_info(uuid);
+            const [, info] = await Promise.all([
+                this.fplus.Directory.get_device_info(uuid).catch(() => null),
+                this.fplus.ConfigDB.get_config(INFO_APP_UUID, uuid).catch(() => null),
+            ]);
+            const displayName = info?.name ?? uuid;
 
             const obj = toI3xObject(
                 uuid,
-                uuid, // use device UUID as displayName for now
+                displayName,
                 classUuid,
                 "/",    // root objects have parentId "/" per i3X convention
                 true,   // isComposition

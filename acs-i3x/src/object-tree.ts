@@ -71,7 +71,7 @@ export class ObjectTree {
         this.objectTypes.clear();
         this.objects.clear();
         this.children.clear();
-        this.instanceToDevice.clear();
+        // Don't clear instanceToDevice — the mapping is permanent once learned
         await this.loadDevices();
     }
 

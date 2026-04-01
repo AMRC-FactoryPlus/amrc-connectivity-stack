@@ -84,7 +84,7 @@ function createApp() {
 
     const app = express();
     app.use(express.json());
-    app.use("/info", api.infoRoute);
+    app.use("/", api.infoRoute);
     app.use("/", api.routes);
 
     return { app, objectTree, valueCache, history, subscriptions, api };
@@ -161,16 +161,13 @@ describe("APIv1", () => {
 
             expect(res.status).toBe(200);
             expect(res.body).toEqual({
-                success: true,
-                result: {
-                    specVersion: I3X_SPEC_VERSION,
-                    serverName: "AMRC Connectivity Stack",
-                    serverVersion: Version,
-                    capabilities: {
-                        query: { history: true },
-                        update: { current: false, history: false },
-                        subscribe: { stream: true },
-                    },
+                specVersion: I3X_SPEC_VERSION,
+                serverName: "AMRC Connectivity Stack",
+                serverVersion: Version,
+                capabilities: {
+                    query: { history: true },
+                    update: { current: false, history: false },
+                    subscribe: { stream: true },
                 },
             });
         });
@@ -279,8 +276,7 @@ describe("APIv1", () => {
                 .send({ elementIds: ["type-2", "type-1", "missing"] });
 
             expect(res.status).toBe(200);
-            expect(res.body.success).toBe(true);
-            const results = res.body.result.results;
+            const results = res.body.results;
             expect(results).toHaveLength(3);
             expect(results[0].elementId).toBe("type-2");
             expect(results[0].success).toBe(true);
@@ -340,7 +336,7 @@ describe("APIv1", () => {
                 .send({ elementIds: ["rel-1", "missing"] });
 
             expect(res.status).toBe(200);
-            const results = res.body.result.results;
+            const results = res.body.results;
             expect(results).toHaveLength(2);
             expect(results[0].success).toBe(true);
             expect(results[1].success).toBe(false);
@@ -430,7 +426,7 @@ describe("APIv1", () => {
                 .send({ elementIds: ["obj-2", "obj-1", "missing"] });
 
             expect(res.status).toBe(200);
-            const results = res.body.result.results;
+            const results = res.body.results;
             expect(results).toHaveLength(3);
             expect(results[0].elementId).toBe("obj-2");
             expect(results[0].success).toBe(true);
@@ -493,7 +489,7 @@ describe("APIv1", () => {
                 .send({ elementIds: ["obj-1", "missing"] });
 
             expect(res.status).toBe(200);
-            const results = res.body.result.results;
+            const results = res.body.results;
             expect(results).toHaveLength(2);
             expect(results[0].elementId).toBe("obj-1");
             expect(results[0].success).toBe(true);
@@ -541,7 +537,7 @@ describe("APIv1", () => {
                 .send({ elementIds: ["obj-1", "missing"] });
 
             expect(res.status).toBe(200);
-            const results = res.body.result.results;
+            const results = res.body.results;
             expect(results).toHaveLength(2);
             expect(results[0].elementId).toBe("obj-1");
             expect(results[0].success).toBe(true);
@@ -602,7 +598,7 @@ describe("APIv1", () => {
                 });
 
             expect(res.status).toBe(200);
-            const results = res.body.result.results;
+            const results = res.body.results;
             expect(results).toHaveLength(2);
             expect(results[0].elementId).toBe("obj-1");
             expect(results[0].success).toBe(true);

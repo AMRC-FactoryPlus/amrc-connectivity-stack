@@ -11,6 +11,8 @@ import java.util.UUID;
 
 import jakarta.json.*;
 
+import io.vavr.collection.Set;
+
 import org.apache.jena.rdf.model.*;
 
 public class Err extends Error
@@ -118,21 +120,18 @@ public class Err extends Error
     }
     public static class BadConfig extends ClientError
     {
-        private Resource app;
         private JsonValue config;
 
-        public BadConfig (Resource app, JsonValue val)
+        public BadConfig (JsonValue val)
         {
-            super("Invalid config entry for " + app);
-            this.app = app;
+            super("Invalid config entry");
             this.config = val;
         }
 
         public int statusCode () { return 422; }
         protected void extendJson (JsonObjectBuilder obj)
         {
-            obj.add("appIRI", app.toString())
-                .add("config", config);
+            obj.add("config", config);
         }
     }
     public static class RankMismatch extends ClientError
@@ -159,13 +158,21 @@ public class Err extends Error
             return Map.of("Allow", "GET, HEAD");
         }
     }
-    public static class InvalidConfig extends BadConfig
+    public static class SchemaConflict extends ClientError
     {
-        public InvalidConfig (Resource app, JsonValue val) { super(app, val); }
-        public int statusCode () { return 405; }
-        public Map<String, String> buildHeaders ()
+        private Set<UUID> conflicts;
+        public SchemaConflict (Set<UUID> conflicts)
         {
-            return Map.of("Allow", "PUT, DELETE");
+            super("Schema conflicts with existing objects");
+            this.conflicts = conflicts;
+        }
+        public int statusCode () { return 409; }
+        protected void extendJson (JsonObjectBuilder obj)
+        {
+            obj.add("conflicts", conflicts
+                .map(UUID::toString)
+                .foldLeft(Json.createArrayBuilder(), (a, v) -> a.add(v))
+                .build());
         }
     }
 }

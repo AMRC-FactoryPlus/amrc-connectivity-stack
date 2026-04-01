@@ -10,6 +10,7 @@ import java.io.StringReader;
 import java.time.Instant;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.UUID;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -66,7 +67,8 @@ final class Util {
         JsonValue.class,    new Datatype(RDF.JSON, Util::readJsonOrError),
         String.class,       new Datatype(XSD.xstring, s -> s),
         Instant.class,      new Datatype(XSD.dateTime, Instant::parse),
-        Integer.class,      new Datatype(XSD.xint, Integer::parseInt));
+        Integer.class,      new Datatype(XSD.xint, Integer::parseInt),
+        UUID.class,         new Datatype(XSD.xstring, UUID::fromString));
 
     public static <T> T decodeLiteral (RDFNode node, Class<T> klass)
     {

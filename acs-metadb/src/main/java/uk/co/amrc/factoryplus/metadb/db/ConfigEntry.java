@@ -12,6 +12,7 @@ import java.util.UUID;
 
 import jakarta.json.*;
 
+import io.vavr.collection.List;
 import io.vavr.control.Option;
 
 import org.apache.jena.query.*;
@@ -49,6 +50,7 @@ public class ConfigEntry extends RequestHandler.Component
         public static Value ofQuerySolution (QuerySolution sol)
         {
             var val = Util.decodeLiteral(sol.get("value"), JsonValue.class);
+
             var etag = Util.decodeLiteral(sol.get("etag"), String.class);
             //var mtime = Util.decodeLiteral(binding.get("mtime"), Instant.class);
 
@@ -59,6 +61,20 @@ public class ConfigEntry extends RequestHandler.Component
     private boolean isStructured ()
     {
         return db().derived().contains(app, RDF.type, Vocab.App.Structured);
+    }
+
+    private static final Query Q_getRawValue = Vocab.query("""
+        select ?value
+        where {
+            [] a ?app; <app/for> ?obj;
+                <doc/content> ?value.
+        }
+    """);
+
+    public Option<JsonValue> getRawValue ()
+    {
+        return db().optionalQuery(Q_getRawValue, "app", app, "obj", obj)
+            .map(s -> Util.decodeLiteral(s.get("value"), JsonValue.class));
     }
 
     private static final Query Q_getValue = Vocab.query("""
@@ -96,6 +112,9 @@ public class ConfigEntry extends RequestHandler.Component
             db().appMapper().deleteConfig(app, obj);
         else
             removeRawValue();
+
+        if (app.equals(Vocab.App.ConfigSchema))
+            db().schemaTracker().updateSchemas(List.empty());
     }
 
     public void removeRawValue ()
@@ -105,22 +124,27 @@ public class ConfigEntry extends RequestHandler.Component
 
     public void putValue (JsonValue value)
     {
+        /* XXX check app:appliesTo */
+
         var schemas = db().schemaTracker();
         if (!schemas.validate(app, value))
-            throw new Err.BadConfig(app, value);
+            throw new Err.BadConfig(value);
 
         if (isStructured())
             db().appMapper().updateConfig(app, obj, value);
         else
             putRawValue(value);
+
+        /* This will throw a 409 if we have a schema conflict */
+        if (app.equals(Vocab.App.ConfigSchema))
+            schemas.updateSchemas(List.of(obj));
     }
 
     /* Returns a Value if we made an update. Returns empty() if the
      * value has not changed and we didn't update it. */
     public Option<Value> putRawValue (JsonValue value)
     {
-        var existing = getValue()
-            .map(Value::value)
+        var existing = getRawValue()
             .filter(v -> v.equals(value));
         if (existing.isDefined()) {
             //log.info("Duplicate config update suppressed");

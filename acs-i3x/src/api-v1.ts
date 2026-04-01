@@ -65,7 +65,7 @@ export class APIv1 {
 
         this.infoRoute = Router();
         this.infoRoute.use(i3xEnvelope);
-        this.infoRoute.get("/", (_req: Request, res: Response) => {
+        this.infoRoute.get("/info", (_req: Request, res: Response) => {
             res.json({
                 specVersion: I3X_SPEC_VERSION,
                 serverName: "AMRC Connectivity Stack",
@@ -123,7 +123,7 @@ export class APIv1 {
                 return { success: false, elementId: id, error: { message: `Object type ${id} not found` } };
             });
             const allSuccess = results.every(r => r.success);
-            res.json({ success: allSuccess, results });
+            ((res as any)._originalJson || res.json.bind(res))({ success: allSuccess, results });
         });
 
         /* ---- Explore: Relationship Types ---- */
@@ -149,7 +149,7 @@ export class APIv1 {
                 return { success: false, elementId: id, error: { message: `Relationship type ${id} not found` } };
             });
             const allSuccess = results.every(r => r.success);
-            res.json({ success: allSuccess, results });
+            ((res as any)._originalJson || res.json.bind(res))({ success: allSuccess, results });
         });
 
         /* ---- Explore: Objects ---- */
@@ -175,7 +175,7 @@ export class APIv1 {
                 return { success: false, elementId: id, error: { message: `Object ${id} not found` } };
             });
             const allSuccess = results.every(r => r.success);
-            res.json({ success: allSuccess, results });
+            ((res as any)._originalJson || res.json.bind(res))({ success: allSuccess, results });
         });
 
         this.routes.post("/objects/value", (req: Request, res: Response) => {
@@ -188,7 +188,7 @@ export class APIv1 {
                 return { success: false, elementId: id, error: { message: `No value for ${id}` } };
             });
             const allSuccess = results.every(r => r.success);
-            res.json({ success: allSuccess, results });
+            ((res as any)._originalJson || res.json.bind(res))({ success: allSuccess, results });
         });
 
         this.routes.post("/objects/history", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
@@ -207,7 +207,7 @@ export class APIv1 {
                 }),
             );
             const allSuccess = results.every(r => r.success);
-            res.json({ success: allSuccess, results });
+            ((res as any)._originalJson || res.json.bind(res))({ success: allSuccess, results });
         }));
 
         this.routes.post("/objects/related", (req: Request, res: Response) => {
@@ -221,7 +221,7 @@ export class APIv1 {
                 return { success: true, elementId: id, result: related };
             });
             const allSuccess = results.every(r => r.success);
-            res.json({ success: allSuccess, results });
+            ((res as any)._originalJson || res.json.bind(res))({ success: allSuccess, results });
         });
 
         this.routes.get("/objects/:elementId/value", (req: Request, res: Response, next: NextFunction) => {

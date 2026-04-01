@@ -122,6 +122,7 @@ describe("ValueCache", () => {
                 ["dev-uuid", "axes-uuid", "x-uuid", "pos-uuid"],
                 ["cnc-schema", "axis-schema", "pos-schema", "cmdval-schema"],
                 expect.any(Array),
+                expect.any(Array),
             );
         });
 

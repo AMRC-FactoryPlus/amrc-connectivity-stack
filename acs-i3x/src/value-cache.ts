@@ -23,6 +23,7 @@ interface ObjectTreeLike {
         instanceUuidPath: string[],
         schemaUuidPath: string[],
         metricSegments: string[],
+        isa95Segments?: string[],
     ): string | null;
     getObject(elementId: string): { elementId: string; isComposition: boolean } | undefined;
     getChildElementIds(elementId: string): string[];
@@ -111,14 +112,18 @@ export class ValueCache {
             return;
         }
 
+        // ISA-95 hierarchy segments (Enterprise, Site, Area, etc.)
+        const isa95Segments = parts.slice(isa95Start, edgeIdx);
+
         // Tell the object tree about the full composition chain.
-        // metricSegments includes every level from device down to the leaf.
+        // Also passes ISA-95 segments so the tree can create hierarchy above the device.
         // Returns the leaf elementId.
         const elementId = this.objectTree.addCompositionFromUns(
             deviceUuid,
             instanceUuidPath,
             schemaUuidPath,
             metricSegments,
+            isa95Segments,
         ) ?? `${bottomUuid}/${metricName}`;
 
         // Derive quality — for values received from UNS, the device is

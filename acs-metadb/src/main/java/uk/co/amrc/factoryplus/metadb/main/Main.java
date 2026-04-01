@@ -10,9 +10,13 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.ServiceConfigurationError;
 
-import org.glassfish.grizzly.http.server.HttpServer;
-import org.glassfish.jersey.grizzly2.httpserver.GrizzlyHttpServerFactory;
+import org.eclipse.jetty.server.*;
+
+//import org.glassfish.grizzly.http.server.HttpServer;
+//import org.glassfish.jersey.grizzly2.httpserver.GrizzlyHttpServerFactory;
+
 import org.glassfish.jersey.inject.hk2.AbstractBinder;
+import org.glassfish.jersey.server.ContainerFactory;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.server.ServerProperties;
 
@@ -30,7 +34,7 @@ public final class Main {
     }
 
     private int port;
-    private HttpServer server;
+    private Server server;
     private RdfStore model;
 
     private Main (int port, String dataDir)
@@ -55,14 +59,12 @@ public final class Main {
         }
     }
 
-    private HttpServer createServer ()
+    private Server createServer ()
     {
-        final URI listen = orSCE(
-            () -> new URI("http", null, "0.0.0.0", this.port, "", null, null),
-            "Cannot create URI for HTTP server");
+        var server = new Server(port);
 
         final var model = this.model;
-        final var rc = new ResourceConfig()
+        final var app = new ResourceConfig()
             .property(ServerProperties.PROCESSING_RESPONSE_ERRORS_ENABLED, true)
             .packages("uk.co.amrc.factoryplus.metadb.api")
             .register(new AbstractBinder () {
@@ -71,8 +73,10 @@ public final class Main {
                 }
             });
 
-        return GrizzlyHttpServerFactory
-            .createHttpServer(listen, rc, false);
+        var handler = ContainerFactory.createContainer(Handler.class, app);
+        server.setHandler(handler);
+
+        return server;
     }
 
     private void start () throws Throwable

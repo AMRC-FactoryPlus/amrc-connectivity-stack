@@ -17,6 +17,8 @@
     <dep.slf4j>2.0.17</dep.slf4j>
     <dep.jena>5.6.0</dep.jena>
     <dep.jersey>4.0.2</dep.jersey>
+    <!-- keep this in sync with service-client -->
+    <dep.jetty>12.1.5</dep.jetty>
   </properties>
 
   <repositories>
@@ -64,8 +66,13 @@
       <version>${dep.jena}</version>
     </dependency>
     <dependency>
+      <groupId>org.eclipse.jetty</groupId>
+      <artifactId>jetty-server</artifactId>
+      <version>${dep.jetty}</version>
+    </dependency>
+    <dependency>
       <groupId>org.glassfish.jersey.containers</groupId>
-      <artifactId>jersey-container-grizzly2-http</artifactId>
+      <artifactId>jersey-container-jetty-http</artifactId>
     </dependency>
     <dependency>
       <groupId>org.glassfish.jersey.inject</groupId>

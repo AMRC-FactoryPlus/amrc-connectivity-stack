@@ -48,11 +48,9 @@ public class ConfigEntry extends RequestHandler.Component
     {
         public static Value ofQuerySolution (QuerySolution sol)
         {
-            var val = Util.decodeLiteral(sol.get("value"), RDF.JSON,
-                s -> Json.createReader(new StringReader(s)).readValue());
-            var etag = Util.decodeLiteral(sol.get("etag"), XSD.xstring, s -> s);
-            //var mtime = Util.decodeLiteral(binding.get("mtime"), XSD.dateTime, 
-            //    Instant::parse);
+            var val = Util.decodeLiteral(sol.get("value"), JsonValue.class);
+            var etag = Util.decodeLiteral(sol.get("etag"), String.class);
+            //var mtime = Util.decodeLiteral(binding.get("mtime"), Instant.class);
 
             return new Value(val, etag, Option.none());
         }

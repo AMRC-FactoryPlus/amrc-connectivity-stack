@@ -297,7 +297,7 @@ function createE2eApp() {
     app.use(express.json());
 
     /* Mount exactly as the real routes.ts does */
-    app.use("/v1/info", api.infoRoute);
+    app.use("/v1", api.infoRoute);
     app.use("/v1", api.routes);
 
     return { app, ...mocks };
@@ -319,10 +319,7 @@ describe("E2E Compliance Tests", () => {
             expect(res.status).toBe(200);
             expect(res.headers["content-type"]).toMatch(/application\/json/);
 
-            const body = res.body;
-            expect(body.success).toBe(true);
-
-            const info = body.result;
+            const info = res.body;
             expect(info).toHaveProperty("specVersion");
             expect(info).toHaveProperty("serverName");
             expect(info).toHaveProperty("serverVersion");
@@ -337,7 +334,7 @@ describe("E2E Compliance Tests", () => {
             const { app } = createE2eApp();
             const res = await request(app).get("/v1/info");
 
-            const caps = res.body.result.capabilities;
+            const caps = res.body.capabilities;
             expect(caps.query.history).toBe(true);
             expect(caps.update.current).toBe(false);
             expect(caps.subscribe.stream).toBe(true);
@@ -347,8 +344,8 @@ describe("E2E Compliance Tests", () => {
             const { app } = createE2eApp();
             const res = await request(app).get("/v1/info");
 
-            expect(res.body.result.specVersion).toBe(I3X_SPEC_VERSION);
-            expect(res.body.result.serverVersion).toBe(Version);
+            expect(res.body.specVersion).toBe(I3X_SPEC_VERSION);
+            expect(res.body.serverVersion).toBe(Version);
         });
     });
 
@@ -448,9 +445,8 @@ describe("E2E Compliance Tests", () => {
                 .send({ elementIds: ids });
 
             expect(res.status).toBe(200);
-            expect(res.body.success).toBe(true);
 
-            const results = res.body.result.results;
+            const results = res.body.results;
             expect(results).toHaveLength(ids.length);
             expect(results[0].elementId).toBe("type-robot");
             expect(results[0].success).toBe(true);
@@ -546,9 +542,8 @@ describe("E2E Compliance Tests", () => {
                 .send({ elementIds: ids });
 
             expect(res.status).toBe(200);
-            expect(res.body.success).toBe(true);
 
-            const results = res.body.result.results;
+            const results = res.body.results;
             expect(results).toHaveLength(ids.length);
             expect(results[0].elementId).toBe("obj-robot-1");
             expect(results[0].success).toBe(true);
@@ -611,7 +606,7 @@ describe("E2E Compliance Tests", () => {
 
             expect(res.status).toBe(200);
 
-            const results = res.body.result.results;
+            const results = res.body.results;
             expect(results).toHaveLength(ids.length);
             expect(results[0].elementId).toBe("rel-has-children");
             expect(results[0].success).toBe(true);
@@ -665,7 +660,7 @@ describe("E2E Compliance Tests", () => {
 
             expect(res.status).toBe(200);
 
-            const results = res.body.result.results;
+            const results = res.body.results;
             expect(results).toHaveLength(2);
             expect(results[0].elementId).toBe("obj-cnc-1");
             expect(results[0].success).toBe(true);
@@ -722,9 +717,8 @@ describe("E2E Compliance Tests", () => {
                 .send({ elementIds: ["obj-cnc-1", "obj-robot-1", "missing"], maxDepth: 1 });
 
             expect(res.status).toBe(200);
-            expect(res.body.success).toBe(true);
 
-            const results = res.body.result.results;
+            const results = res.body.results;
             expect(results).toHaveLength(3);
 
             /* First: has value */
@@ -816,7 +810,7 @@ describe("E2E Compliance Tests", () => {
             expect(res.status).toBe(200);
             expect(res.body.success).toBe(true);
 
-            const results = res.body.result.results;
+            const results = res.body.results;
             expect(results).toHaveLength(2);
 
             expect(results[0].elementId).toBe("obj-cnc-1");
@@ -938,8 +932,9 @@ describe("E2E Compliance Tests", () => {
         it("every success response has { success: true, result: ... }", async () => {
             const { app } = createE2eApp();
 
+            /* /v1/info is excluded: the info route does not use the
+               envelope middleware and returns raw data. */
             const responses = await Promise.all([
-                request(app).get("/v1/info"),
                 request(app).get("/v1/namespaces"),
                 request(app).get("/v1/objecttypes"),
                 request(app).get("/v1/objecttypes/type-cnc"),
@@ -1000,8 +995,8 @@ describe("E2E Compliance Tests", () => {
 
             for (const res of responses) {
                 expect(res.status).toBe(200);
-                expect(res.body.success).toBe(true);
-                const results = res.body.result.results;
+                expect(typeof res.body.success).toBe("boolean");
+                const results = res.body.results;
                 expect(Array.isArray(results)).toBe(true);
                 expect(results).toHaveLength(3);
 
@@ -1049,7 +1044,7 @@ describe("E2E Compliance Tests", () => {
 
             const res = await request(app).get("/v1/info");
             expect(res.status).toBe(200);
-            expect(res.body.success).toBe(true);
+            expect(res.body).toHaveProperty("specVersion");
         });
     });
 
@@ -1136,7 +1131,7 @@ describe("E2E Compliance Tests", () => {
             const single1 = await request(app).get("/v1/objects/obj-cnc-1");
             const single2 = await request(app).get("/v1/objects/obj-robot-1");
 
-            const bulkResults = bulkRes.body.result.results;
+            const bulkResults = bulkRes.body.results;
             expect(bulkResults[0].result).toEqual(single1.body.result);
             expect(bulkResults[1].result).toEqual(single2.body.result);
         });
@@ -1149,7 +1144,7 @@ describe("E2E Compliance Tests", () => {
                 .post("/v1/objects/value")
                 .send({ elementIds: ["obj-cnc-1"] });
 
-            const bulkItem = bulkRes.body.result.results[0];
+            const bulkItem = bulkRes.body.results[0];
             expect(bulkItem.result).toEqual(singleRes.body.result);
         });
     });

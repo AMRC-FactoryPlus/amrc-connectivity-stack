@@ -277,14 +277,18 @@ describe("ObjectTree", () => {
             const subSchema1 = "sub-schema-1";
             const subSchema2 = "sub-schema-2";
 
+            // metricSegments = ["Axes", "X", "Actual"]
+            // instanceUuidPath covers device + Axes + X (3 entries)
+            // schemaPath covers device + Axes + X + leaf (4 entries)
+            // "Actual" has no Instance_UUID so gets a synthesised one
             tree.addCompositionFromUns(
                 dev1,
                 [dev1, sub1, sub2],
-                ["top-schema", subSchema1, subSchema2],
-                ["Device", "Axes", "X"],
+                ["top-schema", subSchema1, subSchema2, "metric-schema"],
+                ["Axes", "X", "Actual"],
             );
 
-            // sub1 should be a child of dev1
+            // sub1 ("Axes") should be a child of dev1
             const obj1 = tree.getObject(sub1);
             expect(obj1).toBeDefined();
             expect(obj1!.parentId).toBe(dev1);
@@ -292,13 +296,22 @@ describe("ObjectTree", () => {
             expect(obj1!.displayName).toBe("Axes");
             expect(obj1!.isComposition).toBe(true);
 
-            // sub2 should be a child of sub1
+            // sub2 ("X") should be a child of sub1
             const obj2 = tree.getObject(sub2);
             expect(obj2).toBeDefined();
             expect(obj2!.parentId).toBe(sub1);
             expect(obj2!.typeElementId).toBe(subSchema2);
             expect(obj2!.displayName).toBe("X");
             expect(obj2!.isComposition).toBe(true);
+
+            // "Actual" is the leaf — has a synthesised UUID, is not composition
+            const children = tree.getChildElementIds(sub2);
+            expect(children.length).toBe(1);
+            const leaf = tree.getObject(children[0]);
+            expect(leaf).toBeDefined();
+            expect(leaf!.displayName).toBe("Actual");
+            expect(leaf!.isComposition).toBe(false);
+            expect(leaf!.parentId).toBe(sub2);
         });
 
         it("is idempotent - calling twice does not duplicate objects", async () => {
@@ -309,7 +322,7 @@ describe("ObjectTree", () => {
                 dev1,
                 [dev1, sub1],
                 ["top-schema", "sub-schema-1"],
-                ["Device", "Axes"],
+                ["Axes"],
             ];
 
             tree.addCompositionFromUns(...args);
@@ -331,7 +344,7 @@ describe("ObjectTree", () => {
                 dev1,
                 [dev1, sub1, sub2],
                 ["top-schema", "sub-schema-1", "sub-schema-2"],
-                ["Device", "Axes", "X"],
+                ["Axes", "X"],
             );
 
             const childrenOfDev = tree.getChildElementIds(dev1);
@@ -350,7 +363,7 @@ describe("ObjectTree", () => {
                 dev1,
                 [dev1, sub1],
                 ["top-schema", "sub-schema-1"],
-                ["Device", "Axes"],
+                ["Axes"],
             );
 
             const children = tree.getRelated(dev1, RelType.HasChildren);
@@ -366,7 +379,7 @@ describe("ObjectTree", () => {
                 dev1,
                 [dev1, sub1],
                 ["top-schema", "sub-schema-1"],
-                ["Device", "Axes"],
+                ["Axes"],
             );
 
             const parents = tree.getRelated(sub1, RelType.HasParent);
@@ -384,7 +397,7 @@ describe("ObjectTree", () => {
                 dev1,
                 [dev1, sub1, sub2],
                 ["top-schema", "sub-schema-1", "sub-schema-2"],
-                ["Device", "Axes", "X"],
+                ["Axes", "X"],
             );
 
             // sub1 has a parent (dev1) and a child (sub2)
@@ -402,7 +415,7 @@ describe("ObjectTree", () => {
                 dev1,
                 [dev1, sub1],
                 ["top-schema", "sub-schema-1"],
-                ["Device", "Axes"],
+                ["Axes"],
             );
 
             // dev1 has no parent, only children

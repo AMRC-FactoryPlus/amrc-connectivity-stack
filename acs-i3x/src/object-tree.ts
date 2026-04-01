@@ -5,6 +5,8 @@
  * All Explore endpoints serve data from this tree.
  */
 
+import { v5 as uuidv5 } from "uuid";
+
 import type {
     I3xNamespace,
     I3xObjectType,
@@ -13,6 +15,10 @@ import type {
 } from "./types/i3x.js";
 
 import { RelType } from "./constants.js";
+
+// Namespace for generating synthetic UUIDs for metric path segments
+// that don't have their own Instance_UUID.
+const I3X_UUID_NAMESPACE = "11ad7b32-1d32-4c4a-b0c9-fa049208939a";
 import {
     toI3xNamespace,
     toI3xObjectType,
@@ -165,18 +171,13 @@ export class ObjectTree {
         _deviceUuid: string,
         instanceUuidPath: string[],
         schemaUuidPath: string[],
-        displayNames: string[],
-    ): void {
-        // Index 0 is the device's Instance_UUID. Resolve to ConfigDB UUID
-        // so the parent chain connects to the device object in the tree.
+        metricSegments: string[],
+    ): string | null {
+        // Resolve the device Instance_UUID to ConfigDB UUID.
         const deviceInstanceUuid = instanceUuidPath[0];
         let deviceConfigDbUuid = this.instanceToDevice.get(deviceInstanceUuid);
 
-        // Auto-detect mapping: if we haven't seen this Instance_UUID before,
-        // find the matching root device object.
-        // TODO: This heuristic matches on schema type — won't work correctly
-        // if multiple devices share the same top-level schema. Fix by using
-        // the Sparkplug device address from UNS topic to match via Directory.
+        // Auto-detect mapping on first encounter.
         if (!deviceConfigDbUuid) {
             const deviceSchemaUuid = schemaUuidPath[0];
             for (const obj of this.objects.values()) {
@@ -190,35 +191,58 @@ export class ObjectTree {
             }
         }
 
-        // Index 0 is the device itself, already in tree. Start from 1.
-        for (let i = 1; i < instanceUuidPath.length; i++) {
-            const elementId = instanceUuidPath[i];
+        // Build the full tree from metric segments.
+        // metricSegments = ["Axes", "1", "Base_Axis", "Angle", "Actual"]
+        // instanceUuidPath = [device, Axes, 1, Base_Axis]  (may be shorter)
+        // schemaUuidPath   = [device, Axes, 1, Base_Axis, Metric]  (may be shorter)
+        //
+        // For each segment, use the Instance_UUID if available (index i+1
+        // in instanceUuidPath, since index 0 is the device). Otherwise
+        // generate a deterministic UUID from the parent UUID + segment name.
 
-            // Idempotent: skip if already exists
-            if (this.objects.has(elementId)) continue;
+        let parentId = deviceConfigDbUuid ?? deviceInstanceUuid;
 
-            const rawParentId = instanceUuidPath[i - 1];
-            // For the first child (i=1), parent is the device — use ConfigDB UUID
-            const parentId = (i === 1 && deviceConfigDbUuid) ? deviceConfigDbUuid : rawParentId;
-            const typeElementId = schemaUuidPath[i];
-            const displayName = displayNames[i];
+        for (let i = 0; i < metricSegments.length; i++) {
+            const segment = metricSegments[i];
+            // instanceUuidPath index: i+1 (0 is the device)
+            const instanceIdx = i + 1;
+            const hasInstanceUuid = instanceIdx < instanceUuidPath.length;
 
-            const obj = toI3xObject(
-                elementId,
-                displayName,
-                typeElementId,
-                parentId,
-                true,
-            );
+            const elementId = hasInstanceUuid
+                ? instanceUuidPath[instanceIdx]
+                : uuidv5(`${parentId}:${segment}`, I3X_UUID_NAMESPACE);
 
-            this.objects.set(elementId, obj);
+            // Schema: use schemaUuidPath[i+1] if available, else "unknown"
+            const schemaIdx = i + 1;
+            const typeElementId = schemaIdx < schemaUuidPath.length
+                ? schemaUuidPath[schemaIdx]
+                : "unknown";
 
-            // Track parent -> children
-            if (!this.children.has(parentId)) {
-                this.children.set(parentId, new Set());
+            // Last segment is a leaf metric (has a value), rest are composition
+            const isLeaf = i === metricSegments.length - 1;
+
+            if (!this.objects.has(elementId)) {
+                const obj = toI3xObject(
+                    elementId,
+                    segment,
+                    typeElementId,
+                    parentId,
+                    !isLeaf,  // isComposition: true for branches, false for leaves
+                );
+                this.objects.set(elementId, obj);
+
+                // Track parent -> children
+                if (!this.children.has(parentId)) {
+                    this.children.set(parentId, new Set());
+                }
+                this.children.get(parentId)!.add(elementId);
             }
-            this.children.get(parentId)!.add(elementId);
+
+            parentId = elementId;
         }
+
+        // Return the leaf elementId (last in the chain)
+        return parentId;
     }
 
     /* ---- Private ---- */

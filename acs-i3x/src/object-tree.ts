@@ -105,7 +105,7 @@ export class ObjectTree {
             all = all.filter(o => o.typeElementId === opts.typeElementId);
         }
         if (opts?.root) {
-            all = all.filter(o => o.parentId === null);
+            all = all.filter(o => o.parentId === "/");
         }
         return all;
     }
@@ -123,7 +123,7 @@ export class ObjectTree {
         const result: I3xObject[] = [];
 
         if (relationshipType === undefined || relationshipType === RelType.HasParent) {
-            if (obj.parentId !== null) {
+            if (obj.parentId !== null && obj.parentId !== "/") {
                 const parent = this.objects.get(obj.parentId);
                 if (parent) result.push(parent);
             }
@@ -183,7 +183,7 @@ export class ObjectTree {
         // from the UNS topic via Directory lookup.
         if (!deviceConfigDbUuid) {
             for (const obj of this.objects.values()) {
-                if (obj.parentId === null
+                if (obj.parentId === "/"
                     && !Array.from(this.instanceToDevice.values()).includes(obj.elementId)) {
                     this.instanceToDevice.set(deviceInstanceUuid, obj.elementId);
                     deviceConfigDbUuid = obj.elementId;
@@ -308,7 +308,7 @@ export class ObjectTree {
                 uuid,
                 uuid, // use device UUID as displayName for now
                 classUuid,
-                null,   // top-level: no parent
+                "/",    // root objects have parentId "/" per i3X convention
                 true,   // isComposition
             );
             this.objects.set(uuid, obj);

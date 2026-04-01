@@ -178,12 +178,13 @@ export class ObjectTree {
         let deviceConfigDbUuid = this.instanceToDevice.get(deviceInstanceUuid);
 
         // Auto-detect mapping on first encounter.
+        // Match any unmatched root device object.
+        // TODO: For multiple devices, match using Sparkplug device address
+        // from the UNS topic via Directory lookup.
         if (!deviceConfigDbUuid) {
-            const deviceSchemaUuid = schemaUuidPath[0];
             for (const obj of this.objects.values()) {
                 if (obj.parentId === null
-                    && !this.instanceToDevice.has(obj.elementId)
-                    && obj.typeElementId === deviceSchemaUuid) {
+                    && !Array.from(this.instanceToDevice.values()).includes(obj.elementId)) {
                     this.instanceToDevice.set(deviceInstanceUuid, obj.elementId);
                     deviceConfigDbUuid = obj.elementId;
                     break;

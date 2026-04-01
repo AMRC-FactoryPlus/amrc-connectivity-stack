@@ -473,6 +473,15 @@ export const DataAccess = {
     }
 }
 
+export const I3X = {
+    Service: {
+        I3X:            "018854a1-a312-46d3-b904-c274b59088c7",
+    },
+    Requirement: {
+        ServiceRole:    "0eb1f761-6b81-4757-a458-c0257c905a20",
+    },
+};
+
 export const UNS = {
     Group: {
         Sparkplug:  "e414d355-b991-429b-8f5d-97e823ff71f5",

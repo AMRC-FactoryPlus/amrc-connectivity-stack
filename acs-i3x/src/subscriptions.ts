@@ -186,7 +186,14 @@ export class SubscriptionManager {
     private writeSseEvent(res: any, item: I3xSyncItem): void {
         // SSE events use the same VQT shape as the spec — no sequenceNumber
         const { sequenceNumber, ...vqt } = item;
-        res.write(`data: ${JSON.stringify([vqt])}\n\n`);
+        const data = `data: ${JSON.stringify([vqt])}\n\n`;
+        const ok = res.write(data);
+        // Ensure the chunk is flushed to the client immediately
+        if (typeof res.flush === "function") res.flush();
+        if (!ok) {
+            // Back-pressure: drain event will allow more writes
+            res.once("drain", () => {});
+        }
     }
 
     private getAndVerify(clientId: string, subscriptionId: string): Subscription {

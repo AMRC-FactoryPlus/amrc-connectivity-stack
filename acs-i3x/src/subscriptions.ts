@@ -132,7 +132,7 @@ export class SubscriptionManager {
         }
 
         // Set SSE headers
-        res.setHeader("Content-Type", "text/event-stream");
+        res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
         res.setHeader("Cache-Control", "no-cache");
         res.setHeader("Connection", "keep-alive");
         res.flushHeaders();
@@ -184,7 +184,9 @@ export class SubscriptionManager {
     }
 
     private writeSseEvent(res: any, item: I3xSyncItem): void {
-        res.write(`data: ${JSON.stringify([item])}\n\n`);
+        // SSE events use the same VQT shape as the spec — no sequenceNumber
+        const { sequenceNumber, ...vqt } = item;
+        res.write(`data: ${JSON.stringify([vqt])}\n\n`);
     }
 
     private getAndVerify(clientId: string, subscriptionId: string): Subscription {

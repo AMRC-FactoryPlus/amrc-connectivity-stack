@@ -17,7 +17,14 @@ export function routes(opts: {
 
     return (app: any) => {
         // Gzip compression (MUST per i3X spec)
-        app.use(compression());
+        // Skip compression for SSE streams — compression buffers chunks
+        // which prevents real-time delivery.
+        app.use(compression({
+            filter: (req: any, res: any) => {
+                if (req.path === "/v1/subscriptions/stream") return false;
+                return compression.filter(req, res);
+            },
+        }));
 
         // Mount info endpoint (unauthenticated — goes through WebAPI's
         // public path pattern, see bin/api.ts `public: "/v1/info"`)

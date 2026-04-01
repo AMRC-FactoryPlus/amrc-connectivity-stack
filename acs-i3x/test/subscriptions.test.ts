@@ -326,7 +326,7 @@ describe("SubscriptionManager", () => {
 
             mgr.stream("client-1", sub.subscriptionId, res);
 
-            expect(res.setHeader).toHaveBeenCalledWith("Content-Type", "text/event-stream");
+            expect(res.setHeader).toHaveBeenCalledWith("Content-Type", "text/event-stream; charset=utf-8");
             expect(res.setHeader).toHaveBeenCalledWith("Cache-Control", "no-cache");
             expect(res.setHeader).toHaveBeenCalledWith("Connection", "keep-alive");
             expect(res.flushHeaders).toHaveBeenCalled();

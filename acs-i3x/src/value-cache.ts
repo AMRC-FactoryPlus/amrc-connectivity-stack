@@ -22,8 +22,8 @@ interface ObjectTreeLike {
         deviceUuid: string,
         instanceUuidPath: string[],
         schemaUuidPath: string[],
-        displayNames: string[],
-    ): void;
+        metricSegments: string[],
+    ): string | null;
     getObject(elementId: string): { elementId: string; isComposition: boolean } | undefined;
     getChildElementIds(elementId: string): string[];
     isReady(): boolean;
@@ -111,28 +111,15 @@ export class ValueCache {
             return;
         }
 
-        // Build display names from metric segments.
-        // The first display name is for the device; subsequent ones map to
-        // the metric path segments.  We pad/trim to match instanceUuidPath length.
-        const displayNames = [
-            userProps.InstanceUUID ?? deviceUuid,
-            ...metricSegments.slice(0, instanceUuidPath.length - 1),
-        ];
-        // Ensure displayNames length matches instanceUuidPath length
-        while (displayNames.length < instanceUuidPath.length) {
-            displayNames.push(metricSegments[displayNames.length - 1] ?? "unknown");
-        }
-
-        // Tell the object tree about the composition chain
-        this.objectTree.addCompositionFromUns(
+        // Tell the object tree about the full composition chain.
+        // metricSegments includes every level from device down to the leaf.
+        // Returns the leaf elementId.
+        const elementId = this.objectTree.addCompositionFromUns(
             deviceUuid,
             instanceUuidPath,
             schemaUuidPath,
-            displayNames,
-        );
-
-        // Build the element ID for this leaf metric
-        const elementId = `${bottomUuid}/${metricName}`;
+            metricSegments,
+        ) ?? `${bottomUuid}/${metricName}`;
 
         // Derive quality — for values received from UNS, the device is
         // online and we have a value, so quality is Good.

@@ -412,7 +412,9 @@ export class ObjectTree {
             const isa95Segments = hierarchyObj ? this.extractIsa95Segments(hierarchyObj) : [];
 
             if (isa95Segments.length === 0) {
-                this.logger.debug?.({ uuid }, "loadDevices: no ISA-95 Enterprise found, device will be at root");
+                // Default to <namespace>/Unknown for devices without ISA-95
+                isa95Segments.push(this.namespaceName, "Unknown");
+                this.logger.debug?.({ uuid }, "loadDevices: no ISA-95 found, placing under Unknown");
             } else {
                 this.logger.debug?.({ uuid, isa95: isa95Segments }, "loadDevices: ISA-95 hierarchy found");
             }

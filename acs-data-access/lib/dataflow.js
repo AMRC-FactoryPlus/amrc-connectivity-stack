@@ -6,9 +6,7 @@
 import { Map as IMap } from "immutable";
 import rx from "rxjs";
 
-// import { UUIDs }    from "@amrc-factoryplus/service-client";
 import * as rxx     from "@amrc-factoryplus/rx-util";
-import { Optional, Response } from "@amrc-factoryplus/rx-util";
 
 import { DataAccess as Constants }  from './constants.js';
 import { valid_uuid, valid_krb }    from "./validate.js";
@@ -25,17 +23,33 @@ export class DataFlow {
     this.dataset_definitions = this._build_dataset_definitions();
   }
 
+  // Todo: check if dataset is duplicated (in all unions, session, sparkplug) -> set as invalid dataset
   _build_dataset_definitions() {
     return rxx.rx(
       rx.combineLatest([
+        this.cdb.search_app(Constants.App.SparkplugSrc),
         this.cdb.search_app(Constants.App.SessionLimits),
         this.cdb.search_app(Constants.App.UnionComponents)
       ]),
-      rx.map(([sessions, unions]) => {
-        return IMap({
-          [Constants.Class.Session]: sessions,
-          [Constants.Class.Union]: unions,
+
+      rx.switchMap(([sprkDevices, sessions, unions]) => {
+        const grouped = IMap({
+          [Constants.App.SessionLimits]: sessions,
+          [Constants.App.UnionComponents]: unions,
+          [Constants.App.SparkplugSrc]: sprkDevices
         });
+
+        return rx.from(grouped.entrySeq()).pipe(
+          rx.mergeMap(([structure, datasets]) =>
+            rx.from((datasets || IMap()).entrySeq()).pipe(
+              rx.map(([datasetId, config]) => ({
+                datasetId,
+                value: { structure, config }
+              }))
+            )
+          ),
+          rx.reduce((acc, { datasetId, value }) => acc.set(datasetId, value), IMap())
+        );
       }),
 
       rxx.shareLatest()
@@ -46,28 +60,9 @@ export class DataFlow {
     return this.dataset_definitions;
   }
 
-  get_dataset_by_uuid(uuid) {
-    return this.dataset_definitions.pipe(
-      rx.map(defs => {
-        const js = defs.toJS(); // convert Imm.Map to JS obj
-
-        for (const group of Object.values(js)) {
-          if (group[uuid]) {
-            return group[uuid];
-          }
-        }
-
-        return null; // not found
-      })
-    );
-  }
-
   run() {
     this.dataset_definitions.subscribe(ss => 
       this.log("Dataset Definitions UPDATE %o", ss.toJS())
     );
   }
-
-
-
 }

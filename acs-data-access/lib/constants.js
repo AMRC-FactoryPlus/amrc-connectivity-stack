@@ -1,8 +1,8 @@
-
 export const DataAccess = {
     App: {
         DatasetDefinition: "eae2d4ae-164d-4dc6-b646-7e0320057bd9",
         DatasetMetadata: "e3b9fd2c-9de1-470b-9675-739e2a55b77f", 
+        SparkplugSrc: "f5d550c4-2831-11f1-b0b0-83fda3035799",
         UnionComponents: "1c4ca454-de38-44d9-92fb-aa5218bfa257",
         SessionLimits: "8754c000-3778-4ae6-b2b8-bbcd959bb775",
         MESIdentifiers: "af178f0c-3b1e-44f2-9724-5cf06e8fd056",
@@ -11,9 +11,6 @@ export const DataAccess = {
     Class: {
         Measurement: "cce0ac4e-b5ba-4837-b45d-c74df55aa2d7",
         Dataset: "c31d3cbd-01cd-4833-8014-c4512aef1e5c",
-        SparkplugDevice: "18773d6d-a70d-443a-b29a-3f1583195290",
-        Session: "2f555be8-e7fc-4fb0-b62f-809cefd8a141",
-        Union: "c57a42a9-348c-4972-a05b-9082c20f2afc", 
         Published: "414d2d10-6be8-4c27-8e9f-c716ef5432b9",
         Partial: "6c583d11-9a88-4bc1-b77c-81b01e9c9827",
         MESDataset: "586205bf-81c6-4091-9d2c-f3c0465ebdc4",
@@ -33,7 +30,11 @@ export const DataAccess = {
     
     Service: {
         DataAccess: "06cee697-29d3-4972-9479-bc392e24946e"
-    }, 
+    },
+
+    Special: {
+        InvalidDataset: "696396a0-2831-11f1-9b12-33d63b8c5115",
+    },
 
     Requirement: {
         ServiceRole: "dd18050c-a9ab-4287-8af2-e983f20e89c8"
@@ -46,5 +47,6 @@ export const DataAccess = {
         ReadDataset: "ec48462e-37eb-4f56-8efa-83d813e85559",
         UseForSession: "c089b9a9-06cd-4211-94fc-9ad52a759987", 
         EditDataset: "af06b9e5-456a-43e4-b636-5b17de28fc7f",
+        UseSparkplug: "788b049c-2831-11f1-99fd-2b0bf86d6f77",
     }
 }

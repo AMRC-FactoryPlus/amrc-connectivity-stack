@@ -5,13 +5,22 @@
 <script setup>
 import { onMounted } from 'vue'
 import { useExplorerStore } from '@store/useExplorerStore.js'
+import { useMonitorStore } from '@store/useMonitorStore.js'
 import ExplorerTreeNode from './ExplorerTreeNode.vue'
+import NodeDetail from './NodeDetail.vue'
 
 const store = useExplorerStore()
+const monitor = useMonitorStore()
 
 onMounted(() => {
   store.loadRoots()
 })
+
+function handleSubscribe () {
+  if (store.selectedNode) {
+    monitor.subscribe(store.selectedId, store.selectedNode.displayName)
+  }
+}
 </script>
 
 <template>
@@ -51,7 +60,10 @@ onMounted(() => {
 
     <!-- Right sidebar -->
     <div v-if="store.selectedId" class="w-96 border-l border-border hidden xl:block overflow-y-auto shrink-0">
-      <div class="p-4 text-sm text-slate-500">Node detail sidebar</div>
+      <NodeDetail
+        :node="store.selectedNode"
+        @subscribe="handleSubscribe"
+      />
     </div>
   </div>
 </template>

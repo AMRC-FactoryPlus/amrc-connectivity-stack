@@ -175,18 +175,21 @@ export class APIv1 {
             ((res as any)._originalJson || res.json.bind(res))({ success: allSuccess, results });
         });
 
-        this.routes.post("/objects/value", (req: Request, res: Response) => {
+        this.routes.post("/objects/value", asyncHandler(async (req: Request, res: Response) => {
             const { elementIds, maxDepth } = req.body;
-            const results = (elementIds as string[]).map(id => {
-                const item = valueCache.getValue(id);
+            const results = await Promise.all((elementIds as string[]).map(async (id) => {
+                const obj = objectTree.getObject(id);
+                const item = obj?.isComposition
+                    ? await history.getCompositionValue(id, maxDepth ?? 1)
+                    : await history.getCurrentValue(id);
                 if (item) {
                     return { success: true, elementId: id, result: item };
                 }
                 return { success: false, elementId: id, error: { message: `No value for ${id}` } };
-            });
+            }));
             const allSuccess = results.every(r => r.success);
             ((res as any)._originalJson || res.json.bind(res))({ success: allSuccess, results });
-        });
+        }));
 
         this.routes.post("/objects/history", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
             const { elementIds, startTime, endTime, maxDepth } = req.body;
@@ -221,11 +224,15 @@ export class APIv1 {
             ((res as any)._originalJson || res.json.bind(res))({ success: allSuccess, results });
         });
 
-        this.routes.get("/objects/:elementId/value", (req: Request, res: Response, next: NextFunction) => {
-            const result = valueCache.getValue(req.params.elementId);
-            if (!result) return next(notFound(`No value for ${req.params.elementId}`));
+        this.routes.get("/objects/:elementId/value", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+            const id = req.params.elementId;
+            const obj = objectTree.getObject(id);
+            const result = obj?.isComposition
+                ? await history.getCompositionValue(id)
+                : await history.getCurrentValue(id);
+            if (!result) return next(notFound(`No value for ${id}`));
             res.json(result);
-        });
+        }));
 
         this.routes.get("/objects/:elementId/history", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
             const { startTime, endTime } = req.query as { startTime?: string; endTime?: string };

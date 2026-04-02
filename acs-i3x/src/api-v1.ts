@@ -181,15 +181,19 @@ export class APIv1 {
                 // Try UNS cache first (real-time), fall back to InfluxDB last()
                 const cached = valueCache.getValue(id);
                 if (cached) {
+                    console.log(`[VALUE] ${id.slice(0,16)} → UNS cache hit: value=${JSON.stringify(cached.value)} age=${Date.now() - new Date(cached.timestamp).getTime()}ms`);
                     return { success: true, elementId: id, result: cached };
                 }
+                console.log(`[VALUE] ${id.slice(0,16)} → UNS cache miss, querying InfluxDB...`);
                 const obj = objectTree.getObject(id);
                 const item = obj?.isComposition
                     ? await history.getCompositionValue(id, maxDepth ?? 1)
                     : await history.getCurrentValue(id);
                 if (item) {
+                    console.log(`[VALUE] ${id.slice(0,16)} → InfluxDB hit: value=${JSON.stringify(item.value)} ts=${item.timestamp}`);
                     return { success: true, elementId: id, result: item };
                 }
+                console.log(`[VALUE] ${id.slice(0,16)} → no data`);
                 return { success: false, elementId: id, error: { message: `No value for ${id}` } };
             }));
             const allSuccess = results.every(r => r.success);

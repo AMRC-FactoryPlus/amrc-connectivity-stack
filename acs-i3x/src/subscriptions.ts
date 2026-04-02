@@ -174,6 +174,8 @@ export class SubscriptionManager {
     /* ---- Private methods ---- */
 
     private onValueChange(elementId: string, vqt: I3xVqt): void {
+        if (this.subscriptions.size === 0) return;
+
         for (const sub of this.subscriptions.values()) {
             if (!sub.registeredElements.has(elementId)) continue;
 

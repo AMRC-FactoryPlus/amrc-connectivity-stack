@@ -30,7 +30,7 @@ const data = new DataFlow({
 });
 
 
-const apiv1 = new APIv1({ data, debug, auth: fplus.Auth });
+const apiv1 = new APIv1({ data, debug, auth: fplus.Auth, cdb: fplus.ConfigDB });
 
 const api = await new WebAPI({
   debug: fplus.debug,

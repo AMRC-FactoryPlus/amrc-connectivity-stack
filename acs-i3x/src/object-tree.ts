@@ -38,6 +38,27 @@ interface ObjectTreeOpts {
     logger: any;
 }
 
+/** InfluxDB query metadata for a leaf metric object. */
+export interface MetricMeta {
+    topLevelInstanceUuid: string;
+    metricPath: string;      // e.g. "Phases/1"
+    metricName: string;      // e.g. "True_RMS_Current"
+    sparkplugType: string;   // e.g. "FloatLE"
+    typeSuffix: string;      // e.g. "d"
+}
+
+/** Map Sparkplug_Type to InfluxDB measurement type suffix. */
+function sparkplugTypeToSuffix(spType: string): string {
+    const t = spType.replace(/(LE|BE)$/i, "");
+    switch (t) {
+        case "Float": case "Double": return "d";
+        case "Int8": case "Int16": case "Int32": case "Int64": return "i";
+        case "UInt8": case "UInt16": case "UInt32": case "UInt64": return "u";
+        case "Boolean": return "b";
+        default: return "s";
+    }
+}
+
 export class ObjectTree {
     private fplus: any;
     private namespaceName: string;
@@ -52,6 +73,10 @@ export class ObjectTree {
     private children: Map<string, Set<string>> = new Map();
     // Maps device Instance_UUID → ConfigDB UUID (for parent linking)
     private instanceToDevice: Map<string, string> = new Map();
+    // Maps ConfigDB UUID → Instance_UUID (reverse of above)
+    private deviceToInstance: Map<string, string> = new Map();
+    // InfluxDB query metadata per leaf metric elementId
+    private metricMeta: Map<string, MetricMeta> = new Map();
 
     constructor(opts: ObjectTreeOpts) {
         this.fplus = opts.fplus;
@@ -159,6 +184,35 @@ export class ObjectTree {
     getChildElementIds(elementId: string): string[] {
         const childSet = this.children.get(elementId);
         return childSet ? Array.from(childSet) : [];
+    }
+
+    /** Get InfluxDB query metadata for a leaf metric. */
+    getMetricMeta(elementId: string): MetricMeta | undefined {
+        return this.metricMeta.get(elementId);
+    }
+
+    /** Get the Instance_UUID for a device ConfigDB UUID. */
+    getInstanceUuid(configDbUuid: string): string | undefined {
+        return this.deviceToInstance.get(configDbUuid);
+    }
+
+    /**
+     * Collect all leaf metric elementIds that are descendants of the
+     * given elementId (for composition value queries).
+     */
+    getDescendantLeafIds(elementId: string, maxDepth: number = 0, depth: number = 0): string[] {
+        if (maxDepth > 0 && depth >= maxDepth) return [];
+        const childIds = this.getChildElementIds(elementId);
+        const leaves: string[] = [];
+        for (const childId of childIds) {
+            const child = this.objects.get(childId);
+            if (child && !child.isComposition) {
+                leaves.push(childId);
+            } else {
+                leaves.push(...this.getDescendantLeafIds(childId, maxDepth, depth + 1));
+            }
+        }
+        return leaves;
     }
 
     /* ---- ISA-95 hierarchy ---- */
@@ -374,6 +428,8 @@ export class ObjectTree {
     private buildTreeFromOriginMap(
         originMap: any,
         parentId: string,
+        topLevelInstanceUuid: string,
+        pathPrefix: string = "",
     ): void {
         if (originMap == null || typeof originMap !== "object") return;
 
@@ -400,6 +456,9 @@ export class ObjectTree {
             // Use Schema_UUID as typeElementId if available
             const typeElementId = entry.Schema_UUID ?? "unknown";
 
+            // Build the metric path for InfluxDB queries
+            const currentPath = pathPrefix ? `${pathPrefix}/${key}` : key;
+
             if (!this.objects.has(elementId)) {
                 const obj = toI3xObject(
                     elementId,
@@ -416,9 +475,26 @@ export class ObjectTree {
                 this.children.get(parentId)!.add(elementId);
             }
 
+            // Store InfluxDB query metadata for leaf metrics
+            if (isLeaf) {
+                // The "path" tag in InfluxDB is everything EXCEPT the metric name.
+                // e.g. for "Phases/1/True_RMS_Current", path="Phases/1", name="True_RMS_Current"
+                const pathParts = currentPath.split("/");
+                const metricName = pathParts.pop()!;
+                const metricPath = pathParts.join("/");
+
+                this.metricMeta.set(elementId, {
+                    topLevelInstanceUuid,
+                    metricPath,
+                    metricName,
+                    sparkplugType: entry.Sparkplug_Type,
+                    typeSuffix: sparkplugTypeToSuffix(entry.Sparkplug_Type),
+                });
+            }
+
             // Recurse into children if this is a composition container
             if (!isLeaf) {
-                this.buildTreeFromOriginMap(entry, elementId);
+                this.buildTreeFromOriginMap(entry, elementId, topLevelInstanceUuid, currentPath);
             }
         }
     }
@@ -502,7 +578,8 @@ export class ObjectTree {
             const instanceUuid = devInfo.originMap?.Instance_UUID;
             if (instanceUuid) {
                 this.instanceToDevice.set(instanceUuid, uuid);
-                this.logger.debug?.({ uuid, instanceUuid }, "loadDevices: registered Instance→ConfigDB mapping");
+                this.deviceToInstance.set(uuid, instanceUuid);
+                this.logger.debug?.({ uuid, instanceUuid }, "loadDevices: registered Instance↔ConfigDB mapping");
             }
 
             // Find ISA-95 hierarchy by searching for the Hierarchy-v1 Schema_UUID
@@ -536,8 +613,8 @@ export class ObjectTree {
             }
 
             // Build the full metric tree from the originMap
-            if (devInfo.originMap) {
-                this.buildTreeFromOriginMap(devInfo.originMap, uuid);
+            if (devInfo.originMap && instanceUuid) {
+                this.buildTreeFromOriginMap(devInfo.originMap, uuid, instanceUuid);
                 this.collectSchemaUuids(devInfo.originMap, schemaUuids);
                 this.logger.debug?.({ uuid, children: this.getChildElementIds(uuid).length },
                     "loadDevices: built metric tree from originMap");

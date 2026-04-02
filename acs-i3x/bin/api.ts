@@ -95,10 +95,15 @@ const api = await new WebAPI({
 api.run();
 logger.info(`acs-i3x server running on port ${env.PORT || 8080}`);
 
-// Re-poll ConfigDB/Directory periodically
-const pollInterval = parseInt(env.I3X_POLL_INTERVAL || "60000");
-setInterval(() => {
-    objectTree.refresh().catch(err => {
-        logger.error({ err }, "Failed to refresh object tree");
-    });
-}, pollInterval);
+// Re-poll ConfigDB/Directory periodically (disable with I3X_DISABLE_REFRESH=true)
+if (env.I3X_DISABLE_REFRESH !== "true") {
+    const pollInterval = parseInt(env.I3X_POLL_INTERVAL || "60000");
+    setInterval(() => {
+        objectTree.refresh().catch(err => {
+            logger.error({ err }, "Failed to refresh object tree");
+        });
+    }, pollInterval);
+    logger.debug({ pollInterval }, "Object tree refresh enabled");
+} else {
+    logger.info("Object tree refresh disabled (I3X_DISABLE_REFRESH=true)");
+}

@@ -171,7 +171,7 @@ export class APIv1 {
   async _check_second_level_permission(principal, structure, config){
     if(structure == Constants.App.SessionLimits){
       
-      const target = config.src;
+      const target = config.source;
       if(!target) return fail(422);
 
       const ok = await this.auth.check_acl(
@@ -180,7 +180,7 @@ export class APIv1 {
           target,
           true
         );
-
+      
       return ok; 
       
     }else if(structure == Constants.App.UnionComponents){
@@ -200,7 +200,7 @@ export class APIv1 {
 
     }else if( structure == Constants.App.SparkplugSrc){
       
-      const target = config.src;
+      const target = config.source;
       if(!target) return fail(422);
 
       const ok = await this.auth.check_acl(
@@ -217,20 +217,14 @@ export class APIv1 {
     }
   }
 
-  /** POST. Creates a new dataset. 
-   * 
-   * @param {*} req.body must be object (structure, config) without uuid.
-   * @param {*} res 
-   * @returns new dataset's UUID - JSON string 
-   */
-  async structure_create(req, res){
-    const structure = req.body.structure;
+
+  async _update_dataset_config(principal, structure, config, objectUuid){
     if(!structure) return fail(422);
     
     if (!valid_uuid(structure)) return fail(410);
 
     const ok = await this.auth.check_acl(
-      req.auth,
+      principal,
       Constants.Perm.CreateDataset,
       structure,
       true
@@ -238,49 +232,71 @@ export class APIv1 {
 
     if (!ok) return fail(403);
 
-   // 2nd persmission check depends on structure
-    // if session -> session permission, UseForSession, target = src
-    // if union -> IncludeInUnion, target = all datasets in the list
-    // if sprk -> 
-
-    
-    const config = req.body.config;
     if(!config) return fail(422);
     
-    const ok2 = await this._check_second_level_permission(req.auth, structure, config);
+    // Check the principal has appropriate permission for all dataset sources in config. 
+    const ok2 = await this._check_second_level_permission(principal, structure, config);
+    
     if(!ok2) return fail(403);
 
 
     // Create new Dataset Object
-    const newDatasetUuid = await this.cdb.create_object(Constants.Class.Dataset);
-    this.log("Created new dataset object in ConfigDB", newDatasetUuid);
-    if(!newDatasetUuid) return fail(400);
+    if(!objectUuid){
+      objectUuid = await this.cdb.create_object(Constants.Class.Dataset);
+      
+      this.log("Created new dataset object in ConfigDB", objectUuid);
+      
+      if(!objectUuid) return fail(400);
+    }
 
     // Create config entry for the dataset object
     try{
-      await this.cdb.put_config(structure, newDatasetUuid, config);
+      await this.cdb.put_config(structure, objectUuid, config);
     }catch(err){
       return fail(422);
     }
 
-    return res.status(200).json(newDatasetUuid);
+    return objectUuid;
+  }
+
+  
+  /** POST. Creates a new dataset. 
+   * 
+   * @param {*} req.body must be object (structure, config) without uuid.
+   * @param {*} res 
+   * @returns new dataset's UUID - JSON string 
+   */
+  async structure_create(req, res){
+    const objectUuid = await this._update_dataset_config(
+      req.auth,
+      req.body.structure,
+      req.body.config,
+      null
+    );
+
+    if(!objectUuid) return fail(500);
+    return res.status(200).json(objectUuid);
   }
 
 
   
-  /** PUT. Updates dataset definition. 
+  /** PUT. Updates dataset definition. Principal should have CreateDataset permission
    * 
-   * @param {*} req.body must be object (class, config) and UUID (optional)
+   * @param {*} req.body must be object (structure, config) and UUID (optional)
    * @param {*} res 
    */
   async structure_update(req, res){
-    // To be implemented
+    const objectUuid = await this._update_dataset_config(
+      req.auth,
+      req.body.structure,
+      req.body.config,
+      req.params.uuid
+    );
 
-    // 2 level permission check same as in POST
+    if(!objectUuid) return fail(500);
+
+    return res.status(200).json(objectUuid);
   }
-
-
-
 
 
   async name_get(req, res) {

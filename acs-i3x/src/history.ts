@@ -165,6 +165,12 @@ export class History {
         endTime: string,
         _maxDepth?: number,
     ): Promise<I3xVqt[]> {
+        // Only support history on leaf metrics (those with MetricMeta).
+        // Composition objects would return all child metrics mixed together
+        // which is not useful. The reference implementation behaves the same.
+        const obj = this.objectTree.getObject(elementId);
+        if (obj?.isComposition) return [];
+
         const query = this.buildFluxQuery(elementId, startTime, endTime);
 
         const rows: Array<{ _value: unknown; _time: string }> =

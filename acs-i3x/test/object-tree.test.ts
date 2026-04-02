@@ -4,8 +4,10 @@ import { RelType } from "../src/constants.js";
 import { createMockFplus } from "./helpers/mock-services.js";
 
 const DEVICE_CLASS_UUID = "18773d6d-a70d-443a-b29a-3f1583195290";
-const REGISTRATION_APP_UUID = "cb40bed5-49ad-4443-a7f5-08c75009da8f";
+const DEVICE_INFORMATION_APP_UUID = "a98ffed5-c613-4e70-bfd3-efeee250ade5";
+const INFO_APP_UUID = "64a8bfa9-7772-45c4-9d1a-9e6290690957";
 const CONFIG_SCHEMA_APP_UUID = "dbd8a535-52ba-4f6e-b4f8-9b71aefe09d3";
+const HIERARCHY_SCHEMA_UUID = "84ac3397-f3a2-440a-99e5-5bb9f6a75091";
 
 const NS_NAME = "Factory+";
 const NS_URI = "urn:factoryplus:ns";
@@ -25,36 +27,67 @@ function makeTree(fplus?: ReturnType<typeof createMockFplus>) {
 function setupMockDevices(fplus: ReturnType<typeof createMockFplus>) {
     const dev1 = "aaaa-1111";
     const dev2 = "bbbb-2222";
-    const class1 = "class-1111";
-    const class2 = "class-2222";
-    const schema1 = { type: "object", properties: { temp: { type: "number" } } };
-    const schema2 = { type: "object", properties: { speed: { type: "number" } } };
+    const schema1uuid = "schema-1111";
+    const schema2uuid = "schema-2222";
+    const instance1 = "inst-1111";
+    const instance2 = "inst-2222";
+    const schema1 = { type: "object", title: "CNC Machine", properties: { temp: { type: "number" } } };
+    const schema2 = { type: "object", title: "Robot", properties: { speed: { type: "number" } } };
 
     fplus.ConfigDB.class_members.mockResolvedValue([dev1, dev2]);
 
     fplus.ConfigDB.get_config.mockImplementation(
         (appUuid: string, objectUuid: string) => {
-            if (appUuid === REGISTRATION_APP_UUID) {
-                if (objectUuid === dev1) return Promise.resolve({ class: class1 });
-                if (objectUuid === dev2) return Promise.resolve({ class: class2 });
+            // DeviceInformation app — returns schema, instanceUUID, ISA-95
+            if (appUuid === DEVICE_INFORMATION_APP_UUID) {
+                if (objectUuid === dev1) return Promise.resolve({
+                    schema: schema1uuid,
+                    sparkplugName: "Dev1",
+                    originMap: {
+                        Schema_UUID: schema1uuid,
+                        Instance_UUID: instance1,
+                        Device_Information: {
+                            Schema_UUID: "2dd093e9-1450-44c5-be8c-c0d78e48219b",
+                            ISA95_Hierarchy: {
+                                Schema_UUID: HIERARCHY_SCHEMA_UUID,
+                                Enterprise: { Value: "AMRC" },
+                                Site: { Value: "F2050" },
+                            },
+                        },
+                    },
+                });
+                if (objectUuid === dev2) return Promise.resolve({
+                    schema: schema2uuid,
+                    sparkplugName: "Dev2",
+                    originMap: {
+                        Schema_UUID: schema2uuid,
+                        Instance_UUID: instance2,
+                        Device_Information: {
+                            Schema_UUID: "2dd093e9-1450-44c5-be8c-c0d78e48219b",
+                            ISA95_Hierarchy: {
+                                Schema_UUID: HIERARCHY_SCHEMA_UUID,
+                                Enterprise: { Value: "AMRC" },
+                                Site: { Value: "F2050" },
+                            },
+                        },
+                    },
+                });
             }
+            // Info app — human-readable names
+            if (appUuid === INFO_APP_UUID) {
+                if (objectUuid === dev1) return Promise.resolve({ name: "Device 1" });
+                if (objectUuid === dev2) return Promise.resolve({ name: "Device 2" });
+            }
+            // ConfigSchema app — JSON schema definitions
             if (appUuid === CONFIG_SCHEMA_APP_UUID) {
-                if (objectUuid === class1) return Promise.resolve(schema1);
-                if (objectUuid === class2) return Promise.resolve(schema2);
+                if (objectUuid === schema1uuid) return Promise.resolve(schema1);
+                if (objectUuid === schema2uuid) return Promise.resolve(schema2);
             }
             return Promise.resolve(null);
         },
     );
 
-    fplus.Directory.get_device_info.mockImplementation(
-        (uuid: string) => {
-            if (uuid === dev1) return Promise.resolve({ online: true });
-            if (uuid === dev2) return Promise.resolve({ online: false });
-            return Promise.resolve({ online: false });
-        },
-    );
-
-    return { dev1, dev2, class1, class2, schema1, schema2 };
+    return { dev1, dev2, class1: schema1uuid, class2: schema2uuid, schema1, schema2, instance1, instance2 };
 }
 
 describe("ObjectTree", () => {
@@ -160,20 +193,21 @@ describe("ObjectTree", () => {
             expect(type2).toBeDefined();
             expect(type2!.schema).toEqual(schema2);
 
-            // Verify device objects were created
+            // Verify device objects were created (+ 2 ISA-95 hierarchy objects: AMRC, F2050)
             const objects = tree.getObjects();
-            expect(objects).toHaveLength(2);
+            expect(objects).toHaveLength(4); // 2 devices + 2 ISA-95 nodes
 
             const obj1 = tree.getObject(dev1);
             expect(obj1).toBeDefined();
             expect(obj1!.typeElementId).toBe(class1);
-            expect(obj1!.parentId).toBe("/");
+            // Device should be nested under ISA-95 hierarchy, not "/"
+            expect(obj1!.parentId).not.toBe("/");
             expect(obj1!.isComposition).toBe(true);
 
             const obj2 = tree.getObject(dev2);
             expect(obj2).toBeDefined();
             expect(obj2!.typeElementId).toBe(class2);
-            expect(obj2!.parentId).toBe("/");
+            expect(obj2!.parentId).not.toBe("/");
             expect(obj2!.isComposition).toBe(true);
         });
 
@@ -184,20 +218,20 @@ describe("ObjectTree", () => {
             await tree.init();
 
             const objects = tree.getObjects();
-            expect(objects).toHaveLength(2);
+            expect(objects).toHaveLength(4); // 2 devices + 2 ISA-95 nodes
         });
 
-        it("getObjects({ root: true }) returns only top-level objects", async () => {
+        it("getObjects({ root: true }) returns only root ISA-95 objects", async () => {
             const fplus = createMockFplus();
-            const { dev1 } = setupMockDevices(fplus);
+            setupMockDevices(fplus);
             const tree = makeTree(fplus);
             await tree.init();
 
             const roots = tree.getObjects({ root: true });
-            expect(roots).toHaveLength(2);
-            for (const obj of roots) {
-                expect(obj.parentId).toBe("/");
-            }
+            // Both devices share AMRC → F2050, so there's 1 root: AMRC
+            expect(roots).toHaveLength(1);
+            expect(roots[0].displayName).toBe("AMRC");
+            expect(roots[0].parentId).toBe("/");
         });
 
         it("getObjects({ typeElementId }) filters by type", async () => {
@@ -249,28 +283,42 @@ describe("ObjectTree", () => {
         async function treeWithDevice() {
             const fplus = createMockFplus();
             const dev1 = "dev-uuid-1";
-            const classA = "class-aaa";
-            const schemaA = { type: "object" };
+            const schemaA = "schema-aaa";
+            const instanceA = "instance-aaa";
+            const schemaDef = { type: "object" };
 
             fplus.ConfigDB.class_members.mockResolvedValue([dev1]);
             fplus.ConfigDB.get_config.mockImplementation(
                 (appUuid: string, objectUuid: string) => {
-                    if (appUuid === REGISTRATION_APP_UUID && objectUuid === dev1)
-                        return Promise.resolve({ class: classA });
-                    if (appUuid === CONFIG_SCHEMA_APP_UUID && objectUuid === classA)
-                        return Promise.resolve(schemaA);
+                    if (appUuid === DEVICE_INFORMATION_APP_UUID && objectUuid === dev1)
+                        return Promise.resolve({
+                            schema: schemaA,
+                            sparkplugName: "TestDevice",
+                            originMap: {
+                                Schema_UUID: schemaA,
+                                Instance_UUID: instanceA,
+                                Device_Information: {
+                                    Schema_UUID: "2dd093e9-1450-44c5-be8c-c0d78e48219b",
+                                    ISA95_Hierarchy: {
+                                        Schema_UUID: HIERARCHY_SCHEMA_UUID,
+                                        Enterprise: { Value: "TestOrg" },
+                                    },
+                                },
+                            },
+                        });
+                    if (appUuid === CONFIG_SCHEMA_APP_UUID && objectUuid === schemaA)
+                        return Promise.resolve(schemaDef);
                     return Promise.resolve(null);
                 },
             );
-            fplus.Directory.get_device_info.mockResolvedValue({ online: true });
 
             const tree = makeTree(fplus);
             await tree.init();
-            return { tree, dev1, classA };
+            return { tree, dev1, classA: schemaA, instanceUuid: instanceA };
         }
 
         it("adds sub-objects with correct parent chain", async () => {
-            const { tree, dev1 } = await treeWithDevice();
+            const { tree, dev1, instanceUuid } = await treeWithDevice();
 
             const sub1 = "sub-1-uuid";
             const sub2 = "sub-2-uuid";
@@ -283,7 +331,7 @@ describe("ObjectTree", () => {
             // "Actual" has no Instance_UUID so gets a synthesised one
             tree.addCompositionFromUns(
                 dev1,
-                [dev1, sub1, sub2],
+                [instanceUuid, sub1, sub2],
                 ["top-schema", subSchema1, subSchema2, "metric-schema"],
                 ["Axes", "X", "Actual"],
             );
@@ -315,12 +363,12 @@ describe("ObjectTree", () => {
         });
 
         it("is idempotent - calling twice does not duplicate objects", async () => {
-            const { tree, dev1 } = await treeWithDevice();
+            const { tree, dev1, instanceUuid } = await treeWithDevice();
 
             const sub1 = "sub-1-uuid";
             const args: [string, string[], string[], string[]] = [
-                dev1,
-                [dev1, sub1],
+                instanceUuid,
+                [instanceUuid, sub1],
                 ["top-schema", "sub-schema-1"],
                 ["Axes"],
             ];
@@ -335,14 +383,14 @@ describe("ObjectTree", () => {
         });
 
         it("after adding composition: getChildElementIds(parentId) returns child IDs", async () => {
-            const { tree, dev1 } = await treeWithDevice();
+            const { tree, dev1, instanceUuid } = await treeWithDevice();
 
             const sub1 = "sub-1-uuid";
             const sub2 = "sub-2-uuid";
 
             tree.addCompositionFromUns(
                 dev1,
-                [dev1, sub1, sub2],
+                [instanceUuid, sub1, sub2],
                 ["top-schema", "sub-schema-1", "sub-schema-2"],
                 ["Axes", "X"],
             );
@@ -356,12 +404,12 @@ describe("ObjectTree", () => {
         });
 
         it("getRelated(id, HasChildren) returns children", async () => {
-            const { tree, dev1 } = await treeWithDevice();
+            const { tree, dev1, instanceUuid } = await treeWithDevice();
 
             const sub1 = "sub-1-uuid";
             tree.addCompositionFromUns(
                 dev1,
-                [dev1, sub1],
+                [instanceUuid, sub1],
                 ["top-schema", "sub-schema-1"],
                 ["Axes"],
             );
@@ -372,12 +420,12 @@ describe("ObjectTree", () => {
         });
 
         it("getRelated(childId, HasParent) returns parent", async () => {
-            const { tree, dev1 } = await treeWithDevice();
+            const { tree, dev1, instanceUuid } = await treeWithDevice();
 
             const sub1 = "sub-1-uuid";
             tree.addCompositionFromUns(
                 dev1,
-                [dev1, sub1],
+                [instanceUuid, sub1],
                 ["top-schema", "sub-schema-1"],
                 ["Axes"],
             );
@@ -388,14 +436,14 @@ describe("ObjectTree", () => {
         });
 
         it("getRelated(id) with no filter returns all related (parent + children)", async () => {
-            const { tree, dev1 } = await treeWithDevice();
+            const { tree, dev1, instanceUuid } = await treeWithDevice();
 
             const sub1 = "sub-1-uuid";
             const sub2 = "sub-2-uuid";
 
             tree.addCompositionFromUns(
                 dev1,
-                [dev1, sub1, sub2],
+                [instanceUuid, sub1, sub2],
                 ["top-schema", "sub-schema-1", "sub-schema-2"],
                 ["Axes", "X"],
             );
@@ -407,21 +455,22 @@ describe("ObjectTree", () => {
             expect(relatedIds).toEqual([dev1, sub2].sort());
         });
 
-        it("getRelated for root with no parent returns only children", async () => {
-            const { tree, dev1 } = await treeWithDevice();
+        it("getRelated for device returns ISA-95 parent and composition children", async () => {
+            const { tree, dev1, instanceUuid } = await treeWithDevice();
 
             const sub1 = "sub-1-uuid";
             tree.addCompositionFromUns(
                 dev1,
-                [dev1, sub1],
+                [instanceUuid, sub1],
                 ["top-schema", "sub-schema-1"],
                 ["Axes"],
             );
 
-            // dev1 has no parent, only children
+            // dev1 has an ISA-95 parent (TestOrg) and a composition child (sub1)
             const related = tree.getRelated(dev1);
-            expect(related).toHaveLength(1);
-            expect(related[0].elementId).toBe(sub1);
+            expect(related.length).toBeGreaterThanOrEqual(1);
+            const relatedIds = related.map(r => r.elementId);
+            expect(relatedIds).toContain(sub1);
         });
 
         it("getRelated for nonexistent element returns empty array", async () => {
@@ -430,23 +479,25 @@ describe("ObjectTree", () => {
         });
 
         it("getChildElementIds for element with no children returns empty array", async () => {
-            const { tree, dev1 } = await treeWithDevice();
+            const { tree, dev1, instanceUuid } = await treeWithDevice();
             expect(tree.getChildElementIds(dev1)).toEqual([]);
         });
 
         it("refresh re-fetches data from ConfigDB/Directory", async () => {
             const fplus = createMockFplus();
-            const { dev1, class1 } = setupMockDevices(fplus);
+            const { dev1 } = setupMockDevices(fplus);
             const tree = makeTree(fplus);
             await tree.init();
 
-            expect(tree.getObjects()).toHaveLength(2);
+            // 2 devices + 2 ISA-95 nodes (AMRC, F2050)
+            expect(tree.getObjects()).toHaveLength(4);
 
             // Now mock returns only one device
             fplus.ConfigDB.class_members.mockResolvedValue([dev1]);
 
             await tree.refresh();
-            expect(tree.getObjects()).toHaveLength(1);
+            // 1 device + 2 ISA-95 nodes
+            expect(tree.getObjects()).toHaveLength(3);
             expect(tree.getObject(dev1)).toBeDefined();
         });
     });

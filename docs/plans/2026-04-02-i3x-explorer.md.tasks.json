@@ -1,0 +1,19 @@
+{
+  "planPath": "docs/plans/2026-04-02-i3x-explorer.md",
+  "tasks": [
+    {"id": 0, "subject": "Task 0: Install dependencies and configure environment", "status": "pending"},
+    {"id": 1, "subject": "Task 1: QualityBadge shared component", "status": "pending", "blockedBy": [0]},
+    {"id": 2, "subject": "Task 2: i3X API client composable", "status": "pending", "blockedBy": [0]},
+    {"id": 3, "subject": "Task 3: Explorer store (tree state)", "status": "pending", "blockedBy": [2]},
+    {"id": 4, "subject": "Task 4: Explorer page shell, routing, and nav entry", "status": "pending", "blockedBy": [3]},
+    {"id": 5, "subject": "Task 5: Hierarchy tree (ExplorerTreeNode)", "status": "pending", "blockedBy": [3, 4]},
+    {"id": 6, "subject": "Task 6: Node detail sidebar", "status": "pending", "blockedBy": [4]},
+    {"id": 7, "subject": "Task 7: Current value card", "status": "pending", "blockedBy": [1, 2, 4]},
+    {"id": 8, "subject": "Task 8: Relationship graph (Cytoscape.js)", "status": "pending", "blockedBy": [2, 4]},
+    {"id": 9, "subject": "Task 9: History panel (ECharts + CSV)", "status": "pending", "blockedBy": [1, 2, 4]},
+    {"id": 10, "subject": "Task 10: Monitor store and SSE composable", "status": "pending", "blockedBy": [2]},
+    {"id": 11, "subject": "Task 11: Monitor button and dialog", "status": "pending", "blockedBy": [1, 10]},
+    {"id": 12, "subject": "Task 12: Final integration and polish", "status": "pending", "blockedBy": [5, 6, 7, 8, 9, 11]}
+  ],
+  "lastUpdated": "2026-04-02T12:00:00Z"
+}

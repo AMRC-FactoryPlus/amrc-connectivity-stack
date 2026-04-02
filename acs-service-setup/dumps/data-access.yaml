@@ -127,7 +127,7 @@ grants:
     !u UUIDs.Permission.ConfigDB.WriteConfig:
       !u DataAccess.App.DatasetDefinition: true
     !u ConfigDB.Perm.CreateObject:
-      !u DataAccess.Class.Dataset: true
+      !u DataAccess.Class.Dataset: false
     !u ConfigDB.Perm.ReadMembers:
       !u DataAccess.App.DatasetDefinition: false
       !u DataAccess.App.DatasetMetadata: false

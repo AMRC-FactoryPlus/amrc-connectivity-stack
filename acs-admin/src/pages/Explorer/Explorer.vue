@@ -8,6 +8,9 @@ import { useExplorerStore } from '@store/useExplorerStore.js'
 import { useMonitorStore } from '@store/useMonitorStore.js'
 import ExplorerTreeNode from './ExplorerTreeNode.vue'
 import NodeDetail from './NodeDetail.vue'
+import CurrentValue from './CurrentValue.vue'
+import RelationshipGraph from './RelationshipGraph.vue'
+import HistoryPanel from './HistoryPanel.vue'
 
 const store = useExplorerStore()
 const monitor = useMonitorStore()
@@ -53,8 +56,20 @@ function handleSubscribe () {
       <div v-if="!store.selectedId" class="flex items-center justify-center h-full text-slate-400 text-sm">
         Select a node from the hierarchy to view details
       </div>
-      <div v-else>
-        <div class="text-sm text-slate-500">Selected: {{ store.selectedNode?.displayName }}</div>
+      <div v-else class="space-y-4">
+        <RelationshipGraph
+          :element-id="store.selectedId"
+          :display-name="store.selectedNode?.displayName"
+          @navigate="store.selectNode"
+        />
+        <CurrentValue
+          :element-id="store.selectedId"
+          :is-composition="store.selectedNode?.isComposition ?? false"
+        />
+        <HistoryPanel
+          :element-id="store.selectedId"
+          :is-composition="store.selectedNode?.isComposition ?? false"
+        />
       </div>
     </div>
 

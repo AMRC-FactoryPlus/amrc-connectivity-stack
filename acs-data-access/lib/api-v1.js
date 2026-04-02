@@ -4,6 +4,7 @@
 */
 
 import express from "express";
+import { Map as IMap } from "immutable";
 import * as rx from "rxjs";
 
 import { APIError } from "@amrc-factoryplus/service-api";
@@ -14,10 +15,16 @@ function fail(status, message) {
   throw new APIError(status);
 }
 
+const mapStructureToPermission = IMap()
+  .set(Constants.App.UnionComponents, Constants.Perm.IncludeInUnion)
+  .set(Constants.App.SessionLimits, Constants.Perm.UseForSession)
+  .set(Constants.App.SparkplugSrc, Constants.Perm.UseSparkplug);
+
 export class APIv1 {
   constructor(opts) {
     this.data = opts.data;
     this.auth = opts.auth;
+    this.cdb = opts.cdb;
     this.log = opts.debug.bound("apiv1");
     this.routes = this.setup_routes();
   }
@@ -45,32 +52,28 @@ export class APIv1 {
     return api;
   }
 
-  async _get_dataset_uuids(principal, permission){
+  async _get_dataset_uuids(principal, permission) {
     const result = await rx.firstValueFrom(
       rx.combineLatest([
         this.data.get_dataset_definitions(),
         this.auth.watch_acl_with_perm(principal, permission)
       ]).pipe(
         rx.map(([datasets, targets]) => {
-          const output = [];
+          // datasets: IMap<datasetId, {...}>
+          // targets: Set or ISet of allowed datasetIds
 
-          datasets.forEach((value) => {
-            const obj = value.toJS ? value.toJS() : value;
-
-            Object.entries(obj).forEach(([key, val]) => {
-              // key is the dataset UUID
-              if (targets.has(key)) {
-                output.push(key);
-              }
-            });
-          });
-
-          return output;
+          return datasets
+            .keySeq()                // get all dataset IDs
+            .filter(id => targets.has(id))
+            .toArray();              // convert to plain array
         })
       )
     );
+
     return result;
   }
+
+
 
   /** GET. Returns a list of Dataset UUIDs that the client has READ access to.
    * The dataset can be optionally restricted by from and to dates. 
@@ -79,8 +82,8 @@ export class APIv1 {
    * @param to {date} (optional, inclusive) query param
   */
   async metadata_list(req, res) {
-    const result = await this._get_dataset_uuids(req.auth, Constants.Perm.ReadDataset);
-    return res.status(200).json(result);
+    const uuids = await this._get_dataset_uuids(req.auth, Constants.Perm.ReadDataset);
+    return res.status(200).json(uuids);
   }
 
   /** GET. Accepts Dataset UUID and returns metadata about a Published dataset.
@@ -124,8 +127,8 @@ export class APIv1 {
    * @returns list of dataset UUIDs the client has permission to EDIT
    */
   async structure_list(req, res){
-    const result = await this._get_dataset_uuids(req.auth, Constants.Perm.EditDataset);
-    return res.status(200).json(result);
+    const uuids = await this._get_dataset_uuids(req.auth, Constants.Perm.EditDataset);
+    return res.status(200).json(uuids);
   }
 
   /** GET. Fetches structural definition of dataset
@@ -154,7 +157,9 @@ export class APIv1 {
     if (!ok) return fail(403);
 
     const result = await rx.firstValueFrom(
-      this.data.get_dataset_by_uuid(uuid)
+      this.data.get_dataset_definitions().pipe(
+        rx.map(datasets => datasets.get(uuid))
+      )
     );
 
     if (!result) return fail(404);
@@ -163,23 +168,106 @@ export class APIv1 {
   } 
   
 
+  async _check_second_level_permission(principal, structure, config){
+    if(structure == Constants.App.SessionLimits){
+      
+      const target = config.src;
+      if(!target) return fail(422);
+
+      const ok = await this.auth.check_acl(
+          principal, 
+          mapStructureToPermission.get(structure),
+          target,
+          true
+        );
+
+      return ok; 
+      
+    }else if(structure == Constants.App.UnionComponents){
+      // Todo: check list length? 
+      if(config.length == 0) return true;
+
+      for(let target of config){
+        const ok = await this.auth.check_acl(
+          principal, 
+          mapStructureToPermission.get(structure),
+          target,
+          true
+        );
+        if(!ok) return false;
+      }
+      return true;
+
+    }else if( structure == Constants.App.SparkplugSrc){
+      
+      const target = config.src;
+      if(!target) return fail(422);
+
+      const ok = await this.auth.check_acl(
+          principal, 
+          mapStructureToPermission.get(structure),
+          target,
+          true
+        );
+
+      return ok; 
+    }else{
+      // Unhandled Structure type
+      return fail(500);
+    }
+  }
+
   /** POST. Creates a new dataset. 
    * 
-   * @param {*} req.body must be object (class, config) without uuid.
+   * @param {*} req.body must be object (structure, config) without uuid.
    * @param {*} res 
    * @returns new dataset's UUID - JSON string 
    */
   async structure_create(req, res){
+    const structure = req.body.structure;
+    if(!structure) return fail(422);
+    
+    if (!valid_uuid(structure)) return fail(410);
+
     const ok = await this.auth.check_acl(
       req.auth,
       Constants.Perm.CreateDataset,
-      uuid,
-      true,
+      structure,
+      true
     );
 
     if (!ok) return fail(403);
+
+   // 2nd persmission check depends on structure
+    // if session -> session permission, UseForSession, target = src
+    // if union -> IncludeInUnion, target = all datasets in the list
+    // if sprk -> 
+
+    
+    const config = req.body.config;
+    if(!config) return fail(422);
+    
+    const ok2 = await this._check_second_level_permission(req.auth, structure, config);
+    if(!ok2) return fail(403);
+
+
+    // Create new Dataset Object
+    const newDatasetUuid = await this.cdb.create_object(Constants.Class.Dataset);
+    this.log("Created new dataset object in ConfigDB", newDatasetUuid);
+    if(!newDatasetUuid) return fail(400);
+
+    // Create config entry for the dataset object
+    try{
+      await this.cdb.put_config(structure, newDatasetUuid, config);
+    }catch(err){
+      return fail(422);
+    }
+
+    return res.status(200).json(newDatasetUuid);
   }
 
+
+  
   /** PUT. Updates dataset definition. 
    * 
    * @param {*} req.body must be object (class, config) and UUID (optional)
@@ -187,6 +275,8 @@ export class APIv1 {
    */
   async structure_update(req, res){
     // To be implemented
+
+    // 2 level permission check same as in POST
   }
 
 

@@ -14,10 +14,18 @@ function createMockQueryApi() {
 }
 
 /*
- * Minimal mock ObjectTree: getObject returns an object for known UUIDs,
- * undefined for unknown ones.
+ * Minimal mock ObjectTree: provides getObject, getMetricMeta,
+ * getInstanceUuid, and getDescendantLeafIds stubs.
  */
-function createMockObjectTree(knownUuids: Set<string> = new Set()): ObjectTree {
+function createMockObjectTree(opts?: {
+    knownUuids?: Set<string>;
+    metricMeta?: Map<string, any>;
+    instanceUuids?: Map<string, string>;
+}): ObjectTree {
+    const knownUuids = opts?.knownUuids ?? new Set<string>();
+    const metricMeta = opts?.metricMeta ?? new Map<string, any>();
+    const instanceUuids = opts?.instanceUuids ?? new Map<string, string>();
+
     return {
         getObject: jest.fn((elementId: string) => {
             if (knownUuids.has(elementId)) {
@@ -32,6 +40,9 @@ function createMockObjectTree(knownUuids: Set<string> = new Set()): ObjectTree {
             }
             return undefined;
         }),
+        getMetricMeta: jest.fn((elementId: string) => metricMeta.get(elementId)),
+        getInstanceUuid: jest.fn((configDbUuid: string) => instanceUuids.get(configDbUuid)),
+        getDescendantLeafIds: jest.fn((_elementId: string) => []),
     } as unknown as ObjectTree;
 }
 
@@ -63,62 +74,87 @@ function makeHistory(opts?: {
 
 describe("History", () => {
     describe("buildFluxQuery", () => {
-        it("for a leaf metric (elementId contains '/') uses bottomLevelInstance filter", () => {
-            const { history } = makeHistory();
-            const instanceUuid = "aaaa-1111-2222-3333";
-            const metricName = "Temperature";
-            const elementId = `${instanceUuid}/${metricName}`;
+        it("for a leaf metric with MetricMeta uses measurement name and topLevelInstance + path filters", () => {
+            const metricMeta = new Map([
+                ["leaf-element-1", {
+                    topLevelInstanceUuid: "aaaa-1111-2222-3333",
+                    metricPath: "Phases/1",
+                    metricName: "Temperature",
+                    sparkplugType: "FloatLE",
+                    typeSuffix: "d",
+                }],
+            ]);
+            const objectTree = createMockObjectTree({ metricMeta });
+            const { history } = makeHistory({ objectTree });
 
             const query = history.buildFluxQuery(
-                elementId,
+                "leaf-element-1",
                 "2024-01-01T00:00:00Z",
                 "2024-01-02T00:00:00Z",
             );
 
             expect(query).toContain(`from(bucket: "${BUCKET}")`);
-            expect(query).toContain(`r["bottomLevelInstance"] == "${instanceUuid}"`);
+            expect(query).toContain(`r["_measurement"] == "Temperature:d"`);
+            expect(query).toContain(`r["topLevelInstance"] == "aaaa-1111-2222-3333"`);
+            expect(query).toContain(`r["path"] == "Phases/1"`);
             expect(query).toContain(`r["_field"] == "value"`);
             expect(query).toContain("sort(columns: [\"_time\"])");
-            // Should NOT contain topLevelInstance or usesInstances
-            expect(query).not.toContain("topLevelInstance");
-            expect(query).not.toContain("usesInstances");
         });
 
-        it("for a device UUID (not in ObjectTree sub-objects) uses topLevelInstance filter", () => {
-            // objectTree.getObject returns undefined for this UUID -> device-level
-            const objectTree = createMockObjectTree(new Set());
+        it("for a leaf metric without metricPath omits path filter", () => {
+            const metricMeta = new Map([
+                ["leaf-no-path", {
+                    topLevelInstanceUuid: "bbbb-2222-3333-4444",
+                    metricPath: "",
+                    metricName: "Voltage",
+                    sparkplugType: "Double",
+                    typeSuffix: "d",
+                }],
+            ]);
+            const objectTree = createMockObjectTree({ metricMeta });
             const { history } = makeHistory({ objectTree });
-            const deviceUuid = "device-uuid-1234";
 
             const query = history.buildFluxQuery(
-                deviceUuid,
+                "leaf-no-path",
                 "2024-01-01T00:00:00Z",
                 "2024-01-02T00:00:00Z",
             );
 
-            expect(query).toContain(`r["topLevelInstance"] == "${deviceUuid}"`);
-            expect(query).toContain(`r["_field"] == "value"`);
-            // Should NOT contain bottomLevelInstance or usesInstances
-            expect(query).not.toContain("bottomLevelInstance");
-            expect(query).not.toContain("usesInstances");
+            expect(query).toContain(`r["_measurement"] == "Voltage:d"`);
+            expect(query).toContain(`r["topLevelInstance"] == "bbbb-2222-3333-4444"`);
+            expect(query).not.toContain("path");
         });
 
-        it("for a sub-object UUID (found in ObjectTree with a parentId) uses usesInstances regex filter", () => {
-            const subObjectUuid = "sub-object-uuid-5678";
-            const objectTree = createMockObjectTree(new Set([subObjectUuid]));
+        it("for a device UUID (no MetricMeta) falls back to topLevelInstance filter", () => {
+            const instanceUuids = new Map([
+                ["device-uuid-1234", "instance-uuid-5678"],
+            ]);
+            const objectTree = createMockObjectTree({ instanceUuids });
             const { history } = makeHistory({ objectTree });
 
             const query = history.buildFluxQuery(
-                subObjectUuid,
+                "device-uuid-1234",
                 "2024-01-01T00:00:00Z",
                 "2024-01-02T00:00:00Z",
             );
 
-            expect(query).toContain(`r["usesInstances"] =~ /${subObjectUuid}/`);
+            expect(query).toContain(`r["topLevelInstance"] == "instance-uuid-5678"`);
             expect(query).toContain(`r["_field"] == "value"`);
-            // Should NOT contain bottomLevelInstance or topLevelInstance
-            expect(query).not.toContain("bottomLevelInstance");
-            expect(query).not.toContain("topLevelInstance");
+            expect(query).not.toContain("_measurement");
+        });
+
+        it("for unknown elementId (no MetricMeta, no instanceUuid) uses elementId as topLevelInstance", () => {
+            const objectTree = createMockObjectTree();
+            const { history } = makeHistory({ objectTree });
+
+            const query = history.buildFluxQuery(
+                "unknown-uuid",
+                "2024-01-01T00:00:00Z",
+                "2024-01-02T00:00:00Z",
+            );
+
+            expect(query).toContain(`r["topLevelInstance"] == "unknown-uuid"`);
+            expect(query).toContain(`r["_field"] == "value"`);
         });
 
         it("includes correct bucket, startTime, and endTime", () => {

@@ -40,6 +40,10 @@ function mockValueCache() {
 
 function mockHistory() {
     return {
+        getCurrentValue: jest.fn<(id: string) => Promise<I3xValueResponse | null>>()
+            .mockResolvedValue(null),
+        getCompositionValue: jest.fn<(id: string, maxDepth?: number) => Promise<I3xValueResponse | null>>()
+            .mockResolvedValue(null),
         queryHistory: jest.fn<(id: string, start: string, end: string, maxDepth?: number) => Promise<I3xVqt[]>>()
             .mockResolvedValue([]),
     };
@@ -502,14 +506,30 @@ describe("APIv1", () => {
     /* ---- Values ---- */
 
     describe("GET /objects/:elementId/value", () => {
-        it("returns VQT value", async () => {
-            const { app, valueCache } = createApp();
-            valueCache.getValue.mockReturnValue(sampleValueResponse);
+        it("returns VQT value for a non-composition object", async () => {
+            const { app, history, objectTree } = createApp();
+            objectTree.getObject.mockReturnValue(sampleObject2); // isComposition: false
+            history.getCurrentValue.mockResolvedValue(sampleValueResponse);
+
+            const res = await request(app).get("/objects/obj-2/value");
+
+            expect(res.status).toBe(200);
+            expect(res.body.result).toEqual(sampleValueResponse);
+        });
+
+        it("returns VQT value for a composition object", async () => {
+            const { app, history, objectTree } = createApp();
+            objectTree.getObject.mockReturnValue(sampleObject); // isComposition: true
+            const compositionResponse: I3xValueResponse = {
+                ...sampleValueResponse,
+                isComposition: true,
+            };
+            history.getCompositionValue.mockResolvedValue(compositionResponse);
 
             const res = await request(app).get("/objects/obj-1/value");
 
             expect(res.status).toBe(200);
-            expect(res.body.result).toEqual(sampleValueResponse);
+            expect(res.body.result).toEqual(compositionResponse);
         });
 
         it("returns 404 for missing value", async () => {
@@ -524,10 +544,11 @@ describe("APIv1", () => {
 
     describe("POST /objects/value", () => {
         it("returns bulk VQTs", async () => {
-            const { app, valueCache } = createApp();
+            const { app, history, objectTree } = createApp();
             const resp1: I3xValueResponse = { ...sampleValueResponse, elementId: "obj-1" };
-            valueCache.getValue
-                .mockImplementation((id: string) => {
+            // obj-1 is not a composition in this context (getObject returns undefined by default)
+            history.getCurrentValue
+                .mockImplementation(async (id: string) => {
                     if (id === "obj-1") return resp1;
                     return null;
                 });

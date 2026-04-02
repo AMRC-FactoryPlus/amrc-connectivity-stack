@@ -150,6 +150,7 @@ export class ValueCache {
 
         // Store in cache
         this.cache.set(elementId, vqt);
+        this.logger.debug?.({ elementId: elementId.slice(0, 16), value: vqt.value }, "ValueCache: cached UNS value");
 
         // Track this leaf under its parent (bottom UUID)
         if (!this.parentToLeaves.has(bottomUuid)) {
@@ -158,6 +159,7 @@ export class ValueCache {
         this.parentToLeaves.get(bottomUuid)!.add(elementId);
 
         // Notify listeners
+        this.logger.debug?.({ elementId: elementId.slice(0, 16), listenerCount: this.listeners.size }, "ValueCache: notifying listeners");
         for (const listener of this.listeners) {
             try {
                 listener(elementId, vqt);

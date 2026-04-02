@@ -20,10 +20,6 @@ objects:
       name: "Dataset role"
       subclassOf:
         - !u DataAccess.Group.DatasetGroup
-    # !u DataAccess.Group.StructuralDatasetType:
-    #   name: "Structural dataset type"
-    #   subclassOf:
-    #     - !u DataAccess.Group.DatasetGroup
     !u DataAccess.Group.FunctionalDatasetGroup:
       name: "Functional dataset group"
       subclassOf:
@@ -33,21 +29,6 @@ objects:
     !u DataAccess.Class.Dataset:
       name: "Dataset"
   
-  # !u DataAccess.Group.StructuralDatasetType:
-  #   !u DataAccess.Class.Sparkplug:
-  #     name: "Sparkplug dataset"
-  #     subclassOf: 
-  #       - !u DataAccess.Class.Dataset
-  #   !u DataAccess.Class.Session:
-  #     name: "Session dataset"
-  #     subclassOf: 
-  #       - !u DataAccess.Class.Dataset
-  #   !u DataAccess.Class.Union:
-  #     name: "Union dataset"
-  #     subclassOf: 
-  #       - !u DataAccess.Class.Dataset
-
-
   !u DataAccess.Group.FunctionalDatasetGroup:
     !u DataAccess.Class.Published:
       name: "Published dataset"

@@ -241,6 +241,10 @@ function createPreloadedMocks() {
     };
 
     const history = {
+        getCurrentValue: jest.fn<(id: string) => Promise<I3xValueResponse | null>>()
+            .mockImplementation(async (id: string) => valuesById.get(id) ?? null),
+        getCompositionValue: jest.fn<(id: string, maxDepth?: number) => Promise<I3xValueResponse | null>>()
+            .mockImplementation(async (id: string) => valuesById.get(id) ?? null),
         queryHistory: jest.fn<(id: string, start: string, end: string, maxDepth?: number) => Promise<I3xVqt[]>>()
             .mockImplementation(async (id: string) => {
                 if (id === "obj-cnc-1") return historyCnc1;

@@ -158,9 +158,6 @@ export class ValueCache {
         this.parentToLeaves.get(bottomUuid)!.add(elementId);
 
         // Notify listeners
-        if (this.listeners.size > 0) {
-            console.log(`[UNS] update: element=${elementId.slice(0,16)} value=${JSON.stringify(vqt.value)} listeners=${this.listeners.size}`);
-        }
         for (const listener of this.listeners) {
             try {
                 listener(elementId, vqt);

@@ -352,6 +352,104 @@ export class ObjectTree {
         return segments;
     }
 
+    /**
+     * Keys in the originMap that are metadata, not metric/container nodes.
+     * These should be skipped when building the object tree.
+     */
+    private static readonly METADATA_KEYS = new Set([
+        "Schema_UUID", "Instance_UUID", "Method", "Address", "Path",
+        "Documentation", "Sparkplug_Type", "Record_To_Historian",
+        "Eng_Unit", "Eng_Low", "Eng_High", "Deadband", "Tooltip",
+        "Value", "value",
+    ]);
+
+    /**
+     * Recursively walk an originMap and build the object tree.
+     *
+     * Each key in the map is either:
+     * - A metadata field (Schema_UUID, Sparkplug_Type, etc.) → skip
+     * - A leaf metric (has Sparkplug_Type, no sub-objects with Schema_UUID) → create leaf object
+     * - A composition container (has sub-objects) → create composition object, recurse
+     */
+    private buildTreeFromOriginMap(
+        originMap: any,
+        parentId: string,
+    ): void {
+        if (originMap == null || typeof originMap !== "object") return;
+
+        for (const [key, value] of Object.entries(originMap)) {
+            // Skip metadata fields
+            if (ObjectTree.METADATA_KEYS.has(key)) continue;
+            if (value == null || typeof value !== "object") continue;
+
+            const entry = value as any;
+
+            // Is this a leaf metric? It has Sparkplug_Type and no child containers.
+            const hasSparkplugType = typeof entry.Sparkplug_Type === "string";
+            const hasChildren = this.hasChildContainers(entry);
+            const isLeaf = hasSparkplugType && !hasChildren;
+
+            // Skip plain value objects that aren't metrics and don't have children
+            // (e.g. ISA-95 hierarchy values like { Value: "AMRC" })
+            if (!hasSparkplugType && !hasChildren) continue;
+
+            // Use Instance_UUID if available, otherwise synthesise
+            const elementId = entry.Instance_UUID
+                ?? uuidv5(`${parentId}:${key}`, I3X_UUID_NAMESPACE);
+
+            // Use Schema_UUID as typeElementId if available
+            const typeElementId = entry.Schema_UUID ?? "unknown";
+
+            if (!this.objects.has(elementId)) {
+                const obj = toI3xObject(
+                    elementId,
+                    key,
+                    typeElementId,
+                    parentId,
+                    !isLeaf,
+                );
+                this.objects.set(elementId, obj);
+
+                if (!this.children.has(parentId)) {
+                    this.children.set(parentId, new Set());
+                }
+                this.children.get(parentId)!.add(elementId);
+            }
+
+            // Recurse into children if this is a composition container
+            if (!isLeaf) {
+                this.buildTreeFromOriginMap(entry, elementId);
+            }
+        }
+    }
+
+    /**
+     * Check if an originMap entry has child containers (sub-objects
+     * that have their own Schema_UUID or Sparkplug_Type).
+     */
+    private hasChildContainers(entry: any): boolean {
+        for (const [key, value] of Object.entries(entry)) {
+            if (ObjectTree.METADATA_KEYS.has(key)) continue;
+            if (value != null && typeof value === "object") return true;
+        }
+        return false;
+    }
+
+    /**
+     * Recursively collect all Schema_UUIDs from an originMap.
+     */
+    private collectSchemaUuids(obj: any, target: Set<string>): void {
+        if (obj == null || typeof obj !== "object") return;
+        if (typeof obj.Schema_UUID === "string" && obj.Schema_UUID !== "") {
+            target.add(obj.Schema_UUID);
+        }
+        for (const value of Object.values(obj)) {
+            if (value != null && typeof value === "object") {
+                this.collectSchemaUuids(value, target);
+            }
+        }
+    }
+
     private buildNamespace(): void {
         this.namespace = toI3xNamespace(this.namespaceName, this.namespaceUri);
     }
@@ -435,6 +533,14 @@ export class ObjectTree {
             // Place under ISA-95 hierarchy if available
             if (isa95Segments.length > 0) {
                 this.ensureIsa95Hierarchy(isa95Segments, uuid);
+            }
+
+            // Build the full metric tree from the originMap
+            if (devInfo.originMap) {
+                this.buildTreeFromOriginMap(devInfo.originMap, uuid);
+                this.collectSchemaUuids(devInfo.originMap, schemaUuids);
+                this.logger.debug?.({ uuid, children: this.getChildElementIds(uuid).length },
+                    "loadDevices: built metric tree from originMap");
             }
         }
 

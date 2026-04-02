@@ -100,6 +100,7 @@ export class SubscriptionManager {
             sub.registeredElements.set(elementId, maxDepth);
         }
 
+        console.log(`[SUB] register: sub=${subscriptionId.slice(0,8)} elements=[${elementIds.join(", ")}] maxDepth=${maxDepth}`);
         this.resetTtl(sub);
     }
 
@@ -131,6 +132,8 @@ export class SubscriptionManager {
             throw new Error(`Subscription ${subscriptionId} already has an active stream`);
         }
 
+        console.log(`[SSE] stream opened: sub=${subscriptionId.slice(0,8)} registered=[${[...sub.registeredElements.keys()].map(k => k.slice(0,8)).join(", ")}] queued=${sub.queue.length}`);
+
         // Set SSE headers
         res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
         res.setHeader("Cache-Control", "no-cache");
@@ -140,12 +143,16 @@ export class SubscriptionManager {
         sub.activeStream = res;
 
         // Flush any queued items
+        if (sub.queue.length > 0) {
+            console.log(`[SSE] flushing ${sub.queue.length} queued items`);
+        }
         for (const item of sub.queue) {
             this.writeSseEvent(res, item);
         }
 
         // Handle close
         res.on("close", () => {
+            console.log(`[SSE] stream closed: sub=${subscriptionId.slice(0,8)}`);
             sub.activeStream = null;
         });
 
@@ -178,7 +185,10 @@ export class SubscriptionManager {
             sub.queue.push(item);
 
             if (sub.activeStream) {
+                console.log(`[SSE] writing seq=${item.sequenceNumber} to sub=${sub.subscriptionId.slice(0,8)} element=${elementId.slice(0,8)} value=${JSON.stringify(vqt.value)}`);
                 this.writeSseEvent(sub.activeStream, item);
+            } else {
+                console.log(`[SSE] queued seq=${item.sequenceNumber} for sub=${sub.subscriptionId.slice(0,8)} element=${elementId.slice(0,8)} (no active stream)`);
             }
         }
     }

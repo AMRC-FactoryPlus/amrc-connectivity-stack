@@ -234,10 +234,20 @@ export class APIv1 {
             const obj = objectTree.getObject(id);
             // Try UNS cache first (real-time), fall back to InfluxDB last()
             const cached = valueCache.getValue(id);
-            if (cached) { res.json(cached); return; }
+            if (cached) {
+                console.log(`[VALUE] ${id} → UNS cache hit: value=${JSON.stringify(cached.value)} ts=${cached.timestamp} age=${Date.now() - new Date(cached.timestamp).getTime()}ms`);
+                res.json(cached);
+                return;
+            }
+            console.log(`[VALUE] ${id} → UNS cache miss, querying InfluxDB...`);
             const result = obj?.isComposition
                 ? await history.getCompositionValue(id)
                 : await history.getCurrentValue(id);
+            if (result) {
+                console.log(`[VALUE] ${id} → InfluxDB hit: value=${JSON.stringify(result.value)} ts=${result.timestamp}`);
+            } else {
+                console.log(`[VALUE] ${id} → InfluxDB miss: no data`);
+            }
             if (!result) return next(notFound(`No value for ${id}`));
             res.json(result);
         }));

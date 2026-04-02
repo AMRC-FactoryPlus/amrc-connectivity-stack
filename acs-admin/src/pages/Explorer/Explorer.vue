@@ -5,6 +5,7 @@
 <script setup>
 import { onMounted } from 'vue'
 import { useExplorerStore } from '@store/useExplorerStore.js'
+import ExplorerTreeNode from './ExplorerTreeNode.vue'
 
 const store = useExplorerStore()
 
@@ -29,9 +30,11 @@ onMounted(() => {
         <div v-if="store.loadingRoots" class="text-sm text-slate-500 p-2">Loading...</div>
         <div v-else-if="store.rootIds.length === 0" class="text-sm text-slate-500 p-2">No objects found</div>
         <div v-else>
-          <div v-for="id in store.rootIds" :key="id" class="text-sm text-slate-700 px-2 py-1">
-            {{ store.nodes.get(id)?.node?.displayName ?? id }}
-          </div>
+          <ExplorerTreeNode
+            v-for="id in store.rootIds"
+            :key="id"
+            :element-id="id"
+          />
         </div>
       </div>
     </div>

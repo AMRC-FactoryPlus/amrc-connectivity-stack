@@ -41,6 +41,14 @@ const routes = [
     },
   },
   {
+    path: '/explorer',
+    component: () => import('@pages/Explorer/Explorer.vue'),
+    meta: {
+      name: 'Explorer',
+      icon: 'compass',
+    },
+  },
+  {
     path: "/login",
     component: Login,
     meta: {

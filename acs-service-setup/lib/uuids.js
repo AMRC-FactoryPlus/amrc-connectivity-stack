@@ -434,9 +434,9 @@ export const DataAccess = {
     Class: {
         Measurement: "cce0ac4e-b5ba-4837-b45d-c74df55aa2d7",
         Dataset: "c31d3cbd-01cd-4833-8014-c4512aef1e5c",
-        Sparkplug: "8d25845e-2831-11f1-ad53-3be499ddf442",
-        Session: "2f555be8-e7fc-4fb0-b62f-809cefd8a141",
-        Union: "c57a42a9-348c-4972-a05b-9082c20f2afc", 
+        // Sparkplug: "8d25845e-2831-11f1-ad53-3be499ddf442",
+        // Session: "2f555be8-e7fc-4fb0-b62f-809cefd8a141",
+        // Union: "c57a42a9-348c-4972-a05b-9082c20f2afc", 
         Published: "414d2d10-6be8-4c27-8e9f-c716ef5432b9",
         Partial: "6c583d11-9a88-4bc1-b77c-81b01e9c9827",
         MESDataset: "586205bf-81c6-4091-9d2c-f3c0465ebdc4",
@@ -450,7 +450,7 @@ export const DataAccess = {
     Group: {
         DatasetGroup: "17e37253-8626-4031-b217-28c6a03e91c1",
         DatasetRoleGroup: "56c52f70-0649-4962-8526-9ec9d1c85ca4",
-        StructuralDatasetType: "70ff7bea-bb2d-48c2-88fd-4f7a79b1aa3c", 
+        // StructuralDatasetType: "70ff7bea-bb2d-48c2-88fd-4f7a79b1aa3c", 
         FunctionalDatasetGroup: "86e5b048-e956-4820-939e-3abf3eda4e03", 
     }, 
     

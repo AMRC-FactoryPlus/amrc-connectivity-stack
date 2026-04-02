@@ -20,10 +20,10 @@ objects:
       name: "Dataset role"
       subclassOf:
         - !u DataAccess.Group.DatasetGroup
-    !u DataAccess.Group.StructuralDatasetType:
-      name: "Structural dataset type"
-      subclassOf:
-        - !u DataAccess.Group.DatasetGroup
+    # !u DataAccess.Group.StructuralDatasetType:
+    #   name: "Structural dataset type"
+    #   subclassOf:
+    #     - !u DataAccess.Group.DatasetGroup
     !u DataAccess.Group.FunctionalDatasetGroup:
       name: "Functional dataset group"
       subclassOf:
@@ -33,19 +33,19 @@ objects:
     !u DataAccess.Class.Dataset:
       name: "Dataset"
   
-  !u DataAccess.Group.StructuralDatasetType:
-    !u DataAccess.Class.Sparkplug:
-      name: "Sparkplug dataset"
-      subclassOf: 
-        - !u DataAccess.Class.Dataset
-    !u DataAccess.Class.Session:
-      name: "Session dataset"
-      subclassOf: 
-        - !u DataAccess.Class.Dataset
-    !u DataAccess.Class.Union:
-      name: "Union dataset"
-      subclassOf: 
-        - !u DataAccess.Class.Dataset
+  # !u DataAccess.Group.StructuralDatasetType:
+  #   !u DataAccess.Class.Sparkplug:
+  #     name: "Sparkplug dataset"
+  #     subclassOf: 
+  #       - !u DataAccess.Class.Dataset
+  #   !u DataAccess.Class.Session:
+  #     name: "Session dataset"
+  #     subclassOf: 
+  #       - !u DataAccess.Class.Dataset
+  #   !u DataAccess.Class.Union:
+  #     name: "Union dataset"
+  #     subclassOf: 
+  #       - !u DataAccess.Class.Dataset
 
 
   !u DataAccess.Group.FunctionalDatasetGroup:
@@ -146,14 +146,14 @@ grants:
     !u UUIDs.Permission.ConfigDB.WriteConfig:
       !u DataAccess.App.DatasetDefinition: true
     !u ConfigDB.Perm.CreateObject:
-      !u DataAccess.Group.StructuralDatasetType: true
+      !u DataAccess.Class.Dataset: true
     !u ConfigDB.Perm.ReadMembers:
       !u DataAccess.App.DatasetDefinition: false
       !u DataAccess.App.DatasetMetadata: false
-      !u DataAccess.Group.StructuralDatasetType: "both"
+      !u DataAccess.Class.Dataset: "both"
       !u DataAccess.Group.FunctionalDatasetGroup: "both"
     !u ConfigDB.Perm.WriteMembers:
-      !u DataAccess.Group.StructuralDatasetType: true
+      !u DataAccess.Class.Dataset: true
     !u ConfigDB.Perm.WriteMemberships:
       !u DataAccess.Class.Dataset: true
     !u ConfigDB.Perm.WriteSubclasses:

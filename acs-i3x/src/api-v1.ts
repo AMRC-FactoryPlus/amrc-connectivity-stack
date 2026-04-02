@@ -178,6 +178,11 @@ export class APIv1 {
         this.routes.post("/objects/value", asyncHandler(async (req: Request, res: Response) => {
             const { elementIds, maxDepth } = req.body;
             const results = await Promise.all((elementIds as string[]).map(async (id) => {
+                // Try UNS cache first (real-time), fall back to InfluxDB last()
+                const cached = valueCache.getValue(id);
+                if (cached) {
+                    return { success: true, elementId: id, result: cached };
+                }
                 const obj = objectTree.getObject(id);
                 const item = obj?.isComposition
                     ? await history.getCompositionValue(id, maxDepth ?? 1)
@@ -227,6 +232,9 @@ export class APIv1 {
         this.routes.get("/objects/:elementId/value", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
             const id = req.params.elementId;
             const obj = objectTree.getObject(id);
+            // Try UNS cache first (real-time), fall back to InfluxDB last()
+            const cached = valueCache.getValue(id);
+            if (cached) { res.json(cached); return; }
             const result = obj?.isComposition
                 ? await history.getCompositionValue(id)
                 : await history.getCurrentValue(id);

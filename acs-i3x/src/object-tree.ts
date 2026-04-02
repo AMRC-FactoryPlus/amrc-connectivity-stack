@@ -14,7 +14,7 @@ import type {
     I3xRelationshipType,
 } from "./types/i3x.js";
 
-import { RelType } from "./constants.js";
+import { RelType, HIERARCHY_SCHEMA_UUID } from "./constants.js";
 
 // Namespace for generating synthetic UUIDs for metric path segments
 // that don't have their own Instance_UUID.
@@ -27,9 +27,9 @@ import {
 } from "./mapping.js";
 
 const DEVICE_CLASS_UUID = "18773d6d-a70d-443a-b29a-3f1583195290";
-const REGISTRATION_APP_UUID = "cb40bed5-49ad-4443-a7f5-08c75009da8f";
 const CONFIG_SCHEMA_APP_UUID = "dbd8a535-52ba-4f6e-b4f8-9b71aefe09d3";
 const INFO_APP_UUID = "64a8bfa9-7772-45c4-9d1a-9e6290690957";
+const DEVICE_INFORMATION_APP_UUID = "a98ffed5-c613-4e70-bfd3-efeee250ade5";
 
 interface ObjectTreeOpts {
     fplus: any;
@@ -319,6 +319,39 @@ export class ObjectTree {
 
     /* ---- Private ---- */
 
+    /**
+     * Recursively search an originMap for an object whose Schema_UUID
+     * matches the target. Returns the matching object or undefined.
+     */
+    private findBySchemaUuid(obj: any, targetSchemaUuid: string): any | undefined {
+        if (obj == null || typeof obj !== "object") return undefined;
+        if (obj.Schema_UUID === targetSchemaUuid) return obj;
+        for (const value of Object.values(obj)) {
+            if (value != null && typeof value === "object") {
+                const found = this.findBySchemaUuid(value, targetSchemaUuid);
+                if (found) return found;
+            }
+        }
+        return undefined;
+    }
+
+    /**
+     * Extract ISA-95 hierarchy values from an ISA95_Hierarchy object.
+     * Returns the segments in order (Enterprise, Site, Area, WorkCenter, WorkUnit),
+     * stopping at the first missing level (unbroken chain).
+     */
+    private extractIsa95Segments(hierarchy: any): string[] {
+        const levels = ["Enterprise", "Site", "Area", "Work Center", "Work Unit"];
+        const segments: string[] = [];
+        for (const level of levels) {
+            const entry = hierarchy[level];
+            const value = entry?.Value ?? entry?.value;
+            if (!value) break;
+            segments.push(value);
+        }
+        return segments;
+    }
+
     private buildNamespace(): void {
         this.namespace = toI3xNamespace(this.namespaceName, this.namespaceUri);
     }
@@ -341,65 +374,93 @@ export class ObjectTree {
         const deviceUuids: string[] = await this.fplus.ConfigDB.class_members(DEVICE_CLASS_UUID);
         this.logger.debug?.({ count: deviceUuids.length }, "loadDevices: found devices");
 
-        // For each device, get its class via the Registration app
-        const classMap = new Map<string, string>(); // deviceUuid -> classUuid
-        const classUuids = new Set<string>();
+        // Track unique schema UUIDs so we create ObjectTypes for them
+        const schemaUuids = new Set<string>();
 
         for (const uuid of deviceUuids) {
-            this.logger.debug?.({ uuid }, "loadDevices: fetching registration for device");
-            const reg = await this.fplus.ConfigDB.get_config(REGISTRATION_APP_UUID, uuid);
-            if (reg?.class) {
-                classMap.set(uuid, reg.class);
-                classUuids.add(reg.class);
-                this.logger.debug?.({ uuid, class: reg.class }, "loadDevices: device class resolved");
-            } else {
-                this.logger.debug?.({ uuid }, "loadDevices: no class found for device");
-            }
-        }
+            this.logger.debug?.({ uuid }, "loadDevices: fetching DeviceInformation config");
 
-        // For each unique class, get its JSON schema and name, create ObjectType
-        this.logger.debug?.({ count: classUuids.size }, "loadDevices: loading schemas for unique classes");
-        for (const classUuid of classUuids) {
-            if (this.objectTypes.has(classUuid)) continue;
-
-            this.logger.debug?.({ classUuid }, "loadDevices: fetching schema and info for class");
-            const [schema, info] = await Promise.all([
-                this.fplus.ConfigDB.get_config(CONFIG_SCHEMA_APP_UUID, classUuid).catch(() => null),
-                this.fplus.ConfigDB.get_config(INFO_APP_UUID, classUuid).catch(() => null),
-            ]);
-            const displayName = info?.name ?? schema?.title ?? classUuid;
-            this.logger.debug?.({ classUuid, displayName }, "loadDevices: created ObjectType");
-            const objType = toI3xObjectType(
-                classUuid,
-                displayName,
-                this.namespaceUri,
-                classUuid,
-                schema ?? {},
-            );
-            this.objectTypes.set(classUuid, objType);
-        }
-
-        // For each device, get Directory info and name, create Object
-        this.logger.debug?.("loadDevices: creating device objects...");
-        for (const uuid of deviceUuids) {
-            const classUuid = classMap.get(uuid);
-            if (!classUuid) continue;
-
-            this.logger.debug?.({ uuid }, "loadDevices: fetching directory info and name");
-            const [, info] = await Promise.all([
-                this.fplus.Directory.get_device_info(uuid).catch(() => null),
+            // Fetch DeviceInformation app config — contains Schema_UUID,
+            // Instance_UUID, ISA-95 hierarchy, and the full originMap.
+            const [devInfo, nameInfo] = await Promise.all([
+                this.fplus.ConfigDB.get_config(DEVICE_INFORMATION_APP_UUID, uuid).catch(() => null),
                 this.fplus.ConfigDB.get_config(INFO_APP_UUID, uuid).catch(() => null),
             ]);
-            const displayName = info?.name ?? uuid;
 
+            if (!devInfo) {
+                this.logger.debug?.({ uuid }, "loadDevices: no DeviceInformation config, skipping");
+                continue;
+            }
+
+            // Schema_UUID from the DeviceInformation config
+            const schemaUuid = devInfo.schema ?? devInfo.originMap?.Schema_UUID;
+            if (!schemaUuid) {
+                this.logger.debug?.({ uuid }, "loadDevices: no Schema_UUID found, skipping");
+                continue;
+            }
+            schemaUuids.add(schemaUuid);
+
+            // Instance_UUID from the originMap
+            const instanceUuid = devInfo.originMap?.Instance_UUID;
+            if (instanceUuid) {
+                this.instanceToDevice.set(instanceUuid, uuid);
+                this.logger.debug?.({ uuid, instanceUuid }, "loadDevices: registered Instance→ConfigDB mapping");
+            }
+
+            // Find ISA-95 hierarchy by searching for the Hierarchy-v1 Schema_UUID
+            const hierarchyObj = this.findBySchemaUuid(devInfo.originMap, HIERARCHY_SCHEMA_UUID);
+            const isa95Segments = hierarchyObj ? this.extractIsa95Segments(hierarchyObj) : [];
+
+            if (isa95Segments.length === 0) {
+                this.logger.debug?.({ uuid }, "loadDevices: no ISA-95 Enterprise found, device will be at root");
+            } else {
+                this.logger.debug?.({ uuid, isa95: isa95Segments }, "loadDevices: ISA-95 hierarchy found");
+            }
+
+            // Display name: prefer Info app name, then sparkplugName from config
+            const displayName = nameInfo?.name ?? devInfo.sparkplugName ?? uuid;
+
+            // Create the device object — initially at "/" (re-parented below if ISA-95 exists)
             const obj = toI3xObject(
                 uuid,
                 displayName,
-                classUuid,
-                "/",    // root objects have parentId "/" per i3X convention
-                true,   // isComposition
+                schemaUuid,
+                "/",
+                true,
             );
             this.objects.set(uuid, obj);
+
+            // Place under ISA-95 hierarchy if available
+            if (isa95Segments.length > 0) {
+                this.ensureIsa95Hierarchy(isa95Segments, uuid);
+            }
         }
+
+        // For each unique schema, get its JSON schema definition and create ObjectType
+        this.logger.debug?.({ count: schemaUuids.size }, "loadDevices: loading schemas for unique device types");
+        for (const schemaUuid of schemaUuids) {
+            if (this.objectTypes.has(schemaUuid)) continue;
+
+            this.logger.debug?.({ schemaUuid }, "loadDevices: fetching schema definition");
+            const [schema, info] = await Promise.all([
+                this.fplus.ConfigDB.get_config(CONFIG_SCHEMA_APP_UUID, schemaUuid).catch(() => null),
+                this.fplus.ConfigDB.get_config(INFO_APP_UUID, schemaUuid).catch(() => null),
+            ]);
+            const displayName = info?.name ?? schema?.title ?? schemaUuid;
+            const objType = toI3xObjectType(
+                schemaUuid,
+                displayName,
+                this.namespaceUri,
+                schemaUuid,
+                schema ?? {},
+            );
+            this.objectTypes.set(schemaUuid, objType);
+            this.logger.debug?.({ schemaUuid, displayName }, "loadDevices: created ObjectType");
+        }
+
+        this.logger.debug?.({
+            devices: this.objects.size,
+            types: this.objectTypes.size,
+        }, "loadDevices: complete");
     }
 }

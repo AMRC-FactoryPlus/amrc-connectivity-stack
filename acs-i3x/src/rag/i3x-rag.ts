@@ -7,6 +7,8 @@
 
 import Graph from "graphology";
 import MiniSearch from "minisearch";
+import { bfsFromNode } from "graphology-traversal";
+import { bidirectional } from "graphology-shortest-path/unweighted";
 
 import type { I3xObject, I3xVqt } from "../types/i3x.js";
 
@@ -68,6 +70,20 @@ export interface SearchResult {
 
 export interface SearchRelatedResult extends SearchResult {
     related: Array<{ elementId: string; displayName: string; depth: number }>;
+}
+
+export interface TraversalNode {
+    elementId: string;
+    displayName: string;
+    depth: number;
+}
+
+export interface CompositionTreeNode {
+    elementId: string;
+    displayName: string;
+    typeElementId: string;
+    isComposition: boolean;
+    children: CompositionTreeNode[];
 }
 
 /* ------------------------------------------------------------------ */
@@ -155,12 +171,69 @@ export class I3xRag {
         }));
     }
 
-    /** Return neighbours within `hops` of a node. STUB — will be implemented in Task 3. */
-    neighborhood(_elementId: string, _hops: number = 2): Array<{ elementId: string; displayName: string; depth: number }> {
-        return [];
+    /* -- graph traversal ------------------------------------------- */
+
+    /** BFS from a node, collecting visited nodes up to N hops. Does NOT include the source. */
+    traverse(elementId: string, hops: number = 1): TraversalNode[] {
+        if (!this.graph.hasNode(elementId)) return [];
+
+        const result: TraversalNode[] = [];
+        bfsFromNode(this.graph, elementId, (node, attrs, depth) => {
+            if (depth > hops) return true;       // stop traversal
+            if (depth > 0) {                      // skip source node
+                result.push({
+                    elementId: node,
+                    displayName: attrs.displayName,
+                    depth,
+                });
+            }
+        });
+        return result;
+    }
+
+    /** Return neighbours within `hops` of a node. Delegates to traverse(). */
+    neighborhood(elementId: string, hops: number = 2): TraversalNode[] {
+        return this.traverse(elementId, hops);
+    }
+
+    /** Shortest path between two nodes. Returns null if either doesn't exist or no path. */
+    findPath(fromId: string, toId: string): string[] | null {
+        if (!this.graph.hasNode(fromId) || !this.graph.hasNode(toId)) return null;
+        if (fromId === toId) return [fromId];
+        return bidirectional(this.graph, fromId, toId);
+    }
+
+    /** Build a nested composition tree starting from a node. */
+    compositionTree(elementId: string, maxDepth: number = 0): CompositionTreeNode | null {
+        if (!this.graph.hasNode(elementId)) return null;
+        return this.buildCompositionNode(elementId, 0, maxDepth);
     }
 
     /* -- internals ------------------------------------------------- */
+
+    private buildCompositionNode(
+        elementId: string,
+        currentDepth: number,
+        maxDepth: number,
+    ): CompositionTreeNode {
+        const attrs = this.graph.getNodeAttributes(elementId);
+        const childIds = this.objectTree.getChildElementIds(elementId);
+
+        let children: CompositionTreeNode[] = [];
+        if (maxDepth === 0 || currentDepth < maxDepth) {
+            children = childIds.map(cid =>
+                this.buildCompositionNode(cid, currentDepth + 1, maxDepth),
+            );
+        }
+
+        return {
+            elementId,
+            displayName: attrs.displayName,
+            typeElementId: attrs.typeElementId,
+            isComposition: attrs.isComposition,
+            children,
+        };
+    }
 
     private createIndex(): MiniSearch<I3xObject> {
         return new MiniSearch<I3xObject>({

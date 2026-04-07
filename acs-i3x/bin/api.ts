@@ -104,6 +104,7 @@ const api = await new WebAPI({
         namespaceName: env.I3X_NAMESPACE_NAME || "Default",
         namespaceUri: env.I3X_NAMESPACE_URI || "https://example.com",
         mcpServer,
+        logger,
     }),
 }).init();
 

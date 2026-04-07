@@ -1,4 +1,5 @@
-import { I3xRag, ObjectTreeLike, ValueCacheLike, HistoryLike, SearchResult, SearchRelatedResult, TraversalNode, CompositionTreeNode } from "../../src/rag/i3x-rag.js";
+import { jest } from "@jest/globals";
+import { I3xRag, ObjectTreeLike, ValueCacheLike, HistoryLike, SearchResult, SearchRelatedResult, TraversalNode, CompositionTreeNode, RelationshipMapEntry, TypeSchemaResult, ValueFilterResult } from "../../src/rag/i3x-rag.js";
 import type { I3xObject, I3xVqt } from "../../src/types/i3x.js";
 
 /*
@@ -96,6 +97,25 @@ function createMockObjectTree(): ObjectTreeLike {
 function createMockValueCache(): ValueCacheLike {
     return {
         getValue: (_id: string) => null,
+    };
+}
+
+function createMockValueCacheWithValues(
+    values: Map<string, I3xVqt>,
+): ValueCacheLike {
+    return {
+        getValue: (id: string) => {
+            const vqt = values.get(id);
+            if (!vqt) return null;
+            const obj = objectMap.get(id);
+            return {
+                elementId: id,
+                isComposition: obj?.isComposition ?? false,
+                value: vqt.value,
+                quality: vqt.quality,
+                timestamp: vqt.timestamp,
+            };
+        },
     };
 }
 
@@ -365,6 +385,150 @@ describe("I3xRag", () => {
         it("returns null for nonexistent node", () => {
             const result = rag.compositionTree("nonexistent");
             expect(result).toBeNull();
+        });
+    });
+
+    /* ---- analysis methods ---- */
+
+    const recentTimestamp = new Date(Date.now() - 30_000).toISOString();  // 30s ago
+    const staleTimestamp = new Date(Date.now() - 600_000).toISOString();  // 10min ago
+
+    const prePopulatedValues = new Map<string, I3xVqt>([
+        ["x-pos",        { value: 123.4,  quality: "Good", timestamp: recentTimestamp }],
+        ["y-pos",        { value: 567.8,  quality: "Good", timestamp: recentTimestamp }],
+        ["spindle-spd",  { value: 12000,  quality: "Good", timestamp: recentTimestamp }],
+        ["joint1-angle", { value: 45.0,   quality: "Bad",  timestamp: staleTimestamp }],
+    ]);
+
+    describe("relationshipMap", () => {
+        let rag: I3xRag;
+
+        beforeEach(() => {
+            rag = new I3xRag(createMockObjectTree(), createMockValueCache(), createMockHistory());
+            rag.init();
+        });
+
+        it("returns type-level adjacency entries", () => {
+            const map: RelationshipMapEntry[] = rag.relationshipMap();
+            expect(map.length).toBeGreaterThan(0);
+            for (const entry of map) {
+                expect(typeof entry.fromType).toBe("string");
+                expect(typeof entry.toType).toBe("string");
+                expect(typeof entry.count).toBe("number");
+                expect(entry.count).toBeGreaterThan(0);
+            }
+        });
+
+        it("has an entry for schema-cnc -> schema-axes with count 1", () => {
+            const map = rag.relationshipMap();
+            const entry = map.find(
+                e => e.fromType === "schema-cnc" && e.toType === "schema-axes",
+            );
+            expect(entry).toBeDefined();
+            expect(entry!.count).toBe(1);
+        });
+    });
+
+    describe("typeSchema", () => {
+        let rag: I3xRag;
+
+        beforeEach(() => {
+            rag = new I3xRag(createMockObjectTree(), createMockValueCache(), createMockHistory());
+            rag.init();
+        });
+
+        it("returns correct child type distribution for schema-axis", () => {
+            const result: TypeSchemaResult | null = rag.typeSchema("schema-axis");
+            expect(result).not.toBeNull();
+            expect(result!.typeElementId).toBe("schema-axis");
+            expect(result!.instanceCount).toBe(2);
+            expect(result!.childTypeCounts["metric"]).toBe(2);
+        });
+
+        it("returns null for nonexistent type", () => {
+            const result = rag.typeSchema("nonexistent-type-xyz");
+            expect(result).toBeNull();
+        });
+    });
+
+    describe("valueFilter", () => {
+        let rag: I3xRag;
+
+        beforeEach(() => {
+            const valueCache = createMockValueCacheWithValues(prePopulatedValues);
+            rag = new I3xRag(createMockObjectTree(), valueCache, createMockHistory());
+            rag.init();
+        });
+
+        it("filters by quality (quality='Bad' -> just joint1-angle)", () => {
+            const results: ValueFilterResult[] = rag.valueFilter({ quality: "Bad" });
+            expect(results.length).toBe(1);
+            expect(results[0].elementId).toBe("joint1-angle");
+        });
+
+        it("filters by min/max value (min=100, max=200 -> just x-pos)", () => {
+            const results = rag.valueFilter({ minValue: 100, maxValue: 200 });
+            expect(results.length).toBe(1);
+            expect(results[0].elementId).toBe("x-pos");
+            expect(results[0].value).toBe(123.4);
+        });
+
+        it("missing=true returns objects with no cached value (all 4 leaves have values -> 0 results)", () => {
+            const results = rag.valueFilter({ missing: true });
+            expect(results.length).toBe(0);
+        });
+
+        it("no filter returns all 4 leaf values", () => {
+            const results = rag.valueFilter();
+            expect(results.length).toBe(4);
+            const ids = results.map(r => r.elementId).sort();
+            expect(ids).toEqual(["joint1-angle", "spindle-spd", "x-pos", "y-pos"]);
+        });
+    });
+
+    describe("staleValues", () => {
+        let rag: I3xRag;
+
+        beforeEach(() => {
+            const valueCache = createMockValueCacheWithValues(prePopulatedValues);
+            rag = new I3xRag(createMockObjectTree(), valueCache, createMockHistory());
+            rag.init();
+        });
+
+        it("threshold=300s returns joint1-angle (timestamp 600s ago)", () => {
+            const results: ValueFilterResult[] = rag.staleValues(300);
+            expect(results.length).toBe(1);
+            expect(results[0].elementId).toBe("joint1-angle");
+        });
+
+        it("threshold=999999 returns empty (nothing that stale)", () => {
+            const results = rag.staleValues(999999);
+            expect(results).toEqual([]);
+        });
+    });
+
+    describe("getHistory", () => {
+        it("delegates to history.queryHistory and returns result", async () => {
+            const historyData: I3xVqt[] = [
+                { value: 100, quality: "Good", timestamp: "2026-04-01T00:00:00Z" },
+                { value: 200, quality: "Good", timestamp: "2026-04-01T01:00:00Z" },
+            ];
+
+            const mockHistory: HistoryLike = {
+                queryHistory: jest.fn().mockResolvedValue(historyData),
+            };
+
+            const rag = new I3xRag(createMockObjectTree(), createMockValueCache(), mockHistory);
+            rag.init();
+
+            const result = await rag.getHistory("x-pos", "2026-04-01T00:00:00Z", "2026-04-01T02:00:00Z");
+
+            expect(result).toEqual(historyData);
+            expect(mockHistory.queryHistory).toHaveBeenCalledWith(
+                "x-pos",
+                "2026-04-01T00:00:00Z",
+                "2026-04-01T02:00:00Z",
+            );
         });
     });
 });

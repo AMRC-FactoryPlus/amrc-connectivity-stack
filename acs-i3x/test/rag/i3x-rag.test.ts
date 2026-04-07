@@ -1,4 +1,3 @@
-import { jest } from "@jest/globals";
 import { I3xRag, ObjectTreeLike, ValueCacheLike, HistoryLike } from "../../src/rag/i3x-rag.js";
 import type { I3xObject, I3xVqt } from "../../src/types/i3x.js";
 

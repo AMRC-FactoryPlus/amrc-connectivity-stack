@@ -10,3 +10,5 @@ config.mk
 spirit-schemas/
 /acs-opcua-server-edge/test/
 /.mcp.json
+
+node_modules/

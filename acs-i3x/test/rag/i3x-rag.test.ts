@@ -1,4 +1,4 @@
-import { I3xRag, ObjectTreeLike, ValueCacheLike, HistoryLike, SearchResult, SearchRelatedResult } from "../../src/rag/i3x-rag.js";
+import { I3xRag, ObjectTreeLike, ValueCacheLike, HistoryLike, SearchResult, SearchRelatedResult, TraversalNode, CompositionTreeNode } from "../../src/rag/i3x-rag.js";
 import type { I3xObject, I3xVqt } from "../../src/types/i3x.js";
 
 /*
@@ -209,7 +209,7 @@ describe("I3xRag", () => {
             expect(Array.isArray(results[0].related)).toBe(true);
         });
 
-        it.skip("related nodes include neighbours within hops (depends on Task 3)", () => {
+        it("related nodes include neighbours within hops", () => {
             const results = rag.searchRelated("Device_A", 1);
             expect(results.length).toBeGreaterThanOrEqual(1);
             const related = results[0].related;
@@ -217,6 +217,154 @@ describe("I3xRag", () => {
             // Device_A's direct neighbours: site (parent), axes, spindle (children)
             const relatedIds = related.map(r => r.elementId).sort();
             expect(relatedIds).toEqual(expect.arrayContaining(["axes", "site", "spindle"]));
+        });
+    });
+
+    describe("traverse", () => {
+        let rag: I3xRag;
+
+        beforeEach(() => {
+            rag = new I3xRag(createMockObjectTree(), createMockValueCache(), createMockHistory());
+            rag.init();
+        });
+
+        it("1 hop from device-a returns site, axes, spindle (not x-axis)", () => {
+            const result: TraversalNode[] = rag.traverse("device-a", 1);
+            const ids = result.map(r => r.elementId).sort();
+            expect(ids).toEqual(["axes", "site", "spindle"]);
+            expect(ids).not.toContain("x-axis");
+        });
+
+        it("does not include the source node", () => {
+            const result = rag.traverse("device-a", 1);
+            const ids = result.map(r => r.elementId);
+            expect(ids).not.toContain("device-a");
+        });
+
+        it("returns empty for nonexistent node", () => {
+            const result = rag.traverse("nonexistent", 1);
+            expect(result).toEqual([]);
+        });
+
+        it("2 hops reaches grandchildren (x-axis, y-axis)", () => {
+            const result = rag.traverse("device-a", 2);
+            const ids = result.map(r => r.elementId);
+            expect(ids).toContain("x-axis");
+            expect(ids).toContain("y-axis");
+        });
+    });
+
+    describe("findPath", () => {
+        let rag: I3xRag;
+
+        beforeEach(() => {
+            rag = new I3xRag(createMockObjectTree(), createMockValueCache(), createMockHistory());
+            rag.init();
+        });
+
+        it("shortest path x-pos -> y-pos has length 5", () => {
+            // x-pos -> x-axis -> axes -> y-axis -> y-pos
+            const path = rag.findPath("x-pos", "y-pos");
+            expect(path).not.toBeNull();
+            expect(path!.length).toBe(5);
+            expect(path![0]).toBe("x-pos");
+            expect(path![path!.length - 1]).toBe("y-pos");
+        });
+
+        it("returns null for nonexistent node", () => {
+            expect(rag.findPath("nonexistent", "x-pos")).toBeNull();
+            expect(rag.findPath("x-pos", "nonexistent")).toBeNull();
+        });
+
+        it("adjacent nodes have path length 2", () => {
+            // device-a -> axes are adjacent (parent-child edge)
+            const path = rag.findPath("device-a", "axes");
+            expect(path).not.toBeNull();
+            expect(path!.length).toBe(2);
+        });
+
+        it("path to self has length 1", () => {
+            const path = rag.findPath("device-a", "device-a");
+            expect(path).not.toBeNull();
+            expect(path!.length).toBe(1);
+            expect(path![0]).toBe("device-a");
+        });
+    });
+
+    describe("neighborhood", () => {
+        let rag: I3xRag;
+
+        beforeEach(() => {
+            rag = new I3xRag(createMockObjectTree(), createMockValueCache(), createMockHistory());
+            rag.init();
+        });
+
+        it("returns nodes grouped by depth (1-hop from axes: device-a, x-axis, y-axis)", () => {
+            const result = rag.neighborhood("axes", 1);
+            const ids = result.map(r => r.elementId).sort();
+            expect(ids).toEqual(["device-a", "x-axis", "y-axis"]);
+        });
+
+        it("includes depth on each result", () => {
+            const result = rag.neighborhood("axes", 2);
+            expect(result.length).toBeGreaterThan(0);
+            for (const node of result) {
+                expect(typeof node.depth).toBe("number");
+                expect(node.depth).toBeGreaterThanOrEqual(1);
+                expect(node.depth).toBeLessThanOrEqual(2);
+            }
+        });
+
+        it("returns empty for nonexistent node", () => {
+            const result = rag.neighborhood("nonexistent");
+            expect(result).toEqual([]);
+        });
+    });
+
+    describe("compositionTree", () => {
+        let rag: I3xRag;
+
+        beforeEach(() => {
+            rag = new I3xRag(createMockObjectTree(), createMockValueCache(), createMockHistory());
+            rag.init();
+        });
+
+        it("returns nested tree for device-a with 2 children (axes, spindle)", () => {
+            const tree: CompositionTreeNode | null = rag.compositionTree("device-a");
+            expect(tree).not.toBeNull();
+            expect(tree!.elementId).toBe("device-a");
+            expect(tree!.displayName).toBe("Device_A");
+            expect(tree!.children.length).toBe(2);
+            const childIds = tree!.children.map(c => c.elementId).sort();
+            expect(childIds).toEqual(["axes", "spindle"]);
+        });
+
+        it("children are nested recursively (axes has x-axis, y-axis; each has Position leaf)", () => {
+            const tree = rag.compositionTree("device-a");
+            expect(tree).not.toBeNull();
+            const axes = tree!.children.find(c => c.elementId === "axes");
+            expect(axes).toBeDefined();
+            expect(axes!.children.length).toBe(2);
+            const xAxis = axes!.children.find(c => c.elementId === "x-axis");
+            expect(xAxis).toBeDefined();
+            expect(xAxis!.children.length).toBe(1);
+            expect(xAxis!.children[0].elementId).toBe("x-pos");
+            expect(xAxis!.children[0].displayName).toBe("Position");
+            expect(xAxis!.children[0].children).toEqual([]);
+        });
+
+        it("respects maxDepth (maxDepth=1 means children have empty children arrays)", () => {
+            const tree = rag.compositionTree("device-a", 1);
+            expect(tree).not.toBeNull();
+            expect(tree!.children.length).toBe(2);
+            for (const child of tree!.children) {
+                expect(child.children).toEqual([]);
+            }
+        });
+
+        it("returns null for nonexistent node", () => {
+            const result = rag.compositionTree("nonexistent");
+            expect(result).toBeNull();
         });
     });
 });

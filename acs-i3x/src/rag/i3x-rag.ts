@@ -56,6 +56,21 @@ interface NodeAttributes {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Search result types                                               */
+/* ------------------------------------------------------------------ */
+
+export interface SearchResult {
+    elementId: string;
+    displayName: string;
+    typeElementId: string;
+    score: number;
+}
+
+export interface SearchRelatedResult extends SearchResult {
+    related: Array<{ elementId: string; displayName: string; depth: number }>;
+}
+
+/* ------------------------------------------------------------------ */
 /*  I3xRag                                                            */
 /* ------------------------------------------------------------------ */
 
@@ -101,6 +116,48 @@ export class I3xRag {
 
     edgeCount(): number {
         return this.graph.size;
+    }
+
+    /* -- search --------------------------------------------------- */
+
+    /** Full-text search across displayName and typeElementId. */
+    search(query: string, limit: number = 20): SearchResult[] {
+        const raw = this.index.search(query, { prefix: true, fuzzy: 0.2 });
+        return raw.slice(0, limit).map(r => ({
+            elementId: r.id as string,
+            displayName: r.displayName as string,
+            typeElementId: r.typeElementId as string,
+            score: r.score,
+        }));
+    }
+
+    /** Search filtered to a specific typeElementId. */
+    searchByType(typeElementId: string, query: string, limit: number = 20): SearchResult[] {
+        const raw = this.index.search(query, {
+            prefix: true,
+            fuzzy: 0.2,
+            filter: (result) => result.typeElementId === typeElementId,
+        });
+        return raw.slice(0, limit).map(r => ({
+            elementId: r.id as string,
+            displayName: r.displayName as string,
+            typeElementId: r.typeElementId as string,
+            score: r.score,
+        }));
+    }
+
+    /** Search with related neighbours attached to each result. */
+    searchRelated(query: string, hops: number = 1, limit: number = 20): SearchRelatedResult[] {
+        const results = this.search(query, limit);
+        return results.map(r => ({
+            ...r,
+            related: this.neighborhood(r.elementId, hops),
+        }));
+    }
+
+    /** Return neighbours within `hops` of a node. STUB — will be implemented in Task 3. */
+    neighborhood(_elementId: string, _hops: number = 2): Array<{ elementId: string; displayName: string; depth: number }> {
+        return [];
     }
 
     /* -- internals ------------------------------------------------- */

@@ -1,4 +1,4 @@
-import { I3xRag, ObjectTreeLike, ValueCacheLike, HistoryLike } from "../../src/rag/i3x-rag.js";
+import { I3xRag, ObjectTreeLike, ValueCacheLike, HistoryLike, SearchResult, SearchRelatedResult } from "../../src/rag/i3x-rag.js";
 import type { I3xObject, I3xVqt } from "../../src/types/i3x.js";
 
 /*
@@ -130,6 +130,93 @@ describe("I3xRag", () => {
             rag.rebuild();
             expect(rag.nodeCount()).toBe(13);
             expect(rag.edgeCount()).toBe(12);
+        });
+    });
+
+    describe("search", () => {
+        let rag: I3xRag;
+
+        beforeEach(() => {
+            rag = new I3xRag(createMockObjectTree(), createMockValueCache(), createMockHistory());
+            rag.init();
+        });
+
+        it("finds objects by displayName", () => {
+            const results: SearchResult[] = rag.search("Device_A");
+            expect(results.length).toBeGreaterThanOrEqual(1);
+            expect(results[0].elementId).toBe("device-a");
+            expect(results[0].displayName).toBe("Device_A");
+        });
+
+        it("finds by partial name (Position → 2 results: x-pos, y-pos)", () => {
+            const results = rag.search("Position");
+            expect(results.length).toBe(2);
+            const ids = results.map(r => r.elementId).sort();
+            expect(ids).toEqual(["x-pos", "y-pos"]);
+        });
+
+        it("returns empty array for no match", () => {
+            const results = rag.search("NonExistent_XYZ_12345");
+            expect(results).toEqual([]);
+        });
+
+        it("respects limit parameter", () => {
+            // "isa95-level" appears in typeElementId of enterprise & site
+            const results = rag.search("isa95-level", 1);
+            expect(results.length).toBe(1);
+        });
+
+        it("results include score (typeof number)", () => {
+            const results = rag.search("Device_A");
+            expect(results.length).toBeGreaterThanOrEqual(1);
+            expect(typeof results[0].score).toBe("number");
+        });
+    });
+
+    describe("searchByType", () => {
+        let rag: I3xRag;
+
+        beforeEach(() => {
+            rag = new I3xRag(createMockObjectTree(), createMockValueCache(), createMockHistory());
+            rag.init();
+        });
+
+        it("filters to given type (searchByType('schema-axis', 'X') → x-axis only)", () => {
+            const results: SearchResult[] = rag.searchByType("schema-axis", "X");
+            expect(results.length).toBe(1);
+            expect(results[0].elementId).toBe("x-axis");
+            expect(results[0].typeElementId).toBe("schema-axis");
+        });
+
+        it("returns empty when type has no matches", () => {
+            const results = rag.searchByType("nonexistent-type", "X");
+            expect(results).toEqual([]);
+        });
+    });
+
+    describe("searchRelated", () => {
+        let rag: I3xRag;
+
+        beforeEach(() => {
+            rag = new I3xRag(createMockObjectTree(), createMockValueCache(), createMockHistory());
+            rag.init();
+        });
+
+        it("returns search results with `related` array", () => {
+            const results: SearchRelatedResult[] = rag.searchRelated("Device_A");
+            expect(results.length).toBeGreaterThanOrEqual(1);
+            expect(results[0].elementId).toBe("device-a");
+            expect(Array.isArray(results[0].related)).toBe(true);
+        });
+
+        it.skip("related nodes include neighbours within hops (depends on Task 3)", () => {
+            const results = rag.searchRelated("Device_A", 1);
+            expect(results.length).toBeGreaterThanOrEqual(1);
+            const related = results[0].related;
+            expect(related.length).toBeGreaterThan(0);
+            // Device_A's direct neighbours: site (parent), axes, spindle (children)
+            const relatedIds = related.map(r => r.elementId).sort();
+            expect(relatedIds).toEqual(expect.arrayContaining(["axes", "site", "spindle"]));
         });
     });
 });

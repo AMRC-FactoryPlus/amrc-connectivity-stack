@@ -15,6 +15,7 @@ export function routes(opts: {
     namespaceName: string;
     namespaceUri: string;
     mcpServer?: McpServer;
+    logger?: any;
 }) {
     const api = new APIv1(opts);
 
@@ -38,7 +39,7 @@ export function routes(opts: {
 
         // Mount MCP Streamable HTTP endpoint (if configured)
         if (opts.mcpServer) {
-            mountMcpTransport(app, opts.mcpServer);
+            mountMcpTransport(app, opts.mcpServer, opts.logger);
         }
     };
 }

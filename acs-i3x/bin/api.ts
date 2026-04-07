@@ -1,10 +1,13 @@
 import { ServiceClient, UUIDs } from "@amrc-factoryplus/service-client";
 import { WebAPI } from "@amrc-factoryplus/service-api";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { routes } from "../src/routes.js";
 import { ObjectTree } from "../src/object-tree.js";
 import { ValueCache } from "../src/value-cache.js";
 import { History } from "../src/history.js";
 import { SubscriptionManager } from "../src/subscriptions.js";
+import { I3xRag } from "../src/rag/i3x-rag.js";
+import { registerRagTools } from "../src/mcp/tools.js";
 import { Version } from "../src/constants.js";
 import { GIT_VERSION } from "../src/git-version.js";
 import pino from "pino";
@@ -58,6 +61,17 @@ const subscriptions = new SubscriptionManager({
     ttl: parseInt(env.I3X_SUBSCRIPTION_TTL || "300000"),
 });
 
+// Build RAG engine (graph + search index)
+logger.debug("Building RAG engine...");
+const i3xRag = new I3xRag(objectTree, valueCache, history);
+i3xRag.init();
+logger.debug({ nodes: i3xRag.nodeCount(), edges: i3xRag.edgeCount() }, "RAG engine built");
+
+// MCP server
+const mcpServer = new McpServer({ name: "acs-i3x-rag", version: "1.0.0" });
+registerRagTools(mcpServer, i3xRag);
+logger.info("MCP server registered with 12 RAG tools");
+
 // Start HTTP server via WebAPI
 // In dev mode, make all paths public (no Kerberos keytab needed)
 const devNoAuth = env.DEV_NO_AUTH === "true";
@@ -89,6 +103,7 @@ const api = await new WebAPI({
         subscriptions,
         namespaceName: env.I3X_NAMESPACE_NAME || "Default",
         namespaceUri: env.I3X_NAMESPACE_URI || "https://example.com",
+        mcpServer,
     }),
 }).init();
 
@@ -99,9 +114,14 @@ logger.info(`acs-i3x server running on port ${env.PORT || 8080}`);
 if (env.I3X_DISABLE_REFRESH !== "true") {
     const pollInterval = parseInt(env.I3X_POLL_INTERVAL || "60000");
     setInterval(() => {
-        objectTree.refresh().catch(err => {
-            logger.error({ err }, "Failed to refresh object tree");
-        });
+        objectTree.refresh()
+            .then(() => {
+                i3xRag.rebuild();
+                logger.debug({ nodes: i3xRag.nodeCount() }, "RAG engine rebuilt after refresh");
+            })
+            .catch(err => {
+                logger.error({ err }, "Failed to refresh object tree");
+            });
     }, pollInterval);
     logger.debug({ pollInterval }, "Object tree refresh enabled");
 } else {

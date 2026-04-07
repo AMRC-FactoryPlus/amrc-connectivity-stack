@@ -11,15 +11,14 @@ import java.net.URI;
 import java.util.ServiceConfigurationError;
 
 import org.eclipse.jetty.server.*;
-
-//import org.glassfish.grizzly.http.server.HttpServer;
-//import org.glassfish.jersey.grizzly2.httpserver.GrizzlyHttpServerFactory;
+import org.eclipse.jetty.server.handler.*;
 
 import org.glassfish.jersey.inject.hk2.AbstractBinder;
 import org.glassfish.jersey.server.ContainerFactory;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.server.ServerProperties;
 
+import uk.co.amrc.factoryplus.notify.NotifyV2;
 import uk.co.amrc.factoryplus.metadb.db.Dataflow;
 import uk.co.amrc.factoryplus.metadb.db.RdfStore;
 
@@ -49,22 +48,12 @@ public final class Main {
         public T get () throws Throwable;
     }
 
-    private static <T> T orSCE(Throws<T> supp, String msg)
-    {
-        try {
-            return supp.get();
-        }
-        catch (Throwable t) {
-            throw new ServiceConfigurationError(msg, t);
-        }
-    }
-
     private Server createServer ()
     {
         var server = new Server(port);
 
-        final var model = this.model;
-        final var app = new ResourceConfig()
+        var model = this.model;
+        var v2app = new ResourceConfig()
             .property(ServerProperties.PROCESSING_RESPONSE_ERRORS_ENABLED, true)
             .packages("uk.co.amrc.factoryplus.metadb.api")
             .register(new AbstractBinder () {
@@ -72,9 +61,23 @@ public final class Main {
                     bind(model).to(RdfStore.class);
                 }
             });
+        var v2api = new ContextHandler(
+            ContainerFactory.createContainer(Handler.class, v2app), "/v2");
 
-        var handler = ContainerFactory.createContainer(Handler.class, app);
-        server.setHandler(handler);
+        var notify = NotifyV2.builder()
+            .build()
+            .buildHandlerFor(server);
+        var webapp = new ResourceConfig()
+            .packages("uk.co.amrc.factoryplus.webapi");
+        var webapi = new ContextHandler(
+            ContainerFactory.createContainer(Handler.class, webapp), "/");
+
+        var coll = new ContextHandlerCollection();
+        coll.addHandler(v2api);
+        coll.addHandler(notify);
+        coll.addHandler(webapi);
+
+        server.setHandler(coll);
 
         return server;
     }

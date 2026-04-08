@@ -1,0 +1,80 @@
+{{- if and .Values.configdb.enabled .Values.configdb.backup.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: configdb-backups
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    "helm.sh/hook": pre-upgrade
+    "helm.sh/hook-weight": "-10"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.configdb.backup.storageSize }}
+
+---
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: configdb-pre-upgrade-backup
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    "helm.sh/hook": pre-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  ttlSecondsAfterFinished: 300
+  template:
+    spec:
+      restartPolicy: Never
+      volumes:
+        - name: krb5-conf
+          configMap:
+            name: krb5-conf
+        - name: krb5-keytabs-dbinit
+          secret:
+            secretName: krb5-keytabs
+            items:
+              - path: dbadmin
+                key: op1pgadmin
+        - name: backups
+          persistentVolumeClaim:
+            claimName: configdb-backups
+      containers:
+        - name: pg-backup
+{{ include "amrc-connectivity-stack.image" (list . .Values.configdb) | indent 10 }}
+          command: ["/usr/bin/k5start", "-Uf", "/keytabs/dbadmin"]
+          args:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              TIMESTAMP=$(date -u +%Y-%m-%dT%H-%M-%SZ)
+              BACKUP_FILE="/backups/configdb-backup-${TIMESTAMP}.sql"
+              echo "Running pg_dump to ${BACKUP_FILE}..."
+              pg_dump -h "$PGHOST" -U "$PGUSER" -d configdb -f "$BACKUP_FILE"
+              echo "Backup complete."
+              RETENTION={{ .Values.configdb.backup.retention }}
+              ls -t /backups/configdb-backup-*.sql | tail -n +$((RETENTION + 1)) | xargs -r rm --
+              echo "Rotation complete. Current backups:"
+              ls -lh /backups/
+          env:
+            - name: KRB5_CONFIG
+              value: /config/krb5-conf/krb5.conf
+            - name: PGHOST
+              value: postgres.{{ .Release.Namespace }}.svc.cluster.local
+            - name: PGUSER
+              value: op1pgadmin
+          volumeMounts:
+            - mountPath: /config/krb5-conf
+              name: krb5-conf
+            - mountPath: /keytabs
+              name: krb5-keytabs-dbinit
+            - mountPath: /backups
+              name: backups
+  backoffLimit: 0
+{{- end }}

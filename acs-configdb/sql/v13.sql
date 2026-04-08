@@ -25,7 +25,7 @@ call migrate_to(13, $$
         begin
             -- Pre-flight: check for duplicate Instance_UUIDs among
             -- Sparkplug Device objects that have an origin map.
-            select (c.json->>'Instance_UUID')::uuid
+            select (c.json->'originMap'->>'Instance_UUID')::uuid
             into dup_instance_uuid
             from all_membership m
                 join object o on o.id = m.id
@@ -36,8 +36,8 @@ call migrate_to(13, $$
             where m.class = (
                     select id from object
                     where uuid = sparkplug_device_class)
-                and c.json ? 'Instance_UUID'
-            group by (c.json->>'Instance_UUID')::uuid
+                and c.json->'originMap' ? 'Instance_UUID'
+            group by (c.json->'originMap'->>'Instance_UUID')::uuid
             having count(*) > 1
             limit 1;
 
@@ -52,7 +52,7 @@ call migrate_to(13, $$
             -- Iterate over each Sparkplug Device whose object UUID does
             -- not already match its Instance_UUID.
             for obj_id, obj_uuid, instance_uuid in
-                select o.id, o.uuid, (c.json->>'Instance_UUID')::uuid
+                select o.id, o.uuid, (c.json->'originMap'->>'Instance_UUID')::uuid
                 from all_membership m
                     join object o on o.id = m.id
                     join object app on app.uuid = device_info_app
@@ -62,8 +62,8 @@ call migrate_to(13, $$
                 where m.class = (
                         select id from object
                         where uuid = sparkplug_device_class)
-                    and c.json ? 'Instance_UUID'
-                    and o.uuid != (c.json->>'Instance_UUID')::uuid
+                    and c.json->'originMap' ? 'Instance_UUID'
+                    and o.uuid != (c.json->'originMap'->>'Instance_UUID')::uuid
             loop
                 raise notice 'Aligning Device %: object UUID % -> Instance_UUID %',
                     obj_id, obj_uuid, instance_uuid;

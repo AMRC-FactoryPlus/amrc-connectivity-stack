@@ -18,11 +18,16 @@ import org.glassfish.jersey.server.ContainerFactory;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.server.ServerProperties;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import uk.co.amrc.factoryplus.notify.NotifyV2;
 import uk.co.amrc.factoryplus.metadb.db.Dataflow;
 import uk.co.amrc.factoryplus.metadb.db.RdfStore;
 
 public final class Main {
+    private static final Logger log = LoggerFactory.getLogger(Main.class);
+
     public static void main (String[] args) throws Throwable
     {
         final int port = Integer.parseUnsignedInt(System.getenv("PORT"));
@@ -55,6 +60,7 @@ public final class Main {
         var model = this.model;
         var v2app = new ResourceConfig()
             .property(ServerProperties.PROCESSING_RESPONSE_ERRORS_ENABLED, true)
+            .packages("uk.co.amrc.factoryplus.providers")
             .packages("uk.co.amrc.factoryplus.metadb.api")
             .register(new AbstractBinder () {
                 protected void configure () {
@@ -68,6 +74,7 @@ public final class Main {
             .build()
             .buildHandlerFor(server);
         var webapp = new ResourceConfig()
+            .packages("uk.co.amrc.factoryplus.providers")
             .packages("uk.co.amrc.factoryplus.webapi");
         var webapi = new ContextHandler(
             ContainerFactory.createContainer(Handler.class, webapp), "/");

@@ -83,10 +83,10 @@
       <groupId>org.glassfish.jersey.inject</groupId>
       <artifactId>jersey-hk2</artifactId>
     </dependency>
-    <dependency>
+    <!--dependency>
       <groupId>org.glassfish.jersey.media</groupId>
       <artifactId>jersey-media-json-processing</artifactId>
-    </dependency>
+    </dependency-->
     <dependency>
       <groupId>dev.harrel</groupId>
       <artifactId>json-schema</artifactId>

@@ -43,6 +43,7 @@ public class RdfStore
     private Dataset     dataset;
 
     private Dataflow        dataflow;
+    private MetaDBNotify    metaNotify;
     private AppMapper       appMapper;
     private SchemaTracker   schemaTracker;
 
@@ -62,6 +63,7 @@ public class RdfStore
         dataset.addNamedModel(Vocab.G_derived, derived);
 
         dataflow        = new Dataflow(this);
+        metaNotify      = new MetaDBNotify(this);
         appMapper       = new AppMapper(this);
         schemaTracker   = new SchemaTracker(this);
     }
@@ -71,6 +73,7 @@ public class RdfStore
     public InfModel derived () { return derived; }
 
     public Dataflow dataflow () { return dataflow; }
+    public MetaDBNotify metaNotify () { return metaNotify; }
     public AppMapper appMapper () { return appMapper; }
     public SchemaTracker schemaTracker () { return schemaTracker; }
 

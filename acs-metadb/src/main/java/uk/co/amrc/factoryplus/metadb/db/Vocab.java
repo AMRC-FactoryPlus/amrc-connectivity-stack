@@ -77,20 +77,6 @@ public class Vocab
     public static final UUID U_Unowned      = UUID.fromString(
         "091e796a-65c0-4080-adff-c3ce01a65b2e");
 
-    public static Option<UUID> parseUUID (String uuid)
-    {
-        /* Initial length check as UUID.fromString is too lenient. */
-        if (uuid.length() != 36)
-            return Option.none();
-
-        try {
-            return Option.some(UUID.fromString(uuid)); 
-        }
-        catch (IllegalArgumentException e) {
-            return Option.none();
-        }
-    }
-    
     public static Literal uuidLiteral (UUID uuid)
     {
         return ResourceFactory.createPlainLiteral(uuid.toString());

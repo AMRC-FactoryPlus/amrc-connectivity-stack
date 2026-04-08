@@ -9,8 +9,8 @@ import rx from "rxjs";
 import * as rxx     from "@amrc-factoryplus/rx-util";
 
 import { DataAccess as Constants }  from './constants.js';
-import { valid_uuid, valid_krb }    from "./validate.js";
-
+import { valid_uuid, valid_krb, DatasetValidity }    from "./validate.js";
+import { RxClient, UUIDs } from '@amrc-factoryplus/rx-client';
 
 export class DataFlow {
   constructor(opts) {
@@ -23,7 +23,14 @@ export class DataFlow {
     this.dataset_definitions = this._build_dataset_definitions();
   }
 
-  // Todo: check if dataset is duplicated (in all unions, session, sparkplug) -> set as invalid dataset
+
+  run() {
+    // this.dataset_definitions.subscribe(ss => 
+    //   this.log("Dataset Definitions UPDATE %o", ss.toJS())
+    // );
+    
+  }
+
   _build_dataset_definitions() {
     return rxx.rx(
       rx.combineLatest([
@@ -40,15 +47,21 @@ export class DataFlow {
         });
 
         return rx.from(grouped.entrySeq()).pipe(
+          // Flatten all datasets across all apps
           rx.mergeMap(([structure, datasets]) =>
             rx.from((datasets || IMap()).entrySeq()).pipe(
               rx.map(([datasetId, config]) => ({
                 datasetId,
-                value: { structure, config }
+                definition: { structure, config }
               }))
             )
           ),
-          rx.reduce((acc, { datasetId, value }) => acc.set(datasetId, value), IMap())
+
+          // Group into: { datasetId: [definitions] }
+          rx.reduce((acc, { datasetId, definition }) => {
+            const existing = acc.get(datasetId, []);
+            return acc.set(datasetId, [...existing, definition]);
+          }, IMap())
         );
       }),
 
@@ -56,13 +69,35 @@ export class DataFlow {
     );
   }
 
-  get_dataset_definitions(){
+  get_dataset_definitions(validity){
+    if(validity == DatasetValidity.VALID){
+      return this._get_valid_dataset_definitions();
+    }else if (validity == DatasetValidity.INVALID){
+      return this._get_invalid_dataset_definitions();
+    }else if(validity == DatasetValidity.ALL){
+      return this._get_all_dataset_definitions();
+    }else{
+      throw Error("Unhandled dataset validity type.");
+    }
+  }
+
+  _get_all_dataset_definitions(){
     return this.dataset_definitions;
   }
 
-  run() {
-    this.dataset_definitions.subscribe(ss => 
-      this.log("Dataset Definitions UPDATE %o", ss.toJS())
+  _get_valid_dataset_definitions() {
+    return this.dataset_definitions.pipe(
+      rx.map((map) =>
+        map.filter((definitions) => definitions.length === 1)
+      )
+    );
+  }
+
+  _get_invalid_dataset_definitions() {
+    return this.dataset_definitions.pipe(
+      rx.map((map) =>
+        map.filter((definitions) => definitions.length > 1)
+      )
     );
   }
 }

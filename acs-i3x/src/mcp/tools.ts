@@ -1,4 +1,8 @@
 /*
+ * Copyright (c) University of Sheffield AMRC 2026.
+ */
+
+/*
  * MCP tool registrations for I3xRag.
  *
  * Registers 12 tools (search, graph traversal, analysis) on an McpServer
@@ -147,6 +151,16 @@ export function registerRagTools(server: McpServer, rag: I3xRag): void {
         async ({ element_id, start_time, end_time }) => {
             const history = await rag.getHistory(element_id, start_time, end_time);
             return jsonResult(history);
+        },
+    );
+
+    server.tool(
+        "get_values",
+        "Get current values for one or more elements, trying cache first then InfluxDB.",
+        { element_ids: z.array(z.string()) },
+        async ({ element_ids }) => {
+            const values = await rag.getValues(element_ids);
+            return jsonResult(values);
         },
     );
 }

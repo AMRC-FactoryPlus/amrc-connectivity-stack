@@ -6,10 +6,13 @@
 import express from "express";
 import { Map as IMap } from "immutable";
 import * as rx from "rxjs";
+import {InfluxDB, flux} from '@influxdata/influxdb-client';
 
 import { APIError } from "@amrc-factoryplus/service-api";
 import { DataAccess as Constants } from "./constants.js";
-import { valid_grant, valid_krb, valid_uuid } from "./validate.js";
+import { valid_grant, valid_krb, valid_uuid, DatasetValidity } from "./validate.js";
+
+
 
 function fail(status, message) {
   throw new APIError(status);
@@ -26,6 +29,9 @@ export class APIv1 {
     this.auth = opts.auth;
     this.cdb = opts.cdb;
     this.log = opts.debug.bound("apiv1");
+    this.influx_bucket = opts.influx_bucket;
+    this.influx_org = opts.influx_org;
+    this.influx_query_api = opts.influx_client.getQueryApi(opts.influx_org);
     this.routes = this.setup_routes();
   }
 
@@ -52,10 +58,12 @@ export class APIv1 {
     return api;
   }
 
-  async _get_dataset_uuids(principal, permission) {
+  async _get_allowed_dataset_uuids(principal, permission, dataset_validity) {
+    const dataset_def_obs = this.data.get_dataset_definitions(dataset_validity);
+    
     const result = await rx.firstValueFrom(
       rx.combineLatest([
-        this.data.get_dataset_definitions(),
+        dataset_def_obs,
         this.auth.watch_acl_with_perm(principal, permission)
       ]).pipe(
         rx.map(([datasets, targets]) => {
@@ -80,9 +88,10 @@ export class APIv1 {
    * Dates must be in the format ISO date-time string in UTC 2025-11-13T09:33:18.000Z
    * @param from {date} (optional, inclusive) query param
    * @param to {date} (optional, inclusive) query param
+   * Don't return invalid datasets
   */
   async metadata_list(req, res) {
-    const uuids = await this._get_dataset_uuids(req.auth, Constants.Perm.ReadDataset);
+    const uuids = await this._get_allowed_dataset_uuids(req.auth, Constants.Perm.ReadDataset, DatasetValidity.VALID);
     return res.status(200).json(uuids);
   }
 
@@ -97,9 +106,10 @@ export class APIv1 {
                     * function {array} - Array of Functional classes - UUIDs of classes dataset belongs to (only members of Functional dataset type)
                     * metadata {object} - Map of metadata configs keyed by Application UUID - contains all config entries for dataset which use applications in the Dataset metadata class
                     * parts {array} - Subset datasets - contains UUIDs of all subclasses of dataset the client has READ access to.
+    * Don't return valid response if dataset is invalid
    */
   async metadata_uuid(req, res){
-    // To be implemented
+    // to be implemented
     const {uuid} = req.params
     if (!valid_uuid(uuid)) fail(410);
   }
@@ -115,9 +125,50 @@ export class APIv1 {
               * timestamp - ISO string
               * value - actual data value
               * unit - Engineering unit (if available)
+    * Don't return valid response if dataset is invalid
    */
   async dataset_data(req, res){
-    // To be implemented using influxdb-client-js
+    // to be implemented
+    const dataset_uuid = req.params.uuid;
+    // if (!valid_uuid(dataset_uuid)) return fail(410);
+
+    // const dataset_def = await rx.firstValueFrom(
+    //   this.data.get_dataset_definitions().pipe(
+    //     rx.map(datasets => datasets.get(dataset_uuid))
+    //   )
+    // );
+
+    // // Recursion until the structure is Device -> get data out of influx
+
+    // const source_uuid = dataset_def.config.source; 
+
+    // // get sprk uuid for that device
+    // // const instance_uuid = 
+
+    // if (!source_uuid) return fail(404);
+
+    // const query = flux`from(bucket: "${this.influx_bucket}")
+    // |> range(start: -1d)
+    // |> filter(fn: (r) => r.topLevelInstance == "${source_uuid}")`;
+
+    // const rows = [];
+
+    // this.influx_query_api.queryRows(query, {
+    //   next: (row, tableMeta) => {
+    //     const o = tableMeta.toObject(row);
+    //     rows.push({
+    //       _time: o._time,
+    //       _measurement: o._measurement,
+    //       _value: o._value
+    //     });
+    //   },
+    //   error: (err) => {
+    //     return res.status(500).json(err);
+    //   },
+    //   complete: () => {
+    //     return res.status(200).json(rows); 
+    //   }
+    // });
   }
 
   /** GET. 
@@ -125,9 +176,10 @@ export class APIv1 {
    * @param {*} req 
    * @param {*} res 
    * @returns list of dataset UUIDs the client has permission to EDIT
+   * the response should include invalid datasets 
    */
   async structure_list(req, res){
-    const uuids = await this._get_dataset_uuids(req.auth, Constants.Perm.EditDataset);
+    const uuids = await this._get_allowed_dataset_uuids(req.auth, Constants.Perm.EditDataset, DatasetValidity.ALL);
     return res.status(200).json(uuids);
   }
 
@@ -141,6 +193,7 @@ export class APIv1 {
       * uuid {UUID} - Dataset UUID
       * class {UUID} - Structural class: Sparkplug device, Union Dataset, Session
       * config {any} - Structural definition: "not visible", Union components, Session limits
+  * the response should specify structure field as invalid uuid in definition if the dataset is invalid
    */
   async structure_uuid(req, res) {
     const { uuid } = req.params;
@@ -156,15 +209,21 @@ export class APIv1 {
 
     if (!ok) return fail(403);
 
-    const result = await rx.firstValueFrom(
-      this.data.get_dataset_definitions().pipe(
+    const definition = await rx.firstValueFrom(
+      this.data.get_dataset_definitions(DatasetValidity.ALL).pipe(
         rx.map(datasets => datasets.get(uuid))
       )
     );
 
-    if (!result) return fail(404);
+    if (!definition) return fail(404);
 
-    return res.status(200).json(result);
+    if (definition.length > 1){
+      for(let def of definition){
+        def.structure = Constants.Special.InvalidDataset;
+      }
+    }
+
+    return res.status(200).json(definition);
   } 
   
 
@@ -184,7 +243,6 @@ export class APIv1 {
       return ok; 
       
     }else if(structure == Constants.App.UnionComponents){
-      // Todo: check list length? 
       if(config.length == 0) return true;
 
       for(let target of config){
@@ -285,6 +343,7 @@ export class APIv1 {
    * @param {*} req.body must be object (structure, config) and UUID (optional)
    * @param {*} res 
    */
+
   async structure_update(req, res){
     const objectUuid = await this._update_dataset_config(
       req.auth,
@@ -294,6 +353,21 @@ export class APIv1 {
     );
 
     if(!objectUuid) return fail(500);
+
+    // remove definitions from other structure apps
+    const invalid_defs = await rx.firstValueFrom(
+      this.data.get_dataset_definitions(DatasetValidity.INVALID).pipe(
+        rx.map(datasets => datasets.get(req.params.uuid)),   // extract defs
+        rx.filter(defs => defs && defs.length),              // ensure exists
+        rx.map(defs => defs.filter(d => d.structure !== req.body.structure)) // filter array
+      )
+    );
+
+    if(invalid_defs){
+      for (let i_def of invalid_defs){
+        this.cdb.delete_config(i_def.structure, objectUuid);
+      }
+    }
 
     return res.status(200).json(objectUuid);
   }

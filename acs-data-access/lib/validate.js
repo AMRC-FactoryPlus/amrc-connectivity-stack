@@ -34,3 +34,10 @@ export function valid_grant (grant) {
     if (!valid_uuid(grant.target)) return false;
     return (grant.plural === true || grant.plural === false);
 }
+
+
+export const DatasetValidity = Object.freeze({
+  VALID: 'valid',
+  INVALID: 'invalid',
+  ALL: 'all'
+});

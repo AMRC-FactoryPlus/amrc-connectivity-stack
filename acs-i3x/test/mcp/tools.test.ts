@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) University of Sheffield AMRC 2026.
+ */
+
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -44,13 +48,14 @@ describe("MCP tool registrations", () => {
         client = harness.client;
     });
 
-    it("lists all 12 tools", async () => {
+    it("lists all 13 tools", async () => {
         const { tools } = await client.listTools();
         const names = tools.map(t => t.name).sort();
         expect(names).toEqual([
             "composition_tree",
             "find_path",
             "get_history",
+            "get_values",
             "neighborhood",
             "relationship_map",
             "search",
@@ -107,6 +112,18 @@ describe("MCP tool registrations", () => {
         expect(Array.isArray(data)).toBe(true);
         expect(data.length).toBe(1);
         expect(data[0].elementId).toBe("joint1-angle");
+    });
+
+    it("get_values retrieves current values from cache for multiple elements", async () => {
+        const result = await client.callTool({ name: "get_values", arguments: { element_ids: ["x-pos", "y-pos", "joint1-angle"] } });
+        const data = parseResult(result);
+        expect(Array.isArray(data)).toBe(true);
+        expect(data.length).toBe(3);
+        const xPos = data.find((v: any) => v.elementId === "x-pos");
+        expect(xPos).toBeDefined();
+        expect(xPos.value).toBe(123.4);
+        expect(xPos.quality).toBe("Good");
+        expect(xPos.source).toBe("cache");
     });
 
     it("search with missing required query param returns error", async () => {

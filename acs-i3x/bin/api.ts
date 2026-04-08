@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) University of Sheffield AMRC 2026.
+ */
+
 import { ServiceClient, UUIDs } from "@amrc-factoryplus/service-client";
 import { WebAPI } from "@amrc-factoryplus/service-api";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -70,7 +74,7 @@ logger.debug({ nodes: i3xRag.nodeCount(), edges: i3xRag.edgeCount() }, "RAG engi
 // MCP server
 const mcpServer = new McpServer({ name: "acs-i3x-rag", version: "1.0.0" });
 registerRagTools(mcpServer, i3xRag);
-logger.info("MCP server registered with 12 RAG tools");
+logger.info("MCP server registered with 13 RAG tools");
 
 // Start HTTP server via WebAPI
 // In dev mode, make all paths public (no Kerberos keytab needed)

@@ -1,4 +1,8 @@
 /*
+ * Copyright (c) University of Sheffield AMRC 2026.
+ */
+
+/*
  * I3xRag — graph + search index for RAG-style queries over the i3X object tree.
  *
  * Mirrors all I3xObjects into a graphology undirected graph (parent-child edges)
@@ -44,6 +48,8 @@ export interface HistoryLike {
         startTime: string,
         endTime: string,
     ): Promise<I3xVqt[]>;
+    getCurrentValue(elementId: string): Promise<{ elementId: string; isComposition: boolean; value: unknown; quality: string; timestamp: string } | null>;
+    getCompositionValue(elementId: string, maxDepth?: number): Promise<{ elementId: string; isComposition: boolean; value: unknown; quality: string; timestamp: string } | null>;
 }
 
 /* ------------------------------------------------------------------ */
@@ -104,6 +110,15 @@ export interface ValueFilterResult {
     value: unknown;
     quality: string;
     timestamp: string;
+}
+
+export interface CurrentValueResult {
+    elementId: string;
+    displayName: string;
+    value: unknown;
+    quality: string;
+    timestamp: string;
+    source: "cache" | "influxdb";
 }
 
 /* ------------------------------------------------------------------ */
@@ -354,6 +369,79 @@ export class I3xRag {
     /** Delegate to history service. */
     async getHistory(elementId: string, startTime: string, endTime: string): Promise<I3xVqt[]> {
         return this.history.queryHistory(elementId, startTime, endTime);
+    }
+
+    /** Get current values for multiple elements, trying cache first then InfluxDB. */
+    async getValues(elementIds: string[]): Promise<CurrentValueResult[]> {
+        const results: CurrentValueResult[] = [];
+
+        for (const elementId of elementIds) {
+            const attrs = this.graph.getNodeAttributes(elementId);
+            if (!attrs) {
+                results.push({
+                    elementId,
+                    displayName: "Unknown",
+                    value: undefined,
+                    quality: "Unknown",
+                    timestamp: "",
+                    source: "cache",
+                });
+                continue;
+            }
+
+            // Try cache first
+            const cached = this.valueCache.getValue(elementId);
+            if (cached) {
+                results.push({
+                    elementId,
+                    displayName: attrs.displayName,
+                    value: cached.value,
+                    quality: cached.quality,
+                    timestamp: cached.timestamp,
+                    source: "cache",
+                });
+                continue;
+            }
+
+            // Fall back to InfluxDB
+            try {
+                const obj = this.objectTree.getObject(elementId);
+                const influxValue = obj?.isComposition
+                    ? await this.history.getCompositionValue(elementId)
+                    : await this.history.getCurrentValue(elementId);
+
+                if (influxValue) {
+                    results.push({
+                        elementId,
+                        displayName: attrs.displayName,
+                        value: influxValue.value,
+                        quality: influxValue.quality,
+                        timestamp: influxValue.timestamp,
+                        source: "influxdb",
+                    });
+                } else {
+                    results.push({
+                        elementId,
+                        displayName: attrs.displayName,
+                        value: undefined,
+                        quality: "Unknown",
+                        timestamp: "",
+                        source: "influxdb",
+                    });
+                }
+            } catch (err) {
+                results.push({
+                    elementId,
+                    displayName: attrs.displayName,
+                    value: undefined,
+                    quality: "Error",
+                    timestamp: "",
+                    source: "influxdb",
+                });
+            }
+        }
+
+        return results;
     }
 
     /* -- internals ------------------------------------------------- */

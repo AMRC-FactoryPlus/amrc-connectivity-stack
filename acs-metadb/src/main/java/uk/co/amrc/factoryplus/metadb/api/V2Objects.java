@@ -41,7 +41,7 @@ public class V2Objects {
         return Option.of(val)
             .filter(v -> v instanceof JsonString)
             .map(v -> ((JsonString)v).getString())
-            .flatMap(Vocab::parseUUID)
+            .flatMap(Util::parseUUID)
             .getOrElseThrow(() -> new WebApplicationException(422));
     }
 

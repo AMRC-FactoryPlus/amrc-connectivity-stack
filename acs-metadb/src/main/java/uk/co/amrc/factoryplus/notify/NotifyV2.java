@@ -41,9 +41,9 @@ public class NotifyV2
     {
         private List<Filter> filters = List.empty();
 
-        public Builder watch (String path, Handler<Observable<Update>> handler)
+        public Builder watch (String path, Handler<Observable<NotifyUpdate>> handler)
         {
-            filters.prepend(new Filter.Watch(path, handler));
+            filters = filters.prepend(new Filter.Watch(path, handler));
             return this;
         }
 
@@ -58,11 +58,12 @@ public class NotifyV2
     private NotifyV2 (List<Filter> filters)
     {
         this.filters = filters;
+        log.info("Build NotifyV2: {}", filters);
     }
 
     public static Builder builder () { return new Builder(); }
 
-    public ContextHandler buildHandlerFor (Server server)
+    public ContextHandler contextHandlerFor (Server server)
     {
         log.info("Handling WS connections on notify/v2");
         var ch = new ContextHandler("/notify");
@@ -77,10 +78,18 @@ public class NotifyV2
 
     private TextWebsocket.Endpoint newClientSession ()
     {
+        var sess = new Session(this);
         var ep = new TextWebsocket.Endpoint();
-        var sess = new Session(this, ep.getDuplex());
 
-        sess.start();
+        sess.start(ep.getDuplex());
         return ep;
+    }
+
+    public Option<Observable<NotifyUpdate>> findHandler (Session sess, Request req)
+    {
+        log.info("Finding handler for {}", req);
+        return filters.iterator()
+            .flatMap(f -> f.handleRequest(sess, req))
+            .headOption();
     }
 }

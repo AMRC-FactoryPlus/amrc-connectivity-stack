@@ -180,7 +180,7 @@ public class AppMapper {
             throw new Err.BadJson(spec.get("uuid"));
         }
 
-        var klass = Vocab.parseUUID(spec.getString("class"))
+        var klass = Util.parseUUID(spec.getString("class"))
             .flatMap(db::findObject)
             .map(FPObject::node)
             .getOrElseThrow(() -> {

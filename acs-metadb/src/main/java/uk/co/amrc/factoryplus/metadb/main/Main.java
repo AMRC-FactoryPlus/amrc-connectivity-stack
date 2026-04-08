@@ -21,7 +21,6 @@ import org.glassfish.jersey.server.ServerProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import uk.co.amrc.factoryplus.notify.NotifyV2;
 import uk.co.amrc.factoryplus.metadb.db.Dataflow;
 import uk.co.amrc.factoryplus.metadb.db.RdfStore;
 
@@ -70,9 +69,9 @@ public final class Main {
         var v2api = new ContextHandler(
             ContainerFactory.createContainer(Handler.class, v2app), "/v2");
 
-        var notify = NotifyV2.builder()
-            .build()
-            .buildHandlerFor(server);
+        var notify = model.metaNotify()
+            .notifyV2()
+            .contextHandlerFor(server);
         var webapp = new ResourceConfig()
             .packages("uk.co.amrc.factoryplus.providers")
             .packages("uk.co.amrc.factoryplus.webapi");

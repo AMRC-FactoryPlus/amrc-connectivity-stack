@@ -27,7 +27,7 @@ import org.slf4j.LoggerFactory;
 import io.vavr.*;
 import io.vavr.control.*;
 
-final class Util {
+public final class Util {
     private static final Logger log = LoggerFactory.getLogger(Util.class);
 
     private static Throwable error (String fmt, Object... args)
@@ -36,6 +36,20 @@ final class Util {
         return new Err.CorruptRDF(msg);
     }
 
+    public static UUID parseUUIDOrError (String uuid)
+    {
+        /* Initial length check as UUID.fromString is too lenient. */
+        if (uuid.length() != 36)
+            throw new IllegalArgumentException("UUID is not 36 chars long");
+        return UUID.fromString(uuid);
+    }
+
+    public static Option<UUID> parseUUID (String uuid)
+    {
+        return Try.of(() -> parseUUIDOrError(uuid))
+            .toOption();
+    }
+    
     /* This will silently ignore trailing garbage. I think this could be
      * cured by using JsonParser instead but it's not straightforward. */
     public static Try<JsonValue> tryReadJson (String json)
@@ -68,7 +82,7 @@ final class Util {
         String.class,       new Datatype(XSD.xstring, s -> s),
         Instant.class,      new Datatype(XSD.dateTime, Instant::parse),
         Integer.class,      new Datatype(XSD.xint, Integer::parseInt),
-        UUID.class,         new Datatype(XSD.xstring, UUID::fromString));
+        UUID.class,         new Datatype(XSD.xstring, Util::parseUUIDOrError));
 
     public static <T> T decodeLiteral (RDFNode node, Class<T> klass)
     {

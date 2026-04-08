@@ -12,17 +12,19 @@ import jakarta.json.*;
 
 import io.vavr.collection.*;
 
-public record Update (int status, Map<String, JsonValue> content)
+public record NotifyUpdate (int status, Map<String, JsonValue> content)
 {
-    public static Update empty (int status)
+    public static NotifyUpdate empty (int status)
     {
-        return new Update(status, HashMap.empty());
+        return new NotifyUpdate(status, HashMap.empty());
     }
-    public static Update ofResponse (Response res, boolean initial)
+    public static NotifyUpdate ofResponse (Response res, boolean initial)
     {
-        return new Update(initial ? 201 : 200, 
+        return new NotifyUpdate(initial ? 201 : 200, 
             HashMap.of("response", res.toJson()));
     }
+
+    public boolean ok () { return status < 400; }
 
     public JsonValue toJson (UUID session)
     {

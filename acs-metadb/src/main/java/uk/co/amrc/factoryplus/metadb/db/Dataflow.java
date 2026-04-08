@@ -6,6 +6,7 @@
 
 package uk.co.amrc.factoryplus.metadb.db;
 
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import jakarta.json.JsonValue;
@@ -47,7 +48,7 @@ public class Dataflow
      * made not an App). Either this should be disallowed (impractical)
      * or it will need special handling. */
     private static final Query Q_appUpdates = Vocab.query("""
-        select ?app ?obj ?value ?etag
+        select ?appU ?objU ?value ?etag
         where {
             {   select distinct ?app ?obj
                 where {
@@ -56,12 +57,16 @@ public class Dataflow
                         graph <graph/removed> { [] a ?app; <app/for> ?obj. } }
             } }
 
-            graph <graph/derived> { ?app a <app/Application>. }
+            graph <graph/derived> { 
+                ?app a <app/Application>;
+                    <core/uuid> ?appU.
+                ?obj <core/uuid> ?objU.
+            }
             # We must select out the current value from the derived
             # graph. We don't know what order the changes happened in so
             # we don't know which happened last.
             optional { graph <graph/derived> {
-                ?conf a ?app;
+                [] a ?app;
                     <app/for> ?obj;
                     <doc/content> ?value;
                     <core/uuid> ?etag.
@@ -78,19 +83,13 @@ public class Dataflow
                 rs.forEachRemaining(em::onNext);
                 em.onComplete();
             }))
-            .map(sol -> {
-                var val = Option.some(sol)
-                    .filter(s -> s.contains("value"))
-                    .map(ConfigEntry.Value::ofQuerySolution);
-                return new Update.Config(
-                    sol.getResource("app"), sol.getResource("obj"), val);
-            })
+            .map(Update.Config::ofQuerySolution)
             .share();
     }
 
     public Observable<Update.Config> configUpdates () { return configUpdates; }
 
-    public Observable<Update.Config> appUpdates (Resource app)
+    public Observable<Update.Config> appUpdates (UUID app)
     {
         return configUpdates
             .filter(u -> u.app().equals(app));
@@ -100,28 +99,34 @@ public class Dataflow
      * sure how best to avoid that; I don't really want to fall back to
      * iterating over a list all the time. */
     private static final Query Q_appState = Vocab.query("""
-        select ?obj ?value ?etag
+        select ?objU ?value ?etag
         where {
-            ?conf a ?app; <app/for> ?obj;
+            ?app <core/uuid> ?appU.
+            [] a ?app;
+                <app/for> ?obj;
                 <doc/content> ?value;
                 <core/uuid> ?etag.
+            ?obj <core/uuid> ?objU.
         }
     """);
 
-    private Map<Resource, ConfigEntry.Value> appState (Resource app)
+    private Map<UUID, ConfigEntry.Value> appState (UUID app)
     {
+        /* This method is not triggered by an Update, so it must use its
+         * own transaction. */
         return db.calculateRead(() -> 
-            Iterator.ofAll(db.selectQuery(Q_appState, "app", app))
-                .toMap(qs -> qs.getResource("obj"),
+            Iterator.ofAll(db.selectQuery(Q_appState, 
+                    "appU", Vocab.uuidLiteral(app)))
+                .toMap(qs -> Util.decodeLiteral(qs.get("objU"), UUID.class),
                     ConfigEntry.Value::ofQuerySolution));
     }
 
-    private CacheSeq<Resource, Map<Resource, ConfigEntry.Value>> _cacheAppValues
+    private CacheSeq<UUID, Map<UUID, ConfigEntry.Value>> _cacheAppValues
         = CacheSeq.builder(this::_buildAppValues)
             .withReplay()
             .build();
 
-    private Observable<Map<Resource, ConfigEntry.Value>> _buildAppValues (Resource app)
+    private Observable<Map<UUID, ConfigEntry.Value>> _buildAppValues (UUID app)
     {
         return appUpdates(app)
             .scanWith(() -> appState(app), (st, upd) -> 
@@ -133,15 +138,9 @@ public class Dataflow
             .debounce(500, TimeUnit.MILLISECONDS);
     }
 
-    private Observable<Map<Resource, ConfigEntry.Value>> appValues (Resource app)
+    public Observable<Map<UUID, ConfigEntry.Value>> appValues (UUID app)
     {
         return _cacheAppValues.get(app);
-    }
-
-    public Observable<Map<Resource, JsonValue>> appEntries (Resource app)
-    {
-        return appValues(app)
-            .map(es -> es.mapValues(v -> v.value()));
     }
 
     public void start ()

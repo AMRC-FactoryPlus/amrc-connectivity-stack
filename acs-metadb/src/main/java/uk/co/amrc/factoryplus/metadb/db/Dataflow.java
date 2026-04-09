@@ -53,15 +53,16 @@ public class Dataflow
             {   select distinct ?app ?obj
                 where {
                     { graph <graph/added> { [] a ?app; <app/for> ?obj. } }
-                    union { 
-                        graph <graph/removed> { [] a ?app; <app/for> ?obj. } }
+                    union { graph <graph/removed> { [] a ?app; <app/for> ?obj. } }
             } }
 
-            graph <graph/derived> { 
-                ?app a <app/Application>;
-                    <core/uuid> ?appU.
-                ?obj <core/uuid> ?objU.
-            }
+            # We can't handle deleting Apps yet
+            graph <graph/derived> { ?app a <app/Application>; <core/uuid> ?appU. }
+
+            # …but we must search for the obj in the removed statements
+            { graph <graph/derived> { ?obj <core/uuid> ?objU. } }
+            union { graph <graph/removed> { ?obj <core/uuid> ?objU. } }
+
             # We must select out the current value from the derived
             # graph. We don't know what order the changes happened in so
             # we don't know which happened last.
@@ -129,8 +130,8 @@ public class Dataflow
     private Observable<Map<UUID, ConfigEntry.Value>> _buildAppValues (UUID app)
     {
         return appUpdates(app)
-            .scanWith(() -> appState(app), (st, upd) -> 
-                upd.value().fold(
+            .scanWith(() -> appState(app),
+                (st, upd) -> upd.value().fold(
                     () -> st.remove(upd.obj()),
                     val -> st.put(upd.obj(), val)))
             /* Include a half-second debounce as this will always be

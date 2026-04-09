@@ -66,10 +66,10 @@ public class AppUpdater extends RequestHandler.Component
      * removed to send notify updates.
      */
     private static Query Q_orphanConfigs = Vocab.query("""
-        select ?conf
+        select ?conf ?app ?obj
         where {
             ?conf a ?app; <app/for> ?obj.
-            ?app <app/appliesTo> ?domain.
+            ?app a <app/Structured>; <app/appliesTo> ?domain.
 
             filter not exists { ?obj a ?domain. }
         }
@@ -105,10 +105,10 @@ public class AppUpdater extends RequestHandler.Component
     private void updateEntry (Resource app, Resource obj)
     {
         //log.info("Updating {} {}", app, obj);
+        var entry = request().configEntry(app, obj);
         mapper.generateConfig(app, obj)
-            .peek(j -> request()
-                .configEntry(app, obj)
-                .putRawValue(j));
+            .peek(entry::putRawValue)
+            .onEmpty(entry::removeRawValue);
     }
 
 }

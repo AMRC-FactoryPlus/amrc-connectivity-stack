@@ -34,7 +34,8 @@ export function createEdges (scene) {
     const material = new THREE.LineBasicMaterial({
       color: COLOUR_EDGE,
       transparent: true,
-      opacity: 0.4,
+      opacity: 0.5,
+      linewidth: 1,
     })
 
     lines = new THREE.LineSegments(geometry, material)

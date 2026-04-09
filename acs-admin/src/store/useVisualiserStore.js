@@ -11,6 +11,23 @@ function generateClientId () {
   return 'acs-vis-' + crypto.randomUUID()
 }
 
+// Run async tasks with limited concurrency
+async function mapConcurrent (items, concurrency, fn) {
+  const results = []
+  let index = 0
+  async function worker () {
+    while (index < items.length) {
+      const i = index++
+      results[i] = await fn(items[i])
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, worker))
+  return results
+}
+
+const MAX_CONCURRENT = 6
+const MAX_DEPTH = 10
+
 export const useVisualiserStore = defineStore('visualiser', {
   state: () => ({
     // Tree structure
@@ -70,29 +87,46 @@ export const useVisualiserStore = defineStore('visualiser', {
     },
 
     async _loadChildrenRecursive (parentIds, depth) {
-      if (parentIds.length === 0) return
+      if (parentIds.length === 0 || depth > MAX_DEPTH) return
 
       const i3x = useI3xClient()
       const nextLevel = []
 
-      // Load children for all parents at this depth in parallel
-      const results = await Promise.all(
-        parentIds.map(async (parentId) => {
-          try {
-            const children = await i3x.getRelated(parentId, 'i3x:rel:has-children')
-            return { parentId, children }
-          } catch {
-            return { parentId, children: [] }
-          }
-        }),
-      )
+      console.log(`Visualiser: loading depth ${depth}, ${parentIds.length} parents...`)
 
-      for (const { parentId, children } of results) {
+      // Use bulk endpoint: one request per depth level instead of per parent.
+      // Note: getRelatedBulk returns body.result via the shared request helper,
+      // but the bulk endpoint uses body.results (plural). So we call fetch directly.
+      const BATCH_SIZE = 200
+      const baseUrl = i3x.baseUrl
+      const allResults = []
+      for (let i = 0; i < parentIds.length; i += BATCH_SIZE) {
+        const batch = parentIds.slice(i, i + BATCH_SIZE)
+        try {
+          const res = await fetch(`${baseUrl}/objects/related`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ elementIds: batch, relationshiptype: 'i3x:rel:has-children' }),
+          })
+          const body = await res.json()
+          if (body.success && Array.isArray(body.results)) {
+            allResults.push(...body.results)
+          }
+        } catch (e) {
+          console.warn(`Visualiser: bulk related failed for batch at depth ${depth}:`, e)
+        }
+      }
+
+      for (const entry of allResults) {
+        if (!entry.success) continue
+        const parentId = entry.elementId
+        const children = entry.result || []
         const parent = this.nodes.get(parentId)
         if (!parent) continue
 
         const childIds = []
         for (const child of children) {
+          if (!child.elementId) continue
           childIds.push(child.elementId)
           if (!this.nodes.has(child.elementId)) {
             this.nodes.set(child.elementId, {
@@ -107,7 +141,8 @@ export const useVisualiserStore = defineStore('visualiser', {
         parent.childIds = childIds
       }
 
-      // Recurse to next level
+      console.log(`Visualiser: depth ${depth} done, ${nextLevel.length} children found, ${this.nodes.size} total nodes`)
+
       if (nextLevel.length > 0) {
         await this._loadChildrenRecursive(nextLevel, depth + 1)
       }
@@ -141,7 +176,10 @@ export const useVisualiserStore = defineStore('visualiser', {
     },
 
     _handleStreamData (items) {
-      for (const item of items) {
+      const arr = Array.isArray(items) ? items : [items]
+
+      for (const item of arr) {
+        if (!item.elementId) continue
         this.values.set(item.elementId, {
           value: item.value,
           quality: item.quality,

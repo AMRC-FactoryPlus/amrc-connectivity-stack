@@ -4,17 +4,14 @@
 
 import * as THREE from 'three'
 
-// Golden angle in radians for even sphere distribution
-const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5))
-
-// Distance between hierarchy shells
-const SHELL_SPACING = 20
-
-// Jitter to avoid perfect overlaps
-const JITTER = 0.5
+const TURN = 2 * Math.PI
+const JITTER = 0.3
 
 /**
  * Compute 3D positions for all nodes in the hierarchy.
+ * Uses the same radial layout approach as the old 2D visualiser:
+ * angle segments proportional to leaf count, radius increases per depth.
+ * Adds a 3D twist: Y offset varies with depth for visual depth.
  *
  * @param {Map} nodes - store.nodes Map (elementId -> { parentId, childIds, depth })
  * @param {string[]} rootIds - store.rootIds
@@ -25,67 +22,95 @@ export function computeLayout (nodes, rootIds) {
 
   if (rootIds.length === 0) return positions
 
-  // Place roots at the centre, spread slightly
-  placeGroup(rootIds, new THREE.Vector3(0, 0, 0), 5, positions)
+  // First pass: count leaves for each node (needed for proportional angles)
+  const leafCounts = new Map()
+  const maxDepthMap = new Map()
 
-  // BFS outward, placing children around their parent
-  const queue = [...rootIds]
+  function countLeaves (id) {
+    const entry = nodes.get(id)
+    if (!entry) return 1
+    if (entry.childIds.length === 0) {
+      leafCounts.set(id, 1)
+      maxDepthMap.set(id, 0)
+      return 1
+    }
+    let total = 0
+    let maxD = 0
+    for (const childId of entry.childIds) {
+      total += countLeaves(childId)
+      maxD = Math.max(maxD, (maxDepthMap.get(childId) ?? 0) + 1)
+    }
+    leafCounts.set(id, total)
+    maxDepthMap.set(id, maxD)
+    return total
+  }
 
-  while (queue.length > 0) {
-    const parentId = queue.shift()
-    const parent = nodes.get(parentId)
-    if (!parent || parent.childIds.length === 0) continue
+  // Count from a virtual root that contains all rootIds
+  let totalLeaves = 0
+  let globalMaxDepth = 0
+  for (const id of rootIds) {
+    totalLeaves += countLeaves(id)
+    globalMaxDepth = Math.max(globalMaxDepth, (maxDepthMap.get(id) ?? 0) + 1)
+  }
 
-    const parentPos = positions.get(parentId)
-    const radius = SHELL_SPACING * (1 - 0.15 * Math.min(parent.depth, 4))
+  // The ring spacing: how much radius increases per depth level
+  // Scale so the whole tree fits nicely
+  const viewRadius = 40
+  const ring = globalMaxDepth > 0 ? (viewRadius * 0.8) / globalMaxDepth : viewRadius
 
-    placeGroup(parent.childIds, parentPos, radius, positions)
+  // Place roots at centre
+  positions.set('__virtual_root__', new THREE.Vector3(0, 0, 0))
 
-    for (const childId of parent.childIds) {
-      queue.push(childId)
+  // Place all root nodes around the centre
+  const segment = TURN / Math.max(totalLeaves, 1)
+  let angle = 0
+  for (const id of rootIds) {
+    const leaves = leafCounts.get(id) ?? 1
+    placeNode(id, angle, 0, segment, ring, 0)
+    angle += segment * leaves
+  }
+
+  function placeNode (id, startAngle, radius, segment, ring, depth) {
+    const entry = nodes.get(id)
+    if (!entry) return
+
+    const leaves = leafCounts.get(id) ?? 1
+    const myAngle = startAngle + segment * leaves / 2
+
+    // Add jitter to radius for organic feel
+    const jitter = (Math.random() - 0.5) * 0.4 * ring
+
+    // 3D: use angle in XZ plane, with Y offset based on depth for 3D effect
+    const r = radius + jitter
+    const yOffset = (Math.random() - 0.5) * ring * 0.5
+    const pos = new THREE.Vector3(
+      r * Math.cos(myAngle),
+      yOffset,
+      r * Math.sin(myAngle),
+    )
+    positions.set(id, pos)
+
+    // Recurse into children
+    if (entry.childIds.length === 0) return
+
+    let childAngle = startAngle
+    for (const childId of entry.childIds) {
+      const childLeaves = leafCounts.get(childId) ?? 1
+      placeNode(childId, childAngle, radius + ring, segment, ring, depth + 1)
+      childAngle += segment * childLeaves
     }
   }
+
+  // Remove virtual root
+  positions.delete('__virtual_root__')
+
+  // Log bounds
+  let maxDist = 0
+  for (const pos of positions.values()) {
+    const d = pos.length()
+    if (d > maxDist) maxDist = d
+  }
+  console.log(`Visualiser layout: ${positions.size} nodes, maxDist ${maxDist.toFixed(1)}, maxDepth ${globalMaxDepth}`)
 
   return positions
-}
-
-/**
- * Distribute a group of node IDs on a sphere around a centre point.
- */
-function placeGroup (ids, centre, radius, positions) {
-  const count = ids.length
-
-  for (let i = 0; i < count; i++) {
-    const id = ids[i]
-    if (positions.has(id)) continue
-
-    if (count === 1) {
-      // Single child: offset slightly from parent
-      positions.set(id, new THREE.Vector3(
-        centre.x + radius * 0.5,
-        centre.y,
-        centre.z,
-      ))
-      continue
-    }
-
-    // Fibonacci sphere distribution
-    const y = 1 - (2 * i / (count - 1))  // -1 to 1
-    const radiusAtY = Math.sqrt(1 - y * y)
-    const theta = GOLDEN_ANGLE * i
-
-    const x = radiusAtY * Math.cos(theta)
-    const z = radiusAtY * Math.sin(theta)
-
-    // Add small jitter to avoid exact overlaps
-    const jx = (Math.random() - 0.5) * JITTER
-    const jy = (Math.random() - 0.5) * JITTER
-    const jz = (Math.random() - 0.5) * JITTER
-
-    positions.set(id, new THREE.Vector3(
-      centre.x + x * radius + jx,
-      centre.y + y * radius + jy,
-      centre.z + z * radius + jz,
-    ))
-  }
 }

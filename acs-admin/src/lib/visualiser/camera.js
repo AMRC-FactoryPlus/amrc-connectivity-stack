@@ -18,32 +18,50 @@ function randomRange (min, max) {
   return min + Math.random() * (max - min)
 }
 
-export function createCameraController (camera, positions) {
-  const baseDistance = 100
+/**
+ * @param {THREE.Camera} camera
+ * @param {Map} positions - elementId -> Vector3
+ * @param {function} getActiveLeafIds - returns array of elementIds with live data
+ */
+export function createCameraController (camera, positions, getActiveLeafIds) {
+  // Auto-fit: compute the bounding sphere of all positions
+  let maxDist = 0
+  for (const pos of positions.values()) {
+    const d = pos.length()
+    if (d > maxDist) maxDist = d
+  }
+  // Camera orbits outside the bounding sphere - viewing the whole graph
+  const baseDistance = Math.max(maxDist * 1.8, 25)
+  const elevationBase = baseDistance * 0.15   // slight elevation for perspective
+  const elevationSwing = baseDistance * 0.05  // subtle vertical bob
+
+  console.log(`Visualiser camera: baseDistance ${baseDistance.toFixed(1)} (maxNodeDist ${maxDist.toFixed(1)})`)
+
   let angle = 0
   let elapsed = 0
   let nextSweep = randomRange(SWEEP_INTERVAL_MIN, SWEEP_INTERVAL_MAX)
 
   // Sweep state
   let sweeping = false
-  let sweepTarget = null
   let sweepStartPos = new THREE.Vector3()
   let sweepStartLook = new THREE.Vector3()
   let sweepEndPos = new THREE.Vector3()
   let sweepEndLook = new THREE.Vector3()
   let sweepTime = 0
-  let sweepPhase = 'idle'  // idle | ease-in | hold | ease-out
+  let sweepPhase = 'idle'
   let sweepPhaseDuration = 0
 
-  // Current look target (for smooth interpolation)
   const lookTarget = new THREE.Vector3(0, 0, 0)
 
   function pickSweepTarget () {
-    // Pick a random node that has children (a device cluster)
+    // Only sweep to leaf nodes that have live data
+    const activeIds = getActiveLeafIds ? getActiveLeafIds() : []
     const candidates = []
-    for (const [id, pos] of positions) {
-      candidates.push({ id, pos })
+    for (const id of activeIds) {
+      const pos = positions.get(id)
+      if (pos) candidates.push({ id, pos })
     }
+    // Fallback: if no active leaves, don't sweep
     if (candidates.length === 0) return null
     return candidates[Math.floor(Math.random() * candidates.length)]
   }
@@ -52,7 +70,6 @@ export function createCameraController (camera, positions) {
     const target = pickSweepTarget()
     if (!target) return
 
-    sweepTarget = target
     sweeping = true
     sweepPhase = 'ease-in'
     sweepPhaseDuration = SWEEP_EASE_IN
@@ -61,7 +78,6 @@ export function createCameraController (camera, positions) {
     sweepStartPos.copy(camera.position)
     sweepStartLook.copy(lookTarget)
 
-    // Position camera close to the target, offset slightly
     const offset = new THREE.Vector3(
       LOD_SPARKLINE_SHOW * 0.8,
       LOD_SPARKLINE_SHOW * 0.3,
@@ -79,12 +95,11 @@ export function createCameraController (camera, positions) {
     sweepStartPos.copy(camera.position)
     sweepStartLook.copy(lookTarget)
 
-    // Return to orbit position
     const drift = DRIFT_MIN + (DRIFT_MAX - DRIFT_MIN) * 0.5
     const dist = baseDistance * drift
     sweepEndPos.set(
       Math.cos(angle) * dist,
-      40,
+      elevationBase,
       Math.sin(angle) * dist,
     )
     sweepEndLook.set(0, 0, 0)
@@ -127,21 +142,21 @@ export function createCameraController (camera, positions) {
 
     camera.position.set(
       Math.cos(angle) * dist,
-      30 + 10 * Math.sin(elapsed * 0.1),
+      elevationBase + elevationSwing * Math.sin(elapsed * 0.1),
       Math.sin(angle) * dist,
     )
 
     lookTarget.set(0, 0, 0)
     camera.lookAt(lookTarget)
 
-    // Check if it's time for a sweep
     nextSweep -= dt
     if (nextSweep <= 0) {
       startSweep()
+      // If no target found, retry in 5s instead of waiting another 30-45s
+      if (!sweeping) nextSweep = 5
     }
   }
 
-  /** Returns the position the camera is currently looking at. */
   function getLookTarget () {
     return lookTarget
   }

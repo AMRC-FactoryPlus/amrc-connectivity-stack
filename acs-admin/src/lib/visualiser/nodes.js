@@ -99,6 +99,8 @@ export function createNodes (scene) {
   // Brightness flash tracking
   const flashes = new Map()  // elementId -> remaining seconds
 
+  const WHITE = new THREE.Color(0xffffff)
+
   function update (dt, storeValues) {
     // Decay flashes
     for (const [id, remaining] of flashes) {
@@ -109,6 +111,9 @@ export function createNodes (scene) {
         flashes.set(id, next)
       }
     }
+
+    // Track which meshes need a GPU upload
+    const dirtyMeshes = new Set()
 
     // Update colours from values
     for (const [elementId, vqt] of storeValues) {
@@ -121,11 +126,16 @@ export function createNodes (scene) {
       // Brighten on recent update
       const flash = flashes.get(elementId)
       if (flash) {
-        colour.lerp(new THREE.Color(0xffffff), flash)
+        colour.lerp(WHITE, flash)
       }
 
       inst.mesh.setColorAt(inst.index, colour)
-      inst.mesh.instanceColor.needsUpdate = true
+      dirtyMeshes.add(inst.mesh)
+    }
+
+    // Single GPU upload per mesh, not per instance
+    for (const mesh of dirtyMeshes) {
+      mesh.instanceColor.needsUpdate = true
     }
   }
 

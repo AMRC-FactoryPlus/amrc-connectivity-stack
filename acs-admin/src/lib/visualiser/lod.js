@@ -3,25 +3,25 @@
  */
 
 import * as THREE from 'three'
-import { LOD_LABEL, LOD_SPARKLINE_SHOW, LOD_SPARKLINE_HIDE } from './constants.js'
+import { LOD_SPARKLINE_SHOW, LOD_SPARKLINE_HIDE } from './constants.js'
 
 function createLabelTexture (text) {
   const canvas = document.createElement('canvas')
   const ctx = canvas.getContext('2d')
 
-  const fontSize = 48
-  ctx.font = `${fontSize}px sans-serif`
+  const fontSize = 28
+  ctx.font = `${fontSize}px Calibri, sans-serif`
   const metrics = ctx.measureText(text)
-  const width = Math.ceil(metrics.width) + 20
-  const height = fontSize + 20
+  const width = Math.ceil(metrics.width) + 12
+  const height = fontSize + 12
 
   canvas.width = width
   canvas.height = height
 
-  ctx.font = `${fontSize}px sans-serif`
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.9)'
+  ctx.font = `${fontSize}px Calibri, sans-serif`
+  ctx.fillStyle = 'rgba(220, 220, 220, 0.85)'
   ctx.textBaseline = 'middle'
-  ctx.fillText(text, 10, height / 2)
+  ctx.fillText(text, 6, height / 2)
 
   const texture = new THREE.CanvasTexture(canvas)
   texture.minFilter = THREE.LinearFilter
@@ -29,53 +29,52 @@ function createLabelTexture (text) {
 }
 
 export function createLOD (scene, storeNodes, positions) {
-  const labels = new Map()
-  const visible = new Set()
   const sparklineVisible = new Set()
 
+  // Create all labels upfront - always visible like the old visualiser
+  const labels = []
   for (const [id, entry] of storeNodes) {
     const pos = positions.get(id)
     if (!pos) continue
+
+    // Skip leaf nodes to avoid clutter - only label non-leaves
+    if (entry.childIds.length === 0) continue
 
     const name = entry.node.displayName || entry.node.elementId.slice(0, 8)
     const { texture, aspect } = createLabelTexture(name)
     const material = new THREE.SpriteMaterial({
       map: texture,
       transparent: true,
-      opacity: 0,
+      opacity: 0.8,
       depthWrite: false,
+      sizeAttenuation: true,
     })
     const sprite = new THREE.Sprite(material)
-    const scale = 2
+    const scale = 1.0
     sprite.scale.set(scale * aspect, scale, 1)
     sprite.position.copy(pos)
-    sprite.position.y += entry.childIds.length === 0 ? 0.5 : 2
-    sprite.visible = false
+    sprite.position.y += entry.depth === 0 ? 1.5 : 0.8
     scene.add(sprite)
 
-    labels.set(id, { sprite, material, pos: sprite.position })
+    labels.push({ sprite, material, texture })
+  }
+
+  console.log(`Visualiser LOD: created ${labels.length} labels`)
+
+  // Sparkline proximity check - only needs nearby leaf nodes
+  const leafPositions = new Map()
+  for (const [id, entry] of storeNodes) {
+    if (entry.childIds.length !== 0) continue
+    const pos = positions.get(id)
+    if (pos) leafPositions.set(id, pos)
   }
 
   function update (camera, dt, onSparklineShow, onSparklineHide) {
     const camPos = camera.position
 
-    for (const [id, label] of labels) {
-      const dist = camPos.distanceTo(label.pos)
-
-      if (dist < LOD_LABEL) {
-        if (!visible.has(id)) {
-          label.sprite.visible = true
-          visible.add(id)
-        }
-        const t = 1 - (dist / LOD_LABEL)
-        label.material.opacity = Math.min(t * 2, 0.9)
-      } else {
-        if (visible.has(id)) {
-          label.sprite.visible = false
-          label.material.opacity = 0
-          visible.delete(id)
-        }
-      }
+    // Only check sparkline proximity for leaf nodes
+    for (const [id, pos] of leafPositions) {
+      const dist = camPos.distanceTo(pos)
 
       if (dist < LOD_SPARKLINE_SHOW && !sparklineVisible.has(id)) {
         sparklineVisible.add(id)
@@ -88,10 +87,10 @@ export function createLOD (scene, storeNodes, positions) {
   }
 
   function dispose () {
-    for (const [, label] of labels) {
-      scene.remove(label.sprite)
-      label.material.map.dispose()
-      label.material.dispose()
+    for (const { sprite, texture, material } of labels) {
+      scene.remove(sprite)
+      texture.dispose()
+      material.dispose()
     }
   }
 

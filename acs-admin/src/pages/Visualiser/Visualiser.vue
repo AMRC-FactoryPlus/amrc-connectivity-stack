@@ -40,7 +40,10 @@ onMounted(async () => {
   edgesCtx = createEdges(sceneCtx.scene)
   edgesCtx.build(store.nodes, positions)
 
-  const cameraCtrl = createCameraController(sceneCtx.camera, positions)
+  const cameraCtrl = createCameraController(sceneCtx.camera, positions, () => {
+    // Return IDs of leaf nodes that have received live data
+    return [...store.values.keys()]
+  })
   particlesCtx = createParticles(sceneCtx.scene)
   lodCtx = createLOD(sceneCtx.scene, store.nodes, positions)
   sparklinesCtx = createSparklines(sceneCtx.scene)
@@ -49,14 +52,21 @@ onMounted(async () => {
     cameraCtrl.update(dt)
 
     // Check for new SSE values and emit particles
+    let emitted = 0
     for (const [id, vqt] of store.values) {
       const prev = seenValues.get(id)
       if (prev !== vqt.timestamp) {
         seenValues.set(id, vqt.timestamp)
-        particlesCtx.emit(id, vqt.quality, store.nodes, positions, (nodeId) => {
+        const result = particlesCtx.emit(id, vqt.quality, store.nodes, positions, (nodeId) => {
           nodesCtx.flash(nodeId)
         })
+        emitted++
       }
+    }
+    if (emitted > 0 && !window._particleLogThrottle) {
+      console.log(`Visualiser: emitted ${emitted} particles, values=${store.values.size}`)
+      window._particleLogThrottle = true
+      setTimeout(() => { window._particleLogThrottle = false }, 2000)
     }
 
     nodesCtx.update(dt, store.values)
@@ -65,12 +75,14 @@ onMounted(async () => {
       sceneCtx.camera,
       dt,
       (id) => {
-        store.fetchHistory(id)
+        // Create an empty history entry so live SSE values get appended
+        if (!store.history.has(id)) {
+          store.history.set(id, { points: [], fetching: false, lastFetch: 0 })
+        }
         const pos = positions.get(id)
         if (pos) sparklinesCtx.show(id, pos)
       },
       (id) => {
-        store.evictHistory(id)
         sparklinesCtx.hide(id)
       },
     )

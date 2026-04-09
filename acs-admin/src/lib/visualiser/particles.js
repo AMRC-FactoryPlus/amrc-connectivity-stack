@@ -5,54 +5,44 @@
 import * as THREE from 'three'
 import {
   PARTICLE_POOL_SIZE, PARTICLE_SPEED, PARTICLE_SIZE,
-  COLOUR_GOOD, COLOUR_UNCERTAIN, COLOUR_BAD, COLOUR_STALE,
 } from './constants.js'
 
-const QUALITY_COLOURS = {
-  Good: new THREE.Color(COLOUR_GOOD),
-  GoodNoData: new THREE.Color(COLOUR_GOOD),
-  Uncertain: new THREE.Color(COLOUR_UNCERTAIN),
-  Bad: new THREE.Color(COLOUR_BAD),
-}
-const DEFAULT_COLOUR = new THREE.Color(COLOUR_STALE)
+// Pink packet colour matching old visualiser: rgb(244,215,241)
+const PACKET_PINK = 0xf4d7f1
+
+// Use a small pool of actual Mesh objects - guaranteed visible
+const POOL_SIZE = Math.min(PARTICLE_POOL_SIZE, 50)  // cap for perf with real meshes
 
 export function createParticles (scene) {
+  const sphereGeo = new THREE.SphereGeometry(PARTICLE_SIZE, 8, 6)
   const pool = []
-  let activeCount = 0
 
-  const geometry = new THREE.BufferGeometry()
-  const posAttr = new Float32Array(PARTICLE_POOL_SIZE * 3)
-  const colAttr = new Float32Array(PARTICLE_POOL_SIZE * 3)
-  const sizeAttr = new Float32Array(PARTICLE_POOL_SIZE)
-
-  geometry.setAttribute('position', new THREE.BufferAttribute(posAttr, 3))
-  geometry.setAttribute('color', new THREE.BufferAttribute(colAttr, 3))
-  geometry.setAttribute('size', new THREE.BufferAttribute(sizeAttr, 1))
-  geometry.setDrawRange(0, 0)
-
-  const material = new THREE.PointsMaterial({
-    size: PARTICLE_SIZE,
-    vertexColors: true,
-    transparent: true,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false,
-    sizeAttenuation: true,
-  })
-
-  const points = new THREE.Points(geometry, material)
-  scene.add(points)
-
-  for (let i = 0; i < PARTICLE_POOL_SIZE; i++) {
-    pool.push({ path: [], pathIndex: 0, progress: 0, colour: new THREE.Color(), alive: false })
+  for (let i = 0; i < POOL_SIZE; i++) {
+    const mat = new THREE.MeshBasicMaterial({ color: PACKET_PINK, transparent: true, opacity: 0.9 })
+    const mesh = new THREE.Mesh(sphereGeo, mat)
+    mesh.visible = false
+    scene.add(mesh)
+    pool.push({
+      mesh,
+      path: [],
+      pathIndex: 0,
+      progress: 0,
+      alive: false,
+      _onNodeHit: null,
+    })
   }
 
+  let _logCount = 0
+
   function emit (elementId, quality, storeNodes, positions, onNodeHit) {
+    // Find a dead particle
     let p = null
-    for (let i = 0; i < PARTICLE_POOL_SIZE; i++) {
+    for (let i = 0; i < POOL_SIZE; i++) {
       if (!pool[i].alive) { p = pool[i]; break }
     }
     if (!p) return
 
+    // Build path from leaf to root
     const path = []
     let current = elementId
     while (current) {
@@ -67,34 +57,33 @@ export function createParticles (scene) {
     p.path = path
     p.pathIndex = 0
     p.progress = 0
-    p.colour.copy(QUALITY_COLOURS[quality] ?? DEFAULT_COLOUR)
     p.alive = true
+    p.mesh.visible = true
     p._onNodeHit = onNodeHit
+
+    if (_logCount < 3) {
+      console.log(`Particles: emit path=${path.length} hops`)
+      _logCount++
+    }
   }
 
   function update (dt) {
-    activeCount = 0
+    const clampedDt = Math.min(dt, 0.1)
 
-    for (let i = 0; i < PARTICLE_POOL_SIZE; i++) {
+    for (let i = 0; i < POOL_SIZE; i++) {
       const p = pool[i]
-      if (!p.alive) {
-        posAttr[i * 3] = 0
-        posAttr[i * 3 + 1] = -9999
-        posAttr[i * 3 + 2] = 0
-        sizeAttr[i] = 0
-        continue
-      }
+      if (!p.alive) continue
 
       const segCount = p.path.length - 1
       const totalDuration = PARTICLE_SPEED
       const segDuration = totalDuration / segCount
 
-      p.progress += dt
+      p.progress += clampedDt
       const segIndex = Math.floor(p.progress / segDuration)
 
       if (segIndex >= segCount) {
         p.alive = false
-        sizeAttr[i] = 0
+        p.mesh.visible = false
         continue
       }
 
@@ -108,31 +97,20 @@ export function createParticles (scene) {
       const from = p.path[segIndex].pos
       const to = p.path[segIndex + 1].pos
 
-      posAttr[i * 3] = from.x + (to.x - from.x) * segT
-      posAttr[i * 3 + 1] = from.y + (to.y - from.y) * segT
-      posAttr[i * 3 + 2] = from.z + (to.z - from.z) * segT
-
-      const lifeT = p.progress / totalDuration
-      const fade = 1 - lifeT
-      colAttr[i * 3] = p.colour.r * fade
-      colAttr[i * 3 + 1] = p.colour.g * fade
-      colAttr[i * 3 + 2] = p.colour.b * fade
-
-      sizeAttr[i] = PARTICLE_SIZE * fade
-
-      activeCount++
+      p.mesh.position.set(
+        from.x + (to.x - from.x) * segT,
+        from.y + (to.y - from.y) * segT,
+        from.z + (to.z - from.z) * segT,
+      )
     }
-
-    geometry.attributes.position.needsUpdate = true
-    geometry.attributes.color.needsUpdate = true
-    geometry.attributes.size.needsUpdate = true
-    geometry.setDrawRange(0, PARTICLE_POOL_SIZE)
   }
 
   function dispose () {
-    scene.remove(points)
-    geometry.dispose()
-    material.dispose()
+    for (const p of pool) {
+      scene.remove(p.mesh)
+      p.mesh.material.dispose()
+    }
+    sphereGeo.dispose()
   }
 
   return { emit, update, dispose }

@@ -15,7 +15,7 @@ export function createScene (canvas) {
   renderer.setClearColor(BG_COLOUR)
 
   const scene = new THREE.Scene()
-  scene.fog = new THREE.FogExp2(BG_COLOUR, 0.003)
+  // No fog - let all nodes be visible regardless of distance
 
   const camera = new THREE.PerspectiveCamera(
     60,
@@ -23,39 +23,29 @@ export function createScene (canvas) {
     0.1,
     2000,
   )
-  camera.position.set(0, 40, 100)
+  camera.position.set(0, 10, 30)
   camera.lookAt(0, 0, 0)
 
-  // Ambient light so nodes are visible from all angles
-  scene.add(new THREE.AmbientLight(0xffffff, 0.4))
+  // Ambient light - brighter so nodes read well against dark bg
+  scene.add(new THREE.AmbientLight(0xffffff, 0.6))
 
-  // Point light at centre for glow effect
-  const centreLight = new THREE.PointLight(0x009fe3, 1, 200)
+  // Subtle point light at centre
+  const centreLight = new THREE.PointLight(0x009fe3, 0.5, 300)
   centreLight.position.set(0, 0, 0)
   scene.add(centreLight)
 
-  // Post-processing: bloom for the cosmos glow
+  // Post-processing: subtle bloom - high threshold so only bright
+  // emissive nodes glow, not labels or edges
   const composer = new EffectComposer(renderer)
   composer.addPass(new RenderPass(scene, camera))
 
   const bloom = new UnrealBloomPass(
     new THREE.Vector2(canvas.clientWidth, canvas.clientHeight),
-    1.2,   // strength
-    0.4,   // radius
-    0.85,  // threshold
+    0.6,   // strength (was 1.2 - much more subtle now)
+    0.3,   // radius
+    0.9,   // threshold (higher = only bright things bloom)
   )
   composer.addPass(bloom)
-
-  // Star field background
-  const starGeo = new THREE.BufferGeometry()
-  const starCount = 2000
-  const starPositions = new Float32Array(starCount * 3)
-  for (let i = 0; i < starCount * 3; i++) {
-    starPositions[i] = (Math.random() - 0.5) * 1500
-  }
-  starGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3))
-  const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.3, transparent: true, opacity: 0.6 })
-  scene.add(new THREE.Points(starGeo, starMat))
 
   // Resize handler
   function onResize () {

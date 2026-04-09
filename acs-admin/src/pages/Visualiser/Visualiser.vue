@@ -13,6 +13,7 @@ import { createEdges } from '@/lib/visualiser/edges.js'
 import { createCameraController } from '@/lib/visualiser/camera.js'
 import { createParticles } from '@/lib/visualiser/particles.js'
 import { createLOD } from '@/lib/visualiser/lod.js'
+import { createSparklines } from '@/lib/visualiser/sparklines.js'
 
 const canvas = ref(null)
 const layout = useLayoutStore()
@@ -22,6 +23,7 @@ let nodesCtx = null
 let edgesCtx = null
 let particlesCtx = null
 let lodCtx = null
+let sparklinesCtx = null
 let positions = null
 const seenValues = new Map()
 
@@ -41,6 +43,7 @@ onMounted(async () => {
   const cameraCtrl = createCameraController(sceneCtx.camera, positions)
   particlesCtx = createParticles(sceneCtx.scene)
   lodCtx = createLOD(sceneCtx.scene, store.nodes, positions)
+  sparklinesCtx = createSparklines(sceneCtx.scene)
 
   sceneCtx.onUpdate((dt) => {
     cameraCtrl.update(dt)
@@ -61,9 +64,17 @@ onMounted(async () => {
     lodCtx.update(
       sceneCtx.camera,
       dt,
-      (id) => store.fetchHistory(id),
-      (id) => store.evictHistory(id),
+      (id) => {
+        store.fetchHistory(id)
+        const pos = positions.get(id)
+        if (pos) sparklinesCtx.show(id, pos)
+      },
+      (id) => {
+        store.evictHistory(id)
+        sparklinesCtx.hide(id)
+      },
     )
+    sparklinesCtx.update(sceneCtx.camera, store.history, store.values)
   })
 
   sceneCtx.start()
@@ -71,6 +82,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(async () => {
+  if (sparklinesCtx) sparklinesCtx.dispose()
   if (lodCtx) lodCtx.dispose()
   if (particlesCtx) particlesCtx.dispose()
   if (edgesCtx) edgesCtx.dispose()

@@ -29,6 +29,12 @@ const sidebarNavItems: Item[] = [
         auth: true
     },
     {
+        title: 'Visualiser',
+        href: '/visualiser',
+        icon: 'cube',
+        auth: true
+    },
+    {
         title: 'Live Activity',
         href: '/activity',
         icon: 'table-cells',

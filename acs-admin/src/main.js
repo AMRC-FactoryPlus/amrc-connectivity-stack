@@ -49,6 +49,14 @@ const routes = [
     },
   },
   {
+    path: '/visualiser',
+    component: () => import('@pages/Visualiser/Visualiser.vue'),
+    meta: {
+      name: 'Visualiser',
+      icon: 'cube',
+    },
+  },
+  {
     path: "/login",
     component: Login,
     meta: {

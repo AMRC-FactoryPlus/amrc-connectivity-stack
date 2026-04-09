@@ -6,6 +6,7 @@ import type {ColumnDef} from '@tanstack/vue-table'
 import {h} from 'vue'
 
 import DataTableColumnHeader from '@/components/ui/data-table/DataTableColumnHeader.vue'
+import RebirthButton from '@/components/EdgeManager/RebirthButton.vue'
 
 export interface Device {
     uuid: string,
@@ -31,6 +32,24 @@ export const deviceColumns: ColumnDef<Device>[] = [
         filterFn: (row, id, value) => {
             return value.includes(row.getValue(id))
         },
+    },
+    {
+        id: 'actions',
+        header: () => null,
+        cell: ({row}) => {
+            const addr = row.original._nodeAddress
+            const sparkplugName = row.original.deviceInformation?.sparkplugName
+            if (!addr || !sparkplugName) return null
+            const addressStr = `${addr.group_id}/${addr.node_id}/${sparkplugName}`
+            return h(RebirthButton, {
+                address: addressStr,
+                name: row.original.name,
+                isDevice: true,
+                canRebirth: row.original._canRebirth ?? false,
+            })
+        },
+        enableSorting: false,
+        enableHiding: false,
     }
     // {
     //     accessorKey: 'schema',

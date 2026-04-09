@@ -96,5 +96,8 @@ onBeforeUnmount(async () => {
 <template>
   <div class="fixed inset-0 bg-[#0a0a1a]">
     <canvas ref="canvas" class="w-full h-full block" />
+    <div v-if="!store.loaded" class="absolute inset-0 flex items-center justify-center">
+      <p class="text-white/50 text-sm">Loading hierarchy...</p>
+    </div>
   </div>
 </template>

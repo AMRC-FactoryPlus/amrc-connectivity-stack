@@ -12,6 +12,7 @@ import { createNodes } from '@/lib/visualiser/nodes.js'
 import { createEdges } from '@/lib/visualiser/edges.js'
 import { createCameraController } from '@/lib/visualiser/camera.js'
 import { createParticles } from '@/lib/visualiser/particles.js'
+import { createLOD } from '@/lib/visualiser/lod.js'
 
 const canvas = ref(null)
 const layout = useLayoutStore()
@@ -20,6 +21,7 @@ let sceneCtx = null
 let nodesCtx = null
 let edgesCtx = null
 let particlesCtx = null
+let lodCtx = null
 let positions = null
 const seenValues = new Map()
 
@@ -38,6 +40,7 @@ onMounted(async () => {
 
   const cameraCtrl = createCameraController(sceneCtx.camera, positions)
   particlesCtx = createParticles(sceneCtx.scene)
+  lodCtx = createLOD(sceneCtx.scene, store.nodes, positions)
 
   sceneCtx.onUpdate((dt) => {
     cameraCtrl.update(dt)
@@ -55,6 +58,12 @@ onMounted(async () => {
 
     nodesCtx.update(dt, store.values)
     particlesCtx.update(dt)
+    lodCtx.update(
+      sceneCtx.camera,
+      dt,
+      (id) => store.fetchHistory(id),
+      (id) => store.evictHistory(id),
+    )
   })
 
   sceneCtx.start()
@@ -62,6 +71,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(async () => {
+  if (lodCtx) lodCtx.dispose()
   if (particlesCtx) particlesCtx.dispose()
   if (edgesCtx) edgesCtx.dispose()
   if (nodesCtx) nodesCtx.dispose()

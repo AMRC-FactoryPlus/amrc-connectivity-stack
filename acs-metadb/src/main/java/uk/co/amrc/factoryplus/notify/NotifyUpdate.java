@@ -10,28 +10,38 @@ import java.util.UUID;
 
 import jakarta.json.*;
 
-import io.vavr.collection.*;
-
-public record NotifyUpdate (int status, Map<String, JsonValue> content)
+public record NotifyUpdate (int status, JsonObject content)
 {
     public static NotifyUpdate empty (int status)
     {
-        return new NotifyUpdate(status, HashMap.empty());
+        return new NotifyUpdate(status, JsonValue.EMPTY_JSON_OBJECT);
     }
+
+    public static NotifyUpdate ok (boolean initial, JsonObject content)
+    {
+        return new NotifyUpdate(initial ? 201 : 200, content);
+    }
+
+    /* Args reversed to simplify zipWith */
     public static NotifyUpdate ofResponse (Response res, boolean initial)
     {
-        return new NotifyUpdate(initial ? 201 : 200, 
-            HashMap.of("response", res.toJson()));
+        /* Special case where we know the response cannot change */
+        if (res.status() == 410)
+            return NotifyUpdate.empty(404);
+
+        return NotifyUpdate.ok(initial,
+            Json.createObjectBuilder()
+                .add("response", res.toJson())
+                .build());
     }
 
     public boolean ok () { return status < 400; }
 
     public JsonValue toJson (UUID session)
     {
-        var obj = Json.createObjectBuilder()
+        var obj = Json.createObjectBuilder(content)
             .add("status", status)
             .add("uuid", session.toString());
-        content.forEach(obj::add);
         return obj.build();
     }
 }

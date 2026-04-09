@@ -31,12 +31,6 @@ public class NotifyV2
 {
     private static final Logger log = LoggerFactory.getLogger(NotifyV2.class);
 
-    public record SearchProvider (
-        Supplier<Option<Map<String, Response>>> full,
-        Observable<Tuple2<String, Response>> updates,
-        Observable<Boolean> acl)
-    { }
-
     public static class Builder
     {
         private List<Filter> filters = List.empty();
@@ -44,6 +38,12 @@ public class NotifyV2
         public Builder watch (String path, Handler<NotifyUpdate> handler)
         {
             filters = filters.prepend(new Filter.Watch(path, handler));
+            return this;
+        }
+
+        public Builder search (String path, Handler<SearchUpdate> handler)
+        {
+            filters = filters.prepend(new Filter.Search(path, handler));
             return this;
         }
 

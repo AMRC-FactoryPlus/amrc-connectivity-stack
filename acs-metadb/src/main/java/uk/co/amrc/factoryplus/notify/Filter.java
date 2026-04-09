@@ -36,9 +36,7 @@ interface Filter
 
         public Option<Map<String, String>> checkPath (String path)
         {
-            log.info("Checking path {} against {}", path, pathSpec);
             var params = pathSpec.getPathParams("/" + path);
-            log.info("Path result: {}", params);
             return Option.of(params)
                 .map(HashMap::ofAll)
                 .map(m -> m.mapValues(UrlPath::decodeURI));
@@ -58,16 +56,47 @@ interface Filter
             this.handler = handler;
         }
 
-        public Option<Observable<NotifyUpdate>> handleRequest (
-            Session sess, Request sub)
+        public Option<Observable<NotifyUpdate>> handleRequest (Session sess, Request sub)
         {
-            log.info("Attempting to handle {} for {}", sub, sess);
             return Option.some(sub)
                 .filter(s -> s.method() == Request.Method.WATCH)
                 .map(s -> s.body().getJsonObject("request"))
                 .filter(r -> r.getString("method", "GET").equals("GET"))
                 .flatMap(r -> path.checkPath(r.getString("url")))
                 .map(args -> this.handler.handle(sess, args));
+        }
+    }
+
+    class Search implements Filter
+    {
+        private static final Logger log = LoggerFactory.getLogger(Search.class);
+        private Path path;
+        private Handler<SearchUpdate> handler;
+
+        public Search (String path, Handler<SearchUpdate> handler)
+        {
+            this.path = new Path(path);
+            this.handler = handler;
+        }
+
+        public Option<Observable<NotifyUpdate>> handleRequest (Session sess, Request sub)
+        {
+            return Option.some(sub)
+                .filter(s -> s.method() == Request.Method.SEARCH)
+                .flatMap(s -> path.checkPath(s.body().getString("parent")))
+                .map(args -> buildSearch(this.handler.handle(sess, args)));
+        }
+        
+        /* XXX Filtering not implemented for now */
+        private Observable<NotifyUpdate> buildSearch (Observable<SearchUpdate> updates)
+        {
+            return updates
+                /* It doesn't matter what this first item is as long as
+                 * it's not a Full update */
+                .zipWith(updates.startWithItem(SearchUpdate.notFound()),
+                    SearchUpdate::diffFrom)
+                .flatMapIterable(l -> l)
+                .zipWith(IsFirst.isFirst(), SearchUpdate::toUpdate);
         }
     }
 }

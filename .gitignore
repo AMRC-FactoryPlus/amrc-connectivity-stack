@@ -12,3 +12,4 @@ spirit-schemas/
 /.mcp.json
 
 node_modules/
+.worktrees/

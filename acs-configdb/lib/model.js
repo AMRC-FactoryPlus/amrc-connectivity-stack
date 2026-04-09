@@ -15,7 +15,7 @@ import { DB } from '@amrc-factoryplus/pg-client'
 import { App, Class, Perm, Service, SpecialObj } from './constants.js'
 import { SpecialApps } from './special.js'
 
-const DB_Version = 11;
+const DB_Version = 13;
 
 /* Well-known object IDs. This is cheating but it's stupid to keep
  * looking them up. */

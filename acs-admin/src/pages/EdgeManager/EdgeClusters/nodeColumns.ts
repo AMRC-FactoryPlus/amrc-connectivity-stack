@@ -6,6 +6,7 @@ import type {ColumnDef} from '@tanstack/vue-table'
 import {h} from 'vue'
 
 import DataTableColumnHeader from '@/components/ui/data-table/DataTableColumnHeader.vue'
+import RebirthButton from '@/components/EdgeManager/RebirthButton.vue'
 
 export interface Host {
     uuid: string,
@@ -52,5 +53,21 @@ export const nodeColumns: ColumnDef<Host>[] = [
         filterFn: (row, id, value) => {
             return value.includes(row.getValue(id))
         },
+    },
+    {
+        id: 'actions',
+        header: () => null,
+        cell: ({row}) => {
+            const addr = row.original.sparkplugAddress
+            if (!addr) return null
+            const addressStr = `${addr.group_id}/${addr.node_id}`
+            return h(RebirthButton, {
+                address: addressStr,
+                name: row.original.name,
+                canRebirth: row.original._canRebirth ?? false,
+            })
+        },
+        enableSorting: false,
+        enableHiding: false,
     }
 ]

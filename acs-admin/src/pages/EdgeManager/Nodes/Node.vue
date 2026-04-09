@@ -129,10 +129,12 @@
 </template>
 
 <script>
+import { computed } from 'vue'
 import { useNodeStore } from '@store/useNodeStore.js'
 import { useEdgeClusterStore } from '@store/useEdgeClusterStore.js'
 import { useDeviceStore } from '@store/useDeviceStore.js'
 import { useConnectionStore } from '@store/useConnectionStore.js'
+import { useCanRebirth } from '@/composables/useCanRebirth.js'
 import EdgeContainer from '@components/Containers/EdgeContainer.vue'
 import { Label } from '@components/ui/label/index.js'
 import { Input } from '@components/ui/input/index.js'
@@ -176,11 +178,16 @@ export default {
   },
 
   setup () {
+    const d = useDeviceStore()
+    const deviceUuids = computed(() => d.data?.map(e => e.uuid) ?? [])
+    const canRebirthMap = useCanRebirth(deviceUuids)
+
     return {
       c: useEdgeClusterStore(),
       n: useNodeStore(),
-      d: useDeviceStore(),
+      d,
       cn: useConnectionStore(),
+      canRebirthMap,
       inop,
       deviceColumns,
       connectionColumns,
@@ -206,7 +213,12 @@ export default {
     },
 
     devices () {
-      return Array.isArray(this.d.data) ? this.d.data.filter(e => e.deviceInformation?.node === this.node.uuid) : []
+      const filtered = Array.isArray(this.d.data) ? this.d.data.filter(e => e.deviceInformation?.node === this.node.uuid) : []
+      return filtered.map(d => ({
+        ...d,
+        _nodeAddress: this.node.sparkplugAddress,
+        _canRebirth: this.canRebirthMap?.get(d.uuid) ?? false
+      }))
     },
 
     connections () {

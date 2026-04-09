@@ -41,7 +41,7 @@ public class NotifyV2
     {
         private List<Filter> filters = List.empty();
 
-        public Builder watch (String path, Handler<Observable<NotifyUpdate>> handler)
+        public Builder watch (String path, Handler<NotifyUpdate> handler)
         {
             filters = filters.prepend(new Filter.Watch(path, handler));
             return this;

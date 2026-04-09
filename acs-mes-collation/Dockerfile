@@ -14,8 +14,9 @@ SHELL
 COPY --from=lib . /home/node/lib/
 
 WORKDIR /home/node/app
+RUN chown node:node /home/node/app
 USER node
-COPY package*.json ./
+COPY --chown=node package*.json ./
 RUN <<'SHELL'
     touch /home/node/.npmrc
     npm install --save=false --install-links

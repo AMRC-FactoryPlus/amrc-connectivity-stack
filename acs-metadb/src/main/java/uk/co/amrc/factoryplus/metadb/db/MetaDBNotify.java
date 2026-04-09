@@ -37,16 +37,13 @@ public class MetaDBNotify
 
     public NotifyV2 notifyV2 () { return notify; }
 
-    private static <U> Observable<NotifyUpdate> setUpdates (Observable<Set<U>> src)
+    private static <U> Observable<Response> setUpdates (Observable<Set<U>> src)
     {
         return src
             .map(s -> s.map(u -> u.toString()))
             .map(s -> s.foldLeft(Json.createArrayBuilder(), (a, v) -> a.add(v))
                 .build())
-            .map(Response::ok)
-            /* XXX These two steps should probably be in the Filter */
-            .distinctUntilChanged()
-            .zipWith(IsFirst.isFirst(), NotifyUpdate::ofResponse);
+            .map(Response::ok);
     }
 
     /* XXX These app endpoints will return empty maps for nonexistent
@@ -54,7 +51,7 @@ public class MetaDBNotify
      * configs, which is also not correct. Probably appValues needs to
      * return an Observable<Option<Map>>. */
 
-    private Observable<NotifyUpdate> appList (Session sess, Map<String, String> args)
+    private Observable<Response> appList (Session sess, Map<String, String> args)
     {
         log.info("appList: {}", args);
         return args.get("app")
@@ -62,10 +59,7 @@ public class MetaDBNotify
             .map(app -> data.appValues(app)
                 .map(m -> m.keySet())
                 .compose(MetaDBNotify::setUpdates))
-            /* This 404 is a notify update status, not an HTTP response
-             * status. So this is not 'app not found' it is 'notify
-             * endpoint not found'. */
-            .getOrElse(Observable.just(NotifyUpdate.empty(404)));
+            .getOrElse(Observable.just(Response.status(410)));
     }
 
     private Observable<SearchUpdate> appSearch (Session sess, Map<String, String> args)
@@ -78,13 +72,5 @@ public class MetaDBNotify
                     .mapValues(v -> Response.ok(v.value(), v.etag())))
                 .map(SearchUpdate::full))
             .getOrElse(Observable.just(SearchUpdate.invalid()));
-    }
-
-    private Observable<NotifyUpdate> classMember (
-            Session sess, Map<String, String> args)
-    {
-        log.info("classMember: {}", args);
-        return Observable.just(NotifyUpdate.ofResponse(
-                Response.ok(JsonValue.NULL), true));
     }
 }

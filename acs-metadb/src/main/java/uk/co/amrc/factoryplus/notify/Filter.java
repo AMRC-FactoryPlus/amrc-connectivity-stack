@@ -48,9 +48,9 @@ interface Filter
     {
         private static final Logger log = LoggerFactory.getLogger(Watch.class);
         private Path path;
-        private Handler<NotifyUpdate> handler;
+        private Handler<Response> handler;
 
-        public Watch (String path, Handler<NotifyUpdate> handler)
+        public Watch (String path, Handler<Response> handler)
         {
             this.path = new Path(path);
             this.handler = handler;
@@ -63,7 +63,14 @@ interface Filter
                 .map(s -> s.body().getJsonObject("request"))
                 .filter(r -> r.getString("method", "GET").equals("GET"))
                 .flatMap(r -> path.checkPath(r.getString("url")))
-                .map(args -> this.handler.handle(sess, args));
+                .map(args -> buildWatch(this.handler.handle(sess, args)));
+        }
+
+        private Observable<NotifyUpdate> buildWatch (Observable<Response> resps)
+        {
+            return resps
+                .distinctUntilChanged()
+                .zipWith(IsFirst.isFirst(), NotifyUpdate::ofResponse);
         }
     }
 

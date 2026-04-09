@@ -12,8 +12,6 @@ import { APIError } from "@amrc-factoryplus/service-api";
 import { DataAccess as Constants } from "./constants.js";
 import { valid_grant, valid_krb, valid_uuid, DatasetValidity } from "./validate.js";
 
-
-
 function fail(status, message) {
   throw new APIError(status);
 }
@@ -126,49 +124,222 @@ export class APIv1 {
               * value - actual data value
               * unit - Engineering unit (if available)
     * Don't return valid response if dataset is invalid
+  
+  Influx tags:
+    [
+    "_start",
+    "_stop",
+    "_field",
+    "_measurement",
+    "bottomLevelInstance",
+    "bottomLevelSchema",
+    "device",
+    "group",
+    "node",
+    "path",
+    "topLevelInstance",
+    "topLevelSchema",
+    "usesInstances",
+    "usesSchemas"
+  ]
    */
-  async dataset_data(req, res){
-    // to be implemented
+
+  async _check_second_level_permission(principal, structure, config, permission){
+    if(structure == Constants.App.SessionLimits){
+      
+      const target = config.source;
+      if(!target) return fail(422);
+
+      const ok = await this.auth.check_acl(
+          principal, 
+          permission,
+          target,
+          true
+        );
+      
+      return ok; 
+      
+    }else if(structure == Constants.App.UnionComponents){
+      if(config.length == 0) return true;
+
+      for(let target of config){
+        const ok = await this.auth.check_acl(
+          principal, 
+          permission,
+          target,
+          true
+        );
+        if(!ok) return false;
+      }
+      return true;
+
+    }else if( structure == Constants.App.SparkplugSrc){
+      
+      const target = config.source;
+      if(!target) return fail(422);
+
+      const ok = await this.auth.check_acl(
+          principal, 
+          permission,
+          target,
+          true
+        );
+
+      return ok; 
+    }else{
+      // Unhandled Structure type
+      return fail(500);
+    }
+  }
+
+  async _run_influx_query(topLevelInstance) {
+    const query = flux`from(bucket: "${this.influx_bucket}")
+      |> range(start: -1d)
+      |> filter(fn: (r) => r.topLevelInstance == "${topLevelInstance}")`;
+
+    return new Promise((resolve, reject) => {
+      const rows = [];
+
+      this.influx_query_api.queryRows(query, {
+        next: (row, tableMeta) => {
+          const o = tableMeta.toObject(row);
+          rows.push({
+            device: o.device,
+            metric: o._measurement,
+            timestamp: o._time,
+            value: o._value,
+            unit: o.unit,
+            path: o.path
+          });
+        },
+        error: (err) => reject(err),
+        complete: () => resolve(rows)
+      });
+    });
+  }
+  
+
+
+  async _get_dataset_data(dataset_uuid, visited = new Set()) {
+    if (visited.has(dataset_uuid)) {
+        throw new Error(`Circular dataset reference detected at ${dataset_uuid}`);
+      }
+
+      visited.add(dataset_uuid);
+
+      const dataset_def = await this._get_dataset_def_by_uuid(dataset_uuid);
+      if (!dataset_def) return [];
+
+      const { structure, config } = dataset_def;
+
+      // -------------------------
+      // 1. SparkplugSrc (BASE CASE)
+      // -------------------------
+      if (structure === Constants.App.SparkplugSrc) {
+        const source_uuid = config?.source;
+        if (!source_uuid) return [];
+
+        // NOTE: here source_uuid is the topLevelInstance for influx
+        const data = await this._run_influx_query(source_uuid);
+        return data;
+      }
+
+      // -------------------------
+      // 2. SessionLimits (SINGLE REFERENCE)
+      // -------------------------
+      else if (structure === Constants.App.SessionLimits) {
+        const source_uuid = config?.source;
+        if (!source_uuid) return [];
+
+        return this._get_dataset_data(source_uuid, visited);
+      }
+
+      // -------------------------
+      // 3. UnionComponents (MULTIPLE REFERENCES)
+      // -------------------------
+      else if (structure === Constants.App.UnionComponents) {
+        const dataset_uuids = config;
+
+        if (!Array.isArray(dataset_uuids)) return [];
+
+        const results = await Promise.all(
+          dataset_uuids.map(uuid =>
+            this._get_dataset_data(uuid, new Set(visited)) // isolate branch
+          )
+        );
+
+        return results.flat();
+      }
+
+    // -------------------------
+    // 4. Unknown structure
+    // -------------------------
+    else {
+      throw new Error(`Unhandled structure type: ${structure}`);
+    }
+  }
+
+
+  
+
+  async _get_dataset_def_by_uuid(uuid){
+    const def = await rx.firstValueFrom(
+      this.data.get_dataset_definitions(DatasetValidity.VALID).pipe(
+        rx.map(datasets => datasets.get(uuid)?.[0])
+      )
+    );
+    return def;
+  }
+
+  _convert_to_csv(rows) {
+    if (!rows.length) return "";
+
+    const headers = Object.keys(rows[0]);
+    const lines = rows.map(row =>
+      headers.map(h => JSON.stringify(row[h] ?? "")).join(",")
+    );
+
+    return [headers.join(","), ...lines].join("\n");
+  }
+
+  async dataset_data(req, res) {
     const dataset_uuid = req.params.uuid;
-    // if (!valid_uuid(dataset_uuid)) return fail(410);
+    if (!valid_uuid(dataset_uuid)) return fail(410);
 
-    // const dataset_def = await rx.firstValueFrom(
-    //   this.data.get_dataset_definitions().pipe(
-    //     rx.map(datasets => datasets.get(dataset_uuid))
-    //   )
-    // );
+    const dataset_def = await this._get_dataset_def_by_uuid(dataset_uuid);
+    if (!dataset_def) return fail(404);
 
-    // // Recursion until the structure is Device -> get data out of influx
+    const ok = await this.auth.check_acl(
+      req.auth,
+      Constants.Perm.ReadDataset,
+      dataset_uuid,
+      true,
+    );
+    if (!ok) return fail(403);
 
-    // const source_uuid = dataset_def.config.source; 
+    const structure = dataset_def.structure;
+    const config = dataset_def.config;
 
-    // // get sprk uuid for that device
-    // // const instance_uuid = 
+    const ok2 = this._check_second_level_permission(
+      req.auth,
+      structure,
+      config,
+      Constants.Perm.ReadDataset
+    );
+    if (!ok2) return fail(403);
 
-    // if (!source_uuid) return fail(404);
+    try {
+      const rows = await this._get_dataset_data(dataset_uuid);
 
-    // const query = flux`from(bucket: "${this.influx_bucket}")
-    // |> range(start: -1d)
-    // |> filter(fn: (r) => r.topLevelInstance == "${source_uuid}")`;
+      const csv = this._convert_to_csv(rows);
 
-    // const rows = [];
+      res.setHeader("Content-Type", "text/csv");
+      return res.status(200).send(csv);
 
-    // this.influx_query_api.queryRows(query, {
-    //   next: (row, tableMeta) => {
-    //     const o = tableMeta.toObject(row);
-    //     rows.push({
-    //       _time: o._time,
-    //       _measurement: o._measurement,
-    //       _value: o._value
-    //     });
-    //   },
-    //   error: (err) => {
-    //     return res.status(500).json(err);
-    //   },
-    //   complete: () => {
-    //     return res.status(200).json(rows); 
-    //   }
-    // });
+    } catch (err) {
+      console.error(err);
+      return fail(500);
+    }
   }
 
   /** GET. 
@@ -227,54 +398,6 @@ export class APIv1 {
   } 
   
 
-  async _check_second_level_permission(principal, structure, config){
-    if(structure == Constants.App.SessionLimits){
-      
-      const target = config.source;
-      if(!target) return fail(422);
-
-      const ok = await this.auth.check_acl(
-          principal, 
-          mapStructureToPermission.get(structure),
-          target,
-          true
-        );
-      
-      return ok; 
-      
-    }else if(structure == Constants.App.UnionComponents){
-      if(config.length == 0) return true;
-
-      for(let target of config){
-        const ok = await this.auth.check_acl(
-          principal, 
-          mapStructureToPermission.get(structure),
-          target,
-          true
-        );
-        if(!ok) return false;
-      }
-      return true;
-
-    }else if( structure == Constants.App.SparkplugSrc){
-      
-      const target = config.source;
-      if(!target) return fail(422);
-
-      const ok = await this.auth.check_acl(
-          principal, 
-          mapStructureToPermission.get(structure),
-          target,
-          true
-        );
-
-      return ok; 
-    }else{
-      // Unhandled Structure type
-      return fail(500);
-    }
-  }
-
 
   async _update_dataset_config(principal, structure, config, objectUuid){
     if(!structure) return fail(422);
@@ -293,7 +416,7 @@ export class APIv1 {
     if(!config) return fail(422);
     
     // Check the principal has appropriate permission for all dataset sources in config. 
-    const ok2 = await this._check_second_level_permission(principal, structure, config);
+    const ok2 = await this._check_second_level_permission(principal, structure, config, mapStructureToPermission[structure]);
     
     if(!ok2) return fail(403);
 

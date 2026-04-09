@@ -65,6 +65,7 @@ export const nodeColumns: ColumnDef<Host>[] = [
                 address: addressStr,
                 name: row.original.name,
                 canRebirth: row.original._canRebirth ?? false,
+                class: 'ml-auto'
             })
         },
         enableSorting: false,

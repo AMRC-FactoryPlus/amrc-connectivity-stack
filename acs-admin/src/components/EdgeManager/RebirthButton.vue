@@ -1,24 +1,32 @@
 <template>
-  <Button
-    v-if="true || canRebirth"
-    size="xs"
-    variant="ghost"
-    title="Rebirth"
-    :disabled="loading"
-    class="flex items-center justify-center gap-1.5"
-    @click.stop="rebirth"
-  >
-    <i class="fa-solid" :class="loading ? 'fa-circle-notch animate-spin' : 'fa-rotate'"></i>
-  </Button>
+  <TooltipProvider v-if="canRebirth">
+    <Tooltip>
+      <TooltipTrigger as-child>
+        <Button
+          size="xs"
+          variant="outline"
+          :disabled="loading"
+          class="ml-auto flex items-center justify-center gap-1.5 hover:bg-gray-800 hover:text-white"
+          @click.stop="rebirth"
+        >
+          <i class="fa-solid" :class="loading ? 'fa-circle-notch animate-spin' : 'fa-tower-broadcast'"></i>
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p>Rebirth</p>
+      </TooltipContent>
+    </Tooltip>
+  </TooltipProvider>
 </template>
 
 <script>
 import { useServiceClientStore } from '@store/serviceClientStore.js'
 import { Button } from '@components/ui/button/index.js'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { toast } from 'vue-sonner'
 
 export default {
-  components: { Button },
+  components: { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger },
   props: {
     address: { type: String, required: true },
     name: { type: String, required: true },

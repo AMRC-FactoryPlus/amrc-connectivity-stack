@@ -6,38 +6,35 @@ import * as THREE from 'three'
 import {
   RADIUS_ROOT, RADIUS_AREA, RADIUS_DEVICE, RADIUS_LEAF,
   COLOUR_GOOD, COLOUR_UNCERTAIN, COLOUR_BAD, COLOUR_STALE,
+  COLOUR_NODE_BRIGHT,
 } from './constants.js'
 
 const DEPTH_CONFIG = [
-  { radius: RADIUS_ROOT, emissive: 0.8 },     // depth 0: root/enterprise
-  { radius: RADIUS_AREA, emissive: 0.5 },      // depth 1: site/area
-  { radius: RADIUS_AREA * 0.8, emissive: 0.4 },// depth 2: work centre
-  { radius: RADIUS_DEVICE, emissive: 0.3 },    // depth 3: device
+  { radius: RADIUS_ROOT, emissive: 2.0 },     // depth 0: bright hub
+  { radius: RADIUS_AREA, emissive: 1.5 },
+  { radius: RADIUS_AREA * 0.8, emissive: 1.2 },
+  { radius: RADIUS_DEVICE, emissive: 1.0 },
 ]
-const LEAF_CONFIG = { radius: RADIUS_LEAF, emissive: 0.6 }
+const LEAF_CONFIG = { radius: RADIUS_LEAF, emissive: 0.8 }
 
 const QUALITY_COLOURS = {
-  Good: new THREE.Color(COLOUR_GOOD),
+  Good: new THREE.Color(COLOUR_NODE_BRIGHT),
   GoodNoData: new THREE.Color(COLOUR_GOOD).multiplyScalar(0.5),
   Uncertain: new THREE.Color(COLOUR_UNCERTAIN),
   Bad: new THREE.Color(COLOUR_BAD),
 }
 const DEFAULT_COLOUR = new THREE.Color(COLOUR_STALE)
 
-/**
- * Create and manage instanced node meshes.
- */
 export function createNodes (scene) {
   const meshes = []
-  const instanceMap = new Map()  // elementId -> { mesh, index }
+  const instanceMap = new Map()
 
-  // Shared geometry
-  const sphere = new THREE.SphereGeometry(1, 16, 12)
+  const sphere = new THREE.SphereGeometry(1, 12, 8)
   const dummy = new THREE.Object3D()
   const colour = new THREE.Color()
+  const WHITE = new THREE.Color(0xffffff)
 
   function build (storeNodes, positions) {
-    // Remove old meshes
     for (const m of meshes) {
       scene.remove(m)
       m.dispose()
@@ -45,8 +42,7 @@ export function createNodes (scene) {
     meshes.length = 0
     instanceMap.clear()
 
-    // Group nodes by depth bucket
-    const groups = new Map()  // depth -> [{ id, pos }]
+    const groups = new Map()
 
     for (const [id, entry] of storeNodes) {
       const pos = positions.get(id)
@@ -59,23 +55,21 @@ export function createNodes (scene) {
       groups.get(key).push({ id, pos })
     }
 
-    // Create one InstancedMesh per group
     for (const [key, items] of groups) {
       const config = key === 'leaf' ? LEAF_CONFIG : DEPTH_CONFIG[key]
-      const material = new THREE.MeshStandardMaterial({
-        color: 0xffffff,
-        emissive: COLOUR_GOOD,
-        emissiveIntensity: config.emissive,
+
+      // Emissive material - self-illuminating points that glow with bloom
+      const material = new THREE.MeshBasicMaterial({
+        color: new THREE.Color(COLOUR_NODE_BRIGHT),
         transparent: true,
-        opacity: 0.9,
+        opacity: 0.95,
       })
 
       const mesh = new THREE.InstancedMesh(sphere, material, items.length)
       mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
 
-      // Per-instance colour
       const colours = new Float32Array(items.length * 3)
-      DEFAULT_COLOUR.toArray(colours, 0)
+      const defaultCol = new THREE.Color(COLOUR_NODE_BRIGHT)
       mesh.instanceColor = new THREE.InstancedBufferAttribute(colours, 3)
 
       for (let i = 0; i < items.length; i++) {
@@ -84,7 +78,7 @@ export function createNodes (scene) {
         dummy.scale.setScalar(config.radius)
         dummy.updateMatrix()
         mesh.setMatrixAt(i, dummy.matrix)
-        mesh.setColorAt(i, DEFAULT_COLOUR)
+        mesh.setColorAt(i, defaultCol)
 
         instanceMap.set(id, { mesh, index: i })
       }
@@ -96,13 +90,9 @@ export function createNodes (scene) {
     }
   }
 
-  // Brightness flash tracking
-  const flashes = new Map()  // elementId -> remaining seconds
-
-  const WHITE = new THREE.Color(0xffffff)
+  const flashes = new Map()
 
   function update (dt, storeValues) {
-    // Decay flashes
     for (const [id, remaining] of flashes) {
       const next = remaining - dt
       if (next <= 0) {
@@ -112,10 +102,8 @@ export function createNodes (scene) {
       }
     }
 
-    // Track which meshes need a GPU upload
     const dirtyMeshes = new Set()
 
-    // Update colours from values
     for (const [elementId, vqt] of storeValues) {
       const inst = instanceMap.get(elementId)
       if (!inst) continue
@@ -123,17 +111,15 @@ export function createNodes (scene) {
       const base = QUALITY_COLOURS[vqt.quality] ?? DEFAULT_COLOUR
       colour.copy(base)
 
-      // Brighten on recent update
       const flash = flashes.get(elementId)
       if (flash) {
-        colour.lerp(WHITE, flash)
+        colour.lerp(WHITE, flash * 3)  // brighter flash
       }
 
       inst.mesh.setColorAt(inst.index, colour)
       dirtyMeshes.add(inst.mesh)
     }
 
-    // Single GPU upload per mesh, not per instance
     for (const mesh of dirtyMeshes) {
       mesh.instanceColor.needsUpdate = true
     }

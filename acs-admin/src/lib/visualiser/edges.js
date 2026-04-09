@@ -3,17 +3,21 @@
  */
 
 import * as THREE from 'three'
+import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js'
+import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js'
+import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js'
 import { COLOUR_EDGE } from './constants.js'
 
 export function createEdges (scene) {
-  let lines = null
+  let line = null
+  let material = null
 
   function build (storeNodes, positions) {
-    if (lines) {
-      scene.remove(lines)
-      lines.geometry.dispose()
-      lines.material.dispose()
+    if (line) {
+      scene.remove(line)
+      line.geometry.dispose()
     }
+    if (material) material.dispose()
 
     const points = []
 
@@ -28,26 +32,33 @@ export function createEdges (scene) {
 
     if (points.length === 0) return
 
-    const geometry = new THREE.BufferGeometry()
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(points, 3))
+    const geometry = new LineSegmentsGeometry()
+    geometry.setPositions(points)
 
-    const material = new THREE.LineBasicMaterial({
+    material = new LineMaterial({
       color: COLOUR_EDGE,
+      linewidth: 2,
       transparent: true,
       opacity: 0.5,
-      linewidth: 1,
+      resolution: new THREE.Vector2(window.innerWidth, window.innerHeight),
     })
 
-    lines = new THREE.LineSegments(geometry, material)
-    scene.add(lines)
+    line = new LineSegments2(geometry, material)
+    scene.add(line)
+
+    window.addEventListener('resize', () => {
+      if (material) {
+        material.resolution.set(window.innerWidth, window.innerHeight)
+      }
+    })
   }
 
   function dispose () {
-    if (lines) {
-      scene.remove(lines)
-      lines.geometry.dispose()
-      lines.material.dispose()
+    if (line) {
+      scene.remove(line)
+      line.geometry.dispose()
     }
+    if (material) material.dispose()
   }
 
   return { build, dispose }

@@ -13,9 +13,10 @@ export function createScene (canvas) {
   renderer.setPixelRatio(window.devicePixelRatio)
   renderer.setSize(canvas.clientWidth, canvas.clientHeight)
   renderer.setClearColor(BG_COLOUR)
+  renderer.toneMapping = THREE.ACESFilmicToneMapping
+  renderer.toneMappingExposure = 1.0
 
   const scene = new THREE.Scene()
-  // No fog - let all nodes be visible regardless of distance
 
   const camera = new THREE.PerspectiveCamera(
     60,
@@ -26,24 +27,18 @@ export function createScene (canvas) {
   camera.position.set(0, 10, 30)
   camera.lookAt(0, 0, 0)
 
-  // Ambient light - brighter so nodes read well against dark bg
-  scene.add(new THREE.AmbientLight(0xffffff, 0.6))
+  // Minimal ambient - let emissive materials do the work
+  scene.add(new THREE.AmbientLight(0xffffff, 0.15))
 
-  // Subtle point light at centre
-  const centreLight = new THREE.PointLight(0x009fe3, 0.5, 300)
-  centreLight.position.set(0, 0, 0)
-  scene.add(centreLight)
-
-  // Post-processing: subtle bloom - high threshold so only bright
-  // emissive nodes glow, not labels or edges
+  // Post-processing: strong bloom for the glow aesthetic
   const composer = new EffectComposer(renderer)
   composer.addPass(new RenderPass(scene, camera))
 
   const bloom = new UnrealBloomPass(
     new THREE.Vector2(canvas.clientWidth, canvas.clientHeight),
-    0.6,   // strength (was 1.2 - much more subtle now)
-    0.3,   // radius
-    0.9,   // threshold (higher = only bright things bloom)
+    0.4,   // strength - very subtle
+    0.2,   // radius - tight
+    0.7,   // threshold - only the brightest things glow
   )
   composer.addPass(bloom)
 

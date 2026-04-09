@@ -5,20 +5,17 @@
 import * as THREE from 'three'
 import {
   PARTICLE_POOL_SIZE, PARTICLE_SPEED, PARTICLE_SIZE,
+  TRAIL_COLOUR,
 } from './constants.js'
 
-// Pink packet colour matching old visualiser: rgb(244,215,241)
-const PACKET_PINK = 0xf4d7f1
-
-// Use a small pool of actual Mesh objects - guaranteed visible
-const POOL_SIZE = Math.min(PARTICLE_POOL_SIZE, 50)  // cap for perf with real meshes
+const POOL_SIZE = Math.min(PARTICLE_POOL_SIZE, 50)
 
 export function createParticles (scene) {
-  const sphereGeo = new THREE.SphereGeometry(PARTICLE_SIZE, 8, 6)
+  const sphereGeo = new THREE.SphereGeometry(PARTICLE_SIZE, 6, 4)
   const pool = []
 
   for (let i = 0; i < POOL_SIZE; i++) {
-    const mat = new THREE.MeshBasicMaterial({ color: PACKET_PINK, transparent: true, opacity: 0.9 })
+    const mat = new THREE.MeshBasicMaterial({ color: TRAIL_COLOUR, transparent: true, opacity: 0.9 })
     const mesh = new THREE.Mesh(sphereGeo, mat)
     mesh.visible = false
     scene.add(mesh)
@@ -32,17 +29,13 @@ export function createParticles (scene) {
     })
   }
 
-  let _logCount = 0
-
   function emit (elementId, quality, storeNodes, positions, onNodeHit) {
-    // Find a dead particle
     let p = null
     for (let i = 0; i < POOL_SIZE; i++) {
       if (!pool[i].alive) { p = pool[i]; break }
     }
     if (!p) return
 
-    // Build path from leaf to root
     const path = []
     let current = elementId
     while (current) {
@@ -60,11 +53,6 @@ export function createParticles (scene) {
     p.alive = true
     p.mesh.visible = true
     p._onNodeHit = onNodeHit
-
-    if (_logCount < 3) {
-      console.log(`Particles: emit path=${path.length} hops`)
-      _logCount++
-    }
   }
 
   function update (dt) {

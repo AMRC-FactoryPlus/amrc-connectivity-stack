@@ -19,7 +19,7 @@ function createLabelTexture (text) {
   canvas.height = height
 
   ctx.font = `${fontSize}px Calibri, sans-serif`
-  ctx.fillStyle = 'rgba(220, 220, 220, 0.85)'
+  ctx.fillStyle = 'rgba(100, 160, 150, 0.5)'
   ctx.textBaseline = 'middle'
   ctx.fillText(text, 6, height / 2)
 
@@ -37,20 +37,23 @@ export function createLOD (scene, storeNodes, positions) {
     const pos = positions.get(id)
     if (!pos) continue
 
-    // Skip leaf nodes to avoid clutter - only label non-leaves
-    if (entry.childIds.length === 0) continue
+    // Label ISA-95 levels (sites/areas) and devices (leaves)
+    // Skip if too many nodes would get labels (perf)
+    const isDevice = entry.childIds.length === 0
+    const isTopLevel = entry.depth <= 2
+    if (!isDevice && !isTopLevel) continue
 
     const name = entry.node.displayName || entry.node.elementId.slice(0, 8)
     const { texture, aspect } = createLabelTexture(name)
     const material = new THREE.SpriteMaterial({
       map: texture,
       transparent: true,
-      opacity: 0.8,
+      opacity: 0.5,
       depthWrite: false,
       sizeAttenuation: true,
     })
     const sprite = new THREE.Sprite(material)
-    const scale = 1.0
+    const scale = 0.8
     sprite.scale.set(scale * aspect, scale, 1)
     sprite.position.copy(pos)
     sprite.position.y += entry.depth === 0 ? 1.5 : 0.8

@@ -26,7 +26,8 @@ async function mapConcurrent (items, concurrency, fn) {
 }
 
 const MAX_CONCURRENT = 6
-const MAX_DEPTH = 10
+const MAX_DEPTH = 20  // Effectively unlimited - we stop based on type, not depth
+const ISA95_TYPE = 'isa95-level'  // Only recurse into ISA-95 hierarchy nodes
 
 export const useVisualiserStore = defineStore('visualiser', {
   state: () => ({
@@ -38,6 +39,8 @@ export const useVisualiserStore = defineStore('visualiser', {
 
     // Live values from SSE
     values: new Map(),      // elementId -> { value, quality, timestamp }
+    // Track update counts per leaf for "most active" targeting
+    updateCounts: new Map(), // leafId -> count
     clientId: generateClientId(),
     subscriptionId: null,
     streaming: false,
@@ -54,6 +57,24 @@ export const useVisualiserStore = defineStore('visualiser', {
         if (entry.childIds.length === 0) leaves.push(id)
       }
       return leaves
+    },
+
+    /** Nodes to render: ISA95 hierarchy nodes + their direct device children */
+    renderableNodes (state) {
+      const result = new Map()
+      for (const [id, entry] of state.nodes) {
+        // Always render ISA95 nodes
+        if (!entry.isDevice) {
+          result.set(id, entry)
+          continue
+        }
+        // Render devices whose parent is an ISA95 node (direct children of areas)
+        const parent = state.nodes.get(entry.parentId)
+        if (parent && !parent.isDevice) {
+          result.set(id, entry)
+        }
+      }
+      return result
     },
   },
 
@@ -134,8 +155,12 @@ export const useVisualiserStore = defineStore('visualiser', {
               parentId,
               childIds: [],
               depth,
+              isDevice: child.typeElementId !== ISA95_TYPE,
             })
-            nextLevel.push(child.elementId)
+            // Only recurse into ISA-95 hierarchy nodes - devices are leaf-level for rendering
+            if (child.typeElementId === ISA95_TYPE) {
+              nextLevel.push(child.elementId)
+            }
           }
         }
         parent.childIds = childIds
@@ -151,19 +176,70 @@ export const useVisualiserStore = defineStore('visualiser', {
     // --- SSE Subscriptions ---
 
     async startStreaming () {
-      const leaves = this.leafIds
-      if (leaves.length === 0) return
-
       const i3x = useI3xClient()
 
       const result = await i3x.createSubscription(this.clientId, 'ACS Visualiser')
       this.subscriptionId = result.subscriptionId
 
-      // Register in batches of 100 to avoid huge payloads
-      for (let i = 0; i < leaves.length; i += 100) {
-        const batch = leaves.slice(i, i + 100)
+      // Cache the set of renderable IDs for fast lookup in _handleStreamData
+      this._renderableIds = new Set(this.renderableNodes.keys())
+
+      // We need to register actual leaf metric IDs (not devices).
+      // Fetch the full subtree under each device to find leaf IDs,
+      // and build a mapping from leaf -> device for the SSE handler.
+      this._deviceCache = new Map()
+      const deviceIds = []
+      for (const [id, entry] of this.renderableNodes) {
+        if (entry.isDevice) deviceIds.push(id)
+      }
+
+      console.log(`Visualiser: resolving leaf metrics for ${deviceIds.length} devices...`)
+      const allLeafIds = []
+      const baseUrl = i3x.baseUrl
+
+      // Fetch children recursively for each device to find leaves
+      // Use a queue per device, batched
+      for (let d = 0; d < deviceIds.length; d += 20) {
+        const deviceBatch = deviceIds.slice(d, d + 20)
+        await Promise.all(deviceBatch.map(async (deviceId) => {
+          const queue = [deviceId]
+          const visited = new Set()
+          while (queue.length > 0) {
+            const batch = queue.splice(0, 50)
+            try {
+              const res = await fetch(`${baseUrl}/objects/related`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ elementIds: batch, relationshiptype: 'i3x:rel:has-children' }),
+              })
+              const body = await res.json()
+              if (!body.success || !Array.isArray(body.results)) continue
+              for (const entry of body.results) {
+                if (!entry.success) continue
+                const children = entry.result || []
+                if (children.length === 0) {
+                  // This is a leaf - register it
+                  allLeafIds.push(entry.elementId)
+                  this._deviceCache.set(entry.elementId, deviceId)
+                }
+                for (const child of children) {
+                  if (!child.elementId || visited.has(child.elementId)) continue
+                  visited.add(child.elementId)
+                  this._deviceCache.set(child.elementId, deviceId)
+                  queue.push(child.elementId)
+                }
+              }
+            } catch { /* skip failed batches */ }
+          }
+        }))
+      }
+
+      console.log(`Visualiser: found ${allLeafIds.length} leaf metrics, registering for SSE...`)
+      for (let i = 0; i < allLeafIds.length; i += 100) {
+        const batch = allLeafIds.slice(i, i + 100)
         await i3x.registerItems(this.clientId, this.subscriptionId, batch)
       }
+      console.log(`Visualiser: registered ${allLeafIds.length} leaves, ${this._renderableIds.size} renderable nodes`)
 
       this.streaming = true
       this._streamController = openI3xStream(
@@ -180,11 +256,18 @@ export const useVisualiserStore = defineStore('visualiser', {
 
       for (const item of arr) {
         if (!item.elementId) continue
-        this.values.set(item.elementId, {
+
+        // Map the leaf metric to its rendered device node
+        let targetId = this._deviceCache?.get(item.elementId) ?? item.elementId
+        if (!this._renderableIds?.has(targetId)) continue
+
+        this.values.set(targetId, {
           value: item.value,
           quality: item.quality,
           timestamp: item.timestamp,
         })
+
+        this.updateCounts.set(targetId, (this.updateCounts.get(targetId) || 0) + 1)
 
         // Append to history if we have an active cache for this node
         const hist = this.history.get(item.elementId)

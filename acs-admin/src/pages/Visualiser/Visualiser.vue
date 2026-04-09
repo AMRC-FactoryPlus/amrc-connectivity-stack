@@ -11,6 +11,7 @@ import { computeLayout } from '@/lib/visualiser/graph.js'
 import { createNodes } from '@/lib/visualiser/nodes.js'
 import { createEdges } from '@/lib/visualiser/edges.js'
 import { createCameraController } from '@/lib/visualiser/camera.js'
+import { createParticles } from '@/lib/visualiser/particles.js'
 
 const canvas = ref(null)
 const layout = useLayoutStore()
@@ -18,7 +19,9 @@ const store = useVisualiserStore()
 let sceneCtx = null
 let nodesCtx = null
 let edgesCtx = null
+let particlesCtx = null
 let positions = null
+const seenValues = new Map()
 
 onMounted(async () => {
   layout.toggleFullscreen(true)
@@ -34,10 +37,24 @@ onMounted(async () => {
   edgesCtx.build(store.nodes, positions)
 
   const cameraCtrl = createCameraController(sceneCtx.camera, positions)
+  particlesCtx = createParticles(sceneCtx.scene)
 
   sceneCtx.onUpdate((dt) => {
     cameraCtrl.update(dt)
+
+    // Check for new SSE values and emit particles
+    for (const [id, vqt] of store.values) {
+      const prev = seenValues.get(id)
+      if (prev !== vqt.timestamp) {
+        seenValues.set(id, vqt.timestamp)
+        particlesCtx.emit(id, vqt.quality, store.nodes, positions, (nodeId) => {
+          nodesCtx.flash(nodeId)
+        })
+      }
+    }
+
     nodesCtx.update(dt, store.values)
+    particlesCtx.update(dt)
   })
 
   sceneCtx.start()
@@ -45,6 +62,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(async () => {
+  if (particlesCtx) particlesCtx.dispose()
   if (edgesCtx) edgesCtx.dispose()
   if (nodesCtx) nodesCtx.dispose()
   if (sceneCtx) sceneCtx.dispose()

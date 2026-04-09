@@ -10,6 +10,7 @@ import { createScene } from '@/lib/visualiser/scene.js'
 import { computeLayout } from '@/lib/visualiser/graph.js'
 import { createNodes } from '@/lib/visualiser/nodes.js'
 import { createEdges } from '@/lib/visualiser/edges.js'
+import { createCameraController } from '@/lib/visualiser/camera.js'
 
 const canvas = ref(null)
 const layout = useLayoutStore()
@@ -32,7 +33,10 @@ onMounted(async () => {
   edgesCtx = createEdges(sceneCtx.scene)
   edgesCtx.build(store.nodes, positions)
 
+  const cameraCtrl = createCameraController(sceneCtx.camera, positions)
+
   sceneCtx.onUpdate((dt) => {
+    cameraCtrl.update(dt)
     nodesCtx.update(dt, store.values)
   })
 

@@ -50,9 +50,9 @@ interface Filter
     {
         private static final Logger log = LoggerFactory.getLogger(Watch.class);
         private Path path;
-        private Handler<Observable<NotifyUpdate>> handler;
+        private Handler<NotifyUpdate> handler;
 
-        public Watch (String path, Handler<Observable<NotifyUpdate>> handler)
+        public Watch (String path, Handler<NotifyUpdate> handler)
         {
             this.path = new Path(path);
             this.handler = handler;

@@ -6,9 +6,11 @@
 
 package uk.co.amrc.factoryplus.notify;
 
+import io.reactivex.rxjava3.core.Observable;
+
 import io.vavr.collection.*;
 
 public interface Handler<T>
 {
-    T handle (Session sess, Map<String, String> args);
+    Observable<T> handle (Session sess, Map<String, String> args);
 }

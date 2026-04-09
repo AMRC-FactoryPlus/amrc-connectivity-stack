@@ -5,6 +5,7 @@
 * Entry point: api.js
 */
 
+import {InfluxDB, flux} from '@influxdata/influxdb-client';
 
 import { RxClient, UUIDs } from '@amrc-factoryplus/rx-client';
 import { WebAPI } from '@amrc-factoryplus/service-api';
@@ -23,6 +24,11 @@ const Version = "2.0.0";
 const debug = fplus.debug;
 debug.log("app", "Starting acs-data-service revision %s");
 
+const influxClient = new InfluxDB({
+  url: env.INFLUXDB_URL,
+  token: env.INFLUXDB_TOKEN
+});
+
 
 // the dataflow object is full of sequences that does most of the work of this service. Sequence means an RX observable.
 const data = new DataFlow({
@@ -30,7 +36,14 @@ const data = new DataFlow({
 });
 
 
-const apiv1 = new APIv1({ data, debug, auth: fplus.Auth, cdb: fplus.ConfigDB });
+const apiv1 = new APIv1({ 
+  data, debug,
+  auth: fplus.Auth,
+  cdb: fplus.ConfigDB,
+  influx_client: influxClient,
+  influx_org: env.INFLUXDB_ORG,
+  influx_bucket: env.INFLUXDB_BUCKET,
+});
 
 const api = await new WebAPI({
   debug: fplus.debug,
@@ -50,6 +63,7 @@ const api = await new WebAPI({
   routes: app => {
     app.use("/v1", apiv1.routes);
   }
+
 }).init();
 
 

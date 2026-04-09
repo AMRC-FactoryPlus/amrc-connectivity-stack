@@ -115,7 +115,7 @@ configdb:
     # -- Number of backups to retain
     retention: 5
     # -- Size of the PVC for storing backups
-    storageSize: 2Gi
+    storageSize: 1Gi
 
 files:
   enabled: true

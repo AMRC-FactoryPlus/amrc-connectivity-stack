@@ -45,13 +45,12 @@ public class ConfigEntry extends RequestHandler.Component
         return new ConfigEntry(req, appO.node(), objO.node());
     }
 
-    public record Value (JsonValue value, String etag, Option<Instant> mtime)
+    public record Value (JsonValue value, UUID etag, Option<Instant> mtime)
     {
         public static Value ofQuerySolution (QuerySolution sol)
         {
             var val = Util.decodeLiteral(sol.get("value"), JsonValue.class);
-
-            var etag = Util.decodeLiteral(sol.get("etag"), String.class);
+            var etag = Util.decodeLiteral(sol.get("etag"), UUID.class);
             //var mtime = Util.decodeLiteral(binding.get("mtime"), Instant.class);
 
             return new Value(val, etag, Option.none());
@@ -165,7 +164,7 @@ public class ConfigEntry extends RequestHandler.Component
         //graph.add(entry, Vocab.Time.start, inst);
 
         return Option.some(new Value(
-            value, entry.uuid().toString(), Option.none()));
+            value, entry.uuid(), Option.none()));
     }
 }
 

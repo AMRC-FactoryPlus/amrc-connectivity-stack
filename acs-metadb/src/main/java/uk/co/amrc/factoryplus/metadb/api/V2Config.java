@@ -44,7 +44,7 @@ public class V2Config {
         return entry
             .map(e -> {
                 var res = Response.ok(e.value())
-                    .tag(e.etag());
+                    .tag(e.etag().toString());
                 e.mtime().peek(t ->
                     res.lastModified(Date.from(t)));
                 return res.build();

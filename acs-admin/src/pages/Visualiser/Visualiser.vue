@@ -30,6 +30,12 @@ const seenValues = new Map()
 const hudTargetId = ref(null)
 const hudPhase = ref(null)
 
+// Expanded device state
+let expandedDeviceId = null
+let expandedNodeIds = new Set()
+let expandedNodesCtx = null
+let expandedEdgesCtx = null
+
 onMounted(async () => {
   layout.toggleFullscreen(true)
   sceneCtx = createScene(canvas.value)
@@ -51,13 +57,90 @@ onMounted(async () => {
   const cameraCtrl = createCameraController(sceneCtx.camera, canvas.value, positions, () => {
     return [...store.values.keys()]
   }, {
-    onSweepIn (deviceId) {
-      console.log(`Sweep in: ${store.nodes.get(deviceId)?.node?.displayName ?? deviceId.slice(0,8)}`)
-      // TODO: expand device subtree, render child nodes, pick active leaf for HUD
+    async onSweepIn (deviceId) {
+      const name = store.nodes.get(deviceId)?.node?.displayName ?? deviceId.slice(0, 8)
+      console.log(`Sweep in: ${name}`)
+
+      // Expand the device subtree
+      const { nodes: expandedNodes, leafIds, activeLeafId } = await store.expandDevice(deviceId)
+      if (expandedNodes.size === 0) return
+
+      expandedDeviceId = deviceId
+      expandedNodeIds = new Set(expandedNodes.keys())
+
+      // Compute positions for expanded nodes around the device
+      const devicePos = positions.get(deviceId)
+      if (!devicePos) return
+
+      // Build a mini position map: device + its expanded children
+      const expandedPositions = new Map()
+      expandedPositions.set(deviceId, devicePos)
+
+      // Layout expanded nodes in a small cluster around the device
+      const miniRenderable = new Map()
+      miniRenderable.set(deviceId, store.nodes.get(deviceId))
+      for (const [id, entry] of expandedNodes) {
+        miniRenderable.set(id, entry)
+      }
+      const miniPositions = computeLayout(miniRenderable, [deviceId])
+
+      // Offset all mini positions to be centred on the device's world position
+      for (const [id, pos] of miniPositions) {
+        if (id === deviceId) continue
+        // Scale down the expanded cluster to fit near the device
+        pos.multiplyScalar(0.3)
+        pos.add(devicePos)
+        positions.set(id, pos)
+        expandedPositions.set(id, pos)
+      }
+
+      // Render expanded nodes and edges
+      expandedNodesCtx = createNodes(sceneCtx.scene)
+      expandedNodesCtx.build(expandedNodes, expandedPositions)
+
+      expandedEdgesCtx = createEdges(sceneCtx.scene)
+      expandedEdgesCtx.build(expandedNodes, expandedPositions)
+
+      // Set HUD to the most active leaf
+      if (activeLeafId) {
+        hudTargetId.value = activeLeafId
+      }
+
+      // Dim the main graph
+      nodesCtx.setOpacity(0.1)
+      edgesCtx.setOpacity(0.05)
+      lodCtx.setOpacity(0.1)
+
+      console.log(`Expanded ${name}: ${expandedNodes.size} nodes, active leaf: ${activeLeafId?.slice(0, 8)}`)
     },
+
     onSweepOut (deviceId) {
-      console.log(`Sweep out: ${store.nodes.get(deviceId)?.node?.displayName ?? deviceId.slice(0,8)}`)
-      // TODO: collapse device subtree, remove child nodes
+      console.log(`Sweep out: ${store.nodes.get(deviceId)?.node?.displayName ?? deviceId.slice(0, 8)}`)
+
+      // Restore main graph opacity
+      nodesCtx.setOpacity(0.95)
+      edgesCtx.setOpacity(0.5)
+      lodCtx.setOpacity(0.5)
+
+      // Remove expanded nodes
+      if (expandedNodesCtx) {
+        expandedNodesCtx.dispose()
+        expandedNodesCtx = null
+      }
+      if (expandedEdgesCtx) {
+        expandedEdgesCtx.dispose()
+        expandedEdgesCtx = null
+      }
+
+      for (const id of expandedNodeIds) {
+        positions.delete(id)
+      }
+
+      if (expandedDeviceId) {
+        store.collapseDevice(expandedDeviceId, expandedNodeIds)
+      }
+      expandedDeviceId = null
+      expandedNodeIds = new Set()
       hudPhase.value = null
     },
   })
@@ -78,15 +161,16 @@ onMounted(async () => {
     }
 
     nodesCtx.update(dt, store.values)
+    if (expandedNodesCtx) expandedNodesCtx.update(dt, store.values)
     particlesCtx.update(dt)
     lodCtx.update(sceneCtx.camera, dt, null, null)
 
     // Update HUD state
     const sweep = cameraCtrl.getSweepState()
     if (sweep) {
-      hudTargetId.value = sweep.targetId
+      // During hold, hudTargetId may have been set to an active leaf by onSweepIn
       hudPhase.value = sweep.phase
-    } else if (hudPhase.value && hudPhase.value !== 'ease-out') {
+    } else if (hudPhase.value) {
       hudPhase.value = null
     }
   })

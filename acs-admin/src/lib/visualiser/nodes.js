@@ -129,6 +129,12 @@ export function createNodes (scene) {
     flashes.set(elementId, 0.3)
   }
 
+  function setOpacity (opacity) {
+    for (const m of meshes) {
+      m.material.opacity = opacity
+    }
+  }
+
   function dispose () {
     for (const m of meshes) {
       scene.remove(m)
@@ -137,5 +143,5 @@ export function createNodes (scene) {
     }
   }
 
-  return { build, update, flash, dispose, instanceMap }
+  return { build, update, flash, setOpacity, dispose, instanceMap }
 }

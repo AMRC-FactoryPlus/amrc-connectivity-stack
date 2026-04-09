@@ -89,6 +89,12 @@ export function createLOD (scene, storeNodes, positions) {
     }
   }
 
+  function setOpacity (opacity) {
+    for (const { material } of labels) {
+      material.opacity = opacity
+    }
+  }
+
   function dispose () {
     for (const { sprite, texture, material } of labels) {
       scene.remove(sprite)
@@ -97,5 +103,5 @@ export function createLOD (scene, storeNodes, positions) {
     }
   }
 
-  return { update, dispose }
+  return { update, setOpacity, dispose }
 }

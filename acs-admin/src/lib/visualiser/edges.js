@@ -53,6 +53,10 @@ export function createEdges (scene) {
     })
   }
 
+  function setOpacity (opacity) {
+    if (material) material.opacity = opacity
+  }
+
   function dispose () {
     if (line) {
       scene.remove(line)
@@ -61,5 +65,5 @@ export function createEdges (scene) {
     if (material) material.dispose()
   }
 
-  return { build, dispose }
+  return { build, setOpacity, dispose }
 }

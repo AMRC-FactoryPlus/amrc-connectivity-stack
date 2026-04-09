@@ -317,6 +317,107 @@ export const useVisualiserStore = defineStore('visualiser', {
       this.history.delete(elementId)
     },
 
+    // --- Device expansion (zoom-in subtree) ---
+
+    /**
+     * Load the full subtree under a device and return all nodes.
+     * Also adds expanded node values to the _deviceCache so SSE
+     * values map to expanded leaves (not just the device).
+     * Returns { nodes: Map, leafIds: string[] }
+     */
+    async expandDevice (deviceId) {
+      const i3x = useI3xClient()
+      const baseUrl = i3x.baseUrl
+      const expandedNodes = new Map()
+      const leafIds = []
+
+      const deviceEntry = this.nodes.get(deviceId)
+      if (!deviceEntry) return { nodes: expandedNodes, leafIds }
+
+      // BFS to load all children under this device
+      const queue = [deviceId]
+      const visited = new Set([deviceId])
+
+      while (queue.length > 0) {
+        const batch = queue.splice(0, 100)
+        try {
+          const res = await fetch(`${baseUrl}/objects/related`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ elementIds: batch, relationshiptype: 'i3x:rel:has-children' }),
+          })
+          const body = await res.json()
+          if (!body.success || !Array.isArray(body.results)) continue
+
+          for (const entry of body.results) {
+            if (!entry.success) continue
+            const parentId = entry.elementId
+            const children = entry.result || []
+
+            if (children.length === 0 && !expandedNodes.has(parentId)) {
+              // This parent is itself a leaf
+              leafIds.push(parentId)
+            }
+
+            for (const child of children) {
+              if (!child.elementId || visited.has(child.elementId)) continue
+              visited.add(child.elementId)
+
+              const depth = (expandedNodes.get(parentId)?.depth ?? deviceEntry.depth) + 1
+              expandedNodes.set(child.elementId, {
+                node: child,
+                parentId,
+                childIds: [],
+                depth,
+                isDevice: false,
+              })
+
+              // Update parent's childIds
+              const parent = expandedNodes.get(parentId) ?? this.nodes.get(parentId)
+              if (parent && !parent.childIds.includes(child.elementId)) {
+                parent.childIds.push(child.elementId)
+              }
+
+              queue.push(child.elementId)
+            }
+          }
+        } catch { /* skip */ }
+      }
+
+      // Find leaves in expanded nodes
+      for (const [id, entry] of expandedNodes) {
+        if (entry.childIds.length === 0) {
+          leafIds.push(id)
+          // Map to device for SSE
+          this._deviceCache.set(id, deviceId)
+          // Also add to renderableIds so values show up
+          this._renderableIds.add(id)
+        }
+      }
+
+      console.log(`Visualiser: expanded ${deviceEntry.node?.displayName}, ${expandedNodes.size} nodes, ${leafIds.length} leaves`)
+
+      // Find the most active leaf (one with most updates)
+      let bestLeaf = leafIds[0]
+      let bestCount = 0
+      for (const id of leafIds) {
+        const count = this.updateCounts.get(id) || 0
+        if (count > bestCount) {
+          bestCount = count
+          bestLeaf = id
+        }
+      }
+
+      return { nodes: expandedNodes, leafIds, activeLeafId: bestLeaf }
+    },
+
+    collapseDevice (deviceId, expandedNodeIds) {
+      // Remove expanded nodes from renderableIds
+      for (const id of expandedNodeIds) {
+        this._renderableIds.delete(id)
+      }
+    },
+
     // --- Cleanup ---
 
     async cleanup () {

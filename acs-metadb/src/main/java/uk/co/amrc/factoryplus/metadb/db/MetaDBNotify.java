@@ -31,6 +31,7 @@ public class MetaDBNotify
 
         notify = NotifyV2.builder()
             .watch("v2/app/{app}/object/", this::appList)
+            .search("v2/app/{app}/object/", this::appSearch)
             .build();
     }
 
@@ -43,11 +44,17 @@ public class MetaDBNotify
             .map(s -> s.foldLeft(Json.createArrayBuilder(), (a, v) -> a.add(v))
                 .build())
             .map(Response::ok)
+            /* XXX These two steps should probably be in the Filter */
+            .distinctUntilChanged()
             .zipWith(IsFirst.isFirst(), NotifyUpdate::ofResponse);
     }
 
-    private Observable<NotifyUpdate> appList (
-        Session sess, Map<String, String> args)
+    /* XXX These app endpoints will return empty maps for nonexistent
+     * apps. I think the ConfigDB returned 404s if the app had no
+     * configs, which is also not correct. Probably appValues needs to
+     * return an Observable<Option<Map>>. */
+
+    private Observable<NotifyUpdate> appList (Session sess, Map<String, String> args)
     {
         log.info("appList: {}", args);
         return args.get("app")
@@ -55,7 +62,22 @@ public class MetaDBNotify
             .map(app -> data.appValues(app)
                 .map(m -> m.keySet())
                 .compose(MetaDBNotify::setUpdates))
+            /* This 404 is a notify update status, not an HTTP response
+             * status. So this is not 'app not found' it is 'notify
+             * endpoint not found'. */
             .getOrElse(Observable.just(NotifyUpdate.empty(404)));
+    }
+
+    private Observable<SearchUpdate> appSearch (Session sess, Map<String, String> args)
+    {
+        log.info("appSearch: {}", args);
+        return args.get("app")
+            .flatMap(Util::parseUUID)
+            .map(app -> data.appValues(app)
+                .map(m -> m.mapKeys(UUID::toString)
+                    .mapValues(v -> Response.ok(v.value(), v.etag())))
+                .map(SearchUpdate::full))
+            .getOrElse(Observable.just(SearchUpdate.invalid()));
     }
 
     private Observable<NotifyUpdate> classMember (

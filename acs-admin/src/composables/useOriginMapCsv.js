@@ -58,32 +58,112 @@ function collectMetricRows(schema, model, pathSegments = []) {
         } else if (type === 'object') {
             // Recurse into the child object
             rows.push(...collectMetricRows(prop, model?.[key], currentPath));
-        } else if (type === 'schemaArray') {
-            // For schema arrays, iterate only over model instances
-            // (keys that aren't reserved). Each instance's schema was
-            // injected into prop.properties by updateDynamicSchemaObjects.
-            const modelNode = model?.[key];
-            if (modelNode && typeof modelNode === 'object') {
-                const instanceKeys = Object.keys(modelNode).filter(
-                    k => !RESERVED_KEYS.includes(k),
-                );
-                for (const instanceKey of instanceKeys) {
-                    const instanceSchema = prop.properties?.[instanceKey];
-                    if (instanceSchema) {
-                        rows.push(
-                            ...collectMetricRows(
-                                instanceSchema,
-                                modelNode[instanceKey],
-                                [...currentPath, instanceKey],
-                            ),
-                        );
-                    }
-                }
+        } else if (type === 'schemaArray' && prop.patternProperties) {
+            // For arrays, walk each instance in the model if present, otherwise just walk the schema
+            const regexKey = Object.keys(prop.patternProperties)[0];
+            const schemaForArray = prop.patternProperties[regexKey];
+            const modelArray = model?.[key] || {};
+            // If there are instances in the model, walk them
+            for (const instanceKey of Object.keys(modelArray)) {
+                rows.push(...collectMetricRows(schemaForArray, modelArray[instanceKey], [...currentPath, instanceKey]));
+            }
+            // Also add a row for the pattern itself if no instances exist
+            if (Object.keys(modelArray).length === 0) {
+                rows.push(...collectMetricRows(schemaForArray, undefined, [...currentPath, '<new>']));
             }
         }
     }
 
     return rows;
+}
+
+export function applyCsvToModel(rows, model, schema) {
+    let applied = 0;
+    let skipped = 0;
+
+    function getMetricSchema(schema, segments) {
+        let currentSchema = schema;
+        for (const segment of segments) {
+            if (!currentSchema || !currentSchema.properties || !(segment in currentSchema.properties)) {
+                return null;
+            }
+            currentSchema = currentSchema.properties[segment];
+        }
+        // If this is a metric, return the merged allOf properties
+        if (currentSchema && currentSchema.allOf) {
+            return {
+                ...currentSchema.allOf[0]?.properties,
+                ...currentSchema.allOf[1]?.properties,
+            };
+        }
+        return null;
+    }
+
+    for (const { tagPath, fields } of rows) {
+        const segments = tagPath.split('/');
+        let current = model;
+        let found = true;
+
+        // Traverse or create the path in the model
+        for (let i = 0; i < segments.length; i++) {
+            const segment = segments[i];
+            if (current == null || typeof current !== 'object') {
+                found = false;
+                break;
+            }
+            if (!(segment in current)) {
+                // Only create the metric object at the leaf
+                if (i === segments.length - 1 && schema) {
+                    const metricSchema = getMetricSchema(schema, segments);
+                    if (metricSchema) {
+                        // Create the metric object with default values from schema
+                        const newMetric = {};
+                        Object.keys(metricSchema).forEach(key => {
+                            if ('default' in metricSchema[key]) {
+                                newMetric[key] = metricSchema[key].default;
+                            } else if ('enum' in metricSchema[key]) {
+                                newMetric[key] = metricSchema[key].enum[0];
+                            }
+                        });
+                        current[segment] = newMetric;
+                    } else {
+                        found = false;
+                        break;
+                    }
+                } else {
+                    found = false;
+                    break;
+                }
+            }
+            current = current[segment];
+        }
+
+        if (!found || current == null || typeof current !== 'object') {
+            skipped++;
+            continue;
+        }
+
+        for (const [field, value] of Object.entries(fields)) {
+            if (value === '' || value === null || value === undefined) {
+                delete current[field];
+            } else if (field === 'Record_To_Historian') {
+                current[field] = value.toLowerCase() === 'true';
+            } else if (field === 'Eng_Low' || field === 'Eng_High' || field === 'Deadband') {
+                const num = Number(value);
+                if (!isNaN(num)) {
+                    current[field] = num;
+                } else {
+                    current[field] = value.trim();
+                }
+            } else {
+                current[field] = value.trim();
+            }
+        }
+
+        applied++;
+    }
+
+    return { applied, skipped };
 }
 
 /**
@@ -354,50 +434,50 @@ export function parseCsv(csvString, driverPresentation) {
  * @param {object} model - The origin map model to update in place
  * @returns {{ applied: number, skipped: number }}
  */
-export function applyCsvToModel(rows, model) {
-    let applied = 0;
-    let skipped = 0;
-    //console.log("model before update:", JSON.stringify(model, null, 2));
+// export function applyCsvToModel(rows, model) {
+//     let applied = 0;
+//     let skipped = 0;
+//     //console.log("model before update:", JSON.stringify(model, null, 2));
 
-    for (const { tagPath, fields } of rows) {
-        const segments = tagPath.split('/');
-        let current = model;
-        let found = true;
+//     for (const { tagPath, fields } of rows) {
+//         const segments = tagPath.split('/');
+//         let current = model;
+//         let found = true;
 
-        //If an option in the config map is not selected, then it is not added to the model and thus will not be found when applying the CSV.
-        for (const segment of segments) {
-            if (current == null || typeof current !== 'object' /*|| !(segment in current)*/) {
-                found = false;
-                break;
-            }
-            current = current[segment];
-        }
+//         //If an option in the config map is not selected, then it is not added to the model and thus will not be found when applying the CSV.
+//         for (const segment of segments) {
+//             if (current == null || typeof current !== 'object' /*|| !(segment in current)*/) {
+//                 found = false;
+//                 break;
+//             }
+//             current = current[segment];
+//         }
 
-        if (!found || current == null || typeof current !== 'object') {
-            skipped++;
-            continue;
-        }
+//         if (!found || current == null || typeof current !== 'object') {
+//             skipped++;
+//             continue;
+//         }
 
-        for (const [field, value] of Object.entries(fields)) {
-            if (value === '' || value === null || value === undefined) {
-                delete current[field];
-            } else if (field === 'Record_To_Historian') {
-                current[field] = value.toLowerCase() === 'true';
-            } else if (field === 'Eng_Low' || field === 'Eng_High' || field === 'Deadband') {
-                const num = Number(value);
-                if (!isNaN(num)) {
-                    current[field] = num;
-                } else {
-                    current[field] = value.trim();
-                }
-            } else {
-                current[field] = value.trim();
-            }
-        }
+//         for (const [field, value] of Object.entries(fields)) {
+//             if (value === '' || value === null || value === undefined) {
+//                 delete current[field];
+//             } else if (field === 'Record_To_Historian') {
+//                 current[field] = value.toLowerCase() === 'true';
+//             } else if (field === 'Eng_Low' || field === 'Eng_High' || field === 'Deadband') {
+//                 const num = Number(value);
+//                 if (!isNaN(num)) {
+//                     current[field] = num;
+//                 } else {
+//                     current[field] = value.trim();
+//                 }
+//             } else {
+//                 current[field] = value.trim();
+//             }
+//         }
 
-        applied++;
-    }
-    //console.log("model after update:", JSON.stringify(model, null, 2));
+//         applied++;
+//     }
+//     //console.log("model after update:", JSON.stringify(model, null, 2));
 
-    return { applied, skipped };
-}
+//     return { applied, skipped };
+// }

@@ -129,9 +129,6 @@ export default class Model extends Queries {
             return 422;
         }
         for (const advertisement of dump.advertisements) {
-            if(!advertisement.device){
-                continue;
-            }
             await this.record_service({
                 service: advertisement.service,
                 url: advertisement.url,

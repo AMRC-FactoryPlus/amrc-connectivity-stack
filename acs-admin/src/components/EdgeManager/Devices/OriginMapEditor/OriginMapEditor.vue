@@ -65,7 +65,7 @@
             </SidebarGroupContent>
           </SidebarGroup>
           <!-- Save button fixed at the bottom -->
-          <Button variant="destructive" :disabled="loading" @click="save()" class="mt-2 shrink-0 m-3">
+          <Button variant="destructive" :disabled="loading" @click="save()" class="mt-2 shrink-0 mx-3 mb-1">
             <div v-if="!loading" class="flex items-center justify-center gap-1">
               <span>Save Changes</span>
               <i class="fa-sharp fa-solid fa-save ml-2"></i>
@@ -75,12 +75,13 @@
               <i class="fa-sharp fa-solid fa-circle-notch fa-spin ml-2"></i>
             </div>
           </Button>
+          <!-- CSV Import/Export buttons -->
           <!-- <div class="flex gap-2 mx-3 mb-3"> -->
             <Button variant="outline" class="shrink-0 mx-3" @click="handleDownloadCsv" :disabled="!schema">
               <Download class="size-4 mr-1" />
               Download CSV
             </Button>
-            <Button variant="outline" class="shrink-0 m-3" @click="$refs.csvFileInput.click()" :disabled="!schema">
+            <Button variant="outline" class="shrink-0 mx-3 mt-1 mb-2" @click="$refs.csvFileInput.click()" :disabled="!schema">
               <Upload class="size-4 mr-1" />
               Upload CSV
             </Button>
@@ -159,6 +160,7 @@ import NewObjectOverlayForm from './NewObjectOverlayForm.vue'
 import { updateEdgeAgentConfig } from '@/utils/edgeAgentConfigUpdater'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { generateCsv, downloadCsv, parseCsv, applyCsvToModel } from '@/composables/useOriginMapCsv.js'
+import Papa from 'papaparse'
 import Ajv from 'ajv'
 import addFormats from 'ajv-formats'
 
@@ -983,7 +985,10 @@ export default {
 
     handleDownloadCsv () {
       const driverPresentation = this.getDriverPresentation()
-      const csvString = generateCsv(this.model, this.schema, driverPresentation)
+      const schemaInfo = this.sch.data.find(s => s.uuid === this.schema.properties.Schema_UUID.const)
+      // Add Schema Type from schema.schemaInformation.name
+      const schemaType = schemaInfo?.schemaInformation?.name || ''
+      const csvString = generateCsv(this.model, this.schema, driverPresentation, schemaType)
       const deviceName = this.device.name || this.device.uuid || 'device'
       const safeName = deviceName.replace(/[^a-zA-Z0-9_-]/g, '_')
       downloadCsv(csvString, `${safeName}_origin_map.csv`)
@@ -1006,7 +1011,37 @@ export default {
       reader.onload = (e) => {
         const csvString = e.target.result
         const driverPresentation = this.getDriverPresentation()
+        // Parse CSV and extract schema type from header/rows
         const { rows } = parseCsv(csvString, driverPresentation)
+
+        // Find Schema_Type column in CSV header
+        const parsed = Papa.parse(csvString, { header: true, skipEmptyLines: true })
+        const schemaTypeCol = (parsed.meta.fields || []).find(f => f === 'Schema_Type')
+        let csvSchemaType = ''
+        if (schemaTypeCol && parsed.data.length > 0) {
+          // Find the first non-empty Schema_Type value
+          for (const row of parsed.data) {
+            if (row['Schema_Type'] && row['Schema_Type'].trim() !== '') {
+              csvSchemaType = row['Schema_Type'].trim()
+              break
+            }
+          }
+        }
+
+        // Get current device schema type
+        let deviceSchemaType = ''
+        if (this.schema && this.schema.properties && this.schema.properties.Schema_UUID) {
+          const schemaInfo = this.sch.data.find(s => s.uuid === this.schema.properties.Schema_UUID.const)
+          deviceSchemaType = schemaInfo?.schemaInformation?.name || ''
+        }
+
+        if (csvSchemaType && deviceSchemaType && csvSchemaType !== deviceSchemaType) {
+          toast.error('CSV Schema Type does not match device Schema Type', {
+            description: `CSV Schema Type: ${csvSchemaType}, Device Schema Type: ${deviceSchemaType}`,
+          })
+          this.$refs.csvFileInput.value = ''
+          return
+        }
 
         if (rows.length === 0) {
           toast.error('No data rows found in CSV')
@@ -1015,14 +1050,16 @@ export default {
 
         this.csvParsedData = rows
         this.csvDialogOpen = true
+
       }
       reader.readAsText(file)
-
+      
       // Reset input so the same file can be re-selected
       this.$refs.csvFileInput.value = ''
     },
 
     applyParsedCsv () {
+      // console.log('Device information before applying CSV:', this.device.deviceInformation)
       if (!this.csvParsedData) return { applied: 0, skipped: 0 }
       const result = applyCsvToModel(this.csvParsedData, this.model)
 

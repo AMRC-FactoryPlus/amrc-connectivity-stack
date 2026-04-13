@@ -24,7 +24,9 @@ const schemas = [
 const local = {};
 
 const dumps = new DumpLoader({
-    dumps:      "dumps",
+    /* We can only lint the local dumps. Any supplied by the Helm chart
+     * will only be validated on install. */
+    dumps:      ["dumps"],
     acs_config: {
         organisation:   "ORG",
         namespace:      "factory-plus",
@@ -47,6 +49,11 @@ function check_files (msg, files) {
         const fail = (cause, ...args) => {
             throw new Error(`${f.name}: ` + util.format(...args), { cause });
         };
+
+        if (!f.yaml) {
+            console.log(`==> MISSING ${f.name}`);
+            console.log(`===> Assuming this will be supplied by the Helm chart.`);
+        }
 
         console.log("==> Checking %s", f.name);
         try { 

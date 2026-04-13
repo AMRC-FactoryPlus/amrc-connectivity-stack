@@ -90,21 +90,32 @@ export class DumpLoader {
             });
     }
 
-    /** Read all YAML files.
-     * Reads all YAML files from the dumps dir. Filters based on the
-     * supplied condition.
-     * @param filter A condition applied to the file contents.
-     * @returns A Map from filename to contents.
+    /** Read all YAML files in a directory.
+     * @param dir the directory to read
+     * @returns a Promise to an array of Promises to pairs [filename, content]
      */
-    read_files (filter) {
-        const { dumps } = this;
-        return fsp.readdir(dumps)
+    read_dir (dir) {
+        if (dir == "")
+            return [];
+
+        return fsp.readdir(dir)
             .then(l => l
                 .filter(f => f.endsWith(".yaml"))
-                .map(f => fsp.readFile(`${dumps}/${f}`, { encoding: "utf8" })
-                    .then(c => [f, c])))
-            .then(ps => Promise.all(ps))
-            .then(es => es.filter(([f, t]) => filter(t)))
+                .map(f => fsp.readFile(`${dir}/${f}`, { encoding: "utf8" })
+                    .then(c => [f, c])));
+    }
+        
+
+    /** Read all YAML files.
+     * Reads all YAML files from the dumps dirs. Stores the result in
+     * `this.files`.
+     */
+    read_files () {
+        const { dumps } = this;
+        return Promise.all(                 // await the readdirs
+                dumps.map(dir => this.read_dir(dir)))
+            .then(rfs => rfs.flat())        // merge the different dirs
+            .then(ps => Promise.all(ps))    // await the readFiles
             .then(es => new Map(es));
     }
 
@@ -115,20 +126,24 @@ export class DumpLoader {
      * @returns A list of {file, yaml} objects.
      */
     async sort_files (early) {
-        const yamls = await this.read_files(t => /^#-EARLY/m.test(t) == early);
+        if (!this.files)
+            this.files = await this.read_files();
+        
+        const yamls = [...this.files.entries()]
+            .filter(([f, c]) => /^#-EARLY/m.test(c) == early);
 
         const graph = tsort();
-        [...yamls.entries()]
+        yamls
             .map(([f, t]) => [f, t.match(/^#-REQUIRE:\s+(.*)/m)?.[1]])
             .filter(m => m[1])
             .flatMap(([f, m]) => m.split(/\s+/)
                 .map(d => [`${d}.yaml`, f]))
             .forEach(e => graph.add(e));
-        [...yamls.keys()]
-            .forEach(f => graph.add(f));
+        yamls
+            .forEach(([f, c]) => graph.add(f));
 
         return graph.sort()
-            .map(name => ({ name, yaml: yamls.get(name) }));
+            .map(name => ({ name, yaml: this.files.get(name) }));
     }
 
     /** Load a dump into the appropriate service.

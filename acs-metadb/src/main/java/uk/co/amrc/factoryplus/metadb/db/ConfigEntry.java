@@ -8,10 +8,12 @@ package uk.co.amrc.factoryplus.metadb.db;
 
 import java.io.StringReader;
 import java.time.Instant;
-import java.util.Optional;
 import java.util.UUID;
 
 import jakarta.json.*;
+
+import io.vavr.collection.List;
+import io.vavr.control.Option;
 
 import org.apache.jena.query.*;
 import org.apache.jena.rdf.model.*;
@@ -43,11 +45,35 @@ public class ConfigEntry extends RequestHandler.Component
         return new ConfigEntry(req, appO.node(), objO.node());
     }
 
-    public record Value (JsonValue value, String etag, Optional<Instant> mtime) {}
+    public record Value (JsonValue value, UUID etag, Option<Instant> mtime)
+    {
+        public static Value ofQuerySolution (QuerySolution sol)
+        {
+            var val = Util.decodeLiteral(sol.get("value"), JsonValue.class);
+            var etag = Util.decodeLiteral(sol.get("etag"), UUID.class);
+            //var mtime = Util.decodeLiteral(binding.get("mtime"), Instant.class);
+
+            return new Value(val, etag, Option.none());
+        }
+    }
 
     private boolean isStructured ()
     {
         return db().derived().contains(app, RDF.type, Vocab.App.Structured);
+    }
+
+    private static final Query Q_getRawValue = Vocab.query("""
+        select ?value
+        where {
+            [] a ?app; <app/for> ?obj;
+                <doc/content> ?value.
+        }
+    """);
+
+    public Option<JsonValue> getRawValue ()
+    {
+        return db().optionalQuery(Q_getRawValue, "app", app, "obj", obj)
+            .map(s -> Util.decodeLiteral(s.get("value"), JsonValue.class));
     }
 
     private static final Query Q_getValue = Vocab.query("""
@@ -60,18 +86,10 @@ public class ConfigEntry extends RequestHandler.Component
         }
     """);
 
-    public Optional<Value> getValue ()
+    public Option<Value> getValue ()
     {
         return db().optionalQuery(Q_getValue, "app", app, "obj", obj)
-            .map(binding -> {
-                var val = Util.decodeLiteral(binding.get("value"), RDF.JSON,
-                    s -> Json.createReader(new StringReader(s)).readValue());
-                var etag = Util.decodeLiteral(binding.get("etag"), XSD.xstring, s -> s);
-                //var mtime = Util.decodeLiteral(binding.get("mtime"), XSD.dateTime, 
-                //    Instant::parse);
-
-                return new Value(val, etag, Optional.empty());
-            });
+            .map(Value::ofQuerySolution);
     }
 
     /* This removes an existing ConfigEntry. For a more 4D approach we
@@ -93,6 +111,9 @@ public class ConfigEntry extends RequestHandler.Component
             db().appMapper().deleteConfig(app, obj);
         else
             removeRawValue();
+
+        if (app.equals(Vocab.App.ConfigSchema))
+            db().schemaTracker().updateSchemas(List.empty());
     }
 
     public void removeRawValue ()
@@ -102,20 +123,31 @@ public class ConfigEntry extends RequestHandler.Component
 
     public void putValue (JsonValue value)
     {
+        /* XXX check app:appliesTo */
+
+        var schemas = db().schemaTracker();
+        if (!schemas.validate(app, value))
+            throw new Err.BadConfig(value);
+
         if (isStructured())
             db().appMapper().updateConfig(app, obj, value);
         else
             putRawValue(value);
+
+        /* This will throw a 409 if we have a schema conflict */
+        if (app.equals(Vocab.App.ConfigSchema))
+            schemas.updateSchemas(List.of(obj));
     }
 
-    public boolean putRawValue (JsonValue value)
+    /* Returns a Value if we made an update. Returns empty() if the
+     * value has not changed and we didn't update it. */
+    public Option<Value> putRawValue (JsonValue value)
     {
-        var existing = getValue()
-            .map(Value::value)
+        var existing = getRawValue()
             .filter(v -> v.equals(value));
-        if (existing.isPresent()) {
-            log.info("Duplicate config update suppressed");
-            return false;
+        if (existing.isDefined()) {
+            //log.info("Duplicate config update suppressed");
+            return Option.none();
         }
 
         removeRawValue();
@@ -124,14 +156,15 @@ public class ConfigEntry extends RequestHandler.Component
             value.toString(), RDF.dtRDFJSON);
 
         var graph   = db().derived();
-        var entry   = db().createObject(app).node();
+        var entry   = db().createObject(app);
         //var inst    = request().getInstant();
 
-        graph.add(entry, Vocab.App.forP, obj);
-        graph.add(entry, Vocab.Doc.content, json);
+        graph.add(entry.node(), Vocab.App.forP, obj);
+        graph.add(entry.node(), Vocab.Doc.content, json);
         //graph.add(entry, Vocab.Time.start, inst);
 
-        return true;
+        return Option.some(new Value(
+            value, entry.uuid(), Option.none()));
     }
 }
 

@@ -38,6 +38,28 @@ public final class UrlPath
         return builder.toString();
     }
 
+    public static String decodeURI (String str)
+    {
+        var b = new StringBuilder(str.length());
+
+        var ix = 0;
+        while (true) {
+            var pct = str.indexOf('%', ix);
+            
+            if (pct == -1) break;
+            b.append(str, ix, pct);
+
+            ix = pct + 3;
+            if (ix > str.length())
+                throw new IllegalArgumentException("Bad URI encoding: " + str);
+
+            b.appendCodePoint(Integer.parseUnsignedInt(str, pct+1, ix, 16));
+        }
+        b.append(str, ix, str.length());
+
+        return b.toString();
+    }
+
     public static String join (List<Object> args, boolean dir)
     {
         return args

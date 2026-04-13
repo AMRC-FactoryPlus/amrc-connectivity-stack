@@ -81,8 +81,10 @@ export default class Model extends EventEmitter {
 
         this.schemas = new Map();
 
-        /* { app, obj, etag, config }
-         * config is undefined for a delete entry */
+        /* type field gives type of update.
+         * "config" updates have {app, object, config}.
+         * "class" updates have no props.
+         */
         this.updates = new rx.Subject();
     }
 

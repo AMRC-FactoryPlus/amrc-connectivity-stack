@@ -7,7 +7,6 @@
 package uk.co.amrc.factoryplus.metadb.api;
 
 import java.util.Date;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
 
@@ -45,12 +44,12 @@ public class V2Config {
         return entry
             .map(e -> {
                 var res = Response.ok(e.value())
-                    .tag(e.etag());
-                e.mtime().ifPresent(t ->
+                    .tag(e.etag().toString());
+                e.mtime().peek(t ->
                     res.lastModified(Date.from(t)));
                 return res.build();
             })
-            .orElseThrow(() -> new WebApplicationException(404));
+            .getOrElseThrow(() -> new WebApplicationException(404));
     }
 
     /* XXX The default JsonValue entity parser will accept and silently
@@ -84,7 +83,7 @@ public class V2Config {
 
             var o_conf = entry.getValue()
                 .map(e -> e.value())
-                .orElse(JsonValue.EMPTY_JSON_OBJECT);
+                .getOrElse(JsonValue.EMPTY_JSON_OBJECT);
             /* Safety: applying merge-patch to a non-object destroys the
              * whole thing. */
             if (!(o_conf instanceof JsonObject))

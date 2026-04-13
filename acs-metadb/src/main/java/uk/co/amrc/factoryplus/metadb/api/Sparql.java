@@ -10,7 +10,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
@@ -73,10 +72,10 @@ public class Sparql {
     {
         public Lang acceptLang (Request req) throws WebApplicationException
         {
-            return Optional.ofNullable(req.selectVariant(accept))
+            return Option.of(req.selectVariant(accept))
                 .map(v -> v.getMediaType().toString())
                 .map(ctToLang)
-                .orElseThrow(() -> new WebApplicationException(406));
+                .getOrElseThrow(() -> new WebApplicationException(406));
         }
 
         public Lang contentLang (String ct) throws WebApplicationException

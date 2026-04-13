@@ -131,18 +131,18 @@ export class CDBNotify {
             ck_acl);
     }
 
-    async search_full (app, status) {
+    async search_full (app) {
         const { model } = this;
 
         const entries = await model.config_get_all(app);
         if (!entries)
-            return { status, response: { status: 404 } };
+            return { response: { status: 404 } };
 
         const children = Object.fromEntries(
             entries.map(e => [e.object, entry_response(e)]));
 
         return {
-            status, children,
+            children,
             response:   { status: 204 },
         };
     }

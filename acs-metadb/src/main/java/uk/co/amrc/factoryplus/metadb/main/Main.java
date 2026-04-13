@@ -10,15 +10,23 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.ServiceConfigurationError;
 
-import org.glassfish.grizzly.http.server.HttpServer;
-import org.glassfish.jersey.grizzly2.httpserver.GrizzlyHttpServerFactory;
+import org.eclipse.jetty.server.*;
+import org.eclipse.jetty.server.handler.*;
+
 import org.glassfish.jersey.inject.hk2.AbstractBinder;
+import org.glassfish.jersey.server.ContainerFactory;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.server.ServerProperties;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import uk.co.amrc.factoryplus.metadb.db.Dataflow;
 import uk.co.amrc.factoryplus.metadb.db.RdfStore;
 
 public final class Main {
+    private static final Logger log = LoggerFactory.getLogger(Main.class);
+
     public static void main (String[] args) throws Throwable
     {
         final int port = Integer.parseUnsignedInt(System.getenv("PORT"));
@@ -29,14 +37,14 @@ public final class Main {
     }
 
     private int port;
-    private HttpServer server;
+    private Server server;
     private RdfStore model;
 
-    private Main (int port, String data)
+    private Main (int port, String dataDir)
     {
         this.port = port;
 
-        this.model = new RdfStore(data);
+        this.model = new RdfStore(dataDir);
         this.server = createServer();
     }
 
@@ -44,38 +52,45 @@ public final class Main {
         public T get () throws Throwable;
     }
 
-    private static <T> T orSCE(Throws<T> supp, String msg)
+    private Server createServer ()
     {
-        try {
-            return supp.get();
-        }
-        catch (Throwable t) {
-            throw new ServiceConfigurationError(msg, t);
-        }
-    }
+        var server = new Server(port);
 
-    private HttpServer createServer ()
-    {
-        final URI listen = orSCE(
-            () -> new URI("http", null, "0.0.0.0", this.port, "", null, null),
-            "Cannot create URI for HTTP server");
-
-        final var model = this.model;
-        final var rc = new ResourceConfig()
+        var model = this.model;
+        var v2app = new ResourceConfig()
             .property(ServerProperties.PROCESSING_RESPONSE_ERRORS_ENABLED, true)
+            .packages("uk.co.amrc.factoryplus.providers")
             .packages("uk.co.amrc.factoryplus.metadb.api")
             .register(new AbstractBinder () {
                 protected void configure () {
                     bind(model).to(RdfStore.class);
                 }
             });
+        var v2api = new ContextHandler(
+            ContainerFactory.createContainer(Handler.class, v2app), "/v2");
 
-        return GrizzlyHttpServerFactory
-            .createHttpServer(listen, rc, false);
+        var notify = model.metaNotify()
+            .notifyV2()
+            .contextHandlerFor(server);
+        var webapp = new ResourceConfig()
+            .packages("uk.co.amrc.factoryplus.providers")
+            .packages("uk.co.amrc.factoryplus.webapi");
+        var webapi = new ContextHandler(
+            ContainerFactory.createContainer(Handler.class, webapp), "/");
+
+        var coll = new ContextHandlerCollection();
+        coll.addHandler(v2api);
+        coll.addHandler(notify);
+        coll.addHandler(webapi);
+
+        server.setHandler(coll);
+
+        return server;
     }
 
     private void start () throws Throwable
     {
+        model.start();
         server.start();
     }
 }

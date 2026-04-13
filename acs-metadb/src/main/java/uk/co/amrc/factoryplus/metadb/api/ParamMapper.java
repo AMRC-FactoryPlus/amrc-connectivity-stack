@@ -23,8 +23,8 @@ public class ParamMapper implements ParamConverterProvider
     {
         public UUID fromString (String value)
         {
-            return Vocab.parseUUID(value)
-                .orElseThrow(() -> new Err.InvalidName(value));
+            return Util.parseUUID(value)
+                .getOrElseThrow(() -> new Err.InvalidName(value));
         }
 
         public String toString (UUID value)

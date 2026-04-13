@@ -6,11 +6,11 @@
 
 package uk.co.amrc.factoryplus.metadb.db;
 
-import java.util.Optional;
 import java.util.UUID;
 import java.net.URI;
 
 import io.vavr.control.Try;
+import io.vavr.control.Option;
 
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.shared.PrefixMapping;
@@ -69,26 +69,14 @@ public class Vocab
 
     public static final Resource G_direct   = res("graph/direct");
     public static final Resource G_derived  = res("graph/derived");
+    public static final Resource G_added    = res("graph/added");
+    public static final Resource G_removed  = res("graph/removed");
 
     public static final UUID U_RDFStore     = UUID.fromString(
         "8abf031c-193f-11f1-b047-d762a2934dfc");
     public static final UUID U_Unowned      = UUID.fromString(
         "091e796a-65c0-4080-adff-c3ce01a65b2e");
 
-    public static Optional<UUID> parseUUID (String uuid)
-    {
-        /* Initial length check as UUID.fromString is too lenient. */
-        if (uuid.length() != 36)
-            return Optional.empty();
-
-        try {
-            return Optional.of(UUID.fromString(uuid)); 
-        }
-        catch (IllegalArgumentException e) {
-            return Optional.empty();
-        }
-    }
-    
     public static Literal uuidLiteral (UUID uuid)
     {
         return ResourceFactory.createPlainLiteral(uuid.toString());

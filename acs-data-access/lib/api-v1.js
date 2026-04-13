@@ -192,10 +192,41 @@ export class APIv1 {
     }
   }
 
-  async _run_influx_query(topLevelInstance) {
-    const query = flux`from(bucket: "${this.influx_bucket}")
-      |> range(start: -1d)
-      |> filter(fn: (r) => r.topLevelInstance == "${topLevelInstance}")`;
+  async _run_influx_query(topLevelInstance, meta = {}) {
+    const { from, to, measurement } = meta;
+
+    // Build range
+    const rangeClause = (from && to)
+      ? `|> range(start: ${from}, stop: ${to})`
+      : `|> range(start: -5m)`;
+
+    // Optional measurement filter
+    const measurementFilter = measurement
+      ? `|> filter(fn: (r) => r._measurement == "${measurement}")`
+      : ``;
+
+    const query = `
+      import "strings"
+
+      from(bucket: "${this.influx_bucket}")
+        ${rangeClause}
+        |> filter(fn: (r) => r.topLevelInstance == "${topLevelInstance}")
+        ${measurementFilter}
+        |> drop(columns: [
+          "_start","_stop","_field","table",
+          "bottomLevelInstance","bottomLevelSchema",
+          "group","node","topLevelSchema",
+          "usesInstances","usesSchemas"
+        ])
+        |> map(fn: (r) => ({ r with path: if exists r.path then r.path else "" }))
+        |> pivot(
+          rowKey: ["_time"],
+          columnKey: ["_measurement"],
+          valueColumn: "_value"
+        )
+        |> group()
+        |> sort(columns: ["_time"], desc: false)
+    `;
 
     return new Promise((resolve, reject) => {
       const rows = [];
@@ -203,16 +234,9 @@ export class APIv1 {
       this.influx_query_api.queryRows(query, {
         next: (row, tableMeta) => {
           const o = tableMeta.toObject(row);
-          rows.push({
-            device: o.device,
-            metric: o._measurement,
-            timestamp: o._time,
-            value: o._value,
-            unit: o.unit,
-            path: o.path
-          });
+          rows.push(o);
         },
-        error: (err) => reject(err),
+        error: reject,
         complete: () => resolve(rows)
       });
     });

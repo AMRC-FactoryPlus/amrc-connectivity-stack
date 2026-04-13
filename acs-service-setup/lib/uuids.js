@@ -188,6 +188,32 @@ export const ConfigDB = {
     }
 };
 
+/* Many of these are not used at the moment, or are only used in the
+ * MetaDB's initial Turtle file. At some point there will probably want
+ * to be a merge of these with the ConfigDB entries, unless the MetaDB
+ * name is only used for specifically the RDF stuff and the ConfigDB
+ * name kept for the JSON interfaces. */
+export const MetaDB = {
+    Class: {
+        AppGroup:           "75b030ca-2463-11f1-8bc8-372c7503501b",
+        Structured:         "912771e2-2463-11f1-b0e8-83e356c50fc8",
+        ConfigEntry:        "86d6f3d0-1c9c-11f1-9d4d-3b787922d771",
+        ConfigEntryGroup:   "62314906-1c9f-11f1-9bf0-bb3086d1330d",
+        Document:           "04e2abe8-2c0b-11f1-9cdd-6ffcd35127ab",
+        DocumentGroup:      "4304c4b0-2c0b-11f1-834f-a34b414e7540",
+        Instant:            "600bc688-1d35-11f1-80e6-d7c35e61c3ce",
+    },
+    Service:                "8abf031c-193f-11f1-b047-d762a2934dfc",
+    Perm: {
+        All:                "395756ce-3739-11f1-a752-338301d8dd19",
+        ReadRDF:            "d2b89414-3738-11f1-86d5-573f5f0cb628",
+        WriteRDF:           "d92c30f8-3738-11f1-8daa-33e4253b6bac",
+    },
+    Role: {
+        MetaDB:             "bf59ab10-3738-11f1-894f-cb07fd5bf02f",
+    },
+};
+
 export const Auth = {
     Class: {
         PrincipalGroup:     "c0157038-ccff-11ef-a4db-63c6212e998f",

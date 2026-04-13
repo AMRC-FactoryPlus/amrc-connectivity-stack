@@ -224,12 +224,31 @@ function buildHelpRows(headerInfo, driverPresentation) {
  *   (i.e. driverInfo.presentation), or null for defaults.
  * @returns {string} CSV content
  */
-export function generateCsv(model, schema, driverPresentation) {
+export function generateCsv(model, schema, driverPresentation, schemaType) {
     const headerInfo = buildHeaders(driverPresentation);
+    // Add Schema Type as a column
+    headerInfo.headers.push('Schema_Type');
     const metricRows = collectMetricRows(schema, model);
 
-    const dataRows = metricRows.map(row => metricToRow(row, headerInfo));
+    // Add schemaType to each data row
+    const dataRows = metricRows.map(row => {
+        const baseRow = metricToRow(row, headerInfo);
+        baseRow.push(schemaType || '');
+        return baseRow;
+    });
     const helpRows = buildHelpRows(headerInfo, driverPresentation);
+
+    // Add Schema_Type description to helpRows if present
+    if (helpRows.length > 2 && headerInfo.headers.includes('Schema_Type')) {
+        // Insert description for Schema_Type
+        const descRow = helpRows.find(r => r[0] === 'Schema_Type');
+        if (!descRow) {
+            // Insert after last known description
+            helpRows.push(Array(headerInfo.headers.length).fill(''));
+            helpRows[helpRows.length-1][0] = 'Schema_Type';
+            helpRows[helpRows.length-1][1] = 'The type of the schema used for this origin map.';
+        }
+    }
 
     const allRows = [headerInfo.headers, ...dataRows, ...helpRows];
 
@@ -338,14 +357,16 @@ export function parseCsv(csvString, driverPresentation) {
 export function applyCsvToModel(rows, model) {
     let applied = 0;
     let skipped = 0;
+    //console.log("model before update:", JSON.stringify(model, null, 2));
 
     for (const { tagPath, fields } of rows) {
         const segments = tagPath.split('/');
         let current = model;
         let found = true;
 
+        //If an option in the config map is not selected, then it is not added to the model and thus will not be found when applying the CSV.
         for (const segment of segments) {
-            if (current == null || typeof current !== 'object' || !(segment in current)) {
+            if (current == null || typeof current !== 'object' /*|| !(segment in current)*/) {
                 found = false;
                 break;
             }
@@ -376,6 +397,7 @@ export function applyCsvToModel(rows, model) {
 
         applied++;
     }
+    //console.log("model after update:", JSON.stringify(model, null, 2));
 
     return { applied, skipped };
 }

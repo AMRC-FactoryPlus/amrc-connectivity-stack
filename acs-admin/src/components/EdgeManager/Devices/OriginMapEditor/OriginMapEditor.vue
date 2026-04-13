@@ -1059,6 +1059,7 @@ export default {
     },
 
     applyParsedCsv () {
+      // console.log('Device information before applying CSV:', this.device.deviceInformation)
       if (!this.csvParsedData) return { applied: 0, skipped: 0 }
       // Pass the schema to applyCsvToModel so missing metrics can be created
       const result = applyCsvToModel(this.csvParsedData, this.model, this.schema)

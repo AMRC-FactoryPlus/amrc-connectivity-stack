@@ -1,0 +1,38 @@
+#-REQUIRE: auth
+---
+service: !u UUIDs.Service.ConfigDB
+version: 2
+objects:
+  !u Auth.Class.ServiceRole:
+    !u MetaDB.Role.MetaDB:
+      name: "MetaDB server"
+      subclassOf:
+        - !u Auth.Class.CentralService
+
+  !u Auth.Class.ServicePerms:
+    !u MetaDB.Perm.All:
+      name: "MetaDB Permission"
+      subclassOf:
+        - !u Auth.Class.Permission
+
+  !u UUIDs.Class.Service:
+    !u MetaDB.Service: { name: "MetaDB" }
+
+  # This only includes permissions unique to the MetaDB. It is not
+  # straightforward to unify with the ConfigDB permissions so we will
+  # just make two grants to the MetaDB service role.
+  !u MetaDB.Perm.All:
+    !u MetaDB.Perm.ReadRDF: { name: "Read RDF data" }
+    !u MetaDB.Perm.WriteRDF: { name: "Write RDF data" }
+
+---
+service: !u UUIDs.Service.Authentication
+version: 2
+grants:
+  !u MetaDB.Role.MetaDB:
+    !u Auth.Perm.ReadACL:
+      !u MetaDB.Perm.All: true
+      !u ACS.PermGroup.ConfigDB: true
+    # We need this for ownership change checks
+    !u Auth.Perm.ReadKerberos: null
+

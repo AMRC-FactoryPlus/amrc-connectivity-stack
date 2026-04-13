@@ -54,6 +54,17 @@ spec:
 {{ include "amrc-connectivity-stack.cache-max-age" (list . "dataAccess") | indent 12 }}
             - name: DIRECTORY_URL
               value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
+            - name: INFLUXDB_URL
+              value: http://acs-influxdb2.{{ .Release.Namespace }}.svc.cluster.local
+            - name: INFLUXDB_ORG
+              value: default
+            - name: INFLUXDB_BUCKET
+              value: default
+            - name: INFLUXDB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: influxdb-auth
+                  key: admin-token
           volumeMounts:
             - mountPath: /config/krb5-conf
               name: krb5-conf

@@ -17,20 +17,7 @@
   <properties>
     <acs.top>..</acs.top>
     <acs.output>${project.artifactId}-${project.version}.jar</acs.output>
-
-    <dep.slf4j>2.0.17</dep.slf4j>
-    <dep.jersey>4.0.2</dep.jersey>
-    <!-- keep this in sync with service-client -->
-    <dep.jetty>12.1.5</dep.jetty>
   </properties>
-
-  <repositories>
-    <repository>
-      <id>local.lib</id>
-      <name>ACS build Mavan repo</name>
-      <url>file:../lib/mvn</url>
-    </repository>
-  </repositories>
 
   <dependencies>
     <dependency>

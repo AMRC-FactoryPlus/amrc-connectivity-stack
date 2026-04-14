@@ -7,6 +7,7 @@
     <groupId>io.github.amrc-factoryplus</groupId>
     <artifactId>base-pom</artifactId>
     <version>0.0.0-intree</version>
+    <relativePath>../lib/java-base-pom</relativePath>
   </parent>
 
   <artifactId>acs-metadb</artifactId>

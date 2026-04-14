@@ -6,9 +6,11 @@
   <groupId>io.github.amrc-factoryplus</groupId>
   <artifactId>base-pom</artifactId>
   <!-- This version number, and ${acs.version} below, are intended for
-  builds targetting the in-tree Maven repo only. The purpose is to
-  ensure in-tree builds always pick up the appropriate in-tree library
-  versions, and nothing else does. -->
+    builds targetting the in-tree Maven repo only. The purpose is to
+    ensure in-tree builds always pick up the appropriate in-tree library
+    versions, and nothing else does. The GHA builds rely on exactly this
+    string being used, as we can't manipulate the POM using Maven when
+    parent POMs may not exist. -->
   <version>0.0.0-intree</version>
   <packaging>pom</packaging>
 

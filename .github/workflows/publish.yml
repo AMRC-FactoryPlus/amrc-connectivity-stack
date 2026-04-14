@@ -460,8 +460,9 @@ jobs:
       - name: Update POM versions
         env:
           workdir: ${{ matrix.workdir }}
+          ref: ${{ github.ref_name }}
         run: |
-          tag="${GITHUB_REF#v}"
+          tag="${ref#v}"
           cd lib/java-base-pom
           mvn versions:set -DnewVersion="$tag"
           mvn versions:set-property -Dproperty=acs.version -DnewVersion="$tag"
@@ -504,8 +505,9 @@ jobs:
       - name: Update POM versions
         env:
           service: ${{ matrix.service }}
+          ref: ${{ github.ref_name }}
         run: |
-          tag="${GITHUB_REF#v}"
+          tag="${ref#v}"
           cd lib/java-base-pom
           mvn versions:set -DnewVersion="$tag"
           mvn versions:set-property -Dproperty=acs.version -DnewVersion="$tag"

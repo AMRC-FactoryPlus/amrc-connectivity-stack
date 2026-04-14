@@ -438,8 +438,49 @@ jobs:
           service-name: ${{ steps.prepare.outputs.service-name }}
           digest: ${{ steps.build-and-push.outputs.digest }}
 
-  build-mqtt:
+  java-libs:
     runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 1
+      matrix:
+        workdir:
+          - java-base-pom
+          - java-service-client
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up JDK
+        uses: actions/setup-java@v3
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+      - name: Update POM versions
+        env:
+          workdir: ${{ matrix.workdir }}
+        run: |
+          tag="${GITHUB_REF#v}"
+          cd lib/java-base-pom
+          mvn versions:set -DnewVersion="$tag"
+          mvn versions:set-property -Dproperty=acs.version -DnewVersion="$tag"
+          cd ../$workdir
+          # This will do nothing in java-base-pom
+          mvn versions:update-parent -DskipResolution -DparentVersion="$tag"
+      - name: Publish to GH Packages
+        run: mvn -B -Pgha deploy
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+  java-services:
+    needs: [ java-libs ]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - acs-metadb
+          - acs-mqtt
     permissions:
       contents: read
       packages: write
@@ -450,27 +491,31 @@ jobs:
       - uses: ./.github/actions/prepare
         id: prepare
         with:
-          service-name: acs-mqtt
+          service-name: ${{ matrix.service }}
           token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Set up JDK 19
+      - name: Set up JDK
         uses: actions/setup-java@v3
         with:
-          java-version: '19'
+          java-version: '25'
           distribution: 'temurin'
-          server-id: github # Value of the distributionManagement/repository/id field of the pom.xml
-          settings-path: ${{ github.workspace }} # location for the settings.xml file
-
-      - name: Extract POM version
+      - name: Update POM versions
+        env:
+          service: ${{ matrix.service }}
         run: |
-          cd hivemq-krb
-          ver="$(mvn -q help:evaluate -Dexpression=project.version -DforceStdout)"
-          echo "krb_zipfile=hivemq-auth-krb-${ver}-distribution.zip" >>"$GITHUB_ENV"
+          tag="${GITHUB_REF#v}"
+          cd lib/java-base-pom
+          mvn versions:set -DnewVersion="$tag"
+          mvn versions:set-property -Dproperty=acs.version -DnewVersion="$tag"
+          cd "../../$service"
+          mvn versions:update-parent -DskipResolution -DparentVersion="$tag"
       - name: Build with Maven
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
-          (cd lib/java-service-client; mvn -B deploy)
-          cd hivemq-krb
-          mvn -B package
-          cp "target/${krb_zipfile}" "../${{ steps.prepare.outputs.service-name }}"
+          cd "$service"
+          mvn -B -Pgha package
+          output="$(mvn -q help:evaluate -DforceStdout -Dexpression=acs.output)"
+          echo "mvn_output=${output}" >>"$GITHUB_ENV"
       - name: Build and push Docker image
         id: build-and-push
         uses: docker/build-push-action@v6
@@ -480,7 +525,7 @@ jobs:
           tags: ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}:${{ steps.prepare.outputs.version }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            krb_zipfile=${{ env.krb_zipfile }}
+            mvn_output=${{ env.mvn_output }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - uses: ./.github/actions/cleanup
@@ -489,6 +534,7 @@ jobs:
           version: ${{ steps.prepare.outputs.version }}
           service-name: ${{ steps.prepare.outputs.service-name }}
           digest: ${{ steps.build-and-push.outputs.digest }}
+
   build-helm-chart:
     if: github.event_name == 'release'
     needs: [ 'build-x86-js', 'build-arm-js-merge', 'build-x86-pg', 'build-mqtt' ]

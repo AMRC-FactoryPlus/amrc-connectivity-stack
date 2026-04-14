@@ -13,26 +13,3 @@ For more information about the MQTT component of Factory+ see the
 how to deploy this service see the [AMRC Connectivity Stack
 repository](https://github.com/AMRC-FactoryPlus/amrc-connectivity-stack).
 
-## Updating the plugin
-
-To pull in a new version of the plugin, check out this repository and
-run
-
-    git submodule update --remote
-
-This will pull in the latest version of the plugin. Add and commit the
-changed files and push to Github for an automated build.
-
-Alternatively, to build an image by hand, ensure you have a JDK, Maven
-and Docker installed. Change directory to `hivemq-krb` and run
-
-    mvn -B package
-
-Copy the file target/hivemq-auth-krb-*-distribution.zip to the parent
-directory.
-
-Change back to the parent directory and run
-
-    docker build --build-arg krb_zipfile=hivemq-auth-krb-*-distribution.zip
-
-substituting in the appropriate zipfile.

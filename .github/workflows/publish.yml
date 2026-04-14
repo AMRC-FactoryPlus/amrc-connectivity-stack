@@ -537,7 +537,7 @@ jobs:
 
   build-helm-chart:
     if: github.event_name == 'release'
-    needs: [ 'build-x86-js', 'build-arm-js-merge', 'build-x86-pg', 'build-mqtt' ]
+    needs: [ 'build-x86-js', 'build-arm-js-merge', 'build-x86-pg', 'java-services' ]
     runs-on: ubuntu-latest
     steps:
       - name: Install Helm

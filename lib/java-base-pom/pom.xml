@@ -1,0 +1,255 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>io.github.amrc-factoryplus</groupId>
+  <artifactId>base-pom</artifactId>
+  <!-- This version number, and ${acs.version} below, are intended for
+  builds targetting the in-tree Maven repo only. The purpose is to
+  ensure in-tree builds always pick up the appropriate in-tree library
+  versions, and nothing else does. -->
+  <version>0.0.0-intree</version>
+  <packaging>pom</packaging>
+
+  <name>ACS parent POM</name>
+  <url>http://factoryplus.app.amrc.co.uk</url>
+
+  <properties>
+    <!-- This will be updated by GHA -->
+    <acs.version>0.0.0-intree</acs.version>
+    <!-- This must be overridden by child POMs where needed -->
+    <acs.top>../..</acs.top>
+
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <maven.compiler.release>17</maven.compiler.release>
+
+    <httpc.version>5.6</httpc.version>
+    <jena.version>5.6.0</jena.version>
+    <jersey.version>4.0.2</jersey.version>
+    <jetty.version>12.1.5</jetty.version>
+    <slf4j.version>2.0.17</slf4j.version>
+  </properties>
+
+  <profiles>
+    <profile>
+      <id>local-build</id>
+      <activation><activeByDefault>true</activeByDefault></activation>
+
+      <distributionManagement>
+        <repository>
+          <id>in-tree</id>
+          <name>ACS in-tree Maven repo</name>
+          <url>file:${acs.top}/lib/mvn</url>
+        </repository>
+      </distributionManagement>
+      <repositories>
+        <repository>
+          <id>in-tree</id>
+          <name>ACS in-tree Maven repo</name>
+          <url>file:${acs.top}/lib/mvn</url>
+        </repository>
+      </repositories>
+    </profile>
+
+    <profile>
+      <!-- This profile should be used for all Github Actions builds. 
+        It uses the GH Maven repos so artifacts persist across build steps. -->
+      <id>gha</id>
+
+      <distributionManagement>
+        <repository>
+          <id>github</id>
+          <name>ACS Github Maven repo</name>
+          <url>https://maven.pkg.github.com/amrc-factoryplus/acs</url>
+        </repository>
+      </distributionManagement>
+      <repositories>
+        <repository>
+          <id>github</id>
+          <name>ACS Github Maven repo</name>
+          <url>https://maven.pkg.github.com/amrc-factoryplus/acs</url>
+        </repository>
+      </repositories>
+    </profile>
+  </profiles>
+
+  <dependencyManagement>
+    <dependencies>
+      <!-- Basic utils -->
+      <dependency>
+        <groupId>org.junit</groupId>
+        <artifactId>junit-bom</artifactId>
+        <version>6.1.0-M1</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.slf4j</groupId>
+        <artifactId>slf4j-api</artifactId>
+        <version>${slf4j.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.slf4j</groupId>
+        <artifactId>slf4j-simple</artifactId>
+        <version>${slf4j.version}</version>
+      </dependency>
+      <!-- JSON -->
+      <dependency>
+        <groupId>org.json</groupId>
+        <artifactId>json</artifactId>
+        <version>20251224</version>
+      </dependency>
+      <dependency>
+        <groupId>dev.harrel</groupId>
+        <artifactId>json-schema</artifactId>
+        <version>1.9.1</version>
+      </dependency>
+      <!-- Apache HTTP client -->
+      <dependency>
+        <groupId>org.apache.commons</groupId>
+        <artifactId>commons-lang3</artifactId>
+        <version>3.20.0</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.httpcomponents.client5</groupId>
+        <artifactId>httpclient5</artifactId>
+        <version>${httpc.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.httpcomponents.client5</groupId>
+        <artifactId>httpclient5-cache</artifactId>
+        <version>${httpc.version}</version>
+      </dependency>
+      <!-- RxJava -->
+      <dependency>
+        <groupId>io.reactivex.rxjava3</groupId>
+        <artifactId>rxjava</artifactId>
+        <version>3.1.12</version>
+      </dependency>
+      <!-- Vavr (immutable/persistent data structures) -->
+      <dependency>
+        <groupId>io.vavr</groupId>
+        <artifactId>vavr</artifactId>
+        <version>1.0.0</version>
+      </dependency>
+      <!-- Jetty -->
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-client</artifactId>
+        <version>${jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty.websocket</groupId>
+        <artifactId>jetty-websocket-jetty-client</artifactId>
+        <version>${jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-server</artifactId>
+        <version>${jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty.websocket</groupId>
+        <artifactId>jetty-websocket-jetty-server</artifactId>
+        <version>${jetty.version}</version>
+      </dependency>
+      <!-- Jersey -->
+      <dependency>
+        <groupId>org.glassfish.jersey</groupId>
+        <artifactId>jersey-bom</artifactId>
+        <version>${jersey.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <!-- Jena -->
+      <dependency>
+        <groupId>org.apache.jena</groupId>
+        <artifactId>apache-jena-libs</artifactId>
+        <type>pom</type>
+        <version>${jena.version}</version>
+      </dependency>
+      <!-- In-tree ACS deps -->
+      <dependency>
+        <groupId>io.github.amrc-factoryplus</groupId>
+        <artifactId>java-service-client</artifactId>
+        <version>${acs.version}</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <build>
+    <pluginManagement><plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <version>3.6.2</version>
+        <executions><execution>
+          <id>enforce-maven</id>
+          <goals><goal>enforce</goal></goals>
+          <configuration>
+            <rules>
+              <requireMavenVersion>
+                <version>3.8.5</version>
+              </requireMavenVersion>
+            </rules>
+          </configuration>
+        </execution></executions>
+      </plugin>
+      <plugin>
+        <artifactId>maven-clean-plugin</artifactId>
+        <version>3.5.0</version>
+      </plugin>
+      <plugin>
+        <artifactId>maven-resources-plugin</artifactId>
+        <version>3.4.0</version>
+      </plugin>
+      <plugin>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.14.1</version>
+        <configuration>
+          <compilerArgs>
+            <arg>-Xlint:unchecked</arg>
+          </compilerArgs>
+          <release>17</release>
+        </configuration>
+      </plugin>
+      <plugin>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>3.5.4</version>
+      </plugin>
+      <plugin>
+        <artifactId>maven-jar-plugin</artifactId>
+        <version>3.5.0</version>
+      </plugin>
+      <plugin>
+        <artifactId>maven-install-plugin</artifactId>
+        <version>3.1.4</version>
+      </plugin>
+      <plugin>
+        <artifactId>maven-deploy-plugin</artifactId>
+        <version>3.1.4</version>
+      </plugin>
+      <plugin>
+        <artifactId>maven-site-plugin</artifactId>
+        <version>3.12.1</version>
+      </plugin>
+      <plugin>
+        <artifactId>maven-project-info-reports-plugin</artifactId>
+        <version>3.9.0</version>
+      </plugin>
+      <plugin>
+        <groupId>com.github.johnpoth</groupId>
+        <artifactId>jshell-maven-plugin</artifactId>
+        <version>1.4</version>
+        <configuration>
+          <testClasspath>true</testClasspath>
+          <options>
+            <option>-R-Dorg.slf4j.simpleLogger.showThreadName=false</option>
+            <option>-R-Dorg.slf4j.simpleLogger.showShortLogName=true</option>
+          </options>
+        </configuration>
+      </plugin>
+    </plugins></pluginManagement>
+  </build>
+</project>

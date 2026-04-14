@@ -61,14 +61,14 @@
         <repository>
           <id>github</id>
           <name>ACS Github Maven repo</name>
-          <url>https://maven.pkg.github.com/amrc-factoryplus/acs</url>
+          <url>https://maven.pkg.github.com/AMRC-FactoryPlus/amrc-connectivity-stack</url>
         </repository>
       </distributionManagement>
       <repositories>
         <repository>
           <id>github</id>
           <name>ACS Github Maven repo</name>
-          <url>https://maven.pkg.github.com/amrc-factoryplus/acs</url>
+          <url>https://maven.pkg.github.com/AMRC-FactoryPlus/amrc-connectivity-stack</url>
         </repository>
       </repositories>
     </profile>

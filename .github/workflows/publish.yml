@@ -458,19 +458,17 @@ jobs:
           java-version: '25'
           distribution: 'temurin'
       - name: Update POM versions
+        # It would be cleaner to use mvn versions here, but it breaks
+        # when we try to update a POM whose parent doesn't resolve. So
+        # fall back to stupid sed and rely on no reuse of the dummy
+        # in-tree version number.
         env:
           workdir: ${{ matrix.workdir }}
           ref: ${{ github.ref_name }}
         run: |
           tag="${ref#v}"
           cd "lib/$workdir"
-          if [ "$workdir" = java-base-pom ]
-          then
-            mvn versions:set -Pgha -DnewVersion="$tag"
-            mvn versions:set-property -Pgha -Dproperty=acs.version -DnewVersion="$tag"
-          else
-            mvn versions:update-parent -Pgha -DskipResolution -DparentVersion="$tag"
-          fi
+          sed -i -re's!version>0\.0\.0-intree</!version>'"${tag}"'</!g' pom.xml
       - name: Publish to GH Packages
         env:
           workdir: ${{ matrix.workdir }}
@@ -511,7 +509,7 @@ jobs:
         run: |
           tag="${ref#v}"
           cd "$service"
-          mvn versions:update-parent -Pgha -DskipResolution -DparentVersion="$tag"
+          sed -i -re's!version>0\.0\.0-intree</!version>'"${tag}"'</!g' pom.xml
       - name: Build with Maven
         env:
           service: ${{ matrix.service }}

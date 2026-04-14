@@ -2,7 +2,8 @@
 
 This directory contains service dump files loaded into the services by
 service-setup. This should be the normal way to load configuration into
-the services on ACS install.
+the services on ACS install. The Helm chart also supplies additional
+dumps via a ConfigMap.
 
 The files in this directory are YAML and each file can contain multiple
 dumps separated by `---` lines as usual in YAML. The YAML is converted

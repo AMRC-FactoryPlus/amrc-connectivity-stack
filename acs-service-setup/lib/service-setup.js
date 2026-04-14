@@ -25,7 +25,7 @@ export class ServiceSetup {
         this.dumps = new DumpLoader({
             fplus:      this.fplus,
             acs_config: this.acs_config,
-            dumps:      "dumps",
+            dumps:      ["dumps", opts.env.EXTRA_DUMPS],
             log:        this.fplus.debug.bound("dump"),
         });
 

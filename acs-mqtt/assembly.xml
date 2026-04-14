@@ -28,15 +28,6 @@
             <outputDirectory>/${artifactId}/</outputDirectory>
         </file>
         <file>
-            <source>target/README.html</source>
-            <outputDirectory>/${artifactId}/</outputDirectory>
-        </file>
-        <file>
-            <source>README.adoc</source>
-            <destName>README.txt</destName>
-            <outputDirectory>/${artifactId}/</outputDirectory>
-        </file>
-        <file>
             <source>src/main/resources/hivemq-extension.xml</source>
             <outputDirectory>/${artifactId}/</outputDirectory>
             <filtered>true</filtered>

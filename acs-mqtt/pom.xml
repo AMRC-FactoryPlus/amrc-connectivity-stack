@@ -15,6 +15,8 @@
 
     <properties>
         <acs.top>..</acs.top>
+        <acs.output>${project.artifactId}-${project.version}-distribution.zip</acs.output>
+
         <extension.name>Factory+ Kerberos extension</extension.name>
         <extension.author>AMRC</extension.author>
         <asciidoctor.version>3.1.1</asciidoctor.version>
@@ -148,55 +150,6 @@
                             <descriptors>
                                 <descriptor>assembly.xml</descriptor>
                             </descriptors>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-javadoc-plugin</artifactId>
-                <version>3.12.0</version>
-                <executions>
-                    <execution>
-                        <id>render-javadoc</id>
-                        <phase>generate-resources</phase>
-                        <goals>
-                            <goal>javadoc</goal>
-                        </goals>
-                        <configuration>
-                            <doclint>all,-missing</doclint>
-                            <links>
-                                <link>http://stleary.github.io/JSON-java/</link>
-                                <link>http://reactivex.io/RxJava/3.x/javadoc/</link>
-                                <link>https://hc.apache.org/httpcomponents-core-5.2.x/current/httpcore5/apidocs/</link>
-                                <link>https://hc.apache.org/httpcomponents-client-5.2.x/current/httpclient5/apidocs/</link>
-                            </links>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-            <plugin>
-                <groupId>org.asciidoctor</groupId>
-                <artifactId>asciidoctor-maven-plugin</artifactId>
-                <version>${asciidoctor.version}</version>
-                <executions>
-                    <execution>
-                        <id>output-html</id>
-                        <phase>generate-resources</phase>
-                        <goals>
-                            <goal>process-asciidoc</goal>
-                        </goals>
-                        <configuration>
-                            <backend>html</backend>
-                            <doctype>xhtml</doctype>
-                            <headerFooter>true</headerFooter>
-                            <sourceDirectory>${basedir}</sourceDirectory>
-                            <outputDirectory>${output.dir}/target</outputDirectory>
-                            <sourceDocumentName>${source.document.name}</sourceDocumentName>
-                            <attributes>
-                                <icons>font</icons>
-                                <toc2/>
-                            </attributes>
                         </configuration>
                     </execution>
                 </executions>

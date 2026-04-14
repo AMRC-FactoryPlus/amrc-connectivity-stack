@@ -15,6 +15,7 @@
 
   <properties>
     <acs.top>..</acs.top>
+    <acs.output>${project.artifactId}-${project.version}.jar</acs.output>
 
     <dep.slf4j>2.0.17</dep.slf4j>
     <dep.jersey>4.0.2</dep.jersey>

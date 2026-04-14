@@ -465,13 +465,16 @@ jobs:
           cd lib/java-base-pom
           mvn versions:set -DnewVersion="$tag"
           mvn versions:set-property -Dproperty=acs.version -DnewVersion="$tag"
-          cd ../$workdir
+          cd "../$workdir"
           # This will do nothing in java-base-pom
           mvn versions:update-parent -DskipResolution -DparentVersion="$tag"
       - name: Publish to GH Packages
-        run: mvn -B -Pgha deploy
         env:
+          workdir: ${{ matrix.workdir }}
           GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          cd "lib/${workdir}"
+          mvn -B -Pgha deploy
 
   java-services:
     needs: [ java-libs ]
@@ -510,6 +513,7 @@ jobs:
           mvn versions:update-parent -DskipResolution -DparentVersion="$tag"
       - name: Build with Maven
         env:
+          service: ${{ matrix.service }}
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           cd "$service"

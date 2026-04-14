@@ -467,7 +467,9 @@ jobs:
           ref: ${{ github.ref_name }}
         run: |
           tag="${ref#v}"
-          cd "lib/$workdir"
+          cd lib/java-base-pom
+          sed -i -re's!version>0\.0\.0-intree</!version>'"${tag}"'</!g' pom.xml
+          cd "../$workdir"
           sed -i -re's!version>0\.0\.0-intree</!version>'"${tag}"'</!g' pom.xml
       - name: Publish to GH Packages
         env:
@@ -508,7 +510,9 @@ jobs:
           ref: ${{ github.ref_name }}
         run: |
           tag="${ref#v}"
-          cd "$service"
+          cd lib/java-base-pom
+          sed -i -re's!version>0\.0\.0-intree</!version>'"${tag}"'</!g' pom.xml
+          cd "../../$service"
           sed -i -re's!version>0\.0\.0-intree</!version>'"${tag}"'</!g' pom.xml
       - name: Build with Maven
         env:

@@ -4,7 +4,7 @@
 *.swp
 
 # Build
-dependency-reduced-poom.xml
+dependency-reduced-pom.xml
 target/
 
 # Environment

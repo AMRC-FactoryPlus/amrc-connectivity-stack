@@ -31,6 +31,7 @@ import com.hivemq.extension.sdk.api.packets.connect.*;
 import com.hivemq.extension.sdk.api.packets.general.*;
 import com.hivemq.extension.sdk.api.services.Services;
 
+import uk.co.amrc.factoryplus.client.FPServiceException;
 import uk.co.amrc.factoryplus.gss.FPGssResult;
 
 public class FPKrbAuth implements EnhancedAuthenticator {
@@ -89,14 +90,14 @@ public class FPKrbAuth implements EnhancedAuthenticator {
         }
 
         log.info("Unknown auth mech {}", mech);
-        output.failAuthentication();
+        output.failAuthentication(DisconnectedReasonCode.BAD_AUTHENTICATION_METHOD);
     }
 
     @Override
     public void onAuth (EnhancedAuthInput input, EnhancedAuthOutput output)
     {
         log.error("Unexpected multi-step auth attempt");
-        output.failAuthentication();
+        output.failAuthentication(DisconnectedReasonCode.BAD_USER_NAME_OR_PASSWORD);
         return;
     }
 
@@ -105,7 +106,7 @@ public class FPKrbAuth implements EnhancedAuthenticator {
         ByteBuffer in_bb = conn.getAuthenticationData().orElse(null);
         if (in_bb == null) {
             log.error("No GSS step data provided");
-            output.failAuthentication();
+            output.failAuthentication(DisconnectedReasonCode.BAD_USER_NAME_OR_PASSWORD);
             return;
         }
 
@@ -120,7 +121,7 @@ public class FPKrbAuth implements EnhancedAuthenticator {
 
         if (user == null || passwd == null) {
             log.error("Null username/password, failing auth");
-            output.failAuthentication();
+            output.failAuthentication(DisconnectedReasonCode.BAD_USER_NAME_OR_PASSWORD);
             return;
         }
 
@@ -158,7 +159,10 @@ public class FPKrbAuth implements EnhancedAuthenticator {
                 },
                 e -> {
                     log.error("Authentication failed", e);
-                    output.failAuthentication();
+                    var code = e instanceof FPServiceException
+                        ? DisconnectedReasonCode.SERVER_BUSY
+                        : DisconnectedReasonCode.BAD_USER_NAME_OR_PASSWORD;
+                    output.failAuthentication(code);
                 });
     }
 

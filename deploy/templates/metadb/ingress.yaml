@@ -1,23 +1,23 @@
-{{ if .Values.git.enabled }}
+{{ if .Values.metadb.enabled }}
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
-  name: git-ingressroute
+  name: metadb-ingressroute
   namespace: {{ .Release.Namespace }}
 spec:
   entryPoints:
     - {{ .Values.acs.secure | ternary "websecure" "web" }}
   routes:
-    - match: Host(`git.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}`)
+    - match: Host(`metadb.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}`)
       kind: Rule
       services:
-        - name: git
+        - name: metadb
           port: 80
           namespace: {{ .Release.Namespace }}
   {{- if .Values.acs.secure }}
   tls:
     secretName: {{ .Values.acs.tlsSecretName | required "values.acs.tlsSecretName is required!" }}
     domains:
-      - main: git.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
+      - main: metadb.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
   {{- end -}}
 {{- end -}}

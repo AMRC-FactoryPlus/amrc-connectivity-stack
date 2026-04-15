@@ -21,6 +21,7 @@ export class DataFlow {
     this.auth = fplus.Auth;
 
     this.dataset_definitions = this._build_dataset_definitions();
+    this.general_infos = this._build_general_info();
   }
 
 
@@ -28,7 +29,21 @@ export class DataFlow {
     // this.dataset_definitions.subscribe(ss => 
     //   this.log("Dataset Definitions UPDATE %o", ss.toJS())
     // );
+
+    // this.log("GENERAL INFO UUID: ", UUIDs.App.Info);
+    // this.general_infos.subscribe(x => this.log("General infos UPDATE %o", x.toJS()));
     
+  }
+
+  // watch members of Dataset Metadata app Constants.App.DatasetMetadata and then watch members of those members
+  
+  
+  
+  _build_general_info(){
+    return rxx.rx(
+      this.cdb.search_app(UUIDs.App.Info), 
+      rxx.shareLatest()
+    );
   }
 
   _build_dataset_definitions() {
@@ -68,6 +83,11 @@ export class DataFlow {
       rxx.shareLatest()
     );
   }
+
+  get_general_infos(){
+    return this.general_infos;
+  }
+
 
   get_dataset_definitions(validity){
     if(validity == DatasetValidity.VALID){

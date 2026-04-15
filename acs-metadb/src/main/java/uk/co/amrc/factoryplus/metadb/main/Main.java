@@ -21,6 +21,7 @@ import org.glassfish.jersey.server.ServerProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import uk.co.amrc.factoryplus.client.*;
 import uk.co.amrc.factoryplus.metadb.db.*;
 
 public final class Main {
@@ -36,6 +37,7 @@ public final class Main {
     }
 
     private int port;
+    private FPServiceClient fplus;
     private Server server;
     private RdfStore model;
     private AuthProvider auth;
@@ -44,6 +46,7 @@ public final class Main {
     {
         this.port = port;
 
+        this.fplus = new FPServiceClient();
         this.model = new RdfStore(dataDir);
         this.auth = new AuthProvider();
         this.server = createServer();
@@ -92,6 +95,7 @@ public final class Main {
 
     private void start () throws Throwable
     {
+        fplus.start();
         model.start();
         server.start();
     }

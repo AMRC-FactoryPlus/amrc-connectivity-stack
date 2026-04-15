@@ -7,7 +7,6 @@
 package uk.co.amrc.factoryplus.metadb.db;
 
 import java.util.Map;
-import java.util.Optional;
 import java.util.function.Function;
 
 import jakarta.json.*;
@@ -20,6 +19,7 @@ import org.apache.jena.vocabulary.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import io.vavr.control.Option;
 import io.vavr.control.Try;
 
 public class AppMapper {
@@ -85,14 +85,14 @@ public class AppMapper {
      * own mappings. We cannot map arbitrary objects to JSON, and the
      * JSON creation functions will not accept Object. */
     private static final Map<Resource, 
-            Function<String, Optional<JsonValue>>> toJson = Map.of(
-        XSD.xstring,    s -> Optional.of(Json.createValue(s)),
+            Function<String, Option<JsonValue>>> toJson = Map.of(
+        XSD.xstring,    s -> Option.some(Json.createValue(s)),
         XSD.xint,       s -> Try.of(() -> Integer.parseInt(s))
-                                .toJavaOptional()
+                                .toOption()
                                 .map(Json::createValue),
-        XSD.xboolean,   s -> s.equals("true") ? Optional.of(JsonValue.TRUE)
-                            : s.equals("false") ? Optional.of(JsonValue.FALSE)
-                            : Optional.empty(),
+        XSD.xboolean,   s -> s.equals("true") ? Option.some(JsonValue.TRUE)
+                            : s.equals("false") ? Option.some(JsonValue.FALSE)
+                            : Option.none(),
         RDF.JSON,       Util::readJson);
 
     private RdfStore db;
@@ -113,9 +113,9 @@ public class AppMapper {
         this.db = db;
     }
 
-    public Optional<JsonValue> generateConfig (Resource app, Resource obj)
+    public Option<JsonValue> generateConfig (Resource app, Resource obj)
     {
-        return Optional.ofNullable(generators.get(app))
+        return Option.of(generators.get(app))
             .flatMap(q -> db.optionalQuery(q, "obj", obj))
             .map(AppMapper::solutionToJson);
     }
@@ -125,8 +125,8 @@ public class AppMapper {
         if (app.equals(Vocab.App.Registration))
             throw new Err.Immutable();
 
-        Optional.ofNullable(deleters.get(app))
-            .ifPresent(d -> db.runUpdate(d, "obj", obj));
+        Option.of(deleters.get(app))
+            .peek(d -> db.runUpdate(d, "obj", obj));
     }
 
     public void updateConfig (Resource app, Resource obj, JsonValue config)
@@ -139,8 +139,8 @@ public class AppMapper {
         var sol = jsonToSolution(config);
 
         deleteConfig(app, obj);
-        Optional.ofNullable(updaters.get(app))
-            .ifPresent(u -> UpdateExecution.dataset(db.dataset())
+        Option.of(updaters.get(app))
+            .peek(u -> UpdateExecution.dataset(db.dataset())
                 .update(u)
                 .substitution(sol)
                 .substitution("obj", obj)
@@ -174,16 +174,16 @@ public class AppMapper {
         var model = db.derived();
         var uuid = Util.single(model.listObjectsOfProperty(obj, Vocab.uuid))
             .map(AppMapper::literalToJson)
-            .orElseThrow(() -> new Err.CorruptRDF("Cannot find object UUID"));
+            .getOrElseThrow(() -> new Err.CorruptRDF("Cannot find object UUID"));
         if (!spec.get("uuid").equals(uuid)) {
             log.info("UUIDs cannot be changed: {} vs {}", uuid, spec.get("uuid"));
             throw new Err.BadJson(spec.get("uuid"));
         }
 
-        var klass = Vocab.parseUUID(spec.getString("class"))
+        var klass = Util.parseUUID(spec.getString("class"))
             .flatMap(db::findObject)
             .map(FPObject::node)
-            .orElseThrow(() -> {
+            .getOrElseThrow(() -> {
                 log.info("Cannot find new primary class");
                 return new Err.BadJson(spec.get("class"));
             });
@@ -218,9 +218,9 @@ public class AppMapper {
         var lit = node.asLiteral();
         var typ = ResourceFactory.createResource(lit.getDatatypeURI());
 
-        return Optional.ofNullable(toJson.get(typ))
+        return Option.of(toJson.get(typ))
             .flatMap(d -> d.apply(lit.getLexicalForm()))
-            .orElseThrow(() -> new Err.BadLiteral(lit));
+            .getOrElseThrow(() -> new Err.BadLiteral(lit));
     }
 
     private static JsonValue solutionToJson (QuerySolution rs)

@@ -26,11 +26,12 @@ public class ErrorMapper
     public static Response clientError (Err.ClientError err)
     {
         /* XXX we should allow the error to include more fields here */
-        log.info("Returning error: {}", err);
-        var json = Json.createValue(err.getMessage());
-        return Response.status(err.statusCode())
-            .entity(json)
-            .build();
+        log.info("Returning error: {}", err.toString());
+        var json = err.buildJson();
+        var res = Response.status(err.statusCode())
+            .entity(json);
+        err.buildHeaders().forEach(res::header);
+        return res.build();
     }
 
     @Provider

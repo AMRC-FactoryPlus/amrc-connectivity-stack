@@ -65,6 +65,7 @@ public class TextWebsocket
         public void onWebSocketClose (int sc, String r, Callback done) {
             sub.dispose();
             recv.onComplete();
+            done.succeed();
         }
 
         public void onWebSocketError (Throwable e) {

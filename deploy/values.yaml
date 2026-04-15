@@ -119,6 +119,7 @@ configdb:
 
 metadb:
   enabled: false
+  asConfigDB: false
   image:
     repository: acs-metadb
 

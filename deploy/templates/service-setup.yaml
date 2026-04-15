@@ -208,6 +208,13 @@ data:
 {{ if .Values.metadb.enabled }}
       - service: !u MetaDB.Service
         url: !acs "http://metadb.${namespace}.svc.${k8sdomain}"
+  {{- if .Values.metadb.asConfigDB }}
+    {{- if .Values.configdb.enabled }}
+      {{- fail "Cannot have both ConfigDB and MetaDB providing ConfigDB service" }}
+    {{- end }}
+      - service: !u ACS.Service.ConfigDB
+        url: !acs "http://metadb.${namespace}.svc.${k8sdomain}"
+  {{- end }}
 {{ end }}
 {{ if .Values.mqtt.enabled }}
       - service: !u UUIDs.Service.MQTT

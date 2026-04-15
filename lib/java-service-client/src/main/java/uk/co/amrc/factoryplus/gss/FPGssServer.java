@@ -23,7 +23,7 @@ import org.slf4j.LoggerFactory;
 import org.ietf.jgss.*;
 import org.json.*;
 
-import uk.co.amrc.factoryplus.client.Attempt;
+import io.reactivex.rxjava3.core.Single;
 
 public class FPGssServer extends FPGssPrincipal {
     private static final Logger log = LoggerFactory.getLogger(FPGssServer.class);
@@ -56,7 +56,7 @@ public class FPGssServer extends FPGssPrincipal {
      *
      * @return A new GSS acceptor context.
      */
-    public Attempt<GSSContext> createContext ()
+    public Single<GSSContext> createContext ()
     {
         return withCreds(creds -> {
             var krb5 = provider.krb5Mech();

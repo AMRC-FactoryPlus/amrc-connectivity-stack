@@ -8,7 +8,6 @@ package uk.co.amrc.factoryplus.hivemq_auth_krb;
 import java.lang.Runnable;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
-import java.nio.CharBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.PrivilegedAction;
 import java.time.Duration;
@@ -32,7 +31,7 @@ import com.hivemq.extension.sdk.api.packets.connect.*;
 import com.hivemq.extension.sdk.api.packets.general.*;
 import com.hivemq.extension.sdk.api.services.Services;
 
-import uk.co.amrc.factoryplus.client.Attempt;
+import uk.co.amrc.factoryplus.gss.FPGssResult;
 
 public class FPKrbAuth implements EnhancedAuthenticator {
 
@@ -41,10 +40,10 @@ public class FPKrbAuth implements EnhancedAuthenticator {
     private FPKrbAuthProvider provider;
 
     static class AuthResult {
-        public byte[] gssToken;
+        public ByteBuffer gssToken;
         public List<TopicPermission> acl;
 
-        public AuthResult (byte[] tok, List<TopicPermission> acl)
+        public AuthResult (ByteBuffer tok, List<TopicPermission> acl)
         {
             this.gssToken = tok;
             this.acl = acl;
@@ -110,24 +109,8 @@ public class FPKrbAuth implements EnhancedAuthenticator {
             return;
         }
 
-        byte[] in_buf = new byte[in_bb.limit()];
-        in_bb.get(in_buf);
-
-        final Async<EnhancedAuthOutput> asyncOutput = output.async(
-            Duration.ofSeconds(10), TimeoutFallback.FAILURE,
-            DisconnectedReasonCode.SERVER_BUSY);
-
-        verify_gssapi(in_buf)
-            .doAfterTerminate(() -> asyncOutput.resume())
-            .subscribe(
-                rv -> {
-                    rv.applyACL(output);
-                    output.authenticateSuccessfully(rv.gssToken);
-                },
-                e -> {
-                    log.error("GSSAPI auth failed", e);
-                    output.failAuthentication();
-                });
+        var verify = provider.verifyGSSAPI(in_bb);
+        handleVerification(output, verify, true);
     }
 
     private void auth_none (ConnectPacket conn, EnhancedAuthOutput output)
@@ -142,82 +125,47 @@ public class FPKrbAuth implements EnhancedAuthenticator {
         }
 
         /* XXX should passwords be UTF-8? */
-        CharBuffer passwd_c = StandardCharsets.UTF_8.decode(passwd);
-        char[] passwd_buf = new char[passwd_c.limit()];
-        passwd_c.get(passwd_buf);
+        var passwd_c = StandardCharsets.UTF_8.decode(passwd);
 
-        final Async<EnhancedAuthOutput> asyncOutput = output.async(
+        var verify = provider.verifyPassword(user, passwd_c);
+        handleVerification(output, verify, false);
+    }
+
+    private void handleVerification (EnhancedAuthOutput output,
+        Single<FPGssResult> verify, boolean isGSS)
+    {
+        var asyncOutput = output.async(
             Duration.ofSeconds(10), TimeoutFallback.FAILURE,
             DisconnectedReasonCode.SERVER_BUSY);
 
-        Services.extensionExecutorService().submit(() -> {
-            /* We need to get and verify a service ticket, to protect
-             * against a spoofed KDC. The only striaghtforward way to do
-             * this is just to do the whole GSSAPI dance on the client's
-             * behalf. */
-            var buf = get_client_gss_proxy(user, passwd_buf);
-            if (buf.isError()) {
-                log.error("Password authentication failed for {}", 
-                    user.toString(), buf.getError());
-                output.failAuthentication();
-                asyncOutput.resume();
-                return;
-            }
-            verify_gssapi(buf.get())
-                .map(rv -> Optional.of(rv))
-                .onErrorReturnItem(Optional.<AuthResult>empty())
-                .subscribe(opt -> {
+        verify.flatMap(this::findACL)
+            .doAfterTerminate(() -> asyncOutput.resume())
+            .subscribe(
+                rv -> {
                     switch (asyncOutput.getStatus()) {
                         case CANCELED:
-                            log.warn("Timeout authenticating {}",
-                                user.toString());
+                            log.warn("Timeout performing authentication");
                             return;
                         case DONE:
-                            log.error("Trying to return duplicate result for {}",
-                                user.toString());
+                            log.error("Trying to return duplicate auth result");
                             return;
                     }
-                    opt.ifPresentOrElse(
-                        rv -> {
-                            rv.applyACL(output);
-                            output.authenticateSuccessfully();
-                        },
-                        () -> output.failAuthentication());
-                    asyncOutput.resume();
+                    rv.applyACL(output);
+                    if (isGSS)
+                        output.authenticateSuccessfully(rv.gssToken);
+                    else
+                        output.authenticateSuccessfully();
+                },
+                e -> {
+                    log.error("Authentication failed", e);
+                    output.failAuthentication();
                 });
-        });
     }
 
-    private Attempt<byte[]> get_client_gss_proxy (
-        String user, char[] passwd_buf)
+    private Single<AuthResult> findACL (FPGssResult gres)
     {
-        return provider.createProxyContext(user, passwd_buf)
-            .map(ctx -> ctx.initSecContext(new byte[0], 0, 0));
-    }
-
-    private Single<AuthResult> verify_gssapi (byte[] in_buf)
-    {
-        return provider.createServerContext()
-            .toSingle()
-            .flatMap(ctx -> {
-                /* It would be helpful to log the client and server
-                 * identities if this call fails, so we can see who was
-                 * trying to connect and what endpoint they were trying to
-                 * connect to. But get{Src,Targ}Name can't be called until
-                 * the context is established, so we can't. Grrr. */
-                var out_buf = ctx.acceptSecContext(in_buf, 0, in_buf.length);
-
-                /* We could handle this case, but I don't think with the
-                 * Kerberos mech there is ever any need. */
-                if (!ctx.isEstablished())
-                    throw new Exception("GSS login took more than one step!");
-
-                String client_name = ctx.getSrcName().toString();
-                log.info("Authenticated client {}", client_name);
-                return provider.getACLforPrincipal(client_name)
-                    .map(acl -> new AuthResult(out_buf, acl))
-                    .doOnSuccess(rv -> log.info("MQTT ACL [{}]: {}", 
-                        client_name, rv.showACL()));
-            });
+        return provider.getACLforPrincipal(gres.upn())
+            .map(acl -> new AuthResult(gres.gssToken(), acl))
+            .doOnSuccess(rv -> log.info("MQTT ACL [{}]: {}", gres.upn(), rv.showACL()));
     }
 }

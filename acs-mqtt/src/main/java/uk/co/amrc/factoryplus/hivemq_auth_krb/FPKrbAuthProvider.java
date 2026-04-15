@@ -6,6 +6,8 @@
 package uk.co.amrc.factoryplus.hivemq_auth_krb;
 
 import java.security.PrivilegedAction;
+import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -30,6 +32,7 @@ import org.json.*;
 import io.reactivex.rxjava3.core.*;
 
 import uk.co.amrc.factoryplus.client.*;
+import uk.co.amrc.factoryplus.gss.FPGssResult;
 
 import com.hivemq.extension.sdk.api.annotations.NotNull;
 import com.hivemq.extension.sdk.api.annotations.Nullable;
@@ -71,17 +74,19 @@ public class FPKrbAuthProvider implements EnhancedAuthenticatorProvider
         return new FPKrbAuth(this);
     }
 
-    public Attempt<GSSContext> createServerContext ()
+    public Single<FPGssResult> verifyGSSAPI (ByteBuffer buf)
     {
-        return fplus.gssServer().createContext();
+        return fplus.gss().verifyGSSAPI(buf);
     }
 
-    public Attempt<GSSContext> createProxyContext (String user, char[] passwd)
+    public Single<FPGssResult> verifyPassword (String user, CharBuffer passwd)
     {
-        String srv = fplus.getConf("server_principal");
+        /* This call accesses the network in general; a plain
+         * verifyGSSAPI does not. So push this off to the fplus thread
+         * pool. */
         return fplus.gss()
-            .clientWithPassword(user, passwd)
-            .createContext(srv);
+            .verifyPassword(user, passwd)
+            .subscribeOn(fplus.getScheduler());
     }
 
     public Single<List<TopicPermission>> getACLforPrincipal (String principal)

@@ -175,7 +175,7 @@ public class FPServiceClient {
     synchronized public FPGssProvider gss ()
     {
         if (_gss == null)
-            _gss = new FPGssProvider();
+            _gss = new FPGssProvider(this);
         return _gss;
     }
 

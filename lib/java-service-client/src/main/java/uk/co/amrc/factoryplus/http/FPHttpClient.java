@@ -148,17 +148,12 @@ public class FPHttpClient {
     /** Internal */
     public Single<String> tokenFor (URI service)
     {
-        return Single.fromSupplier(() -> {
-                //FPThreadUtil.logId("getting gss context");
-                /* blocking */
-                return fplus.gssClient()
-                    .createContextHB("HTTP@" + service.getHost())
-                    .orElseThrow();
-            })
-            .map(ctx -> new TokenRequest(service, ctx))
-                /* perform is blocking */
-            .flatMap(req -> req.perform(this))
+        return fplus.gssClient()
+            .createContextHB("HTTP@" + service.getHost())
             .subscribeOn(fplus.getScheduler())
+            .map(ctx -> new TokenRequest(service, ctx))
+            /* perform is blocking */
+            .flatMap(req -> req.perform(this))
             /* fetch moves calls below here to the http thread pool */
             .map(res -> res.ifOk()
                 .flatMap(r -> r.getBodyObject())

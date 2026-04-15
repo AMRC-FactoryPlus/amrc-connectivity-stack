@@ -60,7 +60,6 @@ public class FPGssServer extends FPGssPrincipal {
     {
         return withCreds(creds -> {
             var krb5 = provider.krb5Mech();
-            log.info("Server creds: {}", creds.getName(krb5));
             return provider.getGSSManager().createContext(creds);
         });
     }

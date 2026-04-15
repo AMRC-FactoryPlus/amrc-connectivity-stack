@@ -32,28 +32,18 @@ public class AuthFilter implements ContainerRequestFilter
     
     @Context private AuthProvider provider;
 
-    private static final Pattern Auth_rx = Pattern.compile(
-        "([A-Za-z]+) +([A-Za-z0-9._~+/=-]+)");
-
-    private void fail (ContainerRequestContext req, String msg, Object... args)
-    {
-        req.abortWith(Response.status(401)
-            .header("WWW-Authenticate", "Basic realm=\"Factory+\"")
-            .build());
-    }
-
     public void filter (ContainerRequestContext req)
     {
         var auth = req.getHeaderString("Authorization");
 
-        var auth_m = Auth_rx.matcher(auth);
-        if (!auth_m.matches()) {
-            fail(req, "Bad Auth header: ", auth);
-            return;
-        }
-
-        provider.authenticate(auth_m.group(1), auth_m.group(2))
-            .ifPresentOrElse(req::setSecurityContext,
-                () -> fail(req, "Authentication failed"));
+        /* It is important this call blocks this thread, and throws any
+         * exception coming from the Single. Otherwise the request
+         * processing will continue before auth has been checked. */
+        var ctx = provider.authenticate(auth)
+            .doOnSuccess(c -> log.info("Authenticated {} using {}",
+                c.getUserPrincipal(), c.getAuthenticationScheme()))
+            .doOnError(e -> log.info("Auth failed", e))
+            .blockingGet();
+        req.setSecurityContext(ctx);
     }
 }

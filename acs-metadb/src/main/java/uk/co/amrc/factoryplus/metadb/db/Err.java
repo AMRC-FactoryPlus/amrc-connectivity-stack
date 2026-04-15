@@ -82,6 +82,21 @@ public class Err extends Error
             return Map.of();
         }
     }
+    public static class AuthFailed extends ClientError
+    {
+        public AuthFailed (String why) {
+            super("Authentication failed: " + why);
+        }
+        public int statusCode () { return 401; }
+        public Map<String, String> buildHeaders ()
+        {
+            /* This is not a correct reflection of the auth we accept,
+             * but this is what the F+ services have always sent. If we
+             * admit to accepting Negotiate auth then Windows browsers
+             * try to authenticate via SSPI and create a problem. */
+            return Map.of("WWW-Authenticate", "Basic realm=\"Factory+\"");
+        }
+    }
     public static class Forbidden extends ClientError
     {
         public Forbidden ()

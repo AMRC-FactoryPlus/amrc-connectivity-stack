@@ -10,7 +10,7 @@ import {InfluxDB, flux} from '@influxdata/influxdb-client';
 
 import { APIError } from "@amrc-factoryplus/service-api";
 import { DataAccess as Constants } from "./constants.js";
-import { valid_grant, valid_krb, valid_uuid, DatasetValidity } from "./validate.js";
+import { valid_uuid, DatasetValidity } from "./validate.js";
 
 function fail(status, message) {
   throw new APIError(status);
@@ -105,11 +105,38 @@ export class APIv1 {
                     * metadata {object} - Map of metadata configs keyed by Application UUID - contains all config entries for dataset which use applications in the Dataset metadata class
                     * parts {array} - Subset datasets - contains UUIDs of all subclasses of dataset the client has READ access to.
     * Don't return valid response if dataset is invalid
+    * 
+    
    */
   async metadata_uuid(req, res){
-    // to be implemented
-    const {uuid} = req.params
-    if (!valid_uuid(uuid)) fail(410);
+    const dataset_uuid  = req.params.uuid;
+    if (!valid_uuid(dataset_uuid)) fail(410);
+
+    const ok = await this.auth.check_acl(
+      req.auth,
+      Constants.Perm.ReadDataset,
+      dataset_uuid,
+      true,
+    );
+    
+    if (!ok) return fail(403);
+
+    const datasets = await this._get_allowed_dataset_uuids(req.auth, Constants.Perm.ReadDataset, DatasetValidity.VALID);
+    const is_valid = await datasets.includes(dataset_uuid)
+    if(!is_valid) return fail(404);
+
+    const infos = await rx.firstValueFrom(this.data.get_general_infos());
+    const info = infos.get(dataset_uuid);
+    if(!info) return fail(404);
+
+    
+    
+    const meta = {
+      uuid: dataset_uuid,
+      name: info.name,
+    }
+    return res.status(200).json(meta);
+
   }
 
 

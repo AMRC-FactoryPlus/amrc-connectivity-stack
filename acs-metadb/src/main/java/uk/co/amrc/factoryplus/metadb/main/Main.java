@@ -68,6 +68,7 @@ public final class Main {
         var bindings = new AbstractBinder () {
             protected void configure () {
                 bind(model).to(RdfStore.class);
+                bind(fplus).to(FPServiceClient.class);
                 bind(auth).to(AuthProvider.class);
                 bind(pingResult).to(PingResult.class);
             }

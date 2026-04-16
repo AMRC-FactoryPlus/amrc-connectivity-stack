@@ -39,6 +39,7 @@ public class Sparql {
     @Inject private RdfStore store;
     @Inject private Request req;
     @Inject private UriInfo uriInfo;
+    @Inject private SecurityContext auth;
 
     private static final Logger log = LoggerFactory.getLogger(Sparql.class);
 
@@ -125,7 +126,7 @@ public class Sparql {
     @Consumes("application/sparql-update")
     public void update (String update)
     {
-        store.requestExecute(req ->
+        store.requestExecute(auth, req ->
             UpdateAction.parseExecute(update, store.dataset()));
     }
 
@@ -142,7 +143,7 @@ public class Sparql {
 
         var lang = handler.content().acceptLang(req);
 
-        return store.requestRead(req -> {
+        return store.requestRead(auth, req -> {
             try (var qexec = QueryExecutionFactory.create(query, store.dataset())) {
                 return handler.handle().apply(qexec, lang);
             }
@@ -225,7 +226,7 @@ public class Sparql {
         var lang = RDF_HANDLER.contentLang(type);
         var graph = resolveGraph(true);
 
-        store.requestExecute(req -> {
+        store.requestExecute(auth, req -> {
             readToGraph(graph, rdf, lang);
             /* This refreshes the inferences because we have been poking
              * around behind its back. Strictly this is only needed when
@@ -243,7 +244,7 @@ public class Sparql {
         var lang = RDF_HANDLER.contentLang(type);
         var graph = resolveGraph(true);
 
-        store.requestExecute(req -> {
+        store.requestExecute(auth, req -> {
             graph.removeAll();
             readToGraph(graph, rdf, lang);
             store.derived().rebind();

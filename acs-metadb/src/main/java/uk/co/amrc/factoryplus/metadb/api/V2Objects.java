@@ -26,13 +26,14 @@ import uk.co.amrc.factoryplus.service.*;
 @Path("v2")
 public class V2Objects {
     @Inject private RdfStore db;
+    @Inject private SecurityContext auth;
 
     private static final Logger log = LoggerFactory.getLogger(V2Objects.class);
 
     @GET @Path("object")
     public JsonArray listObjects ()
     {
-        var objs = db.requestRead(req ->
+        var objs = db.requestRead(auth, req ->
             req.objectStructure().listObjects());
         return Json.createArrayBuilder(objs).build();
     }
@@ -59,26 +60,26 @@ public class V2Objects {
         /* We don't accept any other parameters. The ServiceClient
          * doesn't pass any anyway. */
 
-        return db.requestWrite(req ->
+        return db.requestWrite(auth, req ->
             req.objectStructure().createObject(klass, uuid));
     }
 
     @DELETE @Path("object/{object}")
     public void deleteObject (@PathParam("object") UUID uuid)
     {
-        db.requestExecute(req -> req.objectStructure().deleteObject(uuid));
+        db.requestExecute(auth, req -> req.objectStructure().deleteObject(uuid));
     }
 
     @GET @Path("object/rank")
     public JsonArray listRanks ()
     {
-        var ranks = db.requestRead(req -> req.objectStructure().listRanks());
+        var ranks = db.requestRead(auth, req -> req.objectStructure().listRanks());
         return Json.createArrayBuilder(ranks).build();
     }
 
     private JsonArray listRelation (String graph, UUID uuid, String relation)
     {
-        var members = db.requestRead(req ->
+        var members = db.requestRead(auth, req ->
             req.objectStructure()
                 .listRelation(graph, uuid, relation));
 
@@ -106,7 +107,7 @@ public class V2Objects {
 
     private Response testRelation (String graph, UUID klass, String relation, UUID object)
     {
-        var rv = db.requestRead(req ->
+        var rv = db.requestRead(auth, req ->
             req.objectStructure()
                 .testRelation(graph, klass, relation, object));
 
@@ -137,7 +138,7 @@ public class V2Objects {
         @PathParam("relation") String relation,
         @PathParam("object") UUID object)
     {
-        db.requestExecute(req ->
+        db.requestExecute(auth, req ->
             req.objectStructure().putRelation(klass, relation, object));
     }
 
@@ -147,7 +148,7 @@ public class V2Objects {
         @PathParam("relation") String relation,
         @PathParam("object") UUID object)
     {
-        db.requestExecute(req ->
+        db.requestExecute(auth, req ->
             req.objectStructure().delRelation(klass, relation, object));
     }
 }

@@ -15,7 +15,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 import jakarta.json.*;
-import jakarta.ws.rs.WebApplicationException;
+import jakarta.ws.rs.core.SecurityContext;
 
 import org.apache.jena.datatypes.xsd.XSDDatatype;
 import org.apache.jena.query.*;
@@ -91,9 +91,9 @@ public class RdfStore
     public void executeWrite (Runnable r) { dataset.executeWrite(r); }
     public <T> T calculateWrite (Supplier<T> s) { return dataset.calculateWrite(s); }
 
-    public <T> T requestRead (Function<RequestHandler, T> cb)
+    public <T> T requestRead (SecurityContext ctx, Function<RequestHandler, T> cb)
     {
-        return calculateRead(() -> cb.apply(new RequestHandler(this)));
+        return calculateRead(() -> cb.apply(new RequestHandler(this, ctx)));
     }
 
     /* Jena ModelChangedListeners do not appear to respect inference
@@ -119,9 +119,9 @@ public class RdfStore
      * for a change in one rank to propagate into other ranks. If we
      * introduced inference for powertypes this would change.
      */
-    public <T> T requestWrite (Function<RequestHandler, T> cb)
+    public <T> T requestWrite (SecurityContext ctx, Function<RequestHandler, T> cb)
     {
-        var req = new RequestHandler(this);
+        var req = new RequestHandler(this, ctx);
         var listener = new ModelUpdate();
         T rv;
 
@@ -152,9 +152,9 @@ public class RdfStore
 
         return rv;
     }
-    public void requestExecute (Consumer<RequestHandler> cb)
+    public void requestExecute (SecurityContext ctx, Consumer<RequestHandler> cb)
     {
-        requestWrite(req -> { cb.accept(req); return 1; });
+        requestWrite(ctx, req -> { cb.accept(req); return 1; });
     }
 
     public ResultSet selectQuery (Query query, Object... substs)

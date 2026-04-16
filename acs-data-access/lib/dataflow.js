@@ -22,6 +22,7 @@ export class DataFlow {
 
     this.dataset_definitions = this._build_dataset_definitions();
     this.general_infos = this._build_general_info();
+    this.metadata = this._build_metadata();
   }
 
 
@@ -35,8 +36,41 @@ export class DataFlow {
     
   }
 
-  // watch members of Dataset Metadata app Constants.App.DatasetMetadata and then watch members of those members
-  
+  // 1. Watch direct members of Constants.App.DatasetMetadata
+  // 2. For each member -> Search App
+  _build_metadata() {
+    return rxx.rx(
+      this.cdb.watch_members(Constants.App.DatasetMetadata),
+
+      rx.switchMap((uuidsSet) => {
+        const uuids = uuidsSet.toArray();
+
+        if (uuids.length === 0) {
+          return rx.of(IMap());
+        }
+
+        const streams = uuids.map(uuid =>
+          this.cdb.search_app(uuid).pipe(
+            rx.map(result => [uuid, result])
+          )
+        );
+
+        return rx.combineLatest(streams).pipe(
+          rx.map(entries => {
+            let map = IMap();
+
+            for (const [uuid, result] of entries) {
+              map = map.set(uuid, result);
+            }
+
+            return map;
+          })
+        );
+      }),
+
+      rxx.shareLatest()
+    );
+  }
   
   
   _build_general_info(){
@@ -82,6 +116,10 @@ export class DataFlow {
 
       rxx.shareLatest()
     );
+  }
+
+  get_metadata(){
+    return this.metadata;
   }
 
   get_general_infos(){

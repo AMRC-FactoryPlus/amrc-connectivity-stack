@@ -22,6 +22,7 @@
     "@amrc-factoryplus/service-api": "file:../lib/js-service-api",
     "@amrc-factoryplus/service-client": "file:../lib/js-service-client",
     "express": "^5.0.1",
+    "immutable": "^5.0.0-rc.2",
     "rxjs": "^7.8.1"
   }
 }

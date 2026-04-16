@@ -473,6 +473,19 @@ export const DataAccess = {
     }
 }
 
+export const MESCollation = {
+    Service: {
+        MESCollation:       "a7f3b2c8-5e4d-4f1a-9c8b-6a2d5e0f4b1c",
+    },
+    ServiceAccount:         "c3f5d8b2-1e9a-4f6c-8b7d-4a2e5c9f1d3b",
+    Requirement: {
+        ServiceRole:        "d4c7e9f2-8b6a-4e5d-a3c9-1f7b4e2d8c5a",
+    },
+    Perm: {
+        All:                "b8e5f3a1-7c4d-4e9f-8b6a-2d5c8e1f4b7a",
+    },
+};
+
 export const UNS = {
     Group: {
         Sparkplug:  "e414d355-b991-429b-8f5d-97e823ff71f5",

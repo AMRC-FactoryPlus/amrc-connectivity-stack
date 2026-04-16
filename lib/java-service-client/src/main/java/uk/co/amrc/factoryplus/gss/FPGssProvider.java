@@ -5,30 +5,17 @@
 
 package uk.co.amrc.factoryplus.gss;
 
-import java.security.PrivilegedAction;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Optional;
 import java.util.ServiceConfigurationError;
-import java.util.concurrent.Callable;
-import java.util.stream.Stream;
-import java.util.stream.Collectors;
-
-import java.security.PrivilegedExceptionAction;
-import java.security.PrivilegedActionException;
-import javax.security.auth.Subject;
-import javax.security.auth.callback.*;
-import javax.security.auth.login.*;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.ietf.jgss.*;
-import org.json.*;
 
 import io.reactivex.rxjava3.core.Single;
+import io.vavr.control.Option;
 
 import uk.co.amrc.factoryplus.client.FPServiceClient;
 
@@ -138,11 +125,15 @@ public class FPGssProvider {
      * This will not make network calls and will only access disk to
      * read the keytab, so in general may be run syncronously.
      * @param buf The GSSAPI packet from the client.
-     * @return A full Kerberos UPN for the user
      */
     public Single<FPGssResult> verifyGSSAPI (ByteBuffer buf)
     {
         var in_buf = bbToArray(buf);
+        return _verifyGSSAPI(in_buf, true);
+    }
+
+    private Single<FPGssResult> _verifyGSSAPI (byte[] in_buf, boolean out)
+    {
         return fplus.gssServer()
             /* In principle this call blocks on disk. In practice that
              * 'disk' will be a K8s tmpfs and very fast. */
@@ -163,7 +154,8 @@ public class FPGssProvider {
                 String upn = ctx.getSrcName().toString();
                 log.info("Authenticated client {}", upn);
 
-                return new FPGssResult(upn, ByteBuffer.wrap(out_buf));
+                return new FPGssResult(upn, 
+                    Option.some(out_buf).filter(b -> out).map(ByteBuffer::wrap));
             });
     }
 
@@ -173,7 +165,6 @@ public class FPGssProvider {
      * asynchronously.
      * @param user The username as supplied
      * @param passwd The password
-     * @return A full Kerberos UPN for the user
      */
     public Single<FPGssResult> verifyPassword (String user, CharBuffer passwd)
     {
@@ -187,7 +178,7 @@ public class FPGssProvider {
         return clientWithPassword(user, passwd_ary)
             /* This call will block on network. */
             .createContext(srv)
-            .map(ctx -> ByteBuffer.wrap(ctx.initSecContext(new byte[0], 0, 0)))
-            .flatMap(this::verifyGSSAPI);
+            .map(ctx -> ctx.initSecContext(new byte[0], 0, 0))
+            .flatMap(buf -> this._verifyGSSAPI(buf, false));
     }
 }

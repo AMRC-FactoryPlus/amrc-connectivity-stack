@@ -20,6 +20,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import io.reactivex.rxjava3.core.*;
+import io.vavr.control.Option;
 
 import com.hivemq.extension.sdk.api.async.*;
 import com.hivemq.extension.sdk.api.client.parameter.Listener;
@@ -40,16 +41,8 @@ public class FPKrbAuth implements EnhancedAuthenticator {
 
     private FPKrbAuthProvider provider;
 
-    static class AuthResult {
-        public ByteBuffer gssToken;
-        public List<TopicPermission> acl;
-
-        public AuthResult (ByteBuffer tok, List<TopicPermission> acl)
-        {
-            this.gssToken = tok;
-            this.acl = acl;
-        }
-
+    static record AuthResult (Option<ByteBuffer> gssToken, List<TopicPermission> acl)
+    {
         public void applyACL (EnhancedAuthOutput output)
         {
             ModifiableDefaultPermissions perms = output.getDefaultPermissions();
@@ -111,7 +104,7 @@ public class FPKrbAuth implements EnhancedAuthenticator {
         }
 
         var verify = provider.verifyGSSAPI(in_bb);
-        handleVerification(output, verify, true);
+        handleVerification(output, verify);
     }
 
     private void auth_none (ConnectPacket conn, EnhancedAuthOutput output)
@@ -129,11 +122,11 @@ public class FPKrbAuth implements EnhancedAuthenticator {
         var passwd_c = StandardCharsets.UTF_8.decode(passwd);
 
         var verify = provider.verifyPassword(user, passwd_c);
-        handleVerification(output, verify, false);
+        handleVerification(output, verify);
     }
 
     private void handleVerification (EnhancedAuthOutput output,
-        Single<FPGssResult> verify, boolean isGSS)
+        Single<FPGssResult> verify)
     {
         var asyncOutput = output.async(
             Duration.ofSeconds(10), TimeoutFallback.FAILURE,
@@ -152,10 +145,10 @@ public class FPKrbAuth implements EnhancedAuthenticator {
                             return;
                     }
                     rv.applyACL(output);
-                    if (isGSS)
-                        output.authenticateSuccessfully(rv.gssToken);
-                    else
-                        output.authenticateSuccessfully();
+                    rv.gssToken()
+                        /* These two are not the same :) */
+                        .peek(output::authenticateSuccessfully)
+                        .onEmpty(output::authenticateSuccessfully);
                 },
                 e -> {
                     log.error("Authentication failed", e);

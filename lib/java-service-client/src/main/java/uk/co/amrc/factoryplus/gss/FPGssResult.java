@@ -6,7 +6,8 @@
 package uk.co.amrc.factoryplus.gss;
 
 import java.nio.ByteBuffer;
+import io.vavr.control.Option;
 
-public record FPGssResult (String upn, ByteBuffer gssToken)
+public record FPGssResult (String upn, Option<ByteBuffer> gssToken)
 {
 }

@@ -106,8 +106,10 @@ public class Session
         var tok = matcher.group(1);
         log("Token: {}", tok);
 
-        return Single.just(
-            new AuthResponse(Option.some("bob"), "200", "Auth ok"));
+        return notify.auth()
+            .bearerAuth(tok)
+            .map(res -> new AuthResponse(Option.some(res.upn()), "200", "Auth OK"))
+            .onErrorReturn(e -> new AuthResponse(Option.none(), "401", "Bad token"));
     }
 
     private static JsonValue readJson (String json)

@@ -30,7 +30,7 @@ public class MetaDBNotify
     {
         data = db.dataflow();
 
-        notify = NotifyV2.builder()
+        notify = NotifyV2.builder(db.auth())
             .watch("v2/app/{app}/object/", this::appList)
             .search("v2/app/{app}/object/", this::appSearch)
             .build();

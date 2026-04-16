@@ -25,8 +25,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import io.reactivex.rxjava3.core.Single;
+import io.vavr.control.Option;
 
 import uk.co.amrc.factoryplus.client.FPServiceClient;
+import uk.co.amrc.factoryplus.gss.FPGssResult;
 import uk.co.amrc.factoryplus.service.SvcErr;
 
 public class AuthProvider
@@ -68,7 +70,7 @@ public class AuthProvider
     private Base64.Decoder b64d = Base64.getDecoder();
     private Base64.Encoder b64e = Base64.getEncoder();
 
-    private Map<String, Function<String, Single<String>>> schemes = Map.of(
+    private Map<String, Function<String, Single<FPGssResult>>> schemes = Map.of(
         "basic",    this::basicAuth,
         "bearer",   this::bearerAuth);
 
@@ -96,7 +98,7 @@ public class AuthProvider
         var creds = auth_m.group(2);
 
         return handler.apply(creds)
-            .<SecurityContext>map(upn -> new Ctx(new Princ(upn), scheme))
+            .<SecurityContext>map(res -> new Ctx(new Princ(res.upn()), scheme))
             .onErrorResumeNext(e -> {
                 if (e instanceof SvcErr.AuthFailed)
                     return Single.error(e);
@@ -116,39 +118,37 @@ public class AuthProvider
         return sess;
     }
 
-    private Single<String> basicAuth (String creds)
+    public Single<FPGssResult> basicAuth (String creds)
     {
-        var creds_b = b64d.decode(creds);
-        var creds_s = new String(creds_b, StandardCharsets.UTF_8);
-
-        var creds_m = Basic_rx.matcher(creds_s);
-        if (!creds_m.matches())
-            throw new SvcErr.AuthFailed("Bad Basic creds");
-
-        var user = creds_m.group(1);
-        var passwd = CharBuffer.wrap(creds_m.group(2));
-
-        return fplus.gss()
-            .verifyPassword(user, passwd)
-            .map(r -> r.upn());
+        return Single.just(creds)
+            .map(b64d::decode)
+            .map(buf -> new String(buf, StandardCharsets.UTF_8))
+            .map(Basic_rx::matcher)
+            .flatMap(m -> m.matches() ? Single.just(m)
+                : Single.error(new SvcErr.AuthFailed("Bad Basic creds")))
+            .flatMap(m -> fplus.gss()
+                .verifyPassword(m.group(1), CharBuffer.wrap(m.group(2))));
     }
 
-    private Single<String> bearerAuth (String tok)
+    public Single<FPGssResult> bearerAuth (String tok)
     {
-        var sess = sessions.get(tok);
+        return Single.defer(() -> {
+            var sess = sessions.get(tok);
 
-        if (sess == null)
-            throw new SvcErr.AuthFailed("Bad token");
+            if (sess == null)
+                return Single.error(new SvcErr.AuthFailed("Bad token"));
 
-        /* We may be racing with another thread which is also expiring
-         * this token. That doesn't matter as one of us will remove it
-         * and both will fail the auth. */
-        if (sess.isExpired()) {
-            log.info("Expired token {}...", tok.substring(0, 5));
-            sessions.remove(tok);
-            throw new SvcErr.AuthFailed("Expired token");
-        }
+            /* We may be racing with another thread which is also expiring
+             * this token. That doesn't matter as one of us will remove it
+             * and both will fail the auth. */
+            if (sess.isExpired()) {
+                log.info("Expired token {}...", tok.substring(0, 5));
+                sessions.remove(tok);
+                return Single.error(new SvcErr.AuthFailed("Expired token"));
+            }
 
-        return Single.just(sess.upn());
+            return Single.just(sess.upn());
+        })
+            .map(upn -> new FPGssResult(upn, Option.none()));
     }
 }

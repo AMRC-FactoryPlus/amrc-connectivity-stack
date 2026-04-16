@@ -1,39 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!--
-  ~ Copyright 2018-present HiveMQ GmbH
-  ~
-  ~ Licensed under the Apache License, Version 2.0 (the "License");
-  ~ you may not use this file except in compliance with the License.
-  ~ You may obtain a copy of the License at
-  ~
-  ~       http://www.apache.org/licenses/LICENSE-2.0
-  ~
-  ~ Unless required by applicable law or agreed to in writing, software
-  ~ distributed under the License is distributed on an "AS IS" BASIS,
-  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-  ~ See the License for the specific language governing permissions and
-  ~ limitations under the License.
-  -->
-
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>uk.co.amrc.factoryplus</groupId>
+    <parent>
+        <groupId>io.github.amrc-factoryplus</groupId>
+        <artifactId>base-pom</artifactId>
+        <version>0.0.0-intree</version>
+        <relativePath>../lib/java-base-pom</relativePath>
+    </parent>
+
     <artifactId>hivemq-auth-krb</artifactId>
-    <version>0.2.1</version>
 
     <description>Factory+ HiveMQ Kerberos extension</description>
 
-    <distributionManagement>
-        <repository>
-            <id>github</id>
-            <name>GitHub Packages</name>
-            <url>https://maven.pkg.github.com/AMRC-FactoryPlus/hivemq-krb</url>
-        </repository>
-    </distributionManagement>
-
     <properties>
+        <acs.top>..</acs.top>
+        <acs.output>${project.artifactId}-${project.version}-distribution.zip</acs.output>
+
         <extension.name>Factory+ Kerberos extension</extension.name>
         <extension.author>AMRC</extension.author>
         <asciidoctor.version>3.1.1</asciidoctor.version>
@@ -41,35 +25,25 @@
         <source.document.name>README.adoc</source.document.name>
     </properties>
 
-    <repositories>
-      <repository>
-        <id>local.lib</id>
-        <name>ACS build Mavan repo</name>
-        <url>file:../lib/mvn</url>
-      </repository>
-    </repositories>
-
     <dependencies>
         <dependency>
             <groupId>com.hivemq</groupId>
             <artifactId>hivemq-extension-sdk</artifactId>
             <version>4.47.1</version>
         </dependency>
-        <dependency>
-          <groupId>io.github.amrc-factoryplus</groupId>
-          <artifactId>java-service-client</artifactId>
-          <version>0.1-SNAPSHOT</version>
-        </dependency>
+          <dependency>
+            <groupId>io.github.amrc-factoryplus</groupId>
+            <artifactId>java-service-client</artifactId>
+          </dependency>
         <dependency>
             <groupId>org.json</groupId>
             <artifactId>json</artifactId>
-            <version>20220320</version>
         </dependency>
         <dependency>
             <groupId>io.reactivex.rxjava3</groupId>
             <artifactId>rxjava</artifactId>
-            <version>3.1.12</version>
         </dependency>
+
         <!-- testing -->
         <dependency>
             <groupId>com.hivemq</groupId>
@@ -177,55 +151,6 @@
                             <descriptors>
                                 <descriptor>assembly.xml</descriptor>
                             </descriptors>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-javadoc-plugin</artifactId>
-                <version>3.12.0</version>
-                <executions>
-                    <execution>
-                        <id>render-javadoc</id>
-                        <phase>generate-resources</phase>
-                        <goals>
-                            <goal>javadoc</goal>
-                        </goals>
-                        <configuration>
-                            <doclint>all,-missing</doclint>
-                            <links>
-                                <link>http://stleary.github.io/JSON-java/</link>
-                                <link>http://reactivex.io/RxJava/3.x/javadoc/</link>
-                                <link>https://hc.apache.org/httpcomponents-core-5.2.x/current/httpcore5/apidocs/</link>
-                                <link>https://hc.apache.org/httpcomponents-client-5.2.x/current/httpclient5/apidocs/</link>
-                            </links>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-            <plugin>
-                <groupId>org.asciidoctor</groupId>
-                <artifactId>asciidoctor-maven-plugin</artifactId>
-                <version>${asciidoctor.version}</version>
-                <executions>
-                    <execution>
-                        <id>output-html</id>
-                        <phase>generate-resources</phase>
-                        <goals>
-                            <goal>process-asciidoc</goal>
-                        </goals>
-                        <configuration>
-                            <backend>html</backend>
-                            <doctype>xhtml</doctype>
-                            <headerFooter>true</headerFooter>
-                            <sourceDirectory>${basedir}</sourceDirectory>
-                            <outputDirectory>${output.dir}/target</outputDirectory>
-                            <sourceDocumentName>${source.document.name}</sourceDocumentName>
-                            <attributes>
-                                <icons>font</icons>
-                                <toc2/>
-                            </attributes>
                         </configuration>
                     </execution>
                 </executions>

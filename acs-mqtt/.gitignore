@@ -4,7 +4,8 @@
 *.swp
 
 # Build
-hivemq-auth-krb-*.zip
+dependency-reduced-pom.xml
+target/
 
 # Environment
 config.mk

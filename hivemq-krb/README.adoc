@@ -1,5 +1,0 @@
-
-== HiveMQ Kerberos Auth Extension ==
-A Factory+ Kerberos authentication & authorisation plugin for HiveMQ
-
-*License*: MIT

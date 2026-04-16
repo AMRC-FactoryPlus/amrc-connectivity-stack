@@ -117,6 +117,12 @@ configdb:
     # -- Size of the PVC for storing backups
     storageSize: 1Gi
 
+metadb:
+  enabled: false
+  asConfigDB: false
+  image:
+    repository: acs-metadb
+
 files:
   enabled: true
   image:

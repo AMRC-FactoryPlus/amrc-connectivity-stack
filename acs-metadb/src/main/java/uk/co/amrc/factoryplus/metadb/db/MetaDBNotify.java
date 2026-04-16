@@ -16,6 +16,7 @@ import org.slf4j.LoggerFactory;
 import io.reactivex.rxjava3.core.*;
 import io.vavr.collection.*;
 
+import uk.co.amrc.factoryplus.util.Response;
 import uk.co.amrc.factoryplus.notify.*;
 import uk.co.amrc.factoryplus.service.*;
 
@@ -60,7 +61,7 @@ public class MetaDBNotify
             .map(app -> data.appValues(app)
                 .map(m -> m.keySet())
                 .compose(MetaDBNotify::setUpdates))
-            .getOrElse(Observable.just(Response.status(410)));
+            .getOrElse(Observable.just(Response.of(410)));
     }
 
     private Observable<SearchUpdate> appSearch (Session sess, Map<String, String> args)
@@ -70,7 +71,8 @@ public class MetaDBNotify
             .flatMap(Decoders::parseUUID)
             .map(app -> data.appValues(app)
                 .map(m -> m.mapKeys(UUID::toString)
-                    .mapValues(v -> Response.ok(v.value(), v.etag())))
+                    .mapValues(v -> Response.ok(v.value())
+                        .withHeaders(HashMap.of("etag", v.etag().toString()))))
                 .map(SearchUpdate::full))
             .getOrElse(Observable.just(SearchUpdate.invalid()));
     }

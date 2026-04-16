@@ -10,6 +10,8 @@ import java.util.UUID;
 
 import jakarta.json.*;
 
+import uk.co.amrc.factoryplus.util.Response;
+
 public record NotifyUpdate (int status, JsonObject content)
 {
     public static NotifyUpdate empty (int status)

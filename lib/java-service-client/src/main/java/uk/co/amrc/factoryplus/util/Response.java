@@ -6,7 +6,6 @@
 
 package uk.co.amrc.factoryplus.util;
 
-import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.Set;
@@ -15,11 +14,21 @@ import java.util.stream.Collectors;
 
 import java.util.function.*;
 
+/* XXX We need to support both JSON libraries for now. Ideally the
+ * org.json lib should be refactored out. */
+import jakarta.json.*;
 import org.json.*;
 
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.core.Maybe;
+
 import io.vavr.collection.List;
+import io.vavr.collection.HashMap;
+import io.vavr.collection.Map;
+import io.vavr.control.Option;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import uk.co.amrc.factoryplus.client.FPServiceException;
 
@@ -46,6 +55,8 @@ import uk.co.amrc.factoryplus.client.FPServiceException;
  */
 
 public abstract class Response<T> {
+    protected static final Logger log = LoggerFactory.getLogger(Response.class);
+
     protected int status;
 
     private Response (int status)
@@ -121,19 +132,43 @@ public abstract class Response<T> {
     {
         return this.toMaybe(HTTPError::new);
     }
+    public JsonValue toJson ()
+    {
+        var obj = Json.createObjectBuilder()
+            .add("status", status);
+
+        /* The ClassCastException here is deliberate */
+        body().peek(b -> obj.add("body", (JsonValue)b));
+
+        if (!headers().isEmpty()) {
+            var h = Json.createObjectBuilder();
+            headers().forEach(h::add);
+            obj.add("headers", h.build());
+        }
+
+        return obj.build();
+    }
 
     public boolean isOK () { return false; }
     public boolean isEmpty() { return false; }
     public boolean isError() { return false; }
 
+    public int status () { return status; }
+    public Map<String, String> headers () { return HashMap.empty(); }
+    public Option<T> body () { return Option.none(); }
+
     public <V> Response<V> withBody (V body)
     {
         return Response.of(this.status, body);
     }
-    
     public Response<T> withStatus (int status)
     {
         return Response.of(status);
+    }
+    public Response<T> withHeaders (Map<String, String> headers)
+    {
+        /* Non-success Responses may not have headers */
+        return this;
     }
 
     public abstract <R> Response<R> flatMap (Function<T, Response<R>> map);
@@ -223,9 +258,15 @@ public abstract class Response<T> {
                 (body == null ? "null" : body.toString());
         }
 
+        public Option<T> body () { return Option.of(body); }
+
         public Response<T> withStatus (int status)
         {
             return Response.of(status, this.body);
+        }
+        public Response<T> withHeaders (Map<String, String> headers)
+        {
+            return new SuccessWithHeaders<T>(status, headers, body);
         }
 
         public boolean isOK () { return true; }
@@ -242,6 +283,19 @@ public abstract class Response<T> {
         {
             return success.apply(this.body);
         }
+    }
+
+    static class SuccessWithHeaders<T> extends Success<T>
+    {
+        private Map<String, String> headers;
+
+        protected SuccessWithHeaders (int status, Map<String, String> headers, T body)
+        {
+            super(status, body);
+            this.headers = headers;
+        }
+
+        public boolean hasHeaders () { return true; }
     }
 
     static class Empty<T> extends Response<T>

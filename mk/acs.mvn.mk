@@ -14,3 +14,6 @@ MVN?=		'${M2_HOME}'/bin/mvn
 
 mvnenv=	JAVA_HOME='${JAVA_HOME}' M2_HOME='${M2_HOME}' M2='${M2_HOME}/bin'
 mvn=	env ${mvnenv} ${MVN}
+
+clean:
+	rm -rf target dependency-reduced-pom.xml

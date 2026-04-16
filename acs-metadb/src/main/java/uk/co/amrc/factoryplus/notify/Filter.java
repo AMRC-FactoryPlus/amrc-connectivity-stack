@@ -18,6 +18,7 @@ import org.eclipse.jetty.http.pathmap.UriTemplatePathSpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import uk.co.amrc.factoryplus.util.Response;
 import uk.co.amrc.factoryplus.util.UrlPath;
 
 interface Filter

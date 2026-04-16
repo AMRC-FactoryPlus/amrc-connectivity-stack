@@ -26,6 +26,7 @@ import org.slf4j.LoggerFactory;
 
 import uk.co.amrc.factoryplus.http.TextWebsocket;
 import uk.co.amrc.factoryplus.providers.AuthProvider;
+import uk.co.amrc.factoryplus.util.Response;
 import uk.co.amrc.factoryplus.util.UrlPath;
 
 public class NotifyV2

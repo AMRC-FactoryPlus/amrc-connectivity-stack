@@ -13,6 +13,8 @@ import io.vavr.collection.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import uk.co.amrc.factoryplus.util.Response;
+
 public interface SearchUpdate
 {
     JsonObject content ();
@@ -32,13 +34,19 @@ public interface SearchUpdate
     static SearchUpdate notFound () { return new Empty(404); }
     static SearchUpdate invalid () { return new Invalid(); }
 
-    static SearchUpdate full (Map<String, Response> children)
+    static SearchUpdate full (Map<String, Response<JsonValue>> children)
     {
         return new Full(children);
     }
-    static SearchUpdate child (String name, Response response)
+    static SearchUpdate child (String name, Response<JsonValue> response)
     {
         return new Child(name, response);
+    }
+
+    static SearchUpdate ofResponse (Response<Map<String, Response<JsonValue>>> children)
+    {
+        return children.ifOK(SearchUpdate::full,
+            SearchUpdate::notFound, SearchUpdate.Empty::new);
     }
 
     public record Empty (int status) implements SearchUpdate
@@ -46,7 +54,7 @@ public interface SearchUpdate
         public JsonObject content ()
         {
             return Json.createObjectBuilder()
-                .add("response", Response.status(status).toJson())
+                .add("response", Response.of(status).toJson())
                 .build();
         }
     }
@@ -62,7 +70,7 @@ public interface SearchUpdate
         }
     }
 
-    public record Full (Map<String, Response> children) implements SearchUpdate
+    public record Full (Map<String, Response<JsonValue>> children) implements SearchUpdate
     {
         private static final Logger log = LoggerFactory.getLogger(Full.class);
 
@@ -72,7 +80,7 @@ public interface SearchUpdate
             children.forEach((k, r) -> obj.add(k, r.toJson()));
             return Json.createObjectBuilder()
                 .add("children", obj.build())
-                .add("response", Response.status(204).toJson())
+                .add("response", Response.of(204).toJson())
                 .build();
         }
 
@@ -89,13 +97,13 @@ public interface SearchUpdate
             var removed = prev.children.keySet()
                 .diff(this.children.keySet())
                 .toStream()
-                .map(n -> SearchUpdate.child(n, Response.status(404)));
+                .map(n -> SearchUpdate.child(n, Response.empty()));
 
             return Stream.concat(updated, removed);
         }
     }
 
-    public record Child (String name, Response response) implements SearchUpdate
+    public record Child (String name, Response<JsonValue> response) implements SearchUpdate
     {
         public JsonObject content ()
         {

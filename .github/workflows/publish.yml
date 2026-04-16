@@ -530,7 +530,7 @@ jobs:
           context: ./${{ steps.prepare.outputs.service-name }}
           push: true
           tags: ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}:${{ steps.prepare.outputs.version }}
-          labels: ${{ steps.meta.outputs.labels }}
+          labels: ${{ steps.prepare.outputs.labels }}
           build-args: |
             mvn_output=${{ env.mvn_output }}
           cache-from: type=gha

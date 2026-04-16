@@ -49,7 +49,7 @@ public final class Main {
         this.port = port;
 
         this.fplus = new FPServiceClient();
-        this.model = new RdfStore(dataDir);
+        this.model = new RdfStore(fplus, dataDir);
         this.auth = new AuthProvider(fplus);
         this.server = createServer();
     }

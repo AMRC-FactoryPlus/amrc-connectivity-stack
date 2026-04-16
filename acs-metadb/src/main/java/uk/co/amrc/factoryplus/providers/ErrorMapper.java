@@ -29,6 +29,7 @@ public class ErrorMapper
         log.info("Returning error: {}", err.toString());
         var json = err.buildJson();
         var res = Response.status(err.statusCode())
+            .type("application/json")
             .entity(json);
         err.buildHeaders().forEach(res::header);
         return res.build();

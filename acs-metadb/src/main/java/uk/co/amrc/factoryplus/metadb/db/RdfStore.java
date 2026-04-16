@@ -30,6 +30,7 @@ import org.slf4j.LoggerFactory;
 import io.vavr.collection.Iterator;
 import io.vavr.control.Option;
 
+import uk.co.amrc.factoryplus.client.*;
 import uk.co.amrc.factoryplus.service.*;
 
 /* This class is not called Model because of the conflict with Jena's
@@ -44,6 +45,7 @@ public class RdfStore
     private InfModel    derived;
     private Dataset     dataset;
 
+    private FPServiceClient fplus;
     private Dataflow        dataflow;
     private MetaDBNotify    metaNotify;
     private AppMapper       appMapper;
@@ -54,7 +56,7 @@ public class RdfStore
      * - G_derived: this is RDFS(G_direct).
      * - default: this is equal to G_derived.
      */
-    public RdfStore (String data)
+    public RdfStore (FPServiceClient fplus, String data)
     {
         var tdb     = TDB2Factory.connectDataset(data);
         direct      = tdb.getNamedModel(Vocab.G_direct);
@@ -64,6 +66,7 @@ public class RdfStore
         dataset.addNamedModel(Vocab.G_direct, direct);
         dataset.addNamedModel(Vocab.G_derived, derived);
 
+        this.fplus      = fplus;
         dataflow        = new Dataflow(this);
         metaNotify      = new MetaDBNotify(this);
         appMapper       = new AppMapper(this);
@@ -74,6 +77,9 @@ public class RdfStore
     public Model direct () { return direct; }
     public InfModel derived () { return derived; }
 
+    /* XXX I think I should be able to use jakarta.inject to handle
+     * these rather than explicitly fetching them all from this object. */
+    public FPServiceClient fplus () { return fplus; }
     public Dataflow dataflow () { return dataflow; }
     public MetaDBNotify metaNotify () { return metaNotify; }
     public AppMapper appMapper () { return appMapper; }

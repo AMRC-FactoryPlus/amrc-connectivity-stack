@@ -19,6 +19,8 @@ import org.slf4j.LoggerFactory;
 
 import io.vavr.Lazy;
 
+import uk.co.amrc.factoryplus.service.*;
+
 /* Eventually these objects will need to be associated with a txn, and a
  * request, and contain the request UPN and the current txn Instant and
  * other per-request information. Possibly at this point this will
@@ -56,6 +58,17 @@ public class RequestHandler
     public RdfStore db () { return db; }
     public Resource getInstant () { return now.get(); }
     public String upn () { return upn; }
+
+    /* This must throw on-thread as we will be within a txn. */
+    public void checkACL (UUID perm, UUID target)
+    {
+        log.info("Checking permission for {} / {}", perm, target);
+        var ok = db().fplus().auth()
+            .checkACL(upn, perm, target)
+            .blockingGet();
+        if (!ok)
+            throw new SvcErr.Forbidden();
+    }
 
     public ObjectStructure objectStructure ()
     {

@@ -101,7 +101,7 @@ public class SchemaTracker
                     .map(Entry::uuid)
                     .toSet();
                 if (!conflicts.isEmpty())
-                    throw new Err.SchemaConflict(conflicts);
+                    throw new RdfErr.SchemaConflict(conflicts);
             });
 
         schemas = newSchemas;
@@ -114,7 +114,7 @@ public class SchemaTracker
             return new URI(uri);
         }
         catch (Throwable e) {
-            throw new Err.CorruptRDF("Invalid IRI: " + uri);
+            throw new RdfErr.CorruptRDF("Invalid IRI: " + uri);
         }
     }
 

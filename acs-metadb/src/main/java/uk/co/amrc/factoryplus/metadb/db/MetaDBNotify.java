@@ -17,6 +17,7 @@ import io.reactivex.rxjava3.core.*;
 import io.vavr.collection.*;
 
 import uk.co.amrc.factoryplus.notify.*;
+import uk.co.amrc.factoryplus.service.*;
 
 public class MetaDBNotify
 {
@@ -55,7 +56,7 @@ public class MetaDBNotify
     {
         log.info("appList: {}", args);
         return args.get("app")
-            .flatMap(Util::parseUUID)
+            .flatMap(Decoders::parseUUID)
             .map(app -> data.appValues(app)
                 .map(m -> m.keySet())
                 .compose(MetaDBNotify::setUpdates))
@@ -66,7 +67,7 @@ public class MetaDBNotify
     {
         log.info("appSearch: {}", args);
         return args.get("app")
-            .flatMap(Util::parseUUID)
+            .flatMap(Decoders::parseUUID)
             .map(app -> data.appValues(app)
                 .map(m -> m.mapKeys(UUID::toString)
                     .mapValues(v -> Response.ok(v.value(), v.etag())))

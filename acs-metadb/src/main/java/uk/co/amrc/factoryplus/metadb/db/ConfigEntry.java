@@ -127,7 +127,7 @@ public class ConfigEntry extends RequestHandler.Component
 
         var schemas = db().schemaTracker();
         if (!schemas.validate(app, value))
-            throw new Err.BadConfig(value);
+            throw new RdfErr.BadConfig(value);
 
         if (isStructured())
             db().appMapper().updateConfig(app, obj, value);

@@ -1,15 +1,10 @@
 /*
- * Factory+ metadata database
+ * Factory+ service API
  * Authentication filter
  * Copyright 2026 University of Sheffield AMRC
  */
 
-/* Currently this is a stub. It should use the GSS methods from the
- * ServiceClient to handle Basic and Negotiate auth. This class should
- * also be moved into a service-api package.
- */
-
-package uk.co.amrc.factoryplus.metadb.api;
+package uk.co.amrc.factoryplus.providers;
 
 import java.util.Base64;
 import java.util.regex.Pattern;
@@ -23,9 +18,13 @@ import jakarta.ws.rs.ext.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import uk.co.amrc.factoryplus.metadb.db.AuthProvider;
+/* We have no facilities to support public URLs, without authentication.
+ * Probably in WSRS these would need to be identified with annotations,
+ * which might mean this filter needs to not be @PreMatching. Or
+ * alternatively they could be provided by an initial match on the Jetty
+ * side that doesn't load this filter? */
 
-@Provider @PreMatching @Priority(Priorities.AUTHENTICATION)
+@Provider @Priority(Priorities.AUTHENTICATION)
 public class AuthFilter implements ContainerRequestFilter
 {
     private static final Logger log = LoggerFactory.getLogger(AuthFilter.class);

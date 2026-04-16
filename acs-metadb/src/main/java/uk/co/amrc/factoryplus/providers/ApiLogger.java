@@ -1,10 +1,10 @@
 /*
- * Factory+ metadata database
+ * Factory+ service API
  * API request logger
  * Copyright 2026 University of Sheffield AMRC
  */
 
-package uk.co.amrc.factoryplus.metadb.api;
+package uk.co.amrc.factoryplus.providers;
 
 import jakarta.annotation.Priority;
 import jakarta.ws.rs.container.*;

@@ -21,6 +21,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import uk.co.amrc.factoryplus.metadb.db.*;
+import uk.co.amrc.factoryplus.service.*;
 
 @Path("v2")
 public class V2Objects {
@@ -41,7 +42,7 @@ public class V2Objects {
         return Option.of(val)
             .filter(v -> v instanceof JsonString)
             .map(v -> ((JsonString)v).getString())
-            .flatMap(Util::parseUUID)
+            .flatMap(Decoders::parseUUID)
             .getOrElseThrow(() -> new WebApplicationException(422));
     }
 

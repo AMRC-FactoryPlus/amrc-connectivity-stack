@@ -23,6 +23,8 @@ import io.vavr.control.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import uk.co.amrc.factoryplus.service.*;
+
 public class ObjectStructure extends RequestHandler.Component
 {
     private static final Logger log = LoggerFactory.getLogger(ObjectStructure.class);
@@ -47,7 +49,7 @@ public class ObjectStructure extends RequestHandler.Component
             switch (relation) {
                 case "member":      return new Relation(RDF.type, 1);
                 case "subclass":    return new Relation(RDFS.subClassOf, 0);
-                default:            throw new Err.NotFound("No such relation");
+                default:            throw new SvcErr.NotFound("No such relation");
             }
         }
     }
@@ -62,7 +64,7 @@ public class ObjectStructure extends RequestHandler.Component
         switch (name) {
             case "direct":      return db().direct();
             case "derived":     return db().derived();
-            default:            throw new Err.NotFound("No such graph");
+            default:            throw new SvcErr.NotFound("No such graph");
         }
     }
 
@@ -102,7 +104,7 @@ public class ObjectStructure extends RequestHandler.Component
         var krank = db().findRank(klass);
 
         if (krank != orank + 1)
-            throw new Err.RankMismatch();
+            throw new RdfErr.RankMismatch();
 
         var model = db().derived();
         model.removeAll(obj.node(), Vocab.primary, null);
@@ -135,7 +137,7 @@ public class ObjectStructure extends RequestHandler.Component
 
         return db().appMapper()
             .generateConfig(Vocab.App.Registration, obj.node())
-            .getOrElseThrow(() -> new Err.CorruptRDF("Cannot find object registration"));
+            .getOrElseThrow(() -> new RdfErr.CorruptRDF("Cannot find object registration"));
     }
 
     private static UpdateRequest U_deleteConfigs = Vocab.update("""
@@ -155,7 +157,7 @@ public class ObjectStructure extends RequestHandler.Component
         log.info("Found node {}", obj);
         if (IMMUTABLE.contains(obj)) {
             log.info("Object {} is immutable", obj);
-            throw new Err.Immutable();
+            throw new RdfErr.Immutable();
         }
 
         /* We only check for direct dependents. If we have no direct
@@ -164,7 +166,7 @@ public class ObjectStructure extends RequestHandler.Component
         var model = db().direct();
         if (model.contains(obj, Vocab.rank)) {
             log.info("Object {} is a rank class", obj);
-            throw new Err.Immutable();
+            throw new RdfErr.Immutable();
         }
 
         /* This will also catch configs-of-app. If we want to return
@@ -173,14 +175,14 @@ public class ObjectStructure extends RequestHandler.Component
         if (members.hasNext()) {
             log.info("Object {} has members:", uuid);
             members.forEachRemaining(m -> log.info("  {}", m));
-            throw new Err.InUse();
+            throw new RdfErr.InUse();
         }
 
         var subclasses = model.listResourcesWithProperty(RDFS.subClassOf, obj);
         if (subclasses.hasNext()) {
             log.info("Object {} has subclasses:", uuid);
             subclasses.forEachRemaining(m -> log.info("  {}", m));
-            throw new Err.InUse();
+            throw new RdfErr.InUse();
         }
 
         db().runUpdate(U_deleteConfigs, "obj", obj);
@@ -224,7 +226,7 @@ public class ObjectStructure extends RequestHandler.Component
         var krank = db().findRank(kres);
         var orank = db().findRank(ores);
         if (krank != orank + rel.offset())
-            throw new Err.RankMismatch();
+            throw new RdfErr.RankMismatch();
 
         db().direct().add(ores, rel.prop(), kres);
     }

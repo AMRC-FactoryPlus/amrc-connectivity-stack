@@ -15,14 +15,11 @@ import io.vavr.collection.Set;
 
 import org.apache.jena.rdf.model.*;
 
-public class Err extends Error
-{
-    public Err (String msg)
-    {
-        super(msg);
-    }
+import uk.co.amrc.factoryplus.service.SvcErr;
 
-    public static class CorruptRDF extends Err
+public final class RdfErr
+{
+    public static class CorruptRDF extends SvcErr
     {
         public CorruptRDF (String msg)
         {
@@ -59,81 +56,7 @@ public class Err extends Error
         }
     }
 
-    public static abstract class ClientError extends Err
-    {
-        public ClientError (String msg)
-        {
-            super(msg);
-        }
-
-        public abstract int statusCode ();
-
-        public JsonValue buildJson ()
-        {
-            var obj = Json.createObjectBuilder()
-                .add("message", getMessage());
-            extendJson(obj);
-            return obj.build();
-        }
-        protected void extendJson (JsonObjectBuilder obj) { }
-
-        public Map<String, String> buildHeaders ()
-        {
-            return Map.of();
-        }
-    }
-    public static class AuthFailed extends ClientError
-    {
-        public AuthFailed (String why) {
-            super("Authentication failed: " + why);
-        }
-        public int statusCode () { return 401; }
-        public Map<String, String> buildHeaders ()
-        {
-            /* This is not a correct reflection of the auth we accept,
-             * but this is what the F+ services have always sent. If we
-             * admit to accepting Negotiate auth then Windows browsers
-             * try to authenticate via SSPI and create a problem. */
-            return Map.of("WWW-Authenticate", "Basic realm=\"Factory+\"");
-        }
-    }
-    public static class Forbidden extends ClientError
-    {
-        public Forbidden ()
-        {
-            super("Access denied");
-        }
-
-        public int statusCode () { return 403; }
-    }
-    public static class NotFound extends ClientError
-    {
-        public NotFound (String res)
-        {
-            super("Resource not found: " + res);
-        }
-
-        public int statusCode () { return 404; }
-    }
-    public static class InvalidName extends ClientError
-    {
-        public InvalidName (String name)
-        {
-            super("Invalid resource name: " + name);
-        }
-
-        public int statusCode () { return 410; }
-    }
-    public static class BadJson extends ClientError
-    {
-        public BadJson (JsonValue val)
-        {
-            super("Unexpected JSON value: " + val.toString());
-        }
-
-        public int statusCode () { return 422; }
-    }
-    public static class BadConfig extends ClientError
+    public static class BadConfig extends SvcErr.Client
     {
         private JsonValue config;
 
@@ -149,22 +72,22 @@ public class Err extends Error
             obj.add("config", config);
         }
     }
-    public static class RankMismatch extends ClientError
+    public static class RankMismatch extends SvcErr.Client
     {
         public RankMismatch () { super("Rank mismatch"); }
         public int statusCode () { return 409; }
     }
-    public static class NotMember extends ClientError
+    public static class NotMember extends SvcErr.Client
     {
         public NotMember () { super("Not a member of a required class"); }
         public int statusCode () { return 409; }
     }
-    public static class InUse extends ClientError
+    public static class InUse extends SvcErr.Client
     {
         public InUse () { super("Object in use"); }
         public int statusCode () { return 409; }
     }
-    public static class Immutable extends ClientError
+    public static class Immutable extends SvcErr.Client
     {
         public Immutable () { super("Object is immutable"); }
         public int statusCode () { return 405; }
@@ -173,7 +96,7 @@ public class Err extends Error
             return Map.of("Allow", "GET, HEAD");
         }
     }
-    public static class SchemaConflict extends ClientError
+    public static class SchemaConflict extends SvcErr.Client
     {
         private Set<UUID> conflicts;
         public SchemaConflict (Set<UUID> conflicts)

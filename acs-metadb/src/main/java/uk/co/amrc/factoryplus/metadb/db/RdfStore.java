@@ -30,6 +30,8 @@ import org.slf4j.LoggerFactory;
 import io.vavr.collection.Iterator;
 import io.vavr.control.Option;
 
+import uk.co.amrc.factoryplus.service.*;
+
 /* This class is not called Model because of the conflict with Jena's
  * Model class. */
 /* XXX I think this is two or possibly three classes: a component
@@ -211,13 +213,13 @@ public class RdfStore
     public FPObject findObjectOrError (UUID uuid)
     {
         return findObject(uuid)
-            .getOrElseThrow(() -> new Err.NotFound(uuid.toString()));
+            .getOrElseThrow(() -> new SvcErr.NotFound(uuid.toString()));
     }
 
     public Resource findRankClass (int rank)
     {
         return findResource(Vocab.rank, direct.createTypedLiteral(rank))
-            .getOrElseThrow(() -> new Err.CorruptRDF("Cannot find rank class"));
+            .getOrElseThrow(() -> new RdfErr.CorruptRDF("Cannot find rank class"));
     }
 
     private static final Query Q_findRank = Vocab.query("""

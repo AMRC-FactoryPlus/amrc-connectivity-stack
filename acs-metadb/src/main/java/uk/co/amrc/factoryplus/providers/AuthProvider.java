@@ -4,9 +4,7 @@
  * Copyright 2026 University of Sheffield AMRC
  */
 
-/* This is not really part of the DB, but it it model layer. It should
- * be moved into a service-api package eventually. */
-package uk.co.amrc.factoryplus.metadb.db;
+package uk.co.amrc.factoryplus.providers;
 
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
@@ -14,22 +12,22 @@ import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.security.SecureRandom;
 import java.time.Instant;
+
 import java.util.Base64;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 
-/* I'm not sure about having this here, this is model layer */
 import jakarta.ws.rs.core.SecurityContext;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import io.vavr.control.Option;
 import io.reactivex.rxjava3.core.Single;
 
 import uk.co.amrc.factoryplus.client.FPServiceClient;
+import uk.co.amrc.factoryplus.service.SvcErr;
 
 public class AuthProvider
 {
@@ -83,19 +81,27 @@ public class AuthProvider
 
     public Single<SecurityContext> authenticate (String auth)
     {
+        if (auth == null)
+            throw new SvcErr.AuthFailed("No auth supplied");
+
         var auth_m = Auth_rx.matcher(auth);
         if (!auth_m.matches())
-            throw new Err.AuthFailed("Bad auth header");
+            throw new SvcErr.AuthFailed("Bad auth header");
 
         var scheme = auth_m.group(1).toLowerCase();
         var handler = schemes.get(scheme);
         if (handler == null)
-            throw new Err.AuthFailed("Unknown scheme: " + scheme);
+            throw new SvcErr.AuthFailed("Unknown scheme: " + scheme);
 
         var creds = auth_m.group(2);
 
         return handler.apply(creds)
-            .map(upn -> new Ctx(new Princ(upn), scheme));
+            .<SecurityContext>map(upn -> new Ctx(new Princ(upn), scheme))
+            .onErrorResumeNext(e -> {
+                if (e instanceof SvcErr.AuthFailed)
+                    return Single.error(e);
+                return Single.error(new SvcErr.AuthFailed("Authentication failure"));
+            });
     }
 
     public Session newSession (String upn)
@@ -117,7 +123,7 @@ public class AuthProvider
 
         var creds_m = Basic_rx.matcher(creds_s);
         if (!creds_m.matches())
-            throw new Err.AuthFailed("Bad Basic creds");
+            throw new SvcErr.AuthFailed("Bad Basic creds");
 
         var user = creds_m.group(1);
         var passwd = CharBuffer.wrap(creds_m.group(2));
@@ -132,7 +138,7 @@ public class AuthProvider
         var sess = sessions.get(tok);
 
         if (sess == null)
-            throw new Err.AuthFailed("Bad token");
+            throw new SvcErr.AuthFailed("Bad token");
 
         /* We may be racing with another thread which is also expiring
          * this token. That doesn't matter as one of us will remove it
@@ -140,7 +146,7 @@ public class AuthProvider
         if (sess.isExpired()) {
             log.info("Expired token {}...", tok.substring(0, 5));
             sessions.remove(tok);
-            throw new Err.AuthFailed("Expired token");
+            throw new SvcErr.AuthFailed("Expired token");
         }
 
         return Single.just(sess.upn());

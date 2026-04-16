@@ -1,10 +1,10 @@
 /* 
- * Factory+ metadata database
+ * Factory+ service API
  * Jakarta parameter mapping
  * Copyright 2026 University of Sheffield AMRC
  */
 
-package uk.co.amrc.factoryplus.metadb.api;
+package uk.co.amrc.factoryplus.providers;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Type;
@@ -14,7 +14,7 @@ import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.*;
 import jakarta.ws.rs.ext.*;
 
-import uk.co.amrc.factoryplus.metadb.db.*;
+import uk.co.amrc.factoryplus.service.*;
 
 @Provider
 public class ParamMapper implements ParamConverterProvider
@@ -23,8 +23,8 @@ public class ParamMapper implements ParamConverterProvider
     {
         public UUID fromString (String value)
         {
-            return Util.parseUUID(value)
-                .getOrElseThrow(() -> new Err.InvalidName(value));
+            return Decoders.parseUUID(value)
+                .getOrElseThrow(() -> new SvcErr.InvalidName(value));
         }
 
         public String toString (UUID value)

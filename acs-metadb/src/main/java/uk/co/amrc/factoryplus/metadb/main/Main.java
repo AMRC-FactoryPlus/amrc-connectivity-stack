@@ -9,6 +9,7 @@ package uk.co.amrc.factoryplus.metadb.main;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ServiceConfigurationError;
+import java.util.UUID;
 
 import org.eclipse.jetty.server.*;
 import org.eclipse.jetty.server.handler.*;
@@ -22,6 +23,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import uk.co.amrc.factoryplus.client.*;
+import uk.co.amrc.factoryplus.providers.*;
 import uk.co.amrc.factoryplus.metadb.db.*;
 
 public final class Main {
@@ -60,17 +62,22 @@ public final class Main {
     {
         var server = new Server(port);
 
-        var model = this.model;
+        var pingResult = new PingResult(
+            Vocab.U_RDFStore, "2.0.0",
+            "AMRC", "acs-metadb", "unknown");
+        var bindings = new AbstractBinder () {
+            protected void configure () {
+                bind(model).to(RdfStore.class);
+                bind(auth).to(AuthProvider.class);
+                bind(pingResult).to(PingResult.class);
+            }
+        };
+
         var v2app = new ResourceConfig()
             .property(ServerProperties.PROCESSING_RESPONSE_ERRORS_ENABLED, true)
             .packages("uk.co.amrc.factoryplus.providers")
             .packages("uk.co.amrc.factoryplus.metadb.api")
-            .register(new AbstractBinder () {
-                protected void configure () {
-                    bind(model).to(RdfStore.class);
-                    bind(auth).to(AuthProvider.class);
-                }
-            });
+            .register(bindings);
         var v2api = new ContextHandler(
             ContainerFactory.createContainer(Handler.class, v2app), "/v2");
 
@@ -78,8 +85,10 @@ public final class Main {
             .notifyV2()
             .contextHandlerFor(server);
         var webapp = new ResourceConfig()
+            .property(ServerProperties.PROCESSING_RESPONSE_ERRORS_ENABLED, true)
             .packages("uk.co.amrc.factoryplus.providers")
-            .packages("uk.co.amrc.factoryplus.webapi");
+            .packages("uk.co.amrc.factoryplus.webapi")
+            .register(bindings);
         var webapi = new ContextHandler(
             ContainerFactory.createContainer(Handler.class, webapp), "/");
 

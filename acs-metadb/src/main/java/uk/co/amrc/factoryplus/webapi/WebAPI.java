@@ -18,31 +18,21 @@ import jakarta.ws.rs.core.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import uk.co.amrc.factoryplus.metadb.db.AuthProvider;
-import uk.co.amrc.factoryplus.metadb.db.Vocab;
+import uk.co.amrc.factoryplus.providers.*;
 
 @Singleton @Path("")
 public class WebAPI
 {
     private static final Logger log = LoggerFactory.getLogger(WebAPI.class);
 
+    @Context private PingResult pingResult;
     @Context private AuthProvider authProvider;
     @Context private SecurityContext auth;
-
-    private JsonValue pingResult;
-
-    public WebAPI ()
-    {
-        pingResult = Json.createObjectBuilder()
-            .add("service", Vocab.U_RDFStore.toString())
-            .add("version", "2.0.0")
-            .build();
-    }
 
     @GET @Path("ping")
     public JsonValue ping ()
     {
-        return pingResult;
+        return pingResult.toJson();
     }
 
     @POST @Path("token")

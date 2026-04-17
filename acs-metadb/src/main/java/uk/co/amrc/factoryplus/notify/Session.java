@@ -19,7 +19,9 @@ import io.vavr.control.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import uk.co.amrc.factoryplus.client.FPAuth;
 import uk.co.amrc.factoryplus.http.TextWebsocket;
+import uk.co.amrc.factoryplus.util.*;
 
 public class Session
 {
@@ -28,6 +30,7 @@ public class Session
         Pattern.compile("^Bearer ([A-Za-z0-9+/]+)$");
 
     private NotifyV2        notify;
+    private FPAuth          auth;
     private UUID            uuid;
 
     /* These are initialised by start() */
@@ -36,7 +39,8 @@ public class Session
     public Session (NotifyV2 notify)
     {
         this.notify = notify;
-        this.uuid = UUID.randomUUID();
+        this.auth   = notify.auth().fplus().auth();
+        this.uuid   = UUID.randomUUID();
     }
 
     public String upn () { return upn; }
@@ -176,6 +180,32 @@ public class Session
 
         return notify.findHandler(this, req)
             .getOrElse(() -> Observable.just(NotifyUpdate.empty(404)));
+    }
+
+    private Observable<Response<Unit>> watchACL (UUID perm, UUID targ)
+    {
+        return auth.watchPermitted(this.upn, perm, targ)
+            .map(res -> res
+                .handle(st -> {
+                    log.info("Error watching ACL: {}", st);
+                    return Response.of(503);
+                })
+                .flatMap(ok -> ok ? Response.ok(Unit.UNIT) : Response.of(403)));
+    }
+
+    /** Apply ACLs to a notify sequence.
+     * Returns a function which can be applied with .compose. This will
+     * replace the Responses in the source sequence with 403s whenever
+     * permission is not granted.
+     */
+    public <T> ObservableTransformer<Response<T>, Response<T>> applyACL (
+        UUID permission, UUID target)
+    {
+        return src -> Observable.combineLatest(
+                src, watchACL(permission, target),
+                (val, ok) -> ok.flatMap(u -> val))
+            /* This stops extra 403s when permission is denied */
+            .distinctUntilChanged();
     }
 }
 

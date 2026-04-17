@@ -81,6 +81,8 @@ public class AuthProvider
         this.fplus = fplus;
     }
 
+    public FPServiceClient fplus () { return fplus; }
+
     public Single<SecurityContext> authenticate (String auth)
     {
         if (auth == null)

@@ -7,6 +7,7 @@
 package uk.co.amrc.factoryplus.metadb.db;
 
 import java.util.UUID;
+import java.util.function.Function;
 
 import jakarta.json.*;
 
@@ -50,18 +51,21 @@ public class MetaDBNotify
                 .build());
     }
 
-    /* Unit is a type which conveys no useful information. It has one
-     * value, Unit.UNIT. In this case, we have nothing useful to say in
-     * the success case, but information to convey in the error cases. */
-    private Observable<Response<Unit>> watchACL (Session sess, UUID perm, UUID targ)
+
+    private record SubHandler (Session sess, Map<String, String> args)
     {
-        return auth.watchPermitted(sess.upn(), perm, targ)
-            .map(res -> res
-                .handle(st -> {
-                    log.info("Error watching ACL: {}", st);
-                    return Response.of(503);
-                })
-                .flatMap(ok -> ok ? Response.ok(Unit.UNIT) : Response.of(403)));
+        private <T> Observable<Response<T>> fromUUID (
+            String arg,
+            Function<UUID, Observable<T>> factory,
+            UUID permission)
+        {
+            return args.get(arg)
+                .flatMap(Decoders::parseUUID)
+                .map(uuid -> factory.apply(uuid)
+                    .map(Response::ok)
+                    .compose(sess.applyACL(permission, uuid)))
+                .getOrElse(Observable.just(Response.of(410)));
+        }
     }
 
     /* XXX These app endpoints will return empty maps for nonexistent
@@ -72,28 +76,20 @@ public class MetaDBNotify
     private Observable<Response> appList (Session sess, Map<String, String> args)
     {
         log.info("appList: {}", args);
-        return args.get("app")
-            .flatMap(Decoders::parseUUID)
-            .map(app -> Observable.combineLatest(
-                    data.appValues(app),
-                    watchACL(sess, Vocab.Perm.ReadApp, app),
-                    (configs, ok) -> ok.map(u -> configs.keySet()))
-                .map(MetaDBNotify::setUpdate))
-            .getOrElse(Observable.just(Response.of(410)));
+        return new SubHandler(sess, args)
+            .fromUUID("app", data::appValues, Vocab.Perm.ReadApp)
+            .map(r -> r.map(configs -> configs.keySet()))
+            .map(MetaDBNotify::setUpdate);
     }
 
     private Observable<SearchUpdate> appSearch (Session sess, Map<String, String> args)
     {
         log.info("appSearch: {}", args);
-        return args.get("app")
-            .flatMap(Decoders::parseUUID)
-            .map(app -> Observable.combineLatest(
-                    data.appValues(app),
-                    watchACL(sess, Vocab.Perm.ReadApp, app),
-                    (configs, ok) -> ok.map(u -> configs
-                        .mapKeys(UUID::toString)
-                        .mapValues(v -> v.toResponse())))
-                .map(SearchUpdate::ofResponse))
-            .getOrElse(Observable.just(SearchUpdate.invalid()));
+        return new SubHandler(sess, args)
+            .fromUUID("app", data::appValues, Vocab.Perm.ReadApp)
+            .map(r -> r.map(cs -> cs
+                .mapKeys(UUID::toString)
+                .mapValues(v -> v.toResponse())))
+            .map(SearchUpdate::ofResponse);
     }
 }

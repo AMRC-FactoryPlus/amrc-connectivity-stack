@@ -17,6 +17,7 @@ import org.glassfish.jersey.server.spi.ResponseErrorMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import uk.co.amrc.factoryplus.client.FPServiceException;
 import uk.co.amrc.factoryplus.service.SvcErr;
 
 public class ErrorMapper
@@ -35,6 +36,12 @@ public class ErrorMapper
         return res.build();
     }
 
+    public static Response serviceError (FPServiceException err)
+    {
+        log.info("Upstream service error: {}", err.toString());
+        return Response.status(503).build();
+    }
+
     @Provider
     public static class CliErr implements ExceptionMapper<SvcErr.Client>
     {
@@ -45,12 +52,23 @@ public class ErrorMapper
     }
 
     @Provider
+    public static class FpErr implements ExceptionMapper<FPServiceException>
+    {
+        public Response toResponse (FPServiceException err)
+        {
+            return serviceError(err);
+        }
+    }
+
+    @Provider
     public static class REM implements ResponseErrorMapper
     {
         public Response toResponse (Throwable err)
         {
             if (err instanceof SvcErr.Client)
                 return ErrorMapper.clientError((SvcErr.Client)err);
+            if (err instanceof FPServiceException)
+                return ErrorMapper.serviceError((FPServiceException)err);
 
             /* These can be thrown by parameters injected into objects
              * (as opposed to method parameters). This causes the

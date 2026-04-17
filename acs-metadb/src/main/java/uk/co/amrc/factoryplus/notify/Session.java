@@ -39,6 +39,8 @@ public class Session
         this.uuid = UUID.randomUUID();
     }
 
+    public String upn () { return upn; }
+
     public Session start (TextWebsocket ws)
     {
         log("New client");

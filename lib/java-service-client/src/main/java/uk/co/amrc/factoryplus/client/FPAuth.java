@@ -55,11 +55,15 @@ public class FPAuth {
 
     private FPServiceClient fplus;
     private FPNotifyV2 notify;
+
+    private Optional<String> root_principal;
     private CacheSeq<String, Response<List<Grant>>> acl_cache;
 
     public FPAuth (FPServiceClient fplus)
     {
         this.fplus = fplus;
+
+        this.root_principal = fplus.getOptionalConf("root_principal");
 
         this.notify = new FPNotifyV2(fplus, SERVICE);
         this.acl_cache = CacheSeq.builder(this::_watchACL)
@@ -119,6 +123,8 @@ public class FPAuth {
      */
     public Observable<Response<List<Grant>>> watchACL (String upn)
     {
+        /* XXX Bootstrap handling should go here. */
+
         return this.acl_cache.get(
             UrlPath.join("v2", "acl", "kerberos", upn));
     }
@@ -137,34 +143,35 @@ public class FPAuth {
                     .map(Grant::fromJSON)));
     }
 
-    /** Fetch a principal's ACL using notify.
-     * 
-     * The ACL for the principal will be cached and tracked for half an
-     * hour.
-     *
-     * @param upn The Kerberos principal name.
+    /** Watch a specific permission check.
+     * This handles wildcard matches.
+     * @param upn The Kerberos UPN.
+     * @param perm The permission UUID.
+     * @param targ The target UUID.
      */
-    public Maybe<List<Grant>> fetchACL (String upn)
+    public Observable<Response<Boolean>> watchPermitted (String upn, UUID perm, UUID targ)
     {
+        if (root_principal.filter(upn::equals).isPresent())
+            return Observable.just(Response.ok(true))
+                .concatWith(Observable.never());
+
         return watchACL(upn)
-            .firstElement()
-            .flatMap(r -> r.toMaybe(st -> 
-                new FPServiceException(SERVICE, st,
-                    "fetching ACL for " + upn)));
+            .map(res -> res
+                .map(gs -> gs.exists(
+                    g -> g.permission.equals(perm) &&
+                        (g.target.equals(targ) || g.target.equals(FPUuid.Null)))));
     }
 
-    /** Check if a principal has permission for an action.
-     * This uses the ACL returned from fetchACL.
-     * @param upn The Kerberos principal name.
-     * @param perm The permission UUID.
-     * @param target The target UUID to check.
+    /** Check a specific permission.
+     * The Single will emit an error if the Auth service can't be
+     * contacted.
      */
-    public Single<Boolean> checkACL (String upn, UUID perm, UUID target)
+    public Single<Boolean> fetchPermitted (String upn, UUID perm, UUID targ)
     {
-        return fetchACL(upn)
-            .map(gs -> gs.exists(
-                g -> g.permission.equals(perm) &&
-                    (g.target.equals(target) || g.target.equals(FPUuid.Null))))
+        return watchPermitted(upn, perm, targ)
+            .firstElement()
+            .flatMap(r -> r.toMaybe(st ->
+                new FPServiceException(SERVICE, st, "Fetching ACL")))
             .switchIfEmpty(Single.just(false));
     }
 }

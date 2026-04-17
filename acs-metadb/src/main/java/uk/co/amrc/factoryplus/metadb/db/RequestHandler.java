@@ -59,12 +59,12 @@ public class RequestHandler
     public Resource getInstant () { return now.get(); }
     public String upn () { return upn; }
 
-    /* This must throw on-thread as we will be within a txn. */
     public void checkACL (UUID perm, UUID target)
     {
         log.info("Checking permission for {} / {}", perm, target);
         var ok = db().fplus().auth()
-            .checkACL(upn, perm, target)
+            .fetchPermitted(upn, perm, target)
+            /* This must throw on-thread as we will be within a txn. */
             .blockingGet();
         if (!ok)
             throw new SvcErr.Forbidden();

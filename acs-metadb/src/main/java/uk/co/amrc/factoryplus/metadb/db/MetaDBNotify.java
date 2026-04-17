@@ -16,19 +16,22 @@ import org.slf4j.LoggerFactory;
 import io.reactivex.rxjava3.core.*;
 import io.vavr.collection.*;
 
-import uk.co.amrc.factoryplus.util.Response;
+import uk.co.amrc.factoryplus.client.*;
 import uk.co.amrc.factoryplus.notify.*;
 import uk.co.amrc.factoryplus.service.*;
+import uk.co.amrc.factoryplus.util.*;
 
 public class MetaDBNotify
 {
     private static final Logger log = LoggerFactory.getLogger(MetaDBNotify.class);
 
+    private FPAuth auth;
     private Dataflow data;
     private NotifyV2 notify;
 
     public MetaDBNotify (RdfStore db)
     {
+        auth = db.fplus().auth();
         data = db.dataflow();
 
         notify = NotifyV2.builder(db.auth())
@@ -64,16 +67,29 @@ public class MetaDBNotify
             .getOrElse(Observable.just(Response.of(410)));
     }
 
+    private Observable<Response<Unit>> watchACL (Session sess, UUID perm, UUID targ)
+    {
+        return auth.watchPermitted(sess.upn(), perm, targ)
+            .map(res -> res
+                .handle(st -> {
+                    log.info("Error watching ACL: {}", st);
+                    return Response.of(503);
+                })
+                .flatMap(ok -> ok ? Response.ok(Unit.UNIT) : Response.of(403)));
+    }
+
     private Observable<SearchUpdate> appSearch (Session sess, Map<String, String> args)
     {
         log.info("appSearch: {}", args);
         return args.get("app")
             .flatMap(Decoders::parseUUID)
-            .map(app -> data.appValues(app)
-                .map(m -> m.mapKeys(UUID::toString)
-                    .mapValues(v -> Response.ok(v.value())
-                        .withHeaders(HashMap.of("etag", v.etag().toString()))))
-                .map(SearchUpdate::full))
+            .map(app -> Observable.combineLatest(
+                    data.appValues(app),
+                    watchACL(sess, Vocab.Perm.ReadApp, app),
+                    (configs, ok) -> ok.map(u -> configs
+                        .mapKeys(UUID::toString)
+                        .mapValues(v -> v.toResponse())))
+                .map(SearchUpdate::ofResponse))
             .getOrElse(Observable.just(SearchUpdate.invalid()));
     }
 }

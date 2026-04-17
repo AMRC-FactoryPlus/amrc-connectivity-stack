@@ -47,7 +47,7 @@ spec:
           secret:
             secretName: {{ .Values.remote.secretName }}
 {{- end }}
-{{- if .Values.remote.caConfigMapName }}
+{{- if .Values.remote.caFile }}
         - name: remote-ca
           configMap:
             name: {{ .Values.remote.caConfigMapName }}
@@ -59,10 +59,6 @@ spec:
             - /bin/sh
             - -c
             - |
-              # Install custom CA certificate if provided
-{{- if .Values.remote.caConfigMapName }}
-              cp /ca/ca.crt /etc/ssl/certs/custom-remote-ca.crt
-{{- end }}
               # Read credentials
               LOCAL_PASSWORD=$(cat /secrets/local/keytab)
 {{- if .Values.remote.secretName }}
@@ -104,7 +100,7 @@ spec:
               name: remote-credentials
               readOnly: true
 {{- end }}
-{{- if .Values.remote.caConfigMapName }}
+{{- if .Values.remote.caFile }}
             - mountPath: /ca
               name: remote-ca
               readOnly: true

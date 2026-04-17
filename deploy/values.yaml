@@ -119,6 +119,19 @@ configdb:
     # -- The repository of the Configuration Store component
     repository: acs-configdb
   bodyLimit: 100kb
+  backup:
+    # -- Whether to run a pg_dump of the ConfigDB before every helm upgrade
+    enabled: true
+    # -- Number of backups to retain
+    retention: 5
+    # -- Size of the PVC for storing backups
+    storageSize: 1Gi
+
+metadb:
+  enabled: false
+  asConfigDB: false
+  image:
+    repository: acs-metadb
 
 files:
   enabled: true

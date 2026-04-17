@@ -19,6 +19,9 @@ spec:
         - name: krb5-conf
           configMap:
             name: krb5-conf
+        - name: extra-dumps
+          configMap:
+            name: service-setup-dumps
       initContainers:
         - name: service-setup
 {{ include "amrc-connectivity-stack.image" (list . .Values.serviceSetup) | indent 10 }}
@@ -36,6 +39,8 @@ spec:
               value: ALL,!token,!service
             - name: GIT_CHECKOUTS
               value: /data
+            - name: EXTRA_DUMPS
+              value: /dumps
             - name: SS_CONFIG
               value: {{ .Values.serviceSetup.config | toRawJson | quote }}
             - name: ACS_CONFIG
@@ -54,6 +59,8 @@ spec:
           volumeMounts:
             - mountPath: /data
               name: git-checkouts
+            - mountPath: /dumps
+              name: extra-dumps
         - name: edge-helm-charts
 {{ include "amrc-connectivity-stack.image" (list . .Values.edgeHelm) | indent 10 }}
           env:
@@ -147,3 +154,70 @@ roleRef:
   kind: Role
   name: service-setup-role
   apiGroup: rbac.authorization.k8s.io
+
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: service-setup-dumps
+data:
+{{ if .Values.directory.enabled }}
+  service-urls.yaml: |
+    # This dump is loaded first of all. It registers the other services with
+    # the Directory; until this is done we can't contact any other service.
+    # All other EARLY dumps need to REQUIRE this one.
+    #-EARLY
+    service: !u UUIDs.Service.Directory
+    version: 1
+    advertisements:
+      - service: !u UUIDs.Service.Directory
+        url: !acs "http://directory.${namespace}.svc.${k8sdomain}"
+        device: !u ACS.Device.Directory
+{{ if .Values.auth.enabled }}
+      - service: !u UUIDs.Service.Authentication
+        url: !acs "http://auth.${namespace}.svc.${k8sdomain}"
+{{ end }}
+{{ if .Values.clusterManager.enabled }}
+      - service: !u ACS.Service.ClusterManager
+        url: !acs "http://clusters.${namespace}.svc.${k8sdomain}"
+{{ end }}
+{{ if .Values.cmdesc.enabled }}
+      - service: !u ACS.Service.CmdEsc
+        url: !acs "http://cmdesc.${namespace}.svc.${k8sdomain}"
+{{ end }}
+{{ if .Values.configdb.enabled }}
+      - service: !u ACS.Service.ConfigDB
+        url: !acs "http://configdb.${namespace}.svc.${k8sdomain}"
+        device: !u ACS.Device.ConfigDB
+{{ end }}
+{{ if .Values.files.enabled }}
+      - service: !u Files.Service.Files
+        url: !acs "http://files.${namespace}.svc.${k8sdomain}"
+{{ end }}
+{{ if .Values.git.enabled }}
+      - service: !u ACS.Service.Git
+        #The Git repository is configured with an external URL. We need
+        #to use the appropriate protocol (HTTP/HTTPS) based on whether
+        #the application is running in a secure or insecure deployment.
+        #${secure} expands to "s" or "" as appropriate.
+        url: !acs "http${secure}://git.${domain}"
+        device: !u ACS.Device.Git
+{{ end }}
+{{ if .Values.metadb.enabled }}
+      - service: !u MetaDB.Service
+        url: !acs "http://metadb.${namespace}.svc.${k8sdomain}"
+  {{- if .Values.metadb.asConfigDB }}
+    {{- if .Values.configdb.enabled }}
+      {{- fail "Cannot have both ConfigDB and MetaDB providing ConfigDB service" }}
+    {{- end }}
+      - service: !u ACS.Service.ConfigDB
+        url: !acs "http://metadb.${namespace}.svc.${k8sdomain}"
+  {{- end }}
+{{ end }}
+{{ if .Values.mqtt.enabled }}
+      - service: !u UUIDs.Service.MQTT
+        url: !acs "mqtt://mqtt.${namespace}.svc.${k8sdomain}"
+{{ end }}
+{{ end }}

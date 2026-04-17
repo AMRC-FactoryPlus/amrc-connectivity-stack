@@ -37,4 +37,8 @@ oneOf:
               - type: "null"
               - type: object
                 propertyNames: { format: uuid }
-                additionalProperties: { type: boolean }
+                additionalProperties:
+                  oneOf:
+                    - type: boolean
+                    - type: string
+                      enum: ["both"]

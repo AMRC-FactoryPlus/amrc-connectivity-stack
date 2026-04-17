@@ -26,6 +26,11 @@ import org.slf4j.LoggerFactory;
 
 import uk.co.amrc.factoryplus.util.Response;
 
+/* Methods in this class DO NOT check permissions before taking action;
+ * these checks must be performed in the api classes. This is because we
+ * do not have the app/obj UUIDs to hand once we get to this point.
+ */
+
 public class ConfigEntry extends RequestHandler.Component
 {
     private static final Logger log = LoggerFactory.getLogger(ConfigEntry.class);

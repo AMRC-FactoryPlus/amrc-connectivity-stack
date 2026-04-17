@@ -1058,7 +1058,6 @@ export default {
       this.$refs.csvFileInput.value = ''
     },
 
-    //applyParsedCsv () {
     applyParsedCsv () {
       if (!this.csvParsedData) return { applied: 0, skipped: 0 }
       // Pass the schema to applyCsvToModel so missing metrics can be created

@@ -134,14 +134,23 @@
               <label for="tls" class="text-sm font-medium cursor-pointer">Use TLS</label>
             </div>
 
-            <div v-if="remoteTls" class="flex flex-col gap-1 mt-3">
-              <label class="text-sm font-medium">CA Certificate ConfigMap</label>
-              <Input
-                placeholder="e.g. corporate-ca"
-                v-model="caConfigMapName"
-              />
-              <p class="text-xs text-gray-500">
-                Optional. Name of a Kubernetes ConfigMap containing a custom CA certificate (key: <code>ca.crt</code>).
+            <div v-if="remoteTls" class="grid grid-cols-2 gap-4 mt-3">
+              <div class="flex flex-col gap-1">
+                <label class="text-sm font-medium">CA Certificate ConfigMap</label>
+                <Input
+                  placeholder="e.g. corporate-ca"
+                  v-model="caConfigMapName"
+                />
+              </div>
+              <div class="flex flex-col gap-1">
+                <label class="text-sm font-medium">CA Certificate Filename</label>
+                <Input
+                  placeholder="e.g. ca.crt"
+                  v-model="caFile"
+                />
+              </div>
+              <p class="text-xs text-gray-500 col-span-2">
+                Optional. Provide the ConfigMap name and certificate filename to use a custom CA.
                 Required when the remote broker uses a certificate signed by a private CA (e.g. corporate TLS inspection).
               </p>
             </div>
@@ -334,6 +343,7 @@ export default {
       this.remoteUsername = null
       this.remotePassword = null
       this.caConfigMapName = null
+      this.caFile = null
       this.isSubmitting = false
       this.v$.$reset()
     },
@@ -359,6 +369,7 @@ export default {
           this.remotePort = values.remote.port
           this.remoteTls = values.remote.tls
           this.caConfigMapName = values.remote.caConfigMapName || null
+          this.caFile = values.remote.caFile || null
         }
       }
     },
@@ -434,6 +445,7 @@ export default {
               usernameKey: 'username',
               passwordKey: 'password',
               ...(this.caConfigMapName ? { caConfigMapName: this.caConfigMapName } : {}),
+              ...(this.caFile ? { caFile: this.caFile } : {}),
             }
           }
 
@@ -475,6 +487,7 @@ export default {
       remoteUsername: null,
       remotePassword: null,
       caConfigMapName: null,
+      caFile: null,
       isSubmitting: false,
       unsChartUuid: null,
     }

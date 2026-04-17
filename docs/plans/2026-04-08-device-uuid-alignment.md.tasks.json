@@ -1,0 +1,11 @@
+{
+  "planPath": "docs/plans/2026-04-08-device-uuid-alignment.md",
+  "tasks": [
+    {"id": 7, "subject": "Task 1: Helm backup hook — values.yaml entries", "status": "pending"},
+    {"id": 8, "subject": "Task 2: Helm backup hook — Kubernetes resources", "status": "pending", "blockedBy": [7]},
+    {"id": 9, "subject": "Task 3: ConfigDB SQL migration v13.sql", "status": "pending"},
+    {"id": 10, "subject": "Task 4: Wire v13 into migrate.sql", "status": "pending", "blockedBy": [9]},
+    {"id": 11, "subject": "Task 5: Admin UI — use ConfigDB UUID as Instance_UUID", "status": "pending"}
+  ],
+  "lastUpdated": "2026-04-08T00:00:00Z"
+}

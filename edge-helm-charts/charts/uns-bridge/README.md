@@ -45,13 +45,15 @@ CA certificate via a Kubernetes ConfigMap.
      -n <edge-namespace>
    ```
 
-2. Set `remote.caConfigMapName` in the bridge values, either via the Admin
-   UI "CA Certificate ConfigMap" field or directly in the Helm values:
+2. Set `remote.caConfigMapName` and `remote.caFile` in the bridge values,
+   either via the Admin UI or directly in the Helm values:
 
    ```yaml
    remote:
      caConfigMapName: corporate-ca
+     caFile: ca.crt
    ```
 
-The certificate is copied into the container's system CA store at startup,
-so both the custom CA and standard public CAs are trusted.
+The ConfigMap is mounted at `/ca` and mosquitto uses `bridge_cafile` pointing
+directly at the file. This works correctly with CA bundles containing multiple
+certificates, which Alpine's `bridge_capath` does not support.

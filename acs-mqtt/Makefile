@@ -4,28 +4,21 @@ include ${top}/mk/acs.init.mk
 repo?=acs-mqtt
 k8s.deployment?=mqtt
 
-src=	../hivemq-krb
-
-build_args+=	--build-arg krb_zipfile=${zip}
+build_args+=	--build-arg mvn_output=${zip}
 
 include ${mk}/acs.docker.mk
 include ${mk}/acs.mvn.mk
 
-pluginver!=	cd ${src} && \
-	${mvn} -q help:evaluate -Dexpression=project.version -DforceStdout
-
-zip=hivemq-auth-krb-${pluginver}-distribution.zip
+zip!=	${mvn} -q help:evaluate -Dexpression=acs.output -DforceStdout
 
 .PHONY: mqtt.build mqtt.clean
 
 build: mqtt.build
 
 mqtt.build: git.prepare
-	cd ${src} && ${mvn} -B package
-	cp ${src}/target/${zip} .
+	${mvn} package
 
 clean: mqtt.clean
 
 mqtt.clean:
 	rm -rf target
-	rm -f ${zip}

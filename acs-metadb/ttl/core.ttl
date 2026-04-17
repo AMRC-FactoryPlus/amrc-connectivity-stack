@@ -1,0 +1,279 @@
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+
+@base <http://factoryplus.app.amrc.co.uk/rdf/> .
+@prefix uuid: <uuid/> .
+@prefix : <core/> .
+
+# These are proper classes and sit outside the rank structure.
+:Object a rdfs:Class.
+:Class a rdfs:Class; rdfs:subClassOf :Object, rdfs:Class.
+
+# We are using these instead of rdfs:{domain,range} as we definitely
+# don't want the inference those imply, at least not over F+ objects.
+# For now they are informational only; ideally they would be implemented
+# with some sort of validation layer, rather than as inferences.
+:from a rdf:Property; rdfs:domain rdf:Property.
+:to a rdf:Property; rdfs:domain rdf:Property.
+
+:uuid :from :Object; :to xsd:string.
+:rank :from :Object; :to xsd:integer.
+
+# This should become some form of name-in-naming-scheme.
+:name :from :Object; :to xsd:string.
+
+# Factory+ primary class. This is not a subproperty of rdf:type as we
+# need to track all memberships in the direct graph. Enforcement that
+# the primary class is actually a class happens in the API.
+:primary :from :Object; :to :Class.
+
+# This is purely informational at the moment.
+:powersetOf :from :Class; :to :Class.
+
+# Implementation of subsets in terms of powersets.
+# These need to be forward rules, I think.
+#
+## a ∈ b, b ⊂ c ⇒ a ∈ c
+## a ∈ b, b ∈ p, p ℙ c ⇒ a ∈ c
+#
+## x ⊂ y, y ⊂ z ⇒ x ⊂ z
+## x ∈ m, m ℙ y, y ∈ n, n ℙ z ⇒ x ∈ r, r ℙ z
+# r = n as powersets are unique
+## x ∈ m, m ℙ y, y ∈ n, n ℙ z ⇒ x ∈ n
+#
+# We cannot remove the condition n ℙ z without adding an assertion that
+# n is a powerset, e.g. n ∈ PowerSet where PowerSet is a proper class.
+# Without this we might have e.g. n = { y } and so cannot derive x ∈ n.
+# Possibly we could replace m ℙ x with m ∈ PowerSet, x ∈ m throughout,
+# and instead of referencing 'the powerset of x', reference 'a powerset
+# containing x', where a powerset m obeys 
+## x ∈ m, (∀a: a ∈ y ⇒ a ∈ x) ⇒ y ∈ m
+#
+# then also (backward rules?):
+## p ℙ a ⇒ a ∈ p
+## a ∈ p, p ℙ b ⇒ a ⊂ p
+## a R b, R ∈ p, p ℙ S ⇒ a S b
+
+:Individual a :R1Class; :primary :R1Class;
+    rdfs:subClassOf :Object;
+    :uuid "2494ae9b-cd87-4c01-98db-437a303b43e9";
+    :name "Individual";
+    :rank "0"^^xsd:int.
+:R1Class a :R2Class; :primary :R2Class;
+    rdfs:subClassOf :Class;
+    :uuid "04a1c90d-2295-4cbe-b33a-74eded62cbf1";
+    :name "Rank 1 class";
+    :rank "1"^^xsd:int; :powersetOf :Individual.
+:R2Class a :R3Class; :primary :R3Class;
+    rdfs:subClassOf :Class;
+    :uuid "705888ce-53fa-434d-afee-274b331d4642";
+    :name "Rank 2 class";
+    :rank "2"^^xsd:int; :powersetOf :R1Class.
+# The top rank class has no primary class
+:R3Class a :Class; rdfs:subClassOf :Class;
+    :uuid "52b80183-6998-4bf9-9b30-132755e7dede";
+    :name "Rank 3 class";
+    :rank "3"^^xsd:int; :powersetOf :R2Class.
+
+# XXX These are definitely not R0. They are perhaps names, which are R1?
+:Special a :R1Class; :primary :R1Class;
+    rdfs:subClassOf :Individual;
+    :uuid "ddb132e4-5cdd-49c8-b9b1-2f35879eab6d";
+    :name "Special UUID".
+# There is some logic in saying this should be :Object.
+:Wildcard a :Special; :primary :Special;
+    :uuid "00000000-0000-0000-0000-000000000000";
+    :name "Wildcard".
+# This makes no logical sense. We should omit the owner instead, or
+# replace the owner link with a link to the set of objects belonging to
+# that owner, where the Unowned set has no owner reference.
+:Unowned a :Special; :primary :Special;
+    :uuid "091e796a-65c0-4080-adff-c3ce01a65b2e";
+    :name "Unowned".
+
+<time/Instant> a :R1Class; :primary :R1Class; 
+    rdfs:subClassOf :Individual;
+    :uuid "600bc688-1d35-11f1-80e6-d7c35e61c3ce";
+    :name "Instant".
+# XXX Long-term this needs to go in favour of measurements against a
+# particular clock. But for now it's a useful simplification.
+<time/timestamp> :from <time/Instant>; :to xsd:datetime.
+
+# A Document is a physical object; ontologically it is the union of
+# certain representations which are part the content of the document
+# for the time being. In HQDM terms it is an Association. In practical
+# terms a Document has an RDF Literal representing its content, and
+# certain additional metadata. Subclasses of Document may have
+# additional metadata to suit their purpose.
+<doc/Document> a <doc/DocumentGroup>; :primary :R1Class;
+    rdfs:subClassOf :Individual;
+    :uuid "04e2abe8-2c0b-11f1-9cdd-6ffcd35127ab";
+    :name "Document".
+<doc/DocumentGroup> a :R2Class; :primary :R2Class;
+    :powersetOf <doc/Document>; rdfs:subClassOf :R1Class;
+    :uuid "4304c4b0-2c0b-11f1-834f-a34b414e7540";
+    :name "Document group".
+
+<doc/content> :from <doc/Document>; :to rdf:Literal.
+
+<app/ConfigEntry> a <app/ConfigEntryGroup>; :primary :R1Class;
+    rdfs:subClassOf <doc/Document>;
+    :uuid "86d6f3d0-1c9c-11f1-9d4d-3b787922d771";
+    :name "Config entry".
+<app/ConfigEntryGroup> a :R2Class; :primary :R2Class;
+    :powersetOf <app/ConfigEntry>; rdfs:subClassOf <doc/DocumentGroup>;
+    :uuid "62314906-1c9f-11f1-9bf0-bb3086d1330d";
+    :name "Config entry group".
+
+<app/for> :from <app/ConfigEntry>; :to :Object.
+
+# Currently we have Application a class of ConfigEntry. This means Apps
+# fit meaningfully into the well-founded class structure but makes them
+# a little harder to handle in RDF. We cannot have App a function from
+# Object to JSON, as we need metadata on the config entry; but
+# potentially from Object to ConfigEntry? We would need to decide how to
+# handle functions within the well-founded structure: Applications must
+# be F+ objects with UUIDs. The standard Kuratowski construction gives a
+# rank of max(rank(domain), rank(range)) + 2, which inflates the ranks
+# rather fast and also requires non-strict ranks to be usable. A
+# pragmatic alternative would be to allow 'proper class' and 'function'
+# as ranks outside the numerical system.
+<app/Application> a <app/AppGroup>; :primary :R2Class; 
+    rdfs:subClassOf <app/ConfigEntryGroup>;
+    :uuid "d319bd87-f42b-4b66-be4f-f82ff48b93f0";
+    :name "Application".
+<app/AppGroup> a :R3Class; :primary :R3Class;
+    :powersetOf <app/Application>; rdfs:subClassOf :R2Class;
+    :uuid "75b030ca-2463-11f1-8bc8-372c7503501b";
+    :name "Application group".
+<app/Structured> a <app/AppGroup>; :primary <app/AppGroup>;
+    rdfs:subClassOf <app/Application>;
+    :uuid "912771e2-2463-11f1-b0e8-83e356c50fc8";
+    :name "Structured application".
+
+<app/appliesTo> :from <app/Application>; :to :Class.
+
+<app/Registration> a <app/Structured>; :primary <app/Application>; 
+    rdfs:subClassOf <app/ConfigEntry>;
+    :uuid "cb40bed5-49ad-4443-a7f5-08c75009da8f";
+    :name "Object registration";
+    <app/appliesTo> :Object.
+<app/Info> a <app/Structured>; :primary <app/Application>;
+    rdfs:subClassOf <app/ConfigEntry>;
+    :uuid "64a8bfa9-7772-45c4-9d1a-9e6290690957";
+    :name "General information";
+    <app/appliesTo> :Object.
+<app/ConfigSchema> a <app/Application>; :primary <app/Application>; 
+    rdfs:subClassOf <app/ConfigEntry>;
+    :uuid "dbd8a535-52ba-4f6e-b4f8-9b71aefe09d3";
+    :name "Application config schema";
+    <app/appliesTo> <app/Application>.
+<app/SparkplugAddress> a <app/Structured>; :primary <app/Application>;
+    rdfs:subClassOf <app/ConfigEntry>;
+    :uuid "8e32801b-f35a-4cbf-a5c3-2af64d3debd7";
+    :name "Sparkplug address";
+    <app/appliesTo> <sparkplug/Entity>.
+
+<uuid/beb7d97c-2c0a-11f1-97ae-9bf4285ba7b1> 
+    a <app/ConfigSchema>; :primary <app/ConfigSchema>;
+    :uuid "beb7d97c-2c0a-11f1-97ae-9bf4285ba7b1";
+    <app/for> <app/Registration>;
+    <doc/content> """
+        {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["uuid", "rank", "class", "deleted", "owner"],
+            "properties": {
+                "uuid": { "type": "string", "format": "uuid" },
+                "rank": { "type": "integer", "minimum": 0 },
+                "class": { "type": "string", "format": "uuid" },
+                "deleted": { "type": "boolean" },
+                "owner": { "type": "string", "format": "uuid" },
+                "strict": { "type": "boolean", "const": true }
+            }
+        }
+    """^^rdf:JSON.
+<uuid/37718a06-2c0c-11f1-9ef8-e3f79d7f6db2>
+    a <app/ConfigSchema>; :primary <app/ConfigSchema>;
+    :uuid "37718a06-2c0c-11f1-9ef8-e3f79d7f6db2";
+    <app/for> <app/Info>; 
+    <doc/content> """
+        { 
+            "type": "object",
+            "properties": {
+                "name": { "type": "string" }
+            }
+        }
+    """^^rdf:JSON.
+
+# These are things which can have a Sparkplug address. _Edge cluster_,
+# _Sparkplug Node_ and _Sparkplug Device_ are all subclasses. Properly
+# we should have Group/Node subclasses here as well, because:
+# * _Edge cluster_ != _Sparkplug Group_ because `*-Service-Core` is not
+#   an _Edge cluster_.
+# * _Sparkplug Node_ is currently a _Client role_. Not all entities with
+#   a Node address should currently be permitted to use it. cf _Edge
+#   Agent_ vs _Active Edge Agent_.
+<sparkplug/Entity> a :R1Class; :primary :R1Class;
+    rdfs:subClassOf :Individual;
+    :uuid "3ef49486-278d-11f1-b52f-f742bd9bbc94";
+    :name "Sparkplug entity".
+<sparkplug/Device> a :R1Class; :primary :R1Class;
+    rdfs:subClassOf <sparkplug/Entity>;
+    :uuid "18773d6d-a70d-443a-b29a-3f1583195290";
+    :name "Sparkplug Device".
+# This is very crude for now and represents group/node/device separately
+# and redundantly. Properly we should link Device→Node→Group and derive
+# the address from that. Probably we could use only a single <sparkplug/name>
+# property for the actual names.
+<sparkplug/groupId> :from <sparkplug/Entity>; :to xsd:string.
+<sparkplug/nodeId> :from <sparkplug/Entity>; :to xsd:string.
+<sparkplug/deviceId> :from <sparkplug/Entity>; :to xsd:string.
+
+<service/Service> a :R1Class; :primary :R1Class;
+    rdfs:subClassOf :Individual;
+    :uuid "265d481f-87a7-4f93-8fc6-53fa64dc11bb";
+    :name "F+ service function".
+<service/Directory> a <service/Service>; :primary <service/Service>;
+    :uuid "af4a1d66-e6f7-43c4-8a67-0fa3be2b1cf9";
+    :name "Directory service".
+<service/ConfigDB> a <service/Service>; :primary <service/Service>; 
+    :uuid "af15f175-78a0-4e05-97c0-2a0bb82b9f3b";
+    :name "ConfigDB service".
+<service/Auth> a <service/Service>; :primary <service/Service>;
+    :uuid "cab2642a-f7d9-42e5-8845-8f35affe1fd4";
+    :name "Auth service".
+# These are for representing Directory information.
+<service/Provider> a :R1Class; :primary :R1Class;
+    rdfs:subClassOf :Individual;
+    :uuid "0fdf17ce-2793-11f1-a869-6fd7319ec1a3";
+    :name "Service provider".
+<service/provides> :from <service/Provider>; :to <service/Service>.
+<service/url> :from <service/Provider>; :to xsd:string.
+
+<authn/Principal> a :R1Class; :primary :R1Class;
+    rdfs:subClassOf :Individual;
+    :uuid "11614546-b6d7-11ef-aebd-8fbb45451d7c";
+    :name "Principal".
+<authn/PrincipalGroup> a :R2Class; :primary :R2Class;
+    rdfs:subClassOf :R1Class; :powersetOf :Principal;
+    :uuid "c0157038-ccff-11ef-a4db-63c6212e998f";
+    :name "Principal group".
+<authn/PrincipalType> a :R2Class; :primary :R2Class;
+    rdfs:subClassOf <authn/PrincipalGroup>;
+    :uuid "ae17afe0-ccff-11ef-bb70-67807cb4a9df";
+    :name "Principal type".
+<authn/CentralService> a <authn/PrincipalType>; :primary <authn/PrincipalType>;
+    rdfs:subClassOf <authn/Principal>;
+    :uuid "e463b4ae-a322-46cc-8976-4ba76838e908";
+    :name "Central service".
+
+<authn/ConfigDB> a <authn/CentralService>, <sparkplug/Entity>, <service/Provider>;
+    :primary <authn/CentralService>;
+    :uuid "36861e8d-9152-40c4-8f08-f51c2d7e3c25";
+    :name "ConfigDB";
+    <service/provides> <service/ConfigDB>;
+    <sparkplug/groupId> "AMRC-Service-Core";
+    <sparkplug/nodeId> "ConfigDB".

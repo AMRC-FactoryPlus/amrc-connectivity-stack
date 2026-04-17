@@ -283,6 +283,7 @@ jobs:
           - edge-bacnet
           - edge-modbus
           - edge-test
+          - edge-openprotocol
           - edge-tplink-smartplug
           - edge-ads
           - edge-rtde
@@ -438,8 +439,55 @@ jobs:
           service-name: ${{ steps.prepare.outputs.service-name }}
           digest: ${{ steps.build-and-push.outputs.digest }}
 
-  build-mqtt:
+  java-libs:
     runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 1
+      matrix:
+        workdir:
+          - java-base-pom
+          - java-service-client
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up JDK
+        uses: actions/setup-java@v3
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+      - name: Update POM versions
+        # It would be cleaner to use mvn versions here, but it breaks
+        # when we try to update a POM whose parent doesn't resolve. So
+        # fall back to stupid sed and rely on no reuse of the dummy
+        # in-tree version number.
+        env:
+          workdir: ${{ matrix.workdir }}
+          ref: ${{ github.ref_name }}
+        run: |
+          tag="${ref#v}"
+          cd lib/java-base-pom
+          sed -i -re's!version>0\.0\.0-intree</!version>'"${tag}"'</!g' pom.xml
+          cd "../$workdir"
+          sed -i -re's!version>0\.0\.0-intree</!version>'"${tag}"'</!g' pom.xml
+      - name: Publish to GH Packages
+        env:
+          workdir: ${{ matrix.workdir }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          cd "lib/${workdir}"
+          mvn -B -Pgha deploy
+
+  java-services:
+    needs: [ java-libs ]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - acs-metadb
+          - acs-mqtt
     permissions:
       contents: read
       packages: write
@@ -450,27 +498,32 @@ jobs:
       - uses: ./.github/actions/prepare
         id: prepare
         with:
-          service-name: acs-mqtt
+          service-name: ${{ matrix.service }}
           token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Set up JDK 19
+      - name: Set up JDK
         uses: actions/setup-java@v3
         with:
-          java-version: '19'
+          java-version: '25'
           distribution: 'temurin'
-          server-id: github # Value of the distributionManagement/repository/id field of the pom.xml
-          settings-path: ${{ github.workspace }} # location for the settings.xml file
-
-      - name: Extract POM version
+      - name: Update POM versions
+        env:
+          service: ${{ matrix.service }}
+          ref: ${{ github.ref_name }}
         run: |
-          cd hivemq-krb
-          ver="$(mvn -q help:evaluate -Dexpression=project.version -DforceStdout)"
-          echo "krb_zipfile=hivemq-auth-krb-${ver}-distribution.zip" >>"$GITHUB_ENV"
+          tag="${ref#v}"
+          cd lib/java-base-pom
+          sed -i -re's!version>0\.0\.0-intree</!version>'"${tag}"'</!g' pom.xml
+          cd "../../$service"
+          sed -i -re's!version>0\.0\.0-intree</!version>'"${tag}"'</!g' pom.xml
       - name: Build with Maven
+        env:
+          service: ${{ matrix.service }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
-          (cd lib/java-service-client; mvn -B deploy)
-          cd hivemq-krb
-          mvn -B package
-          cp "target/${krb_zipfile}" "../${{ steps.prepare.outputs.service-name }}"
+          cd "$service"
+          mvn -B -Pgha package
+          output="$(mvn -q help:evaluate -DforceStdout -Dexpression=acs.output)"
+          echo "mvn_output=${output}" >>"$GITHUB_ENV"
       - name: Build and push Docker image
         id: build-and-push
         uses: docker/build-push-action@v6
@@ -478,9 +531,9 @@ jobs:
           context: ./${{ steps.prepare.outputs.service-name }}
           push: true
           tags: ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}:${{ steps.prepare.outputs.version }}
-          labels: ${{ steps.meta.outputs.labels }}
+          labels: ${{ steps.prepare.outputs.labels }}
           build-args: |
-            krb_zipfile=${{ env.krb_zipfile }}
+            mvn_output=${{ env.mvn_output }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - uses: ./.github/actions/cleanup
@@ -489,9 +542,10 @@ jobs:
           version: ${{ steps.prepare.outputs.version }}
           service-name: ${{ steps.prepare.outputs.service-name }}
           digest: ${{ steps.build-and-push.outputs.digest }}
+
   build-helm-chart:
     if: github.event_name == 'release'
-    needs: [ 'build-x86-js', 'build-arm-js-merge', 'build-x86-pg', 'build-mqtt' ]
+    needs: [ 'build-x86-js', 'build-arm-js-merge', 'build-x86-pg', 'java-services' ]
     runs-on: ubuntu-latest
     steps:
       - name: Install Helm

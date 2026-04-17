@@ -28,7 +28,7 @@ function sym_diff(one, two) {
  * the database directly, and sometimes we need to query using a query
  * function for a transaction. The model inherits from this class. */
 export default class Queries {
-    static DBVersion = 12;
+    static DBVersion = 13;
 
     constructor(query) {
         this.query = query;
@@ -328,9 +328,11 @@ export default class Queries {
     }
 
     async record_service(opts) {
-        const dev = await this.find_or_create("device", opts.device);
+        const dev = opts.device
+            ? (await this.find_or_create("device", opts.device))
+            : null;
         const srv = await this.find_or_create("service", opts.service);
-        if (!dev || !srv) return null;
+        if (!srv) return null;
 
         /* Insert if we can; otherwise only update if we are changing
          * something. This both avoids unnecessary churn on the DB and

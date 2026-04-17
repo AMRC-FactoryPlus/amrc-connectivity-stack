@@ -899,10 +899,10 @@ export default {
       // Set the top level Schema_UUID
       this.model.Schema_UUID = this.deviceSchema.uuid
 
-      // Set the top level Instance_UUID if it doesn't already exist
-      if (!this.model.Instance_UUID) {
-        this.set('Instance_UUID', uuidv4(), this.model)
-      }
+      // Set the top level Instance_UUID to the ConfigDB object UUID.
+      // This ensures stability across schema changes and alignment with the
+      // device's identity in ConfigDB.
+      this.set('Instance_UUID', this.device.uuid, this.model)
 
     },
 

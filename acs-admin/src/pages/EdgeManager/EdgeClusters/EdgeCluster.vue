@@ -159,9 +159,11 @@
 </template>
 
 <script>
+import { computed } from 'vue'
 import { useServiceClientStore } from '@store/serviceClientStore.js'
 import { useEdgeClusterStore } from '@store/useEdgeClusterStore.js'
 import { useNodeStore } from '@store/useNodeStore.js'
+import { useCanRebirth } from '@/composables/useCanRebirth.js'
 import { UUIDs } from '@amrc-factoryplus/service-client'
 import EdgeContainer from '@components/Containers/EdgeContainer.vue'
 import EdgePageSkeleton from '@components/EdgeManager/EdgePageSkeleton.vue'
@@ -213,10 +215,15 @@ export default {
   },
 
   setup () {
+    const n = useNodeStore()
+    const nodeUuids = computed(() => n.data?.map(e => e.uuid) ?? [])
+    const canRebirthMap = useCanRebirth(nodeUuids)
+
     return {
       e: useEdgeClusterStore(),
       dp: useDeploymentStore(),
-      n: useNodeStore(),
+      n,
+      canRebirthMap,
       hostColumns,
       nodeColumns,
       deploymentColumns,
@@ -234,7 +241,11 @@ export default {
     },
 
     nodes () {
-      return Array.isArray(this.n.data) ? this.n.data.filter(e => e.deployment?.cluster === this.cluster.uuid) : []
+      const filtered = Array.isArray(this.n.data) ? this.n.data.filter(e => e.deployment?.cluster === this.cluster.uuid) : []
+      return filtered.map(n => ({
+        ...n,
+        _canRebirth: this.canRebirthMap?.get(n.uuid) ?? false
+      }))
     },
 
     deployments () {

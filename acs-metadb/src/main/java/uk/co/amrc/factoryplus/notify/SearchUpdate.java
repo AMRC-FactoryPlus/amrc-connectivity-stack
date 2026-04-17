@@ -45,6 +45,9 @@ public interface SearchUpdate
 
     static SearchUpdate ofResponse (Response<Map<String, Response<JsonValue>>> children)
     {
+        if (children.status() == 410)
+            return SearchUpdate.invalid();
+
         return children.ifOK(SearchUpdate::full,
             SearchUpdate::notFound, SearchUpdate.Empty::new);
     }

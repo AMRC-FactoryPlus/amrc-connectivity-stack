@@ -42,13 +42,26 @@ public class MetaDBNotify
 
     public NotifyV2 notifyV2 () { return notify; }
 
-    private static <U> Observable<Response> setUpdates (Observable<Set<U>> src)
+    private static <U> Response setUpdate (Response<Set<U>> src)
     {
         return src
             .map(s -> s.map(u -> u.toString()))
             .map(s -> s.foldLeft(Json.createArrayBuilder(), (a, v) -> a.add(v))
-                .build())
-            .map(Response::ok);
+                .build());
+    }
+
+    /* Unit is a type which conveys no useful information. It has one
+     * value, Unit.UNIT. In this case, we have nothing useful to say in
+     * the success case, but information to convey in the error cases. */
+    private Observable<Response<Unit>> watchACL (Session sess, UUID perm, UUID targ)
+    {
+        return auth.watchPermitted(sess.upn(), perm, targ)
+            .map(res -> res
+                .handle(st -> {
+                    log.info("Error watching ACL: {}", st);
+                    return Response.of(503);
+                })
+                .flatMap(ok -> ok ? Response.ok(Unit.UNIT) : Response.of(403)));
     }
 
     /* XXX These app endpoints will return empty maps for nonexistent
@@ -61,21 +74,12 @@ public class MetaDBNotify
         log.info("appList: {}", args);
         return args.get("app")
             .flatMap(Decoders::parseUUID)
-            .map(app -> data.appValues(app)
-                .map(m -> m.keySet())
-                .compose(MetaDBNotify::setUpdates))
+            .map(app -> Observable.combineLatest(
+                    data.appValues(app),
+                    watchACL(sess, Vocab.Perm.ReadApp, app),
+                    (configs, ok) -> ok.map(u -> configs.keySet()))
+                .map(MetaDBNotify::setUpdate))
             .getOrElse(Observable.just(Response.of(410)));
-    }
-
-    private Observable<Response<Unit>> watchACL (Session sess, UUID perm, UUID targ)
-    {
-        return auth.watchPermitted(sess.upn(), perm, targ)
-            .map(res -> res
-                .handle(st -> {
-                    log.info("Error watching ACL: {}", st);
-                    return Response.of(503);
-                })
-                .flatMap(ok -> ok ? Response.ok(Unit.UNIT) : Response.of(403)));
     }
 
     private Observable<SearchUpdate> appSearch (Session sess, Map<String, String> args)

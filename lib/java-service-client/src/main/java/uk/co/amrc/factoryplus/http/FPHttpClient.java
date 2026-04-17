@@ -202,7 +202,11 @@ public class FPHttpClient {
      * out. */
     public Single<TextWebsocket> authWebsocket (UUID service, String path)
     {
-        return this.execute(new WsRequest(service, path));
+        /* execute will perform discovery when it is called. It is
+         * important this doesn't happen until the Single is subscribed,
+         * so sequences can be built in constructors. */
+        return Single.defer(() ->
+            this.execute(new WsRequest(service, path)));
     }
 
     public Single<SimpleHttpResponse> fetch (SimpleHttpRequest req)

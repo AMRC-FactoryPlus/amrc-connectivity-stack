@@ -121,6 +121,8 @@ spec:
             - name: VERBOSE
               value: {{.Values.auth.verbosity | quote | required "values.auth.verbosity is required!"}}
 {{ include "amrc-connectivity-stack.cache-max-age" (list . "auth") | indent 12 }}
+            - name: DIRECTORY_URL
+              value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
             # This principal, if configured, bypasses all ACLs. This is important for
             # bootstrapping but perhaps shouldn't be left in place once we can bootstrap without
             # manual intervention.

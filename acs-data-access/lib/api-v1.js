@@ -79,8 +79,6 @@ export class APIv1 {
     return result;
   }
 
-
-
   /** GET. Returns a list of Dataset UUIDs that the client has READ access to.
    * The dataset can be optionally restricted by from and to dates. 
    * Dates must be in the format ISO date-time string in UTC 2025-11-13T09:33:18.000Z
@@ -105,8 +103,6 @@ export class APIv1 {
                     * metadata {object} - Map of metadata configs keyed by Application UUID - contains all config entries for dataset which use applications in the Dataset metadata class
                     * parts {array} - Subset datasets - contains UUIDs of all subclasses of dataset the client has READ access to.
     * Don't return valid response if dataset is invalid
-    * 
-    
    */
   async metadata_uuid(req, res){
     const dataset_uuid  = req.params.uuid;
@@ -129,14 +125,15 @@ export class APIv1 {
     const info = infos.get(dataset_uuid);
     if(!info) return fail(404);
 
-    
-    
+   const f_types = await rx.firstValueFrom(this.data.get_functional_types());
+   const f_type = f_types.get(dataset_uuid);
+
     const meta = {
       uuid: dataset_uuid,
       name: info.name,
+      function: f_type
     }
     return res.status(200).json(meta);
-
   }
 
 
@@ -331,7 +328,6 @@ export class APIv1 {
   }
 
 
-  
 
   async _get_dataset_def_by_uuid(uuid){
     const def = await rx.firstValueFrom(

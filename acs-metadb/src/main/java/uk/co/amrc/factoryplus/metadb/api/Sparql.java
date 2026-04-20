@@ -26,6 +26,7 @@ import org.apache.jena.query.*;
 import org.apache.jena.riot.Lang;
 import org.apache.jena.riot.RDFDataMgr;
 import org.apache.jena.riot.RDFLanguages;
+import org.apache.jena.riot.RIOT;
 import org.apache.jena.riot.WebContent;
 import org.apache.jena.sparql.resultset.SPARQLResult;
 import org.apache.jena.update.*;
@@ -43,6 +44,12 @@ public class Sparql {
     @Inject private SecurityContext auth;
 
     private static final Logger log = LoggerFactory.getLogger(Sparql.class);
+
+    static {
+        /* This will be called automatically when we call a RIOT
+         * function, but that's too late for the selection logic below. */
+        RIOT.init();
+    }
 
     private static final List<Variant> RS_TYPES = buildVariants(
         "application/sparql-results+json",
@@ -76,7 +83,7 @@ public class Sparql {
         {
             return Option.of(req.selectVariant(accept))
                 .map(v -> v.getMediaType().toString())
-                .map(ctToLang)
+                .flatMap(ct -> Option.of(ctToLang.apply(ct)))
                 .getOrElseThrow(() -> new WebApplicationException(406));
         }
 

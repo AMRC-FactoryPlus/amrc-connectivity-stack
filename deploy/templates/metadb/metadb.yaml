@@ -74,6 +74,14 @@ spec:
               value: HTTP/metadb.{{ .Release.Namespace }}.svc.cluster.local
             - name: DIRECTORY_URL
               value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
+            - name: BOOTSTRAP_ACL
+              value: |
+                sv1auth:Perm.ReadApp:App.Registration
+                sv1auth:Perm.ReadApp:App.SparkplugAddress
+                sv1auth:Perm.ReadMembers:SpecialObj.Wildcard
+                sv1auth:Perm.ReadSubclasses:SpecialObj.Wildcard
+            - name: ROOT_PRINCIPAL
+              value: admin@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
           volumeMounts:
             - mountPath: /etc/krb5.conf
               name: krb5-conf

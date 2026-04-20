@@ -8,7 +8,9 @@ package uk.co.amrc.factoryplus.metadb.main;
 
 import java.io.IOException;
 import java.net.URI;
+import java.time.Duration;
 import java.util.ServiceConfigurationError;
+import java.util.Set;
 import java.util.UUID;
 
 import org.eclipse.jetty.server.*;
@@ -85,6 +87,7 @@ public final class Main {
         var notify = model.metaNotify()
             .notifyV2()
             .contextHandlerFor(server);
+
         var webapp = new ResourceConfig()
             .property(ServerProperties.PROCESSING_RESPONSE_ERRORS_ENABLED, true)
             .packages("uk.co.amrc.factoryplus.providers")
@@ -98,7 +101,15 @@ public final class Main {
         coll.addHandler(notify);
         coll.addHandler(webapi);
 
-        server.setHandler(coll);
+        var cors = new CrossOriginHandler();
+        cors.setAllowedOriginPatterns(Set.of("*"));
+        cors.setAllowedMethods(Set.of("GET", "HEAD", "POST", "PUT", "DELETE", "PATCH"));
+        cors.setAllowedHeaders(Set.of("authorization"));
+        cors.setAllowCredentials(true);
+        cors.setPreflightMaxAge(Duration.ofDays(1));
+        cors.setHandler(coll);
+
+        server.setHandler(cors);
 
         return server;
     }

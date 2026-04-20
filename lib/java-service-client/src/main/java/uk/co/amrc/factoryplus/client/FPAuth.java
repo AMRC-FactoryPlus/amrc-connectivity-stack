@@ -72,6 +72,13 @@ public class FPAuth {
             .build();
     }
 
+    public boolean isRoot (String upn)
+    {
+        return root_principal
+            .filter(upn::equals)
+            .isPresent();
+    }
+
     /* XXX We have no BOOTSTRAP_ACL handling. This will be needed for a
      * ConfigDB implementation. */
 
@@ -151,7 +158,7 @@ public class FPAuth {
      */
     public Observable<Response<Boolean>> watchPermitted (String upn, UUID perm, UUID targ)
     {
-        if (root_principal.filter(upn::equals).isPresent())
+        if (isRoot(upn))
             return Observable.just(Response.ok(true))
                 .concatWith(Observable.never());
 

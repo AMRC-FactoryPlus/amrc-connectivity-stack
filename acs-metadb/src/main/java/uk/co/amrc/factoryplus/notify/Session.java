@@ -34,7 +34,8 @@ public class Session
     private UUID            uuid;
 
     /* These are initialised by start() */
-    private String                  upn;
+    private String  upn;
+    private boolean isRoot = false;
 
     public Session (NotifyV2 notify)
     {
@@ -94,6 +95,8 @@ public class Session
                  * the only alternative is threading the UPN through the
                  * sequence and that's just messy. */
                 this.upn = upn;
+                if (auth.isRoot(upn))
+                    this.isRoot = true;
                 return recv;
             });
     }
@@ -201,6 +204,13 @@ public class Session
     public <T> ObservableTransformer<Response<T>, Response<T>> applyACL (
         UUID permission, UUID target)
     {
+        log.info("Applying notify ACLs for {}", upn);
+        /* For root requests we must not contact the Auth service. */
+        if (isRoot) {
+            log.info("Principal {} is root, skipping ACLs", upn);
+            return src -> src;
+        }
+
         return src -> Observable.combineLatest(
                 src, watchACL(permission, target),
                 (val, ok) -> ok.flatMap(u -> val))

@@ -74,8 +74,6 @@ spec:
               value: HTTP/metadb.{{ .Release.Namespace }}.svc.cluster.local
             - name: DIRECTORY_URL
               value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
-            - name: VERBOSE
-              value: {{.Values.metadb.verbosity | quote | required "values.metadb.verbosity is required!"}}
           volumeMounts:
             - mountPath: /etc/krb5.conf
               name: krb5-conf

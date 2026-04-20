@@ -38,13 +38,13 @@ public class MetaDBNotify
         notify = NotifyV2.builder(db.auth())
             .watch("v2/app/{app}/object/", this::appList)
             .search("v2/app/{app}/object/", this::appSearch)
-            .watch("v2/class/{class}/member/", this::classMembers)
+            .watch("v2/class/{class}/{relation}/", this::classRelation)
             .build();
     }
 
     public NotifyV2 notifyV2 () { return notify; }
 
-    private static <U> Response setUpdate (Response<Set<U>> src)
+    private static <U> Response<JsonValue> setUpdate (Response<Set<U>> src)
     {
         return src
             .map(s -> s.map(u -> u.toString()))
@@ -55,7 +55,12 @@ public class MetaDBNotify
 
     private record SubHandler (Session sess, Map<String, String> args)
     {
-        private <T> Observable<Response<T>> fromUUID (
+        private static <T> Observable<Response<T>> invalid ()
+        {
+            return Observable.just(Response.of(410));
+        }
+
+        public <T> Observable<Response<T>> fromUUID (
             String arg,
             Function<UUID, Observable<T>> factory,
             UUID permission)
@@ -65,7 +70,20 @@ public class MetaDBNotify
                 .map(uuid -> factory.apply(uuid)
                     .map(Response::ok)
                     .compose(sess.applyACL(permission, uuid)))
-                .getOrElse(Observable.just(Response.of(410)));
+                .getOrElse(SubHandler::invalid);
+        }
+        
+        public Observable<Response<JsonValue>> fromRelation (
+            String rarg, String oarg, boolean asClass,
+            Function<Relation.Bound, Observable<Set<UUID>>> factory)
+        {
+            return args.get(rarg)
+                .flatMap(Relation::find)
+                .map(r -> fromUUID(oarg,
+                        u -> factory.apply(r.bind(u, asClass)),
+                        r.readClass())
+                    .map(MetaDBNotify::setUpdate))
+                .getOrElse(SubHandler::invalid);
         }
     }
 
@@ -74,7 +92,8 @@ public class MetaDBNotify
      * configs, which is also not correct. Probably appValues needs to
      * return an Observable<Option<Map>>. */
 
-    private Observable<Response> appList (Session sess, Map<String, String> args)
+    private Observable<Response<JsonValue>> appList (
+        Session sess, Map<String, String> args)
     {
         log.info("appList: {}", args);
         return new SubHandler(sess, args)
@@ -94,11 +113,11 @@ public class MetaDBNotify
             .map(SearchUpdate::ofResponse);
     }
 
-    private Observable<Response> classMembers (Session sess, Map<String, String> args)
+    private Observable<Response<JsonValue>> classRelation (
+        Session sess, Map<String, String> args)
     {
         log.info("classMembers: {}", args);
         return new SubHandler(sess, args)
-            .fromUUID("class", data::classMembers, Vocab.Perm.ReadMembers)
-            .map(MetaDBNotify::setUpdate);
+            .fromRelation("relation", "class", true, data::relation);
     }
 }

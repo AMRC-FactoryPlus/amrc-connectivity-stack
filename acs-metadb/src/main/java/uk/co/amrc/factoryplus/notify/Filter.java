@@ -49,9 +49,9 @@ interface Filter
     {
         private static final Logger log = LoggerFactory.getLogger(Watch.class);
         private Path path;
-        private Handler<Response> handler;
+        private Handler<Response<JsonValue>> handler;
 
-        public Watch (String path, Handler<Response> handler)
+        public Watch (String path, Handler<Response<JsonValue>> handler)
         {
             this.path = new Path(path);
             this.handler = handler;
@@ -67,7 +67,8 @@ interface Filter
                 .map(args -> buildWatch(this.handler.handle(sess, args)));
         }
 
-        private Observable<NotifyUpdate> buildWatch (Observable<Response> resps)
+        private Observable<NotifyUpdate> buildWatch (
+            Observable<Response<JsonValue>> resps)
         {
             return resps
                 .distinctUntilChanged()

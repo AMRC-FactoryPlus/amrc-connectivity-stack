@@ -381,6 +381,7 @@ export class APIv1 {
       const csv = this._convert_to_csv(rows);
 
       res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", `attachment; filename=${dataset_uuid}.csv`);
       return res.status(200).send(csv);
 
     } catch (err) {

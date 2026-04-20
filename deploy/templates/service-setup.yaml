@@ -220,4 +220,8 @@ data:
       - service: !u UUIDs.Service.MQTT
         url: !acs "mqtt://mqtt.${namespace}.svc.${k8sdomain}"
 {{ end }}
+{{ if .Values.dataAccess.enabled }}
+      - service: !u UUIDs.Service.DataAccess
+        url: !acs "http://data-access.${namespace}.svc.${k8sdomain}"
+{{ end }}
 {{ end }}

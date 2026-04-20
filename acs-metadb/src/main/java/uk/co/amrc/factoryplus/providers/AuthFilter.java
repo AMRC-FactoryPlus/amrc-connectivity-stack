@@ -6,6 +6,8 @@
 
 package uk.co.amrc.factoryplus.providers;
 
+import java.nio.ByteBuffer;
+import java.nio.charset.*;
 import java.util.Base64;
 import java.util.regex.Pattern;
 
@@ -14,6 +16,8 @@ import jakarta.ws.rs.*;
 import jakarta.ws.rs.container.*;
 import jakarta.ws.rs.core.*;
 import jakarta.ws.rs.ext.*;
+
+import io.vavr.control.Option;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,12 +29,13 @@ import org.slf4j.LoggerFactory;
  * side that doesn't load this filter? */
 
 @Provider @Priority(Priorities.AUTHENTICATION)
-public class AuthFilter implements ContainerRequestFilter
+public class AuthFilter implements ContainerRequestFilter, ContainerResponseFilter
 {
     private static final Logger log = LoggerFactory.getLogger(AuthFilter.class);
-    
+
     @Context private AuthProvider provider;
 
+    /* This is the request filter. */
     public void filter (ContainerRequestContext req)
     {
         var auth = req.getHeaderString("Authorization");
@@ -39,10 +44,21 @@ public class AuthFilter implements ContainerRequestFilter
          * exception coming from the Single. Otherwise the request
          * processing will continue before auth has been checked. */
         var ctx = provider.authenticate(auth)
-            .doOnSuccess(c -> log.info("Authenticated {} using {}",
-                c.getUserPrincipal(), c.getAuthenticationScheme()))
             .doOnError(e -> log.info("Auth failed", e))
             .blockingGet();
+
         req.setSecurityContext(ctx);
+    }
+
+    /* This is the response filter. */
+    public void filter (ContainerRequestContext req, ContainerResponseContext res)
+    {
+        Option.of(req.getSecurityContext())
+            .filter(r -> r instanceof FPSecurityContext)
+            .flatMap(r -> ((FPSecurityContext)r).gssResult().gssToken())
+            .map(provider.b64e()::encode)
+            .map(StandardCharsets.US_ASCII::decode)
+            .map(b64 -> "Negotiate " + b64)
+            .peek(wwwa -> res.getHeaders().putSingle("WWW-Authenticate", wwwa));
     }
 }

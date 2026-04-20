@@ -38,6 +38,7 @@ public class MetaDBNotify
         notify = NotifyV2.builder(db.auth())
             .watch("v2/app/{app}/object/", this::appList)
             .search("v2/app/{app}/object/", this::appSearch)
+            .watch("v2/class/{class}/member/", this::classMembers)
             .build();
     }
 
@@ -91,5 +92,13 @@ public class MetaDBNotify
                 .mapKeys(UUID::toString)
                 .mapValues(v -> v.toResponse())))
             .map(SearchUpdate::ofResponse);
+    }
+
+    private Observable<Response> classMembers (Session sess, Map<String, String> args)
+    {
+        log.info("classMembers: {}", args);
+        return new SubHandler(sess, args)
+            .fromUUID("class", data::classMembers, Vocab.Perm.ReadMembers)
+            .map(MetaDBNotify::setUpdate);
     }
 }

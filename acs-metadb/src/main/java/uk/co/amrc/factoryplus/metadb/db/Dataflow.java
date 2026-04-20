@@ -12,6 +12,7 @@ import java.util.concurrent.TimeUnit;
 import jakarta.json.JsonValue;
 
 import io.reactivex.rxjava3.core.*;
+import io.reactivex.rxjava3.schedulers.Schedulers;
 import io.reactivex.rxjava3.subjects.*;
 
 import io.vavr.collection.*;
@@ -76,6 +77,7 @@ public class Dataflow
 
     private Observable<Update.Config> buildConfigUpdates ()
     {
+        /* We must start synchronous, inside the txn */
         return modelUpdates
             .map(ds -> QueryExecution.dataset(ds)
                 .query(Q_appUpdates)
@@ -84,11 +86,47 @@ public class Dataflow
                 rs.forEachRemaining(em::onNext);
                 em.onComplete();
             }))
+            /* From here we move to the Rx computation threads */
+            .observeOn(Schedulers.computation())
             .map(Update.Config::ofQuerySolution)
             .share();
     }
 
     public Observable<Update.Config> configUpdates () { return configUpdates; }
+
+    private static final Query Q_classMembers = Vocab.query("""
+        select ?objU
+        where {
+            ?class <core/uuid> ?classU.
+            ?obj a ?class; <core/uuid> ?objU.
+        }
+    """);
+
+    private CacheSeq<UUID, Set<UUID>> _cacheClassMembers =
+        CacheSeq.builder(this::_buildClassMembers)
+            .withTimeout(1, TimeUnit.HOURS)
+            .withReplay()
+            .build();
+
+    private Observable<Set<UUID>> _buildClassMembers (UUID klass)
+    {
+        /* Start synchronous */
+        return modelUpdates
+            /* For now requery every time. In principal we could filter
+             * by rank of class changed to limit the churn. */
+            .map(upd -> db.selectQuery(Q_classMembers, "classU", klass))
+            .map(rs -> Iterator.ofAll(rs)
+                .map(qs -> Util.decodeLiteral(qs.get("objU"), UUID.class))
+                .toSet())
+            /* Move to computation thread */
+            .observeOn(Schedulers.computation())
+            .distinctUntilChanged();
+    }
+
+    public Observable<Set<UUID>> classMembers (UUID klass)
+    {
+        return _cacheClassMembers.get(klass);
+    }
 
     public Observable<Update.Config> appUpdates (UUID app)
     {

@@ -3,7 +3,7 @@
 * Data-Flow / sequence management
 */
 
-import { Map as IMap } from "immutable";
+import { List as IList, Map as IMap } from "immutable";
 import rx from "rxjs";
 
 import * as rxx     from "@amrc-factoryplus/rx-util";
@@ -23,8 +23,8 @@ export class DataFlow {
     this.dataset_definitions = this._build_dataset_definitions();
     this.general_infos = this._build_general_info();
     this.metadata = this._build_metadata();
+    this.functional_types = this._build_functional_types();
   }
-
 
   run() {
     // this.dataset_definitions.subscribe(ss => 
@@ -36,8 +36,28 @@ export class DataFlow {
     
   }
 
-  // 1. Watch direct members of Constants.App.DatasetMetadata
-  // 2. For each member -> Search App
+  // Watch member members of functional group to see what functional type datasets have
+  _build_functional_types() {
+    return rxx.rx(
+      this.cdb.watch_member_members(Constants.Group.FunctionalDatasetGroup),
+      rx.map(data => {
+        let result = IMap();
+
+        data.forEach((memberIds, groupId) => {
+          memberIds.forEach(memberId => {
+            result = result.update(
+              memberId,
+              list => (list ? list.push(groupId) : IList([groupId]))
+            );
+          });
+        });
+
+        return result;
+      }),
+      rxx.shareLatest()
+    );
+  }
+
   _build_metadata() {
     return rxx.rx(
       this.cdb.watch_members(Constants.App.DatasetMetadata),
@@ -59,15 +79,18 @@ export class DataFlow {
           rx.map(entries => {
             let map = IMap();
 
-            for (const [uuid, result] of entries) {
-              map = map.set(uuid, result);
+            for (const [outerUuid, result] of entries) {
+              for (const [innerUuid, payload] of result) {
+                const existing = map.get(innerUuid, IMap());
+
+                map = map.set(innerUuid, existing.set(outerUuid, payload));
+              }
             }
 
             return map;
           })
         );
       }),
-
       rxx.shareLatest()
     );
   }
@@ -116,6 +139,10 @@ export class DataFlow {
 
       rxx.shareLatest()
     );
+  }
+
+  get_functional_types(){
+    return this.functional_types;
   }
 
   get_metadata(){

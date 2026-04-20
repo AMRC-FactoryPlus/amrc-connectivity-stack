@@ -94,39 +94,40 @@ public class Dataflow
 
     public Observable<Update.Config> configUpdates () { return configUpdates; }
 
-    private static final Query Q_classMembers = Vocab.query("""
-        select ?objU
+    private static final Query Q_relation = Vocab.query("""
+        select ?classU ?objU
         where {
             ?class <core/uuid> ?classU.
-            ?obj a ?class; <core/uuid> ?objU.
+            ?obj ?rel ?class; <core/uuid> ?objU.
         }
     """);
 
-    private CacheSeq<UUID, Set<UUID>> _cacheClassMembers =
-        CacheSeq.builder(this::_buildClassMembers)
+    private CacheSeq<Relation.Bound, Set<UUID>> _cacheRelation =
+        CacheSeq.builder(this::_buildRelation)
             .withTimeout(1, TimeUnit.HOURS)
             .withReplay()
             .build();
 
-    private Set<UUID> _fetchClassMembers (UUID klass)
+    private Set<UUID> _fetchRelation (Relation.Bound bound)
     {
-        var rs = db.selectQuery(Q_classMembers, 
-            "classU", Vocab.uuidLiteral(klass));
+        var rs = db.selectQuery(Q_relation, 
+            "rel",              bound.prop(),
+            bound.selectVar(),  bound.literal());
         return Iterator.ofAll(rs)
-            .map(qs -> Util.decodeLiteral(qs.get("objU"), UUID.class))
+            .map(qs -> Util.decodeLiteral(qs.get(bound.resultVar()), UUID.class))
             .toSet();
     }
 
-    private Observable<Set<UUID>> _buildClassMembers (UUID klass)
+    private Observable<Set<UUID>> _buildRelation (Relation.Bound bound)
     {
         /* This is synchronous and comes from an update txn */
         var updates =  modelUpdates
             /* For now requery every time. In principal we could filter
              * by rank of class changed to limit the churn. */
-            .map(upd -> _fetchClassMembers(klass));
+            .map(upd -> _fetchRelation(bound));
 
         return Single.fromCallable(() ->
-                db.calculateRead(() -> _fetchClassMembers(klass)))
+                db.calculateRead(() -> _fetchRelation(bound)))
             /* Make the initial query on the Rx io sched */
             .subscribeOn(Schedulers.io())
             /* Subsequent updates will pass down within an update txn */
@@ -137,9 +138,9 @@ public class Dataflow
             .distinctUntilChanged();
     }
 
-    public Observable<Set<UUID>> classMembers (UUID klass)
+    public Observable<Set<UUID>> relation (Relation.Bound bound)
     {
-        return _cacheClassMembers.get(klass);
+        return _cacheRelation.get(bound);
     }
 
     public Observable<Update.Config> appUpdates (UUID app)

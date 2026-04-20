@@ -43,7 +43,7 @@ public class NotifyV2
             this.auth = auth;
         }
 
-        public Builder watch (String path, Handler<Response> handler)
+        public Builder watch (String path, Handler<Response<JsonValue>> handler)
         {
             filters = filters.prepend(new Filter.Watch(path, handler));
             return this;

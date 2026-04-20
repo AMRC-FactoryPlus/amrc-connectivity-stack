@@ -108,17 +108,31 @@ public class Dataflow
             .withReplay()
             .build();
 
+    private Set<UUID> _fetchClassMembers (UUID klass)
+    {
+        var rs = db.selectQuery(Q_classMembers, 
+            "classU", Vocab.uuidLiteral(klass));
+        return Iterator.ofAll(rs)
+            .map(qs -> Util.decodeLiteral(qs.get("objU"), UUID.class))
+            .toSet();
+    }
+
     private Observable<Set<UUID>> _buildClassMembers (UUID klass)
     {
-        /* Start synchronous */
-        return modelUpdates
+        /* This is synchronous and comes from an update txn */
+        var updates =  modelUpdates
             /* For now requery every time. In principal we could filter
              * by rank of class changed to limit the churn. */
-            .map(upd -> db.selectQuery(Q_classMembers, "classU", klass))
-            .map(rs -> Iterator.ofAll(rs)
-                .map(qs -> Util.decodeLiteral(qs.get("objU"), UUID.class))
-                .toSet())
-            /* Move to computation thread */
+            .map(upd -> _fetchClassMembers(klass));
+
+        return Single.fromCallable(() ->
+                db.calculateRead(() -> _fetchClassMembers(klass)))
+            /* Make the initial query on the Rx io sched */
+            .subscribeOn(Schedulers.io())
+            /* Subsequent updates will pass down within an update txn */
+            .toObservable()
+            .concatWith(updates)
+            /* Move to computation sched */
             .observeOn(Schedulers.computation())
             .distinctUntilChanged();
     }

@@ -104,7 +104,7 @@ public final class Main {
         var cors = new CrossOriginHandler();
         cors.setAllowedOriginPatterns(Set.of("*"));
         cors.setAllowedMethods(Set.of("GET", "HEAD", "POST", "PUT", "DELETE", "PATCH"));
-        cors.setAllowedHeaders(Set.of("authorization"));
+        cors.setAllowedHeaders(Set.of("authorization","*"));
         cors.setAllowCredentials(true);
         cors.setPreflightMaxAge(Duration.ofDays(1));
         cors.setHandler(coll);

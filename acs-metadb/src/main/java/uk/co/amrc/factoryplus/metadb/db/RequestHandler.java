@@ -63,21 +63,12 @@ public class RequestHandler
     public void checkACL (UUID perm, UUID target)
     {
         log.info("Checking permission for {} / {}", perm, target);
-        var not = db().fplus().auth()
+        var ok = db().fplus().auth()
             .fetchPermitted(upn, perm, target)
-            /* We must throw on-thread as we are in a txn. However
-             * .timout will pass us over to the computation thread, so
-             * we must materialise the result to avoid it being passed
-             * to the global error handler. */
-            .timeout(10, TimeUnit.SECONDS)
-            .materialize()
+            /* We must throw on-thread as we are in a txn. */
             .blockingGet();
 
-        if (not.isOnError()) {
-            log.info("Error checking ACL", not.getError());
-            throw new SvcErr.Timeout();
-        }
-        if (!not.getValue())
+        if (!ok)
             throw new SvcErr.Forbidden();
     }
 

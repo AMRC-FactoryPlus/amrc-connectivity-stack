@@ -179,6 +179,8 @@ public class FPAuth {
             .firstElement()
             .flatMap(r -> r.toMaybe(st ->
                 new FPServiceException(SERVICE, st, "Fetching ACL")))
-            .switchIfEmpty(Single.just(false));
+            .switchIfEmpty(Single.just(false))
+            .timeout(10, TimeUnit.SECONDS, Single.error(
+                () -> new FPServiceException(SERVICE, 502, "Timeout fetching ACL")));
     }
 }

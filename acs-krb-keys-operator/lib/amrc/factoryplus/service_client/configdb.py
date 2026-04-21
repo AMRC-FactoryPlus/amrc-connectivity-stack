@@ -17,7 +17,7 @@ class ConfigDB (ServiceInterface):
         self.service = uuids.Service.ConfigDB
 
     def get_config (self, app, obj):
-        st, json = self.fetch(f"v1/app/{app}/object/{obj}")
+        st, json = self.fetch(f"v2/app/{app}/object/{obj}")
         if st == 404:
             return
         if st != 200:
@@ -27,7 +27,7 @@ class ConfigDB (ServiceInterface):
     def put_config (self, app, obj, json):
         st, _ = self.fetch(
             method="PUT",
-            url=f"v1/app/{app}/object/{obj}",
+            url=f"v2/app/{app}/object/{obj}",
             json=json)
         if st == 204:
             return False
@@ -38,7 +38,7 @@ class ConfigDB (ServiceInterface):
     def patch_config (self, app, obj, patch):
         st, _ = self.fetch(
             method="PATCH",
-            url=f"v1/app/{app}/object/{obj}",
+            url=f"v2/app/{app}/object/{obj}",
             content_type="application/merge-patch+json",
             json=patch)
         if st == 204:
@@ -48,7 +48,7 @@ class ConfigDB (ServiceInterface):
     def delete_config (self, app, obj):
         st, _ = self.fetch(
             method="DELETE",
-            url=f"v1/app/{app}/object/{obj}")
+            url=f"v2/app/{app}/object/{obj}")
         if st == 204:
             return
         self.error(f"Can't remove {app} for {obj}", st)
@@ -60,7 +60,7 @@ class ConfigDB (ServiceInterface):
 
         st, json = self.fetch(
             method="POST",
-            url="v1/object",
+            url="v2/object",
             json=req)
 
         if st == 200 and excl:

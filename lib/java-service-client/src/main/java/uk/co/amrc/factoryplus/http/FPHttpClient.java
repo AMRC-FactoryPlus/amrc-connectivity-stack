@@ -209,29 +209,35 @@ public class FPHttpClient {
             this.execute(new WsRequest(service, path)));
     }
 
+    private static String reqURI (SimpleHttpRequest req)
+    {
+        try { return req.getUri().toString(); }
+        catch (Throwable e) { return "???"; }
+    }
+
     public Single<SimpleHttpResponse> fetch (SimpleHttpRequest req)
     {
-        //FPThreadUtil.logId("fetch called");
+        log.info("[<[ Fetch: {}", reqURI(req));
         return Single.<SimpleHttpResponse>create(obs -> {
             //final var context = HttpCacheContext.create();
             async_client.execute(req, //context,
                 new FutureCallback<SimpleHttpResponse>() {
                     public void completed (SimpleHttpResponse res) {
                         //FPThreadUtil.logId("fetch success");
-                        String uri = "???";
-                        try { uri = req.getUri().toString(); }
-                        catch (Exception e) { }
                         //log.info("Cache {} ({}) for {}",
                         //    context.getCacheResponseStatus(), res.getCode(), uri);
+                        log.info("]>] {} {}", res.getCode(), reqURI(req));
                         obs.onSuccess(res);
                     }
 
                     public void failed (Exception ex) {
                         //FPThreadUtil.logId("fetch failure");
+                        log.info("]>] {} failed: {}", reqURI(req), ex.toString());
                         obs.onError(ex);
                     }
 
                     public void cancelled () {
+                        log.info("]>] {} cancelled", reqURI(req));
                         obs.onError(new Exception("HTTP future cancelled"));
                     }
                 });

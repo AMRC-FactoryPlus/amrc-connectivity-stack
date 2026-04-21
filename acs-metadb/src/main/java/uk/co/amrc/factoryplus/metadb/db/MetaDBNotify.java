@@ -40,6 +40,7 @@ public class MetaDBNotify
         notify = NotifyV2.builder(db.auth())
             .watch("v2/app/{app}/object/", this::appList)
             .search("v2/app/{app}/object/", this::appSearch)
+            .watch("v2/app/{app}/object/{object}", this::configWatch)
             .watch("v2/class/{class}/{relation}/", this::classRelation)
             .watch("v2/class/{class}/direct/{relation}/", this::classDirectRelation)
             .build();
@@ -55,10 +56,9 @@ public class MetaDBNotify
                 .build());
     }
 
-
     private record SubHandler (Session sess, Map<String, String> args)
     {
-        private static <T> Observable<Response<T>> invalid ()
+        public static <T> Observable<Response<T>> invalid ()
         {
             return Observable.just(Response.of(410));
         }
@@ -125,6 +125,20 @@ public class MetaDBNotify
                 .mapKeys(UUID::toString)
                 .mapValues(v -> v.toResponse())))
             .map(SearchUpdate::ofResponse);
+    }
+
+    private Observable<Response<JsonValue>> configWatch (
+        Session sess, Map<String, String> args)
+    {
+        log.info("configWatch: {}", args);
+        var sh = new SubHandler(sess, args);
+        return sh.findUUID("object")
+            .map(obj -> sh.fromUUID("app", data::appValues, Vocab.Perm.ReadApp)
+                .map(r -> r.flatMap(cs -> cs
+                    .get(obj)
+                    .map(v -> v.toResponse())
+                    .getOrElse(Response::empty))))
+            .getOrElse(SubHandler::invalid);
     }
 
     private Observable<Response<JsonValue>> classRelation (

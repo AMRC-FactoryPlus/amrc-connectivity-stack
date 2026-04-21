@@ -83,9 +83,9 @@ public class Vocab
         public static final UUID WriteSubclasses = U("ed11bd2a-50ef-11f0-9f85-df13a1dff9e6");
         public static final UUID WriteSuperclasses = U("fb8e5048-50ef-11f0-91c5-7fd3cb373fbb");
 
-        /* Unimplemented */
-        //public static final UUID ReadMemberships = U("db9f5dae-50ef-11f0-b846-8393c17d1574");
-        //public static final UUID ReadSuperclasses = U("f590e476-50ef-11f0-a120-e7c6d06d79ed");
+        /* Currently unused */
+        public static final UUID ReadMemberships = U("db9f5dae-50ef-11f0-b846-8393c17d1574");
+        public static final UUID ReadSuperclasses = U("f590e476-50ef-11f0-a120-e7c6d06d79ed");
 
         public static final UUID DeleteObj = U("6957174b-7b08-45ca-ac5c-c03ab6928a6e");
         public static final UUID GiveTo = U("4eaab346-4d1e-11f0-800e-dfdc061c6a63");

@@ -98,7 +98,8 @@ public class Dataflow
         select ?classU ?objU
         where {
             ?class <core/uuid> ?classU.
-            ?obj ?rel ?class; <core/uuid> ?objU.
+            graph ?graph { ?obj ?rel ?class. }
+            ?obj <core/uuid> ?objU.
         }
     """);
 
@@ -111,6 +112,7 @@ public class Dataflow
     private Set<UUID> _fetchRelation (Relation.Bound bound)
     {
         var rs = db.selectQuery(Q_relation, 
+            "graph",            bound.graph(),
             "rel",              bound.prop(),
             bound.selectVar(),  bound.literal());
         return Iterator.ofAll(rs)

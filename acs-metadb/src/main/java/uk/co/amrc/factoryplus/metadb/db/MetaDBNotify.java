@@ -4,6 +4,7 @@
  * Copyright 2026 University of Sheffield AMRC
  */
 
+/* XXX Should this be in api? */
 package uk.co.amrc.factoryplus.metadb.db;
 
 import java.util.UUID;
@@ -16,6 +17,7 @@ import org.slf4j.LoggerFactory;
 
 import io.reactivex.rxjava3.core.*;
 import io.vavr.collection.*;
+import io.vavr.control.*;
 
 import uk.co.amrc.factoryplus.client.*;
 import uk.co.amrc.factoryplus.notify.*;
@@ -39,6 +41,7 @@ public class MetaDBNotify
             .watch("v2/app/{app}/object/", this::appList)
             .search("v2/app/{app}/object/", this::appSearch)
             .watch("v2/class/{class}/{relation}/", this::classRelation)
+            .watch("v2/class/{class}/direct/{relation}/", this::classDirectRelation)
             .build();
     }
 
@@ -60,28 +63,39 @@ public class MetaDBNotify
             return Observable.just(Response.of(410));
         }
 
+        public Option<UUID> findUUID (String arg)
+        {
+            return args.get(arg)
+                .flatMap(Decoders::parseUUID);
+        }
+
         public <T> Observable<Response<T>> fromUUID (
             String arg,
             Function<UUID, Observable<T>> factory,
             UUID permission)
         {
-            return args.get(arg)
-                .flatMap(Decoders::parseUUID)
+            return findUUID(arg)
                 .map(uuid -> factory.apply(uuid)
-                    .map(Response::ok)
                     .compose(sess.applyACL(permission, uuid)))
                 .getOrElse(SubHandler::invalid);
         }
-        
-        public Observable<Response<JsonValue>> fromRelation (
-            String rarg, String oarg, boolean asClass,
-            Function<Relation.Bound, Observable<Set<UUID>>> factory)
+
+        public Option<Relation.Bound> bindRelation (
+            UUID uuid, String rarg, boolean asClass, boolean direct)
         {
             return args.get(rarg)
                 .flatMap(Relation::find)
-                .map(r -> fromUUID(oarg,
-                        u -> factory.apply(r.bind(u, asClass)),
-                        r.readClass())
+                .map(r -> r.bind(uuid, asClass, direct));
+        }
+        
+        public Observable<Response<JsonValue>> fromRelation (
+            String oarg, String rarg, boolean asClass, boolean direct,
+            Function<Relation.Bound, Observable<Set<UUID>>> factory)
+        {
+            return findUUID(oarg)
+                .flatMap(u -> bindRelation(u, rarg, asClass, direct))
+                .map(bound -> factory.apply(bound)
+                    .compose(sess.applyACL(bound.perm(), bound.uuid()))
                     .map(MetaDBNotify::setUpdate))
                 .getOrElse(SubHandler::invalid);
         }
@@ -116,8 +130,16 @@ public class MetaDBNotify
     private Observable<Response<JsonValue>> classRelation (
         Session sess, Map<String, String> args)
     {
-        log.info("classMembers: {}", args);
+        log.info("classRelation: {}", args);
         return new SubHandler(sess, args)
-            .fromRelation("relation", "class", true, data::relation);
+            .fromRelation("class", "relation", true, false, data::relation);
+    }
+
+    private Observable<Response<JsonValue>> classDirectRelation (
+            Session sess, Map<String, String> args)
+    {
+        log.info("classDirectRelation: {}", args);
+        return new SubHandler(sess, args)
+            .fromRelation("class", "relation", true, true, data::relation);
     }
 }

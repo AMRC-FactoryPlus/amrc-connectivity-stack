@@ -198,24 +198,29 @@ public class Session
 
     /** Apply ACLs to a notify sequence.
      * Returns a function which can be applied with .compose. This will
-     * replace the Responses in the source sequence with 403s whenever
-     * permission is not granted.
+     * wrap the values from the source seq with Responses, or return 403
+     * Responses whenever permission is not granted.
      */
-    public <T> ObservableTransformer<Response<T>, Response<T>> applyACL (
+    public <T> ObservableTransformer<T, Response<T>> applyACL (
         UUID permission, UUID target)
     {
-        log.info("Applying notify ACLs for {}", upn);
-        /* For root requests we must not contact the Auth service. */
-        if (isRoot) {
-            log.info("Principal {} is root, skipping ACLs", upn);
-            return src -> src;
-        }
+        return src -> {
+            log.info("Applying notify ACLs for {}", upn);
 
-        return src -> Observable.combineLatest(
-                src, watchACL(permission, target),
-                (val, ok) -> ok.flatMap(u -> val))
-            /* This stops extra 403s when permission is denied */
-            .distinctUntilChanged();
+            var resps = src.map(Response::ok);
+
+            /* For root requests we must not contact the Auth service. */
+            if (isRoot) {
+                log.info("Principal {} is root, skipping ACLs", upn);
+                return resps;
+            }
+
+            return Observable.combineLatest(
+                    resps, watchACL(permission, target),
+                    (val, ok) -> ok.flatMap(u -> val))
+                /* This stops extra 403s when permission is denied */
+                .distinctUntilChanged();
+        };
     }
 }
 

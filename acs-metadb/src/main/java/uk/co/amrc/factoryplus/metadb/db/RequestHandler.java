@@ -9,6 +9,7 @@ package uk.co.amrc.factoryplus.metadb.db;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 import jakarta.ws.rs.core.SecurityContext;
 
@@ -62,11 +63,21 @@ public class RequestHandler
     public void checkACL (UUID perm, UUID target)
     {
         log.info("Checking permission for {} / {}", perm, target);
-        var ok = db().fplus().auth()
+        var not = db().fplus().auth()
             .fetchPermitted(upn, perm, target)
-            /* This must throw on-thread as we will be within a txn. */
+            /* We must throw on-thread as we are in a txn. However
+             * .timout will pass us over to the computation thread, so
+             * we must materialise the result to avoid it being passed
+             * to the global error handler. */
+            .timeout(10, TimeUnit.SECONDS)
+            .materialize()
             .blockingGet();
-        if (!ok)
+
+        if (not.isOnError()) {
+            log.info("Error checking ACL", not.getError());
+            throw new SvcErr.Timeout();
+        }
+        if (!not.getValue())
             throw new SvcErr.Forbidden();
     }
 

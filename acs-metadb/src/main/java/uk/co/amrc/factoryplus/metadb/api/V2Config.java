@@ -64,7 +64,9 @@ public class V2Config {
     {
         log.info("Put config for {}/{}", app, obj);
         store.requestExecute(auth, req -> {
+            log.info("Put config: calling checkACL");
             req.checkACL(Vocab.Perm.WriteApp, app);
+            log.info("Put config: calling putValue");
             req.configEntry(app, obj).putValue(config);
         });
     }

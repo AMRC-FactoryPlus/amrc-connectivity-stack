@@ -95,30 +95,31 @@ public class RdfStore
         schemaTracker.start();
     }
 
-    private ConcurrentHashMap<String, Boolean> _txnrw = new ConcurrentHashMap<>();
+    //private ConcurrentHashMap<String, Boolean> _txnrw = new ConcurrentHashMap<>();
 
-    private void _txnlog (String msg)
+    private void _txnlog (String msg, boolean open, boolean rw)
     {
-        log.info("TXN: {} ({}): {}", 
-            msg, _txnrw.size(), Thread.currentThread().getName());
-        log.info("TXN: open: {}", _txnrw.toString());
+//        var name = Thread.currentThread().getName();
+//
+//        if (!open)
+//            _txnrw.remove(name);
+//        log.info("TXN: {} {} ({})", msg, rw, _txnrw.size());
+//        log.info("TXN: open: {}", _txnrw.toString());
+//        if (open)
+//            _txnrw.put(name, rw);
     }
 
     private <T> T _txn (boolean rw, Supplier<T> supp)
     {
-        var name = Thread.currentThread().getName();
         try {
-            _txnlog("BEGIN");
-            _txnrw.put(name, rw);
+            _txnlog("BEGIN", true, rw);
             var rv = supp.get();
-            _txnrw.remove(name);
-            _txnlog("COMMIT");
+            _txnlog("COMMIT", false, rw);
 
             return rv;
         }
         catch (Throwable e) {
-            _txnrw.remove(name);
-            _txnlog("ABORT");
+            _txnlog("ABORT", false, rw);
             throw e;
         }
     }
@@ -168,15 +169,13 @@ public class RdfStore
      */
     public <T> T requestWrite (SecurityContext ctx, Function<RequestHandler, T> cb)
     {
-        var thr = Thread.currentThread().getName();
         var req = new RequestHandler(this, ctx)
             .start();
         var listener = new ModelUpdate();
         T rv;
 
         try {
-            _txnlog("BEGIN");
-            _txnrw.put(thr, true);
+            _txnlog("BEGIN", true, true);
             dataset.begin(ReadWrite.WRITE);
             direct.register(listener);
             rv = cb.apply(req);
@@ -184,14 +183,12 @@ public class RdfStore
              * the domains. This could be optimised by using the
              * change-notify information collected up to this point. */
             req.appUpdater().update();
-            _txnrw.remove(thr);
-            _txnlog("COMMIT");
+            _txnlog("COMMIT", false, true);
             dataset.commit();
         }
         catch (Throwable e) {
             dataset.abort();
-            _txnrw.remove(thr);
-            _txnlog("ABORT");
+            _txnlog("ABORT", false, true);
             throw e;
         }
         finally {

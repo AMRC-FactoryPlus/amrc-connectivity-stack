@@ -27,8 +27,10 @@ import org.slf4j.LoggerFactory;
 /* Note we have Java Sets but Vavr Maps and Lists */
 import io.vavr.collection.List;
 import io.vavr.collection.HashMap;
+import io.vavr.control.Option;
 
-import uk.co.amrc.factoryplus.client.*;
+import uk.co.amrc.factoryplus.client.FPServiceClient;
+import uk.co.amrc.factoryplus.client.FPAuth.Grant;
 import uk.co.amrc.factoryplus.providers.*;
 import uk.co.amrc.factoryplus.metadb.db.*;
 
@@ -63,18 +65,23 @@ public final class Main {
     private FPServiceClient createServiceClient ()
     {
         var fplus = new FPServiceClient();
-        fplus.getOptionConf("auth_principal")
-            .peek(auth -> {
-                var acl = List.of(
-                    new FPAuth.Grant(Vocab.Perm.ReadApp, Vocab.Target.Registration),
-                    /* XXX I'm not sure why this is needed? */
-                    new FPAuth.Grant(Vocab.Perm.ReadApp, Vocab.Target.SparkplugAddr),
-                    /* XXX These are broader than strictly necessary. */
-                    new FPAuth.Grant(Vocab.Perm.ReadMembers, Vocab.Target.Wildcard),
-                    new FPAuth.Grant(Vocab.Perm.ReadSubclasses, Vocab.Target.Wildcard));
-                log.info("Setting Auth bootstrap ACL for {} to {}", auth, acl);
-                fplus.auth().setBootstrapACLs(HashMap.of(auth, acl));
-            });
+        
+        var acls = HashMap.of(
+            "auth_principal", List.of(
+                new Grant(Vocab.Perm.ReadApp, Vocab.Target.Registration),
+                /* XXX I'm not sure why this is needed? */
+                new Grant(Vocab.Perm.ReadApp, Vocab.Target.SparkplugAddr),
+                /* XXX These are broader than strictly necessary. */
+                new Grant(Vocab.Perm.ReadMembers, Vocab.Target.Wildcard),
+                new Grant(Vocab.Perm.ReadSubclasses, Vocab.Target.Wildcard)));
+
+        var resolved = acls
+            .mapKeys(fplus::getOptionConf)
+            .filterKeys(Option::isDefined)
+            .mapKeys(Option::get);
+
+        log.info("Setting bootstrap ACLs to {}", resolved);
+        fplus.auth().setBootstrapACLs(resolved);
 
         return fplus;
     }

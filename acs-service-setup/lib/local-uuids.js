@@ -129,6 +129,8 @@ class LocalUUIDs {
             ["Role", Auth.Class.EdgeRole,
                 "EdgeAgent", "EdgeFlux", "EdgeKrbkeys", "EdgeMonitor", "EdgeSync",
                 "UNSBridge", "OPCUAServer"],
+            ["Account", Auth.Class.CentralService,
+                "MetaDB"],
         );
 
         await this.put_conf(ServiceConfig, this.local);

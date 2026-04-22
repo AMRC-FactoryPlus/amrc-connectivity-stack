@@ -8,46 +8,60 @@ objects:
   !u ConfigDB.Class.R2Class:
     !u Auth.Class.PrincipalGroup:
       name: "Principal group"
+      iri: authn/Principal
     !u Auth.Class.PrincipalType:
       name: "Principal type"
+      iri: authn/PrincipalType
       subclassOf:
         - !u Auth.Class.PrincipalGroup
     !u Auth.Class.Role:
       name: "Role"
+      iri: authn/Role
       subclassOf:
         - !u Auth.Class.PrincipalGroup
     !u Auth.Class.EdgeRole:
       name: "Edge role"
+      iri: authn/EdgeRole
       subclassOf:
         - !u Auth.Class.Role
     !u Git.Class.Group:
         name: "Git repository group"
+        iri: git/RepoGroup
 
   !u ConfigDB.Class.R1Class:
+    !u UUIDs.Class.Service:
+      name: "F+ service function"
+      iri: service/Service
     !u Auth.Class.Principal:
       name: "Principal"
+      iri: authn/Principal
       memberOf:
         - !u Auth.Class.PrincipalGroup
     !u Clusters.Class.HelmChart:
       name: "Helm chart"
+      iri: edge/HelmChart
     !u Clusters.Class.SystemHelmChart:
       name: "System Helm chart"
+      iri: edge/SystemHelmChart
       subclassOf:
         - !u Clusters.Class.HelmChart
     !u Git.Class.Repo:
       name: "Git repository"
+      iri: git/Repo
       memberOf:
         - !u Git.Class.Group
 
   !u Auth.Class.PrincipalType:
     !u Auth.Class.CentralService:
       name: "Central service"
+      iri: authn/PrincipalType
       subclassOf:
         - !u Auth.Class.Principal
 
   !u UUIDs.Class.App:
     !u UUIDs.App.ServiceConfig:
       name: "Service setup"
+      iri: app/ServiceConfig
 
   # Register all the service function UUIDs here, it's simpler.
   # XXX I think these should be classes, with the service accounts
@@ -59,12 +73,28 @@ objects:
   # service interface. The only other possibility I can see is that
   # these service function UUIDs are names of some kind.
   !u UUIDs.Class.Service:
-    !u UUIDs.Service.Directory:           { name: "Directory" }
-    !u UUIDs.Service.ConfigDB:            { name: "ConfigDB" }
-    !u UUIDs.Service.Authentication:      { name: "Authentication" }
-    !u UUIDs.Service.Command_Escalation:  { name: "Command escalation" }
-    !u UUIDs.Service.MQTT:                { name: "MQTT" }
-    !u UUIDs.Service.Git:                 { name: "Git hosting" }
-    !u UUIDs.Service.Clusters:            { name: "Cluster manager" }
-    !u ACS.Service.Manager:               { name: "Factory+ Manager" }
+    !u UUIDs.Service.Directory:
+        name: "Directory"
+        iri: service/Directory
+    !u UUIDs.Service.ConfigDB:
+        name: "ConfigDB"
+        iri: service/ConfigDB
+    !u UUIDs.Service.Authentication:
+        name: "Authentication"
+        iri: service/Auth
+    !u UUIDs.Service.Command_Escalation:
+        name: "Command escalation"
+        iri: service/CmdEsc
+    !u UUIDs.Service.MQTT:
+        name: "MQTT"
+        iri: service/MQTT
+    !u UUIDs.Service.Git:
+        name: "Git hosting"
+        iri: service/Git
+    !u UUIDs.Service.Clusters:
+        name: "Cluster manager"
+        iri: service/Clusters
+    !u ACS.Service.Manager:
+        name: "Factory+ Manager"
+        iri: service/Manager
 

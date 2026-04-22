@@ -6,20 +6,24 @@ objects:
   !u ConfigDB.Class.R2Class:
     !u Clusters.Class.ClusterGroups:
       name: "Clusters-managed group"
+      iri: clusters/ClusterGroups
 
   !u Auth.Class.ServiceRole:
     !u Clusters.Requirement.ServiceAccount:
       name: "Cluster manager"
+      iri: clusters/ServiceAccount
       subclassOf:
         - !u Auth.Class.CentralService
   !u Auth.Class.ServicePerms:
     !u Clusters.Perm.All:
       name: "Cluster manager permission"
+      iri: cluster/perm/All
       subclassOf:
         - !u UUIDs.Class.Permission
   !u Auth.Class.EdgeRole:
     !u Local.Role.EdgeFlux:
       name: "Edge flux"
+      iri: local/role/EdgeFlux
       memberOf:
         - !u Auth.Class.EdgeRole
         - !u Clusters.Class.ClusterGroups
@@ -27,6 +31,7 @@ objects:
         - !u Auth.Class.EdgeService
     !u Local.Role.EdgeKrbkeys:
       name: "Edge krbkeys"
+      iri: local/role/EdgeKrbkeys
       memberOf:
         - !u Auth.Class.EdgeRole
         - !u Clusters.Class.ClusterGroups
@@ -42,10 +47,12 @@ objects:
         - !u Git.Class.Repo
     !u Local.RepoGroup.Shared:
       name: "Shared repo"
+      iri: local/git/SharedRepo
       subclassOf:
         - !u Git.Class.Repo
     !u Local.RepoGroup.Cluster:
       name: "Edge cluster repo"
+      iri: local/git/ClusterRepo
       memberOf:
         - !u Git.Class.Group
         - !u Clusters.Class.ClusterGroups
@@ -53,23 +60,38 @@ objects:
         - !u Git.Class.Repo
 
   !u ConfigDB.Class.R1Class:
-    !u Clusters.Class.Cluster: { name: "Edge cluster" }
+    !u Clusters.Class.Cluster:
+        name: "Edge cluster"
+        iri: edge/Cluster
 
   !u UUIDs.Class.App:
-    !u Clusters.App.Bootstrap:      { name: "Bootstrap script" }
-    !u Clusters.App.Cluster: { name: "Edge cluster configuration" }
-    !u Clusters.App.Flux:           { name: "Flux template" }
-    !u Clusters.App.HelmChart: { name: "Helm chart template" }
-    !u Clusters.App.Status: { name: "Edge cluster setup status" }
-  !u UUIDs.Class.Service:
-    !u Clusters.Service.ClusterManager: { name: "Cluster manager" }
+    !u Clusters.App.Bootstrap:
+        name: "Bootstrap script"
+        iri: app/BootstrapScript
+    !u Clusters.App.Cluster:
+        name: "Edge cluster configuration"
+        iri: app/EdgeClusterConfig
+    !u Clusters.App.Flux:
+        name: "Flux template"
+        iri: app/FluxTemplate
+    !u Clusters.App.HelmChart:
+        name: "Helm chart template"
+        iri: app/HelmChartTemplate
+    !u Clusters.App.Status:
+        name: "Edge cluster setup status"
+        iri: app/ClusterSetupStatus
   !u Clusters.Perm.All:
-    !u Clusters.Perm.Clusters: { name: "Manage clusters" }
-    !u Clusters.Perm.Secrets: { name: "Manage secrets" }
+    !u Clusters.Perm.Clusters:
+        name: "Manage clusters"
+        iri: clusters/perm/ManageClusters
+    !u Clusters.Perm.Secrets:
+        name: "Manage secrets"
+        iri: clusters/perm/ManageSecrets
 
   !u Local.RepoGroup.Shared:
     !u Local.Repo.HelmCharts:
       name: "Edge Helm charts"
+      iri: local/git/EdgeHelmCharts
 
 configs:
   !u Git.App.Config:

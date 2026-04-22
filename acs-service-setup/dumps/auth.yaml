@@ -17,6 +17,7 @@ objects:
     #    - !u Auth.Class.PrincipalGroup
     !u Auth.Class.ServiceRole:
       name: "Service role"
+      iri: authn/ServiceRole
       subclassOf:
         - !u Auth.Class.Role
     #!u Auth.Class.EdgeRole:
@@ -25,17 +26,21 @@ objects:
     #    - !u Auth.Class.Role
     !u Auth.Class.ClientRole:
       name: "Client role"
+      iri: authn/ClientRole
       subclassOf:
         - !u Auth.Class.Role
 
     !u Auth.Class.PermissionGroup: 
       name: "Permission group"
+      iri: authz/PermissionGroup
     !u Auth.Class.ServicePerms:
       name: "Service permission set"
+      iri: authz/ServicePerms
       subclassOf:
         - !u Auth.Class.PermissionGroup
     !u Auth.Class.CompositePerm:
       name: "Composite permission"
+      iri: authz/CompositePerm
       subclassOf:
         - !u Auth.Class.PermissionGroup
 
@@ -46,12 +51,14 @@ objects:
     #    - !u Auth.Class.PrincipalGroup
     !u UUIDs.Class.Permission:
       name: "Permission"
+      iri: authz/Permission
       memberOf:
         - !u Auth.Class.PermissionGroup
 
   !u Auth.Class.PrincipalType:
     !u Auth.Class.HumanUser:
       name: "Human user"
+      iri: authn/HumanUser
       subclassOf:
         - !u Auth.Class.Principal
     #!u Auth.Class.CentralService:
@@ -60,36 +67,45 @@ objects:
     #    - !u Auth.Class.Principal
     !u Auth.Class.EdgeService:
       name: "Edge service"
+      iri: authn/EdgeService
       subclassOf:
         - !u Auth.Class.Principal
+    # Should these be a dedicated PrincipalType?
     !u Auth.Class.EdgeAgent:
       name: "Edge Agent"
+      iri: authn/EdgeAgent
       subclassOf:
         - !u Auth.Class.Principal
     !u Auth.Class.AppAccount:
       name: "Application account"
+      iri: authn/Application
       subclassOf:
         - !u Auth.Class.Principal
     !u Auth.Class.SpecialAccount:
       name: "Special account"
+      iri: authn/Special
       subclassOf:
         - !u Auth.Class.Principal
 
   !u Auth.Class.ServicePerms:
     !u ACS.PermGroup.Auth:
       name: "Auth permission"
+      iri: auth/perm/All
       subclassOf:
         - !u UUIDs.Class.Permission
     !u ACS.PermGroup.CmdEsc:
       name: "CmdEsc permission"
+      iri: cmdesc/perm/All
       subclassOf:
         - !u UUIDs.Class.Permission
     !u ACS.PermGroup.ConfigDB:
       name: "ConfigDB permission"
+      iri: configdb/perm/All
       subclassOf:
         - !u UUIDs.Class.Permission
     # Directory in directory.yaml
     !u ACS.PermGroup.MQTT:
       name: "MQTT permission"
+      iri: mqtt/perm/All
       subclassOf:
         - !u UUIDs.Class.Permission

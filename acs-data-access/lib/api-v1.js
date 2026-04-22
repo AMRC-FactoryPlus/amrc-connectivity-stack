@@ -104,7 +104,7 @@ export class APIv1 {
                     * parts {array} - Subset datasets - contains UUIDs of all subclasses of dataset the client has READ access to.
     * Don't return valid response if dataset is invalid
    */
-  async metadata_uuid(req, res){
+  async metadata_uuid(req, res){    
     const dataset_uuid  = req.params.uuid;
     if (!valid_uuid(dataset_uuid)) fail(410);
 
@@ -125,13 +125,26 @@ export class APIv1 {
     const info = infos.get(dataset_uuid);
     if(!info) return fail(404);
 
-   const f_types = await rx.firstValueFrom(this.data.get_functional_types());
-   const f_type = f_types.get(dataset_uuid);
+    const f_types = await rx.firstValueFrom(this.data.get_functional_types());
+    const f_type = f_types.get(dataset_uuid);
+
+    const all_metadata = await rx.firstValueFrom(this.data.get_metadata());
+    const metadata = all_metadata.get(dataset_uuid); 
+
+    /**
+      * If queried dataset is session -> only use its from and to?
+      */
+    const from = null;
+    const to = null;
 
     const meta = {
       uuid: dataset_uuid,
       name: info.name,
-      function: f_type
+      from: from ? from : undefined,
+      to: to ? to : undefined,
+      function: f_type,
+      metadata: metadata,
+      parts: []
     }
     return res.status(200).json(meta);
   }
@@ -169,17 +182,17 @@ export class APIv1 {
    */
 
   async _check_second_level_permission(principal, structure, config, permission){
-    if(structure == Constants.App.SessionLimits){
-      
+    if(structure == Constants.App.SessionLimits || structure == Constants.App.SparkplugSrc){
+      this.log(`second level ACL check for structure ${structure} and config ${config}`);
       const target = config.source;
       if(!target) return fail(422);
 
       const ok = await this.auth.check_acl(
-          principal, 
-          permission,
-          target,
-          true
-        );
+        principal, 
+        permission,
+        target,
+        true
+      );
       
       return ok; 
       
@@ -197,22 +210,10 @@ export class APIv1 {
       }
       return true;
 
-    }else if( structure == Constants.App.SparkplugSrc){
-      
-      const target = config.source;
-      if(!target) return fail(422);
-
-      const ok = await this.auth.check_acl(
-          principal, 
-          permission,
-          target,
-          true
-        );
-
-      return ok; 
     }else{
       // Unhandled Structure type
-      return fail(500);
+      this.log("Unhandled Structure type")
+      return false;
     }
   }
 
@@ -353,9 +354,6 @@ export class APIv1 {
     const dataset_uuid = req.params.uuid;
     if (!valid_uuid(dataset_uuid)) return fail(410);
 
-    const dataset_def = await this._get_dataset_def_by_uuid(dataset_uuid);
-    if (!dataset_def) return fail(404);
-
     const ok = await this.auth.check_acl(
       req.auth,
       Constants.Perm.ReadDataset,
@@ -364,13 +362,13 @@ export class APIv1 {
     );
     if (!ok) return fail(403);
 
-    const structure = dataset_def.structure;
-    const config = dataset_def.config;
+    const dataset_def = await this._get_dataset_def_by_uuid(dataset_uuid);
+    if (!dataset_def) return fail(404);
 
-    const ok2 = this._check_second_level_permission(
+    const ok2 = await this._check_second_level_permission(
       req.auth,
-      structure,
-      config,
+      dataset_def?.structure,
+      dataset_def?.config,
       Constants.Perm.ReadDataset
     );
     if (!ok2) return fail(403);
@@ -385,7 +383,7 @@ export class APIv1 {
       return res.status(200).send(csv);
 
     } catch (err) {
-      console.error(err);
+      this.log(err);
       return fail(500);
     }
   }

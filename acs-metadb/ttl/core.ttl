@@ -258,9 +258,10 @@
     :uuid "11614546-b6d7-11ef-aebd-8fbb45451d7c";
     :name "Principal".
 <authn/PrincipalGroup> a :R2Class; :primary :R2Class;
-    rdfs:subClassOf :R1Class; :powersetOf :Principal;
+    rdfs:subClassOf :R1Class; :powersetOf <authn/Principal>;
     :uuid "c0157038-ccff-11ef-a4db-63c6212e998f";
     :name "Principal group".
+
 <authn/PrincipalType> a :R2Class; :primary :R2Class;
     rdfs:subClassOf <authn/PrincipalGroup>;
     :uuid "ae17afe0-ccff-11ef-bb70-67807cb4a9df";
@@ -269,11 +270,141 @@
     rdfs:subClassOf <authn/Principal>;
     :uuid "e463b4ae-a322-46cc-8976-4ba76838e908";
     :name "Central service".
+<authn/HumanUser> a <authn/PrincipalType>; :primary <authn/PrincipalType>;
+    rdfs:subClassOf <authn/Principal>;
+    :uuid "8b3e8f35-78e5-4f93-bf21-7238bcb2ba9d";
+    :name "Human user".
 
-<authn/ConfigDB> a <authn/CentralService>, <sparkplug/Entity>, <service/Provider>;
+<authn/Role> a :R2Class; :primary :R2Class;
+    rdfs:subClassOf <authn/PrincipalGroup>;
+    :uuid "f1fabdd1-de90-4399-b3da-ccf6c2b2c08b";
+    :name "Role".
+<authn/ServiceRole> a :R2Class; :primary :R2Class;
+    rdfs:subClassOf <authn/Role>;
+    :uuid "b419cbc2-ab0f-4311-bd9e-f0591f7e88cb";
+    :name "Service role".
+<authn/EdgeRole> a :R2Class; :primary :R2Class;
+    rdfs:subClassOf <authn/Role>;
+    :uuid "3ba1d68e-ccf5-11ef-82d9-ef32470538b1";
+    :name "Edge role".
+<authn/ClientRole> a :R2Class; :primary :R2Class;
+    rdfs:subClassOf <authn/Role>;
+    :uuid "b2053a3e-bdf8-11ef-9423-771a19e4a8a4";
+    :name "Client role".
+:Administrator a <authn/ClientRole>; :primary <authn/ClientRole>;
+    :uuid "10fc06b7-02f5-45f1-b419-a486b6bc13ba";
+    :name "Administrator".
+
+# This should be R2, a Permission is a set of Grants
+<authz/Permission> a :R1Class; :primary :R1Class;
+    rdfs:subClassOf :Individual;
+    :uuid "8ae784bb-c4b5-4995-9bf6-799b3c7f21ad";
+    :name "Permission".
+<authz/PermissionGroup> a :R2Class; :primary :R2Class;
+    rdfs:subClassOf :R1Class; :powersetOf <authz/Permission>;
+    :uuid "ac0d5288-6136-4ced-a372-325fbbcdd70d";
+    :name "Permission group".
+<authz/ServicePerms> a :R2Class; :primary :R2Class;
+    rdfs:subClassOf <authz/PermissionGroup>;
+    :uuid "c43c7157-a50b-4d2a-ac1a-86ff8e8e88c1";
+    :name "Service permission set".
+
+<auth/perm/All> a <authz/ServicePerms>; :primary <authz/ServicePerms>;
+    rdfs:subClassOf <authz/Permission>;
+    :uuid "50b727d4-3faa-40dc-b347-01c99a226c58";
+    :name "Auth permissions".
+<auth/perm/ManageKerberos> a <auth/perm/All>; :primary <auth/perm/All>;
+    :uuid "327c4cc8-9c46-4e1e-bb6b-257ace37b0f6";
+    :name "ManageKerberos".
+<auth/perm/ReadEffective> a <auth/perm/All>; :primary <auth/perm/All>;
+    :uuid "35252562-51e5-4dd8-84cd-ba0fafa62669";
+    :name "ReadEffective".
+<auth/perm/ManageACL> a <auth/perm/All>; :primary <auth/perm/All>;
+    :uuid "3a41f5ce-fc08-4669-9762-ec9e71061168";
+    :name "ManageACL".
+<auth/perm/ReadACL> a <auth/perm/All>; :primary <auth/perm/All>;
+    :uuid "ba566181-0e8a-405b-b16e-3fb89130fbee";
+    :name "ReadACL".
+<auth/perm/ManageGroup> a <auth/perm/All>; :primary <auth/perm/All>;
+    :uuid "be9b6d47-c845-49b2-b9d5-d87b83f11c3b";
+    :name "ManageGroup".
+<auth/perm/ReadKerberos> a <auth/perm/All>; :primary <auth/perm/All>;
+    :uuid "e8c9c0f7-0d54-4db2-b8d6-cd80c45f6a5c";
+    :name "ReadKerberos".
+
+<configdb/perm/All> a <authz/ServicePerms>; :primary <authz/ServicePerms>;
+    rdfs:subClassOf <authz/Permission>;
+    :uuid "c43c7157-a50b-4d2a-ac1a-86ff8e8e88c1";
+    :name "ConfigDB permissions".
+<configdb/perm/ReadConfig> a <configdb/perm/All>; :primary <config/perm/All>;
+    :uuid "4a339562-cd57-408d-9d1a-6529a383ea4b";
+    :name "ReadConfig".
+<configdb/perm/WriteConfig> a <configdb/perm/All>; :primary <config/perm/All>;
+    :uuid "6c799ccb-d2ad-4715-a2a7-3c8728d6c0bf";
+    :name "WriteConfig".
+<configdb/perm/ListObjects> a <configdb/perm/All>; :primary <config/perm/All>;
+    :uuid "6b4d73ea-50f1-11f0-9333-132037a152a5";
+    :name "ListObjects".
+<configdb/perm/CreateObject> a <configdb/perm/All>; :primary <config/perm/All>;
+    :uuid "ae09e2ba-50ef-11f0-ac03-1f9f5e6548be";
+    :name "CreateObject".
+<configdb/perm/CreateSpecificObject> a <configdb/perm/All>; :primary <config/perm/All>;
+    :uuid "e3491b9c-50f1-11f0-8e16-e75c8f93227b";
+    :name "CreateSpecificObject".
+<configdb/perm/ReadMembers> a <configdb/perm/All>; :primary <config/perm/All>;
+    :uuid "d4fd61da-50ef-11f0-ad24-335234e4c8a2";
+    :name "ReadMembers".
+<configdb/perm/WriteMembers> a <configdb/perm/All>; :primary <config/perm/All>;
+    :uuid "c2759f6e-50ef-11f0-8730-ef0ba0514a0e";
+    :name "WriteMembers".
+<configdb/perm/WriteMemberships> a <configdb/perm/All>; :primary <config/perm/All>;
+    :uuid "e08d89bc-50ef-11f0-8352-83e3d3d35028";
+    :name "WriteMemberships".
+<configdb/perm/ReadSubclasses> a <configdb/perm/All>; :primary <config/perm/All>;
+    :uuid "e6bb9978-50ef-11f0-b3c2-b79b9f64d2ff";
+    :name "ReadSubclasses".
+<configdb/perm/WriteSubclasses> a <configdb/perm/All>; :primary <config/perm/All>;
+    :uuid "ed11bd2a-50ef-11f0-9f85-df13a1dff9e6";
+    :name "WriteSubclasses".
+<configdb/perm/WriteSuperclasses> a <configdb/perm/All>; :primary <config/perm/All>;
+    :uuid "fb8e5048-50ef-11f0-91c5-7fd3cb373fbb";
+    :name "WriteSuperclasses".
+<configdb/perm/ReadMemberships> a <configdb/perm/All>; :primary <config/perm/All>;
+    :uuid "db9f5dae-50ef-11f0-b846-8393c17d1574";
+    :name "ReadMemberships".
+<configdb/perm/ReadSuperclasses> a <configdb/perm/All>; :primary <config/perm/All>;
+    :uuid "f590e476-50ef-11f0-a120-e7c6d06d79ed";
+    :name "ReadSuperclasses".
+<configdb/perm/DeleteObject> a <configdb/perm/All>; :primary <config/perm/All>;
+    :uuid "6957174b-7b08-45ca-ac5c-c03ab6928a6e";
+    :name "DeleteObject".
+<configdb/perm/GiveTo> a <configdb/perm/All>; :primary <config/perm/All>;
+    :uuid "4eaab346-4d1e-11f0-800e-dfdc061c6a63";
+    :name "GiveTo".
+<configdb/perm/TakeFrom> a <configdb/perm/All>; :primary <config/perm/All>;
+    :uuid "6ad67652-5009-11f0-9404-73b79124c3d5";
+    :name "TakeFrom".
+
+<configdb/Account> a <authn/CentralService>, <sparkplug/Entity>, <service/Provider>;
     :primary <authn/CentralService>;
     :uuid "36861e8d-9152-40c4-8f08-f51c2d7e3c25";
     :name "ConfigDB";
     <service/provides> <service/ConfigDB>;
     <sparkplug/groupId> "AMRC-Service-Core";
     <sparkplug/nodeId> "ConfigDB".
+
+<metadb/perm/All> a <authz/ServicePerms>; :primary <authz/ServicePerms>;
+    rdfs:subClassOf <authz/Permission>;
+    :uuid "395756ce-3739-11f1-a752-338301d8dd19";
+    :name "MetaDB permissions".
+<metadb/perm/ReadRDF> a <metadb/perm/All>; :primary <metadb/perm/All>;
+    :uuid "d2b89414-3738-11f1-86d5-573f5f0cb628";
+    :name "Read RDF".
+<metadb/perm/WriteRDF> a <metadb/perm/All>; :primary <metadb/perm/All>;
+    :uuid "d92c30f8-3738-11f1-8daa-33e4253b6bac";
+    :name "Write RDF".
+
+<metadb/ServiceRole> a <authn/ServiceRole>; :primary <authn/ServiceRole>;
+    rdfs:subClassOf <authn/CentralService>;
+    :uuid "bf59ab10-3738-11f1-894f-cb07fd5bf02f";
+    :name "MetaDB".

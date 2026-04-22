@@ -52,6 +52,32 @@ public class FPAuth {
         }
     }
 
+    /** Allows checking for a particular permission */
+    public interface Checker
+    {
+        /** Check if a permission is granted.
+         * This will always allow a wildcard target.
+         */
+        boolean check (UUID perm, UUID targ);
+
+        record ACL (List<Grant> acl) implements Checker
+        {
+            public boolean check (UUID perm, UUID targ)
+            {
+                return acl.exists(
+                    g -> g.permission.equals(perm) &&
+                        (g.target.equals(targ) || g.target.equals(FPUuid.Null)));
+            }
+        }
+
+        /** A Checker which always succeeds. */
+        static final Checker PASS = (p, t) -> true;
+        /** A Checker which always fails. */
+        static final Checker FAIL = (p, t) -> false;
+        /** A Checker based on a list of Grants. */
+        static Checker ofACL (List<Grant> acl) { return new ACL(acl); }
+    }
+
     private FPServiceClient fplus;
     private FPNotifyV2 notify;
 
@@ -166,6 +192,35 @@ public class FPAuth {
                     .map(Grant::fromJSON)));
     }
 
+    /** Map the ACL for a principal to a Checker.
+     * Where the Auth service will not respond a failure Response will
+     * be emitted.
+     */
+    public Observable<Response<Checker>> watchChecker (String upn)
+    {
+        if (isRoot(upn))
+            return fixedResponse(Checker.PASS);
+
+        return watchACL(upn)
+            .map(res -> res.map(Checker::ofACL));
+    }
+
+    /** Fetch a Checker for a principal.
+     * The Single will emit an error if the Auth service can't be
+     * contacted. A timeout of 10s is applied if the Auth service does
+     * not respond.
+     */
+    public Single<Checker> fetchChecker (String upn)
+    {
+        return watchChecker(upn)
+            .firstElement()
+            .flatMap(r -> r.toMaybe(st ->
+                new FPServiceException(SERVICE, st, "Fetching ACL")))
+            .switchIfEmpty(Single.just(Checker.FAIL))
+            .timeout(10, TimeUnit.SECONDS, Single.error(
+                () -> new FPServiceException(SERVICE, 502, "Timeout fetching ACL")));
+    }
+
     /** Watch a specific permission check.
      * This handles wildcard matches.
      * @param upn The Kerberos UPN.
@@ -174,28 +229,7 @@ public class FPAuth {
      */
     public Observable<Response<Boolean>> watchPermitted (String upn, UUID perm, UUID targ)
     {
-        if (isRoot(upn))
-            return fixedResponse(true);
-
-        return watchACL(upn)
-            .map(res -> res
-                .map(gs -> gs.exists(
-                    g -> g.permission.equals(perm) &&
-                        (g.target.equals(targ) || g.target.equals(FPUuid.Null)))));
-    }
-
-    /** Check a specific permission.
-     * The Single will emit an error if the Auth service can't be
-     * contacted.
-     */
-    public Single<Boolean> fetchPermitted (String upn, UUID perm, UUID targ)
-    {
-        return watchPermitted(upn, perm, targ)
-            .firstElement()
-            .flatMap(r -> r.toMaybe(st ->
-                new FPServiceException(SERVICE, st, "Fetching ACL")))
-            .switchIfEmpty(Single.just(false))
-            .timeout(10, TimeUnit.SECONDS, Single.error(
-                () -> new FPServiceException(SERVICE, 502, "Timeout fetching ACL")));
+        return watchChecker(upn)
+            .map(r -> r.map(c -> c.check(perm, targ)));
     }
 }

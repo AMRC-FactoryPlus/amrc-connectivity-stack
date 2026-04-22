@@ -44,7 +44,7 @@ public class AuthFilter implements ContainerRequestFilter, ContainerResponseFilt
          * exception coming from the Single. Otherwise the request
          * processing will continue before auth has been checked. */
         var ctx = provider.authenticate(auth)
-            .doOnError(e -> log.info("Auth failed", e))
+            .doOnError(e -> log.info("Auth failed: {}", e.toString()))
             .blockingGet();
 
         req.setSecurityContext(ctx);

@@ -20,6 +20,7 @@ import org.slf4j.LoggerFactory;
 
 import io.vavr.Lazy;
 
+import uk.co.amrc.factoryplus.client.FPAuth;
 import uk.co.amrc.factoryplus.service.*;
 
 /* Eventually these objects will need to be associated with a txn, and a
@@ -47,6 +48,9 @@ public class RequestHandler
     private Lazy<Resource> now;
     private String upn;
 
+    /* Initialised by start() */
+    private FPAuth.Checker checker;
+
     public RequestHandler (RdfStore db, SecurityContext ctx)
     {
         this.db = db;
@@ -60,15 +64,24 @@ public class RequestHandler
     public Resource getInstant () { return now.get(); }
     public String upn () { return upn; }
 
+    /* This will throw if we can't contact the Auth service. It's
+     * important this throws on-thread as we need to abort the current
+     * HTTP request. It's also important we fetch this before the txn
+     * starts to avoid attempting external network access with a txn
+     * open. */
+    public RequestHandler start ()
+    {
+        log.info("Fetching ACL for {}", upn);
+        checker = db().fplus().auth()
+            .fetchChecker(upn)
+            .blockingGet();
+        return this;
+    }
+
     public void checkACL (UUID perm, UUID target)
     {
         log.info("Checking permission for {} / {}", perm, target);
-        var ok = db().fplus().auth()
-            .fetchPermitted(upn, perm, target)
-            /* We must throw on-thread as we are in a txn. */
-            .blockingGet();
-
-        if (!ok)
+        if (!checker.check(perm, target))
             throw new SvcErr.Forbidden();
     }
 

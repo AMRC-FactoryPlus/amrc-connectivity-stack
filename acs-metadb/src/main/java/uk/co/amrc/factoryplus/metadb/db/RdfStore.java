@@ -139,7 +139,8 @@ public class RdfStore
 
     public <T> T requestRead (SecurityContext ctx, Function<RequestHandler, T> cb)
     {
-        return calculateRead(() -> cb.apply(new RequestHandler(this, ctx)));
+        var req = new RequestHandler(this, ctx).start();
+        return calculateRead(() -> cb.apply(req));
     }
 
     /* Jena ModelChangedListeners do not appear to respect inference
@@ -168,7 +169,8 @@ public class RdfStore
     public <T> T requestWrite (SecurityContext ctx, Function<RequestHandler, T> cb)
     {
         var thr = Thread.currentThread().getName();
-        var req = new RequestHandler(this, ctx);
+        var req = new RequestHandler(this, ctx)
+            .start();
         var listener = new ModelUpdate();
         T rv;
 

@@ -95,14 +95,6 @@ public final class Main {
             }
         };
 
-        var v2app = new ResourceConfig()
-            .property(ServerProperties.PROCESSING_RESPONSE_ERRORS_ENABLED, true)
-            .packages("uk.co.amrc.factoryplus.providers")
-            .packages("uk.co.amrc.factoryplus.metadb.api")
-            .register(bindings);
-        var v2api = new ContextHandler(
-            ContainerFactory.createContainer(Handler.class, v2app), "/v2");
-
         var notify = model.metaNotify()
             .notifyV2()
             .contextHandlerFor(server);
@@ -111,12 +103,12 @@ public final class Main {
             .property(ServerProperties.PROCESSING_RESPONSE_ERRORS_ENABLED, true)
             .packages("uk.co.amrc.factoryplus.providers")
             .packages("uk.co.amrc.factoryplus.webapi")
+            .packages("uk.co.amrc.factoryplus.metadb.api")
             .register(bindings);
         var webapi = new ContextHandler(
             ContainerFactory.createContainer(Handler.class, webapp), "/");
 
         var coll = new ContextHandlerCollection();
-        coll.addHandler(v2api);
         coll.addHandler(notify);
         coll.addHandler(webapi);
 

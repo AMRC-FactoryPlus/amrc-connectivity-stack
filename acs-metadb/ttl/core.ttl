@@ -175,6 +175,10 @@
     :uuid "8e32801b-f35a-4cbf-a5c3-2af64d3debd7";
     :name "Sparkplug address";
     <app/appliesTo> <sparkplug/Entity>.
+<app/ServiceConfig> a <app/Application>; :primary <app/Application>;
+    rdfs:subClassOf <app/ConfigEntry>;
+    :uuid "5b47881c-b012-4040-945c-eacafca539b2";
+    :name "Service config".
 
 <uuid/beb7d97c-2c0a-11f1-97ae-9bf4285ba7b1> 
     a <app/ConfigSchema>; :primary <app/ConfigSchema>;
@@ -245,6 +249,12 @@
 <service/Auth> a <service/Service>; :primary <service/Service>;
     :uuid "cab2642a-f7d9-42e5-8845-8f35affe1fd4";
     :name "Auth service".
+<service/Clusters> a <service/Service>; :primary <service/Service>;
+    :uuid "2706aa43-a826-441e-9cec-cd3d4ce623c2";
+    :name "Cluster manager service".
+<service/Manager> a <service/Service>; :primary <service/Service>;
+    :uuid "619eecab-742d-4824-8b97-bcae472e5c04";
+    :name "Admin UI service".
 # These are for representing Directory information.
 <service/Provider> a :R1Class; :primary :R1Class;
     rdfs:subClassOf :Individual;
@@ -308,6 +318,24 @@
     rdfs:subClassOf <authz/PermissionGroup>;
     :uuid "c43c7157-a50b-4d2a-ac1a-86ff8e8e88c1";
     :name "Service permission set".
+
+<git/Repo> a :R1Class, <git/RepoGroup>; :primary :R1Class;
+    rdfs:subClassOf :Individual;
+    :uuid "d25f2afc-1ab8-4d27-b51b-d02314624e3e";
+    :name "Git repository".
+<git/RepoGroup> a :R2Class; :primary :R2Class;
+    rdfs:subClassOf :R1Class; :powersetOf <git/Repo>;
+    :uuid "b03d4dfe-7e78-4252-8e62-af594cf316c9";
+    :name "Git repository group".
+
+<edge/HelmChart> a :R1Class; :primary :R1Class;
+    rdfs:subClassOf :Individual;
+    :uuid "f9be0334-0ff7-43d3-9d8a-188d3e4d472b";
+    :name "Helm chart".
+<edge/SystemHelmChart> a :R1Class; :primary :R1Class;
+    rdfs:subClassOf <edge/HelmChart>;
+    :uuid "a5c54a2e-8f7b-4b2a-9e8d-3f7c9e7d1c6a";
+    :name "System Helm chart".
 
 <auth/perm/All> a <authz/ServicePerms>; :primary <authz/ServicePerms>;
     rdfs:subClassOf <authz/Permission>;

@@ -21,6 +21,7 @@ import org.slf4j.LoggerFactory;
 
 import uk.co.amrc.factoryplus.metadb.db.*;
 
+@Path("")
 public class Load {
     @Inject private RdfStore db;
     @Inject private SecurityContext auth;

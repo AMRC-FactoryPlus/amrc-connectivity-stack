@@ -20,7 +20,7 @@ public class ApiLogger implements ContainerRequestFilter, ContainerResponseFilte
 
     public void filter (ContainerRequestContext req)
     {
-        log.info(">>> {} {}", req.getMethod(), req.getUriInfo().getRequestUri());
+        log.info(">>> {} {}", req.getMethod(), req.getUriInfo().getPath());
     }
 
     public void filter (ContainerRequestContext req, ContainerResponseContext res)

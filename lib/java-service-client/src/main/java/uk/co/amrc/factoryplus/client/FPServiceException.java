@@ -7,7 +7,7 @@ package uk.co.amrc.factoryplus.client;
 
 import java.util.UUID;
 
-public class FPServiceException extends Exception
+public class FPServiceException extends RuntimeException
 {
     private UUID service;
     private int status;

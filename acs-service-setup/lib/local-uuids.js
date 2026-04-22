@@ -133,6 +133,9 @@ class LocalUUIDs {
                 "MetaDB"],
         );
 
+        /* XXX We should use a service function UUID for service-setup
+         * here. Then ServiceConfig has a meaningful domain of service
+         * functions. */
         await this.put_conf(ServiceConfig, this.local);
         await this.put_service_configs();
 

@@ -316,7 +316,7 @@
     :name "Permission group".
 <authz/ServicePerms> a :R2Class; :primary :R2Class;
     rdfs:subClassOf <authz/PermissionGroup>;
-    :uuid "c43c7157-a50b-4d2a-ac1a-86ff8e8e88c1";
+    :uuid "b7f0c2f4-ccf5-11ef-be77-777cd4e8cb41";
     :name "Service permission set".
 
 <git/Repo> a :R1Class, <git/RepoGroup>; :primary :R1Class;
@@ -433,6 +433,6 @@
     :name "Write RDF".
 
 <metadb/ServiceRole> a <authn/ServiceRole>; :primary <authn/ServiceRole>;
-    rdfs:subClassOf <authn/CentralService>;
+    rdfs:subClassOf <authn/Principal>;
     :uuid "bf59ab10-3738-11f1-894f-cb07fd5bf02f";
     :name "MetaDB".

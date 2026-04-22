@@ -24,6 +24,10 @@ import org.glassfish.jersey.server.ServerProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/* Note we have Java Sets but Vavr Maps and Lists */
+import io.vavr.collection.List;
+import io.vavr.collection.HashMap;
+
 import uk.co.amrc.factoryplus.client.*;
 import uk.co.amrc.factoryplus.providers.*;
 import uk.co.amrc.factoryplus.metadb.db.*;
@@ -50,14 +54,29 @@ public final class Main {
     {
         this.port = port;
 
-        this.fplus = new FPServiceClient();
+        this.fplus = createServiceClient();
         this.auth = new AuthProvider(fplus);
         this.model = new RdfStore(fplus, auth, dataDir);
         this.server = createServer();
     }
 
-    interface Throws<T> {
-        public T get () throws Throwable;
+    private FPServiceClient createServiceClient ()
+    {
+        var fplus = new FPServiceClient();
+        fplus.getOptionConf("auth_principal")
+            .peek(auth -> {
+                var acl = List.of(
+                    new FPAuth.Grant(Vocab.Perm.ReadApp, Vocab.Target.Registration),
+                    /* XXX I'm not sure why this is needed? */
+                    new FPAuth.Grant(Vocab.Perm.ReadApp, Vocab.Target.SparkplugAddr),
+                    /* XXX These are broader than strictly necessary. */
+                    new FPAuth.Grant(Vocab.Perm.ReadMembers, Vocab.Target.Wildcard),
+                    new FPAuth.Grant(Vocab.Perm.ReadSubclasses, Vocab.Target.Wildcard));
+                log.info("Setting Auth bootstrap ACL for {} to {}", auth, acl);
+                fplus.auth().setBootstrapACLs(HashMap.of(auth, acl));
+            });
+
+        return fplus;
     }
 
     private Server createServer ()

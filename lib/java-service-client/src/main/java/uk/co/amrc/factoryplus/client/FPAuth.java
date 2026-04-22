@@ -7,7 +7,6 @@
 package uk.co.amrc.factoryplus.client;
 
 import java.net.*;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
@@ -21,8 +20,8 @@ import org.json.*;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 import io.reactivex.rxjava3.core.*;
 
-import io.vavr.collection.List;
-import io.vavr.collection.Set;
+import io.vavr.collection.*;
+import io.vavr.control.Option;
 
 import uk.co.amrc.factoryplus.http.*;
 import uk.co.amrc.factoryplus.util.*;
@@ -56,14 +55,16 @@ public class FPAuth {
     private FPServiceClient fplus;
     private FPNotifyV2 notify;
 
-    private Optional<String> root_principal;
+    private Option<String> root_principal;
+    private Map<String, List<Grant>> bootstrap_acls;
     private CacheSeq<String, Response<List<Grant>>> acl_cache;
 
     public FPAuth (FPServiceClient fplus)
     {
         this.fplus = fplus;
 
-        this.root_principal = fplus.getOptionalConf("root_principal");
+        this.root_principal = fplus.getOptionConf("root_principal");
+        this.bootstrap_acls = HashMap.empty();
 
         this.notify = new FPNotifyV2(fplus, SERVICE);
         this.acl_cache = CacheSeq.builder(this::_watchACL)
@@ -72,15 +73,21 @@ public class FPAuth {
             .build();
     }
 
+    /** Set the bootstrap ACLs.
+     * This must be called before the FPServiceClient.start to avoid
+     * problems with multithreaded access.
+     */
+    public void setBootstrapACLs (Map<String, List<Grant>> bsACLs)
+    {
+        this.bootstrap_acls = bsACLs;
+    }
+
     public boolean isRoot (String upn)
     {
         return root_principal
             .filter(upn::equals)
-            .isPresent();
+            .isDefined();
     }
-
-    /* XXX We have no BOOTSTRAP_ACL handling. This will be needed for a
-     * ConfigDB implementation. */
 
     /**
      * Fetches an ACL over HTTP.
@@ -91,7 +98,8 @@ public class FPAuth {
      *
      * This uses the HTTP API and makes a fresh request every time.
      * Where the HTTP backend supports a client-side cache a response
-     * may come from the cache.
+     * may come from the cache. This method does not honour bootstrap
+     * ACLs or the root principal setting.
      *
      * Note the return value uses Java rather than Vavr types, for
      * compatibility. This is used by the HiveMQ plugin; once that has
@@ -121,6 +129,12 @@ public class FPAuth {
                 .map(o -> (java.util.Map)o));
     }
 
+    private <T> Observable<Response<T>> fixedResponse (T value)
+    {
+        return Observable.just(Response.ok(value))
+            .concatWith(Observable.never());
+    }
+
     /** Watch a principal's ACL over notify.
      *
      * The ACLs are wrapped in Responses to allow for error handling.
@@ -130,7 +144,9 @@ public class FPAuth {
      */
     public Observable<Response<List<Grant>>> watchACL (String upn)
     {
-        /* XXX Bootstrap handling should go here. */
+        var bs = bootstrap_acls.get(upn);
+        if (bs.isDefined())
+            return fixedResponse(bs.get());
 
         return this.acl_cache.get(
             UrlPath.join("v2", "acl", "kerberos", upn));
@@ -159,8 +175,7 @@ public class FPAuth {
     public Observable<Response<Boolean>> watchPermitted (String upn, UUID perm, UUID targ)
     {
         if (isRoot(upn))
-            return Observable.just(Response.ok(true))
-                .concatWith(Observable.never());
+            return fixedResponse(true);
 
         return watchACL(upn)
             .map(res -> res

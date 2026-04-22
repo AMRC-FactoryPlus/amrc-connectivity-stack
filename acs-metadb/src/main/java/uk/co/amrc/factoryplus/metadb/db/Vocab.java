@@ -9,9 +9,6 @@ package uk.co.amrc.factoryplus.metadb.db;
 import java.util.UUID;
 import java.net.URI;
 
-import io.vavr.control.Try;
-import io.vavr.control.Option;
-
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.shared.PrefixMapping;
 import org.apache.jena.sparql.core.Prologue;
@@ -67,6 +64,13 @@ public class Vocab
 
         public static final Property forP           = prop("app/for");
         public static final Property value          = prop("app/value");
+    }
+
+    /* This is for the bootstrap ACLs. */
+    public static class Target {
+        public static final UUID Registration = U("cb40bed5-49ad-4443-a7f5-08c75009da8f");
+        public static final UUID SparkplugAddr = U("8e32801b-f35a-4cbf-a5c3-2af64d3debd7");
+        public static final UUID Wildcard = U("00000000-0000-0000-0000-000000000000");
     }
 
     public static class Perm {

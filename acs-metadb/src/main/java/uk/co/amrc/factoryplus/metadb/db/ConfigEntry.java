@@ -12,6 +12,7 @@ import java.util.UUID;
 
 import jakarta.json.*;
 
+import io.vavr.collection.HashMap;
 import io.vavr.collection.List;
 import io.vavr.control.Option;
 
@@ -22,6 +23,13 @@ import org.apache.jena.vocabulary.*;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import uk.co.amrc.factoryplus.util.Response;
+
+/* Methods in this class DO NOT check permissions before taking action;
+ * these checks must be performed in the api classes. This is because we
+ * do not have the app/obj UUIDs to hand once we get to this point.
+ */
 
 public class ConfigEntry extends RequestHandler.Component
 {
@@ -54,6 +62,13 @@ public class ConfigEntry extends RequestHandler.Component
             //var mtime = Util.decodeLiteral(binding.get("mtime"), Instant.class);
 
             return new Value(val, etag, Option.none());
+        }
+
+        public Response<JsonValue> toResponse ()
+        {
+            return Response.ok(value())
+                .withHeaders(HashMap.of(
+                    "etag", etag().toString()));
         }
     }
 
@@ -127,7 +142,7 @@ public class ConfigEntry extends RequestHandler.Component
 
         var schemas = db().schemaTracker();
         if (!schemas.validate(app, value))
-            throw new Err.BadConfig(value);
+            throw new RdfErr.BadConfig(value);
 
         if (isStructured())
             db().appMapper().updateConfig(app, obj, value);

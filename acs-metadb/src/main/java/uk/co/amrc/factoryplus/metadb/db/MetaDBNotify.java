@@ -7,6 +7,7 @@
 package uk.co.amrc.factoryplus.metadb.db;
 
 import java.util.UUID;
+import java.util.function.Function;
 
 import jakarta.json.*;
 
@@ -16,20 +17,25 @@ import org.slf4j.LoggerFactory;
 import io.reactivex.rxjava3.core.*;
 import io.vavr.collection.*;
 
+import uk.co.amrc.factoryplus.client.*;
 import uk.co.amrc.factoryplus.notify.*;
+import uk.co.amrc.factoryplus.service.*;
+import uk.co.amrc.factoryplus.util.*;
 
 public class MetaDBNotify
 {
     private static final Logger log = LoggerFactory.getLogger(MetaDBNotify.class);
 
+    private FPAuth auth;
     private Dataflow data;
     private NotifyV2 notify;
 
     public MetaDBNotify (RdfStore db)
     {
+        auth = db.fplus().auth();
         data = db.dataflow();
 
-        notify = NotifyV2.builder()
+        notify = NotifyV2.builder(db.auth())
             .watch("v2/app/{app}/object/", this::appList)
             .search("v2/app/{app}/object/", this::appSearch)
             .build();
@@ -37,13 +43,29 @@ public class MetaDBNotify
 
     public NotifyV2 notifyV2 () { return notify; }
 
-    private static <U> Observable<Response> setUpdates (Observable<Set<U>> src)
+    private static <U> Response setUpdate (Response<Set<U>> src)
     {
         return src
             .map(s -> s.map(u -> u.toString()))
             .map(s -> s.foldLeft(Json.createArrayBuilder(), (a, v) -> a.add(v))
-                .build())
-            .map(Response::ok);
+                .build());
+    }
+
+
+    private record SubHandler (Session sess, Map<String, String> args)
+    {
+        private <T> Observable<Response<T>> fromUUID (
+            String arg,
+            Function<UUID, Observable<T>> factory,
+            UUID permission)
+        {
+            return args.get(arg)
+                .flatMap(Decoders::parseUUID)
+                .map(uuid -> factory.apply(uuid)
+                    .map(Response::ok)
+                    .compose(sess.applyACL(permission, uuid)))
+                .getOrElse(Observable.just(Response.of(410)));
+        }
     }
 
     /* XXX These app endpoints will return empty maps for nonexistent
@@ -54,23 +76,20 @@ public class MetaDBNotify
     private Observable<Response> appList (Session sess, Map<String, String> args)
     {
         log.info("appList: {}", args);
-        return args.get("app")
-            .flatMap(Util::parseUUID)
-            .map(app -> data.appValues(app)
-                .map(m -> m.keySet())
-                .compose(MetaDBNotify::setUpdates))
-            .getOrElse(Observable.just(Response.status(410)));
+        return new SubHandler(sess, args)
+            .fromUUID("app", data::appValues, Vocab.Perm.ReadApp)
+            .map(r -> r.map(configs -> configs.keySet()))
+            .map(MetaDBNotify::setUpdate);
     }
 
     private Observable<SearchUpdate> appSearch (Session sess, Map<String, String> args)
     {
         log.info("appSearch: {}", args);
-        return args.get("app")
-            .flatMap(Util::parseUUID)
-            .map(app -> data.appValues(app)
-                .map(m -> m.mapKeys(UUID::toString)
-                    .mapValues(v -> Response.ok(v.value(), v.etag())))
-                .map(SearchUpdate::full))
-            .getOrElse(Observable.just(SearchUpdate.invalid()));
+        return new SubHandler(sess, args)
+            .fromUUID("app", data::appValues, Vocab.Perm.ReadApp)
+            .map(r -> r.map(cs -> cs
+                .mapKeys(UUID::toString)
+                .mapValues(v -> v.toResponse())))
+            .map(SearchUpdate::ofResponse);
     }
 }

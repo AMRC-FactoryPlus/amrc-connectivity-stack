@@ -10,9 +10,16 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+import jakarta.ws.rs.core.SecurityContext;
+
 import org.apache.jena.rdf.model.*;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import io.vavr.Lazy;
+
+import uk.co.amrc.factoryplus.service.*;
 
 /* Eventually these objects will need to be associated with a txn, and a
  * request, and contain the request UPN and the current txn Instant and
@@ -20,6 +27,8 @@ import io.vavr.Lazy;
  * become a second object rather than a superclass. */
 public class RequestHandler
 {
+    private static final Logger log = LoggerFactory.getLogger(RequestHandler.class);
+
     public static abstract class Component
     {
         private RequestHandler req;
@@ -35,15 +44,31 @@ public class RequestHandler
 
     private RdfStore db;
     private Lazy<Resource> now;
+    private String upn;
 
-    public RequestHandler (RdfStore db)
+    public RequestHandler (RdfStore db, SecurityContext ctx)
     {
         this.db = db;
         this.now = Lazy.of(db::createInstant);
+        this.upn = ctx.getUserPrincipal().getName();
+
+        log.info("Handling request for {}", upn);
     }
 
     public RdfStore db () { return db; }
     public Resource getInstant () { return now.get(); }
+    public String upn () { return upn; }
+
+    public void checkACL (UUID perm, UUID target)
+    {
+        log.info("Checking permission for {} / {}", perm, target);
+        var ok = db().fplus().auth()
+            .fetchPermitted(upn, perm, target)
+            /* This must throw on-thread as we will be within a txn. */
+            .blockingGet();
+        if (!ok)
+            throw new SvcErr.Forbidden();
+    }
 
     public ObjectStructure objectStructure ()
     {

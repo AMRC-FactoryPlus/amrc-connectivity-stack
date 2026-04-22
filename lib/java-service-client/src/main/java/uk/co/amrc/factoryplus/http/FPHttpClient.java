@@ -148,17 +148,12 @@ public class FPHttpClient {
     /** Internal */
     public Single<String> tokenFor (URI service)
     {
-        return Single.fromSupplier(() -> {
-                //FPThreadUtil.logId("getting gss context");
-                /* blocking */
-                return fplus.gssClient()
-                    .createContextHB("HTTP@" + service.getHost())
-                    .orElseThrow();
-            })
-            .map(ctx -> new TokenRequest(service, ctx))
-                /* perform is blocking */
-            .flatMap(req -> req.perform(this))
+        return fplus.gssClient()
+            .createContextHB("HTTP@" + service.getHost())
             .subscribeOn(fplus.getScheduler())
+            .map(ctx -> new TokenRequest(service, ctx))
+            /* perform is blocking */
+            .flatMap(req -> req.perform(this))
             /* fetch moves calls below here to the http thread pool */
             .map(res -> res.ifOk()
                 .flatMap(r -> r.getBodyObject())
@@ -207,7 +202,11 @@ public class FPHttpClient {
      * out. */
     public Single<TextWebsocket> authWebsocket (UUID service, String path)
     {
-        return this.execute(new WsRequest(service, path));
+        /* execute will perform discovery when it is called. It is
+         * important this doesn't happen until the Single is subscribed,
+         * so sequences can be built in constructors. */
+        return Single.defer(() ->
+            this.execute(new WsRequest(service, path)));
     }
 
     public Single<SimpleHttpResponse> fetch (SimpleHttpRequest req)

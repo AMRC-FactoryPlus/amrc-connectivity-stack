@@ -22,6 +22,8 @@ import org.slf4j.LoggerFactory;
 import io.vavr.control.Option;
 import io.vavr.control.Try;
 
+import uk.co.amrc.factoryplus.service.*;
+
 public class AppMapper {
     private static final Logger log = LoggerFactory.getLogger(AppMapper.class);
 
@@ -93,7 +95,7 @@ public class AppMapper {
         XSD.xboolean,   s -> s.equals("true") ? Option.some(JsonValue.TRUE)
                             : s.equals("false") ? Option.some(JsonValue.FALSE)
                             : Option.none(),
-        RDF.JSON,       Util::readJson);
+        RDF.JSON,       Decoders::readJson);
 
     private RdfStore db;
 
@@ -123,7 +125,7 @@ public class AppMapper {
     public void deleteConfig (Resource app, Resource obj)
     {
         if (app.equals(Vocab.App.Registration))
-            throw new Err.Immutable();
+            throw new RdfErr.Immutable();
 
         Option.of(deleters.get(app))
             .peek(d -> db.runUpdate(d, "obj", obj));
@@ -153,39 +155,39 @@ public class AppMapper {
     private void updateRegistration (Resource obj, JsonValue config)
     {
         if (!(config instanceof JsonObject))
-            throw new Err.BadJson(config);
+            throw new SvcErr.BadJson(config);
         var spec = (JsonObject)config;
 
         if (!spec.getBoolean("strict")) {
             log.info("Objects must be strict");
-            throw new Err.BadJson(spec.get("strict"));
+            throw new SvcErr.BadJson(spec.get("strict"));
         }
         if (!spec.getString("owner").equals(Vocab.U_Unowned.toString())) {
             log.info("Owners not implemented yet");
-            throw new Err.Forbidden();
+            throw new SvcErr.Forbidden();
         }
 
         var rank = db.findRank(obj);
         if (spec.getInt("rank") != rank) {
             log.info("Rank changes can only be made via dumps");
-            throw new Err.RankMismatch();
+            throw new RdfErr.RankMismatch();
         }
 
         var model = db.derived();
         var uuid = Util.single(model.listObjectsOfProperty(obj, Vocab.uuid))
             .map(AppMapper::literalToJson)
-            .getOrElseThrow(() -> new Err.CorruptRDF("Cannot find object UUID"));
+            .getOrElseThrow(() -> new RdfErr.CorruptRDF("Cannot find object UUID"));
         if (!spec.get("uuid").equals(uuid)) {
             log.info("UUIDs cannot be changed: {} vs {}", uuid, spec.get("uuid"));
-            throw new Err.BadJson(spec.get("uuid"));
+            throw new SvcErr.BadJson(spec.get("uuid"));
         }
 
-        var klass = Util.parseUUID(spec.getString("class"))
+        var klass = Decoders.parseUUID(spec.getString("class"))
             .flatMap(db::findObject)
             .map(FPObject::node)
             .getOrElseThrow(() -> {
                 log.info("Cannot find new primary class");
-                return new Err.BadJson(spec.get("class"));
+                return new SvcErr.BadJson(spec.get("class"));
             });
         /* This is a change from the JS implementation; here we require
          * the object to already be a member of the new primary class.
@@ -194,7 +196,7 @@ public class AppMapper {
          * This is inconsistent and so has been changed. */
         if (!model.contains(obj, RDF.type, klass)) {
             log.info("Object not a member of new primary class");
-            throw new Err.NotMember();
+            throw new RdfErr.NotMember();
         }
         model.removeAll(obj, Vocab.primary, null);
         model.add(obj, Vocab.primary, klass);
@@ -213,14 +215,14 @@ public class AppMapper {
         if (node == null) return JsonValue.NULL;
 
         if (!node.isLiteral())
-            throw new Err.NotLiteral(node);
+            throw new RdfErr.NotLiteral(node);
         
         var lit = node.asLiteral();
         var typ = ResourceFactory.createResource(lit.getDatatypeURI());
 
         return Option.of(toJson.get(typ))
             .flatMap(d -> d.apply(lit.getLexicalForm()))
-            .getOrElseThrow(() -> new Err.BadLiteral(lit));
+            .getOrElseThrow(() -> new RdfErr.BadLiteral(lit));
     }
 
     private static JsonValue solutionToJson (QuerySolution rs)
@@ -238,7 +240,7 @@ public class AppMapper {
     private static Literal jsonToLiteral (JsonValue val)
     {
         if (!(val instanceof JsonString))
-            throw new Err.BadJson(val);
+            throw new SvcErr.BadJson(val);
 
         return ResourceFactory.createPlainLiteral(
             ((JsonString)val).getString());
@@ -248,7 +250,7 @@ public class AppMapper {
     private static QuerySolution jsonToSolution (JsonValue val)
     {
         if (!(val instanceof JsonObject))
-            throw new Err.BadJson(val);
+            throw new SvcErr.BadJson(val);
 
         var qsol = new QuerySolutionMap();
         ((JsonObject)val).forEach(

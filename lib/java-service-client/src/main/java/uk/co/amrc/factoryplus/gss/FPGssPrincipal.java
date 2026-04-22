@@ -28,6 +28,7 @@ import org.json.*;
 
 import io.reactivex.rxjava3.functions.Function;
 import io.reactivex.rxjava3.functions.Supplier;
+import io.reactivex.rxjava3.core.Single;
 
 import uk.co.amrc.factoryplus.client.Attempt;
 
@@ -70,8 +71,7 @@ public abstract class FPGssPrincipal {
             }));
     }
 
-    protected synchronized <T> Attempt<T> withCreds (
-        Function<GSSCredential,T> callback)
+    private synchronized <T> Attempt<T> _withCreds (Function<GSSCredential,T> callback)
     {
         /* XXX This is a mess. It could probably be redone with a pair
          * of cached Observables to avoid all this stateful tangle. */
@@ -94,12 +94,21 @@ public abstract class FPGssPrincipal {
                 subject = null;
                 return getCreds();
             })
+            /* XXX Is this withSubject necessary? We have a GSS
+             * Credential, do we still need the Subject selected? */
             .flatMap(cr -> withSubject(() -> callback.apply(cr)));
     }
 
-    protected <T> Attempt<T> withSubject (Supplier<T> callback)
+    /* This Single will execute synchronously and may block. */
+    protected <T> Single<T> withCreds (Function<GSSCredential, T> callback)
+    {
+        return Single.defer(() -> _withCreds(callback).toSingle());
+    }
+
+    private <T> Attempt<T> withSubject (Supplier<T> callback)
     {
         PrivilegedAction<Attempt<T>> action = () -> Attempt.ofSupplier(callback);
+
         return Subject.doAs(subject, action)
             .mapError(PrivilegedActionException.class, err -> err.getCause());
     }

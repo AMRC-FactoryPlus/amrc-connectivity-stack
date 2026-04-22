@@ -1,10 +1,10 @@
 /*
- * Factory+ metadata database
+ * Factory+ service API
  * Jakarta RS exception mapping
  * Copyright 2026 University of Sheffield AMRC
  */
 
-package uk.co.amrc.factoryplus.metadb.api;
+package uk.co.amrc.factoryplus.providers;
 
 import jakarta.json.*;
 import jakarta.ws.rs.*;
@@ -17,29 +17,46 @@ import org.glassfish.jersey.server.spi.ResponseErrorMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import uk.co.amrc.factoryplus.metadb.db.Err;
+import uk.co.amrc.factoryplus.client.FPServiceException;
+import uk.co.amrc.factoryplus.service.SvcErr;
 
 public class ErrorMapper
 {
     public static final Logger log = LoggerFactory.getLogger(ErrorMapper.class);
 
-    public static Response clientError (Err.ClientError err)
+    public static Response clientError (SvcErr.Client err)
     {
         /* XXX we should allow the error to include more fields here */
         log.info("Returning error: {}", err.toString());
         var json = err.buildJson();
         var res = Response.status(err.statusCode())
+            .type("application/json")
             .entity(json);
         err.buildHeaders().forEach(res::header);
         return res.build();
     }
 
-    @Provider
-    public static class CliErr implements ExceptionMapper<Err.ClientError>
+    public static Response serviceError (FPServiceException err)
     {
-        public Response toResponse (Err.ClientError err)
+        log.info("Upstream service error: {}", err.toString());
+        return Response.status(503).build();
+    }
+
+    @Provider
+    public static class CliErr implements ExceptionMapper<SvcErr.Client>
+    {
+        public Response toResponse (SvcErr.Client err)
         {
             return ErrorMapper.clientError(err);
+        }
+    }
+
+    @Provider
+    public static class FpErr implements ExceptionMapper<FPServiceException>
+    {
+        public Response toResponse (FPServiceException err)
+        {
+            return serviceError(err);
         }
     }
 
@@ -48,8 +65,10 @@ public class ErrorMapper
     {
         public Response toResponse (Throwable err)
         {
-            if (err instanceof Err.ClientError)
-                return ErrorMapper.clientError((Err.ClientError)err);
+            if (err instanceof SvcErr.Client)
+                return ErrorMapper.clientError((SvcErr.Client)err);
+            if (err instanceof FPServiceException)
+                return ErrorMapper.serviceError((FPServiceException)err);
 
             /* These can be thrown by parameters injected into objects
              * (as opposed to method parameters). This causes the

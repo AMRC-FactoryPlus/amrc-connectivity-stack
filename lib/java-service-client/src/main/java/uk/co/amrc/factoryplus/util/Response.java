@@ -6,7 +6,6 @@
 
 package uk.co.amrc.factoryplus.util;
 
-import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.Set;
@@ -15,24 +14,23 @@ import java.util.stream.Collectors;
 
 import java.util.function.*;
 
+/* XXX We need to support both JSON libraries for now. Ideally the
+ * org.json lib should be refactored out. */
+import jakarta.json.*;
 import org.json.*;
 
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.core.Maybe;
+
 import io.vavr.collection.List;
+import io.vavr.collection.HashMap;
+import io.vavr.collection.Map;
+import io.vavr.control.Option;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import uk.co.amrc.factoryplus.client.FPServiceException;
-
-/* This is to map headers. We don't need use this client-side yet but
- * the ConfigDB server-side should use it. I think this should be
- * another subclass, SuccessWithHeaders, I don't think failures need
- * header information. */
-//        final var headers = raw_headers
-//            .map(h -> h.entrySet().stream()
-//                .map(e -> Map.entry(e.getKey().toLowerCase(), e.getValue()))
-//                .filter(e -> KNOWN_HEADERS.contains(e.getKey()))
-//                .collect(Collectors.toMap(e -> e.getKey(), e -> e.getValue())))
-//            .orElse(Map.of());
 
 /* XXX This should be refactored to hold a Throwable in the error case.
  * I think perhaps
@@ -45,212 +43,199 @@ import uk.co.amrc.factoryplus.client.FPServiceException;
  * easier; and in fact we can become an interface.
  */
 
-public abstract class Response<T> {
-    protected int status;
-
-    private Response (int status)
+public interface Response<T> {
+    static <V> Response<V> of (int status)
     {
-        this.status = status;
+        return Response.of(status, null);
+    }
+    static <V> Response<V> of (int status, V body)
+    {
+        if (status == 404)
+            return Response.empty();
+        if (status >= 300)
+            return Response.error(status);
+        return Response.success(status, body);
     }
 
-    private static <V> Response<V> _of (int status, V body)
+    static <V> Response<V> success (int status, V body)
     {
-        return
-            status == 404   ? new Empty<V>() :
-            status < 300    ? new Success<V>(status, body) :
-            new Failure<V>(status);
+        return new Success<V>(status, HashMap.empty(), Option.of(body));
     }
-    
-    public static <V> Response<V> of (int status)
-    {
-        return Response._of(status, null);
-    }
-    public static <V> Response<V> of (int status, V body)
-    {
-        return Response._of(status, body);
-    }
+    static <V> Response<V> ok (V body)          { return Response.success(200, body); }
+    static <V> Response<V> empty ()             { return new Empty<V>(); }
+    static <V> Response<V> error (int status)   { return new Failure<V>(status); }
+    static <V> Response<V> error ()             { return Response.error(500); }
 
-    public static <V> Response<V> ok (V body)
-    {
-        return Response.of(200, body);
-    }
-    public static <V> Response<V> empty ()
-    {
-        return Response.of(404);
-    }
-    public static <V> Response<V> error ()
-    {
-        return Response.of(500);
-    }
-
-    public static <V> Response<V> ofNullable (V v)
+    static <V> Response<V> ofNullable (V v)
     {
         return v == null ? Response.empty() : Response.ok(v);
     }
-
-    public static <V> Response<V> ofOptional (Optional<V> opt)
+    static <V> Response<V> ofOptional (Optional<V> opt)
     {
         return opt.map(Response::ok)
             .orElseGet(Response::empty);
     }
-
-    public static Response<Object> fromJSON (JSONObject obj)
+    static Response<Object> fromJSON (JSONObject obj)
         throws JSONException
     {
         return Response.of(obj.getInt("status"), obj.opt("body"));
     }
 
-    public String toString ()
-    {
-        return "Response [" + status + "]";
-    }
-    public Optional<T> toOptional ()
+    int status ();
+    default Map<String, String> headers () { return HashMap.empty(); }
+    default Option<T> body () { return Option.none(); }
+
+    default boolean isOK () { return false; }
+    default boolean isEmpty() { return false; }
+    default boolean isError() { return false; }
+
+    default Optional<T> toOptional ()
     {
         return this.ifOK(Optional::of, Optional::empty);
     }
-    public List<T> toVavrList ()
+    default List<T> toVavrList ()
     {
         return this.ifOK(List::of, List::empty);
     }
-    public Maybe<T> toMaybe (Function<Integer, Throwable> mkerror)
+    default Maybe<T> toMaybe (Function<Integer, Throwable> mkerror)
     {
         return this.ifOK(Maybe::just, Maybe::empty,
             st -> Maybe.error(mkerror.apply(st)));
     }
-    public Maybe<T> toMaybe ()
+    default Maybe<T> toMaybe ()
     {
         return this.toMaybe(HTTPError::new);
     }
-
-    public boolean isOK () { return false; }
-    public boolean isEmpty() { return false; }
-    public boolean isError() { return false; }
-
-    public <V> Response<V> withBody (V body)
+    default JsonValue toJson ()
     {
-        return Response.of(this.status, body);
+        var obj = Json.createObjectBuilder()
+            .add("status", status());
+
+        /* The ClassCastException here is deliberate */
+        body().peek(b -> obj.add("body", (JsonValue)b));
+
+        if (!headers().isEmpty()) {
+            var h = Json.createObjectBuilder();
+            headers().forEach(h::add);
+            obj.add("headers", h.build());
+        }
+
+        return obj.build();
     }
-    
-    public Response<T> withStatus (int status)
+
+    default <V> Response<V> withBody (V body)
+    {
+        return Response.of(status(), body);
+    }
+    default Response<T> withStatus (int status)
     {
         return Response.of(status);
     }
-
-    public abstract <R> Response<R> flatMap (Function<T, Response<R>> map);
-
-    public Response<T> or (Supplier<Response<T>> supp)
+    default Response<T> withHeaders (Map<String, String> headers)
     {
+        /* Non-success Responses may not have headers */
         return this;
     }
-    public Response<T> orItem (Supplier<T> supp)
+
+    /* This could potentially default to a cast? */
+    <R> Response<R> flatMap (Function<T, Response<R>> map);
+    default Response<T> or (Supplier<Response<T>> supp) { return this; }
+    default Response<T> handle (Function<Integer, Response<T>> handler) { return this; }
+
+    default Response<T> orItem (Supplier<T> supp)
     {
         return this.or(() -> Response.ok(supp.get()));
     }
 
-    public Response<T> handle (Function<Integer, Response<T>> handler)
-    {
-        return this;
-    }
-    public Response<T> handle (Set<Integer> statusses,
+    default Response<T> handle (Set<Integer> statusses,
         Function<Integer, Response<T>> handler)
     {
-        if (!statusses.contains(this.status))
+        if (!statusses.contains(status()))
             return this;
         return this.handle(handler);
     }
 
-    public abstract T get () throws NoSuchElementException, HTTPError;
-    public abstract T orElse (T val) throws HTTPError;
-    public abstract <R> R ifOK (Function<T, R> success,
-        Supplier<R> empty, Function<Integer, R> failure);
+    T get () throws NoSuchElementException, HTTPError;
+    T orElse (T val) throws HTTPError;
+    <R> R ifOK (Function<T, R> success, Supplier<R> empty, Function<Integer, R> failure);
 
-    public <R> R ifOK (Function<T, R> success, Function<Integer, R> failure)
+    default <R> R ifOK (Function<T, R> success, Function<Integer, R> failure)
     {
         return this.ifOK(success, () -> failure.apply(404), failure);
     }
-    public <R> R ifOK (Function<T, R> success, Supplier<R> failure)
+    default <R> R ifOK (Function<T, R> success, Supplier<R> failure)
     {
         return this.ifOK(success, failure, s -> failure.get());
     }
 
-    public void doIfOK (Consumer<T> success, Consumer<Integer> failure)
+    default void doIfOK (Consumer<T> success, Consumer<Integer> failure)
     {
         this.<Object>ifOK(v -> { success.accept(v); return null; },
             () -> { failure.accept(404); return null; },
             s -> { failure.accept(s); return null; });
     }
-    public void doIfOK (Consumer<T> success)
+    default void doIfOK (Consumer<T> success)
     {
         this.doIfOK(success, s -> {});
     }
-    /* Java doesn't seem to have a Thunk (function from void to void) type */
 
-    public Response<T> orWith (int st, T body)
+    default Response<T> orWith (int st, T body)
     {
         return this.or(() -> Response.of(st, body));
     }
 
-    public void throwIfError (String msg) throws HTTPError { return; }
+    default void throwIfError (String msg) throws HTTPError { return; }
 
-    public Response<T> filter (Predicate<T> pred)
+    default Response<T> filter (Predicate<T> pred)
     {
         return this.flatMap(b -> pred.test(b) ? this : Response.empty());
     }
-
-    public <V> Response<V> map (Function<T, V> mapper)
+    default <V> Response<V> map (Function<T, V> mapper)
     {
         return this.flatMap(b -> this.withBody(mapper.apply(b)));
     }
-
-    public <C> Response<C> cast (Class<C> klass)
+    default <C> Response<C> cast (Class<C> klass)
     {
         return this.map(klass::cast);
     }
 
-    static class Success<T> extends Response<T>
+    /* We have a nasty special case here: a 204 is a Success with no
+     * body. Currently we handle this with a null body, which I don't
+     * like. But I'm not sure what the correct semantics are for flatMap
+     * with an empty body. */
+    static record Success<T> (int status, Map<String, String> headers, Option<T> body)
+        implements Response<T>
     {
-        private T body;
-
-        protected Success (int status, T body)
-        {
-            super(status);
-            this.body = body;
-        }
-
-        public String toString ()
-        {
-            return super.toString() + ": " + 
-                (body == null ? "null" : body.toString());
-        }
+        private T bodyOrNull () { return body.getOrElse((T)null); }
 
         public Response<T> withStatus (int status)
         {
-            return Response.of(status, this.body);
+            return Response.of(status, bodyOrNull());
+        }
+        public Response<T> withHeaders (Map<String, String> headers)
+        {
+            return new Success<T>(this.status, headers, this.body);
         }
 
         public boolean isOK () { return true; }
 
         public <R> Response<R> flatMap(Function<T, Response<R>> map)
         {
-            return map.apply(this.body);
+            return map.apply(bodyOrNull());
         }
 
-        public T get () { return this.body; }
-        public T orElse (T v) { return this.body; }
+        public T get () { return bodyOrNull(); }
+        public T orElse (T v) { return bodyOrNull(); }
         public <R> R ifOK (Function<T, R> success,
             Supplier<R> empty, Function<Integer, R> failure)
         {
-            return success.apply(this.body);
+            return success.apply(bodyOrNull());
         }
     }
 
-    static class Empty<T> extends Response<T>
+    static class Empty<T> implements Response<T>
     {
-        protected Empty ()
-        {
-            super(404);
-        }
-
+        public int status () { return 404; }
         public boolean isEmpty () { return true; }
 
         public <R> Response<R> flatMap(Function<T, Response<R>> map)
@@ -294,13 +279,8 @@ public abstract class Response<T> {
         }
     }
 
-    static class Failure<T> extends Response<T>
+    static record Failure<T> (int status) implements Response<T>
     {
-        protected Failure (int status)
-        {
-            super(status);
-        }
-
         public boolean isError () { return true; }
 
         public <R> Response<R> flatMap(Function<T, Response<R>> map)

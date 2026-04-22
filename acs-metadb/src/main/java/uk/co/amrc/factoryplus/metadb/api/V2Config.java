@@ -30,15 +30,18 @@ import uk.co.amrc.factoryplus.metadb.db.*;
 public class V2Config {
     private static final Logger log = LoggerFactory.getLogger(V2Config.class);
 
-    @Inject                 RdfStore store;
-    @PathParam("app")       UUID app;
-    @PathParam("object")    UUID obj;
+    @Inject private RdfStore store;
+    @Inject private SecurityContext auth;
+
+    @PathParam("app")       private UUID app;
+    @PathParam("object")    private UUID obj;
 
     @GET 
     public Response get ()
     {
         log.info("Get config for {}/{}", app, obj);
-        var entry = store.requestRead(req -> {
+        var entry = store.requestRead(auth, req -> {
+            req.checkACL(Vocab.Perm.ReadApp, app);
             return req.configEntry(app, obj).getValue();
         });
         return entry
@@ -60,7 +63,8 @@ public class V2Config {
     public void put (JsonValue config)
     {
         log.info("Put config for {}/{}", app, obj);
-        store.requestExecute(req -> {
+        store.requestExecute(auth, req -> {
+            req.checkACL(Vocab.Perm.WriteApp, app);
             req.configEntry(app, obj).putValue(config);
         });
     }
@@ -69,7 +73,8 @@ public class V2Config {
     public void delete ()
     {
         log.info("Delete config for {}/{}", app, obj);
-        store.requestExecute(req -> {
+        store.requestExecute(auth, req -> {
+            req.checkACL(Vocab.Perm.WriteApp, app);
             req.configEntry(app, obj).removeValue();
         });
     }
@@ -78,7 +83,9 @@ public class V2Config {
     public void mergePatch (JsonValue json)
     {
         var patch = Json.createMergePatch(json);
-        store.requestExecute(req -> {
+        store.requestExecute(auth, req -> {
+            req.checkACL(Vocab.Perm.ReadApp, app);
+            req.checkACL(Vocab.Perm.WriteApp, app);
             var entry = req.configEntry(app, obj);
 
             var o_conf = entry.getValue()

@@ -55,11 +55,15 @@ public class FPAuth {
 
     private FPServiceClient fplus;
     private FPNotifyV2 notify;
-    private CacheSeq<String, Response<Set<Grant>>> acl_cache;
+
+    private Optional<String> root_principal;
+    private CacheSeq<String, Response<List<Grant>>> acl_cache;
 
     public FPAuth (FPServiceClient fplus)
     {
         this.fplus = fplus;
+
+        this.root_principal = fplus.getOptionalConf("root_principal");
 
         this.notify = new FPNotifyV2(fplus, SERVICE);
         this.acl_cache = CacheSeq.builder(this::_watchACL)
@@ -83,8 +87,10 @@ public class FPAuth {
      * may come from the cache.
      *
      * Note the return value uses Java rather than Vavr types, for
-     * compatibility.
+     * compatibility. This is used by the HiveMQ plugin; once that has
+     * been upgraded to use the newer APIs this method can be removed.
      *
+     * @deprecated Use fetchACL instead.
      * @param princ The principal to fetch permissions for.
      * @param perms The permission group to fetch (ignored).
      * @return A stream of maps representing the granted permissions.
@@ -113,15 +119,17 @@ public class FPAuth {
      * The ACLs are wrapped in Responses to allow for error handling.
      * The returned Observable is shared and cached for 30m.
      *
-     * @param princ The Kerberos principal name.
+     * @param upn The Kerberos principal name.
      */
-    public Observable<Response<Set<Grant>>> watchACL (String princ)
+    public Observable<Response<List<Grant>>> watchACL (String upn)
     {
+        /* XXX Bootstrap handling should go here. */
+
         return this.acl_cache.get(
-            UrlPath.join("v2", "acl", "kerberos", princ));
+            UrlPath.join("v2", "acl", "kerberos", upn));
     }
 
-    private Observable<Response<Set<Grant>>> _watchACL (String path)
+    private Observable<Response<List<Grant>>> _watchACL (String path)
     {
         /* XXX There are casts here which can fail if the server returns
          * an invalid response. If a Response contained a generic
@@ -132,23 +140,38 @@ public class FPAuth {
                 .map(a -> (JSONArray)a) /* XXX Response.ofType? */
                 .map(a -> List.ofAll(a)
                     .map(g -> (JSONObject)g)
-                    .map(Grant::fromJSON)
-                    .toSet()));
+                    .map(Grant::fromJSON)));
     }
 
-    /** Fetch a principal's ACL using notify.
-     * 
-     * The ACL for the principal will be cached and tracked for half an
-     * hour.
-     *
-     * @param princ The Kerberos principal name.
+    /** Watch a specific permission check.
+     * This handles wildcard matches.
+     * @param upn The Kerberos UPN.
+     * @param perm The permission UUID.
+     * @param targ The target UUID.
      */
-    public Maybe<Set<Grant>> fetchACL (String princ)
+    public Observable<Response<Boolean>> watchPermitted (String upn, UUID perm, UUID targ)
     {
-        return watchACL(princ)
+        if (root_principal.filter(upn::equals).isPresent())
+            return Observable.just(Response.ok(true))
+                .concatWith(Observable.never());
+
+        return watchACL(upn)
+            .map(res -> res
+                .map(gs -> gs.exists(
+                    g -> g.permission.equals(perm) &&
+                        (g.target.equals(targ) || g.target.equals(FPUuid.Null)))));
+    }
+
+    /** Check a specific permission.
+     * The Single will emit an error if the Auth service can't be
+     * contacted.
+     */
+    public Single<Boolean> fetchPermitted (String upn, UUID perm, UUID targ)
+    {
+        return watchPermitted(upn, perm, targ)
             .firstElement()
-            .flatMap(r -> r.toMaybe(st -> 
-                new FPServiceException(SERVICE, st,
-                    "fetching ACL for " + princ)));
+            .flatMap(r -> r.toMaybe(st ->
+                new FPServiceException(SERVICE, st, "Fetching ACL")))
+            .switchIfEmpty(Single.just(false));
     }
 }

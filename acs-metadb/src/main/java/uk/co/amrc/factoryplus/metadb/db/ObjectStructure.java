@@ -23,6 +23,13 @@ import io.vavr.control.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import uk.co.amrc.factoryplus.client.FPUuid;
+import uk.co.amrc.factoryplus.service.*;
+
+/* Methods in this class check permissions before taking action. In the
+ * case of owner changes this will be a requirement as the permission
+ * requirements depend on the existing data. */
+
 public class ObjectStructure extends RequestHandler.Component
 {
     private static final Logger log = LoggerFactory.getLogger(ObjectStructure.class);
@@ -40,14 +47,21 @@ public class ObjectStructure extends RequestHandler.Component
     /* XXX Ideally both of these switch statements would become
      * data-driven. Possibly an :apiName relation from the property? But
      * with only two valid cases it does not seem worth it for now. */
-    private record Relation (Property prop, int offset)
+    public record Relation (Property prop, int offset,
+        UUID readClass, /*UUID readObj,*/ UUID writeClass, UUID writeObject)
     {
-        public static Relation of (String relation)
-        {
+        public static Relation of (String relation) {
             switch (relation) {
-                case "member":      return new Relation(RDF.type, 1);
-                case "subclass":    return new Relation(RDFS.subClassOf, 0);
-                default:            throw new Err.NotFound("No such relation");
+                case "member":
+                    return new Relation(RDF.type, 1, 
+                        Vocab.Perm.ReadMembers, /*Vocab.Perm.ReadMemberships,*/
+                        Vocab.Perm.WriteMembers, Vocab.Perm.WriteMemberships);
+                case "subclass":
+                    return new Relation(RDFS.subClassOf, 0,
+                        Vocab.Perm.ReadSubclasses, /*Vocab.Perm.ReadSuperclasses,*/
+                        Vocab.Perm.WriteSubclasses, Vocab.Perm.WriteSuperclasses);
+                default:
+                    throw new SvcErr.NotFound("No such relation");
             }
         }
     }
@@ -57,18 +71,10 @@ public class ObjectStructure extends RequestHandler.Component
         Vocab.App.Registration, Vocab.App.ConfigSchema,
         Vocab.Wildcard, Vocab.Unowned);
 
-    private Model findGraph (String name)
-    {
-        switch (name) {
-            case "direct":      return db().direct();
-            case "derived":     return db().derived();
-            default:            throw new Err.NotFound("No such graph");
-        }
-    }
-
     /* These could return UUIDs, but it seems silly. */
     public List<String> listObjects ()
     {
+        request().checkACL(Vocab.Perm.ListObj, FPUuid.Null);
         return db().derived()
             .listObjectsOfProperty(Vocab.uuid)
             .filterKeep(n -> n.isLiteral())
@@ -87,6 +93,7 @@ public class ObjectStructure extends RequestHandler.Component
 
     public List<String> listRanks ()
     {
+        request().checkACL(Vocab.Perm.ListObj, FPUuid.Null);
         var rs = db().selectQuery(Q_listRanks);
         return Iterator.ofAll(rs)
             .map(s -> s.getLiteral("uuid").getString())
@@ -94,15 +101,15 @@ public class ObjectStructure extends RequestHandler.Component
     }
 
     /* TXN */
-    private FPObject updateRegistration (FPObject obj, Resource klass)
+    private FPObject setPrimaryClass (FPObject obj, Resource klass)
     {
-        log.info("Update registration: {}, {}", obj, klass);
+        log.info("Set primary class: {}, {}", obj, klass);
 
         var orank = db().findRank(obj.node());
         var krank = db().findRank(klass);
 
         if (krank != orank + 1)
-            throw new Err.RankMismatch();
+            throw new RdfErr.RankMismatch();
 
         var model = db().derived();
         model.removeAll(obj.node(), Vocab.primary, null);
@@ -124,18 +131,22 @@ public class ObjectStructure extends RequestHandler.Component
      * a Jakarta Response, which is a clear layer violation. */
     public JsonValue createObject (UUID klass, Option<UUID> uuid)
     {
+        request().checkACL(
+            uuid.isEmpty() ? Vocab.Perm.CreateObj : Vocab.Perm.CreateSpecificObj,
+            klass);
+
         var kres = db().findObjectOrError(klass).node();
 
         var obj = uuid
             .map(u -> db().findObject(u)
                 .map(o -> { log.info("Found object {}", o); return o; })
-                .map(o -> updateRegistration(o, kres))
+                .map(o -> setPrimaryClass(o, kres))
                 .getOrElse(() -> db().createObject(kres, u)))
             .getOrElse(() -> db().createObject(kres));
 
         return db().appMapper()
             .generateConfig(Vocab.App.Registration, obj.node())
-            .getOrElseThrow(() -> new Err.CorruptRDF("Cannot find object registration"));
+            .getOrElseThrow(() -> new RdfErr.CorruptRDF("Cannot find object registration"));
     }
 
     private static UpdateRequest U_deleteConfigs = Vocab.update("""
@@ -151,11 +162,13 @@ public class ObjectStructure extends RequestHandler.Component
     public void deleteObject (UUID uuid)
     {
         log.info("Delete object {}", uuid);
+        request().checkACL(Vocab.Perm.DeleteObj, uuid);
+
         var obj = db().findObjectOrError(uuid).node();
         log.info("Found node {}", obj);
         if (IMMUTABLE.contains(obj)) {
             log.info("Object {} is immutable", obj);
-            throw new Err.Immutable();
+            throw new RdfErr.Immutable();
         }
 
         /* We only check for direct dependents. If we have no direct
@@ -164,7 +177,7 @@ public class ObjectStructure extends RequestHandler.Component
         var model = db().direct();
         if (model.contains(obj, Vocab.rank)) {
             log.info("Object {} is a rank class", obj);
-            throw new Err.Immutable();
+            throw new RdfErr.Immutable();
         }
 
         /* This will also catch configs-of-app. If we want to return
@@ -173,24 +186,26 @@ public class ObjectStructure extends RequestHandler.Component
         if (members.hasNext()) {
             log.info("Object {} has members:", uuid);
             members.forEachRemaining(m -> log.info("  {}", m));
-            throw new Err.InUse();
+            throw new RdfErr.InUse();
         }
 
         var subclasses = model.listResourcesWithProperty(RDFS.subClassOf, obj);
         if (subclasses.hasNext()) {
             log.info("Object {} has subclasses:", uuid);
             subclasses.forEachRemaining(m -> log.info("  {}", m));
-            throw new Err.InUse();
+            throw new RdfErr.InUse();
         }
 
         db().runUpdate(U_deleteConfigs, "obj", obj);
         model.removeAll(obj, null, null);
     }
 
-    public List<String> listRelation (String gname, UUID uuid, String relation)
+    public List<String> listRelation (boolean direct, UUID uuid, String relation)
     {
-        var graph = findGraph(gname);
         var rel = Relation.of(relation);
+        var graph = direct ? db().direct() : db().derived();
+
+        request().checkACL(direct ? rel.readClass : rel.writeClass, uuid);
 
         var klass = db().findObjectOrError(uuid);
         return graph
@@ -201,10 +216,15 @@ public class ObjectStructure extends RequestHandler.Component
             .toList();
     }
 
-    public boolean testRelation (String gname, UUID klass, String relation, UUID object)
+    public boolean testRelation (boolean direct, UUID klass, String relation, UUID object)
     {
-        var graph = findGraph(gname);
         var rel = Relation.of(relation);
+        var graph = direct ? db().direct() : db().derived();
+
+        /* We don't check the object permissions here because (a) there
+         * are no readObject perms defined and (b) the information can
+         * be derived from listRelation anyway so there's no point. */
+        request().checkACL(direct ? rel.readClass : rel.writeClass, klass);
 
         var kres = db().findObjectOrError(klass).node();
         var ores = db().findObjectOrError(object).node();
@@ -218,13 +238,17 @@ public class ObjectStructure extends RequestHandler.Component
     public void putRelation (UUID klass, String relation, UUID object)
     {
         var rel = Relation.of(relation);
+
+        request().checkACL(rel.writeClass, klass);
+        request().checkACL(rel.writeObject, object);
+
         var kres = db().findObjectOrError(klass).node();
         var ores = db().findObjectOrError(object).node();
 
         var krank = db().findRank(kres);
         var orank = db().findRank(ores);
         if (krank != orank + rel.offset())
-            throw new Err.RankMismatch();
+            throw new RdfErr.RankMismatch();
 
         db().direct().add(ores, rel.prop(), kres);
     }
@@ -232,6 +256,10 @@ public class ObjectStructure extends RequestHandler.Component
     public void delRelation (UUID klass, String relation, UUID object)
     {
         var rel = Relation.of(relation);
+
+        request().checkACL(rel.writeClass, klass);
+        request().checkACL(rel.writeObject, object);
+
         var kres = db().findObjectOrError(klass).node();
         var ores = db().findObjectOrError(object).node();
         db().direct().remove(ores, rel.prop(), kres);

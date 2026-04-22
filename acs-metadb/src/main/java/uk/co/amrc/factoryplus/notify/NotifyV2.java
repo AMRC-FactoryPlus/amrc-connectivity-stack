@@ -24,8 +24,10 @@ import org.eclipse.jetty.websocket.server.WebSocketUpgradeHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import uk.co.amrc.factoryplus.util.UrlPath;
 import uk.co.amrc.factoryplus.http.TextWebsocket;
+import uk.co.amrc.factoryplus.providers.AuthProvider;
+import uk.co.amrc.factoryplus.util.Response;
+import uk.co.amrc.factoryplus.util.UrlPath;
 
 public class NotifyV2
 {
@@ -33,7 +35,13 @@ public class NotifyV2
 
     public static class Builder
     {
+        private AuthProvider auth;
         private List<Filter> filters = List.empty();
+
+        Builder (AuthProvider auth)
+        {
+            this.auth = auth;
+        }
 
         public Builder watch (String path, Handler<Response> handler)
         {
@@ -49,19 +57,26 @@ public class NotifyV2
 
         public NotifyV2 build ()
         {
-            return new NotifyV2(filters.reverse());
+            return new NotifyV2(auth, filters.reverse());
         }
     }
 
+    private AuthProvider auth;
     private List<Filter> filters;
 
-    private NotifyV2 (List<Filter> filters)
+    private NotifyV2 (AuthProvider auth, List<Filter> filters)
     {
+        this.auth = auth;
         this.filters = filters;
         log.info("Build NotifyV2: {}", filters);
     }
 
-    public static Builder builder () { return new Builder(); }
+    public AuthProvider auth () { return auth; }
+
+    public static Builder builder (AuthProvider auth)
+    {
+        return new Builder(auth);
+    }
 
     public ContextHandler contextHandlerFor (Server server)
     {

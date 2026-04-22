@@ -26,6 +26,8 @@ import org.slf4j.LoggerFactory;
 import org.ietf.jgss.*;
 import org.json.*;
 
+import io.reactivex.rxjava3.core.Single;
+
 import uk.co.amrc.factoryplus.client.Attempt;
 
 /** GSS client credentials.
@@ -48,7 +50,7 @@ public abstract class FPGssClient extends FPGssPrincipal {
      * @param server The server we are communicating with.
      * @return A GSS context.
      */
-    public Attempt<GSSContext> createContext (String server)
+    public Single<GSSContext> createContext (String server)
     {
         return _createContext(server, provider.krb5PrincipalNT());
     }
@@ -62,12 +64,12 @@ public abstract class FPGssClient extends FPGssPrincipal {
      * @param service The server we are communicating with.
      * @return A GSS context.
      */
-    public Attempt<GSSContext> createContextHB (String service)
+    public Single<GSSContext> createContextHB (String service)
     {
         return _createContext(service, GSSName.NT_HOSTBASED_SERVICE);
     }
 
-    private Attempt<GSSContext> _createContext (String name, Oid type)
+    private Single<GSSContext> _createContext (String name, Oid type)
     {
         return withCreds(creds -> {
             GSSManager mgr = provider.getGSSManager();

@@ -15,7 +15,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 import jakarta.json.*;
-import jakarta.ws.rs.WebApplicationException;
+import jakarta.ws.rs.core.SecurityContext;
 
 import org.apache.jena.datatypes.xsd.XSDDatatype;
 import org.apache.jena.query.*;
@@ -30,6 +30,10 @@ import org.slf4j.LoggerFactory;
 import io.vavr.collection.Iterator;
 import io.vavr.control.Option;
 
+import uk.co.amrc.factoryplus.client.*;
+import uk.co.amrc.factoryplus.providers.AuthProvider;
+import uk.co.amrc.factoryplus.service.*;
+
 /* This class is not called Model because of the conflict with Jena's
  * Model class. */
 /* XXX I think this is two or possibly three classes: a component
@@ -42,6 +46,8 @@ public class RdfStore
     private InfModel    derived;
     private Dataset     dataset;
 
+    private FPServiceClient fplus;
+    private AuthProvider    auth;
     private Dataflow        dataflow;
     private MetaDBNotify    metaNotify;
     private AppMapper       appMapper;
@@ -52,7 +58,7 @@ public class RdfStore
      * - G_derived: this is RDFS(G_direct).
      * - default: this is equal to G_derived.
      */
-    public RdfStore (String data)
+    public RdfStore (FPServiceClient fplus, AuthProvider auth, String data)
     {
         var tdb     = TDB2Factory.connectDataset(data);
         direct      = tdb.getNamedModel(Vocab.G_direct);
@@ -62,6 +68,8 @@ public class RdfStore
         dataset.addNamedModel(Vocab.G_direct, direct);
         dataset.addNamedModel(Vocab.G_derived, derived);
 
+        this.fplus      = fplus;
+        this.auth       = auth;
         dataflow        = new Dataflow(this);
         metaNotify      = new MetaDBNotify(this);
         appMapper       = new AppMapper(this);
@@ -72,6 +80,10 @@ public class RdfStore
     public Model direct () { return direct; }
     public InfModel derived () { return derived; }
 
+    /* XXX I think I should be able to use jakarta.inject to handle
+     * these rather than explicitly fetching them all from this object. */
+    public FPServiceClient fplus () { return fplus; }
+    public AuthProvider auth () { return auth; }
     public Dataflow dataflow () { return dataflow; }
     public MetaDBNotify metaNotify () { return metaNotify; }
     public AppMapper appMapper () { return appMapper; }
@@ -89,9 +101,9 @@ public class RdfStore
     public void executeWrite (Runnable r) { dataset.executeWrite(r); }
     public <T> T calculateWrite (Supplier<T> s) { return dataset.calculateWrite(s); }
 
-    public <T> T requestRead (Function<RequestHandler, T> cb)
+    public <T> T requestRead (SecurityContext ctx, Function<RequestHandler, T> cb)
     {
-        return calculateRead(() -> cb.apply(new RequestHandler(this)));
+        return calculateRead(() -> cb.apply(new RequestHandler(this, ctx)));
     }
 
     /* Jena ModelChangedListeners do not appear to respect inference
@@ -117,9 +129,9 @@ public class RdfStore
      * for a change in one rank to propagate into other ranks. If we
      * introduced inference for powertypes this would change.
      */
-    public <T> T requestWrite (Function<RequestHandler, T> cb)
+    public <T> T requestWrite (SecurityContext ctx, Function<RequestHandler, T> cb)
     {
-        var req = new RequestHandler(this);
+        var req = new RequestHandler(this, ctx);
         var listener = new ModelUpdate();
         T rv;
 
@@ -150,9 +162,9 @@ public class RdfStore
 
         return rv;
     }
-    public void requestExecute (Consumer<RequestHandler> cb)
+    public void requestExecute (SecurityContext ctx, Consumer<RequestHandler> cb)
     {
-        requestWrite(req -> { cb.accept(req); return 1; });
+        requestWrite(ctx, req -> { cb.accept(req); return 1; });
     }
 
     public ResultSet selectQuery (Query query, Object... substs)
@@ -211,13 +223,13 @@ public class RdfStore
     public FPObject findObjectOrError (UUID uuid)
     {
         return findObject(uuid)
-            .getOrElseThrow(() -> new Err.NotFound(uuid.toString()));
+            .getOrElseThrow(() -> new SvcErr.NotFound(uuid.toString()));
     }
 
     public Resource findRankClass (int rank)
     {
         return findResource(Vocab.rank, direct.createTypedLiteral(rank))
-            .getOrElseThrow(() -> new Err.CorruptRDF("Cannot find rank class"));
+            .getOrElseThrow(() -> new RdfErr.CorruptRDF("Cannot find rank class"));
     }
 
     private static final Query Q_findRank = Vocab.query("""

@@ -32,13 +32,15 @@ import org.apache.jena.update.*;
 
 import io.vavr.control.*;
 
+import uk.co.amrc.factoryplus.client.FPUuid;
 import uk.co.amrc.factoryplus.metadb.db.*;
 
 @Path("v2")
 public class Sparql {
     @Inject private RdfStore store;
-    @Inject private Request req;
+    @Inject private Request httpReq;
     @Inject private UriInfo uriInfo;
+    @Inject private SecurityContext auth;
 
     private static final Logger log = LoggerFactory.getLogger(Sparql.class);
 
@@ -125,8 +127,10 @@ public class Sparql {
     @Consumes("application/sparql-update")
     public void update (String update)
     {
-        store.requestExecute(req ->
-            UpdateAction.parseExecute(update, store.dataset()));
+        store.requestExecute(auth, req -> {
+            req.checkACL(Vocab.Perm.WriteRDF, FPUuid.Null);
+            UpdateAction.parseExecute(update, store.dataset());
+        });
     }
 
     @POST @Path("sparql")
@@ -140,9 +144,10 @@ public class Sparql {
         if (handler == null)
             throw new WebApplicationException(422);
 
-        var lang = handler.content().acceptLang(req);
+        var lang = handler.content().acceptLang(httpReq);
 
-        return store.requestRead(req -> {
+        return store.requestRead(auth, req -> {
+            req.checkACL(Vocab.Perm.ReadRDF, FPUuid.Null);
             try (var qexec = QueryExecutionFactory.create(query, store.dataset())) {
                 return handler.handle().apply(qexec, lang);
             }
@@ -185,21 +190,14 @@ public class Sparql {
     @GET @Path("rdf")
     public StreamingOutput graphGet ()
     {
-        var dataset = store.dataset();
-        var lang = RDF_HANDLER.acceptLang(req);
+        var lang = RDF_HANDLER.acceptLang(httpReq);
         var graph = resolveGraph(false);
 
-        /* We must do explict txn handling here as otherwise we will
-         * need to copy the complete graph in memory. */
-        dataset.begin(TxnType.READ);
-        return os -> {
-            try {
-                RDFDataMgr.write(os, graph, lang);
-            }
-            finally {
-                dataset.end();
-            }
-        };
+        /* We defer txn start until the streaming write starts. */
+        return os -> store.requestExecute(auth, req -> {
+            req.checkACL(Vocab.Perm.ReadRDF, FPUuid.Null);
+            RDFDataMgr.write(os, graph, lang);
+        });
     }
 
     /* TXN */
@@ -225,7 +223,8 @@ public class Sparql {
         var lang = RDF_HANDLER.contentLang(type);
         var graph = resolveGraph(true);
 
-        store.requestExecute(req -> {
+        store.requestExecute(auth, req -> {
+            req.checkACL(Vocab.Perm.WriteRDF, FPUuid.Null);
             readToGraph(graph, rdf, lang);
             /* This refreshes the inferences because we have been poking
              * around behind its back. Strictly this is only needed when
@@ -243,7 +242,8 @@ public class Sparql {
         var lang = RDF_HANDLER.contentLang(type);
         var graph = resolveGraph(true);
 
-        store.requestExecute(req -> {
+        store.requestExecute(auth, req -> {
+            req.checkACL(Vocab.Perm.WriteRDF, FPUuid.Null);
             graph.removeAll();
             readToGraph(graph, rdf, lang);
             store.derived().rebind();

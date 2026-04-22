@@ -132,7 +132,6 @@ grants:
     !u ConfigDB.Perm.ReadMembers:
       !u DataAccess.App.DatasetDefinition: false
       !u DataAccess.App.DatasetMetadata: false
-      !u UUIDs.App.Info: false
       !u DataAccess.Class.Dataset: "both"
       !u DataAccess.Group.FunctionalDatasetGroup: "both"
     !u ConfigDB.Perm.WriteMembers:

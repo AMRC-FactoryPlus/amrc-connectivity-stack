@@ -68,18 +68,29 @@ objects:
     !u Clusters.App.Bootstrap:
         name: "Bootstrap script"
         iri: app/BootstrapScript
+        subclassOf:
+          - !u MetaDB.Class.ConfigEntry
     !u Clusters.App.Cluster:
         name: "Edge cluster configuration"
         iri: app/EdgeClusterConfig
+        subclassOf:
+          - !u MetaDB.Class.ConfigEntry
     !u Clusters.App.Flux:
         name: "Flux template"
         iri: app/FluxTemplate
+        subclassOf:
+          - !u MetaDB.Class.ConfigEntry
     !u Clusters.App.HelmChart:
         name: "Helm chart template"
         iri: app/HelmChartTemplate
+        subclassOf:
+          - !u MetaDB.Class.ConfigEntry
     !u Clusters.App.Status:
         name: "Edge cluster setup status"
         iri: app/ClusterSetupStatus
+        subclassOf:
+          - !u MetaDB.Class.ConfigEntry
+
   !u Clusters.Perm.All:
     !u Clusters.Perm.Clusters:
         name: "Manage clusters"

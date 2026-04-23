@@ -1,35 +1,7 @@
 service: !u UUIDs.Service.ConfigDB
 version: 2
 objects:
-  # Some of these are commented out because, although they logically
-  # belong here, they are actually defined in service-setup.yaml because
-  # they are needed for local UUID generation.
   !u ConfigDB.Class.R2Class:
-    #!u Auth.Class.PrincipalGroup:
-    #  name: "Principal group"
-    #!u Auth.Class.PrincipalType:
-    #  name: "Principal type"
-    #  subclassOf:
-    #    - !u Auth.Class.PrincipalGroup
-    #!u Auth.Class.Role:
-    #  name: "Role"
-    #  subclassOf:
-    #    - !u Auth.Class.PrincipalGroup
-    !u Auth.Class.ServiceRole:
-      name: "Service role"
-      iri: authn/ServiceRole
-      subclassOf:
-        - !u Auth.Class.Role
-    #!u Auth.Class.EdgeRole:
-    #  name: "Edge role"
-    #  subclassOf:
-    #    - !u Auth.Class.Role
-    !u Auth.Class.ClientRole:
-      name: "Client role"
-      iri: authn/ClientRole
-      subclassOf:
-        - !u Auth.Class.Role
-
     !u Auth.Class.PermissionGroup: 
       name: "Permission group"
       iri: authz/PermissionGroup
@@ -45,10 +17,6 @@ objects:
         - !u Auth.Class.PermissionGroup
 
   !u UUIDs.Class.Class:
-    #!u Auth.Class.Principal:
-    #  name: "Principal"
-    #  memberOf:
-    #    - !u Auth.Class.PrincipalGroup
     !u UUIDs.Class.Permission:
       name: "Permission"
       iri: authz/Permission
@@ -56,15 +24,12 @@ objects:
         - !u Auth.Class.PermissionGroup
 
   !u Auth.Class.PrincipalType:
+    # CentralService is in core-auth.yaml
     !u Auth.Class.HumanUser:
       name: "Human user"
       iri: authn/HumanUser
       subclassOf:
         - !u Auth.Class.Principal
-    #!u Auth.Class.CentralService:
-    #  name: "Central service"
-    #  subclassOf:
-    #    - !u Auth.Class.Principal
     !u Auth.Class.EdgeService:
       name: "Edge service"
       iri: authn/EdgeService

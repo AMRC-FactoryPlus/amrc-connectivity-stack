@@ -30,7 +30,10 @@ objects:
         - !u Auth.Class.Principal
 
   !u UUIDs.Class.App:
-    !u Edge.App.AgentConfig:      { name: "Edge Agent config" }
+    !u Edge.App.AgentConfig:
+      name: "Edge Agent config"
+      subclassOf:
+        - !u MetaDB.Class.ConfigEntry
 ---
 service: !u UUIDs.Service.Authentication
 version: 2

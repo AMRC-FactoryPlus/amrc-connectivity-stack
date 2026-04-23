@@ -1,20 +1,26 @@
 # Special UUIDs
+#-EARLY
+#-REQUIRE: service-urls core-apps
 
 service: !u UUIDs.Service.ConfigDB
-version: 1
-overwrite: true
-classes:
-  - !u UUIDs.Class.Special
+version: 2
 objects:
+  # XXX I don't think these should be Individuals.
+  !u ConfigDB.Class.R1Class:
+    !u UUIDs.Class.Special:
+      name: "Special UUIDs"
+      iri: core/Special
+
   !u UUIDs.Class.Special:
-    - !u UUIDs.Special.Null
-    - !u UUIDs.Special.FactoryPlus
-    - !u UUIDs.Special.Self
-    - !u UUIDs.Special.Mine
-configs:
-  !u UUIDs.App.Info:
-    !u UUIDs.Class.Special:       { name: "Special UUIDs" }
-    !u UUIDs.Special.Null:        { name: "Wildcard" }
-    !u UUIDs.Special.FactoryPlus: { name: "Factory+" }
-    !u UUIDs.Special.Self:        { name: "Self" }
-    !u UUIDs.Special.Mine:        { name: "Mine" }
+    !u UUIDs.Special.Null:
+      name: "Wildcard"
+      iri: core/Wildcard
+    !u UUIDs.Special.FactoryPlus:
+      name: "Factory+"
+      iri: core/FactoryPlus
+    !u UUIDs.Special.Self:
+      name: "Self"
+      iri: core/Self
+    !u UUIDs.Special.Mine:
+      name: "Mine"
+      iri: core/Mine

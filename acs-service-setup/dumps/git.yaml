@@ -24,7 +24,10 @@ objects:
   !u UUIDs.Class.Service:
     !u Git.Service.Git: { name: "Git hosting" }
   !u UUIDs.Class.App:
-    !u Git.App.Config: { name: "Git repository configuration" }
+    !u Git.App.Config:
+      name: "Git repository configuration"
+      subclassOf:
+        - !u MetaDB.Class.ConfigEntry
   !u Git.Perm.All:
     !u Git.Perm.Create: { name: "Create repo" }
     !u Git.Perm.Delete: { name: "delete repo" }

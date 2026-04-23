@@ -1,29 +1,47 @@
 service: !u UUIDs.Service.ConfigDB
-version: 1
-classes:
-  - !u UUIDs.Class.Schema
+version: 2
 objects:
+  !u ConfigDB.Class.R1Class: 
+    !u UUIDs.Class.Schema:
+      name: "Metric schema"
+      iri: schema/Schema
+
   !u UUIDs.Class.App:
-    - !u ACS.App.SchemaIcon
+    !u ACS.App.SchemaIcon:
+      name: "Schema icon"
+      subclassOf:
+        - !u MetaDB.Class.ConfigEntry
+
   !u UUIDs.Class.Schema:
-    - !u UUIDs.Schema.Service
-    - !u ACS.Schema.ThreePhaseCircuitV1
-    - !u ACS.Schema.DirectCurrentCircuitV1
-    - !u ACS.Schema.PowerMonitoringV1
-    - !u ACS.Schema.PowerMonitoringV2
-    - !u ACS.Schema.SinglePhaseCircuitV1
-    - !u ACS.Schema.MonitorV1
+    !u UUIDs.Schema.Service:
+      name: "Service v1"
+      iri: schema/Service
+    !u ACS.Schema.ThreePhaseCircuitV1:
+      name: "Three Phase Circuit v1"
+    !u ACS.Schema.DirectCurrentCircuitV1:
+      name: "Direct Current Circuit v1"
+    !u ACS.Schema.PowerMonitoringV1:
+      name: "Power Monitoring v1"
+    !u ACS.Schema.PowerMonitoringV2:
+      name: "Power Monitoring v2"
+    !u ACS.Schema.SinglePhaseCircuitV1:
+      name: "Single Phase Circuit v1"
+    !u ACS.Schema.MonitorV1:
+      name: "Monitor v1"
 configs:
   !u UUIDs.App.Info:
-    !u UUIDs.Class.Schema: { name: "Metric schema" }
-    !u ACS.App.SchemaIcon: { name: "Schema icon" }
-    !u UUIDs.Schema.Service: { name: "Service v1" }
-    !u ACS.Schema.ThreePhaseCircuitV1: { name: "Three Phase Circuit v1" }
-    !u ACS.Schema.DirectCurrentCircuitV1: { name: "Direct Current Circuit v1" }
-    !u ACS.Schema.PowerMonitoringV1: { name: "Power Monitoring v1" }
-    !u ACS.Schema.PowerMonitoringV2: { name: "Power Monitoring v2" }
-    !u ACS.Schema.SinglePhaseCircuitV1: { name: "Single Phase Circuit v1" }
-    !u ACS.Schema.MonitorV1: { name: "Monitor v1" }
+    !u UUIDs.Class.Schema:
+      name: "Metric schema"
+    !u ACS.App.SchemaIcon:
+      name: "Schema icon"
+    !u UUIDs.Schema.Service:
+      name: "Service v1"
+    !u ACS.Schema.ThreePhaseCircuitV1:
+    !u ACS.Schema.DirectCurrentCircuitV1:
+    !u ACS.Schema.PowerMonitoringV1:
+    !u ACS.Schema.PowerMonitoringV2:
+    !u ACS.Schema.SinglePhaseCircuitV1:
+    !u ACS.Schema.MonitorV1:
   !u ACS.App.SchemaIcon:
     !u UUIDs.Schema.Service:
       bbox: { top: 0, left: 0, width: 512, height: 512 }

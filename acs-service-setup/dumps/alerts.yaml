@@ -1,8 +1,5 @@
 service: !u UUIDs.Service.ConfigDB
 version: 2
-classes:
-  - !u Edge.Class.Alert
-  - !u Edge.Class.LinkRelation
 objects:
   !u ConfigDB.Class.R1Class:
     !u Edge.Class.Alert:

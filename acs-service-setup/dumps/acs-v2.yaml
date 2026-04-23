@@ -6,9 +6,23 @@ service: !u UUIDs.Service.ConfigDB
 version: 2
 objects:
   !u UUIDs.Class.App:
-    !u UUIDs.App.SparkplugAddress:    { name: "Sparkplug address" }
-    !u MQTT.App.PermTemplate:         { name: "MQTT permission template" }
-    !u CmdEsc.App.CmdDef:             { name: "Command definition" }
+    !u UUIDs.App.SparkplugAddress:
+        name: "Sparkplug address"
+        iri: app/SparkplugAddress
+        memberOf:
+          - !u MetaDB.Class.Structured
+        subclassOf:
+          - !u MetaDB.Class.ConfigEntry
+    !u MQTT.App.PermTemplate:
+        name: "MQTT permission template"
+        iri: app/MqttPermTemplate
+        subclassOf:
+          - !u MetaDB.Class.ConfigEntry
+    !u CmdEsc.App.CmdDef:
+        name: "Command definition"
+        iri: app/CommandDefinition
+        subclassOf:
+          - !u MetaDB.Class.ConfigEntry
 
   !u ACS.PermGroup.Auth:
     !u Auth.Perm.ManageKerberos:      { name: "Manage Kerberos mappings" }

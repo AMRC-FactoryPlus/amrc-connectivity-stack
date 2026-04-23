@@ -33,6 +33,16 @@ objects:
       iri: app/Structured
       subclassOf:
         - !u UUIDs.Class.App
+    # These properly belong in data-access.yaml, but must be loaded here
+    # for now or they prevent Application upgrading to R2.
+    !u DataAccess.App.DatasetDefinition:
+      name: "Dataset definition"
+      subclassOf:
+        - !u UUIDs.Class.App
+    !u DataAccess.App.DatasetMetadata:
+      name: "Dataset metadata"
+      subclassOf:
+        - !u UUIDs.Class.App
 
   !u ConfigDB.Class.R1Class:
     !u MetaDB.Class.Document:

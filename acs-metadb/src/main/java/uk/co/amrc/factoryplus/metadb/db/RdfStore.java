@@ -28,6 +28,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import io.vavr.collection.Iterator;
+import io.vavr.collection.List;
 import io.vavr.control.Option;
 
 import uk.co.amrc.factoryplus.client.*;
@@ -91,6 +92,9 @@ public class RdfStore
 
     public void start ()
     {
+        var zfc = new ZFC(this);
+        executeRead(zfc::validateInvariants);
+
         dataflow.start();
         schemaTracker.start();
     }
@@ -229,6 +233,12 @@ public class RdfStore
     public QuerySolution singleQuery (Query query, Object... substs)
     {
         return Util.singleOrError(selectQuery(query, substs));
+    }
+
+    public List<QuerySolution> listQuery (Query query, Object... substs)
+    {
+        return Iterator.ofAll(selectQuery(query, substs))
+            .toList();
     }
 
     public void runUpdate (UpdateRequest update, Object... substs)

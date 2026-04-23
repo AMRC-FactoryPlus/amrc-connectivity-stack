@@ -6,9 +6,9 @@
 
 package uk.co.amrc.factoryplus.service;
 
-import java.util.Map;
-
 import jakarta.json.*;
+
+import io.vavr.collection.*;
 
 public class SvcErr extends Error
 {
@@ -37,7 +37,7 @@ public class SvcErr extends Error
 
         public Map<String, String> buildHeaders ()
         {
-            return Map.of();
+            return HashMap.empty();
         }
     }
     public static class AuthFailed extends Client
@@ -52,7 +52,7 @@ public class SvcErr extends Error
              * but this is what the F+ services have always sent. If we
              * admit to accepting Negotiate auth then Windows browsers
              * try to authenticate via SSPI and create a problem. */
-            return Map.of("WWW-Authenticate", "Basic realm=\"Factory+\"");
+            return HashMap.of("WWW-Authenticate", "Basic realm=\"Factory+\"");
         }
     }
     public static class Forbidden extends Client

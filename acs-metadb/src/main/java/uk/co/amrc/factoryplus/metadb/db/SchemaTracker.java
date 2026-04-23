@@ -99,7 +99,7 @@ public class SchemaTracker
                 var conflicts = findConfigs(app)
                     .filter(e -> !newSchemas.validate(app, e.value()))
                     .map(Entry::uuid)
-                    .toSet();
+                    .toList();
                 if (!conflicts.isEmpty())
                     throw new RdfErr.SchemaConflict(conflicts);
             });

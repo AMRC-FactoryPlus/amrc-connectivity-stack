@@ -69,7 +69,7 @@ public class FPConfigDB {
     {
         return request("GET")
             .withURIBuilder(b -> b
-                .appendPath("v1/app")
+                .appendPath("v2/app")
                 .appendPath(appid.toString())
                 .appendPath("object")
                 .appendPath(objid.toString()))
@@ -128,7 +128,7 @@ public class FPConfigDB {
      */
     public Observable<Set<UUID>> watchList (UUID app)
     {
-        return this.watchSet(List.of("v1", "app", app, "object"));
+        return this.watchSet(List.of("v2", "app", app, "object"));
     }
 
     /** Watch all entries for a given App.
@@ -148,7 +148,7 @@ public class FPConfigDB {
     /* No implementation of filters yet, we don't have a use case. */
     public Observable<Map<UUID, Object>> searchApp (UUID app)
     {
-        return this.notify.search(List.of("v1", "app", app, "object"));
+        return this.notify.search(List.of("v2", "app", app, "object"));
     }
 
     /** Watch the members of a class.

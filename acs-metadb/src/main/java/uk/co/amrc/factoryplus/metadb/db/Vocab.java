@@ -41,6 +41,18 @@ public class Vocab
     public static final Resource Wildcard   = res("core/Wildcard");
     public static final Resource Unowned    = res("core/Unowned");
 
+    public static class Class {
+        /* These are proper classes and don't have ranks or UUIDs */
+        public static final Resource Object         = res("core/Object");
+        public static final Resource Class          = res("core/Class");
+
+        public static final Resource Individual     = res("core/Individual");
+        public static final Resource R1Class        = res("core/R1Class");
+        public static final Resource R2Class        = res("core/R2Class");
+        public static final Resource R3Class        = res("core/R3Class");
+        public static final Resource TopRank        = R3Class;
+    }
+
     public static class Time {
         public static final Resource Instant        = res("time/Instant");
 

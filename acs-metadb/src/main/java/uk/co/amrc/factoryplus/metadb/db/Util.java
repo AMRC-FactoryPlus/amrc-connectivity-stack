@@ -15,6 +15,7 @@ import java.util.function.Supplier;
 
 import jakarta.json.*;
 
+import org.apache.jena.datatypes.xsd.XSDDatatype;
 import org.apache.jena.query.ResultSet;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.util.iterator.ClosableIterator;
@@ -69,6 +70,12 @@ public final class Util {
                 }))
             .map(klass::cast)
             .get();
+    }
+
+    public static Literal intLiteral (int val)
+    {
+        return ResourceFactory.createTypedLiteral(
+            Integer.toString(val), XSDDatatype.XSDint);
     }
 
     public static <T> Option<T> single (Iterator<T> it)

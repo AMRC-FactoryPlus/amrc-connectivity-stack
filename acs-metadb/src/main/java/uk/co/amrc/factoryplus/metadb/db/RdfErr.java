@@ -6,12 +6,11 @@
 
 package uk.co.amrc.factoryplus.metadb.db;
 
-import java.util.Map;
 import java.util.UUID;
 
 import jakarta.json.*;
 
-import io.vavr.collection.Set;
+import io.vavr.collection.*;
 
 import org.apache.jena.rdf.model.*;
 
@@ -93,23 +92,51 @@ public final class RdfErr
         public int statusCode () { return 405; }
         public Map<String, String> buildHeaders ()
         {
-            return Map.of("Allow", "GET, HEAD");
+            return HashMap.of("Allow", "GET, HEAD");
         }
     }
-    public static class SchemaConflict extends SvcErr.Client
+
+    public static class InvalidObjs extends SvcErr.Client
     {
-        private Set<UUID> conflicts;
-        public SchemaConflict (Set<UUID> conflicts)
+        private List<UUID> objects;
+        public InvalidObjs (String msg, List<UUID> objects)
         {
-            super("Schema conflicts with existing objects");
-            this.conflicts = conflicts;
+            super(msg);
+            this.objects = objects;
         }
         public int statusCode () { return 409; }
         protected void extendJson (JsonObjectBuilder obj)
         {
-            obj.add("conflicts", conflicts
+            obj.add("objects", objects
                 .map(UUID::toString)
                 .foldLeft(Json.createArrayBuilder(), (a, v) -> a.add(v))
+                .build());
+        }
+    }
+    public static class SchemaConflict extends InvalidObjs
+    {
+        public SchemaConflict (List<UUID> conflicts)
+        {
+            super("Schema conflicts with existing objects", conflicts);
+        }
+    }
+
+    public static class InvalidRels extends SvcErr.Client
+    {
+        private Map<UUID, UUID> relations;
+        public InvalidRels (String msg, Map<UUID, UUID> relations)
+        {
+            super(msg);
+            this.relations = relations;
+        }
+        public int statusCode () { return 409; }
+        protected void extendJson (JsonObjectBuilder obj)
+        {
+            obj.add("relations", 
+                Json.createObjectBuilder(relations
+                    .mapKeys(UUID::toString)
+                    .mapValues(v -> (Object)v.toString())
+                    .toJavaMap())
                 .build());
         }
     }

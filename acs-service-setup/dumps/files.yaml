@@ -19,7 +19,10 @@ objects:
     !u Files.Service.Files: { name: "Files Hosting" }
 
   !u UUIDs.Class.App:
-    !u Files.App.Config: { name: "Files Configuration" }
+    !u Files.App.Config:
+      name: "Files Configuration"
+      subclassOf:
+        - !u MetaDB.Class.ConfigEntry
 
   !u Files.Perm.All:
     !u Files.Perm.Upload: { name: "Upload" }

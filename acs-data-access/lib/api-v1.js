@@ -459,10 +459,13 @@ export class APIv1 {
 
     if (!ok) return fail(403);
 
+    this.log(`Passed ACL Check to CreateDataset for structure ${structure}`);
+
     if(!config) return fail(422);
     
     // Check the principal has appropriate permission for all dataset sources in config. 
-    const ok2 = await this._check_second_level_permission(principal, structure, config, mapStructureToPermission[structure]);
+    this.log(`Now will try ACL check ${mapStructureToPermission.get(structure)} for ${config.source} `);
+    const ok2 = await this._check_second_level_permission(principal, structure, config, mapStructureToPermission.get(structure));
     
     if(!ok2) return fail(403);
 

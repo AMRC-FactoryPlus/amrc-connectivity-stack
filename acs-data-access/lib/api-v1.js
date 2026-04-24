@@ -6,12 +6,11 @@
 import express from "express";
 import { Map as IMap } from "immutable";
 import * as rx from "rxjs";
-import {InfluxDB, flux} from '@influxdata/influxdb-client';
 
 import { APIError } from "@amrc-factoryplus/service-api";
 import { DataAccess as Constants } from "./constants.js";
 import { valid_uuid, DatasetValidity } from "./validate.js";
-import {convert_to_csv} from './utils.js';
+import {convert_to_csv, minDate, maxDate} from './utils.js';
 
 function fail(status, message) {
   throw new APIError(status);
@@ -28,9 +27,7 @@ export class APIv1 {
     this.auth = opts.auth;
     this.cdb = opts.cdb;
     this.log = opts.debug.bound("apiv1");
-    this.influx_bucket = opts.influx_bucket;
-    this.influx_org = opts.influx_org;
-    this.influx_query_api = opts.influx_client.getQueryApi(opts.influx_org);
+    this.influxReader = opts.influxReader;
     this.routes = this.setup_routes();
   }
 
@@ -69,6 +66,66 @@ export class APIv1 {
   async metadata_list(req, res) {
     const uuids = await this.data.get_allowed_dataset_uuids(req.auth, Constants.Perm.ReadDataset, DatasetValidity.VALID);
     return res.status(200).json(uuids);
+  }
+
+
+  async _get_dataset_time_bounds(dataset_uuid, visited=new Set()){
+    if(visited.has(dataset_uuid)) return fail(422, `Cycle detected at dataset ${dataset_uuid}`);
+
+    visited.add(dataset_uuid);
+
+    const def = await this.data.get_dataset_def_by_uuid(dataset_uuid);
+    if(!def) return fail(404, `Dataset def for ${dataset_uuid} not found`);
+
+    const {structure, config} = def;
+
+    // ------------------------
+    // 1. SESSION 
+    // ------------------------
+    if(structure === Constants.App.SessionLimits){
+      const child = await this._get_dataset_time_bounds(config.source, visited);
+
+      const from = config.from ? new Date(config.from) : null;
+      const to = config.to ? new Date(config.to) : null;
+
+      return {
+        from: maxDate(from, child.from),
+        to: minDate(to, child.to)
+      };
+    }
+
+
+    // ------------------------
+    // 2. SPARKPLUG SRC
+    // ------------------------
+    if(structure === Constants.App.SparkplugSrc){
+      const {from, to} = await this._get_influx_bounds(config.source);
+
+      return {from, to}
+    }
+
+
+    // ------------------------
+    // 3. UNION
+    // ------------------------
+    if(structure === Constants.App.UnionComponents){
+      const results = await Promise.all(
+        config.map(source_uuid => 
+          this._get_dataset_time_bounds(source_uuid, new Set(visited))
+        )
+      );
+
+      const valid = results.filter(r => r.from && r.to);
+
+      if(!valid.length) return {from: null, to: null};
+
+      return {
+        from: new Date(Math.min(...valid.map(v => v.from))),
+        to: new Date(Math.max(...valid.map(v => v.to)))
+      };
+    }
+
+    return {from: null, to: null};
   }
 
   /** GET. Accepts Dataset UUID and returns metadata about a Published dataset.
@@ -114,14 +171,13 @@ export class APIv1 {
     /**
      * if the queried dataset does not have from to time period -> recursively find the earliest and latest timestamps from source datasets.
      */
-    const from = null;
-    const to = null;
+    const {from, to} = await this._get_dataset_time_bounds(dataset_uuid);
 
     const meta = {
       uuid: dataset_uuid,
       name: info.name,
-      from: from ? from : undefined,
-      to: to ? to : undefined,
+      from: from,
+      to: to,
       function: f_type,
       metadata: metadata,
       parts: []
@@ -129,37 +185,6 @@ export class APIv1 {
     return res.status(200).json(meta);
   }
 
-
-  /** POST. Queries all possible Influx suffixes, combines the measuremenets and returns actual data from a dataset. 
-   * Empty POST body requests all dataset measurements.
-   * @param {*} req 
-   * @param {*} res 
-   * @returns CSV with columns:
-              * device - Device this data point comes from
-              * metric - metric name (don't include Influx :x suffix)
-              * timestamp - ISO string
-              * value - actual data value
-              * unit - Engineering unit (if available)
-    * Don't return valid response if dataset is invalid
-  
-  Influx tags:
-    [
-    "_start",
-    "_stop",
-    "_field",
-    "_measurement",
-    "bottomLevelInstance",
-    "bottomLevelSchema",
-    "device",
-    "group",
-    "node",
-    "path",
-    "topLevelInstance",
-    "topLevelSchema",
-    "usesInstances",
-    "usesSchemas"
-  ]
-   */
 
   async _check_second_level_permission(principal, structure, config, permission){
     if(structure == Constants.App.SessionLimits || structure == Constants.App.SparkplugSrc){
@@ -198,55 +223,7 @@ export class APIv1 {
     }
   }
 
-  async _run_influx_query(topLevelInstance, meta = {}) {
-    const { from, to, measurement } = meta;
 
-    // Build range
-    const rangeClause = (from && to)
-      ? `|> range(start: ${from}, stop: ${to})`
-      : `|> range(start: -5m)`;
-
-    // Optional measurement filter
-    const measurementFilter = measurement
-      ? `|> filter(fn: (r) => r._measurement == "${measurement}")`
-      : ``;
-
-    const query = `
-      import "strings"
-
-      from(bucket: "${this.influx_bucket}")
-        ${rangeClause}
-        |> filter(fn: (r) => r.topLevelInstance == "${topLevelInstance}")
-        ${measurementFilter}
-        |> drop(columns: [
-          "_start","_stop","_field","table",
-          "bottomLevelInstance","bottomLevelSchema",
-          "group","node","topLevelSchema",
-          "usesInstances","usesSchemas"
-        ])
-        |> map(fn: (r) => ({ r with path: if exists r.path then r.path else "" }))
-        |> pivot(
-          rowKey: ["_time"],
-          columnKey: ["_measurement"],
-          valueColumn: "_value"
-        )
-        |> group()
-        |> sort(columns: ["_time"], desc: false)
-    `;
-
-    return new Promise((resolve, reject) => {
-      const rows = [];
-
-      this.influx_query_api.queryRows(query, {
-        next: (row, tableMeta) => {
-          const o = tableMeta.toObject(row);
-          rows.push(o);
-        },
-        error: reject,
-        complete: () => resolve(rows)
-      });
-    });
-  }
   
 
   _merge_intervals(queries){
@@ -382,7 +359,36 @@ export class APIv1 {
     }
   }
 
-
+  /** POST. Queries all possible Influx suffixes, combines the measuremenets and returns actual data from a dataset. 
+   * Empty POST body requests all dataset measurements.
+   * @param {*} req 
+   * @param {*} res 
+   * @returns CSV with columns:
+              * device - Device this data point comes from
+              * metric - metric name (don't include Influx :x suffix)
+              * timestamp - ISO string
+              * value - actual data value
+              * unit - Engineering unit (if available)
+    * Don't return valid response if dataset is invalid
+  
+  Influx tags:
+    [
+    "_start",
+    "_stop",
+    "_field",
+    "_measurement",
+    "bottomLevelInstance",
+    "bottomLevelSchema",
+    "device",
+    "group",
+    "node",
+    "path",
+    "topLevelInstance",
+    "topLevelSchema",
+    "usesInstances",
+    "usesSchemas"
+  ]
+   */
   async dataset_data(req, res) {
     const dataset_uuid = req.params.uuid;
     if (!valid_uuid(dataset_uuid)) return fail(422, `Dataset uuid ${dataset_uuid} is invalid.`);
@@ -413,7 +419,7 @@ export class APIv1 {
 
       const results = await Promise.all(
         merged.map(q => 
-            this._run_influx_query(q.source, {
+            this.influxReader.get_dataset_data(q.source, {
                 from: q.from?.toISOString(),
                 to: q.to?.toISOString()
             })
@@ -433,21 +439,6 @@ export class APIv1 {
       return fail(500);
     }
   }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
   /** GET. 

@@ -58,7 +58,7 @@ export class InfluxReader{
             |> ${fn}(column: "_time")
         `;
 
-        const rows = await this.run_flux(query);
+        const rows = await this._run_influx(query);
         return rows?.[0]?._value ?? null;
     }
 

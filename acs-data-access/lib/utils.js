@@ -1,5 +1,5 @@
 
-export const convert_to_csv = (rows) => {
+export function convert_to_csv (rows){
     if (!rows.length) return "";
 
     const headers = Object.keys(rows[0]);
@@ -8,4 +8,17 @@ export const convert_to_csv = (rows) => {
     );
 
     return [headers.join(","), ...lines].join("\n");
+}
+
+
+export function minDate(a, b) {
+  if (!a) return b;
+  if (!b) return a;
+  return a < b ? a : b;
+}
+
+export function maxDate(a, b) {
+  if (!a) return b;
+  if (!b) return a;
+  return a > b ? a : b;
 }

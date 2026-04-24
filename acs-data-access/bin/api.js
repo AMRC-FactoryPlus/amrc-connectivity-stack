@@ -12,6 +12,7 @@ import { WebAPI } from '@amrc-factoryplus/service-api';
 import {DataFlow} from '../lib/dataflow.js';
 import { APIv1 } from '../lib/api-v1.js';
 import {DataAccessNotify} from '../lib/notify.js';
+import { InfluxReader } from '../lib/influx-reader.js';
 
 const { env } = process;
 
@@ -35,14 +36,19 @@ const data = new DataFlow({
   fplus
 });
 
-
-const apiv1 = new APIv1({ 
-  data, debug,
-  auth: fplus.Auth,
-  cdb: fplus.ConfigDB,
+const influxReader = new InfluxReader({
+  debug,
   influx_client: influxClient,
   influx_org: env.INFLUXDB_ORG,
   influx_bucket: env.INFLUXDB_BUCKET,
+})
+
+const apiv1 = new APIv1({ 
+  data,
+  debug,
+  auth: fplus.Auth,
+  cdb: fplus.ConfigDB,
+  influxReader
 });
 
 const api = await new WebAPI({

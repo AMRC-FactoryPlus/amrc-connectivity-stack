@@ -99,7 +99,7 @@ export class APIv1 {
     // 2. SPARKPLUG SRC
     // ------------------------
     if(structure === Constants.App.SparkplugSrc){
-      const {from, to} = await this._get_influx_bounds(config.source);
+      const {from, to} = await this.influxReader.get_influx_time_bounds(config.source);
 
       return {from, to}
     }

@@ -154,6 +154,40 @@ export class DataFlow {
   }
 
 
+  async get_allowed_dataset_uuids(principal, permission, dataset_validity) {
+    const dataset_def_obs = this.get_dataset_definitions(dataset_validity);
+    
+    const result = await rx.firstValueFrom(
+      rx.combineLatest([
+        dataset_def_obs,
+        this.auth.watch_acl_with_perm(principal, permission)
+      ]).pipe(
+        rx.map(([datasets, targets]) => {
+          // datasets: IMap<datasetId, {...}>
+          // targets: Set or ISet of allowed datasetIds
+
+          return datasets
+            .keySeq()                // get all dataset IDs
+            .filter(id => targets.has(id))
+            .toArray();              // convert to plain array
+        })
+      )
+    );
+
+    return result;
+  }
+
+
+  async get_dataset_def_by_uuid(uuid){
+    const def = await rx.firstValueFrom(
+      this.get_dataset_definitions(DatasetValidity.VALID).pipe(
+        rx.map(datasets => datasets.get(uuid)?.[0])
+      )
+    );
+    return def;
+  }
+
+
   get_dataset_definitions(validity){
     if(validity == DatasetValidity.VALID){
       return this._get_valid_dataset_definitions();

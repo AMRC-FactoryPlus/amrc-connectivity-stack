@@ -173,14 +173,16 @@ export class APIv1 {
      */
     const {from, to} = await this._get_dataset_time_bounds(dataset_uuid);
 
+    const parts = null;
+
     const meta = {
       uuid: dataset_uuid,
       name: info.name,
-      from: from,
-      to: to,
+      from,
+      to,
       function: f_type,
-      metadata: metadata,
-      parts: []
+      metadata,
+      parts
     }
     return res.status(200).json(meta);
   }
@@ -531,14 +533,23 @@ export class APIv1 {
     }
 
     // Create config entry for the dataset object
-    try{
-      await this.cdb.put_config(structure, objectUuid, config);
-      this.log("Updated dataset def in ConfigDB", objectUuid);
-    }catch(err){
-      return fail(422, `Config entry for ${objectUuid} couldn't be updated.`);
-    }
+    await this.cdb.put_config(structure, objectUuid, config);
+
+    await this._create_subclass_relationship(structure, objectUuid, config);
 
     return objectUuid;
+  }
+
+  async _create_subclass_relationship(structure, dataset_uuid, config){
+    if(structure === Constants.App.SessionLimits){
+        const source = config.source;
+        await this.cdb.class_add_subclass(source, dataset_uuid);
+    }
+    else if(structure === Constants.App.UnionComponents){
+      for (let source in config){
+        await this.cdb.class_add_subclass(dataset_uuid, source);
+      }
+    }
   }
 
   

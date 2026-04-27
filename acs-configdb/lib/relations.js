@@ -35,7 +35,7 @@ export const Relations = [
         path:   "direct/subclass",
         table:  "subclass",
         cperm:  Perm.WriteSubclasses,
-        operm:  Perm.ReadSubclasses,
+        operm:  Perm.WriteSuperclasses,
         add:    m => m.class_add_subclass,
         remove: m => m.class_remove_subclass,
     },

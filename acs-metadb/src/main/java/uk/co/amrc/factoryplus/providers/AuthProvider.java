@@ -15,13 +15,14 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import io.reactivex.rxjava3.core.Single;
+import io.reactivex.rxjava3.core.*;
 import io.vavr.control.Option;
 
 import uk.co.amrc.factoryplus.client.FPServiceClient;
@@ -66,6 +67,19 @@ public class AuthProvider
 
     public FPServiceClient fplus () { return fplus; }
     public Base64.Encoder b64e () { return b64e; }
+
+    public void start ()
+    {
+        Observable.interval(6, TimeUnit.HOURS)
+            .subscribe(v -> {
+                log.info("Expiring old sessions");
+                sessions.forEach(Long.MAX_VALUE,
+                    (tok, sess) -> {
+                        if (sess.isExpired())
+                            sessions.remove(tok);
+                    });
+            });
+    }
 
     public Single<FPSecurityContext> authenticate (String auth)
     {

@@ -135,6 +135,7 @@ public final class Main {
     private void start () throws Throwable
     {
         fplus.start();
+        auth.start();
         model.start();
         server.start();
     }

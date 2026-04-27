@@ -175,6 +175,16 @@ export class APIv1 {
 
     const all_parts = await rx.firstValueFrom(this.data.get_parts());
     const parts = all_parts.get(dataset_uuid);
+    
+    const allowed_parts = [];
+
+    for (let part of parts){
+      const ok = await this.auth.check_acl(req.auth, Constants.Perm.ReadDataset, part, true);
+      if(ok){
+        allowed_parts.push(part);
+      }
+    }
+
 
     const meta = {
       uuid: dataset_uuid,
@@ -183,7 +193,7 @@ export class APIv1 {
       to,
       function: f_type,
       metadata,
-      parts
+      parts: allowed_parts
     }
     return res.status(200).json(meta);
   }

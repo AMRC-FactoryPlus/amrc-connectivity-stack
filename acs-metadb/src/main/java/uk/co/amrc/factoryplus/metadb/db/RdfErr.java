@@ -135,7 +135,7 @@ public final class RdfErr
             obj.add("iris", iris
                 .map(Resource::toString)
                 .foldLeft(Json.createArrayBuilder(), (a, v) -> a.add(v))
-                .build();
+                .build());
         }
     }
 

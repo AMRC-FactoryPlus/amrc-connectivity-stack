@@ -11,6 +11,7 @@
 package uk.co.amrc.factoryplus.metadb.db;
 
 import java.net.URI;
+import java.util.ServiceConfigurationError;
 import java.util.UUID;
 
 import jakarta.json.*;
@@ -31,18 +32,24 @@ public class SchemaTracker
 {
     private static final Logger log = LoggerFactory.getLogger(SchemaTracker.class);
 
+    /* XXX Should this throw BadJson instead? Or some subclass? If it
+     * did it could include the schema errors in the HTTP result. */
+    public static boolean _validate (Validator validator, URI schema, JsonValue doc)
+    {
+        var result = validator.validate(schema, doc);
+
+        result.getErrors().forEach(err ->
+            log.info("Validation failed for {}: {}", schema, err));
+        return result.isValid();
+    }
+
     private record SchemaSet (Validator validator, Set<Resource> apps)
     { 
         public boolean validate (Resource app, JsonValue config)
         {
             if (!apps.contains(app))
                 return true;
-
-            var result = validator.validate(resURI(app), config);
-
-            result.getErrors().forEach(err ->
-                log.info("Validation failed for {}: {}", app, err));
-            return result.isValid();
+            return SchemaTracker._validate(validator, resURI(app), config);
         }
     }
 
@@ -58,6 +65,8 @@ public class SchemaTracker
 
     private RdfStore            db;
     private ValidatorFactory    factory;
+    private Validator           internal;
+    private URI                 dumpSchema;
 
     /* Updates to this field always occurs within a Jena RW
      * transaction. This provides a global lock. We rely on this for
@@ -73,12 +82,26 @@ public class SchemaTracker
             .withDefaultDialect(new Dialects.Draft2020Dialect())
             .withEvaluatorFactory(new FormatEvaluatorFactory());
 
-        /* We have no schemas until start() */
+        /* This is for internal schemas; specifically the dump schema */
+        internal = factory.createValidator();
+
+        /* We have no app schemas until start() */
         schemas = new SchemaSet(factory.createValidator(), HashSet.empty());
     }
 
     public void start ()
     {
+        try {
+            var dsIs = SchemaTracker.class
+                .getResourceAsStream("dump_schema.json");
+            var dsSch = Json.createReader(dsIs)
+                .readValue();
+            dumpSchema = internal.registerSchema(dsSch);
+        }
+        catch (Throwable e) {
+            throw new ServiceConfigurationError(
+                "Cannot load schema for dumps", e);
+        }
         schemas = db.calculateRead(() -> rebuildSchemas());
     }
 
@@ -105,6 +128,11 @@ public class SchemaTracker
             });
 
         schemas = newSchemas;
+    }
+
+    public boolean validateDump (JsonValue document)
+    {
+        return _validate(internal, dumpSchema, document);
     }
 
     private static URI resURI (Resource res)

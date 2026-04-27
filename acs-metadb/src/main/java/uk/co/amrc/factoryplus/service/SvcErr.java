@@ -82,14 +82,17 @@ public class SvcErr extends Error
 
         public int statusCode () { return 410; }
     }
-    public static class BadJson extends Client
+    public static class BadInput extends Client
+    {
+        public BadInput (String msg) { super(msg); }
+        public int statusCode () { return 422; }
+    }
+    public static class BadJson extends BadInput
     {
         public BadJson (JsonValue val)
         {
             super("Unexpected JSON value: " + val.toString());
         }
-
-        public int statusCode () { return 422; }
     }
     public static class Timeout extends Client
     {

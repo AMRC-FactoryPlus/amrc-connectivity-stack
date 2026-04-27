@@ -92,8 +92,7 @@ public class RdfStore
 
     public void start ()
     {
-        var zfc = new ZFC(this);
-        executeRead(zfc::validateInvariants);
+        executeRead(this::validateZFC);
 
         dataflow.start();
         schemaTracker.start();
@@ -249,6 +248,12 @@ public class RdfStore
             .grouped(2)
             .forEach(sq -> exec.substitution((String)sq.get(0), (RDFNode)sq.get(1)));
         exec.execute();
+    }
+
+    public void validateZFC ()
+    {
+        var zfc = new ZFC(this);
+        zfc.validateInvariants();
     }
 
     /** Find a single resource within the direct graph. */

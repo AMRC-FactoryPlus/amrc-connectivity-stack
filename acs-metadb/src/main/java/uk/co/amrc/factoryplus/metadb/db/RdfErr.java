@@ -121,6 +121,24 @@ public final class RdfErr
         }
     }
 
+    public static class InvalidIris extends SvcErr.Client
+    {
+        private List<Resource> iris;
+        public InvalidIris (String msg, List<Resource> iris)
+        {
+            super(msg);
+            this.iris = iris;
+        }
+        public int statusCode () { return 409; }
+        protected void extendJson (JsonObjectBuilder obj)
+        {
+            obj.add("iris", iris
+                .map(Resource::toString)
+                .foldLeft(Json.createArrayBuilder(), (a, v) -> a.add(v))
+                .build();
+        }
+    }
+
     public static class InvalidRels extends SvcErr.Client
     {
         private Map<UUID, UUID> relations;

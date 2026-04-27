@@ -101,4 +101,8 @@ public class RequestHandler
     {
         return new AppUpdater(this);
     }
+    public BulkOperations bulkOperations ()
+    {
+        return BulkOperations.create(this);
+    }
 }

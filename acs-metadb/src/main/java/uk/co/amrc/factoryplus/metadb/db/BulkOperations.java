@@ -39,4 +39,11 @@ public class BulkOperations extends RequestHandler.Component
     {
         return new BulkOperations(req);
     }
+
+    public void loadDump (JsonValue dump)
+    {
+        if (!db().schemaTracker().validateDump(dump))
+            throw new SvcErr.BadInput("Invalid dump");
+        log.info("Dump validated");
+    }
 }

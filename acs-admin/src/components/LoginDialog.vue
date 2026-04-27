@@ -32,6 +32,12 @@
           </div>
           <Input @keydown.enter="login" v-model="password" id="password" type="password" required/>
         </div>
+        <div class="grid gap-2">
+          <div class="flex items-center gap-3">
+            <Checkbox id="verbose" v-model="verbose" />
+            <label for="verbose" class="text-sm font-medium cursor-pointer">Verbose logging</label>
+          </div>
+        </div>
         <Button :disabled="buttonDisabled" @click="login" type="submit" class="w-full">
           <div v-if="!loggingIn">Login</div>
           <div v-else class="flex items-center justify-center">
@@ -48,6 +54,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
 import { useServiceClientStore } from '@/store/serviceClientStore.js'
 import {toast} from "vue-sonner";
 
@@ -62,6 +69,7 @@ export default {
     CardDescription,
     CardHeader,
     CardTitle,
+    Checkbox,
     Input,
     Label,
   },
@@ -91,7 +99,7 @@ export default {
         username: this.username,
         password: this.password,
         browser: true,
-        verbose: import.meta.env.VERBOSE ?? "",
+        verbose: this.verbose ? "ALL" : (import.meta.env.VERBOSE ?? ""),
       })
         this.$router.push("/");
       }catch(e){
@@ -107,6 +115,7 @@ export default {
       loggingIn: false,
       username: null,
       password: null,
+      verbose: false,
     }
   },
 }

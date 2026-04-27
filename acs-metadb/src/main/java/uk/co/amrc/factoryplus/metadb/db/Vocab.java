@@ -9,9 +9,6 @@ package uk.co.amrc.factoryplus.metadb.db;
 import java.util.UUID;
 import java.net.URI;
 
-import io.vavr.control.Try;
-import io.vavr.control.Option;
-
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.shared.PrefixMapping;
 import org.apache.jena.sparql.core.Prologue;
@@ -69,6 +66,13 @@ public class Vocab
         public static final Property value          = prop("app/value");
     }
 
+    /* This is for the bootstrap ACLs. */
+    public static class Target {
+        public static final UUID Registration = U("cb40bed5-49ad-4443-a7f5-08c75009da8f");
+        public static final UUID SparkplugAddr = U("8e32801b-f35a-4cbf-a5c3-2af64d3debd7");
+        public static final UUID Wildcard = U("00000000-0000-0000-0000-000000000000");
+    }
+
     public static class Perm {
         public static final UUID ReadApp = U("4a339562-cd57-408d-9d1a-6529a383ea4b");
         public static final UUID WriteApp = U("6c799ccb-d2ad-4715-a2a7-3c8728d6c0bf");
@@ -83,9 +87,9 @@ public class Vocab
         public static final UUID WriteSubclasses = U("ed11bd2a-50ef-11f0-9f85-df13a1dff9e6");
         public static final UUID WriteSuperclasses = U("fb8e5048-50ef-11f0-91c5-7fd3cb373fbb");
 
-        /* Unimplemented */
-        //public static final UUID ReadMemberships = U("db9f5dae-50ef-11f0-b846-8393c17d1574");
-        //public static final UUID ReadSuperclasses = U("f590e476-50ef-11f0-a120-e7c6d06d79ed");
+        /* Currently unused */
+        public static final UUID ReadMemberships = U("db9f5dae-50ef-11f0-b846-8393c17d1574");
+        public static final UUID ReadSuperclasses = U("f590e476-50ef-11f0-a120-e7c6d06d79ed");
 
         public static final UUID DeleteObj = U("6957174b-7b08-45ca-ac5c-c03ab6928a6e");
         public static final UUID GiveTo = U("4eaab346-4d1e-11f0-800e-dfdc061c6a63");

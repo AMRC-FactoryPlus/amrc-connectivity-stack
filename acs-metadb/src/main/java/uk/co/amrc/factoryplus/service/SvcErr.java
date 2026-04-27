@@ -91,4 +91,9 @@ public class SvcErr extends Error
 
         public int statusCode () { return 422; }
     }
+    public static class Timeout extends Client
+    {
+        public Timeout () { super("Upstream timeout"); }
+        public int statusCode () { return 503; }
+    }
 }

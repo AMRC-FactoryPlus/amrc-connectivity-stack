@@ -60,7 +60,7 @@ public class FPDirectory {
                 }))
             .cast(JSONArray.class)
             .flatMapObservable(Observable::fromIterable)
-            //.doOnNext(o -> log.info("Service URL: {}", o))
+            .doOnNext(o -> log.info("Service URL: {}", o))
             .cast(JSONObject.class)
             .map(o -> o.getString("url"))
             .map(URI::new)

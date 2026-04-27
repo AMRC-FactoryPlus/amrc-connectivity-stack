@@ -44,28 +44,6 @@ public class ObjectStructure extends RequestHandler.Component
         return new ObjectStructure(req);
     }
 
-    /* XXX Ideally both of these switch statements would become
-     * data-driven. Possibly an :apiName relation from the property? But
-     * with only two valid cases it does not seem worth it for now. */
-    public record Relation (Property prop, int offset,
-        UUID readClass, /*UUID readObj,*/ UUID writeClass, UUID writeObject)
-    {
-        public static Relation of (String relation) {
-            switch (relation) {
-                case "member":
-                    return new Relation(RDF.type, 1, 
-                        Vocab.Perm.ReadMembers, /*Vocab.Perm.ReadMemberships,*/
-                        Vocab.Perm.WriteMembers, Vocab.Perm.WriteMemberships);
-                case "subclass":
-                    return new Relation(RDFS.subClassOf, 0,
-                        Vocab.Perm.ReadSubclasses, /*Vocab.Perm.ReadSuperclasses,*/
-                        Vocab.Perm.WriteSubclasses, Vocab.Perm.WriteSuperclasses);
-                default:
-                    throw new SvcErr.NotFound("No such relation");
-            }
-        }
-    }
-
     private static final Set<Resource> IMMUTABLE = Set.of(
         Vocab.App.Application, Vocab.Special,
         Vocab.App.Registration, Vocab.App.ConfigSchema,
@@ -205,7 +183,7 @@ public class ObjectStructure extends RequestHandler.Component
         var rel = Relation.of(relation);
         var graph = direct ? db().direct() : db().derived();
 
-        request().checkACL(direct ? rel.readClass : rel.writeClass, uuid);
+        request().checkACL(direct ? rel.readClass() : rel.writeClass(), uuid);
 
         var klass = db().findObjectOrError(uuid);
         return graph
@@ -224,7 +202,7 @@ public class ObjectStructure extends RequestHandler.Component
         /* We don't check the object permissions here because (a) there
          * are no readObject perms defined and (b) the information can
          * be derived from listRelation anyway so there's no point. */
-        request().checkACL(direct ? rel.readClass : rel.writeClass, klass);
+        request().checkACL(direct ? rel.readClass() : rel.writeClass(), klass);
 
         var kres = db().findObjectOrError(klass).node();
         var ores = db().findObjectOrError(object).node();
@@ -239,8 +217,8 @@ public class ObjectStructure extends RequestHandler.Component
     {
         var rel = Relation.of(relation);
 
-        request().checkACL(rel.writeClass, klass);
-        request().checkACL(rel.writeObject, object);
+        request().checkACL(rel.writeClass(), klass);
+        request().checkACL(rel.writeObject(), object);
 
         var kres = db().findObjectOrError(klass).node();
         var ores = db().findObjectOrError(object).node();
@@ -257,8 +235,8 @@ public class ObjectStructure extends RequestHandler.Component
     {
         var rel = Relation.of(relation);
 
-        request().checkACL(rel.writeClass, klass);
-        request().checkACL(rel.writeObject, object);
+        request().checkACL(rel.writeClass(), klass);
+        request().checkACL(rel.writeObject(), object);
 
         var kres = db().findObjectOrError(klass).node();
         var ores = db().findObjectOrError(object).node();

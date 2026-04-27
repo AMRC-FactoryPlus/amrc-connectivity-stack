@@ -12,6 +12,7 @@ import java.util.concurrent.TimeUnit;
 import jakarta.json.JsonValue;
 
 import io.reactivex.rxjava3.core.*;
+import io.reactivex.rxjava3.schedulers.Schedulers;
 import io.reactivex.rxjava3.subjects.*;
 
 import io.vavr.collection.*;
@@ -76,6 +77,7 @@ public class Dataflow
 
     private Observable<Update.Config> buildConfigUpdates ()
     {
+        /* We must start synchronous, inside the txn */
         return modelUpdates
             .map(ds -> QueryExecution.dataset(ds)
                 .query(Q_appUpdates)
@@ -84,11 +86,65 @@ public class Dataflow
                 rs.forEachRemaining(em::onNext);
                 em.onComplete();
             }))
+            /* From here we move to the Rx computation threads */
+            .observeOn(Schedulers.computation())
             .map(Update.Config::ofQuerySolution)
             .share();
     }
 
     public Observable<Update.Config> configUpdates () { return configUpdates; }
+
+    private static final Query Q_relation = Vocab.query("""
+        select ?classU ?objU
+        where {
+            ?class <core/uuid> ?classU.
+            graph ?graph { ?obj ?rel ?class. }
+            ?obj <core/uuid> ?objU.
+        }
+    """);
+
+    private CacheSeq<Relation.Bound, Set<UUID>> _cacheRelation =
+        CacheSeq.builder(this::_buildRelation)
+            .withTimeout(1, TimeUnit.HOURS)
+            .withReplay()
+            .build();
+
+    private Set<UUID> _fetchRelation (Relation.Bound bound)
+    {
+        log.info("Fetch relation {}", bound);
+        var rs = db.selectQuery(Q_relation, 
+            "graph",            bound.graph(),
+            "rel",              bound.prop(),
+            bound.selectVar(),  bound.literal());
+        return Iterator.ofAll(rs)
+            .map(qs -> Util.decodeLiteral(qs.get(bound.resultVar()), UUID.class))
+            .toSet();
+    }
+
+    private Observable<Set<UUID>> _buildRelation (Relation.Bound bound)
+    {
+        /* This is synchronous and comes from an update txn */
+        var updates =  modelUpdates
+            /* For now requery every time. In principal we could filter
+             * by rank of class changed to limit the churn. */
+            .map(upd -> _fetchRelation(bound));
+
+        return Single.fromCallable(() ->
+                db.calculateRead(() -> _fetchRelation(bound)))
+            /* Make the initial query on the Rx io sched */
+            .subscribeOn(Schedulers.io())
+            /* Subsequent updates will pass down within an update txn */
+            .toObservable()
+            .concatWith(updates)
+            /* Move to computation sched */
+            .observeOn(Schedulers.computation())
+            .distinctUntilChanged();
+    }
+
+    public Observable<Set<UUID>> relation (Relation.Bound bound)
+    {
+        return _cacheRelation.get(bound);
+    }
 
     public Observable<Update.Config> appUpdates (UUID app)
     {

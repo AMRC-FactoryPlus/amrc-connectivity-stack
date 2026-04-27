@@ -24,6 +24,7 @@ export class DataFlow {
     this.general_infos = this._build_general_info();
     this.metadata = this._build_metadata();
     this.functional_types = this._build_functional_types();
+    this.parts = this._build_parts();
   }
 
   run() {
@@ -33,8 +34,19 @@ export class DataFlow {
 
     // this.log("GENERAL INFO UUID: ", UUIDs.App.Info);
     // this.general_infos.subscribe(x => this.log("General infos UPDATE %o", x.toJS()));
-    
   }
+
+  // watch Dataset's members' subclasses
+  _build_parts(){
+    return rxx.rx(
+      this.cdb.watch_members_direct_subclasses(Constants.Class.Dataset),
+      rx.map(map => map.map(set => 
+          set.filter(x => this.cdb.class_has_member(Constants.Class.Dataset, x))
+      )),
+      rxx.shareLatest()
+    )
+  }
+
 
   // Watch member members of functional group to see what functional type datasets have
   _build_functional_types() {
@@ -141,6 +153,10 @@ export class DataFlow {
     );
   }
 
+  get_parts(){
+    return this.parts;
+  }
+
   get_functional_types(){
     return this.functional_types;
   }
@@ -152,6 +168,7 @@ export class DataFlow {
   get_general_infos(){
     return this.general_infos;
   }
+
 
 
   async get_allowed_dataset_uuids(principal, permission, dataset_validity) {

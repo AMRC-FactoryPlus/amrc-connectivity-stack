@@ -79,21 +79,21 @@ public class ObjectStructure extends RequestHandler.Component
     }
 
     /* TXN */
-    private FPObject setPrimaryClass (FPObject obj, Resource klass)
+    private Resource setPrimaryClass (Resource obj, Resource klass)
     {
         log.info("Set primary class: {}, {}", obj, klass);
 
-        var orank = db().findRank(obj.node());
+        var orank = db().findRank(obj);
         var krank = db().findRank(klass);
 
         if (krank != orank + 1)
             throw new RdfErr.RankMismatch();
 
         var model = db().derived();
-        model.removeAll(obj.node(), Vocab.primary, null);
-        model.add(obj.node(), Vocab.primary, klass);
-        if (!model.contains(obj.node(), RDF.type, klass))
-            model.add(obj.node(), RDF.type, klass);
+        model.removeAll(obj, Vocab.primary, null);
+        model.add(obj, Vocab.primary, klass);
+        if (!model.contains(obj, RDF.type, klass))
+            model.add(obj, RDF.type, klass);
 
         return obj;
     }
@@ -113,7 +113,7 @@ public class ObjectStructure extends RequestHandler.Component
             uuid.isEmpty() ? Vocab.Perm.CreateObj : Vocab.Perm.CreateSpecificObj,
             klass);
 
-        var kres = db().findObjectOrError(klass).node();
+        var kres = db().findObjectOrError(klass);
 
         var obj = uuid
             .map(u -> db().findObject(u)
@@ -123,7 +123,7 @@ public class ObjectStructure extends RequestHandler.Component
             .getOrElse(() -> db().createObject(kres));
 
         return db().appMapper()
-            .generateConfig(Vocab.App.Registration, obj.node())
+            .generateConfig(Vocab.App.Registration, obj)
             .getOrElseThrow(() -> new RdfErr.CorruptRDF("Cannot find object registration"));
     }
 
@@ -142,7 +142,7 @@ public class ObjectStructure extends RequestHandler.Component
         log.info("Delete object {}", uuid);
         request().checkACL(Vocab.Perm.DeleteObj, uuid);
 
-        var obj = db().findObjectOrError(uuid).node();
+        var obj = db().findObjectOrError(uuid);
         log.info("Found node {}", obj);
         if (IMMUTABLE.contains(obj)) {
             log.info("Object {} is immutable", obj);
@@ -187,7 +187,7 @@ public class ObjectStructure extends RequestHandler.Component
 
         var klass = db().findObjectOrError(uuid);
         return graph
-            .listResourcesWithProperty(rel.prop(), klass.node())
+            .listResourcesWithProperty(rel.prop(), klass)
             .mapWith(r -> r.getProperty(Vocab.uuid))
             .filterKeep(s -> s != null)
             .mapWith(s -> s.getString())
@@ -204,8 +204,8 @@ public class ObjectStructure extends RequestHandler.Component
          * be derived from listRelation anyway so there's no point. */
         request().checkACL(direct ? rel.readClass() : rel.writeClass(), klass);
 
-        var kres = db().findObjectOrError(klass).node();
-        var ores = db().findObjectOrError(object).node();
+        var kres = db().findObjectOrError(klass);
+        var ores = db().findObjectOrError(object);
         /* We cannot use methods on ores as this is always from the
          * direct graph. */
         return !graph.listStatements(ores, rel.prop(), kres)
@@ -220,8 +220,8 @@ public class ObjectStructure extends RequestHandler.Component
         request().checkACL(rel.writeClass(), klass);
         request().checkACL(rel.writeObject(), object);
 
-        var kres = db().findObjectOrError(klass).node();
-        var ores = db().findObjectOrError(object).node();
+        var kres = db().findObjectOrError(klass);
+        var ores = db().findObjectOrError(object);
 
         var krank = db().findRank(kres);
         var orank = db().findRank(ores);
@@ -238,8 +238,8 @@ public class ObjectStructure extends RequestHandler.Component
         request().checkACL(rel.writeClass(), klass);
         request().checkACL(rel.writeObject(), object);
 
-        var kres = db().findObjectOrError(klass).node();
-        var ores = db().findObjectOrError(object).node();
+        var kres = db().findObjectOrError(klass);
+        var ores = db().findObjectOrError(object);
         db().direct().remove(ores, rel.prop(), kres);
     }
 }

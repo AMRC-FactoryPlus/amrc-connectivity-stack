@@ -184,7 +184,6 @@ public class AppMapper {
 
         var klass = Decoders.parseUUID(spec.getString("class"))
             .flatMap(db::findObject)
-            .map(FPObject::node)
             .getOrElseThrow(() -> {
                 log.info("Cannot find new primary class");
                 return new SvcErr.BadJson(spec.get("class"));

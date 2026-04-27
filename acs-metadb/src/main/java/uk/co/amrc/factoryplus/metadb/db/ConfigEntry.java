@@ -47,10 +47,10 @@ public class ConfigEntry extends RequestHandler.Component
 
     public static ConfigEntry create (RequestHandler req, UUID app, UUID obj)
     {
-        var appO = req.db().findObjectOrError(app);
-        var objO = req.db().findObjectOrError(obj);
+        var appR = req.db().findObjectOrError(app);
+        var objR = req.db().findObjectOrError(obj);
 
-        return new ConfigEntry(req, appO.node(), objO.node());
+        return new ConfigEntry(req, appR, objR);
     }
 
     public record Value (JsonValue value, UUID etag, Option<Instant> mtime)
@@ -154,16 +154,12 @@ public class ConfigEntry extends RequestHandler.Component
             schemas.updateSchemas(List.of(obj));
     }
 
-    /* Returns a Value if we made an update. Returns empty() if the
-     * value has not changed and we didn't update it. */
-    public Option<Value> putRawValue (JsonValue value)
+    public void putRawValue (JsonValue value)
     {
         var existing = getRawValue()
             .filter(v -> v.equals(value));
-        if (existing.isDefined()) {
-            //log.info("Duplicate config update suppressed");
-            return Option.none();
-        }
+        if (existing.isDefined())
+            return;
 
         removeRawValue();
 
@@ -174,12 +170,9 @@ public class ConfigEntry extends RequestHandler.Component
         var entry   = db().createObject(app);
         //var inst    = request().getInstant();
 
-        graph.add(entry.node(), Vocab.App.forP, obj);
-        graph.add(entry.node(), Vocab.Doc.content, json);
+        graph.add(entry, Vocab.App.forP, obj);
+        graph.add(entry, Vocab.Doc.content, json);
         //graph.add(entry, Vocab.Time.start, inst);
-
-        return Option.some(new Value(
-            value, entry.uuid(), Option.none()));
     }
 }
 

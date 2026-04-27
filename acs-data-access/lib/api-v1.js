@@ -173,7 +173,8 @@ export class APIv1 {
      */
     const {from, to} = await this._get_dataset_time_bounds(dataset_uuid);
 
-    const parts = null;
+    const all_parts = await rx.firstValueFrom(this.data.get_parts());
+    const parts = all_parts.get(dataset_uuid);
 
     const meta = {
       uuid: dataset_uuid,

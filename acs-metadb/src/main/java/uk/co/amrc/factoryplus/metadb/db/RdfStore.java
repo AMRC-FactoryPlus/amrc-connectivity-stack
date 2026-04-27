@@ -268,13 +268,12 @@ public class RdfStore
             derived.removeAll(null, node.as(Property.class), null);
     }
 
-    public Option<FPObject> findObject (UUID uuid)
+    public Option<Resource> findObject (UUID uuid)
     {
-        return findResource(Vocab.uuid, Vocab.uuidLiteral(uuid))
-            .map(node -> new FPObject(node, uuid));
+        return findResource(Vocab.uuid, Vocab.uuidLiteral(uuid));
     }
 
-    public FPObject findObjectOrError (UUID uuid)
+    public Resource findObjectOrError (UUID uuid)
     {
         return findObject(uuid)
             .getOrElseThrow(() -> new SvcErr.NotFound(uuid.toString()));
@@ -297,7 +296,7 @@ public class RdfStore
         return Util.decodeLiteral(binding.get("rank"), Integer.class);
     }
 
-    public FPObject createObject (Resource klass)
+    public Resource createObject (Resource klass)
     {
         UUID uuid;
         while (true) {
@@ -310,7 +309,7 @@ public class RdfStore
         return createObject(klass, uuid);
     }
 
-    public FPObject createObject (Resource klass, UUID uuid)
+    public Resource createObject (Resource klass, UUID uuid)
     {
         var obj = Vocab.uuidResource(uuid);
         derived.add(obj, Vocab.uuid, uuid.toString());
@@ -323,12 +322,12 @@ public class RdfStore
             derived.add(obj, RDFS.subClassOf, rk);
         }
 
-        return new FPObject(obj, uuid);
+        return obj;
     }
 
     public Resource createInstant ()
     {
-        var inst = createObject(Vocab.Time.Instant).node();
+        var inst = createObject(Vocab.Time.Instant);
         var stamp = derived.createTypedLiteral(Instant.now(), XSDDatatype.XSDdateTime);
         derived.add(inst, Vocab.Time.timestamp, stamp);
         return inst;

@@ -18,6 +18,14 @@ public record ZFC (RdfStore db)
 {
     private static final Logger log = LoggerFactory.getLogger(ZFC.class);
 
+    private static final Query V_dupUUID = Vocab.query("""
+        select ?obj
+        where {
+            ?obj <core/uuid> ?objU.
+        }
+        group by ?obj
+        having (count(?objU) != 1)
+    """);
     private static final Query V_badUUID = Vocab.query("""
         select ?objU
         where {
@@ -94,7 +102,12 @@ public record ZFC (RdfStore db)
     {
         log.info("Validating class structure invariants");
 
-        _validateObjs("Duplicate UUIDs", V_badUUID);
+        var badIris = db().listQuery(V_dupUUID);
+        if (!badIris.isEmpty())
+            throw new RdfErr.InvalidIris("IRI with multiple UUIDs",
+                badIris.map(qs -> qs.getResource("obj")));
+
+        _validateObjs("UUID with multiple IRIs", V_badUUID);
         _validateObjs("Bad primary class", V_badPrimary,
             "toprank", Vocab.Class.TopRank);
         _validateObjs("Invalid ranks", V_badRank);

@@ -138,7 +138,7 @@ public class Sparql {
         store.requestExecute(auth, req -> {
             req.checkACL(Vocab.Perm.WriteRDF, FPUuid.Null);
             UpdateAction.parseExecute(update, store.dataset());
-            new ZFC(store).validateInvariants();
+            store.validateZFC();
         });
     }
 
@@ -219,7 +219,7 @@ public class Sparql {
              * we load to a graph which is a source for the inference,
              * but graph load will not be a common operation. */
             store.derived().rebind();
-            new ZFC(store).validateInvariants();
+            store.validateZFC();
         }
         catch (SvcErr.Client e) { throw e; }
         catch (Throwable e) {

@@ -33,7 +33,9 @@ const influxClient = new InfluxDB({
 
 // the dataflow object is full of sequences that does most of the work of this service. Sequence means an RX observable.
 const data = new DataFlow({
-  fplus
+  debug,
+  cdb: fplus.ConfigDB,
+  auth: fplus.Auth,
 });
 
 const influxReader = new InfluxReader({

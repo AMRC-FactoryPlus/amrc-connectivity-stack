@@ -71,6 +71,7 @@ objects:
         - !u MetaDB.Class.ConfigEntry
     !u UUIDs.App.Info:
       name: "General information"
+      iri: app/Info
       memberOf:
         - !u MetaDB.Class.Structured
       subclassOf:

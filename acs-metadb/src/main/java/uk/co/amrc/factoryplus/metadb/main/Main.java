@@ -8,7 +8,9 @@ package uk.co.amrc.factoryplus.metadb.main;
 
 import java.io.IOException;
 import java.net.URI;
+import java.time.Duration;
 import java.util.ServiceConfigurationError;
+import java.util.Set;
 import java.util.UUID;
 
 import org.eclipse.jetty.server.*;
@@ -22,7 +24,13 @@ import org.glassfish.jersey.server.ServerProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import uk.co.amrc.factoryplus.client.*;
+/* Note we have Java Sets but Vavr Maps and Lists */
+import io.vavr.collection.List;
+import io.vavr.collection.HashMap;
+import io.vavr.control.Option;
+
+import uk.co.amrc.factoryplus.client.FPServiceClient;
+import uk.co.amrc.factoryplus.client.FPAuth.Grant;
 import uk.co.amrc.factoryplus.providers.*;
 import uk.co.amrc.factoryplus.metadb.db.*;
 
@@ -48,14 +56,34 @@ public final class Main {
     {
         this.port = port;
 
-        this.fplus = new FPServiceClient();
+        this.fplus = createServiceClient();
         this.auth = new AuthProvider(fplus);
         this.model = new RdfStore(fplus, auth, dataDir);
         this.server = createServer();
     }
 
-    interface Throws<T> {
-        public T get () throws Throwable;
+    private FPServiceClient createServiceClient ()
+    {
+        var fplus = new FPServiceClient();
+        
+        var acls = HashMap.of(
+            "auth_principal", List.of(
+                new Grant(Vocab.Perm.ReadApp, Vocab.Target.Registration),
+                /* XXX I'm not sure why this is needed? */
+                new Grant(Vocab.Perm.ReadApp, Vocab.Target.SparkplugAddr),
+                /* XXX These are broader than strictly necessary. */
+                new Grant(Vocab.Perm.ReadMembers, Vocab.Target.Wildcard),
+                new Grant(Vocab.Perm.ReadSubclasses, Vocab.Target.Wildcard)));
+
+        var resolved = acls
+            .mapKeys(fplus::getOptionConf)
+            .filterKeys(Option::isDefined)
+            .mapKeys(Option::get);
+
+        log.info("Setting bootstrap ACLs to {}", resolved);
+        fplus.auth().setBootstrapACLs(resolved);
+
+        return fplus;
     }
 
     private Server createServer ()
@@ -74,31 +102,32 @@ public final class Main {
             }
         };
 
-        var v2app = new ResourceConfig()
-            .property(ServerProperties.PROCESSING_RESPONSE_ERRORS_ENABLED, true)
-            .packages("uk.co.amrc.factoryplus.providers")
-            .packages("uk.co.amrc.factoryplus.metadb.api")
-            .register(bindings);
-        var v2api = new ContextHandler(
-            ContainerFactory.createContainer(Handler.class, v2app), "/v2");
-
         var notify = model.metaNotify()
             .notifyV2()
             .contextHandlerFor(server);
+
         var webapp = new ResourceConfig()
             .property(ServerProperties.PROCESSING_RESPONSE_ERRORS_ENABLED, true)
             .packages("uk.co.amrc.factoryplus.providers")
             .packages("uk.co.amrc.factoryplus.webapi")
+            .packages("uk.co.amrc.factoryplus.metadb.api")
             .register(bindings);
         var webapi = new ContextHandler(
             ContainerFactory.createContainer(Handler.class, webapp), "/");
 
         var coll = new ContextHandlerCollection();
-        coll.addHandler(v2api);
         coll.addHandler(notify);
         coll.addHandler(webapi);
 
-        server.setHandler(coll);
+        var cors = new CrossOriginHandler();
+        cors.setAllowedOriginPatterns(Set.of("*"));
+        cors.setAllowedMethods(Set.of("GET", "HEAD", "POST", "PUT", "DELETE", "PATCH"));
+        cors.setAllowedHeaders(Set.of("authorization","*"));
+        cors.setAllowCredentials(true);
+        cors.setPreflightMaxAge(Duration.ofDays(1));
+        cors.setHandler(coll);
+
+        server.setHandler(cors);
 
         return server;
     }
@@ -106,6 +135,7 @@ public final class Main {
     private void start () throws Throwable
     {
         fplus.start();
+        auth.start();
         model.start();
         server.start();
     }

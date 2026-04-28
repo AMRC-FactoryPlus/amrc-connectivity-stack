@@ -1,14 +1,16 @@
 service: !u UUIDs.Service.ConfigDB
 version: 2
 objects:
+  # Some of these are commented out because, although they logically
+  # belong here, they are actually defined in service-setup.yaml because
+  # they are needed for local UUID generation.
   !u ConfigDB.Class.R2Class:
-    # Some of these are in service-setup
     #!u Auth.Class.PrincipalGroup:
     #  name: "Principal group"
-    !u Auth.Class.PrincipalType:
-      name: "Principal type"
-      subclassOf:
-        - !u Auth.Class.PrincipalGroup
+    #!u Auth.Class.PrincipalType:
+    #  name: "Principal type"
+    #  subclassOf:
+    #    - !u Auth.Class.PrincipalGroup
     #!u Auth.Class.Role:
     #  name: "Role"
     #  subclassOf:
@@ -38,10 +40,10 @@ objects:
         - !u Auth.Class.PermissionGroup
 
   !u UUIDs.Class.Class:
-    !u Auth.Class.Principal:
-      name: "Principal"
-      memberOf:
-        - !u Auth.Class.PrincipalGroup
+    #!u Auth.Class.Principal:
+    #  name: "Principal"
+    #  memberOf:
+    #    - !u Auth.Class.PrincipalGroup
     !u UUIDs.Class.Permission:
       name: "Permission"
       memberOf:
@@ -52,10 +54,10 @@ objects:
       name: "Human user"
       subclassOf:
         - !u Auth.Class.Principal
-    !u Auth.Class.CentralService:
-      name: "Central service"
-      subclassOf:
-        - !u Auth.Class.Principal
+    #!u Auth.Class.CentralService:
+    #  name: "Central service"
+    #  subclassOf:
+    #    - !u Auth.Class.Principal
     !u Auth.Class.EdgeService:
       name: "Edge service"
       subclassOf:

@@ -27,6 +27,8 @@ import org.json.*;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 import io.reactivex.rxjava3.core.*;
 
+import io.vavr.control.Option;
+
 import uk.co.amrc.factoryplus.gss.*;
 import uk.co.amrc.factoryplus.http.*;
 
@@ -117,6 +119,15 @@ public class FPServiceClient {
             return Optional.<String>empty();
 
         return Optional.of(val);
+    }
+
+    /** Get a config parameter as a Vavr Option.
+     *
+     * @param key The config parameter.
+     */
+    public Option<String> getOptionConf (String key)
+    {
+        return Option.ofOptional(getOptionalConf(key));
     }
 
     /** Get a config parameter which is a URL.

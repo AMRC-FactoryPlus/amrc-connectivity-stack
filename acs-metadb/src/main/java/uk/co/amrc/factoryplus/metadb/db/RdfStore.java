@@ -95,15 +95,53 @@ public class RdfStore
         schemaTracker.start();
     }
 
-    public void executeRead (Runnable r) { dataset.executeRead(r); }
-    public <T> T calculateRead (Supplier<T> s) { return dataset.calculateRead(s); }
+    //private ConcurrentHashMap<String, Boolean> _txnrw = new ConcurrentHashMap<>();
 
-    public void executeWrite (Runnable r) { dataset.executeWrite(r); }
-    public <T> T calculateWrite (Supplier<T> s) { return dataset.calculateWrite(s); }
+    private void _txnlog (String msg, boolean open, boolean rw)
+    {
+//        var name = Thread.currentThread().getName();
+//
+//        if (!open)
+//            _txnrw.remove(name);
+//        log.info("TXN: {} {} ({})", msg, rw, _txnrw.size());
+//        log.info("TXN: open: {}", _txnrw.toString());
+//        if (open)
+//            _txnrw.put(name, rw);
+    }
+
+    private <T> T _txn (boolean rw, Supplier<T> supp)
+    {
+        try {
+            _txnlog("BEGIN", true, rw);
+            var rv = supp.get();
+            _txnlog("COMMIT", false, rw);
+
+            return rv;
+        }
+        catch (Throwable e) {
+            _txnlog("ABORT", false, rw);
+            throw e;
+        }
+    }
+
+    public void executeRead (Runnable r) { 
+        _txn(false, () -> {dataset.executeRead(r); return 1;});
+    }
+    public <T> T calculateRead (Supplier<T> s) { 
+        return _txn(false, () -> dataset.calculateRead(s));
+    }
+
+    public void executeWrite (Runnable r) { 
+        _txn(true, () -> {dataset.executeWrite(r); return 1;});
+    }
+    public <T> T calculateWrite (Supplier<T> s) { 
+        return _txn(true, () -> dataset.calculateWrite(s)); 
+    }
 
     public <T> T requestRead (SecurityContext ctx, Function<RequestHandler, T> cb)
     {
-        return calculateRead(() -> cb.apply(new RequestHandler(this, ctx)));
+        var req = new RequestHandler(this, ctx).start();
+        return calculateRead(() -> cb.apply(req));
     }
 
     /* Jena ModelChangedListeners do not appear to respect inference
@@ -131,11 +169,13 @@ public class RdfStore
      */
     public <T> T requestWrite (SecurityContext ctx, Function<RequestHandler, T> cb)
     {
-        var req = new RequestHandler(this, ctx);
+        var req = new RequestHandler(this, ctx)
+            .start();
         var listener = new ModelUpdate();
         T rv;
 
         try {
+            _txnlog("BEGIN", true, true);
             dataset.begin(ReadWrite.WRITE);
             direct.register(listener);
             rv = cb.apply(req);
@@ -143,10 +183,12 @@ public class RdfStore
              * the domains. This could be optimised by using the
              * change-notify information collected up to this point. */
             req.appUpdater().update();
+            _txnlog("COMMIT", false, true);
             dataset.commit();
         }
         catch (Throwable e) {
             dataset.abort();
+            _txnlog("ABORT", false, true);
             throw e;
         }
         finally {
@@ -158,7 +200,9 @@ public class RdfStore
         /* It is important that all dataflow processing that queries the
          * update dataset happens syncronously. Otherwise it won't be in
          * this transaction. */
-        update.executeRead(() -> dataflow.modelUpdate(update));
+        update.executeRead(() -> {
+            dataflow.modelUpdate(update);
+        });
 
         return rv;
     }

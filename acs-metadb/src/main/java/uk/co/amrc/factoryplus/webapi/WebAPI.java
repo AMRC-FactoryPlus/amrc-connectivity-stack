@@ -20,7 +20,7 @@ import org.slf4j.LoggerFactory;
 
 import uk.co.amrc.factoryplus.providers.*;
 
-@Singleton @Path("")
+@Path("")
 public class WebAPI
 {
     private static final Logger log = LoggerFactory.getLogger(WebAPI.class);
@@ -39,7 +39,7 @@ public class WebAPI
     public JsonValue token ()
     {
         /* We do not allow refreshing a token from a token. */
-        if (auth.getAuthenticationScheme().equals("token"))
+        if (auth.getAuthenticationScheme().equals("bearer"))
             throw new WebApplicationException(403);
 
         var upn = auth.getUserPrincipal().getName();

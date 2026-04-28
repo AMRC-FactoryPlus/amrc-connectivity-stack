@@ -9,22 +9,20 @@ package uk.co.amrc.factoryplus.providers;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.charset.StandardCharsets;
-import java.security.Principal;
 import java.security.SecureRandom;
 import java.time.Instant;
 
 import java.util.Base64;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.regex.Pattern;
-
-import jakarta.ws.rs.core.SecurityContext;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import io.reactivex.rxjava3.core.Single;
+import io.reactivex.rxjava3.core.*;
 import io.vavr.control.Option;
 
 import uk.co.amrc.factoryplus.client.FPServiceClient;
@@ -41,21 +39,6 @@ public class AuthProvider
 
     private static final long EXPIRY = 3*3600;
 
-    private record Princ (String name) implements Principal
-    {
-        public String getName () { return name; }
-    }
-
-    private record Ctx (Principal principal, String scheme) implements SecurityContext 
-    {
-        public String getAuthenticationScheme () { return scheme; }
-        public Principal getUserPrincipal () { return principal; }
-        public boolean isSecure () { return true; }
-        public boolean isUserInRole (String role) { return false; }
-
-        public String upn () { return principal().getName(); }
-    }
-
     public record Session (String token, String upn, Instant expiry)
     {
         public boolean isExpired ()
@@ -71,8 +54,9 @@ public class AuthProvider
     private Base64.Encoder b64e = Base64.getEncoder();
 
     private Map<String, Function<String, Single<FPGssResult>>> schemes = Map.of(
-        "basic",    this::basicAuth,
-        "bearer",   this::bearerAuth);
+        "negotiate",    this::gssapiAuth,
+        "basic",        this::basicAuth,
+        "bearer",       this::bearerAuth);
 
     private ConcurrentHashMap<String, Session> sessions = new ConcurrentHashMap<>();
 
@@ -82,8 +66,22 @@ public class AuthProvider
     }
 
     public FPServiceClient fplus () { return fplus; }
+    public Base64.Encoder b64e () { return b64e; }
 
-    public Single<SecurityContext> authenticate (String auth)
+    public void start ()
+    {
+        Observable.interval(6, TimeUnit.HOURS)
+            .subscribe(v -> {
+                log.info("Expiring old sessions");
+                sessions.forEach(Long.MAX_VALUE,
+                    (tok, sess) -> {
+                        if (sess.isExpired())
+                            sessions.remove(tok);
+                    });
+            });
+    }
+
+    public Single<FPSecurityContext> authenticate (String auth)
     {
         if (auth == null)
             throw new SvcErr.AuthFailed("No auth supplied");
@@ -100,10 +98,12 @@ public class AuthProvider
         var creds = auth_m.group(2);
 
         return handler.apply(creds)
-            .<SecurityContext>map(res -> new Ctx(new Princ(res.upn()), scheme))
+            .doOnSuccess(r -> log.info("Authenticated {} using {}", r.upn(), scheme))
+            .map(r -> new FPSecurityContext(scheme, r))
             .onErrorResumeNext(e -> {
                 if (e instanceof SvcErr.AuthFailed)
                     return Single.error(e);
+                log.info("Authentication failed ({}): {}", scheme, e.toString());
                 return Single.error(new SvcErr.AuthFailed("Authentication failure"));
             });
     }
@@ -118,6 +118,14 @@ public class AuthProvider
         sessions.put(token, sess);
 
         return sess;
+    }
+
+    public Single<FPGssResult> gssapiAuth (String creds)
+    {
+        return Single.just(creds)
+            .map(b64d::decode)
+            .map(ByteBuffer::wrap)
+            .flatMap(fplus.gss()::verifyGSSAPI);
     }
 
     public Single<FPGssResult> basicAuth (String creds)

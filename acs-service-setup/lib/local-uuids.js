@@ -129,8 +129,13 @@ class LocalUUIDs {
             ["Role", Auth.Class.EdgeRole,
                 "EdgeAgent", "EdgeFlux", "EdgeKrbkeys", "EdgeMonitor", "EdgeSync",
                 "UNSBridge", "OPCUAServer"],
+            ["Account", Auth.Class.CentralService,
+                "MetaDB"],
         );
 
+        /* XXX We should use a service function UUID for service-setup
+         * here. Then ServiceConfig has a meaningful domain of service
+         * functions. */
         await this.put_conf(ServiceConfig, this.local);
         await this.put_service_configs();
 

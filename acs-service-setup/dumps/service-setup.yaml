@@ -8,6 +8,10 @@ objects:
   !u ConfigDB.Class.R2Class:
     !u Auth.Class.PrincipalGroup:
       name: "Principal group"
+    !u Auth.Class.PrincipalType:
+      name: "Principal type"
+      subclassOf:
+        - !u Auth.Class.PrincipalGroup
     !u Auth.Class.Role:
       name: "Role"
       subclassOf:
@@ -20,6 +24,10 @@ objects:
         name: "Git repository group"
 
   !u ConfigDB.Class.R1Class:
+    !u Auth.Class.Principal:
+      name: "Principal"
+      memberOf:
+        - !u Auth.Class.PrincipalGroup
     !u Clusters.Class.HelmChart:
       name: "Helm chart"
     !u Clusters.Class.SystemHelmChart:
@@ -30,6 +38,12 @@ objects:
       name: "Git repository"
       memberOf:
         - !u Git.Class.Group
+
+  !u Auth.Class.PrincipalType:
+    !u Auth.Class.CentralService:
+      name: "Central service"
+      subclassOf:
+        - !u Auth.Class.Principal
 
   !u UUIDs.Class.App:
     !u UUIDs.App.ServiceConfig:

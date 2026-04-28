@@ -14,11 +14,9 @@ import { RxClient, UUIDs } from '@amrc-factoryplus/rx-client';
 
 export class DataFlow {
   constructor(opts) {
-    const { fplus } = opts;
-
-    this.log = fplus.debug.bound("data");
-    this.cdb = fplus.ConfigDB;
-    this.auth = fplus.Auth;
+    this.log = opts.debug.bound("data");
+    this.cdb = opts.cdb;
+    this.auth = opts.auth;
 
     this.dataset_definitions = this._build_dataset_definitions();
     this.general_infos = this._build_general_info();
@@ -34,7 +32,7 @@ export class DataFlow {
 
     // this.log("GENERAL INFO UUID: ", UUIDs.App.Info);
     // this.general_infos.subscribe(x => this.log("General infos UPDATE %o", x.toJS()));
-    this.parts.subscribe(x => this.log("Parts UPDATE %o", x.toJS()));
+    // this.parts.subscribe(x => this.log("Parts UPDATE %o", x.toJS()));
   }
 
   // watch Dataset's members' subclasses

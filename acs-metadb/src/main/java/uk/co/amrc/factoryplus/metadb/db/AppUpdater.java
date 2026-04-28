@@ -105,10 +105,16 @@ public class AppUpdater extends RequestHandler.Component
     private void updateEntry (Resource app, Resource obj)
     {
         //log.info("Updating {} {}", app, obj);
-        var entry = request().configEntry(app, obj);
-        mapper.generateConfig(app, obj)
-            .peek(entry::putRawValue)
-            .onEmpty(entry::removeRawValue);
+        try {
+            var entry = request().configEntry(app, obj);
+            mapper.generateConfig(app, obj)
+                .peek(entry::putRawValue)
+                .onEmpty(entry::removeRawValue);
+        }
+        catch (Throwable e) {
+            log.error("Error updating {} {}", app, obj);
+            throw e;
+        }
     }
 
 }

@@ -87,7 +87,7 @@ export class APIv1 {
 
       const from = config.from ? new Date(config.from) : null;
       const to = config.to ? new Date(config.to) : null;
-
+      this.log("Session influx time bounds", maxDate(from, child.from), minDate(to, child.to));
       return {
         from: maxDate(from, child.from),
         to: minDate(to, child.to)
@@ -98,9 +98,9 @@ export class APIv1 {
     // ------------------------
     // 2. SPARKPLUG SRC
     // ------------------------
-    if(structure === Constants.App.SparkplugSrc){
+    else if(structure === Constants.App.SparkplugSrc){
       const {from, to} = await this.influxReader.get_influx_time_bounds(config.source);
-
+      this.log("Sprk SRC influx time bounds", from, to);
       return {from, to}
     }
 
@@ -108,7 +108,7 @@ export class APIv1 {
     // ------------------------
     // 3. UNION
     // ------------------------
-    if(structure === Constants.App.UnionComponents){
+    else if(structure === Constants.App.UnionComponents){
       const results = await Promise.all(
         config.map(source_uuid => 
           this._get_dataset_time_bounds(source_uuid, new Set(visited))
@@ -119,6 +119,8 @@ export class APIv1 {
 
       if(!valid.length) return {from: null, to: null};
 
+      this.log("Union influx time bounds: ");
+
       return {
         from: new Date(Math.min(...valid.map(v => v.from))),
         to: new Date(Math.max(...valid.map(v => v.to)))
@@ -127,6 +129,7 @@ export class APIv1 {
 
     return {from: null, to: null};
   }
+
 
   /** GET. Accepts Dataset UUID and returns metadata about a Published dataset.
    * @param uuid {request param}
@@ -168,9 +171,7 @@ export class APIv1 {
     const all_metadata = await rx.firstValueFrom(this.data.get_metadata());
     const metadata = all_metadata.get(dataset_uuid); 
 
-    /**
-     * if the queried dataset does not have from to time period -> recursively find the earliest and latest timestamps from source datasets.
-     */
+
     const {from, to} = await this._get_dataset_time_bounds(dataset_uuid);
 
     const all_parts = await rx.firstValueFrom(this.data.get_parts());
@@ -189,8 +190,8 @@ export class APIv1 {
     const meta = {
       uuid: dataset_uuid,
       name: info.name,
-      from,
-      to,
+      from: from ? from : undefined,
+      to: to ? to : undefined,
       function: f_type,
       metadata,
       parts: allowed_parts

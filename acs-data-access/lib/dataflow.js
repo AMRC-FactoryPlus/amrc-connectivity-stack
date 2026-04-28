@@ -3,10 +3,10 @@
 * Data-Flow / sequence management
 */
 
-import { List as IList, Map as IMap } from "immutable";
+import { List as IList, Map as IMap, Set as ISet } from "immutable";
 import rx from "rxjs";
 
-import * as rxx     from "@amrc-factoryplus/rx-util";
+import * as rxu     from "@amrc-factoryplus/rx-util";
 
 import { DataAccess as Constants }  from './constants.js';
 import { valid_uuid, valid_krb, DatasetValidity }    from "./validate.js";
@@ -34,23 +34,23 @@ export class DataFlow {
 
     // this.log("GENERAL INFO UUID: ", UUIDs.App.Info);
     // this.general_infos.subscribe(x => this.log("General infos UPDATE %o", x.toJS()));
+    this.parts.subscribe(x => this.log("Parts UPDATE %o", x.toJS()));
   }
 
   // watch Dataset's members' subclasses
-  _build_parts(){
-    return rxx.rx(
-      this.cdb.watch_members_direct_subclasses(Constants.Class.Dataset),
-      rx.map(map => map.map(set => 
-          set.filter(x => this.cdb.class_has_member(Constants.Class.Dataset, x))
+  _build_parts() {
+    return rxu.rx(
+      this.cdb.watch_members_subclasses(Constants.Class.Dataset),
+      rx.map(map => map.map(subclass_uuids => 
+          subclass_uuids.filter(x => this.cdb.class_has_member(Constants.Class.Dataset, x))
       )),
-      rxx.shareLatest()
-    )
+      rxu.shareLatest()
+    );
   }
-
 
   // Watch member members of functional group to see what functional type datasets have
   _build_functional_types() {
-    return rxx.rx(
+    return rxu.rx(
       this.cdb.watch_member_members(Constants.Group.FunctionalDatasetGroup),
       rx.map(data => {
         let result = IMap();
@@ -66,12 +66,12 @@ export class DataFlow {
 
         return result;
       }),
-      rxx.shareLatest()
+      rxu.shareLatest()
     );
   }
 
   _build_metadata() {
-    return rxx.rx(
+    return rxu.rx(
       this.cdb.watch_members(Constants.App.DatasetMetadata),
 
       rx.switchMap((uuidsSet) => {
@@ -103,20 +103,20 @@ export class DataFlow {
           })
         );
       }),
-      rxx.shareLatest()
+      rxu.shareLatest()
     );
   }
   
   
   _build_general_info(){
-    return rxx.rx(
+    return rxu.rx(
       this.cdb.search_app(UUIDs.App.Info), 
-      rxx.shareLatest()
+      rxu.shareLatest()
     );
   }
 
   _build_dataset_definitions() {
-    return rxx.rx(
+    return rxu.rx(
       rx.combineLatest([
         this.cdb.search_app(Constants.App.SparkplugSrc),
         this.cdb.search_app(Constants.App.SessionLimits),
@@ -149,7 +149,7 @@ export class DataFlow {
         );
       }),
 
-      rxx.shareLatest()
+      rxu.shareLatest()
     );
   }
 

@@ -1,4 +1,8 @@
 /*
+ * Copyright (c) University of Sheffield AMRC 2026.
+ */
+
+/*
  * History — Translates i3X value and history requests into InfluxDB
  * Flux queries against the sparkplug (default) bucket.
  *
@@ -145,12 +149,11 @@ export class History {
             ].filter(Boolean).join("\n");
         }
 
-        // Fallback: try using the elementId as a topLevelInstance UUID
-        const instanceUuid = this.objectTree.getInstanceUuid(elementId) ?? elementId;
+        // Fallback: use the elementId directly as topLevelInstance UUID
         return [
             `from(bucket: "${this.bucket}")`,
             `  |> range(start: ${startTime}, stop: ${endTime})`,
-            `  |> filter(fn: (r) => r["topLevelInstance"] == "${instanceUuid}")`,
+            `  |> filter(fn: (r) => r["topLevelInstance"] == "${elementId}")`,
             `  |> filter(fn: (r) => r["_field"] == "value")`,
             `  |> sort(columns: ["_time"])`,
         ].join("\n");

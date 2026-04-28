@@ -1,4 +1,8 @@
 /*
+ * Copyright (c) University of Sheffield AMRC 2026.
+ */
+
+/*
  * ValueCache — Subscribes to UNS MQTT topics, maintains an in-memory
  * cache of current values, and notifies subscribers of changes.
  */
@@ -19,7 +23,6 @@ interface ValueCacheOpts {
  */
 interface ObjectTreeLike {
     addCompositionFromUns(
-        deviceUuid: string,
         instanceUuidPath: string[],
         schemaUuidPath: string[],
         metricSegments: string[],
@@ -112,7 +115,6 @@ export class ValueCache {
 
         const instanceUuidPath = instanceUuidPathStr.split(":");
         const schemaUuidPath = schemaUuidPathStr.split(":");
-        const deviceUuid = instanceUuidPath[0];
         const bottomUuid = instanceUuidPath[instanceUuidPath.length - 1];
 
         // Parse payload
@@ -131,7 +133,6 @@ export class ValueCache {
         // Also passes ISA-95 segments so the tree can create hierarchy above the device.
         // Returns the leaf elementId.
         const elementId = this.objectTree.addCompositionFromUns(
-            deviceUuid,
             instanceUuidPath,
             schemaUuidPath,
             metricSegments,

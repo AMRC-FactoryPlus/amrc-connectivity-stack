@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) University of Sheffield AMRC 2026.
+ */
+
 import { jest, describe, it, expect, beforeEach } from "@jest/globals";
 import { ValueCache } from "../src/value-cache.js";
 import type { I3xVqt, I3xValueResponse } from "../src/types/i3x.js";
@@ -118,7 +122,6 @@ describe("ValueCache", () => {
             cache.onUnsMessage(DEFAULT_TOPIC, DEFAULT_PAYLOAD, DEFAULT_PROPS);
 
             expect(objectTree.addCompositionFromUns).toHaveBeenCalledWith(
-                "dev-uuid",
                 ["dev-uuid", "axes-uuid", "x-uuid", "pos-uuid"],
                 ["cnc-schema", "axis-schema", "pos-schema", "cmdval-schema"],
                 expect.any(Array),

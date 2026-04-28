@@ -36,9 +36,9 @@ export function createScene (canvas) {
 
   const bloom = new UnrealBloomPass(
     new THREE.Vector2(canvas.clientWidth, canvas.clientHeight),
-    0.4,   // strength - very subtle
-    0.2,   // radius - tight
-    0.7,   // threshold - only the brightest things glow
+    0.6,   // strength
+    0.3,   // radius
+    0.5,   // threshold
   )
   composer.addPass(bloom)
 

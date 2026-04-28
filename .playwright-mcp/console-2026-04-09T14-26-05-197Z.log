@@ -1,0 +1,4 @@
+[  103933ms] [LOG] Visualiser: loading depth 1, 1 parents... @ http://localhost:5173/src/store/useVisualiserStore.js:94
+[  103936ms] [LOG] Visualiser: depth 1 done, 0 children found, 1 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js:136
+[  103936ms] [LOG] Visualiser layout: 1 nodes, span 0.0 units @ http://localhost:5173/src/lib/visualiser/graph.js:72
+[  103937ms] [LOG] Visualiser camera: baseDistance 40.0 (maxNodeDist 2.0) @ http://localhost:5173/src/lib/visualiser/camera.js:32

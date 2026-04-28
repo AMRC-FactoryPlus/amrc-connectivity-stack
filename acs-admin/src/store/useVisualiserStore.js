@@ -261,11 +261,21 @@ export const useVisualiserStore = defineStore('visualiser', {
         let targetId = this._deviceCache?.get(item.elementId) ?? item.elementId
         if (!this._renderableIds?.has(targetId)) continue
 
+        // Store against the device (for main graph particles)
         this.values.set(targetId, {
           value: item.value,
           quality: item.quality,
           timestamp: item.timestamp,
         })
+
+        // Also store against the original leaf (for expanded tour particles)
+        if (item.elementId !== targetId) {
+          this.values.set(item.elementId, {
+            value: item.value,
+            quality: item.quality,
+            timestamp: item.timestamp,
+          })
+        }
 
         this.updateCounts.set(targetId, (this.updateCounts.get(targetId) || 0) + 1)
 
@@ -384,13 +394,12 @@ export const useVisualiserStore = defineStore('visualiser', {
         } catch { /* skip */ }
       }
 
-      // Find leaves in expanded nodes
+      // Merge expanded nodes into the main store so HUD and particles can find them
       for (const [id, entry] of expandedNodes) {
+        this.nodes.set(id, entry)
         if (entry.childIds.length === 0) {
           leafIds.push(id)
-          // Map to device for SSE
           this._deviceCache.set(id, deviceId)
-          // Also add to renderableIds so values show up
           this._renderableIds.add(id)
         }
       }
@@ -412,9 +421,10 @@ export const useVisualiserStore = defineStore('visualiser', {
     },
 
     collapseDevice (deviceId, expandedNodeIds) {
-      // Remove expanded nodes from renderableIds
       for (const id of expandedNodeIds) {
         this._renderableIds.delete(id)
+        this.nodes.delete(id)
+        this.values.delete(id)
       }
     },
 

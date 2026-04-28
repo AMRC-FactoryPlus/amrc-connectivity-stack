@@ -1,0 +1,140 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - region "Notifications alt+T":
+      - list
+    - generic [ref=e3]:
+      - generic [ref=e152]:
+        - list [ref=e154]:
+          - listitem [ref=e155]:
+            - generic [ref=e156]:
+              - img [ref=e158]
+              - generic [ref=e159]:
+                - heading "ACS (dev)" [level=1] [ref=e160]
+                - heading "admin" [level=2] [ref=e161]
+        - generic [ref=e162]:
+          - list [ref=e165]:
+            - listitem [ref=e166]:
+              - link "Home" [ref=e167] [cursor=pointer]:
+                - /url: "#/"
+                - button "Home" [ref=e168]:
+                  - generic [ref=e169]:
+                    - generic [ref=e170]: 
+                    - generic [ref=e171]: Home
+            - listitem [ref=e172]:
+              - link "Explorer" [ref=e173] [cursor=pointer]:
+                - /url: "#/explorer"
+                - button "Explorer" [ref=e174]:
+                  - generic [ref=e175]:
+                    - generic [ref=e176]: 
+                    - generic [ref=e177]: Explorer
+            - listitem [ref=e178]:
+              - link "Visualiser" [ref=e179] [cursor=pointer]:
+                - /url: "#/visualiser"
+                - button "Visualiser" [ref=e180]:
+                  - generic [ref=e181]:
+                    - generic [ref=e182]: 
+                    - generic [ref=e183]: Visualiser
+            - listitem [ref=e184]:
+              - link "Live Activity" [ref=e185] [cursor=pointer]:
+                - /url: "#/activity"
+                - button "Live Activity" [ref=e186]:
+                  - generic [ref=e187]:
+                    - generic [ref=e188]: 
+                    - generic [ref=e189]: Live Activity
+            - listitem [ref=e190]:
+              - link "Alerts" [ref=e191] [cursor=pointer]:
+                - /url: "#/alerts"
+                - button "Alerts" [ref=e192]:
+                  - generic [ref=e193]:
+                    - generic [ref=e194]: 
+                    - generic [ref=e195]: Alerts
+            - listitem [ref=e196]:
+              - link "Access Control" [ref=e197] [cursor=pointer]:
+                - /url: "#/access-control"
+                - button "Access Control" [ref=e198]:
+                  - generic [ref=e199]:
+                    - generic [ref=e200]: 
+                    - generic [ref=e201]: Access Control
+            - listitem [ref=e202]:
+              - link "ConfigDB" [ref=e203] [cursor=pointer]:
+                - /url: "#/configdb"
+                - button "ConfigDB" [ref=e204]:
+                  - generic [ref=e205]:
+                    - generic [ref=e206]: 
+                    - generic [ref=e207]: ConfigDB
+            - listitem [ref=e208]:
+              - link "Files" [ref=e209] [cursor=pointer]:
+                - /url: "#/files"
+                - button "Files" [ref=e210]:
+                  - generic [ref=e211]:
+                    - generic [ref=e212]: 
+                    - generic [ref=e213]: Files
+            - listitem [ref=e214]:
+              - link "Bridges" [ref=e215] [cursor=pointer]:
+                - /url: "#/bridges"
+                - button "Bridges" [ref=e216]:
+                  - generic [ref=e217]:
+                    - generic [ref=e218]: 
+                    - generic [ref=e219]: Bridges
+          - generic [ref=e220]:
+            - generic [ref=e221]: Edge Clusters & Devices
+            - list [ref=e223]:
+              - listitem [ref=e224]:
+                - link "Cluster" [ref=e226] [cursor=pointer]:
+                  - /url: "#/edge-clusters/5ee1a8e8-494e-4242-a334-1d919adbf3c5"
+                  - button "Cluster" [ref=e227]:
+                    - generic [ref=e228]:
+                      - generic "Show nodes for this cluster" [ref=e229]:
+                        - generic [ref=e230]: 
+                      - generic [ref=e231]: 
+                      - generic [ref=e232]: Cluster
+              - button "New Cluster" [ref=e233] [cursor=pointer]:
+                - generic [ref=e234]: +
+                - generic [ref=e235]: New Cluster
+          - generic [ref=e237]:
+            - generic [ref=e238]:
+              - heading "Factory+" [level=3] [ref=e239]
+              - paragraph [ref=e240]: The AMRC Connectivity Stack is an implementation of the Factory+ framework.
+            - link "Read More" [ref=e242] [cursor=pointer]:
+              - /url: https://factoryplus.app.amrc.co.uk
+        - button "Toggle Sidebar" [ref=e243]
+      - main [ref=e4]:
+        - generic [ref=e244]:
+          - generic [ref=e245]:
+            - generic [ref=e246]: 
+            - heading "Home" [level=3] [ref=e258]
+          - generic [ref=e248]:
+            - button "Monitored Items" [ref=e249] [cursor=pointer]:
+              - generic [ref=e250]: 
+            - button "Toggle sidebar" [ref=e251] [cursor=pointer]:
+              - generic [ref=e252]: 
+            - button "Toggle fullscreen" [ref=e253] [cursor=pointer]:
+              - generic [ref=e254]: 
+            - button "Logout" [ref=e255] [cursor=pointer]
+        - main [ref=e5]:
+          - generic [ref=e259]:
+            - generic [ref=e261]:
+              - paragraph [ref=e262]: MQTT Server
+              - generic "Click to copy" [ref=e263]:
+                - heading "mqtt://mqtt.amrc-fpd-ago.shef.ac.uk" [level=3] [ref=e264]
+                - text: 
+            - generic [ref=e265]:
+              - generic [ref=e266]:
+                - generic [ref=e267]:
+                  - heading "Graph" [level=3] [ref=e268]
+                  - paragraph [ref=e269]: Visualise real-time data flow across the infrastructure in a graph view.
+                - link "View" [ref=e271] [cursor=pointer]:
+                  - /url: http://visualiser.amrc-fpd-ago.shef.ac.uk
+              - generic [ref=e272]:
+                - generic [ref=e273]:
+                  - heading "Activity" [level=3] [ref=e274]
+                  - paragraph [ref=e275]: Visualise real-time data changes across the infrastructure in a table view.
+                - link "View" [ref=e277] [cursor=pointer]:
+                  - /url: "#/activity"
+                  - link "View" [ref=e278]:
+                    - /url: http://activity.amrc-fpd-ago.shef.ac.uk
+  - generic [ref=e8]:
+    - generic "Toggle devtools panel" [ref=e9] [cursor=pointer]:
+      - img [ref=e10]
+    - generic "Toggle Component Inspector" [ref=e15] [cursor=pointer]:
+      - img [ref=e16]

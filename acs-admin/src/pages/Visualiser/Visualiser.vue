@@ -24,17 +24,23 @@ let edgesCtx = null
 let particlesCtx = null
 let lodCtx = null
 let positions = null
+let cameraCtrl = null
 const seenValues = new Map()
 
 // HUD state
 const hudTargetId = ref(null)
 const hudPhase = ref(null)
+const hudDeviceName = ref(null)
+const hudDeviceHierarchy = ref([])
 
 // Expanded device state
 let expandedDeviceId = null
 let expandedNodeIds = new Set()
 let expandedNodesCtx = null
 let expandedEdgesCtx = null
+let expandedParticlesCtx = null
+let expandedLodCtx = null
+let inTour = false
 
 onMounted(async () => {
   layout.toggleFullscreen(true)
@@ -54,29 +60,44 @@ onMounted(async () => {
   particlesCtx = createParticles(sceneCtx.scene)
   lodCtx = createLOD(sceneCtx.scene, renderable, positions)
 
-  const cameraCtrl = createCameraController(sceneCtx.camera, canvas.value, positions, () => {
+  cameraCtrl = createCameraController(sceneCtx.camera, canvas.value, positions, () => {
     return [...store.values.keys()]
   }, {
     async onSweepIn (deviceId) {
       const name = store.nodes.get(deviceId)?.node?.displayName ?? deviceId.slice(0, 8)
       console.log(`Sweep in: ${name}`)
 
-      // Expand the device subtree
+      // Set device context for HUD
+      const deviceEntry = store.nodes.get(deviceId)
+      hudDeviceName.value = deviceEntry?.node?.displayName ?? name
+      const path = []
+      let cur = deviceEntry?.parentId
+      while (cur) {
+        const e = store.nodes.get(cur)
+        if (!e) break
+        path.unshift(e.node?.displayName ?? cur.slice(0, 8))
+        cur = e.parentId
+      }
+      hudDeviceHierarchy.value = path
+
+      // Hide main graph completely during tour
+      nodesCtx.setOpacity(0)
+      edgesCtx.setOpacity(0)
+      lodCtx.setOpacity(0)
+      particlesCtx.setVisible(false)
+      inTour = true
+
+      // Expand device subtree
       const { nodes: expandedNodes, leafIds, activeLeafId } = await store.expandDevice(deviceId)
       if (expandedNodes.size === 0) return
 
       expandedDeviceId = deviceId
       expandedNodeIds = new Set(expandedNodes.keys())
 
-      // Compute positions for expanded nodes around the device
+      // Compute positions for expanded nodes
       const devicePos = positions.get(deviceId)
       if (!devicePos) return
 
-      // Build a mini position map: device + its expanded children
-      const expandedPositions = new Map()
-      expandedPositions.set(deviceId, devicePos)
-
-      // Layout expanded nodes in a small cluster around the device
       const miniRenderable = new Map()
       miniRenderable.set(deviceId, store.nodes.get(deviceId))
       for (const [id, entry] of expandedNodes) {
@@ -84,10 +105,9 @@ onMounted(async () => {
       }
       const miniPositions = computeLayout(miniRenderable, [deviceId])
 
-      // Offset all mini positions to be centred on the device's world position
+      const expandedPositions = new Map()
       for (const [id, pos] of miniPositions) {
         if (id === deviceId) continue
-        // Scale down the expanded cluster to fit near the device
         pos.multiplyScalar(0.3)
         pos.add(devicePos)
         positions.set(id, pos)
@@ -101,75 +121,114 @@ onMounted(async () => {
       expandedEdgesCtx = createEdges(sceneCtx.scene)
       expandedEdgesCtx.build(expandedNodes, expandedPositions)
 
-      // Set HUD to the most active leaf
-      if (activeLeafId) {
-        hudTargetId.value = activeLeafId
+      // Labels for ALL expanded nodes
+      expandedLodCtx = createLOD(sceneCtx.scene, expandedNodes, expandedPositions, { labelAll: true })
+
+      // Expanded particles for leaf-level emission
+      expandedParticlesCtx = createParticles(sceneCtx.scene)
+
+      // Build tour stops from active leaves that have positions
+      const activeStops = []
+      for (const leafId of leafIds) {
+        const pos = positions.get(leafId)
+        if (pos) {
+          activeStops.push({ id: leafId, pos })
+        }
       }
 
-      // Dim the main graph
-      nodesCtx.setOpacity(0.1)
-      edgesCtx.setOpacity(0.05)
-      lodCtx.setOpacity(0.1)
+      // Prefer leaves with data, limit to 10
+      activeStops.sort((a, b) => {
+        return (store.updateCounts.get(b.id) || 0) - (store.updateCounts.get(a.id) || 0)
+      })
 
-      console.log(`Expanded ${name}: ${expandedNodes.size} nodes, active leaf: ${activeLeafId?.slice(0, 8)}`)
+      console.log(`Expanded ${name}: ${expandedNodes.size} nodes, ${activeStops.length} tour stops`)
+      cameraCtrl.setTourStops(activeStops)
+    },
+
+    onTourStop (leafId) {
+      // Update HUD to show this leaf
+      hudTargetId.value = leafId
+      const entry = store.nodes.get(leafId)
+      console.log(`Tour stop: ${entry?.node?.displayName ?? leafId.slice(0, 8)}`)
     },
 
     onSweepOut (deviceId) {
       console.log(`Sweep out: ${store.nodes.get(deviceId)?.node?.displayName ?? deviceId.slice(0, 8)}`)
 
-      // Restore main graph opacity
+      // Restore main graph and particles
       nodesCtx.setOpacity(0.95)
       edgesCtx.setOpacity(0.5)
       lodCtx.setOpacity(0.5)
+      particlesCtx.setVisible(true)
+      inTour = false
 
-      // Remove expanded nodes
-      if (expandedNodesCtx) {
-        expandedNodesCtx.dispose()
-        expandedNodesCtx = null
-      }
-      if (expandedEdgesCtx) {
-        expandedEdgesCtx.dispose()
-        expandedEdgesCtx = null
-      }
+      // Remove expanded
+      if (expandedLodCtx) { expandedLodCtx.dispose(); expandedLodCtx = null }
+      if (expandedNodesCtx) { expandedNodesCtx.dispose(); expandedNodesCtx = null }
+      if (expandedEdgesCtx) { expandedEdgesCtx.dispose(); expandedEdgesCtx = null }
+      if (expandedParticlesCtx) { expandedParticlesCtx.dispose(); expandedParticlesCtx = null }
 
       for (const id of expandedNodeIds) {
         positions.delete(id)
       }
-
       if (expandedDeviceId) {
         store.collapseDevice(expandedDeviceId, expandedNodeIds)
       }
       expandedDeviceId = null
       expandedNodeIds = new Set()
       hudPhase.value = null
+      hudTargetId.value = null
+      hudDeviceName.value = null
+      hudDeviceHierarchy.value = []
     },
   })
 
   sceneCtx.onUpdate((dt) => {
     cameraCtrl.update(dt)
 
-    // Emit particles for new SSE values
+    // Emit particles
+    let _emitDebugOnce = window._emitDebugDone ? false : true
     for (const [id, vqt] of store.values) {
       const prev = seenValues.get(id)
       if (prev !== vqt.timestamp) {
         seenValues.set(id, vqt.timestamp)
-        if (!positions.has(id)) continue
-        particlesCtx.emit(id, vqt.quality, renderable, positions, (nodeId) => {
-          nodesCtx.flash(nodeId)
-        })
+
+        if (inTour) {
+          // During tour - emit from expanded leaves OR device
+          const hasPos = positions.has(id)
+          const isExpanded = expandedNodeIds.has(id)
+          if (_emitDebugOnce) {
+            console.log(`Tour emit: id=${id.slice(0,8)} hasPos=${hasPos} isExpanded=${isExpanded} expandedCount=${expandedNodeIds.size}`)
+            window._emitDebugDone = true
+            _emitDebugOnce = false
+          }
+          if (hasPos && expandedParticlesCtx) {
+            expandedParticlesCtx.emit(id, vqt.quality, store.nodes, positions, (nodeId) => {
+              if (expandedNodesCtx) expandedNodesCtx.flash(nodeId)
+            })
+          }
+        } else {
+          if (!positions.has(id)) continue
+          particlesCtx.emit(id, vqt.quality, renderable, positions, (nodeId) => {
+            nodesCtx.flash(nodeId)
+          })
+        }
       }
     }
 
     nodesCtx.update(dt, store.values)
     if (expandedNodesCtx) expandedNodesCtx.update(dt, store.values)
     particlesCtx.update(dt)
+    if (expandedParticlesCtx) expandedParticlesCtx.update(dt)
     lodCtx.update(sceneCtx.camera, dt, null, null)
 
-    // Update HUD state
+    // Update HUD
     const sweep = cameraCtrl.getSweepState()
     if (sweep) {
-      // During hold, hudTargetId may have been set to an active leaf by onSweepIn
       hudPhase.value = sweep.phase
+      if (sweep.tourStopId) {
+        hudTargetId.value = sweep.tourStopId
+      }
     } else if (hudPhase.value) {
       hudPhase.value = null
     }
@@ -180,6 +239,10 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(async () => {
+  if (expandedLodCtx) expandedLodCtx.dispose()
+  if (expandedParticlesCtx) expandedParticlesCtx.dispose()
+  if (expandedNodesCtx) expandedNodesCtx.dispose()
+  if (expandedEdgesCtx) expandedEdgesCtx.dispose()
   if (lodCtx) lodCtx.dispose()
   if (particlesCtx) particlesCtx.dispose()
   if (edgesCtx) edgesCtx.dispose()
@@ -201,6 +264,8 @@ onBeforeUnmount(async () => {
       :phase="hudPhase"
       :nodes="store.nodes"
       :values="store.values"
+      :device-name="hudDeviceName"
+      :device-hierarchy="hudDeviceHierarchy"
     />
   </div>
 </template>

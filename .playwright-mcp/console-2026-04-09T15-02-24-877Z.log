@@ -1,0 +1,168 @@
+[      76ms] [LOG] Visualiser: loading depth 1, 1 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775746812403:94
+[      82ms] [LOG] Visualiser: depth 1 done, 2 children found, 3 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775746812403:143
+[      83ms] [LOG] Visualiser: loading depth 2, 2 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775746812403:94
+[      87ms] [LOG] Visualiser: depth 2 done, 3 children found, 6 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775746812403:143
+[      87ms] [LOG] Visualiser: loading depth 3, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775746812403:94
+[      89ms] [LOG] Visualiser: depth 3 done, 3 children found, 9 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775746812403:143
+[      89ms] [LOG] Visualiser: loading depth 4, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775746812403:94
+[      91ms] [LOG] Visualiser: depth 4 done, 3 children found, 12 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775746812403:143
+[      91ms] [LOG] Visualiser: loading depth 5, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775746812403:94
+[      93ms] [LOG] Visualiser: depth 5 done, 2 children found, 14 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775746812403:143
+[      93ms] [LOG] Visualiser: loading depth 6, 2 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775746812403:94
+[      96ms] [LOG] Visualiser: depth 6 done, 3 children found, 17 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775746812403:143
+[      96ms] [LOG] Visualiser: loading depth 7, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775746812403:94
+[      98ms] [LOG] Visualiser: depth 7 done, 0 children found, 17 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775746812403:143
+[      98ms] [LOG] Visualiser layout: 17 nodes, maxDist 27.7, maxDepth 7 @ http://localhost:5173/src/lib/visualiser/graph.js?t=1775745365396:112
+[      98ms] [LOG] Visualiser camera: baseDistance 49.9 (maxNodeDist 27.7) @ http://localhost:5173/src/lib/visualiser/camera.js?t=1775746812403:37
+[     100ms] [LOG] Visualiser LOD: created 12 labels @ http://localhost:5173/src/lib/visualiser/lod.js?t=1775746812403:61
+[   77991ms] [ERROR] SSE stream error: TypeError: network error @ http://localhost:5173/src/composables/useI3xSSE.js:25
+[   81439ms] [LOG] 🍍 "node" store installed 🆕 @ http://localhost:5173/node_modules/.vite/deps/pinia.js?v=001f3bc8:202
+[   81439ms] [LOG] 🍍 "deployment" store installed 🆕 @ http://localhost:5173/node_modules/.vite/deps/pinia.js?v=001f3bc8:202
+[   81626ms] [LOG] 🍍 "visualiser" store installed 🆕 @ http://localhost:5173/node_modules/.vite/deps/pinia.js?v=001f3bc8:202
+[   81632ms] [LOG] Visualiser: loading depth 1, 1 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775746812403:94
+[   81634ms] [LOG] Visualiser: depth 1 done, 2 children found, 3 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775746812403:143
+[   81634ms] [LOG] Visualiser: loading depth 2, 2 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775746812403:94
+[   81635ms] [LOG] Visualiser: depth 2 done, 3 children found, 6 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775746812403:143
+[   81635ms] [LOG] Visualiser: loading depth 3, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775746812403:94
+[   81637ms] [LOG] Visualiser: depth 3 done, 3 children found, 9 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775746812403:143
+[   81637ms] [LOG] Visualiser: loading depth 4, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775746812403:94
+[   81639ms] [LOG] Visualiser: depth 4 done, 3 children found, 12 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775746812403:143
+[   81639ms] [LOG] Visualiser: loading depth 5, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775746812403:94
+[   81641ms] [LOG] Visualiser: depth 5 done, 2 children found, 14 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775746812403:143
+[   81641ms] [LOG] Visualiser: loading depth 6, 2 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775746812403:94
+[   81643ms] [LOG] Visualiser: depth 6 done, 3 children found, 17 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775746812403:143
+[   81643ms] [LOG] Visualiser: loading depth 7, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775746812403:94
+[   81645ms] [LOG] Visualiser: depth 7 done, 0 children found, 17 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775746812403:143
+[   81646ms] [LOG] Visualiser layout: 17 nodes, maxDist 28.1, maxDepth 7 @ http://localhost:5173/src/lib/visualiser/graph.js?t=1775745365396:112
+[   81647ms] [LOG] Visualiser camera: baseDistance 50.5 (maxNodeDist 28.1) @ http://localhost:5173/src/lib/visualiser/camera.js?t=1775746812403:37
+[   81649ms] [LOG] Visualiser LOD: created 12 labels @ http://localhost:5173/src/lib/visualiser/lod.js?t=1775746812403:61
+[  189210ms] [LOG] [vite] server connection lost. Polling for restart... @ http://localhost:5173/@vite/client:555
+[  189213ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  190267ms] [ERROR] SSE stream error: TypeError: network error @ http://localhost:5173/src/composables/useI3xSSE.js:25
+[  193340ms] [LOG] 🍍 "node" store installed 🆕 @ http://localhost:5173/node_modules/.vite/deps/pinia.js?v=001f3bc8:202
+[  193340ms] [LOG] 🍍 "deployment" store installed 🆕 @ http://localhost:5173/node_modules/.vite/deps/pinia.js?v=001f3bc8:202
+[  193459ms] [LOG] 🍍 "visualiser" store installed 🆕 @ http://localhost:5173/node_modules/.vite/deps/pinia.js?v=001f3bc8:202
+[  193478ms] [LOG] Visualiser: loading depth 1, 1 parents... @ http://localhost:5173/src/store/useVisualiserStore.js:94
+[  193488ms] [LOG] Visualiser: depth 1 done, 2 children found, 3 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js:143
+[  193488ms] [LOG] Visualiser: loading depth 2, 2 parents... @ http://localhost:5173/src/store/useVisualiserStore.js:94
+[  193490ms] [LOG] Visualiser: depth 2 done, 3 children found, 6 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js:143
+[  193490ms] [LOG] Visualiser: loading depth 3, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js:94
+[  193492ms] [LOG] Visualiser: depth 3 done, 3 children found, 9 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js:143
+[  193493ms] [LOG] Visualiser: loading depth 4, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js:94
+[  193494ms] [LOG] Visualiser: depth 4 done, 3 children found, 12 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js:143
+[  193494ms] [LOG] Visualiser: loading depth 5, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js:94
+[  193496ms] [LOG] Visualiser: depth 5 done, 2 children found, 14 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js:143
+[  193496ms] [LOG] Visualiser: loading depth 6, 2 parents... @ http://localhost:5173/src/store/useVisualiserStore.js:94
+[  193504ms] [LOG] Visualiser: depth 6 done, 3 children found, 17 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js:143
+[  193504ms] [LOG] Visualiser: loading depth 7, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js:94
+[  193506ms] [LOG] Visualiser: depth 7 done, 0 children found, 17 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js:143
+[  193507ms] [LOG] Visualiser layout: 17 nodes, maxDist 27.9, maxDepth 7 @ http://localhost:5173/src/lib/visualiser/graph.js:112
+[  193508ms] [LOG] Visualiser camera: baseDistance 50.3 (maxNodeDist 27.9) @ http://localhost:5173/src/lib/visualiser/camera.js:37
+[  193509ms] [LOG] Visualiser LOD: created 12 labels @ http://localhost:5173/src/lib/visualiser/lod.js:61
+[  211722ms] [LOG] Visualiser: loading depth 1, 1 parents... @ http://localhost:5173/src/store/useVisualiserStore.js:94
+[  211729ms] [LOG] Visualiser: depth 1 done, 2 children found, 3 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js:143
+[  211729ms] [LOG] Visualiser: loading depth 2, 2 parents... @ http://localhost:5173/src/store/useVisualiserStore.js:94
+[  211732ms] [LOG] Visualiser: depth 2 done, 3 children found, 6 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js:143
+[  211732ms] [LOG] Visualiser: loading depth 3, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js:94
+[  211734ms] [LOG] Visualiser: depth 3 done, 3 children found, 9 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js:143
+[  211734ms] [LOG] Visualiser: loading depth 4, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js:94
+[  211736ms] [LOG] Visualiser: depth 4 done, 3 children found, 12 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js:143
+[  211736ms] [LOG] Visualiser: loading depth 5, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js:94
+[  211738ms] [LOG] Visualiser: depth 5 done, 2 children found, 14 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js:143
+[  211738ms] [LOG] Visualiser: loading depth 6, 2 parents... @ http://localhost:5173/src/store/useVisualiserStore.js:94
+[  211740ms] [LOG] Visualiser: depth 6 done, 3 children found, 17 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js:143
+[  211741ms] [LOG] Visualiser: loading depth 7, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js:94
+[  211742ms] [LOG] Visualiser: depth 7 done, 0 children found, 17 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js:143
+[  211742ms] [LOG] Visualiser layout: 17 nodes, maxDist 28.0, maxDepth 7 @ http://localhost:5173/src/lib/visualiser/graph.js:112
+[  211743ms] [LOG] Visualiser camera: baseDistance 50.4 (maxNodeDist 28.0) @ http://localhost:5173/src/lib/visualiser/camera.js?t=1775747156424:37
+[  211744ms] [LOG] Visualiser LOD: created 12 labels @ http://localhost:5173/src/lib/visualiser/lod.js:61
+[  218822ms] [LOG] Visualiser: loading depth 1, 1 parents... @ http://localhost:5173/src/store/useVisualiserStore.js:94
+[  218828ms] [LOG] Visualiser: depth 1 done, 2 children found, 3 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js:143
+[  218828ms] [LOG] Visualiser: loading depth 2, 2 parents... @ http://localhost:5173/src/store/useVisualiserStore.js:94
+[  218830ms] [LOG] Visualiser: depth 2 done, 3 children found, 6 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js:143
+[  218830ms] [LOG] Visualiser: loading depth 3, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js:94
+[  218831ms] [LOG] Visualiser: depth 3 done, 3 children found, 9 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js:143
+[  218832ms] [LOG] Visualiser: loading depth 4, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js:94
+[  218834ms] [LOG] Visualiser: depth 4 done, 3 children found, 12 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js:143
+[  218834ms] [LOG] Visualiser: loading depth 5, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js:94
+[  218836ms] [LOG] Visualiser: depth 5 done, 2 children found, 14 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js:143
+[  218836ms] [LOG] Visualiser: loading depth 6, 2 parents... @ http://localhost:5173/src/store/useVisualiserStore.js:94
+[  218838ms] [LOG] Visualiser: depth 6 done, 3 children found, 17 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js:143
+[  218838ms] [LOG] Visualiser: loading depth 7, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js:94
+[  218839ms] [LOG] Visualiser: depth 7 done, 0 children found, 17 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js:143
+[  218839ms] [LOG] Visualiser layout: 17 nodes, maxDist 28.2, maxDepth 7 @ http://localhost:5173/src/lib/visualiser/graph.js:112
+[  218840ms] [LOG] Visualiser camera: baseDistance 50.8 (maxNodeDist 28.2) @ http://localhost:5173/src/lib/visualiser/camera.js?t=1775747163607:37
+[  218840ms] [LOG] Visualiser LOD: created 12 labels @ http://localhost:5173/src/lib/visualiser/lod.js:61
+[  225523ms] [LOG] Visualiser: loading depth 1, 1 parents... @ http://localhost:5173/src/store/useVisualiserStore.js:94
+[  225528ms] [LOG] Visualiser: depth 1 done, 2 children found, 3 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js:143
+[  225528ms] [LOG] Visualiser: loading depth 2, 2 parents... @ http://localhost:5173/src/store/useVisualiserStore.js:94
+[  225530ms] [LOG] Visualiser: depth 2 done, 3 children found, 6 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js:143
+[  225530ms] [LOG] Visualiser: loading depth 3, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js:94
+[  225533ms] [LOG] Visualiser: depth 3 done, 3 children found, 9 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js:143
+[  225533ms] [LOG] Visualiser: loading depth 4, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js:94
+[  225535ms] [LOG] Visualiser: depth 4 done, 3 children found, 12 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js:143
+[  225535ms] [LOG] Visualiser: loading depth 5, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js:94
+[  225537ms] [LOG] Visualiser: depth 5 done, 2 children found, 14 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js:143
+[  225537ms] [LOG] Visualiser: loading depth 6, 2 parents... @ http://localhost:5173/src/store/useVisualiserStore.js:94
+[  225539ms] [LOG] Visualiser: depth 6 done, 3 children found, 17 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js:143
+[  225539ms] [LOG] Visualiser: loading depth 7, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js:94
+[  225540ms] [LOG] Visualiser: depth 7 done, 0 children found, 17 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js:143
+[  225541ms] [LOG] Visualiser layout: 17 nodes, maxDist 27.7, maxDepth 7 @ http://localhost:5173/src/lib/visualiser/graph.js:112
+[  225541ms] [LOG] Visualiser camera: baseDistance 49.8 (maxNodeDist 27.7) @ http://localhost:5173/src/lib/visualiser/camera.js?t=1775747170303:37
+[  225542ms] [LOG] Visualiser LOD: created 12 labels @ http://localhost:5173/src/lib/visualiser/lod.js:61
+[  247725ms] [ERROR] Failed to load resource: net::ERR_INCOMPLETE_CHUNKED_ENCODING @ http://localhost:8080/v1/subscriptions/stream:0
+[  247726ms] [ERROR] SSE stream error: TypeError: network error @ http://localhost:5173/src/composables/useI3xSSE.js:25
+[  248729ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8080/v1/subscriptions/stream:0
+[  248729ms] [ERROR] SSE stream error: TypeError: Failed to fetch
+    at create (http://localhost:5173/node_modules/.vite/deps/@microsoft_fetch-event-source.js?v=001f3bc8:158:32) @ http://localhost:5173/src/composables/useI3xSSE.js:25
+[  249731ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8080/v1/subscriptions/stream:0
+[  249731ms] [ERROR] SSE stream error: TypeError: Failed to fetch
+    at create (http://localhost:5173/node_modules/.vite/deps/@microsoft_fetch-event-source.js?v=001f3bc8:158:32) @ http://localhost:5173/src/composables/useI3xSSE.js:25
+[  250734ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8080/v1/subscriptions/stream:0
+[  250734ms] [ERROR] SSE stream error: TypeError: Failed to fetch
+    at create (http://localhost:5173/node_modules/.vite/deps/@microsoft_fetch-event-source.js?v=001f3bc8:158:32) @ http://localhost:5173/src/composables/useI3xSSE.js:25
+[  251655ms] [LOG] [vite] server connection lost. Polling for restart... @ http://localhost:5173/@vite/client:555
+[  251657ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  251737ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8080/v1/subscriptions/stream:0
+[  251737ms] [ERROR] SSE stream error: TypeError: Failed to fetch
+    at create (http://localhost:5173/node_modules/.vite/deps/@microsoft_fetch-event-source.js?v=001f3bc8:158:32) @ http://localhost:5173/src/composables/useI3xSSE.js:25
+[  252659ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  252739ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8080/v1/subscriptions/stream:0
+[  252739ms] [ERROR] SSE stream error: TypeError: Failed to fetch
+    at create (http://localhost:5173/node_modules/.vite/deps/@microsoft_fetch-event-source.js?v=001f3bc8:158:32) @ http://localhost:5173/src/composables/useI3xSSE.js:25
+[  257050ms] [LOG] 🍍 "node" store installed 🆕 @ http://localhost:5173/node_modules/.vite/deps/pinia.js?v=001f3bc8:202
+[  257050ms] [LOG] 🍍 "deployment" store installed 🆕 @ http://localhost:5173/node_modules/.vite/deps/pinia.js?v=001f3bc8:202
+[  257104ms] [LOG] 🍍 "visualiser" store installed 🆕 @ http://localhost:5173/node_modules/.vite/deps/pinia.js?v=001f3bc8:202
+[  257106ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8080/v1/objects?root=true:0
+[  257107ms] [WARNING] [Vue warn]: Unhandled error during execution of mounted hook 
+  at <Visualiser onVnodeUnmounted=fn<onVnodeUnmounted> ref=Ref< Proxy(Object) > > 
+  at <RouterView > 
+  at <SidebarInset > 
+  at <TooltipProvider delay-duration=0 > 
+  at <SidebarProvider > 
+  at <App> @ http://localhost:5173/node_modules/.vite/deps/chunk-KZIOITQL.js?v=001f3bc8:2383
+[  257122ms] TypeError: Failed to fetch
+    at request (http://localhost:5173/src/composables/useI3xClient.js:9:21)
+    at get (http://localhost:5173/src/composables/useI3xClient.js:25:10)
+    at Object.getObjects (http://localhost:5173/src/composables/useI3xClient.js:47:14)
+    at Proxy.loadTree (http://localhost:5173/src/store/useVisualiserStore.js:66:33)
+    at Proxy.wrappedAction (http://localhost:5173/node_modules/.vite/deps/pinia.js?v=001f3bc8:1107:18)
+    at store.<computed> (http://localhost:5173/node_modules/.vite/deps/pinia.js?v=001f3bc8:785:44)
+    at http://localhost:5173/src/pages/Visualiser/Visualiser.vue:46:15
+    at http://localhost:5173/node_modules/.vite/deps/chunk-KZIOITQL.js?v=001f3bc8:5435:40
+    at callWithErrorHandling (http://localhost:5173/node_modules/.vite/deps/chunk-KZIOITQL.js?v=001f3bc8:2531:19)
+    at callWithAsyncErrorHandling (http://localhost:5173/node_modules/.vite/deps/chunk-KZIOITQL.js?v=001f3bc8:2538:17)
+[  268710ms] [VERBOSE] [DOM] Password field is not contained in a form: (More info: https://goo.gl/9p2vKq) %o @ http://localhost:5173/#/login:0
+[  271101ms] [WARNING] [Vue warn]: Component emitted event "blur" but it is neither declared in the emits option nor as an "onBlur" prop. @ http://localhost:5173/node_modules/.vite/deps/chunk-KZIOITQL.js?v=001f3bc8:2383
+[  272959ms] [WARNING] [Vue warn]: Component emitted event "blur" but it is neither declared in the emits option nor as an "onBlur" prop. @ http://localhost:5173/node_modules/.vite/deps/chunk-KZIOITQL.js?v=001f3bc8:2383
+[  274629ms] [LOG] Visualiser: loading depth 1, 2 parents... @ http://localhost:5173/src/store/useVisualiserStore.js:94
+[  274646ms] [LOG] Visualiser: depth 1 done, 10 children found, 12 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js:143
+[  274646ms] [LOG] Visualiser: loading depth 2, 10 parents... @ http://localhost:5173/src/store/useVisualiserStore.js:94
+[  274681ms] [LOG] Visualiser: depth 2 done, 89 children found, 101 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js:143
+[  274681ms] [LOG] Visualiser: loading depth 3, 89 parents... @ http://localhost:5173/src/store/useVisualiserStore.js:94
+[  274985ms] [LOG] Visualiser: depth 3 done, 205 children found, 306 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js:143
+[  274985ms] [LOG] Visualiser: loading depth 4, 205 parents... @ http://localhost:5173/src/store/useVisualiserStore.js:94
+[  277132ms] [LOG] Visualiser: depth 4 done, 555 children found, 861 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js:143
+[  277132ms] [LOG] Visualiser: loading depth 5, 555 parents... @ http://localhost:5173/src/store/useVisualiserStore.js:94
+[  284840ms] [LOG] Visualiser: depth 5 done, 712 children found, 1573 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js:143
+[  284840ms] [LOG] Visualiser: loading depth 6, 712 parents... @ http://localhost:5173/src/store/useVisualiserStore.js:94

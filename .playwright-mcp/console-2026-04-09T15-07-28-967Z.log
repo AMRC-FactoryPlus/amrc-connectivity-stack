@@ -1,0 +1,18 @@
+[     282ms] [LOG] 🍍 "visualiser" store installed 🆕 @ http://localhost:5173/node_modules/.vite/deps/pinia.js?v=001f3bc8:202
+[     300ms] [LOG] Visualiser: loading depth 1, 2 parents... @ http://localhost:5173/src/store/useVisualiserStore.js:94
+[     306ms] [LOG] Visualiser: depth 1 done, 10 children found, 12 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js:143
+[     306ms] [LOG] Visualiser: loading depth 2, 10 parents... @ http://localhost:5173/src/store/useVisualiserStore.js:94
+[     341ms] [LOG] Visualiser: depth 2 done, 89 children found, 101 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js:143
+[     341ms] [LOG] Visualiser: loading depth 3, 89 parents... @ http://localhost:5173/src/store/useVisualiserStore.js:94
+[     647ms] [LOG] Visualiser: depth 3 done, 205 children found, 306 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js:143
+[     647ms] [LOG] Visualiser: loading depth 4, 205 parents... @ http://localhost:5173/src/store/useVisualiserStore.js:94
+[    2849ms] [LOG] Visualiser: depth 4 done, 555 children found, 861 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js:143
+[    2849ms] [LOG] Visualiser: loading depth 5, 555 parents... @ http://localhost:5173/src/store/useVisualiserStore.js:94
+[   10891ms] [LOG] Visualiser: depth 5 done, 712 children found, 1573 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js:143
+[   10891ms] [LOG] Visualiser: loading depth 6, 712 parents... @ http://localhost:5173/src/store/useVisualiserStore.js:94
+[   27041ms] [LOG] Visualiser: depth 6 done, 881 children found, 2454 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js:143
+[   27041ms] [LOG] Visualiser: loading depth 7, 881 parents... @ http://localhost:5173/src/store/useVisualiserStore.js:94
+[   55842ms] [LOG] Visualiser: depth 7 done, 940 children found, 3394 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js:143
+[   55843ms] [LOG] Visualiser: loading depth 8, 940 parents... @ http://localhost:5173/src/store/useVisualiserStore.js:94
+[   86477ms] [LOG] Visualiser: depth 8 done, 556 children found, 3950 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js:143
+[   86477ms] [LOG] Visualiser: loading depth 9, 556 parents... @ http://localhost:5173/src/store/useVisualiserStore.js:94

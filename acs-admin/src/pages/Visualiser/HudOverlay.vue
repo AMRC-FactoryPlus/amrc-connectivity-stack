@@ -10,6 +10,8 @@ const props = defineProps({
   phase: { type: String, default: null },
   nodes: { type: Map, required: true },
   values: { type: Map, required: true },
+  deviceName: { type: String, default: null },
+  deviceHierarchy: { type: Array, default: () => [] },
 })
 
 const visible = ref(false)
@@ -56,7 +58,7 @@ watch(() => props.targetId, (id) => {
 })
 
 watch(() => props.phase, (phase) => {
-  if (phase === 'hold' || phase === 'ease-in') {
+  if (phase === 'hold' || phase === 'ease-in' || phase === 'tour') {
     visible.value = true
   } else {
     visible.value = false
@@ -117,7 +119,18 @@ function formatValue (v) {
       <div class="hud-corner bl" />
       <div class="hud-corner br" />
 
-      <!-- Hierarchy breadcrumb -->
+      <!-- Device context header -->
+      <div v-if="deviceName" class="hud-device">
+        <span class="hud-device-path">
+          <span v-for="(name, i) in deviceHierarchy" :key="'d'+i">
+            <span v-if="i > 0" class="hud-sep">&rsaquo;</span>
+            <span>{{ name }}</span>
+          </span>
+        </span>
+        <span class="hud-device-name">{{ deviceName }}</span>
+      </div>
+
+      <!-- Metric breadcrumb (path below device) -->
       <div class="hud-hierarchy">
         <span v-for="(name, i) in hierarchy" :key="i" class="hud-crumb">
           <span v-if="i > 0" class="hud-sep">&rsaquo;</span>
@@ -173,6 +186,25 @@ function formatValue (v) {
   backdrop-filter: blur(4px);
   font-family: 'Courier New', monospace;
   color: rgba(68, 255, 221, 0.9);
+}
+
+.hud-device {
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(68, 255, 221, 0.15);
+}
+.hud-device-path {
+  display: block;
+  font-size: 9px;
+  opacity: 0.5;
+  margin-bottom: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.hud-device-name {
+  font-size: 16px;
+  font-weight: bold;
+  color: rgba(68, 255, 221, 1);
 }
 
 /* Corner brackets */

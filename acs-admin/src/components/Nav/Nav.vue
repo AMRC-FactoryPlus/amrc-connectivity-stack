@@ -31,7 +31,7 @@ const sidebarNavItems: Item[] = [
     {
         title: 'Visualiser',
         href: '/visualiser',
-        icon: 'cube',
+        icon: 'hexagon-nodes',
         auth: true
     },
     {

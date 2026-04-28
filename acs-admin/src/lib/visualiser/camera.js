@@ -20,14 +20,10 @@ function randomRange (min, max) {
 }
 
 const IDLE_TIMEOUT = 10
+const TOUR_STOP_HOLD = 5     // seconds at each leaf stop
+const TOUR_STOP_TRAVEL = 2   // seconds travelling between stops
+const MAX_TOUR_STOPS = 10
 
-/**
- * @param {THREE.Camera} camera
- * @param {HTMLElement} domElement
- * @param {Map} positions - elementId -> Vector3
- * @param {function} getActiveLeafIds - returns array of elementIds with live data
- * @param {object} callbacks - { onSweepIn(id), onSweepOut(id) }
- */
 export function createCameraController (camera, domElement, positions, getActiveLeafIds, callbacks = {}) {
   const controls = new OrbitControls(camera, domElement)
   controls.enableDamping = true
@@ -51,7 +47,6 @@ export function createCameraController (camera, domElement, positions, getActive
   let elapsed = 0
   let nextSweep = randomRange(SWEEP_INTERVAL_MIN, SWEEP_INTERVAL_MAX)
 
-  // User interaction
   let userInteracting = false
   let idleTimer = 0
 
@@ -59,15 +54,12 @@ export function createCameraController (camera, domElement, positions, getActive
     userInteracting = true
     idleTimer = 0
     if (sweeping && sweepPhase !== 'ease-out') {
-      // User grabbed during a sweep - cancel it
       if (sweepTargetId && callbacks.onSweepOut) callbacks.onSweepOut(sweepTargetId)
       sweeping = false
       sweepPhase = 'idle'
     }
   })
-  controls.addEventListener('end', () => {
-    idleTimer = 0
-  })
+  controls.addEventListener('end', () => { idleTimer = 0 })
 
   // Sweep state
   let sweeping = false
@@ -80,6 +72,16 @@ export function createCameraController (camera, domElement, positions, getActive
   let sweepPhaseDuration = 0
   let sweepTargetId = null
   let sweepTargetPos = null
+
+  // Mini-tour state
+  let tourStops = []      // [{id, pos}, ...] - leaf nodes to visit
+  let tourIndex = 0
+  let tourSubPhase = 'travel' // 'travel' | 'hold'
+  let tourSubTime = 0
+  let tourFromPos = new THREE.Vector3()
+  let tourFromLook = new THREE.Vector3()
+  let tourToPos = new THREE.Vector3()
+  let tourToLook = new THREE.Vector3()
 
   const lookTarget = new THREE.Vector3(0, 0, 0)
 
@@ -105,6 +107,15 @@ export function createCameraController (camera, domElement, positions, getActive
     )
   }
 
+  function getCameraOffsetForTarget (targetPos) {
+    // Position camera near the target, offset so we can see it
+    return new THREE.Vector3(
+      targetPos.x + LOD_SPARKLINE_SHOW * 0.7,
+      targetPos.y + LOD_SPARKLINE_SHOW * 0.3,
+      targetPos.z + LOD_SPARKLINE_SHOW * 0.5,
+    )
+  }
+
   function startSweep () {
     const target = pickSweepTarget()
     if (!target) return
@@ -118,16 +129,40 @@ export function createCameraController (camera, domElement, positions, getActive
 
     sweepStartPos.copy(camera.position)
     sweepStartLook.copy(controls.target)
-
-    const offset = new THREE.Vector3(
-      LOD_SPARKLINE_SHOW * 0.8,
-      LOD_SPARKLINE_SHOW * 0.3,
-      LOD_SPARKLINE_SHOW * 0.5,
-    )
-    sweepEndPos.copy(target.pos).add(offset)
+    sweepEndPos.copy(getCameraOffsetForTarget(target.pos))
     sweepEndLook.copy(target.pos)
 
+    // Reset tour
+    tourStops = []
+    tourIndex = 0
+
     if (callbacks.onSweepIn) callbacks.onSweepIn(target.id)
+  }
+
+  /**
+   * Called by Visualiser after device expansion to set the leaf stops.
+   * @param {Array<{id: string, pos: THREE.Vector3}>} stops
+   */
+  function setTourStops (stops) {
+    tourStops = stops.slice(0, MAX_TOUR_STOPS)
+    tourIndex = 0
+    if (tourStops.length > 0) {
+      startTourTravel()
+    }
+  }
+
+  function startTourTravel () {
+    const stop = tourStops[tourIndex]
+    if (!stop) return
+
+    tourSubPhase = 'travel'
+    tourSubTime = 0
+    tourFromPos.copy(camera.position)
+    tourFromLook.copy(controls.target)
+    tourToPos.copy(getCameraOffsetForTarget(stop.pos))
+    tourToLook.copy(stop.pos)
+
+    if (callbacks.onTourStop) callbacks.onTourStop(stop.id)
   }
 
   function startEaseOut () {
@@ -138,7 +173,6 @@ export function createCameraController (camera, domElement, positions, getActive
     sweepStartPos.copy(camera.position)
     sweepStartLook.copy(controls.target)
 
-    // Sync angle to current time so the orbit position is smooth
     angle = ORBIT_SPEED * elapsed
     sweepEndPos.copy(getOrbitPos())
     sweepEndLook.set(0, 0, 0)
@@ -149,7 +183,6 @@ export function createCameraController (camera, domElement, positions, getActive
   function update (dt) {
     elapsed += dt
 
-    // User interaction mode
     if (userInteracting) {
       idleTimer += dt
       if (idleTimer > IDLE_TIMEOUT) {
@@ -163,39 +196,75 @@ export function createCameraController (camera, domElement, positions, getActive
 
     if (sweeping) {
       sweepTime += dt
+
+      if (sweepPhase === 'tour') {
+        // Mini-tour: travel between leaf stops
+        tourSubTime += dt
+
+        if (tourSubPhase === 'travel') {
+          const t = Math.min(tourSubTime / TOUR_STOP_TRAVEL, 1)
+          const eased = easeInOutCubic(t)
+          camera.position.lerpVectors(tourFromPos, tourToPos, eased)
+          lookTarget.lerpVectors(tourFromLook, tourToLook, eased)
+          controls.target.copy(lookTarget)
+          controls.update()
+
+          if (t >= 1) {
+            tourSubPhase = 'hold'
+            tourSubTime = 0
+          }
+        } else if (tourSubPhase === 'hold') {
+          // Slowly orbit around current stop
+          const stop = tourStops[tourIndex]
+          if (stop) {
+            const holdAngle = tourSubTime * 0.15
+            const holdDist = LOD_SPARKLINE_SHOW * 0.6
+            camera.position.set(
+              stop.pos.x + Math.cos(holdAngle) * holdDist,
+              stop.pos.y + holdDist * 0.25,
+              stop.pos.z + Math.sin(holdAngle) * holdDist,
+            )
+            controls.target.copy(stop.pos)
+            controls.update()
+          }
+
+          if (tourSubTime >= TOUR_STOP_HOLD) {
+            // Move to next stop or exit
+            tourIndex++
+            if (tourIndex < tourStops.length) {
+              startTourTravel()
+            } else {
+              startEaseOut()
+            }
+          }
+        }
+        return
+      }
+
+      // ease-in and ease-out
       const t = Math.min(sweepTime / sweepPhaseDuration, 1)
       const eased = easeInOutCubic(t)
 
-      if (sweepPhase === 'hold') {
-        // Stay put during hold - don't lerp, just keep position stable
-        // Slowly orbit around the target
-        const holdAngle = sweepTime * 0.1
-        const holdDist = LOD_SPARKLINE_SHOW * 0.9
-        camera.position.set(
-          sweepTargetPos.x + Math.cos(holdAngle) * holdDist,
-          sweepTargetPos.y + holdDist * 0.3,
-          sweepTargetPos.z + Math.sin(holdAngle) * holdDist,
-        )
-        controls.target.copy(sweepTargetPos)
-        controls.update()
-      } else {
-        camera.position.lerpVectors(sweepStartPos, sweepEndPos, eased)
-        lookTarget.lerpVectors(sweepStartLook, sweepEndLook, eased)
-        controls.target.copy(lookTarget)
-        controls.update()
-      }
+      camera.position.lerpVectors(sweepStartPos, sweepEndPos, eased)
+      lookTarget.lerpVectors(sweepStartLook, sweepEndLook, eased)
+      controls.target.copy(lookTarget)
+      controls.update()
 
       if (t >= 1) {
         if (sweepPhase === 'ease-in') {
-          sweepPhase = 'hold'
-          sweepPhaseDuration = SWEEP_HOLD
+          sweepPhase = 'tour'
           sweepTime = 0
-        } else if (sweepPhase === 'hold') {
-          startEaseOut()
+          // If no tour stops yet (still loading), wait at device
+          if (tourStops.length === 0) {
+            // Will start touring when setTourStops is called
+          } else {
+            startTourTravel()
+          }
         } else if (sweepPhase === 'ease-out') {
           sweeping = false
           sweepTargetId = null
           sweepTargetPos = null
+          tourStops = []
           nextSweep = randomRange(SWEEP_INTERVAL_MIN, SWEEP_INTERVAL_MAX)
         }
       }
@@ -205,8 +274,7 @@ export function createCameraController (camera, domElement, positions, getActive
 
     // Normal auto-orbit
     angle += ORBIT_SPEED * dt
-    const orbitPos = getOrbitPos()
-    camera.position.copy(orbitPos)
+    camera.position.copy(getOrbitPos())
     controls.target.set(0, 0, 0)
     controls.update()
 
@@ -226,6 +294,7 @@ export function createCameraController (camera, domElement, positions, getActive
     return {
       phase: sweepPhase,
       targetId: sweepTargetId,
+      tourStopId: (sweepPhase === 'tour' && tourStops[tourIndex]) ? tourStops[tourIndex].id : null,
     }
   }
 
@@ -233,5 +302,5 @@ export function createCameraController (camera, domElement, positions, getActive
     controls.dispose()
   }
 
-  return { update, getLookTarget, getSweepState, dispose }
+  return { update, getLookTarget, getSweepState, setTourStops, dispose }
 }

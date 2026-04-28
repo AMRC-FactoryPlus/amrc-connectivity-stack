@@ -1,0 +1,119 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - region "Notifications alt+T":
+      - list
+    - generic [ref=e3]:
+      - generic [ref=e457]:
+        - list [ref=e459]:
+          - listitem [ref=e460]:
+            - generic [ref=e461]:
+              - img [ref=e463]
+              - generic [ref=e464]:
+                - heading "ACS (dev)" [level=1] [ref=e465]
+                - heading "admin" [level=2] [ref=e466]
+        - generic [ref=e467]:
+          - list [ref=e470]:
+            - listitem [ref=e471]:
+              - link "Home" [ref=e472] [cursor=pointer]:
+                - /url: "#/"
+                - button "Home" [ref=e473]:
+                  - generic [ref=e474]:
+                    - generic [ref=e475]: 
+                    - generic [ref=e476]: Home
+            - listitem [ref=e477]:
+              - link "Explorer" [ref=e478] [cursor=pointer]:
+                - /url: "#/explorer"
+                - button "Explorer" [ref=e479]:
+                  - generic [ref=e480]:
+                    - generic [ref=e481]: 
+                    - generic [ref=e482]: Explorer
+            - listitem [ref=e483]:
+              - link "Visualiser" [ref=e484] [cursor=pointer]:
+                - /url: "#/visualiser"
+                - button "Visualiser" [ref=e485]:
+                  - generic [ref=e486]:
+                    - generic [ref=e487]: 
+                    - generic [ref=e488]: Visualiser
+            - listitem [ref=e489]:
+              - link "Live Activity" [ref=e490] [cursor=pointer]:
+                - /url: "#/activity"
+                - button "Live Activity" [ref=e491]:
+                  - generic [ref=e492]:
+                    - generic [ref=e493]: 
+                    - generic [ref=e494]: Live Activity
+            - listitem [ref=e495]:
+              - link "Alerts" [ref=e496] [cursor=pointer]:
+                - /url: "#/alerts"
+                - button "Alerts" [ref=e497]:
+                  - generic [ref=e498]:
+                    - generic [ref=e499]: 
+                    - generic [ref=e500]: Alerts
+            - listitem [ref=e501]:
+              - link "Access Control" [ref=e502] [cursor=pointer]:
+                - /url: "#/access-control"
+                - button "Access Control" [ref=e503]:
+                  - generic [ref=e504]:
+                    - generic [ref=e505]: 
+                    - generic [ref=e506]: Access Control
+            - listitem [ref=e507]:
+              - link "ConfigDB" [ref=e508] [cursor=pointer]:
+                - /url: "#/configdb"
+                - button "ConfigDB" [ref=e509]:
+                  - generic [ref=e510]:
+                    - generic [ref=e511]: 
+                    - generic [ref=e512]: ConfigDB
+            - listitem [ref=e513]:
+              - link "Files" [ref=e514] [cursor=pointer]:
+                - /url: "#/files"
+                - button "Files" [ref=e515]:
+                  - generic [ref=e516]:
+                    - generic [ref=e517]: 
+                    - generic [ref=e518]: Files
+            - listitem [ref=e519]:
+              - link "Bridges" [ref=e520] [cursor=pointer]:
+                - /url: "#/bridges"
+                - button "Bridges" [ref=e521]:
+                  - generic [ref=e522]:
+                    - generic [ref=e523]: 
+                    - generic [ref=e524]: Bridges
+          - generic [ref=e525]:
+            - generic [ref=e526]: Edge Clusters & Devices
+            - list [ref=e528]:
+              - listitem [ref=e529]:
+                - link "Cluster" [ref=e531] [cursor=pointer]:
+                  - /url: "#/edge-clusters/5ee1a8e8-494e-4242-a334-1d919adbf3c5"
+                  - button "Cluster" [ref=e532]:
+                    - generic [ref=e533]:
+                      - generic "Show nodes for this cluster" [ref=e534]:
+                        - generic [ref=e535]: 
+                      - generic [ref=e536]: 
+                      - generic [ref=e537]: Cluster
+              - button "New Cluster" [ref=e538] [cursor=pointer]:
+                - generic [ref=e539]: +
+                - generic [ref=e540]: New Cluster
+          - generic [ref=e542]:
+            - generic [ref=e543]:
+              - heading "Factory+" [level=3] [ref=e544]
+              - paragraph [ref=e545]: The AMRC Connectivity Stack is an implementation of the Factory+ framework.
+            - link "Read More" [ref=e547] [cursor=pointer]:
+              - /url: https://factoryplus.app.amrc.co.uk
+        - button "Toggle Sidebar" [ref=e548]
+      - main [ref=e99]:
+        - generic [ref=e549]:
+          - generic [ref=e550]:
+            - generic [ref=e551]: 
+            - heading "Visualiser" [level=3] [ref=e552]
+          - generic [ref=e553]:
+            - button "Monitored Items" [ref=e554] [cursor=pointer]:
+              - generic [ref=e555]: 
+            - button "Toggle sidebar" [ref=e556] [cursor=pointer]:
+              - generic [ref=e557]: 
+            - button "Toggle fullscreen" [ref=e558] [cursor=pointer]:
+              - generic [ref=e559]: 
+            - button "Logout" [ref=e560] [cursor=pointer]
+        - main [ref=e112]
+  - generic [ref=e115]:
+    - generic "Toggle devtools panel" [ref=e116] [cursor=pointer]:
+      - img [ref=e117]
+    - generic "Toggle Component Inspector" [ref=e122] [cursor=pointer]:
+      - img [ref=e123]

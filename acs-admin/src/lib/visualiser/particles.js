@@ -15,7 +15,7 @@ export function createParticles (scene) {
   const pool = []
 
   for (let i = 0; i < POOL_SIZE; i++) {
-    const mat = new THREE.MeshBasicMaterial({ color: TRAIL_COLOUR, transparent: true, opacity: 0.9 })
+    const mat = new THREE.MeshBasicMaterial({ color: 0xe39bdd, transparent: true, opacity: 0.9 })
     const mesh = new THREE.Mesh(sphereGeo, mat)
     mesh.visible = false
     scene.add(mesh)
@@ -51,7 +51,7 @@ export function createParticles (scene) {
     p.pathIndex = 0
     p.progress = 0
     p.alive = true
-    p.mesh.visible = true
+    p.mesh.visible = globalVisible
     p._onNodeHit = onNodeHit
   }
 
@@ -93,6 +93,15 @@ export function createParticles (scene) {
     }
   }
 
+  let globalVisible = true
+
+  function setVisible (vis) {
+    globalVisible = vis
+    for (const p of pool) {
+      p.mesh.visible = vis && p.alive
+    }
+  }
+
   function dispose () {
     for (const p of pool) {
       scene.remove(p.mesh)
@@ -101,5 +110,5 @@ export function createParticles (scene) {
     sphereGeo.dispose()
   }
 
-  return { emit, update, dispose }
+  return { emit, update, setVisible, dispose }
 }

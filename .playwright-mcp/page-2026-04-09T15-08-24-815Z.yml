@@ -1,0 +1,12 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - region "Notifications alt+T":
+      - list
+    - main [ref=e153]:
+      - main [ref=e166]:
+        - paragraph [ref=e202]: Loading hierarchy...
+  - generic [ref=e187]:
+    - generic "Toggle devtools panel" [ref=e188] [cursor=pointer]:
+      - img [ref=e189]
+    - generic "Toggle Component Inspector" [ref=e194] [cursor=pointer]:
+      - img [ref=e195]

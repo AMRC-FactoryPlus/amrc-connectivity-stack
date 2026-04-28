@@ -1,0 +1,97 @@
+[   64455ms] [ERROR] Failed to load resource: net::ERR_INCOMPLETE_CHUNKED_ENCODING @ http://localhost:8080/v1/subscriptions/stream:0
+[   64455ms] [ERROR] SSE stream error: TypeError: network error @ http://localhost:5173/src/composables/useI3xSSE.js:25
+[   65458ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8080/v1/subscriptions/stream:0
+[   65458ms] [ERROR] SSE stream error: TypeError: Failed to fetch
+    at create (http://localhost:5173/node_modules/.vite/deps/@microsoft_fetch-event-source.js?v=bf9bfe29:158:32) @ http://localhost:5173/src/composables/useI3xSSE.js:25
+[   66460ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8080/v1/subscriptions/stream:0
+[   66460ms] [ERROR] SSE stream error: TypeError: Failed to fetch
+    at create (http://localhost:5173/node_modules/.vite/deps/@microsoft_fetch-event-source.js?v=bf9bfe29:158:32) @ http://localhost:5173/src/composables/useI3xSSE.js:25
+[   67462ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8080/v1/subscriptions/stream:0
+[   67462ms] [ERROR] SSE stream error: TypeError: Failed to fetch
+    at create (http://localhost:5173/node_modules/.vite/deps/@microsoft_fetch-event-source.js?v=bf9bfe29:158:32) @ http://localhost:5173/src/composables/useI3xSSE.js:25
+[   68464ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8080/v1/subscriptions/stream:0
+[   68464ms] [ERROR] SSE stream error: TypeError: Failed to fetch
+    at create (http://localhost:5173/node_modules/.vite/deps/@microsoft_fetch-event-source.js?v=bf9bfe29:158:32) @ http://localhost:5173/src/composables/useI3xSSE.js:25
+[   69481ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:8080/v1/subscriptions/stream:0
+[   69481ms] [ERROR] SSE stream error: Error: Expected content-type to be text/event-stream, Actual: application/json; charset=utf-8
+    at defaultOnOpen (http://localhost:5173/node_modules/.vite/deps/@microsoft_fetch-event-source.js?v=bf9bfe29:191:11)
+    at create (http://localhost:5173/node_modules/.vite/deps/@microsoft_fetch-event-source.js?v=bf9bfe29:159:15) @ http://localhost:5173/src/composables/useI3xSSE.js:25
+[   70486ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:8080/v1/subscriptions/stream:0
+[   70486ms] [ERROR] SSE stream error: Error: Expected content-type to be text/event-stream, Actual: application/json; charset=utf-8
+    at defaultOnOpen (http://localhost:5173/node_modules/.vite/deps/@microsoft_fetch-event-source.js?v=bf9bfe29:191:11)
+    at create (http://localhost:5173/node_modules/.vite/deps/@microsoft_fetch-event-source.js?v=bf9bfe29:159:15) @ http://localhost:5173/src/composables/useI3xSSE.js:25
+[   71490ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:8080/v1/subscriptions/stream:0
+[   71490ms] [ERROR] SSE stream error: Error: Expected content-type to be text/event-stream, Actual: application/json; charset=utf-8
+    at defaultOnOpen (http://localhost:5173/node_modules/.vite/deps/@microsoft_fetch-event-source.js?v=bf9bfe29:191:11)
+    at create (http://localhost:5173/node_modules/.vite/deps/@microsoft_fetch-event-source.js?v=bf9bfe29:159:15) @ http://localhost:5173/src/composables/useI3xSSE.js:25
+[   72494ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:8080/v1/subscriptions/stream:0
+[   72494ms] [ERROR] SSE stream error: Error: Expected content-type to be text/event-stream, Actual: application/json; charset=utf-8
+    at defaultOnOpen (http://localhost:5173/node_modules/.vite/deps/@microsoft_fetch-event-source.js?v=bf9bfe29:191:11)
+    at create (http://localhost:5173/node_modules/.vite/deps/@microsoft_fetch-event-source.js?v=bf9bfe29:159:15) @ http://localhost:5173/src/composables/useI3xSSE.js:25
+[   73498ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:8080/v1/subscriptions/stream:0
+[   73498ms] [ERROR] SSE stream error: Error: Expected content-type to be text/event-stream, Actual: application/json; charset=utf-8
+    at defaultOnOpen (http://localhost:5173/node_modules/.vite/deps/@microsoft_fetch-event-source.js?v=bf9bfe29:191:11)
+    at create (http://localhost:5173/node_modules/.vite/deps/@microsoft_fetch-event-source.js?v=bf9bfe29:159:15) @ http://localhost:5173/src/composables/useI3xSSE.js:25
+[   74503ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:8080/v1/subscriptions/stream:0
+[   74504ms] [ERROR] SSE stream error: Error: Expected content-type to be text/event-stream, Actual: application/json; charset=utf-8
+    at defaultOnOpen (http://localhost:5173/node_modules/.vite/deps/@microsoft_fetch-event-source.js?v=bf9bfe29:191:11)
+    at create (http://localhost:5173/node_modules/.vite/deps/@microsoft_fetch-event-source.js?v=bf9bfe29:159:15) @ http://localhost:5173/src/composables/useI3xSSE.js:25
+[   75507ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:8080/v1/subscriptions/stream:0
+[   75508ms] [ERROR] SSE stream error: Error: Expected content-type to be text/event-stream, Actual: application/json; charset=utf-8
+    at defaultOnOpen (http://localhost:5173/node_modules/.vite/deps/@microsoft_fetch-event-source.js?v=bf9bfe29:191:11)
+    at create (http://localhost:5173/node_modules/.vite/deps/@microsoft_fetch-event-source.js?v=bf9bfe29:159:15) @ http://localhost:5173/src/composables/useI3xSSE.js:25
+[   76513ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:8080/v1/subscriptions/stream:0
+[   76513ms] [ERROR] SSE stream error: Error: Expected content-type to be text/event-stream, Actual: application/json; charset=utf-8
+    at defaultOnOpen (http://localhost:5173/node_modules/.vite/deps/@microsoft_fetch-event-source.js?v=bf9bfe29:191:11)
+    at create (http://localhost:5173/node_modules/.vite/deps/@microsoft_fetch-event-source.js?v=bf9bfe29:159:15) @ http://localhost:5173/src/composables/useI3xSSE.js:25
+[   77516ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:8080/v1/subscriptions/stream:0
+[   77516ms] [ERROR] SSE stream error: Error: Expected content-type to be text/event-stream, Actual: application/json; charset=utf-8
+    at defaultOnOpen (http://localhost:5173/node_modules/.vite/deps/@microsoft_fetch-event-source.js?v=bf9bfe29:191:11)
+    at create (http://localhost:5173/node_modules/.vite/deps/@microsoft_fetch-event-source.js?v=bf9bfe29:159:15) @ http://localhost:5173/src/composables/useI3xSSE.js:25
+[   78521ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:8080/v1/subscriptions/stream:0
+[   78521ms] [ERROR] SSE stream error: Error: Expected content-type to be text/event-stream, Actual: application/json; charset=utf-8
+    at defaultOnOpen (http://localhost:5173/node_modules/.vite/deps/@microsoft_fetch-event-source.js?v=bf9bfe29:191:11)
+    at create (http://localhost:5173/node_modules/.vite/deps/@microsoft_fetch-event-source.js?v=bf9bfe29:159:15) @ http://localhost:5173/src/composables/useI3xSSE.js:25
+[   79524ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:8080/v1/subscriptions/stream:0
+[   79524ms] [ERROR] SSE stream error: Error: Expected content-type to be text/event-stream, Actual: application/json; charset=utf-8
+    at defaultOnOpen (http://localhost:5173/node_modules/.vite/deps/@microsoft_fetch-event-source.js?v=bf9bfe29:191:11)
+    at create (http://localhost:5173/node_modules/.vite/deps/@microsoft_fetch-event-source.js?v=bf9bfe29:159:15) @ http://localhost:5173/src/composables/useI3xSSE.js:25
+[   80530ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:8080/v1/subscriptions/stream:0
+[   80530ms] [ERROR] SSE stream error: Error: Expected content-type to be text/event-stream, Actual: application/json; charset=utf-8
+    at defaultOnOpen (http://localhost:5173/node_modules/.vite/deps/@microsoft_fetch-event-source.js?v=bf9bfe29:191:11)
+    at create (http://localhost:5173/node_modules/.vite/deps/@microsoft_fetch-event-source.js?v=bf9bfe29:159:15) @ http://localhost:5173/src/composables/useI3xSSE.js:25
+[   81534ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:8080/v1/subscriptions/stream:0
+[   81535ms] [ERROR] SSE stream error: Error: Expected content-type to be text/event-stream, Actual: application/json; charset=utf-8
+    at defaultOnOpen (http://localhost:5173/node_modules/.vite/deps/@microsoft_fetch-event-source.js?v=bf9bfe29:191:11)
+    at create (http://localhost:5173/node_modules/.vite/deps/@microsoft_fetch-event-source.js?v=bf9bfe29:159:15) @ http://localhost:5173/src/composables/useI3xSSE.js:25
+[   82538ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:8080/v1/subscriptions/stream:0
+[   82539ms] [ERROR] SSE stream error: Error: Expected content-type to be text/event-stream, Actual: application/json; charset=utf-8
+    at defaultOnOpen (http://localhost:5173/node_modules/.vite/deps/@microsoft_fetch-event-source.js?v=bf9bfe29:191:11)
+    at create (http://localhost:5173/node_modules/.vite/deps/@microsoft_fetch-event-source.js?v=bf9bfe29:159:15) @ http://localhost:5173/src/composables/useI3xSSE.js:25
+[   83544ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:8080/v1/subscriptions/stream:0
+[   83544ms] [ERROR] SSE stream error: Error: Expected content-type to be text/event-stream, Actual: application/json; charset=utf-8
+    at defaultOnOpen (http://localhost:5173/node_modules/.vite/deps/@microsoft_fetch-event-source.js?v=bf9bfe29:191:11)
+    at create (http://localhost:5173/node_modules/.vite/deps/@microsoft_fetch-event-source.js?v=bf9bfe29:159:15) @ http://localhost:5173/src/composables/useI3xSSE.js:25
+[   83788ms] [LOG] 🍍 "explorer" store installed 🆕 @ http://localhost:5173/node_modules/.vite/deps/pinia.js?v=bf9bfe29:202
+[   85074ms] [LOG] 🍍 "node" store installed 🆕 @ http://localhost:5173/node_modules/.vite/deps/pinia.js?v=bf9bfe29:202
+[   85074ms] [LOG] 🍍 "deployment" store installed 🆕 @ http://localhost:5173/node_modules/.vite/deps/pinia.js?v=bf9bfe29:202
+[   85090ms] [LOG] 🍍 "explorer" store installed 🆕 @ http://localhost:5173/node_modules/.vite/deps/pinia.js?v=bf9bfe29:202
+[  110143ms] [LOG] 🍍 "visualiser" store installed 🆕 @ http://localhost:5173/node_modules/.vite/deps/pinia.js?v=bf9bfe29:202
+[  110151ms] [LOG] Visualiser: loading depth 1, 1 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:94
+[  110160ms] [LOG] Visualiser: depth 1 done, 2 children found, 3 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:143
+[  110160ms] [LOG] Visualiser: loading depth 2, 2 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:94
+[  110162ms] [LOG] Visualiser: depth 2 done, 3 children found, 6 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:143
+[  110162ms] [LOG] Visualiser: loading depth 3, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:94
+[  110163ms] [LOG] Visualiser: depth 3 done, 3 children found, 9 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:143
+[  110163ms] [LOG] Visualiser: loading depth 4, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:94
+[  110165ms] [LOG] Visualiser: depth 4 done, 3 children found, 12 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:143
+[  110165ms] [LOG] Visualiser: loading depth 5, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:94
+[  110166ms] [LOG] Visualiser: depth 5 done, 2 children found, 14 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:143
+[  110166ms] [LOG] Visualiser: loading depth 6, 2 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:94
+[  110169ms] [LOG] Visualiser: depth 6 done, 4 children found, 18 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:143
+[  110169ms] [LOG] Visualiser: loading depth 7, 4 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:94
+[  110171ms] [LOG] Visualiser: depth 7 done, 1 children found, 19 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:143
+[  110171ms] [LOG] Visualiser: loading depth 8, 1 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:94
+[  110172ms] [LOG] Visualiser: depth 8 done, 0 children found, 19 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:143
+[  110172ms] [LOG] Visualiser layout: 19 nodes, span 25.9 units @ http://localhost:5173/src/lib/visualiser/graph.js?t=1775744972487:72
+[  110174ms] [LOG] Visualiser camera: baseDistance 48.0 (maxNodeDist 16.0) @ http://localhost:5173/src/lib/visualiser/camera.js:32

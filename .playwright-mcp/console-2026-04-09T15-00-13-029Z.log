@@ -1,0 +1,17 @@
+[    2340ms] [LOG] Visualiser: loading depth 1, 1 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775746812403:94
+[    2345ms] [LOG] Visualiser: depth 1 done, 2 children found, 3 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775746812403:143
+[    2345ms] [LOG] Visualiser: loading depth 2, 2 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775746812403:94
+[    2347ms] [LOG] Visualiser: depth 2 done, 3 children found, 6 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775746812403:143
+[    2347ms] [LOG] Visualiser: loading depth 3, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775746812403:94
+[    2349ms] [LOG] Visualiser: depth 3 done, 3 children found, 9 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775746812403:143
+[    2349ms] [LOG] Visualiser: loading depth 4, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775746812403:94
+[    2351ms] [LOG] Visualiser: depth 4 done, 3 children found, 12 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775746812403:143
+[    2351ms] [LOG] Visualiser: loading depth 5, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775746812403:94
+[    2354ms] [LOG] Visualiser: depth 5 done, 2 children found, 14 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775746812403:143
+[    2354ms] [LOG] Visualiser: loading depth 6, 2 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775746812403:94
+[    2355ms] [LOG] Visualiser: depth 6 done, 3 children found, 17 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775746812403:143
+[    2355ms] [LOG] Visualiser: loading depth 7, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775746812403:94
+[    2357ms] [LOG] Visualiser: depth 7 done, 0 children found, 17 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775746812403:143
+[    2357ms] [LOG] Visualiser layout: 17 nodes, maxDist 27.7, maxDepth 7 @ http://localhost:5173/src/lib/visualiser/graph.js?t=1775745365396:112
+[    2357ms] [LOG] Visualiser camera: baseDistance 49.9 (maxNodeDist 27.7) @ http://localhost:5173/src/lib/visualiser/camera.js?t=1775746812403:37
+[    2358ms] [LOG] Visualiser LOD: created 12 labels @ http://localhost:5173/src/lib/visualiser/lod.js?t=1775746812403:61

@@ -1,0 +1,122 @@
+[      71ms] [LOG] Visualiser: loading depth 1, 1 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:94
+[      77ms] [LOG] Visualiser: depth 1 done, 2 children found, 3 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:143
+[      77ms] [LOG] Visualiser: loading depth 2, 2 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:94
+[      80ms] [LOG] Visualiser: depth 2 done, 3 children found, 6 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:143
+[      80ms] [LOG] Visualiser: loading depth 3, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:94
+[      83ms] [LOG] Visualiser: depth 3 done, 3 children found, 9 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:143
+[      83ms] [LOG] Visualiser: loading depth 4, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:94
+[      85ms] [LOG] Visualiser: depth 4 done, 3 children found, 12 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:143
+[      85ms] [LOG] Visualiser: loading depth 5, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:94
+[      88ms] [LOG] Visualiser: depth 5 done, 2 children found, 14 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:143
+[      88ms] [LOG] Visualiser: loading depth 6, 2 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:94
+[      92ms] [LOG] Visualiser: depth 6 done, 4 children found, 18 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:143
+[      92ms] [LOG] Visualiser: loading depth 7, 4 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:94
+[      95ms] [LOG] Visualiser: depth 7 done, 1 children found, 19 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:143
+[      95ms] [LOG] Visualiser: loading depth 8, 1 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:94
+[      97ms] [LOG] Visualiser: depth 8 done, 0 children found, 19 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:143
+[      97ms] [LOG] Visualiser layout: 19 nodes, span 25.5 units @ http://localhost:5173/src/lib/visualiser/graph.js?t=1775744972487:72
+[      98ms] [LOG] Visualiser camera: baseDistance 46.5 (maxNodeDist 15.5) @ http://localhost:5173/src/lib/visualiser/camera.js:32
+[   82115ms] [LOG] Visualiser: loading depth 1, 1 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:94
+[   82119ms] [LOG] Visualiser: depth 1 done, 2 children found, 3 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:143
+[   82119ms] [LOG] Visualiser: loading depth 2, 2 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:94
+[   82121ms] [LOG] Visualiser: depth 2 done, 3 children found, 6 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:143
+[   82121ms] [LOG] Visualiser: loading depth 3, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:94
+[   82123ms] [LOG] Visualiser: depth 3 done, 3 children found, 9 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:143
+[   82123ms] [LOG] Visualiser: loading depth 4, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:94
+[   82124ms] [LOG] Visualiser: depth 4 done, 3 children found, 12 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:143
+[   82124ms] [LOG] Visualiser: loading depth 5, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:94
+[   82126ms] [LOG] Visualiser: depth 5 done, 2 children found, 14 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:143
+[   82126ms] [LOG] Visualiser: loading depth 6, 2 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:94
+[   82128ms] [LOG] Visualiser: depth 6 done, 4 children found, 18 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:143
+[   82128ms] [LOG] Visualiser: loading depth 7, 4 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:94
+[   82130ms] [LOG] Visualiser: depth 7 done, 1 children found, 19 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:143
+[   82130ms] [LOG] Visualiser: loading depth 8, 1 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:94
+[   82132ms] [LOG] Visualiser: depth 8 done, 0 children found, 19 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:143
+[   82132ms] [LOG] Visualiser layout: 19 nodes, span 26.6 units @ http://localhost:5173/src/lib/visualiser/graph.js?t=1775744972487:72
+[   82133ms] [LOG] Visualiser camera: baseDistance 48.6 (maxNodeDist 16.2) @ http://localhost:5173/src/lib/visualiser/camera.js?t=1775745180622:32
+[   98523ms] [ERROR] Failed to load resource: net::ERR_INCOMPLETE_CHUNKED_ENCODING @ http://localhost:8080/v1/subscriptions/stream:0
+[   98523ms] [ERROR] SSE stream error: TypeError: network error @ http://localhost:5173/src/composables/useI3xSSE.js:25
+[   99347ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8080/v1/subscriptions/delete:0
+[   99360ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8080/v1/objects?root=true:0
+[   99361ms] [WARNING] [Vue warn]: Unhandled error during execution of mounted hook 
+  at <Visualiser onVnodeUnmounted=fn<onVnodeUnmounted> ref=Ref< Proxy(Object) > > 
+  at <RouterView > 
+  at <SidebarInset > 
+  at <TooltipProvider delay-duration=0 > 
+  at <SidebarProvider > 
+  at <App> @ http://localhost:5173/node_modules/.vite/deps/chunk-KZIOITQL.js?v=bf9bfe29:2383
+[   99362ms] TypeError: Failed to fetch
+    at request (http://localhost:5173/src/composables/useI3xClient.js:9:21)
+    at get (http://localhost:5173/src/composables/useI3xClient.js:25:10)
+    at Object.getObjects (http://localhost:5173/src/composables/useI3xClient.js:47:14)
+    at Proxy.loadTree (http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:66:33)
+    at Proxy.wrappedAction (http://localhost:5173/node_modules/.vite/deps/pinia.js?v=bf9bfe29:1107:18)
+    at store.<computed> (http://localhost:5173/node_modules/.vite/deps/pinia.js?v=bf9bfe29:785:44)
+    at http://localhost:5173/src/pages/Visualiser/Visualiser.vue?t=1775745197930:48:15
+    at http://localhost:5173/node_modules/.vite/deps/chunk-KZIOITQL.js?v=bf9bfe29:5435:40
+    at callWithErrorHandling (http://localhost:5173/node_modules/.vite/deps/chunk-KZIOITQL.js?v=bf9bfe29:2531:19)
+    at callWithAsyncErrorHandling (http://localhost:5173/node_modules/.vite/deps/chunk-KZIOITQL.js?v=bf9bfe29:2538:17)
+[  110099ms] [LOG] Visualiser: loading depth 1, 1 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:94
+[  110109ms] [LOG] Visualiser: depth 1 done, 2 children found, 3 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:143
+[  110109ms] [LOG] Visualiser: loading depth 2, 2 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:94
+[  110111ms] [LOG] Visualiser: depth 2 done, 3 children found, 6 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:143
+[  110111ms] [LOG] Visualiser: loading depth 3, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:94
+[  110113ms] [LOG] Visualiser: depth 3 done, 3 children found, 9 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:143
+[  110113ms] [LOG] Visualiser: loading depth 4, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:94
+[  110114ms] [LOG] Visualiser: depth 4 done, 3 children found, 12 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:143
+[  110114ms] [LOG] Visualiser: loading depth 5, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:94
+[  110116ms] [LOG] Visualiser: depth 5 done, 2 children found, 14 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:143
+[  110116ms] [LOG] Visualiser: loading depth 6, 2 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:94
+[  110117ms] [LOG] Visualiser: depth 6 done, 3 children found, 17 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:143
+[  110118ms] [LOG] Visualiser: loading depth 7, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:94
+[  110119ms] [LOG] Visualiser: depth 7 done, 0 children found, 17 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:143
+[  110120ms] [LOG] Visualiser layout: 17 nodes, span 50.1 units @ http://localhost:5173/src/lib/visualiser/graph.js?t=1775745208638:72
+[  110120ms] [LOG] Visualiser camera: baseDistance 86.2 (maxNodeDist 28.7) @ http://localhost:5173/src/lib/visualiser/camera.js?t=1775745180622:32
+[  116068ms] [LOG] Visualiser: loading depth 1, 1 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:94
+[  116072ms] [LOG] Visualiser: depth 1 done, 2 children found, 3 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:143
+[  116072ms] [LOG] Visualiser: loading depth 2, 2 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:94
+[  116074ms] [LOG] Visualiser: depth 2 done, 3 children found, 6 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:143
+[  116074ms] [LOG] Visualiser: loading depth 3, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:94
+[  116076ms] [LOG] Visualiser: depth 3 done, 3 children found, 9 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:143
+[  116076ms] [LOG] Visualiser: loading depth 4, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:94
+[  116078ms] [LOG] Visualiser: depth 4 done, 3 children found, 12 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:143
+[  116078ms] [LOG] Visualiser: loading depth 5, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:94
+[  116079ms] [LOG] Visualiser: depth 5 done, 2 children found, 14 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:143
+[  116079ms] [LOG] Visualiser: loading depth 6, 2 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:94
+[  116080ms] [LOG] Visualiser: depth 6 done, 3 children found, 17 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:143
+[  116080ms] [LOG] Visualiser: loading depth 7, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:94
+[  116082ms] [LOG] Visualiser: depth 7 done, 0 children found, 17 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:143
+[  116082ms] [LOG] Visualiser layout: 17 nodes, span 49.8 units @ http://localhost:5173/src/lib/visualiser/graph.js?t=1775745214642:72
+[  116083ms] [LOG] Visualiser camera: baseDistance 95.0 (maxNodeDist 31.7) @ http://localhost:5173/src/lib/visualiser/camera.js?t=1775745180622:32
+[  133062ms] [LOG] Visualiser: loading depth 1, 1 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:94
+[  133066ms] [LOG] Visualiser: depth 1 done, 2 children found, 3 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:143
+[  133066ms] [LOG] Visualiser: loading depth 2, 2 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:94
+[  133069ms] [LOG] Visualiser: depth 2 done, 3 children found, 6 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:143
+[  133069ms] [LOG] Visualiser: loading depth 3, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:94
+[  133071ms] [LOG] Visualiser: depth 3 done, 3 children found, 9 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:143
+[  133071ms] [LOG] Visualiser: loading depth 4, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:94
+[  133072ms] [LOG] Visualiser: depth 4 done, 3 children found, 12 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:143
+[  133072ms] [LOG] Visualiser: loading depth 5, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:94
+[  133073ms] [LOG] Visualiser: depth 5 done, 2 children found, 14 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:143
+[  133073ms] [LOG] Visualiser: loading depth 6, 2 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:94
+[  133075ms] [LOG] Visualiser: depth 6 done, 3 children found, 17 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:143
+[  133075ms] [LOG] Visualiser: loading depth 7, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:94
+[  133077ms] [LOG] Visualiser: depth 7 done, 0 children found, 17 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:143
+[  133077ms] [LOG] Visualiser layout: 17 nodes, span 49.9 units @ http://localhost:5173/src/lib/visualiser/graph.js?t=1775745214642:72
+[  133077ms] [LOG] Visualiser camera: baseDistance 95.5 (maxNodeDist 31.8) @ http://localhost:5173/src/lib/visualiser/camera.js?t=1775745180622:32
+[  144106ms] [LOG] Visualiser: loading depth 1, 1 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:94
+[  144109ms] [LOG] Visualiser: depth 1 done, 2 children found, 3 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:143
+[  144109ms] [LOG] Visualiser: loading depth 2, 2 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:94
+[  144111ms] [LOG] Visualiser: depth 2 done, 3 children found, 6 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:143
+[  144111ms] [LOG] Visualiser: loading depth 3, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:94
+[  144112ms] [LOG] Visualiser: depth 3 done, 3 children found, 9 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:143
+[  144112ms] [LOG] Visualiser: loading depth 4, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:94
+[  144113ms] [LOG] Visualiser: depth 4 done, 3 children found, 12 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:143
+[  144113ms] [LOG] Visualiser: loading depth 5, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:94
+[  144114ms] [LOG] Visualiser: depth 5 done, 2 children found, 14 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:143
+[  144114ms] [LOG] Visualiser: loading depth 6, 2 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:94
+[  144116ms] [LOG] Visualiser: depth 6 done, 3 children found, 17 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:143
+[  144116ms] [LOG] Visualiser: loading depth 7, 3 parents... @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:94
+[  144117ms] [LOG] Visualiser: depth 7 done, 0 children found, 17 total nodes @ http://localhost:5173/src/store/useVisualiserStore.js?t=1775744869024:143
+[  144117ms] [LOG] Visualiser layout: 17 nodes, span 50.3 units @ http://localhost:5173/src/lib/visualiser/graph.js?t=1775745214642:72
+[  144118ms] [LOG] Visualiser camera: baseDistance 95.9 (maxNodeDist 32.0) @ http://localhost:5173/src/lib/visualiser/camera.js?t=1775745180622:32

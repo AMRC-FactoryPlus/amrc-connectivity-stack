@@ -269,12 +269,17 @@ public class RdfStore
         this.executeWrite(() -> {
             findVersion(direct)
                 .peek(ver -> {
+                    log.info("Found core schema version {}", ver);
                     if (ver != coreVer)
                         throw new RdfErr.CorruptRDF(
-                            "Incorrect core schema version " + ver);
+                            "Expected core schema version " + coreVer);
                 })
-                .onEmpty(() -> direct.add(core));
+                .onEmpty(() -> {
+                    log.info("Loading core schema version {}", coreVer);
+                    direct.add(core);
+                });
         });
+        derived.rebind();
     }
 
     public void validateZFC ()

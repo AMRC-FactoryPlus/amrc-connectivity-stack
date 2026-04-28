@@ -102,20 +102,34 @@ public class BulkOperations extends RequestHandler.Component
      * we have <core/Individual> <core/rank> 0. for instance, even
      * though Individual itself is rank 1. We do not currently attempt
      * to infer <core/rank> for other objects. */
-    private static final UpdateRequest U_setRankSuperclasses = Vocab.update("""
-        insert { ?obj rdfs:subClassOf ?class }
+    private static final Query Q_rankSuperclasses = Vocab.query("""
+        select ?obj ?class
         where {
-            ?obj <core/uuid> ?objU;
-                rdf:type/<core/rank> ?rank.
-
+            ?obj rdf:type/<core/rank> ?rank.
             ?class <core/rank> ?crank.
             filter (?crank = (?rank - 1))
 
             filter not exists {
-                graph <graph/direct> {
-                    ?obj rdfs:subClassOf ?super.
-        } } }
+                ?obj rdfs:subClassOf ?class.
+            }
+        }
     """);
+
+    public void setRankSuperclasses ()
+    {
+        /* We must loop here, as there will be objects which don't have
+         * a valid rank until their class has been assigned a rank
+         * superclass. */
+        while (true) {
+            var supers = db().listQuery(Q_rankSuperclasses);
+            if (supers.isEmpty())
+                break;
+            log.info("Setting rank superclasses: {}", supers);
+            supers.forEach(qs ->
+                db().derived().add(qs.getResource("obj"), RDFS.subClassOf,
+                    qs.getResource("class")));
+        }
+    }
 
     public void loadDump (JsonValue jval)
     {
@@ -133,8 +147,7 @@ public class BulkOperations extends RequestHandler.Component
             .peek(this::loadObjects);
 
         db().derived().rebind();
-        db().runUpdate(U_setRankSuperclasses);
-
+        setRankSuperclasses();
         db().validateZFC();
     }
 

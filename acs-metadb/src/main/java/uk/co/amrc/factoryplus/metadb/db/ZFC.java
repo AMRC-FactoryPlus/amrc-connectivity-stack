@@ -26,7 +26,7 @@ public record ZFC (RdfStore db)
         group by ?obj
         having (count(?objU) != 1)
     """);
-    private static final Query V_badUUID = Vocab.query("""
+    private static final Query V_dupIRI = Vocab.query("""
         select ?objU
         where {
             ?obj <core/uuid> ?objU.
@@ -37,7 +37,8 @@ public record ZFC (RdfStore db)
     private static final Query V_badPrimary = Vocab.query("""
         select ?objU
         where {
-            ?obj <core/uuid> ?objU; <core/primary> ?primary.
+            ?obj <core/uuid> ?objU.
+            optional { ?obj <core/primary> ?primary. }
             filter (?obj != ?toprank)
         }
         group by ?objU
@@ -46,8 +47,8 @@ public record ZFC (RdfStore db)
     private static final Query V_badRank = Vocab.query("""
         select ?objU
         where {
-            ?obj <core/uuid> ?objU;
-                <core/rank> ?rank.
+            ?obj <core/uuid> ?objU.
+            optional { ?obj <core/rank> ?rank. }
         }
         group by ?objU
         having (count(?rank) != 1)
@@ -107,7 +108,7 @@ public record ZFC (RdfStore db)
             throw new RdfErr.InvalidIris("IRI with multiple UUIDs",
                 badIris.map(qs -> qs.getResource("obj")));
 
-        _validateObjs("UUID with multiple IRIs", V_badUUID);
+        _validateObjs("UUID with multiple IRIs", V_dupIRI);
         _validateObjs("Bad primary class", V_badPrimary,
             "toprank", Vocab.Class.TopRank);
         _validateObjs("Invalid ranks", V_badRank);

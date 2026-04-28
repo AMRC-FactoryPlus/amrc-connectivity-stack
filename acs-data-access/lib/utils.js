@@ -11,14 +11,16 @@ export function convert_to_csv (rows){
 }
 
 
-export function minDate(a, b) {
-  if (!a) return b;
-  if (!b) return a;
-  return a < b ? a : b;
-}
+const toTime = d => d ? new Date(d).getTime() : null;
 
 export function maxDate(a, b) {
   if (!a) return b;
   if (!b) return a;
-  return a > b ? a : b;
+  return toTime(a) > toTime(b) ? a : b;
+}
+
+export function minDate(a, b) {
+  if (!a) return b;
+  if (!b) return a;
+  return toTime(a) < toTime(b) ? a : b;
 }

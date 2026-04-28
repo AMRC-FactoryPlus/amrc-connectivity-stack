@@ -94,8 +94,11 @@ public record ZFC (RdfStore db)
     private void _validateObjs (String msg, Query query, Object... substs)
     {
         var bad = db().listQuery(query, substs);
-        if (!bad.isEmpty())
-            throw new RdfErr.InvalidObjs(msg, bad.map(qs -> getU(qs, "objU")));
+        if (!bad.isEmpty()) {
+            var uuids = bad.map(qs -> getU(qs, "objU"));
+            log.error("{}: {}", msg, uuids);
+            throw new RdfErr.InvalidObjs(msg, uuids);
+        }
     }
 
     /* This will throw if it detects a problem. */
@@ -104,21 +107,24 @@ public record ZFC (RdfStore db)
         log.info("Validating class structure invariants");
 
         var badIris = db().listQuery(V_dupUUID);
-        if (!badIris.isEmpty())
-            throw new RdfErr.InvalidIris("IRI with multiple UUIDs",
-                badIris.map(qs -> qs.getResource("obj")));
+        if (!badIris.isEmpty()) {
+            var iris = badIris.map(qs -> qs.getResource("obj"));
+            log.error("IRI with multiple UUIDs: {}", iris);
+            throw new RdfErr.InvalidIris("IRI with multiple UUIDs", iris);
+        }
 
         _validateObjs("UUID with multiple IRIs", V_dupIRI);
-        _validateObjs("Bad primary class", V_badPrimary,
-            "toprank", Vocab.Class.TopRank);
+        _validateObjs("Bad primary class", V_badPrimary, "toprank", Vocab.Class.TopRank);
         _validateObjs("Invalid ranks", V_badRank);
 
         for (var rel : Relation.KNOWN) {
             var badRel = db().listQuery(V_relRank, 
                 "prop", rel.prop(), "offset", Util.intLiteral(rel.offset()));
-            if (!badRel.isEmpty())
-                throw new RdfErr.InvalidRels("Invalid " + rel.name(),
-                    badRel.toMap(qs -> getU(qs, "objU"), qs -> getU(qs, "classU")));
+            if (!badRel.isEmpty()) {
+                var rels = badRel.toMap(qs -> getU(qs, "objU"), qs -> getU(qs, "classU"));
+                log.error("Invalid {}: {}", rel.name(), rels);
+                throw new RdfErr.InvalidRels("Invalid " + rel.name(), rels);
+            }
         }
         
         _validateObjs("Not member of primary class", V_notPrimary);

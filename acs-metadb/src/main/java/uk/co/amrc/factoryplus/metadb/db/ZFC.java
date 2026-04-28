@@ -39,7 +39,7 @@ public record ZFC (RdfStore db)
         where {
             ?obj <core/uuid> ?objU.
             optional { ?obj <core/primary> ?primary. }
-            filter (?obj != ?toprank)
+            filter not exists { <core> <sys/topRank> ?obj. }
         }
         group by ?objU
         having (count(?primary) != 1)
@@ -49,6 +49,7 @@ public record ZFC (RdfStore db)
         where {
             ?obj <core/uuid> ?objU.
             optional { ?obj rdf:type/<core/rank> ?rank. }
+            filter not exists { <core> <sys/topRank> ?obj. }
         }
         group by ?objU
         having (count(?rank) != 1)
@@ -94,12 +95,11 @@ public record ZFC (RdfStore db)
         return Util.decodeLiteral(qs.get(arg), UUID.class);
     }
 
-    private void _validateObjs (String msg, Query query, Object... substs)
+    private void _validateObjs (String msg, Query query)
     {
-        var bad = db().listQuery(query, substs);
+        var bad = db().listQuery(query);
         if (!bad.isEmpty()) {
             var uuids = bad.map(qs -> getU(qs, "objU"));
-            log.error("{}: {}", msg, bad);
             log.error("{}: {}", msg, uuids);
             throw new RdfErr.InvalidObjs(msg, uuids);
         }
@@ -118,7 +118,7 @@ public record ZFC (RdfStore db)
         }
 
         _validateObjs("UUID with multiple IRIs", V_dupIRI);
-        _validateObjs("Bad primary class", V_badPrimary, "toprank", Vocab.Class.TopRank);
+        _validateObjs("Bad primary class", V_badPrimary);
         _validateObjs("Invalid ranks", V_badRank);
 
         for (var rel : Relation.KNOWN) {

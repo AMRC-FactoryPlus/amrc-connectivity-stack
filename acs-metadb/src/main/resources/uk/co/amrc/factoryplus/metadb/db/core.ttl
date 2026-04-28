@@ -7,15 +7,18 @@
 @prefix uuid: <uuid/> .
 @prefix : <core/> .
 
-# Jon Eyre would say this should be modelled within the system as some
-# sort of description of this installation / this bootstrap file. But
-# for now just use a simple property…
-#
+# System parameters. These apply to <core> only. Jon Eyre would say
+# these should be modelled within the system as some sort of description
+# of this installation / this bootstrap file. But for now just use a
+# simple property…
+<sys/dbVersion> a rdf:Property.
+<sys/topRank> a rdf:Property.
+
 # Upgrades to the core definitions are not supported yet. Changing this
 # version number will cause the MetaDB to fail to start. This is by
 # design; if incompatible changes are to be made we will need to work
 # out how to upgrade existing installations.
-<core> <core/dbVersion> "1"^^xsd:int.
+<core> <sys/dbVersion> "1"^^xsd:int.
 
 # These are proper classes and sit outside the rank structure.
 :Object a rdfs:Class.
@@ -86,6 +89,7 @@
     :uuid "52b80183-6998-4bf9-9b30-132755e7dede";
     :name "Rank 3 class";
     :rank "3"^^xsd:int; :powersetOf :R2Class.
+<core> <sys/topRank> :R3Class.
 
 # XXX These are definitely not R0. They are perhaps names, which are R1?
 :Special a :R1Class; :primary :R1Class;

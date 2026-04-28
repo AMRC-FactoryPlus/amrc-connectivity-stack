@@ -32,9 +32,6 @@ public class Vocab
 
     private static UUID U (String u) { return UUID.fromString(u); }
 
-    public static final Resource core       = res("core");
-
-    public static final Property dbVersion  = prop("core/dbVersion");
     public static final Property uuid       = prop("core/uuid");
     public static final Property rank       = prop("core/rank");
     public static final Property primary    = prop("core/primary");
@@ -46,6 +43,15 @@ public class Vocab
     public static final Resource Wildcard   = res("core/Wildcard");
     public static final Resource Unowned    = res("core/Unowned");
 
+    public static class Sys {
+        public static final Resource core           = res("core");
+
+        /* These are properties on <core>, defining operational
+         * parameters of the current MetaDB. */
+        public static final Property dbVersion      = prop("sys/dbVersion");
+        public static final Property topRank        = prop("sys/topRank");
+    }
+
     public static class Class {
         /* These are proper classes and don't have ranks or UUIDs */
         public static final Resource Object         = res("core/Object");
@@ -55,7 +61,6 @@ public class Vocab
         public static final Resource R1Class        = res("core/R1Class");
         public static final Resource R2Class        = res("core/R2Class");
         public static final Resource R3Class        = res("core/R3Class");
-        public static final Resource TopRank        = R3Class;
     }
 
     public static class Time {

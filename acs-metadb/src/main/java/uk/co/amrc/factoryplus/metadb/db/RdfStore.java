@@ -254,7 +254,8 @@ public class RdfStore
 
     private static Option<Integer> findVersion (Model model)
     {
-        return Util.single(model.listObjectsOfProperty(Vocab.core, Vocab.dbVersion))
+        return Util.single(model.listObjectsOfProperty(
+                Vocab.Sys.core, Vocab.Sys.dbVersion))
             .map(n -> Util.decodeLiteral(n, Integer.class));
     }
 

@@ -45,10 +45,10 @@ public record ZFC (RdfStore db)
         having (count(?primary) != 1)
     """);
     private static final Query V_badRank = Vocab.query("""
-        select ?objU
+        select ?objU (group_concat(?rank) as ?ranks)
         where {
             ?obj <core/uuid> ?objU.
-            optional { ?obj <core/rank> ?rank. }
+            optional { ?obj rdf:type/<core/rank> ?rank. }
         }
         group by ?objU
         having (count(?rank) != 1)
@@ -56,8 +56,10 @@ public record ZFC (RdfStore db)
     private static final Query V_relRank = Vocab.query("""
         select ?objU ?classU
         where {
-            ?obj <core/uuid> ?objU; <core/rank> ?objR.
-            ?class <core/uuid> ?classU; <core/rank> ?classR.
+            ?obj <core/uuid> ?objU;
+                rdf:type/<core/rank> ?objR.
+            ?class <core/uuid> ?classU; 
+                rdf:type/<core/rank> ?classR.
             ?obj ?prop ?class.
             filter (?classR != ?objR + ?offset)
         }
@@ -74,7 +76,8 @@ public record ZFC (RdfStore db)
     private static final Query V_notSubclass = Vocab.query("""
         select ?objU
         where {
-            ?obj <core/uuid> ?objU; <core/rank> ?rank.
+            ?obj <core/uuid> ?objU; 
+                rdf:type/<core/rank> ?rank.
             filter (?rank > 0)
             filter not exists { ?obj rdfs:subClassOf <core/Object>. }
         }
@@ -96,6 +99,7 @@ public record ZFC (RdfStore db)
         var bad = db().listQuery(query, substs);
         if (!bad.isEmpty()) {
             var uuids = bad.map(qs -> getU(qs, "objU"));
+            log.error("{}: {}", msg, bad);
             log.error("{}: {}", msg, uuids);
             throw new RdfErr.InvalidObjs(msg, uuids);
         }

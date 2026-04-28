@@ -59,7 +59,8 @@ export class InfluxReader{
         `;
 
         const rows = await this._run_influx(query);
-        return rows?.[0]?._value ?? null;
+
+        return rows?.[0]?._time ?? null;
     }
 
     async get_influx_time_bounds(topLevelInstance) {
@@ -67,7 +68,7 @@ export class InfluxReader{
             this._run_min_max_time_agg(topLevelInstance, "min"),
             this._run_min_max_time_agg(topLevelInstance, "max"),
         ]);
-
+        this.log(`Get influx time bounds is run: from=${from} to=${to}`)
         return { from, to };
     }
 

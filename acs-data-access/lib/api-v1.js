@@ -70,6 +70,7 @@ export class APIv1 {
 
 
   async _get_dataset_time_bounds(dataset_uuid, visited=new Set()){
+    this.log(`Running get dataset time bounds for ${dataset_uuid}`);
     if(visited.has(dataset_uuid)) return fail(422, `Cycle detected at dataset ${dataset_uuid}`);
 
     visited.add(dataset_uuid);
@@ -98,7 +99,7 @@ export class APIv1 {
     // ------------------------
     // 2. SPARKPLUG SRC
     // ------------------------
-    else if(structure === Constants.App.SparkplugSrc){
+    if(structure === Constants.App.SparkplugSrc){
       const {from, to} = await this.influxReader.get_influx_time_bounds(config.source);
       this.log("Sprk SRC influx time bounds", from, to);
       return {from, to}
@@ -108,7 +109,9 @@ export class APIv1 {
     // ------------------------
     // 3. UNION
     // ------------------------
-    else if(structure === Constants.App.UnionComponents){
+    if(structure === Constants.App.UnionComponents){
+      this.log("Union influx time bounds: ");
+
       const results = await Promise.all(
         config.map(source_uuid => 
           this._get_dataset_time_bounds(source_uuid, new Set(visited))
@@ -116,14 +119,28 @@ export class APIv1 {
       );
 
       const valid = results.filter(r => r.from && r.to);
+      this.log(`After getting time bounds for UNION`);
+      this.log(valid);
 
       if(!valid.length) return {from: null, to: null};
 
-      this.log("Union influx time bounds: ");
+
+      const from_times = valid
+                          .map(v => new Date(v.from).getTime())
+                          .filter(t => !isNaN(t));
+
+
+      const to_times = valid
+                        .map(v => new Date(v.to).getTime())
+                        .filter(t => !isNaN(t));
+
+      if (!from_times.length || !to_times.length) {
+        return { from: null, to: null };
+      }
 
       return {
-        from: new Date(Math.min(...valid.map(v => v.from))),
-        to: new Date(Math.max(...valid.map(v => v.to)))
+        from: new Date(Math.min(...from_times)),
+        to: new Date(Math.max(...to_times))
       };
     }
 
@@ -170,7 +187,6 @@ export class APIv1 {
 
     const all_metadata = await rx.firstValueFrom(this.data.get_metadata());
     const metadata = all_metadata.get(dataset_uuid); 
-
 
     const {from, to} = await this._get_dataset_time_bounds(dataset_uuid);
 

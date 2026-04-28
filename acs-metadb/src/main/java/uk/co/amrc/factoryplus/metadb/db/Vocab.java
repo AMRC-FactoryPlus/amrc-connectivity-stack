@@ -32,6 +32,9 @@ public class Vocab
 
     private static UUID U (String u) { return UUID.fromString(u); }
 
+    public static final Resource core       = res("core");
+
+    public static final Property dbVersion  = prop("core/dbVersion");
     public static final Property uuid       = prop("core/uuid");
     public static final Property rank       = prop("core/rank");
     public static final Property primary    = prop("core/primary");

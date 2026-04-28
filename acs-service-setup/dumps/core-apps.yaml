@@ -59,7 +59,11 @@ objects:
         - !u MetaDB.Class.Document
 
   !u UUIDs.Class.App:
-    # Registration must be implemented internally by any ConfigDB
+    !u UUIDs.App.Registration:
+      name: "Object registration"
+      iri: app/Registration
+      subclassOf:
+        - !u MetaDB.Class.ConfigEntry
     !u UUIDs.App.ConfigSchema:
       name: "Application config schema"
       iri: app/ConfigSchema

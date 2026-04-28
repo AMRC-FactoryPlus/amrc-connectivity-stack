@@ -202,6 +202,7 @@ export const MetaDB = {
         Document:           "04e2abe8-2c0b-11f1-9cdd-6ffcd35127ab",
         DocumentGroup:      "4304c4b0-2c0b-11f1-834f-a34b414e7540",
         Instant:            "600bc688-1d35-11f1-80e6-d7c35e61c3ce",
+        SparkplugEntity:    "3ef49486-278d-11f1-b52f-f742bd9bbc94",
     },
     Service:                "8abf031c-193f-11f1-b047-d762a2934dfc",
     Perm: {

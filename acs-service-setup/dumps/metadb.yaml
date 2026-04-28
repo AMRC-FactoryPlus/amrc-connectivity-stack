@@ -17,10 +17,15 @@ objects:
       subclassOf:
         - !u Auth.Class.Permission
 
+  # Random classes that are not really specific to the MetaDB but are
+  # currently only used there. These should be elsewhere.
   !u ConfigDB.Class.R1Class:
     !u MetaDB.Class.Instant:
       name: "Instant"
       iri: time/Instant
+    !u MetaDB.Class.SparkplugEntity:
+      name: "Sparkplug entity"
+      iri: sparkplug/Entity
 
   # This only includes permissions unique to the MetaDB. It is not
   # straightforward to unify with the ConfigDB permissions so we will

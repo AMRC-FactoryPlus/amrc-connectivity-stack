@@ -20,6 +20,7 @@ import jakarta.ws.rs.core.SecurityContext;
 import org.apache.jena.datatypes.xsd.XSDDatatype;
 import org.apache.jena.query.*;
 import org.apache.jena.rdf.model.*;
+import org.apache.jena.riot.*;
 import org.apache.jena.tdb2.TDB2Factory;
 import org.apache.jena.update.*;
 import org.apache.jena.vocabulary.*;
@@ -92,6 +93,7 @@ public class RdfStore
 
     public void start ()
     {
+        bootstrap();
         executeRead(this::validateZFC);
 
         dataflow.start();
@@ -248,6 +250,31 @@ public class RdfStore
             .grouped(2)
             .forEach(sq -> exec.substitution((String)sq.get(0), (RDFNode)sq.get(1)));
         exec.execute();
+    }
+
+    private static Option<Integer> findVersion (Model model)
+    {
+        return Util.single(model.listObjectsOfProperty(Vocab.core, Vocab.dbVersion))
+            .map(n -> Util.decodeLiteral(n, Integer.class));
+    }
+
+    public void bootstrap ()
+    {
+        var core = ModelFactory.createDefaultModel();
+        var ttl = RdfStore.class.getResourceAsStream("core.ttl");
+        RDFDataMgr.read(core, ttl, Lang.TURTLE);
+
+        var coreVer = findVersion(core).get();
+
+        this.executeWrite(() -> {
+            findVersion(direct)
+                .peek(ver -> {
+                    if (ver != coreVer)
+                        throw new RdfErr.CorruptRDF(
+                            "Incorrect core schema version " + ver);
+                })
+                .onEmpty(() -> direct.add(core));
+        });
     }
 
     public void validateZFC ()

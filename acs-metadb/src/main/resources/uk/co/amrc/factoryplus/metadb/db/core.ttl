@@ -7,6 +7,16 @@
 @prefix uuid: <uuid/> .
 @prefix : <core/> .
 
+# Jon Eyre would say this should be modelled within the system as some
+# sort of description of this installation / this bootstrap file. But
+# for now just use a simple property…
+#
+# Upgrades to the core definitions are not supported yet. Changing this
+# version number will cause the MetaDB to fail to start. This is by
+# design; if incompatible changes are to be made we will need to work
+# out how to upgrade existing installations.
+<core> <core/dbVersion> "1"^^xsd:int.
+
 # These are proper classes and sit outside the rank structure.
 :Object a rdfs:Class.
 :Class a rdfs:Class; rdfs:subClassOf :Object, rdfs:Class.

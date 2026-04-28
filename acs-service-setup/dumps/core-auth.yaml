@@ -8,38 +8,38 @@ objects:
   !u ConfigDB.Class.R2Class:
     !u Auth.Class.PrincipalGroup:
       name: "Principal group"
-      iri: authn/Principal
+      iri: user/PrincipalGroup
     !u Auth.Class.PrincipalType:
       name: "Principal type"
-      iri: authn/PrincipalType
+      iri: user/PrincipalType
       subclassOf:
         - !u Auth.Class.PrincipalGroup
 
     !u Auth.Class.Role:
       name: "Role"
-      iri: authn/Role
+      iri: user/Role
       subclassOf:
         - !u Auth.Class.PrincipalGroup
     !u Auth.Class.ServiceRole:
       name: "Service role"
-      iri: authn/ServiceRole
+      iri: user/ServiceRole
       subclassOf:
         - !u Auth.Class.Role
     !u Auth.Class.ClientRole:
       name: "Client role"
-      iri: authn/ClientRole
+      iri: user/ClientRole
       subclassOf:
         - !u Auth.Class.Role
     !u Auth.Class.EdgeRole:
       name: "Edge role"
-      iri: authn/EdgeRole
+      iri: user/EdgeRole
       subclassOf:
         - !u Auth.Class.Role
 
   !u ConfigDB.Class.R1Class:
     !u Auth.Class.Principal:
       name: "Principal"
-      iri: authn/Principal
+      iri: user/Principal
       memberOf:
         - !u Auth.Class.PrincipalGroup
 
@@ -47,7 +47,7 @@ objects:
   !u Auth.Class.PrincipalType:
     !u Auth.Class.CentralService:
       name: "Central service"
-      iri: authn/PrincipalType
+      iri: user/CentralService
       subclassOf:
         - !u Auth.Class.Principal
 

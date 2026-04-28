@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) University of Sheffield AMRC 2026.
+ */
+
 import { jest } from "@jest/globals";
 import { ObjectTree } from "../src/object-tree.js";
 import { RelType } from "../src/constants.js";
@@ -280,7 +284,6 @@ describe("ObjectTree", () => {
             const fplus = createMockFplus();
             const dev1 = "dev-uuid-1";
             const schemaA = "schema-aaa";
-            const instanceA = "instance-aaa";
             const schemaDef = { type: "object" };
 
             fplus.ConfigDB.class_members.mockResolvedValue([dev1]);
@@ -292,7 +295,7 @@ describe("ObjectTree", () => {
                             sparkplugName: "TestDevice",
                             originMap: {
                                 Schema_UUID: schemaA,
-                                Instance_UUID: instanceA,
+                                Instance_UUID: dev1,
                                 Device_Information: {
                                     Schema_UUID: "2dd093e9-1450-44c5-be8c-c0d78e48219b",
                                     ISA95_Hierarchy: {
@@ -310,11 +313,11 @@ describe("ObjectTree", () => {
 
             const tree = makeTree(fplus);
             await tree.init();
-            return { tree, dev1, classA: schemaA, instanceUuid: instanceA };
+            return { tree, dev1, classA: schemaA };
         }
 
         it("adds sub-objects with correct parent chain", async () => {
-            const { tree, dev1, instanceUuid } = await treeWithDevice();
+            const { tree, dev1 } = await treeWithDevice();
 
             const sub1 = "sub-1-uuid";
             const sub2 = "sub-2-uuid";
@@ -326,8 +329,7 @@ describe("ObjectTree", () => {
             // schemaPath covers device + Axes + X + leaf (4 entries)
             // "Actual" has no Instance_UUID so gets a synthesised one
             tree.addCompositionFromUns(
-                dev1,
-                [instanceUuid, sub1, sub2],
+                [dev1, sub1, sub2],
                 ["top-schema", subSchema1, subSchema2, "metric-schema"],
                 ["Axes", "X", "Actual"],
             );
@@ -359,12 +361,11 @@ describe("ObjectTree", () => {
         });
 
         it("is idempotent - calling twice does not duplicate objects", async () => {
-            const { tree, dev1, instanceUuid } = await treeWithDevice();
+            const { tree, dev1 } = await treeWithDevice();
 
             const sub1 = "sub-1-uuid";
-            const args: [string, string[], string[], string[]] = [
-                instanceUuid,
-                [instanceUuid, sub1],
+            const args: [string[], string[], string[]] = [
+                [dev1, sub1],
                 ["top-schema", "sub-schema-1"],
                 ["Axes"],
             ];
@@ -379,14 +380,13 @@ describe("ObjectTree", () => {
         });
 
         it("after adding composition: getChildElementIds(parentId) returns child IDs", async () => {
-            const { tree, dev1, instanceUuid } = await treeWithDevice();
+            const { tree, dev1 } = await treeWithDevice();
 
             const sub1 = "sub-1-uuid";
             const sub2 = "sub-2-uuid";
 
             tree.addCompositionFromUns(
-                dev1,
-                [instanceUuid, sub1, sub2],
+                [dev1, sub1, sub2],
                 ["top-schema", "sub-schema-1", "sub-schema-2"],
                 ["Axes", "X"],
             );
@@ -400,12 +400,11 @@ describe("ObjectTree", () => {
         });
 
         it("getRelated(id, HasChildren) returns children", async () => {
-            const { tree, dev1, instanceUuid } = await treeWithDevice();
+            const { tree, dev1 } = await treeWithDevice();
 
             const sub1 = "sub-1-uuid";
             tree.addCompositionFromUns(
-                dev1,
-                [instanceUuid, sub1],
+                [dev1, sub1],
                 ["top-schema", "sub-schema-1"],
                 ["Axes"],
             );
@@ -416,12 +415,11 @@ describe("ObjectTree", () => {
         });
 
         it("getRelated(childId, HasParent) returns parent", async () => {
-            const { tree, dev1, instanceUuid } = await treeWithDevice();
+            const { tree, dev1 } = await treeWithDevice();
 
             const sub1 = "sub-1-uuid";
             tree.addCompositionFromUns(
-                dev1,
-                [instanceUuid, sub1],
+                [dev1, sub1],
                 ["top-schema", "sub-schema-1"],
                 ["Axes"],
             );
@@ -432,14 +430,13 @@ describe("ObjectTree", () => {
         });
 
         it("getRelated(id) with no filter returns all related (parent + children)", async () => {
-            const { tree, dev1, instanceUuid } = await treeWithDevice();
+            const { tree, dev1 } = await treeWithDevice();
 
             const sub1 = "sub-1-uuid";
             const sub2 = "sub-2-uuid";
 
             tree.addCompositionFromUns(
-                dev1,
-                [instanceUuid, sub1, sub2],
+                [dev1, sub1, sub2],
                 ["top-schema", "sub-schema-1", "sub-schema-2"],
                 ["Axes", "X"],
             );
@@ -452,12 +449,11 @@ describe("ObjectTree", () => {
         });
 
         it("getRelated for device returns ISA-95 parent and composition children", async () => {
-            const { tree, dev1, instanceUuid } = await treeWithDevice();
+            const { tree, dev1 } = await treeWithDevice();
 
             const sub1 = "sub-1-uuid";
             tree.addCompositionFromUns(
-                dev1,
-                [instanceUuid, sub1],
+                [dev1, sub1],
                 ["top-schema", "sub-schema-1"],
                 ["Axes"],
             );

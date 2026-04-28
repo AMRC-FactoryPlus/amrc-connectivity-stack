@@ -21,8 +21,10 @@ objects:
   #!u ConfigDB.Class.R1Class:
   #  !u Git.Class.Repo: { name: "Git repository" }
 
-  !u UUIDs.Class.Service:
-    !u Git.Service.Git: { name: "Git hosting" }
+  # In core-service
+  #!u UUIDs.Class.Service:
+  #  !u Git.Service.Git: { name: "Git hosting" }
+  
   !u UUIDs.Class.App:
     !u Git.App.Config:
       name: "Git repository configuration"

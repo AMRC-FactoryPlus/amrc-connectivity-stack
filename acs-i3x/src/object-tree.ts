@@ -1,4 +1,8 @@
 /*
+ * Copyright (c) University of Sheffield AMRC 2026.
+ */
+
+/*
  * ObjectTree — Constructs and maintains the i3X object graph from
  * Factory+ services (ConfigDB + Directory).
  *
@@ -71,10 +75,6 @@ export class ObjectTree {
     private objectTypes: Map<string, I3xObjectType> = new Map();
     private objects: Map<string, I3xObject> = new Map();
     private children: Map<string, Set<string>> = new Map();
-    // Maps device Instance_UUID → ConfigDB UUID (for parent linking)
-    private instanceToDevice: Map<string, string> = new Map();
-    // Maps ConfigDB UUID → Instance_UUID (reverse of above)
-    private deviceToInstance: Map<string, string> = new Map();
     // InfluxDB query metadata per leaf metric elementId
     private metricMeta: Map<string, MetricMeta> = new Map();
 
@@ -100,7 +100,6 @@ export class ObjectTree {
         this.objectTypes.clear();
         this.objects.clear();
         this.children.clear();
-        // Don't clear instanceToDevice — the mapping is permanent once learned
         await this.loadDevices();
     }
 
@@ -191,11 +190,6 @@ export class ObjectTree {
         return this.metricMeta.get(elementId);
     }
 
-    /** Get the Instance_UUID for a device ConfigDB UUID. */
-    getInstanceUuid(configDbUuid: string): string | undefined {
-        return this.deviceToInstance.get(configDbUuid);
-    }
-
     /**
      * Collect all leaf metric elementIds that are descendants of the
      * given elementId (for composition value queries).
@@ -273,48 +267,19 @@ export class ObjectTree {
 
     /* ---- UNS composition ---- */
 
-    /**
-     * Register a mapping from a device's Instance_UUID to its ConfigDB UUID.
-     * Called when we first see a UNS message for a device.
-     */
-    registerDeviceInstance(instanceUuid: string, configDbUuid: string): void {
-        this.instanceToDevice.set(instanceUuid, configDbUuid);
-    }
-
-    /** Check if a parentId points to an ISA-95 hierarchy node */
-    private isIsa95Child(parentId: string | null): boolean {
-        if (!parentId || parentId === "/") return false;
-        const parent = this.objects.get(parentId);
-        return parent?.typeElementId === "isa95-level";
-    }
-
     addCompositionFromUns(
-        _deviceUuid: string,
         instanceUuidPath: string[],
         schemaUuidPath: string[],
         metricSegments: string[],
         isa95Segments?: string[],
     ): string | null {
-        // Resolve the device Instance_UUID to ConfigDB UUID.
-        const deviceInstanceUuid = instanceUuidPath[0];
-        let deviceConfigDbUuid = this.instanceToDevice.get(deviceInstanceUuid);
-
-        // Auto-detect mapping on first encounter.
-        // Match any unmatched root device object (could be at "/" or under ISA-95 hierarchy).
-        if (!deviceConfigDbUuid) {
-            for (const obj of this.objects.values()) {
-                if ((obj.parentId === "/" || this.isIsa95Child(obj.parentId))
-                    && !Array.from(this.instanceToDevice.values()).includes(obj.elementId)) {
-                    this.instanceToDevice.set(deviceInstanceUuid, obj.elementId);
-                    deviceConfigDbUuid = obj.elementId;
-                    break;
-                }
-            }
-        }
+        // Since f46612c5, Instance_UUID === ConfigDB object UUID,
+        // so the device UUID from UNS messages is the elementId directly.
+        const deviceElementId = instanceUuidPath[0];
 
         // Build ISA-95 hierarchy above the device if segments provided
-        if (isa95Segments && isa95Segments.length > 0 && deviceConfigDbUuid) {
-            this.ensureIsa95Hierarchy(isa95Segments, deviceConfigDbUuid);
+        if (isa95Segments && isa95Segments.length > 0 && this.objects.has(deviceElementId)) {
+            this.ensureIsa95Hierarchy(isa95Segments, deviceElementId);
         }
 
         // Build the full tree from metric segments.
@@ -326,7 +291,7 @@ export class ObjectTree {
         // in instanceUuidPath, since index 0 is the device). Otherwise
         // generate a deterministic UUID from the parent UUID + segment name.
 
-        let parentId = deviceConfigDbUuid ?? deviceInstanceUuid;
+        let parentId = deviceElementId;
 
         for (let i = 0; i < metricSegments.length; i++) {
             const segment = metricSegments[i];
@@ -334,9 +299,15 @@ export class ObjectTree {
             const instanceIdx = i + 1;
             const hasInstanceUuid = instanceIdx < instanceUuidPath.length;
 
-            const elementId = hasInstanceUuid
-                ? instanceUuidPath[instanceIdx]
-                : uuidv5(`${parentId}:${segment}`, I3X_UUID_NAMESPACE);
+            // If the tree already has a child of parentId with this name
+            // (from buildTreeFromOriginMap at startup), reuse its elementId.
+            // This avoids divergence when the origin map has Instance_UUIDs
+            // at deeper levels than the UNS instanceUuidPath provides.
+            const existing = this.findChildByName(parentId, segment);
+            const elementId = existing?.elementId
+                ?? (hasInstanceUuid
+                    ? instanceUuidPath[instanceIdx]
+                    : uuidv5(`${parentId}:${segment}`, I3X_UUID_NAMESPACE));
 
             // Schema: use schemaUuidPath[i+1] if available, else "unknown"
             const schemaIdx = i + 1;
@@ -372,6 +343,17 @@ export class ObjectTree {
     }
 
     /* ---- Private ---- */
+
+    /** Find an existing child of parentId by display name. */
+    private findChildByName(parentId: string, name: string): I3xObject | undefined {
+        const childIds = this.children.get(parentId);
+        if (!childIds) return undefined;
+        for (const childId of childIds) {
+            const child = this.objects.get(childId);
+            if (child?.displayName === name) return child;
+        }
+        return undefined;
+    }
 
     /**
      * Recursively search an originMap for an object whose Schema_UUID
@@ -574,14 +556,6 @@ export class ObjectTree {
             }
             schemaUuids.add(schemaUuid);
 
-            // Instance_UUID from the originMap
-            const instanceUuid = devInfo.originMap?.Instance_UUID;
-            if (instanceUuid) {
-                this.instanceToDevice.set(instanceUuid, uuid);
-                this.deviceToInstance.set(uuid, instanceUuid);
-                this.logger.debug?.({ uuid, instanceUuid }, "loadDevices: registered Instance↔ConfigDB mapping");
-            }
-
             // Find ISA-95 hierarchy by searching for the Hierarchy-v1 Schema_UUID
             const hierarchyObj = this.findBySchemaUuid(devInfo.originMap, HIERARCHY_SCHEMA_UUID);
             const isa95Segments = hierarchyObj ? this.extractIsa95Segments(hierarchyObj) : [];
@@ -613,8 +587,8 @@ export class ObjectTree {
             }
 
             // Build the full metric tree from the originMap
-            if (devInfo.originMap && instanceUuid) {
-                this.buildTreeFromOriginMap(devInfo.originMap, uuid, instanceUuid);
+            if (devInfo.originMap) {
+                this.buildTreeFromOriginMap(devInfo.originMap, uuid, uuid);
                 this.collectSchemaUuids(devInfo.originMap, schemaUuids);
                 this.logger.debug?.({ uuid, children: this.getChildElementIds(uuid).length },
                     "loadDevices: built metric tree from originMap");

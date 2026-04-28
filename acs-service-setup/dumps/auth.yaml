@@ -4,22 +4,22 @@ objects:
   !u ConfigDB.Class.R2Class:
     !u Auth.Class.PermissionGroup: 
       name: "Permission group"
-      iri: authz/PermissionGroup
+      iri: acl/PermissionGroup
     !u Auth.Class.ServicePerms:
       name: "Service permission set"
-      iri: authz/ServicePerms
+      iri: acl/ServicePerms
       subclassOf:
         - !u Auth.Class.PermissionGroup
     !u Auth.Class.CompositePerm:
       name: "Composite permission"
-      iri: authz/CompositePerm
+      iri: acl/CompositePerm
       subclassOf:
         - !u Auth.Class.PermissionGroup
 
   !u UUIDs.Class.Class:
     !u UUIDs.Class.Permission:
       name: "Permission"
-      iri: authz/Permission
+      iri: acl/Permission
       memberOf:
         - !u Auth.Class.PermissionGroup
 
@@ -27,28 +27,28 @@ objects:
     # CentralService is in core-auth.yaml
     !u Auth.Class.HumanUser:
       name: "Human user"
-      iri: authn/HumanUser
+      iri: user/HumanUser
       subclassOf:
         - !u Auth.Class.Principal
     !u Auth.Class.EdgeService:
       name: "Edge service"
-      iri: authn/EdgeService
+      iri: user/EdgeService
       subclassOf:
         - !u Auth.Class.Principal
     # Should these be a dedicated PrincipalType?
     !u Auth.Class.EdgeAgent:
       name: "Edge Agent"
-      iri: authn/EdgeAgent
+      iri: user/EdgeAgent
       subclassOf:
         - !u Auth.Class.Principal
     !u Auth.Class.AppAccount:
       name: "Application account"
-      iri: authn/Application
+      iri: user/Application
       subclassOf:
         - !u Auth.Class.Principal
     !u Auth.Class.SpecialAccount:
       name: "Special account"
-      iri: authn/Special
+      iri: user/Special
       subclassOf:
         - !u Auth.Class.Principal
 

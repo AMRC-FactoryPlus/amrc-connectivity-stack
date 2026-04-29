@@ -137,7 +137,17 @@ public class BulkOperations extends RequestHandler.Component
             throw new SvcErr.BadInput("Invalid dump");
         log.info("Dump validated");
 
-        var dump = (JsonObject)jval;
+        try {
+            _loadDump((JsonObject)jval);
+        }
+        catch (RdfErr.CorruptRDF e) {
+            log.warn("Error loading dump: {}", e.toString());
+            throw new SvcErr.BadInput("Dump violates class system constraints");
+        }
+    }
+
+    private void _loadDump (JsonObject dump)
+    {
         Option.of(dump.get("objects"))
             .map(objs -> jsonEntries(objs)
                 .flatMap(e1 -> jsonEntries(e1.getValue())

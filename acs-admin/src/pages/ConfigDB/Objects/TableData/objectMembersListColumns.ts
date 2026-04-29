@@ -42,7 +42,7 @@ export const membersColumns: ColumnDef<MembersMapping>[] = [{
     },
 }, {
     accessorKey: 'class',
-    accessorFn: (item) => item.class.name,
+    accessorFn: (item) => item.class ? item.class.name : 'NO CLASS',
     header: ({column}) => h(DataTableColumnHeader, {
         column,
         title: 'Class'

@@ -8,6 +8,7 @@ import { Map as IMap } from "immutable";
 import * as rx from "rxjs";
 
 import { APIError } from "@amrc-factoryplus/service-api";
+import { retryBackoff } from "@amrc-factoryplus/rx-util";
 import { DataAccess as Constants } from "./constants.js";
 import { valid_uuid, DatasetValidity } from "./validate.js";
 import {convert_to_csv, minDate, maxDate} from './utils.js';
@@ -49,12 +50,10 @@ export class APIv1 {
 
     api.route("/structure/:uuid")
       .get(this.structure_uuid.bind(this))
-      .put(this.structure_update.bind(this))
+      .put(this.structure_update.bind(this));
 
     return api;
   }
-
-
 
   /** GET. Returns a list of Dataset UUIDs that the client has READ_DATASET access to.
    * The dataset can be optionally restricted by from and to dates (this is not implemented yet).
@@ -159,11 +158,11 @@ export class APIv1 {
                     * function {array} - Array of Functional classes - UUIDs of classes dataset belongs to (only members of Functional dataset type)
                     * metadata {object} - Map of metadata configs keyed by Application UUID - contains all config entries for dataset which use applications in the Dataset metadata class
                     * parts {array} - Subset datasets - contains UUIDs of all subclasses of dataset the client has READ access to.
-    * Don't return valid response if dataset is invalid
+    * Returns 404 if dataset is invalid.
    */
   async metadata_uuid(req, res){    
     const dataset_uuid  = req.params.uuid;
-    if (!valid_uuid(dataset_uuid)) fail(410, `${dataset_uuid} is invalid uuid.`);
+    if (!valid_uuid(dataset_uuid)) fail(422, `${dataset_uuid} is invalid uuid.`);
 
     const ok = await this.auth.check_acl(
       req.auth,
@@ -210,7 +209,8 @@ export class APIv1 {
       to: to ? to : undefined,
       function: f_type,
       metadata,
-      parts: allowed_parts
+      parts: parts,
+      allowed_parts: allowed_parts
     }
     return res.status(200).json(meta);
   }
@@ -555,27 +555,36 @@ export class APIv1 {
     if(!objectUuid){
       objectUuid = await this.cdb.create_object(Constants.Class.Dataset);
       
-      if(!objectUuid) return fail(400, `New Dataset object couldn't be created in ConfigDB.`);
+      if(!objectUuid) return fail(500, `New Dataset object couldn't be created in ConfigDB.`);
 
       this.log("Created new dataset object in ConfigDB", objectUuid);
     }
 
     // Create config entry for the dataset object
     await this.cdb.put_config(structure, objectUuid, config);
+    this.log(`Added config for ${objectUuid}`);
 
-    await this._create_subclass_relationship(structure, objectUuid, config);
+    this._create_subclass_relationship(structure, objectUuid, config);
 
+    this.log(`Created subclass relationship`);
     return objectUuid;
   }
 
-  async _create_subclass_relationship(structure, dataset_uuid, config){
-    if(structure === Constants.App.SessionLimits){
-        const source = config.source;
-        await this.cdb.class_add_subclass(source, dataset_uuid);
+  async _create_subclass_relationship(structure, dataset_uuid, config) {
+    if (structure === Constants.App.SessionLimits) {
+      await rx.lastValueFrom(
+        rx.defer(() =>
+          this.cdb.class_add_subclass(config.source, dataset_uuid)
+        ).pipe(retryBackoff(500, e => this.log(e)))
+      );
     }
-    else if(structure === Constants.App.UnionComponents){
-      for (let source in config){
-        await this.cdb.class_add_subclass(dataset_uuid, source);
+    else if (structure === Constants.App.UnionComponents) {
+      for (let source of config) {
+        await rx.lastValueFrom(
+          rx.defer(() =>
+            this.cdb.class_add_subclass(dataset_uuid, source)
+          ).pipe(retryBackoff(500, e => this.log(e)))
+        );
       }
     }
   }
@@ -600,6 +609,31 @@ export class APIv1 {
   }
 
 
+  async _unlink_subclasses(structure, dataset_uuid, curr_config, new_config){
+    
+    if(structure === Constants.App.SessionLimits){
+      if(curr_config.source != new_config.source){
+        // remove the dataset from subclasses of its source dataset
+        await this.cdb.class_remove_subclass(curr_config.source, dataset_uuid);
+        this.log(`Removed ${dataset_uuid} from ${curr_config.source} subclasses.`)
+      }
+    }else if(structure === Constants.App.UnionComponents){
+      if(curr_config.length > 0){
+        // if new_config does not include sources from curr_config -> remove subclass rel.
+        const sources_to_remove = curr_config.filter(x => !new_config.includes(x));
+
+        for (const source_uuid of sources_to_remove){
+          await this.cdb.class_remove_subclass(dataset_uuid, source_uuid);
+          this.log(`Removed ${dataset_uuid} from ${source_uuid} subclasses.`);
+        }
+      }
+
+    }else if (structure === Constants.App.SparkplugSrc){
+      return;
+    }else{
+      return fail(422, `Unknown structure type ${structure}`);
+    }
+  }
   
   /** PUT. Updates dataset definition. Principal should have CreateDataset permission
    * 
@@ -611,10 +645,27 @@ export class APIv1 {
     const dataset_uuid = req.params.uuid;
     if(!valid_uuid(dataset_uuid)) return fail(422, `Dataset uuid is invalid.`);
 
+    const structure = req.body.structure;
+    const new_config = req.body.config;
+
+    // get current config
+    const all_defs = await rx.firstValueFrom(this.data.get_dataset_definitions(DatasetValidity.ALL));
+    const curr_defs = all_defs.get(dataset_uuid);
+
+    const curr_config_for_structure = curr_defs.find(c => c.structure === structure)?.config;
+    
+    if(!curr_config_for_structure){
+      this.log(`Current config for structure does not exist.`);
+    }
+    // update subclass links if config def for this structure already exists and being updated.
+    if(curr_config_for_structure){
+      await this._unlink_subclasses(structure, dataset_uuid,curr_config_for_structure, new_config);
+    }
+
     const objectUuid = await this._update_dataset_config(
       req.auth,
-      req.body.structure,
-      req.body.config,
+      structure,
+      new_config,
       dataset_uuid
     );
 

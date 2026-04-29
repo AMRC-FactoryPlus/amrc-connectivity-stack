@@ -54,19 +54,23 @@ public record ZFC (RdfStore db)
         group by ?objU
         having (count(?rank) != 1)
     """);
-    private static final Query V_relRank = Vocab.query("""
-        select ?objU ?classU
-        where {
-            ?obj <core/uuid> ?objU;
-                rdf:type/<core/rank> ?objR.
-            ?class <core/uuid> ?classU; 
-                rdf:type/<core/rank> ?classR.
-
-            graph <graph/direct> { ?obj ?prop ?class. }
-
-            filter (?classR != ?objR + ?offset)
-        }
-    """);
+    /* The ConfigDB had these checks on the direct relations. But they
+     * are very slow here (a lot of relations to check) and I believe
+     * that given our ranks are derived the badRank check above will
+     * catch any rank errors. */
+//    private static final Query V_relRank = Vocab.query("""
+//        select ?objU ?classU
+//        where {
+//            ?obj <core/uuid> ?objU;
+//                rdf:type/<core/rank> ?objR.
+//            ?class <core/uuid> ?classU; 
+//                rdf:type/<core/rank> ?classR.
+//
+//            graph <graph/direct> { ?obj ?prop ?class. }
+//
+//            filter (?classR != ?objR + ?offset)
+//        }
+//    """);
     private static final Query V_notPrimary = Vocab.query("""
         select ?objU
         where {
@@ -108,6 +112,18 @@ public record ZFC (RdfStore db)
         }
     }
 
+//    private void _validateRelation (Relation rel)
+//    {
+//        log.info("checking {}", rel.name());
+//        var badRel = db().listQuery(V_relRank, 
+//            "prop", rel.prop(), "offset", Util.intLiteral(rel.offset()));
+//        if (!badRel.isEmpty()) {
+//            var rels = badRel.toMap(qs -> getU(qs, "objU"), qs -> getU(qs, "classU"));
+//            log.error("Invalid {}: {}", rel.name(), rels);
+//            throw new RdfErr.InvalidRels("Invalid " + rel.name(), rels);
+//        }
+//    }
+
     /* This will throw if it detects a problem. */
     public void validateInvariants ()
     {
@@ -125,16 +141,10 @@ public record ZFC (RdfStore db)
         _validateObjs("Bad primary class", V_badPrimary);
         _validateObjs("Invalid ranks", V_badRank);
 
-        for (var rel : Relation.KNOWN) {
-            log.info("checking {}", rel.name());
-            var badRel = db().listQuery(V_relRank, 
-                "prop", rel.prop(), "offset", Util.intLiteral(rel.offset()));
-            if (!badRel.isEmpty()) {
-                var rels = badRel.toMap(qs -> getU(qs, "objU"), qs -> getU(qs, "classU"));
-                log.error("Invalid {}: {}", rel.name(), rels);
-                throw new RdfErr.InvalidRels("Invalid " + rel.name(), rels);
-            }
-        }
+        /* Disable these for now, they're slow and I'm not sure they add
+         * any value over the rank check. */
+        //for (var rel : Relation.KNOWN)
+        //    _validateRelation(rel);
         
         _validateObjs("Not member of primary class", V_notPrimary);
         _validateObjs("Not subclass of rank root", V_notSubclass);

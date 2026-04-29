@@ -97,6 +97,7 @@ public record ZFC (RdfStore db)
 
     private void _validateObjs (String msg, Query query)
     {
+        log.info("checking {}", msg);
         var bad = db().listQuery(query);
         if (!bad.isEmpty()) {
             var uuids = bad.map(qs -> getU(qs, "objU"));
@@ -110,6 +111,7 @@ public record ZFC (RdfStore db)
     {
         log.info("Validating class structure invariants");
 
+        log.info("checking for IRIs with multiple UUIDs");
         var badIris = db().listQuery(V_dupUUID);
         if (!badIris.isEmpty()) {
             var iris = badIris.map(qs -> qs.getResource("obj"));
@@ -122,6 +124,7 @@ public record ZFC (RdfStore db)
         _validateObjs("Invalid ranks", V_badRank);
 
         for (var rel : Relation.KNOWN) {
+            log.info("checking {}", rel.name());
             var badRel = db().listQuery(V_relRank, 
                 "prop", rel.prop(), "offset", Util.intLiteral(rel.offset()));
             if (!badRel.isEmpty()) {

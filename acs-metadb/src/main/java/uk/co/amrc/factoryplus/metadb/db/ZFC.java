@@ -61,7 +61,9 @@ public record ZFC (RdfStore db)
                 rdf:type/<core/rank> ?objR.
             ?class <core/uuid> ?classU; 
                 rdf:type/<core/rank> ?classR.
-            ?obj ?prop ?class.
+
+            graph <graph/direct> { ?obj ?prop ?class. }
+
             filter (?classR != ?objR + ?offset)
         }
     """);

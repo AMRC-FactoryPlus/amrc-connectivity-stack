@@ -23,7 +23,6 @@ objects:
   !u Auth.Class.EdgeRole:
     !u Local.Role.EdgeFlux:
       name: "Edge flux"
-      iri: local/role/EdgeFlux
       memberOf:
         - !u Auth.Class.EdgeRole
         - !u Clusters.Class.ClusterGroups
@@ -31,7 +30,6 @@ objects:
         - !u Auth.Class.EdgeService
     !u Local.Role.EdgeKrbkeys:
       name: "Edge krbkeys"
-      iri: local/role/EdgeKrbkeys
       memberOf:
         - !u Auth.Class.EdgeRole
         - !u Clusters.Class.ClusterGroups
@@ -47,12 +45,10 @@ objects:
         - !u Git.Class.Repo
     !u Local.RepoGroup.Shared:
       name: "Shared repo"
-      iri: local/git/SharedRepo
       subclassOf:
         - !u Git.Class.Repo
     !u Local.RepoGroup.Cluster:
       name: "Edge cluster repo"
-      iri: local/git/ClusterRepo
       memberOf:
         - !u Git.Class.Group
         - !u Clusters.Class.ClusterGroups
@@ -102,7 +98,6 @@ objects:
   !u Local.RepoGroup.Shared:
     !u Local.Repo.HelmCharts:
       name: "Edge Helm charts"
-      iri: local/git/EdgeHelmCharts
 
 configs:
   !u Git.App.Config:

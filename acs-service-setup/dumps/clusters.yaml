@@ -1,4 +1,4 @@
-#-REQUIRE: auth git
+#-REQUIRE: auth git helm
 ---
 service: !u UUIDs.Service.ConfigDB
 version: 2
@@ -74,11 +74,6 @@ objects:
     !u Clusters.App.Flux:
         name: "Flux template"
         iri: app/FluxTemplate
-        subclassOf:
-          - !u MetaDB.Class.ConfigEntry
-    !u Clusters.App.HelmChart:
-        name: "Helm chart template"
-        iri: app/HelmChartTemplate
         subclassOf:
           - !u MetaDB.Class.ConfigEntry
     !u Clusters.App.Status:
@@ -435,7 +430,7 @@ grants:
       !u Clusters.App.Status: false
       !u Clusters.App.EdgeStatus: false
       !u Clusters.App.Flux: false
-      !u Clusters.App.HelmChart: false
+      !u Clusters.App.HelmTemplate: false
       !u Clusters.App.K8sTemplate: false
       !u Clusters.App.Bootstrap: false
       !u UUIDs.App.SparkplugAddress: false

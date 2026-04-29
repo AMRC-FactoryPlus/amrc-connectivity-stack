@@ -82,14 +82,22 @@ objects:
   !u DataAccess.App.DatasetDefinition:
     !u DataAccess.App.SparkplugSrc:
       name: "Sparkplug source"
+      subclassOf:
+        - MetaDB.Class.ConfigEntry
     !u DataAccess.App.UnionComponents:
       name: "Union components"
+      subclassOf:
+        - MetaDB.Class.ConfigEntry
     !u DataAccess.App.SessionLimits:
       name: "Session limits"
+      subclassOf:
+        - MetaDB.Class.ConfigEntry
 
   !u DataAccess.App.DatasetMetadata:
     !u DataAccess.App.MESIdentifiers:
       name: "MES identifiers"  
+      subclassOf:
+        - MetaDB.Class.ConfigEntry
 
   !u UUIDs.Class.Special:
     !u DataAccess.Special.InvalidDataset:

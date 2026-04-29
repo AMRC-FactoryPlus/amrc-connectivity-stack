@@ -243,6 +243,17 @@ clusterManager:
     repository: acs-cluster-manager
   verbosity: "ALL,!service,!token"
 
+i3x:
+  # -- Whether or not to enable the i3X service
+  enabled: true
+  image:
+    # -- The repository of the i3X service
+    repository: acs-i3x
+  # -- The minimum log level for the i3X service
+  logLevel: info
+  # -- Override the i3X namespace URI (defaults to https://<baseUrl>/i3x)
+  # namespaceUri: https://example.com/i3x
+
 admin:
   # -- Whether or not to enable the Admin component
   enabled: true

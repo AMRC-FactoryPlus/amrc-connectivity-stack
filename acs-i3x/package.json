@@ -1,0 +1,59 @@
+{
+  "name": "acs-i3x",
+  "version": "1.0.0",
+  "description": "i3X REST/SSE API service for the AMRC Connectivity Stack",
+  "author": "AMRC",
+  "license": "MIT",
+  "main": "./dist/bin/api.js",
+  "type": "module",
+  "keywords": [
+    "amrc",
+    "factory-plus",
+    "factoryplus",
+    "acs",
+    "amrc-connectivity-stack",
+    "i3x"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "clean": "tsc --build --clean",
+    "start": "node --preserve-symlinks --preserve-symlinks-main --es-module-specifier-resolution=node dist/bin/api.js",
+    "start:shell": "k5start -Uf $CLIENT_KEYTAB npm run start",
+    "dev": "npm run build && npm run start",
+    "test": "NODE_OPTIONS=--experimental-vm-modules npx jest",
+    "lint": "eslint --ignore-path .gitignore --ext .ts src/",
+    "lint:fix": "npm run lint -- --fix"
+  },
+  "dependencies": {
+    "@amrc-factoryplus/rx-util": "file:../lib/js-rx-util",
+    "@amrc-factoryplus/service-api": "file:../lib/js-service-api",
+    "@amrc-factoryplus/service-client": "file:../lib/js-service-client",
+    "@influxdata/influxdb-client": "^1.33.2",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "compression": "^1.7.4",
+    "express": "^5.2.1",
+    "graphology": "^0.26.0",
+    "graphology-shortest-path": "^2.1.0",
+    "graphology-traversal": "^0.3.1",
+    "gssapi.js": "^2.0.1",
+    "minisearch": "^7.2.0",
+    "pino": "^8.11.0",
+    "uuid": "^9.0.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/compression": "^1.7.5",
+    "@types/express": "^4.17.21",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^20.11.0",
+    "@types/supertest": "^7.2.0",
+    "@types/uuid": "^9.0.7",
+    "dotenv": "^17.3.1",
+    "graphology-types": "^0.24.8",
+    "jest": "^29.7.0",
+    "supertest": "^7.2.2",
+    "ts-jest": "^29.1.1",
+    "typescript": "^5.3.3"
+  },
+  "private": true
+}

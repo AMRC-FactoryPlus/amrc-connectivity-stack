@@ -168,3 +168,26 @@ spec:
       - 03f5f08a-f61e-4134-8f66-b2951e3bbb69
 
 {{- end }}
+---
+{{- if .Values.i3x.enabled }}
+apiVersion: factoryplus.app.amrc.co.uk/v1
+kind: KerberosKey
+metadata:
+  name: sv1i3x
+  namespace: {{ .Release.Namespace }}
+spec:
+  type: Random
+  principal: sv1i3x@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+  secret: i3x-keytabs/client
+  account:
+    class: e463b4ae-a322-46cc-8976-4ba76838e908
+    name: i3X Service
+    groups:
+      # I3X.Requirement.ServiceRole — grants ConfigDB read, Directory read,
+      # UNS MQTT read (via UNS.Group.Reader inheritance), and Directory
+      # service advertisement.
+      - 0eb1f761-6b81-4757-a458-c0257c905a20
+    sparkplug:
+      group: {{ .Values.acs.organisation }}-Service-Core
+      node: i3X
+{{- end }}

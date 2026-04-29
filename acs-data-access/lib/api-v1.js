@@ -179,8 +179,7 @@ export class APIv1 {
 
     const infos = await rx.firstValueFrom(this.data.get_general_infos());
     const info = infos.get(dataset_uuid);
-    if(!info) return fail(404, `General info does not exist for dataset ${dataset_uuid}`);
-
+    
     const f_types = await rx.firstValueFrom(this.data.get_functional_types());
     const f_type = f_types.get(dataset_uuid);
 
@@ -204,13 +203,12 @@ export class APIv1 {
 
     const meta = {
       uuid: dataset_uuid,
-      name: info.name,
+      name: info ? info.name : "UNKNOWN",
       from: from ? from : undefined,
       to: to ? to : undefined,
       function: f_type,
       metadata,
-      parts: parts,
-      allowed_parts: allowed_parts
+      parts: allowed_parts
     }
     return res.status(200).json(meta);
   }

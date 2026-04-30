@@ -113,3 +113,18 @@ spec:
     - HTTP/git.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
   secret: git-keytabs/server
 {{- end }}
+
+---
+{{- if .Values.dataAccess.enabled }}
+apiVersion: factoryplus.app.amrc.co.uk/v1
+kind: KerberosKey
+metadata:
+  name: http.data-access
+  namespace: {{ .Release.Namespace }}
+spec:
+  type: Random
+  principal: HTTP/data-access.{{ .Release.Namespace }}.svc.cluster.local@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+  secret: data-access-keytabs/server
+  additionalPrincipals:
+    - HTTP/data-access.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+{{- end }}

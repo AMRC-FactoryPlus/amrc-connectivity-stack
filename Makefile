@@ -42,6 +42,7 @@ subdirs+= acs-auth
 subdirs+= acs-cluster-manager
 subdirs+= acs-cmdesc
 subdirs+= acs-configdb
+subdirs+= acs-data-access
 subdirs+= acs-directory
 subdirs+= acs-edge
 subdirs+= acs-edge-sync
@@ -65,5 +66,6 @@ subdirs+= edge-tplink-smartplug
 subdirs+= historian-sparkplug
 subdirs+= historian-uns
 subdirs+= uns-ingester-sparkplug
+
 
 include ${mk}/acs.subdirs.mk

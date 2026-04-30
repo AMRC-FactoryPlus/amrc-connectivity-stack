@@ -69,7 +69,7 @@ export class APIv1 {
 
 
   async _get_dataset_time_bounds(dataset_uuid, visited=new Set()){
-    this.log(`Running get dataset time bounds for ${dataset_uuid}`);
+
     if(visited.has(dataset_uuid)) return fail(422, `Cycle detected at dataset ${dataset_uuid}`);
 
     visited.add(dataset_uuid);
@@ -87,7 +87,7 @@ export class APIv1 {
 
       const from = config.from ? new Date(config.from) : null;
       const to = config.to ? new Date(config.to) : null;
-      this.log("Session influx time bounds", maxDate(from, child.from), minDate(to, child.to));
+
       return {
         from: maxDate(from, child.from),
         to: minDate(to, child.to)
@@ -100,7 +100,7 @@ export class APIv1 {
     // ------------------------
     if(structure === Constants.App.SparkplugSrc){
       const {from, to} = await this.influxReader.get_influx_time_bounds(config.source);
-      this.log("Sprk SRC influx time bounds", from, to);
+
       return {from, to}
     }
 
@@ -109,7 +109,6 @@ export class APIv1 {
     // 3. UNION
     // ------------------------
     if(structure === Constants.App.UnionComponents){
-      this.log("Union influx time bounds: ");
 
       const results = await Promise.all(
         config.map(source_uuid => 
@@ -118,16 +117,11 @@ export class APIv1 {
       );
 
       const valid = results.filter(r => r.from && r.to);
-      this.log(`After getting time bounds for UNION`);
-      this.log(valid);
-
       if(!valid.length) return {from: null, to: null};
-
 
       const from_times = valid
                           .map(v => new Date(v.from).getTime())
                           .filter(t => !isNaN(t));
-
 
       const to_times = valid
                         .map(v => new Date(v.to).getTime())
@@ -174,8 +168,8 @@ export class APIv1 {
     if (!ok) return fail(403, `You don't have Read permission for ${dataset_uuid}`);
 
     const datasets = await this.data.get_allowed_dataset_uuids(req.auth, Constants.Perm.ReadDataset, DatasetValidity.VALID);
-    const is_valid = await datasets.includes(dataset_uuid)
-    if(!is_valid) return fail(404, `Dataset ${dataset_uuid} is not found: it's either invalid or does not exist.`);
+    const is_valid_exist = await datasets.includes(dataset_uuid)
+    if(!is_valid_exist) return fail(404, `Dataset ${dataset_uuid} is not found or invalid.`);
 
     const infos = await rx.firstValueFrom(this.data.get_general_infos());
     const info = infos.get(dataset_uuid);
@@ -214,11 +208,14 @@ export class APIv1 {
   }
 
 
+  // Check if principal has necessary permission to referenced source
   async _check_second_level_permission(principal, structure, config, permission){
+
     if(structure == Constants.App.SessionLimits || structure == Constants.App.SparkplugSrc){
-      this.log(`second level ACL check for structure ${structure} and config ${config}`);
+
       const target = config.source;
       if(!target) return fail(422, `Dataset definition does not contain source.`);
+
       if(!valid_uuid(target)) return fail(422, `Source uuid ${target} is invalid.`);
 
       const ok = await this.auth.check_acl(
@@ -232,17 +229,21 @@ export class APIv1 {
       
     }else if(structure == Constants.App.UnionComponents){
       if(config.length == 0) return true;
-      if(!Array.isArray(config)) return fail(422, `Dataset def of structure ${structure} must be Array.`);
+
+      if(!Array.isArray(config)) return fail(422, `Dataset def of structure ${structure} must be an Array.`);
 
       for(let target of config){
+
         const ok = await this.auth.check_acl(
           principal, 
           permission,
           target,
           true
         );
+
         if(!ok) return false;
       }
+
       return true;
 
     }else{
@@ -251,8 +252,6 @@ export class APIv1 {
     }
   }
 
-
-  
 
   _merge_intervals(queries){
     const grouped = {};
@@ -301,6 +300,7 @@ export class APIv1 {
   }
 
 
+  // Resolve nested datasets 
   async _resolve_dataset(dataset_uuid, from=null, to=null, visited = new Set()) {
     if (visited.has(dataset_uuid)) {
         return fail(404, `Circular dataset reference detected at ${dataset_uuid}`);
@@ -312,7 +312,9 @@ export class APIv1 {
       if (!dataset_def) return fail(404, `Dataset definition not found for ${dataset_uuid}`);
 
       const { structure, config } = dataset_def;
+
       if(!structure) return fail(422, `Structure is not found in dataset definition ${dataset_uuid}`);
+    
       if(!valid_uuid(structure)) return fail(422, `Structure uuid is invalid for dataset ${dataset_uuid}`);
 
       // -------------------------
@@ -339,6 +341,7 @@ export class APIv1 {
       // -------------------------
       else if (structure === Constants.App.SessionLimits) {
         const source_uuid = config?.source;
+
         if (!source_uuid) return fail(422, `Dataset def ${dataset_uuid} does not contain source uuid`);
 
         if(!valid_uuid(source_uuid)) return fail(422, `Dataset ${dataset_uuid}'s source is invalid uuid`);
@@ -368,6 +371,7 @@ export class APIv1 {
       // -------------------------
       else if (structure === Constants.App.UnionComponents) {
         if(!Array.isArray(config)) return fail(422, `Union structure type dataset def must be Array ${dataset_uuid}`);
+        
         const results = await Promise.all(
             config.map(uuid => 
                 this._resolve_dataset(uuid, from, to, new Set(visited))
@@ -474,7 +478,7 @@ export class APIv1 {
    * @param {*} req 
    * @param {*} res 
    * @returns list of dataset UUIDs the client has permission to EDIT
-   * the response should include invalid datasets 
+   * the response includes invalid datasets 
    */
   async structure_list(req, res){
     const uuids = await this.data.get_allowed_dataset_uuids(req.auth, Constants.Perm.EditDataset, DatasetValidity.ALL);
@@ -491,7 +495,7 @@ export class APIv1 {
       * uuid {UUID} - Dataset UUID
       * class {UUID} - Structural class: Sparkplug device, Union Dataset, Session
       * config {any} - Structural definition: "not visible", Union components, Session limits
-  * the response should specify structure field as invalid uuid in definition if the dataset is invalid
+  * the response includes invalid datasets but their structure field references Invalid Dataset uuid
    */
   async structure_uuid(req, res) {
     const { uuid } = req.params;
@@ -527,6 +531,7 @@ export class APIv1 {
 
   async _update_dataset_config(principal, structure, config, objectUuid){
     if(!structure) return fail(422, `Structure not provided.`);
+
     if(!valid_uuid(structure)) return fail(422, `Structure uuid ${structure} is invalid.`)
     
     const ok = await this.auth.check_acl(
@@ -538,16 +543,12 @@ export class APIv1 {
 
     if (!ok) return fail(403, `You don't have Create permission for structure ${structure}`);
 
-    this.log(`Passed ACL Check to CreateDataset for structure ${structure}`);
-
     if(!config) return fail(422, `Config not provided.`);
     
     // Check the principal has appropriate permission for all dataset sources in config. 
-    this.log(`Now will try ACL check ${mapStructureToPermission.get(structure)} for ${config.source} `);
     const ok2 = await this._check_second_level_permission(principal, structure, config, mapStructureToPermission.get(structure));
     
     if(!ok2) return fail(403, `You don't have ${mapStructureToPermission.get(structure)} permission for dataset source(s).`);
-
 
     // Create new Dataset Object
     if(!objectUuid){
@@ -564,19 +565,22 @@ export class APIv1 {
 
     this._create_subclass_relationship(structure, objectUuid, config);
 
-    this.log(`Created subclass relationship`);
+    this.log(`Created subclass relationship for ${objectUuid}`);
     return objectUuid;
   }
 
   async _create_subclass_relationship(structure, dataset_uuid, config) {
     if (structure === Constants.App.SessionLimits) {
+
       await rx.lastValueFrom(
         rx.defer(() =>
           this.cdb.class_add_subclass(config.source, dataset_uuid)
         ).pipe(retryBackoff(500, e => this.log(e)))
       );
+
     }
     else if (structure === Constants.App.UnionComponents) {
+
       for (let source of config) {
         await rx.lastValueFrom(
           rx.defer(() =>
@@ -584,28 +588,9 @@ export class APIv1 {
           ).pipe(retryBackoff(500, e => this.log(e)))
         );
       }
+
     }
   }
-
-  
-  /** POST. Creates a new dataset. 
-   * 
-   * @param {*} req.body must be object (structure, config) without uuid.
-   * @param {*} res 
-   * @returns new dataset's UUID - JSON string 
-   */
-  async structure_create(req, res){
-    const objectUuid = await this._update_dataset_config(
-      req.auth,
-      req.body.structure,
-      req.body.config,
-      null
-    );
-
-    if(!objectUuid) return fail(422, `Failed to create new Dataset.`);
-    return res.status(200).json(objectUuid);
-  }
-
 
   async _unlink_subclasses(structure, dataset_uuid, curr_config, new_config){
     
@@ -632,7 +617,27 @@ export class APIv1 {
       return fail(422, `Unknown structure type ${structure}`);
     }
   }
+
   
+  /** POST. Creates a new dataset. 
+   * 
+   * @param {*} req.body must be object (structure, config) without uuid.
+   * @param {*} res 
+   * @returns new dataset's UUID - JSON string 
+   */
+  async structure_create(req, res){
+    const objectUuid = await this._update_dataset_config(
+      req.auth,
+      req.body.structure,
+      req.body.config,
+      null
+    );
+
+    if(!objectUuid) return fail(422, `Failed to create new Dataset.`);
+    return res.status(200).json(objectUuid);
+  }
+
+
   /** PUT. Updates dataset definition. Principal should have CreateDataset permission
    * 
    * @param {*} req.body must be object (structure, config) and UUID (optional)
@@ -641,9 +646,11 @@ export class APIv1 {
 
   async structure_update(req, res){
     const dataset_uuid = req.params.uuid;
+
     if(!valid_uuid(dataset_uuid)) return fail(422, `Dataset uuid is invalid.`);
 
     const structure = req.body.structure;
+
     const new_config = req.body.config;
 
     // get current config
@@ -655,6 +662,7 @@ export class APIv1 {
     if(!curr_config_for_structure){
       this.log(`Current config for structure does not exist.`);
     }
+
     // update subclass links if config def for this structure already exists and being updated.
     if(curr_config_for_structure){
       await this._unlink_subclasses(structure, dataset_uuid,curr_config_for_structure, new_config);
@@ -669,13 +677,15 @@ export class APIv1 {
 
     if(!objectUuid) return fail(422, `Failed to update dataset ${dataset_uuid}`);
 
-    // remove definitions from other structure apps
+    // remove definitions from other structure apps if the dataset was invalid
     const invalid_defs = await rx.firstValueFrom(
+
       this.data.get_dataset_definitions(DatasetValidity.INVALID).pipe(
         rx.map(datasets => datasets.get(dataset_uuid) ?? []),
         rx.map(defs => defs.filter(d => d.structure !== req.body.structure)),
         rx.map(filtered => filtered.length ? filtered : undefined)
       )
+      
     );
 
     if (invalid_defs?.length) {

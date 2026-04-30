@@ -293,8 +293,6 @@ function createE2eApp() {
         valueCache: mocks.valueCache as any,
         history: mocks.history as any,
         subscriptions: mocks.subscriptions as any,
-        namespaceName: NS_NAME,
-        namespaceUri: NS_URI,
     });
 
     const app = express();

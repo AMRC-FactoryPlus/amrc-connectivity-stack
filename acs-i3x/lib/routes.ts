@@ -12,8 +12,6 @@ export function routes(opts: {
     valueCache: ValueCache;
     history: History;
     subscriptions: SubscriptionManager;
-    namespaceName: string;
-    namespaceUri: string;
     mcpServer?: McpServer;
     logger?: any;
 }) {

@@ -71,6 +71,18 @@ public final class RdfErr
             obj.add("config", config);
         }
     }
+    public static class UUIDNotFound extends SvcErr.NotFound
+    {
+        private UUID uuid;
+        public UUIDNotFound (UUID uuid) {
+            super("UUID not found");
+            this.uuid = uuid;
+        }
+        public UUID uuid () { return uuid; }
+        protected void extendJson (JsonObjectBuilder obj) {
+            obj.add("uuid", uuid.toString());
+        }
+    }
     public static class RankMismatch extends SvcErr.Client
     {
         public RankMismatch () { super("Rank mismatch"); }

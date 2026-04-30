@@ -84,6 +84,8 @@ public class Vocab
         public static final Resource Info           = res("app/Info");
         public static final Resource SparkplugAddr  = res("app/SparkplugAddress");
 
+        public static final UUID U_ConfigSchema     = U("dbd8a535-52ba-4f6e-b4f8-9b71aefe09d3");
+
         public static final Property forP           = prop("app/for");
         public static final Property value          = prop("app/value");
     }
@@ -126,7 +128,7 @@ public class Vocab
     public static final Resource G_added    = res("graph/added");
     public static final Resource G_removed  = res("graph/removed");
 
-    public static final UUID U_RDFStore     = U("8abf031c-193f-11f1-b047-d762a2934dfc");
+    public static final UUID U_MetaDB       = U("8abf031c-193f-11f1-b047-d762a2934dfc");
     public static final UUID U_Unowned      = U("091e796a-65c0-4080-adff-c3ce01a65b2e");
 
     public static Literal uuidLiteral (UUID uuid)

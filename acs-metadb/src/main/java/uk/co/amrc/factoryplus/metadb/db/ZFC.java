@@ -92,7 +92,9 @@ public record ZFC (RdfStore db)
     private static final Query V_indSubclass = Vocab.query("""
         select ?objU
         where {
-            ?objU a <core/Individual>; rdfs:subClassOf ?class.
+            ?obj <core/uuid> ?objU;
+                a <core/Individual>.
+            graph <graph/direct> { ?obj rdfs:subClassOf ?class. }
         }
     """);
 

@@ -7,12 +7,13 @@
 package uk.co.amrc.factoryplus.metadb.db;
 
 import java.time.Instant;
-import java.util.function.Consumer;
-import java.util.function.Function;
-import java.util.function.Supplier;
+import java.util.ConcurrentModificationException;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Supplier;
 
 import jakarta.json.*;
 import jakarta.ws.rs.core.SecurityContext;
@@ -59,6 +60,8 @@ public class RdfStore
      * - G_direct: this is G_direct from the TDB.
      * - G_derived: this is RDFS(G_direct).
      * - default: this is equal to G_derived.
+     * Potentially we could add a <graph/core> to hold the definitions
+     * from the core TTL, and make them read-only.
      */
     public RdfStore (FPServiceClient fplus, AuthProvider auth, String data)
     {
@@ -216,7 +219,9 @@ public class RdfStore
         requestWrite(ctx, req -> { cb.accept(req); return 1; });
     }
 
-    public ResultSet selectQuery (Query query, Object... substs)
+    /* This has been made private because of the exceptions detailed
+     * below. Use listQuery instead. */
+    private ResultSet selectQuery (Query query, Object... substs)
     {
         var exec = QueryExecution.dataset(dataset)
             .query(query);
@@ -224,8 +229,7 @@ public class RdfStore
             .grouped(2)
             .forEach(sq -> exec.substitution((String)sq.get(0), (RDFNode)sq.get(1)));
         return exec.build()
-            .execSelect()
-            .materialise();
+            .execSelect();
     }
 
     public Option<QuerySolution> optionalQuery (Query query, Object... substs)
@@ -240,8 +244,26 @@ public class RdfStore
 
     public List<QuerySolution> listQuery (Query query, Object... substs)
     {
-        return Iterator.ofAll(selectQuery(query, substs))
-            .toList();
+        /* I do not understand why, but under reasonably heavy
+         * contention (e.g. service-setup running) this fails
+         * sporadically with a ConcurrentModificationException. I do not
+         * think this can be a problem with the lifetime of the
+         * ResultSet as we are iterating and materialising it
+         * immediately. The exception usually comes from the call to
+         * Dataflow::_fetchRelation on the model updates dataset, so
+         * it's possible that my Dataset manipulation is not valid and
+         * the transactions are not being passed through to TDB2
+         * properly, or that transactions on the two Datasets don't
+         * properly lock each other out. */
+         while (true) {
+             try {
+                 return Iterator.ofAll(selectQuery(query, substs))
+                     .toList();
+            }
+            catch (ConcurrentModificationException e) {
+                log.info("Caught ConcurrentModificationException, retrying…");
+            }
+        }
     }
 
     public void runUpdate (UpdateRequest update, Object... substs)

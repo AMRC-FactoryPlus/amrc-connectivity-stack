@@ -223,7 +223,9 @@ public class RdfStore
         Iterator.of(substs)
             .grouped(2)
             .forEach(sq -> exec.substitution((String)sq.get(0), (RDFNode)sq.get(1)));
-        return exec.build().execSelect();
+        return exec.build()
+            .execSelect()
+            .materialise();
     }
 
     public Option<QuerySolution> optionalQuery (Query query, Object... substs)

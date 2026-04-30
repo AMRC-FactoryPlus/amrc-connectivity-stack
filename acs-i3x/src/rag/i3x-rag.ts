@@ -12,7 +12,7 @@
 import Graph from "graphology";
 import MiniSearch from "minisearch";
 import { bfsFromNode } from "graphology-traversal";
-import { bidirectional } from "graphology-shortest-path/unweighted";
+import { bidirectional } from "graphology-shortest-path";
 
 import type { I3xObject, I3xVqt } from "../types/i3x.js";
 

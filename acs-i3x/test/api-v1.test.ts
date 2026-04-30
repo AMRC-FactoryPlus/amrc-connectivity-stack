@@ -82,8 +82,6 @@ function createApp() {
         valueCache: valueCache as any,
         history: history as any,
         subscriptions: subscriptions as any,
-        namespaceName: NS_NAME,
-        namespaceUri: NS_URI,
     });
 
     const app = express();

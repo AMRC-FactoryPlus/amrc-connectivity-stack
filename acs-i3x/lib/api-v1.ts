@@ -20,8 +20,6 @@ interface APIv1Opts {
     valueCache: ValueCache;
     history: History;
     subscriptions: SubscriptionManager;
-    namespaceName: string;
-    namespaceUri: string;
 }
 
 /**
@@ -62,8 +60,6 @@ export class APIv1 {
     private valueCache: ValueCache;
     private history: History;
     private subscriptions: SubscriptionManager;
-    private namespaceName: string;
-    private namespaceUri: string;
 
     /**
      * Stores the collaborator services and builds both routers.
@@ -73,8 +69,6 @@ export class APIv1 {
         this.valueCache = opts.valueCache;
         this.history = opts.history;
         this.subscriptions = opts.subscriptions;
-        this.namespaceName = opts.namespaceName;
-        this.namespaceUri = opts.namespaceUri;
 
         this.routes = Router();
         this.infoRoute = Router();

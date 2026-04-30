@@ -273,7 +273,7 @@ public class RdfStore
             findVersion(direct)
                 .peek(ver -> {
                     log.info("Found core schema version {}", ver);
-                    if (ver != coreVer)
+                    if (!ver.equals(coreVer))
                         throw new RdfErr.CorruptRDF(
                             "Expected core schema version " + coreVer);
                 })

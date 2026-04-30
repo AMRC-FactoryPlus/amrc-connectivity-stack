@@ -1,6 +1,6 @@
 import { jest } from "@jest/globals";
-import { I3xRag, HistoryLike, SearchResult, SearchRelatedResult, TraversalNode, CompositionTreeNode, RelationshipMapEntry, TypeSchemaResult, ValueFilterResult } from "../../src/rag/i3x-rag.js";
-import type { I3xVqt } from "../../src/types/i3x.js";
+import { I3xRag, HistoryLike, SearchResult, SearchRelatedResult, TraversalNode, CompositionTreeNode, RelationshipMapEntry, TypeSchemaResult, ValueFilterResult } from "../../lib/rag/i3x-rag.js";
+import type { I3xVqt } from "../../lib/types/i3x.js";
 import { createMockObjectTree, createMockValueCache, createMockValueCacheWithValues, createMockHistory, createPrePopulatedValues } from "../helpers/mock-rag.js";
 
 describe("I3xRag", () => {

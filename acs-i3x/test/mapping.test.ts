@@ -7,11 +7,11 @@ import {
     wrapResponse,
     wrapError,
     wrapBulkResponse,
-} from "../src/mapping.js";
+} from "../lib/mapping.js";
 import type {
     I3xBulkItem,
     I3xQuality,
-} from "../src/types/i3x.js";
+} from "../lib/types/i3x.js";
 
 describe("toI3xNamespace", () => {
     it("returns a namespace with uri and displayName", () => {

@@ -6,8 +6,8 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 
-import { I3xRag } from "../../src/rag/i3x-rag.js";
-import { registerRagTools } from "../../src/mcp/tools.js";
+import { I3xRag } from "../../lib/rag/i3x-rag.js";
+import { registerRagTools } from "../../lib/mcp/tools.js";
 import { createMockObjectTree, createMockValueCacheWithValues, createMockHistory, createPrePopulatedValues } from "../helpers/mock-rag.js";
 
 /* ------------------------------------------------------------------ */

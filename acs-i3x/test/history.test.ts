@@ -3,9 +3,9 @@
  */
 
 import { jest } from "@jest/globals";
-import { History } from "../src/history.js";
-import type { ObjectTree } from "../src/object-tree.js";
-import type { I3xVqt } from "../src/types/i3x.js";
+import { History } from "../lib/history.js";
+import type { ObjectTree } from "../lib/object-tree.js";
+import type { I3xVqt } from "../lib/types/i3x.js";
 
 /*
  * Mock QueryApi: collectRows returns whatever we configure.

@@ -21,7 +21,7 @@
     "start:shell": "k5start -Uf $CLIENT_KEYTAB npm run start",
     "dev": "npm run build && npm run start",
     "test": "NODE_OPTIONS=--experimental-vm-modules npx jest",
-    "lint": "eslint --ignore-path .gitignore --ext .ts src/",
+    "lint": "eslint --ignore-path .gitignore --ext .ts lib/",
     "lint:fix": "npm run lint -- --fix"
   },
   "dependencies": {

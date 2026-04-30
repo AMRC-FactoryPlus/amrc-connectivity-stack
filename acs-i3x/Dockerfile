@@ -32,7 +32,7 @@ SHELL
 
 COPY --chown=node . ./
 RUN <<'SHELL'
-    echo "export const GIT_VERSION=\"$revision\";" > ./src/git-version.ts
+    echo "export const GIT_VERSION=\"$revision\";" > ./lib/git-version.ts
 
     npm run clean
     npm run build

@@ -3,8 +3,8 @@
  */
 
 import { jest } from "@jest/globals";
-import { ObjectTree } from "../src/object-tree.js";
-import { RelType } from "../src/constants.js";
+import { ObjectTree } from "../lib/object-tree.js";
+import { RelType } from "../lib/constants.js";
 import { createMockFplus } from "./helpers/mock-services.js";
 
 const DEVICE_CLASS_UUID = "18773d6d-a70d-443a-b29a-3f1583195290";

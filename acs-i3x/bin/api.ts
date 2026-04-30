@@ -5,15 +5,15 @@
 import { ServiceClient, UUIDs } from "@amrc-factoryplus/service-client";
 import { WebAPI } from "@amrc-factoryplus/service-api";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { routes } from "../src/routes.js";
-import { ObjectTree } from "../src/object-tree.js";
-import { ValueCache } from "../src/value-cache.js";
-import { History } from "../src/history.js";
-import { SubscriptionManager } from "../src/subscriptions.js";
-import { I3xRag } from "../src/rag/i3x-rag.js";
-import { registerRagTools } from "../src/mcp/tools.js";
-import { Version } from "../src/constants.js";
-import { GIT_VERSION } from "../src/git-version.js";
+import { routes } from "../lib/routes.js";
+import { ObjectTree } from "../lib/object-tree.js";
+import { ValueCache } from "../lib/value-cache.js";
+import { History } from "../lib/history.js";
+import { SubscriptionManager } from "../lib/subscriptions.js";
+import { I3xRag } from "../lib/rag/i3x-rag.js";
+import { registerRagTools } from "../lib/mcp/tools.js";
+import { Version } from "../lib/constants.js";
+import { GIT_VERSION } from "../lib/git-version.js";
 import pino from "pino";
 
 let dotenv: any = null;

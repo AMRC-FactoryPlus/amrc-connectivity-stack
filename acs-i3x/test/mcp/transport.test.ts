@@ -1,7 +1,7 @@
 import express from "express";
 import request from "supertest";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { mountMcpTransport } from "../../src/mcp/transport.js";
+import { mountMcpTransport } from "../../lib/mcp/transport.js";
 
 /* ------------------------------------------------------------------ */
 /*  Helper: build Express app with a minimal MCP server               */

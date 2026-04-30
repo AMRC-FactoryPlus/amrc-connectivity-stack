@@ -1,6 +1,6 @@
 import { jest, describe, it, expect, beforeEach, afterEach } from "@jest/globals";
-import { SubscriptionManager } from "../src/subscriptions.js";
-import type { I3xVqt, I3xSyncItem } from "../src/types/i3x.js";
+import { SubscriptionManager } from "../lib/subscriptions.js";
+import type { I3xVqt, I3xSyncItem } from "../lib/types/i3x.js";
 
 /* ---- Mock helpers ---- */
 

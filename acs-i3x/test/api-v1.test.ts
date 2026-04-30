@@ -1,8 +1,8 @@
 import { jest, describe, it, expect, beforeEach } from "@jest/globals";
 import express from "express";
 import request from "supertest";
-import { APIv1 } from "../src/api-v1.js";
-import { I3X_SPEC_VERSION, Version } from "../src/constants.js";
+import { APIv1 } from "../lib/api-v1.js";
+import { I3X_SPEC_VERSION, Version } from "../lib/constants.js";
 import type {
     I3xNamespace,
     I3xObjectType,
@@ -12,7 +12,7 @@ import type {
     I3xVqt,
     I3xSubscription,
     I3xSyncItem,
-} from "../src/types/i3x.js";
+} from "../lib/types/i3x.js";
 
 /* ---- Mock factories ---- */
 

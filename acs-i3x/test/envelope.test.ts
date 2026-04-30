@@ -1,5 +1,5 @@
 import { jest, describe, it, expect } from "@jest/globals";
-import { i3xEnvelope, i3xErrorHandler } from "../src/middleware/envelope.js";
+import { i3xEnvelope, i3xErrorHandler } from "../lib/middleware/envelope.js";
 import type { Request, Response, NextFunction } from "express";
 
 function mockRes() {

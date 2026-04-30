@@ -1,4 +1,4 @@
-import { deriveQuality, isStale } from "../src/quality.js";
+import { deriveQuality, isStale } from "../lib/quality.js";
 
 describe("deriveQuality", () => {
     it("returns Good when online, has value, and not stale", () => {

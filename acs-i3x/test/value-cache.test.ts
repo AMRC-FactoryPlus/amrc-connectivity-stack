@@ -3,8 +3,8 @@
  */
 
 import { jest, describe, it, expect, beforeEach } from "@jest/globals";
-import { ValueCache } from "../src/value-cache.js";
-import type { I3xVqt, I3xValueResponse } from "../src/types/i3x.js";
+import { ValueCache } from "../lib/value-cache.js";
+import type { I3xVqt, I3xValueResponse } from "../lib/types/i3x.js";
 
 /* ---- Mock helpers ---- */
 

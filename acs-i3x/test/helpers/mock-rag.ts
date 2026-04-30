@@ -20,8 +20,8 @@
  * 13 objects, 12 parent-child edges.
  */
 
-import type { ObjectTreeLike, ValueCacheLike, HistoryLike } from "../../src/rag/i3x-rag.js";
-import type { I3xObject, I3xVqt } from "../../src/types/i3x.js";
+import type { ObjectTreeLike, ValueCacheLike, HistoryLike } from "../../lib/rag/i3x-rag.js";
+import type { I3xObject, I3xVqt } from "../../lib/types/i3x.js";
 
 export const objects: I3xObject[] = [
     { elementId: "enterprise",  displayName: "Enterprise",  typeElementId: "isa95-level",    parentId: null,         isComposition: true,  isExtended: false },

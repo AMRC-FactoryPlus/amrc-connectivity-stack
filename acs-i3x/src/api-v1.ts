@@ -58,270 +58,419 @@ export class APIv1 {
     public routes: Router;
     public infoRoute: Router;
 
+    private objectTree: ObjectTree;
+    private valueCache: ValueCache;
+    private history: History;
+    private subscriptions: SubscriptionManager;
+    private namespaceName: string;
+    private namespaceUri: string;
+
+    /**
+     * Stores the collaborator services and builds both routers.
+     **/
     constructor(opts: APIv1Opts) {
-        const { objectTree, valueCache, history, subscriptions } = opts;
-
-        /* ---- /info router (unauthenticated) ---- */
-
-        this.infoRoute = Router();
-        this.infoRoute.get("/info", (_req: Request, res: Response) => {
-            res.json({
-                specVersion: I3X_SPEC_VERSION,
-                serverName: "AMRC Connectivity Stack",
-                serverVersion: Version,
-                capabilities: {
-                    query: { history: true },
-                    update: { current: false, history: false },
-                    subscribe: { stream: true },
-                },
-            });
-        });
-        /* ---- Main router (authenticated) ---- */
+        this.objectTree = opts.objectTree;
+        this.valueCache = opts.valueCache;
+        this.history = opts.history;
+        this.subscriptions = opts.subscriptions;
+        this.namespaceName = opts.namespaceName;
+        this.namespaceUri = opts.namespaceUri;
 
         this.routes = Router();
-        this.routes.use(i3xEnvelope);
+        this.infoRoute = Router();
 
-        /* Readiness check middleware */
-        this.routes.use((req: Request, res: Response, next: NextFunction) => {
-            if (!objectTree.isReady()) {
-                const err = new Error("Service not ready") as any;
-                err.status = 503;
-                return next(err);
-            }
-            next();
-        });
+        this.setup_routes();
+    }
+
+    /**
+     * Builds the unauthenticated /info router and the authenticated
+     * main router. The main router applies the i3X envelope, gates
+     * requests on object-tree readiness, mounts every endpoint, and
+     * terminates with the i3X error handler.
+     */
+    setup_routes() {
+        /* ---- /info router (unauthenticated) ---- */
+
+        this.infoRoute.get("/info", this.get_info.bind(this));
+
+        /* ---- Main router (authenticated) ---- */
+
+        const api = this.routes;
+        api.use(i3xEnvelope);
+        api.use(this.check_ready.bind(this));
 
         /* ---- Explore: Namespaces ---- */
-
-        this.routes.get("/namespaces", (_req: Request, res: Response) => {
-            res.json(objectTree.getNamespaces());
-        });
+        api.get("/namespaces", this.get_namespaces.bind(this));
 
         /* ---- Explore: Object Types ---- */
-
-        this.routes.get("/objecttypes", (req: Request, res: Response) => {
-            const ns = req.query.namespaceUri as string | undefined;
-            res.json(objectTree.getObjectTypes(ns));
-        });
-
-        this.routes.get("/objecttypes/:elementId", (req: Request, res: Response, next: NextFunction) => {
-            const result = objectTree.getObjectType(req.params.elementId);
-            if (!result) return next(notFound(`Object type ${req.params.elementId} not found`));
-            res.json(result);
-        });
-
-        this.routes.post("/objecttypes/query", (req: Request, res: Response) => {
-            const { elementIds } = req.body;
-            const results = (elementIds as string[]).map(id => {
-                const item = objectTree.getObjectType(id);
-                if (item) {
-                    return { success: true, elementId: id, result: item };
-                }
-                return { success: false, elementId: id, error: { message: `Object type ${id} not found` } };
-            });
-            const allSuccess = results.every(r => r.success);
-            ((res as any)._originalJson || res.json.bind(res))({ success: allSuccess, results });
-        });
+        api.get("/objecttypes", this.get_object_types.bind(this));
+        api.get("/objecttypes/:elementId", this.get_object_type.bind(this));
+        api.post("/objecttypes/query", this.query_object_types.bind(this));
 
         /* ---- Explore: Relationship Types ---- */
-
-        this.routes.get("/relationshiptypes", (req: Request, res: Response) => {
-            const ns = req.query.namespaceUri as string | undefined;
-            res.json(objectTree.getRelationshipTypes(ns));
-        });
-
-        this.routes.get("/relationshiptypes/:elementId", (req: Request, res: Response, next: NextFunction) => {
-            const result = objectTree.getRelationshipType(req.params.elementId);
-            if (!result) return next(notFound(`Relationship type ${req.params.elementId} not found`));
-            res.json(result);
-        });
-
-        this.routes.post("/relationshiptypes/query", (req: Request, res: Response) => {
-            const { elementIds } = req.body;
-            const results = (elementIds as string[]).map(id => {
-                const item = objectTree.getRelationshipType(id);
-                if (item) {
-                    return { success: true, elementId: id, result: item };
-                }
-                return { success: false, elementId: id, error: { message: `Relationship type ${id} not found` } };
-            });
-            const allSuccess = results.every(r => r.success);
-            ((res as any)._originalJson || res.json.bind(res))({ success: allSuccess, results });
-        });
+        api.get("/relationshiptypes", this.get_relationship_types.bind(this));
+        api.get("/relationshiptypes/:elementId", this.get_relationship_type.bind(this));
+        api.post("/relationshiptypes/query", this.query_relationship_types.bind(this));
 
         /* ---- Explore: Objects ---- */
-
-        this.routes.get("/objects", (req: Request, res: Response) => {
-            res.json(objectTree.getObjects({
-                typeElementId: req.query.typeElementId as string | undefined,
-                root: req.query.root === "true",
-                includeMetadata: req.query.includeMetadata === "true",
-            }));
-        });
+        api.get("/objects", this.get_objects.bind(this));
 
         /* Value and history sub-routes must be declared before the
          * /:elementId catch-all to avoid path conflicts. */
+        api.post("/objects/list", this.list_objects.bind(this));
+        api.post("/objects/value", asyncHandler(this.value_objects.bind(this)));
+        api.post("/objects/history", asyncHandler(this.history_objects.bind(this)));
+        api.post("/objects/related", this.related_objects.bind(this));
 
-        this.routes.post("/objects/list", (req: Request, res: Response) => {
-            const { elementIds, includeMetadata } = req.body;
-            const results = (elementIds as string[]).map(id => {
-                const item = objectTree.getObject(id);
-                if (item) {
-                    return { success: true, elementId: id, result: item };
-                }
-                return { success: false, elementId: id, error: { message: `Object ${id} not found` } };
-            });
-            const allSuccess = results.every(r => r.success);
-            ((res as any)._originalJson || res.json.bind(res))({ success: allSuccess, results });
-        });
-
-        this.routes.post("/objects/value", asyncHandler(async (req: Request, res: Response) => {
-            const { elementIds, maxDepth } = req.body;
-            const results = await Promise.all((elementIds as string[]).map(async (id) => {
-                // Try UNS cache first (real-time), fall back to InfluxDB last()
-                const cached = valueCache.getValue(id);
-                if (cached) {
-                    console.log(`[VALUE] ${id.slice(0,16)} → UNS cache hit: value=${JSON.stringify(cached.value)} age=${Date.now() - new Date(cached.timestamp).getTime()}ms`);
-                    return { success: true, elementId: id, result: cached };
-                }
-                console.log(`[VALUE] ${id.slice(0,16)} → UNS cache miss, querying InfluxDB...`);
-                const obj = objectTree.getObject(id);
-                const item = obj?.isComposition
-                    ? await history.getCompositionValue(id, maxDepth ?? 1)
-                    : await history.getCurrentValue(id);
-                if (item) {
-                    console.log(`[VALUE] ${id.slice(0,16)} → InfluxDB hit: value=${JSON.stringify(item.value)} ts=${item.timestamp}`);
-                    return { success: true, elementId: id, result: item };
-                }
-                console.log(`[VALUE] ${id.slice(0,16)} → no data`);
-                return { success: false, elementId: id, error: { message: `No value for ${id}` } };
-            }));
-            const allSuccess = results.every(r => r.success);
-            ((res as any)._originalJson || res.json.bind(res))({ success: allSuccess, results });
-        }));
-
-        this.routes.post("/objects/history", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
-            const { elementIds, startTime, endTime, maxDepth } = req.body;
-            if (!startTime || !endTime) {
-                return next(badRequest("startTime and endTime are required"));
-            }
-            const results = await Promise.all(
-                (elementIds as string[]).map(async id => {
-                    try {
-                        const values = await history.queryHistory(id, startTime, endTime, maxDepth);
-                        return { success: true, elementId: id, result: { elementId: id, values } };
-                    } catch (err: any) {
-                        return { success: false, elementId: id, error: { message: err.message } };
-                    }
-                }),
-            );
-            const allSuccess = results.every(r => r.success);
-            ((res as any)._originalJson || res.json.bind(res))({ success: allSuccess, results });
-        }));
-
-        this.routes.post("/objects/related", (req: Request, res: Response) => {
-            const { elementIds, relationshiptype } = req.body;
-            const results = (elementIds as string[]).map(id => {
-                const obj = objectTree.getObject(id);
-                if (!obj) {
-                    return { success: false, elementId: id, error: { message: `Object ${id} not found` } };
-                }
-                const related = objectTree.getRelated(id, relationshiptype);
-                return { success: true, elementId: id, result: related };
-            });
-            const allSuccess = results.every(r => r.success);
-            ((res as any)._originalJson || res.json.bind(res))({ success: allSuccess, results });
-        });
-
-        this.routes.get("/objects/:elementId/value", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
-            const id = req.params.elementId;
-            const obj = objectTree.getObject(id);
-            // Try UNS cache first (real-time), fall back to InfluxDB last()
-            const cached = valueCache.getValue(id);
-            if (cached) {
-                console.log(`[VALUE] ${id} → UNS cache hit: value=${JSON.stringify(cached.value)} ts=${cached.timestamp} age=${Date.now() - new Date(cached.timestamp).getTime()}ms`);
-                res.json(cached);
-                return;
-            }
-            console.log(`[VALUE] ${id} → UNS cache miss, querying InfluxDB...`);
-            const result = obj?.isComposition
-                ? await history.getCompositionValue(id)
-                : await history.getCurrentValue(id);
-            if (result) {
-                console.log(`[VALUE] ${id} → InfluxDB hit: value=${JSON.stringify(result.value)} ts=${result.timestamp}`);
-            } else {
-                console.log(`[VALUE] ${id} → InfluxDB miss: no data`);
-            }
-            if (!result) return next(notFound(`No value for ${id}`));
-            res.json(result);
-        }));
-
-        this.routes.get("/objects/:elementId/history", asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
-            const { startTime, endTime } = req.query as { startTime?: string; endTime?: string };
-            if (!startTime || !endTime) {
-                return next(badRequest("startTime and endTime query parameters are required"));
-            }
-            const values = await history.queryHistory(req.params.elementId, startTime, endTime);
-            res.json({ elementId: req.params.elementId, values });
-        }));
-
-        this.routes.get("/objects/:elementId/related", (req: Request, res: Response, next: NextFunction) => {
-            const obj = objectTree.getObject(req.params.elementId);
-            if (!obj) return next(notFound(`Object ${req.params.elementId} not found`));
-            const rt = req.query.relationshiptype as string | undefined;
-            res.json(objectTree.getRelated(req.params.elementId, rt));
-        });
-
-        this.routes.get("/objects/:elementId", (req: Request, res: Response, next: NextFunction) => {
-            const result = objectTree.getObject(req.params.elementId);
-            if (!result) return next(notFound(`Object ${req.params.elementId} not found`));
-            res.json(result);
-        });
+        api.get("/objects/:elementId/value", asyncHandler(this.get_object_value.bind(this)));
+        api.get("/objects/:elementId/history", asyncHandler(this.get_object_history.bind(this)));
+        api.get("/objects/:elementId/related", this.get_object_related.bind(this));
+        api.get("/objects/:elementId", this.get_object.bind(this));
 
         /* ---- Subscriptions ---- */
-
-        this.routes.post("/subscriptions/list", (req: Request, res: Response) => {
-            const { clientId, subscriptionIds } = req.body;
-            res.json(subscriptions.list(clientId, subscriptionIds));
-        });
-
-        this.routes.post("/subscriptions/delete", (req: Request, res: Response) => {
-            const { clientId, subscriptionIds } = req.body;
-            subscriptions.delete(clientId, subscriptionIds);
-            res.json({ deleted: subscriptionIds });
-        });
-
-        this.routes.post("/subscriptions/register", (req: Request, res: Response) => {
-            const { clientId, subscriptionId, elementIds, maxDepth } = req.body;
-            subscriptions.register(clientId, subscriptionId, elementIds, maxDepth);
-            res.json({ registered: elementIds });
-        });
-
-        this.routes.post("/subscriptions/unregister", (req: Request, res: Response) => {
-            const { clientId, subscriptionId, elementIds } = req.body;
-            subscriptions.unregister(clientId, subscriptionId, elementIds);
-            res.json({ unregistered: elementIds });
-        });
-
-        this.routes.post("/subscriptions/stream", asyncHandler(async (req: Request, res: Response, _next: NextFunction) => {
-            const { clientId, subscriptionId } = req.body;
-            /* The subscription manager takes over the response for SSE.
-             * Do NOT call res.json — the manager handles the response directly. */
-            subscriptions.stream(clientId, subscriptionId, res);
-        }));
-
-        this.routes.post("/subscriptions/sync", (req: Request, res: Response) => {
-            const { clientId, subscriptionId, lastSequenceNumber } = req.body;
-            res.json(subscriptions.sync(clientId, subscriptionId, lastSequenceNumber));
-        });
-
-        this.routes.post("/subscriptions", (req: Request, res: Response) => {
-            const { clientId, displayName } = req.body;
-            res.json(subscriptions.create(clientId, displayName));
-        });
+        api.post("/subscriptions/list", this.list_subscriptions.bind(this));
+        api.post("/subscriptions/delete", this.delete_subscriptions.bind(this));
+        api.post("/subscriptions/register", this.register_subscriptions.bind(this));
+        api.post("/subscriptions/unregister", this.unregister_subscriptions.bind(this));
+        api.post("/subscriptions/stream", asyncHandler(this.stream_subscription.bind(this)));
+        api.post("/subscriptions/sync", this.sync_subscription.bind(this));
+        api.post("/subscriptions", this.create_subscription.bind(this));
 
         /* ---- Error handler (must be last) ---- */
+        api.use(i3xErrorHandler);
+    }
 
-        this.routes.use(i3xErrorHandler);
+    /**
+     * Middleware that returns 503 until the object tree finishes its initial sync.
+     **/
+    check_ready(req: Request, res: Response, next: NextFunction): void {
+        if (!this.objectTree.isReady()) {
+            const err = new Error("Service not ready") as any;
+            err.status = 503;
+            return next(err);
+        }
+        next();
+    }
+
+    /**
+     * GET /info — returns spec version, server name/version, and capability flags.
+     **/
+    get_info(_req: Request, res: Response): void {
+        res.json({
+            specVersion: I3X_SPEC_VERSION,
+            serverName: "AMRC Connectivity Stack",
+            serverVersion: Version,
+            capabilities: {
+                query: { history: true },
+                update: { current: false, history: false },
+                subscribe: { stream: true },
+            },
+        });
+    }
+
+    /**
+     * GET /namespaces — returns every namespace known to the object tree.
+     **/
+    get_namespaces(_req: Request, res: Response): void {
+        res.json(this.objectTree.getNamespaces());
+    }
+
+    /**
+     * GET /objecttypes — returns object types, optionally filtered by `namespaceUri`.
+     **/
+    get_object_types(req: Request, res: Response): void {
+        const ns = req.query.namespaceUri as string | undefined;
+        res.json(this.objectTree.getObjectTypes(ns));
+    }
+
+    /**
+     * GET /objecttypes/:elementId — returns one object type, or 404 if unknown.
+     **/
+    get_object_type(req: Request, res: Response, next: NextFunction): void {
+        const result = this.objectTree.getObjectType(req.params.elementId);
+        if (!result) return next(notFound(`Object type ${req.params.elementId} not found`));
+        res.json(result);
+    }
+
+    /**
+     * POST /objecttypes/query — bulk lookup of object types by id list.
+     * Returns a per-id success/error envelope; missing ids are reported
+     * as failures rather than aborting the batch. Uses the
+     * `_originalJson` escape hatch to avoid double-wrapping by the
+     * envelope middleware (the response is already a complete envelope).
+     */
+    query_object_types(req: Request, res: Response): void {
+        const { elementIds } = req.body;
+        const results = (elementIds as string[]).map(id => {
+            const item = this.objectTree.getObjectType(id);
+            if (item) {
+                return { success: true, elementId: id, result: item };
+            }
+            return { success: false, elementId: id, error: { message: `Object type ${id} not found` } };
+        });
+        const allSuccess = results.every(r => r.success);
+        ((res as any)._originalJson || res.json.bind(res))({ success: allSuccess, results });
+    }
+
+    /**
+     * GET /relationshiptypes — returns relationship types, optionally filtered by `namespaceUri`.
+     **/
+    get_relationship_types(req: Request, res: Response): void {
+        const ns = req.query.namespaceUri as string | undefined;
+        res.json(this.objectTree.getRelationshipTypes(ns));
+    }
+
+    /**
+     * GET /relationshiptypes/:elementId — returns one relationship type, or 404 if unknown.
+     **/
+    get_relationship_type(req: Request, res: Response, next: NextFunction): void {
+        const result = this.objectTree.getRelationshipType(req.params.elementId);
+        if (!result) return next(notFound(`Relationship type ${req.params.elementId} not found`));
+        res.json(result);
+    }
+
+    /**
+     * POST /relationshiptypes/query — bulk lookup of relationship types
+     * by id list, mirroring `query_object_types`: per-id success/error
+     * envelope with the same `_originalJson` escape hatch.
+     */
+    query_relationship_types(req: Request, res: Response): void {
+        const { elementIds } = req.body;
+        const results = (elementIds as string[]).map(id => {
+            const item = this.objectTree.getRelationshipType(id);
+            if (item) {
+                return { success: true, elementId: id, result: item };
+            }
+            return { success: false, elementId: id, error: { message: `Relationship type ${id} not found` } };
+        });
+        const allSuccess = results.every(r => r.success);
+        ((res as any)._originalJson || res.json.bind(res))({ success: allSuccess, results });
+    }
+
+    /**
+     * GET /objects — lists objects with optional `typeElementId`, `root`, and `includeMetadata` filters.
+     **/
+    get_objects(req: Request, res: Response): void {
+        res.json(this.objectTree.getObjects({
+            typeElementId: req.query.typeElementId as string | undefined,
+            root: req.query.root === "true",
+            includeMetadata: req.query.includeMetadata === "true",
+        }));
+    }
+
+    /**
+     * POST /objects/list — bulk lookup of objects by id list. Returns
+     * a per-id success/error envelope; missing ids are reported as
+     * failures rather than aborting the batch.
+     */
+    list_objects(req: Request, res: Response): void {
+        const { elementIds, includeMetadata } = req.body;
+        const results = (elementIds as string[]).map(id => {
+            const item = this.objectTree.getObject(id);
+            if (item) {
+                return { success: true, elementId: id, result: item };
+            }
+            return { success: false, elementId: id, error: { message: `Object ${id} not found` } };
+        });
+        const allSuccess = results.every(r => r.success);
+        ((res as any)._originalJson || res.json.bind(res))({ success: allSuccess, results });
+    }
+
+    /**
+     * POST /objects/value — bulk current-value lookup. For each id,
+     * tries the real-time UNS `valueCache` first, then falls back to
+     * InfluxDB via `history.getCurrentValue` (or `getCompositionValue`
+     * for composition objects). `maxDepth` controls composition
+     * recursion; defaults to 1 for compositions.
+     */
+    async value_objects(req: Request, res: Response): Promise<void> {
+        const { elementIds, maxDepth } = req.body;
+        const results = await Promise.all((elementIds as string[]).map(async (id) => {
+            // Try UNS cache first (real-time), fall back to InfluxDB last()
+            const cached = this.valueCache.getValue(id);
+            if (cached) {
+                console.log(`[VALUE] ${id.slice(0,16)} → UNS cache hit: value=${JSON.stringify(cached.value)} age=${Date.now() - new Date(cached.timestamp).getTime()}ms`);
+                return { success: true, elementId: id, result: cached };
+            }
+            console.log(`[VALUE] ${id.slice(0,16)} → UNS cache miss, querying InfluxDB...`);
+            const obj = this.objectTree.getObject(id);
+            const item = obj?.isComposition
+                ? await this.history.getCompositionValue(id, maxDepth ?? 1)
+                : await this.history.getCurrentValue(id);
+            if (item) {
+                console.log(`[VALUE] ${id.slice(0,16)} → InfluxDB hit: value=${JSON.stringify(item.value)} ts=${item.timestamp}`);
+                return { success: true, elementId: id, result: item };
+            }
+            console.log(`[VALUE] ${id.slice(0,16)} → no data`);
+            return { success: false, elementId: id, error: { message: `No value for ${id}` } };
+        }));
+        const allSuccess = results.every(r => r.success);
+        ((res as any)._originalJson || res.json.bind(res))({ success: allSuccess, results });
+    }
+
+    /**
+     * POST /objects/history — bulk history lookup over `[startTime,
+     * endTime]`. Both bounds are required (400 otherwise). Per-id
+     * errors are caught and reported in the envelope rather than
+     * failing the whole batch.
+     */
+    async history_objects(req: Request, res: Response, next: NextFunction): Promise<void> {
+        const { elementIds, startTime, endTime, maxDepth } = req.body;
+        if (!startTime || !endTime) {
+            return next(badRequest("startTime and endTime are required"));
+        }
+        const results = await Promise.all(
+            (elementIds as string[]).map(async id => {
+                try {
+                    const values = await this.history.queryHistory(id, startTime, endTime, maxDepth);
+                    return { success: true, elementId: id, result: { elementId: id, values } };
+                } catch (err: any) {
+                    return { success: false, elementId: id, error: { message: err.message } };
+                }
+            }),
+        );
+        const allSuccess = results.every(r => r.success);
+        ((res as any)._originalJson || res.json.bind(res))({ success: allSuccess, results });
+    }
+
+    /**
+     * POST /objects/related — bulk related-object lookup, optionally
+     * filtered by `relationshiptype`. Per-id success/error envelope:
+     * missing ids are reported as failures.
+     */
+    related_objects(req: Request, res: Response): void {
+        const { elementIds, relationshiptype } = req.body;
+        const results = (elementIds as string[]).map(id => {
+            const obj = this.objectTree.getObject(id);
+            if (!obj) {
+                return { success: false, elementId: id, error: { message: `Object ${id} not found` } };
+            }
+            const related = this.objectTree.getRelated(id, relationshiptype);
+            return { success: true, elementId: id, result: related };
+        });
+        const allSuccess = results.every(r => r.success);
+        ((res as any)._originalJson || res.json.bind(res))({ success: allSuccess, results });
+    }
+
+    /**
+     * GET /objects/:elementId/value — single-id current value. Same
+     * cache-then-InfluxDB strategy as `value_objects` (UNS cache,
+     * then `history.getCompositionValue`/`getCurrentValue`); 404 if
+     * neither source has a value.
+     */
+    async get_object_value(req: Request, res: Response, next: NextFunction): Promise<void> {
+        const id = req.params.elementId;
+        const obj = this.objectTree.getObject(id);
+        // Try UNS cache first (real-time), fall back to InfluxDB last()
+        const cached = this.valueCache.getValue(id);
+        if (cached) {
+            console.log(`[VALUE] ${id} → UNS cache hit: value=${JSON.stringify(cached.value)} ts=${cached.timestamp} age=${Date.now() - new Date(cached.timestamp).getTime()}ms`);
+            res.json(cached);
+            return;
+        }
+        console.log(`[VALUE] ${id} → UNS cache miss, querying InfluxDB...`);
+        const result = obj?.isComposition
+            ? await this.history.getCompositionValue(id)
+            : await this.history.getCurrentValue(id);
+        if (result) {
+            console.log(`[VALUE] ${id} → InfluxDB hit: value=${JSON.stringify(result.value)} ts=${result.timestamp}`);
+        } else {
+            console.log(`[VALUE] ${id} → InfluxDB miss: no data`);
+        }
+        if (!result) return next(notFound(`No value for ${id}`));
+        res.json(result);
+    }
+
+    /**
+     * GET /objects/:elementId/history — requires `startTime`/`endTime` query params (400 otherwise).
+     **/
+    async get_object_history(req: Request, res: Response, next: NextFunction): Promise<void> {
+        const { startTime, endTime } = req.query as { startTime?: string; endTime?: string };
+        if (!startTime || !endTime) {
+            return next(badRequest("startTime and endTime query parameters are required"));
+        }
+        const values = await this.history.queryHistory(req.params.elementId, startTime, endTime);
+        res.json({ elementId: req.params.elementId, values });
+    }
+
+    /**
+     * GET /objects/:elementId/related — related objects, optionally filtered by `relationshiptype`. 404 if the source object is unknown.
+     **/
+    get_object_related(req: Request, res: Response, next: NextFunction): void {
+        const obj = this.objectTree.getObject(req.params.elementId);
+        if (!obj) return next(notFound(`Object ${req.params.elementId} not found`));
+        const rt = req.query.relationshiptype as string | undefined;
+        res.json(this.objectTree.getRelated(req.params.elementId, rt));
+    }
+
+    /**
+     * GET /objects/:elementId — returns one object, or 404 if unknown.
+     **/
+    get_object(req: Request, res: Response, next: NextFunction): void {
+        const result = this.objectTree.getObject(req.params.elementId);
+        if (!result) return next(notFound(`Object ${req.params.elementId} not found`));
+        res.json(result);
+    }
+
+    /**
+     * POST /subscriptions/list — lists subscriptions for a client, optionally filtered by ids.
+     **/
+    list_subscriptions(req: Request, res: Response): void {
+        const { clientId, subscriptionIds } = req.body;
+        res.json(this.subscriptions.list(clientId, subscriptionIds));
+    }
+
+    /**
+     * POST /subscriptions/delete — deletes the listed subscriptions for a client.
+     **/
+    delete_subscriptions(req: Request, res: Response): void {
+        const { clientId, subscriptionIds } = req.body;
+        this.subscriptions.delete(clientId, subscriptionIds);
+        res.json({ deleted: subscriptionIds });
+    }
+
+    /**
+     * POST /subscriptions/register — adds element ids to an existing subscription, with optional composition `maxDepth`.
+     **/
+    register_subscriptions(req: Request, res: Response): void {
+        const { clientId, subscriptionId, elementIds, maxDepth } = req.body;
+        this.subscriptions.register(clientId, subscriptionId, elementIds, maxDepth);
+        res.json({ registered: elementIds });
+    }
+
+    /**
+     * POST /subscriptions/unregister — removes element ids from an existing subscription.
+     **/
+    unregister_subscriptions(req: Request, res: Response): void {
+        const { clientId, subscriptionId, elementIds } = req.body;
+        this.subscriptions.unregister(clientId, subscriptionId, elementIds);
+        res.json({ unregistered: elementIds });
+    }
+
+    /**
+     * POST /subscriptions/stream — opens a Server-Sent Events stream
+     * for the subscription. Hands the response off to
+     * `SubscriptionManager.stream`, which owns the response lifecycle;
+     * do NOT call `res.json` here.
+     */
+    async stream_subscription(req: Request, res: Response, _next: NextFunction): Promise<void> {
+        const { clientId, subscriptionId } = req.body;
+        this.subscriptions.stream(clientId, subscriptionId, res);
+    }
+
+    /**
+     * POST /subscriptions/sync — replays missed updates after `lastSequenceNumber`.
+     **/
+    sync_subscription(req: Request, res: Response): void {
+        const { clientId, subscriptionId, lastSequenceNumber } = req.body;
+        res.json(this.subscriptions.sync(clientId, subscriptionId, lastSequenceNumber));
+    }
+
+    /**
+     * POST /subscriptions — creates a new subscription for the given client.
+     **/
+    create_subscription(req: Request, res: Response): void {
+        const { clientId, displayName } = req.body;
+        res.json(this.subscriptions.create(clientId, displayName));
     }
 }

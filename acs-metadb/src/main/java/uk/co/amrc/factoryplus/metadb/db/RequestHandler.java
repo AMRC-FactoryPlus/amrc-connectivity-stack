@@ -23,10 +23,6 @@ import io.vavr.Lazy;
 import uk.co.amrc.factoryplus.client.FPAuth;
 import uk.co.amrc.factoryplus.service.*;
 
-/* Eventually these objects will need to be associated with a txn, and a
- * request, and contain the request UPN and the current txn Instant and
- * other per-request information. Possibly at this point this will
- * become a second object rather than a superclass. */
 public class RequestHandler
 {
     private static final Logger log = LoggerFactory.getLogger(RequestHandler.class);
@@ -57,7 +53,7 @@ public class RequestHandler
         this.now = Lazy.of(db::createInstant);
         this.upn = ctx.getUserPrincipal().getName();
 
-        log.info("Handling request for {}", upn);
+        //log.info("Handling request for {}", upn);
     }
 
     public RdfStore db () { return db; }
@@ -71,7 +67,6 @@ public class RequestHandler
      * open. */
     public RequestHandler start ()
     {
-        log.info("Fetching ACL for {}", upn);
         checker = db().fplus().auth()
             .fetchChecker(upn)
             .blockingGet();

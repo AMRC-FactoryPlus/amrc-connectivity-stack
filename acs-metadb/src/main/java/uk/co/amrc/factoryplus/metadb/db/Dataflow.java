@@ -112,7 +112,6 @@ public class Dataflow
 
     private Set<UUID> _fetchRelation (Relation.Bound bound)
     {
-        log.info("Fetch relation {}", bound);
         return db.listQuery(Q_relation, 
                 "graph",            bound.graph(),
                 "rel",              bound.prop(),

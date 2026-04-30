@@ -33,17 +33,10 @@ public class JsonValueBodyReader implements MessageBodyReader<JsonValue>
 
     private static final String PLUS_JSON = "+json";
 
-    public JsonValueBodyReader ()
-    {
-        log.info("CONSTRUCT JsonValueBodyReader");
-    }
-
     @Override
     public boolean isReadable (
         Class<?> aClass, Type gType, Annotation[] annots, MediaType mType)
     {
-        log.info("isReadable: {}, {}", aClass, mType);
-
         if (!JsonValue.class.isAssignableFrom(aClass))
             return false;
 
@@ -70,7 +63,6 @@ public class JsonValueBodyReader implements MessageBodyReader<JsonValue>
             charset = Charset.forName(cparam);
         }
         catch (Throwable err) {
-            log.info("Cannot find JSON charset", err);
             throw new WebApplicationException(
                 "Cannot decode JSON using charset " + cparam, err, 415);
         }

@@ -62,6 +62,8 @@ objects:
     !u UUIDs.App.Registration:
       name: "Object registration"
       iri: app/Registration
+      memberOf:
+        - !u MetaDB.Class.Structured
       subclassOf:
         - !u MetaDB.Class.ConfigEntry
     !u UUIDs.App.ConfigSchema:

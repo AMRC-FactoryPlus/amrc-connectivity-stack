@@ -20,7 +20,7 @@ public class SvcErr extends Error
     /* Throwable should be generic on itself, like Class. */
     public SvcErr initCause (Throwable e)
     {
-        return (SvcErr)initCause(e);
+        return (SvcErr)super.initCause(e);
     }
 
     public static abstract class Client extends SvcErr

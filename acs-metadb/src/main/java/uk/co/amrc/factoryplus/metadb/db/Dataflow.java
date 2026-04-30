@@ -81,7 +81,8 @@ public class Dataflow
         return modelUpdates
             .map(ds -> QueryExecution.dataset(ds)
                 .query(Q_appUpdates)
-                .build().execSelect())
+                .build().execSelect()
+                .materialise())
             .flatMap(rs -> Observable.<QuerySolution>create(em -> {
                 rs.forEachRemaining(em::onNext);
                 em.onComplete();

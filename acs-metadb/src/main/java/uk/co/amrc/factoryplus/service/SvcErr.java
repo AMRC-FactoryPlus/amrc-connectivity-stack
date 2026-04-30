@@ -17,6 +17,12 @@ public class SvcErr extends Error
         super(msg);
     }
 
+    /* Throwable should be generic on itself, like Class. */
+    public SvcErr initCause (Throwable e)
+    {
+        return (SvcErr)initCause(e);
+    }
+
     public static abstract class Client extends SvcErr
     {
         public Client (String msg)
@@ -33,7 +39,14 @@ public class SvcErr extends Error
             extendJson(obj);
             return obj.build();
         }
-        protected void extendJson (JsonObjectBuilder obj) { }
+
+        protected void extendJson (JsonObjectBuilder obj)
+        {
+            var c = getCause();
+            if (!(c instanceof Client)) return;
+            ((Client)c).extendJson(obj);
+            obj.add("causedBy", c.getMessage());
+        }
 
         public Map<String, String> buildHeaders ()
         {

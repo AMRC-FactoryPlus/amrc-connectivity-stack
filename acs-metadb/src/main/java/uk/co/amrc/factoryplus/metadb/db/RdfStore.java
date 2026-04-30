@@ -314,7 +314,7 @@ public class RdfStore
     public Resource findObjectOrError (UUID uuid)
     {
         return findObject(uuid)
-            .getOrElseThrow(() -> new SvcErr.NotFound(uuid.toString()));
+            .getOrElseThrow(() -> new RdfErr.UUIDNotFound(uuid));
     }
 
     public Resource findRankClass (int rank)

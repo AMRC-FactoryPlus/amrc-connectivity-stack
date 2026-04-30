@@ -91,7 +91,7 @@ public final class Main {
         var server = new Server(port);
 
         var pingResult = new PingResult(
-            Vocab.U_RDFStore, "2.0.0",
+            Vocab.U_MetaDB, "2.0.0",
             "AMRC", "acs-metadb", "unknown");
         var bindings = new AbstractBinder () {
             protected void configure () {

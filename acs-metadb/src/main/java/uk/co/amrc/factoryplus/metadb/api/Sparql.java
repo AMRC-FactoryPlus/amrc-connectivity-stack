@@ -35,6 +35,7 @@ import io.vavr.control.*;
 
 import uk.co.amrc.factoryplus.client.FPUuid;
 import uk.co.amrc.factoryplus.metadb.db.*;
+import uk.co.amrc.factoryplus.service.SvcErr;
 
 @Path("v2")
 public class Sparql {
@@ -137,6 +138,7 @@ public class Sparql {
         store.requestExecute(auth, req -> {
             req.checkACL(Vocab.Perm.WriteRDF, FPUuid.Null);
             UpdateAction.parseExecute(update, store.dataset());
+            store.validateZFC();
         });
     }
 
@@ -212,7 +214,14 @@ public class Sparql {
     {
         try {
             RDFDataMgr.read(graph, rdf, lang);
+            /* This refreshes the inferences because we have been poking
+             * around behind its back. Strictly this is only needed when
+             * we load to a graph which is a source for the inference,
+             * but graph load will not be a common operation. */
+            store.derived().rebind();
+            store.validateZFC();
         }
+        catch (SvcErr.Client e) { throw e; }
         catch (Throwable e) {
             var res = Response.status(422)
                 .type("text/plain")
@@ -233,11 +242,6 @@ public class Sparql {
         store.requestExecute(auth, req -> {
             req.checkACL(Vocab.Perm.WriteRDF, FPUuid.Null);
             readToGraph(graph, rdf, lang);
-            /* This refreshes the inferences because we have been poking
-             * around behind its back. Strictly this is only needed when
-             * we load to a graph which is a source for the inference,
-             * but graph load will not be a common operation. */
-            store.derived().rebind();
         });
     }
 
@@ -253,7 +257,6 @@ public class Sparql {
             req.checkACL(Vocab.Perm.WriteRDF, FPUuid.Null);
             graph.removeAll();
             readToGraph(graph, rdf, lang);
-            store.derived().rebind();
         });
     }
 }

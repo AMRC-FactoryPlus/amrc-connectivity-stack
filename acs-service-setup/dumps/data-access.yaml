@@ -59,32 +59,45 @@ objects:
       subclassOf:
         - !u DataAccess.Class.MESDataset
 
+# These are in core-apps for now, as they were previously R1 and are
+# preventing the Application upgrade to R2. Once all installations are
+# upgraded they can come back here.
+#
+#  !u MetaDB.Class.AppGroup: 
+#    !u DataAccess.App.DatasetDefinition:
+#      name: "Dataset definition"
+#      subclassOf:
+#        - !u UUIDs.Class.App
+#    !u DataAccess.App.DatasetMetadata:
+#      name: "Dataset metadata"
+#      subclassOf:
+#        - !u UUIDs.Class.App
+
   !u ConfigDB.Class.R1Class:
     !u DataAccess.Class.Measurement:
       name: "Measurement"
     !u DataAccess.Class.MES:
       name: "MES"
-    
-    !u DataAccess.App.DatasetDefinition:
-      name: "Dataset definition"
-      subclassOf:
-        - !u UUIDs.Class.App
-    !u DataAccess.App.DatasetMetadata:
-      name: "Dataset metadata"
-      subclassOf:
-        - !u UUIDs.Class.App
 
   !u DataAccess.App.DatasetDefinition:
     !u DataAccess.App.SparkplugSrc:
       name: "Sparkplug source"
+      subclassOf:
+        - MetaDB.Class.ConfigEntry
     !u DataAccess.App.UnionComponents:
       name: "Union components"
+      subclassOf:
+        - MetaDB.Class.ConfigEntry
     !u DataAccess.App.SessionLimits:
       name: "Session limits"
+      subclassOf:
+        - MetaDB.Class.ConfigEntry
 
   !u DataAccess.App.DatasetMetadata:
     !u DataAccess.App.MESIdentifiers:
       name: "MES identifiers"  
+      subclassOf:
+        - MetaDB.Class.ConfigEntry
 
   !u UUIDs.Class.Special:
     !u DataAccess.Special.InvalidDataset:

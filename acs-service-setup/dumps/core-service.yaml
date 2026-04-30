@@ -1,0 +1,49 @@
+# Core service definitions
+#-EARLY
+#-REQUIRE: service-urls core-apps
+---
+service: !u UUIDs.Service.ConfigDB
+version: 2
+objects:
+  !u ConfigDB.Class.R1Class: 
+    !u UUIDs.Class.Service:
+      name: "F+ service function"
+      iri: service/Service
+
+  # Register all the service function UUIDs here, it's simpler.
+  # XXX I think these should be classes, with the service accounts
+  # (representing the actual running services) as members. Or possibly
+  # the account should be a different object from the service (physical
+  # object) itself? There is already some confusion between the client
+  # and server sides of a service; e.g. the ConfigDB UUID is used for
+  # both the sv1configdb account and also to locate the Sparkplug
+  # service interface. The only other possibility I can see is that
+  # these service function UUIDs are names of some kind.
+  !u UUIDs.Class.Service:
+    !u UUIDs.Service.Directory:
+        name: "Directory"
+        iri: service/Directory
+    !u UUIDs.Service.ConfigDB:
+        name: "ConfigDB"
+        iri: service/ConfigDB
+    !u UUIDs.Service.Authentication:
+        name: "Authentication"
+        iri: service/Auth
+    !u UUIDs.Service.Command_Escalation:
+        name: "Command escalation"
+        iri: service/CmdEsc
+    !u MetaDB.Service:
+        name: "MetaDB"
+        iri: service/MetaDB
+    !u UUIDs.Service.MQTT:
+        name: "MQTT"
+        iri: service/MQTT
+    !u UUIDs.Service.Git:
+        name: "Git hosting"
+        iri: service/Git
+    !u UUIDs.Service.Clusters:
+        name: "Cluster manager"
+        iri: service/Clusters
+    !u ACS.Service.Manager:
+        name: "Factory+ Manager"
+        iri: service/Manager

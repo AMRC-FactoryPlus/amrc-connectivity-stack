@@ -16,10 +16,17 @@ import io.vavr.control.*;
 
 import uk.co.amrc.factoryplus.service.SvcErr;
 
-public record Relation (String name, Property prop, int offset,
+/* These are the object structure relations we know about. Currently
+ * this is just memberOf and subclassOf, but potentially it could
+ * include powersetOf in the future. */
+public record Relation (
+    String name,        // the name used in the HTTP API
+    Property prop,      // the RDF property
+    int offset,         // the rank offset between subj and obj
+    // permissions
     UUID readClass, UUID readObject, UUID writeClass, UUID writeObject)
 {
-    private static List<Relation> known = List.of(
+    public static final List<Relation> KNOWN = List.of(
         new Relation("member", RDF.type, 1, 
             Vocab.Perm.ReadMembers, Vocab.Perm.ReadMemberships,
             Vocab.Perm.WriteMembers, Vocab.Perm.WriteMemberships),
@@ -29,7 +36,7 @@ public record Relation (String name, Property prop, int offset,
 
     public static Option<Relation> find (String relation)
     {
-        return known.find(r -> r.name.equals(relation));
+        return KNOWN.find(r -> r.name.equals(relation));
     }
 
     public static Relation of (String relation)

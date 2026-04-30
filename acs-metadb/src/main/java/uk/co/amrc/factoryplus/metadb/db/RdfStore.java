@@ -20,6 +20,7 @@ import jakarta.ws.rs.core.SecurityContext;
 import org.apache.jena.datatypes.xsd.XSDDatatype;
 import org.apache.jena.query.*;
 import org.apache.jena.rdf.model.*;
+import org.apache.jena.riot.*;
 import org.apache.jena.tdb2.TDB2Factory;
 import org.apache.jena.update.*;
 import org.apache.jena.vocabulary.*;
@@ -28,6 +29,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import io.vavr.collection.Iterator;
+import io.vavr.collection.List;
 import io.vavr.control.Option;
 
 import uk.co.amrc.factoryplus.client.*;
@@ -91,6 +93,9 @@ public class RdfStore
 
     public void start ()
     {
+        bootstrap();
+        executeRead(this::validateZFC);
+
         dataflow.start();
         schemaTracker.start();
     }
@@ -218,7 +223,9 @@ public class RdfStore
         Iterator.of(substs)
             .grouped(2)
             .forEach(sq -> exec.substitution((String)sq.get(0), (RDFNode)sq.get(1)));
-        return exec.build().execSelect();
+        return exec.build()
+            .execSelect()
+            .materialise();
     }
 
     public Option<QuerySolution> optionalQuery (Query query, Object... substs)
@@ -231,6 +238,12 @@ public class RdfStore
         return Util.singleOrError(selectQuery(query, substs));
     }
 
+    public List<QuerySolution> listQuery (Query query, Object... substs)
+    {
+        return Iterator.ofAll(selectQuery(query, substs))
+            .toList();
+    }
+
     public void runUpdate (UpdateRequest update, Object... substs)
     {
         var exec = UpdateExecution.dataset(dataset)
@@ -239,6 +252,43 @@ public class RdfStore
             .grouped(2)
             .forEach(sq -> exec.substitution((String)sq.get(0), (RDFNode)sq.get(1)));
         exec.execute();
+    }
+
+    private static Option<Integer> findVersion (Model model)
+    {
+        return Util.single(model.listObjectsOfProperty(
+                Vocab.Sys.core, Vocab.Sys.dbVersion))
+            .map(n -> Util.decodeLiteral(n, Integer.class));
+    }
+
+    public void bootstrap ()
+    {
+        var core = ModelFactory.createDefaultModel();
+        var ttl = RdfStore.class.getResourceAsStream("core.ttl");
+        RDFDataMgr.read(core, ttl, Lang.TURTLE);
+
+        var coreVer = findVersion(core).get();
+
+        this.executeWrite(() -> {
+            findVersion(direct)
+                .peek(ver -> {
+                    log.info("Found core schema version {}", ver);
+                    if (!ver.equals(coreVer))
+                        throw new RdfErr.CorruptRDF(
+                            "Expected core schema version " + coreVer);
+                })
+                .onEmpty(() -> {
+                    log.info("Loading core schema version {}", coreVer);
+                    direct.add(core);
+                });
+        });
+        derived.rebind();
+    }
+
+    public void validateZFC ()
+    {
+        var zfc = new ZFC(this);
+        zfc.validateInvariants();
     }
 
     /** Find a single resource within the direct graph. */
@@ -258,16 +308,15 @@ public class RdfStore
             derived.removeAll(null, node.as(Property.class), null);
     }
 
-    public Option<FPObject> findObject (UUID uuid)
+    public Option<Resource> findObject (UUID uuid)
     {
-        return findResource(Vocab.uuid, Vocab.uuidLiteral(uuid))
-            .map(node -> new FPObject(node, uuid));
+        return findResource(Vocab.uuid, Vocab.uuidLiteral(uuid));
     }
 
-    public FPObject findObjectOrError (UUID uuid)
+    public Resource findObjectOrError (UUID uuid)
     {
         return findObject(uuid)
-            .getOrElseThrow(() -> new SvcErr.NotFound(uuid.toString()));
+            .getOrElseThrow(() -> new RdfErr.UUIDNotFound(uuid));
     }
 
     public Resource findRankClass (int rank)
@@ -287,7 +336,7 @@ public class RdfStore
         return Util.decodeLiteral(binding.get("rank"), Integer.class);
     }
 
-    public FPObject createObject (Resource klass)
+    public Resource createObject (Resource klass)
     {
         UUID uuid;
         while (true) {
@@ -300,7 +349,7 @@ public class RdfStore
         return createObject(klass, uuid);
     }
 
-    public FPObject createObject (Resource klass, UUID uuid)
+    public Resource createObject (Resource klass, UUID uuid)
     {
         var obj = Vocab.uuidResource(uuid);
         derived.add(obj, Vocab.uuid, uuid.toString());
@@ -313,12 +362,12 @@ public class RdfStore
             derived.add(obj, RDFS.subClassOf, rk);
         }
 
-        return new FPObject(obj, uuid);
+        return obj;
     }
 
     public Resource createInstant ()
     {
-        var inst = createObject(Vocab.Time.Instant).node();
+        var inst = createObject(Vocab.Time.Instant);
         var stamp = derived.createTypedLiteral(Instant.now(), XSDDatatype.XSDdateTime);
         derived.add(inst, Vocab.Time.timestamp, stamp);
         return inst;

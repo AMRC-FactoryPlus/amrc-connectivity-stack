@@ -2,9 +2,10 @@
 service: !u UUIDs.Service.ConfigDB
 version: 2
 objects:
-  !u UUIDs.Class.Service:
-    !u UUIDs.Service.Directory:
-      name: "Directory service"
+  # In core-service
+  #!u UUIDs.Class.Service:
+  #  !u UUIDs.Service.Directory:
+  #    name: "Directory service"
   !u Auth.Class.ServicePerms:
     !u Directory.Perm.All:
       name: "Directory permission"

@@ -81,7 +81,8 @@ public class Dataflow
         return modelUpdates
             .map(ds -> QueryExecution.dataset(ds)
                 .query(Q_appUpdates)
-                .build().execSelect())
+                .build().execSelect()
+                .materialise())
             .flatMap(rs -> Observable.<QuerySolution>create(em -> {
                 rs.forEachRemaining(em::onNext);
                 em.onComplete();
@@ -112,11 +113,10 @@ public class Dataflow
     private Set<UUID> _fetchRelation (Relation.Bound bound)
     {
         log.info("Fetch relation {}", bound);
-        var rs = db.selectQuery(Q_relation, 
-            "graph",            bound.graph(),
-            "rel",              bound.prop(),
-            bound.selectVar(),  bound.literal());
-        return Iterator.ofAll(rs)
+        return db.listQuery(Q_relation, 
+                "graph",            bound.graph(),
+                "rel",              bound.prop(),
+                bound.selectVar(),  bound.literal())
             .map(qs -> Util.decodeLiteral(qs.get(bound.resultVar()), UUID.class))
             .toSet();
     }
@@ -172,8 +172,7 @@ public class Dataflow
         /* This method is not triggered by an Update, so it must use its
          * own transaction. */
         return db.calculateRead(() -> 
-            Iterator.ofAll(db.selectQuery(Q_appState, 
-                    "appU", Vocab.uuidLiteral(app)))
+            db.listQuery(Q_appState, "appU", Vocab.uuidLiteral(app))
                 .toMap(qs -> Util.decodeLiteral(qs.get("objU"), UUID.class),
                     ConfigEntry.Value::ofQuerySolution));
     }

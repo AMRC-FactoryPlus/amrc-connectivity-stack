@@ -32,6 +32,8 @@ public class Load {
     public void load (JsonValue dump)
     {
         log.info("Attempt to load dump {}", dump);
+        db.requestExecute(auth, req ->
+            req.bulkOperations().loadDump(dump));
     }
 }
 

@@ -1,0 +1,85 @@
+# Core app definitions
+#-EARLY
+#-REQUIRE: service-urls
+---
+service: !u UUIDs.Service.ConfigDB
+version: 2
+objects:
+  !u ConfigDB.Class.R3Class:
+    !u MetaDB.Class.AppGroup:
+      name: "Application group"
+      iri: app/AppGroup
+
+  !u ConfigDB.Class.R2Class:
+    !u MetaDB.Class.DocumentGroup:
+      name: "Document group"
+      iri: doc/DocumentGroup
+    !u MetaDB.Class.ConfigEntryGroup:
+      name: "Config entry group"
+      iri: app/ConfigEntryGroup
+      subclassOf:
+        - !u MetaDB.Class.DocumentGroup
+    !u UUIDs.Class.App:
+      name: "Application"
+      iri: app/Application
+      memberOf:
+        - !u MetaDB.Class.AppGroup
+      subclassOf:
+        - !u MetaDB.Class.ConfigEntryGroup
+
+  !u MetaDB.Class.AppGroup:
+    !u MetaDB.Class.Structured:
+      name: "Structured application"
+      iri: app/Structured
+      subclassOf:
+        - !u UUIDs.Class.App
+    # These properly belong in data-access.yaml, but must be loaded here
+    # for now or they prevent Application upgrading to R2.
+    !u DataAccess.App.DatasetDefinition:
+      name: "Dataset definition"
+      subclassOf:
+        - !u UUIDs.Class.App
+    !u DataAccess.App.DatasetMetadata:
+      name: "Dataset metadata"
+      subclassOf:
+        - !u UUIDs.Class.App
+
+  !u ConfigDB.Class.R1Class:
+    !u MetaDB.Class.Document:
+      name: "Document"
+      iri: doc/Document
+      memberOf:
+        - !u MetaDB.Class.DocumentGroup
+    !u MetaDB.Class.ConfigEntry:
+      name: "Config entry"
+      iri: app/ConfigEntry
+      memberOf:
+        - !u MetaDB.Class.ConfigEntryGroup
+      subclassOf:
+        - !u MetaDB.Class.Document
+
+  !u UUIDs.Class.App:
+    !u UUIDs.App.Registration:
+      name: "Object registration"
+      iri: app/Registration
+      subclassOf:
+        - !u MetaDB.Class.ConfigEntry
+    !u UUIDs.App.ConfigSchema:
+      name: "Application config schema"
+      iri: app/ConfigSchema
+      subclassOf:
+        - !u MetaDB.Class.ConfigEntry
+    !u UUIDs.App.Info:
+      name: "General information"
+      iri: app/Info
+      memberOf:
+        - !u MetaDB.Class.Structured
+      subclassOf:
+        - !u MetaDB.Class.ConfigEntry
+    !u UUIDs.App.ServiceConfig:
+      name: "Service setup"
+      iri: app/ServiceConfig
+      subclassOf:
+        - !u MetaDB.Class.ConfigEntry
+
+

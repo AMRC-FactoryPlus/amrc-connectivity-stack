@@ -1,4 +1,4 @@
-#-REQUIRE: auth git
+#-REQUIRE: auth git helm
 ---
 service: !u UUIDs.Service.ConfigDB
 version: 2
@@ -6,15 +6,18 @@ objects:
   !u ConfigDB.Class.R2Class:
     !u Clusters.Class.ClusterGroups:
       name: "Clusters-managed group"
+      iri: clusters/ClusterGroups
 
   !u Auth.Class.ServiceRole:
     !u Clusters.Requirement.ServiceAccount:
       name: "Cluster manager"
+      iri: clusters/ServiceAccount
       subclassOf:
         - !u Auth.Class.CentralService
   !u Auth.Class.ServicePerms:
     !u Clusters.Perm.All:
       name: "Cluster manager permission"
+      iri: cluster/perm/All
       subclassOf:
         - !u UUIDs.Class.Permission
   !u Auth.Class.EdgeRole:
@@ -53,19 +56,39 @@ objects:
         - !u Git.Class.Repo
 
   !u ConfigDB.Class.R1Class:
-    !u Clusters.Class.Cluster: { name: "Edge cluster" }
+    !u Clusters.Class.Cluster:
+        name: "Edge cluster"
+        iri: edge/Cluster
 
   !u UUIDs.Class.App:
-    !u Clusters.App.Bootstrap:      { name: "Bootstrap script" }
-    !u Clusters.App.Cluster: { name: "Edge cluster configuration" }
-    !u Clusters.App.Flux:           { name: "Flux template" }
-    !u Clusters.App.HelmChart: { name: "Helm chart template" }
-    !u Clusters.App.Status: { name: "Edge cluster setup status" }
-  !u UUIDs.Class.Service:
-    !u Clusters.Service.ClusterManager: { name: "Cluster manager" }
+    !u Clusters.App.Bootstrap:
+        name: "Bootstrap script"
+        iri: app/BootstrapScript
+        subclassOf:
+          - !u MetaDB.Class.ConfigEntry
+    !u Clusters.App.Cluster:
+        name: "Edge cluster configuration"
+        iri: app/EdgeClusterConfig
+        subclassOf:
+          - !u MetaDB.Class.ConfigEntry
+    !u Clusters.App.Flux:
+        name: "Flux template"
+        iri: app/FluxTemplate
+        subclassOf:
+          - !u MetaDB.Class.ConfigEntry
+    !u Clusters.App.Status:
+        name: "Edge cluster setup status"
+        iri: app/ClusterSetupStatus
+        subclassOf:
+          - !u MetaDB.Class.ConfigEntry
+
   !u Clusters.Perm.All:
-    !u Clusters.Perm.Clusters: { name: "Manage clusters" }
-    !u Clusters.Perm.Secrets: { name: "Manage secrets" }
+    !u Clusters.Perm.Clusters:
+        name: "Manage clusters"
+        iri: clusters/perm/ManageClusters
+    !u Clusters.Perm.Secrets:
+        name: "Manage secrets"
+        iri: clusters/perm/ManageSecrets
 
   !u Local.RepoGroup.Shared:
     !u Local.Repo.HelmCharts:
@@ -407,7 +430,7 @@ grants:
       !u Clusters.App.Status: false
       !u Clusters.App.EdgeStatus: false
       !u Clusters.App.Flux: false
-      !u Clusters.App.HelmChart: false
+      !u Clusters.App.HelmTemplate: false
       !u Clusters.App.K8sTemplate: false
       !u Clusters.App.Bootstrap: false
       !u UUIDs.App.SparkplugAddress: false

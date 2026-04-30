@@ -35,11 +35,33 @@ public class Vocab
     public static final Property uuid       = prop("core/uuid");
     public static final Property rank       = prop("core/rank");
     public static final Property primary    = prop("core/primary");
+    public static final Property name       = prop("core/name");
     public static final Property deleted    = prop("core/deleted");
+    public static final Property powersetOf = prop("core/powersetOf");
 
     public static final Resource Special    = res("core/Special");
     public static final Resource Wildcard   = res("core/Wildcard");
     public static final Resource Unowned    = res("core/Unowned");
+
+    public static class Sys {
+        public static final Resource core           = res("core");
+
+        /* These are properties on <core>, defining operational
+         * parameters of the current MetaDB. */
+        public static final Property dbVersion      = prop("sys/dbVersion");
+        public static final Property topRank        = prop("sys/topRank");
+    }
+
+    public static class Class {
+        /* These are proper classes and don't have ranks or UUIDs */
+        public static final Resource Object         = res("core/Object");
+        public static final Resource Class          = res("core/Class");
+
+        public static final Resource Individual     = res("core/Individual");
+        public static final Resource R1Class        = res("core/R1Class");
+        public static final Resource R2Class        = res("core/R2Class");
+        public static final Resource R3Class        = res("core/R3Class");
+    }
 
     public static class Time {
         public static final Resource Instant        = res("time/Instant");
@@ -61,6 +83,8 @@ public class Vocab
         public static final Resource ConfigSchema   = res("app/ConfigSchema");
         public static final Resource Info           = res("app/Info");
         public static final Resource SparkplugAddr  = res("app/SparkplugAddress");
+
+        public static final UUID U_ConfigSchema     = U("dbd8a535-52ba-4f6e-b4f8-9b71aefe09d3");
 
         public static final Property forP           = prop("app/for");
         public static final Property value          = prop("app/value");
@@ -104,7 +128,7 @@ public class Vocab
     public static final Resource G_added    = res("graph/added");
     public static final Resource G_removed  = res("graph/removed");
 
-    public static final UUID U_RDFStore     = U("8abf031c-193f-11f1-b047-d762a2934dfc");
+    public static final UUID U_MetaDB       = U("8abf031c-193f-11f1-b047-d762a2934dfc");
     public static final UUID U_Unowned      = U("091e796a-65c0-4080-adff-c3ce01a65b2e");
 
     public static Literal uuidLiteral (UUID uuid)

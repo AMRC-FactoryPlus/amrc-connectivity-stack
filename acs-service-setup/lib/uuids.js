@@ -4,8 +4,8 @@
 
 export const ACS = {
     Class: {
-        EdgeDeployment:     "e6f6a6e6-f6b2-422a-bc86-2dcb417a362a",
         Bridge:             "178506d2-af52-4c79-8e5d-4958ae7ddfa9",
+        EdgeDeployment:     "e6f6a6e6-f6b2-422a-bc86-2dcb417a362a",
     },
     App: {
         JsonSchema:         "b16e85fb-53c2-49f9-8d83-cdf6763304ba",
@@ -202,6 +202,7 @@ export const MetaDB = {
         Document:           "04e2abe8-2c0b-11f1-9cdd-6ffcd35127ab",
         DocumentGroup:      "4304c4b0-2c0b-11f1-834f-a34b414e7540",
         Instant:            "600bc688-1d35-11f1-80e6-d7c35e61c3ce",
+        SparkplugEntity:    "3ef49486-278d-11f1-b52f-f742bd9bbc94",
     },
     Service:                "8abf031c-193f-11f1-b047-d762a2934dfc",
     Perm: {
@@ -292,7 +293,6 @@ export const Clusters = {
         Cluster:            "bdb13634-0b3d-4e38-a065-9d88c12ee78d",
         EdgeStatus:         "747a62c9-1b66-4a2e-8dd9-0b70a91b6b75",
         Flux:               "72804a19-636b-4836-b62b-7ad1476f2b86",
-        HelmChart:          "729fe070-5e67-4bc7-94b5-afd75cb42b03",
         K8sTemplate:        "88436128-09a3-4c9c-b7f4-b0e495137265",
         HelmTemplate:       "729fe070-5e67-4bc7-94b5-afd75cb42b03",
         Status:             "f6c67e6f-e48e-4f69-b4bb-bfbddcc2a517",

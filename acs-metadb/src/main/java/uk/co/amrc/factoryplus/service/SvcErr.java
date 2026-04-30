@@ -6,15 +6,21 @@
 
 package uk.co.amrc.factoryplus.service;
 
-import java.util.Map;
-
 import jakarta.json.*;
+
+import io.vavr.collection.*;
 
 public class SvcErr extends Error
 {
     public SvcErr (String msg)
     {
         super(msg);
+    }
+
+    /* Throwable should be generic on itself, like Class. */
+    public SvcErr initCause (Throwable e)
+    {
+        return (SvcErr)initCause(e);
     }
 
     public static abstract class Client extends SvcErr
@@ -33,11 +39,18 @@ public class SvcErr extends Error
             extendJson(obj);
             return obj.build();
         }
-        protected void extendJson (JsonObjectBuilder obj) { }
+
+        protected void extendJson (JsonObjectBuilder obj)
+        {
+            var c = getCause();
+            if (!(c instanceof Client)) return;
+            ((Client)c).extendJson(obj);
+            obj.add("causedBy", c.getMessage());
+        }
 
         public Map<String, String> buildHeaders ()
         {
-            return Map.of();
+            return HashMap.empty();
         }
     }
     public static class AuthFailed extends Client
@@ -52,7 +65,7 @@ public class SvcErr extends Error
              * but this is what the F+ services have always sent. If we
              * admit to accepting Negotiate auth then Windows browsers
              * try to authenticate via SSPI and create a problem. */
-            return Map.of("WWW-Authenticate", "Basic realm=\"Factory+\"");
+            return HashMap.of("WWW-Authenticate", "Basic realm=\"Factory+\"");
         }
     }
     public static class Forbidden extends Client
@@ -82,14 +95,17 @@ public class SvcErr extends Error
 
         public int statusCode () { return 410; }
     }
-    public static class BadJson extends Client
+    public static class BadInput extends Client
+    {
+        public BadInput (String msg) { super(msg); }
+        public int statusCode () { return 422; }
+    }
+    public static class BadJson extends BadInput
     {
         public BadJson (JsonValue val)
         {
             super("Unexpected JSON value: " + val.toString());
         }
-
-        public int statusCode () { return 422; }
     }
     public static class Timeout extends Client
     {

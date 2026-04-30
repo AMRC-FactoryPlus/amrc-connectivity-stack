@@ -1,0 +1,26 @@
+# Core definitions needed by the edge
+#-EARLY
+#-REQUIRE: service-urls core-apps
+---
+service: !u UUIDs.Service.ConfigDB
+version: 2
+objects:
+  !u ConfigDB.Class.R2Class:
+    !u Git.Class.Group:
+        name: "Git repository group"
+        iri: git/RepoGroup
+
+  !u ConfigDB.Class.R1Class:
+    !u Clusters.Class.HelmChart:
+      name: "Helm chart"
+      iri: edge/HelmChart
+    !u Clusters.Class.SystemHelmChart:
+      name: "System Helm chart"
+      iri: edge/SystemHelmChart
+      subclassOf:
+        - !u Clusters.Class.HelmChart
+    !u Git.Class.Repo:
+      name: "Git repository"
+      iri: git/Repo
+      memberOf:
+        - !u Git.Class.Group

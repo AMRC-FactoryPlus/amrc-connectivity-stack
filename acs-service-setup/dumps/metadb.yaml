@@ -6,17 +6,26 @@ objects:
   !u Auth.Class.ServiceRole:
     !u MetaDB.Role.MetaDB:
       name: "MetaDB server"
+      iri: metadb/ServiceRole
       subclassOf:
         - !u Auth.Class.CentralService
 
   !u Auth.Class.ServicePerms:
     !u MetaDB.Perm.All:
       name: "MetaDB Permission"
+      iri: metadb/perm/All
       subclassOf:
         - !u Auth.Class.Permission
 
-  !u UUIDs.Class.Service:
-    !u MetaDB.Service: { name: "MetaDB" }
+  # Random classes that are not really specific to the MetaDB but are
+  # currently only used there. These should be elsewhere.
+  !u ConfigDB.Class.R1Class:
+    !u MetaDB.Class.Instant:
+      name: "Instant"
+      iri: time/Instant
+    !u MetaDB.Class.SparkplugEntity:
+      name: "Sparkplug entity"
+      iri: sparkplug/Entity
 
   # This only includes permissions unique to the MetaDB. It is not
   # straightforward to unify with the ConfigDB permissions so we will

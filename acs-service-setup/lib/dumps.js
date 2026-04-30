@@ -163,7 +163,7 @@ export class DumpLoader {
             body:           JSON.stringify(dump),
             headers:        { "Content-Type": "application/json" },
         });
-        return res.status;
+        return [res.status, await res.text()];
     }
 
     async load_from_file (yaml, name) {
@@ -171,9 +171,12 @@ export class DumpLoader {
         const ds = this.parse_yaml(yaml, name);
         for (const d of ds) {
             this.log("=== %s", d.service);
-            const st = await this.load_dump(d);
+            const [st, body] = await this.load_dump(d);
             if (st != 204)
-                throw new Error(`Service dump ${name} failed: ${st}`);
+                throw new Error(
+                    [`Service dump ${name} failed`, st, body]
+                        .filter(v => v != undefined)
+                        .join(": "));
         }
     }
 

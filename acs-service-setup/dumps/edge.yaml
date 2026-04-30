@@ -34,10 +34,22 @@ objects:
         - !u ACS.Group.SparkplugReader
 
   !u UUIDs.Class.App:
-    !u Edge.App.ClusterStatus:      { name: "Edge cluster status" }
-    !u Edge.App.ConnConfig:         { name: "Connection config" }
-    !u Edge.App.Deployment:         { name: "Edge deployment" }
-    !u Edge.App.DriverDef:          { name: "Driver definition" }
+    !u Edge.App.ClusterStatus:
+      name: "Edge cluster status"
+      subclassOf:
+        - !u MetaDB.Class.ConfigEntry
+    !u Edge.App.ConnConfig:
+      name: "Connection config"
+      subclassOf:
+        - !u MetaDB.Class.ConfigEntry
+    !u Edge.App.Deployment:
+      name: "Edge deployment"
+      subclassOf:
+        - !u MetaDB.Class.ConfigEntry
+    !u Edge.App.DriverDef:
+      name: "Driver definition"
+      subclassOf:
+        - !u MetaDB.Class.ConfigEntry
 
   !u Edge.Class.Driver:
     !u ACS.Driver.REST:             { name: "REST" }

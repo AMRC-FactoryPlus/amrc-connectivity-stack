@@ -72,8 +72,7 @@ public class ObjectStructure extends RequestHandler.Component
     public List<String> listRanks ()
     {
         request().checkACL(Vocab.Perm.ListObj, FPUuid.Null);
-        var rs = db().selectQuery(Q_listRanks);
-        return Iterator.ofAll(rs)
+        return db().listQuery(Q_listRanks)
             .map(s -> s.getLiteral("uuid").getString())
             .toJavaList();
     }

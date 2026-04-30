@@ -121,8 +121,7 @@ public class SchemaTracker
             .forEach(app -> {
                 var conflicts = findConfigs(app)
                     .filter(e -> !newSchemas.validate(app, e.value()))
-                    .map(Entry::uuid)
-                    .toList();
+                    .map(Entry::uuid);
                 if (!conflicts.isEmpty())
                     throw new RdfErr.SchemaConflict(conflicts);
             });
@@ -153,15 +152,15 @@ public class SchemaTracker
             ?obj <core/uuid> ?uuid.
         }
     """);
-    private Iterator<Entry> findConfigs (Resource app)
+    private List<Entry> findConfigs (Resource app)
     {
-        return Iterator.ofAll(db.selectQuery(Q_findConfigs, "app", app))
+        return db.listQuery(Q_findConfigs, "app", app)
             .map(Entry::ofQS);
     }
 
     private SchemaSet rebuildSchemas ()
     {
-        var configs = findConfigs(Vocab.App.ConfigSchema).toList();
+        var configs = findConfigs(Vocab.App.ConfigSchema);
         var apps    = configs.map(Entry::obj).toSet();
         var val     = factory.createValidator();
 

@@ -68,7 +68,7 @@ export class InfluxReader{
             this._run_min_max_time_agg(topLevelInstance, "min"),
             this._run_min_max_time_agg(topLevelInstance, "max"),
         ]);
-        this.log(`Get influx time bounds is run: from=${from} to=${to}`)
+
         return { from, to };
     }
 

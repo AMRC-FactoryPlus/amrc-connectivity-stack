@@ -2,9 +2,11 @@
  * Copyright (c) University of Sheffield AMRC 2026.
  */
 
-import { ServiceClient, UUIDs } from "@amrc-factoryplus/service-client";
+import { UUIDs } from "@amrc-factoryplus/service-client";
+import { RxClient } from "@amrc-factoryplus/rx-client";
 import { WebAPI } from "@amrc-factoryplus/service-api";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import * as rx from "rxjs";
 import { routes } from "../lib/routes.js";
 import { ObjectTree } from "../lib/object-tree.js";
 import { ValueCache } from "../lib/value-cache.js";
@@ -12,7 +14,13 @@ import { History } from "../lib/history.js";
 import { SubscriptionManager } from "../lib/subscriptions.js";
 import { I3xRag } from "../lib/rag/i3x-rag.js";
 import { registerRagTools } from "../lib/mcp/tools.js";
-import { Version } from "../lib/constants.js";
+import {
+    Version,
+    DEVICE_CLASS_UUID,
+    CONFIG_SCHEMA_APP_UUID,
+    INFO_APP_UUID,
+    DEVICE_INFORMATION_APP_UUID,
+} from "../lib/constants.js";
 import { GIT_VERSION } from "../lib/git-version.js";
 import pino from "pino";
 
@@ -26,10 +34,10 @@ const logger = pino({ name: "acs-i3x", level: env.LOG_LEVEL || "info" });
 logger.info("Starting acs-i3x service...");
 logger.debug({ directoryUrl: env.DIRECTORY_URL, realm: env.REALM, user: env.SERVICE_USERNAME }, "Configuration");
 
-// Init Factory+ service client
-logger.debug("Initialising ServiceClient...");
-const fplus = await new ServiceClient({ env }).init();
-logger.debug("ServiceClient initialised");
+// Init Factory+ service client (RxClient adds notify-v2 Observables on ConfigDB)
+logger.debug("Initialising RxClient...");
+const fplus = await new RxClient({ env }).init();
+logger.debug("RxClient initialised");
 
 // Build object tree from ConfigDB + Directory
 logger.debug("Building object tree from ConfigDB + Directory...");
@@ -113,20 +121,48 @@ const api = await new WebAPI({
 api.run();
 logger.info(`acs-i3x server running on port ${env.PORT || 8080}`);
 
-// Re-poll ConfigDB/Directory periodically (disable with I3X_DISABLE_REFRESH=true)
+// Refresh object tree on ConfigDB notify events (disable with I3X_DISABLE_REFRESH=true).
+// A `dirty` flag coalesces events that arrive during an in-flight refresh, so a
+// burst of changes collapses into at most two rebuilds (leading + trailing).
 if (env.I3X_DISABLE_REFRESH !== "true") {
-    const pollInterval = parseInt(env.I3X_POLL_INTERVAL || "60000");
-    setInterval(() => {
-        objectTree.refresh()
-            .then(() => {
+    const cdb = fplus.ConfigDB;
+
+    const trigger$ = rx.merge(
+        cdb.watch_members(DEVICE_CLASS_UUID),
+        cdb.search_app(DEVICE_INFORMATION_APP_UUID, {}),
+        cdb.search_app(INFO_APP_UUID, {}),
+        cdb.search_app(CONFIG_SCHEMA_APP_UUID, {}),
+    );
+
+    let inFlight = false;
+    let dirty = false;
+
+    const runRefresh = async () => {
+        inFlight = true;
+        try {
+            do {
+                dirty = false;
+                await objectTree.refresh();
                 i3xRag.rebuild();
-                logger.debug({ nodes: i3xRag.nodeCount() }, "RAG engine rebuilt after refresh");
-            })
-            .catch(err => {
-                logger.error({ err }, "Failed to refresh object tree");
-            });
-    }, pollInterval);
-    logger.debug({ pollInterval }, "Object tree refresh enabled");
+                logger.debug({ nodes: i3xRag.nodeCount() },
+                    "Object tree refreshed via ConfigDB notify");
+            } while (dirty);
+        } catch (err) {
+            logger.error({ err }, "Failed to refresh object tree");
+        } finally {
+            inFlight = false;
+        }
+    };
+
+    trigger$.subscribe({
+        next: () => {
+            if (inFlight) { dirty = true; return; }
+            void runRefresh();
+        },
+        error: (err: unknown) => logger.error({ err }, "ConfigDB notify stream errored"),
+    });
+
+    logger.info("Object tree refresh: ConfigDB notify subscriptions active");
 } else {
     logger.info("Object tree refresh disabled (I3X_DISABLE_REFRESH=true)");
 }

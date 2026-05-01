@@ -22,6 +22,7 @@ public class Vocab
     public static final String NS_core      = NS + "core/";
     public static final String NS_graph     = NS + "graph/";
     public static final String NS_app       = NS + "app/";
+    public static final String NS_config    = NS + "config/";
 
     public static Resource res (String r) {
         return ResourceFactory.createResource(NS + r);
@@ -93,7 +94,9 @@ public class Vocab
         public static final UUID U_ConfigSchema     = U("dbd8a535-52ba-4f6e-b4f8-9b71aefe09d3");
         public static final UUID U_SparkplugAddr    = U("8e32801b-f35a-4cbf-a5c3-2af64d3debd7");
 
+        public static final Property app            = prop("app/app");
         public static final Property forP           = prop("app/for");
+        public static final Property etag           = prop("app/etag");
         public static final Property value          = prop("app/value");
     }
 
@@ -137,6 +140,12 @@ public class Vocab
     {
         return ResourceFactory.createResource(
             NS_uuid + uuid.toString());
+    }
+
+    public static Resource configResource (UUID uuid)
+    {
+        return ResourceFactory.createResource(
+            NS_config + uuid.toString());
     }
 
     public static Query query (String sparql)

@@ -190,11 +190,11 @@
     :name "Sparkplug address";
     <app/appliesTo> <sparkplug/Entity>.
 
-<app/schema/Registration> 
-    a <app/ConfigSchema>; :primary <app/ConfigSchema>;
-    :uuid "beb7d97c-2c0a-11f1-97ae-9bf4285ba7b1";
+<config/beb7d97c-2c0a-11f1-97ae-9bf4285ba7b1>
+    <app/app> <app/ConfigSchema>;
+    <app/etag> "beb7d97c-2c0a-11f1-97ae-9bf4285ba7b1";
     <app/for> <app/Registration>;
-    <doc/content> """
+    <app/value> """
         {
             "type": "object",
             "additionalProperties": false,
@@ -209,11 +209,11 @@
             }
         }
     """^^rdf:JSON.
-<app/schema/Info>
-    a <app/ConfigSchema>; :primary <app/ConfigSchema>;
-    :uuid "37718a06-2c0c-11f1-9ef8-e3f79d7f6db2";
+<config/37718a06-2c0c-11f1-9ef8-e3f79d7f6db2>
+    <app/app> <app/ConfigSchema>;
+    <app/etag> "37718a06-2c0c-11f1-9ef8-e3f79d7f6db2";
     <app/for> <app/Info>; 
-    <doc/content> """
+    <app/value> """
         { 
             "type": "object",
             "properties": {

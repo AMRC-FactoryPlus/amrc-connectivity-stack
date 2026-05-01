@@ -80,8 +80,9 @@ public class ConfigEntry extends RequestHandler.Component
     private static final Query Q_getRawValue = Vocab.query("""
         select ?value
         where {
-            [] a ?app; <app/for> ?obj;
-                <doc/content> ?value.
+            [] <app/app> ?app; 
+                <app/for> ?obj;
+                <app/value> ?value.
         }
     """);
 
@@ -94,10 +95,10 @@ public class ConfigEntry extends RequestHandler.Component
     private static final Query Q_getValue = Vocab.query("""
         select ?value ?etag
         where {
-            ?config a ?app;
+            ?config <app/app> ?app;
                 <app/for> ?obj;
-                <core/uuid> ?etag;
-                <doc/content> ?value.
+                <app/etag> ?etag;
+                <app/value> ?value.
         }
     """);
 
@@ -111,12 +112,11 @@ public class ConfigEntry extends RequestHandler.Component
      * could instead set an :end Instant and adjust getValue to only
      * look for entries without an end. */
     private static final UpdateRequest U_removeValue = Vocab.update("""
-        delete {
-            ?entry ?p ?o.
-        }
-        where {
-            ?entry a ?app; <app/for> ?obj.
-            ?entry ?p ?o.
+        delete where {
+            ?entry <app/app> ?app;
+                <app/for> ?obj;
+                <app/etag> ?etag;
+                <app/value> ?value.
         }
     """);
 
@@ -175,11 +175,23 @@ public class ConfigEntry extends RequestHandler.Component
             value.toString(), RDF.dtRDFJSON);
 
         var graph   = db().derived();
-        var entry   = db().createObject(app);
+        /* We used to create config entries as full F+ objects, where
+         * their ETag was their F+ UUID. The longer-term intention was
+         * to support 4Dish ideas modelling the entries as States, and
+         * keeping the history. But Jena does not seem to be able to
+         * cope with this, so for now at least we just create them as
+         * tag-soup. */
+        //var entry   = db().createObject(app);
         //var inst    = request().getInstant();
 
+        var uuid = UUID.randomUUID();
+        var entry = Vocab.configResource(uuid);
+        var etag = Vocab.uuidLiteral(uuid);
+
+        graph.add(entry, Vocab.App.app, app);
         graph.add(entry, Vocab.App.forP, obj);
-        graph.add(entry, Vocab.Doc.content, json);
+        graph.add(entry, Vocab.App.value, json);
+        graph.add(entry, Vocab.App.etag, etag);
         //graph.add(entry, Vocab.Time.start, inst);
     }
 }

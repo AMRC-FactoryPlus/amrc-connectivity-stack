@@ -285,7 +285,6 @@ INFLUX_BUCKET=default
 # i3X specific
 I3X_NAMESPACE_NAME=<organisation name from Helm values.organisation>
 I3X_NAMESPACE_URI=<organisation URI>
-I3X_POLL_INTERVAL=60000
 I3X_SUBSCRIPTION_TTL=300000
 I3X_STALE_THRESHOLD=300000
 

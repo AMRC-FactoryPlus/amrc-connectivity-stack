@@ -18,7 +18,14 @@ import type {
     I3xRelationshipType,
 } from "./types/i3x.js";
 
-import { RelType, HIERARCHY_SCHEMA_UUID } from "./constants.js";
+import {
+    RelType,
+    HIERARCHY_SCHEMA_UUID,
+    DEVICE_CLASS_UUID,
+    CONFIG_SCHEMA_APP_UUID,
+    INFO_APP_UUID,
+    DEVICE_INFORMATION_APP_UUID,
+} from "./constants.js";
 
 // Namespace for generating synthetic UUIDs for metric path segments
 // that don't have their own Instance_UUID.
@@ -29,11 +36,6 @@ import {
     toI3xObject,
     toI3xRelationshipType,
 } from "./mapping.js";
-
-const DEVICE_CLASS_UUID = "18773d6d-a70d-443a-b29a-3f1583195290";
-const CONFIG_SCHEMA_APP_UUID = "dbd8a535-52ba-4f6e-b4f8-9b71aefe09d3";
-const INFO_APP_UUID = "64a8bfa9-7772-45c4-9d1a-9e6290690957";
-const DEVICE_INFORMATION_APP_UUID = "a98ffed5-c613-4e70-bfd3-efeee250ade5";
 
 interface ObjectTreeOpts {
     fplus: any;

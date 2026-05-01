@@ -55,7 +55,7 @@ public final class Util {
     public static <T> T decodeLiteral (RDFNode node, Class<T> klass)
     {
         var dt = Option.of(TYPE_MAP.get(klass))
-            .getOrElseThrow(() -> new RuntimeException(
+            .getOrElseThrow(() -> new IllegalArgumentException(
                 "RDF decoding requested for unknown type: " + klass));
 
         return Try.success(node)

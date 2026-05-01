@@ -55,19 +55,14 @@ public final class RdfErr
         }
     }
 
-    public static class BadConfig extends SvcErr.Client
+    public static class BadConfig extends SvcErr.BadInput
     {
         private JsonValue config;
-
-        public BadConfig (JsonValue val)
-        {
+        public BadConfig (JsonValue val) {
             super("Invalid config entry");
             this.config = val;
         }
-
-        public int statusCode () { return 422; }
-        protected void extendJson (JsonObjectBuilder obj)
-        {
+        protected void extendJson (JsonObjectBuilder obj) {
             obj.add("config", config);
         }
     }
@@ -83,21 +78,7 @@ public final class RdfErr
             obj.add("uuid", uuid.toString());
         }
     }
-    public static class RankMismatch extends SvcErr.Client
-    {
-        public RankMismatch () { super("Rank mismatch"); }
-        public int statusCode () { return 409; }
-    }
-    public static class NotMember extends SvcErr.Client
-    {
-        public NotMember () { super("Not a member of a required class"); }
-        public int statusCode () { return 409; }
-    }
-    public static class InUse extends SvcErr.Client
-    {
-        public InUse () { super("Object in use"); }
-        public int statusCode () { return 409; }
-    }
+
     public static class Immutable extends SvcErr.Client
     {
         public Immutable () { super("Object is immutable"); }
@@ -108,7 +89,15 @@ public final class RdfErr
         }
     }
 
-    public static class InvalidObjs extends SvcErr.Client
+    public static class RankMismatch extends SvcErr.Conflict
+    {
+        public RankMismatch () { super("Rank mismatch"); }
+    }
+    public static class InUse extends SvcErr.Conflict
+    {
+        public InUse () { super("Object in use"); }
+    }
+    public static class InvalidObjs extends SvcErr.Conflict
     {
         private List<UUID> objects;
         public InvalidObjs (String msg, List<UUID> objects)
@@ -116,7 +105,6 @@ public final class RdfErr
             super(msg);
             this.objects = objects;
         }
-        public int statusCode () { return 409; }
         protected void extendJson (JsonObjectBuilder obj)
         {
             obj.add("objects", objects
@@ -132,8 +120,7 @@ public final class RdfErr
             super("Schema conflicts with existing objects", conflicts);
         }
     }
-
-    public static class InvalidIris extends SvcErr.Client
+    public static class InvalidIris extends SvcErr.Conflict
     {
         private List<Resource> iris;
         public InvalidIris (String msg, List<Resource> iris)
@@ -141,7 +128,6 @@ public final class RdfErr
             super(msg);
             this.iris = iris;
         }
-        public int statusCode () { return 409; }
         protected void extendJson (JsonObjectBuilder obj)
         {
             obj.add("iris", iris
@@ -150,8 +136,7 @@ public final class RdfErr
                 .build());
         }
     }
-
-    public static class InvalidRels extends SvcErr.Client
+    public static class InvalidRels extends SvcErr.Conflict
     {
         private Map<UUID, UUID> relations;
         public InvalidRels (String msg, Map<UUID, UUID> relations)
@@ -159,7 +144,6 @@ public final class RdfErr
             super(msg);
             this.relations = relations;
         }
-        public int statusCode () { return 409; }
         protected void extendJson (JsonObjectBuilder obj)
         {
             obj.add("relations", 

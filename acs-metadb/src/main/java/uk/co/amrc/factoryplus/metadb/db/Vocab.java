@@ -37,11 +37,16 @@ public class Vocab
     public static final Property primary    = prop("core/primary");
     public static final Property name       = prop("core/name");
     public static final Property deleted    = prop("core/deleted");
+    public static final Property owner      = prop("core/owner");
     public static final Property powersetOf = prop("core/powersetOf");
 
     public static final Resource Special    = res("core/Special");
     public static final Resource Wildcard   = res("core/Wildcard");
     public static final Resource Unowned    = res("core/Unowned");
+
+    public static final UUID U_MetaDB       = U("8abf031c-193f-11f1-b047-d762a2934dfc");
+    public static final UUID U_Unowned      = U("091e796a-65c0-4080-adff-c3ce01a65b2e");
+    public static final UUID U_Wildcard     = U("00000000-0000-0000-0000-000000000000");
 
     public static class Sys {
         public static final Resource core           = res("core");
@@ -84,17 +89,12 @@ public class Vocab
         public static final Resource Info           = res("app/Info");
         public static final Resource SparkplugAddr  = res("app/SparkplugAddress");
 
+        public static final UUID U_Registration     = U("cb40bed5-49ad-4443-a7f5-08c75009da8f");
         public static final UUID U_ConfigSchema     = U("dbd8a535-52ba-4f6e-b4f8-9b71aefe09d3");
+        public static final UUID U_SparkplugAddr    = U("8e32801b-f35a-4cbf-a5c3-2af64d3debd7");
 
         public static final Property forP           = prop("app/for");
         public static final Property value          = prop("app/value");
-    }
-
-    /* This is for the bootstrap ACLs. */
-    public static class Target {
-        public static final UUID Registration = U("cb40bed5-49ad-4443-a7f5-08c75009da8f");
-        public static final UUID SparkplugAddr = U("8e32801b-f35a-4cbf-a5c3-2af64d3debd7");
-        public static final UUID Wildcard = U("00000000-0000-0000-0000-000000000000");
     }
 
     public static class Perm {
@@ -127,9 +127,6 @@ public class Vocab
     public static final Resource G_derived  = res("graph/derived");
     public static final Resource G_added    = res("graph/added");
     public static final Resource G_removed  = res("graph/removed");
-
-    public static final UUID U_MetaDB       = U("8abf031c-193f-11f1-b047-d762a2934dfc");
-    public static final UUID U_Unowned      = U("091e796a-65c0-4080-adff-c3ce01a65b2e");
 
     public static Literal uuidLiteral (UUID uuid)
     {

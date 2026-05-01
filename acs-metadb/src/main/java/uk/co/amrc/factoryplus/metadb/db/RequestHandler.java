@@ -8,6 +8,7 @@ package uk.co.amrc.factoryplus.metadb.db;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -44,8 +45,8 @@ public class RequestHandler
     private Lazy<Resource> now;
     private String upn;
 
-    /* Initialised by start() */
     private FPAuth.Checker checker;
+    private UUID clientUUID;
 
     public RequestHandler (RdfStore db, SecurityContext ctx)
     {
@@ -60,24 +61,54 @@ public class RequestHandler
     public Resource getInstant () { return now.get(); }
     public String upn () { return upn; }
 
-    /* This will throw if we can't contact the Auth service. It's
-     * important this throws on-thread as we need to abort the current
+    /* These will throw if we can't contact the Auth service. It's
+     * important they throws on-thread as we need to abort the current
      * HTTP request. It's also important we fetch this before the txn
      * starts to avoid attempting external network access with a txn
      * open. */
-    public RequestHandler start ()
+    public RequestHandler fetchACL ()
     {
         checker = db().fplus().auth()
             .fetchChecker(upn)
             .blockingGet();
         return this;
     }
+    public RequestHandler fetchClientUUID ()
+    {
+        log.info("Fetching client UUID");
+        var auth = db().fplus().auth();
+        if (auth.isRoot(upn)) {
+            /* XXX This is specific to the ConfigDB ownership setup;
+             * maybe instead of Unowned we should always have used the
+             * root principal UUID? But in an ideal world that would not
+             * be fixed but be per-installation. Maybe Unowned should be
+             * generalised to a 'virtual Principal' representing 'users
+             * who are acting as root'. In that case this special-casing
+             * could be moved into FPAuth. */
+            clientUUID = Vocab.U_Unowned;
+        }
+        else {
+            clientUUID = db().fplus().auth()
+                .resolveIdentity("kerberos", upn)
+                .blockingGet()
+                .getOrElseThrow(() -> new SvcErr.Upstream("I don't know who you are"));
+        }
+        return this;
+    }
 
+    /* These are not necessarily available. Calling them when they have
+     * not been set up will throw a null pointer exception; this is
+     * expected, it indicates an internal error. The framework should
+     * catch these errors and return 500. */
     public void checkACL (UUID perm, UUID target)
     {
         log.info("Checking permission for {} / {}", perm, target);
         if (!checker.check(perm, target))
             throw new SvcErr.Forbidden();
+    }
+    public UUID clientUUID ()
+    {
+        return Objects.requireNonNull(clientUUID);
     }
 
     public ObjectStructure objectStructure ()

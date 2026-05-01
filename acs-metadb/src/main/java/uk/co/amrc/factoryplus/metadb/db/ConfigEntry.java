@@ -144,7 +144,9 @@ public class ConfigEntry extends RequestHandler.Component
         if (!schemas.validate(app, value))
             throw new RdfErr.BadConfig(value);
 
-        if (isStructured())
+        if (app.equals(Vocab.App.Registration))
+            request().objectStructure().updateRegistration(obj, value);
+        else if (isStructured())
             db().appMapper().updateConfig(app, obj, value);
         else
             putRawValue(value);
@@ -154,6 +156,12 @@ public class ConfigEntry extends RequestHandler.Component
             schemas.updateSchemas(List.of(obj));
     }
 
+    /* This creates a ConfigEntry object. We do not attempt to set
+     * ownership on the new object, even though we potentially have this
+     * information available, as it isn't clear what compatibility
+     * effects this would have. It also isn't clear that it makes sense
+     * when the entry may be derived from a different entry via the RDF
+     * mappings. */
     public void putRawValue (JsonValue value)
     {
         var existing = getRawValue()

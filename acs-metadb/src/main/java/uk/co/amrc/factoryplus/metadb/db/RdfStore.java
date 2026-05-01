@@ -148,8 +148,21 @@ public class RdfStore
 
     public <T> T requestRead (SecurityContext ctx, Function<RequestHandler, T> cb)
     {
-        var req = new RequestHandler(this, ctx).start();
+        var req = new RequestHandler(this, ctx).fetchACL();
         return calculateRead(() -> cb.apply(req));
+    }
+    public <T> T requestWrite (SecurityContext ctx, Function<RequestHandler, T> cb)
+    {
+        return requestWrite(ctx, false, cb);
+    }
+    public void requestExecute (SecurityContext ctx, boolean needClientUUID,
+        Consumer<RequestHandler> cb)
+    {
+        requestWrite(ctx, needClientUUID, req -> { cb.accept(req); return 1; });
+    }
+    public void requestExecute (SecurityContext ctx, Consumer<RequestHandler> cb)
+    {
+        requestExecute(ctx, false, cb);
     }
 
     /* Jena ModelChangedListeners do not appear to respect inference
@@ -175,10 +188,13 @@ public class RdfStore
      * for a change in one rank to propagate into other ranks. If we
      * introduced inference for powertypes this would change.
      */
-    public <T> T requestWrite (SecurityContext ctx, Function<RequestHandler, T> cb)
+    public <T> T requestWrite (SecurityContext ctx, boolean needClientUUID,
+        Function<RequestHandler, T> cb)
     {
-        var req = new RequestHandler(this, ctx)
-            .start();
+        var req = new RequestHandler(this, ctx).fetchACL();
+        log.info("requestWrite: needClientUUID {}", needClientUUID);
+        if (needClientUUID)
+            req.fetchClientUUID();
         var listener = new ModelUpdate();
         T rv;
 
@@ -213,10 +229,6 @@ public class RdfStore
         });
 
         return rv;
-    }
-    public void requestExecute (SecurityContext ctx, Consumer<RequestHandler> cb)
-    {
-        requestWrite(ctx, req -> { cb.accept(req); return 1; });
     }
 
     /* This has been made private because of the exceptions detailed

@@ -86,6 +86,11 @@ public class SvcErr extends Error
 
         public int statusCode () { return 404; }
     }
+    public static class Conflict extends SvcErr.Client
+    {
+        public Conflict (String msg) { super(msg); }
+        public int statusCode () { return 409; }
+    }
     public static class InvalidName extends Client
     {
         public InvalidName (String name)
@@ -107,9 +112,14 @@ public class SvcErr extends Error
             super("Unexpected JSON value: " + val.toString());
         }
     }
-    public static class Timeout extends Client
+
+    public static class Upstream extends Client
+    {
+        public Upstream (String msg) { super(msg); }
+        public int statusCode () { return 503; }
+    }
+    public static class Timeout extends Upstream
     {
         public Timeout () { super("Upstream timeout"); }
-        public int statusCode () { return 503; }
     }
 }

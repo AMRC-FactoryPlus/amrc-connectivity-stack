@@ -12,6 +12,8 @@ import org.apache.hc.core5.http.ProtocolException;
 
 import org.json.*;
 
+import io.vavr.control.Option;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,6 +76,15 @@ public class JsonResponse
     public Optional<JsonResponse> ifOk ()
     {
         return ok() ? Optional.of(this) : Optional.<JsonResponse>empty();
+    }
+
+    /** Handle success using Vavr Option.
+     * Returns Option.some() of the body if this is a successful
+     * response containing a body. Returns Option.none() otherwise.
+     */
+    public Option<Object> toOption ()
+    {
+        return ok() ? Option.ofOptional(body) : Option.none();
     }
 
     /** Fetches a header.

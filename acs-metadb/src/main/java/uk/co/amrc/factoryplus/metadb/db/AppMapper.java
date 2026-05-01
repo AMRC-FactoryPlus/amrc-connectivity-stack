@@ -133,10 +133,11 @@ public class AppMapper {
 
     public void updateConfig (Resource app, Resource obj, JsonValue config)
     {
-        if (app.equals(Vocab.App.Registration)) {
-            updateRegistration(obj, config);
-            return;
-        }
+        /* Updates to Registration entries have their own permissions
+         * handling and must be special-cased in the RequestHandler. */
+        if (app.equals(Vocab.App.Registration))
+            throw new IllegalArgumentException(
+                "updateConfig cannot handle Registration entries");
 
         var sol = jsonToSolution(config);
 
@@ -147,61 +148,6 @@ public class AppMapper {
                 .substitution(sol)
                 .substitution("obj", obj)
                 .execute());
-    }
-
-    /* XXX This assumes JSON schema validation has been performed.
-     * Currently this is not implemented nor is a schema installed for
-     * the Registration app. */
-    private void updateRegistration (Resource obj, JsonValue config)
-    {
-        if (!(config instanceof JsonObject))
-            throw new SvcErr.BadJson(config);
-        var spec = (JsonObject)config;
-
-        if (!spec.getBoolean("strict")) {
-            log.info("Objects must be strict");
-            throw new SvcErr.BadJson(spec.get("strict"));
-        }
-        if (!spec.getString("owner").equals(Vocab.U_Unowned.toString())) {
-            log.info("Owners not implemented yet");
-            throw new SvcErr.Forbidden();
-        }
-
-        var rank = db.findRank(obj);
-        if (spec.getInt("rank") != rank) {
-            log.info("Rank changes can only be made via dumps");
-            throw new RdfErr.RankMismatch();
-        }
-
-        var model = db.derived();
-        var uuid = Util.single(model.listObjectsOfProperty(obj, Vocab.uuid))
-            .map(AppMapper::literalToJson)
-            .getOrElseThrow(() -> new RdfErr.CorruptRDF("Cannot find object UUID"));
-        if (!spec.get("uuid").equals(uuid)) {
-            log.info("UUIDs cannot be changed: {} vs {}", uuid, spec.get("uuid"));
-            throw new SvcErr.BadJson(spec.get("uuid"));
-        }
-
-        var klass = Decoders.parseUUID(spec.getString("class"))
-            .flatMap(db::findObject)
-            .getOrElseThrow(() -> {
-                log.info("Cannot find new primary class");
-                return new SvcErr.BadJson(spec.get("class"));
-            });
-        /* This is a change from the JS implementation; here we require
-         * the object to already be a member of the new primary class.
-         * The ConfigDB will create a new direct membership if needed,
-         * but will not remove it again if the primary class changes.
-         * This is inconsistent and so has been changed. */
-        if (!model.contains(obj, RDF.type, klass)) {
-            log.info("Object not a member of new primary class");
-            throw new RdfErr.NotMember();
-        }
-        model.removeAll(obj, Vocab.primary, null);
-        model.add(obj, Vocab.primary, klass);
-
-        model.removeAll(obj, Vocab.deleted, null);
-        model.addLiteral(obj, Vocab.deleted, spec.getBoolean("deleted"));
     }
 
     /* Currently this does dynamic decoding based on what was returned

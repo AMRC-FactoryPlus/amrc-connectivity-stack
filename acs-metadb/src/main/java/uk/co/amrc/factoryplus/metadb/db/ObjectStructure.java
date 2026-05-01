@@ -18,7 +18,7 @@ import org.apache.jena.update.*;
 import org.apache.jena.vocabulary.*;
 
 import io.vavr.collection.Iterator;
-import io.vavr.control.Option;
+import io.vavr.control.*;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -77,26 +77,6 @@ public class ObjectStructure extends RequestHandler.Component
             .toJavaList();
     }
 
-    /* TXN */
-    private Resource setPrimaryClass (Resource obj, Resource klass)
-    {
-        log.info("Set primary class: {}, {}", obj, klass);
-
-        var orank = db().findRank(obj);
-        var krank = db().findRank(klass);
-
-        if (krank != orank + 1)
-            throw new RdfErr.RankMismatch();
-
-        var model = db().derived();
-        model.removeAll(obj, Vocab.primary, null);
-        model.add(obj, Vocab.primary, klass);
-        if (!model.contains(obj, RDF.type, klass))
-            model.add(obj, RDF.type, klass);
-
-        return obj;
-    }
-
     /* XXX The JS API is careful about returning 201 when the object was
      * created. The JS ServiceClient uses this to provide an 'exclusive
      * create' feature. However I have moved away from thinking this is
@@ -112,14 +92,17 @@ public class ObjectStructure extends RequestHandler.Component
             uuid.isEmpty() ? Vocab.Perm.CreateObj : Vocab.Perm.CreateSpecificObj,
             klass);
 
-        var kres = db().findObjectOrError(klass);
+        var kres = db().findObject(klass)
+            .getOrElseThrow(() -> new SvcErr.Conflict("Primary class not found"));
 
         var obj = uuid
             .map(u -> db().findObject(u)
-                .map(o -> { log.info("Found object {}", o); return o; })
-                .map(o -> setPrimaryClass(o, kres))
+                .peek(o -> updatePrimary(o, kres))
                 .getOrElse(() -> db().createObject(kres, u)))
             .getOrElse(() -> db().createObject(kres));
+
+        updateOwner(obj, request().clientUUID());
+        updateDeleted(obj, false);
 
         return db().appMapper()
             .generateConfig(Vocab.App.Registration, obj)
@@ -175,6 +158,109 @@ public class ObjectStructure extends RequestHandler.Component
 
         db().runUpdate(U_deleteConfigs, "obj", obj);
         model.removeAll(obj, null, null);
+    }
+
+    /* XXX This assumes JSON schema validation has been performed. The
+     * appropriate schema is installed by core.ttl but there are no
+     * protections to prevent it from being removed or changed. */
+    public void updateRegistration (Resource obj, JsonValue config)
+    {
+        var spec = (JsonObject)config;
+
+        var primary = Try.of(() -> spec.getString("class"))
+            .flatMap(Decoders::tryParseUUID)
+            .orElse(() -> Try.failure(new SvcErr.BadInput("Invalid class UUID")))
+            .mapTry(classU -> db().findObject(classU)
+                .getOrElseThrow(() -> new SvcErr.Conflict("Primary class not found")))
+            .get();
+        var owner = Try.of(() -> spec.getString("owner"))
+            .flatMap(Decoders::tryParseUUID)
+            .getOrElseThrow(() -> new SvcErr.BadInput("Invalid owner UUID"));
+        var deleted = Try.of(() -> spec.getBoolean("deleted"))
+            .getOrElseThrow(() -> new SvcErr.BadInput("Invalid deleted flag"));
+
+        checkRegInvariants(obj, spec);
+        updatePrimary(obj, primary);
+        updateOwner(obj, owner);
+        updateDeleted(obj, deleted);
+    }
+
+    private void updateDeleted (Resource obj, boolean deleted)
+    {
+        var model = db().derived();
+        model.removeAll(obj, Vocab.deleted, null);
+        model.addLiteral(obj, Vocab.deleted, deleted);
+    }
+
+    private void checkRegInvariants (Resource obj, JsonObject spec)
+    {
+        Try.of(() -> spec.getBoolean("strict"))
+            .orElse(() -> Try.failure(new SvcErr.BadInput("Invalid strict flag")))
+            .filterTry(s -> s, () -> new SvcErr.BadInput("Objects must be strict"))
+            .get();
+
+        var specUuid = Try.of(() -> spec.getString("uuid"))
+            .flatMap(Decoders::tryParseUUID)
+            .getOrElseThrow(() -> new SvcErr.BadInput("Invalid object UUID"));
+
+        var model = db().derived();
+
+        /* XXX We have to look up the object UUID again here because
+         * we've lost track of it. This is a syntactic error and returns
+         * 422; it should not need to access the database. */
+        var dbUuid = Util.single(model.listObjectsOfProperty(obj, Vocab.uuid))
+            .map(l -> Util.decodeLiteral(l, UUID.class))
+            .getOrElseThrow(() -> new RdfErr.CorruptRDF("Cannot find object UUID"));
+        if (!specUuid.equals(dbUuid))
+            throw new SvcErr.BadInput("UUIDs cannot be changed");
+
+        /* This is a semantic error, it depends on the current rank, so
+         * it returns 409. */
+        var rank = db().findRank(obj);
+        if (spec.getInt("rank") != rank) {
+            log.info("Rank changes can only be made via dumps");
+            throw new RdfErr.RankMismatch();
+        }
+    }
+
+    private void updateOwner (Resource obj, UUID toU)
+    {
+        var model = db().derived();
+        var client = request().clientUUID();
+        var fromU = Util.single(model.listObjectsOfProperty(obj, Vocab.owner))
+            .map(l -> Util.decodeLiteral(l, UUID.class))
+            .getOrElse(Vocab.U_Unowned);
+
+        if (toU.equals(fromU)) return;
+        
+        /* We must have TakeFrom the old owner and GiveTo the new owner.
+         * Everyone implicitly has: TakeFrom Self; GiveTo Self, Unowned. */
+        if (!fromU.equals(client))
+            request().checkACL(Vocab.Perm.TakeFrom, fromU);
+        if (!toU.equals(Vocab.U_Unowned) && !toU.equals(client))
+            request().checkACL(Vocab.Perm.GiveTo, toU);
+
+        model.removeAll(obj, Vocab.owner, null);
+        if (!toU.equals(Vocab.U_Unowned)) {
+            var toR = db().findObject(toU)
+                .getOrElseThrow(() -> new SvcErr.Conflict("Owner not found"));
+            model.add(obj, Vocab.owner, toR);
+        }
+    }
+
+    private void updatePrimary (Resource obj, Resource classR)
+    {
+        var model = db().derived();
+
+        /* This is a change from the JS implementation; here we require
+         * the object to already be a member of the new primary class.
+         * The ConfigDB will create a new direct membership if needed,
+         * but will not remove it again if the primary class changes.
+         * This is inconsistent and so has been changed. */
+        if (!model.contains(obj, RDF.type, classR))
+            throw new SvcErr.Conflict("Not a member of primary class");
+        model.removeAll(obj, Vocab.primary, null);
+        model.add(obj, Vocab.primary, classR);
     }
 
     public List<String> listRelation (boolean direct, UUID uuid, String relation)

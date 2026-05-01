@@ -60,7 +60,7 @@ public class V2Objects {
         /* We don't accept any other parameters. The ServiceClient
          * doesn't pass any anyway. */
 
-        return db.requestWrite(auth, req ->
+        return db.requestWrite(auth, true, req ->
             req.objectStructure().createObject(klass, uuid));
     }
 

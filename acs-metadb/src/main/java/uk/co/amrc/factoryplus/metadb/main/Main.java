@@ -68,12 +68,12 @@ public final class Main {
         
         var acls = HashMap.of(
             "auth_principal", List.of(
-                new Grant(Vocab.Perm.ReadApp, Vocab.Target.Registration),
+                new Grant(Vocab.Perm.ReadApp, Vocab.App.U_Registration),
                 /* XXX I'm not sure why this is needed? */
-                new Grant(Vocab.Perm.ReadApp, Vocab.Target.SparkplugAddr),
+                new Grant(Vocab.Perm.ReadApp, Vocab.App.U_SparkplugAddr),
                 /* XXX These are broader than strictly necessary. */
-                new Grant(Vocab.Perm.ReadMembers, Vocab.Target.Wildcard),
-                new Grant(Vocab.Perm.ReadSubclasses, Vocab.Target.Wildcard)));
+                new Grant(Vocab.Perm.ReadMembers, Vocab.U_Wildcard),
+                new Grant(Vocab.Perm.ReadSubclasses, Vocab.U_Wildcard)));
 
         var resolved = acls
             .mapKeys(fplus::getOptionConf)

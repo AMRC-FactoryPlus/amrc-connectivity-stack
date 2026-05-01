@@ -178,6 +178,7 @@ public class BulkOperations extends RequestHandler.Component
          * future but it's not simple to see what to do. */
         model.add(o.iri(), Vocab.uuid, Vocab.uuidLiteral(o.uuid()));
         model.removeAll(o.iri(), Vocab.deleted, null);
+        model.removeAll(o.iri(), Vocab.owner, null);
         model.removeAll(o.iri(), Vocab.name, null);
         o.name().peek(n -> model.add(o.iri(), Vocab.name, n));
     }

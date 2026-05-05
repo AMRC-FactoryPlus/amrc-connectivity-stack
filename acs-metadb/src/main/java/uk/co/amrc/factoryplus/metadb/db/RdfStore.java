@@ -223,8 +223,11 @@ public class RdfStore
         var update = listener.dataset(derived);
         /* It is important that all dataflow processing that queries the
          * update dataset happens syncronously. Otherwise it won't be in
-         * this transaction. */
-        update.executeRead(() -> {
+         * this transaction. The transaction is on our own Dataset,
+         * even though we will also be querying the update Dataset; this
+         * is important as Jena does not handle transactions via
+         * multiple Datasets referencing the same TDB correctly. */
+        executeRead(() -> {
             dataflow.modelUpdate(update);
         });
 

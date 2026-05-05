@@ -1,0 +1,17 @@
+{{- if .Values.grafana.enabled }}
+{{- $proto := .Values.acs.secure | ternary "https://" "http://" }}
+{{- $openid := printf "%sopenid.%s" $proto (.Values.acs.baseUrl | required "values.acs.baseUrl is required") }}
+{{- $grafana := printf "%sgrafana.%s" $proto (.Values.acs.baseUrl | required "values.acs.baseUrl is required") }}
+{{- $realm := printf "%s/realms/%s" $openid (.Values.openid.realm | required "values.openid.realm is required") }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: acs-grafana-config
+  namespace: {{ .Release.Namespace }}
+data:
+  root_url: {{ $grafana | quote }}
+  auth_url: {{ printf "%s/protocol/openid-connect/auth" $realm | quote }}
+  token_url: {{ printf "%s/protocol/openid-connect/token" $realm | quote }}
+  api_url: {{ printf "%s/protocol/openid-connect/userinfo" $realm | quote }}
+  signout_redirect_url: {{ printf "%s/protocol/openid-connect/logout?post_logout_redirect_uri=%s&client_id=grafana" $realm $grafana | quote }}
+{{- end }}

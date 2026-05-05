@@ -175,6 +175,38 @@ serviceSetup:
     helmChart:
       # Chart to deploy an edge cluster
       #cluster: null
+    # OIDC clients to provision in Keycloak. Each entry generates a
+    # LocalSecret holding the client_secret in keycloak-clients/<key>.
+    # Set builtin: true to skip client creation and only map roles to
+    # the admin user (used for Keycloak's own realm-management client).
+    openidClients:
+      grafana:
+        enabled: true
+        name: Grafana
+        redirectPath: /login/generic_oauth
+        roles:
+          - { name: viewer }
+          - { name: editor }
+          - { name: admin }
+          - { name: grafanaAdmin }
+        defaultRoles: [viewer]
+        adminRoles: [grafanaAdmin]
+      realm-management:
+        enabled: true
+        builtin: true
+        adminRoles:
+          - view-realm
+          - view-users
+          - view-clients
+          - view-events
+          - manage-realm
+          - manage-users
+          - create-client
+          - manage-clients
+          - manage-events
+          - view-identity-providers
+          - manage-identity-providers
+          - impersonation
 
 edgeHelm:
   enabled: true
@@ -366,13 +398,46 @@ grafana:
   admin:
     existingSecret: grafana-admin-user
   grafana.ini:
+    server:
+      root_url: "$__file{/etc/acs-config/root_url}"
+    auth:
+      # Keep the local form available as a fallback if Keycloak is
+      # unreachable. The seed admin user logs in this way.
+      disable_login_form: false
+      oauth_auto_login: false
     auth.basic:
       enabled: false
-    auth.proxy:
+    auth.generic_oauth:
       enabled: true
-      header_name: X-Auth-Principal
-      header_property: username
-      auto_sign_up: true
+      name: "Factory+"
+      allow_sign_up: true
+      client_id: grafana
+      client_secret: $__file{/etc/secrets/auth_generic_oauth/grafana}
+      scopes: openid profile email
+      auth_url: $__file{/etc/acs-config/auth_url}
+      token_url: $__file{/etc/acs-config/token_url}
+      api_url: $__file{/etc/acs-config/api_url}
+      signout_redirect_url: $__file{/etc/acs-config/signout_redirect_url}
+      role_attribute_path: >-
+        contains(roles[*], 'grafanaAdmin') && 'GrafanaAdmin'
+        || contains(roles[*], 'admin') && 'Admin'
+        || contains(roles[*], 'editor') && 'Editor'
+        || 'Viewer'
+      allow_assign_grafana_admin: true
+  extraConfigmapMounts:
+    - name: acs-grafana-config
+      mountPath: /etc/acs-config
+      configMap: acs-grafana-config
+      readOnly: true
+  extraSecretMounts:
+    - name: keycloak-client-grafana
+      secretName: keycloak-clients
+      defaultMode: 0440
+      mountPath: /etc/secrets/auth_generic_oauth
+      readOnly: true
+      items:
+        - key: grafana
+          path: grafana
   sidecar:
     datasources:
       enabled: true

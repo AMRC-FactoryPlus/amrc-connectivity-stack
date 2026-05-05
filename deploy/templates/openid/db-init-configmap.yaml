@@ -1,0 +1,37 @@
+{{- if .Values.openid.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: openid-db-init
+  namespace: {{ .Release.Namespace }}
+data:
+  keycloak-init.sql: |
+    -- Idempotent role + database creation for Keycloak. Run as
+    -- op1pgadmin connected to the 'postgres' database. Keycloak
+    -- itself runs its own schema migrations on startup, so this
+    -- file only needs to ensure the role and DB exist.
+
+    \set ON_ERROR_STOP
+
+    \set db   `echo $SRV_DATABASE`
+    \set role `echo $SRV_USER`
+
+    select
+        exists(select 1 from pg_database where datname = :'db')   has_db,
+        exists(select 1 from pg_roles    where rolname = :'role') has_role
+    \gset
+
+    \if :has_role
+    \else
+        \echo Creating database role :"role"
+        create user :"role";
+    \endif
+
+    \if :has_db
+    \else
+        \echo Creating database :"db"
+        create database :"db" owner :"role";
+    \endif
+
+    grant all on database :"db" to :"role";
+{{- end }}

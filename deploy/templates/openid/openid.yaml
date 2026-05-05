@@ -1,0 +1,171 @@
+{{- if .Values.openid.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openid
+  namespace: {{ .Release.Namespace }}
+  labels:
+    component: openid
+spec:
+  # Postgres-backed Keycloak permits HA, but this chart stays
+  # single-replica for parity with auth/configdb. Recreate avoids
+  # ever running two pods at once during a rollout.
+  strategy:
+    type: Recreate
+  replicas: 1
+  selector:
+    matchLabels:
+      component: openid
+  template:
+    metadata:
+      labels:
+        component: openid
+        factory-plus.service: openid
+    spec:
+      {{- with .Values.acs.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: krb5-conf
+          configMap:
+            name: krb5-conf
+        # The db-init container needs the op1pgadmin keytab to create
+        # the keycloak DB; the main container needs sv1openid (client)
+        # to log in to that DB. Server keytab is the SPNEGO HTTP key.
+        - name: krb5-keytabs-dbinit
+          secret:
+            secretName: krb5-keytabs
+            items:
+              - path: dbadmin
+                key: op1pgadmin
+        - name: krb5-keytabs
+          secret:
+            secretName: krb5-keytabs
+            defaultMode: 0440
+            items:
+              - path: client
+                key: sv1openid
+              - path: server
+                key: http.openid
+        - name: db-init-sql
+          configMap:
+            name: openid-db-init
+        - name: jaas
+          configMap:
+            name: openid-jaas
+
+      initContainers:
+        - name: db-init
+{{ include "amrc-connectivity-stack.image" (list . .Values.auth) | indent 10 }}
+          command: [ "/usr/bin/k5start", "-Uf", "/keytabs/dbadmin", "/usr/local/bin/psql" ]
+          args: [ "-w", "-q", "-f", "/sql/keycloak-init.sql" ]
+          env:
+            - name: KRB5_CONFIG
+              value: /config/krb5-conf/krb5.conf
+            - name: PGHOST
+              value: postgres.{{ .Release.Namespace }}.svc.cluster.local
+            - name: PGUSER
+              value: op1pgadmin
+            - name: PGDATABASE
+              value: postgres
+            - name: SRV_DATABASE
+              value: keycloak
+            - name: SRV_USER
+              value: sv1openid
+          volumeMounts:
+            - mountPath: /config/krb5-conf
+              name: krb5-conf
+            - mountPath: /keytabs
+              name: krb5-keytabs-dbinit
+            - mountPath: /sql
+              name: db-init-sql
+
+      containers:
+        - name: keycloak
+          image: "{{ .Values.openid.image.registry }}/{{ .Values.openid.image.repository }}:{{ .Values.openid.image.tag }}"
+          imagePullPolicy: {{ .Values.openid.image.pullPolicy }}
+          args: [ "start", "--optimized=false" ]
+          env:
+            # Database — GSSAPI via JAAS (see jaas-configmap.yaml)
+            - name: KC_DB
+              value: postgres
+            - name: KC_DB_URL_HOST
+              value: postgres.{{ .Release.Namespace }}.svc.cluster.local
+            - name: KC_DB_URL_DATABASE
+              value: keycloak
+            - name: KC_DB_URL_PROPERTIES
+              value: "?gssEncMode=require&jaasApplicationName=pgjdbc"
+            - name: KC_DB_USERNAME
+              value: sv1openid
+            # Empty password — pgjdbc still requires the field to be set
+            # but the JAAS Krb5LoginModule supplies the credentials.
+            - name: KC_DB_PASSWORD
+              value: ""
+
+            # HTTP / proxy — Traefik terminates TLS upstream
+            - name: KC_HOSTNAME
+              value: {{ include "amrc-connectivity-stack.external-url" (list . "openid") }}
+            - name: KC_HTTP_ENABLED
+              value: "true"
+            - name: KC_PROXY_HEADERS
+              value: xforwarded
+            - name: KC_HEALTH_ENABLED
+              value: "true"
+
+            # Initial admin user (for bootstrapping the realm via service-setup)
+            - name: KEYCLOAK_ADMIN
+              value: _bootstrap
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-clients
+                  key: _bootstrap
+
+            # JVM Kerberos config. The JVM ignores KRB5_CONFIG, so we
+            # have to point java.security.krb5.conf at the cluster
+            # krb5.conf explicitly.
+            - name: JAVA_OPTS_APPEND
+              value: >-
+                -Djava.security.krb5.conf=/config/krb5-conf/krb5.conf
+                -Djava.security.auth.login.config=/etc/jaas/login.conf
+                -Djavax.security.auth.useSubjectCredsOnly=false
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: management
+              containerPort: 9000
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 9000
+            periodSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 9000
+            periodSeconds: 30
+            failureThreshold: 5
+          volumeMounts:
+            - mountPath: /config/krb5-conf
+              name: krb5-conf
+            - mountPath: /etc/keytabs
+              name: krb5-keytabs
+            - mountPath: /etc/jaas
+              name: jaas
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: openid
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    factory-plus.service: openid
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+{{- end }}

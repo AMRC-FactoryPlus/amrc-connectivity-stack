@@ -54,14 +54,16 @@ public class V2Objects {
         var uuid = Option.of(spec.get("uuid"))
             .filter(v -> !v.equals(JsonValue.NULL))
             .map(this::jsonUUID);
+        var owner = Option.of(spec.get("owner"))
+            .map(this::jsonUUID);
 
-        log.info("Create object {}, {}", klass, uuid);
+        log.info("Create object {}, {}, {}", klass, uuid, owner);
 
         /* We don't accept any other parameters. The ServiceClient
          * doesn't pass any anyway. */
 
         return db.requestWrite(auth, true, req ->
-            req.objectStructure().createObject(klass, uuid));
+            req.objectStructure().createObject(klass, uuid, owner));
     }
 
     @DELETE @Path("object/{object}")

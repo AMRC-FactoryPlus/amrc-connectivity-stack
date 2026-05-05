@@ -86,27 +86,46 @@ public class ObjectStructure extends RequestHandler.Component
      * the required information, but it would make a mess of the return
      * value of this method. The most sensible option would be to return
      * a Jakarta Response, which is a clear layer violation. */
-    public JsonValue createObject (UUID klass, Option<UUID> uuid)
+    public JsonValue createObject (UUID classU, Option<UUID> uuid, Option<UUID> owner)
     {
         request().checkACL(
             uuid.isEmpty() ? Vocab.Perm.CreateObj : Vocab.Perm.CreateSpecificObj,
-            klass);
+            classU);
 
-        var kres = db().findObject(klass)
+        var classR = db().findObject(classU)
             .getOrElseThrow(() -> new SvcErr.Conflict("Primary class not found"));
 
         var obj = uuid
-            .map(u -> db().findObject(u)
-                .peek(o -> updatePrimary(o, kres))
-                .getOrElse(() -> db().createObject(kres, u)))
-            .getOrElse(() -> db().createObject(kres));
+            .flatMap(db()::findObject)
+            .peek(o -> updatePrimary(o, classR))
+            .getOrElse(() -> createNewObject(classR, uuid));
 
-        updateOwner(obj, request().clientUUID());
+        var ownerU = owner.getOrElse(request()::clientUUID);
+
+        updateOwner(obj, ownerU);
         updateDeleted(obj, false);
 
         return db().appMapper()
             .generateConfig(Vocab.App.Registration, obj)
             .getOrElseThrow(() -> new RdfErr.CorruptRDF("Cannot find object registration"));
+    }
+
+    private Resource createNewObject (Resource classR, Option<UUID> objU)
+    {
+        /* This is an Upstream error even though we don't strictly have
+         * an upstream here; the most likely cause is service-setup not
+         * complete yet, so a retry is appropriate. */
+        var clientR = db().findObject(request().clientUUID())
+                .getOrElseThrow(() -> new SvcErr.Upstream("Cannot resolve client UUID"));
+
+        var objR = objU
+            .map(u -> db().createObject(classR, u))
+            .getOrElse(() -> db().createObject(classR));
+
+        /* It's much easier to just set the ownership to the client
+         * here, even if we're about to change it. */
+        db().derived().add(objR, Vocab.owner, clientR);
+        return objR;
     }
 
     private static UpdateRequest U_deleteConfigs = Vocab.update("""
@@ -180,6 +199,7 @@ public class ObjectStructure extends RequestHandler.Component
             .getOrElseThrow(() -> new SvcErr.BadInput("Invalid deleted flag"));
 
         checkRegInvariants(obj, spec);
+
         updatePrimary(obj, primary);
         updateOwner(obj, owner);
         updateDeleted(obj, deleted);
@@ -227,12 +247,15 @@ public class ObjectStructure extends RequestHandler.Component
     {
         var model = db().derived();
         var client = request().clientUUID();
+
         var fromU = Util.single(model.listObjectsOfProperty(obj, Vocab.owner))
+            .map(RDFNode::asResource)
+            .flatMap(f -> Util.single(model.listObjectsOfProperty(f, Vocab.uuid)))
             .map(l -> Util.decodeLiteral(l, UUID.class))
             .getOrElse(Vocab.U_Unowned);
 
         if (toU.equals(fromU)) return;
-        
+    
         /* We must have TakeFrom the old owner and GiveTo the new owner.
          * Everyone implicitly has: TakeFrom Self; GiveTo Self, Unowned. */
         if (!fromU.equals(client))
@@ -241,11 +264,11 @@ public class ObjectStructure extends RequestHandler.Component
             request().checkACL(Vocab.Perm.GiveTo, toU);
 
         model.removeAll(obj, Vocab.owner, null);
-        if (!toU.equals(Vocab.U_Unowned)) {
-            var toR = db().findObject(toU)
-                .getOrElseThrow(() -> new SvcErr.Conflict("Owner not found"));
-            model.add(obj, Vocab.owner, toR);
-        }
+        Option.some(toU)
+            .filter(u -> !u.equals(Vocab.U_Unowned))
+            .map(u -> db().findObject(u)
+                .getOrElseThrow(() -> new SvcErr.Conflict("Owner not found")))
+            .peek(to -> model.add(obj, Vocab.owner, to));
     }
 
     private void updatePrimary (Resource obj, Resource classR)

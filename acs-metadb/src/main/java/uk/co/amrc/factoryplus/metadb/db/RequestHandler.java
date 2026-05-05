@@ -47,6 +47,7 @@ public class RequestHandler
 
     private FPAuth.Checker checker;
     private UUID clientUUID;
+    private Resource clientResource;
 
     public RequestHandler (RdfStore db, SecurityContext ctx)
     {
@@ -109,6 +110,12 @@ public class RequestHandler
     public UUID clientUUID ()
     {
         return Objects.requireNonNull(clientUUID);
+    }
+    public Resource clientResource ()
+    {
+        if (clientResource == null) {
+        }
+        return clientResource;
     }
 
     public ObjectStructure objectStructure ()

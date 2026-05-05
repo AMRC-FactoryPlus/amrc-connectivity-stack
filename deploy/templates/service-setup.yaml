@@ -22,6 +22,11 @@ spec:
         - name: extra-dumps
           configMap:
             name: service-setup-dumps
+{{- if .Values.openid.enabled }}
+        - name: client-secrets
+          secret:
+            secretName: keycloak-clients
+{{- end }}
       initContainers:
         - name: service-setup
 {{ include "amrc-connectivity-stack.image" (list . .Values.serviceSetup) | indent 10 }}
@@ -53,14 +58,25 @@ spec:
                   "secure"          (.Values.acs.secure | ternary "s" "")
                   "realm"           .Values.identity.realm
                   "directory"
-                    (include "amrc-connectivity-stack.external-url" 
+                    (include "amrc-connectivity-stack.external-url"
                       (list . "directory"))
                 | toRawJson | quote }}
+{{- if .Values.openid.enabled }}
+            - name: OPENID_URL
+              value: {{ include "amrc-connectivity-stack.external-url" (list . "openid") }}
+            - name: OPENID_REALM
+              value: {{ .Values.openid.realm }}
+{{- end }}
           volumeMounts:
             - mountPath: /data
               name: git-checkouts
             - mountPath: /dumps
               name: extra-dumps
+{{- if .Values.openid.enabled }}
+            - mountPath: /etc/secret
+              name: client-secrets
+              readOnly: true
+{{- end }}
         - name: edge-helm-charts
 {{ include "amrc-connectivity-stack.image" (list . .Values.edgeHelm) | indent 10 }}
           env:

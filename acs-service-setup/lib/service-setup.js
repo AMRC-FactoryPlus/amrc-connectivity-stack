@@ -13,6 +13,7 @@ import { setup_git_repos }      from "./git-repos.js";
 import { setup_local_uuids }    from "./local-uuids.js";
 import {migrate_edge_agent_config} from "./manager-devices.js";
 import {migrate_deployment_charts} from "./deployment-charts.js";
+import { setup_openid }         from "./openid.js";
 
 export class ServiceSetup {
     constructor (opts) {
@@ -82,6 +83,11 @@ export class ServiceSetup {
 
         this.log("Migrating Edge Deployment charts");
         await migrate_deployment_charts(this);
+
+        if (process.env.OPENID_URL) {
+            this.log("Configuring OpenID realm");
+            await setup_openid(this);
+        }
 
         this.log("Finished setup");
     }

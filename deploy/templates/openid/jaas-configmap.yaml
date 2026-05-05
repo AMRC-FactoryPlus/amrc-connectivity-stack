@@ -1,0 +1,22 @@
+{{- if .Values.openid.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: openid-jaas
+  namespace: {{ .Release.Namespace }}
+data:
+  # JAAS login config for the pgjdbc driver. Keycloak's JVM reads this
+  # via -Djava.security.auth.login.config and uses Krb5LoginModule to
+  # acquire a TGT from the mounted keytab on every Postgres connection.
+  # No k5start sidecar needed because the JDBC driver does its own auth.
+  login.conf: |
+    pgjdbc {
+        com.sun.security.auth.module.Krb5LoginModule required
+            useKeyTab=true
+            keyTab="/etc/keytabs/client"
+            principal="sv1openid@{{ .Values.identity.realm | required "values.identity.realm is required!" }}"
+            storeKey=true
+            doNotPrompt=true
+            refreshKrb5Config=true;
+    };
+{{- end }}

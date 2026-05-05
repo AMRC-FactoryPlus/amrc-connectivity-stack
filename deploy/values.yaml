@@ -142,6 +142,19 @@ dataAccess:
     repository: acs-data-access
   verbosity: "ALL,!service,!token"
 
+openid:
+  # -- Whether or not to deploy the Keycloak OIDC server
+  enabled: true
+  # -- Realm name created in Keycloak. Must match the realm used in
+  # the Grafana OAuth ConfigMap (deploy/templates/grafana/grafana-ini.yaml).
+  realm: factory_plus
+  image:
+    registry: quay.io
+    repository: keycloak/keycloak
+    tag: "26.1.1"
+    pullPolicy: IfNotPresent
+  # tlsSecretName: <override>   # optional, falls back to acs.tlsSecretName
+
 # -- The service-setup component loads ACS-specific configuration into
 # the ACS services when the Helm chart is deployed or upgraded.
 serviceSetup:

@@ -121,48 +121,38 @@ const api = await new WebAPI({
 api.run();
 logger.info(`acs-i3x server running on port ${env.PORT || 8080}`);
 
-// Refresh object tree on ConfigDB notify events (disable with I3X_DISABLE_REFRESH=true).
 // A `dirty` flag coalesces events that arrive during an in-flight refresh, so a
 // burst of changes collapses into at most two rebuilds (leading + trailing).
-if (env.I3X_DISABLE_REFRESH !== "true") {
-    const cdb = fplus.ConfigDB;
+const cdb = fplus.ConfigDB;
+const trigger$ = rx.merge(
+    cdb.watch_members(DEVICE_CLASS_UUID),
+    cdb.search_app(DEVICE_INFORMATION_APP_UUID, {}),
+    cdb.search_app(INFO_APP_UUID, {}),
+    cdb.search_app(CONFIG_SCHEMA_APP_UUID, {}),
+);
+let inFlight = false;
+let dirty = false;
+const runRefresh = async () => {
+    inFlight = true;
+    try {
+        do {
+            dirty = false;
+            await objectTree.refresh();
+            i3xRag.rebuild();
+            logger.debug({ nodes: i3xRag.nodeCount() },
+                "Object tree refreshed via ConfigDB notify");
+        } while (dirty);
+    } catch (err) {
+        logger.error({ err }, "Failed to refresh object tree");
+    } finally {
+        inFlight = false;
+    }
+};
+trigger$.subscribe({
+    next: () => {
+        if (inFlight) { dirty = true; return; }
+        void runRefresh();},
+    error: (err: unknown) => logger.error({ err }, "ConfigDB notify stream errored"),
+});
+logger.info("Object tree refresh: ConfigDB notify subscriptions active");
 
-    const trigger$ = rx.merge(
-        cdb.watch_members(DEVICE_CLASS_UUID),
-        cdb.search_app(DEVICE_INFORMATION_APP_UUID, {}),
-        cdb.search_app(INFO_APP_UUID, {}),
-        cdb.search_app(CONFIG_SCHEMA_APP_UUID, {}),
-    );
-
-    let inFlight = false;
-    let dirty = false;
-
-    const runRefresh = async () => {
-        inFlight = true;
-        try {
-            do {
-                dirty = false;
-                await objectTree.refresh();
-                i3xRag.rebuild();
-                logger.debug({ nodes: i3xRag.nodeCount() },
-                    "Object tree refreshed via ConfigDB notify");
-            } while (dirty);
-        } catch (err) {
-            logger.error({ err }, "Failed to refresh object tree");
-        } finally {
-            inFlight = false;
-        }
-    };
-
-    trigger$.subscribe({
-        next: () => {
-            if (inFlight) { dirty = true; return; }
-            void runRefresh();
-        },
-        error: (err: unknown) => logger.error({ err }, "ConfigDB notify stream errored"),
-    });
-
-    logger.info("Object tree refresh: ConfigDB notify subscriptions active");
-} else {
-    logger.info("Object tree refresh disabled (I3X_DISABLE_REFRESH=true)");
-}

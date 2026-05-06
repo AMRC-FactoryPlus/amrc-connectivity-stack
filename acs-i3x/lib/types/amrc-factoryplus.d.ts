@@ -1,7 +1,3 @@
-declare module "dotenv" {
-    export function config(opts?: any): void;
-}
-
 declare module "@amrc-factoryplus/service-client" {
     export class ServiceClient {
         constructor(opts: any);

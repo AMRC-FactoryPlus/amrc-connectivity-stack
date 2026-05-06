@@ -63,8 +63,7 @@ registerRagTools(mcpServer, i3xRag);
 const api = await new WebAPI({
     ping: {
         version: Version,
-        service: UUIDs.Service.Registry,
-        device: env.DEVICE_UUID,
+        service: UUIDs.Service.i3x,
         software: {
             vendor: "AMRC",
             application: "acs-i3x",
@@ -75,7 +74,7 @@ const api = await new WebAPI({
     realm: env.REALM,
     hostname: env.HOSTNAME,
     keytab: env.SERVER_KEYTAB,
-    http_port: env.PORT || 8080,
+    http_port: env.PORT,
     public: "/v1/info",
     routes: routes({
         objectTree,

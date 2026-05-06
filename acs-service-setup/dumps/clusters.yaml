@@ -1,4 +1,4 @@
-#-REQUIRE: auth git helm
+#-REQUIRE: auth git helm metadb
 ---
 service: !u UUIDs.Service.ConfigDB
 version: 2
@@ -59,6 +59,11 @@ objects:
     !u Clusters.Class.Cluster:
         name: "Edge cluster"
         iri: edge/Cluster
+        subclassOf:
+          # Edge cluster is not the only possibility for a Sparkplug
+          # Group, so probably we should have a SparkplugGroup
+          # intermediate class here. 
+          - !u MetaDB.Class.SparkplugEntity
 
   !u UUIDs.Class.App:
     !u Clusters.App.Bootstrap:

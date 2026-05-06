@@ -21,7 +21,6 @@ function makeTree(fplus?: ReturnType<typeof createMockFplus>) {
         fplus: fplus ?? createMockFplus(),
         namespaceName: NS_NAME,
         namespaceUri: NS_URI,
-        logger: { info: () => {}, warn: () => {}, error: () => {}, debug: () => {} },
     });
 }
 

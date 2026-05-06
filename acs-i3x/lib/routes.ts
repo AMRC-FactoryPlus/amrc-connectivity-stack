@@ -13,7 +13,6 @@ export function routes(opts: {
     history: History;
     subscriptions: SubscriptionManager;
     mcpServer?: McpServer;
-    logger?: any;
 }) {
     const api = new APIv1(opts);
 
@@ -37,7 +36,7 @@ export function routes(opts: {
 
         // Mount MCP Streamable HTTP endpoint (if configured)
         if (opts.mcpServer) {
-            mountMcpTransport(app, opts.mcpServer, opts.logger);
+            mountMcpTransport(app, opts.mcpServer);
         }
     };
 }

@@ -17,13 +17,8 @@ function createMockObjectTree() {
     };
 }
 
-function mockLogger() {
-    return {
-        info: jest.fn(),
-        warn: jest.fn(),
-        error: jest.fn(),
-        debug: jest.fn(),
-    };
+function mockDebug() {
+    return { bound: () => () => {} };
 }
 
 /**
@@ -72,7 +67,6 @@ describe("ValueCache", () => {
         cache = new ValueCache({
             objectTree: objectTree as any,
             staleThreshold: STALE_MS,
-            logger: mockLogger(),
         });
     });
 
@@ -90,6 +84,7 @@ describe("ValueCache", () => {
             };
             const fplus = {
                 mqtt_client: jest.fn<any>().mockResolvedValue(mockMqtt),
+                debug: mockDebug(),
             };
             await cache.init(fplus);
             expect(cache.isReady()).toBe(true);
@@ -381,6 +376,7 @@ describe("ValueCache", () => {
             };
             const fplus = {
                 mqtt_client: jest.fn<any>().mockResolvedValue(mockMqtt),
+                debug: mockDebug(),
             };
 
             await cache.init(fplus);
@@ -395,6 +391,7 @@ describe("ValueCache", () => {
             };
             const fplus = {
                 mqtt_client: jest.fn<any>().mockResolvedValue(mockMqtt),
+                debug: mockDebug(),
             };
 
             await cache.init(fplus);

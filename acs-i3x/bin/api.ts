@@ -107,7 +107,7 @@ const api = await new WebAPI({
     hostname: env.HOSTNAME,
     keytab: env.SERVER_KEYTAB,
     http_port: env.PORT || 8080,
-    public: devNoAuth ? "(.*)" : "/v1/info",
+    public: "/v1/info",
     routes: routes({
         objectTree,
         valueCache,

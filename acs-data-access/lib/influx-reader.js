@@ -15,7 +15,7 @@ export class InfluxReader{
         // Build range
         const rangeClause = (from && to)
         ? `|> range(start: ${from}, stop: ${to})`
-        : `|> range(start: -5m)`;
+        : `|> range(start: 0)`;
 
         // Optional measurement filter
         const measurementFilter = measurement

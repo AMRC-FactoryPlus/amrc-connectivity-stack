@@ -4,23 +4,20 @@
 */
 
 import express from "express";
-import { Map as IMap } from "immutable";
+import { Map as IMap, Seq as ISeq } from "immutable";
 import * as rx from "rxjs";
 
 import { APIError } from "@amrc-factoryplus/service-api";
 import { retryBackoff } from "@amrc-factoryplus/rx-util";
 import { DataAccess as Constants } from "./constants.js";
 import { valid_uuid, DatasetValidity } from "./validate.js";
-import {convert_to_csv, minDate, maxDate} from './utils.js';
+import { convertToCsv } from './utils.js';
 
-function fail(status, message) {
-  throw new APIError(status);
-}
 
-const mapStructureToPermission = IMap()
-  .set(Constants.App.UnionComponents, Constants.Perm.IncludeInUnion)
-  .set(Constants.App.SessionLimits, Constants.Perm.UseForSession)
-  .set(Constants.App.SparkplugSrc, Constants.Perm.UseSparkplug);
+function fail(log, status, message) {
+    log(message);
+    throw new APIError(status);
+  }
 
 export class APIv1 {
   constructor(opts) {
@@ -67,80 +64,6 @@ export class APIv1 {
     return res.status(200).json(uuids);
   }
 
-
-  async _get_dataset_time_bounds(dataset_uuid, visited=new Set()){
-
-    if(visited.has(dataset_uuid)) return fail(422, `Cycle detected at dataset ${dataset_uuid}`);
-
-    visited.add(dataset_uuid);
-
-    const def = await this.data.get_dataset_def_by_uuid(dataset_uuid);
-    if(!def) return fail(404, `Dataset def for ${dataset_uuid} not found`);
-
-    const {structure, config} = def;
-
-    // ------------------------
-    // 1. SESSION 
-    // ------------------------
-    if(structure === Constants.App.SessionLimits){
-      const child = await this._get_dataset_time_bounds(config.source, visited);
-
-      const from = config.from ? new Date(config.from) : null;
-      const to = config.to ? new Date(config.to) : null;
-
-      return {
-        from: maxDate(from, child.from),
-        to: minDate(to, child.to)
-      };
-    }
-
-
-    // ------------------------
-    // 2. SPARKPLUG SRC
-    // ------------------------
-    if(structure === Constants.App.SparkplugSrc){
-      const {from, to} = await this.influxReader.get_influx_time_bounds(config.source);
-
-      return {from, to}
-    }
-
-
-    // ------------------------
-    // 3. UNION
-    // ------------------------
-    if(structure === Constants.App.UnionComponents){
-
-      const results = await Promise.all(
-        config.map(source_uuid => 
-          this._get_dataset_time_bounds(source_uuid, new Set(visited))
-        )
-      );
-
-      const valid = results.filter(r => r.from && r.to);
-      if(!valid.length) return {from: null, to: null};
-
-      const from_times = valid
-                          .map(v => new Date(v.from).getTime())
-                          .filter(t => !isNaN(t));
-
-      const to_times = valid
-                        .map(v => new Date(v.to).getTime())
-                        .filter(t => !isNaN(t));
-
-      if (!from_times.length || !to_times.length) {
-        return { from: null, to: null };
-      }
-
-      return {
-        from: new Date(Math.min(...from_times)),
-        to: new Date(Math.max(...to_times))
-      };
-    }
-
-    return {from: null, to: null};
-  }
-
-
   /** GET. Accepts Dataset UUID and returns metadata about a Published dataset.
    * @param uuid {request param}
    * @param 
@@ -156,7 +79,7 @@ export class APIv1 {
    */
   async metadata_uuid(req, res){    
     const dataset_uuid  = req.params.uuid;
-    if (!valid_uuid(dataset_uuid)) fail(422, `${dataset_uuid} is invalid uuid.`);
+    if (!valid_uuid(dataset_uuid)) fail(this.log, 422, `${dataset_uuid} is invalid uuid.`);
 
     const ok = await this.auth.check_acl(
       req.auth,
@@ -165,62 +88,69 @@ export class APIv1 {
       true,
     );
     
-    if (!ok) return fail(403, `You don't have Read permission for ${dataset_uuid}`);
+    if (!ok) return fail(this.log, 403, `You don't have READ permissions for ${dataset_uuid}`);
 
-    const datasets = await this.data.get_allowed_dataset_uuids(req.auth, Constants.Perm.ReadDataset, DatasetValidity.VALID);
-    const is_valid_exist = await datasets.includes(dataset_uuid)
-    if(!is_valid_exist) return fail(404, `Dataset ${dataset_uuid} is not found or invalid.`);
+    const datasets = await rx.firstValueFrom(this.data.get_dataset_definitions(DatasetValidity.VALID));
+    const dataset = await datasets.get(dataset_uuid);
+    if(!dataset) return fail(this.log, 404, `Dataset ${dataset_uuid} is not found or invalid.`);
+    
+    const from = dataset.config?.from;
+    const to = dataset.config?.to;
 
-    const infos = await rx.firstValueFrom(this.data.get_general_infos());
+    const infos = await rx.firstValueFrom(this.data.general_infos);
     const info = infos.get(dataset_uuid);
     
-    const f_types = await rx.firstValueFrom(this.data.get_functional_types());
-    const f_type = f_types.get(dataset_uuid);
+    const all_f_types = await rx.firstValueFrom(this.data.functional_types);
+    const f_types = all_f_types.get(dataset_uuid);
 
-    const all_metadata = await rx.firstValueFrom(this.data.get_metadata());
+    const all_metadata = await rx.firstValueFrom(this.data.metadata);
     const metadata = all_metadata.get(dataset_uuid); 
 
-    const {from, to} = await this._get_dataset_time_bounds(dataset_uuid);
-
-    const all_parts = await rx.firstValueFrom(this.data.get_parts());
-    const parts = all_parts.get(dataset_uuid);
-    
-    const allowed_parts = [];
-
-    for (let part of parts){
-      const ok = await this.auth.check_acl(req.auth, Constants.Perm.ReadDataset, part, true);
-      if(ok){
-        allowed_parts.push(part);
-      }
-    }
-
+    const parts = await this.data.get_dataset_allowed_parts(dataset_uuid, req.auth, Constants.Perm.ReadDataset);
 
     const meta = {
       uuid: dataset_uuid,
       name: info ? info.name : "UNKNOWN",
       from: from ? from : undefined,
       to: to ? to : undefined,
-      function: f_type,
+      function: f_types,
       metadata,
-      parts: allowed_parts
+      parts: parts
     }
     return res.status(200).json(meta);
   }
 
 
   // Check if principal has necessary permission to referenced source
-  async _check_second_level_permission(principal, structure, config, permission){
+  async _check_second_level_permission(principal, structure, config){
 
-    if(structure == Constants.App.SessionLimits || structure == Constants.App.SparkplugSrc){
+    if( structure == Constants.App.SparkplugSrc){
 
       const target = config.source;
-      if(!target) return fail(422, `Dataset definition does not contain source.`);
+      if(!target) return fail(this.log, 422, `Dataset definition does not contain source.`);
 
-      if(!valid_uuid(target)) return fail(422, `Source uuid ${target} is invalid.`);
+      if(!valid_uuid(target)) return fail(this.log, 422, `Source uuid ${target} is invalid.`);
 
       const ok = await this.auth.check_acl(
         principal, 
-        permission,
+        Constants.Perm.UseSparkplug,
+        target,
+        true
+      );
+      
+      return ok; 
+    }
+
+    if(structure == Constants.App.SessionLimits){
+
+      const target = config.source;
+      if(!target) return fail(this.log, 422, `Dataset definition does not contain source.`);
+
+      if(!valid_uuid(target)) return fail(this.log, 422, `Source uuid ${target} is invalid.`);
+
+      const ok = await this.auth.check_acl(
+        principal, 
+        Constants.Perm.UseForSession,
         target,
         true
       );
@@ -230,13 +160,13 @@ export class APIv1 {
     }else if(structure == Constants.App.UnionComponents){
       if(config.length == 0) return true;
 
-      if(!Array.isArray(config)) return fail(422, `Dataset def of structure ${structure} must be an Array.`);
+      if(!Array.isArray(config)) return fail(this.log, 422, `Dataset def of structure ${structure} must be an Array.`);
 
       for(let target of config){
 
         const ok = await this.auth.check_acl(
           principal, 
-          permission,
+          Constants.Perm.IncludeInUnion,
           target,
           true
         );
@@ -248,74 +178,67 @@ export class APIv1 {
 
     }else{
       // Unhandled Structure type
-      return fail(422, `Structure ${structure} is unknown`);
+      return fail(this.log, 422, `Structure ${structure} is unknown`);
     }
   }
 
+  _merge_intervals(queries) {
+    return ISeq(queries)
+      .groupBy(q => q.source)
+      .flatMap((group, source) => {
+        const intervals = group
+          .map(q => ({
+            from: q.from ? new Date(q.from) : new Date(0),
+            to: q.to ? new Date(q.to) : new Date()
+          }))
+          .sortBy(i => i.from)
+          .toArray(); 
 
-  _merge_intervals(queries){
-    const grouped = {};
+        const merged = [];
 
-    for (const q of queries){
-        if(!grouped[q.source]) grouped[q.source] = [];
-        grouped[q.source].push(q);
-    }
+        for (const interval of intervals) {
+          if (!merged.length) {
+            merged.push(interval);
+            continue;
+          }
 
-    const result = []; 
+          const last = merged[merged.length - 1];
 
-    for(const source in grouped){
-        const intervals = grouped[source]
-            .map(q => ({
-                from: q.from ? new Date(q.from) : new Date(0),
-                to: q.to ? new Date(q.to) : new Date()
-            }))
-            .sort((a, b) => a.from - b.from);
-    
-
-        let merged = [];
-        
-        for(const interval of intervals){
-            if(!merged.length){
-                merged.push(interval);
-                continue;
-            }
-            const last = merged[merged.length - 1];
-
-            if(interval.from <= last.to){
-                last.to = new Date(Math.max(last.to, interval.to));
-            }else{
-                merged.push(interval);
-            }
+          if (interval.from <= last.to) {
+            last.to = new Date(Math.max(last.to, interval.to));
+          } else {
+            merged.push(interval);
+          }
         }
 
-        for (const m of merged){
-            result.push({
-                source,
-                from: m.from,
-                to: m.to
-            });
-        }
-    }
-    return result;
+        return merged.map(m => ({
+          source,
+          from: m.from,
+          to: m.to
+        }));
+      })
+      .toArray();
   }
 
 
   // Resolve nested datasets 
   async _resolve_dataset(dataset_uuid, from=null, to=null, visited = new Set()) {
-    if (visited.has(dataset_uuid)) {
-        return fail(404, `Circular dataset reference detected at ${dataset_uuid}`);
-      }
+      const datasets = await rx.firstValueFrom(this.data.datasets);
+      const dataset = await datasets.get(dataset_uuid);
+
+      if (!dataset) return fail(this.log, 404, `Dataset not found for ${dataset_uuid}`);
+
+      if(dataset.validity === DatasetValidity.INVALID) return fail(this.log, 404, `Invalid dataset ${dataset_uuid}`);
+      
+      if(visited.has(dataset_uuid)) return fail(this.log, 404, `Circular dataset reference detected at ${dataset_uuid}`);
 
       visited.add(dataset_uuid);
 
-      const dataset_def = await this.data.get_dataset_def_by_uuid(dataset_uuid);
-      if (!dataset_def) return fail(404, `Dataset definition not found for ${dataset_uuid}`);
+      const { structure, config } = dataset;
 
-      const { structure, config } = dataset_def;
-
-      if(!structure) return fail(422, `Structure is not found in dataset definition ${dataset_uuid}`);
+      if(!structure) return fail(this.log, 404, `Structure not found for ${dataset_uuid}`);
     
-      if(!valid_uuid(structure)) return fail(422, `Structure uuid is invalid for dataset ${dataset_uuid}`);
+      if(!valid_uuid(structure)) return fail(this.log, 404, `Invalid structure uuid for ${dataset_uuid}`);
 
       // -------------------------
       // 1. SparkplugSrc (BASE CASE)
@@ -323,9 +246,9 @@ export class APIv1 {
       if (structure === Constants.App.SparkplugSrc) {
         const source_uuid = config?.source;
         
-        if (!source_uuid) return fail(422, `Dataset def ${dataset_uuid} does not contain source uuid.`);
+        if (!source_uuid) return fail(this.log, 404, `Dataset def ${dataset_uuid} does not contain source uuid.`);
         
-        if(!valid_uuid(source_uuid)) return fail(422, `Dataset ${dataset_uuid}'s source uuid is invalid.`);
+        if(!valid_uuid(source_uuid)) return fail(this.log, 404, `Dataset ${dataset_uuid}'s source uuid is invalid.`);
 
         return [{
             source: source_uuid,
@@ -342,9 +265,9 @@ export class APIv1 {
       else if (structure === Constants.App.SessionLimits) {
         const source_uuid = config?.source;
 
-        if (!source_uuid) return fail(422, `Dataset def ${dataset_uuid} does not contain source uuid`);
+        if (!source_uuid) return fail(this.log, 404, `Dataset def ${dataset_uuid} does not contain source uuid`);
 
-        if(!valid_uuid(source_uuid)) return fail(422, `Dataset ${dataset_uuid}'s source is invalid uuid`);
+        if(!valid_uuid(source_uuid)) return fail(this.log, 404, `Dataset ${dataset_uuid}'s source is invalid uuid`);
 
         const session_from = config?.from ? new Date(config.from) : null;
         const session_to = config?.to ? new Date(config.to) : null;
@@ -370,7 +293,7 @@ export class APIv1 {
       // 3. UnionComponents (MULTIPLE REFERENCES)
       // -------------------------
       else if (structure === Constants.App.UnionComponents) {
-        if(!Array.isArray(config)) return fail(422, `Union structure type dataset def must be Array ${dataset_uuid}`);
+        if(!Array.isArray(config)) return fail(this.log, 404, `Union structure type dataset def must be Array ${dataset_uuid}`);
         
         const results = await Promise.all(
             config.map(uuid => 
@@ -387,7 +310,7 @@ export class APIv1 {
     // 4. Unknown structure
     // -------------------------
     else {
-        return fail(422, `Dataset ${dataset_uuid} has unknown structure type ${structure}`);
+        return fail(this.log, 404, `Dataset ${dataset_uuid} has unknown structure type ${structure}`);
     }
   }
 
@@ -423,7 +346,7 @@ export class APIv1 {
    */
   async dataset_data(req, res) {
     const dataset_uuid = req.params.uuid;
-    if (!valid_uuid(dataset_uuid)) return fail(422, `Dataset uuid ${dataset_uuid} is invalid.`);
+    if (!valid_uuid(dataset_uuid)) return fail(this.log, 422, `Dataset uuid ${dataset_uuid} is invalid.`);
 
     const ok = await this.auth.check_acl(
       req.auth,
@@ -431,22 +354,10 @@ export class APIv1 {
       dataset_uuid,
       true,
     );
-    if (!ok) return fail(403, `You don't have Read permission for dataset ${dataset_uuid}`);
-
-    const dataset_def = await this.data.get_dataset_def_by_uuid(dataset_uuid);
-    if (!dataset_def) return fail(404, `Dataset def ${dataset_uuid} not found or invalid.`);
-
-    const ok2 = await this._check_second_level_permission(
-      req.auth,
-      dataset_def?.structure,
-      dataset_def?.config,
-      Constants.Perm.ReadDataset
-    );
-    if (!ok2) return fail(403, `You don't have permissions to Read the contents of dataset ${dataset_uuid}.`);
+    if (!ok) return fail(this.log, 403, `You don't have Read permission for dataset ${dataset_uuid}`);
 
     try {
       const resolved = await this._resolve_dataset(dataset_uuid);
-
       const merged = this._merge_intervals(resolved);
 
       const results = await Promise.all(
@@ -457,10 +368,10 @@ export class APIv1 {
             })
         )
       );
-
       const rows = results.flat();
+      this.log(`# influx rows = ${rows.length}`);
 
-      const csv = convert_to_csv(rows);
+      const csv = convertToCsv(rows);
 
       res.setHeader("Content-Type", "text/csv");
       res.setHeader("Content-Disposition", `attachment; filename=${dataset_uuid}.csv`);
@@ -468,7 +379,7 @@ export class APIv1 {
 
     } catch (err) {
       this.log(err);
-      return fail(500);
+      return fail(this.log, 500);
     }
   }
 
@@ -498,41 +409,33 @@ export class APIv1 {
   * the response includes invalid datasets but their structure field references Invalid Dataset uuid
    */
   async structure_uuid(req, res) {
-    const { uuid } = req.params;
-    
-    if (!valid_uuid(uuid)) return fail(422, `Dataset uuid ${uuid} is invalid.`);
+    const dataset_uuid = req.params.uuid;
+    if (!valid_uuid(dataset_uuid)) return fail(this.log, 422, `Dataset uuid ${dataset_uuid} is invalid.`);
 
     const ok = await this.auth.check_acl(
       req.auth,
       Constants.Perm.EditDataset,
-      uuid,
+      dataset_uuid,
       true,
     );
 
-    if (!ok) return fail(403, `You don't have permission to Edit dataset ${uuid}.`);
+    if (!ok) return fail(this.log, 403, `You don't have permission to Edit dataset ${uuid}.`);
 
-    const definition = await rx.firstValueFrom(
+    const dataset = await rx.firstValueFrom(
       this.data.get_dataset_definitions(DatasetValidity.ALL).pipe(
-        rx.map(datasets => datasets.get(uuid))
+        rx.map(datasets => datasets.get(dataset_uuid))
       )
     );
 
-    if (!definition) return fail(404, `Dataset def with uuid ${uuid} not found.`);
-
-    if (definition.length > 1){
-      for(let def of definition){
-        def.structure = Constants.Special.InvalidDataset;
-      }
-    }
-
-    return res.status(200).json(definition);
+    if (!dataset) return fail(this.log, 404, `Dataset not found for ${dataset_uuid}.`);
+    return res.status(200).json(dataset);
   } 
   
 
   async _update_dataset_config(principal, structure, config, objectUuid){
-    if(!structure) return fail(422, `Structure not provided.`);
-
-    if(!valid_uuid(structure)) return fail(422, `Structure uuid ${structure} is invalid.`)
+    if(!structure) return fail(this.log, 422, `Structure not provided.`);
+    if(!valid_uuid(structure)) return fail(this.log, 422, `Structure uuid ${structure} is invalid.`);
+    if(!config) return fail(this.log, 422, `Config not provided.`);
     
     const ok = await this.auth.check_acl(
       principal,
@@ -541,21 +444,16 @@ export class APIv1 {
       true
     );
 
-    if (!ok) return fail(403, `You don't have Create permission for structure ${structure}`);
+    if (!ok) return fail(this.log, 403, `You don't have Create permission for structure ${structure}`);
 
-    if(!config) return fail(422, `Config not provided.`);
-    
     // Check the principal has appropriate permission for all dataset sources in config. 
-    const ok2 = await this._check_second_level_permission(principal, structure, config, mapStructureToPermission.get(structure));
+    const ok2 = await this._check_second_level_permission(principal, structure, config);
     
-    if(!ok2) return fail(403, `You don't have ${mapStructureToPermission.get(structure)} permission for dataset source(s).`);
+    if(!ok2) return fail(this.log, 403, `You don't have permission for dataset source(s) ${dataset_uuid}`);
 
     // Create new Dataset Object
     if(!objectUuid){
       objectUuid = await this.cdb.create_object(Constants.Class.Dataset);
-      
-      if(!objectUuid) return fail(500, `New Dataset object couldn't be created in ConfigDB.`);
-
       this.log("Created new dataset object in ConfigDB", objectUuid);
     }
 
@@ -571,25 +469,21 @@ export class APIv1 {
 
   async _create_subclass_relationship(structure, dataset_uuid, config) {
     if (structure === Constants.App.SessionLimits) {
-
-      await rx.lastValueFrom(
-        rx.defer(() =>
-          this.cdb.class_add_subclass(config.source, dataset_uuid)
-        ).pipe(retryBackoff(500, e => this.log(e)))
-      );
-
+      await this._add_cdb_subclass(config?.source, dataset_uuid);
     }
     else if (structure === Constants.App.UnionComponents) {
-
       for (let source of config) {
-        await rx.lastValueFrom(
-          rx.defer(() =>
-            this.cdb.class_add_subclass(dataset_uuid, source)
-          ).pipe(retryBackoff(500, e => this.log(e)))
-        );
+        this._add_cdb_subclass(dataset_uuid, source);
       }
-
     }
+  }
+
+  async _add_cdb_subclass(klass, obj){
+      await rx.lastValueFrom(
+        rx.defer(() =>
+          this.cdb.class_add_subclass(klass, obj)
+        ).pipe(retryBackoff(500, e => this.log(e)))
+      );
   }
 
   async _unlink_subclasses(structure, dataset_uuid, curr_config, new_config){
@@ -614,7 +508,7 @@ export class APIv1 {
     }else if (structure === Constants.App.SparkplugSrc){
       return;
     }else{
-      return fail(422, `Unknown structure type ${structure}`);
+      return fail(this.log, 422, `Unknown structure type ${structure}`);
     }
   }
 
@@ -633,7 +527,6 @@ export class APIv1 {
       null
     );
 
-    if(!objectUuid) return fail(422, `Failed to create new Dataset.`);
     return res.status(200).json(objectUuid);
   }
 
@@ -644,20 +537,29 @@ export class APIv1 {
    * @param {*} res 
    */
 
+  /*
+    If dataset valid: 
+      - 
+  */
   async structure_update(req, res){
     const dataset_uuid = req.params.uuid;
 
-    if(!valid_uuid(dataset_uuid)) return fail(422, `Dataset uuid is invalid.`);
+    if(!valid_uuid(dataset_uuid)) return fail(this.log, 422, `Invalid uuid ${dataset_uuid}`);
 
     const structure = req.body.structure;
+    if(!structure) return fail(this.log, 422, `Structure not provided`);
 
     const new_config = req.body.config;
+    if(!new_config) return fail(this.log, 422, `Config not provided`);
 
     // get current config
-    const all_defs = await rx.firstValueFrom(this.data.get_dataset_definitions(DatasetValidity.ALL));
-    const curr_defs = all_defs.get(dataset_uuid);
+    const datasets = await rx.firstValueFrom(this.data.get_dataset_definitions(DatasetValidity.ALL));
+    const dataset = datasets.get(dataset_uuid);
 
-    const curr_config_for_structure = curr_defs.find(c => c.structure === structure)?.config;
+
+    // const { config } = dataset;
+    // if(!config) return fail(this.log, 404, `Config not found for ${dataset_uuid}`);
+
     
     if(!curr_config_for_structure){
       this.log(`Current config for structure does not exist.`);
@@ -675,7 +577,7 @@ export class APIv1 {
       dataset_uuid
     );
 
-    if(!objectUuid) return fail(422, `Failed to update dataset ${dataset_uuid}`);
+    if(!objectUuid) return fail(this.log, 422, `Failed to update dataset ${dataset_uuid}`);
 
     // remove definitions from other structure apps if the dataset was invalid
     const invalid_defs = await rx.firstValueFrom(

@@ -41,7 +41,6 @@ interface ObjectTreeOpts {
     fplus: any;
     namespaceName: string;
     namespaceUri: string;
-    logger: any;
 }
 
 /** InfluxDB query metadata for a leaf metric object. */
@@ -69,7 +68,7 @@ export class ObjectTree {
     private fplus: any;
     private namespaceName: string;
     private namespaceUri: string;
-    private logger: any;
+    private log: (msg: string, ...args: any[]) => void;
 
     private ready: boolean = false;
     private namespace: I3xNamespace | null = null;
@@ -84,16 +83,16 @@ export class ObjectTree {
         this.fplus = opts.fplus;
         this.namespaceName = opts.namespaceName;
         this.namespaceUri = opts.namespaceUri;
-        this.logger = opts.logger;
+        this.log = opts.fplus.debug.bound("object-tree");
     }
 
     async init(): Promise<this> {
-        this.logger.debug?.("ObjectTree: building namespace and relationship types");
+        this.log("building namespace and relationship types");
         this.buildNamespace();
         this.buildRelationshipTypes();
-        this.logger.debug?.("ObjectTree: loading devices from ConfigDB + Directory...");
+        this.log("loading devices from ConfigDB + Directory");
         await this.loadDevices();
-        this.logger.debug?.({ objectCount: this.objects.size, typeCount: this.objectTypes.size }, "ObjectTree: init complete");
+        this.log("init complete: objects=%d types=%d", this.objects.size, this.objectTypes.size);
         this.ready = true;
         return this;
     }
@@ -528,15 +527,15 @@ export class ObjectTree {
     }
 
     private async loadDevices(): Promise<void> {
-        this.logger.debug?.("loadDevices: fetching Device class members from ConfigDB...");
+        this.log("loadDevices: fetching Device class members from ConfigDB");
         const deviceUuids: string[] = await this.fplus.ConfigDB.class_members(DEVICE_CLASS_UUID);
-        this.logger.debug?.({ count: deviceUuids.length }, "loadDevices: found devices");
+        this.log("loadDevices: found %d devices", deviceUuids.length);
 
         // Track unique schema UUIDs so we create ObjectTypes for them
         const schemaUuids = new Set<string>();
 
         for (const uuid of deviceUuids) {
-            this.logger.debug?.({ uuid }, "loadDevices: fetching DeviceInformation config");
+            this.log("loadDevices: fetching DeviceInformation config for %s", uuid);
 
             // Fetch DeviceInformation app config — contains Schema_UUID,
             // Instance_UUID, ISA-95 hierarchy, and the full originMap.
@@ -546,14 +545,14 @@ export class ObjectTree {
             ]);
 
             if (!devInfo) {
-                this.logger.debug?.({ uuid }, "loadDevices: no DeviceInformation config, skipping");
+                this.log("loadDevices: no DeviceInformation config for %s, skipping", uuid);
                 continue;
             }
 
             // Schema_UUID from the DeviceInformation config
             const schemaUuid = devInfo.schema ?? devInfo.originMap?.Schema_UUID;
             if (!schemaUuid) {
-                this.logger.debug?.({ uuid }, "loadDevices: no Schema_UUID found, skipping");
+                this.log("loadDevices: no Schema_UUID for %s, skipping", uuid);
                 continue;
             }
             schemaUuids.add(schemaUuid);
@@ -565,9 +564,9 @@ export class ObjectTree {
             if (isa95Segments.length === 0) {
                 // Default to <namespace>/Unknown for devices without ISA-95
                 isa95Segments.push(this.namespaceName, "Unknown");
-                this.logger.debug?.({ uuid }, "loadDevices: no ISA-95 found, placing under Unknown");
+                this.log("loadDevices: no ISA-95 for %s, placing under Unknown", uuid);
             } else {
-                this.logger.debug?.({ uuid, isa95: isa95Segments }, "loadDevices: ISA-95 hierarchy found");
+                this.log("loadDevices: ISA-95 hierarchy for %s: %o", uuid, isa95Segments);
             }
 
             // Display name: prefer Info app name, then sparkplugName from config
@@ -592,17 +591,17 @@ export class ObjectTree {
             if (devInfo.originMap) {
                 this.buildTreeFromOriginMap(devInfo.originMap, uuid, uuid);
                 this.collectSchemaUuids(devInfo.originMap, schemaUuids);
-                this.logger.debug?.({ uuid, children: this.getChildElementIds(uuid).length },
-                    "loadDevices: built metric tree from originMap");
+                this.log("loadDevices: built metric tree for %s, children=%d",
+                    uuid, this.getChildElementIds(uuid).length);
             }
         }
 
         // For each unique schema, get its JSON schema definition and create ObjectType
-        this.logger.debug?.({ count: schemaUuids.size }, "loadDevices: loading schemas for unique device types");
+        this.log("loadDevices: loading %d schemas for unique device types", schemaUuids.size);
         for (const schemaUuid of schemaUuids) {
             if (this.objectTypes.has(schemaUuid)) continue;
 
-            this.logger.debug?.({ schemaUuid }, "loadDevices: fetching schema definition");
+            this.log("loadDevices: fetching schema definition %s", schemaUuid);
             const [schema, info] = await Promise.all([
                 this.fplus.ConfigDB.get_config(CONFIG_SCHEMA_APP_UUID, schemaUuid).catch(() => null),
                 this.fplus.ConfigDB.get_config(INFO_APP_UUID, schemaUuid).catch(() => null),
@@ -616,12 +615,10 @@ export class ObjectTree {
                 schema ?? {},
             );
             this.objectTypes.set(schemaUuid, objType);
-            this.logger.debug?.({ schemaUuid, displayName }, "loadDevices: created ObjectType");
+            this.log("loadDevices: created ObjectType %s (%s)", schemaUuid, displayName);
         }
 
-        this.logger.debug?.({
-            devices: this.objects.size,
-            types: this.objectTypes.size,
-        }, "loadDevices: complete");
+        this.log("loadDevices: complete, devices=%d types=%d",
+            this.objects.size, this.objectTypes.size);
     }
 }

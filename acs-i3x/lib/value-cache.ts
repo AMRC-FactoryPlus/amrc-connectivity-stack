@@ -14,7 +14,6 @@ import { toI3xVqt } from "./mapping.js";
 interface ValueCacheOpts {
     objectTree: ObjectTreeLike;
     staleThreshold: number;
-    logger: any;
 }
 
 /**
@@ -38,7 +37,7 @@ type ValueChangeListener = (elementId: string, vqt: I3xVqt) => void;
 export class ValueCache {
     private objectTree: ObjectTreeLike;
     private staleThreshold: number;
-    private logger: any;
+    private log: (msg: string, ...args: any[]) => void = () => {};
 
     private ready: boolean = false;
     private cache: Map<string, I3xVqt> = new Map();
@@ -54,28 +53,28 @@ export class ValueCache {
     constructor(opts: ValueCacheOpts) {
         this.objectTree = opts.objectTree;
         this.staleThreshold = opts.staleThreshold;
-        this.logger = opts.logger;
     }
 
     async init(fplus: any): Promise<this> {
-        this.logger.debug?.("ValueCache: requesting MQTT client from ServiceClient...");
+        this.log = fplus.debug.bound("value-cache");
+        this.log("requesting MQTT client from ServiceClient");
         const mqtt = await fplus.mqtt_client();
-        this.logger.debug?.("ValueCache: MQTT client obtained, subscribing to UNS/v1/#...");
+        this.log("MQTT client obtained, subscribing to UNS/v1/#");
         mqtt.subscribe("UNS/v1/#");
         mqtt.on("message", (topic: string, payload: Buffer, packet: any) => {
             this.onUnsMessage(topic, payload, packet);
         });
         mqtt.on("connect", () => {
-            this.logger.debug?.("ValueCache: MQTT connected");
+            this.log("MQTT connected");
         });
         mqtt.on("error", (err: any) => {
-            this.logger.error?.({ err }, "ValueCache: MQTT error");
+            console.error("ValueCache: MQTT error:", err);
         });
         mqtt.on("close", () => {
-            this.logger.debug?.("ValueCache: MQTT connection closed");
+            this.log("MQTT connection closed");
         });
         this.ready = true;
-        this.logger.debug?.("ValueCache: initialised and subscribed");
+        this.log("initialised and subscribed");
         return this;
     }
 
@@ -122,7 +121,7 @@ export class ValueCache {
         try {
             parsed = JSON.parse(payload.toString());
         } catch {
-            this.logger.warn?.("ValueCache: failed to parse payload as JSON");
+            this.log("failed to parse payload as JSON");
             return;
         }
 
@@ -163,7 +162,7 @@ export class ValueCache {
             try {
                 listener(elementId, vqt);
             } catch (err) {
-                this.logger.error?.("ValueCache: listener threw", err);
+                console.error("ValueCache: listener threw:", err);
             }
         }
     }

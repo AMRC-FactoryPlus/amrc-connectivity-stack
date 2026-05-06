@@ -26,7 +26,6 @@ import type { Express, Request, Response } from "express";
 export function mountMcpTransport(
     app: Express,
     mcpServer: McpServer,
-    logger?: { warn?: (...args: any[]) => void },
 ): void {
     const server = mcpServer.server;
 
@@ -41,13 +40,13 @@ export function mountMcpTransport(
                 enableJsonResponse: true,
             });
             transport.onerror = (err) => {
-                logger?.warn?.({ err }, "MCP transport error");
+                console.warn("MCP transport error:", err);
             };
             try {
                 await server.connect(transport);
                 await transport.handleRequest(req, res, req.body);
             } catch (err: unknown) {
-                logger?.warn?.({ err }, "MCP request handling error");
+                console.warn("MCP request handling error:", err);
                 if (!res.headersSent) {
                     res.status(500).json({
                         jsonrpc: "2.0",

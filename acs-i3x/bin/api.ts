@@ -16,11 +16,11 @@ import { I3xRag } from "../lib/rag/i3x-rag.js";
 import { registerRagTools } from "../lib/mcp/tools.js";
 import { Version } from "../lib/constants.js";
 import { GIT_VERSION } from "../lib/git-version.js";
-import { ObjectTreeRefresh } from "../lib/refresh";
 
 let dotenv: any = null;
 try { dotenv = await import("dotenv"); } catch (e) {}
 dotenv?.config();
+import { ObjectTreeRefresh } from "../lib/refresh.js";
 
 const { env } = process;
 

@@ -3,9 +3,9 @@ import {
     DEVICE_CLASS_UUID,
     INFO_APP_UUID,
     CONFIG_SCHEMA_APP_UUID
-} from "./constants";
-import {ObjectTree} from "./object-tree";
-import {I3xRag} from "./rag/i3x-rag";
+} from "./constants.js";
+import {ObjectTree} from "./object-tree.js";
+import {I3xRag} from "./rag/i3x-rag.js";
 import * as rx from "rxjs";
 
 

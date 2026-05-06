@@ -142,5 +142,7 @@ grants:
       !u DataAccess.Class.Dataset: true
     !u ConfigDB.Perm.WriteSuperclasses:
       !u DataAccess.Class.Dataset: true
+    !u ConfigDB.Perm.ReadSubclasses:
+      !u DataAccess.Class.Dataset: true
 
 

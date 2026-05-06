@@ -11,6 +11,7 @@ import * as rxu     from "@amrc-factoryplus/rx-util";
 import { DataAccess as Constants }  from './constants.js';
 import { valid_uuid, valid_krb, DatasetValidity }    from "./validate.js";
 import { RxClient, UUIDs } from '@amrc-factoryplus/rx-client';
+import { minDate, maxDate } from './utils.js';
 
 export class DataFlow {
   constructor(opts) {
@@ -18,7 +19,7 @@ export class DataFlow {
     this.cdb = opts.cdb;
     this.auth = opts.auth;
 
-    this.dataset_definitions = this._build_dataset_definitions();
+    this.datasets = this._build_datasets();
     this.general_infos = this._build_general_info();
     this.metadata = this._build_metadata();
     this.functional_types = this._build_functional_types();
@@ -38,9 +39,12 @@ export class DataFlow {
   // watch Dataset's members' subclasses
   _build_parts() {
     return rxu.rx(
-      this.cdb.watch_members_subclasses(Constants.Class.Dataset),
-      rx.map(map => map.map(subclass_uuids => 
-          subclass_uuids.filter(x => this.cdb.class_has_member(Constants.Class.Dataset, x))
+      rx.combineLatest([
+        this.cdb.watch_members_subclasses(Constants.Class.Dataset),
+        this.cdb.watch_members(Constants.Class.Dataset)
+      ]),
+      rx.map(([subclassesMap, datasetMembers]) => subclassesMap.map(
+        subclass_uuids => subclass_uuids.filter(x => datasetMembers.has(x))
       )),
       rxu.shareLatest()
     );
@@ -72,32 +76,33 @@ export class DataFlow {
     return rxu.rx(
       this.cdb.watch_members(Constants.App.DatasetMetadata),
 
-      rx.switchMap((uuidsSet) => {
-        const uuids = uuidsSet.toArray();
+      rx.switchMap((metaAppMembersSet) => {
+        const metaAppUuids = metaAppMembersSet.toArray();
 
-        if (uuids.length === 0) {
+        if (metaAppUuids.length === 0) {
           return rx.of(IMap());
         }
 
-        const streams = uuids.map(uuid =>
-          this.cdb.search_app(uuid).pipe(
-            rx.map(result => [uuid, result])
+        const metadataStreams = metaAppUuids.map(appId =>
+          this.cdb.search_app(appId).pipe(
+            rxu.shareLatest(),
+            rx.map(metadataByDataset => [appId, metadataByDataset])
           )
         );
 
-        return rx.combineLatest(streams).pipe(
-          rx.map(entries => {
-            let map = IMap();
+        return rx.combineLatest(metadataStreams).pipe(
+          rx.map(appEntries => {
+            let result = IMap();
 
-            for (const [outerUuid, result] of entries) {
-              for (const [innerUuid, payload] of result) {
-                const existing = map.get(innerUuid, IMap());
+            for (const [appId, metadataByDataset] of appEntries) {
+              for (const [datasetId, payload] of metadataByDataset) {
+                const existing = result.get(datasetId, IMap());
 
-                map = map.set(innerUuid, existing.set(outerUuid, payload));
+                result = result.set(datasetId, existing.set(appId, payload));
               }
             }
 
-            return map;
+            return result;
           })
         );
       }),
@@ -113,7 +118,14 @@ export class DataFlow {
     );
   }
 
-  _build_dataset_definitions() {
+
+  /*
+    1. search structure apps for all dataset configs
+    2. invalid if exists in more than one structural app
+    3. invalid if contains self-referencing source or invalid source
+    4. if invalid throw away the definition and create a new one with the same dataset_uuid but structure = Constants.Special.InvalidDataset
+  */
+  _build_datasets() {
     return rxu.rx(
       rx.combineLatest([
         this.cdb.search_app(Constants.App.SparkplugSrc),
@@ -121,60 +133,212 @@ export class DataFlow {
         this.cdb.search_app(Constants.App.UnionComponents)
       ]),
 
-      rx.switchMap(([sprkDevices, sessions, unions]) => {
+      rx.map(([sprkDevices, sessions, unions]) => {
         const grouped = IMap({
           [Constants.App.SessionLimits]: sessions,
           [Constants.App.UnionComponents]: unions,
           [Constants.App.SparkplugSrc]: sprkDevices
         });
 
-        return rx.from(grouped.entrySeq()).pipe(
-          // Flatten all datasets across all apps
-          rx.mergeMap(([structure, datasets]) =>
-            rx.from((datasets || IMap()).entrySeq()).pipe(
-              rx.map(([datasetId, config]) => ({
-                datasetId,
-                definition: { structure, config }
-              }))
-            )
-          ),
+        // ----------------------------
+        // 1. Flatten + group by datasetId
+        // ----------------------------
+        let map = grouped.entrySeq().reduce((acc, [structure, datasets]) => {
+          return (datasets || IMap()).entrySeq().reduce((innerAcc, [datasetId, config]) => {
+            const existing = innerAcc.get(datasetId, []);
+            return innerAcc.set(datasetId, [
+              ...existing,
+              { structure, config }
+            ]);
+          }, acc);
+        }, IMap());
 
-          // Group into: { datasetId: [definitions] }
-          rx.reduce((acc, { datasetId, definition }) => {
-            const existing = acc.get(datasetId, []);
-            return acc.set(datasetId, [...existing, definition]);
-          }, IMap())
-        );
+        // ----------------------------
+        // 2. Normalise duplicates
+        // ----------------------------
+        map = map.map((definitions) => {
+          if (definitions.length === 1) {
+            return definitions[0];
+          }
+
+          return {
+            structure: Constants.Special.InvalidDataset,
+            config: null
+          };
+        });
+
+        // ----------------------------
+        // 3. Recursive resolution (cached)
+        // ----------------------------
+        const cache = new Map();
+
+        const resolve = (datasetId, visited = new Set()) => {
+          if (cache.has(datasetId)) return cache.get(datasetId);
+
+          if (visited.has(datasetId)) {
+            const result = {
+              validity: DatasetValidity.INVALID,
+              from: null,
+              to: null,
+              error: 'Cycle detected'
+            };
+            cache.set(datasetId, result);
+            return result;
+          }
+
+          visited.add(datasetId);
+
+          const def = map.get(datasetId);
+
+          if (!def || def.structure === Constants.Special.InvalidDataset) {
+            const result = {
+              validity: DatasetValidity.INVALID,
+              from: null,
+              to: null
+            };
+            cache.set(datasetId, result);
+            return result;
+          }
+
+          const { structure, config } = def;
+
+          // ------------------------
+          // SESSION
+          // ------------------------
+          if (structure === Constants.App.SessionLimits) {
+            const child = resolve(config.source, new Set(visited));
+
+            if (child.validity === DatasetValidity.INVALID) {
+              cache.set(datasetId, child);
+              return child;
+            }
+
+            const from = config.from ? new Date(config.from) : null;
+            const to = config.to ? new Date(config.to) : null;
+
+            const result = {
+              validity: DatasetValidity.VALID,
+              from: maxDate(from, child.from),
+              to: minDate(to, child.to)
+            };
+
+            cache.set(datasetId, result);
+            return result;
+          }
+
+          // ------------------------
+          // SPARKPLUG
+          // ------------------------
+          if (structure === Constants.App.SparkplugSrc) {
+            const result = {
+              validity: DatasetValidity.VALID,
+              from: null,
+              to: null
+            };
+
+            cache.set(datasetId, result);
+            return result;
+          }
+
+          // ------------------------
+          // UNION
+          // ------------------------
+          if (structure === Constants.App.UnionComponents) {
+            const children = config.map(id =>
+              resolve(id, new Set(visited))
+            );
+
+            const validChildren = children.filter(
+              c => c.validity === DatasetValidity.VALID
+            );
+
+            if (validChildren.length !== children.length) {
+              const result = {
+                validity: DatasetValidity.INVALID,
+                from: null,
+                to: null
+              };
+              cache.set(datasetId, result);
+              return result;
+            }
+
+            const fromTimes = validChildren
+              .map(v => v.from?.getTime())
+              .filter(t => !isNaN(t));
+
+            const toTimes = validChildren
+              .map(v => v.to?.getTime())
+              .filter(t => !isNaN(t));
+
+            const result = {
+              validity: DatasetValidity.VALID,
+              from: fromTimes.length
+                ? new Date(Math.min(...fromTimes))
+                : null,
+              to: toTimes.length
+                ? new Date(Math.max(...toTimes))
+                : null
+            };
+
+            cache.set(datasetId, result);
+            return result;
+          }
+
+          // ------------------------
+          // Fallback
+          // ------------------------
+          const result = {
+            validity: DatasetValidity.INVALID,
+            from: null,
+            to: null
+          };
+
+          cache.set(datasetId, result);
+          return result;
+        };
+
+        // ----------------------------
+        // 4. Resolve all datasets
+        // ----------------------------
+        return map.map((def, datasetId) => {
+          const resolved = resolve(datasetId);
+
+          return {
+            ...def,
+            ...resolved
+          };
+        });
       }),
 
       rxu.shareLatest()
     );
   }
 
-  get_parts(){
-    return this.parts;
-  }
-
-  get_functional_types(){
-    return this.functional_types;
-  }
-
-  get_metadata(){
-    return this.metadata;
-  }
-
-  get_general_infos(){
-    return this.general_infos;
-  }
-
-
-
-  async get_allowed_dataset_uuids(principal, permission, dataset_validity) {
-    const dataset_def_obs = this.get_dataset_definitions(dataset_validity);
-    
+  async get_dataset_allowed_parts(dataset_uuid, principal, permission){
     const result = await rx.firstValueFrom(
       rx.combineLatest([
-        dataset_def_obs,
+        this.parts,
+        this.auth.watch_acl_with_perm(principal, permission)
+      ]).pipe(
+        rx.map(([partsMap, allowedParts]) => {
+          const parts = partsMap.get(dataset_uuid);
+
+          if(!parts) return [];
+
+          return parts.filter(partId => allowedParts.has(partId));
+        })
+      )
+    );
+
+    return result;
+  }
+
+  async get_allowed_dataset_uuids(principal, permission, dataset_validity) {
+    const datasets = this.get_dataset_definitions(dataset_validity);
+    
+    const allowed_datasets = await rx.firstValueFrom(
+      rx.combineLatest([
+        datasets,
         this.auth.watch_acl_with_perm(principal, permission)
       ]).pipe(
         rx.map(([datasets, targets]) => {
@@ -183,25 +347,13 @@ export class DataFlow {
 
           return datasets
             .keySeq()                // get all dataset IDs
-            .filter(id => targets.has(id))
-            .toArray();              // convert to plain array
+            .filter(id => targets.has(id));
         })
       )
     );
 
-    return result;
+    return allowed_datasets;
   }
-
-
-  async get_dataset_def_by_uuid(uuid){
-    const def = await rx.firstValueFrom(
-      this.get_dataset_definitions(DatasetValidity.VALID).pipe(
-        rx.map(datasets => datasets.get(uuid)?.[0])
-      )
-    );
-    return def;
-  }
-
 
   get_dataset_definitions(validity){
     if(validity == DatasetValidity.VALID){
@@ -216,21 +368,27 @@ export class DataFlow {
   }
 
   _get_all_dataset_definitions(){
-    return this.dataset_definitions;
+    return this.datasets;
   }
 
   _get_valid_dataset_definitions() {
-    return this.dataset_definitions.pipe(
+    return this.datasets.pipe(
       rx.map((map) =>
-        map.filter((definitions) => definitions.length === 1)
+        map.filter(
+          (definition) =>
+            definition.structure !== Constants.Special.InvalidDataset
+        )
       )
     );
   }
 
   _get_invalid_dataset_definitions() {
-    return this.dataset_definitions.pipe(
+    return this.datasets.pipe(
       rx.map((map) =>
-        map.filter((definitions) => definitions.length > 1)
+        map.filter(
+          (definition) =>
+            definition.structure === Constants.Special.InvalidDataset
+        )
       )
     );
   }

@@ -75,6 +75,7 @@ public class V2App {
 
     private Set<UUID> findAll (JsonValue config)
     {
+        log.info("Searching for config {}", config);
         return appValues()
             .filterValues(e -> e.value().equals(config))
             .keySet();

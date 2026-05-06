@@ -1,10 +1,23 @@
+function escapeCsv(value) {
+    if (value == null) return "";
 
-export function convert_to_csv (rows){
+    const str = String(value);
+
+    // If it contains special chars, wrap in quotes
+    if (/[",\n\r]/.test(str)) {
+        return `"${str.replace(/"/g, '""')}"`;
+    }
+
+    return str;
+}
+
+
+export function convertToCsv (rows){
     if (!rows.length) return "";
 
     const headers = Object.keys(rows[0]);
     const lines = rows.map(row =>
-        headers.map(h => JSON.stringify(row[h] ?? "")).join(",")
+        headers.map(h => escapeCsv(row[h])).join(",")
     );
 
     return [headers.join(","), ...lines].join("\n");

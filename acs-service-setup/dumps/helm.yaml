@@ -22,8 +22,12 @@ objects:
   !u UUIDs.Class.App:
     !u Clusters.App.K8sTemplate:
       name: "K8s resource template"
+      subclassOf:
+        - !u MetaDB.Class.ConfigEntry
     !u Clusters.App.HelmTemplate:
       name: "Helm chart template"
+      subclassOf:
+        - !u MetaDB.Class.ConfigEntry
 
   !u Auth.Class.EdgeRole:
     !u Local.Role.EdgeAgent:

@@ -1,95 +1,76 @@
 service: !u UUIDs.Service.ConfigDB
 version: 2
 objects:
-  # Some of these are commented out because, although they logically
-  # belong here, they are actually defined in service-setup.yaml because
-  # they are needed for local UUID generation.
   !u ConfigDB.Class.R2Class:
-    #!u Auth.Class.PrincipalGroup:
-    #  name: "Principal group"
-    #!u Auth.Class.PrincipalType:
-    #  name: "Principal type"
-    #  subclassOf:
-    #    - !u Auth.Class.PrincipalGroup
-    #!u Auth.Class.Role:
-    #  name: "Role"
-    #  subclassOf:
-    #    - !u Auth.Class.PrincipalGroup
-    !u Auth.Class.ServiceRole:
-      name: "Service role"
-      subclassOf:
-        - !u Auth.Class.Role
-    #!u Auth.Class.EdgeRole:
-    #  name: "Edge role"
-    #  subclassOf:
-    #    - !u Auth.Class.Role
-    !u Auth.Class.ClientRole:
-      name: "Client role"
-      subclassOf:
-        - !u Auth.Class.Role
-
     !u Auth.Class.PermissionGroup: 
       name: "Permission group"
+      iri: acl/PermissionGroup
     !u Auth.Class.ServicePerms:
       name: "Service permission set"
+      iri: acl/ServicePerms
       subclassOf:
         - !u Auth.Class.PermissionGroup
     !u Auth.Class.CompositePerm:
       name: "Composite permission"
+      iri: acl/CompositePerm
       subclassOf:
         - !u Auth.Class.PermissionGroup
 
   !u UUIDs.Class.Class:
-    #!u Auth.Class.Principal:
-    #  name: "Principal"
-    #  memberOf:
-    #    - !u Auth.Class.PrincipalGroup
     !u UUIDs.Class.Permission:
       name: "Permission"
+      iri: acl/Permission
       memberOf:
         - !u Auth.Class.PermissionGroup
 
   !u Auth.Class.PrincipalType:
+    # CentralService is in core-auth.yaml
     !u Auth.Class.HumanUser:
       name: "Human user"
+      iri: user/HumanUser
       subclassOf:
         - !u Auth.Class.Principal
-    #!u Auth.Class.CentralService:
-    #  name: "Central service"
-    #  subclassOf:
-    #    - !u Auth.Class.Principal
     !u Auth.Class.EdgeService:
       name: "Edge service"
+      iri: user/EdgeService
       subclassOf:
         - !u Auth.Class.Principal
+    # Should these be a dedicated PrincipalType?
     !u Auth.Class.EdgeAgent:
       name: "Edge Agent"
+      iri: user/EdgeAgent
       subclassOf:
         - !u Auth.Class.Principal
     !u Auth.Class.AppAccount:
       name: "Application account"
+      iri: user/Application
       subclassOf:
         - !u Auth.Class.Principal
     !u Auth.Class.SpecialAccount:
       name: "Special account"
+      iri: user/Special
       subclassOf:
         - !u Auth.Class.Principal
 
   !u Auth.Class.ServicePerms:
     !u ACS.PermGroup.Auth:
       name: "Auth permission"
+      iri: auth/perm/All
       subclassOf:
         - !u UUIDs.Class.Permission
     !u ACS.PermGroup.CmdEsc:
       name: "CmdEsc permission"
+      iri: cmdesc/perm/All
       subclassOf:
         - !u UUIDs.Class.Permission
     !u ACS.PermGroup.ConfigDB:
       name: "ConfigDB permission"
+      iri: configdb/perm/All
       subclassOf:
         - !u UUIDs.Class.Permission
     # Directory in directory.yaml
     !u ACS.PermGroup.MQTT:
       name: "MQTT permission"
+      iri: mqtt/perm/All
       subclassOf:
         - !u UUIDs.Class.Permission

@@ -6,6 +6,8 @@
 
 package uk.co.amrc.factoryplus.notify;
 
+import java.util.concurrent.TimeUnit;
+
 import jakarta.json.*;
 
 import io.reactivex.rxjava3.core.*;
@@ -24,6 +26,18 @@ import uk.co.amrc.factoryplus.util.UrlPath;
 interface Filter
 {
     Option<Observable<NotifyUpdate>> handleRequest (Session sess, Request request);
+
+    /* We need to rate-control our notify output, otherwise we get
+     * massive churn when we load a lot of data. It is important this is
+     * applied to a level-triggered sequence as it will drop
+     * notifications. It's possible the 10s throttle timeout might be
+     * too long. */
+    public static <T> Observable<T> rateControl (Observable<T> src)
+    {
+        return src
+            .throttleLatest(10, TimeUnit.SECONDS, true)
+            .distinctUntilChanged();
+    }
 
     class Path
     {
@@ -71,7 +85,7 @@ interface Filter
             Observable<Response<JsonValue>> resps)
         {
             return resps
-                .distinctUntilChanged()
+                .compose(Filter::rateControl)
                 .zipWith(IsFirst.isFirst(), NotifyUpdate::ofResponse);
         }
     }
@@ -99,10 +113,11 @@ interface Filter
         /* XXX Filtering not implemented for now */
         private Observable<NotifyUpdate> buildSearch (Observable<SearchUpdate> updates)
         {
-            return updates
+            var src = updates.compose(Filter::rateControl);
+            return src
                 /* It doesn't matter what this first item is as long as
                  * it's not a Full update */
-                .zipWith(updates.startWithItem(SearchUpdate.notFound()),
+                .zipWith(src.startWithItem(SearchUpdate.notFound()),
                     SearchUpdate::diffFrom)
                 .flatMapIterable(l -> l)
                 .zipWith(IsFirst.isFirst(), SearchUpdate::toUpdate);

@@ -7,12 +7,13 @@
 package uk.co.amrc.factoryplus.metadb.db;
 
 import java.time.Instant;
-import java.util.function.Consumer;
-import java.util.function.Function;
-import java.util.function.Supplier;
+import java.util.ConcurrentModificationException;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Supplier;
 
 import jakarta.json.*;
 import jakarta.ws.rs.core.SecurityContext;
@@ -20,6 +21,7 @@ import jakarta.ws.rs.core.SecurityContext;
 import org.apache.jena.datatypes.xsd.XSDDatatype;
 import org.apache.jena.query.*;
 import org.apache.jena.rdf.model.*;
+import org.apache.jena.riot.*;
 import org.apache.jena.tdb2.TDB2Factory;
 import org.apache.jena.update.*;
 import org.apache.jena.vocabulary.*;
@@ -28,6 +30,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import io.vavr.collection.Iterator;
+import io.vavr.collection.List;
 import io.vavr.control.Option;
 
 import uk.co.amrc.factoryplus.client.*;
@@ -57,6 +60,8 @@ public class RdfStore
      * - G_direct: this is G_direct from the TDB.
      * - G_derived: this is RDFS(G_direct).
      * - default: this is equal to G_derived.
+     * Potentially we could add a <graph/core> to hold the definitions
+     * from the core TTL, and make them read-only.
      */
     public RdfStore (FPServiceClient fplus, AuthProvider auth, String data)
     {
@@ -91,6 +96,9 @@ public class RdfStore
 
     public void start ()
     {
+        bootstrap();
+        executeRead(this::validateZFC);
+
         dataflow.start();
         schemaTracker.start();
     }
@@ -140,8 +148,21 @@ public class RdfStore
 
     public <T> T requestRead (SecurityContext ctx, Function<RequestHandler, T> cb)
     {
-        var req = new RequestHandler(this, ctx).start();
+        var req = new RequestHandler(this, ctx).fetchACL();
         return calculateRead(() -> cb.apply(req));
+    }
+    public <T> T requestWrite (SecurityContext ctx, Function<RequestHandler, T> cb)
+    {
+        return requestWrite(ctx, false, cb);
+    }
+    public void requestExecute (SecurityContext ctx, boolean needClientUUID,
+        Consumer<RequestHandler> cb)
+    {
+        requestWrite(ctx, needClientUUID, req -> { cb.accept(req); return 1; });
+    }
+    public void requestExecute (SecurityContext ctx, Consumer<RequestHandler> cb)
+    {
+        requestExecute(ctx, false, cb);
     }
 
     /* Jena ModelChangedListeners do not appear to respect inference
@@ -167,10 +188,13 @@ public class RdfStore
      * for a change in one rank to propagate into other ranks. If we
      * introduced inference for powertypes this would change.
      */
-    public <T> T requestWrite (SecurityContext ctx, Function<RequestHandler, T> cb)
+    public <T> T requestWrite (SecurityContext ctx, boolean needClientUUID,
+        Function<RequestHandler, T> cb)
     {
-        var req = new RequestHandler(this, ctx)
-            .start();
+        var req = new RequestHandler(this, ctx).fetchACL();
+        log.info("requestWrite: needClientUUID {}", needClientUUID);
+        if (needClientUUID)
+            req.fetchClientUUID();
         var listener = new ModelUpdate();
         T rv;
 
@@ -199,26 +223,28 @@ public class RdfStore
         var update = listener.dataset(derived);
         /* It is important that all dataflow processing that queries the
          * update dataset happens syncronously. Otherwise it won't be in
-         * this transaction. */
-        update.executeRead(() -> {
+         * this transaction. The transaction is on our own Dataset,
+         * even though we will also be querying the update Dataset; this
+         * is important as Jena does not handle transactions via
+         * multiple Datasets referencing the same TDB correctly. */
+        executeRead(() -> {
             dataflow.modelUpdate(update);
         });
 
         return rv;
     }
-    public void requestExecute (SecurityContext ctx, Consumer<RequestHandler> cb)
-    {
-        requestWrite(ctx, req -> { cb.accept(req); return 1; });
-    }
 
-    public ResultSet selectQuery (Query query, Object... substs)
+    /* This has been made private because of the exceptions detailed
+     * below. Use listQuery instead. */
+    private ResultSet selectQuery (Query query, Object... substs)
     {
         var exec = QueryExecution.dataset(dataset)
             .query(query);
         Iterator.of(substs)
             .grouped(2)
             .forEach(sq -> exec.substitution((String)sq.get(0), (RDFNode)sq.get(1)));
-        return exec.build().execSelect();
+        return exec.build()
+            .execSelect();
     }
 
     public Option<QuerySolution> optionalQuery (Query query, Object... substs)
@@ -231,6 +257,30 @@ public class RdfStore
         return Util.singleOrError(selectQuery(query, substs));
     }
 
+    public List<QuerySolution> listQuery (Query query, Object... substs)
+    {
+        /* I do not understand why, but under reasonably heavy
+         * contention (e.g. service-setup running) this fails
+         * sporadically with a ConcurrentModificationException. I do not
+         * think this can be a problem with the lifetime of the
+         * ResultSet as we are iterating and materialising it
+         * immediately. The exception usually comes from the call to
+         * Dataflow::_fetchRelation on the model updates dataset, so
+         * it's possible that my Dataset manipulation is not valid and
+         * the transactions are not being passed through to TDB2
+         * properly, or that transactions on the two Datasets don't
+         * properly lock each other out. */
+         while (true) {
+             try {
+                 return Iterator.ofAll(selectQuery(query, substs))
+                     .toList();
+            }
+            catch (ConcurrentModificationException e) {
+                log.info("Caught ConcurrentModificationException, retrying…");
+            }
+        }
+    }
+
     public void runUpdate (UpdateRequest update, Object... substs)
     {
         var exec = UpdateExecution.dataset(dataset)
@@ -239,6 +289,43 @@ public class RdfStore
             .grouped(2)
             .forEach(sq -> exec.substitution((String)sq.get(0), (RDFNode)sq.get(1)));
         exec.execute();
+    }
+
+    private static Option<Integer> findVersion (Model model)
+    {
+        return Util.single(model.listObjectsOfProperty(
+                Vocab.Sys.core, Vocab.Sys.dbVersion))
+            .map(n -> Util.decodeLiteral(n, Integer.class));
+    }
+
+    public void bootstrap ()
+    {
+        var core = ModelFactory.createDefaultModel();
+        var ttl = RdfStore.class.getResourceAsStream("core.ttl");
+        RDFDataMgr.read(core, ttl, Lang.TURTLE);
+
+        var coreVer = findVersion(core).get();
+
+        this.executeWrite(() -> {
+            findVersion(direct)
+                .peek(ver -> {
+                    log.info("Found core schema version {}", ver);
+                    if (!ver.equals(coreVer))
+                        throw new RdfErr.CorruptRDF(
+                            "Expected core schema version " + coreVer);
+                })
+                .onEmpty(() -> {
+                    log.info("Loading core schema version {}", coreVer);
+                    direct.add(core);
+                });
+        });
+        derived.rebind();
+    }
+
+    public void validateZFC ()
+    {
+        var zfc = new ZFC(this);
+        zfc.validateInvariants();
     }
 
     /** Find a single resource within the direct graph. */
@@ -258,16 +345,15 @@ public class RdfStore
             derived.removeAll(null, node.as(Property.class), null);
     }
 
-    public Option<FPObject> findObject (UUID uuid)
+    public Option<Resource> findObject (UUID uuid)
     {
-        return findResource(Vocab.uuid, Vocab.uuidLiteral(uuid))
-            .map(node -> new FPObject(node, uuid));
+        return findResource(Vocab.uuid, Vocab.uuidLiteral(uuid));
     }
 
-    public FPObject findObjectOrError (UUID uuid)
+    public Resource findObjectOrError (UUID uuid)
     {
         return findObject(uuid)
-            .getOrElseThrow(() -> new SvcErr.NotFound(uuid.toString()));
+            .getOrElseThrow(() -> new RdfErr.UUIDNotFound(uuid));
     }
 
     public Resource findRankClass (int rank)
@@ -287,7 +373,7 @@ public class RdfStore
         return Util.decodeLiteral(binding.get("rank"), Integer.class);
     }
 
-    public FPObject createObject (Resource klass)
+    public Resource createObject (Resource klass)
     {
         UUID uuid;
         while (true) {
@@ -300,7 +386,7 @@ public class RdfStore
         return createObject(klass, uuid);
     }
 
-    public FPObject createObject (Resource klass, UUID uuid)
+    public Resource createObject (Resource klass, UUID uuid)
     {
         var obj = Vocab.uuidResource(uuid);
         derived.add(obj, Vocab.uuid, uuid.toString());
@@ -313,12 +399,12 @@ public class RdfStore
             derived.add(obj, RDFS.subClassOf, rk);
         }
 
-        return new FPObject(obj, uuid);
+        return obj;
     }
 
     public Resource createInstant ()
     {
-        var inst = createObject(Vocab.Time.Instant).node();
+        var inst = createObject(Vocab.Time.Instant);
         var stamp = derived.createTypedLiteral(Instant.now(), XSDDatatype.XSDdateTime);
         derived.add(inst, Vocab.Time.timestamp, stamp);
         return inst;

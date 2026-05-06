@@ -902,38 +902,6 @@ export default class Model extends EventEmitter {
         return schema;
     }
 
-    async _dump_load_obj_v1 (dump) {
-        const creat = (u, c) => this.object_create({
-            uuid: u, class: c, owner: SpecialObj.Unowned });
-
-        /* The order of loading here is important. This is why Classes
-         * are handled separately from the others. */
-        for (const uuid of dump.classes ?? []) {
-            /* XXX temporary hack while the ACS dumps attempt to create
-             * this class */
-            if (uuid == Class.Class)
-                continue;
-            this.log("LOAD v1 CLASS %s", uuid);
-            const [st] = await creat(uuid, Class.Class);
-            if (st > 299) {
-                this.log("Dump failed [%s] on class %s", st, uuid);
-                return st;
-            }
-        }
-        for (const [klass, objs] of Object.entries(dump.objects ?? {})) {
-            for (const uuid of objs) {
-                this.log("LOAD v1 OBJECT %s/%s", klass, uuid);
-                let [st] = await creat(uuid, klass);
-                if (st > 299) {
-                    this.log("Dump failed [%s] on object %s (%s)",
-                        st, uuid, klass);
-                    return st;
-                }
-            }
-        }
-        return 204;
-    }
-
     _dump_load_obj_v2 (dump) {
         /* XXX This txn should include the configs. */
         return this.db.txn({}, q => q(`select load_dump($1)`, [dump.objects]))
@@ -953,8 +921,7 @@ export default class Model extends EventEmitter {
 
         const v = dump.version;
         const st = await (
-            v == 1 ? this._dump_load_obj_v1(dump)
-            : v == 2 ? this._dump_load_obj_v2(dump)
+            v == 2 ? this._dump_load_obj_v2(dump)
             : 422);
         if (st > 299) return st;
 

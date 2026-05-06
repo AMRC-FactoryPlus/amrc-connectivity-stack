@@ -232,4 +232,30 @@ public class FPAuth {
         return watchChecker(upn)
             .map(r -> r.map(c -> c.check(perm, targ)));
     }
+
+    /** Look up an identity.
+     * This only supports name types supported directly by the Auth
+     * service. Currently this means Kerberos only.
+     *
+     * @param type The type of name `name` is.
+     * @param name The name to look up.
+     */
+    /* XXX This makes an HTTP request to the Auth service every time. If
+     * the Auth service supported WATCH v2/identity/{type}/{name} or the
+     * equivalent SEARCH we could cache-and-track as we do for the ACLs.
+     * But it may not be worth it; currently the operations that need
+     * this information are not common, unless the MetaDB starts
+     * tracking owners for ConfigEntries. */
+    public Single<Option<UUID>> resolveIdentity (String type, String name)
+    {
+        return fplus.http().request(SERVICE, "GET")
+            .withURIBuilder(b -> b
+                .appendPathSegments("v2", "identity", type, name))
+            .fetch()
+            .map(res -> res.toOption()
+                .filter(v -> v instanceof String).map(v -> (String)v)
+                .mapTry(UUID::fromString).toOption()
+                .peek(uuid -> log.info("Resolved {}/{} to {}", type, name, uuid))
+                .onEmpty(() -> log.info("Failed to resolve {}/{}", type, name)));
+    }
 }

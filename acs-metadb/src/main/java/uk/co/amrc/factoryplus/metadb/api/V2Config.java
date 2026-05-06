@@ -63,7 +63,10 @@ public class V2Config {
     public void put (JsonValue config)
     {
         log.info("Put config for {}/{}", app, obj);
-        store.requestExecute(auth, req -> {
+        var needUUID = app.equals(Vocab.App.U_Registration);
+        log.info("put: app {} needUUID {}", app, needUUID);
+
+        store.requestExecute(auth, needUUID, req -> {
             log.info("Put config: calling checkACL");
             req.checkACL(Vocab.Perm.WriteApp, app);
             log.info("Put config: calling putValue");
@@ -75,6 +78,9 @@ public class V2Config {
     public void delete ()
     {
         log.info("Delete config for {}/{}", app, obj);
+        if (app.equals(Vocab.App.U_Registration))
+            throw new RdfErr.Immutable();
+
         store.requestExecute(auth, req -> {
             req.checkACL(Vocab.Perm.WriteApp, app);
             req.configEntry(app, obj).removeValue();
@@ -84,8 +90,11 @@ public class V2Config {
     @PATCH @Consumes("application/merge-patch+json")
     public void mergePatch (JsonValue json)
     {
+        var needUUID = app.equals(Vocab.App.U_Registration);
+        log.info("mergePatch: app {} needUUID {}", app, needUUID);
         var patch = Json.createMergePatch(json);
-        store.requestExecute(auth, req -> {
+
+        store.requestExecute(auth, needUUID, req -> {
             req.checkACL(Vocab.Perm.ReadApp, app);
             req.checkACL(Vocab.Perm.WriteApp, app);
             var entry = req.configEntry(app, obj);

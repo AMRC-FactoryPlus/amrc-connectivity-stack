@@ -47,10 +47,10 @@ public class ConfigEntry extends RequestHandler.Component
 
     public static ConfigEntry create (RequestHandler req, UUID app, UUID obj)
     {
-        var appO = req.db().findObjectOrError(app);
-        var objO = req.db().findObjectOrError(obj);
+        var appR = req.db().findObjectOrError(app);
+        var objR = req.db().findObjectOrError(obj);
 
-        return new ConfigEntry(req, appO.node(), objO.node());
+        return new ConfigEntry(req, appR, objR);
     }
 
     public record Value (JsonValue value, UUID etag, Option<Instant> mtime)
@@ -80,8 +80,9 @@ public class ConfigEntry extends RequestHandler.Component
     private static final Query Q_getRawValue = Vocab.query("""
         select ?value
         where {
-            [] a ?app; <app/for> ?obj;
-                <doc/content> ?value.
+            [] <app/app> ?app; 
+                <app/for> ?obj;
+                <app/value> ?value.
         }
     """);
 
@@ -94,10 +95,10 @@ public class ConfigEntry extends RequestHandler.Component
     private static final Query Q_getValue = Vocab.query("""
         select ?value ?etag
         where {
-            ?config a ?app;
+            ?config <app/app> ?app;
                 <app/for> ?obj;
-                <core/uuid> ?etag;
-                <doc/content> ?value.
+                <app/etag> ?etag;
+                <app/value> ?value.
         }
     """);
 
@@ -111,12 +112,11 @@ public class ConfigEntry extends RequestHandler.Component
      * could instead set an :end Instant and adjust getValue to only
      * look for entries without an end. */
     private static final UpdateRequest U_removeValue = Vocab.update("""
-        delete {
-            ?entry ?p ?o.
-        }
-        where {
-            ?entry a ?app; <app/for> ?obj.
-            ?entry ?p ?o.
+        delete where {
+            ?entry <app/app> ?app;
+                <app/for> ?obj;
+                <app/etag> ?etag;
+                <app/value> ?value.
         }
     """);
 
@@ -144,7 +144,9 @@ public class ConfigEntry extends RequestHandler.Component
         if (!schemas.validate(app, value))
             throw new RdfErr.BadConfig(value);
 
-        if (isStructured())
+        if (app.equals(Vocab.App.Registration))
+            request().objectStructure().updateRegistration(obj, value);
+        else if (isStructured())
             db().appMapper().updateConfig(app, obj, value);
         else
             putRawValue(value);
@@ -154,16 +156,18 @@ public class ConfigEntry extends RequestHandler.Component
             schemas.updateSchemas(List.of(obj));
     }
 
-    /* Returns a Value if we made an update. Returns empty() if the
-     * value has not changed and we didn't update it. */
-    public Option<Value> putRawValue (JsonValue value)
+    /* This creates a ConfigEntry object. We do not attempt to set
+     * ownership on the new object, even though we potentially have this
+     * information available, as it isn't clear what compatibility
+     * effects this would have. It also isn't clear that it makes sense
+     * when the entry may be derived from a different entry via the RDF
+     * mappings. */
+    public void putRawValue (JsonValue value)
     {
         var existing = getRawValue()
             .filter(v -> v.equals(value));
-        if (existing.isDefined()) {
-            //log.info("Duplicate config update suppressed");
-            return Option.none();
-        }
+        if (existing.isDefined())
+            return;
 
         removeRawValue();
 
@@ -171,15 +175,24 @@ public class ConfigEntry extends RequestHandler.Component
             value.toString(), RDF.dtRDFJSON);
 
         var graph   = db().derived();
-        var entry   = db().createObject(app);
+        /* We used to create config entries as full F+ objects, where
+         * their ETag was their F+ UUID. The longer-term intention was
+         * to support 4Dish ideas modelling the entries as States, and
+         * keeping the history. But Jena does not seem to be able to
+         * cope with this, so for now at least we just create them as
+         * tag-soup. */
+        //var entry   = db().createObject(app);
         //var inst    = request().getInstant();
 
-        graph.add(entry.node(), Vocab.App.forP, obj);
-        graph.add(entry.node(), Vocab.Doc.content, json);
-        //graph.add(entry, Vocab.Time.start, inst);
+        var uuid = UUID.randomUUID();
+        var entry = Vocab.configResource(uuid);
+        var etag = Vocab.uuidLiteral(uuid);
 
-        return Option.some(new Value(
-            value, entry.uuid(), Option.none()));
+        graph.add(entry, Vocab.App.app, app);
+        graph.add(entry, Vocab.App.forP, obj);
+        graph.add(entry, Vocab.App.value, json);
+        graph.add(entry, Vocab.App.etag, etag);
+        //graph.add(entry, Vocab.Time.start, inst);
     }
 }
 

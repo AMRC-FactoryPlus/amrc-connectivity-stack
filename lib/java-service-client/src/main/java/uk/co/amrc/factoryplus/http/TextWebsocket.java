@@ -6,8 +6,11 @@
 
 package uk.co.amrc.factoryplus.http;
 
+import java.nio.channels.ClosedChannelException;
+
 import org.eclipse.jetty.websocket.api.Callback;
 import org.eclipse.jetty.websocket.api.Session;
+import org.eclipse.jetty.websocket.api.StatusCode;
 
 import io.reactivex.rxjava3.core.*;
 import io.reactivex.rxjava3.disposables.SerialDisposable;
@@ -69,6 +72,10 @@ public class TextWebsocket
         }
 
         public void onWebSocketError (Throwable e) {
+            if (e instanceof ClosedChannelException) {
+                onWebSocketClose(StatusCode.NO_CLOSE, "", Callback.NOOP);
+                return;
+            }
             recv.tryOnError(e);
         }
 

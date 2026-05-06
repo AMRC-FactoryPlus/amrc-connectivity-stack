@@ -53,8 +53,8 @@ public class Dataflow
         where {
             {   select distinct ?app ?obj
                 where {
-                    { graph <graph/added> { [] a ?app; <app/for> ?obj. } }
-                    union { graph <graph/removed> { [] a ?app; <app/for> ?obj. } }
+                    { graph <graph/added> { [] <app/app> ?app; <app/for> ?obj. } }
+                    union { graph <graph/removed> { [] <app/app> ?app; <app/for> ?obj. } }
             } }
 
             # We can't handle deleting Apps yet
@@ -68,10 +68,10 @@ public class Dataflow
             # graph. We don't know what order the changes happened in so
             # we don't know which happened last.
             optional { graph <graph/derived> {
-                [] a ?app;
+                []  <app/app> ?app;
                     <app/for> ?obj;
-                    <doc/content> ?value;
-                    <core/uuid> ?etag.
+                    <app/value> ?value;
+                    <app/etag> ?etag.
         } } }
     """);
 
@@ -81,7 +81,8 @@ public class Dataflow
         return modelUpdates
             .map(ds -> QueryExecution.dataset(ds)
                 .query(Q_appUpdates)
-                .build().execSelect())
+                .build().execSelect()
+                .materialise())
             .flatMap(rs -> Observable.<QuerySolution>create(em -> {
                 rs.forEachRemaining(em::onNext);
                 em.onComplete();
@@ -111,12 +112,10 @@ public class Dataflow
 
     private Set<UUID> _fetchRelation (Relation.Bound bound)
     {
-        log.info("Fetch relation {}", bound);
-        var rs = db.selectQuery(Q_relation, 
-            "graph",            bound.graph(),
-            "rel",              bound.prop(),
-            bound.selectVar(),  bound.literal());
-        return Iterator.ofAll(rs)
+        return db.listQuery(Q_relation, 
+                "graph",            bound.graph(),
+                "rel",              bound.prop(),
+                bound.selectVar(),  bound.literal())
             .map(qs -> Util.decodeLiteral(qs.get(bound.resultVar()), UUID.class))
             .toSet();
     }
@@ -152,17 +151,17 @@ public class Dataflow
             .filter(u -> u.app().equals(app));
     }
 
-    /* XXX These find-entry queries have a lot of dupliction. I'm not
+    /* XXX These find-entry queries have a lot of duplication. I'm not
      * sure how best to avoid that; I don't really want to fall back to
      * iterating over a list all the time. */
     private static final Query Q_appState = Vocab.query("""
         select ?objU ?value ?etag
         where {
             ?app <core/uuid> ?appU.
-            [] a ?app;
+            []  <app/app> ?app;
                 <app/for> ?obj;
-                <doc/content> ?value;
-                <core/uuid> ?etag.
+                <app/value> ?value;
+                <app/etag> ?etag.
             ?obj <core/uuid> ?objU.
         }
     """);
@@ -172,8 +171,7 @@ public class Dataflow
         /* This method is not triggered by an Update, so it must use its
          * own transaction. */
         return db.calculateRead(() -> 
-            Iterator.ofAll(db.selectQuery(Q_appState, 
-                    "appU", Vocab.uuidLiteral(app)))
+            db.listQuery(Q_appState, "appU", Vocab.uuidLiteral(app))
                 .toMap(qs -> Util.decodeLiteral(qs.get("objU"), UUID.class),
                     ConfigEntry.Value::ofQuerySolution));
     }

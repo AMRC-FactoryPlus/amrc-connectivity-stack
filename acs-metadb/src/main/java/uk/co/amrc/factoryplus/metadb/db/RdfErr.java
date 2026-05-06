@@ -6,12 +6,11 @@
 
 package uk.co.amrc.factoryplus.metadb.db;
 
-import java.util.Map;
 import java.util.UUID;
 
 import jakarta.json.*;
 
-import io.vavr.collection.Set;
+import io.vavr.collection.*;
 
 import org.apache.jena.rdf.model.*;
 
@@ -56,60 +55,102 @@ public final class RdfErr
         }
     }
 
-    public static class BadConfig extends SvcErr.Client
+    public static class BadConfig extends SvcErr.BadInput
     {
         private JsonValue config;
-
-        public BadConfig (JsonValue val)
-        {
+        public BadConfig (JsonValue val) {
             super("Invalid config entry");
             this.config = val;
         }
-
-        public int statusCode () { return 422; }
-        protected void extendJson (JsonObjectBuilder obj)
-        {
+        protected void extendJson (JsonObjectBuilder obj) {
             obj.add("config", config);
         }
     }
-    public static class RankMismatch extends SvcErr.Client
+    public static class UUIDNotFound extends SvcErr.NotFound
     {
-        public RankMismatch () { super("Rank mismatch"); }
-        public int statusCode () { return 409; }
+        private UUID uuid;
+        public UUIDNotFound (UUID uuid) {
+            super("UUID not found");
+            this.uuid = uuid;
+        }
+        public UUID uuid () { return uuid; }
+        protected void extendJson (JsonObjectBuilder obj) {
+            obj.add("uuid", uuid.toString());
+        }
     }
-    public static class NotMember extends SvcErr.Client
-    {
-        public NotMember () { super("Not a member of a required class"); }
-        public int statusCode () { return 409; }
-    }
-    public static class InUse extends SvcErr.Client
-    {
-        public InUse () { super("Object in use"); }
-        public int statusCode () { return 409; }
-    }
+
     public static class Immutable extends SvcErr.Client
     {
         public Immutable () { super("Object is immutable"); }
         public int statusCode () { return 405; }
         public Map<String, String> buildHeaders ()
         {
-            return Map.of("Allow", "GET, HEAD");
+            return HashMap.of("Allow", "GET, HEAD");
         }
     }
-    public static class SchemaConflict extends SvcErr.Client
+
+    public static class RankMismatch extends SvcErr.Conflict
     {
-        private Set<UUID> conflicts;
-        public SchemaConflict (Set<UUID> conflicts)
+        public RankMismatch () { super("Rank mismatch"); }
+    }
+    public static class InUse extends SvcErr.Conflict
+    {
+        public InUse () { super("Object in use"); }
+    }
+    public static class InvalidObjs extends SvcErr.Conflict
+    {
+        private List<UUID> objects;
+        public InvalidObjs (String msg, List<UUID> objects)
         {
-            super("Schema conflicts with existing objects");
-            this.conflicts = conflicts;
+            super(msg);
+            this.objects = objects;
         }
-        public int statusCode () { return 409; }
         protected void extendJson (JsonObjectBuilder obj)
         {
-            obj.add("conflicts", conflicts
+            obj.add("objects", objects
                 .map(UUID::toString)
                 .foldLeft(Json.createArrayBuilder(), (a, v) -> a.add(v))
+                .build());
+        }
+    }
+    public static class SchemaConflict extends InvalidObjs
+    {
+        public SchemaConflict (List<UUID> conflicts)
+        {
+            super("Schema conflicts with existing objects", conflicts);
+        }
+    }
+    public static class InvalidIris extends SvcErr.Conflict
+    {
+        private List<Resource> iris;
+        public InvalidIris (String msg, List<Resource> iris)
+        {
+            super(msg);
+            this.iris = iris;
+        }
+        protected void extendJson (JsonObjectBuilder obj)
+        {
+            obj.add("iris", iris
+                .map(Resource::toString)
+                .foldLeft(Json.createArrayBuilder(), (a, v) -> a.add(v))
+                .build());
+        }
+    }
+    public static class InvalidRels extends SvcErr.Conflict
+    {
+        private Map<UUID, UUID> relations;
+        public InvalidRels (String msg, Map<UUID, UUID> relations)
+        {
+            super(msg);
+            this.relations = relations;
+        }
+        protected void extendJson (JsonObjectBuilder obj)
+        {
+            obj.add("relations", 
+                Json.createObjectBuilder(relations
+                    .mapKeys(UUID::toString)
+                    .mapValues(v -> (Object)v.toString())
+                    .toJavaMap())
                 .build());
         }
     }

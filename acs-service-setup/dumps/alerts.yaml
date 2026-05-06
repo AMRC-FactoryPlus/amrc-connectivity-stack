@@ -1,25 +1,15 @@
 service: !u UUIDs.Service.ConfigDB
-version: 1
-classes:
-  - !u Edge.Class.Alert
-  - !u Edge.Class.LinkRelation
+version: 2
 objects:
-  !u Edge.Class.Alert:
-    - !u Edge.Alert.Agent.Connection
-    - !u Edge.Alert.Agent.ConfigInvalid
-    - !u Edge.Alert.Agent.ConfigFetch
-    - !u Edge.Alert.Monitor.Offline
-    - !u Edge.Alert.Monitor.Reload
-  !u Edge.Class.LinkRelation:
-    - !u Edge.Link.Monitor.Cluster
-    - !u Edge.Link.Monitor.Node
-configs:
-  !u UUIDs.App.Info:
+  !u ConfigDB.Class.R1Class:
     !u Edge.Class.Alert:
       name: "Alert type"
+      iri: edge/AlertType
+    # This is specifically for links published via Sparkplug
     !u Edge.Class.LinkRelation:
       name: "Link relation"
-
+      iri: edge/LinkRelation
+  !u Edge.Class.Alert:
     !u Edge.Alert.Agent.Connection:
       name: "Edge Agent: Connection problem"
     !u Edge.Alert.Agent.ConfigInvalid:
@@ -30,7 +20,7 @@ configs:
       name: "Monitor: Node offline"
     !u Edge.Alert.Monitor.Reload:
       name: "Monitor: Node will not reload config"
-
+  !u Edge.Class.LinkRelation:
     !u Edge.Link.Monitor.Cluster:
       name: "Monitored cluster"
     !u Edge.Link.Monitor.Node:

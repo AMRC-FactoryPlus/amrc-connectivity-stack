@@ -37,6 +37,12 @@ public class ModelUpdate extends StatementListener
 
     public Dataset dataset (Model derived)
     {
+        /* This is nice and neat and allows us to query the updates
+         * alongside the existing data. However I'm not entirely sure
+         * it's valid; it may be the cause of the
+         * ConcurrentModificationExceptions described in
+         * RdfStore::listQuery. It may be necessary to handle this some
+         * other way. */
         var ds = DatasetFactory.create(derived);
         ds.addNamedModel(Vocab.G_derived, derived);
         ds.addNamedModel(Vocab.G_added, toModel(added));

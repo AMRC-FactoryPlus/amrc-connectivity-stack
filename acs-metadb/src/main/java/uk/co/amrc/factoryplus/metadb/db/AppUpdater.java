@@ -77,38 +77,41 @@ public class AppUpdater extends RequestHandler.Component
 
     public void update ()
     {
-        var updates = db().selectQuery(Q_findUpdates)
-            .materialise();
-        updates.forEachRemaining(row -> {
-            var app = row.getResource("app");
-            var obj = row.getResource("obj");
-            updateEntry(app, obj);
-        });
+        db().listQuery(Q_findUpdates)
+            .forEach(row -> {
+                var app = row.getResource("app");
+                var obj = row.getResource("obj");
+                updateEntry(app, obj);
+            });
 
         /* We update Reg entries in a second pass, as updating the other
          * entries will have created registered objects. */
-        var objects = db().selectQuery(Q_findObjects)
-            .materialise();
-        objects.forEachRemaining(row -> {
-            var obj = row.getResource("obj");
-            updateEntry(Vocab.App.Registration, obj);
-        });
+        db().listQuery(Q_findObjects)
+            .forEach(row -> {
+                var obj = row.getResource("obj");
+                updateEntry(Vocab.App.Registration, obj);
+            });
 
-        var orphans = db().selectQuery(Q_orphanConfigs)
-            .materialise();
-        orphans.forEachRemaining(row -> {
-            var conf = row.getResource("conf");
-            db().removeResource(conf);
-        });
+        db().listQuery(Q_orphanConfigs)
+            .forEach(row -> {
+                var conf = row.getResource("conf");
+                db().removeResource(conf);
+            });
     }
 
     private void updateEntry (Resource app, Resource obj)
     {
         //log.info("Updating {} {}", app, obj);
-        var entry = request().configEntry(app, obj);
-        mapper.generateConfig(app, obj)
-            .peek(entry::putRawValue)
-            .onEmpty(entry::removeRawValue);
+        try {
+            var entry = request().configEntry(app, obj);
+            mapper.generateConfig(app, obj)
+                .peek(entry::putRawValue)
+                .onEmpty(entry::removeRawValue);
+        }
+        catch (Throwable e) {
+            log.error("Error updating {} {}", app, obj);
+            throw e;
+        }
     }
 
 }

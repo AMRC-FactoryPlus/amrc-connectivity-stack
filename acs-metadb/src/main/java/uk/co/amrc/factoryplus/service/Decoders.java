@@ -22,10 +22,13 @@ public final class Decoders {
         return UUID.fromString(uuid);
     }
 
+    public static Try<UUID> tryParseUUID (String uuid)
+    {
+        return Try.of(() -> parseUUIDOrError(uuid));
+    }
     public static Option<UUID> parseUUID (String uuid)
     {
-        return Try.of(() -> parseUUIDOrError(uuid))
-            .toOption();
+        return tryParseUUID(uuid).toOption();
     }
     
     /* This will silently ignore trailing garbage. I think this could be

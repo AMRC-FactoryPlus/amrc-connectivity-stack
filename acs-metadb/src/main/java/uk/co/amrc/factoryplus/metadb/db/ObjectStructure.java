@@ -18,7 +18,7 @@ import org.apache.jena.update.*;
 import org.apache.jena.vocabulary.*;
 
 import io.vavr.collection.Iterator;
-import io.vavr.control.Option;
+import io.vavr.control.*;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,30 +72,9 @@ public class ObjectStructure extends RequestHandler.Component
     public List<String> listRanks ()
     {
         request().checkACL(Vocab.Perm.ListObj, FPUuid.Null);
-        var rs = db().selectQuery(Q_listRanks);
-        return Iterator.ofAll(rs)
+        return db().listQuery(Q_listRanks)
             .map(s -> s.getLiteral("uuid").getString())
             .toJavaList();
-    }
-
-    /* TXN */
-    private FPObject setPrimaryClass (FPObject obj, Resource klass)
-    {
-        log.info("Set primary class: {}, {}", obj, klass);
-
-        var orank = db().findRank(obj.node());
-        var krank = db().findRank(klass);
-
-        if (krank != orank + 1)
-            throw new RdfErr.RankMismatch();
-
-        var model = db().derived();
-        model.removeAll(obj.node(), Vocab.primary, null);
-        model.add(obj.node(), Vocab.primary, klass);
-        if (!model.contains(obj.node(), RDF.type, klass))
-            model.add(obj.node(), RDF.type, klass);
-
-        return obj;
     }
 
     /* XXX The JS API is careful about returning 201 when the object was
@@ -107,24 +86,46 @@ public class ObjectStructure extends RequestHandler.Component
      * the required information, but it would make a mess of the return
      * value of this method. The most sensible option would be to return
      * a Jakarta Response, which is a clear layer violation. */
-    public JsonValue createObject (UUID klass, Option<UUID> uuid)
+    public JsonValue createObject (UUID classU, Option<UUID> uuid, Option<UUID> owner)
     {
         request().checkACL(
             uuid.isEmpty() ? Vocab.Perm.CreateObj : Vocab.Perm.CreateSpecificObj,
-            klass);
+            classU);
 
-        var kres = db().findObjectOrError(klass).node();
+        var classR = db().findObject(classU)
+            .getOrElseThrow(() -> new SvcErr.Conflict("Primary class not found"));
 
         var obj = uuid
-            .map(u -> db().findObject(u)
-                .map(o -> { log.info("Found object {}", o); return o; })
-                .map(o -> setPrimaryClass(o, kres))
-                .getOrElse(() -> db().createObject(kres, u)))
-            .getOrElse(() -> db().createObject(kres));
+            .flatMap(db()::findObject)
+            .peek(o -> updatePrimary(o, classR))
+            .getOrElse(() -> createNewObject(classR, uuid));
+
+        var ownerU = owner.getOrElse(request()::clientUUID);
+
+        updateOwner(obj, ownerU);
+        updateDeleted(obj, false);
 
         return db().appMapper()
-            .generateConfig(Vocab.App.Registration, obj.node())
+            .generateConfig(Vocab.App.Registration, obj)
             .getOrElseThrow(() -> new RdfErr.CorruptRDF("Cannot find object registration"));
+    }
+
+    private Resource createNewObject (Resource classR, Option<UUID> objU)
+    {
+        /* This is an Upstream error even though we don't strictly have
+         * an upstream here; the most likely cause is service-setup not
+         * complete yet, so a retry is appropriate. */
+        var clientR = db().findObject(request().clientUUID())
+                .getOrElseThrow(() -> new SvcErr.Upstream("Cannot resolve client UUID"));
+
+        var objR = objU
+            .map(u -> db().createObject(classR, u))
+            .getOrElse(() -> db().createObject(classR));
+
+        /* It's much easier to just set the ownership to the client
+         * here, even if we're about to change it. */
+        db().derived().add(objR, Vocab.owner, clientR);
+        return objR;
     }
 
     private static UpdateRequest U_deleteConfigs = Vocab.update("""
@@ -142,7 +143,7 @@ public class ObjectStructure extends RequestHandler.Component
         log.info("Delete object {}", uuid);
         request().checkACL(Vocab.Perm.DeleteObj, uuid);
 
-        var obj = db().findObjectOrError(uuid).node();
+        var obj = db().findObjectOrError(uuid);
         log.info("Found node {}", obj);
         if (IMMUTABLE.contains(obj)) {
             log.info("Object {} is immutable", obj);
@@ -178,6 +179,113 @@ public class ObjectStructure extends RequestHandler.Component
         model.removeAll(obj, null, null);
     }
 
+    /* XXX This assumes JSON schema validation has been performed. The
+     * appropriate schema is installed by core.ttl but there are no
+     * protections to prevent it from being removed or changed. */
+    public void updateRegistration (Resource obj, JsonValue config)
+    {
+        var spec = (JsonObject)config;
+
+        var primary = Try.of(() -> spec.getString("class"))
+            .flatMap(Decoders::tryParseUUID)
+            .orElse(() -> Try.failure(new SvcErr.BadInput("Invalid class UUID")))
+            .mapTry(classU -> db().findObject(classU)
+                .getOrElseThrow(() -> new SvcErr.Conflict("Primary class not found")))
+            .get();
+        var owner = Try.of(() -> spec.getString("owner"))
+            .flatMap(Decoders::tryParseUUID)
+            .getOrElseThrow(() -> new SvcErr.BadInput("Invalid owner UUID"));
+        var deleted = Try.of(() -> spec.getBoolean("deleted"))
+            .getOrElseThrow(() -> new SvcErr.BadInput("Invalid deleted flag"));
+
+        checkRegInvariants(obj, spec);
+
+        updatePrimary(obj, primary);
+        updateOwner(obj, owner);
+        updateDeleted(obj, deleted);
+    }
+
+    private void updateDeleted (Resource obj, boolean deleted)
+    {
+        var model = db().derived();
+        model.removeAll(obj, Vocab.deleted, null);
+        model.addLiteral(obj, Vocab.deleted, deleted);
+    }
+
+    private void checkRegInvariants (Resource obj, JsonObject spec)
+    {
+        Try.of(() -> spec.getBoolean("strict"))
+            .orElse(() -> Try.failure(new SvcErr.BadInput("Invalid strict flag")))
+            .filterTry(s -> s, () -> new SvcErr.BadInput("Objects must be strict"))
+            .get();
+
+        var specUuid = Try.of(() -> spec.getString("uuid"))
+            .flatMap(Decoders::tryParseUUID)
+            .getOrElseThrow(() -> new SvcErr.BadInput("Invalid object UUID"));
+
+        var model = db().derived();
+
+        /* XXX We have to look up the object UUID again here because
+         * we've lost track of it. This is a syntactic error and returns
+         * 422; it should not need to access the database. */
+        var dbUuid = Util.single(model.listObjectsOfProperty(obj, Vocab.uuid))
+            .map(l -> Util.decodeLiteral(l, UUID.class))
+            .getOrElseThrow(() -> new RdfErr.CorruptRDF("Cannot find object UUID"));
+        if (!specUuid.equals(dbUuid))
+            throw new SvcErr.BadInput("UUIDs cannot be changed");
+
+        /* This is a semantic error, it depends on the current rank, so
+         * it returns 409. */
+        var rank = db().findRank(obj);
+        if (spec.getInt("rank") != rank) {
+            log.info("Rank changes can only be made via dumps");
+            throw new RdfErr.RankMismatch();
+        }
+    }
+
+    private void updateOwner (Resource obj, UUID toU)
+    {
+        var model = db().derived();
+        var client = request().clientUUID();
+
+        var fromU = Util.single(model.listObjectsOfProperty(obj, Vocab.owner))
+            .map(RDFNode::asResource)
+            .flatMap(f -> Util.single(model.listObjectsOfProperty(f, Vocab.uuid)))
+            .map(l -> Util.decodeLiteral(l, UUID.class))
+            .getOrElse(Vocab.U_Unowned);
+
+        if (toU.equals(fromU)) return;
+    
+        /* We must have TakeFrom the old owner and GiveTo the new owner.
+         * Everyone implicitly has: TakeFrom Self; GiveTo Self, Unowned. */
+        if (!fromU.equals(client))
+            request().checkACL(Vocab.Perm.TakeFrom, fromU);
+        if (!toU.equals(Vocab.U_Unowned) && !toU.equals(client))
+            request().checkACL(Vocab.Perm.GiveTo, toU);
+
+        model.removeAll(obj, Vocab.owner, null);
+        Option.some(toU)
+            .filter(u -> !u.equals(Vocab.U_Unowned))
+            .map(u -> db().findObject(u)
+                .getOrElseThrow(() -> new SvcErr.Conflict("Owner not found")))
+            .peek(to -> model.add(obj, Vocab.owner, to));
+    }
+
+    private void updatePrimary (Resource obj, Resource classR)
+    {
+        var model = db().derived();
+
+        /* This is a change from the JS implementation; here we require
+         * the object to already be a member of the new primary class.
+         * The ConfigDB will create a new direct membership if needed,
+         * but will not remove it again if the primary class changes.
+         * This is inconsistent and so has been changed. */
+        if (!model.contains(obj, RDF.type, classR))
+            throw new SvcErr.Conflict("Not a member of primary class");
+        model.removeAll(obj, Vocab.primary, null);
+        model.add(obj, Vocab.primary, classR);
+    }
+
     public List<String> listRelation (boolean direct, UUID uuid, String relation)
     {
         var rel = Relation.of(relation);
@@ -187,7 +295,7 @@ public class ObjectStructure extends RequestHandler.Component
 
         var klass = db().findObjectOrError(uuid);
         return graph
-            .listResourcesWithProperty(rel.prop(), klass.node())
+            .listResourcesWithProperty(rel.prop(), klass)
             .mapWith(r -> r.getProperty(Vocab.uuid))
             .filterKeep(s -> s != null)
             .mapWith(s -> s.getString())
@@ -204,8 +312,8 @@ public class ObjectStructure extends RequestHandler.Component
          * be derived from listRelation anyway so there's no point. */
         request().checkACL(direct ? rel.readClass() : rel.writeClass(), klass);
 
-        var kres = db().findObjectOrError(klass).node();
-        var ores = db().findObjectOrError(object).node();
+        var kres = db().findObjectOrError(klass);
+        var ores = db().findObjectOrError(object);
         /* We cannot use methods on ores as this is always from the
          * direct graph. */
         return !graph.listStatements(ores, rel.prop(), kres)
@@ -220,8 +328,8 @@ public class ObjectStructure extends RequestHandler.Component
         request().checkACL(rel.writeClass(), klass);
         request().checkACL(rel.writeObject(), object);
 
-        var kres = db().findObjectOrError(klass).node();
-        var ores = db().findObjectOrError(object).node();
+        var kres = db().findObjectOrError(klass);
+        var ores = db().findObjectOrError(object);
 
         var krank = db().findRank(kres);
         var orank = db().findRank(ores);
@@ -238,8 +346,8 @@ public class ObjectStructure extends RequestHandler.Component
         request().checkACL(rel.writeClass(), klass);
         request().checkACL(rel.writeObject(), object);
 
-        var kres = db().findObjectOrError(klass).node();
-        var ores = db().findObjectOrError(object).node();
+        var kres = db().findObjectOrError(klass);
+        var ores = db().findObjectOrError(object);
         db().direct().remove(ores, rel.prop(), kres);
     }
 }

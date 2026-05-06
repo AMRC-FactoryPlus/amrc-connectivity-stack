@@ -68,12 +68,12 @@ public final class Main {
         
         var acls = HashMap.of(
             "auth_principal", List.of(
-                new Grant(Vocab.Perm.ReadApp, Vocab.Target.Registration),
+                new Grant(Vocab.Perm.ReadApp, Vocab.App.U_Registration),
                 /* XXX I'm not sure why this is needed? */
-                new Grant(Vocab.Perm.ReadApp, Vocab.Target.SparkplugAddr),
+                new Grant(Vocab.Perm.ReadApp, Vocab.App.U_SparkplugAddr),
                 /* XXX These are broader than strictly necessary. */
-                new Grant(Vocab.Perm.ReadMembers, Vocab.Target.Wildcard),
-                new Grant(Vocab.Perm.ReadSubclasses, Vocab.Target.Wildcard)));
+                new Grant(Vocab.Perm.ReadMembers, Vocab.U_Wildcard),
+                new Grant(Vocab.Perm.ReadSubclasses, Vocab.U_Wildcard)));
 
         var resolved = acls
             .mapKeys(fplus::getOptionConf)
@@ -91,7 +91,7 @@ public final class Main {
         var server = new Server(port);
 
         var pingResult = new PingResult(
-            Vocab.U_RDFStore, "2.0.0",
+            Vocab.U_MetaDB, "2.0.0",
             "AMRC", "acs-metadb", "unknown");
         var bindings = new AbstractBinder () {
             protected void configure () {

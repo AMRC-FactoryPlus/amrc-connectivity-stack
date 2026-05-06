@@ -1,0 +1,53 @@
+# Core auth definitions
+#-EARLY
+#-REQUIRE: service-urls core-apps
+---
+service: !u UUIDs.Service.ConfigDB
+version: 2
+objects:
+  !u ConfigDB.Class.R2Class:
+    !u Auth.Class.PrincipalGroup:
+      name: "Principal group"
+      iri: user/PrincipalGroup
+    !u Auth.Class.PrincipalType:
+      name: "Principal type"
+      iri: user/PrincipalType
+      subclassOf:
+        - !u Auth.Class.PrincipalGroup
+
+    !u Auth.Class.Role:
+      name: "Role"
+      iri: user/Role
+      subclassOf:
+        - !u Auth.Class.PrincipalGroup
+    !u Auth.Class.ServiceRole:
+      name: "Service role"
+      iri: user/ServiceRole
+      subclassOf:
+        - !u Auth.Class.Role
+    !u Auth.Class.ClientRole:
+      name: "Client role"
+      iri: user/ClientRole
+      subclassOf:
+        - !u Auth.Class.Role
+    !u Auth.Class.EdgeRole:
+      name: "Edge role"
+      iri: user/EdgeRole
+      subclassOf:
+        - !u Auth.Class.Role
+
+  !u ConfigDB.Class.R1Class:
+    !u Auth.Class.Principal:
+      name: "Principal"
+      iri: user/Principal
+      memberOf:
+        - !u Auth.Class.PrincipalGroup
+
+  # Other principal types are in auth.yaml
+  !u Auth.Class.PrincipalType:
+    !u Auth.Class.CentralService:
+      name: "Central service"
+      iri: user/CentralService
+      subclassOf:
+        - !u Auth.Class.Principal
+

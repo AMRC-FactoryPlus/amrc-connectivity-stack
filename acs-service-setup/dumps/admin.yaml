@@ -7,6 +7,7 @@ objects:
   !u Auth.Class.ClientRole:
     !u ACS.Group.Administrator:
       name: "Administrator"
+      iri: core/Administrator
       subclassOf:
         - !u ACS.Group.SparkplugReader
         - !u UNS.Group.Reader

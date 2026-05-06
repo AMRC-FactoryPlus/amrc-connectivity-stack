@@ -21,6 +21,7 @@ import org.slf4j.LoggerFactory;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.vocabulary.*;
 
+import io.vavr.collection.*;
 import io.vavr.control.*;
 
 import uk.co.amrc.factoryplus.metadb.db.*;
@@ -46,16 +47,36 @@ public class V2App {
             .checkACL(perm, targ);
     }
 
+    private JsonValue uuidSet (Set<UUID> uuids)
+    {
+        var strs = uuids.map(UUID::toString)
+            .toJavaSet();
+        return Json.createArrayBuilder(strs)
+            .build();
+    }
+
+    private Map<UUID, ConfigEntry.Value> appValues ()
+    {
+        return db.dataflow()
+            .appValues(app)
+            .blockingFirst();
+    }
+
     @GET @Path("object")
-    public JsonArray list ()
+    public JsonValue list ()
     {
         checkACL(Vocab.Perm.ReadApp, app);
-        var objs = db.dataflow()
-            .appValues(app)
-            .blockingFirst()
-            .keySet()
-            .map(UUID::toString)
-            .toJavaSet();
-        return Json.createArrayBuilder(objs).build();
+        var objs = appValues().keySet();
+        return uuidSet(objs);
+    }
+
+    @POST @Path("find")
+    public JsonValue find (JsonValue config)
+    {
+        checkACL(Vocab.Perm.ReadApp, app);
+        var objs = appValues()
+            .filterValues(e -> e.value().equals(config))
+            .keySet();
+        return uuidSet(objs);
     }
 }

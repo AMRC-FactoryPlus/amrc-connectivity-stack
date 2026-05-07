@@ -14,15 +14,21 @@
 
 package uk.co.amrc.app.factoryplus.keycloak.integration;
 
+import com.github.tomakehurst.wiremock.WireMockServer;
+import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 import jakarta.ws.rs.core.Response;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.admin.client.KeycloakBuilder;
+import org.keycloak.common.util.MultivaluedHashMap;
 import org.keycloak.representations.idm.ComponentRepresentation;
 import org.keycloak.storage.UserStorageProvider;
 import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -77,6 +83,26 @@ class FactoryPlusFederationIT {
     private static final String ADMIN_USER = "admin";
     private static final String ADMIN_PASS = "admin";
 
+    /** In-process Wiremock acting as a fake F+ auth service, reachable
+     *  from the Keycloak container via host.testcontainers.internal. */
+    private static WireMockServer wiremock;
+
+    @BeforeAll
+    static void startWiremock() {
+        if (!dockerAvailable()) return;
+        wiremock = new WireMockServer(WireMockConfiguration.options().dynamicPort());
+        wiremock.start();
+        // Make the host port reachable from inside the Keycloak container.
+        // FQN: clashes with org.testcontainers.junit.jupiter.Testcontainers
+        // (the @Testcontainers annotation) imported on the class.
+        org.testcontainers.Testcontainers.exposeHostPorts(wiremock.port());
+    }
+
+    @AfterAll
+    static void stopWiremock() {
+        if (wiremock != null) wiremock.stop();
+    }
+
     @Container
     static final GenericContainer<?> KEYCLOAK = new GenericContainer<>(
             DockerImageName.parse("quay.io/keycloak/keycloak:26.1.1"))
@@ -90,7 +116,9 @@ class FactoryPlusFederationIT {
         .withCommand("start-dev")
         .waitingFor(Wait.forHttp("/health/ready")
             .forPort(9000)
-            .withStartupTimeout(Duration.ofMinutes(3)));
+            .withStartupTimeout(Duration.ofMinutes(3)))
+        .withLogConsumer(new Slf4jLogConsumer(
+            org.slf4j.LoggerFactory.getLogger("keycloak-container")));
 
     private Keycloak adminClient() {
         var url = "http://%s:%d".formatted(
@@ -147,6 +175,50 @@ class FactoryPlusFederationIT {
                 .as("Federation should fall through cleanly with the "
                     + "null store, returning no matches rather than erroring")
                 .isEmpty();
+        }
+    }
+
+    @Test
+    void federation_accepts_wiremock_auth_url_configuration() {
+        // Phase 2 IT: prove that the SPI accepts the auth.url config and
+        // wires up an FPAuthBackedUserStore pointing at it. Full
+        // end-to-end search through Keycloak admin REST needs
+        // UserQueryProvider which is a Phase 5 task; until then the
+        // FPAuthBackedUserStore behaviour itself is covered by the 10
+        // Wiremock unit tests in FPAuthBackedUserStoreTest.
+
+        try (Keycloak admin = adminClient()) {
+            var realm = admin.realm("master");
+            String realmId = realm.toRepresentation().getId();
+
+            var component = new ComponentRepresentation();
+            component.setName("factoryplus-wiremock");
+            component.setProviderType(UserStorageProvider.class.getName());
+            component.setProviderId("factoryplus");
+            component.setParentId(realmId);
+            var config = new MultivaluedHashMap<String, String>();
+            config.putSingle("auth.url",
+                "http://host.testcontainers.internal:" + wiremock.port());
+            config.putSingle("auth.timeout.seconds", "3");
+            component.setConfig(config);
+
+            try (Response res = realm.components().add(component)) {
+                assertThat(res.getStatus())
+                    .as("Configuring 'factoryplus' with auth.url + timeout "
+                        + "should succeed; if this fails the factory's "
+                        + "config processing is broken")
+                    .isEqualTo(201);
+            }
+
+            // Verify the configuration round-trips through Keycloak's
+            // component store: read it back and check our values landed.
+            var stored = realm.components().query(realmId,
+                UserStorageProvider.class.getName(), "factoryplus-wiremock");
+            assertThat(stored).hasSize(1);
+            assertThat(stored.get(0).getConfig().getFirst("auth.url"))
+                .startsWith("http://host.testcontainers.internal:");
+            assertThat(stored.get(0).getConfig().getFirst("auth.timeout.seconds"))
+                .isEqualTo("3");
         }
     }
 }

@@ -25,7 +25,10 @@
         <acs.top>..</acs.top>
 
         <keycloak.version>26.1.1</keycloak.version>
-        <mockito.version>5.11.0</mockito.version>
+        <!-- 5.18.0 supports inline-mocking on JDK 24/25; 5.11 throws
+             "Could not modify all classes [interface
+             org.keycloak.models.KeycloakSession]" on JDK 25. -->
+        <mockito.version>5.18.0</mockito.version>
         <assertj.version>3.25.3</assertj.version>
         <testcontainers.version>1.19.7</testcontainers.version>
     </properties>

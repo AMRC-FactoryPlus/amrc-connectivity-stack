@@ -76,10 +76,14 @@
             <version>0.1-SNAPSHOT</version>
         </dependency>
 
-        <!-- JSON parsing (version managed by base-pom). -->
+        <!-- JSON parsing via Jackson. Keycloak ships these at runtime
+             (transitively via keycloak-core), so we mark them 'provided'
+             - compile against them, don't bundle. -->
         <dependency>
-            <groupId>org.json</groupId>
-            <artifactId>json</artifactId>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>2.17.2</version>
+            <scope>provided</scope>
         </dependency>
 
         <!-- Test deps -->

@@ -8,6 +8,10 @@
  * (FactoryPlusUserStore) absorbs that change without touching the
  * provider.
  *
+ * JSON parsing uses Jackson (which Keycloak ships in its runtime
+ * classpath) rather than org.json so we don't have to bundle a JSON
+ * library into the SPI jar.
+ *
  * HTTP contract this expects from the auth service (Phase 3 implements
  * these endpoints in acs-auth):
  *
@@ -33,8 +37,9 @@
 
 package uk.co.amrc.app.factoryplus.keycloak;
 
-import org.json.JSONException;
-import org.json.JSONObject;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.net.URI;
@@ -47,6 +52,8 @@ import java.time.Duration;
 import java.util.Optional;
 
 public class FPAuthBackedUserStore implements FactoryPlusUserStore {
+
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final URI baseUrl;
     private final Duration timeout;
@@ -105,15 +112,21 @@ public class FPAuthBackedUserStore implements FactoryPlusUserStore {
         }
 
         try {
-            JSONObject json = new JSONObject(res.body());
+            JsonNode root = MAPPER.readTree(res.body());
+            if (!root.isObject() || !root.hasNonNull("uuid") || !root.hasNonNull("name")) {
+                throw new FactoryPlusAuthException(
+                    "Malformed response from " + uri + " (missing required fields)");
+            }
+            JsonNode emailNode = root.get("email");
+            String email = (emailNode == null || emailNode.isNull())
+                ? null
+                : emailNode.asText();
             return Optional.of(new FactoryPlusUser(
-                json.getString("uuid"),
-                json.getString("name"),
-                json.has("email") && !json.isNull("email")
-                    ? json.getString("email")
-                    : null));
+                root.get("uuid").asText(),
+                root.get("name").asText(),
+                email));
         }
-        catch (JSONException e) {
+        catch (JsonProcessingException e) {
             throw new FactoryPlusAuthException(
                 "Malformed response from " + uri, e);
         }

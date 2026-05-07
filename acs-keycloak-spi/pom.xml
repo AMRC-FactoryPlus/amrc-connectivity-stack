@@ -5,10 +5,14 @@
                              http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>uk.co.amrc.app.factoryplus</groupId>
+    <parent>
+        <groupId>io.github.amrc-factoryplus</groupId>
+        <artifactId>base-pom</artifactId>
+        <version>0.0.0-intree</version>
+        <relativePath>../lib/java-base-pom</relativePath>
+    </parent>
+
     <artifactId>acs-keycloak-spi</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
-    <packaging>jar</packaging>
     <name>Factory+ Keycloak User Storage SPI</name>
     <description>
         Custom Keycloak User Storage Provider that federates users, groups,
@@ -16,12 +20,11 @@
     </description>
 
     <properties>
-        <maven.compiler.source>17</maven.compiler.source>
-        <maven.compiler.target>17</maven.compiler.target>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <!-- Override base default; this module sits one level deeper than
+             the base assumes (lib/X), so acs.top must point at the repo root. -->
+        <acs.top>..</acs.top>
 
         <keycloak.version>26.1.1</keycloak.version>
-        <junit.version>5.10.2</junit.version>
         <mockito.version>5.11.0</mockito.version>
         <assertj.version>3.25.3</assertj.version>
         <testcontainers.version>1.19.7</testcontainers.version>
@@ -48,11 +51,16 @@
             <scope>provided</scope>
         </dependency>
 
+        <!-- F+ service client will be added in Phase 2 (Wiremock-backed
+             auth client). The in-tree jar at lib/mvn is currently
+             0.1-SNAPSHOT, predating the base-pom inheritance refactor;
+             when we add the dep we'll either pin that version, rebuild
+             java-service-client, or upstream a fix. -->
+
         <!-- Test deps -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
-            <version>${junit.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -83,6 +91,10 @@
 
     <build>
         <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+            </plugin>
             <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.2.5</version>

@@ -541,10 +541,14 @@ extending FPAuth upstream is a separate optional cleanup.
   `auth.timeout.seconds`). If `auth.url` is set, construct
   `FPServiceClient` + `FPAuthBackedUserStore`; otherwise keep
   `NullFactoryPlusUserStore.INSTANCE`.
-- **2.5** Extend the IT: run Wiremock alongside Keycloak (sibling
-  container), configure the federation provider to point at Wiremock
-  URL, assert end-to-end user search through Keycloak admin REST
-  returns the stubbed F+ users.
+- **2.5** Extend the IT: run Wiremock as a sibling host (in-process,
+  exposed via host.testcontainers.internal), configure the federation
+  provider to point at it. Asserts the wiring (config accepted +
+  round-trips through Keycloak's component store). End-to-end search
+  via Keycloak admin REST is deferred to Phase 5 because it requires
+  a UserQueryProvider implementation; the FPAuthBackedUserStore's
+  behaviour is fully covered by 10 Wiremock unit tests in the
+  meantime.
 - **2.6** Acceptance + re-plan Phase 3 in detail.
 
 ### Phase 3 — F+ auth read API extensions

@@ -1,7 +1,6 @@
 /* ACS Keycloak SPI
- * Wiremock-driven tests for the F+ auth HTTP-backed user store. The
- * Wiremock stubs in this file are the spec for the endpoints Phase 3
- * adds to acs-auth.
+ * Wiremock-driven tests for the F+ auth HTTP-backed user store. Stubs
+ * mirror the actual existing acs-auth v2 identity endpoints (Phase 3).
  * Copyright 2026 University of Sheffield AMRC
  */
 
@@ -18,9 +17,7 @@ import java.time.Duration;
 import java.util.Optional;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
-import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
-import static com.github.tomakehurst.wiremock.client.WireMock.notFound;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -29,20 +26,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class FPAuthBackedUserStoreTest {
 
     private static final String UUID_ALICE = "00000000-0000-0000-0000-000000000001";
+    private static final String UPN_ALICE  = "alice@FACTORYPLUS.LOCAL";
 
-    /**
-     * Canonical principal JSON shape returned by every Phase 3 lookup
-     * endpoint. The 'name' field is the F+ principal name (corresponds to
-     * Keycloak's 'username'); 'email' is optional (service principals
-     * have none).
-     */
+    /** Canonical principal response shape: identity kinds become object
+     *  keys. Today only the 'kerberos' key exists in F+. */
     private static final String PRINCIPAL_JSON = """
-        {
-            "uuid": "%s",
-            "name": "alice",
-            "email": "alice@example.invalid"
-        }
-        """.formatted(UUID_ALICE);
+        { "uuid": "%s", "kerberos": "%s" }
+        """.formatted(UUID_ALICE, UPN_ALICE);
 
     private WireMockServer wiremock;
     private FPAuthBackedUserStore store;
@@ -71,16 +61,43 @@ class FPAuthBackedUserStoreTest {
 
         assertThat(user).isPresent();
         assertThat(user.get().uuid()).isEqualTo(UUID_ALICE);
-        assertThat(user.get().username()).isEqualTo("alice");
-        assertThat(user.get().email()).isEqualTo("alice@example.invalid");
+        assertThat(user.get().username())
+            .as("Username is the full Kerberos UPN, matching Keycloak's "
+                + "Kerberos federation convention")
+            .isEqualTo(UPN_ALICE);
+        assertThat(user.get().email())
+            .as("F+ has no email field; always null in v1")
+            .isNull();
     }
 
     @Test
-    void find_by_uuid_returns_empty_on_404() {
+    void find_by_uuid_returns_empty_on_410() {
         wiremock.stubFor(get(urlPathEqualTo("/v2/principal/missing"))
-            .willReturn(notFound()));
+            .willReturn(aResponse().withStatus(410)));
 
         assertThat(store.findByUuid("missing")).isEmpty();
+    }
+
+    @Test
+    void find_by_uuid_also_returns_empty_on_404() {
+        // F+ uses 410, but accept 404 too in case a proxy rewrites it.
+        wiremock.stubFor(get(urlPathEqualTo("/v2/principal/missing"))
+            .willReturn(aResponse().withStatus(404)));
+
+        assertThat(store.findByUuid("missing")).isEmpty();
+    }
+
+    @Test
+    void find_by_uuid_returns_empty_when_principal_has_no_kerberos_identity() {
+        // Principal exists but has no kerberos identity yet (e.g. a
+        // service principal added via UUID without registering its
+        // Kerberos UPN). Treat as not-resolvable rather than failing.
+        wiremock.stubFor(get(urlPathEqualTo("/v2/principal/" + UUID_ALICE))
+            .willReturn(okJson("""
+                { "uuid": "%s" }
+                """.formatted(UUID_ALICE))));
+
+        assertThat(store.findByUuid(UUID_ALICE)).isEmpty();
     }
 
     @Test
@@ -93,85 +110,92 @@ class FPAuthBackedUserStoreTest {
             .hasMessageContaining("503");
     }
 
-    // -- find by username ------------------------------------------------
-
     @Test
-    void find_by_username_uses_query_parameter() {
-        wiremock.stubFor(get(urlPathEqualTo("/v2/principal"))
-            .withQueryParam("name", equalTo("alice"))
-            .willReturn(okJson(PRINCIPAL_JSON)));
-
-        Optional<FactoryPlusUser> user = store.findByUsername("alice");
-
-        assertThat(user).isPresent();
-        assertThat(user.get().username()).isEqualTo("alice");
-        assertThat(user.get().uuid()).isEqualTo(UUID_ALICE);
-    }
-
-    @Test
-    void find_by_username_returns_empty_on_404() {
-        wiremock.stubFor(get(urlPathEqualTo("/v2/principal"))
-            .withQueryParam("name", equalTo("nope"))
-            .willReturn(notFound()));
-
-        assertThat(store.findByUsername("nope")).isEmpty();
-    }
-
-    @Test
-    void find_by_username_url_encodes_special_chars() {
-        // Some F+ principals have / or @ in their names. The store must
-        // URL-encode the query value so it lands intact at the server.
-        wiremock.stubFor(get(urlPathEqualTo("/v2/principal"))
-            .withQueryParam("name", equalTo("svc/openid"))
-            .willReturn(okJson(PRINCIPAL_JSON)));
-
-        assertThat(store.findByUsername("svc/openid")).isPresent();
-    }
-
-    // -- find by email ---------------------------------------------------
-
-    @Test
-    void find_by_email_uses_query_parameter() {
-        wiremock.stubFor(get(urlPathEqualTo("/v2/principal"))
-            .withQueryParam("email", equalTo("alice@example.invalid"))
-            .willReturn(okJson(PRINCIPAL_JSON)));
-
-        Optional<FactoryPlusUser> user = store.findByEmail("alice@example.invalid");
-
-        assertThat(user).isPresent();
-        assertThat(user.get().email()).isEqualTo("alice@example.invalid");
-    }
-
-    @Test
-    void find_by_email_returns_empty_on_404() {
-        wiremock.stubFor(get(urlPathEqualTo("/v2/principal"))
-            .withQueryParam("email", equalTo("nope@example.invalid"))
-            .willReturn(notFound()));
-
-        assertThat(store.findByEmail("nope@example.invalid")).isEmpty();
-    }
-
-    // -- response shape edge cases ---------------------------------------
-
-    @Test
-    void principal_with_no_email_yields_dto_with_null_email() {
-        wiremock.stubFor(get(urlPathEqualTo("/v2/principal/" + UUID_ALICE))
-            .willReturn(okJson("""
-                { "uuid": "%s", "name": "service-account" }
-                """.formatted(UUID_ALICE))));
-
-        Optional<FactoryPlusUser> user = store.findByUuid(UUID_ALICE);
-
-        assertThat(user).isPresent();
-        assertThat(user.get().email()).isNull();
-    }
-
-    @Test
-    void malformed_response_throws() {
+    void find_by_uuid_throws_on_malformed_response() {
         wiremock.stubFor(get(urlPathEqualTo("/v2/principal/" + UUID_ALICE))
             .willReturn(okJson("not json at all")));
 
         assertThatThrownBy(() -> store.findByUuid(UUID_ALICE))
             .isInstanceOf(FactoryPlusAuthException.class);
+    }
+
+    // -- find by username (two-call path) --------------------------------
+
+    @Test
+    void find_by_username_resolves_identity_then_principal() {
+        wiremock.stubFor(get(urlPathEqualTo(
+                "/v2/identity/kerberos/" + UPN_ALICE.replace("@", "%40")))
+            .willReturn(okJson("\"" + UUID_ALICE + "\"")));
+        wiremock.stubFor(get(urlPathEqualTo("/v2/principal/" + UUID_ALICE))
+            .willReturn(okJson(PRINCIPAL_JSON)));
+
+        Optional<FactoryPlusUser> user = store.findByUsername(UPN_ALICE);
+
+        assertThat(user).isPresent();
+        assertThat(user.get().username()).isEqualTo(UPN_ALICE);
+        assertThat(user.get().uuid()).isEqualTo(UUID_ALICE);
+    }
+
+    @Test
+    void find_by_username_returns_empty_when_identity_missing() {
+        wiremock.stubFor(get(urlPathEqualTo(
+                "/v2/identity/kerberos/" + "nope%40FACTORYPLUS.LOCAL"))
+            .willReturn(aResponse().withStatus(410)));
+
+        assertThat(store.findByUsername("nope@FACTORYPLUS.LOCAL")).isEmpty();
+    }
+
+    @Test
+    void find_by_username_returns_empty_when_principal_disappears_between_calls() {
+        // Identity lookup succeeds (so the principal exists per the
+        // identity table) but the principal lookup races with a delete.
+        // We treat the second 410 as not-found rather than as a fault.
+        wiremock.stubFor(get(urlPathEqualTo(
+                "/v2/identity/kerberos/" + UPN_ALICE.replace("@", "%40")))
+            .willReturn(okJson("\"" + UUID_ALICE + "\"")));
+        wiremock.stubFor(get(urlPathEqualTo("/v2/principal/" + UUID_ALICE))
+            .willReturn(aResponse().withStatus(410)));
+
+        assertThat(store.findByUsername(UPN_ALICE)).isEmpty();
+    }
+
+    @Test
+    void find_by_username_throws_when_identity_endpoint_returns_non_string() {
+        wiremock.stubFor(get(urlPathEqualTo(
+                "/v2/identity/kerberos/" + UPN_ALICE.replace("@", "%40")))
+            .willReturn(okJson("{\"unexpected\": \"object\"}")));
+
+        assertThatThrownBy(() -> store.findByUsername(UPN_ALICE))
+            .isInstanceOf(FactoryPlusAuthException.class)
+            .hasMessageContaining("UUID string");
+    }
+
+    @Test
+    void find_by_username_url_encodes_special_chars_in_upn() {
+        // F+ service principals often have a slash in the UPN
+        // (HTTP/openid.acs.example@REALM).
+        String upn = "HTTP/openid@FACTORYPLUS.LOCAL";
+        // URLEncoder turns / into %2F and @ into %40.
+        String encoded = "HTTP%2Fopenid%40FACTORYPLUS.LOCAL";
+        wiremock.stubFor(get(urlPathEqualTo("/v2/identity/kerberos/" + encoded))
+            .willReturn(okJson("\"" + UUID_ALICE + "\"")));
+        wiremock.stubFor(get(urlPathEqualTo("/v2/principal/" + UUID_ALICE))
+            .willReturn(okJson(PRINCIPAL_JSON)));
+
+        assertThat(store.findByUsername(upn)).isPresent();
+    }
+
+    // -- find by email ---------------------------------------------------
+
+    @Test
+    void find_by_email_always_returns_empty_makes_no_http_call() {
+        // F+ has no email field. We assert NO HTTP request is made -
+        // bypassing the wiremock entirely.
+        Optional<FactoryPlusUser> result = store.findByEmail("anything@example.invalid");
+
+        assertThat(result).isEmpty();
+        assertThat(wiremock.getAllServeEvents())
+            .as("findByEmail must not hit F+; it has no email field")
+            .isEmpty();
     }
 }

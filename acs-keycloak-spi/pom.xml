@@ -64,11 +64,16 @@
             <scope>provided</scope>
         </dependency>
 
-        <!-- F+ service client will be added in Phase 2 (Wiremock-backed
-             auth client). The in-tree jar at lib/mvn is currently
-             0.1-SNAPSHOT, predating the base-pom inheritance refactor;
-             when we add the dep we'll either pin that version, rebuild
-             java-service-client, or upstream a fix. -->
+        <!-- F+ service client. Pinned to 0.1-SNAPSHOT explicitly because
+             base-pom's dependencyManagement references ${acs.version}
+             (= 0.0.0-intree) which doesn't match the in-tree publication
+             at lib/mvn. Re-publishing the lib under the parent's version
+             scheme is a separate cleanup. -->
+        <dependency>
+            <groupId>io.github.amrc-factoryplus</groupId>
+            <artifactId>java-service-client</artifactId>
+            <version>0.1-SNAPSHOT</version>
+        </dependency>
 
         <!-- Test deps -->
         <dependency>

@@ -590,11 +590,22 @@ Phase 5 alongside GroupLookupProvider.
 - Replace Wiremock in IT with real acs-auth (testcontainers + the real images, or a docker-compose helper)
 - Verify end-to-end against real F+ data
 
-### Phase 5 — Group lookup + caching
-- Implement `GroupLookupProvider`
-- Wire Keycloak's CACHED policy with 60s TTL
-- Tests for cache hit/miss, TTL expiry
-- Document the staleness contract
+### Phase 5 — Caching first; group lookup deferred (revised 2026-05-07)
+
+Phase 5 ships the Keycloak CACHED policy with 60s TTL only. Group
+lookup needs F+ to expose group endpoints (which currently don't exist
+in acs-auth at all - F+'s "groups" concept is grant-targeting, not
+user-membership), so it grows into its own Phase 5.5/9 piece of work
+once F+ has groups in the right shape.
+
+Tasks for the cache part:
+- The Keycloak `UserStorageProvider` is per-request; we need to
+  configure its parent `ComponentModel` with cache policy. Set the
+  default to CACHED with 60s evictions.
+- Document the staleness contract: when a F+ admin grants/revokes,
+  Keycloak users won't see the change for up to 60 seconds.
+- Validate with a Wiremock-counted test (assert the second lookup
+  doesn't hit Wiremock).
 
 ### Phase 6 — Credential validator (Kerberos delegate)
 - Implement `CredentialInputValidator`

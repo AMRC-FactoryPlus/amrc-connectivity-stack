@@ -176,6 +176,22 @@ serviceSetup:
     helmChart:
       # Chart to deploy an edge cluster
       #cluster: null
+    # Stable UUIDs for the Grafana role groups in F+. These groups are
+    # created by service-setup (see lib/grafana-groups.js) as subclasses
+    # of Class.Principal. To grant a user a Grafana role, an admin adds
+    # their principal to one of these groups via the F+ ACL editor;
+    # the SPI's fp_groups claim picks this up on next login (within
+    # cache TTL) and Grafana's role_attribute_path translates it to
+    # the matching Grafana role.
+    #
+    # Customise per deployment if needed, but DO NOT change once a
+    # production cluster has grants attached - the UUIDs are referenced
+    # by the F+ ACL data which doesn't migrate when UUIDs change.
+    grafanaGroups:
+      grafanaAdmin: "9b0a37ff-cd00-4cd0-bf8c-c95ad1f00001"
+      admin:        "9b0a37ff-cd00-4cd0-bf8c-c95ad1f00002"
+      editor:       "9b0a37ff-cd00-4cd0-bf8c-c95ad1f00003"
+
     # OIDC clients to provision in Keycloak. Each entry generates a
     # LocalSecret holding the client_secret in keycloak-clients/<key>.
     # Every client automatically gets the fp_principal_uuid and
@@ -399,11 +415,11 @@ grafana:
       token_url: $__file{/etc/acs-config/token_url}
       api_url: $__file{/etc/acs-config/api_url}
       signout_redirect_url: $__file{/etc/acs-config/signout_redirect_url}
-      role_attribute_path: >-
-        contains(roles[*], 'grafanaAdmin') && 'GrafanaAdmin'
-        || contains(roles[*], 'admin') && 'Admin'
-        || contains(roles[*], 'editor') && 'Editor'
-        || 'Viewer'
+      # role_attribute_path is templated into the acs-grafana-config
+      # ConfigMap by deploy/templates/grafana/grafana-ini.yaml so the
+      # F+ group UUIDs from serviceSetup.config.grafanaGroups can be
+      # interpolated. Reading via $__file picks up the rendered value.
+      role_attribute_path: $__file{/etc/acs-config/role_attribute_path}
       allow_assign_grafana_admin: true
   extraConfigmapMounts:
     - name: acs-grafana-config

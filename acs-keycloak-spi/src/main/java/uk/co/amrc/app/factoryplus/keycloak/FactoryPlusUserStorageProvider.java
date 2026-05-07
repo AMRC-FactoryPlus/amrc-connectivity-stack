@@ -53,21 +53,21 @@ public class FactoryPlusUserStorageProvider
         // The external id, by our convention in the adapter, is the F+ UUID.
         String uuid = StorageId.externalId(id);
         return store.findByUuid(uuid)
-            .map(u -> new FactoryPlusUserAdapter(session, realm, model, u))
+            .map(u -> new FactoryPlusUserAdapter(session, realm, model, u, store))
             .orElse(null);
     }
 
     @Override
     public UserModel getUserByUsername(RealmModel realm, String username) {
         return store.findByUsername(username)
-            .map(u -> new FactoryPlusUserAdapter(session, realm, model, u))
+            .map(u -> new FactoryPlusUserAdapter(session, realm, model, u, store))
             .orElse(null);
     }
 
     @Override
     public UserModel getUserByEmail(RealmModel realm, String email) {
         return store.findByEmail(email)
-            .map(u -> new FactoryPlusUserAdapter(session, realm, model, u))
+            .map(u -> new FactoryPlusUserAdapter(session, realm, model, u, store))
             .orElse(null);
     }
 

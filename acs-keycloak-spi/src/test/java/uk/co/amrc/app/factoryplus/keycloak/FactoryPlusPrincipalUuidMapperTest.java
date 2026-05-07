@@ -45,7 +45,7 @@ class FactoryPlusPrincipalUuidMapperTest {
     void claim_value_is_factory_plus_uuid_for_federated_user() {
         when(model.getId()).thenReturn("model-id");
         FactoryPlusUserAdapter adapter = new FactoryPlusUserAdapter(
-            session, realm, model, ALICE);
+            session, realm, model, ALICE, NullFactoryPlusUserStore.INSTANCE);
 
         Object value = FactoryPlusPrincipalUuidMapper.claimValueFor(adapter);
 

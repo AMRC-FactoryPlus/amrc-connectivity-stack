@@ -65,14 +65,14 @@ class FactoryConfigDrivenStoreTest {
     }
 
     @Test
-    void config_properties_advertise_url_timeout_and_cache_ttl_to_keycloak_admin_ui() {
+    void config_properties_advertise_full_set_to_keycloak_admin_ui() {
         List<ProviderConfigProperty> props = factory.getConfigProperties();
 
         assertThat(props)
             .extracting(ProviderConfigProperty::getName)
-            .as("Admin UI must expose at least the F+ auth URL, request timeout, "
-                + "and cache TTL")
-            .contains("auth.url", "auth.timeout.seconds", "cache.ttl.seconds");
+            .as("Admin UI must expose all the configurable surface")
+            .contains("auth.url", "auth.timeout.seconds", "cache.ttl.seconds",
+                "auth.principal", "auth.keytab.path");
     }
 
     @Test

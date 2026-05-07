@@ -36,10 +36,12 @@ public class FactoryPlusUserStorageProviderFactory
 
     public static final String PROVIDER_ID = "factoryplus";
 
-    static final String CONFIG_AUTH_URL          = "auth.url";
-    static final String CONFIG_TIMEOUT_SECONDS   = "auth.timeout.seconds";
-    static final String CONFIG_CACHE_TTL_SECONDS = "cache.ttl.seconds";
-    static final String DEFAULT_TIMEOUT_SECONDS  = "5";
+    static final String CONFIG_AUTH_URL           = "auth.url";
+    static final String CONFIG_TIMEOUT_SECONDS    = "auth.timeout.seconds";
+    static final String CONFIG_CACHE_TTL_SECONDS  = "cache.ttl.seconds";
+    static final String CONFIG_KRB_PRINCIPAL      = "auth.principal";
+    static final String CONFIG_KRB_KEYTAB_PATH    = "auth.keytab.path";
+    static final String DEFAULT_TIMEOUT_SECONDS   = "5";
     static final String DEFAULT_CACHE_TTL_SECONDS = "60";
 
     private static final List<ProviderConfigProperty> CONFIG_PROPERTIES =
@@ -70,6 +72,23 @@ public class FactoryPlusUserStorageProviderFactory
                 .type(ProviderConfigProperty.STRING_TYPE)
                 .defaultValue(DEFAULT_CACHE_TTL_SECONDS)
                 .add()
+            .property()
+                .name(CONFIG_KRB_PRINCIPAL)
+                .label("SPI Kerberos principal")
+                .helpText("Principal the SPI authenticates as when calling F+ "
+                    + "(e.g. sv1openid@FACTORYPLUS.LOCAL). Leave blank to call "
+                    + "F+ unauthenticated (only useful with stand-in servers "
+                    + "like Wiremock).")
+                .type(ProviderConfigProperty.STRING_TYPE)
+                .add()
+            .property()
+                .name(CONFIG_KRB_KEYTAB_PATH)
+                .label("SPI Kerberos keytab path")
+                .helpText("Filesystem path to the keytab containing credentials "
+                    + "for the SPI principal (e.g. /etc/keytabs/client). The "
+                    + "keytab must be readable by Keycloak's process.")
+                .type(ProviderConfigProperty.STRING_TYPE)
+                .add()
             .build();
 
     @Override
@@ -86,7 +105,10 @@ public class FactoryPlusUserStorageProviderFactory
         Duration timeout = parseSeconds(
             model.getConfig().getFirst(CONFIG_TIMEOUT_SECONDS),
             DEFAULT_TIMEOUT_SECONDS);
-        FactoryPlusUserStore base = new FPAuthBackedUserStore(URI.create(url), timeout);
+
+        KerberosAuthenticator auth = buildAuthenticator(model);
+        FactoryPlusUserStore base = new FPAuthBackedUserStore(
+            URI.create(url), timeout, auth);
 
         Duration cacheTtl = parseSeconds(
             model.getConfig().getFirst(CONFIG_CACHE_TTL_SECONDS),
@@ -95,6 +117,20 @@ public class FactoryPlusUserStorageProviderFactory
             return base;
         }
         return new CachingFactoryPlusUserStore(base, cacheTtl, Clock.systemUTC());
+    }
+
+    /** Returns a {@link KerberosAuthenticator} when both principal and
+     *  keytab are configured; null otherwise. Null leaves the SPI calling
+     *  F+ unauthenticated, which only makes sense for a Wiremock-style
+     *  stand-in server. */
+    private static KerberosAuthenticator buildAuthenticator(ComponentModel model) {
+        String principal = model.getConfig().getFirst(CONFIG_KRB_PRINCIPAL);
+        String keytab = model.getConfig().getFirst(CONFIG_KRB_KEYTAB_PATH);
+        if (principal == null || principal.isBlank()
+            || keytab == null || keytab.isBlank()) {
+            return null;
+        }
+        return new JaasKerberosAuthenticator(principal, keytab);
     }
 
     private static Duration parseSeconds(String configured, String fallback) {

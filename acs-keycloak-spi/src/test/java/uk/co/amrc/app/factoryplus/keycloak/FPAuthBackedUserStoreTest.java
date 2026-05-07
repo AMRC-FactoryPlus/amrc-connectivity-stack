@@ -198,4 +198,74 @@ class FPAuthBackedUserStoreTest {
             .as("findByEmail must not hit F+; it has no email field")
             .isEmpty();
     }
+
+    // -- SPNEGO authentication injection (Phase 6) -----------------------
+
+    @Test
+    void requests_have_no_authorization_header_when_authenticator_is_null() {
+        // Phase 2 mode: no Kerberos auth. Useful for tests against
+        // unauthenticated F+ stand-ins like Wiremock.
+        wiremock.stubFor(get(urlPathEqualTo("/v2/principal/" + UUID_ALICE))
+            .willReturn(okJson(PRINCIPAL_JSON)));
+
+        store.findByUuid(UUID_ALICE);
+
+        assertThat(wiremock.getAllServeEvents()).hasSize(1);
+        var serveEvent = wiremock.getAllServeEvents().get(0);
+        assertThat(serveEvent.getRequest().getHeader("Authorization"))
+            .as("No Kerberos authenticator -> no Authorization header")
+            .isNull();
+    }
+
+    @Test
+    void requests_carry_negotiate_header_when_authenticator_present() {
+        wiremock.stubFor(get(urlPathEqualTo("/v2/principal/" + UUID_ALICE))
+            .willReturn(okJson(PRINCIPAL_JSON)));
+
+        var stubAuth = new StubAuthenticator("STUB-SPNEGO-TOKEN");
+        var authedStore = new FPAuthBackedUserStore(
+            URI.create(wiremock.baseUrl()), Duration.ofSeconds(2), stubAuth);
+
+        authedStore.findByUuid(UUID_ALICE);
+
+        assertThat(stubAuth.callCount)
+            .as("Authenticator should be consulted for the call")
+            .isEqualTo(1);
+        var serveEvent = wiremock.getAllServeEvents().get(0);
+        assertThat(serveEvent.getRequest().getHeader("Authorization"))
+            .isEqualTo("Negotiate STUB-SPNEGO-TOKEN");
+    }
+
+    @Test
+    void authenticator_called_with_target_url() {
+        wiremock.stubFor(get(urlPathEqualTo("/v2/principal/" + UUID_ALICE))
+            .willReturn(okJson(PRINCIPAL_JSON)));
+
+        var stubAuth = new StubAuthenticator("T");
+        var authedStore = new FPAuthBackedUserStore(
+            URI.create(wiremock.baseUrl()), Duration.ofSeconds(2), stubAuth);
+
+        authedStore.findByUuid(UUID_ALICE);
+
+        assertThat(stubAuth.lastTarget).isNotNull();
+        assertThat(stubAuth.lastTarget.getHost())
+            .as("Authenticator must be told the host so it can build the SPN")
+            .isEqualTo("localhost");
+    }
+
+    /** Captures call count + last target URL for assertion. */
+    private static final class StubAuthenticator implements KerberosAuthenticator {
+        final String token;
+        int callCount;
+        URI lastTarget;
+
+        StubAuthenticator(String token) { this.token = token; }
+
+        @Override
+        public String spnegoTokenFor(URI target) {
+            callCount++;
+            lastTarget = target;
+            return token;
+        }
+    }
 }

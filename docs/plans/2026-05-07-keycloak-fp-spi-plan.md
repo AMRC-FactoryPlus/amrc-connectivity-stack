@@ -18,18 +18,20 @@
 
 | Phase | Title | Detail level | Outcome |
 |---|---|---|---|
-| 1 | Build skeleton + hello-world SPI | Full | Maven project, "FixedUser" SPI loads in a real Keycloak via Testcontainers, one hardcoded user logs in, CI green |
-| 2 | Wiremock-backed F+ auth client | Headline | SPI calls a fake F+ HTTP API; user lookup by UUID/name/email works end-to-end against the fake |
-| 3 | F+ auth read API extensions | Headline | New endpoints in `acs-auth` for paginated user list, prefix search, "groups for principal", "members of group" |
-| 4 | Real F+ integration | Headline | SPI talks to real `acs-auth` in a kind cluster; auth via service-account JWT or service principal |
-| 5 | Group lookup + caching | Headline | `GroupLookupProvider` implementation; Keycloak CACHED policy with 60s TTL |
-| 6 | Credential validator (Kerberos delegate) | Headline | SPNEGO authentication path through SPI; users log in with Kerberos tickets |
+| 1 | Build skeleton + hello-world SPI | ✅ done | Maven project, SPI loads in real Keycloak via Testcontainers, CI green |
+| 2 | Wiremock-backed F+ auth client | ✅ done | FPAuthBackedUserStore with Wiremock-driven tests |
+| 3 | Adapt SPI to existing F+ identity API | ✅ done | No acs-auth changes; SPI uses existing /v2/principal + /v2/identity endpoints |
+| 4 | UserQueryProvider + admin search end-to-end | revised | Implement search dispatch; close out Phase 2's deferred admin-REST search story |
+| 5 | Group lookup + caching | revised | GroupLookupProvider, F+ group endpoints via lib, Keycloak CACHED policy with 60s TTL |
+| 6 | Kerberos: outbound SPNEGO + inbound credential validation | revised (consolidated from old Phase 4 + 6) | SPI authenticates to F+ as sv1openid via FPGssClientKeytab; CredentialInputValidator delegates user logins to Kerberos |
 | 7 | JWT claim mappers | Headline | `fp_principal_uuid`, `fp_groups`, `fp_classes` claims appear in tokens |
-| 8 | Custom Keycloak image | Headline | `acs-keycloak` image built in CI, jar baked in, version-pinned |
+| 8 | Custom Keycloak image | Headline | `acs-keycloak` image built in CI, jar baked in, version-pinned (likely shaded once we depend on the lib in Phase 6) |
 | 9 | Helm + service-setup wiring | Headline | `factoryplus` federation provider replaces `kerberos`, Grafana role mapping switches to `fp_groups` |
 | 10 | Seed Grafana groups in F+ | Headline | `Grafana Viewer/Editor/Admin` groups with stable UUIDs, dump-schema entries |
 | 11 | End-to-end verification recipe | Headline | Documented happy path: provision principal, add to group, log into Grafana, see correct role |
 | 12 | Decommission Kerberos federation | Headline | Remove old federation code paths, update docs, write upgrade notes |
+
+**2026-05-07 reorg note:** the original Phase 4 ("Real F+ integration") fundamentally needed Kerberos auth, which is the same code path Phase 6 owned (credential validator). Building Kerberos twice was wasteful, so old-Phase-4 was consolidated into Phase 6. The new Phase 4 takes on what was deferred during Phase 2 (admin-REST search through the federation needs UserQueryProvider). This sequence ships visible-to-Keycloak progress earlier and concentrates the Kerberos work into one coherent phase.
 
 ---
 

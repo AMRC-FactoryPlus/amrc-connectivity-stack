@@ -178,36 +178,16 @@ serviceSetup:
       #cluster: null
     # OIDC clients to provision in Keycloak. Each entry generates a
     # LocalSecret holding the client_secret in keycloak-clients/<key>.
-    # Set builtin: true to skip client creation and only map roles to
-    # the admin user (used for Keycloak's own realm-management client).
+    # Every client automatically gets the fp_principal_uuid and
+    # fp_groups protocol mappers attached - JWT consumers read F+
+    # identity directly from the token. Per-client Keycloak roles are
+    # no longer used; permissions are driven from F+ ACLs via
+    # fp_groups.
     openidClients:
       grafana:
         enabled: true
         name: Grafana
         redirectPath: /login/generic_oauth
-        roles:
-          - { name: viewer }
-          - { name: editor }
-          - { name: admin }
-          - { name: grafanaAdmin }
-        defaultRoles: [viewer]
-        adminRoles: [grafanaAdmin]
-      realm-management:
-        enabled: true
-        builtin: true
-        adminRoles:
-          - view-realm
-          - view-users
-          - view-clients
-          - view-events
-          - manage-realm
-          - manage-users
-          - create-client
-          - manage-clients
-          - manage-events
-          - view-identity-providers
-          - manage-identity-providers
-          - impersonation
 
 edgeHelm:
   enabled: true

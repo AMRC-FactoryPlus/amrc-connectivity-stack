@@ -66,6 +66,12 @@ spec:
               value: {{ include "amrc-connectivity-stack.external-url" (list . "openid") }}
             - name: OPENID_REALM
               value: {{ .Values.openid.realm }}
+            # Cluster-internal URL for the F+ auth service. The Keycloak
+            # SPI federation will be configured to call this URL for
+            # principal/group lookups; the SPI authenticates as
+            # sv1openid via the keytab mounted in the openid pod.
+            - name: AUTH_INTERNAL_URL
+              value: http://auth.{{ .Release.Namespace }}.svc.cluster.local
 {{- end }}
           volumeMounts:
             - mountPath: /data

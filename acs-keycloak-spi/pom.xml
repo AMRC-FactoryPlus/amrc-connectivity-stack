@@ -5,7 +5,7 @@
                              http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>uk.co.amrc.factoryplus</groupId>
+    <groupId>uk.co.amrc.app.factoryplus</groupId>
     <artifactId>acs-keycloak-spi</artifactId>
     <version>0.1.0-SNAPSHOT</version>
     <packaging>jar</packaging>

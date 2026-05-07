@@ -326,24 +326,6 @@ export class APIv1 {
               * value - actual data value
               * unit - Engineering unit (if available)
     * Don't return valid response if dataset is invalid
-  
-  Influx tags:
-    [
-    "_start",
-    "_stop",
-    "_field",
-    "_measurement",
-    "bottomLevelInstance",
-    "bottomLevelSchema",
-    "device",
-    "group",
-    "node",
-    "path",
-    "topLevelInstance",
-    "topLevelSchema",
-    "usesInstances",
-    "usesSchemas"
-  ]
    */
   async dataset_data(req, res) {
     const dataset_uuid = req.params.uuid;
@@ -455,22 +437,17 @@ export class APIv1 {
   }
 
   async _create_subclass_relationship(structure, dataset_uuid, config) {
-    if (structure === Constants.App.SessionLimits) {
-      await this._add_cdb_subclass(config?.source, dataset_uuid);
-    }
-    else if (structure === Constants.App.UnionComponents) {
-      for (let source of config) {
-        await this._add_cdb_subclass(dataset_uuid, source);
-      }
-    }
-  }
-
-  async _add_cdb_subclass(klass, obj){
+    const subclasses = 
+        structure == Constants.App.SessionLimits ? [[config.source, dataset_uuid]]
+        : structure == Constants.App.UnionComponents ? config.map(source => [dataset_uuid, source])
+        : [];
+    for (const subclass of subclasses) {
       await rx.lastValueFrom(
         rx.defer(() =>
-          this.cdb.class_add_subclass(klass, obj)
+          this.cdb.class_add_subclass(...subclass)
         ).pipe(retryBackoff(500, e => this.log(e)))
       );
+    }
   }
 
   async _unlink_subclasses(dataset_uuid, structure, config){

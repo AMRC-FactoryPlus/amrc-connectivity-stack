@@ -40,22 +40,24 @@ class FactoryPlusFederationIT {
 
     /**
      * Class-level guard. Runs before the @Testcontainers extension tries
-     * to start any container, so the test class is disabled cleanly on
-     * dev machines where Docker isn't auto-detectable.
+     * to start any container, so the IT skips cleanly when no Docker
+     * daemon is reachable rather than failing the whole build.
      *
-     * Docker is auto-detectable on:
-     *   * Linux with default daemon at /var/run/docker.sock
-     *   * Docker Desktop (macOS/Windows/Linux)
-     *   * GitHub Actions ubuntu-latest runners
+     * The IT WILL run if any of the following holds:
+     *   * /var/run/docker.sock exists and is connectable (Linux, Docker
+     *     Desktop, GitHub Actions ubuntu-latest)
+     *   * DOCKER_HOST env var is set AND the socket file it names
+     *     actually exists (OrbStack/Colima/Rancher Desktop on macOS,
+     *     after starting the VM)
      *
-     * Docker is NOT auto-detectable on macOS with OrbStack/Colima/Rancher
-     * Desktop because the JVM can't read /var/run/docker.sock through
-     * the symlink (SIP / sandboxing). Workarounds:
-     *   * `sudo ln -sf $HOME/.orbstack/run/docker.sock /var/run/docker.sock`
-     *     (recreates the symlink in a writable namespace), or
-     *   * Set DOCKER_HOST=unix://$HOME/.orbstack/run/docker.sock and
-     *     verify Testcontainers' EnvironmentAndSystemPropertyClient
-     *     strategy applies (it didn't on 1.21.3 in initial testing).
+     * Common gotcha on macOS + OrbStack: the docker CLI auto-starts
+     * OrbStack on demand, so `docker version` works even when the VM
+     * is stopped. Testcontainers does NOT trigger that auto-start - it
+     * just stat()s the socket file. If OrbStack is stopped the file
+     * doesn't exist and this IT skips. Run `orb start` first, or
+     * configure OrbStack to start on login, then:
+     *
+     *   DOCKER_HOST=unix://$HOME/.orbstack/run/docker.sock mvn -B verify
      */
     static boolean dockerAvailable() {
         try {

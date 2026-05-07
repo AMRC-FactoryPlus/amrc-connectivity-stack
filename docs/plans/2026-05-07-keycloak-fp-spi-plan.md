@@ -67,13 +67,13 @@ Goal: Reach a state where `mvn test` compiles a Keycloak provider jar, drops it 
 **Step 1: Create the module directory structure**
 
 ```bash
-mkdir -p acs-keycloak-spi/src/main/java/uk/co/amrc/factoryplus/keycloak
+mkdir -p acs-keycloak-spi/src/main/java/uk/co/amrc/app/factoryplus/keycloak
 mkdir -p acs-keycloak-spi/src/main/resources/META-INF/services
-mkdir -p acs-keycloak-spi/src/test/java/uk/co/amrc/factoryplus/keycloak
+mkdir -p acs-keycloak-spi/src/test/java/uk/co/amrc/app/factoryplus/keycloak
 mkdir -p acs-keycloak-spi/src/test/resources
 ```
 
-📘 **Why this directory structure?** Maven convention: `src/main/java` for production code, `src/test/java` for tests. The package name `uk.co.amrc.factoryplus.keycloak` is the Java equivalent of an npm scope — it just has to be globally unique. We're following the convention from `hivemq-krb/dependency-reduced-pom.xml` which uses `uk.co.amrc.factoryplus`.
+📘 **Why this directory structure?** Maven convention: `src/main/java` for production code, `src/test/java` for tests. The package name `uk.co.amrc.app.factoryplus.keycloak` is the Java equivalent of an npm scope. Convention is *strict* reverse-DNS of a domain you control: `factoryplus.app.amrc.co.uk` reversed is `uk.co.amrc.app.factoryplus`. (The existing `hivemq-krb/` module uses `uk.co.amrc.factoryplus`, dropping the `app` segment — slightly off; we're using the correct inversion here.)
 
 **Step 2: Write the minimal `pom.xml`**
 
@@ -82,7 +82,7 @@ mkdir -p acs-keycloak-spi/src/test/resources
 <project xmlns="http://maven.apache.org/POM/4.0.0">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>uk.co.amrc.factoryplus</groupId>
+    <groupId>uk.co.amrc.app.factoryplus</groupId>
     <artifactId>acs-keycloak-spi</artifactId>
     <version>0.1.0-SNAPSHOT</version>
     <packaging>jar</packaging>
@@ -221,12 +221,12 @@ git commit -m "Scaffold acs-keycloak-spi Maven module"
 📘 **TDD applies here too.** Even though we're going to wire up infrastructure, we'll TDD the actual logic. We start with a *unit* test for a class that doesn't exist yet, watch it fail, then write the minimum to make it pass.
 
 **Files:**
-- Test: `acs-keycloak-spi/src/test/java/uk/co/amrc/factoryplus/keycloak/FactoryPlusUserStorageProviderFactoryTest.java`
+- Test: `acs-keycloak-spi/src/test/java/uk/co/amrc/app/factoryplus/keycloak/FactoryPlusUserStorageProviderFactoryTest.java`
 
 **Step 1: Write the failing test**
 
 ```java
-package uk.co.amrc.factoryplus.keycloak;
+package uk.co.amrc.app.factoryplus.keycloak;
 
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -250,10 +250,10 @@ Expected: compile error — class `FactoryPlusUserStorageProviderFactory` does n
 
 **Step 3: Create the minimal implementation**
 
-File: `acs-keycloak-spi/src/main/java/uk/co/amrc/factoryplus/keycloak/FactoryPlusUserStorageProviderFactory.java`
+File: `acs-keycloak-spi/src/main/java/uk/co/amrc/app/factoryplus/keycloak/FactoryPlusUserStorageProviderFactory.java`
 
 ```java
-package uk.co.amrc.factoryplus.keycloak;
+package uk.co.amrc.app.factoryplus.keycloak;
 
 import org.keycloak.component.ComponentModel;
 import org.keycloak.models.KeycloakSession;
@@ -278,10 +278,10 @@ public class FactoryPlusUserStorageProviderFactory
 
 And the provider class itself (placeholder; we'll fill it in next task):
 
-File: `acs-keycloak-spi/src/main/java/uk/co/amrc/factoryplus/keycloak/FactoryPlusUserStorageProvider.java`
+File: `acs-keycloak-spi/src/main/java/uk/co/amrc/app/factoryplus/keycloak/FactoryPlusUserStorageProvider.java`
 
 ```java
-package uk.co.amrc.factoryplus.keycloak;
+package uk.co.amrc.app.factoryplus.keycloak;
 
 import org.keycloak.component.ComponentModel;
 import org.keycloak.models.KeycloakSession;
@@ -337,10 +337,10 @@ git commit -m "Add FactoryPlusUserStorageProvider skeleton with passing factory 
 
 **Step 1: Write a test asserting the resource file exists and has the right contents**
 
-File: `acs-keycloak-spi/src/test/java/uk/co/amrc/factoryplus/keycloak/SpiRegistrationTest.java`
+File: `acs-keycloak-spi/src/test/java/uk/co/amrc/app/factoryplus/keycloak/SpiRegistrationTest.java`
 
 ```java
-package uk.co.amrc.factoryplus.keycloak;
+package uk.co.amrc.app.factoryplus.keycloak;
 
 import org.junit.jupiter.api.Test;
 import java.io.InputStream;
@@ -358,7 +358,7 @@ class SpiRegistrationTest {
                 .isNotNull();
             String contents = new String(in.readAllBytes(), StandardCharsets.UTF_8).trim();
             assertThat(contents)
-                .isEqualTo("uk.co.amrc.factoryplus.keycloak.FactoryPlusUserStorageProviderFactory");
+                .isEqualTo("uk.co.amrc.app.factoryplus.keycloak.FactoryPlusUserStorageProviderFactory");
         }
     }
 }
@@ -373,7 +373,7 @@ Expected: `SpiRegistrationTest.factory_is_registered_via_service_loader_metadata
 
 **Step 3: Create the metadata file**
 
-File contents (single line, no trailing whitespace): `uk.co.amrc.factoryplus.keycloak.FactoryPlusUserStorageProviderFactory`
+File contents (single line, no trailing whitespace): `uk.co.amrc.app.factoryplus.keycloak.FactoryPlusUserStorageProviderFactory`
 
 **Step 4: Run, expect pass**
 
@@ -399,15 +399,15 @@ git commit -m "Register SPI factory via META-INF/services"
 Now we make the provider actually return a user. Just one — hardcoded — to prove the plumbing.
 
 **Files:**
-- Modify: `acs-keycloak-spi/src/main/java/uk/co/amrc/factoryplus/keycloak/FactoryPlusUserStorageProvider.java`
-- Create: `acs-keycloak-spi/src/test/java/uk/co/amrc/factoryplus/keycloak/FactoryPlusUserStorageProviderTest.java`
+- Modify: `acs-keycloak-spi/src/main/java/uk/co/amrc/app/factoryplus/keycloak/FactoryPlusUserStorageProvider.java`
+- Create: `acs-keycloak-spi/src/test/java/uk/co/amrc/app/factoryplus/keycloak/FactoryPlusUserStorageProviderTest.java`
 
 **Step 1: Write failing tests for `getUserByUsername`, `getUserById`, `getUserByEmail`**
 
 The provider needs to implement `UserLookupProvider`. Tests assert that asking for our hardcoded user returns a non-null `UserModel` with the expected attributes.
 
 ```java
-package uk.co.amrc.factoryplus.keycloak;
+package uk.co.amrc.app.factoryplus.keycloak;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -503,7 +503,7 @@ git commit -m "Hardcoded fixed-user lookup with unit tests"
 📘 **Testcontainers** spins up real Docker containers from JUnit. We launch Keycloak 26.1.1, mount our jar into `/opt/keycloak/providers/`, configure a realm with our federation provider, and then drive it via Keycloak's admin REST client — asserting that "fixed.user" appears in user search.
 
 **Files:**
-- Create: `acs-keycloak-spi/src/test/java/uk/co/amrc/factoryplus/keycloak/integration/FactoryPlusFederationIT.java`
+- Create: `acs-keycloak-spi/src/test/java/uk/co/amrc/app/factoryplus/keycloak/integration/FactoryPlusFederationIT.java`
 - Create: `acs-keycloak-spi/src/test/resources/realm-test.json` (realm definition with our federation provider configured)
 
 **Step 1:** Write the IT (full file in the executing-plans phase). Pattern:

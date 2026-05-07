@@ -3,13 +3,67 @@
 # This implements recursion for POSIX make. There are many reasons why
 # recursive make is not the best way to do things but it is difficult to
 # avoid within the restriction of POSIX make syntax.
+#
+# Default behaviour: build subdirs sequentially in the order given.
+#
+# Opt-in parallelism via env var:
+#
+#   SUBDIRS_PARALLEL=N      run up to N subdirs concurrently
+#   SUBDIRS_PARALLEL=auto   detect CPU count and use that
+#
+# When parallel mode is on, SUBDIRS_SERIAL_FIRST (default: "lib") is
+# always built first on its own; the remaining subdirs are then dispatched
+# concurrently. This preserves the invariant that lib (the in-tree Maven
+# parent POM and service-client) is available before any Java component
+# build starts.
+#
+# Parallel mode uses `xargs -P` which is POSIX (Issue 7, 2008) and is
+# supported by busybox xargs, so the Windows-via-busybox setup the top
+# Makefile recommends is not broken. If you don't set the env var,
+# nothing changes.
+#
+# A failed subdir build aborts the dispatch but lets jobs already in
+# flight finish; xargs returns non-zero so make sees the failure.
 
 set -e
 
 target="$1"
 shift
 
-for d in "$@"
-do
-    ${MAKE} -C "${d}" "${target}"
-done
+if [ -n "${SUBDIRS_PARALLEL}" ] && [ "${SUBDIRS_PARALLEL}" != "0" ]; then
+    jobs="${SUBDIRS_PARALLEL}"
+    if [ "$jobs" = "auto" ]; then
+        jobs=$(getconf _NPROCESSORS_ONLN 2>/dev/null \
+            || sysctl -n hw.ncpu 2>/dev/null \
+            || echo 4)
+    fi
+
+    serial_first="${SUBDIRS_SERIAL_FIRST:-lib}"
+
+    rest=
+    for d in "$@"
+    do
+        if [ "${d}" = "${serial_first}" ]
+        then
+            ${MAKE} -C "${d}" "${target}"
+        else
+            rest="${rest} ${d}"
+        fi
+    done
+
+    if [ -n "${rest}" ]
+    then
+        # `xargs -I {}` keeps each arg as a single token; -n 1 ensures
+        # one subdir per invocation. Use printf, not echo, so subdir
+        # names with leading dashes (none today, but safe) don't get
+        # eaten as flags.
+        # shellcheck disable=SC2086
+        printf '%s\n' ${rest} | xargs -P "${jobs}" -I '{}' \
+            ${MAKE} -C '{}' "${target}"
+    fi
+else
+    for d in "$@"
+    do
+        ${MAKE} -C "${d}" "${target}"
+    done
+fi

@@ -426,6 +426,10 @@ grafana:
       mountPath: /etc/acs-config
       configMap: acs-grafana-config
       readOnly: true
+      # The grafana subchart (6.52.4) calls `tpl` on `.subPath` and
+      # errors when the field is missing rather than honouring its
+      # `default ""` fallback. Empty string keeps the mount un-subpath'd.
+      subPath: ""
   extraSecretMounts:
     - name: keycloak-client-grafana
       secretName: keycloak-clients

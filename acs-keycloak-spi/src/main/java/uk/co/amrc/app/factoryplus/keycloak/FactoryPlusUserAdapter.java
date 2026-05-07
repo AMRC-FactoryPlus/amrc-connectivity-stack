@@ -20,16 +20,22 @@ import org.keycloak.models.SubjectCredentialManager;
 import org.keycloak.storage.StorageId;
 import org.keycloak.storage.adapter.AbstractUserAdapter;
 
+import java.util.Set;
+
 public class FactoryPlusUserAdapter extends AbstractUserAdapter {
 
     private final ComponentModel componentModel;
     private final FactoryPlusUser user;
+    private final FactoryPlusUserStore store;
 
     public FactoryPlusUserAdapter(KeycloakSession session, RealmModel realm,
-                                  ComponentModel componentModel, FactoryPlusUser user) {
+                                  ComponentModel componentModel,
+                                  FactoryPlusUser user,
+                                  FactoryPlusUserStore store) {
         super(session, realm, componentModel);
         this.componentModel = componentModel;
         this.user = user;
+        this.store = store;
     }
 
     @Override
@@ -55,6 +61,16 @@ public class FactoryPlusUserAdapter extends AbstractUserAdapter {
      */
     public String getFactoryPlusUuid() {
         return user.uuid();
+    }
+
+    /**
+     * The set of F+ principal-groups containing this user, used by the
+     * {@code fp_groups} OIDC claim mapper. Delegates to the store so
+     * results come from the cache layer (group lookups are an HTTP
+     * round-trip otherwise).
+     */
+    public Set<String> getFactoryPlusGroups() {
+        return store.findGroupsForPrincipal(user.uuid());
     }
 
     @Override

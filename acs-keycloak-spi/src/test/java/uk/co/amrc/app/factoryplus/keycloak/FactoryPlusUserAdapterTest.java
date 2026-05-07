@@ -40,7 +40,7 @@ class FactoryPlusUserAdapterTest {
     @BeforeEach
     void setUp() {
         when(model.getId()).thenReturn(MODEL_ID);
-        adapter = new FactoryPlusUserAdapter(session, realm, model, ALICE);
+        adapter = new FactoryPlusUserAdapter(session, realm, model, ALICE, NullFactoryPlusUserStore.INSTANCE);
     }
 
     @Test
@@ -71,7 +71,40 @@ class FactoryPlusUserAdapterTest {
     void exposes_null_email_when_dto_email_is_null() {
         FactoryPlusUser noEmail = new FactoryPlusUser(
             "00000000-0000-0000-0000-000000000002", "bob", null);
-        var bob = new FactoryPlusUserAdapter(session, realm, model, noEmail);
+        var bob = new FactoryPlusUserAdapter(session, realm, model, noEmail,
+            NullFactoryPlusUserStore.INSTANCE);
         assertThat(bob.getEmail()).isNull();
+    }
+
+    @Test
+    void factoryplus_groups_delegates_to_store() {
+        var stubStore = new StubGroupsStore(java.util.Set.of("g1", "g2"));
+        var alice = new FactoryPlusUserAdapter(session, realm, model, ALICE, stubStore);
+
+        assertThat(alice.getFactoryPlusGroups()).containsExactlyInAnyOrder("g1", "g2");
+        assertThat(stubStore.lastUuid)
+            .as("Store must be queried with the principal's F+ UUID")
+            .isEqualTo(ALICE.uuid());
+    }
+
+    private static final class StubGroupsStore implements FactoryPlusUserStore {
+        private final java.util.Set<String> response;
+        String lastUuid;
+
+        StubGroupsStore(java.util.Set<String> response) { this.response = response; }
+
+        @Override public java.util.Optional<FactoryPlusUser> findByUuid(String uuid) {
+            return java.util.Optional.empty();
+        }
+        @Override public java.util.Optional<FactoryPlusUser> findByUsername(String n) {
+            return java.util.Optional.empty();
+        }
+        @Override public java.util.Optional<FactoryPlusUser> findByEmail(String e) {
+            return java.util.Optional.empty();
+        }
+        @Override public java.util.Set<String> findGroupsForPrincipal(String uuid) {
+            lastUuid = uuid;
+            return response;
+        }
     }
 }

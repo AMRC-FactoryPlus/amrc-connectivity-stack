@@ -1,9 +1,9 @@
 /* ACS Keycloak SPI
  * HTTP-backed FactoryPlusUserStore implementation.
  *
- * Phase 2 implementation: uses bare java.net.http.HttpClient against
- * the Factory+ auth service. No Kerberos here - that's Phase 4, which
- * will swap this out (or extend it) to use lib/java-service-client's
+ * Uses bare java.net.http.HttpClient against the Factory+ auth service
+ * over its existing v2 identity API. No Kerberos here - that's Phase 4,
+ * which will swap this out (or extend it) to use lib/java-service-client's
  * FPGssClientKeytab for SPNEGO authentication. The interface seam
  * (FactoryPlusUserStore) absorbs that change without touching the
  * provider.
@@ -12,25 +12,35 @@
  * classpath) rather than org.json so we don't have to bundle a JSON
  * library into the SPI jar.
  *
- * HTTP contract this expects from the auth service (Phase 3 implements
- * these endpoints in acs-auth):
+ * F+ identity model recap:
+ *   * Principals are UUIDs with 0+ identities (kind, name)
+ *   * Today only kind="kerberos" exists; name is the full UPN
+ *     (e.g. "alice@FACTORYPLUS.LOCAL")
+ *   * F+ does not store email addresses
+ *   * Status 410 ("Gone") is the "doesn't exist" code, not 404
+ *
+ * HTTP contract (existing acs-auth v2 endpoints, no changes needed):
  *
  *   GET /v2/principal/{uuid}
- *       200 with { uuid, name, email? } when the principal exists
- *       404 when no principal has that UUID
+ *       200 with { uuid, kerberos: "alice@..." } when the principal exists
+ *       410 when no principal has that UUID
  *
- *   GET /v2/principal?name={name}
- *       200 with { uuid, name, email? } when a principal has that name
- *       404 when no principal has that name
+ *   GET /v2/identity/kerberos/{upn}
+ *       200 with the UUID string (NOT JSON object) when the UPN matches
+ *       410 when no identity has that UPN
  *
- *   GET /v2/principal?email={email}
- *       200 with { uuid, name, email } when a principal has that email
- *       404 when no principal has that email
+ * findByUsername therefore costs two HTTP calls (identity lookup, then
+ * principal lookup). Login is rare; Phase 5 adds caching to fold both
+ * into a single warm path.
  *
- * In all responses 'name' is the F+ principal name (corresponds to
- * Keycloak's username) and 'email' is optional (service principals
- * have none). Any 5xx, malformed JSON, or transport failure is
- * surfaced as FactoryPlusAuthException.
+ * findByEmail always returns Optional.empty() because F+ has no email
+ * field. Reserving the FactoryPlusUser.email DTO field for future use
+ * if F+ ever stores email.
+ *
+ * Any 5xx, malformed JSON, or transport failure is surfaced as
+ * FactoryPlusAuthException so Keycloak can fall through to the next
+ * federation rather than silently treating the failure as "user not
+ * found".
  *
  * Copyright 2026 University of Sheffield AMRC
  */
@@ -55,6 +65,8 @@ public class FPAuthBackedUserStore implements FactoryPlusUserStore {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
+    private static final String IDENTITY_KIND_KERBEROS = "kerberos";
+
     private final URI baseUrl;
     private final Duration timeout;
     private final HttpClient http;
@@ -69,30 +81,84 @@ public class FPAuthBackedUserStore implements FactoryPlusUserStore {
 
     @Override
     public Optional<FactoryPlusUser> findByUuid(String uuid) {
-        return doLookup("/v2/principal/" + encode(uuid));
+        return fetchPrincipal(uuid);
     }
 
     @Override
     public Optional<FactoryPlusUser> findByUsername(String username) {
-        return doLookup("/v2/principal?name=" + encode(username));
+        // Two-call path: resolve UPN -> UUID, then UUID -> full principal.
+        return fetchUuidByIdentity(IDENTITY_KIND_KERBEROS, username)
+            .flatMap(this::fetchPrincipal);
     }
 
     @Override
     public Optional<FactoryPlusUser> findByEmail(String email) {
-        return doLookup("/v2/principal?email=" + encode(email));
+        // F+ has no email field; this lookup is unsupported and always
+        // returns empty. Reserved for a future F+ schema extension.
+        return Optional.empty();
     }
 
-    private Optional<FactoryPlusUser> doLookup(String path) {
-        URI uri = baseUrl.resolve(path);
+    /** GET /v2/identity/{kind}/{name} -> UUID string, or empty on 410. */
+    private Optional<String> fetchUuidByIdentity(String kind, String name) {
+        URI uri = baseUrl.resolve("/v2/identity/" + encode(kind) + "/" + encode(name));
+        HttpResponse<String> res = sendGet(uri);
+        if (isNotFound(res.statusCode())) return Optional.empty();
+        requireSuccess(res, uri);
+
+        try {
+            JsonNode node = MAPPER.readTree(res.body());
+            if (!node.isTextual()) {
+                throw new FactoryPlusAuthException(
+                    "Expected UUID string from " + uri + ", got: " + res.body());
+            }
+            return Optional.of(node.asText());
+        }
+        catch (JsonProcessingException e) {
+            throw new FactoryPlusAuthException("Malformed response from " + uri, e);
+        }
+    }
+
+    /** GET /v2/principal/{uuid} -> {uuid, kerberos: "..."}, or empty on 410. */
+    private Optional<FactoryPlusUser> fetchPrincipal(String uuid) {
+        URI uri = baseUrl.resolve("/v2/principal/" + encode(uuid));
+        HttpResponse<String> res = sendGet(uri);
+        if (isNotFound(res.statusCode())) return Optional.empty();
+        requireSuccess(res, uri);
+
+        try {
+            JsonNode root = MAPPER.readTree(res.body());
+            if (!root.isObject() || !root.hasNonNull("uuid")) {
+                throw new FactoryPlusAuthException(
+                    "Malformed principal response from " + uri
+                        + " (missing uuid field)");
+            }
+            JsonNode kerberosNode = root.get(IDENTITY_KIND_KERBEROS);
+            if (kerberosNode == null || kerberosNode.isNull()) {
+                // Principal exists but has no Kerberos identity. We
+                // can't surface it as a Keycloak user without a
+                // username, so treat as not-found from the SPI's
+                // perspective rather than NPE later.
+                return Optional.empty();
+            }
+            return Optional.of(new FactoryPlusUser(
+                root.get("uuid").asText(),
+                kerberosNode.asText(),
+                null /* F+ has no email */));
+        }
+        catch (JsonProcessingException e) {
+            throw new FactoryPlusAuthException(
+                "Malformed response from " + uri, e);
+        }
+    }
+
+    private HttpResponse<String> sendGet(URI uri) {
         HttpRequest req = HttpRequest.newBuilder(uri)
             .timeout(timeout)
             .header("Accept", "application/json")
             .GET()
             .build();
-
-        HttpResponse<String> res;
         try {
-            res = http.send(req, HttpResponse.BodyHandlers.ofString());
+            return http.send(req, HttpResponse.BodyHandlers.ofString());
         }
         catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -101,34 +167,19 @@ public class FPAuthBackedUserStore implements FactoryPlusUserStore {
         catch (IOException e) {
             throw new FactoryPlusAuthException("Transport failure calling " + uri, e);
         }
+    }
 
+    /** F+ uses 410 for "doesn't exist". Some clients/proxies may also
+     *  surface 404; accept both for resilience. */
+    private static boolean isNotFound(int status) {
+        return status == 410 || status == 404;
+    }
+
+    private static void requireSuccess(HttpResponse<String> res, URI uri) {
         int status = res.statusCode();
-        if (status == 404) {
-            return Optional.empty();
-        }
         if (status < 200 || status >= 300) {
             throw new FactoryPlusAuthException(
                 "F+ auth returned " + status + " for " + uri);
-        }
-
-        try {
-            JsonNode root = MAPPER.readTree(res.body());
-            if (!root.isObject() || !root.hasNonNull("uuid") || !root.hasNonNull("name")) {
-                throw new FactoryPlusAuthException(
-                    "Malformed response from " + uri + " (missing required fields)");
-            }
-            JsonNode emailNode = root.get("email");
-            String email = (emailNode == null || emailNode.isNull())
-                ? null
-                : emailNode.asText();
-            return Optional.of(new FactoryPlusUser(
-                root.get("uuid").asText(),
-                root.get("name").asText(),
-                email));
-        }
-        catch (JsonProcessingException e) {
-            throw new FactoryPlusAuthException(
-                "Malformed response from " + uri, e);
         }
     }
 

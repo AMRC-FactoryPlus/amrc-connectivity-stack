@@ -551,11 +551,36 @@ extending FPAuth upstream is a separate optional cleanup.
   meantime.
 - **2.6** Acceptance + re-plan Phase 3 in detail.
 
-### Phase 3 — F+ auth read API extensions
-- Inventory what Keycloak's `UserQueryProvider` actually needs (paginated user search by prefix, count by criterion, filter by group)
-- Add endpoints to `acs-auth/lib/api_v2.js`: `GET /principal?search=&first=&max=`, `GET /principal/:uuid/groups`, `GET /group/:uuid/members`, `GET /principal/count`
-- TDD on the JS side (use existing acs-auth test patterns)
-- Document the shape
+### Phase 3 — Adapt SPI to existing F+ identity API (no acs-auth changes) (revised 2026-05-07)
+
+While planning, discovered the F+ identity model is shaped differently
+than the Phase 2 Wiremock contract assumed:
+
+  * Principals are UUIDs with 0+ identities (kind, name)
+  * Today only kind="kerberos" exists; name is the full Kerberos UPN
+  * No email field exists in F+
+  * GET /v2/principal/{uuid} returns {uuid, kerberos: "alice@..."}
+    (identity kinds become object keys)
+  * GET /v2/identity/kerberos/{upn} returns just the UUID string
+  * 410 is the "doesn't exist" status, not 404
+
+Phase 3 therefore needs zero acs-auth endpoint additions - the
+existing API is sufficient. Instead the work is:
+
+  * Rewrite FPAuthBackedUserStore to use the existing endpoints
+    (findByUuid: 1 call; findByUsername: 2 calls - identity lookup
+    then principal lookup; findByEmail: returns empty, F+ has no email)
+  * Treat 410 as "not found" instead of 404
+  * Use full Kerberos UPN as Keycloak username (matches Keycloak's
+    existing kerberos federation behaviour)
+  * Keep the email field on the FactoryPlusUser DTO as a nullable
+    reservation for when/if F+ ever stores it
+  * Update Wiremock unit tests and IT to match
+  * The 2-call cost of findByUsername is mitigated by Phase 5 caching;
+    login is rare enough that uncached is acceptable in v1
+
+Group/membership endpoints (originally Phase 3 work) are deferred to
+Phase 5 alongside GroupLookupProvider.
 
 ### Phase 4 — Real F+ integration
 - Stand up a kind cluster with current dn/oAuth branch

@@ -14,6 +14,7 @@ import { setup_local_uuids }    from "./local-uuids.js";
 import {migrate_edge_agent_config} from "./manager-devices.js";
 import {migrate_deployment_charts} from "./deployment-charts.js";
 import { setup_openid }         from "./openid.js";
+import { setup_grafana_groups } from "./grafana-groups.js";
 
 export class ServiceSetup {
     constructor (opts) {
@@ -85,6 +86,9 @@ export class ServiceSetup {
         await migrate_deployment_charts(this);
 
         if (process.env.OPENID_URL) {
+            this.log("Seeding Grafana role groups in F+");
+            await setup_grafana_groups(this);
+
             this.log("Configuring OpenID realm");
             await setup_openid(this);
         }

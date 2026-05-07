@@ -30,7 +30,9 @@
              org.keycloak.models.KeycloakSession]" on JDK 25. -->
         <mockito.version>5.18.0</mockito.version>
         <assertj.version>3.25.3</assertj.version>
-        <testcontainers.version>1.19.7</testcontainers.version>
+        <!-- 1.21.x improves Docker socket detection on macOS with
+             OrbStack/Colima/Rancher Desktop. -->
+        <testcontainers.version>1.21.3</testcontainers.version>
     </properties>
 
     <dependencies>
@@ -98,6 +100,25 @@
             <version>${testcontainers.version}</version>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <!-- Lets Testcontainers' debug logs surface; without an
+                 SLF4J binding the diagnostic chain is silent. Version
+                 inherited from base-pom. -->
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-simple</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <!-- Drives Keycloak admin REST from integration tests. The
+                 admin-client artefact lags the main Keycloak release - 26.1.1
+                 doesn't publish one yet, so we pin to 26.0.5 (the latest
+                 available). The admin REST contract is stable across the
+                 26.x minor series. -->
+            <groupId>org.keycloak</groupId>
+            <artifactId>keycloak-admin-client</artifactId>
+            <version>26.0.5</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -109,6 +130,38 @@
             <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.2.5</version>
+            </plugin>
+            <plugin>
+                <!-- Failsafe runs *IT.java in the verify phase, AFTER
+                     the jar is built. Surefire (test phase) only runs
+                     *Test.java. This separation lets us depend on the
+                     packaged jar in integration tests. -->
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <version>3.2.5</version>
+                <configuration>
+                    <systemPropertyVariables>
+                        <spi.jar>${project.build.directory}/${project.build.finalName}.jar</spi.jar>
+                        <!-- Forward DOCKER_HOST to the forked test JVM as
+                             both env var and system property so Testcontainers'
+                             EnvironmentAndSystemPropertyClientProviderStrategy
+                             finds it. Needed when the macOS JVM can't read
+                             /var/run/docker.sock (SIP) and Docker is provided
+                             by OrbStack/Colima/Rancher Desktop with a socket
+                             at $HOME/.<vendor>/run/docker.sock. -->
+                        <docker.host>${env.DOCKER_HOST}</docker.host>
+                    </systemPropertyVariables>
+                    <environmentVariables>
+                        <DOCKER_HOST>${env.DOCKER_HOST}</DOCKER_HOST>
+                    </environmentVariables>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

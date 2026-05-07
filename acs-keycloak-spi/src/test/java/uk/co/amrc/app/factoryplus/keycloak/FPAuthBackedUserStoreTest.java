@@ -253,6 +253,58 @@ class FPAuthBackedUserStoreTest {
             .isEqualTo("localhost");
     }
 
+    // -- find groups -----------------------------------------------------
+
+    @Test
+    void find_groups_returns_set_of_group_uuids() {
+        wiremock.stubFor(get(urlPathEqualTo("/v2/principal/" + UUID_ALICE + "/groups"))
+            .willReturn(okJson("""
+                ["aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                 "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"]
+                """)));
+
+        var groups = store.findGroupsForPrincipal(UUID_ALICE);
+
+        assertThat(groups).containsExactlyInAnyOrder(
+            "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+    }
+
+    @Test
+    void find_groups_returns_empty_when_principal_not_found() {
+        wiremock.stubFor(get(urlPathEqualTo("/v2/principal/missing/groups"))
+            .willReturn(aResponse().withStatus(410)));
+
+        assertThat(store.findGroupsForPrincipal("missing")).isEmpty();
+    }
+
+    @Test
+    void find_groups_returns_empty_for_principal_in_no_groups() {
+        wiremock.stubFor(get(urlPathEqualTo("/v2/principal/" + UUID_ALICE + "/groups"))
+            .willReturn(okJson("[]")));
+
+        assertThat(store.findGroupsForPrincipal(UUID_ALICE)).isEmpty();
+    }
+
+    @Test
+    void find_groups_throws_on_5xx() {
+        wiremock.stubFor(get(urlPathEqualTo("/v2/principal/" + UUID_ALICE + "/groups"))
+            .willReturn(aResponse().withStatus(503)));
+
+        assertThatThrownBy(() -> store.findGroupsForPrincipal(UUID_ALICE))
+            .isInstanceOf(FactoryPlusAuthException.class)
+            .hasMessageContaining("503");
+    }
+
+    @Test
+    void find_groups_throws_on_malformed_response() {
+        wiremock.stubFor(get(urlPathEqualTo("/v2/principal/" + UUID_ALICE + "/groups"))
+            .willReturn(okJson("{\"unexpected\": \"object\"}")));
+
+        assertThatThrownBy(() -> store.findGroupsForPrincipal(UUID_ALICE))
+            .isInstanceOf(FactoryPlusAuthException.class);
+    }
+
     /** Captures call count + last target URL for assertion. */
     private static final class StubAuthenticator implements KerberosAuthenticator {
         final String token;

@@ -25,6 +25,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.Supplier;
@@ -32,13 +33,15 @@ import java.util.function.Supplier;
 public class CachingFactoryPlusUserStore implements FactoryPlusUserStore {
 
     private record Entry(Optional<FactoryPlusUser> result, Instant expiresAt) {}
+    private record GroupEntry(Set<String> result, Instant expiresAt) {}
 
     private final FactoryPlusUserStore delegate;
     private final Duration ttl;
     private final Clock clock;
-    private final ConcurrentMap<String, Entry> byUuid     = new ConcurrentHashMap<>();
-    private final ConcurrentMap<String, Entry> byUsername = new ConcurrentHashMap<>();
-    private final ConcurrentMap<String, Entry> byEmail    = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, Entry> byUuid       = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, Entry> byUsername   = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, Entry> byEmail      = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, GroupEntry> byGroups = new ConcurrentHashMap<>();
 
     public CachingFactoryPlusUserStore(FactoryPlusUserStore delegate,
                                        Duration ttl, Clock clock) {
@@ -60,6 +63,18 @@ public class CachingFactoryPlusUserStore implements FactoryPlusUserStore {
     @Override
     public Optional<FactoryPlusUser> findByEmail(String email) {
         return cached(byEmail, email, () -> delegate.findByEmail(email));
+    }
+
+    @Override
+    public Set<String> findGroupsForPrincipal(String uuid) {
+        Instant now = clock.instant();
+        GroupEntry existing = byGroups.get(uuid);
+        if (existing != null && existing.expiresAt.isAfter(now)) {
+            return existing.result;
+        }
+        Set<String> fresh = delegate.findGroupsForPrincipal(uuid);
+        byGroups.put(uuid, new GroupEntry(fresh, now.plus(ttl)));
+        return fresh;
     }
 
     private Optional<FactoryPlusUser> cached(ConcurrentMap<String, Entry> map,

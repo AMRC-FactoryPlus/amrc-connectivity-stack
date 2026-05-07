@@ -14,15 +14,20 @@
 package uk.co.amrc.app.factoryplus.keycloak;
 
 import org.keycloak.component.ComponentModel;
+import org.keycloak.models.GroupModel;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
 import org.keycloak.models.UserModel;
 import org.keycloak.storage.StorageId;
 import org.keycloak.storage.UserStorageProvider;
 import org.keycloak.storage.user.UserLookupProvider;
+import org.keycloak.storage.user.UserQueryProvider;
+
+import java.util.Map;
+import java.util.stream.Stream;
 
 public class FactoryPlusUserStorageProvider
-        implements UserStorageProvider, UserLookupProvider {
+        implements UserStorageProvider, UserLookupProvider, UserQueryProvider {
 
     private final KeycloakSession session;
     private final ComponentModel model;
@@ -64,6 +69,52 @@ public class FactoryPlusUserStorageProvider
         return store.findByEmail(email)
             .map(u -> new FactoryPlusUserAdapter(session, realm, model, u))
             .orElse(null);
+    }
+
+    // -- UserQueryProvider --------------------------------------------
+    //
+    // Three abstract methods on UserQueryMethodsProvider must be
+    // implemented. We deliberately leave UserCountMethodsProvider's
+    // default methods alone; overriding them broke admin REST searches
+    // in an earlier attempt (caused HTTP 400 from the admin endpoint,
+    // root cause unidentified - likely an interaction between Keycloak's
+    // pagination and a 0-count override).
+
+    @Override
+    public Stream<UserModel> searchForUserStream(RealmModel realm,
+            Map<String, String> params, Integer first, Integer max) {
+        // Keycloak's admin REST and login flows query us with a Map of
+        // criteria. We handle the two single-criterion cases the
+        // FactoryPlusUserStore can answer cheaply (exact username,
+        // exact email); free-text search and other params fall through
+        // empty until Phase 5 introduces a richer F+ search endpoint.
+        String username = params.get(UserModel.USERNAME);
+        if (username != null) {
+            UserModel user = getUserByUsername(realm, username);
+            return user == null ? Stream.empty() : Stream.of(user);
+        }
+        String email = params.get(UserModel.EMAIL);
+        if (email != null) {
+            UserModel user = getUserByEmail(realm, email);
+            return user == null ? Stream.empty() : Stream.of(user);
+        }
+        return Stream.empty();
+    }
+
+    @Override
+    public Stream<UserModel> searchForUserByUserAttributeStream(RealmModel realm,
+            String attrName, String attrValue) {
+        // F+ has no concept of arbitrary user attributes today. Phase 5
+        // could light this up if F+ exposes attributes via ConfigDB.
+        return Stream.empty();
+    }
+
+    @Override
+    public Stream<UserModel> getGroupMembersStream(RealmModel realm,
+            GroupModel group, Integer first, Integer max) {
+        // Phase 5 implements group membership; until then no federated
+        // users appear in any group.
+        return Stream.empty();
     }
 
     @Override

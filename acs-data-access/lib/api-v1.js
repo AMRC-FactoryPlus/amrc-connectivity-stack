@@ -8,6 +8,7 @@ import { Map as IMap, Seq as ISeq } from "immutable";
 import * as rx from "rxjs";
 
 import { APIError } from "@amrc-factoryplus/service-api";
+import { ServiceError } from "@amrc-factoryplus/service-client";
 import { retryBackoff } from "@amrc-factoryplus/rx-util";
 import { DataAccess as Constants } from "./constants.js";
 import { valid_uuid, DatasetValidity } from "./validate.js";
@@ -590,7 +591,7 @@ export class APIv1 {
         try{
           await this.cdb.delete_config(s, dataset_uuid);
         }catch(e){
-          this.log(e);
+          ServiceError.check(404);
         }
       }
     } 

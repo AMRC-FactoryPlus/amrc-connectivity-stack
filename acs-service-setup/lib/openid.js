@@ -21,6 +21,11 @@ class OpenIDSetup {
         this.url = process.env.OPENID_URL.replace(/\/+$/, "");
         this.realm = process.env.OPENID_REALM;
         this.kerberos_realm = this.acs.realm;
+        // Cluster-internal F+ auth URL (e.g.
+        // http://auth.factory-plus.svc.cluster.local). The Keycloak
+        // SPI federation calls this URL for principal/group lookups.
+        this.auth_internal_url = (process.env.AUTH_INTERNAL_URL ?? "")
+            .replace(/\/+$/, "");
 
         this.token = null;
         this.token_expires_at = 0;
@@ -120,38 +125,56 @@ class OpenIDSetup {
         }
     }
 
-    async ensure_kerberos_federation () {
+    /** Provision the Factory+ User Storage SPI as Keycloak's federation
+     *  source. Replaces the previous Kerberos federation. Idempotent:
+     *  on a redeploy the existing component is updated in-place; if the
+     *  legacy `kerberos` provider is still present it's removed.
+     */
+    async ensure_factoryplus_federation () {
+        if (!this.auth_internal_url) {
+            throw new Error("AUTH_INTERNAL_URL must be set so the SPI "
+                + "federation can reach the F+ auth service");
+        }
+
         const path = `/admin/realms/${encodeURIComponent(this.realm)}/components`;
         const list = await this.api("GET",
             `${path}?type=org.keycloak.storage.UserStorageProvider&parent=${encodeURIComponent(this.realm)}`);
-        const existing = (list.body ?? []).find(c => c.providerId === "kerberos");
+        const existing = (list.body ?? []).find(c => c.providerId === "factoryplus");
+        const oldKrb   = (list.body ?? []).find(c => c.providerId === "kerberos");
 
-        const server_principal = `HTTP/openid.${this.acs.domain}@${this.kerberos_realm}`;
+        if (oldKrb) {
+            this.log("Removing legacy Kerberos federation provider");
+            await this.api("DELETE", `${path}/${oldKrb.id}`);
+        }
+
+        const sv1openid = `sv1openid@${this.kerberos_realm}`;
+
         const desired = {
-            name: "kerberos",
-            providerId: "kerberos",
+            name: "factoryplus",
+            providerId: "factoryplus",
             providerType: "org.keycloak.storage.UserStorageProvider",
             parentId: this.realm,
             config: {
-                priority: ["0"],
-                enabled: ["true"],
-                cachePolicy: ["DEFAULT"],
-                kerberosRealm: [this.kerberos_realm],
-                serverPrincipal: [server_principal],
-                keyTab: ["/etc/keytabs/server"],
-                debug: ["false"],
-                allowPasswordAuthentication: ["true"],
-                editMode: ["READ_ONLY"],
-                updateProfileFirstLogin: ["true"],
+                "auth.url":             [this.auth_internal_url],
+                "auth.timeout.seconds": ["5"],
+                "cache.ttl.seconds":    ["60"],
+                // Path matches the keytab mount in
+                // deploy/templates/openid/openid.yaml. Principal must
+                // exist in the cluster's KDC and have the keytab
+                // available at this path inside the Keycloak pod.
+                "auth.principal":   [sv1openid],
+                "auth.keytab.path": ["/etc/keytabs/client"],
             },
         };
 
         if (existing) {
-            this.log("Updating Kerberos federation provider");
-            await this.api("PUT", `${path}/${existing.id}`, { ...existing, ...desired });
+            this.log("Updating Factory+ federation provider");
+            await this.api("PUT", `${path}/${existing.id}`,
+                { ...existing, ...desired });
             return existing.id;
         }
-        this.log("Creating Kerberos federation provider for %s", server_principal);
+        this.log("Creating Factory+ federation provider -> %s as %s",
+            this.auth_internal_url, sv1openid);
         const created = await this.api("POST", path, desired);
         return created.location?.split("/").pop();
     }
@@ -160,12 +183,6 @@ class OpenIDSetup {
         const res = await this.api("GET",
             `/admin/realms/${encodeURIComponent(this.realm)}/clients?clientId=${encodeURIComponent(clientId)}`);
         return (res.body ?? [])[0];
-    }
-
-    async find_client_role (uuid, name) {
-        const res = await this.api("GET",
-            `/admin/realms/${encodeURIComponent(this.realm)}/clients/${uuid}/roles/${encodeURIComponent(name)}`);
-        return res.status === 404 ? null : res.body;
     }
 
     redirect_root (name) {
@@ -207,79 +224,46 @@ class OpenIDSetup {
         return client;
     }
 
-    async ensure_client_roles (uuid, roles) {
-        for (const role of roles ?? []) {
-            const existing = await this.find_client_role(uuid, role.name);
-            if (existing) continue;
-            this.log("Creating role %s on client %s", role.name, uuid);
-            await this.api("POST",
-                `/admin/realms/${encodeURIComponent(this.realm)}/clients/${uuid}/roles`,
-                { name: role.name, description: role.description ?? "" });
-        }
-    }
-
-    async ensure_role_mapper (uuid, clientId) {
-        const path = `/admin/realms/${encodeURIComponent(this.realm)}/clients/${uuid}/protocol-mappers/models`;
+    /** Stamp the Factory+ identity claims (fp_principal_uuid, fp_groups)
+     *  into every token issued for this OIDC client. Both mappers are
+     *  shipped by the acs-keycloak-spi jar and registered via
+     *  META-INF/services/org.keycloak.protocol.ProtocolMapper.
+     *
+     *  Existing mappers with the same name are not modified; this is
+     *  safe to run on every helm upgrade. */
+    async ensure_factoryplus_claim_mappers (clientUuid) {
+        const path = `/admin/realms/${encodeURIComponent(this.realm)}`
+            + `/clients/${clientUuid}/protocol-mappers/models`;
         const list = await this.api("GET", path);
-        const name = "roles-mapper";
-        if ((list.body ?? []).some(m => m.name === name)) return;
-        this.log("Creating roles protocol mapper on client %s", clientId);
-        await this.api("POST", path, {
-            name,
-            protocol: "openid-connect",
-            protocolMapper: "oidc-usermodel-client-role-mapper",
-            config: {
-                "usermodel.clientRoleMapping.clientId": clientId,
-                "claim.name": "roles",
-                "jsonType.label": "String",
-                "id.token.claim": "true",
-                "access.token.claim": "true",
-                "userinfo.token.claim": "true",
-                "multivalued": "true",
-            },
-        });
-    }
+        const present = new Set((list.body ?? []).map(m => m.name));
 
-    async ensure_admin_user () {
-        const username = `admin@${this.kerberos_realm}`;
-        const path = `/admin/realms/${encodeURIComponent(this.realm)}/users`;
-        const search = await this.api("GET",
-            `${path}?username=${encodeURIComponent(username)}&exact=true`);
-        let user = (search.body ?? [])[0];
-        if (!user) {
-            this.log("Creating admin user %s", username);
+        const mappers = [
+            { name: "fp_principal_uuid",
+              protocolMapper: "factoryplus-principal-uuid-mapper" },
+            { name: "fp_groups",
+              protocolMapper: "factoryplus-groups-mapper" },
+        ];
+        for (const m of mappers) {
+            if (present.has(m.name)) continue;
+            this.log("Creating %s mapper on client %s", m.name, clientUuid);
             await this.api("POST", path, {
-                username,
-                enabled: true,
-                emailVerified: true,
-                email: username,
+                name: m.name,
+                protocol: "openid-connect",
+                protocolMapper: m.protocolMapper,
+                config: {
+                    "id.token.claim":       "true",
+                    "access.token.claim":   "true",
+                    "userinfo.token.claim": "true",
+                    "introspection.token.claim": "true",
+                },
             });
-            const re = await this.api("GET",
-                `${path}?username=${encodeURIComponent(username)}&exact=true`);
-            user = (re.body ?? [])[0];
-            if (!user) throw new Error(`Created admin user but could not find it back`);
         }
-        return user;
-    }
-
-    async assign_admin_client_roles (userId, clientUuid, role_names) {
-        if (!role_names?.length) return;
-        const realm_path = `/admin/realms/${encodeURIComponent(this.realm)}`;
-        const available = await this.api("GET",
-            `${realm_path}/users/${userId}/role-mappings/clients/${clientUuid}/available`);
-        const wanted = (available.body ?? []).filter(r => role_names.includes(r.name));
-        if (!wanted.length) return;
-        await this.api("POST",
-            `${realm_path}/users/${userId}/role-mappings/clients/${clientUuid}`,
-            wanted);
     }
 
     async run () {
         await this.wait_for_ready();
         await this.ensure_realm();
-        await this.ensure_kerberos_federation();
-
-        const admin = await this.ensure_admin_user();
+        await this.ensure_factoryplus_federation();
 
         const clients = this.config.openidClients ?? {};
         for (const [name, spec] of Object.entries(clients)) {
@@ -297,11 +281,12 @@ class OpenIDSetup {
             else {
                 const client = await this.ensure_client(name, spec);
                 clientUuid = client.id;
-                await this.ensure_client_roles(clientUuid, spec.roles);
-                await this.ensure_role_mapper(clientUuid, name);
             }
 
-            await this.assign_admin_client_roles(admin.id, clientUuid, spec.adminRoles);
+            // Every OIDC client gets the F+ identity claims so JWT
+            // consumers (Grafana, acs-i3x, future shims) read F+ data
+            // directly from the token.
+            await this.ensure_factoryplus_claim_mappers(clientUuid);
         }
 
         this.log("OpenID setup complete");

@@ -42,9 +42,10 @@ class FactoryConfigDrivenStoreTest {
     }
 
     @Test
-    void create_returns_fp_auth_backed_store_when_url_configured() {
+    void create_returns_fp_auth_backed_store_when_url_configured_and_cache_disabled() {
         var config = new MultivaluedHashMap<String, String>();
         config.putSingle("auth.url", "http://localhost:9999");
+        config.putSingle("cache.ttl.seconds", "0");
         when(model.getConfig()).thenReturn(config);
 
         FactoryPlusUserStorageProvider provider = factory.create(session, model);
@@ -64,12 +65,51 @@ class FactoryConfigDrivenStoreTest {
     }
 
     @Test
-    void config_properties_advertise_url_and_timeout_to_keycloak_admin_ui() {
+    void config_properties_advertise_url_timeout_and_cache_ttl_to_keycloak_admin_ui() {
         List<ProviderConfigProperty> props = factory.getConfigProperties();
 
         assertThat(props)
             .extracting(ProviderConfigProperty::getName)
-            .as("Admin UI must expose at least the F+ auth URL and the request timeout")
-            .contains("auth.url", "auth.timeout.seconds");
+            .as("Admin UI must expose at least the F+ auth URL, request timeout, "
+                + "and cache TTL")
+            .contains("auth.url", "auth.timeout.seconds", "cache.ttl.seconds");
+    }
+
+    @Test
+    void create_wraps_fp_auth_store_in_cache_when_ttl_positive() {
+        var config = new MultivaluedHashMap<String, String>();
+        config.putSingle("auth.url", "http://localhost:9999");
+        config.putSingle("cache.ttl.seconds", "60");
+        when(model.getConfig()).thenReturn(config);
+
+        FactoryPlusUserStorageProvider provider = factory.create(session, model);
+
+        assertThat(provider.getStore()).isInstanceOf(CachingFactoryPlusUserStore.class);
+    }
+
+    @Test
+    void create_skips_cache_wrap_when_ttl_zero() {
+        var config = new MultivaluedHashMap<String, String>();
+        config.putSingle("auth.url", "http://localhost:9999");
+        config.putSingle("cache.ttl.seconds", "0");
+        when(model.getConfig()).thenReturn(config);
+
+        FactoryPlusUserStorageProvider provider = factory.create(session, model);
+
+        assertThat(provider.getStore())
+            .as("ttl=0 disables caching; expose the raw F+ store")
+            .isInstanceOf(FPAuthBackedUserStore.class);
+    }
+
+    @Test
+    void create_uses_default_60s_cache_when_ttl_unset() {
+        var config = new MultivaluedHashMap<String, String>();
+        config.putSingle("auth.url", "http://localhost:9999");
+        // cache.ttl.seconds NOT set
+        when(model.getConfig()).thenReturn(config);
+
+        FactoryPlusUserStorageProvider provider = factory.create(session, model);
+
+        assertThat(provider.getStore()).isInstanceOf(CachingFactoryPlusUserStore.class);
     }
 }

@@ -1,0 +1,36 @@
+name: acs-keycloak-spi CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'acs-keycloak-spi/**'
+      - 'lib/java-base-pom/**'
+      - 'lib/mvn/**'
+      - '.github/workflows/acs-keycloak-spi.yml'
+  pull_request:
+    paths:
+      - 'acs-keycloak-spi/**'
+      - 'lib/java-base-pom/**'
+      - 'lib/mvn/**'
+      - '.github/workflows/acs-keycloak-spi.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      # Docker is preinstalled on ubuntu-latest with the daemon at the
+      # standard /var/run/docker.sock, so the Testcontainers IT runs.
+      - name: Build, test, and integration-test
+        working-directory: acs-keycloak-spi
+        run: mvn -B verify

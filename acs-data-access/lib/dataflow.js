@@ -72,42 +72,46 @@ export class DataFlow {
     );
   }
 
-  _build_metadata() {
+  _build_apps_configs(app_klass){
     return rxu.rx(
-      this.cdb.watch_members(Constants.App.DatasetMetadata),
+          this.cdb.watch_members(app_klass),
 
-      rx.switchMap((metaAppMembersSet) => {
-        const metaAppUuids = metaAppMembersSet.toArray();
+          rx.switchMap((membersSet) => {
+            const appUuids = membersSet.toArray();
 
-        if (metaAppUuids.length === 0) {
-          return rx.of(IMap());
-        }
-
-        const metadataStreams = metaAppUuids.map(appId =>
-          this.cdb.search_app(appId).pipe(
-            rxu.shareLatest(),
-            rx.map(metadataByDataset => [appId, metadataByDataset])
-          )
-        );
-
-        return rx.combineLatest(metadataStreams).pipe(
-          rx.map(appEntries => {
-            let result = IMap();
-
-            for (const [appId, metadataByDataset] of appEntries) {
-              for (const [datasetId, payload] of metadataByDataset) {
-                const existing = result.get(datasetId, IMap());
-
-                result = result.set(datasetId, existing.set(appId, payload));
-              }
+            if (appUuids.length === 0) {
+              return rx.of(IMap());
             }
 
-            return result;
-          })
+            const dataStreams = appUuids.map(appId =>
+              this.cdb.search_app(appId).pipe(
+                rxu.shareLatest(),
+                rx.map(config => [appId, config])
+              )
+            );
+
+            return rx.combineLatest(dataStreams).pipe(
+              rx.map(appEntries => {
+                let result = IMap();
+
+                for (const [appId, config] of appEntries) {
+                  for (const [datasetId, payload] of config) {
+                    const existing = result.get(datasetId, IMap());
+
+                    result = result.set(datasetId, existing.set(appId, payload));
+                  }
+                }
+
+                return result;
+              })
+            );
+          }),
+          rxu.shareLatest()
         );
-      }),
-      rxu.shareLatest()
-    );
+  }
+
+  _build_metadata() {
+    return this._build_apps_configs(Constants.App.DatasetMetadata);
   }
   
   
@@ -119,6 +123,7 @@ export class DataFlow {
   }
 
 
+
   /*
     1. search structure apps for all dataset configs
     2. invalid if exists in more than one structural app
@@ -127,61 +132,66 @@ export class DataFlow {
   */
   _build_datasets() {
     return rxu.rx(
-      rx.combineLatest([
-        this.cdb.search_app(Constants.App.SparkplugSrc),
-        this.cdb.search_app(Constants.App.SessionLimits),
-        this.cdb.search_app(Constants.App.UnionComponents)
-      ]),
+      this._build_apps_configs(Constants.App.DatasetDefinition),
 
-      rx.map(([sprkDevices, sessions, unions]) => {
-        const grouped = IMap({
-          [Constants.App.SessionLimits]: sessions,
-          [Constants.App.UnionComponents]: unions,
-          [Constants.App.SparkplugSrc]: sprkDevices
-        });
+      rx.map((groupedConfigs) => {
 
         // ----------------------------
-        // 1. Flatten + group by datasetId
+        // 1. Normalise duplicates
         // ----------------------------
-        let map = grouped.entrySeq().reduce((acc, [structure, datasets]) => {
-          return (datasets || IMap()).entrySeq().reduce((innerAcc, [datasetId, config]) => {
-            const existing = innerAcc.get(datasetId, []);
-            return innerAcc.set(datasetId, [
-              ...existing,
-              { structure, config }
-            ]);
-          }, acc);
-        }, IMap());
+        //
+        // Convert:
+        //
+        // datasetId => IMap({
+        //   appId => payload
+        // })
+        //
+        // into:
+        //
+        // datasetId => {
+        //   structure,
+        //   config
+        // }
+        //
+        // or INVALID if multiple definitions exist
+        //
 
-        // ----------------------------
-        // 2. Normalise duplicates
-        // ----------------------------
-        map = map.map((definitions) => {
-          if (definitions.length === 1) {
-            return definitions[0];
+        let map = groupedConfigs.map((definitions) => {
+          const entries = definitions.entrySeq().toArray();
+
+          if (entries.length !== 1) {
+            return {
+              structure: Constants.Special.InvalidDataset,
+              config: null
+            };
           }
 
+          const [structure, config] = entries[0];
+
           return {
-            structure: Constants.Special.InvalidDataset,
-            config: null
+            structure,
+            config
           };
         });
 
         // ----------------------------
-        // 3. Recursive resolution (cached)
+        // 2. Recursive resolution (cached)
         // ----------------------------
+
         const cache = new Map();
 
         const resolve = (datasetId, visited = new Set()) => {
-          if (cache.has(datasetId)) return cache.get(datasetId);
+          if (cache.has(datasetId))
+            return cache.get(datasetId);
 
           if (visited.has(datasetId)) {
             const result = {
               validity: DatasetValidity.INVALID,
               from: null,
               to: null,
-              error: 'Cycle detected'
+              error: "Cycle detected"
             };
+
             cache.set(datasetId, result);
             return result;
           }
@@ -190,12 +200,15 @@ export class DataFlow {
 
           const def = map.get(datasetId);
 
-          if (!def || def.structure === Constants.Special.InvalidDataset) {
+          if (!def ||
+              def.structure === Constants.Special.InvalidDataset) {
+
             const result = {
               validity: DatasetValidity.INVALID,
               from: null,
               to: null
             };
+
             cache.set(datasetId, result);
             return result;
           }
@@ -205,6 +218,7 @@ export class DataFlow {
           // ------------------------
           // SESSION
           // ------------------------
+
           if (structure === Constants.App.SessionLimits) {
             const child = resolve(config.source, new Set(visited));
 
@@ -213,8 +227,13 @@ export class DataFlow {
               return child;
             }
 
-            const from = config.from ? new Date(config.from) : null;
-            const to = config.to ? new Date(config.to) : null;
+            const from = config.from
+              ? new Date(config.from)
+              : null;
+
+            const to = config.to
+              ? new Date(config.to)
+              : null;
 
             const result = {
               validity: DatasetValidity.VALID,
@@ -229,6 +248,7 @@ export class DataFlow {
           // ------------------------
           // SPARKPLUG
           // ------------------------
+
           if (structure === Constants.App.SparkplugSrc) {
             const result = {
               validity: DatasetValidity.VALID,
@@ -243,6 +263,7 @@ export class DataFlow {
           // ------------------------
           // UNION
           // ------------------------
+
           if (structure === Constants.App.UnionComponents) {
             const children = config.map(id =>
               resolve(id, new Set(visited))
@@ -258,6 +279,7 @@ export class DataFlow {
                 from: null,
                 to: null
               };
+
               cache.set(datasetId, result);
               return result;
             }
@@ -287,6 +309,7 @@ export class DataFlow {
           // ------------------------
           // Fallback
           // ------------------------
+
           const result = {
             validity: DatasetValidity.INVALID,
             from: null,
@@ -298,16 +321,13 @@ export class DataFlow {
         };
 
         // ----------------------------
-        // 4. Resolve all datasets
+        // 3. Resolve all datasets
         // ----------------------------
-        return map.map((def, datasetId) => {
-          const resolved = resolve(datasetId);
 
-          return {
-            ...def,
-            ...resolved
-          };
-        });
+        return map.map((def, datasetId) => ({
+          ...def,
+          ...resolve(datasetId)
+        }));
       }),
 
       rxu.shareLatest()

@@ -67,12 +67,19 @@
         <!-- F+ service client. Pinned to 0.1-SNAPSHOT explicitly because
              base-pom's dependencyManagement references ${acs.version}
              (= 0.0.0-intree) which doesn't match the in-tree publication
-             at lib/mvn. Re-publishing the lib under the parent's version
-             scheme is a separate cleanup. -->
+             at lib/mvn. Phase 4 actually consumes this dep for
+             FPGssClientKeytab; Phase 2's Wiremock-driven implementation
+             uses bare java.net.http instead. -->
         <dependency>
             <groupId>io.github.amrc-factoryplus</groupId>
             <artifactId>java-service-client</artifactId>
             <version>0.1-SNAPSHOT</version>
+        </dependency>
+
+        <!-- JSON parsing (version managed by base-pom). -->
+        <dependency>
+            <groupId>org.json</groupId>
+            <artifactId>json</artifactId>
         </dependency>
 
         <!-- Test deps -->
@@ -103,6 +110,18 @@
             <groupId>org.testcontainers</groupId>
             <artifactId>junit-jupiter</artifactId>
             <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <!-- Wiremock provides an in-process HTTP server we can stub
+                 to simulate the Factory+ auth API. Used here for Phase 2
+                 unit tests (the store calls real HTTP against localhost
+                 Wiremock); reused in Phase 5 for the integration test
+                 that runs Wiremock as a sibling container alongside
+                 Keycloak. -->
+            <groupId>org.wiremock</groupId>
+            <artifactId>wiremock-standalone</artifactId>
+            <version>3.13.1</version>
             <scope>test</scope>
         </dependency>
         <dependency>

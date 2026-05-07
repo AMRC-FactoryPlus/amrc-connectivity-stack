@@ -70,10 +70,22 @@ public class FPAuthBackedUserStore implements FactoryPlusUserStore {
     private final URI baseUrl;
     private final Duration timeout;
     private final HttpClient http;
+    private final KerberosAuthenticator authenticator;
 
+    /** No-auth constructor; useful for unauthenticated test setups
+     *  (Wiremock fixtures, etc). */
     public FPAuthBackedUserStore(URI baseUrl, Duration timeout) {
+        this(baseUrl, timeout, null);
+    }
+
+    /** Production constructor: when {@code authenticator} is non-null
+     *  every request gets {@code Authorization: Negotiate <token>}
+     *  derived from it. */
+    public FPAuthBackedUserStore(URI baseUrl, Duration timeout,
+                                 KerberosAuthenticator authenticator) {
         this.baseUrl = baseUrl;
         this.timeout = timeout;
+        this.authenticator = authenticator;
         this.http = HttpClient.newBuilder()
             .connectTimeout(timeout)
             .build();
@@ -152,11 +164,14 @@ public class FPAuthBackedUserStore implements FactoryPlusUserStore {
     }
 
     private HttpResponse<String> sendGet(URI uri) {
-        HttpRequest req = HttpRequest.newBuilder(uri)
+        HttpRequest.Builder builder = HttpRequest.newBuilder(uri)
             .timeout(timeout)
             .header("Accept", "application/json")
-            .GET()
-            .build();
+            .GET();
+        if (authenticator != null) {
+            builder.header("Authorization", "Negotiate " + authenticator.spnegoTokenFor(uri));
+        }
+        HttpRequest req = builder.build();
         try {
             return http.send(req, HttpResponse.BodyHandlers.ofString());
         }

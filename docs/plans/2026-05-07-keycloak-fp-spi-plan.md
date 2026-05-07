@@ -4,9 +4,9 @@
 
 **Goal:** Replace Keycloak's Kerberos user federation with a custom Factory+ User Storage SPI plugin so that F+ becomes the single source of truth for users, groups, and (via JWT claims) authorisation data consumed by Grafana, acs-i3x, and future OIDC integrations.
 
-**Architecture:** A Java Maven module `acs-keycloak-spi/` produces a Keycloak provider jar implementing `UserStorageProvider`, `UserLookupProvider`, `UserQueryProvider`, `GroupLookupProvider`, and `CredentialInputValidator`. The SPI calls a small read-only HTTP surface on `acs-auth` (extended in this plan) to fetch principals and groups, delegates credential validation to the existing Kerberos infrastructure, and stamps `fp_principal_uuid` + `fp_groups` claims into JWTs via custom protocol mappers. A custom Keycloak Docker image bakes the jar in. Helm + service-setup are updated to install the `factoryplus` federation provider in place of `kerberos`.
+**Architecture:** A Java Maven module `acs-keycloak-spi/` produces a Keycloak provider jar implementing `UserStorageProvider`, `UserLookupProvider`, `UserQueryProvider`, `GroupLookupProvider`, and `CredentialInputValidator`. The SPI calls `acs-auth` via the existing `lib/java-service-client` library (`FPAuth`, `FPGssClientKeytab`) to fetch principals and groups, delegates credential validation to the existing Kerberos infrastructure, and stamps `fp_principal_uuid` + `fp_groups` claims into JWTs via custom protocol mappers. A custom Keycloak Docker image bakes the jar in. Helm + service-setup are updated to install the `factoryplus` federation provider in place of `kerberos`. The module inherits from `lib/java-base-pom` so it shares dependency versions with the rest of the AMRC Java stack.
 
-**Tech Stack:** Java 17 (Keycloak 26 requires it), Maven, Keycloak 26.1.1 SPI, JUnit 5, Mockito, AssertJ, Testcontainers (Keycloak module), Wiremock for fake F+ auth in tests, GitHub Actions for CI. Existing repo uses Java 11 in `hivemq-krb/`; this is a clean module with its own POM.
+**Tech Stack:** Java 17 (Keycloak 26 requires it), Maven (multi-module: inherits from `lib/java-base-pom`, depends on `lib/java-service-client` from Phase 2 onward), Keycloak 26.1.1 SPI, JUnit 5, Mockito, AssertJ, Testcontainers (Keycloak module), Wiremock for fake F+ auth in tests, GitHub Actions for CI. Existing repo uses Java 11 in `hivemq-krb/`; this module uses 17 to match Keycloak's requirement and the base-pom default.
 
 **Pedagogy:** The author of this plan has zero Java experience. Every Java concept introduced has a `📘` block explaining it in plain language with a comparison to JS/TS where useful. Skip these when re-reading; they're for first contact only.
 
@@ -572,10 +572,10 @@ After Phase 1 lands, re-plan Phase 2 in detail with the `writing-plans` skill ag
 These get re-planned in full detail when their phase begins. Headlines are placeholders to keep the architecture honest.
 
 ### Phase 2 — Wiremock-backed F+ auth client
-- Define a small Java interface `FactoryPlusAuthClient` (find by uuid/name/email, list groups for principal, list members of group)
-- Implement using Java 17's `HttpClient`
-- Drive lookup from the SPI through this interface (replacing the hardcoded fixed user)
-- Wiremock stubs the F+ HTTP API for tests
+- Add `lib/java-service-client` as a compile dep in `acs-keycloak-spi/pom.xml` (currently the in-tree jar is `0.1-SNAPSHOT`, predating the `base-pom` inheritance refactor; resolve by either pinning that version, rebuilding the lib, or upstreaming a parent-POM fix)
+- Wrap `FPAuth` in a small adapter interface `FactoryPlusUserStore` (find by uuid/name/email, list groups for principal, list members of group) so we can mock it without touching the lib
+- Drive lookup from the SPI through the adapter (replacing the hardcoded fixed user)
+- Wiremock stubs the F+ HTTP responses; FPAuth fronts them
 - Unit + integration coverage of the JSON shapes we expect
 
 ### Phase 3 — F+ auth read API extensions
@@ -586,7 +586,7 @@ These get re-planned in full detail when their phase begins. Headlines are place
 
 ### Phase 4 — Real F+ integration
 - Stand up a kind cluster with current dn/oAuth branch
-- SPI authenticates to acs-auth using sv1openid keytab via Kerberos (acs-auth already accepts SPNEGO)
+- SPI authenticates to acs-auth using `FPGssClientKeytab` with the existing `sv1openid` keytab (acs-auth already accepts SPNEGO)
 - Replace Wiremock in IT with real acs-auth (testcontainers + the real images, or a docker-compose helper)
 - Verify end-to-end against real F+ data
 
@@ -607,8 +607,9 @@ These get re-planned in full detail when their phase begins. Headlines are place
 - IT: provision client with mappers, call /token, decode JWT, assert claims present
 - Document claim names as the public API
 
-### Phase 8 — Custom Keycloak image
-- New directory: `acs-keycloak/Dockerfile` — `FROM quay.io/keycloak/keycloak:26.1.1`, COPY jar into `/opt/keycloak/providers/`
+### Phase 8 — Custom Keycloak image + shading
+- Add `maven-shade-plugin` to `acs-keycloak-spi/pom.xml` to produce a single fat jar with `java-service-client` + transitives bundled in. Relocate packages (Apache HTTP, RxJava, Vavr) under `uk.co.amrc.app.factoryplus.shaded.*` to avoid Keycloak classloader collisions.
+- New directory: `acs-keycloak/Dockerfile` — `FROM quay.io/keycloak/keycloak:26.1.1`, COPY shaded jar into `/opt/keycloak/providers/`
 - Build via existing repo image pipeline
 - Pin version in `deploy/values.yaml` so `acs-keycloak` replaces upstream `keycloak/keycloak`
 

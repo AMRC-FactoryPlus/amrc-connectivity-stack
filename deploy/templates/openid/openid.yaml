@@ -83,8 +83,7 @@ spec:
 
       containers:
         - name: keycloak
-          image: "{{ .Values.openid.image.registry }}/{{ .Values.openid.image.repository }}:{{ .Values.openid.image.tag }}"
-          imagePullPolicy: {{ .Values.openid.image.pullPolicy }}
+{{ include "amrc-connectivity-stack.image" (list . .Values.openid) | indent 10 }}
           args: [ "start", "--optimized=false" ]
           env:
             # Database — GSSAPI via JAAS (see jaas-configmap.yaml)

@@ -394,97 +394,34 @@ git commit -m "Register SPI factory via META-INF/services"
 
 ---
 
-### Task 1.4: Hardcoded "fixed user" lookup with unit tests
+### Task 1.4: FactoryPlusUserStore interface + UserModel adapter, mock-driven tests
 
-Now we make the provider actually return a user. Just one — hardcoded — to prove the plumbing.
+**Engineering choice (2026-05-07):** the original plan had the provider return a hardcoded "fixed.user". Replaced with a real seam: `FactoryPlusUserStore` interface, provider delegates lookups to it, Mockito drives the unit tests. Phase 2's real implementation slots in behind the same interface. No throwaway code is ever committed.
 
-**Files:**
-- Modify: `acs-keycloak-spi/src/main/java/uk/co/amrc/app/factoryplus/keycloak/FactoryPlusUserStorageProvider.java`
-- Create: `acs-keycloak-spi/src/test/java/uk/co/amrc/app/factoryplus/keycloak/FactoryPlusUserStorageProviderTest.java`
+**Files (all new):**
+- `FactoryPlusUserStore.java` — interface: `Optional<FactoryPlusUser> findByUuid|Username|Email(String)`
+- `FactoryPlusUser.java` — DTO record: `uuid`, `username`, `email`
+- `FactoryPlusUserAdapter.java` — wraps a `FactoryPlusUser` as Keycloak's `UserModel` (extends `AbstractUserAdapter` from `keycloak-server-spi-private` to avoid implementing 30+ no-op methods)
+- `NullFactoryPlusUserStore.java` — default impl returning `Optional.empty()` for everything; used by the factory until Phase 2 wires in the real store
+- Modify `FactoryPlusUserStorageProvider.java` to take a `FactoryPlusUserStore` and implement `UserLookupProvider`
+- Modify `FactoryPlusUserStorageProviderFactory.java` to construct the null store as the default
+- `FactoryPlusUserStorageProviderTest.java` — Mockito-driven: stubs the store, asserts the provider delegates correctly and adapter fields are right
+- `FactoryPlusUserAdapterTest.java` — adapter exposes username/email/id from the DTO
 
-**Step 1: Write failing tests for `getUserByUsername`, `getUserById`, `getUserByEmail`**
-
-The provider needs to implement `UserLookupProvider`. Tests assert that asking for our hardcoded user returns a non-null `UserModel` with the expected attributes.
-
-```java
-package uk.co.amrc.app.factoryplus.keycloak;
-
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.keycloak.component.ComponentModel;
-import org.keycloak.models.KeycloakSession;
-import org.keycloak.models.RealmModel;
-import org.keycloak.models.UserModel;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-
-import static org.assertj.core.api.Assertions.assertThat;
-
-@ExtendWith(MockitoExtension.class)
-class FactoryPlusUserStorageProviderTest {
-
-    @Mock KeycloakSession session;
-    @Mock ComponentModel model;
-    @Mock RealmModel realm;
-
-    FactoryPlusUserStorageProvider provider;
-
-    @BeforeEach
-    void setUp() {
-        provider = new FactoryPlusUserStorageProvider(session, model);
-    }
-
-    @Test
-    void looks_up_fixed_user_by_username() {
-        UserModel user = provider.getUserByUsername(realm, "fixed.user");
-        assertThat(user).isNotNull();
-        assertThat(user.getUsername()).isEqualTo("fixed.user");
-        assertThat(user.getEmail()).isEqualTo("fixed.user@example.invalid");
-    }
-
-    @Test
-    void returns_null_for_unknown_username() {
-        UserModel user = provider.getUserByUsername(realm, "nope");
-        assertThat(user).isNull();
-    }
-
-    @Test
-    void looks_up_fixed_user_by_email() {
-        UserModel user = provider.getUserByEmail(realm, "fixed.user@example.invalid");
-        assertThat(user).isNotNull();
-        assertThat(user.getUsername()).isEqualTo("fixed.user");
-    }
-}
-```
+**Approach:**
+1. Define the interface and DTO first (no impl). Compiles but does nothing.
+2. Build the adapter against `AbstractUserAdapter`. Test it in isolation.
+3. Wire the provider to delegate to the store. Tests use a Mockito-stubbed store.
+4. Provide `NullFactoryPlusUserStore` as the production default until Phase 2.
 
 📘 **Mockito** is JS's `vi.fn()` / `jest.fn()` for Java. `@Mock` produces a stand-in for the interface so we can construct our provider without real Keycloak. `MockitoExtension` is the JUnit 5 wiring that scans for `@Mock` fields.
 
-**Step 2: Run, expect compile errors / test failures**
-
-`getUserByUsername` etc. don't exist on the provider yet.
-
-**Step 3: Implement `UserLookupProvider`**
-
-Implement a private inner `FixedUserAdapter implements UserModel` returning the hardcoded values. Mark the provider as `implements UserStorageProvider, UserLookupProvider`. Implement the three lookups.
-
-(Full code shown in Task 1.4 expansion below — kept separate to keep this section readable.)
-
-**Step 4: Run tests; iterate until green**
-
-`mvn -B test` → all green.
-
-**Step 5: Confirm and commit**
-
-```bash
-git add acs-keycloak-spi/
-git commit -m "Hardcoded fixed-user lookup with unit tests"
-```
+📘 **`AbstractUserAdapter`** is Keycloak's helper base class that provides reasonable defaults for every method on `UserModel` (and there are dozens — credentials, attributes, role mappings, group mappings, federation link, etc.). We override only `getUsername`, `getEmail`, and the storage id; the rest stays sensible.
 
 **Walkthrough block:**
-- What we did: implemented the three lookup methods Keycloak calls when a user logs in. Returned a single hardcoded user. Tests prove name/email lookup works and unknown names return null (Keycloak interprets null as "not my user, ask the next federation").
-- Java concepts: inner classes, interface implementation, Mockito, AssertJ.
-- How to verify: `mvn -B test` → 5 passing tests. Read `FactoryPlusUserStorageProvider.java` end-to-end; the FixedUserAdapter is the model for every per-user object we'll return later.
+- What we did: introduced the seam between "Keycloak SPI surface" and "where users come from" via the `FactoryPlusUserStore` interface. Provider holds one and delegates. Adapter wraps a small DTO into the full `UserModel` Keycloak expects. Production default is a null store; Phase 2 swaps in the real one.
+- Java concepts: interfaces with `Optional<T>` return types, `record` types (Java 14+ DTO syntax), `AbstractUserAdapter` from Keycloak, Mockito (`@Mock`, `when().thenReturn()`).
+- How to verify: `mvn -B test` → all green; new tests cover provider delegation, adapter fields, and "store returns empty → provider returns null". Inspect `FactoryPlusUserStore.java` — that interface is the contract Phase 2 has to satisfy.
 
 ---
 
@@ -571,12 +508,44 @@ After Phase 1 lands, re-plan Phase 2 in detail with the `writing-plans` skill ag
 
 These get re-planned in full detail when their phase begins. Headlines are placeholders to keep the architecture honest.
 
-### Phase 2 — Wiremock-backed F+ auth client
-- Add `lib/java-service-client` as a compile dep in `acs-keycloak-spi/pom.xml` (currently the in-tree jar is `0.1-SNAPSHOT`, predating the `base-pom` inheritance refactor; resolve by either pinning that version, rebuilding the lib, or upstreaming a parent-POM fix)
-- Wrap `FPAuth` in a small adapter interface `FactoryPlusUserStore` (find by uuid/name/email, list groups for principal, list members of group) so we can mock it without touching the lib
-- Drive lookup from the SPI through the adapter (replacing the hardcoded fixed user)
-- Wiremock stubs the F+ HTTP responses; FPAuth fronts them
-- Unit + integration coverage of the JSON shapes we expect
+### Phase 2 — Wiremock-backed F+ auth client (detailed 2026-05-07)
+
+The interface seam (`FactoryPlusUserStore`) already exists from Phase 1.
+Phase 2 ships the first real implementation behind it.
+
+**Constraint discovered while planning:** `FPAuth` in `lib/java-service-client`
+is incomplete - it only exposes ACL/permission-checking, not user
+lookup. Its own javadoc says "Unmapped endpoints can be accessed
+through the generic http() interface of FPServiceClient." So Phase 2
+uses `FPServiceClient.http().request(SERVICE, method).withPath(...).fetch()`
+directly. Phase 4 (real Kerberos integration) keeps this approach;
+extending FPAuth upstream is a separate optional cleanup.
+
+**Tasks:**
+
+- **2.1** Add `lib/java-service-client` dep pinned to `0.1-SNAPSHOT`
+  (overrides the base-pom's `${acs.version}=0.0.0-intree` which is
+  stale relative to the in-tree publication). Verify compile + full
+  test suite still green.
+- **2.2** Document the F+ auth HTTP contract Wiremock will simulate.
+  Lookup by UUID and by Kerberos identity uses existing acs-auth
+  endpoints (`GET /v2/principal/:uuid`, `GET /v2/identity/:kind/:name`).
+  Lookup by username and email needs new endpoints, defined here as
+  spec for Phase 3.
+- **2.3** Implement `FPAuthBackedUserStore implements FactoryPlusUserStore`
+  using `FPServiceClient.http()`. Wiremock-driven unit tests stub
+  each endpoint shape; verify the store parses responses, handles
+  404 (returns Optional.empty), and surfaces 5xx as exceptions.
+- **2.4** Make factory configuration-driven. Add ComponentModel
+  properties (`auth.url`, `auth.principal`, `auth.keytab.path`,
+  `auth.timeout.seconds`). If `auth.url` is set, construct
+  `FPServiceClient` + `FPAuthBackedUserStore`; otherwise keep
+  `NullFactoryPlusUserStore.INSTANCE`.
+- **2.5** Extend the IT: run Wiremock alongside Keycloak (sibling
+  container), configure the federation provider to point at Wiremock
+  URL, assert end-to-end user search through Keycloak admin REST
+  returns the stubbed F+ users.
+- **2.6** Acceptance + re-plan Phase 3 in detail.
 
 ### Phase 3 — F+ auth read API extensions
 - Inventory what Keycloak's `UserQueryProvider` actually needs (paginated user search by prefix, count by criterion, filter by group)

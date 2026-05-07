@@ -432,24 +432,10 @@ export class APIv1 {
   } 
   
 
-  async _update_dataset_config(principal, structure, config, objectUuid){
-    if(!structure) return fail(this.log, 422, `Structure not provided.`);
-    if(!valid_uuid(structure)) return fail(this.log, 422, `Structure uuid ${structure} is invalid.`);
-    if(!config) return fail(this.log, 422, `Config not provided.`);
-    
-    const ok = await this.auth.check_acl(
-      principal,
-      Constants.Perm.CreateDataset,
-      structure,
-      true
-    );
-
-    if (!ok) return fail(this.log, 403, `You don't have Create permission for structure ${structure}`);
-
-    // Check the principal has appropriate permission for all dataset sources in config. 
+  async _update_dataset_config(principal, structure, config, objectUuid){ 
     const ok2 = await this._check_second_level_permission(principal, structure, config);
     
-    if(!ok2) return fail(this.log, 403, `You don't have permission for dataset source(s) ${dataset_uuid}`);
+    if(!ok2) return fail(this.log, 403, `You don't have permission for source(s) in config.`);
 
     // Create new Dataset Object
     if(!objectUuid){
@@ -473,7 +459,7 @@ export class APIv1 {
     }
     else if (structure === Constants.App.UnionComponents) {
       for (let source of config) {
-        this._add_cdb_subclass(dataset_uuid, source);
+        await this._add_cdb_subclass(dataset_uuid, source);
       }
     }
   }
@@ -486,29 +472,22 @@ export class APIv1 {
       );
   }
 
-  async _unlink_subclasses(structure, dataset_uuid, curr_config, new_config){
-    
-    if(structure === Constants.App.SessionLimits){
-      if(curr_config.source != new_config.source){
+  async _unlink_subclasses(dataset_uuid, structure, config){
+    if (structure === Constants.App.SparkplugSrc) return;
+    else if(structure === Constants.App.SessionLimits){
         // remove the dataset from subclasses of its source dataset
-        await this.cdb.class_remove_subclass(curr_config.source, dataset_uuid);
-        this.log(`Removed ${dataset_uuid} from ${curr_config.source} subclasses.`)
-      }
+        await this.cdb.class_remove_subclass(config.source, dataset_uuid);
+        this.log(`Removed ${dataset_uuid} from ${config.source} subclasses.`)
+      
     }else if(structure === Constants.App.UnionComponents){
-      if(curr_config.length > 0){
-        // if new_config does not include sources from curr_config -> remove subclass rel.
-        const sources_to_remove = curr_config.filter(x => !new_config.includes(x));
+      if(config.length <= 0) return;
 
-        for (const source_uuid of sources_to_remove){
-          await this.cdb.class_remove_subclass(dataset_uuid, source_uuid);
-          this.log(`Removed ${dataset_uuid} from ${source_uuid} subclasses.`);
-        }
+      for (const source_uuid of config){
+        await this.cdb.class_remove_subclass(dataset_uuid, source_uuid);
+        this.log(`Removed ${dataset_uuid} from ${source_uuid} subclasses.`);
       }
-
-    }else if (structure === Constants.App.SparkplugSrc){
-      return;
     }else{
-      return fail(this.log, 422, `Unknown structure type ${structure}`);
+      return fail(this.log, 404, `Unknown structure type ${structure}`);
     }
   }
 
@@ -520,10 +499,26 @@ export class APIv1 {
    * @returns new dataset's UUID - JSON string 
    */
   async structure_create(req, res){
+    const {structure, config} = req.body;
+
+    if(!structure) return fail(this.log, 422, `Structure not provided in request body.`);
+    if(!valid_uuid(structure)) return fail(this.log, 422, `Structure uuid ${structure} is invalid.`);
+
+    if(!config) return fail(this.log, 422, `Config not provided in request body.`)
+
+    const ok = await this.auth.check_acl(
+      req.auth,
+      Constants.Perm.CreateDataset,
+      structure,
+      true
+    );
+
+    if (!ok) return fail(this.log, 403, `You don't have Create permission for structure ${structure}`);
+
     const objectUuid = await this._update_dataset_config(
       req.auth,
-      req.body.structure,
-      req.body.config,
+      structure,
+      config,
       null
     );
 
@@ -536,14 +531,20 @@ export class APIv1 {
    * @param {*} req.body must be object (structure, config) and UUID (optional)
    * @param {*} res 
    */
-
   /*
-    If dataset valid: 
-      - 
+    For VALID dataset:
+    Don't let changing the structure type only config. So, if request.body.structure != dataset.structure then return 409. 
+    Remove all subclass relationships between dataset and its current config sources
+    Add subclass relationships between datasets and its new config sources
+
+    For INVALID dataset:
+    Remove config entries for this dataset from all structure apps and ignore 404
+    Don't remove any existing subclass relationships -> Completely ignore existing subclass relationships for Invalid ones.
+    Add subclass relationship between dataset and its new config source
   */
+
   async structure_update(req, res){
     const dataset_uuid = req.params.uuid;
-
     if(!valid_uuid(dataset_uuid)) return fail(this.log, 422, `Invalid uuid ${dataset_uuid}`);
 
     const structure = req.body.structure;
@@ -552,52 +553,59 @@ export class APIv1 {
     const new_config = req.body.config;
     if(!new_config) return fail(this.log, 422, `Config not provided`);
 
-    // get current config
+    const ok = await this.auth.check_acl(
+      req.auth,
+      Constants.Perm.EditDataset,
+      dataset_uuid,
+      true
+    );
+
+    if (!ok) return fail(this.log, 403, `You don't have Edit permission for dataset ${dataset_uuid}`);
+
     const datasets = await rx.firstValueFrom(this.data.get_dataset_definitions(DatasetValidity.ALL));
     const dataset = datasets.get(dataset_uuid);
+    if(!dataset) return fail(this.log, 404, `Dataset ${dataset_uuid} not found.`);
 
+    const current_structure = dataset.structure;
+    const current_config = dataset.config; 
+    const is_valid = (dataset.validity == DatasetValidity.VALID);
 
-    // const { config } = dataset;
-    // if(!config) return fail(this.log, 404, `Config not found for ${dataset_uuid}`);
+    // for VALID dataset
+    if(is_valid){
+      if(current_structure != structure) return fail(this.log, 409, `Changing structure type is not allowed (current: ${current_structure}, new: ${structure})`); 
 
-    
-    if(!curr_config_for_structure){
-      this.log(`Current config for structure does not exist.`);
+      // remove all subclass relationships with current config sources
+      await this._unlink_subclasses(
+        dataset_uuid,
+        current_structure, 
+        current_config
+      );
     }
+    // For INVALID dataset
+    else{
+      // delete configs for all other structures
+      const all_structure_apps = Object.values(Constants.App);
 
-    // update subclass links if config def for this structure already exists and being updated.
-    if(curr_config_for_structure){
-      await this._unlink_subclasses(structure, dataset_uuid,curr_config_for_structure, new_config);
-    }
+      for(const s of all_structure_apps){
+        try{
+          await this.cdb.delete_config(s, dataset_uuid);
+        }catch(e){
+          this.log(e);
+        }
+      }
+    } 
 
     const objectUuid = await this._update_dataset_config(
       req.auth,
       structure,
       new_config,
-      dataset_uuid
+      dataset_uuid,
     );
 
-    if(!objectUuid) return fail(this.log, 422, `Failed to update dataset ${dataset_uuid}`);
-
-    // remove definitions from other structure apps if the dataset was invalid
-    const invalid_defs = await rx.firstValueFrom(
-
-      this.data.get_dataset_definitions(DatasetValidity.INVALID).pipe(
-        rx.map(datasets => datasets.get(dataset_uuid) ?? []),
-        rx.map(defs => defs.filter(d => d.structure !== req.body.structure)),
-        rx.map(filtered => filtered.length ? filtered : undefined)
-      )
-      
-    );
-
-    if (invalid_defs?.length) {
-      this.log(`Deleting invalid defs from ConfigDB`);
-
-      for (const i_def of invalid_defs) {
-        this.cdb.delete_config(i_def.structure, objectUuid);
-      }
+    if(!objectUuid){
+      return fail(this.log, 500, `Failed to update dataset ${dataset_uuid}`);
     }
-
+ 
     return res.status(200).json(objectUuid);
   }
 }

@@ -36,6 +36,12 @@ public class FactoryPlusUserStorageProvider
         this.store = store;
     }
 
+    /** Test-only accessor; lets factory tests assert which store
+     *  implementation got wired in based on configuration. */
+    FactoryPlusUserStore getStore() {
+        return store;
+    }
+
     @Override
     public UserModel getUserById(RealmModel realm, String id) {
         // Keycloak passes a federated storage id "f:<modelId>:<externalId>".

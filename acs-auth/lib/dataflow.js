@@ -290,4 +290,47 @@ export class DataFlow {
     find_kerberos (upn) {
         return rx.firstValueFrom(this.track_kerberos(upn));
     }
+
+    /** Backend for the v2 `principal/:uuid/groups` endpoint.
+     *
+     * Returns the UUIDs of all principal-groups (subclasses of
+     * Class.Principal) that contain the given principal as a member,
+     * recursively. This is the same set the auth service uses to expand
+     * ACEs in `_acl_for`; exposing it lets external services (the
+     * Keycloak SPI is the first consumer) compute fp_groups claims
+     * directly without re-implementing group expansion.
+     *
+     * Permission: ReadKrb wildcard, the blanket "read any identity"
+     * permission. Group membership is treated as identity-level data.
+     *
+     * @param upn The requesting principal UPN
+     * @param principal The target principal UUID whose groups we want
+     */
+    track_groups (upn, principal) {
+        if (!valid_uuid(principal)) return Optional.of();
+
+        const filtered = rxx.rx(
+            this.groups,
+            rx.map(gs => gs.princ.has(principal)
+                ? gs.princ_grp
+                    .filter(ms => ms.has(principal))
+                    .keySeq()
+                    .toArray()
+                : null));
+
+        const permitted = this.permitted(upn, Perm.ReadKrb, false);
+
+        return Optional.of(rxx.rx(
+            rx.combineLatest(filtered, permitted),
+            rx.map(([groups, perm]) =>
+                !perm   ? Response.of(403)
+                : !groups ? Response.of(410)
+                :         Response.ok(groups))));
+    }
+
+    find_groups (upn, principal) {
+        return this.track_groups(upn, principal)
+            .map(rx.firstValueFrom)
+            .orElse(Response.of(410));
+    }
 }

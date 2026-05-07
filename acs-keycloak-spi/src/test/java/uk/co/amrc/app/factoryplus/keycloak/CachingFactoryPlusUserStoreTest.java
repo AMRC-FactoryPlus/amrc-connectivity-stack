@@ -16,6 +16,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -95,6 +96,32 @@ class CachingFactoryPlusUserStoreTest {
     }
 
     @Test
+    void group_lookups_are_cached_too() {
+        counting.respondWithGroups(Set.of("g1", "g2"));
+
+        cache.findGroupsForPrincipal("alice-uuid");
+        cache.findGroupsForPrincipal("alice-uuid");
+
+        assertThat(counting.groupCalls)
+            .as("Second group lookup within TTL should hit cache")
+            .isEqualTo(1);
+    }
+
+    @Test
+    void group_cache_is_separate_from_user_caches() {
+        counting.respondWith(Optional.of(ALICE));
+        counting.respondWithGroups(Set.of("g1"));
+
+        cache.findByUuid("alice-uuid");
+        cache.findGroupsForPrincipal("alice-uuid");
+
+        assertThat(counting.uuidCalls).isEqualTo(1);
+        assertThat(counting.groupCalls)
+            .as("Same key in user-cache must not satisfy group cache")
+            .isEqualTo(1);
+    }
+
+    @Test
     void username_and_email_caches_behave_like_uuid() {
         counting.respondWith(Optional.of(ALICE));
 
@@ -133,12 +160,18 @@ class CachingFactoryPlusUserStoreTest {
         int uuidCalls;
         int usernameCalls;
         int emailCalls;
+        int groupCalls;
         Optional<FactoryPlusUser> response = Optional.empty();
+        Set<String> groupResponse = Set.of();
         boolean throwOnNext = false;
 
         void respondWith(Optional<FactoryPlusUser> r) {
             response = r;
             throwOnNext = false;
+        }
+
+        void respondWithGroups(Set<String> g) {
+            groupResponse = g;
         }
 
         void respondWithException() {
@@ -156,6 +189,10 @@ class CachingFactoryPlusUserStoreTest {
         @Override public Optional<FactoryPlusUser> findByEmail(String email) {
             emailCalls++;
             return responseOrThrow();
+        }
+        @Override public Set<String> findGroupsForPrincipal(String uuid) {
+            groupCalls++;
+            return groupResponse;
         }
 
         private Optional<FactoryPlusUser> responseOrThrow() {

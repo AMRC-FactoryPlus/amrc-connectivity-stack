@@ -11,6 +11,7 @@
 package uk.co.amrc.app.factoryplus.keycloak;
 
 import java.util.Optional;
+import java.util.Set;
 
 public final class NullFactoryPlusUserStore implements FactoryPlusUserStore {
 
@@ -32,5 +33,10 @@ public final class NullFactoryPlusUserStore implements FactoryPlusUserStore {
     @Override
     public Optional<FactoryPlusUser> findByEmail(String email) {
         return Optional.empty();
+    }
+
+    @Override
+    public Set<String> findGroupsForPrincipal(String uuid) {
+        return Set.of();
     }
 }

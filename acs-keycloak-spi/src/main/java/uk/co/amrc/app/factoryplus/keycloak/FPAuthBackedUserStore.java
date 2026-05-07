@@ -59,7 +59,9 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.HashSet;
 import java.util.Optional;
+import java.util.Set;
 
 public class FPAuthBackedUserStore implements FactoryPlusUserStore {
 
@@ -110,6 +112,11 @@ public class FPAuthBackedUserStore implements FactoryPlusUserStore {
         return Optional.empty();
     }
 
+    @Override
+    public Set<String> findGroupsForPrincipal(String uuid) {
+        return fetchGroups(uuid);
+    }
+
     /** GET /v2/identity/{kind}/{name} -> UUID string, or empty on 410. */
     private Optional<String> fetchUuidByIdentity(String kind, String name) {
         URI uri = baseUrl.resolve("/v2/identity/" + encode(kind) + "/" + encode(name));
@@ -127,6 +134,37 @@ public class FPAuthBackedUserStore implements FactoryPlusUserStore {
         }
         catch (JsonProcessingException e) {
             throw new FactoryPlusAuthException("Malformed response from " + uri, e);
+        }
+    }
+
+    /** GET /v2/principal/{uuid}/groups -> [uuid, ...], or empty on 410. */
+    private Set<String> fetchGroups(String uuid) {
+        URI uri = baseUrl.resolve("/v2/principal/" + encode(uuid) + "/groups");
+        HttpResponse<String> res = sendGet(uri);
+        if (isNotFound(res.statusCode())) return Set.of();
+        requireSuccess(res, uri);
+
+        try {
+            JsonNode root = MAPPER.readTree(res.body());
+            if (!root.isArray()) {
+                throw new FactoryPlusAuthException(
+                    "Expected JSON array of UUIDs from " + uri
+                        + ", got: " + res.body());
+            }
+            Set<String> out = new HashSet<>(root.size());
+            for (JsonNode element : root) {
+                if (!element.isTextual()) {
+                    throw new FactoryPlusAuthException(
+                        "Group array from " + uri
+                            + " must contain only UUID strings");
+                }
+                out.add(element.asText());
+            }
+            return Set.copyOf(out);
+        }
+        catch (JsonProcessingException e) {
+            throw new FactoryPlusAuthException(
+                "Malformed response from " + uri, e);
         }
     }
 

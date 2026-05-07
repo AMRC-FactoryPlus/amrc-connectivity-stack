@@ -20,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -110,5 +111,72 @@ class FactoryPlusUserStorageProviderTest {
         UserModel user = provider.getUserById(realm, storageId);
 
         assertThat(user).isNull();
+    }
+
+    // -- UserQueryProvider --------------------------------------------
+
+    @Test
+    void search_for_user_stream_delegates_username_param_to_username_lookup() {
+        when(store.findByUsername("alice")).thenReturn(Optional.of(ALICE));
+
+        var users = provider.searchForUserStream(realm,
+            Map.of(UserModel.USERNAME, "alice"), 0, 100).toList();
+
+        assertThat(users).hasSize(1);
+        assertThat(users.get(0).getUsername()).isEqualTo("alice");
+    }
+
+    @Test
+    void search_for_user_stream_delegates_email_param_to_email_lookup() {
+        when(store.findByEmail("alice@example.invalid")).thenReturn(Optional.of(ALICE));
+
+        var users = provider.searchForUserStream(realm,
+            Map.of(UserModel.EMAIL, "alice@example.invalid"), 0, 100).toList();
+
+        assertThat(users).hasSize(1);
+        assertThat(users.get(0).getUsername()).isEqualTo("alice");
+    }
+
+    @Test
+    void search_for_user_stream_returns_empty_for_unhandled_params() {
+        var users = provider.searchForUserStream(realm,
+            Map.of("search", "ali"), 0, 100).toList();
+
+        assertThat(users).isEmpty();
+    }
+
+    @Test
+    void search_for_user_stream_returns_empty_when_username_misses() {
+        when(store.findByUsername("nope")).thenReturn(Optional.empty());
+
+        var users = provider.searchForUserStream(realm,
+            Map.of(UserModel.USERNAME, "nope"), 0, 100).toList();
+
+        assertThat(users).isEmpty();
+    }
+
+    @Test
+    void search_for_user_stream_handles_null_pagination_args() {
+        when(store.findByUsername("alice")).thenReturn(Optional.of(ALICE));
+
+        var users = provider.searchForUserStream(realm,
+            Map.of(UserModel.USERNAME, "alice"), null, null).toList();
+
+        assertThat(users).hasSize(1);
+    }
+
+    @Test
+    void search_for_user_by_attribute_returns_empty() {
+        var users = provider.searchForUserByUserAttributeStream(
+            realm, "department", "engineering").toList();
+
+        assertThat(users).isEmpty();
+    }
+
+    @Test
+    void get_group_members_stream_returns_empty_in_phase_4() {
+        var users = provider.getGroupMembersStream(realm, null, 0, 100).toList();
+
+        assertThat(users).isEmpty();
     }
 }

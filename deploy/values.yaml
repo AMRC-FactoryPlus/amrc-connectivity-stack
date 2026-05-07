@@ -149,10 +149,11 @@ openid:
   # the Grafana OAuth ConfigMap (deploy/templates/grafana/grafana-ini.yaml).
   realm: factory_plus
   image:
-    registry: quay.io
-    repository: keycloak/keycloak
-    tag: "26.1.1"
-    pullPolicy: IfNotPresent
+    # -- Custom Keycloak image with the Factory+ User Storage SPI baked
+    # in (built from acs-keycloak/Dockerfile). To run upstream Keycloak
+    # without the SPI, override repository to "keycloak/keycloak" and
+    # registry to "quay.io" - but the SPI federation provider won't load.
+    repository: acs-keycloak
   # tlsSecretName: <override>   # optional, falls back to acs.tlsSecretName
 
 # -- The service-setup component loads ACS-specific configuration into

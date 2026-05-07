@@ -63,6 +63,13 @@
             <version>${keycloak.version}</version>
             <scope>provided</scope>
         </dependency>
+        <dependency>
+            <!-- Holds AbstractOIDCProtocolMapper for Phase 7 claim mappers. -->
+            <groupId>org.keycloak</groupId>
+            <artifactId>keycloak-services</artifactId>
+            <version>${keycloak.version}</version>
+            <scope>provided</scope>
+        </dependency>
 
         <!-- F+ service client. Pinned to 0.1-SNAPSHOT explicitly because
              base-pom's dependencyManagement references ${acs.version}

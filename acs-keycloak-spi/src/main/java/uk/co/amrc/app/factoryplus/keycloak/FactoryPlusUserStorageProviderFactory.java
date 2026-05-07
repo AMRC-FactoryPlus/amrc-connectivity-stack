@@ -27,6 +27,7 @@ import org.keycloak.provider.ProviderConfigurationBuilder;
 import org.keycloak.storage.UserStorageProviderFactory;
 
 import java.net.URI;
+import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
 
@@ -35,9 +36,11 @@ public class FactoryPlusUserStorageProviderFactory
 
     public static final String PROVIDER_ID = "factoryplus";
 
-    static final String CONFIG_AUTH_URL         = "auth.url";
-    static final String CONFIG_TIMEOUT_SECONDS  = "auth.timeout.seconds";
-    static final String DEFAULT_TIMEOUT_SECONDS = "5";
+    static final String CONFIG_AUTH_URL          = "auth.url";
+    static final String CONFIG_TIMEOUT_SECONDS   = "auth.timeout.seconds";
+    static final String CONFIG_CACHE_TTL_SECONDS = "cache.ttl.seconds";
+    static final String DEFAULT_TIMEOUT_SECONDS  = "5";
+    static final String DEFAULT_CACHE_TTL_SECONDS = "60";
 
     private static final List<ProviderConfigProperty> CONFIG_PROPERTIES =
         ProviderConfigurationBuilder.create()
@@ -57,6 +60,16 @@ public class FactoryPlusUserStorageProviderFactory
                 .type(ProviderConfigProperty.STRING_TYPE)
                 .defaultValue(DEFAULT_TIMEOUT_SECONDS)
                 .add()
+            .property()
+                .name(CONFIG_CACHE_TTL_SECONDS)
+                .label("Cache TTL (seconds)")
+                .helpText("How long to cache F+ user lookups, including misses. "
+                    + "Set to 0 to disable caching. Larger values reduce F+ load "
+                    + "but staleness window is longer (admin grants/revokes "
+                    + "take up to TTL seconds to appear in Keycloak).")
+                .type(ProviderConfigProperty.STRING_TYPE)
+                .defaultValue(DEFAULT_CACHE_TTL_SECONDS)
+                .add()
             .build();
 
     @Override
@@ -70,20 +83,29 @@ public class FactoryPlusUserStorageProviderFactory
         if (url == null || url.isBlank()) {
             return NullFactoryPlusUserStore.INSTANCE;
         }
-        Duration timeout = parseTimeout(
-            model.getConfig().getFirst(CONFIG_TIMEOUT_SECONDS));
-        return new FPAuthBackedUserStore(URI.create(url), timeout);
+        Duration timeout = parseSeconds(
+            model.getConfig().getFirst(CONFIG_TIMEOUT_SECONDS),
+            DEFAULT_TIMEOUT_SECONDS);
+        FactoryPlusUserStore base = new FPAuthBackedUserStore(URI.create(url), timeout);
+
+        Duration cacheTtl = parseSeconds(
+            model.getConfig().getFirst(CONFIG_CACHE_TTL_SECONDS),
+            DEFAULT_CACHE_TTL_SECONDS);
+        if (cacheTtl.isZero() || cacheTtl.isNegative()) {
+            return base;
+        }
+        return new CachingFactoryPlusUserStore(base, cacheTtl, Clock.systemUTC());
     }
 
-    private static Duration parseTimeout(String configured) {
+    private static Duration parseSeconds(String configured, String fallback) {
         long secs;
         try {
             secs = Long.parseLong(configured == null || configured.isBlank()
-                ? DEFAULT_TIMEOUT_SECONDS
+                ? fallback
                 : configured.trim());
         }
         catch (NumberFormatException e) {
-            secs = Long.parseLong(DEFAULT_TIMEOUT_SECONDS);
+            secs = Long.parseLong(fallback);
         }
         return Duration.ofSeconds(secs);
     }

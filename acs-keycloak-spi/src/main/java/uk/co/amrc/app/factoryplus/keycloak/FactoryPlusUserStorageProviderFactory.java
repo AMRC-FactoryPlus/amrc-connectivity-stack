@@ -2,6 +2,12 @@
  * Factory class. Keycloak constructs exactly one of these per server
  * lifetime and calls create(...) for every request that needs to talk to
  * the Factory+ federation.
+ *
+ * The factory owns the FactoryPlusUserStore and hands it to each provider
+ * instance - sharing the store (and any caches it holds) across requests
+ * is much cheaper than constructing a fresh one per call. Phase 1 ships
+ * with the NullFactoryPlusUserStore singleton; Phase 2 will instead build
+ * a real HTTP-backed store here, configured from the ComponentModel.
  * Copyright 2026 University of Sheffield AMRC
  */
 
@@ -18,7 +24,8 @@ public class FactoryPlusUserStorageProviderFactory
 
     @Override
     public FactoryPlusUserStorageProvider create(KeycloakSession session, ComponentModel model) {
-        return new FactoryPlusUserStorageProvider(session, model);
+        return new FactoryPlusUserStorageProvider(session, model,
+            NullFactoryPlusUserStore.INSTANCE);
     }
 
     @Override

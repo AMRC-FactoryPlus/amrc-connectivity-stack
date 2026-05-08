@@ -437,6 +437,14 @@ grafana:
       # value.
       role_attribute_path: $__file{/etc/acs-config/role_attribute_path}
       allow_assign_grafana_admin: true
+      # Grafana applies role_attribute_path on every OAuth login. By
+      # default it will not *demote* an existing user (GrafanaAdmin
+      # stays once granted, even if the JMESPath later resolves to
+      # Viewer). With role_attribute_strict the JMESPath result is
+      # authoritative each login, so revoking Grafana.Perm.* in F+
+      # actually downgrades the user on next login rather than 60s
+      # of cache staleness becoming permanent.
+      role_attribute_strict: true
   extraConfigmapMounts:
     - name: acs-grafana-config
       mountPath: /etc/acs-config

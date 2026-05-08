@@ -34,6 +34,7 @@
    - [File Service](./services/file-service.md)
    - [Git Server](./services/git-server.md)
    - [Notify v2](./services/notify-v2.md)
+   - [Connecting OAuth applications](./services/oauth-clients.md)
 
 
 

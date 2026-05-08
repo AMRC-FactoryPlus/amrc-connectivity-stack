@@ -31,7 +31,7 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
-class FactoryPlusGroupsMapperTest {
+class FactoryPlusPermissionsMapperTest {
 
     private static final FactoryPlusUser ALICE = new FactoryPlusUser(
         "alice-uuid", "alice@FACTORYPLUS.LOCAL", null);
@@ -47,7 +47,7 @@ class FactoryPlusGroupsMapperTest {
         var store = new StubGroupsStore(Set.of("g-editor", "g-viewer"));
         var adapter = new FactoryPlusUserAdapter(session, realm, model, ALICE, store);
 
-        Object value = FactoryPlusGroupsMapper.claimValueFor(adapter);
+        Object value = FactoryPlusPermissionsMapper.claimValueFor(adapter);
 
         assertThat(value).isInstanceOf(List.class);
         assertThat((List<String>) value).containsExactlyInAnyOrder("g-editor", "g-viewer");
@@ -62,7 +62,7 @@ class FactoryPlusGroupsMapperTest {
         var store = new StubGroupsStore(Set.of());
         var adapter = new FactoryPlusUserAdapter(session, realm, model, ALICE, store);
 
-        Object value = FactoryPlusGroupsMapper.claimValueFor(adapter);
+        Object value = FactoryPlusPermissionsMapper.claimValueFor(adapter);
 
         assertThat(value).isInstanceOf(List.class);
         assertThat((List<String>) value).isEmpty();
@@ -72,16 +72,16 @@ class FactoryPlusGroupsMapperTest {
     void claim_value_is_null_for_non_federated_user() {
         UserModel notOurs = mock(UserModel.class);
 
-        Object value = FactoryPlusGroupsMapper.claimValueFor(notOurs);
+        Object value = FactoryPlusPermissionsMapper.claimValueFor(notOurs);
 
         assertThat(value).isNull();
     }
 
     @Test
     void mapper_id_and_display_type_are_correct() {
-        var mapper = new FactoryPlusGroupsMapper();
-        assertThat(mapper.getId()).isEqualTo("factoryplus-groups-mapper");
-        assertThat(mapper.getDisplayType()).contains("Groups");
+        var mapper = new FactoryPlusPermissionsMapper();
+        assertThat(mapper.getId()).isEqualTo("factoryplus-permissions-mapper");
+        assertThat(mapper.getDisplayType()).contains("Permissions");
     }
 
     @Test
@@ -91,7 +91,7 @@ class FactoryPlusGroupsMapperTest {
             assertThat(in).isNotNull();
             String contents = new String(in.readAllBytes(), StandardCharsets.UTF_8);
             assertThat(contents)
-                .contains("uk.co.amrc.app.factoryplus.keycloak.FactoryPlusGroupsMapper");
+                .contains("uk.co.amrc.app.factoryplus.keycloak.FactoryPlusPermissionsMapper");
         }
     }
 
@@ -102,6 +102,6 @@ class FactoryPlusGroupsMapperTest {
         @Override public Optional<FactoryPlusUser> findByUuid(String u) { return Optional.empty(); }
         @Override public Optional<FactoryPlusUser> findByUsername(String n) { return Optional.empty(); }
         @Override public Optional<FactoryPlusUser> findByEmail(String e) { return Optional.empty(); }
-        @Override public Set<String> findGroupsForPrincipal(String u) { return groups; }
+        @Override public Set<String> findPermissionsForPrincipal(String u) { return groups; }
     }
 }

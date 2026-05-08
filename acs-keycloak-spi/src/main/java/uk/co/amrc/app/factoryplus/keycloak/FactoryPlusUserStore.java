@@ -21,16 +21,18 @@ public interface FactoryPlusUserStore {
     Optional<FactoryPlusUser> findByEmail(String email);
 
     /**
-     * Returns the UUIDs of all principal-groups (subclasses of
-     * Factory+'s {@code Class.Principal}) containing the given
-     * principal, recursively expanded. This populates the
-     * {@code fp_groups} JWT claim and drives Grafana role mapping.
+     * Returns the UUIDs of permissions held by the given principal
+     * with target=Wildcard. These populate the {@code fp_permissions}
+     * JWT claim and drive Grafana role mapping (and any future OIDC
+     * consumer's role logic).
      *
-     * @return empty Set if the principal exists but isn't in any
-     *     group; empty Set if the principal doesn't exist
-     *     (callers can't distinguish the two cases - the only thing
-     *     the SPI does with this is stamp a claim, where empty=no
-     *     groups is correct in both situations)
+     * <p>Wildcard-targeted permissions are the F+ analogue of "global
+     * roles": the principal has the permission against any object.
+     * Targeted grants ({@code (perm, obj-uuid)}) are intentionally
+     * excluded - the JWT carries roles only.
+     *
+     * @return empty Set if the principal exists but has no Wildcard
+     *     grants; empty Set if the principal doesn't exist.
      */
-    Set<String> findGroupsForPrincipal(String uuid);
+    Set<String> findPermissionsForPrincipal(String uuid);
 }

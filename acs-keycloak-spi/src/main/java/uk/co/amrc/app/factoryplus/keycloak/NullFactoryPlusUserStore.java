@@ -36,7 +36,7 @@ public final class NullFactoryPlusUserStore implements FactoryPlusUserStore {
     }
 
     @Override
-    public Set<String> findGroupsForPrincipal(String uuid) {
+    public Set<String> findPermissionsForPrincipal(String uuid) {
         return Set.of();
     }
 }

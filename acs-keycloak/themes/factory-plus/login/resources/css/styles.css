@@ -18,6 +18,9 @@
     --slate-900: #0f172a;
     --slate-950: #020617;
 
+    --gray-100: #f3f4f6;
+    --gray-400: #9ca3af;
+
     --red-500: #ef4444;
     --red-600: #dc2626;
 
@@ -32,6 +35,11 @@
     --muted: var(--slate-500);
     --primary: var(--slate-900);
     --primary-text: var(--slate-50);
+
+    /* Custom easing curves - the built-in CSS keywords are too soft for
+       UI animations, per Emil Kowalski's design engineering principles. */
+    --ease-out:    cubic-bezier(0.23, 1, 0.32, 1);
+    --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
 }
 
 *,
@@ -74,22 +82,49 @@ a:hover {
     padding: 2rem 1rem;
 }
 
+/* Card uses opacity+scale entrance via @starting-style. We avoid
+   scale(0) - per Emil's principles, nothing in the real world appears
+   from nothing. scale(0.97) keeps the element's footprint visible
+   throughout the animation. */
 .acs-card {
     width: 100%;
-    max-width: 24rem; /* matches max-w-sm */
+    max-width: 26rem;
     background: var(--card-bg);
     color: var(--text);
     border: 1px solid var(--card-border);
     border-radius: var(--radius);
     box-shadow: var(--card-shadow);
-    transition: box-shadow 200ms ease, outline-color 200ms ease;
+    opacity: 1;
+    transform: scale(1);
+    transition:
+        box-shadow 300ms var(--ease-out),
+        opacity    400ms var(--ease-out),
+        transform  400ms var(--ease-out);
+}
+
+@starting-style {
+    .acs-card {
+        opacity: 0;
+        transform: scale(0.97);
+    }
+}
+
+/* Mirror the acs-admin login card hover ring. Gated to fine pointers
+   so touch devices don't get a sticky hover state on tap. */
+@media (hover: hover) and (pointer: fine) {
+    .acs-card:hover {
+        box-shadow:
+            0 0 0 2px var(--gray-100),
+            0 0 0 4px rgb(156 163 175 / 0.3),
+            var(--card-shadow);
+    }
 }
 
 .acs-card-header {
     display: flex;
     flex-direction: column;
-    gap: 0.375rem;
-    padding: 1.5rem 1.5rem 0; /* p-6 with no bottom (CardContent owns its top padding) */
+    gap: 0.5rem;
+    padding: 1.75rem 1.75rem 0;
 }
 
 .acs-brand {
@@ -115,7 +150,7 @@ a:hover {
     font-size: 1.5rem;          /* text-2xl */
     font-weight: 600;
     letter-spacing: -0.025em;   /* tracking-tight */
-    line-height: 1;
+    line-height: 1.1;
 }
 
 .acs-card-description {
@@ -125,17 +160,17 @@ a:hover {
 }
 
 .acs-card-content {
-    padding: 1.5rem;
+    padding: 1.75rem;
 }
 
 .acs-form {
     display: grid;
-    gap: 1rem;                  /* gap-4 */
+    gap: 1rem;
 }
 
 .acs-field {
     display: grid;
-    gap: 0.5rem;                /* gap-2 */
+    gap: 0.5rem;
 }
 
 .acs-label {
@@ -144,19 +179,24 @@ a:hover {
     line-height: 1;
 }
 
+/* Inputs - shadcn focus ring, slate-900 ring with white offset.
+   Specific transition targets (not `all`) so the focus ring snaps in
+   without re-rendering the rest of the input. */
 .acs-input {
     display: flex;
-    height: 2.5rem;             /* h-10 */
+    height: 2.5rem;
     width: 100%;
     border: 1px solid var(--slate-200);
     background: #ffffff;
     color: var(--text);
     border-radius: var(--radius-md);
-    padding: 0.5rem 0.75rem;    /* px-3 py-2 */
+    padding: 0.5rem 0.75rem;
     font-size: 0.875rem;
     line-height: 1.25rem;
     outline: none;
-    transition: box-shadow 150ms ease, border-color 150ms ease;
+    transition:
+        border-color 150ms var(--ease-out),
+        box-shadow   150ms var(--ease-out);
 }
 
 .acs-input::placeholder {
@@ -164,8 +204,8 @@ a:hover {
 }
 
 .acs-input:focus-visible {
-    border-color: var(--slate-400);
-    box-shadow: 0 0 0 2px var(--slate-50), 0 0 0 4px var(--slate-900);
+    border-color: var(--slate-950);
+    box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px var(--slate-950);
 }
 
 .acs-input:disabled {
@@ -177,7 +217,6 @@ a:hover {
     border-color: var(--red-500);
 }
 
-/* Password visibility toggle Keycloak injects (input + button wrapper) */
 .acs-input-wrapper {
     position: relative;
     display: flex;
@@ -203,6 +242,9 @@ a:hover {
     color: var(--slate-500);
     border-radius: var(--radius-md);
     cursor: pointer;
+    transition:
+        background 150ms var(--ease-out),
+        color      150ms var(--ease-out);
 }
 
 .acs-password-toggle:hover {
@@ -210,34 +252,51 @@ a:hover {
     color: var(--slate-900);
 }
 
-/* Buttons */
+.acs-password-toggle:active {
+    transform: translateY(-50%) scale(0.95);
+}
 
+/* Buttons. scale(0.97) on :active gives tactile press feedback - the
+   single most missed detail in stock UIs. Hover gates behind fine
+   pointers so touch devices don't latch on tap. */
 .acs-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    height: 2.5rem;             /* h-10 */
-    padding: 0 1rem;            /* px-4 */
+    height: 2.5rem;
+    padding: 0 1rem;
     border: 0;
     border-radius: var(--radius-md);
     font-size: 0.875rem;
     font-weight: 500;
     cursor: pointer;
-    transition: background 150ms ease, opacity 150ms ease, color 150ms ease;
     white-space: nowrap;
+    transition:
+        background 160ms var(--ease-out),
+        color      160ms var(--ease-out),
+        opacity    160ms var(--ease-out),
+        transform  160ms var(--ease-out),
+        box-shadow 160ms var(--ease-out);
 }
 
 .acs-btn:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px var(--slate-900);
+    box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px var(--slate-950);
+}
+
+.acs-btn:active {
+    transform: scale(0.97);
 }
 
 .acs-btn-primary {
     background: var(--primary);
     color: var(--primary-text);
 }
-.acs-btn-primary:hover {
-    background: rgb(15 23 42 / 0.9);  /* slate-900/90 */
+
+@media (hover: hover) and (pointer: fine) {
+    .acs-btn-primary:hover {
+        background: rgb(15 23 42 / 0.9);
+    }
 }
 
 .acs-btn-block {
@@ -251,18 +310,28 @@ a:hover {
     padding: 0;
     font-weight: 500;
     text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
 }
+
 .acs-btn-link:hover {
     text-decoration: underline;
     text-underline-offset: 4px;
 }
 
-/* Footer / info row (used by logout-confirm) */
+.acs-btn-link .acs-arrow {
+    color: var(--slate-500);
+    font-size: 1em;
+    line-height: 1;
+}
+
+/* Card footer (logout-confirm "Back to Application", info pages) */
 .acs-card-footer {
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
-    padding: 0 1.5rem 1.5rem;
+    padding: 0 1.75rem 1.75rem;
 }
 
 /* Alerts */
@@ -308,7 +377,6 @@ a:hover {
     font-size: 0.75rem;
 }
 
-/* Small helpers */
 .acs-muted { color: var(--muted); }
 .acs-mt-2  { margin-top: 0.5rem; }
 .acs-mt-4  { margin-top: 1rem; }
@@ -317,3 +385,18 @@ a:hover {
 /* Hide upstream Keycloak chrome elements that leak through when we
  * #nested into sections we don't want to render. */
 #kc-locale, #kc-content-wrapper > div.subtitle { display: none; }
+
+/* Reduced motion: drop entrance and press scale, keep colour and
+ * opacity transitions that aid comprehension. */
+@media (prefers-reduced-motion: reduce) {
+    @starting-style {
+        .acs-card {
+            opacity: 0;
+            transform: none;
+        }
+    }
+    .acs-btn:active,
+    .acs-password-toggle:active {
+        transform: none;
+    }
+}

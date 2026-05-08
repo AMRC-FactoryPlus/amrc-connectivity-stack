@@ -19,7 +19,10 @@
             <#if skipLink?? && skipLink>
             <#elseif pageRedirectUri?has_content>
                 <div class="acs-text-center acs-mt-2">
-                    <a href="${pageRedirectUri}" class="acs-btn-link">&laquo; ${msg("backToApplication")}</a>
+                    <a href="${pageRedirectUri}" class="acs-btn-link">
+                        <span class="acs-arrow" aria-hidden="true">&#171;</span>
+                        ${msg("backToApplication")}
+                    </a>
                 </div>
             <#elseif actionUri?has_content>
                 <div class="acs-text-center acs-mt-2">
@@ -27,7 +30,10 @@
                 </div>
             <#elseif client.baseUrl?has_content>
                 <div class="acs-text-center acs-mt-2">
-                    <a href="${client.baseUrl}" class="acs-btn-link">&laquo; ${msg("backToApplication")}</a>
+                    <a href="${client.baseUrl}" class="acs-btn-link">
+                        <span class="acs-arrow" aria-hidden="true">&#171;</span>
+                        ${msg("backToApplication")}
+                    </a>
                 </div>
             </#if>
         </div>

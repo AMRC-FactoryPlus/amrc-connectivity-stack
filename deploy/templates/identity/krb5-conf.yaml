@@ -9,6 +9,7 @@ data:
     [libdefaults]
         default_realm = {{ .Values.identity.realm | required "values.identity.realm is required!" }}
         dns_canonicalize_hostname = false
+        rdns = false
         udp_preference_limit = 1
         spake_preauth_groups = edwards25519
 

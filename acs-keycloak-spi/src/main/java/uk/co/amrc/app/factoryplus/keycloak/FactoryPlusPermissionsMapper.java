@@ -1,18 +1,17 @@
 /* ACS Keycloak SPI
- * OIDC protocol mapper that stamps the F+ principal-groups containing
- * the user into JWTs (access token, id token, userinfo) under the
- * claim name 'fp_groups'.
+ * OIDC protocol mapper that stamps the F+ permission UUIDs held by the
+ * user (with target=Wildcard) into JWTs (access token, id token,
+ * userinfo) under the claim name 'fp_permissions'.
  *
- * This is the load-bearing claim of the pitch: Grafana (and future
- * northbound consumers) read fp_groups from the JWT and translate it
- * into per-app roles via JMESPath role_attribute_path. Without it,
- * F+ ACL grants don't drive Grafana access; with it, granting a user
- * the "Grafana Editor" group in F+ immediately changes their Grafana
- * role on next login (modulo cache TTL).
+ * This is the load-bearing claim: Grafana (and future northbound
+ * consumers) read fp_permissions and translate them into per-app roles
+ * via JMESPath role_attribute_path. Granting a user e.g.
+ * Grafana.Perm.Editor in F+ immediately changes their Grafana role on
+ * next login (modulo cache TTL).
  *
  * Only fires for users sourced from this federation - a Keycloak local
- * user or one from another federation has no F+ groups, so the claim
- * is omitted from their tokens.
+ * user or one from another federation has no F+ permissions, so the
+ * claim is omitted from their tokens.
  *
  * Copyright 2026 University of Sheffield AMRC
  */
@@ -35,31 +34,31 @@ import org.keycloak.representations.IDToken;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 
-public class FactoryPlusGroupsMapper extends AbstractOIDCProtocolMapper
+public class FactoryPlusPermissionsMapper extends AbstractOIDCProtocolMapper
         implements OIDCAccessTokenMapper, OIDCIDTokenMapper,
                    UserInfoTokenMapper, TokenIntrospectionTokenMapper {
 
-    public static final String PROVIDER_ID = "factoryplus-groups-mapper";
-    public static final String CLAIM_NAME  = "fp_groups";
+    public static final String PROVIDER_ID = "factoryplus-permissions-mapper";
+    public static final String CLAIM_NAME  = "fp_permissions";
 
     private static final List<ProviderConfigProperty> CONFIG_PROPERTIES = new ArrayList<>();
     static {
         OIDCAttributeMapperHelper.addIncludeInTokensConfig(
-            CONFIG_PROPERTIES, FactoryPlusGroupsMapper.class);
+            CONFIG_PROPERTIES, FactoryPlusPermissionsMapper.class);
     }
 
     @Override public String getDisplayCategory() { return TOKEN_MAPPER_CATEGORY; }
-    @Override public String getDisplayType()     { return "Factory+ Groups"; }
+    @Override public String getDisplayType()     { return "Factory+ Permissions"; }
     @Override public String getId()              { return PROVIDER_ID; }
 
     @Override
     public String getHelpText() {
-        return "Stamps the array of Factory+ principal-group UUIDs containing "
-            + "the user into the '" + CLAIM_NAME + "' claim. Fires only for "
-            + "users sourced from the factoryplus user federation. Empty array "
-            + "if the user is in no groups.";
+        return "Stamps the array of Factory+ permission UUIDs held by the "
+            + "user (with target=Wildcard) into the '" + CLAIM_NAME + "' "
+            + "claim. Fires only for users sourced from the factoryplus "
+            + "user federation. Empty array if the user has no Wildcard "
+            + "permission grants.";
     }
 
     @Override
@@ -80,16 +79,28 @@ public class FactoryPlusGroupsMapper extends AbstractOIDCProtocolMapper
     }
 
     /**
-     * Returns the claim value (a List of group UUIDs) for {@code user},
-     * or null if the user isn't from this federation.
+     * Returns the claim value (a List of permission UUIDs) for {@code
+     * user}, or null if the user isn't from this federation.
      *
      * <p>Public + static so unit tests can cover claim determination
      * without driving Keycloak's full transform machinery.
      */
     public static Object claimValueFor(UserModel user) {
-        if (!(user instanceof FactoryPlusUserAdapter adapter)) return null;
-        Set<String> groups = adapter.getFactoryPlusGroups();
-        // OIDCAttributeMapperHelper expects List for array claims.
-        return List.copyOf(groups);
+        if (user == null) return null;
+        // Read via the attribute API so this works against both fresh
+        // FactoryPlusUserAdapter instances and Keycloak's
+        // UserCacheSession wrapper.
+        List<String> perms = user.getAttributeStream(
+                FactoryPlusUserAdapter.ATTR_FP_PERMISSIONS)
+            .toList();
+        if (perms.isEmpty()) {
+            // Distinguish "user is from F+ federation but has no
+            // Wildcard perms" (claim present, value []) from "user
+            // is not from us" (return null - claim omitted).
+            String uuid = user.getFirstAttribute(
+                FactoryPlusUserAdapter.ATTR_FP_UUID);
+            if (uuid == null) return null;
+        }
+        return perms;
     }
 }

@@ -71,16 +71,17 @@
             <scope>provided</scope>
         </dependency>
 
-        <!-- F+ service client. Pinned to 0.1-SNAPSHOT explicitly because
-             base-pom's dependencyManagement references ${acs.version}
-             (= 0.0.0-intree) which doesn't match the in-tree publication
-             at lib/mvn. Phase 4 actually consumes this dep for
-             FPGssClientKeytab; Phase 2's Wiremock-driven implementation
-             uses bare java.net.http instead. -->
+        <!-- F+ service client. Pin to the in-tree publication version
+             (0.0.0-intree); the docker build installs lib/java-service-client
+             into Maven's local cache so this resolves without needing
+             a pre-staged lib/mvn directory. The current SPI doesn't
+             import this jar yet (Phase 2 uses bare java.net.http);
+             keeping the dep declared so Phase 4's FPGssClientKeytab
+             work has a one-line wiring path. -->
         <dependency>
             <groupId>io.github.amrc-factoryplus</groupId>
             <artifactId>java-service-client</artifactId>
-            <version>0.1-SNAPSHOT</version>
+            <version>0.0.0-intree</version>
         </dependency>
 
         <!-- JSON parsing via Jackson. Keycloak ships these at runtime

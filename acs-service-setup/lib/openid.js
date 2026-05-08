@@ -220,7 +220,16 @@ class OpenIDSetup {
             baseUrl: root,
             redirectUris: [`${root}${spec.redirectPath ?? "/*"}`],
             webOrigins: [root],
-            attributes: { "post.logout.redirect.uris": root },
+            attributes: {
+                "post.logout.redirect.uris": root,
+                // When an admin force-logs-out a user in Keycloak,
+                // backchannel.logout.session.required tells Keycloak to
+                // POST a session-end notification to the client so it
+                // can drop its local session instead of holding a stale
+                // one until the next refresh attempt. Picked up from
+                // upstream PR #443.
+                "backchannel.logout.session.required": "true",
+            },
         };
 
         let client = await this.find_client(name);

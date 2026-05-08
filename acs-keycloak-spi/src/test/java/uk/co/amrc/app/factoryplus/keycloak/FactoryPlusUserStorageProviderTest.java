@@ -46,7 +46,8 @@ class FactoryPlusUserStorageProviderTest {
     @BeforeEach
     void setUp() {
         when(model.getId()).thenReturn(MODEL_ID);
-        provider = new FactoryPlusUserStorageProvider(session, model, store);
+        provider = new FactoryPlusUserStorageProvider(session, model, store,
+            new KerberosPasswordValidator());
     }
 
     @Test

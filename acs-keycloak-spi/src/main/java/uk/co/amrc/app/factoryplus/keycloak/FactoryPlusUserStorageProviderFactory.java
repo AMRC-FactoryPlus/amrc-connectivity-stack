@@ -30,9 +30,23 @@ import java.net.URI;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
+import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 public class FactoryPlusUserStorageProviderFactory
         implements UserStorageProviderFactory<FactoryPlusUserStorageProvider> {
+
+    /** Per-componentModel cache. Keycloak invokes {@code create} on every
+     *  request that touches user storage; doing a fresh JAAS Krb5
+     *  login + GSSContext init each time blows past Keycloak's 3-second
+     *  ServicesUtils.timeBoundOne hard limit. The cache key includes
+     *  the config so admins editing the federation in the UI rebuild
+     *  cleanly. */
+    private final ConcurrentMap<CacheKey, CachedStore> storeCache = new ConcurrentHashMap<>();
+
+    private record CacheKey(String componentId, String configHash) {}
+    private record CachedStore(FactoryPlusUserStore store) {}
 
     public static final String PROVIDER_ID = "factoryplus";
 
@@ -93,8 +107,36 @@ public class FactoryPlusUserStorageProviderFactory
 
     @Override
     public FactoryPlusUserStorageProvider create(KeycloakSession session, ComponentModel model) {
-        FactoryPlusUserStore store = buildStore(model);
-        return new FactoryPlusUserStorageProvider(session, model, store);
+        FactoryPlusUserStore store = cachedStore(model);
+        return new FactoryPlusUserStorageProvider(session, model, store,
+            new KerberosPasswordValidator());
+    }
+
+    /** Build (or return cached) FactoryPlusUserStore for this component
+     *  config. Authenticator construction does a JAAS Kerberos login;
+     *  we want that to happen at most once per config, not per request. */
+    private FactoryPlusUserStore cachedStore(ComponentModel model) {
+        CacheKey key = new CacheKey(model.getId(), configFingerprint(model));
+        // Drop stale entries for this component (different config).
+        storeCache.keySet().removeIf(k ->
+            Objects.equals(k.componentId(), key.componentId())
+                && !Objects.equals(k.configHash(), key.configHash()));
+        return storeCache
+            .computeIfAbsent(key, k -> new CachedStore(buildStore(model)))
+            .store();
+    }
+
+    private static String configFingerprint(ComponentModel model) {
+        // Cheap, order-stable fingerprint of the auth-affecting config
+        // values. Any change here causes a clean rebuild.
+        StringBuilder sb = new StringBuilder();
+        for (String k : List.of(CONFIG_AUTH_URL, CONFIG_TIMEOUT_SECONDS,
+                CONFIG_CACHE_TTL_SECONDS, CONFIG_KRB_PRINCIPAL,
+                CONFIG_KRB_KEYTAB_PATH)) {
+            sb.append(k).append('=')
+              .append(model.getConfig().getFirst(k)).append(';');
+        }
+        return sb.toString();
     }
 
     private static FactoryPlusUserStore buildStore(ComponentModel model) {

@@ -102,3 +102,7 @@ grants:
     !u ACS.PermGroup.Directory: null
     !u ACS.PermGroup.Git: null
     !u Files.Perm.All: null
+    # Cluster admins are Grafana admins by default. Lower roles
+    # (Admin/Editor) are not granted - GrafanaAdmin already includes
+    # everything they would, and the JMESPath picks the first match.
+    !u Grafana.Perm.GrafanaAdmin: null

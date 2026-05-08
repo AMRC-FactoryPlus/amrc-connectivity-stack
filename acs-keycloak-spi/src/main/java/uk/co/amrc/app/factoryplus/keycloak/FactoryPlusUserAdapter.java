@@ -20,7 +20,12 @@ import org.keycloak.models.SubjectCredentialManager;
 import org.keycloak.storage.StorageId;
 import org.keycloak.storage.adapter.AbstractUserAdapter;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Stream;
+import org.keycloak.common.util.MultivaluedHashMap;
 
 public class FactoryPlusUserAdapter extends AbstractUserAdapter {
 
@@ -45,7 +50,13 @@ public class FactoryPlusUserAdapter extends AbstractUserAdapter {
 
     @Override
     public String getEmail() {
-        return user.email();
+        // F+ has no email field. Fall back to the UPN, which is
+        // syntactically email-shaped and unique-per-user. This is the
+        // only realistic value we can give Keycloak so downstream
+        // consumers (e.g. Grafana, which 500s when email is missing)
+        // stop probing GitHub-style /userinfo/emails fallbacks.
+        if (user.email() != null && !user.email().isBlank()) return user.email();
+        return user.username();
     }
 
     @Override
@@ -64,13 +75,55 @@ public class FactoryPlusUserAdapter extends AbstractUserAdapter {
     }
 
     /**
-     * The set of F+ principal-groups containing this user, used by the
-     * {@code fp_groups} OIDC claim mapper. Delegates to the store so
-     * results come from the cache layer (group lookups are an HTTP
-     * round-trip otherwise).
+     * The set of F+ permission UUIDs (target=Wildcard) held by this
+     * user, used by the {@code fp_permissions} OIDC claim mapper.
+     * Delegates to the store so results come from the cache layer.
      */
-    public Set<String> getFactoryPlusGroups() {
-        return store.findGroupsForPrincipal(user.uuid());
+    public Set<String> getFactoryPlusPermissions() {
+        return store.findPermissionsForPrincipal(user.uuid());
+    }
+
+    /** Expose the F+ UUID and Wildcard-permission UUIDs as Keycloak
+     *  user attributes so the protocol mappers can read them via the
+     *  standard attribute API. {@code instanceof FactoryPlusUserAdapter}
+     *  doesn't work at token-issuance time because Keycloak's
+     *  UserCacheSession wraps us in its own UserAdapter; attributes
+     *  survive that wrapping (and the cache itself). */
+    public static final String ATTR_FP_UUID = "fp_principal_uuid";
+    public static final String ATTR_FP_PERMISSIONS = "fp_permissions";
+
+    @Override
+    public Map<String, List<String>> getAttributes() {
+        // Start from the parent so standard attributes (username,
+        // email, firstName, lastName) are preserved - overriding from
+        // scratch here masked username/email and made userinfo return
+        // them as null. Then layer the F+ extras on top.
+        MultivaluedHashMap<String, String> attrs = new MultivaluedHashMap<>();
+        Map<String, List<String>> base = super.getAttributes();
+        if (base != null) attrs.putAll(base);
+        attrs.add(ATTR_FP_UUID, user.uuid());
+        for (String g : store.findPermissionsForPrincipal(user.uuid())) {
+            attrs.add(ATTR_FP_PERMISSIONS, g);
+        }
+        return attrs;
+    }
+
+    @Override
+    public Stream<String> getAttributeStream(String name) {
+        if (ATTR_FP_UUID.equals(name)) return Stream.of(user.uuid());
+        if (ATTR_FP_PERMISSIONS.equals(name))
+            return store.findPermissionsForPrincipal(user.uuid()).stream();
+        return Stream.empty();
+    }
+
+    @Override
+    public String getFirstAttribute(String name) {
+        if (ATTR_FP_UUID.equals(name)) return user.uuid();
+        if (ATTR_FP_PERMISSIONS.equals(name)) {
+            return store.findPermissionsForPrincipal(user.uuid())
+                .stream().findFirst().orElse(null);
+        }
+        return null;
     }
 
     @Override

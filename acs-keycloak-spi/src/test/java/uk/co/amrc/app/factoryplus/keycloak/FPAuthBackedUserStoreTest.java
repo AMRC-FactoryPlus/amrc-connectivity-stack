@@ -253,55 +253,66 @@ class FPAuthBackedUserStoreTest {
             .isEqualTo("localhost");
     }
 
-    // -- find groups -----------------------------------------------------
+    // -- find permissions -----------------------------------------------
+
+    private static final String WILDCARD = "00000000-0000-0000-0000-000000000000";
 
     @Test
-    void find_groups_returns_set_of_group_uuids() {
-        wiremock.stubFor(get(urlPathEqualTo("/v2/principal/" + UUID_ALICE + "/groups"))
+    void find_permissions_returns_wildcard_targeted_perms() {
+        // Body shape mirrors acs-auth's GET /v2/acl/<uuid>: list of
+        // {permission, target} (with optional plural). Targeted entries
+        // are filtered out - only Wildcard counts as a "role" for OIDC.
+        wiremock.stubFor(get(urlPathEqualTo("/v2/acl/" + UUID_ALICE))
             .willReturn(okJson("""
-                ["aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-                 "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"]
+                [
+                  {"permission":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                   "target":"00000000-0000-0000-0000-000000000000"},
+                  {"permission":"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+                   "target":"00000000-0000-0000-0000-000000000000"},
+                  {"permission":"cccccccc-cccc-cccc-cccc-cccccccccccc",
+                   "target":"deadbeef-0000-0000-0000-000000000000"}
+                ]
                 """)));
 
-        var groups = store.findGroupsForPrincipal(UUID_ALICE);
+        var perms = store.findPermissionsForPrincipal(UUID_ALICE);
 
-        assertThat(groups).containsExactlyInAnyOrder(
+        assertThat(perms).containsExactlyInAnyOrder(
             "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
             "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
     }
 
     @Test
-    void find_groups_returns_empty_when_principal_not_found() {
-        wiremock.stubFor(get(urlPathEqualTo("/v2/principal/missing/groups"))
+    void find_permissions_returns_empty_when_principal_not_found() {
+        wiremock.stubFor(get(urlPathEqualTo("/v2/acl/missing"))
             .willReturn(aResponse().withStatus(410)));
 
-        assertThat(store.findGroupsForPrincipal("missing")).isEmpty();
+        assertThat(store.findPermissionsForPrincipal("missing")).isEmpty();
     }
 
     @Test
-    void find_groups_returns_empty_for_principal_in_no_groups() {
-        wiremock.stubFor(get(urlPathEqualTo("/v2/principal/" + UUID_ALICE + "/groups"))
+    void find_permissions_returns_empty_for_principal_with_no_grants() {
+        wiremock.stubFor(get(urlPathEqualTo("/v2/acl/" + UUID_ALICE))
             .willReturn(okJson("[]")));
 
-        assertThat(store.findGroupsForPrincipal(UUID_ALICE)).isEmpty();
+        assertThat(store.findPermissionsForPrincipal(UUID_ALICE)).isEmpty();
     }
 
     @Test
-    void find_groups_throws_on_5xx() {
-        wiremock.stubFor(get(urlPathEqualTo("/v2/principal/" + UUID_ALICE + "/groups"))
+    void find_permissions_throws_on_5xx() {
+        wiremock.stubFor(get(urlPathEqualTo("/v2/acl/" + UUID_ALICE))
             .willReturn(aResponse().withStatus(503)));
 
-        assertThatThrownBy(() -> store.findGroupsForPrincipal(UUID_ALICE))
+        assertThatThrownBy(() -> store.findPermissionsForPrincipal(UUID_ALICE))
             .isInstanceOf(FactoryPlusAuthException.class)
             .hasMessageContaining("503");
     }
 
     @Test
-    void find_groups_throws_on_malformed_response() {
-        wiremock.stubFor(get(urlPathEqualTo("/v2/principal/" + UUID_ALICE + "/groups"))
+    void find_permissions_throws_on_malformed_response() {
+        wiremock.stubFor(get(urlPathEqualTo("/v2/acl/" + UUID_ALICE))
             .willReturn(okJson("{\"unexpected\": \"object\"}")));
 
-        assertThatThrownBy(() -> store.findGroupsForPrincipal(UUID_ALICE))
+        assertThatThrownBy(() -> store.findPermissionsForPrincipal(UUID_ALICE))
             .isInstanceOf(FactoryPlusAuthException.class);
     }
 

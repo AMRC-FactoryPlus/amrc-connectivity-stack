@@ -1,2 +1,2 @@
 uk.co.amrc.app.factoryplus.keycloak.FactoryPlusPrincipalUuidMapper
-uk.co.amrc.app.factoryplus.keycloak.FactoryPlusGroupsMapper
+uk.co.amrc.app.factoryplus.keycloak.FactoryPlusPermissionsMapper

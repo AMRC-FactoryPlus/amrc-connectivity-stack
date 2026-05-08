@@ -105,6 +105,7 @@ export const ACS = {
         Git:                    "626df296-8156-4c67-8aed-aac70161aa8b",
         KrbKeys:                "a04b4195-7db4-4480-b3f3-4d22c08b96ea",
         MQTT:                   "2f42daeb-4521-4522-8e19-85dfb73db88e",
+        OpenID:                 "ba12dd71-ee22-4045-89f7-3db8d0da8fea",
         Warehouse:              "388ddbdc-4eb4-4ae8-bbd0-9be32f3c31e8",
 
         /* Obsolete: these are now dynamic */
@@ -498,6 +499,18 @@ export const DataAccess = {
         UseSparkplug: "788b049c-2831-11f1-99fd-2b0bf86d6f77",
     }
 }
+
+/* Grafana role permissions. UUIDs must match
+ * deploy/values.yaml -> serviceSetup.config.grafanaPermissions; the
+ * SPI's fp_permissions JWT claim and Grafana's role_attribute_path
+ * JMESPath both key off these. */
+export const Grafana = {
+    Perm: {
+        GrafanaAdmin:   "8d2f26ae-99c1-40c7-8487-310f7edcb64e",
+        Admin:          "7b553965-0987-4ffb-bf9a-afac8bc13707",
+        Editor:         "e5f9fe18-da63-49d3-bee5-7950eeb3e053",
+    },
+};
 
 export const UNS = {
     Group: {

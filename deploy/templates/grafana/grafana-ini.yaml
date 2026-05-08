@@ -21,8 +21,7 @@ data:
   # same UUIDs are seeded by service-setup as F+ Permission objects, so
   # admins grant them via the standard ACL editor.
   role_attribute_path: >-
-    contains(fp_permissions[*], '{{ $perms.grafanaAdmin }}') && 'GrafanaAdmin'
-    || contains(fp_permissions[*], '{{ $perms.admin }}') && 'Admin'
+    contains(fp_permissions[*], '{{ $perms.admin }}') && 'Admin'
     || contains(fp_permissions[*], '{{ $perms.editor }}') && 'Editor'
     || 'Viewer'
 {{- end }}

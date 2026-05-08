@@ -13,8 +13,16 @@ export async function migrate_auth_groups (ss) {
     const cdb = fplus.ConfigDB;
     const log = fplus.debug.bound("groups");
 
-    /* This endpoint is not mapped in the ServiceClient */
-    const [st, grps] = await auth.fetch("authz/group/all");
+    /* This endpoint is not mapped in the ServiceClient. On fresh
+     * installs there is nothing to migrate; if the legacy v1 endpoint
+     * is unreachable (network error -> status 0) or returns 404/410
+     * (endpoint removed) we have nothing to do. */
+    const [st, grps] = await auth.fetch("authz/group/all")
+        .catch(e => [0, []]);
+    if (st == 0 || st == 404 || st == 410) {
+        log("Skipping legacy Auth group migration (status %s)", st);
+        return;
+    }
     if (st != 200)
         throw `Can't fetch legacy Auth groups: ${st}`;
 

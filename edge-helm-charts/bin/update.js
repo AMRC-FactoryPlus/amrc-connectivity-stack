@@ -7,7 +7,7 @@
 import fs       from "fs";
 
 import git      from "isomorphic-git";
-import http     from "isomorphic-git/http/node";
+import http     from "isomorphic-git/http/node/index.cjs";
 
 import { ServiceClient } from "@amrc-factoryplus/service-client";
 

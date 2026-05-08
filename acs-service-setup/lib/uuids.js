@@ -503,12 +503,16 @@ export const DataAccess = {
 /* Grafana role permissions. UUIDs must match
  * deploy/values.yaml -> serviceSetup.config.grafanaPermissions; the
  * SPI's fp_permissions JWT claim and Grafana's role_attribute_path
- * JMESPath both key off these. */
+ * JMESPath both key off these.
+ *
+ * No GrafanaAdmin (server-wide superuser) is exposed - in single-org
+ * ACS deployments the Admin org role is sufficient, and Grafana 10
+ * doesn't reliably demote the is_grafana_admin flag through OAuth so
+ * the role becomes sticky. */
 export const Grafana = {
     Perm: {
-        GrafanaAdmin:   "8d2f26ae-99c1-40c7-8487-310f7edcb64e",
-        Admin:          "7b553965-0987-4ffb-bf9a-afac8bc13707",
-        Editor:         "e5f9fe18-da63-49d3-bee5-7950eeb3e053",
+        Admin:  "7b553965-0987-4ffb-bf9a-afac8bc13707",
+        Editor: "e5f9fe18-da63-49d3-bee5-7950eeb3e053",
     },
 };
 

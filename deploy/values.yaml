@@ -187,10 +187,10 @@ serviceSetup:
     # Customise per deployment if needed, but DO NOT change once a
     # production cluster has grants attached - the UUIDs are referenced
     # by the F+ ACL data which doesn't migrate when UUIDs change.
-    grafanaGroups:
-      grafanaAdmin: "9b0a37ff-cd00-4cd0-bf8c-c95ad1f00001"
-      admin:        "9b0a37ff-cd00-4cd0-bf8c-c95ad1f00002"
-      editor:       "9b0a37ff-cd00-4cd0-bf8c-c95ad1f00003"
+    grafanaPermissions:
+      grafanaAdmin: "8d2f26ae-99c1-40c7-8487-310f7edcb64e"
+      admin:        "7b553965-0987-4ffb-bf9a-afac8bc13707"
+      editor:       "e5f9fe18-da63-49d3-bee5-7950eeb3e053"
 
     # OIDC clients to provision in Keycloak. Each entry generates a
     # LocalSecret holding the client_secret in keycloak-clients/<key>.
@@ -398,9 +398,18 @@ grafana:
     server:
       root_url: "$__file{/etc/acs-config/root_url}"
     auth:
-      # Keep the local form available as a fallback if Keycloak is
-      # unreachable. The seed admin user logs in this way.
-      disable_login_form: false
+      # Hide the local username/password form: F+ via Keycloak is the
+      # only intended login path. The default Grafana admin (seed in
+      # Secret grafana-admin-user) is reachable via the URL
+      # /login?disableLoginForm=false for emergency access if Keycloak
+      # is unreachable.
+      #
+      # Operators that want the form back can override with:
+      #   grafana:
+      #     grafana.ini:
+      #       auth:
+      #         disable_login_form: false
+      disable_login_form: true
       oauth_auto_login: false
     auth.basic:
       enabled: false
@@ -411,14 +420,21 @@ grafana:
       client_id: grafana
       client_secret: $__file{/etc/secrets/auth_generic_oauth/grafana}
       scopes: openid profile email
+      # F+ has no email field; the kerberos UPN (delivered as the
+      # `preferred_username` claim by Keycloak) is the closest thing.
+      # Pointing email_attribute_path at it stops Grafana falling back
+      # to the GitHub-style /emails endpoint (which Keycloak doesn't
+      # expose and which 404s).
+      email_attribute_path: preferred_username
       auth_url: $__file{/etc/acs-config/auth_url}
       token_url: $__file{/etc/acs-config/token_url}
       api_url: $__file{/etc/acs-config/api_url}
       signout_redirect_url: $__file{/etc/acs-config/signout_redirect_url}
       # role_attribute_path is templated into the acs-grafana-config
       # ConfigMap by deploy/templates/grafana/grafana-ini.yaml so the
-      # F+ group UUIDs from serviceSetup.config.grafanaGroups can be
-      # interpolated. Reading via $__file picks up the rendered value.
+      # F+ permission UUIDs from serviceSetup.config.grafanaPermissions
+      # can be interpolated. Reading via $__file picks up the rendered
+      # value.
       role_attribute_path: $__file{/etc/acs-config/role_attribute_path}
       allow_assign_grafana_admin: true
   extraConfigmapMounts:

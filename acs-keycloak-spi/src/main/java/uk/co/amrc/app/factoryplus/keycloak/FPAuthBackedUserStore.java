@@ -88,7 +88,11 @@ public class FPAuthBackedUserStore implements FactoryPlusUserStore {
         this.baseUrl = baseUrl;
         this.timeout = timeout;
         this.authenticator = authenticator;
+        // Pin HTTP/1.1: Java's default tries an h2c upgrade on plaintext
+        // connections (sends Upgrade: h2c + Connection: Upgrade). Node's
+        // HTTP parser rejects that with 400 "Invalid Upgrade header".
         this.http = HttpClient.newBuilder()
+            .version(HttpClient.Version.HTTP_1_1)
             .connectTimeout(timeout)
             .build();
     }
@@ -100,9 +104,21 @@ public class FPAuthBackedUserStore implements FactoryPlusUserStore {
 
     @Override
     public Optional<FactoryPlusUser> findByUsername(String username) {
-        // Two-call path: resolve UPN -> UUID, then UUID -> full principal.
-        return fetchUuidByIdentity(IDENTITY_KIND_KERBEROS, username)
+        // Keycloak lowercases usernames coming off the login form, but
+        // Kerberos UPNs in F+ are stored with the realm in canonical
+        // uppercase. acs-auth's valid_krb rejects a lowercase realm
+        // outright (HTTP 400), so normalise the realm part here.
+        String upn = canonicaliseUpn(username);
+        return fetchUuidByIdentity(IDENTITY_KIND_KERBEROS, upn)
             .flatMap(this::fetchPrincipal);
+    }
+
+    private static String canonicaliseUpn(String username) {
+        if (username == null) return null;
+        int at = username.lastIndexOf('@');
+        if (at < 0) return username;
+        return username.substring(0, at) + "@"
+            + username.substring(at + 1).toUpperCase();
     }
 
     @Override
@@ -113,8 +129,8 @@ public class FPAuthBackedUserStore implements FactoryPlusUserStore {
     }
 
     @Override
-    public Set<String> findGroupsForPrincipal(String uuid) {
-        return fetchGroups(uuid);
+    public Set<String> findPermissionsForPrincipal(String uuid) {
+        return fetchWildcardPermissions(uuid);
     }
 
     /** GET /v2/identity/{kind}/{name} -> UUID string, or empty on 410. */
@@ -137,9 +153,17 @@ public class FPAuthBackedUserStore implements FactoryPlusUserStore {
         }
     }
 
-    /** GET /v2/principal/{uuid}/groups -> [uuid, ...], or empty on 410. */
-    private Set<String> fetchGroups(String uuid) {
-        URI uri = baseUrl.resolve("/v2/principal/" + encode(uuid) + "/groups");
+    /** All-zero UUID = F+ Wildcard target. Permissions granted on this
+     *  target are global ("any object"), the analogue of a role. */
+    private static final String WILDCARD_TARGET =
+        "00000000-0000-0000-0000-000000000000";
+
+    /** GET /v2/acl/{uuid} -> [{permission, target, plural?}, ...].
+     *  Filters to entries with target=Wildcard and returns the unique
+     *  set of permission UUIDs. Empty on 410/404 (principal absent or
+     *  caller cannot read any of its grants). */
+    private Set<String> fetchWildcardPermissions(String uuid) {
+        URI uri = baseUrl.resolve("/v2/acl/" + encode(uuid));
         HttpResponse<String> res = sendGet(uri);
         if (isNotFound(res.statusCode())) return Set.of();
         requireSuccess(res, uri);
@@ -148,17 +172,17 @@ public class FPAuthBackedUserStore implements FactoryPlusUserStore {
             JsonNode root = MAPPER.readTree(res.body());
             if (!root.isArray()) {
                 throw new FactoryPlusAuthException(
-                    "Expected JSON array of UUIDs from " + uri
+                    "Expected JSON array of ACL entries from " + uri
                         + ", got: " + res.body());
             }
-            Set<String> out = new HashSet<>(root.size());
-            for (JsonNode element : root) {
-                if (!element.isTextual()) {
-                    throw new FactoryPlusAuthException(
-                        "Group array from " + uri
-                            + " must contain only UUID strings");
-                }
-                out.add(element.asText());
+            Set<String> out = new HashSet<>();
+            for (JsonNode entry : root) {
+                JsonNode perm = entry.get("permission");
+                JsonNode targ = entry.get("target");
+                if (perm == null || !perm.isTextual()) continue;
+                if (targ == null || !targ.isTextual()) continue;
+                if (!WILDCARD_TARGET.equals(targ.asText())) continue;
+                out.add(perm.asText());
             }
             return Set.copyOf(out);
         }
@@ -202,6 +226,18 @@ public class FPAuthBackedUserStore implements FactoryPlusUserStore {
     }
 
     private HttpResponse<String> sendGet(URI uri) {
+        // Fresh HttpClient (and therefore fresh TCP socket) per
+        // request. The F+ auth Node HTTP server's idle keep-alive
+        // timeout (~5s) is shorter than the JDK HttpClient's default
+        // (1200s), so a shared client racing the server eventually
+        // reuses a half-dead socket and the SPI lookup fails with
+        // "received no bytes" after Keycloak's 3s storage timeout.
+        // Login traffic is sparse enough that the per-call client
+        // overhead is negligible.
+        HttpClient oneShot = HttpClient.newBuilder()
+            .version(HttpClient.Version.HTTP_1_1)
+            .connectTimeout(timeout)
+            .build();
         HttpRequest.Builder builder = HttpRequest.newBuilder(uri)
             .timeout(timeout)
             .header("Accept", "application/json")
@@ -211,7 +247,7 @@ public class FPAuthBackedUserStore implements FactoryPlusUserStore {
         }
         HttpRequest req = builder.build();
         try {
-            return http.send(req, HttpResponse.BodyHandlers.ofString());
+            return oneShot.send(req, HttpResponse.BodyHandlers.ofString());
         }
         catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -231,8 +267,12 @@ public class FPAuthBackedUserStore implements FactoryPlusUserStore {
     private static void requireSuccess(HttpResponse<String> res, URI uri) {
         int status = res.statusCode();
         if (status < 200 || status >= 300) {
+            String body = res.body();
+            if (body != null && body.length() > 500)
+                body = body.substring(0, 500) + "...[truncated]";
             throw new FactoryPlusAuthException(
-                "F+ auth returned " + status + " for " + uri);
+                "F+ auth returned " + status + " for " + uri
+                    + " body=" + body);
         }
     }
 

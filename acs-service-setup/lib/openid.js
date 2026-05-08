@@ -136,9 +136,22 @@ class OpenIDSetup {
                 + "federation can reach the F+ auth service");
         }
 
+        // Keycloak component records use the realm's internal UUID as
+        // parentId, NOT the realm name. Passing the name leaves the
+        // component orphaned: it persists but never shows up under the
+        // realm in the UI or via filtered lookups, so subsequent runs
+        // can't find it to update and the create silently piles up
+        // duplicates. Resolve the UUID first.
+        const realmRes = await this.api("GET",
+            `/admin/realms/${encodeURIComponent(this.realm)}`);
+        const realmUuid = realmRes.body?.id;
+        if (!realmUuid) {
+            throw new Error(`Cannot resolve realm UUID for ${this.realm}`);
+        }
+
         const path = `/admin/realms/${encodeURIComponent(this.realm)}/components`;
         const list = await this.api("GET",
-            `${path}?type=org.keycloak.storage.UserStorageProvider&parent=${encodeURIComponent(this.realm)}`);
+            `${path}?type=org.keycloak.storage.UserStorageProvider&parent=${encodeURIComponent(realmUuid)}`);
         const existing = (list.body ?? []).find(c => c.providerId === "factoryplus");
         const oldKrb   = (list.body ?? []).find(c => c.providerId === "kerberos");
 
@@ -153,15 +166,16 @@ class OpenIDSetup {
             name: "factoryplus",
             providerId: "factoryplus",
             providerType: "org.keycloak.storage.UserStorageProvider",
-            parentId: this.realm,
+            parentId: realmUuid,
             config: {
                 "auth.url":             [this.auth_internal_url],
                 "auth.timeout.seconds": ["5"],
                 "cache.ttl.seconds":    ["60"],
-                // Path matches the keytab mount in
-                // deploy/templates/openid/openid.yaml. Principal must
-                // exist in the cluster's KDC and have the keytab
-                // available at this path inside the Keycloak pod.
+                // The openid Pod mounts krb5-keytabs at /etc/keytabs
+                // and remaps the sv1openid secret key to filename
+                // `client` (see deploy/templates/openid/openid.yaml
+                // volume items). Don't change this path without
+                // updating the volume mapping there.
                 "auth.principal":   [sv1openid],
                 "auth.keytab.path": ["/etc/keytabs/client"],
             },
@@ -224,39 +238,76 @@ class OpenIDSetup {
         return client;
     }
 
-    /** Stamp the Factory+ identity claims (fp_principal_uuid, fp_groups)
-     *  into every token issued for this OIDC client. Both mappers are
-     *  shipped by the acs-keycloak-spi jar and registered via
+    /** Stamp the Factory+ identity claims (fp_principal_uuid,
+     *  fp_permissions) into every token issued for this OIDC client.
+     *  Both mappers are shipped by the acs-keycloak-spi jar and
+     *  registered via
      *  META-INF/services/org.keycloak.protocol.ProtocolMapper.
      *
-     *  Existing mappers with the same name are not modified; this is
-     *  safe to run on every helm upgrade. */
+     *  Idempotent: existing mappers are updated to the canonical
+     *  config (so renames or schema fixes propagate on helm upgrade). */
     async ensure_factoryplus_claim_mappers (clientUuid) {
         const path = `/admin/realms/${encodeURIComponent(this.realm)}`
             + `/clients/${clientUuid}/protocol-mappers/models`;
         const list = await this.api("GET", path);
-        const present = new Set((list.body ?? []).map(m => m.name));
 
         const mappers = [
             { name: "fp_principal_uuid",
-              protocolMapper: "factoryplus-principal-uuid-mapper" },
-            { name: "fp_groups",
-              protocolMapper: "factoryplus-groups-mapper" },
+              protocolMapper: "factoryplus-principal-uuid-mapper",
+              multivalued: false },
+            { name: "fp_permissions",
+              protocolMapper: "factoryplus-permissions-mapper",
+              // fp_permissions is a list of permission UUIDs; without
+              // multivalued=true OIDCAttributeMapperHelper.mapClaim
+              // collapses it to the first element and breaks JMESPath
+              // like contains(fp_permissions[*], '<uuid>').
+              multivalued: true },
         ];
+        const byName = new Map(
+            (list.body ?? []).map(m => [m.name, m]));
         for (const m of mappers) {
-            if (present.has(m.name)) continue;
-            this.log("Creating %s mapper on client %s", m.name, clientUuid);
-            await this.api("POST", path, {
-                name: m.name,
-                protocol: "openid-connect",
-                protocolMapper: m.protocolMapper,
-                config: {
-                    "id.token.claim":       "true",
-                    "access.token.claim":   "true",
-                    "userinfo.token.claim": "true",
-                    "introspection.token.claim": "true",
-                },
-            });
+            const config = {
+                "id.token.claim":       "true",
+                "access.token.claim":   "true",
+                "userinfo.token.claim": "true",
+                "introspection.token.claim": "true",
+                "multivalued":          String(m.multivalued),
+            };
+            const existing = byName.get(m.name);
+            if (existing) {
+                this.log("Updating %s mapper on client %s", m.name, clientUuid);
+                await this.api("PUT", `${path}/${existing.id}`, {
+                    ...existing,
+                    protocol: "openid-connect",
+                    protocolMapper: m.protocolMapper,
+                    config,
+                });
+            } else {
+                this.log("Creating %s mapper on client %s", m.name, clientUuid);
+                await this.api("POST", path, {
+                    name: m.name,
+                    protocol: "openid-connect",
+                    protocolMapper: m.protocolMapper,
+                    config,
+                });
+            }
+        }
+    }
+
+    /** Disable required actions that try to write back to the federated
+     *  user. F+ has no email/firstName/lastName fields, and our SPI
+     *  adapter is read-only - if Keycloak prompts the user to fill in
+     *  those fields and tries to save them, the save fails with
+     *  ReadOnlyException. Disable the actions globally for the realm. */
+    async ensure_required_actions_disabled () {
+        const path = `/admin/realms/${encodeURIComponent(this.realm)}/authentication/required-actions`;
+        const res = await this.api("GET", path);
+        const blockers = ["UPDATE_PROFILE", "VERIFY_PROFILE", "VERIFY_EMAIL"];
+        for (const ra of res.body ?? []) {
+            if (!blockers.includes(ra.alias) || !ra.enabled) continue;
+            this.log("Disabling required action %s", ra.alias);
+            await this.api("PUT", `${path}/${ra.alias}`,
+                { ...ra, enabled: false, defaultAction: false });
         }
     }
 
@@ -264,6 +315,7 @@ class OpenIDSetup {
         await this.wait_for_ready();
         await this.ensure_realm();
         await this.ensure_factoryplus_federation();
+        await this.ensure_required_actions_disabled();
 
         const clients = this.config.openidClients ?? {};
         for (const [name, spec] of Object.entries(clients)) {

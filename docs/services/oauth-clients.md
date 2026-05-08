@@ -68,8 +68,9 @@ install/upgrade, ACS will:
 2. Create or update the client in Keycloak with:
    - `clientId` = the entry name
    - confidential client (`publicClient: false`), `standardFlowEnabled` (auth code)
-   - rootUrl/baseUrl/webOrigins = `<proto>://<name>.<acs.baseUrl>`
-   - `redirectUris` = `<root><spec.redirectPath>` (defaults to `/*`)
+   - rootUrl/baseUrl/webOrigins = `<proto>://<name>.<acs.baseUrl>` (overridable - see *Keys* below)
+   - `redirectUris` = `<root><spec.redirectPath>` (defaults to `/*`; overridable)
+   - `post.logout.redirect.uris` = `<root>` (overridable)
    - `backchannel.logout.session.required = true` (force-logouts in
      Keycloak invalidate the application's session immediately)
 3. Attach the `fp_principal_uuid` and `fp_permissions` protocol
@@ -108,26 +109,21 @@ Keys:
 |-------|----------|---------|-------|
 | `enabled` | yes | - | Set `false` to skip provisioning without removing the entry. |
 | `name` | no | the map key | Display name in the Keycloak admin UI. |
-| `redirectPath` | no | `/*` | The path part of the redirect URI. Combined with `<proto>://<name>.<acs.baseUrl>`. |
+| `redirectPath` | no | `/*` | The path part of the redirect URI. Combined with `<proto>://<name>.<acs.baseUrl>`. Ignored if `redirectUris` is set. |
 | `builtin` | no | `false` | If `true`, do not create or modify the client - just attach the `fp_*` claim mappers to a client that already exists in the realm. Useful for `admin-cli` and similar realm-builtin clients. |
+| `rootUrl` | no | `<proto>://<name>.<acs.baseUrl>` | Override the client's Root URL (shown in the Keycloak admin UI; used by Keycloak to resolve relative URLs). |
+| `baseUrl` | no | same as `rootUrl` | Override the client's Home URL (where Keycloak sends the user from the account console). |
+| `redirectUris` | no | `[<root><redirectPath>]` | Override the full list of valid redirect URIs. Each entry is a full URL (or a Keycloak wildcard like `https://example.com/*`). When set, `redirectPath` is ignored. |
+| `webOrigins` | no | `[<root>]` | Override the CORS web origins. Each entry is an origin (`https://host[:port]`). |
+| `postLogoutRedirectUris` | no | `[<root>]` | Override the list of allowed post-logout redirect URIs. Each entry is a full URL. |
 
-> **Heads up: redirect URIs are derived from the client name.** The
-> root URL is always `<proto>://<name>.<acs.baseUrl>`. If your
-> application is reachable at a different host (an external domain,
-> a different subdomain pattern, multiple environments behind one
-> realm), the auto-generated redirect URI will be wrong. Either:
->
-> - Deploy the application as `<name>.<acs.baseUrl>` to match (the
->   path most internal apps follow - this is what Grafana does), or
-> - After the first run, edit the client in the Keycloak admin UI to
->   add extra `redirectUris`/`webOrigins`. Subsequent service-setup
->   runs will reset only the canonical redirect URI; manually-added
->   ones survive because service-setup merges its desired state on
->   top of the existing record. (Removing entries this way is harder;
->   you'd have to delete them in Keycloak after each upgrade.)
->
-> A first-class override mechanism is on the roadmap. Until then,
-> follow the `<name>.<acs.baseUrl>` convention where possible.
+> **Override behaviour.** When any of the override fields above is
+> set, the value flows straight through to Keycloak and **replaces**
+> the auto-derived default for that field. This means removals work
+> too - declaring `redirectUris: ["https://other.host/callback"]`
+> will drop the canonical `https://<name>.<acs.baseUrl>/*` entry on
+> the next service-setup run. Helm upgrades stay idempotent: leave
+> the field unset and the existing default is preserved.
 
 ### 2. Apply the chart
 
@@ -362,9 +358,11 @@ Most common cause: your application is served at a host other than
 the application actually redirects to.
 
 Check the registered URIs in the Keycloak admin UI (Clients ->
-`<name>` -> Settings -> Valid redirect URIs). Either change the
-application's redirect URI to match what's registered, or add the
-extra URI in the Keycloak UI.
+`<name>` -> Settings -> Valid redirect URIs). The clean fix is to set
+`redirectUris` (and, if needed, `webOrigins` /
+`postLogoutRedirectUris`) on the client entry in `values.yaml` and
+re-run `helm upgrade` - service-setup will write the full list to
+Keycloak and the change survives subsequent runs.
 
 ### `fp_permissions` is missing or empty
 

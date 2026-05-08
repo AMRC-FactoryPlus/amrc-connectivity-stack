@@ -198,6 +198,20 @@ serviceSetup:
     # identity directly from the token. Per-client Keycloak roles are
     # no longer used; permissions are driven from F+ ACLs via
     # fp_groups.
+    #
+    # By default the client's URLs are derived from the entry name and
+    # acs.baseUrl: rootUrl/baseUrl/webOrigins all become
+    # `<proto>://<name>.<acs.baseUrl>`, redirectUris becomes
+    # `<root><redirectPath>`, and post.logout.redirect.uris becomes
+    # `<root>`. For applications served at a different host, override
+    # any of the following per-client fields - the values flow
+    # straight through to Keycloak and replace the auto-derived
+    # defaults so removals also work:
+    #   rootUrl                 (string)
+    #   baseUrl                 (string)
+    #   redirectUris            (list of full URLs)
+    #   webOrigins              (list of origins)
+    #   postLogoutRedirectUris  (list of full URLs)
     openidClients:
       grafana:
         enabled: true

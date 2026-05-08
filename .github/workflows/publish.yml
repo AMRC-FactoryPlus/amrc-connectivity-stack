@@ -542,9 +542,45 @@ jobs:
           service-name: ${{ steps.prepare.outputs.service-name }}
           digest: ${{ steps.build-and-push.outputs.digest }}
 
+  build-keycloak:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - uses: ./.github/actions/prepare
+        id: prepare
+        with:
+          service-name: acs-keycloak
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build
+        uses: docker/build-push-action@v6
+        id: build-and-push
+        with:
+          context: ./${{ steps.prepare.outputs.service-name }}
+          push: true
+          tags: ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}:${{ steps.prepare.outputs.version }}
+          labels: ${{ steps.prepare.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            revision=${{ steps.prepare.outputs.version }} (${{ github.sha }})
+          build-contexts: |
+            lib=./lib
+            spi=./acs-keycloak-spi
+      - uses: ./.github/actions/cleanup
+        id: cleanup
+        with:
+          version: ${{ steps.prepare.outputs.version }}
+          service-name: ${{ steps.prepare.outputs.service-name }}
+          digest: ${{ steps.build-and-push.outputs.digest }}
+
   build-helm-chart:
     if: github.event_name == 'release'
-    needs: [ 'build-x86-js', 'build-arm-js-merge', 'build-x86-pg', 'java-services' ]
+    needs: [ 'build-x86-js', 'build-arm-js-merge', 'build-x86-pg', 'java-services', 'build-keycloak' ]
     runs-on: ubuntu-latest
     steps:
       - name: Install Helm

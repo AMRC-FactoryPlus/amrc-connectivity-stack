@@ -188,9 +188,8 @@ serviceSetup:
     # production cluster has grants attached - the UUIDs are referenced
     # by the F+ ACL data which doesn't migrate when UUIDs change.
     grafanaPermissions:
-      grafanaAdmin: "8d2f26ae-99c1-40c7-8487-310f7edcb64e"
-      admin:        "7b553965-0987-4ffb-bf9a-afac8bc13707"
-      editor:       "e5f9fe18-da63-49d3-bee5-7950eeb3e053"
+      admin:  "7b553965-0987-4ffb-bf9a-afac8bc13707"
+      editor: "e5f9fe18-da63-49d3-bee5-7950eeb3e053"
 
     # OIDC clients to provision in Keycloak. Each entry generates a
     # LocalSecret holding the client_secret in keycloak-clients/<key>.
@@ -436,14 +435,11 @@ grafana:
       # can be interpolated. Reading via $__file picks up the rendered
       # value.
       role_attribute_path: $__file{/etc/acs-config/role_attribute_path}
-      allow_assign_grafana_admin: true
       # Grafana applies role_attribute_path on every OAuth login. By
-      # default it will not *demote* an existing user (GrafanaAdmin
-      # stays once granted, even if the JMESPath later resolves to
-      # Viewer). With role_attribute_strict the JMESPath result is
-      # authoritative each login, so revoking Grafana.Perm.* in F+
-      # actually downgrades the user on next login rather than 60s
-      # of cache staleness becoming permanent.
+      # default it will not *demote* an existing user; with strict
+      # mode the JMESPath result is authoritative each login, so
+      # revoking Grafana.Perm.* in F+ downgrades on next login rather
+      # than letting the 60s SPI cache staleness become permanent.
       role_attribute_strict: true
   extraConfigmapMounts:
     - name: acs-grafana-config

@@ -10,7 +10,12 @@ metadata:
     "helm.sh/resource-policy": "keep"
 type: Opaque
 data:
-  admin-user: {{ (printf "admin@%s" (.Values.identity.realm | required "values.identity.realm is required!") | b64enc) | quote }}
+  # Default Grafana admin login. Must NOT match any F+ OAuth login -
+  # federated users arrive with preferred_username = their kerberos
+  # UPN (e.g. admin@FACTORYPLUS.LOCAL), and Grafana refuses OAuth
+  # login with "user already exists" if a local user has the same
+  # name. Keep this as the bare "admin" default so it never collides.
+  admin-user: {{ "admin" | b64enc | quote }}
   admin-password: {{ (printf "" | b64enc) | quote }}
 
 {{- end }}

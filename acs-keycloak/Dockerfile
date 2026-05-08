@@ -38,3 +38,8 @@ LABEL org.opencontainers.image.revision="${revision}"
 # at startup and discovers the providers via META-INF/services.
 COPY --from=build /build/acs-keycloak-spi/target/acs-keycloak-spi-*.jar \
                   /opt/keycloak/providers/
+
+# ACS-branded login theme. service-setup activates it by setting
+# loginTheme=factory-plus on the realm; if disabled, the directory just
+# sits unused.
+COPY themes/factory-plus /opt/keycloak/themes/factory-plus

@@ -66,6 +66,11 @@ spec:
               value: {{ include "amrc-connectivity-stack.external-url" (list . "openid") }}
             - name: OPENID_REALM
               value: {{ .Values.openid.realm }}
+            # Login theme baked into the acs-keycloak image. Empty
+            # disables the override and Keycloak falls back to its
+            # built-in keycloak.v2 theme.
+            - name: OPENID_LOGIN_THEME
+              value: {{ .Values.openid.loginTheme | default "" | quote }}
             # Cluster-internal URL for the F+ auth service. The Keycloak
             # SPI federation will be configured to call this URL for
             # principal/group lookups; the SPI authenticates as

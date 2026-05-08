@@ -148,6 +148,12 @@ openid:
   # -- Realm name created in Keycloak. Must match the realm used in
   # the Grafana OAuth ConfigMap (deploy/templates/grafana/grafana-ini.yaml).
   realm: factory_plus
+  # -- Keycloak login theme set on the realm. The "factory-plus" theme
+  # ships in the acs-keycloak image and renders ACS-branded login,
+  # logout and error pages. Set to "" (empty) to keep Keycloak's stock
+  # keycloak.v2 theme, or set to a different name if you've baked a
+  # custom theme into your own Keycloak image.
+  loginTheme: factory-plus
   image:
     # -- Custom Keycloak image with the Factory+ User Storage SPI baked
     # in (built from acs-keycloak/Dockerfile). To run upstream Keycloak

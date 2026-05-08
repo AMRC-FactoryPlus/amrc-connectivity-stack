@@ -21,6 +21,9 @@ class OpenIDSetup {
         this.url = process.env.OPENID_URL.replace(/\/+$/, "");
         this.realm = process.env.OPENID_REALM;
         this.kerberos_realm = this.acs.realm;
+        // Empty string disables theme override and lets Keycloak fall
+        // back to its built-in keycloak.v2 theme.
+        this.login_theme = process.env.OPENID_LOGIN_THEME ?? "";
         // Cluster-internal F+ auth URL (e.g.
         // http://auth.factory-plus.svc.cluster.local). The Keycloak
         // SPI federation calls this URL for principal/group lookups.
@@ -115,6 +118,13 @@ class OpenIDSetup {
             registrationAllowed: false,
             sslRequired: this.acs.secure ? "external" : "none",
         };
+        // Login pages are the visible surface (sign in, logout, error).
+        // The account console isn't reskinned - users don't reach it in
+        // ACS - so we only override loginTheme. Always assign the field
+        // (even when empty) so flipping the values.yaml setting back
+        // off actually propagates instead of being shadowed by the
+        // existing realm value during the merge below.
+        desired.loginTheme = this.login_theme;
         if (get.status === 404) {
             this.log("Creating realm %s", this.realm);
             await this.api("POST", "/admin/realms", desired);

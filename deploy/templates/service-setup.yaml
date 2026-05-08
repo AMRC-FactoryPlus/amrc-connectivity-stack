@@ -122,22 +122,21 @@ spec:
             - /bin/sh
             - -c
             - |
-              DEPLOYMENT_NAME=mqtt
+              # Restart deployments whose state may go stale relative
+              # to F+ after service-setup runs.
+              #   mqtt   - permission template / ACL config rebuild
+              #   openid - service-setup may regenerate sv1openid's
+              #            keytab, leaving a stale TGT in the Keycloak
+              #            SPI's cached JAAS Subject. Without a restart
+              #            the SPI's outbound calls to F+ Auth time
+              #            out until the pod is bounced manually.
               NAMESPACE={{.Release.Namespace}}
-
-              echo "Attempting to restart deployment: $DEPLOYMENT_NAME"
-
-              # Try to rollout restart the deployment
-              kubectl rollout restart deployment/$DEPLOYMENT_NAME -n $NAMESPACE
-
-              # Wait and check rollout status
-              if kubectl rollout status deployment/$DEPLOYMENT_NAME -n $NAMESPACE --timeout=60s; then
-                echo "Deployment restarted successfully!"
-                exit 0  # Exit successfully, no pod restart needed
-              else
-                echo "Deployment restart failed, retrying..."
-                exit 1  # Exit with error, pod will restart
-              fi
+              for D in mqtt openid; do
+                echo "Restarting deployment: $D"
+                kubectl rollout restart "deployment/$D" -n "$NAMESPACE" || exit 1
+                kubectl rollout status "deployment/$D" -n "$NAMESPACE" --timeout=120s || exit 1
+                echo "$D restarted."
+              done
 ---
 
 apiVersion: v1

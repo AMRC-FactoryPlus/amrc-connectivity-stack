@@ -206,6 +206,14 @@ class OpenIDSetup {
     async ensure_client (name, spec) {
         const root = this.redirect_root(name);
         const secret = await this.read_secret(name);
+        // Each of these has an auto-derived default keyed off `root`
+        // (i.e. `<proto>://<name>.<acs.baseUrl>`) which is right for
+        // any application served at that canonical host. Apps served
+        // elsewhere - external domains, partner integrations, multiple
+        // environments behind one realm - declare the corresponding
+        // field in values.yaml to replace the default. Keycloak's
+        // post.logout.redirect.uris attribute is a single string with
+        // entries joined by `##`.
         const desired = {
             clientId: name,
             name: spec.name ?? name,
@@ -216,12 +224,14 @@ class OpenIDSetup {
             directAccessGrantsEnabled: false,
             serviceAccountsEnabled: false,
             secret,
-            rootUrl: root,
-            baseUrl: root,
-            redirectUris: [`${root}${spec.redirectPath ?? "/*"}`],
-            webOrigins: [root],
+            rootUrl: spec.rootUrl ?? root,
+            baseUrl: spec.baseUrl ?? root,
+            redirectUris: spec.redirectUris
+                ?? [`${root}${spec.redirectPath ?? "/*"}`],
+            webOrigins: spec.webOrigins ?? [root],
             attributes: {
-                "post.logout.redirect.uris": root,
+                "post.logout.redirect.uris":
+                    (spec.postLogoutRedirectUris ?? [root]).join("##"),
                 // When an admin force-logs-out a user in Keycloak,
                 // backchannel.logout.session.required tells Keycloak to
                 // POST a session-end notification to the client so it

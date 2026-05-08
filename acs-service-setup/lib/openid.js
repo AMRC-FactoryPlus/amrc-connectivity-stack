@@ -114,7 +114,11 @@ class OpenIDSetup {
         const desired = {
             realm: this.realm,
             enabled: true,
-            loginWithEmailAllowed: true,
+            // F+ identities are username+Kerberos. We don't issue email
+            // addresses and the federation provider has no email field
+            // to query, so accepting "username or email" misleads users
+            // into trying their personal email. Force username-only.
+            loginWithEmailAllowed: false,
             registrationAllowed: false,
             sslRequired: this.acs.secure ? "external" : "none",
         };

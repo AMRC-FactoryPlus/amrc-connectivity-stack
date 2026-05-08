@@ -68,12 +68,15 @@ class FactoryPlusUserAdapterTest {
     }
 
     @Test
-    void exposes_null_email_when_dto_email_is_null() {
+    void falls_back_to_username_when_dto_email_is_null() {
+        // F+ has no email field; we synthesise the email from the UPN
+        // so downstream OIDC consumers (Grafana) don't 500 on missing
+        // email. Real email values from the DTO still take precedence.
         FactoryPlusUser noEmail = new FactoryPlusUser(
             "00000000-0000-0000-0000-000000000002", "bob", null);
         var bob = new FactoryPlusUserAdapter(session, realm, model, noEmail,
             NullFactoryPlusUserStore.INSTANCE);
-        assertThat(bob.getEmail()).isNull();
+        assertThat(bob.getEmail()).isEqualTo("bob");
     }
 
     @Test
@@ -81,7 +84,7 @@ class FactoryPlusUserAdapterTest {
         var stubStore = new StubGroupsStore(java.util.Set.of("g1", "g2"));
         var alice = new FactoryPlusUserAdapter(session, realm, model, ALICE, stubStore);
 
-        assertThat(alice.getFactoryPlusGroups()).containsExactlyInAnyOrder("g1", "g2");
+        assertThat(alice.getFactoryPlusPermissions()).containsExactlyInAnyOrder("g1", "g2");
         assertThat(stubStore.lastUuid)
             .as("Store must be queried with the principal's F+ UUID")
             .isEqualTo(ALICE.uuid());
@@ -102,7 +105,7 @@ class FactoryPlusUserAdapterTest {
         @Override public java.util.Optional<FactoryPlusUser> findByEmail(String e) {
             return java.util.Optional.empty();
         }
-        @Override public java.util.Set<String> findGroupsForPrincipal(String uuid) {
+        @Override public java.util.Set<String> findPermissionsForPrincipal(String uuid) {
             lastUuid = uuid;
             return response;
         }

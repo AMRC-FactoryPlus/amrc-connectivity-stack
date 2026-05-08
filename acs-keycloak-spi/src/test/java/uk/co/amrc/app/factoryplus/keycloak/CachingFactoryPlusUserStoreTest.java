@@ -99,8 +99,8 @@ class CachingFactoryPlusUserStoreTest {
     void group_lookups_are_cached_too() {
         counting.respondWithGroups(Set.of("g1", "g2"));
 
-        cache.findGroupsForPrincipal("alice-uuid");
-        cache.findGroupsForPrincipal("alice-uuid");
+        cache.findPermissionsForPrincipal("alice-uuid");
+        cache.findPermissionsForPrincipal("alice-uuid");
 
         assertThat(counting.groupCalls)
             .as("Second group lookup within TTL should hit cache")
@@ -113,7 +113,7 @@ class CachingFactoryPlusUserStoreTest {
         counting.respondWithGroups(Set.of("g1"));
 
         cache.findByUuid("alice-uuid");
-        cache.findGroupsForPrincipal("alice-uuid");
+        cache.findPermissionsForPrincipal("alice-uuid");
 
         assertThat(counting.uuidCalls).isEqualTo(1);
         assertThat(counting.groupCalls)
@@ -190,7 +190,7 @@ class CachingFactoryPlusUserStoreTest {
             emailCalls++;
             return responseOrThrow();
         }
-        @Override public Set<String> findGroupsForPrincipal(String uuid) {
+        @Override public Set<String> findPermissionsForPrincipal(String uuid) {
             groupCalls++;
             return groupResponse;
         }

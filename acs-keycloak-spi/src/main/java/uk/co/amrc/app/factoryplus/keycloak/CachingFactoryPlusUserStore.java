@@ -66,13 +66,13 @@ public class CachingFactoryPlusUserStore implements FactoryPlusUserStore {
     }
 
     @Override
-    public Set<String> findGroupsForPrincipal(String uuid) {
+    public Set<String> findPermissionsForPrincipal(String uuid) {
         Instant now = clock.instant();
         GroupEntry existing = byGroups.get(uuid);
         if (existing != null && existing.expiresAt.isAfter(now)) {
             return existing.result;
         }
-        Set<String> fresh = delegate.findGroupsForPrincipal(uuid);
+        Set<String> fresh = delegate.findPermissionsForPrincipal(uuid);
         byGroups.put(uuid, new GroupEntry(fresh, now.plus(ttl)));
         return fresh;
     }

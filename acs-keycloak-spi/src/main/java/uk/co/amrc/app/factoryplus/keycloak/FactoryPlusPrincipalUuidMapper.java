@@ -98,9 +98,10 @@ public class FactoryPlusPrincipalUuidMapper extends AbstractOIDCProtocolMapper
      * full session/transform machinery.
      */
     public static Object claimValueFor(UserModel user) {
-        if (user instanceof FactoryPlusUserAdapter adapter) {
-            return adapter.getFactoryPlusUuid();
-        }
-        return null;
+        if (user == null) return null;
+        // Read via the attribute API so this works against both fresh
+        // FactoryPlusUserAdapter instances and Keycloak's
+        // UserCacheSession wrapper.
+        return user.getFirstAttribute(FactoryPlusUserAdapter.ATTR_FP_UUID);
     }
 }

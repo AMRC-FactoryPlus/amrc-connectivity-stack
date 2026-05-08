@@ -14,10 +14,13 @@
 package uk.co.amrc.app.factoryplus.keycloak;
 
 import org.keycloak.component.ComponentModel;
+import org.keycloak.credential.CredentialInput;
+import org.keycloak.credential.CredentialInputValidator;
 import org.keycloak.models.GroupModel;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
 import org.keycloak.models.UserModel;
+import org.keycloak.models.credential.PasswordCredentialModel;
 import org.keycloak.storage.StorageId;
 import org.keycloak.storage.UserStorageProvider;
 import org.keycloak.storage.user.UserLookupProvider;
@@ -27,18 +30,22 @@ import java.util.Map;
 import java.util.stream.Stream;
 
 public class FactoryPlusUserStorageProvider
-        implements UserStorageProvider, UserLookupProvider, UserQueryProvider {
+        implements UserStorageProvider, UserLookupProvider, UserQueryProvider,
+                   CredentialInputValidator {
 
     private final KeycloakSession session;
     private final ComponentModel model;
     private final FactoryPlusUserStore store;
+    private final KerberosPasswordValidator passwordValidator;
 
     public FactoryPlusUserStorageProvider(KeycloakSession session,
                                           ComponentModel model,
-                                          FactoryPlusUserStore store) {
+                                          FactoryPlusUserStore store,
+                                          KerberosPasswordValidator passwordValidator) {
         this.session = session;
         this.model = model;
         this.store = store;
+        this.passwordValidator = passwordValidator;
     }
 
     /** Test-only accessor; lets factory tests assert which store
@@ -115,6 +122,31 @@ public class FactoryPlusUserStorageProvider
         // Phase 5 implements group membership; until then no federated
         // users appear in any group.
         return Stream.empty();
+    }
+
+    // -- CredentialInputValidator ------------------------------------
+    //
+    // We only support PASSWORD; SPNEGO/Negotiate flows go through
+    // Keycloak's Kerberos authenticator separately.
+
+    @Override
+    public boolean supportsCredentialType(String credentialType) {
+        return PasswordCredentialModel.TYPE.equals(credentialType);
+    }
+
+    @Override
+    public boolean isConfiguredFor(RealmModel realm, UserModel user, String credentialType) {
+        // Every federated user can be challenged for a password (we
+        // delegate validation to KDC at challenge time).
+        return supportsCredentialType(credentialType);
+    }
+
+    @Override
+    public boolean isValid(RealmModel realm, UserModel user, CredentialInput input) {
+        if (!supportsCredentialType(input.getType())) return false;
+        // The username Keycloak stored for this UserModel is the F+
+        // kerberos UPN (set by FactoryPlusUserAdapter).
+        return passwordValidator.validate(user.getUsername(), input.getChallengeResponse());
     }
 
     @Override

@@ -419,12 +419,26 @@ export class APIv1 {
     }
 
     /**
-     * POST /subscriptions/delete — deletes the listed subscriptions for a client.
-     **/
+     * POST /subscriptions/delete — deletes the listed subscriptions for
+     * a client. Per-id success/error envelope: missing or wrong-client
+     * ids are reported as failures rather than aborting the batch.
+     */
     delete_subscriptions(req: Request, res: Response): void {
         const { clientId, subscriptionIds } = req.body;
-        this.subscriptions.delete(clientId, subscriptionIds);
-        res.json({ deleted: subscriptionIds });
+        const results = (subscriptionIds as string[]).map(id => {
+            try {
+                this.subscriptions.deleteOne(clientId, id);
+                return { success: true, subscriptionId: id, result: null };
+            } catch (err: any) {
+                return {
+                    success: false,
+                    subscriptionId: id,
+                    error: { code: err.status ?? 500, message: err.message },
+                };
+            }
+        });
+        const allSuccess = results.every(r => r.success);
+        ((res as any)._originalJson || res.json.bind(res))({ success: allSuccess, results });
     }
 
     /**

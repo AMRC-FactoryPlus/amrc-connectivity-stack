@@ -267,7 +267,14 @@ function createPreloadedMocks() {
                     displayName: "Sub " + id,
                 })),
             ),
-        delete: jest.fn<(clientId: string, ids: string[]) => void>(),
+        deleteOne: jest.fn<(clientId: string, id: string) => void>()
+            .mockImplementation((_clientId: string, id: string) => {
+                if (id === "does-not-exist") {
+                    const err: any = new Error(`Subscription ${id} not found`);
+                    err.status = 404;
+                    throw err;
+                }
+            }),
         register: jest.fn<(clientId: string, subId: string, ids: string[], maxDepth?: number) => void>(),
         unregister: jest.fn<(clientId: string, subId: string, ids: string[]) => void>(),
         stream: jest.fn<(clientId: string, subId: string, res: any) => void>(),
@@ -917,15 +924,39 @@ describe("E2E Compliance Tests", () => {
     });
 
     describe("POST /v1/subscriptions/delete", () => {
-        it("returns 200 with deleted confirmation", async () => {
+        it("returns bulk envelope for an existing subscription", async () => {
+            const { app } = createE2eApp();
+
+            const create = await request(app)
+                .post("/v1/subscriptions")
+                .send({ clientId: "test-client", displayName: "to-delete" });
+            const subId = create.body.result.subscriptionId;
+
+            const res = await request(app)
+                .post("/v1/subscriptions/delete")
+                .send({ clientId: "test-client", subscriptionIds: [subId] });
+
+            expect(res.status).toBe(200);
+            expect(res.body).toEqual({
+                success: true,
+                results: [
+                    { success: true, subscriptionId: subId, result: null },
+                ],
+            });
+        });
+
+        it("reports 404 per-item for an unknown subscription", async () => {
             const { app } = createE2eApp();
             const res = await request(app)
                 .post("/v1/subscriptions/delete")
-                .send({ clientId: "test-client", subscriptionIds: ["sub-1"] });
+                .send({ clientId: "test-client", subscriptionIds: ["does-not-exist"] });
 
             expect(res.status).toBe(200);
-            expect(res.body.success).toBe(true);
-            expect(res.body.result).toHaveProperty("deleted");
+            expect(res.body.success).toBe(false);
+            expect(res.body.results).toHaveLength(1);
+            expect(res.body.results[0].success).toBe(false);
+            expect(res.body.results[0].subscriptionId).toBe("does-not-exist");
+            expect(res.body.results[0].error.code).toBe(404);
         });
     });
 

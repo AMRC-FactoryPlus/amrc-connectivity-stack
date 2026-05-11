@@ -59,7 +59,7 @@ function mockSubscriptions() {
             }),
         list: jest.fn<(clientId: string, ids: string[]) => I3xSubscription[]>()
             .mockReturnValue([]),
-        delete: jest.fn<(clientId: string, ids: string[]) => void>(),
+        deleteOne: jest.fn<(clientId: string, id: string) => void>(),
         register: jest.fn<(clientId: string, subId: string, ids: string[], maxDepth?: number) => void>(),
         unregister: jest.fn<(clientId: string, subId: string, ids: string[]) => void>(),
         stream: jest.fn<(clientId: string, subId: string, res: any) => void>(),
@@ -738,15 +738,49 @@ describe("APIv1", () => {
     });
 
     describe("POST /subscriptions/delete", () => {
-        it("removes subscription", async () => {
+        it("returns bulk envelope on success", async () => {
             const { app, subscriptions } = createApp();
 
             const res = await request(app)
                 .post("/subscriptions/delete")
-                .send({ clientId: "c1", subscriptionIds: ["sub-1"] });
+                .send({ clientId: "c1", subscriptionIds: ["sub-1", "sub-2"] });
 
             expect(res.status).toBe(200);
-            expect(subscriptions.delete).toHaveBeenCalledWith("c1", ["sub-1"]);
+            expect(subscriptions.deleteOne).toHaveBeenCalledWith("c1", "sub-1");
+            expect(subscriptions.deleteOne).toHaveBeenCalledWith("c1", "sub-2");
+            expect(res.body).toEqual({
+                success: true,
+                results: [
+                    { success: true, subscriptionId: "sub-1", result: null },
+                    { success: true, subscriptionId: "sub-2", result: null },
+                ],
+            });
+        });
+
+        it("reports per-id errors with code from err.status", async () => {
+            const { app, subscriptions } = createApp();
+            subscriptions.deleteOne.mockImplementation((_clientId: string, id: string) => {
+                if (id === "missing") {
+                    const err: any = new Error("Subscription missing not found");
+                    err.status = 404;
+                    throw err;
+                }
+            });
+
+            const res = await request(app)
+                .post("/subscriptions/delete")
+                .send({ clientId: "c1", subscriptionIds: ["sub-1", "missing"] });
+
+            expect(res.status).toBe(200);
+            expect(res.body.success).toBe(false);
+            expect(res.body.results).toEqual([
+                { success: true, subscriptionId: "sub-1", result: null },
+                {
+                    success: false,
+                    subscriptionId: "missing",
+                    error: { code: 404, message: "Subscription missing not found" },
+                },
+            ]);
         });
     });
 

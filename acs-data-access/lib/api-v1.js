@@ -4,7 +4,7 @@
 */
 
 import express from "express";
-import { Map as IMap, Seq as ISeq } from "immutable";
+import { Map as IMap, Seq as ISeq, merge } from "immutable";
 import * as rx from "rxjs";
 
 import { APIError } from "@amrc-factoryplus/service-api";
@@ -12,7 +12,7 @@ import { ServiceError } from "@amrc-factoryplus/service-client";
 import { retryBackoff } from "@amrc-factoryplus/rx-util";
 import { DataAccess as Constants } from "./constants.js";
 import { valid_uuid, DatasetValidity } from "./validate.js";
-import { convertToCsv } from './utils.js';
+import { csv_escape, maxDate, minDate } from './utils.js';
 
 
 function fail(log, status, message) {
@@ -183,137 +183,98 @@ export class APIv1 {
     }
   }
 
-  _merge_intervals(queries) {
-    return ISeq(queries)
-      .groupBy(q => q.source)
-      .flatMap((group, source) => {
-        const intervals = group
-          .map(q => ({
-            from: q.from ? new Date(q.from) : new Date(0),
-            to: q.to ? new Date(q.to) : new Date()
-          }))
-          .sortBy(i => i.from)
-          .toArray(); 
 
-        const merged = [];
+  async _resolve_dataset(
+    dataset_uuid,
+    inherited_range = {from: null, to: null},
+    visited = new Set(),
+  ){
+    // prevent circular references
+    if(visited.has(dataset_uuid)) return fail(this.log, 404, `Circular dataset reference detected ${dataset_uuid}`);
 
-        for (const interval of intervals) {
-          if (!merged.length) {
-            merged.push(interval);
-            continue;
-          }
+    visited.add(dataset_uuid);
 
-          const last = merged[merged.length - 1];
+    const datasets = await rx.firstValueFrom(this.data.datasets);
+    const dataset = await datasets.get(dataset_uuid);
 
-          if (interval.from <= last.to) {
-            last.to = new Date(Math.max(last.to, interval.to));
-          } else {
-            merged.push(interval);
-          }
-        }
+    if(!dataset) return fail(this.log, 404, `Dataset not found ${dataset_uuid}`);
 
-        return merged.map(m => ({
-          source,
-          from: m.from,
-          to: m.to
-        }));
-      })
-      .toArray();
-  }
+    if(dataset.validity !== DatasetValidity.VALID) return fail(this.log, 404, `Invalid dataset ${dataset_uuid}`);
+ 
+    const {structure, config} = dataset;
+    if(!structure) return fail(this.log, 404, `Structure not found for dataset ${dataset_uuid}`);
+    if(!config) return fail(this.log, 404, `Config not found for ${dataset_uuid}`);
 
+    // ======================================================
+    //                      SparkplugSRC 
+    // ======================================================
 
-  // Resolve nested datasets 
-  async _resolve_dataset(dataset_uuid, from=null, to=null, visited = new Set()) {
-      const datasets = await rx.firstValueFrom(this.data.datasets);
-      const dataset = await datasets.get(dataset_uuid);
-
-      if (!dataset) return fail(this.log, 404, `Dataset not found for ${dataset_uuid}`);
-
-      if(dataset.validity === DatasetValidity.INVALID) return fail(this.log, 404, `Invalid dataset ${dataset_uuid}`);
-      
-      if(visited.has(dataset_uuid)) return fail(this.log, 404, `Circular dataset reference detected at ${dataset_uuid}`);
-
-      visited.add(dataset_uuid);
-
-      const { structure, config } = dataset;
-
-      if(!structure) return fail(this.log, 404, `Structure not found for ${dataset_uuid}`);
-    
-      if(!valid_uuid(structure)) return fail(this.log, 404, `Invalid structure uuid for ${dataset_uuid}`);
-
-      // -------------------------
-      // 1. SparkplugSrc (BASE CASE)
-      // -------------------------
-      if (structure === Constants.App.SparkplugSrc) {
-        const source_uuid = config?.source;
-        
-        if (!source_uuid) return fail(this.log, 404, `Dataset def ${dataset_uuid} does not contain source uuid.`);
-        
-        if(!valid_uuid(source_uuid)) return fail(this.log, 404, `Dataset ${dataset_uuid}'s source uuid is invalid.`);
-
-        return [{
-            source: source_uuid,
-            from,
-            to
-        }];
-      }
-
-
-
-      // -------------------------
-      // 2. SessionLimits (SINGLE REFERENCE)
-      // -------------------------
-      else if (structure === Constants.App.SessionLimits) {
-        const source_uuid = config?.source;
-
-        if (!source_uuid) return fail(this.log, 404, `Dataset def ${dataset_uuid} does not contain source uuid`);
-
-        if(!valid_uuid(source_uuid)) return fail(this.log, 404, `Dataset ${dataset_uuid}'s source is invalid uuid`);
-
-        const session_from = config?.from ? new Date(config.from) : null;
-        const session_to = config?.to ? new Date(config.to) : null;
-
-        const new_from = from && session_from
-        ? new Date(Math.max(from, session_from))
-        : (from || session_from);
-
-        const new_to = to && session_to
-        ? new Date(Math.min(to, session_to))
-        : (to || session_to);
-
-        if(new_from && new_to && new_from >= new_to){
-            return []; // no overlap
-        }
-
-        return this._resolve_dataset(source_uuid, new_from, new_to, visited);
-      }
-
-
-
-      // -------------------------
-      // 3. UnionComponents (MULTIPLE REFERENCES)
-      // -------------------------
-      else if (structure === Constants.App.UnionComponents) {
-        if(!Array.isArray(config)) return fail(this.log, 404, `Union structure type dataset def must be Array ${dataset_uuid}`);
-        
-        const results = await Promise.all(
-            config.map(uuid => 
-                this._resolve_dataset(uuid, from, to, new Set(visited))
-            )
-        );
-
-        return results.flat();
-      }
-
-
-
-    // -------------------------
-    // 4. Unknown structure
-    // -------------------------
-    else {
-        return fail(this.log, 404, `Dataset ${dataset_uuid} has unknown structure type ${structure}`);
+    if(structure == Constants.App.SparkplugSrc){
+      return [
+        {
+          dataset_uuid, 
+          device_uuid: config.source,
+          from: inherited_range.from,
+          to: inherited_range.to,
+        },
+      ];
     }
+
+    // ======================================================
+    //                      SessionLimits 
+    // ======================================================
+    
+    if(structure == Constants.App.SessionLimits){
+      const session_range = {
+        from: config.from ?? null,
+        to: config.to ?? null,
+      };
+
+      const merged_range = this._intersectRanges(
+        inherited_range,
+        session_range,
+      );
+
+      return this._resolve_dataset(
+        config.source,
+        merged_range, 
+        visited,
+      );
+    }
+
+    // ======================================================
+    //                      UnionComponents 
+    // ======================================================
+    if(structure == Constants.App.UnionComponents){
+      if(!Array.isArray(config)) return fail(this.log, 404, `Union dataset config must be an array.`);
+
+      const results = [];
+
+      for (const src_ds_uuid of config){
+        const src_results = await this._resolve_dataset(
+          src_ds_uuid,
+          inherited_range,
+          new Set(visited),
+        );
+        results.push(...src_results);
+      }
+      return results;
+    }
+
+    return fail(this.log, 404, `Unknown dataset structure ${structure}`);
   }
+
+  _intersectRanges(parent, child){
+    const from = maxDate(parent.from, child.from);
+    const to = minDate(parent.to, child.to);
+
+    if(from && to && new Date(from) > new Date(to)){
+      return fail(this.log, 404, `Invalid intersected range. From: ${from} > to: ${to}`);
+    }
+
+    return {from, to};
+  }
+
 
   /** POST. Queries all possible Influx suffixes, combines the measuremenets and returns actual data from a dataset. 
    * Empty POST body requests all dataset measurements.
@@ -328,41 +289,44 @@ export class APIv1 {
     * Don't return valid response if dataset is invalid
    */
   async dataset_data(req, res) {
+
     const dataset_uuid = req.params.uuid;
-    if (!valid_uuid(dataset_uuid)) return fail(this.log, 422, `Dataset uuid ${dataset_uuid} is invalid.`);
+
+    if (!valid_uuid(dataset_uuid)) {
+        return fail(this.log, 422, `Invalid dataset uuid`);
+    }
 
     const ok = await this.auth.check_acl(
-      req.auth,
-      Constants.Perm.ReadDataset,
-      dataset_uuid,
-      true,
+        req.auth,
+        Constants.Perm.ReadDataset,
+        dataset_uuid,
+        true,
     );
-    if (!ok) return fail(this.log, 403, `You don't have Read permission for dataset ${dataset_uuid}`);
+
+    if (!ok) {
+        return fail(this.log, 403);
+    }
 
     try {
-      const resolved = await this._resolve_dataset(dataset_uuid);
-      const merged = this._merge_intervals(resolved);
+        // Resolve dataset tree
+        const resolved = await this._resolve_dataset(dataset_uuid);
 
-      const results = await Promise.all(
-        merged.map(q => 
-            this.influxReader.get_dataset_data(q.source, {
-                from: q.from?.toISOString(),
-                to: q.to?.toISOString()
-            })
-        )
-      );
-      const rows = results.flat();
-      this.log(`# influx rows = ${rows.length}`);
+        res.setHeader("Content-Type", "text/csv");
+        res.setHeader(
+            "Content-Disposition",
+            `attachment; filename="${dataset_uuid}.csv"`
+        );
 
-      const csv = convertToCsv(rows);
+        await this.influxReader.stream_dataset_data(
+            resolved,
+            res,
+            {},
+        );
 
-      res.setHeader("Content-Type", "text/csv");
-      res.setHeader("Content-Disposition", `attachment; filename=${dataset_uuid}.csv`);
-      return res.status(200).send(csv);
-
-    } catch (err) {
-      this.log(err);
-      return fail(this.log, 500);
+        res.end();
+       }catch (err) {
+        this.log(err);
+        return fail(this.log, 500);
     }
   }
 

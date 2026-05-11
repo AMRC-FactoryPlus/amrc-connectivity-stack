@@ -180,19 +180,19 @@ describe("wrapResponse", () => {
 });
 
 describe("wrapError", () => {
-    it("wraps a message in an error envelope", () => {
-        const resp = wrapError("something went wrong");
+    it("wraps a message and code in an error envelope", () => {
+        const resp = wrapError("something went wrong", 500);
         expect(resp).toEqual({
             success: false,
-            error: { message: "something went wrong" },
+            error: { code: 500, message: "something went wrong" },
         });
     });
 
     it("handles empty message", () => {
-        const resp = wrapError("");
+        const resp = wrapError("", 400);
         expect(resp).toEqual({
             success: false,
-            error: { message: "" },
+            error: { code: 400, message: "" },
         });
     });
 });
@@ -210,7 +210,7 @@ describe("wrapBulkResponse", () => {
     it("returns success false when one item failed", () => {
         const items: I3xBulkItem<string>[] = [
             { success: true, elementId: "a", result: "ok" },
-            { success: false, elementId: "b", error: { message: "not found" } },
+            { success: false, elementId: "b", error: { code: 404, message: "not found" } },
         ];
         const resp = wrapBulkResponse(items);
         expect(resp.success).toBe(false);
@@ -219,8 +219,8 @@ describe("wrapBulkResponse", () => {
 
     it("returns success false when all items failed", () => {
         const items: I3xBulkItem<string>[] = [
-            { success: false, elementId: "a", error: { message: "err1" } },
-            { success: false, elementId: "b", error: { message: "err2" } },
+            { success: false, elementId: "a", error: { code: 500, message: "err1" } },
+            { success: false, elementId: "b", error: { code: 500, message: "err2" } },
         ];
         const resp = wrapBulkResponse(items);
         expect(resp.success).toBe(false);

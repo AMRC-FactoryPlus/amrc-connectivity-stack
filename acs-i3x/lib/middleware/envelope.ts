@@ -3,7 +3,7 @@
  *
  * Provides two Express middleware functions:
  * - i3xEnvelope: wraps successful responses in { success: true, result: data }
- * - i3xErrorHandler: catches errors and returns { success: false, error: { message } }
+ * - i3xErrorHandler: catches errors and returns { success: false, error: { code, message } }
  */
 
 import type { Request, Response, NextFunction } from "express";
@@ -37,5 +37,5 @@ export function i3xErrorHandler (err: any, req: Request, res: Response, next: Ne
 
     /* Use the original json method to avoid double-wrapping by i3xEnvelope */
     const json = (res as any)._originalJson || res.json.bind(res);
-    json({ success: false, error: { message } });
+    json({ success: false, error: { code: status, message } });
 }

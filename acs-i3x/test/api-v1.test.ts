@@ -783,7 +783,7 @@ describe("APIv1", () => {
             expect(res.status).toBe(500);
             expect(res.body).toEqual({
                 success: false,
-                error: { message: "Boom" },
+                error: { code: 500, message: "Boom" },
             });
         });
 

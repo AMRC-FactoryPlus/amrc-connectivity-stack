@@ -201,7 +201,7 @@ export class APIv1 {
             if (item) {
                 return { success: true, elementId: id, result: item };
             }
-            return { success: false, elementId: id, error: { message: `Object type ${id} not found` } };
+            return { success: false, elementId: id, error: { code: 404, message: `Object type ${id} not found` } };
         });
         const allSuccess = results.every(r => r.success);
         ((res as any)._originalJson || res.json.bind(res))({ success: allSuccess, results });
@@ -236,7 +236,7 @@ export class APIv1 {
             if (item) {
                 return { success: true, elementId: id, result: item };
             }
-            return { success: false, elementId: id, error: { message: `Relationship type ${id} not found` } };
+            return { success: false, elementId: id, error: { code: 404, message: `Relationship type ${id} not found` } };
         });
         const allSuccess = results.every(r => r.success);
         ((res as any)._originalJson || res.json.bind(res))({ success: allSuccess, results });
@@ -265,7 +265,7 @@ export class APIv1 {
             if (item) {
                 return { success: true, elementId: id, result: item };
             }
-            return { success: false, elementId: id, error: { message: `Object ${id} not found` } };
+            return { success: false, elementId: id, error: { code: 404, message: `Object ${id} not found` } };
         });
         const allSuccess = results.every(r => r.success);
         ((res as any)._originalJson || res.json.bind(res))({ success: allSuccess, results });
@@ -297,7 +297,7 @@ export class APIv1 {
                 return { success: true, elementId: id, result: item };
             }
             console.log(`[VALUE] ${id.slice(0,16)} → no data`);
-            return { success: false, elementId: id, error: { message: `No value for ${id}` } };
+            return { success: false, elementId: id, error: { code: 404, message: `No value for ${id}` } };
         }));
         const allSuccess = results.every(r => r.success);
         ((res as any)._originalJson || res.json.bind(res))({ success: allSuccess, results });
@@ -323,7 +323,7 @@ export class APIv1 {
                     const values = await this.history.queryHistory(id, startTime, endTime, maxDepth);
                     return { success: true, elementId: id, result: { elementId: id, values } };
                 } catch (err: any) {
-                    return { success: false, elementId: id, error: { message: err.message } };
+                    return { success: false, elementId: id, error: { code: err.status ?? 500, message: err.message } };
                 }
             }),
         );
@@ -341,7 +341,7 @@ export class APIv1 {
         const results = (elementIds as string[]).map(id => {
             const obj = this.objectTree.getObject(id);
             if (!obj) {
-                return { success: false, elementId: id, error: { message: `Object ${id} not found` } };
+                return { success: false, elementId: id, error: { code: 404, message: `Object ${id} not found` } };
             }
             const related = this.objectTree.getRelated(id, relationshiptype);
             return { success: true, elementId: id, result: related };

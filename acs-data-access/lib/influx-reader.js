@@ -1,5 +1,6 @@
 
 import {InfluxDB, flux} from '@influxdata/influxdb-client';
+import {csv_escape} from './utils.js';
 
 export class InfluxReader{
     constructor(opts){
@@ -9,79 +10,125 @@ export class InfluxReader{
         this.influx_query_api = opts.influx_client.getQueryApi(opts.influx_org);
     }
 
-    async get_dataset_data(topLevelInstance, meta = {}) {
-        const { from, to, measurement } = meta;
+    async stream_dataset_data(device_sources, writable, meta = {}) {
 
-        // Build range
-        const rangeClause = (from && to)
-        ? `|> range(start: ${from}, stop: ${to})`
-        : `|> range(start: 0)`;
+        const measurementFilter = meta.measurement
+            ? `|> filter(fn: (r) => r._measurement == "${meta.measurement}")`
+            : ``;
 
-        // Optional measurement filter
-        const measurementFilter = measurement
-        ? `|> filter(fn: (r) => r._measurement == "${measurement}")`
-        : ``;
+        // =====================================================
+        // Device + per-device session filtering
+        // =====================================================
+
+        const deviceConditions = device_sources.map(src => {
+
+            const timeParts = [];
+
+            if (src.from) {
+                timeParts.push(`r._time >= time(v: "${src.from}")`);
+            }
+
+            if (src.to) {
+                timeParts.push(`r._time <= time(v: "${src.to}")`);
+            }
+
+            const timeExpr = timeParts.length
+                ? ` and ${timeParts.join(" and ")}`
+                : "";
+
+            return `(r.topLevelInstance == "${src.device_uuid}"${timeExpr})`;
+
+        }).join(" or ");
+
+        // =====================================================
+        // Global bounds
+        // =====================================================
+
+        const froms = device_sources
+            .map(s => s.from)
+            .filter(Boolean)
+            .sort();
+
+        const tos = device_sources
+            .map(s => s.to)
+            .filter(Boolean)
+            .sort();
+
+        const globalFrom = froms.length
+            ? froms[0]
+            : "0";
+
+        const globalTo = tos.length
+            ? tos[tos.length - 1]
+            : null;
+
+        const rangeClause = globalTo
+            ? `|> range(start: time(v: "${globalFrom}"), stop: time(v: "${globalTo}"))`
+            : `|> range(start: ${globalFrom})`;
+
+        // =====================================================
+        // QUERY
+        // =====================================================
 
         const query = `
-        import "strings"
-
         from(bucket: "${this.influx_bucket}")
+
             ${rangeClause}
-            |> filter(fn: (r) => r.topLevelInstance == "${topLevelInstance}")
+
+            |> filter(fn: (r) => ${deviceConditions})
+
             ${measurementFilter}
-            |> drop(columns: [
-            "_start","_stop","_field","table",
-            "bottomLevelInstance","bottomLevelSchema",
-            "group","node","topLevelSchema",
-            "usesInstances","usesSchemas"
-            ])
-            |> map(fn: (r) => ({ r with path: if exists r.path then r.path else "" }))
-            |> pivot(
-            rowKey: ["_time"],
-            columnKey: ["_measurement"],
-            valueColumn: "_value"
-            )
+
+            |> map(fn: (r) => ({
+                r with
+                column_name:
+                    if exists r.path and r.path != ""
+                    then r.device + ":" + r.path + ":" + r._measurement
+                    else r.device + ":" + r._measurement
+            }))
+
+            // IMPORTANT:
+            // remove grouping before pivot
             |> group()
+
+            |> pivot(
+                rowKey: ["_time", "unit"],
+                columnKey: ["column_name"],
+                valueColumn: "_value"
+            )
+
             |> sort(columns: ["_time"], desc: false)
         `;
-        const res = await this._run_influx(query);
-        return res;
+
+        return this._stream_influx_csv(query, writable);
     }
 
-    async _run_min_max_time_agg(source_uuid, fn) {
-        const query = `
-            from(bucket: "${this.influx_bucket}")
-            |> range(start: 0)
-            |> filter(fn: (r) => r.topLevelInstance == "${source_uuid}")
-            |> keep(columns: ["_time"])
-            |> group()
-            |> ${fn}(column: "_time")
-        `;
-
-        const rows = await this._run_influx(query);
-
-        return rows?.[0]?._time ?? null;
-    }
-
-    async get_influx_time_bounds(topLevelInstance) {
-        const [from, to] = await Promise.all([
-            this._run_min_max_time_agg(topLevelInstance, "min"),
-            this._run_min_max_time_agg(topLevelInstance, "max"),
-        ]);
-
-        return { from, to };
-    }
-
-    async _run_influx(query) {
+    async _stream_influx_csv(query, writable) {
         return new Promise((resolve, reject) => {
-            const rows = [];
+            let headersWritten = false;
 
             this.influx_query_api.queryRows(query, {
-            next: (row, tableMeta) => {
-                rows.push(tableMeta.toObject(row));
-            },
-            error: reject,
-            complete: () => resolve(rows)
+                next: (row, tableMeta) => {
+                    const obj = tableMeta.toObject(row);
+
+                    // Write headers once
+                    if (!headersWritten) {
+                        writable.write(
+                            Object.keys(obj).join(",") + "\n"
+                        );
+                        headersWritten = true;
+                    }
+
+                    const csvRow = Object.values(obj)
+                        .map(v => csv_escape(v))
+                        .join(",");
+
+                    writable.write(csvRow + "\n");
+                },
+
+                error: reject,
+
+                complete: resolve,
             });
         });
     }

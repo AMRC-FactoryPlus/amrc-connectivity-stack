@@ -87,7 +87,7 @@ describe("i3xErrorHandler", () => {
         expect(res.status).toHaveBeenCalledWith(404);
         expect(res.json).toHaveBeenCalledWith({
             success: false,
-            error: { message: "Not Found" },
+            error: { code: 404, message: "Not Found" },
         });
     });
 
@@ -102,7 +102,7 @@ describe("i3xErrorHandler", () => {
         expect(res.status).toHaveBeenCalledWith(403);
         expect(res.json).toHaveBeenCalledWith({
             success: false,
-            error: { message: "Forbidden" },
+            error: { code: 403, message: "Forbidden" },
         });
     });
 
@@ -116,7 +116,7 @@ describe("i3xErrorHandler", () => {
         expect(res.status).toHaveBeenCalledWith(500);
         expect(res.json).toHaveBeenCalledWith({
             success: false,
-            error: { message: "something broke" },
+            error: { code: 500, message: "something broke" },
         });
     });
 
@@ -130,7 +130,7 @@ describe("i3xErrorHandler", () => {
         expect(res.status).toHaveBeenCalledWith(500);
         expect(res.json).toHaveBeenCalledWith({
             success: false,
-            error: { message: "Internal server error" },
+            error: { code: 500, message: "Internal server error" },
         });
     });
 
@@ -146,7 +146,7 @@ describe("i3xErrorHandler", () => {
         expect(res.status).toHaveBeenCalledWith(400);
         expect(res.json).toHaveBeenCalledWith({
             success: false,
-            error: { message: "Bad Request" },
+            error: { code: 400, message: "Bad Request" },
         });
     });
 
@@ -169,7 +169,7 @@ describe("i3xErrorHandler", () => {
         const lastCall = originalJson.mock.calls[originalJson.mock.calls.length - 1][0];
         expect(lastCall).toEqual({
             success: false,
-            error: { message: "Not Found" },
+            error: { code: 404, message: "Not Found" },
         });
     });
 });

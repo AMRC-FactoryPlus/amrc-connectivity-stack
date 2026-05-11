@@ -434,6 +434,7 @@ describe("E2E Compliance Tests", () => {
             expect(res.body.success).toBe(false);
             expect(res.body.error).toHaveProperty("message");
             expect(typeof res.body.error.message).toBe("string");
+            expect(res.body.error.code).toBe(404);
         });
     });
 
@@ -956,7 +957,7 @@ describe("E2E Compliance Tests", () => {
             }
         });
 
-        it("every error response has { success: false, error: { message } }", async () => {
+        it("every error response has { success: false, error: { code, message } }", async () => {
             const { app } = createE2eApp();
 
             const responses = await Promise.all([
@@ -973,6 +974,7 @@ describe("E2E Compliance Tests", () => {
                 expect(res.body).toHaveProperty("error");
                 expect(res.body.error).toHaveProperty("message");
                 expect(typeof res.body.error.message).toBe("string");
+                expect(res.body.error.code).toBe(res.status);
             }
         });
 

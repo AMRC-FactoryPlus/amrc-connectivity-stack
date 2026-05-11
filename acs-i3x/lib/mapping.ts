@@ -76,8 +76,8 @@ export function wrapResponse<T>(result: T): I3xSuccess<T> {
     return { success: true, result };
 }
 
-export function wrapError(message: string): I3xError {
-    return { success: false, error: { message } };
+export function wrapError(message: string, code: number): I3xError {
+    return { success: false, error: { code, message } };
 }
 
 export function wrapBulkResponse<T>(items: I3xBulkItem<T>[]): I3xBulkResponse<T> {

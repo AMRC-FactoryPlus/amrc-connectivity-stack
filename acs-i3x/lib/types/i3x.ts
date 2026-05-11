@@ -14,7 +14,7 @@ export interface I3xSuccess<T> {
 
 export interface I3xError {
     success: false;
-    error: { message: string };
+    error: { code: number; message: string };
 }
 
 export type I3xResponse<T> = I3xSuccess<T> | I3xError;
@@ -28,7 +28,7 @@ export interface I3xBulkItemSuccess<T> {
 export interface I3xBulkItemError {
     success: false;
     elementId: string;
-    error: { message: string };
+    error: { code: number; message: string };
 }
 
 export type I3xBulkItem<T> = I3xBulkItemSuccess<T> | I3xBulkItemError;

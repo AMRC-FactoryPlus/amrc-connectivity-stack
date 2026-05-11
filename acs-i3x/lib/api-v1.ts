@@ -14,6 +14,7 @@ import type { ObjectTree } from "./object-tree.js";
 import type { ValueCache } from "./value-cache.js";
 import type { History } from "./history.js";
 import type { SubscriptionManager } from "./subscriptions.js";
+import validator from 'validator';
 
 interface APIv1Opts {
     objectTree: ObjectTree;
@@ -312,6 +313,9 @@ export class APIv1 {
         const { elementIds, startTime, endTime, maxDepth } = req.body;
         if (!startTime || !endTime) {
             return next(badRequest("startTime and endTime are required"));
+        }
+        if(!validator.isRFC3339(startTime) || !validator.isRFC3339(endTime)) {
+            return next(badRequest("startTime and endTime must be an RFC 3339 timestamp"));
         }
         const results = await Promise.all(
             (elementIds as string[]).map(async id => {

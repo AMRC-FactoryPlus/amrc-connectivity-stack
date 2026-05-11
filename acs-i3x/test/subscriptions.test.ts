@@ -114,25 +114,37 @@ describe("SubscriptionManager", () => {
         });
     });
 
-    /* ---- delete ---- */
+    /* ---- deleteOne ---- */
 
-    describe("delete", () => {
+    describe("deleteOne", () => {
         it("removes subscription", () => {
             const sub = mgr.create("client-1");
-            mgr.delete("client-1", [sub.subscriptionId]);
+            mgr.deleteOne("client-1", sub.subscriptionId);
 
             const result = mgr.list("client-1", [sub.subscriptionId]);
             expect(result).toHaveLength(0);
         });
 
-        it("is idempotent for unknown subscription", () => {
-            expect(() => mgr.delete("client-1", ["nonexistent-id"])).not.toThrow();
+        it("throws 404 for unknown subscription", () => {
+            try {
+                mgr.deleteOne("client-1", "nonexistent-id");
+                throw new Error("expected throw");
+            } catch (err: any) {
+                expect(err.status).toBe(404);
+                expect(err.message).toMatch(/not found/);
+            }
         });
 
-        it("does not delete subscription owned by different clientId", () => {
+        it("throws 403 when subscription belongs to different clientId", () => {
             const sub = mgr.create("client-1");
-            mgr.delete("client-2", [sub.subscriptionId]);
+            try {
+                mgr.deleteOne("client-2", sub.subscriptionId);
+                throw new Error("expected throw");
+            } catch (err: any) {
+                expect(err.status).toBe(403);
+            }
 
+            /* Subscription is untouched */
             const result = mgr.list("client-1", [sub.subscriptionId]);
             expect(result).toHaveLength(1);
         });

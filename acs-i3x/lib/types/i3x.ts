@@ -38,6 +38,27 @@ export interface I3xBulkResponse<T> {
     results: I3xBulkItem<T>[];
 }
 
+export interface I3xSubscriptionBulkItemSuccess<T> {
+    success: true;
+    subscriptionId: string;
+    result: T;
+}
+
+export interface I3xSubscriptionBulkItemError {
+    success: false;
+    subscriptionId: string;
+    error: { code: number; message: string };
+}
+
+export type I3xSubscriptionBulkItem<T> =
+    | I3xSubscriptionBulkItemSuccess<T>
+    | I3xSubscriptionBulkItemError;
+
+export interface I3xSubscriptionBulkResponse<T> {
+    success: boolean;
+    results: I3xSubscriptionBulkItem<T>[];
+}
+
 /* Data model */
 
 export interface I3xNamespace {

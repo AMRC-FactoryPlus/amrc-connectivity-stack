@@ -79,18 +79,25 @@ export class SubscriptionManager {
         return results;
     }
 
-    delete(clientId: string, subscriptionIds: string[]): void {
-        for (const id of subscriptionIds) {
-            const sub = this.subscriptions.get(id);
-            if (!sub || sub.clientId !== clientId) continue;
-
-            clearTimeout(sub.ttlTimer);
-            if (sub.activeStream) {
-                sub.activeStream.end();
-                sub.activeStream = null;
-            }
-            this.subscriptions.delete(id);
+    deleteOne(clientId: string, subscriptionId: string): void {
+        const sub = this.subscriptions.get(subscriptionId);
+        if (!sub) {
+            const err: any = new Error(`Subscription ${subscriptionId} not found`);
+            err.status = 404;
+            throw err;
         }
+        if (sub.clientId !== clientId) {
+            const err: any = new Error(`Subscription ${subscriptionId} does not belong to client ${clientId}`);
+            err.status = 403;
+            throw err;
+        }
+
+        clearTimeout(sub.ttlTimer);
+        if (sub.activeStream) {
+            sub.activeStream.end();
+            sub.activeStream = null;
+        }
+        this.subscriptions.delete(subscriptionId);
     }
 
     register(clientId: string, subscriptionId: string, elementIds: string[], maxDepth: number = 1): void {

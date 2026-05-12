@@ -194,8 +194,8 @@ class LocalSecret (KrbKeyEvent):
         # consumer that has hashed it server-side (e.g. Keycloak's
         # admin user). `update()` is now idempotent so the no-op path
         # is just two reads.
-        old_dest = self.old.map(lambda s: s.secret).or_else(None)
-        new_dest = self.new.map(lambda s: s.secret).or_else(None)
+        old_dest = self.old.map(lambda s: s.secret).get_or_default(None)
+        new_dest = self.new.map(lambda s: s.secret).get_or_default(None)
         if old_dest is not None and old_dest != new_dest:
             self.old.if_present(lambda s: s.remove())
 

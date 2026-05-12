@@ -185,6 +185,16 @@ class OpenIDSetup {
                 "auth.url":             [this.auth_internal_url],
                 "auth.timeout.seconds": ["5"],
                 "cache.ttl.seconds":    ["60"],
+                // Disable Keycloak's per-user attribute cache for this
+                // federation. With the default (DEFAULT, cache forever)
+                // an fp_permissions grant added in F+ stays invisible
+                // to consumers until the openid pod restarts, because
+                // Keycloak keeps serving the user-attribute snapshot
+                // it took at first load. NO_CACHE makes each token
+                // issuance re-read attributes via the SPI; the SPI's
+                // own 60s cache.ttl.seconds still shields F+ Auth
+                // from per-request load.
+                "cachePolicy":      ["NO_CACHE"],
                 // The openid Pod mounts krb5-keytabs at /etc/keytabs
                 // and remaps the sv1openid secret key to filename
                 // `client` (see deploy/templates/openid/openid.yaml

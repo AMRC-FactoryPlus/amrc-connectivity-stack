@@ -299,54 +299,114 @@ const claims   = tokenSet.claims();
 
 ## Worked example: JupyterHub
 
-A second concrete walkthrough, this one for an application installed
-*alongside* ACS rather than shipped with it. JupyterHub is via the
-official Z2JH chart; ACS code stays untouched. The pattern generalises
-to any OIDC consumer.
+A complete walk-through for adding [JupyterHub](https://hub.jupyter.org/helm-chart/)
+to an existing ACS install. JupyterHub ships its own Helm chart
+("Zero-to-JupyterHub", "Z2JH"); ACS isn't modified. Follow this end-
+to-end to bring up an OIDC-gated hub against a fresh ACS deployment.
 
-### 1. Declare the OIDC client
+The same six steps apply to any OIDC application; only the
+application-side config differs.
 
-Add to your ACS values:
+### 1. Declare the OIDC client in your ACS values
+
+Add `jupyterhub` to `serviceSetup.config.openidClients`. The
+`redirectPath` is the path the application will be redirected to
+after a successful OAuth handshake (JupyterHub's is fixed at
+`/hub/oauth_callback`):
 
 ```yaml
 serviceSetup:
   config:
     openidClients:
-      jupyterhub:
+      grafana:
+        enabled: true
+        name: Grafana
+        redirectPath: /login/generic_oauth
+      jupyterhub:                       # add this block
         enabled: true
         name: JupyterHub
         redirectPath: /hub/oauth_callback
 ```
 
-`helm upgrade` ACS. service-setup will create the Keycloak client, the
-`fp_principal_uuid` and `fp_permissions` mappers, and drop the auto-
-generated client secret into `keycloak-clients/jupyterhub`. Verify:
+Apply with `helm upgrade`. service-setup, on its next run, will:
+
+- Create a confidential Keycloak client called `jupyterhub` in the
+  `factory_plus` realm with `redirectUris=["http://jupyterhub.<acs.baseUrl>/*"]`.
+- Attach the `fp_principal_uuid` and `fp_permissions` protocol mappers
+  to it (so issued tokens carry F+ identity).
+- Generate a random client secret via the krb-keys-operator and
+  expose it under `keycloak-clients/jupyterhub` in the ACS namespace.
+
+Verify the secret was created and grab it for step 5:
 
 ```sh
-kubectl -n factory-plus get secret keycloak-clients \
-  -o jsonpath='{.data.jupyterhub}' | base64 -d
+JH_SECRET=$(kubectl -n factory-plus get secret keycloak-clients \
+  -o jsonpath='{.data.jupyterhub}' | base64 -d)
+echo "$JH_SECRET"
 ```
 
-### 2. Create application-specific F+ permissions
+### 2. Create JupyterHub-specific Permissions in F+
 
-JupyterHub-specific authz lives in F+, not in ACS internals. Open the
-ACS Admin UI -> **ConfigDB** -> **Create Object**:
+JupyterHub-specific roles live in F+, not in ACS internals. We make
+two Permission objects - one for hub admins, one for ordinary users.
+JupyterHub's `admin_groups` and `allowed_groups` will be the UUIDs
+of these objects.
 
-| Name | Type | UUID |
+In ACS Admin: **ConfigDB** -> **Create Object**. Twice:
+
+| Field | First object | Second object |
 | --- | --- | --- |
-| `JupyterHub admin` | `Permission (Rank 1 class)` | pick or auto-generate |
-| `JupyterHub user`  | `Permission (Rank 1 class)` | pick or auto-generate |
+| **Name** | `JupyterHub admin` | `JupyterHub user` |
+| **Type** | `Permission (Rank 1 class)` | `Permission (Rank 1 class)` |
+| **UUID** | turn off auto-generate; paste your chosen UUID, e.g. `b2a4e5c8-3d6f-4e2a-9c1b-5e8f7a3d2b41` | same, e.g. `c5b3f1a7-2e4d-4f3b-8a9c-1d2e3f4a5b6c` |
 
-Then **Access Control** -> **Principals** -> click the user (e.g.
-`admin@<realm>`) -> add a grant: permission = `JupyterHub admin`,
-target = **Wildcard**. Wildcard is the only target that surfaces in
-`fp_permissions`; everything else is invisible to the consumer.
+The exact UUIDs do not matter, but you need to remember them - they
+go into the JupyterHub values in step 5. Pick any UUID generator
+(`uuidgen` on macOS) and keep the pair.
 
-### 3. Install Z2JH with OIDC
+### 3. Grant the permissions to F+ principals
 
-Minimal values for the JupyterHub chart (`hub.jupyter.org/helm-chart`).
-Substitute the client secret you fetched in step 1 and the two
-permission UUIDs from step 2:
+The user who should be a hub admin needs the JupyterHub admin
+Permission with target Wildcard. ACS Admin -> **Access Control** ->
+**Principals** -> click the user (e.g. `admin@AMRC-FPD-AGO.SHEF.AC.UK`)
+-> add a grant:
+
+| Field | Value |
+| --- | --- |
+| **Permission** | `JupyterHub admin` (the object you just made) |
+| **Target** | `Wildcard` (UUID `00000000-0000-0000-0000-000000000000`) |
+
+Wildcard is the only target that surfaces in the `fp_permissions`
+claim. Anything else is invisible to the consumer.
+
+Repeat for `JupyterHub user` for any non-admin user you want to give
+hub access.
+
+Verify the grant landed (optional, but handy):
+
+```sh
+# Quickest: the ACS MCP server
+mcp__acs__find_grants(principal=<user-uuid>)
+mcp__acs__check_acl(principal=<user-uuid>,
+                    permission=<jupyterhub-admin-uuid>,
+                    target=00000000-0000-0000-0000-000000000000,
+                    wild=true)
+```
+
+### 4. Make sure DNS resolves
+
+The Z2JH chart will create an Ingress at `jupyterhub.<acs.baseUrl>`.
+That hostname must resolve to your cluster's ingress IP. If you set
+up wildcard DNS for ACS already (`*.<acs.baseUrl>`) it will Just Work.
+Otherwise add a record - the Ingress alone won't help users reach
+the hub.
+
+### 5. Write the JupyterHub values file
+
+Save the following as `jupyterhub-values.yaml`. Replace the three
+placeholders: `<jh-client-secret>` from step 1, and the two
+permission UUIDs from step 2. The rest is the **complete** working
+config we used:
 
 ```yaml
 hub:
@@ -355,18 +415,31 @@ hub:
       authenticator_class: generic-oauth
     GenericOAuthenticator:
       client_id: jupyterhub
-      client_secret: "<from keycloak-clients/jupyterhub>"
-      oauth_callback_url: "http://jupyterhub.<acs.baseUrl>/hub/oauth_callback"
-      authorize_url: "http://openid.<acs.baseUrl>/realms/factory_plus/protocol/openid-connect/auth"
-      token_url:    "http://openid.<acs.baseUrl>/realms/factory_plus/protocol/openid-connect/token"
-      userdata_url: "http://openid.<acs.baseUrl>/realms/factory_plus/protocol/openid-connect/userinfo"
+      client_secret: "<jh-client-secret>"
+
+      # OAuth endpoint URLs. Use https:// instead of http:// if your
+      # ACS install has acs.secure=true.
+      oauth_callback_url:  "http://jupyterhub.<acs.baseUrl>/hub/oauth_callback"
+      authorize_url:       "http://openid.<acs.baseUrl>/realms/factory_plus/protocol/openid-connect/auth"
+      token_url:           "http://openid.<acs.baseUrl>/realms/factory_plus/protocol/openid-connect/token"
+      userdata_url:        "http://openid.<acs.baseUrl>/realms/factory_plus/protocol/openid-connect/userinfo"
       logout_redirect_url: "http://openid.<acs.baseUrl>/realms/factory_plus/protocol/openid-connect/logout"
+
       scope: [openid, profile]
+      # JH usernames are taken from this token claim - the Kerberos UPN
+      # is the canonical F+ identifier so we use it directly.
       username_claim: preferred_username
-      # OAuthenticator >= 17 requires this for admin_groups to be honoured.
+
+      # Gate access via fp_permissions. The OAuth response body lands
+      # under "oauth_user" in JH's auth_state dict, so the dotted path
+      # to the UUID array is "oauth_user.fp_permissions".
+      #
+      # claim_groups_key existed in older OAuthenticator versions but
+      # is deprecated since 17.0 - use auth_state_groups_key.
+      #
+      # manage_groups MUST be true alongside admin_groups; the
+      # authenticator refuses to start otherwise.
       manage_groups: true
-      # The OAuth response body lands under `oauth_user` in auth_state;
-      # claim_groups_key is deprecated.
       auth_state_groups_key: oauth_user.fp_permissions
       admin_groups:
         - "<jupyterhub-admin permission UUID>"
@@ -374,43 +447,131 @@ hub:
         - "<jupyterhub-admin permission UUID>"
         - "<jupyterhub-user permission UUID>"
 
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
 proxy:
   service:
+    # We expose the hub via the cluster's existing Traefik ingress,
+    # not via a per-chart LoadBalancer.
     type: ClusterIP
+
+singleuser:
+  image:
+    # Small image to keep first spawn quick during testing. Swap for
+    # jupyter/scipy-notebook or your own image for real workloads.
+    name: jupyter/minimal-notebook
+    tag: latest
+  storage:
+    # Per-user PVC for notebook state. Z2JH provisions this against
+    # the cluster's default StorageClass (local-path on k3s).
+    capacity: 1Gi
+  cpu:
+    limit: 1
+    guarantee: 0.05
+  memory:
+    limit: 1G
+    guarantee: 256M
 
 ingress:
   enabled: true
-  hosts: ["jupyterhub.<acs.baseUrl>"]
-  ingressClassName: acs-traefik    # matches the IngressClass installed by ACS
+  hosts:
+    - "jupyterhub.<acs.baseUrl>"
+  # CRITICAL: the IngressClass installed by ACS is "acs-traefik",
+  # NOT the upstream Traefik default "traefik". Get this wrong and
+  # the Ingress is silently ignored - kubectl get ingress will show
+  # it created, but you'll get 404s.
+  ingressClassName: acs-traefik
 ```
 
-Install:
+Two gotchas already baked into the file above; flagged here so a
+future reader knows what would have bitten them:
+
+- **`ingressClassName: acs-traefik`** - the upstream Z2JH default
+  is `traefik`. On a k3s ACS install the matching class is
+  `acs-traefik` (you can see this with `kubectl get ingressclass`).
+- **`auth_state_groups_key`, not `claim_groups_key`** - Z2JH's
+  bundled OAuthenticator 17+ deprecates `claim_groups_key`. If you
+  set the old one the hub starts but silently rejects everyone with
+  `Sorry, you are not currently authorized` because the groups
+  list comes out empty.
+
+### 6. Install Z2JH and bring up the hub
 
 ```sh
 helm repo add jupyterhub https://hub.jupyter.org/helm-chart/
 helm repo update
 helm upgrade --install jupyterhub jupyterhub/jupyterhub \
   --namespace jupyterhub --create-namespace \
+  --version 4.0.0 \
   -f jupyterhub-values.yaml
+
+kubectl -n jupyterhub rollout status deploy/hub --timeout=120s
 ```
 
-Visit `http://jupyterhub.<acs.baseUrl>`, sign in via the ACS Keycloak.
-A user with the JupyterHub admin permission lands as a hub admin; a
-user with only the user permission gets a regular hub session; anyone
-else hits 403. No code in ACS knows about JupyterHub.
+The `hub` and `proxy` pods should reach `1/1 Running` within a
+minute or so. If `hub` crashlooops, check its logs for a config
+validation error (deprecated property names, missing
+`manage_groups`, etc.):
 
-### What this exercises
+```sh
+kubectl -n jupyterhub logs deploy/hub
+```
+
+### 7. Sign in
+
+Visit `http://jupyterhub.<acs.baseUrl>/`:
+
+1. You're redirected to the ACS-branded Keycloak login.
+2. Sign in as your F+ principal (e.g. `admin@<realm>`). Password is
+   validated through the Factory+ User Storage SPI - it's your
+   Kerberos password.
+3. Keycloak redirects back to `/hub/oauth_callback` with an auth
+   code.
+4. JupyterHub exchanges the code for an access token, reads
+   `fp_permissions` out of `auth_state.oauth_user.fp_permissions`,
+   and checks it against `admin_groups` / `allowed_groups`.
+5. If you have the admin UUID, you land in JupyterLab as a hub
+   admin (Server -> Admin Panel is visible). If you have only the
+   user UUID, you land in JupyterLab as a regular user. If you have
+   neither, you get a 403 "not authorized to use this hub" page -
+   that's the gate working.
+
+### If you grant or change a permission later
+
+You'll likely find the change doesn't take effect immediately. There
+are two cache layers in front of `fp_permissions`:
+
+1. The SPI's own 60-second TTL on F+ lookups.
+2. Keycloak's per-user attribute cache, which is **not** time-bounded
+   and survives across logins.
+
+To flush both reliably, restart the openid pod after granting:
+
+```sh
+kubectl -n factory-plus rollout restart deploy/openid
+```
+
+Then have the user sign in again. This is a sharp edge worth
+removing - see the *Constraints and gotchas* section above.
+
+### What this exercises (and why it's representative)
 
 | F+ piece | JupyterHub piece |
 | --- | --- |
-| OIDC client provisioned by service-setup | `client_id` + `client_secret` |
-| `fp_principal_uuid` claim | `username_claim: preferred_username` (we use the UPN, but the UUID is also there for any app that wants it) |
-| `fp_permissions` claim | `auth_state_groups_key: oauth_user.fp_permissions` + `admin_groups` / `allowed_groups` |
-| F+ Permission objects | The "groups" JupyterHub gates on |
-| F+ Wildcard-target ACL grant | Membership in those groups for a given user |
+| OIDC client provisioned by service-setup from `openidClients` entry | `client_id` + `client_secret` |
+| `fp_principal_uuid` claim | available for any app that wants stable F+ identity |
+| `preferred_username` claim (Kerberos UPN) | `username_claim` source |
+| `fp_permissions` claim (Wildcard-target ACL grants) | `auth_state_groups_key` -> `admin_groups` / `allowed_groups` |
+| F+ Permission objects in ConfigDB | the application's "groups" |
+| F+ ACL grant (principal/permission/Wildcard) | a user's membership in a group |
 
-Nothing in JH is ACS-specific; the same shape applies to any OIDC
-consumer that supports group-based gating.
+Nothing here is JupyterHub-specific. The same flow works for any
+OIDC consumer that supports group-based gating - replace step 5's
+values shape with the app's own equivalent of `admin_groups` /
+`allowed_groups` against the `fp_permissions` array.
 
 ## Reference: the Grafana wiring
 

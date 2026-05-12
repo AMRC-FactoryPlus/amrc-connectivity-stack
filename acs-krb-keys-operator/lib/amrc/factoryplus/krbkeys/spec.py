@@ -129,6 +129,13 @@ class LocalSpec:
                 format=spec.get("format", "Password")))
 
     def update (self):
+        # Idempotent: only generate when the target key has no value
+        # yet. The kopf Resume handler fires on every operator pod
+        # start and previously rotated the password each time. To force
+        # a rotation, delete the key from the underlying Secret and
+        # the next reconcile will regenerate.
+        if self.secret.maybe_read() is not None:
+            return
         passwd = secrets.token_urlsafe().encode()
         self.secret.write(passwd)
 

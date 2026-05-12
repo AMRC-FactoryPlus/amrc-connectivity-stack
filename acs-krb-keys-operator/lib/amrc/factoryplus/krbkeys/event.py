@@ -186,6 +186,18 @@ class LocalSecret (KrbKeyEvent):
     def process (self):
         log(f"Process LocalSecret {self.old} -> {self.new}")
 
-        self.old.if_present(lambda s: s.remove())
+        # Only remove the old target when it's actually going away or
+        # moving. On a Resume event (operator pod restart) kopf passes
+        # the same spec as both old and new, so an unconditional remove
+        # here would clear the live key and let `update()` write a
+        # fresh password on every restart - rotating the value for any
+        # consumer that has hashed it server-side (e.g. Keycloak's
+        # admin user). `update()` is now idempotent so the no-op path
+        # is just two reads.
+        old_dest = self.old.map(lambda s: s.secret).get_or_default(None)
+        new_dest = self.new.map(lambda s: s.secret).get_or_default(None)
+        if old_dest is not None and old_dest != new_dest:
+            self.old.if_present(lambda s: s.remove())
+
         self.new.if_present(lambda s: s.update())
 

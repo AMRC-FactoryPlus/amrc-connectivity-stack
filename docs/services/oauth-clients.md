@@ -541,21 +541,20 @@ Visit `http://jupyterhub.<acs.baseUrl>/`:
 
 ### If you grant or change a permission later
 
-You'll likely find the change doesn't take effect immediately. There
-are two cache layers in front of `fp_permissions`:
+The SPI caches F+ lookups for 60 seconds. After granting (or
+revoking) a permission, wait up to 60s and have the user sign in
+again - the change will be in their new token. No openid restart
+needed; service-setup configures the federation with
+`cachePolicy: NO_CACHE` so Keycloak's own user-attribute cache
+doesn't sit on top of the SPI's TTL.
 
-1. The SPI's own 60-second TTL on F+ lookups.
-2. Keycloak's per-user attribute cache, which is **not** time-bounded
-   and survives across logins.
-
-To flush both reliably, restart the openid pod after granting:
+If you need an instant propagation for testing (e.g. during a
+debugging session, you can't wait for the SPI cache), restart the
+openid pod - that drops the SPI cache too:
 
 ```sh
 kubectl -n factory-plus rollout restart deploy/openid
 ```
-
-Then have the user sign in again. This is a sharp edge worth
-removing - see the *Constraints and gotchas* section above.
 
 ### What this exercises (and why it's representative)
 
@@ -600,20 +599,14 @@ configuration changes.
   what Grafana does via `email_attribute_path: preferred_username`).
   Do not enable any feature that asks the user to fill in profile
   fields - the write will fail with `ReadOnlyException` from the SPI.
-- **Permission propagation has two cache layers.** The SPI caches F+
+- **Permission propagation has a ~60s lag.** The SPI caches F+
   lookups for 60 seconds (configurable via the `cache.ttl.seconds`
-  setting on the federation provider). On top of that, Keycloak's
-  *user cache* memoises user attributes per-session - meaning a
-  grant you make in F+ may not show up in `fp_permissions` even after
-  the SPI cache expires, because Keycloak is still serving the
-  attribute snapshot it captured when the user record was first
-  loaded. The reliable invalidation today is `kubectl rollout
-  restart deploy/openid`; for routine operator work, expect "grant
-  the permission, restart openid, have the user sign in again."
-  This is a sharp edge worth removing - see *Future work* in
-  `acs-keycloak-spi/README.md` (set `cachePolicy: NO_CACHE` on the
-  federation component so attribute changes propagate without a
-  restart).
+  setting on the federation provider). Granting a permission in F+
+  shows up on the user's next login *after* the cache TTL expires.
+  Keycloak's per-user attribute cache is disabled for this
+  federation (`cachePolicy: NO_CACHE` set by service-setup) so the
+  SPI is the only cache in play - no openid restart needed after
+  changing grants.
 - **Realm name comes from values.yaml.** It is `factory_plus` by
   default (`openid.realm` in values). It must match what
   `grafana-ini.yaml` and any other client configmap reads, so if you

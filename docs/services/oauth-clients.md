@@ -297,6 +297,121 @@ const claims   = tokenSet.claims();
 // claims.preferred_username -> "alice@FACTORYPLUS.MYORG.COM"
 ```
 
+## Worked example: JupyterHub
+
+A second concrete walkthrough, this one for an application installed
+*alongside* ACS rather than shipped with it. JupyterHub is via the
+official Z2JH chart; ACS code stays untouched. The pattern generalises
+to any OIDC consumer.
+
+### 1. Declare the OIDC client
+
+Add to your ACS values:
+
+```yaml
+serviceSetup:
+  config:
+    openidClients:
+      jupyterhub:
+        enabled: true
+        name: JupyterHub
+        redirectPath: /hub/oauth_callback
+```
+
+`helm upgrade` ACS. service-setup will create the Keycloak client, the
+`fp_principal_uuid` and `fp_permissions` mappers, and drop the auto-
+generated client secret into `keycloak-clients/jupyterhub`. Verify:
+
+```sh
+kubectl -n factory-plus get secret keycloak-clients \
+  -o jsonpath='{.data.jupyterhub}' | base64 -d
+```
+
+### 2. Create application-specific F+ permissions
+
+JupyterHub-specific authz lives in F+, not in ACS internals. Open the
+ACS Admin UI -> **ConfigDB** -> **Create Object**:
+
+| Name | Type | UUID |
+| --- | --- | --- |
+| `JupyterHub admin` | `Permission (Rank 1 class)` | pick or auto-generate |
+| `JupyterHub user`  | `Permission (Rank 1 class)` | pick or auto-generate |
+
+Then **Access Control** -> **Principals** -> click the user (e.g.
+`admin@<realm>`) -> add a grant: permission = `JupyterHub admin`,
+target = **Wildcard**. Wildcard is the only target that surfaces in
+`fp_permissions`; everything else is invisible to the consumer.
+
+### 3. Install Z2JH with OIDC
+
+Minimal values for the JupyterHub chart (`hub.jupyter.org/helm-chart`).
+Substitute the client secret you fetched in step 1 and the two
+permission UUIDs from step 2:
+
+```yaml
+hub:
+  config:
+    JupyterHub:
+      authenticator_class: generic-oauth
+    GenericOAuthenticator:
+      client_id: jupyterhub
+      client_secret: "<from keycloak-clients/jupyterhub>"
+      oauth_callback_url: "http://jupyterhub.<acs.baseUrl>/hub/oauth_callback"
+      authorize_url: "http://openid.<acs.baseUrl>/realms/factory_plus/protocol/openid-connect/auth"
+      token_url:    "http://openid.<acs.baseUrl>/realms/factory_plus/protocol/openid-connect/token"
+      userdata_url: "http://openid.<acs.baseUrl>/realms/factory_plus/protocol/openid-connect/userinfo"
+      logout_redirect_url: "http://openid.<acs.baseUrl>/realms/factory_plus/protocol/openid-connect/logout"
+      scope: [openid, profile]
+      username_claim: preferred_username
+      # OAuthenticator >= 17 requires this for admin_groups to be honoured.
+      manage_groups: true
+      # The OAuth response body lands under `oauth_user` in auth_state;
+      # claim_groups_key is deprecated.
+      auth_state_groups_key: oauth_user.fp_permissions
+      admin_groups:
+        - "<jupyterhub-admin permission UUID>"
+      allowed_groups:
+        - "<jupyterhub-admin permission UUID>"
+        - "<jupyterhub-user permission UUID>"
+
+proxy:
+  service:
+    type: ClusterIP
+
+ingress:
+  enabled: true
+  hosts: ["jupyterhub.<acs.baseUrl>"]
+  ingressClassName: acs-traefik    # matches the IngressClass installed by ACS
+```
+
+Install:
+
+```sh
+helm repo add jupyterhub https://hub.jupyter.org/helm-chart/
+helm repo update
+helm upgrade --install jupyterhub jupyterhub/jupyterhub \
+  --namespace jupyterhub --create-namespace \
+  -f jupyterhub-values.yaml
+```
+
+Visit `http://jupyterhub.<acs.baseUrl>`, sign in via the ACS Keycloak.
+A user with the JupyterHub admin permission lands as a hub admin; a
+user with only the user permission gets a regular hub session; anyone
+else hits 403. No code in ACS knows about JupyterHub.
+
+### What this exercises
+
+| F+ piece | JupyterHub piece |
+| --- | --- |
+| OIDC client provisioned by service-setup | `client_id` + `client_secret` |
+| `fp_principal_uuid` claim | `username_claim: preferred_username` (we use the UPN, but the UUID is also there for any app that wants it) |
+| `fp_permissions` claim | `auth_state_groups_key: oauth_user.fp_permissions` + `admin_groups` / `allowed_groups` |
+| F+ Permission objects | The "groups" JupyterHub gates on |
+| F+ Wildcard-target ACL grant | Membership in those groups for a given user |
+
+Nothing in JH is ACS-specific; the same shape applies to any OIDC
+consumer that supports group-based gating.
+
 ## Reference: the Grafana wiring
 
 If you want to see every piece in one place, Grafana is the canonical
@@ -324,11 +439,20 @@ configuration changes.
   what Grafana does via `email_attribute_path: preferred_username`).
   Do not enable any feature that asks the user to fill in profile
   fields - the write will fail with `ReadOnlyException` from the SPI.
-- **Permission propagation has a ~60s lag.** The SPI caches F+ lookups
-  for 60 seconds (configurable via the `cache.ttl.seconds` setting on
-  the federation provider). Granting a permission in F+ shows up on
-  the user's next login *after* the cache TTL expires. This is by
-  design; do not invent a webhook to invalidate it.
+- **Permission propagation has two cache layers.** The SPI caches F+
+  lookups for 60 seconds (configurable via the `cache.ttl.seconds`
+  setting on the federation provider). On top of that, Keycloak's
+  *user cache* memoises user attributes per-session - meaning a
+  grant you make in F+ may not show up in `fp_permissions` even after
+  the SPI cache expires, because Keycloak is still serving the
+  attribute snapshot it captured when the user record was first
+  loaded. The reliable invalidation today is `kubectl rollout
+  restart deploy/openid`; for routine operator work, expect "grant
+  the permission, restart openid, have the user sign in again."
+  This is a sharp edge worth removing - see *Future work* in
+  `acs-keycloak-spi/README.md` (set `cachePolicy: NO_CACHE` on the
+  federation component so attribute changes propagate without a
+  restart).
 - **Realm name comes from values.yaml.** It is `factory_plus` by
   default (`openid.realm` in values). It must match what
   `grafana-ini.yaml` and any other client configmap reads, so if you
@@ -417,6 +541,75 @@ back to the federated user record. The SPI is read-only.
 service-setup explicitly disables `UPDATE_PROFILE`,
 `VERIFY_PROFILE`, and `VERIFY_EMAIL` for this reason. If you've
 enabled another required action that writes to the user, disable it.
+
+### Inspecting what a user's JWT actually contains
+
+When `fp_permissions` looks wrong (missing UUIDs, stale, etc.), bypass
+the application and look at the token directly.
+
+1. **Verify the grant exists in F+.** Quickest path is the ACS MCP
+   server (if you have it wired up) or the F+ Auth HTTP API. With MCP:
+
+   ```
+   mcp__acs__find_grants(principal=<user-uuid>)
+   mcp__acs__get_grant(uuid=<grant-uuid>)
+   mcp__acs__check_acl(principal=<user-uuid>,
+                       permission=<perm-uuid>,
+                       target=00000000-0000-0000-0000-000000000000,
+                       wild=true)
+   ```
+
+   Confirm the target is `00000000-0000-0000-0000-000000000000`
+   (Wildcard). Anything else is invisible to `fp_permissions`.
+
+2. **Temporarily enable direct access grants on the client** so you
+   can password-grant a token without a browser flow:
+
+   ```sh
+   kubectl -n factory-plus exec deploy/openid -c keycloak -- /bin/sh -c '
+     /opt/keycloak/bin/kcadm.sh config credentials \
+       --server http://localhost:8080 --realm master \
+       --user _bootstrap --password "$KC_BOOTSTRAP" >/dev/null
+     /opt/keycloak/bin/kcadm.sh update clients/<client-id> \
+       -r factory_plus -s directAccessGrantsEnabled=true'
+   ```
+
+   (Get the bootstrap password from the `keycloak-clients/_bootstrap`
+   secret. `<client-id>` is the Keycloak-internal UUID of the OIDC
+   client, *not* the `clientId` string - find it with
+   `kcadm.sh get clients -r factory_plus -q clientId=<name>`.)
+
+3. **Fetch a token and decode it.**
+
+   ```sh
+   CS=$(kubectl -n factory-plus get secret keycloak-clients \
+          -o jsonpath='{.data.<client>}' | base64 -d)
+   curl -s -X POST \
+     "http://openid.<acs.baseUrl>/realms/factory_plus/protocol/openid-connect/token" \
+     -d grant_type=password -d client_id=<client> -d client_secret="$CS" \
+     -d username=<user>@<REALM> -d password=<user-pw> \
+     -d "scope=openid profile" \
+   | jq -r '.access_token' \
+   | awk -F. '{print $2}' | base64 -d 2>/dev/null | jq
+   ```
+
+   The JWT payload includes the issued `fp_permissions` array. If the
+   grant you expected isn't in the array, it's an SPI/cache issue
+   (next step). If it is in the array but the application still
+   rejects you, the application's role-mapping config is the problem
+   (check its docs for the equivalent of Grafana's `role_attribute_path`).
+
+4. **Flush Keycloak's user cache.** If the grant is fresh and isn't
+   appearing, the most likely reason is Keycloak's per-user attribute
+   cache (see the *Constraints and gotchas* section above). Restart
+   the openid pod, then have the user sign in again:
+
+   ```sh
+   kubectl -n factory-plus rollout restart deploy/openid
+   ```
+
+5. **Turn direct access grants back off** when you're done. Same
+   command as step 2 with `directAccessGrantsEnabled=false`.
 
 ### Service-setup keeps creating duplicate clients
 

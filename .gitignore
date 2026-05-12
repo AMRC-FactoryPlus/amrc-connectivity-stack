@@ -13,3 +13,5 @@ spirit-schemas/
 
 node_modules/
 .worktrees/
+/.claude/worktrees/
+/.claude/scheduled_tasks.lock

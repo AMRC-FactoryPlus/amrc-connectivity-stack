@@ -13,6 +13,7 @@ export function routes(opts: {
     history: History;
     subscriptions: SubscriptionManager;
     mcpServer?: McpServer;
+    maxDepthCap?: number;
 }) {
     const api = new APIv1(opts);
 

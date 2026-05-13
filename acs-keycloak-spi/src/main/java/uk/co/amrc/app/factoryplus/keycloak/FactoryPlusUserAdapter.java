@@ -17,6 +17,7 @@ import org.keycloak.credential.UserCredentialManager;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
 import org.keycloak.models.SubjectCredentialManager;
+import org.keycloak.models.UserModel;
 import org.keycloak.storage.StorageId;
 import org.keycloak.storage.adapter.AbstractUserAdapter;
 
@@ -113,7 +114,23 @@ public class FactoryPlusUserAdapter extends AbstractUserAdapter {
         if (ATTR_FP_UUID.equals(name)) return Stream.of(user.uuid());
         if (ATTR_FP_PERMISSIONS.equals(name))
             return store.findPermissionsForPrincipal(user.uuid()).stream();
-        return Stream.empty();
+        // Expose username/email through the per-name attribute API
+        // explicitly. Keycloak's AbstractUserAdapter.getAttributeStream
+        // only surfaces *stored* attributes - it does NOT route
+        // "username"/"email" to getUsername/getEmail. The standard
+        // oidc-usermodel-attribute-mapper looks them up via this API,
+        // so without these branches preferred_username and email come
+        // out as null in the issued tokens / userinfo. The default
+        // user-cache wrapper masks this because it snapshots
+        // getAttributes() (which we *do* implement correctly via
+        // super); cachePolicy=NO_CACHE bypasses the cache and exposes
+        // the bug.
+        if (UserModel.USERNAME.equals(name)) return Stream.of(getUsername());
+        if (UserModel.EMAIL.equals(name)) {
+            String e = getEmail();
+            return e == null ? Stream.empty() : Stream.of(e);
+        }
+        return super.getAttributeStream(name);
     }
 
     @Override
@@ -123,7 +140,9 @@ public class FactoryPlusUserAdapter extends AbstractUserAdapter {
             return store.findPermissionsForPrincipal(user.uuid())
                 .stream().findFirst().orElse(null);
         }
-        return null;
+        if (UserModel.USERNAME.equals(name)) return getUsername();
+        if (UserModel.EMAIL.equals(name))    return getEmail();
+        return super.getFirstAttribute(name);
     }
 
     @Override

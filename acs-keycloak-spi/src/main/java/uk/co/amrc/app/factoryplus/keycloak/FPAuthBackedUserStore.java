@@ -121,28 +121,24 @@ public class FPAuthBackedUserStore implements FactoryPlusUserStore {
 
     @Override
     public Optional<FactoryPlusUser> findByUsername(String username) {
-        // Keycloak lowercases usernames coming off the login form, but
-        // Kerberos UPNs in F+ are stored with the realm in canonical
-        // uppercase. acs-auth's valid_krb rejects a lowercase realm
-        // outright (HTTP 400), so normalise the realm part here.
-        String upn = canonicaliseUpn(username);
+        String upn = applyDefaultRealm(username);
         return fetchUuidByIdentity(IDENTITY_KIND_KERBEROS, upn)
             .flatMap(this::fetchPrincipal);
     }
 
-    private String canonicaliseUpn(String username) {
+    /** Short names get {@code @<defaultRealm>} appended so local users
+     *  can log in with just their username. Inputs that already
+     *  contain {@code @} (and the default realm itself) are used
+     *  verbatim - the SPI does not force any case normalisation,
+     *  since while uppercase Kerberos realms are convention, not
+     *  every deployment follows it and case-folding inputs would
+     *  break lookups against F+ entries that don't match the forced
+     *  casing. */
+    private String applyDefaultRealm(String username) {
         if (username == null) return null;
-        int at = username.lastIndexOf('@');
-        if (at < 0) {
-            // Short name: append the local realm if one is configured
-            // so users can log in with just their username. If no
-            // default realm is configured the lookup proceeds with
-            // the bare name and F+ will return not-found.
-            if (defaultRealm == null) return username;
-            return username + "@" + defaultRealm.toUpperCase();
-        }
-        return username.substring(0, at) + "@"
-            + username.substring(at + 1).toUpperCase();
+        if (username.contains("@")) return username;
+        if (defaultRealm == null) return username;
+        return username + "@" + defaultRealm;
     }
 
     @Override

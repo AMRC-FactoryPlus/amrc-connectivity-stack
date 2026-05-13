@@ -205,20 +205,39 @@ class FPAuthBackedUserStoreTest {
     }
 
     @Test
-    void short_name_default_realm_is_uppercased() {
-        // Kerberos realms are conventionally uppercase; F+ stores them
-        // that way. Uppercase the configured value defensively so a
-        // mis-cased deploy doesn't break login.
+    void short_name_default_realm_is_used_verbatim() {
+        // Use the configured default realm exactly as supplied. While
+        // uppercase Kerberos realms are convention, not every
+        // deployment follows it - some clusters run mixed- or
+        // lowercase realms, and case-folding the configured value
+        // would silently break their lookups.
         var withRealm = new FPAuthBackedUserStore(
             URI.create(wiremock.baseUrl()), Duration.ofSeconds(2),
             null, "factoryplus.local");
         wiremock.stubFor(get(urlPathEqualTo(
-                "/v2/identity/kerberos/alice%40FACTORYPLUS.LOCAL"))
+                "/v2/identity/kerberos/alice%40factoryplus.local"))
             .willReturn(okJson("\"" + UUID_ALICE + "\"")));
         wiremock.stubFor(get(urlPathEqualTo("/v2/principal/" + UUID_ALICE))
             .willReturn(okJson(PRINCIPAL_JSON)));
 
         assertThat(withRealm.findByUsername("alice")).isPresent();
+    }
+
+    @Test
+    void typed_upn_realm_passes_through_verbatim() {
+        // A previous canonicaliseUpn() always uppercased the realm
+        // part of any @-suffixed input. Drop that: respect whatever
+        // the user typed (or whatever Keycloak forwarded). Mixed-
+        // and lowercase realms exist; force-casing them breaks F+
+        // identity lookups against entries that don't match the
+        // forced casing.
+        wiremock.stubFor(get(urlPathEqualTo(
+                "/v2/identity/kerberos/alice%40mixed.Realm"))
+            .willReturn(okJson("\"" + UUID_ALICE + "\"")));
+        wiremock.stubFor(get(urlPathEqualTo("/v2/principal/" + UUID_ALICE))
+            .willReturn(okJson(PRINCIPAL_JSON)));
+
+        assertThat(store.findByUsername("alice@mixed.Realm")).isPresent();
     }
 
     @Test

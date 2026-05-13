@@ -20,8 +20,18 @@ data:
   # Viewer. UUIDs come from serviceSetup.config.grafanaPermissions; the
   # same UUIDs are seeded by service-setup as F+ Permission objects, so
   # admins grant them via the standard ACL editor.
+  #
+  # not_null(fp_permissions, `[]`) is load-bearing: Keycloak's
+  # OIDCAttributeMapperHelper omits the claim entirely (rather than
+  # emitting an empty array) when the user has zero F+ permission
+  # grants. Without the not_null guard, contains() gets null as its
+  # subject and go-jmespath (what Grafana uses) leaks a single space
+  # through the || chain instead of falling through to 'Viewer'. The
+  # net effect with role_attribute_strict=true is "Integration
+  # requires a valid org role assigned in idP. Assigned role: ' '"
+  # and login is refused for any user without a Grafana grant.
   role_attribute_path: >-
-    contains(fp_permissions[*], '{{ $perms.admin }}') && 'Admin'
-    || contains(fp_permissions[*], '{{ $perms.editor }}') && 'Editor'
+    contains(not_null(fp_permissions, `[]`)[*], '{{ $perms.admin }}') && 'Admin'
+    || contains(not_null(fp_permissions, `[]`)[*], '{{ $perms.editor }}') && 'Editor'
     || 'Viewer'
 {{- end }}

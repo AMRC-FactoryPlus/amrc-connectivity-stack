@@ -74,7 +74,7 @@ function mockSubscriptions() {
 const NS_NAME = "TestNamespace";
 const NS_URI = "urn:test:namespace";
 
-function createApp() {
+function createApp(opts: { maxDepthCap?: number } = {}) {
     const objectTree = mockObjectTree();
     const valueCache = mockValueCache();
     const history = mockHistory();
@@ -85,6 +85,7 @@ function createApp() {
         valueCache: valueCache as any,
         history: history as any,
         subscriptions: subscriptions as any,
+        maxDepthCap: opts.maxDepthCap,
     });
 
     const app = express();
@@ -175,6 +176,24 @@ describe("APIv1", () => {
                     subscribe: { stream: true },
                 },
             });
+        });
+
+        it("advertises maxDepthCap when configured", async () => {
+            const { app } = createApp({ maxDepthCap: 5 });
+            const res = await request(app).get("/info");
+
+            expect(res.status).toBe(200);
+            expect(res.body.capabilities.query).toEqual({
+                history: true,
+                maxDepthCap: 5,
+            });
+        });
+
+        it("omits maxDepthCap when unconfigured (0)", async () => {
+            const { app } = createApp();
+            const res = await request(app).get("/info");
+
+            expect(res.body.capabilities.query).not.toHaveProperty("maxDepthCap");
         });
     });
 
@@ -565,6 +584,46 @@ describe("APIv1", () => {
             expect(results[0].success).toBe(true);
             expect(results[1].elementId).toBe("missing");
             expect(results[1].success).toBe(false);
+        });
+
+        it("returns 200 when requested maxDepth is within cap", async () => {
+            const { app, history, objectTree } = createApp({ maxDepthCap: 5 });
+            objectTree.getObject.mockReturnValue(sampleObject);
+            history.getCompositionValue.mockResolvedValue(sampleValueResponse);
+
+            const res = await request(app)
+                .post("/objects/value")
+                .send({ elementIds: ["obj-1"], maxDepth: 3 });
+
+            expect(res.status).toBe(200);
+            expect(history.getCompositionValue).toHaveBeenCalledWith("obj-1", 3);
+        });
+
+        it("returns 206 with clamped depth when maxDepth exceeds cap", async () => {
+            const { app, history, objectTree } = createApp({ maxDepthCap: 2 });
+            objectTree.getObject.mockReturnValue(sampleObject);
+            history.getCompositionValue.mockResolvedValue(sampleValueResponse);
+
+            const res = await request(app)
+                .post("/objects/value")
+                .send({ elementIds: ["obj-1"], maxDepth: 10 });
+
+            expect(res.status).toBe(206);
+            expect(history.getCompositionValue).toHaveBeenCalledWith("obj-1", 2);
+            expect(res.body.success).toBe(true);
+        });
+
+        it("returns 200 when no maxDepthCap is configured even for deep requests", async () => {
+            const { app, history, objectTree } = createApp();
+            objectTree.getObject.mockReturnValue(sampleObject);
+            history.getCompositionValue.mockResolvedValue(sampleValueResponse);
+
+            const res = await request(app)
+                .post("/objects/value")
+                .send({ elementIds: ["obj-1"], maxDepth: 999 });
+
+            expect(res.status).toBe(200);
+            expect(history.getCompositionValue).toHaveBeenCalledWith("obj-1", 999);
         });
     });
 

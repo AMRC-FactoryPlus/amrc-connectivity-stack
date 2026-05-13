@@ -21,6 +21,12 @@ interface APIv1Opts {
     valueCache: ValueCache;
     history: History;
     subscriptions: SubscriptionManager;
+    /**
+     * Server-imposed cap on composition `maxDepth`. 0 means no cap
+     * (default). When set, requests for a deeper traversal are
+     * clamped and the response is returned with HTTP 206.
+     */
+    maxDepthCap?: number;
 }
 
 /**
@@ -61,6 +67,7 @@ export class APIv1 {
     private valueCache: ValueCache;
     private history: History;
     private subscriptions: SubscriptionManager;
+    private maxDepthCap: number;
 
     /**
      * Stores the collaborator services and builds both routers.
@@ -70,11 +77,24 @@ export class APIv1 {
         this.valueCache = opts.valueCache;
         this.history = opts.history;
         this.subscriptions = opts.subscriptions;
+        this.maxDepthCap = opts.maxDepthCap ?? 0;
 
         this.routes = Router();
         this.infoRoute = Router();
 
         this.setup_routes();
+    }
+
+    /**
+     * Applies the server-imposed `maxDepthCap` to a client's requested
+     * depth. Returns the effective depth to use and whether the
+     * request was clamped (caller should return HTTP 206 if so).
+     */
+    private clampDepth(requested: number): { effective: number; clamped: boolean } {
+        if (this.maxDepthCap > 0 && requested > this.maxDepthCap) {
+            return { effective: this.maxDepthCap, clamped: true };
+        }
+        return { effective: requested, clamped: false };
     }
 
     /**
@@ -151,12 +171,16 @@ export class APIv1 {
      * GET /info — returns spec version, server name/version, and capability flags.
      **/
     get_info(_req: Request, res: Response): void {
+        const query: Record<string, any> = { history: true };
+        if (this.maxDepthCap > 0) {
+            query.maxDepthCap = this.maxDepthCap;
+        }
         res.json({
             specVersion: I3X_SPEC_VERSION,
             serverName: "AMRC Connectivity Stack",
             serverVersion: Version,
             capabilities: {
-                query: { history: true },
+                query,
                 update: { current: false, history: false },
                 subscribe: { stream: true },
             },
@@ -276,10 +300,13 @@ export class APIv1 {
      * tries the real-time UNS `valueCache` first, then falls back to
      * InfluxDB via `history.getCurrentValue` (or `getCompositionValue`
      * for composition objects). `maxDepth` controls composition
-     * recursion; defaults to 1 for compositions.
+     * recursion; defaults to 1 for compositions. If the server's
+     * `maxDepthCap` clamped any request, the response is returned
+     * with HTTP 206 to indicate a partial result.
      */
     async value_objects(req: Request, res: Response): Promise<void> {
         const { elementIds, maxDepth } = req.body;
+        const { effective, clamped } = this.clampDepth(maxDepth ?? 1);
         const results = await Promise.all((elementIds as string[]).map(async (id) => {
             // Try UNS cache first (real-time), fall back to InfluxDB last()
             const cached = this.valueCache.getValue(id);
@@ -290,7 +317,7 @@ export class APIv1 {
             console.log(`[VALUE] ${id.slice(0,16)} → UNS cache miss, querying InfluxDB...`);
             const obj = this.objectTree.getObject(id);
             const item = obj?.isComposition
-                ? await this.history.getCompositionValue(id, maxDepth ?? 1)
+                ? await this.history.getCompositionValue(id, effective)
                 : await this.history.getCurrentValue(id);
             if (item) {
                 console.log(`[VALUE] ${id.slice(0,16)} → InfluxDB hit: value=${JSON.stringify(item.value)} ts=${item.timestamp}`);
@@ -299,6 +326,7 @@ export class APIv1 {
             console.log(`[VALUE] ${id.slice(0,16)} → no data`);
             return { success: false, elementId: id, error: { code: 404, message: `No value for ${id}` } };
         }));
+        if (clamped) res.status(206);
         const allSuccess = results.every(r => r.success);
         ((res as any)._originalJson || res.json.bind(res))({ success: allSuccess, results });
     }

@@ -310,7 +310,7 @@ function createPreloadedMocks() {
  * App setup
  * ================================================================ */
 
-function createE2eApp() {
+function createE2eApp(opts: { maxDepthCap?: number } = {}) {
     const mocks = createPreloadedMocks();
 
     const api = new APIv1({
@@ -318,6 +318,7 @@ function createE2eApp() {
         valueCache: mocks.valueCache as any,
         history: mocks.history as any,
         subscriptions: mocks.subscriptions as any,
+        maxDepthCap: opts.maxDepthCap,
     });
 
     const app = express();
@@ -763,6 +764,31 @@ describe("E2E Compliance Tests", () => {
             /* Third: no value */
             expect(results[2].elementId).toBe("missing");
             expect(results[2].success).toBe(false);
+        });
+
+        it("returns 206 when requested maxDepth is clamped by server cap", async () => {
+            const { app, history, valueCache } = createE2eApp({ maxDepthCap: 2 });
+            // Force a cache miss so the request reaches getCompositionValue
+            valueCache.getValue.mockReturnValue(null);
+
+            const res = await request(app)
+                .post("/v1/objects/value")
+                .send({ elementIds: ["obj-cnc-1"], maxDepth: 10 });
+
+            expect(res.status).toBe(206);
+            expect(res.body.success).toBe(true);
+            expect(history.getCompositionValue).toHaveBeenCalledWith("obj-cnc-1", 2);
+        });
+
+        it("advertises maxDepthCap in /info when configured", async () => {
+            const { app } = createE2eApp({ maxDepthCap: 4 });
+            const res = await request(app).get("/v1/info");
+
+            expect(res.status).toBe(200);
+            expect(res.body.capabilities.query).toEqual({
+                history: true,
+                maxDepthCap: 4,
+            });
         });
     });
 

@@ -81,7 +81,8 @@ const api = await new WebAPI({
         valueCache,
         history,
         subscriptions,
-        mcpServer
+        mcpServer,
+        maxDepthCap: parseInt(env.I3X_MAX_DEPTH_CAP || "0"),
     }),
 }).init();
 

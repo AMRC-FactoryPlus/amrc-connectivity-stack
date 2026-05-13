@@ -63,6 +63,7 @@ function mockSubscriptions() {
         register: jest.fn<(clientId: string, subId: string, ids: string[], maxDepth?: number) => void>(),
         registerOne: jest.fn<(clientId: string, subId: string, id: string, maxDepth?: number) => void>(),
         unregister: jest.fn<(clientId: string, subId: string, ids: string[]) => void>(),
+        unregisterOne: jest.fn<(clientId: string, subId: string, id: string) => void>(),
         stream: jest.fn<(clientId: string, subId: string, res: any) => void>(),
         sync: jest.fn<(clientId: string, subId: string, lastSeq?: number) => I3xSyncItem[]>()
             .mockReturnValue([]),
@@ -770,8 +771,74 @@ describe("APIv1", () => {
     });
 
     describe("POST /subscriptions/unregister", () => {
-        it("unregisters elementIds", async () => {
-            const { app, subscriptions } = createApp();
+        it("returns bulk envelope on success", async () => {
+            const { app, objectTree, subscriptions } = createApp();
+            objectTree.getObject.mockImplementation((id: string) => {
+                if (id === "obj-1") return sampleObject;
+                if (id === "obj-2") return sampleObject2;
+                return undefined;
+            });
+
+            const res = await request(app)
+                .post("/subscriptions/unregister")
+                .send({
+                    clientId: "c1",
+                    subscriptionId: "sub-1",
+                    elementIds: ["obj-1", "obj-2"],
+                });
+
+            expect(res.status).toBe(200);
+            expect(subscriptions.unregisterOne).toHaveBeenCalledWith("c1", "sub-1", "obj-1");
+            expect(subscriptions.unregisterOne).toHaveBeenCalledWith("c1", "sub-1", "obj-2");
+            expect(res.body).toEqual({
+                success: true,
+                results: [
+                    { success: true, elementId: "obj-1", result: null },
+                    { success: true, elementId: "obj-2", result: null },
+                ],
+            });
+        });
+
+        it("reports unknown elementIds as 404 without aborting the batch", async () => {
+            const { app, objectTree, subscriptions } = createApp();
+            objectTree.getObject.mockImplementation((id: string) => {
+                if (id === "obj-1") return sampleObject;
+                if (id === "obj-2") return sampleObject2;
+                return undefined;
+            });
+
+            const res = await request(app)
+                .post("/subscriptions/unregister")
+                .send({
+                    clientId: "c1",
+                    subscriptionId: "sub-1",
+                    elementIds: ["obj-1", "missing", "obj-2"],
+                });
+
+            expect(res.status).toBe(200);
+            expect(res.body.success).toBe(false);
+            expect(res.body.results).toEqual([
+                { success: true, elementId: "obj-1", result: null },
+                {
+                    success: false,
+                    elementId: "missing",
+                    error: { code: 404, message: "Object missing not found" },
+                },
+                { success: true, elementId: "obj-2", result: null },
+            ]);
+            expect(subscriptions.unregisterOne).not.toHaveBeenCalledWith(
+                "c1", "sub-1", "missing",
+            );
+        });
+
+        it("reports sub-level errors with code from err.status per id", async () => {
+            const { app, objectTree, subscriptions } = createApp();
+            objectTree.getObject.mockReturnValue(sampleObject);
+            subscriptions.unregisterOne.mockImplementation(() => {
+                const err: any = new Error("Subscription sub-1 not found");
+                err.status = 404;
+                throw err;
+            });
 
             const res = await request(app)
                 .post("/subscriptions/unregister")
@@ -782,9 +849,16 @@ describe("APIv1", () => {
                 });
 
             expect(res.status).toBe(200);
-            expect(subscriptions.unregister).toHaveBeenCalledWith(
-                "c1", "sub-1", ["obj-1"],
-            );
+            expect(res.body).toEqual({
+                success: false,
+                results: [
+                    {
+                        success: false,
+                        elementId: "obj-1",
+                        error: { code: 404, message: "Subscription sub-1 not found" },
+                    },
+                ],
+            });
         });
     });
 

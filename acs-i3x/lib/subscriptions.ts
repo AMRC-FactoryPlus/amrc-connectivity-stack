@@ -139,6 +139,23 @@ export class SubscriptionManager {
         this.resetTtl(sub);
     }
 
+    unregisterOne(clientId: string, subscriptionId: string, elementId: string): void {
+        const sub = this.subscriptions.get(subscriptionId);
+        if (!sub) {
+            const err: any = new Error(`Subscription ${subscriptionId} not found`);
+            err.status = 404;
+            throw err;
+        }
+        if (sub.clientId !== clientId) {
+            const err: any = new Error(`Subscription ${subscriptionId} does not belong to client ${clientId}`);
+            err.status = 403;
+            throw err;
+        }
+
+        sub.registeredElements.delete(elementId);
+        this.resetTtl(sub);
+    }
+
     sync(clientId: string, subscriptionId: string, lastSequenceNumber?: number): I3xSyncItem[] {
         const sub = this.getAndVerify(clientId, subscriptionId);
 

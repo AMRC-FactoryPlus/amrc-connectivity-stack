@@ -59,6 +59,7 @@ function mockSubscriptions() {
             }),
         list: jest.fn<(clientId: string, ids: string[]) => I3xSubscription[]>()
             .mockReturnValue([]),
+        getOne: jest.fn<(clientId: string, id: string) => I3xSubscription>(),
         deleteOne: jest.fn<(clientId: string, id: string) => void>(),
         register: jest.fn<(clientId: string, subId: string, ids: string[], maxDepth?: number) => void>(),
         registerOne: jest.fn<(clientId: string, subId: string, id: string, maxDepth?: number) => void>(),
@@ -660,20 +661,113 @@ describe("APIv1", () => {
     });
 
     describe("POST /subscriptions/list", () => {
-        it("lists subscriptions", async () => {
+        it("returns bulk envelope with monitoredObjects per subscription", async () => {
             const { app, subscriptions } = createApp();
-            subscriptions.list.mockReturnValue([{
-                clientId: "c1",
-                subscriptionId: "sub-1",
-                displayName: "Test",
-            }]);
+            subscriptions.getOne.mockImplementation((clientId: string, id: string) => ({
+                clientId,
+                subscriptionId: id,
+                displayName: `Sub ${id}`,
+                monitoredObjects: [{ elementId: "obj-1", maxDepth: 2 }],
+            }));
+
+            const res = await request(app)
+                .post("/subscriptions/list")
+                .send({ clientId: "c1", subscriptionIds: ["sub-1", "sub-2"] });
+
+            expect(res.status).toBe(200);
+            expect(subscriptions.getOne).toHaveBeenCalledWith("c1", "sub-1");
+            expect(subscriptions.getOne).toHaveBeenCalledWith("c1", "sub-2");
+            expect(res.body).toEqual({
+                success: true,
+                results: [
+                    {
+                        success: true,
+                        subscriptionId: "sub-1",
+                        result: {
+                            clientId: "c1",
+                            subscriptionId: "sub-1",
+                            displayName: "Sub sub-1",
+                            monitoredObjects: [{ elementId: "obj-1", maxDepth: 2 }],
+                        },
+                    },
+                    {
+                        success: true,
+                        subscriptionId: "sub-2",
+                        result: {
+                            clientId: "c1",
+                            subscriptionId: "sub-2",
+                            displayName: "Sub sub-2",
+                            monitoredObjects: [{ elementId: "obj-1", maxDepth: 2 }],
+                        },
+                    },
+                ],
+            });
+        });
+
+        it("reports missing subscriptions as 404 without aborting the batch", async () => {
+            const { app, subscriptions } = createApp();
+            subscriptions.getOne.mockImplementation((clientId: string, id: string) => {
+                if (id === "missing") {
+                    const err: any = new Error(`Subscription ${id} not found`);
+                    err.status = 404;
+                    throw err;
+                }
+                return {
+                    clientId,
+                    subscriptionId: id,
+                    displayName: `Sub ${id}`,
+                    monitoredObjects: [],
+                };
+            });
+
+            const res = await request(app)
+                .post("/subscriptions/list")
+                .send({ clientId: "c1", subscriptionIds: ["sub-1", "missing"] });
+
+            expect(res.status).toBe(200);
+            expect(res.body.success).toBe(false);
+            expect(res.body.results).toEqual([
+                {
+                    success: true,
+                    subscriptionId: "sub-1",
+                    result: {
+                        clientId: "c1",
+                        subscriptionId: "sub-1",
+                        displayName: "Sub sub-1",
+                        monitoredObjects: [],
+                    },
+                },
+                {
+                    success: false,
+                    subscriptionId: "missing",
+                    error: { code: 404, message: "Subscription missing not found" },
+                },
+            ]);
+        });
+
+        it("reports wrong-client subscriptions as 403", async () => {
+            const { app, subscriptions } = createApp();
+            subscriptions.getOne.mockImplementation((_clientId: string, _id: string) => {
+                const err: any = new Error("Subscription sub-1 does not belong to client c1");
+                err.status = 403;
+                throw err;
+            });
 
             const res = await request(app)
                 .post("/subscriptions/list")
                 .send({ clientId: "c1", subscriptionIds: ["sub-1"] });
 
             expect(res.status).toBe(200);
-            expect(res.body.result).toHaveLength(1);
+            expect(res.body).toEqual({
+                success: false,
+                results: [
+                    {
+                        success: false,
+                        subscriptionId: "sub-1",
+                        error: { code: 403, message: "Subscription sub-1 does not belong to client c1" },
+                    },
+                ],
+            });
         });
     });
 

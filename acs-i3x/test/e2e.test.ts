@@ -267,6 +267,22 @@ function createPreloadedMocks() {
                     displayName: "Sub " + id,
                 })),
             ),
+        getOne: jest.fn<(clientId: string, id: string) => I3xSubscription>()
+            .mockImplementation((clientId: string, id: string) => {
+                if (id === "does-not-exist") {
+                    const err: any = new Error(`Subscription ${id} not found`);
+                    err.status = 404;
+                    throw err;
+                }
+                return {
+                    clientId,
+                    subscriptionId: id,
+                    displayName: "Sub " + id,
+                    monitoredObjects: [
+                        { elementId: "obj-cnc-1", maxDepth: 1 },
+                    ],
+                };
+            }),
         deleteOne: jest.fn<(clientId: string, id: string) => void>()
             .mockImplementation((_clientId: string, id: string) => {
                 if (id === "does-not-exist") {
@@ -986,15 +1002,47 @@ describe("E2E Compliance Tests", () => {
     });
 
     describe("POST /v1/subscriptions/list", () => {
-        it("returns subscription details", async () => {
+        it("returns bulk envelope with monitoredObjects per subscription", async () => {
             const { app } = createE2eApp();
             const res = await request(app)
                 .post("/v1/subscriptions/list")
                 .send({ clientId: "test-client", subscriptionIds: ["sub-1"] });
 
             expect(res.status).toBe(200);
-            expect(res.body.success).toBe(true);
-            expect(Array.isArray(res.body.result)).toBe(true);
+            expect(res.body).toEqual({
+                success: true,
+                results: [
+                    {
+                        success: true,
+                        subscriptionId: "sub-1",
+                        result: {
+                            clientId: "test-client",
+                            subscriptionId: "sub-1",
+                            displayName: "Sub sub-1",
+                            monitoredObjects: [
+                                { elementId: "obj-cnc-1", maxDepth: 1 },
+                            ],
+                        },
+                    },
+                ],
+            });
+        });
+
+        it("reports missing subscriptions as 404 per id", async () => {
+            const { app } = createE2eApp();
+            const res = await request(app)
+                .post("/v1/subscriptions/list")
+                .send({ clientId: "test-client", subscriptionIds: ["sub-1", "does-not-exist"] });
+
+            expect(res.status).toBe(200);
+            expect(res.body.success).toBe(false);
+            expect(res.body.results).toHaveLength(2);
+            expect(res.body.results[0].success).toBe(true);
+            expect(res.body.results[1]).toEqual({
+                success: false,
+                subscriptionId: "does-not-exist",
+                error: { code: 404, message: "Subscription does-not-exist not found" },
+            });
         });
     });
 

@@ -411,11 +411,29 @@ export class APIv1 {
     }
 
     /**
-     * POST /subscriptions/list — lists subscriptions for a client, optionally filtered by ids.
-     **/
+     * POST /subscriptions/list — looks up subscriptions by id for a
+     * client. Per-id success/error envelope: missing ids surface as
+     * 404 and ids owned by a different client as 403, rather than
+     * being silently dropped. Each success entry includes a
+     * `monitoredObjects: [{ elementId, maxDepth }]` array built from
+     * the subscription's registered elements.
+     */
     list_subscriptions(req: Request, res: Response): void {
         const { clientId, subscriptionIds } = req.body;
-        res.json(this.subscriptions.list(clientId, subscriptionIds));
+        const results = (subscriptionIds as string[]).map(id => {
+            try {
+                const sub = this.subscriptions.getOne(clientId, id);
+                return { success: true, subscriptionId: id, result: sub };
+            } catch (err: any) {
+                return {
+                    success: false,
+                    subscriptionId: id,
+                    error: { code: err.status ?? 500, message: err.message },
+                };
+            }
+        });
+        const allSuccess = results.every(r => r.success);
+        ((res as any)._originalJson || res.json.bind(res))({ success: allSuccess, results });
     }
 
     /**

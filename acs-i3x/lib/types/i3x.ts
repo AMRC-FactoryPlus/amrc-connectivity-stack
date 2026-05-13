@@ -144,6 +144,7 @@ export interface I3xSubscription {
     clientId: string;
     subscriptionId: string;
     displayName: string;
+    monitoredObjects?: Array<{ elementId: string; maxDepth: number }>;
 }
 
 export interface I3xSubscriptionListRequest {

@@ -1,0 +1,36 @@
+{{- if .Values.openid.enabled }}
+# Random per-key passwords for Keycloak:
+#   _bootstrap  -> initial Keycloak admin (KEYCLOAK_ADMIN_PASSWORD env
+#                  on the keycloak StatefulSet)
+#   _admin      -> client_secret of the realm's admin-cli confidential
+#                  client used by service-setup for client_credentials
+#   <name>      -> client_secret for each enabled non-builtin entry in
+#                  serviceSetup.config.openidClients (e.g. grafana,
+#                  jupyterhub)
+#
+# `lookup` reads the live Secret and `default` keeps existing values
+# whenever a key is already populated, so helm upgrades are idempotent
+# and credentials don't churn. New keys (e.g. enabling a new OIDC
+# client) get a fresh randAlphaNum on the first upgrade that includes
+# them. `helm.sh/resource-policy: keep` stops `helm uninstall` taking
+# the Secret out from under any consumers still holding tokens against
+# Keycloak.
+{{- $existing := (lookup "v1" "Secret" .Release.Namespace "keycloak-clients") | default dict }}
+{{- $data := (get $existing "data") | default dict }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: keycloak-clients
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    "helm.sh/resource-policy": "keep"
+type: Opaque
+data:
+  _bootstrap: {{ index $data "_bootstrap" | default (randAlphaNum 32 | b64enc) | quote }}
+  _admin:     {{ index $data "_admin"     | default (randAlphaNum 32 | b64enc) | quote }}
+  {{- range $name, $client := .Values.serviceSetup.config.openidClients }}
+  {{- if and $client.enabled (not $client.builtin) }}
+  {{ $name }}: {{ index $data $name | default (randAlphaNum 32 | b64enc) | quote }}
+  {{- end }}
+  {{- end }}
+{{- end }}

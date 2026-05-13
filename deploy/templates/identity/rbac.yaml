@@ -18,19 +18,6 @@ rules:
   -   apiGroups: [factoryplus.app.amrc.co.uk]
       resources: [kerberos-keys/status]
       verbs: [list, get, create, update, delete, watch, patch]
-  # LocalSecret resources arrived with the openid/keycloak templates
-  # (deploy/templates/openid/local-secrets.yaml). The operator generates
-  # random passwords for them and stores the result in the referenced
-  # Secret (e.g. keycloak-clients). Without these verbs the operator
-  # logs an APIForbiddenError on startup, never sees the LocalSecrets,
-  # never creates the Secret, and the openid + service-setup pods can't
-  # mount it.
-  -   apiGroups: [factoryplus.app.amrc.co.uk]
-      resources: [localsecrets]
-      verbs: [list, get, watch, patch]
-  -   apiGroups: [factoryplus.app.amrc.co.uk]
-      resources: [localsecrets/status]
-      verbs: [list, get, create, update, delete, watch, patch]
   -   apiGroups: [""]
       resources: [secrets]
       verbs: [get, create, update, delete, patch]

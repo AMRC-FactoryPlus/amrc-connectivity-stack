@@ -52,6 +52,28 @@ export interface MetricMeta {
     typeSuffix: string;      // e.g. "d"
 }
 
+/**
+ * All mutable tree state, bundled so refresh() can build a new snapshot
+ * off to the side and swap it in with a single synchronous assignment.
+ * Readers running between event-loop turns see either the old or new
+ * snapshot, never a half-built one.
+ */
+interface TreeSnapshot {
+    objectTypes: Map<string, I3xObjectType>;
+    objects: Map<string, I3xObject>;
+    children: Map<string, Set<string>>;
+    metricMeta: Map<string, MetricMeta>;
+}
+
+function emptySnapshot(): TreeSnapshot {
+    return {
+        objectTypes: new Map(),
+        objects: new Map(),
+        children: new Map(),
+        metricMeta: new Map(),
+    };
+}
+
 /** Map Sparkplug_Type to InfluxDB measurement type suffix. */
 function sparkplugTypeToSuffix(spType: string): string {
     const t = spType.replace(/(LE|BE)$/i, "");
@@ -73,11 +95,7 @@ export class ObjectTree {
     private ready: boolean = false;
     private namespace: I3xNamespace | null = null;
     private relationshipTypes: Map<string, I3xRelationshipType> = new Map();
-    private objectTypes: Map<string, I3xObjectType> = new Map();
-    private objects: Map<string, I3xObject> = new Map();
-    private children: Map<string, Set<string>> = new Map();
-    // InfluxDB query metadata per leaf metric elementId
-    private metricMeta: Map<string, MetricMeta> = new Map();
+    private snapshot: TreeSnapshot = emptySnapshot();
 
     constructor(opts: ObjectTreeOpts) {
         this.fplus = opts.fplus;
@@ -91,17 +109,24 @@ export class ObjectTree {
         this.buildNamespace();
         this.buildRelationshipTypes();
         this.log("loading devices from ConfigDB + Directory");
-        await this.loadDevices();
-        this.log("init complete: objects=%d types=%d", this.objects.size, this.objectTypes.size);
+        const next = emptySnapshot();
+        await this.loadDevices(next);
+        this.snapshot = next;
+        this.log("init complete: objects=%d types=%d",
+            this.snapshot.objects.size, this.snapshot.objectTypes.size);
         this.ready = true;
         return this;
     }
 
     async refresh(): Promise<void> {
-        this.objectTypes.clear();
-        this.objects.clear();
-        this.children.clear();
-        await this.loadDevices();
+        // Build the new tree off to the side, then swap it in atomically so
+        // in-flight API reads see either the old or new snapshot, never a
+        // partial one. UNS-driven writes via addCompositionFromUns continue
+        // to land on the live (old) snapshot during the rebuild and are
+        // discarded by the swap; the next UNS message per topic rebuilds them.
+        const next = emptySnapshot();
+        await this.loadDevices(next);
+        this.snapshot = next;
     }
 
     isReady(): boolean {
@@ -117,19 +142,19 @@ export class ObjectTree {
     /* ---- Object Types ---- */
 
     getObjectTypes(namespaceUri?: string): I3xObjectType[] {
-        const all = Array.from(this.objectTypes.values());
+        const all = Array.from(this.snapshot.objectTypes.values());
         if (namespaceUri === undefined) return all;
         return all.filter(t => t.namespaceUri === namespaceUri);
     }
 
     getObjectType(elementId: string): I3xObjectType | undefined {
-        return this.objectTypes.get(elementId);
+        return this.snapshot.objectTypes.get(elementId);
     }
 
     /* ---- Objects ---- */
 
     getObjects(opts?: { typeElementId?: string; root?: boolean; includeMetadata?: boolean }): I3xObject[] {
-        let all = Array.from(this.objects.values());
+        let all = Array.from(this.snapshot.objects.values());
         if (opts?.typeElementId !== undefined) {
             all = all.filter(o => o.typeElementId === opts.typeElementId);
         }
@@ -140,29 +165,30 @@ export class ObjectTree {
     }
 
     getObject(elementId: string): I3xObject | undefined {
-        return this.objects.get(elementId);
+        return this.snapshot.objects.get(elementId);
     }
 
     /* ---- Relationships ---- */
 
     getRelated(elementId: string, relationshipType?: string): I3xObject[] {
-        const obj = this.objects.get(elementId);
+        const snap = this.snapshot;
+        const obj = snap.objects.get(elementId);
         if (!obj) return [];
 
         const result: I3xObject[] = [];
 
         if (relationshipType === undefined || relationshipType === RelType.HasParent) {
             if (obj.parentId !== null && obj.parentId !== "/") {
-                const parent = this.objects.get(obj.parentId);
+                const parent = snap.objects.get(obj.parentId);
                 if (parent) result.push(parent);
             }
         }
 
         if (relationshipType === undefined || relationshipType === RelType.HasChildren) {
-            const childIds = this.children.get(elementId);
+            const childIds = snap.children.get(elementId);
             if (childIds) {
                 for (const childId of childIds) {
-                    const child = this.objects.get(childId);
+                    const child = snap.objects.get(childId);
                     if (child) result.push(child);
                 }
             }
@@ -182,13 +208,13 @@ export class ObjectTree {
     }
 
     getChildElementIds(elementId: string): string[] {
-        const childSet = this.children.get(elementId);
+        const childSet = this.snapshot.children.get(elementId);
         return childSet ? Array.from(childSet) : [];
     }
 
     /** Get InfluxDB query metadata for a leaf metric. */
     getMetricMeta(elementId: string): MetricMeta | undefined {
-        return this.metricMeta.get(elementId);
+        return this.snapshot.metricMeta.get(elementId);
     }
 
     /**
@@ -200,7 +226,7 @@ export class ObjectTree {
         const childIds = this.getChildElementIds(elementId);
         const leaves: string[] = [];
         for (const childId of childIds) {
-            const child = this.objects.get(childId);
+            const child = this.snapshot.objects.get(childId);
             if (child && !child.isComposition) {
                 leaves.push(childId);
             } else {
@@ -220,14 +246,16 @@ export class ObjectTree {
      *
      * isa95Segments: e.g. ["AMRC", "Factory 2050", "MK1"]
      * deviceElementId: the ConfigDB UUID of the device
+     * target: the snapshot to mutate (live snapshot for UNS writes,
+     *         in-progress snapshot during a refresh)
      */
-    ensureIsa95Hierarchy(isa95Segments: string[], deviceElementId: string): void {
+    ensureIsa95Hierarchy(isa95Segments: string[], deviceElementId: string, target: TreeSnapshot): void {
         let parentId = "/";
 
         for (const segment of isa95Segments) {
             const elementId = uuidv5(`isa95:${parentId}:${segment}`, I3X_UUID_NAMESPACE);
 
-            if (!this.objects.has(elementId)) {
+            if (!target.objects.has(elementId)) {
                 const obj = toI3xObject(
                     elementId,
                     segment,
@@ -235,34 +263,34 @@ export class ObjectTree {
                     parentId,
                     true,           // isComposition
                 );
-                this.objects.set(elementId, obj);
+                target.objects.set(elementId, obj);
 
-                if (!this.children.has(parentId)) {
-                    this.children.set(parentId, new Set());
+                if (!target.children.has(parentId)) {
+                    target.children.set(parentId, new Set());
                 }
-                this.children.get(parentId)!.add(elementId);
+                target.children.get(parentId)!.add(elementId);
             }
 
             parentId = elementId;
         }
 
         // Re-parent the device under the deepest ISA-95 level
-        const device = this.objects.get(deviceElementId);
+        const device = target.objects.get(deviceElementId);
         if (device && device.parentId !== parentId) {
             // Remove from old parent's children
             const oldParent = device.parentId;
             if (oldParent) {
-                this.children.get(oldParent)?.delete(deviceElementId);
+                target.children.get(oldParent)?.delete(deviceElementId);
             }
 
             // Update device parentId
             (device as any).parentId = parentId;
 
             // Add to new parent's children
-            if (!this.children.has(parentId)) {
-                this.children.set(parentId, new Set());
+            if (!target.children.has(parentId)) {
+                target.children.set(parentId, new Set());
             }
-            this.children.get(parentId)!.add(deviceElementId);
+            target.children.get(parentId)!.add(deviceElementId);
         }
     }
 
@@ -274,13 +302,18 @@ export class ObjectTree {
         metricSegments: string[],
         isa95Segments?: string[],
     ): string | null {
+        // Mutate the live snapshot directly. If a refresh is in flight,
+        // these writes land on the soon-to-be-discarded old snapshot and
+        // will be re-applied by the next UNS message on this topic.
+        const target = this.snapshot;
+
         // Since f46612c5, Instance_UUID === ConfigDB object UUID,
         // so the device UUID from UNS messages is the elementId directly.
         const deviceElementId = instanceUuidPath[0];
 
         // Build ISA-95 hierarchy above the device if segments provided
-        if (isa95Segments && isa95Segments.length > 0 && this.objects.has(deviceElementId)) {
-            this.ensureIsa95Hierarchy(isa95Segments, deviceElementId);
+        if (isa95Segments && isa95Segments.length > 0 && target.objects.has(deviceElementId)) {
+            this.ensureIsa95Hierarchy(isa95Segments, deviceElementId, target);
         }
 
         // Build the full tree from metric segments.
@@ -304,7 +337,7 @@ export class ObjectTree {
             // (from buildTreeFromOriginMap at startup), reuse its elementId.
             // This avoids divergence when the origin map has Instance_UUIDs
             // at deeper levels than the UNS instanceUuidPath provides.
-            const existing = this.findChildByName(parentId, segment);
+            const existing = this.findChildByName(parentId, segment, target);
             const elementId = existing?.elementId
                 ?? (hasInstanceUuid
                     ? instanceUuidPath[instanceIdx]
@@ -319,7 +352,7 @@ export class ObjectTree {
             // Last segment is a leaf metric (has a value), rest are composition
             const isLeaf = i === metricSegments.length - 1;
 
-            if (!this.objects.has(elementId)) {
+            if (!target.objects.has(elementId)) {
                 const obj = toI3xObject(
                     elementId,
                     segment,
@@ -327,13 +360,13 @@ export class ObjectTree {
                     parentId,
                     !isLeaf,  // isComposition: true for branches, false for leaves
                 );
-                this.objects.set(elementId, obj);
+                target.objects.set(elementId, obj);
 
                 // Track parent -> children
-                if (!this.children.has(parentId)) {
-                    this.children.set(parentId, new Set());
+                if (!target.children.has(parentId)) {
+                    target.children.set(parentId, new Set());
                 }
-                this.children.get(parentId)!.add(elementId);
+                target.children.get(parentId)!.add(elementId);
             }
 
             parentId = elementId;
@@ -346,11 +379,11 @@ export class ObjectTree {
     /* ---- Private ---- */
 
     /** Find an existing child of parentId by display name. */
-    private findChildByName(parentId: string, name: string): I3xObject | undefined {
-        const childIds = this.children.get(parentId);
+    private findChildByName(parentId: string, name: string, target: TreeSnapshot): I3xObject | undefined {
+        const childIds = target.children.get(parentId);
         if (!childIds) return undefined;
         for (const childId of childIds) {
-            const child = this.objects.get(childId);
+            const child = target.objects.get(childId);
             if (child?.displayName === name) return child;
         }
         return undefined;
@@ -412,7 +445,8 @@ export class ObjectTree {
         originMap: any,
         parentId: string,
         topLevelInstanceUuid: string,
-        pathPrefix: string = "",
+        pathPrefix: string,
+        target: TreeSnapshot,
     ): void {
         if (originMap == null || typeof originMap !== "object") return;
 
@@ -442,7 +476,7 @@ export class ObjectTree {
             // Build the metric path for InfluxDB queries
             const currentPath = pathPrefix ? `${pathPrefix}/${key}` : key;
 
-            if (!this.objects.has(elementId)) {
+            if (!target.objects.has(elementId)) {
                 const obj = toI3xObject(
                     elementId,
                     key,
@@ -450,12 +484,12 @@ export class ObjectTree {
                     parentId,
                     !isLeaf,
                 );
-                this.objects.set(elementId, obj);
+                target.objects.set(elementId, obj);
 
-                if (!this.children.has(parentId)) {
-                    this.children.set(parentId, new Set());
+                if (!target.children.has(parentId)) {
+                    target.children.set(parentId, new Set());
                 }
-                this.children.get(parentId)!.add(elementId);
+                target.children.get(parentId)!.add(elementId);
             }
 
             // Store InfluxDB query metadata for leaf metrics
@@ -466,7 +500,7 @@ export class ObjectTree {
                 const metricName = pathParts.pop()!;
                 const metricPath = pathParts.join("/");
 
-                this.metricMeta.set(elementId, {
+                target.metricMeta.set(elementId, {
                     topLevelInstanceUuid,
                     metricPath,
                     metricName,
@@ -477,7 +511,7 @@ export class ObjectTree {
 
             // Recurse into children if this is a composition container
             if (!isLeaf) {
-                this.buildTreeFromOriginMap(entry, elementId, topLevelInstanceUuid, currentPath);
+                this.buildTreeFromOriginMap(entry, elementId, topLevelInstanceUuid, currentPath, target);
             }
         }
     }
@@ -526,7 +560,7 @@ export class ObjectTree {
         }
     }
 
-    private async loadDevices(): Promise<void> {
+    private async loadDevices(target: TreeSnapshot): Promise<void> {
         this.log("loadDevices: fetching Device class members from ConfigDB");
         const deviceUuids: string[] = await this.fplus.ConfigDB.class_members(DEVICE_CLASS_UUID);
         this.log("loadDevices: found %d devices", deviceUuids.length);
@@ -580,26 +614,26 @@ export class ObjectTree {
                 "/",
                 true,
             );
-            this.objects.set(uuid, obj);
+            target.objects.set(uuid, obj);
 
             // Place under ISA-95 hierarchy if available
             if (isa95Segments.length > 0) {
-                this.ensureIsa95Hierarchy(isa95Segments, uuid);
+                this.ensureIsa95Hierarchy(isa95Segments, uuid, target);
             }
 
             // Build the full metric tree from the originMap
             if (devInfo.originMap) {
-                this.buildTreeFromOriginMap(devInfo.originMap, uuid, uuid);
+                this.buildTreeFromOriginMap(devInfo.originMap, uuid, uuid, "", target);
                 this.collectSchemaUuids(devInfo.originMap, schemaUuids);
                 this.log("loadDevices: built metric tree for %s, children=%d",
-                    uuid, this.getChildElementIds(uuid).length);
+                    uuid, target.children.get(uuid)?.size ?? 0);
             }
         }
 
         // For each unique schema, get its JSON schema definition and create ObjectType
         this.log("loadDevices: loading %d schemas for unique device types", schemaUuids.size);
         for (const schemaUuid of schemaUuids) {
-            if (this.objectTypes.has(schemaUuid)) continue;
+            if (target.objectTypes.has(schemaUuid)) continue;
 
             this.log("loadDevices: fetching schema definition %s", schemaUuid);
             const [schema, info] = await Promise.all([
@@ -614,11 +648,11 @@ export class ObjectTree {
                 schemaUuid,
                 schema ?? {},
             );
-            this.objectTypes.set(schemaUuid, objType);
+            target.objectTypes.set(schemaUuid, objType);
             this.log("loadDevices: created ObjectType %s (%s)", schemaUuid, displayName);
         }
 
         this.log("loadDevices: complete, devices=%d types=%d",
-            this.objects.size, this.objectTypes.size);
+            target.objects.size, target.objectTypes.size);
     }
 }

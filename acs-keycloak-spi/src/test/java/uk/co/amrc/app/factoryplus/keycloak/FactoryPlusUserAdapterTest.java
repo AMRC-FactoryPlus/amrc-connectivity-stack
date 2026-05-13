@@ -80,6 +80,19 @@ class FactoryPlusUserAdapterTest {
     }
 
     @Test
+    void email_is_marked_verified() {
+        // F+ Auth identities are kerberos-authoritative and we
+        // synthesise the email from the same trusted record. We stamp
+        // email_verified=true so Grafana's OAuth user-lookup will
+        // claim a pre-existing account by email without needing
+        // oauth_allow_insecure_email_lookup flipped on - otherwise
+        // an upgrade from AuthProxy fails with "user already exists"
+        // when an OAuth login arrives for a row already in the
+        // Grafana DB.
+        assertThat(adapter.isEmailVerified()).isTrue();
+    }
+
+    @Test
     void getAttributeStream_username_falls_through_to_super() {
         // Keycloak's oidc-usermodel-attribute-mapper queries the per-name
         // attribute API (getAttributeStream / getFirstAttribute). The

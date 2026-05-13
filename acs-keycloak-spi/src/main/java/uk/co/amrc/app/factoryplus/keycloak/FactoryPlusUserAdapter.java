@@ -61,6 +61,20 @@ public class FactoryPlusUserAdapter extends AbstractUserAdapter {
     }
 
     @Override
+    public boolean isEmailVerified() {
+        // F+ Auth identities are kerberos-authoritative: the SPI only
+        // surfaces a user once F+ Auth has accepted their Principal
+        // record, and the email we issue (either a real F+ email or
+        // the kerberos UPN) is derived from that same trusted record.
+        // Returning true stamps email_verified=true on the OIDC
+        // claims so consumers like Grafana (which refuses
+        // email-based user lookup when email_verified is false and
+        // oauth_allow_insecure_email_lookup is default-off) treat the
+        // email as authoritative for matching existing accounts.
+        return true;
+    }
+
+    @Override
     public String getId() {
         // External id is the F+ UUID, not the username, so a rename in F+
         // doesn't invalidate Keycloak references that hold the storage id.

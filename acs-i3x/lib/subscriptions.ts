@@ -79,6 +79,32 @@ export class SubscriptionManager {
         return results;
     }
 
+    getOne(clientId: string, subscriptionId: string): I3xSubscription {
+        const sub = this.subscriptions.get(subscriptionId);
+        if (!sub) {
+            const err: any = new Error(`Subscription ${subscriptionId} not found`);
+            err.status = 404;
+            throw err;
+        }
+        if (sub.clientId !== clientId) {
+            const err: any = new Error(`Subscription ${subscriptionId} does not belong to client ${clientId}`);
+            err.status = 403;
+            throw err;
+        }
+
+        const monitoredObjects = [...sub.registeredElements.entries()]
+            .map(([elementId, maxDepth]) => ({ elementId, maxDepth }));
+
+        this.resetTtl(sub);
+
+        return {
+            clientId: sub.clientId,
+            subscriptionId: sub.subscriptionId,
+            displayName: sub.displayName,
+            monitoredObjects,
+        };
+    }
+
     deleteOne(clientId: string, subscriptionId: string): void {
         const sub = this.subscriptions.get(subscriptionId);
         if (!sub) {

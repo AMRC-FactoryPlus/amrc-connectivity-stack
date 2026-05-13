@@ -114,6 +114,72 @@ describe("SubscriptionManager", () => {
         });
     });
 
+    /* ---- getOne ---- */
+
+    describe("getOne", () => {
+        it("returns subscription with empty monitoredObjects initially", () => {
+            const sub = mgr.create("client-1", "Sub A");
+
+            const result = mgr.getOne("client-1", sub.subscriptionId);
+
+            expect(result).toEqual({
+                clientId: "client-1",
+                subscriptionId: sub.subscriptionId,
+                displayName: "Sub A",
+                monitoredObjects: [],
+            });
+        });
+
+        it("includes registered elements with their maxDepth", () => {
+            const sub = mgr.create("client-1");
+            mgr.register("client-1", sub.subscriptionId, ["elem-1", "elem-2"], 3);
+
+            const result = mgr.getOne("client-1", sub.subscriptionId);
+
+            expect(result.monitoredObjects).toEqual(
+                expect.arrayContaining([
+                    { elementId: "elem-1", maxDepth: 3 },
+                    { elementId: "elem-2", maxDepth: 3 },
+                ]),
+            );
+            expect(result.monitoredObjects).toHaveLength(2);
+        });
+
+        it("reflects different maxDepth per element when registered separately", () => {
+            const sub = mgr.create("client-1");
+            mgr.registerOne("client-1", sub.subscriptionId, "elem-1", 1);
+            mgr.registerOne("client-1", sub.subscriptionId, "elem-2", 5);
+
+            const result = mgr.getOne("client-1", sub.subscriptionId);
+
+            expect(result.monitoredObjects).toEqual(
+                expect.arrayContaining([
+                    { elementId: "elem-1", maxDepth: 1 },
+                    { elementId: "elem-2", maxDepth: 5 },
+                ]),
+            );
+        });
+
+        it("throws 404 for unknown subscriptionId", () => {
+            try {
+                mgr.getOne("client-1", "does-not-exist");
+                fail("expected getOne to throw");
+            } catch (err: any) {
+                expect(err.status).toBe(404);
+            }
+        });
+
+        it("throws 403 for wrong clientId", () => {
+            const sub = mgr.create("client-1");
+            try {
+                mgr.getOne("client-2", sub.subscriptionId);
+                fail("expected getOne to throw");
+            } catch (err: any) {
+                expect(err.status).toBe(403);
+            }
+        });
+    });
+
     /* ---- deleteOne ---- */
 
     describe("deleteOne", () => {

@@ -999,6 +999,46 @@ describe("E2E Compliance Tests", () => {
                 expect(typeof item.sequenceNumber).toBe("number");
             }
         });
+
+        it("returns 404 envelope when subscription is unknown", async () => {
+            const { app, subscriptions } = createE2eApp();
+            subscriptions.sync.mockImplementation(() => {
+                const err: any = new Error("Subscription does-not-exist not found");
+                err.status = 404;
+                throw err;
+            });
+
+            const res = await request(app)
+                .post("/v1/subscriptions/sync")
+                .send({ clientId: "test-client", subscriptionId: "does-not-exist" });
+
+            expect(res.status).toBe(404);
+            expect(res.body).toEqual({
+                success: false,
+                error: { code: 404, message: "Subscription does-not-exist not found" },
+            });
+        });
+    });
+
+    describe("POST /v1/subscriptions/stream", () => {
+        it("returns 404 envelope when subscription is unknown", async () => {
+            const { app, subscriptions } = createE2eApp();
+            subscriptions.stream.mockImplementation(() => {
+                const err: any = new Error("Subscription does-not-exist not found");
+                err.status = 404;
+                throw err;
+            });
+
+            const res = await request(app)
+                .post("/v1/subscriptions/stream")
+                .send({ clientId: "test-client", subscriptionId: "does-not-exist" });
+
+            expect(res.status).toBe(404);
+            expect(res.body).toEqual({
+                success: false,
+                error: { code: 404, message: "Subscription does-not-exist not found" },
+            });
+        });
     });
 
     describe("POST /v1/subscriptions/list", () => {

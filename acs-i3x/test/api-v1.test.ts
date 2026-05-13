@@ -977,6 +977,44 @@ describe("APIv1", () => {
             expect(res.status).toBe(200);
             expect(res.body.result).toEqual([syncItem]);
         });
+
+        it("returns 404 envelope when subscription is unknown", async () => {
+            const { app, subscriptions } = createApp();
+            subscriptions.sync.mockImplementation(() => {
+                const err: any = new Error("Subscription sub-1 not found");
+                err.status = 404;
+                throw err;
+            });
+
+            const res = await request(app)
+                .post("/subscriptions/sync")
+                .send({ clientId: "c1", subscriptionId: "sub-1" });
+
+            expect(res.status).toBe(404);
+            expect(res.body).toEqual({
+                success: false,
+                error: { code: 404, message: "Subscription sub-1 not found" },
+            });
+        });
+
+        it("returns 403 envelope when clientId mismatches", async () => {
+            const { app, subscriptions } = createApp();
+            subscriptions.sync.mockImplementation(() => {
+                const err: any = new Error("Subscription sub-1 does not belong to client c1");
+                err.status = 403;
+                throw err;
+            });
+
+            const res = await request(app)
+                .post("/subscriptions/sync")
+                .send({ clientId: "c1", subscriptionId: "sub-1" });
+
+            expect(res.status).toBe(403);
+            expect(res.body).toEqual({
+                success: false,
+                error: { code: 403, message: "Subscription sub-1 does not belong to client c1" },
+            });
+        });
     });
 
     describe("POST /subscriptions/delete", () => {
@@ -1042,6 +1080,44 @@ describe("APIv1", () => {
                 .send({ clientId: "c1", subscriptionId: "sub-1" });
 
             expect(subscriptions.stream).toHaveBeenCalled();
+        });
+
+        it("returns 404 envelope when subscription is unknown", async () => {
+            const { app, subscriptions } = createApp();
+            subscriptions.stream.mockImplementation(() => {
+                const err: any = new Error("Subscription sub-1 not found");
+                err.status = 404;
+                throw err;
+            });
+
+            const res = await request(app)
+                .post("/subscriptions/stream")
+                .send({ clientId: "c1", subscriptionId: "sub-1" });
+
+            expect(res.status).toBe(404);
+            expect(res.body).toEqual({
+                success: false,
+                error: { code: 404, message: "Subscription sub-1 not found" },
+            });
+        });
+
+        it("returns 403 envelope when clientId mismatches", async () => {
+            const { app, subscriptions } = createApp();
+            subscriptions.stream.mockImplementation(() => {
+                const err: any = new Error("Subscription sub-1 does not belong to client c1");
+                err.status = 403;
+                throw err;
+            });
+
+            const res = await request(app)
+                .post("/subscriptions/stream")
+                .send({ clientId: "c1", subscriptionId: "sub-1" });
+
+            expect(res.status).toBe(403);
+            expect(res.body).toEqual({
+                success: false,
+                error: { code: 403, message: "Subscription sub-1 does not belong to client c1" },
+            });
         });
     });
 

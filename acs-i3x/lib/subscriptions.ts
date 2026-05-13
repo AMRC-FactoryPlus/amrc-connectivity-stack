@@ -80,17 +80,7 @@ export class SubscriptionManager {
     }
 
     getOne(clientId: string, subscriptionId: string): I3xSubscription {
-        const sub = this.subscriptions.get(subscriptionId);
-        if (!sub) {
-            const err: any = new Error(`Subscription ${subscriptionId} not found`);
-            err.status = 404;
-            throw err;
-        }
-        if (sub.clientId !== clientId) {
-            const err: any = new Error(`Subscription ${subscriptionId} does not belong to client ${clientId}`);
-            err.status = 403;
-            throw err;
-        }
+        const sub = this.getAndVerify(clientId, subscriptionId);
 
         const monitoredObjects = [...sub.registeredElements.entries()]
             .map(([elementId, maxDepth]) => ({ elementId, maxDepth }));
@@ -106,17 +96,7 @@ export class SubscriptionManager {
     }
 
     deleteOne(clientId: string, subscriptionId: string): void {
-        const sub = this.subscriptions.get(subscriptionId);
-        if (!sub) {
-            const err: any = new Error(`Subscription ${subscriptionId} not found`);
-            err.status = 404;
-            throw err;
-        }
-        if (sub.clientId !== clientId) {
-            const err: any = new Error(`Subscription ${subscriptionId} does not belong to client ${clientId}`);
-            err.status = 403;
-            throw err;
-        }
+        const sub = this.getAndVerify(clientId, subscriptionId);
 
         clearTimeout(sub.ttlTimer);
         if (sub.activeStream) {
@@ -138,18 +118,7 @@ export class SubscriptionManager {
     }
 
     registerOne(clientId: string, subscriptionId: string, elementId: string, maxDepth: number = 1): void {
-        const sub = this.subscriptions.get(subscriptionId);
-        if (!sub) {
-            const err: any = new Error(`Subscription ${subscriptionId} not found`);
-            err.status = 404;
-            throw err;
-        }
-        if (sub.clientId !== clientId) {
-            const err: any = new Error(`Subscription ${subscriptionId} does not belong to client ${clientId}`);
-            err.status = 403;
-            throw err;
-        }
-
+        const sub = this.getAndVerify(clientId, subscriptionId);
         sub.registeredElements.set(elementId, maxDepth);
         console.log(`[SUB] register: sub=${subscriptionId.slice(0,8)} element=${elementId} maxDepth=${maxDepth}`);
         this.resetTtl(sub);
@@ -166,18 +135,7 @@ export class SubscriptionManager {
     }
 
     unregisterOne(clientId: string, subscriptionId: string, elementId: string): void {
-        const sub = this.subscriptions.get(subscriptionId);
-        if (!sub) {
-            const err: any = new Error(`Subscription ${subscriptionId} not found`);
-            err.status = 404;
-            throw err;
-        }
-        if (sub.clientId !== clientId) {
-            const err: any = new Error(`Subscription ${subscriptionId} does not belong to client ${clientId}`);
-            err.status = 403;
-            throw err;
-        }
-
+        const sub = this.getAndVerify(clientId, subscriptionId);
         sub.registeredElements.delete(elementId);
         this.resetTtl(sub);
     }
@@ -279,10 +237,14 @@ export class SubscriptionManager {
     private getAndVerify(clientId: string, subscriptionId: string): Subscription {
         const sub = this.subscriptions.get(subscriptionId);
         if (!sub) {
-            throw new Error(`Subscription ${subscriptionId} not found`);
+            const err: any = new Error(`Subscription ${subscriptionId} not found`);
+            err.status = 404;
+            throw err;
         }
         if (sub.clientId !== clientId) {
-            throw new Error(`Subscription ${subscriptionId} does not belong to client ${clientId}`);
+            const err: any = new Error(`Subscription ${subscriptionId} does not belong to client ${clientId}`);
+            err.status = 403;
+            throw err;
         }
         return sub;
     }

@@ -238,6 +238,7 @@ jobs:
           - historian-uns
           - uns-ingester-sparkplug
           - acs-opcua-server-edge
+          - acs-i3x
     permissions:
       contents: read
       packages: write

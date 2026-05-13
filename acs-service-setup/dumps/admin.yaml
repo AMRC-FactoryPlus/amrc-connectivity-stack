@@ -102,3 +102,5 @@ grants:
     !u ACS.PermGroup.Directory: null
     !u ACS.PermGroup.Git: null
     !u Files.Perm.All: null
+    # Cluster admins land as Grafana org Admin by default.
+    !u Grafana.Perm.Admin: null

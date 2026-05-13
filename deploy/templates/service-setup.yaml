@@ -22,6 +22,11 @@ spec:
         - name: extra-dumps
           configMap:
             name: service-setup-dumps
+{{- if .Values.openid.enabled }}
+        - name: client-secrets
+          secret:
+            secretName: keycloak-clients
+{{- end }}
       initContainers:
         - name: service-setup
 {{ include "amrc-connectivity-stack.image" (list . .Values.serviceSetup) | indent 10 }}
@@ -53,14 +58,36 @@ spec:
                   "secure"          (.Values.acs.secure | ternary "s" "")
                   "realm"           .Values.identity.realm
                   "directory"
-                    (include "amrc-connectivity-stack.external-url" 
+                    (include "amrc-connectivity-stack.external-url"
                       (list . "directory"))
                 | toRawJson | quote }}
+{{- if .Values.openid.enabled }}
+            - name: OPENID_URL
+              value: {{ include "amrc-connectivity-stack.external-url" (list . "openid") }}
+            - name: OPENID_REALM
+              value: {{ .Values.openid.realm }}
+            # Login theme baked into the acs-keycloak image. Empty
+            # disables the override and Keycloak falls back to its
+            # built-in keycloak.v2 theme.
+            - name: OPENID_LOGIN_THEME
+              value: {{ .Values.openid.loginTheme | default "" | quote }}
+            # Cluster-internal URL for the F+ auth service. The Keycloak
+            # SPI federation will be configured to call this URL for
+            # principal/group lookups; the SPI authenticates as
+            # sv1openid via the keytab mounted in the openid pod.
+            - name: AUTH_INTERNAL_URL
+              value: http://auth.{{ .Release.Namespace }}.svc.cluster.local
+{{- end }}
           volumeMounts:
             - mountPath: /data
               name: git-checkouts
             - mountPath: /dumps
               name: extra-dumps
+{{- if .Values.openid.enabled }}
+            - mountPath: /etc/secret
+              name: client-secrets
+              readOnly: true
+{{- end }}
         - name: edge-helm-charts
 {{ include "amrc-connectivity-stack.image" (list . .Values.edgeHelm) | indent 10 }}
           env:
@@ -100,22 +127,21 @@ spec:
             - /bin/sh
             - -c
             - |
-              DEPLOYMENT_NAME=mqtt
+              # Restart deployments whose state may go stale relative
+              # to F+ after service-setup runs.
+              #   mqtt   - permission template / ACL config rebuild
+              #   openid - service-setup may regenerate sv1openid's
+              #            keytab, leaving a stale TGT in the Keycloak
+              #            SPI's cached JAAS Subject. Without a restart
+              #            the SPI's outbound calls to F+ Auth time
+              #            out until the pod is bounced manually.
               NAMESPACE={{.Release.Namespace}}
-
-              echo "Attempting to restart deployment: $DEPLOYMENT_NAME"
-
-              # Try to rollout restart the deployment
-              kubectl rollout restart deployment/$DEPLOYMENT_NAME -n $NAMESPACE
-
-              # Wait and check rollout status
-              if kubectl rollout status deployment/$DEPLOYMENT_NAME -n $NAMESPACE --timeout=60s; then
-                echo "Deployment restarted successfully!"
-                exit 0  # Exit successfully, no pod restart needed
-              else
-                echo "Deployment restart failed, retrying..."
-                exit 1  # Exit with error, pod will restart
-              fi
+              for D in mqtt openid; do
+                echo "Restarting deployment: $D"
+                kubectl rollout restart "deployment/$D" -n "$NAMESPACE" || exit 1
+                kubectl rollout status "deployment/$D" -n "$NAMESPACE" --timeout=120s || exit 1
+                echo "$D restarted."
+              done
 ---
 
 apiVersion: v1

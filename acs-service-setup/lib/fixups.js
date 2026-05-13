@@ -111,8 +111,8 @@ class FixupAccounts {
         const flux = await members(this.Local.Role.EdgeFlux);
         const krbkeys = await members(this.Local.Role.EdgeKrbkeys);
 
-        const for_cl = flux.union(krbkeys);
-        const for_kk = service.difference(for_cl);
+        const for_cl = new Set([...flux, ...krbkeys]);
+        const for_kk = new Set([...service].filter(x => !for_cl.has(x)));
 
         if (clmgr) {
             this.log("Setting ownership for Cluster Manager accounts");

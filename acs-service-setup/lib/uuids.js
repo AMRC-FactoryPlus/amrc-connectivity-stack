@@ -105,6 +105,7 @@ export const ACS = {
         Git:                    "626df296-8156-4c67-8aed-aac70161aa8b",
         KrbKeys:                "a04b4195-7db4-4480-b3f3-4d22c08b96ea",
         MQTT:                   "2f42daeb-4521-4522-8e19-85dfb73db88e",
+        OpenID:                 "ba12dd71-ee22-4045-89f7-3db8d0da8fea",
         Warehouse:              "388ddbdc-4eb4-4ae8-bbd0-9be32f3c31e8",
 
         /* Obsolete: these are now dynamic */
@@ -498,6 +499,22 @@ export const DataAccess = {
         UseSparkplug: "788b049c-2831-11f1-99fd-2b0bf86d6f77",
     }
 }
+
+/* Grafana role permissions. UUIDs must match
+ * deploy/values.yaml -> serviceSetup.config.grafanaPermissions; the
+ * SPI's fp_permissions JWT claim and Grafana's role_attribute_path
+ * JMESPath both key off these.
+ *
+ * No GrafanaAdmin (server-wide superuser) is exposed - in single-org
+ * ACS deployments the Admin org role is sufficient, and Grafana 10
+ * doesn't reliably demote the is_grafana_admin flag through OAuth so
+ * the role becomes sticky. */
+export const Grafana = {
+    Perm: {
+        Admin:  "7b553965-0987-4ffb-bf9a-afac8bc13707",
+        Editor: "e5f9fe18-da63-49d3-bee5-7950eeb3e053",
+    },
+};
 
 export const UNS = {
     Group: {

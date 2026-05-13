@@ -3,13 +3,111 @@
 # This implements recursion for POSIX make. There are many reasons why
 # recursive make is not the best way to do things but it is difficult to
 # avoid within the restriction of POSIX make syntax.
+#
+# Default behaviour: build subdirs sequentially in the order given.
+#
+# Opt-in parallelism via env var:
+#
+#   SUBDIRS_PARALLEL=N      run up to N subdirs concurrently
+#   SUBDIRS_PARALLEL=auto   detect CPU count and use that
+#
+# When parallel mode is on, SUBDIRS_SERIAL_FIRST (default: "lib") is
+# always built first on its own; the remaining subdirs are then dispatched
+# concurrently. This preserves the invariant that lib (the in-tree Maven
+# parent POM and service-client) is available before any Java component
+# build starts.
+#
+# In parallel mode each subdir's output is redirected to
+# ${SUBDIRS_LOG_DIR}/<subdir>.log (default: build-logs/<subdir>.log) and
+# a one-line PASS/FAIL is printed as each completes. After all jobs
+# finish, a summary block lists every subdir's outcome and the total
+# number of failures.
+#
+# Parallel mode uses `xargs -P` which is POSIX (Issue 7, 2008) and is
+# supported by busybox xargs, so the Windows-via-busybox setup the top
+# Makefile recommends is not broken. If you don't set the env var,
+# nothing changes.
+#
+# A failed subdir build aborts the dispatch but lets jobs already in
+# flight finish; the script returns non-zero so make sees the failure.
 
 set -e
 
 target="$1"
 shift
 
-for d in "$@"
-do
-    ${MAKE} -C "${d}" "${target}"
-done
+if [ -n "${SUBDIRS_PARALLEL}" ] && [ "${SUBDIRS_PARALLEL}" != "0" ]; then
+    jobs="${SUBDIRS_PARALLEL}"
+    if [ "$jobs" = "auto" ]; then
+        jobs=$(getconf _NPROCESSORS_ONLN 2>/dev/null \
+            || sysctl -n hw.ncpu 2>/dev/null \
+            || echo 4)
+    fi
+
+    serial_first="${SUBDIRS_SERIAL_FIRST:-lib}"
+    log_dir="${SUBDIRS_LOG_DIR:-build-logs}"
+    mkdir -p "${log_dir}"
+    # Clear status files from prior runs so the summary at the end only
+    # reflects this invocation.
+    rm -f "${log_dir}"/*.status
+
+    rest=
+    for d in "$@"
+    do
+        if [ "${d}" = "${serial_first}" ]
+        then
+            ${MAKE} -C "${d}" "${target}"
+        else
+            rest="${rest} ${d}"
+        fi
+    done
+
+    rc=0
+    if [ -n "${rest}" ]
+    then
+        # The inner sh wraps each subdir's make invocation: redirects
+        # output to a per-subdir log file, prints a streaming PASS/FAIL
+        # line, and writes a status file for the end-of-run summary.
+        # Exit non-zero on failure so xargs propagates up.
+        # shellcheck disable=SC2086
+        set +e
+        printf '%s\n' ${rest} | xargs -P "${jobs}" -I '{}' sh -c '
+            d="$1"; target="$2"; log_dir="$3"
+            if "${MAKE}" -C "$d" "$target" > "$log_dir/$d.log" 2>&1; then
+                printf "PASS  %s\n" "$d"
+                printf "PASS\n" > "$log_dir/$d.status"
+            else
+                rc=$?
+                printf "FAIL  %s  (see %s/%s.log)\n" "$d" "$log_dir" "$d"
+                printf "FAIL\n" > "$log_dir/$d.status"
+                exit "$rc"
+            fi
+        ' _ '{}' "${target}" "${log_dir}"
+        rc=$?
+        set -e
+    fi
+
+    # Summary - prints regardless of pass/fail so users see what's
+    # happening even after a failure aborted dispatch.
+    echo
+    echo "==== build summary ===="
+    fails=0
+    total=0
+    for f in "${log_dir}"/*.status
+    do
+        [ -f "${f}" ] || continue
+        d=$(basename "${f}" .status)
+        s=$(cat "${f}")
+        total=$((total + 1))
+        printf "  %-40s %s\n" "${d}" "${s}"
+        [ "${s}" = "FAIL" ] && fails=$((fails + 1))
+    done
+    echo "==== ${fails} failed of ${total} ===="
+
+    [ "${rc}" -eq 0 ] || exit "${rc}"
+else
+    for d in "$@"
+    do
+        ${MAKE} -C "${d}" "${target}"
+    done
+fi

@@ -542,9 +542,45 @@ jobs:
           service-name: ${{ steps.prepare.outputs.service-name }}
           digest: ${{ steps.build-and-push.outputs.digest }}
 
+  build-keycloak:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - uses: ./.github/actions/prepare
+        id: prepare
+        with:
+          service-name: acs-keycloak
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build
+        uses: docker/build-push-action@v6
+        id: build-and-push
+        with:
+          context: ./${{ steps.prepare.outputs.service-name }}
+          push: true
+          tags: ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}:${{ steps.prepare.outputs.version }}
+          labels: ${{ steps.prepare.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            revision=${{ steps.prepare.outputs.version }} (${{ github.sha }})
+          build-contexts: |
+            lib=./lib
+            spi=./acs-keycloak-spi
+      - uses: ./.github/actions/cleanup
+        id: cleanup
+        with:
+          version: ${{ steps.prepare.outputs.version }}
+          service-name: ${{ steps.prepare.outputs.service-name }}
+          digest: ${{ steps.build-and-push.outputs.digest }}
+
   build-helm-chart:
     if: github.event_name == 'release'
-    needs: [ 'build-x86-js', 'build-arm-js-merge', 'build-x86-pg', 'java-services' ]
+    needs: [ 'build-x86-js', 'build-arm-js-merge', 'build-x86-pg', 'java-services', 'build-keycloak' ]
     runs-on: ubuntu-latest
     steps:
       - name: Install Helm
@@ -555,11 +591,25 @@ jobs:
         with:
           ref: ${{ github.event.release.tag_name }}
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+        # See .github/actions/prepare/action.yml for the rationale -
+        # docker/login-action has no retry and ghcr.io's token endpoint
+        # flakes intermittently. Same loop here for the Helm chart
+        # publish path.
+        shell: bash
+        env:
+          DOCKER_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DOCKER_USER: ${{ github.actor }}
+        run: |
+          for attempt in 1 2 3 4 5; do
+            printf '%s' "$DOCKER_TOKEN" \
+              | docker login ghcr.io -u "$DOCKER_USER" --password-stdin \
+              && exit 0
+            backoff=$((attempt * 5))
+            echo "docker login attempt $attempt failed; retrying in ${backoff}s" >&2
+            sleep $backoff
+          done
+          echo "docker login failed after 5 attempts" >&2
+          exit 1
       - name: Package Helm chart
         run: |
           TAG="${{ github.event.release.tag_name }}"

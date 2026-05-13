@@ -156,12 +156,19 @@ export class DumpLoader {
         if (!service)
             throw new Error("Dump is missing service!");
 
+        /* Force a fresh TCP connection for every dump POST. Reusing
+         * keep-alive sockets across the dump sequence races with the
+         * server-side idle timeout and surfaces as ECONNRESET. The
+         * round-trip cost is negligible for one-shot setup. */
         const res = await fplus.Fetch.fetch({
             service,
-            method:         "POST",
-            url:            "/load",
-            body:           JSON.stringify(dump),
-            headers:        { "Content-Type": "application/json" },
+            method:  "POST",
+            url:     "/load",
+            body:    JSON.stringify(dump),
+            headers: {
+                "Content-Type": "application/json",
+                "Connection":   "close",
+            },
         });
         return [res.status, await res.text()];
     }

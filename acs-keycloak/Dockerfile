@@ -1,0 +1,52 @@
+# syntax=docker/dockerfile:1
+#
+# Custom Keycloak image with the Factory+ User Storage SPI baked in.
+# Multi-stage: a Maven container builds the SPI jar, then we copy it
+# into Keycloak's providers/ directory so the SPI loads at startup.
+#
+# Build contexts (set via ../mk/acs.docker.mk + this module's Makefile):
+#   * lib  -> ../lib (provides java-base-pom and the in-tree mvn repo)
+#   * spi  -> ../acs-keycloak-spi (the SPI source tree)
+
+ARG keycloak_version=26.1.1
+ARG maven_image=docker.io/library/maven:3.9-eclipse-temurin-21
+ARG revision=unknown
+
+FROM ${maven_image} AS build
+
+# Reproduce the lib/<x> + acs-keycloak-spi/ layout from the repo so
+# the SPI's pom.xml's relativePath '../lib/java-base-pom' and acs.top
+# property resolve to real directories.
+#
+# We don't rely on a pre-populated lib/mvn repo (it's gitignored and
+# only exists on workstations that have run `make -C lib`). Instead we
+# `mvn install` the parent pom and java-service-client into Maven's
+# local cache (~/.m2/repository) inside the build, so the SPI build
+# picks them up regardless of whether the caller pre-staged lib/mvn.
+WORKDIR /build
+COPY --from=lib java-base-pom        /build/lib/java-base-pom
+COPY --from=lib java-service-client  /build/lib/java-service-client
+COPY --from=spi .                    /build/acs-keycloak-spi
+
+RUN --mount=type=cache,target=/root/.m2/repository \
+    mvn -B -DskipTests -f /build/lib/java-base-pom/pom.xml       install \
+ && mvn -B -DskipTests -f /build/lib/java-service-client/pom.xml install \
+ && mvn -B -DskipTests -f /build/acs-keycloak-spi/pom.xml        package
+
+FROM quay.io/keycloak/keycloak:${keycloak_version}
+
+ARG revision
+LABEL org.opencontainers.image.source="https://github.com/AMRC-FactoryPlus/amrc-connectivity-stack"
+LABEL org.opencontainers.image.title="ACS Keycloak (with Factory+ SPI)"
+LABEL org.opencontainers.image.revision="${revision}"
+
+# Drop the SPI jar into Keycloak's provider scan path. Keycloak's
+# `start --optimized=false` (set by the Helm chart) runs the build step
+# at startup and discovers the providers via META-INF/services.
+COPY --from=build /build/acs-keycloak-spi/target/acs-keycloak-spi-*.jar \
+                  /opt/keycloak/providers/
+
+# ACS-branded login theme. service-setup activates it by setting
+# loginTheme=factory-plus on the realm; if disabled, the directory just
+# sits unused.
+COPY themes/factory-plus /opt/keycloak/themes/factory-plus

@@ -168,3 +168,14 @@ spec:
       - 03f5f08a-f61e-4134-8f66-b2951e3bbb69
 
 {{- end }}
+---
+{{- if .Values.openid.enabled }}
+apiVersion: factoryplus.app.amrc.co.uk/v1
+kind: KerberosKey
+metadata:
+  name: sv1openid
+  namespace: {{ .Release.Namespace }}
+spec:
+  type: Random
+  principal: sv1openid@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+{{- end }}

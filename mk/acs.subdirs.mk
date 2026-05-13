@@ -1,4 +1,7 @@
-recurse=	env MAKE="${MAKE}" ${tools}/recurse
+recurse=	env MAKE="${MAKE}" \
+		SUBDIRS_PARALLEL="${SUBDIRS_PARALLEL}" \
+		SUBDIRS_SERIAL_FIRST="${SUBDIRS_SERIAL_FIRST}" \
+		${tools}/recurse
 
 all: git.prepare
 	+${recurse} all ${subdirs}

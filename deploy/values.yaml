@@ -142,6 +142,26 @@ dataAccess:
     repository: acs-data-access
   verbosity: "ALL,!service,!token"
 
+openid:
+  # -- Whether or not to deploy the Keycloak OIDC server
+  enabled: true
+  # -- Realm name created in Keycloak. Must match the realm used in
+  # the Grafana OAuth ConfigMap (deploy/templates/grafana/grafana-ini.yaml).
+  realm: factory_plus
+  # -- Keycloak login theme set on the realm. The "factory-plus" theme
+  # ships in the acs-keycloak image and renders ACS-branded login,
+  # logout and error pages. Set to "" (empty) to keep Keycloak's stock
+  # keycloak.v2 theme, or set to a different name if you've baked a
+  # custom theme into your own Keycloak image.
+  loginTheme: factory-plus
+  image:
+    # -- Custom Keycloak image with the Factory+ User Storage SPI baked
+    # in (built from acs-keycloak/Dockerfile). To run upstream Keycloak
+    # without the SPI, override repository to "keycloak/keycloak" and
+    # registry to "quay.io" - but the SPI federation provider won't load.
+    repository: acs-keycloak
+  # tlsSecretName: <override>   # optional, falls back to acs.tlsSecretName
+
 # -- The service-setup component loads ACS-specific configuration into
 # the ACS services when the Helm chart is deployed or upgraded.
 serviceSetup:
@@ -162,6 +182,47 @@ serviceSetup:
     helmChart:
       # Chart to deploy an edge cluster
       #cluster: null
+    # Stable UUIDs for the Grafana role groups in F+. These groups are
+    # created by service-setup (see lib/grafana-groups.js) as subclasses
+    # of Class.Principal. To grant a user a Grafana role, an admin adds
+    # their principal to one of these groups via the F+ ACL editor;
+    # the SPI's fp_groups claim picks this up on next login (within
+    # cache TTL) and Grafana's role_attribute_path translates it to
+    # the matching Grafana role.
+    #
+    # Customise per deployment if needed, but DO NOT change once a
+    # production cluster has grants attached - the UUIDs are referenced
+    # by the F+ ACL data which doesn't migrate when UUIDs change.
+    grafanaPermissions:
+      admin:  "7b553965-0987-4ffb-bf9a-afac8bc13707"
+      editor: "e5f9fe18-da63-49d3-bee5-7950eeb3e053"
+
+    # OIDC clients to provision in Keycloak. Each entry generates a
+    # LocalSecret holding the client_secret in keycloak-clients/<key>.
+    # Every client automatically gets the fp_principal_uuid and
+    # fp_groups protocol mappers attached - JWT consumers read F+
+    # identity directly from the token. Per-client Keycloak roles are
+    # no longer used; permissions are driven from F+ ACLs via
+    # fp_groups.
+    #
+    # By default the client's URLs are derived from the entry name and
+    # acs.baseUrl: rootUrl/baseUrl/webOrigins all become
+    # `<proto>://<name>.<acs.baseUrl>`, redirectUris becomes
+    # `<root><redirectPath>`, and post.logout.redirect.uris becomes
+    # `<root>`. For applications served at a different host, override
+    # any of the following per-client fields - the values flow
+    # straight through to Keycloak and replace the auto-derived
+    # defaults so removals also work:
+    #   rootUrl                 (string)
+    #   baseUrl                 (string)
+    #   redirectUris            (list of full URLs)
+    #   webOrigins              (list of origins)
+    #   postLogoutRedirectUris  (list of full URLs)
+    openidClients:
+      grafana:
+        enabled: true
+        name: Grafana
+        redirectPath: /login/generic_oauth
 
 edgeHelm:
   enabled: true
@@ -353,13 +414,83 @@ grafana:
   admin:
     existingSecret: grafana-admin-user
   grafana.ini:
+    server:
+      root_url: "$__file{/etc/acs-config/root_url}"
+    auth:
+      # Hide the local username/password form: F+ via Keycloak is the
+      # only intended login path. The default Grafana admin (seed in
+      # Secret grafana-admin-user) is reachable via the URL
+      # /login?disableLoginForm=false for emergency access if Keycloak
+      # is unreachable.
+      #
+      # Operators that want the form back can override with:
+      #   grafana:
+      #     grafana.ini:
+      #       auth:
+      #         disable_login_form: false
+      disable_login_form: true
+      oauth_auto_login: false
     auth.basic:
       enabled: false
-    auth.proxy:
+    auth.generic_oauth:
       enabled: true
-      header_name: X-Auth-Principal
-      header_property: username
-      auto_sign_up: true
+      name: "Factory+"
+      allow_sign_up: true
+      client_id: grafana
+      client_secret: $__file{/etc/secrets/auth_generic_oauth/grafana}
+      scopes: openid profile email
+      # F+ has no email field; the kerberos UPN (delivered as the
+      # `preferred_username` claim by Keycloak) is the closest thing.
+      # Pointing email_attribute_path at it stops Grafana falling back
+      # to the GitHub-style /emails endpoint (which Keycloak doesn't
+      # expose and which 404s).
+      email_attribute_path: preferred_username
+      auth_url: $__file{/etc/acs-config/auth_url}
+      token_url: $__file{/etc/acs-config/token_url}
+      api_url: $__file{/etc/acs-config/api_url}
+      signout_redirect_url: $__file{/etc/acs-config/signout_redirect_url}
+      # role_attribute_path is templated into the acs-grafana-config
+      # ConfigMap by deploy/templates/grafana/grafana-ini.yaml so the
+      # F+ permission UUIDs from serviceSetup.config.grafanaPermissions
+      # can be interpolated. Reading via $__file picks up the rendered
+      # value.
+      role_attribute_path: $__file{/etc/acs-config/role_attribute_path}
+      # Grafana applies role_attribute_path on every OAuth login. By
+      # default it will not *demote* an existing user; with strict
+      # mode the JMESPath result is authoritative each login, so
+      # revoking Grafana.Perm.* in F+ downgrades on next login rather
+      # than letting the 60s SPI cache staleness become permanent.
+      role_attribute_strict: true
+      # Required for OAuth to be able to claim an existing Grafana
+      # user at all - without this flag, pkg/services/authn/clients/
+      # oauth.go leaves lookupParams.Email AND lookupParams.Login
+      # both nil, so lookupByOneOf finds nothing, Grafana drops into
+      # createUser, and the create collides with the existing row's
+      # email/login uniqueness check ("user already exists"). The
+      # "insecure" wording refers to providers that don't verify
+      # emails - ours is our own Keycloak federating F+ Auth, and
+      # the FactoryPlusUserAdapter already stamps email_verified=true
+      # because the email is derived from a kerberos-authoritative
+      # F+ Principal record.
+      oauth_allow_insecure_email_lookup: true
+  extraConfigmapMounts:
+    - name: acs-grafana-config
+      mountPath: /etc/acs-config
+      configMap: acs-grafana-config
+      readOnly: true
+      # The grafana subchart (6.52.4) calls `tpl` on `.subPath` and
+      # errors when the field is missing rather than honouring its
+      # `default ""` fallback. Empty string keeps the mount un-subpath'd.
+      subPath: ""
+  extraSecretMounts:
+    - name: keycloak-client-grafana
+      secretName: keycloak-clients
+      defaultMode: 0440
+      mountPath: /etc/secrets/auth_generic_oauth
+      readOnly: true
+      items:
+        - key: grafana
+          path: grafana
   sidecar:
     datasources:
       enabled: true

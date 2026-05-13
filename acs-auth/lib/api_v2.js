@@ -45,6 +45,11 @@ export class APIv2 {
 
         api.get("/principal", this.id_list.bind(this));
         api.get("/principal/:uuid", this.id_get_all.bind(this));
+        /* `/principal/:uuid/groups` must be registered BEFORE the
+         * `/principal/:uuid/:kind` route below, otherwise Express's
+         * matcher treats "groups" as an identity kind and routes to
+         * the wrong handler. */
+        api.get("/principal/:uuid/groups", this.id_groups.bind(this));
         api.route("/principal/:uuid/:kind")
             .get(this.id_get.bind(this))
             .put(this.id_put.bind(this))
@@ -226,6 +231,26 @@ export class APIv2 {
 
     id_del (req, res) {
         return this._id_put(null, req, res);
+    }
+
+    /** GET /principal/:uuid/groups
+     *
+     * Returns the UUIDs of all principal-groups containing the given
+     * principal (recursively). Used by external services that need to
+     * compute group-aware authorisation (the Keycloak SPI's fp_groups
+     * claim is the first consumer; future northbound shims will follow).
+     *
+     * Status codes:
+     *   200 - JSON array of group UUIDs
+     *   403 - caller lacks ReadKrb wildcard
+     *   410 - target principal doesn't exist
+     */
+    async id_groups (req, res) {
+        const { uuid } = req.params;
+        if (!valid_uuid(uuid)) fail(410);
+
+        const r = await this.data.find_groups(req.auth, uuid);
+        r.toExpress(res);
     }
 
     async id_kinds (req, res) {

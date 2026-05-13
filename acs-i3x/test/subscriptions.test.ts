@@ -244,12 +244,24 @@ describe("SubscriptionManager", () => {
             }).not.toThrow();
         });
 
-        it("throws for wrong clientId", () => {
+        it("throws 403 for wrong clientId", () => {
             const sub = mgr.create("client-1");
 
-            expect(() =>
-                mgr.register("client-2", sub.subscriptionId, ["elem-1"]),
-            ).toThrow();
+            try {
+                mgr.register("client-2", sub.subscriptionId, ["elem-1"]);
+                fail("expected register to throw");
+            } catch (err: any) {
+                expect(err.status).toBe(403);
+            }
+        });
+
+        it("throws 404 for unknown subscriptionId", () => {
+            try {
+                mgr.register("client-1", "does-not-exist", ["elem-1"]);
+                fail("expected register to throw");
+            } catch (err: any) {
+                expect(err.status).toBe(404);
+            }
         });
     });
 
@@ -323,6 +335,25 @@ describe("SubscriptionManager", () => {
             const items = mgr.sync("client-1", sub.subscriptionId);
             expect(items).toHaveLength(1);
             expect(items[0].elementId).toBe("elem-2");
+        });
+
+        it("throws 404 for unknown subscriptionId", () => {
+            try {
+                mgr.unregister("client-1", "does-not-exist", ["elem-1"]);
+                fail("expected unregister to throw");
+            } catch (err: any) {
+                expect(err.status).toBe(404);
+            }
+        });
+
+        it("throws 403 for wrong clientId", () => {
+            const sub = mgr.create("client-1");
+            try {
+                mgr.unregister("client-2", sub.subscriptionId, ["elem-1"]);
+                fail("expected unregister to throw");
+            } catch (err: any) {
+                expect(err.status).toBe(403);
+            }
         });
     });
 
@@ -464,10 +495,24 @@ describe("SubscriptionManager", () => {
             }
         });
 
-        it("throws for wrong clientId", () => {
+        it("throws 403 for wrong clientId", () => {
             const sub = mgr.create("client-1");
 
-            expect(() => mgr.sync("client-2", sub.subscriptionId)).toThrow();
+            try {
+                mgr.sync("client-2", sub.subscriptionId);
+                fail("expected sync to throw");
+            } catch (err: any) {
+                expect(err.status).toBe(403);
+            }
+        });
+
+        it("throws 404 for unknown subscriptionId", () => {
+            try {
+                mgr.sync("client-1", "does-not-exist");
+                fail("expected sync to throw");
+            } catch (err: any) {
+                expect(err.status).toBe(404);
+            }
         });
     });
 
@@ -578,6 +623,27 @@ describe("SubscriptionManager", () => {
             const parsed = JSON.parse(lastWrite.replace("data: ", "").trim());
             expect(Array.isArray(parsed)).toBe(true);
             expect(parsed[0].elementId).toBe("elem-1");
+        });
+
+        it("throws 404 for unknown subscriptionId", () => {
+            const res = mockSseRes();
+            try {
+                mgr.stream("client-1", "does-not-exist", res);
+                fail("expected stream to throw");
+            } catch (err: any) {
+                expect(err.status).toBe(404);
+            }
+        });
+
+        it("throws 403 for wrong clientId", () => {
+            const sub = mgr.create("client-1");
+            const res = mockSseRes();
+            try {
+                mgr.stream("client-2", sub.subscriptionId, res);
+                fail("expected stream to throw");
+            } catch (err: any) {
+                expect(err.status).toBe(403);
+            }
         });
     });
 

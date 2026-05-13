@@ -115,7 +115,7 @@ export class APIv1 {
 
     const meta = {
       uuid: dataset_uuid,
-      name: info.name ? info.name : "UNKNOWN",
+      name: info?.name ? info.name : "UNKNOWN",
       from: dataset.from ? dataset.from : undefined,
       to: dataset.to ? dataset.to : undefined,
       function: all_f_types.get(dataset_uuid),

@@ -78,6 +78,25 @@ Specify cache-control max-age for a service.
 {{- end }}
 
 {{/*
+OIDC discovery URL for the Keycloak realm. Included by every F+ service
+that runs lib/js-service-api so its auth middleware can fetch the
+realm's JWKS and accept Keycloak-issued JWTs. Empty when openid is
+disabled: the auth middleware treats an unset OIDC_DISCOVERY_URL as
+"no JWT acceptance" and continues to honour Basic/Negotiate/opaque
+Bearer unchanged.
+*/}}
+{{- define "amrc-connectivity-stack.oidc-env" }}
+- name: OIDC_DISCOVERY_URL
+{{- if .Values.openid.enabled }}
+  value: {{ printf "%s/realms/%s/.well-known/openid-configuration"
+    (include "amrc-connectivity-stack.external-url" (list . "openid"))
+    .Values.openid.realm | quote }}
+{{- else }}
+  value: ""
+{{- end }}
+{{- end }}
+
+{{/*
 Fetch an external service URL
 */}}
 {{- define "amrc-connectivity-stack.external-url" }}

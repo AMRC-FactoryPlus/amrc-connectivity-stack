@@ -202,6 +202,11 @@ class OpenIDSetup {
                 // updating the volume mapping there.
                 "auth.principal":   [sv1openid],
                 "auth.keytab.path": ["/etc/keytabs/client"],
+                // Lets local users log in with just their short name
+                // (the SPI appends "@<default.realm>" when the input
+                // has no @). Inputs that already contain @ pass
+                // through verbatim, preserving cross-realm logins.
+                "default.realm":    [this.kerberos_realm],
             },
         };
 

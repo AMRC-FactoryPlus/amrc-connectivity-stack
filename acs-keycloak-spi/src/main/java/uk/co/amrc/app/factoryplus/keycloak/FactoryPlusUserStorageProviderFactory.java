@@ -55,6 +55,7 @@ public class FactoryPlusUserStorageProviderFactory
     static final String CONFIG_CACHE_TTL_SECONDS  = "cache.ttl.seconds";
     static final String CONFIG_KRB_PRINCIPAL      = "auth.principal";
     static final String CONFIG_KRB_KEYTAB_PATH    = "auth.keytab.path";
+    static final String CONFIG_DEFAULT_REALM      = "default.realm";
     static final String DEFAULT_TIMEOUT_SECONDS   = "5";
     static final String DEFAULT_CACHE_TTL_SECONDS = "60";
 
@@ -103,6 +104,18 @@ public class FactoryPlusUserStorageProviderFactory
                     + "keytab must be readable by Keycloak's process.")
                 .type(ProviderConfigProperty.STRING_TYPE)
                 .add()
+            .property()
+                .name(CONFIG_DEFAULT_REALM)
+                .label("Default Kerberos realm")
+                .helpText("Realm appended to usernames entered without an "
+                    + "@realm suffix on the login form, so local users can "
+                    + "log in with just their short name "
+                    + "(e.g. me1alice -> me1alice@FACTORYPLUS.LOCAL). Inputs "
+                    + "that already contain @ are passed through verbatim, "
+                    + "preserving cross-realm logins. Leave blank to disable "
+                    + "the affordance and require the full UPN.")
+                .type(ProviderConfigProperty.STRING_TYPE)
+                .add()
             .build();
 
     @Override
@@ -132,7 +145,7 @@ public class FactoryPlusUserStorageProviderFactory
         StringBuilder sb = new StringBuilder();
         for (String k : List.of(CONFIG_AUTH_URL, CONFIG_TIMEOUT_SECONDS,
                 CONFIG_CACHE_TTL_SECONDS, CONFIG_KRB_PRINCIPAL,
-                CONFIG_KRB_KEYTAB_PATH)) {
+                CONFIG_KRB_KEYTAB_PATH, CONFIG_DEFAULT_REALM)) {
             sb.append(k).append('=')
               .append(model.getConfig().getFirst(k)).append(';');
         }
@@ -149,8 +162,9 @@ public class FactoryPlusUserStorageProviderFactory
             DEFAULT_TIMEOUT_SECONDS);
 
         KerberosAuthenticator auth = buildAuthenticator(model);
+        String defaultRealm = model.getConfig().getFirst(CONFIG_DEFAULT_REALM);
         FactoryPlusUserStore base = new FPAuthBackedUserStore(
-            URI.create(url), timeout, auth);
+            URI.create(url), timeout, auth, defaultRealm);
 
         Duration cacheTtl = parseSeconds(
             model.getConfig().getFirst(CONFIG_CACHE_TTL_SECONDS),

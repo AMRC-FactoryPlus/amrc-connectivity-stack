@@ -185,6 +185,85 @@ class FPAuthBackedUserStoreTest {
         assertThat(store.findByUsername(upn)).isPresent();
     }
 
+    // -- short-name / default realm normalisation -----------------------
+
+    @Test
+    void short_name_gets_default_realm_appended() {
+        // User types "alice" on the login form. With a default realm
+        // configured, the SPI must look up "alice@FACTORYPLUS.LOCAL"
+        // rather than the bare short name (which F+ would 410 on).
+        var withRealm = new FPAuthBackedUserStore(
+            URI.create(wiremock.baseUrl()), Duration.ofSeconds(2),
+            null, "FACTORYPLUS.LOCAL");
+        wiremock.stubFor(get(urlPathEqualTo(
+                "/v2/identity/kerberos/alice%40FACTORYPLUS.LOCAL"))
+            .willReturn(okJson("\"" + UUID_ALICE + "\"")));
+        wiremock.stubFor(get(urlPathEqualTo("/v2/principal/" + UUID_ALICE))
+            .willReturn(okJson(PRINCIPAL_JSON)));
+
+        assertThat(withRealm.findByUsername("alice")).isPresent();
+    }
+
+    @Test
+    void short_name_default_realm_is_uppercased() {
+        // Kerberos realms are conventionally uppercase; F+ stores them
+        // that way. Uppercase the configured value defensively so a
+        // mis-cased deploy doesn't break login.
+        var withRealm = new FPAuthBackedUserStore(
+            URI.create(wiremock.baseUrl()), Duration.ofSeconds(2),
+            null, "factoryplus.local");
+        wiremock.stubFor(get(urlPathEqualTo(
+                "/v2/identity/kerberos/alice%40FACTORYPLUS.LOCAL"))
+            .willReturn(okJson("\"" + UUID_ALICE + "\"")));
+        wiremock.stubFor(get(urlPathEqualTo("/v2/principal/" + UUID_ALICE))
+            .willReturn(okJson(PRINCIPAL_JSON)));
+
+        assertThat(withRealm.findByUsername("alice")).isPresent();
+    }
+
+    @Test
+    void cross_realm_upn_passes_through_unchanged_when_default_realm_set() {
+        // User from a federated realm types their full UPN; the local
+        // default realm must not override it. The lookup must hit the
+        // OTHER realm's identity endpoint with the original suffix
+        // preserved.
+        var withRealm = new FPAuthBackedUserStore(
+            URI.create(wiremock.baseUrl()), Duration.ofSeconds(2),
+            null, "FACTORYPLUS.LOCAL");
+        wiremock.stubFor(get(urlPathEqualTo(
+                "/v2/identity/kerberos/bob%40OTHER.REALM"))
+            .willReturn(okJson("\"" + UUID_ALICE + "\"")));
+        wiremock.stubFor(get(urlPathEqualTo("/v2/principal/" + UUID_ALICE))
+            .willReturn(okJson(PRINCIPAL_JSON)));
+
+        assertThat(withRealm.findByUsername("bob@OTHER.REALM")).isPresent();
+    }
+
+    @Test
+    void short_name_passes_through_when_no_default_realm_configured() {
+        // The legacy constructor leaves defaultRealm null. Short names
+        // must be passed through verbatim (and F+ will 410) so the
+        // behaviour is unchanged from before this feature.
+        wiremock.stubFor(get(urlPathEqualTo("/v2/identity/kerberos/alice"))
+            .willReturn(aResponse().withStatus(410)));
+
+        assertThat(store.findByUsername("alice")).isEmpty();
+    }
+
+    @Test
+    void short_name_passes_through_when_default_realm_is_blank() {
+        // Empty/blank config values are common in Keycloak (the field
+        // exists but the admin hasn't filled it in). Treat blank the
+        // same as absent: no realm-appending, F+ sees the bare name.
+        var blankRealm = new FPAuthBackedUserStore(
+            URI.create(wiremock.baseUrl()), Duration.ofSeconds(2),
+            null, "   ");
+        wiremock.stubFor(get(urlPathEqualTo("/v2/identity/kerberos/alice"))
+            .willReturn(aResponse().withStatus(410)));
+
+        assertThat(blankRealm.findByUsername("alice")).isEmpty();
+    }
+
     // -- find by email ---------------------------------------------------
 
     @Test

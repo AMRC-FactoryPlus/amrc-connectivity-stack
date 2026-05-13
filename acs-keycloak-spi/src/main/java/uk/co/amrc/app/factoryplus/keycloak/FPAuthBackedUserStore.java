@@ -73,21 +73,38 @@ public class FPAuthBackedUserStore implements FactoryPlusUserStore {
     private final Duration timeout;
     private final HttpClient http;
     private final KerberosAuthenticator authenticator;
+    private final String defaultRealm;
 
     /** No-auth constructor; useful for unauthenticated test setups
      *  (Wiremock fixtures, etc). */
     public FPAuthBackedUserStore(URI baseUrl, Duration timeout) {
-        this(baseUrl, timeout, null);
+        this(baseUrl, timeout, null, null);
     }
 
-    /** Production constructor: when {@code authenticator} is non-null
-     *  every request gets {@code Authorization: Negotiate <token>}
-     *  derived from it. */
+    /** Authenticated constructor without a default realm; equivalent
+     *  to passing {@code null} for {@code defaultRealm}. Inputs without
+     *  an {@code @realm} suffix are passed to F+ verbatim. */
     public FPAuthBackedUserStore(URI baseUrl, Duration timeout,
                                  KerberosAuthenticator authenticator) {
+        this(baseUrl, timeout, authenticator, null);
+    }
+
+    /** Production constructor. When {@code authenticator} is non-null
+     *  every request gets {@code Authorization: Negotiate <token>}
+     *  derived from it. When {@code defaultRealm} is non-blank, a
+     *  {@code findByUsername} call with no {@code @realm} suffix has
+     *  {@code @<defaultRealm>} appended before the F+ lookup, letting
+     *  local users log in with their short name. Inputs that already
+     *  contain {@code @} are passed through verbatim, preserving
+     *  cross-realm logins. */
+    public FPAuthBackedUserStore(URI baseUrl, Duration timeout,
+                                 KerberosAuthenticator authenticator,
+                                 String defaultRealm) {
         this.baseUrl = baseUrl;
         this.timeout = timeout;
         this.authenticator = authenticator;
+        this.defaultRealm = (defaultRealm == null || defaultRealm.isBlank())
+            ? null : defaultRealm.trim();
         // Pin HTTP/1.1: Java's default tries an h2c upgrade on plaintext
         // connections (sends Upgrade: h2c + Connection: Upgrade). Node's
         // HTTP parser rejects that with 400 "Invalid Upgrade header".
@@ -113,10 +130,17 @@ public class FPAuthBackedUserStore implements FactoryPlusUserStore {
             .flatMap(this::fetchPrincipal);
     }
 
-    private static String canonicaliseUpn(String username) {
+    private String canonicaliseUpn(String username) {
         if (username == null) return null;
         int at = username.lastIndexOf('@');
-        if (at < 0) return username;
+        if (at < 0) {
+            // Short name: append the local realm if one is configured
+            // so users can log in with just their username. If no
+            // default realm is configured the lookup proceeds with
+            // the bare name and F+ will return not-found.
+            if (defaultRealm == null) return username;
+            return username + "@" + defaultRealm.toUpperCase();
+        }
         return username.substring(0, at) + "@"
             + username.substring(at + 1).toUpperCase();
     }

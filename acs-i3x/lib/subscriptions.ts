@@ -111,6 +111,24 @@ export class SubscriptionManager {
         this.resetTtl(sub);
     }
 
+    registerOne(clientId: string, subscriptionId: string, elementId: string, maxDepth: number = 1): void {
+        const sub = this.subscriptions.get(subscriptionId);
+        if (!sub) {
+            const err: any = new Error(`Subscription ${subscriptionId} not found`);
+            err.status = 404;
+            throw err;
+        }
+        if (sub.clientId !== clientId) {
+            const err: any = new Error(`Subscription ${subscriptionId} does not belong to client ${clientId}`);
+            err.status = 403;
+            throw err;
+        }
+
+        sub.registeredElements.set(elementId, maxDepth);
+        console.log(`[SUB] register: sub=${subscriptionId.slice(0,8)} element=${elementId} maxDepth=${maxDepth}`);
+        this.resetTtl(sub);
+    }
+
     unregister(clientId: string, subscriptionId: string, elementIds: string[]): void {
         const sub = this.getAndVerify(clientId, subscriptionId);
 

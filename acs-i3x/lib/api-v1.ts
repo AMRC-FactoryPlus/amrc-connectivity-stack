@@ -442,12 +442,31 @@ export class APIv1 {
     }
 
     /**
-     * POST /subscriptions/register — adds element ids to an existing subscription, with optional composition `maxDepth`.
-     **/
+     * POST /subscriptions/register — adds element ids to an existing
+     * subscription, with optional composition `maxDepth`. Per-id
+     * success/error envelope: unknown ids are reported as 404, sub-level
+     * errors (missing sub / wrong client) surface from `registerOne` as
+     * 404/403 per-id rather than aborting the batch.
+     */
     register_subscriptions(req: Request, res: Response): void {
         const { clientId, subscriptionId, elementIds, maxDepth } = req.body;
-        this.subscriptions.register(clientId, subscriptionId, elementIds, maxDepth);
-        res.json({ registered: elementIds });
+        const results = (elementIds as string[]).map(id => {
+            if (!this.objectTree.getObject(id)) {
+                return { success: false, elementId: id, error: { code: 404, message: `Object ${id} not found` } };
+            }
+            try {
+                this.subscriptions.registerOne(clientId, subscriptionId, id, maxDepth);
+                return { success: true, elementId: id, result: null };
+            } catch (err: any) {
+                return {
+                    success: false,
+                    elementId: id,
+                    error: { code: err.status ?? 500, message: err.message },
+                };
+            }
+        });
+        const allSuccess = results.every(r => r.success);
+        ((res as any)._originalJson || res.json.bind(res))({ success: allSuccess, results });
     }
 
     /**

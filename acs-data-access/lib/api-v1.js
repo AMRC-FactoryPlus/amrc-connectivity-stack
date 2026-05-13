@@ -11,7 +11,7 @@ import { APIError } from "@amrc-factoryplus/service-api";
 import { ServiceError } from "@amrc-factoryplus/service-client";
 import { retryBackoff } from "@amrc-factoryplus/rx-util";
 import { DataAccess as Constants } from "./constants.js";
-import { valid_uuid, DatasetValidity } from "./validate.js";
+import { valid_uuid } from "./validate.js";
 import { csv_escape, maxDate, minDate } from './utils.js';
 
 
@@ -61,7 +61,7 @@ export class APIv1 {
    * Don't return invalid datasets
   */
   async metadata_list(req, res) {
-    const uuids = await this.data.get_allowed_dataset_uuids(req.auth, Constants.Perm.ReadDataset, DatasetValidity.VALID);
+    const uuids = await rx.firstValueFrom(this.data.allowed_valid_dataset_uuids(req.auth, Constants.Perm.ReadDataset));
     return res.status(200).json(uuids);
   }
 
@@ -91,32 +91,36 @@ export class APIv1 {
     
     if (!ok) return fail(this.log, 403, `You don't have READ permissions for ${dataset_uuid}`);
 
-    const datasets = await rx.firstValueFrom(this.data.get_dataset_definitions(DatasetValidity.VALID));
-    const dataset = await datasets.get(dataset_uuid);
+
+    const [
+      datasets,
+      infos,
+      all_f_types,
+      all_metadata,
+      parts
+    ] = await Promise.all([
+      rx.firstValueFrom(this.data.allowed_valid_datasets(req.auth, Constants.Perm.ReadDataset)),
+      rx.firstValueFrom(this.data.general_infos),
+      rx.firstValueFrom(this.data.functional_types),
+      rx.firstValueFrom(this.data.metadata),
+      rx.firstValueFrom(
+        this.data.allowed_dataset_parts(dataset_uuid, req.auth, Constants.Perm.ReadDataset)
+      )
+    ]);
+
+    const dataset = datasets.get(dataset_uuid);
     if(!dataset) return fail(this.log, 404, `Dataset ${dataset_uuid} is not found or invalid.`);
-    
-    const from = dataset.config?.from;
-    const to = dataset.config?.to;
-
-    const infos = await rx.firstValueFrom(this.data.general_infos);
+  
     const info = infos.get(dataset_uuid);
-    
-    const all_f_types = await rx.firstValueFrom(this.data.functional_types);
-    const f_types = all_f_types.get(dataset_uuid);
-
-    const all_metadata = await rx.firstValueFrom(this.data.metadata);
-    const metadata = all_metadata.get(dataset_uuid); 
-
-    const parts = await this.data.get_dataset_allowed_parts(dataset_uuid, req.auth, Constants.Perm.ReadDataset);
 
     const meta = {
       uuid: dataset_uuid,
-      name: info ? info.name : "UNKNOWN",
-      from: from ? from : undefined,
-      to: to ? to : undefined,
-      function: f_types,
-      metadata,
-      parts: parts
+      name: info.name ? info.name : "UNKNOWN",
+      from: dataset.from ? dataset.from : undefined,
+      to: dataset.to ? dataset.to : undefined,
+      function: all_f_types.get(dataset_uuid),
+      metadata: all_metadata.get(dataset_uuid),
+      parts
     }
     return res.status(200).json(meta);
   }
@@ -195,15 +199,17 @@ export class APIv1 {
     visited.add(dataset_uuid);
 
     const datasets = await rx.firstValueFrom(this.data.datasets);
-    const dataset = await datasets.get(dataset_uuid);
+    const dataset = datasets.get(dataset_uuid);
 
     if(!dataset) return fail(this.log, 404, `Dataset not found ${dataset_uuid}`);
 
-    if(dataset.validity !== DatasetValidity.VALID) return fail(this.log, 404, `Invalid dataset ${dataset_uuid}`);
- 
     const {structure, config} = dataset;
     if(!structure) return fail(this.log, 404, `Structure not found for dataset ${dataset_uuid}`);
+
+    if(structure === Constants.Special.InvalidDataset) return fail(this.log, 404, `Invalid dataset ${dataset_uuid}`);
+
     if(!config) return fail(this.log, 404, `Config not found for ${dataset_uuid}`);
+ 
 
     // ======================================================
     //                      SparkplugSRC 
@@ -339,7 +345,7 @@ export class APIv1 {
    * the response includes invalid datasets 
    */
   async structure_list(req, res){
-    const uuids = await this.data.get_allowed_dataset_uuids(req.auth, Constants.Perm.EditDataset, DatasetValidity.ALL);
+    const uuids = await rx.firstValueFrom(this.data.allowed_all_dataset_uuids(req.auth, Constants.Perm.EditDataset));
     return res.status(200).json(uuids);
   }
 
@@ -369,7 +375,7 @@ export class APIv1 {
     if (!ok) return fail(this.log, 403, `You don't have permission to Edit dataset ${uuid}.`);
 
     const dataset = await rx.firstValueFrom(
-      this.data.get_dataset_definitions(DatasetValidity.ALL).pipe(
+      this.data.allowed_all_datasets(req.auth, Constants.Perm.EditDataset).pipe(
         rx.map(datasets => datasets.get(dataset_uuid))
       )
     );
@@ -504,13 +510,13 @@ export class APIv1 {
 
     if (!ok) return fail(this.log, 403, `You don't have Edit permission for dataset ${dataset_uuid}`);
 
-    const datasets = await rx.firstValueFrom(this.data.get_dataset_definitions(DatasetValidity.ALL));
+    const datasets = await rx.firstValueFrom(this.data.allowed_all_datasets(req.auth, Constants.Perm.EditDataset));
     const dataset = datasets.get(dataset_uuid);
     if(!dataset) return fail(this.log, 404, `Dataset ${dataset_uuid} not found.`);
 
     const current_structure = dataset.structure;
     const current_config = dataset.config; 
-    const is_valid = (dataset.validity == DatasetValidity.VALID);
+    const is_valid = current_structure !== Constants.Special.InvalidDataset;
 
     // for VALID dataset
     if(is_valid){

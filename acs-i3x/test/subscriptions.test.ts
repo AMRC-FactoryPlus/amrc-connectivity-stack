@@ -260,6 +260,44 @@ describe("SubscriptionManager", () => {
         });
     });
 
+    /* ---- unregisterOne ---- */
+
+    describe("unregisterOne", () => {
+        it("removes a single elementId from subscription", () => {
+            const sub = mgr.create("client-1");
+            mgr.register("client-1", sub.subscriptionId, ["elem-1", "elem-2"]);
+            mgr.unregisterOne("client-1", sub.subscriptionId, "elem-1");
+
+            const listener = valueCache.onValueChange.mock.calls[0][0] as (
+                elementId: string,
+                vqt: I3xVqt,
+            ) => void;
+            listener("elem-1", makeVqt(100));
+
+            const items = mgr.sync("client-1", sub.subscriptionId);
+            expect(items).toHaveLength(0);
+        });
+
+        it("throws 404 for unknown subscriptionId", () => {
+            try {
+                mgr.unregisterOne("client-1", "does-not-exist", "elem-1");
+                fail("expected unregisterOne to throw");
+            } catch (err: any) {
+                expect(err.status).toBe(404);
+            }
+        });
+
+        it("throws 403 for wrong clientId", () => {
+            const sub = mgr.create("client-1");
+            try {
+                mgr.unregisterOne("client-2", sub.subscriptionId, "elem-1");
+                fail("expected unregisterOne to throw");
+            } catch (err: any) {
+                expect(err.status).toBe(403);
+            }
+        });
+    });
+
     /* ---- onValueChange ---- */
 
     describe("onValueChange", () => {

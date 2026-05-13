@@ -278,6 +278,7 @@ function createPreloadedMocks() {
         register: jest.fn<(clientId: string, subId: string, ids: string[], maxDepth?: number) => void>(),
         registerOne: jest.fn<(clientId: string, subId: string, id: string, maxDepth?: number) => void>(),
         unregister: jest.fn<(clientId: string, subId: string, ids: string[]) => void>(),
+        unregisterOne: jest.fn<(clientId: string, subId: string, id: string) => void>(),
         stream: jest.fn<(clientId: string, subId: string, res: any) => void>(),
         sync: jest.fn<(clientId: string, subId: string, lastSeq?: number) => I3xSyncItem[]>()
             .mockReturnValue([
@@ -890,6 +891,51 @@ describe("E2E Compliance Tests", () => {
             const { app } = createE2eApp();
             const res = await request(app)
                 .post("/v1/subscriptions/register")
+                .send({
+                    clientId: "test-client",
+                    subscriptionId: "sub-1",
+                    elementIds: ["obj-cnc-1", "missing", "obj-robot-1"],
+                });
+
+            expect(res.status).toBe(200);
+            expect(res.body.success).toBe(false);
+            expect(res.body.results).toEqual([
+                { success: true, elementId: "obj-cnc-1", result: null },
+                {
+                    success: false,
+                    elementId: "missing",
+                    error: { code: 404, message: "Object missing not found" },
+                },
+                { success: true, elementId: "obj-robot-1", result: null },
+            ]);
+        });
+    });
+
+    describe("POST /v1/subscriptions/unregister", () => {
+        it("returns bulk envelope for known elementIds", async () => {
+            const { app } = createE2eApp();
+            const res = await request(app)
+                .post("/v1/subscriptions/unregister")
+                .send({
+                    clientId: "test-client",
+                    subscriptionId: "sub-1",
+                    elementIds: ["obj-cnc-1", "obj-robot-1"],
+                });
+
+            expect(res.status).toBe(200);
+            expect(res.body).toEqual({
+                success: true,
+                results: [
+                    { success: true, elementId: "obj-cnc-1", result: null },
+                    { success: true, elementId: "obj-robot-1", result: null },
+                ],
+            });
+        });
+
+        it("reports unknown elementIds as 404 without aborting the batch", async () => {
+            const { app } = createE2eApp();
+            const res = await request(app)
+                .post("/v1/subscriptions/unregister")
                 .send({
                     clientId: "test-client",
                     subscriptionId: "sub-1",

@@ -470,12 +470,31 @@ export class APIv1 {
     }
 
     /**
-     * POST /subscriptions/unregister — removes element ids from an existing subscription.
-     **/
+     * POST /subscriptions/unregister — removes element ids from an
+     * existing subscription. Per-id success/error envelope: unknown
+     * ids are reported as 404, sub-level errors (missing sub / wrong
+     * client) surface from `unregisterOne` as 404/403 per-id rather
+     * than aborting the batch.
+     */
     unregister_subscriptions(req: Request, res: Response): void {
         const { clientId, subscriptionId, elementIds } = req.body;
-        this.subscriptions.unregister(clientId, subscriptionId, elementIds);
-        res.json({ unregistered: elementIds });
+        const results = (elementIds as string[]).map(id => {
+            if (!this.objectTree.getObject(id)) {
+                return { success: false, elementId: id, error: { code: 404, message: `Object ${id} not found` } };
+            }
+            try {
+                this.subscriptions.unregisterOne(clientId, subscriptionId, id);
+                return { success: true, elementId: id, result: null };
+            } catch (err: any) {
+                return {
+                    success: false,
+                    elementId: id,
+                    error: { code: err.status ?? 500, message: err.message },
+                };
+            }
+        });
+        const allSuccess = results.every(r => r.success);
+        ((res as any)._originalJson || res.json.bind(res))({ success: allSuccess, results });
     }
 
     /**

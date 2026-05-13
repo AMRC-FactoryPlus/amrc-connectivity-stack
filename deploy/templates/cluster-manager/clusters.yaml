@@ -51,6 +51,7 @@ spec:
               value: clusters.{{ .Release.Namespace }}.svc.cluster.local
             - name: REALM
               value: {{ .Values.identity.realm | required "values.identity.realm is required!" }}
+{{ include "amrc-connectivity-stack.oidc-env" . | indent 12 }}
             - name: EXTERNAL_DOMAIN
               value: {{ .Values.acs.baseUrl | required "values.acs.baseUrl is required" }}
             - name: ORGANISATION_PREFIX

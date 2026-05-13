@@ -53,6 +53,7 @@ spec:
               value: files.{{ .Release.Namespace }}.svc.cluster.local
             - name: REALM
               value: {{ .Values.identity.realm | required "values.identity.realm is required!" }}
+{{ include "amrc-connectivity-stack.oidc-env" . | indent 12 }}
             - name: FILES_STORAGE
               value: /data
             - name: PORT

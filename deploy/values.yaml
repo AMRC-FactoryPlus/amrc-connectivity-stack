@@ -461,6 +461,18 @@ grafana:
       # revoking Grafana.Perm.* in F+ downgrades on next login rather
       # than letting the 60s SPI cache staleness become permanent.
       role_attribute_strict: true
+      # Required for OAuth to be able to claim an existing Grafana
+      # user at all - without this flag, pkg/services/authn/clients/
+      # oauth.go leaves lookupParams.Email AND lookupParams.Login
+      # both nil, so lookupByOneOf finds nothing, Grafana drops into
+      # createUser, and the create collides with the existing row's
+      # email/login uniqueness check ("user already exists"). The
+      # "insecure" wording refers to providers that don't verify
+      # emails - ours is our own Keycloak federating F+ Auth, and
+      # the FactoryPlusUserAdapter already stamps email_verified=true
+      # because the email is derived from a kerberos-authoritative
+      # F+ Principal record.
+      oauth_allow_insecure_email_lookup: true
   extraConfigmapMounts:
     - name: acs-grafana-config
       mountPath: /etc/acs-config

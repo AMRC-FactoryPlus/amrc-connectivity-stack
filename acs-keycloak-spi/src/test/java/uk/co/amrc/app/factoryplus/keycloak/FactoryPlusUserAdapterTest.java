@@ -80,6 +80,38 @@ class FactoryPlusUserAdapterTest {
     }
 
     @Test
+    void getAttributeStream_username_falls_through_to_super() {
+        // Keycloak's oidc-usermodel-attribute-mapper queries the per-name
+        // attribute API (getAttributeStream / getFirstAttribute). The
+        // standard "username" mapper expects to see the user's username
+        // back. Returning Stream.empty() for everything but our F+
+        // attributes masked username/email and made userinfo emit
+        // preferred_username=null whenever Keycloak's user cache wasn't
+        // in front of us (i.e. cachePolicy=NO_CACHE). Delegate to super.
+        assertThat(adapter.getAttributeStream("username"))
+            .containsExactly("alice");
+        assertThat(adapter.getFirstAttribute("username")).isEqualTo("alice");
+    }
+
+    @Test
+    void getAttributeStream_email_falls_through_to_super() {
+        assertThat(adapter.getAttributeStream("email"))
+            .containsExactly("alice@example.invalid");
+        assertThat(adapter.getFirstAttribute("email"))
+            .isEqualTo("alice@example.invalid");
+    }
+
+    @Test
+    void getAttributeStream_fp_attributes_still_served_locally() {
+        // Our overrides for the F+ attributes must NOT delegate to super
+        // - we own those names exclusively.
+        assertThat(adapter.getAttributeStream(FactoryPlusUserAdapter.ATTR_FP_UUID))
+            .containsExactly(ALICE.uuid());
+        assertThat(adapter.getFirstAttribute(FactoryPlusUserAdapter.ATTR_FP_UUID))
+            .isEqualTo(ALICE.uuid());
+    }
+
+    @Test
     void factoryplus_groups_delegates_to_store() {
         var stubStore = new StubGroupsStore(java.util.Set.of("g1", "g2"));
         var alice = new FactoryPlusUserAdapter(session, realm, model, ALICE, stubStore);

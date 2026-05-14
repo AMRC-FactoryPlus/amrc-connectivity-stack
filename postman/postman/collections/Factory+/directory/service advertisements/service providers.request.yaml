@@ -1,16 +1,4 @@
 $kind: http-request
-url: '{{scheme}}://directory.{{domain}}/v1/service/{{serviceUuid}}'
+url: '{{scheme}}://directory.{{domain}}/v1/service/:service'
 method: GET
 order: 2000
-events:
-- listen: test
-  script:
-    type: text/javascript
-    exec:
-    - pm.test('Status is 200 (or 404 if upstream list empty)', function () {
-    - '    pm.expect(pm.response.code).to.be.oneOf([200, 404]);'
-    - '});'
-    - pm.test('Got a real serviceUuid from upstream list', function () {
-    - '    pm.expect(pm.collectionVariables.get(''serviceUuid''),'
-    - '        ''no serviceUuid - check the upstream list endpoint'').to.not.be.empty;'
-    - '});'

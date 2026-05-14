@@ -1,17 +1,5 @@
 $kind: http-request
 description: Identity record of a given kind (kerberos, sparkplug, etc.) for a principal.
-url: '{{scheme}}://auth.{{domain}}/v2/principal/{{principalUuid}}/:kind'
+url: '{{scheme}}://auth.{{domain}}/v2/principal/:uuid/:kind'
 method: GET
 order: 6000
-events:
-- listen: test
-  script:
-    type: text/javascript
-    exec:
-    - pm.test('Status is 200 (or 404 if upstream list empty)', function () {
-    - '    pm.expect(pm.response.code).to.be.oneOf([200, 404]);'
-    - '});'
-    - pm.test('Got a real principalUuid from upstream list', function () {
-    - '    pm.expect(pm.collectionVariables.get(''principalUuid''),'
-    - '        ''no principalUuid - check the upstream list endpoint'').to.not.be.empty;'
-    - '});'

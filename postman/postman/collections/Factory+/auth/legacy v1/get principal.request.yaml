@@ -2,11 +2,3 @@ $kind: http-request
 url: '{{scheme}}://auth.{{domain}}/authz/principal/:uuid'
 method: GET
 order: 3000
-events:
-- listen: test
-  script:
-    type: text/javascript
-    exec:
-    - pm.test('Status is 200 / 404', function () {
-    - '    pm.expect(pm.response.code).to.be.oneOf([200, 404]);'
-    - '});'

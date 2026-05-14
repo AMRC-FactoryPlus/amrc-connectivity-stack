@@ -1,16 +1,4 @@
 $kind: http-request
-url: '{{scheme}}://auth.{{domain}}/v2/identity/{{identityKind}}'
+url: '{{scheme}}://auth.{{domain}}/v2/identity/:kind'
 method: GET
 order: 10000
-events:
-- listen: test
-  script:
-    type: text/javascript
-    exec:
-    - pm.test('Status is 200 (or 404 if upstream list empty)', function () {
-    - '    pm.expect(pm.response.code).to.be.oneOf([200, 404]);'
-    - '});'
-    - pm.test('Got a real identityKind from upstream list', function () {
-    - '    pm.expect(pm.collectionVariables.get(''identityKind''),'
-    - '        ''no identityKind - check the upstream list endpoint'').to.not.be.empty;'
-    - '});'

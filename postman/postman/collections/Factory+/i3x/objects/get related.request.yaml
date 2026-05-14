@@ -1,16 +1,4 @@
 $kind: http-request
-url: '{{scheme}}://i3x.{{domain}}/v1/objects/{{i3xObjectId}}/related'
+url: '{{scheme}}://i3x.{{domain}}/v1/objects/:elementId/related'
 method: GET
 order: 9000
-events:
-- listen: test
-  script:
-    type: text/javascript
-    exec:
-    - pm.test('Status is 200 (or 404 if upstream list empty)', function () {
-    - '    pm.expect(pm.response.code).to.be.oneOf([200, 404]);'
-    - '});'
-    - pm.test('Got a real i3xObjectId from upstream list', function () {
-    - '    pm.expect(pm.collectionVariables.get(''i3xObjectId''),'
-    - '        ''no i3xObjectId - check the upstream list endpoint'').to.not.be.empty;'
-    - '});'

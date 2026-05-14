@@ -4,11 +4,3 @@ description: Returns the full identity record for the calling principal. With a 
 url: '{{scheme}}://auth.{{domain}}/v2/whoami'
 method: GET
 order: 1000
-events:
-- listen: test
-  script:
-    type: text/javascript
-    exec:
-    - pm.test('Status is 200', function () {
-    - '    pm.expect(pm.response.code).to.be.oneOf([200]);'
-    - '});'

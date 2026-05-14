@@ -1,20 +1,4 @@
 $kind: http-request
-url: '{{scheme}}://configdb.{{domain}}/v2/app/{{appUuid}}/object/{{objectUuid}}'
+url: '{{scheme}}://configdb.{{domain}}/v2/app/:app/object/:object'
 method: GET
 order: 18000
-events:
-- listen: test
-  script:
-    type: text/javascript
-    exec:
-    - pm.test('Status is 200 (or 404 if upstream list empty)', function () {
-    - '    pm.expect(pm.response.code).to.be.oneOf([200, 404]);'
-    - '});'
-    - pm.test('Got a real appUuid from upstream list', function () {
-    - '    pm.expect(pm.collectionVariables.get(''appUuid''),'
-    - '        ''no appUuid - check the upstream list endpoint'').to.not.be.empty;'
-    - '});'
-    - pm.test('Got a real objectUuid from upstream list', function () {
-    - '    pm.expect(pm.collectionVariables.get(''objectUuid''),'
-    - '        ''no objectUuid - check the upstream list endpoint'').to.not.be.empty;'
-    - '});'

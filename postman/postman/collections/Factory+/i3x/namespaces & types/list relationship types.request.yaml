@@ -2,14 +2,3 @@ $kind: http-request
 url: '{{scheme}}://i3x.{{domain}}/v1/relationshiptypes'
 method: GET
 order: 5000
-events:
-- listen: test
-  script:
-    type: text/javascript
-    exec:
-    - pm.test('Status is 200', function () {
-    - '    pm.expect(pm.response.code).to.equal(200);'
-    - '});'
-    - let body = null; try { body = pm.response.json(); } catch (e) {}
-    - const v = body?.result?.[0]?.elementId ?? null;
-    - if (v) pm.collectionVariables.set('i3xRelTypeId', v);

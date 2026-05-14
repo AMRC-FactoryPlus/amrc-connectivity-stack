@@ -11,25 +11,6 @@ description: "Factory+ HTTP API collection for the AMRC Connectivity Stack.\n\n*
 variables:
   scheme: https
   domain: acs.example.com
-  principalUuid: ''
-  grantUuid: ''
-  identityKind: ''
-  appUuid: ''
-  classUuid: ''
-  objectUuid: ''
-  deviceUuid: ''
-  serviceUuid: ''
-  alertUuid: ''
-  linkUuid: ''
-  schemaUuid: ''
-  addressGroup: ''
-  addressNode: ''
-  addressDevice: ''
-  fileUuid: ''
-  gitStorageUuid: ''
-  i3xObjectTypeId: ''
-  i3xRelTypeId: ''
-  i3xObjectId: ''
 auth:
 - id: 8c04df04-f9a4-40bd-8ed0-316b571211fe
   type: oauth2
@@ -46,15 +27,3 @@ auth:
     redirect_uri: https://oauth.pstmn.io/v1/callback
     client_authentication: body
     addTokenTo: header
-events:
-- listen: prerequest
-  script:
-    type: text/javascript
-    exec:
-    - // Collection Runner only fires GET requests.
-    - // Mutating verbs (POST/PUT/PATCH/DELETE) stay in the collection
-    - // for manual use; they're skipped during a Run.
-    - if (pm.request.method !== 'GET') {
-    - '    console.log(`[skip] ${pm.request.method} ${pm.info.requestName}`);'
-    - '    pm.execution.skipRequest();'
-    - '}'

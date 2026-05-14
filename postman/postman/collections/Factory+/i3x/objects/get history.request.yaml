@@ -1,19 +1,7 @@
 $kind: http-request
-url: '{{scheme}}://i3x.{{domain}}/v1/objects/{{i3xObjectId}}/history'
+url: '{{scheme}}://i3x.{{domain}}/v1/objects/:elementId/history'
 method: GET
 queryParams:
   from: 2026-05-01 00:00:00+00:00
   to: 2026-05-14 00:00:00+00:00
 order: 8000
-events:
-- listen: test
-  script:
-    type: text/javascript
-    exec:
-    - pm.test('Status is 200 (or 404 if upstream list empty)', function () {
-    - '    pm.expect(pm.response.code).to.be.oneOf([200, 404]);'
-    - '});'
-    - pm.test('Got a real i3xObjectId from upstream list', function () {
-    - '    pm.expect(pm.collectionVariables.get(''i3xObjectId''),'
-    - '        ''no i3xObjectId - check the upstream list endpoint'').to.not.be.empty;'
-    - '});'

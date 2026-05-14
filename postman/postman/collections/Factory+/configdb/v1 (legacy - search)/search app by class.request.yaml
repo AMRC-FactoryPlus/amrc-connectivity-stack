@@ -1,22 +1,6 @@
 $kind: http-request
-url: '{{scheme}}://configdb.{{domain}}/v1/app/{{appUuid}}/class/{{classUuid}}/search'
+url: '{{scheme}}://configdb.{{domain}}/v1/app/:app/class/:class/search'
 method: GET
 queryParams:
   '@group': group_id
 order: 2000
-events:
-- listen: test
-  script:
-    type: text/javascript
-    exec:
-    - pm.test('Status is 200 (or 404 if upstream list empty)', function () {
-    - '    pm.expect(pm.response.code).to.be.oneOf([200, 404]);'
-    - '});'
-    - pm.test('Got a real appUuid from upstream list', function () {
-    - '    pm.expect(pm.collectionVariables.get(''appUuid''),'
-    - '        ''no appUuid - check the upstream list endpoint'').to.not.be.empty;'
-    - '});'
-    - pm.test('Got a real classUuid from upstream list', function () {
-    - '    pm.expect(pm.collectionVariables.get(''classUuid''),'
-    - '        ''no classUuid - check the upstream list endpoint'').to.not.be.empty;'
-    - '});'

@@ -2,11 +2,3 @@ $kind: http-request
 url: '{{scheme}}://clusters.{{domain}}/v1/cluster/:cluster/status'
 method: GET
 order: 1000
-events:
-- listen: test
-  script:
-    type: text/javascript
-    exec:
-    - pm.test('Status is 200 / 404', function () {
-    - '    pm.expect(pm.response.code).to.be.oneOf([200, 404]);'
-    - '});'

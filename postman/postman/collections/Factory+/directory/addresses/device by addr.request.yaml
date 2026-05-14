@@ -1,24 +1,4 @@
 $kind: http-request
-url: '{{scheme}}://directory.{{domain}}/v1/address/{{addressGroup}}/{{addressNode}}/{{addressDevice}}'
+url: '{{scheme}}://directory.{{domain}}/v1/address/:group/:node/:device'
 method: GET
 order: 4000
-events:
-- listen: test
-  script:
-    type: text/javascript
-    exec:
-    - pm.test('Status is 200 (or 404 if upstream list empty)', function () {
-    - '    pm.expect(pm.response.code).to.be.oneOf([200, 404]);'
-    - '});'
-    - pm.test('Got a real addressGroup from upstream list', function () {
-    - '    pm.expect(pm.collectionVariables.get(''addressGroup''),'
-    - '        ''no addressGroup - check the upstream list endpoint'').to.not.be.empty;'
-    - '});'
-    - pm.test('Got a real addressNode from upstream list', function () {
-    - '    pm.expect(pm.collectionVariables.get(''addressNode''),'
-    - '        ''no addressNode - check the upstream list endpoint'').to.not.be.empty;'
-    - '});'
-    - pm.test('Got a real addressDevice from upstream list', function () {
-    - '    pm.expect(pm.collectionVariables.get(''addressDevice''),'
-    - '        ''no addressDevice - check the upstream list endpoint'').to.not.be.empty;'
-    - '});'

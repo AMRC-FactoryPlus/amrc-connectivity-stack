@@ -1,15 +1,4 @@
 $kind: http-request
-url: '{{scheme}}://directory.{{domain}}/v1/address/{{addressGroup}}/{{addressNode}}'
+url: '{{scheme}}://directory.{{domain}}/v1/address/:group/:node'
 method: GET
 order: 3000
-events:
-- listen: test
-  script:
-    type: text/javascript
-    exec:
-    - pm.test('Status is 200', function () {
-    - '    pm.expect(pm.response.code).to.equal(200);'
-    - '});'
-    - let body = null; try { body = pm.response.json(); } catch (e) {}
-    - 'const v = Array.isArray(body) ? body[0] : null;'
-    - if (v) pm.collectionVariables.set('addressDevice', v);

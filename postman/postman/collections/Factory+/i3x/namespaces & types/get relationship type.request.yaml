@@ -1,5 +1,5 @@
 $kind: http-request
-url: '{{scheme}}://i3x.{{domain}}/v1/relationshiptypes/:elementId'
+url: '{{scheme}}://i3x.{{domain}}/v1/relationshiptypes/{{i3xRelTypeId}}'
 method: GET
 order: 6000
 events:
@@ -7,6 +7,10 @@ events:
   script:
     type: text/javascript
     exec:
-    - pm.test('Status is 200 / 404', function () {
+    - pm.test('Status is 200 (or 404 if upstream list empty)', function () {
     - '    pm.expect(pm.response.code).to.be.oneOf([200, 404]);'
+    - '});'
+    - pm.test('Got a real i3xRelTypeId from upstream list', function () {
+    - '    pm.expect(pm.collectionVariables.get(''i3xRelTypeId''),'
+    - '        ''no i3xRelTypeId - check the upstream list endpoint'').to.not.be.empty;'
     - '});'

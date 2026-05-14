@@ -1,5 +1,5 @@
 $kind: http-request
-url: '{{scheme}}://auth.{{domain}}/v2/acl/:principal'
+url: '{{scheme}}://auth.{{domain}}/v2/acl/{{principalUuid}}'
 method: GET
 order: 12000
 events:
@@ -7,6 +7,10 @@ events:
   script:
     type: text/javascript
     exec:
-    - pm.test('Status is 200 / 404', function () {
+    - pm.test('Status is 200 (or 404 if upstream list empty)', function () {
     - '    pm.expect(pm.response.code).to.be.oneOf([200, 404]);'
+    - '});'
+    - pm.test('Got a real principalUuid from upstream list', function () {
+    - '    pm.expect(pm.collectionVariables.get(''principalUuid''),'
+    - '        ''no principalUuid - check the upstream list endpoint'').to.not.be.empty;'
     - '});'

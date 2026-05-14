@@ -1,5 +1,5 @@
 $kind: http-request
-url: '{{scheme}}://configdb.{{domain}}/v1/app/:app/search'
+url: '{{scheme}}://configdb.{{domain}}/v1/app/{{appUuid}}/search'
 method: GET
 queryParams:
   name: example
@@ -9,6 +9,10 @@ events:
   script:
     type: text/javascript
     exec:
-    - pm.test('Status is 200 / 404', function () {
+    - pm.test('Status is 200 (or 404 if upstream list empty)', function () {
     - '    pm.expect(pm.response.code).to.be.oneOf([200, 404]);'
+    - '});'
+    - pm.test('Got a real appUuid from upstream list', function () {
+    - '    pm.expect(pm.collectionVariables.get(''appUuid''),'
+    - '        ''no appUuid - check the upstream list endpoint'').to.not.be.empty;'
     - '});'

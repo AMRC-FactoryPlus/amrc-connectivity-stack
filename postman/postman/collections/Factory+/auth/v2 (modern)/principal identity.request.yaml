@@ -1,0 +1,5 @@
+$kind: http-request
+description: Identity record of a given kind (kerberos, sparkplug, etc.) for a principal.
+url: "{{scheme}}://auth.{{domain}}/v2/principal/:uuid/:kind"
+method: GET
+order: 6000

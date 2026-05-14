@@ -1,0 +1,11 @@
+$kind: http-request
+url: "{{scheme}}://cmdesc.{{domain}}/v1/address/:group/:node"
+method: POST
+body:
+  type: json
+  content: |-
+    {
+      "name": "Node Control/Reboot",
+      "value": true
+    }
+order: 1000

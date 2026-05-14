@@ -1,0 +1,10 @@
+$kind: http-request
+url: "{{scheme}}://auth.{{domain}}/v2/principal/:uuid/:kind"
+method: PUT
+body:
+  type: json
+  content: |-
+    {
+      "name": "user@REALM"
+    }
+order: 7000

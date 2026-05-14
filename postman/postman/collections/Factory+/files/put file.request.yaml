@@ -1,0 +1,7 @@
+$kind: http-request
+url: "{{scheme}}://files.{{domain}}/v1/storage/:uuid"
+method: PUT
+body:
+  type: text
+  content: <file body>
+order: 3000

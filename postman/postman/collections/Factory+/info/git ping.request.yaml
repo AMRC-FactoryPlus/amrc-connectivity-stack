@@ -1,0 +1,6 @@
+$kind: http-request
+url: "{{scheme}}://git.{{domain}}/ping"
+method: GET
+auth:
+  type: noauth
+order: 6000

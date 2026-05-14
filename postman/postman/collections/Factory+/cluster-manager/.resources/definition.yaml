@@ -1,0 +1,3 @@
+$kind: collection
+description: Edge Cluster Manager. Cluster provisioning, bootstrap manifests, sealed secret management for edge clusters.
+order: 8000

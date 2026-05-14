@@ -1,0 +1,10 @@
+$kind: http-request
+url: "{{scheme}}://i3x.{{domain}}/v1/relationshiptypes/query"
+method: POST
+body:
+  type: json
+  content: |-
+    {
+      "filter": {}
+    }
+order: 7000

@@ -1,0 +1,7 @@
+$kind: http-request
+url: "{{scheme}}://configdb.{{domain}}/v1/app/:app/config-schema"
+method: PUT
+body:
+  type: json
+  content: "{}"
+order: 6000

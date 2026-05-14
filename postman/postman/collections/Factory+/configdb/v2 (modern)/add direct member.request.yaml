@@ -1,0 +1,4 @@
+$kind: http-request
+url: "{{scheme}}://configdb.{{domain}}/v2/class/:class/direct/member/:object"
+method: PUT
+order: 10000

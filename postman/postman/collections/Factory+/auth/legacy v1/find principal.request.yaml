@@ -1,0 +1,6 @@
+$kind: http-request
+url: "{{scheme}}://auth.{{domain}}/authz/principal/find"
+method: GET
+queryParams:
+  kerberos: user@REALM
+order: 2000

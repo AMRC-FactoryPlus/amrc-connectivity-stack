@@ -1,0 +1,3 @@
+$kind: collection
+description: Kept for the service-client + older callers. New code should use /v2.
+order: 2000

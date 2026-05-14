@@ -1,0 +1,12 @@
+$kind: http-request
+url: "{{scheme}}://i3x.{{domain}}/v1/objects/history"
+method: POST
+body:
+  type: json
+  content: |-
+    {
+      "elementIds": ["<id>"],
+      "from": "2026-05-01T00:00:00Z",
+      "to": "2026-05-14T00:00:00Z"
+    }
+order: 4000

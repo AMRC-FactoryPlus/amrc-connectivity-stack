@@ -1,0 +1,5 @@
+$kind: http-request
+description: Direct members only.
+url: "{{scheme}}://configdb.{{domain}}/v2/class/:class/direct/member"
+method: GET
+order: 9000

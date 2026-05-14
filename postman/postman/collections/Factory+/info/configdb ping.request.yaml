@@ -1,0 +1,6 @@
+$kind: http-request
+url: "{{scheme}}://configdb.{{domain}}/ping"
+method: GET
+auth:
+  type: noauth
+order: 2000

@@ -1,0 +1,13 @@
+$kind: http-request
+url: "{{scheme}}://auth.{{domain}}/v2/grant/:uuid"
+method: PUT
+body:
+  type: json
+  content: |-
+    {
+      "principal": "<uuid>",
+      "permission": "<uuid>",
+      "target": "<uuid>",
+      "plural": false
+    }
+order: 17000

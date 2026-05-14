@@ -1,0 +1,6 @@
+$kind: http-request
+url: "{{scheme}}://auth.{{domain}}/ping"
+method: GET
+auth:
+  type: noauth
+order: 1000

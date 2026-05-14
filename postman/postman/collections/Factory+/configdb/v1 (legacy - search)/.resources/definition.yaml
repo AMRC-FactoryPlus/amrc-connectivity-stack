@@ -1,0 +1,4 @@
+$kind: collection
+name: v1 (legacy / search)
+description: Compatibility surface that mostly forwards to v2. Search lives only here.
+order: 2000

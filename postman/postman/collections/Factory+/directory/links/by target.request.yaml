@@ -1,0 +1,4 @@
+$kind: http-request
+url: "{{scheme}}://directory.{{domain}}/v1/link/target/:target"
+method: GET
+order: 5000

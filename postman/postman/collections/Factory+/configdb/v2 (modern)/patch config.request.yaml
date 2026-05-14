@@ -1,0 +1,10 @@
+$kind: http-request
+url: "{{scheme}}://configdb.{{domain}}/v2/app/:app/object/:object"
+method: PATCH
+body:
+  type: json
+  content: |-
+    {
+      "key": "new-value"
+    }
+order: 20000

@@ -1,0 +1,8 @@
+$kind: http-request
+name: get ACL (?principal=)
+url: "{{scheme}}://auth.{{domain}}/authz/acl"
+method: GET
+queryParams:
+  principal: user@REALM
+  permission: <uuid>
+order: 1000

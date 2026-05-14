@@ -1,0 +1,6 @@
+$kind: http-request
+url: "{{scheme}}://configdb.{{domain}}/v1/app/:app/search"
+method: GET
+queryParams:
+  name: example
+order: 1000

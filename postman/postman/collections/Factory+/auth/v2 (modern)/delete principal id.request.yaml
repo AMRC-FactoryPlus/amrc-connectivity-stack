@@ -1,0 +1,4 @@
+$kind: http-request
+url: "{{scheme}}://auth.{{domain}}/v2/principal/:uuid/:kind"
+method: DELETE
+order: 8000

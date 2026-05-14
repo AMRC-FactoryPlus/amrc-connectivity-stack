@@ -1,0 +1,13 @@
+$kind: http-request
+url: "{{scheme}}://auth.{{domain}}/v2/grant"
+method: POST
+body:
+  type: json
+  content: |-
+    {
+      "principal": "<uuid>",
+      "permission": "<uuid>",
+      "target": "<uuid>",
+      "plural": false
+    }
+order: 15000

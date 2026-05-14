@@ -207,8 +207,8 @@ export class DataFlow {
                 .filter(e => e.permission == perm)
                 .map(e => e.target)
                 .toSet()),
-            rx.tap(ptd => 
-                this.log("Permitted %s for %s: %o", perm, upn, ptd.toJS())));
+            rx.tap(ptd =>
+                this.log("Permitted %s for %s: %o", perm, input, ptd.toJS())));
     }
 
     /** Track a permission, including wildcards.

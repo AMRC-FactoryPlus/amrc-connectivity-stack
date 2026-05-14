@@ -1,0 +1,7 @@
+$kind: http-request
+description: i3x's public /v1/info endpoint. Returns spec version + capability flags.
+url: '{{scheme}}://i3x.{{domain}}/v1/info'
+method: GET
+auth:
+  type: noauth
+order: 8000

@@ -1,0 +1,5 @@
+$kind: http-request
+description: Remove a repo's on-disk storage (does not delete the ConfigDB entry).
+url: "{{scheme}}://git.{{domain}}/v1/storage/:uuid"
+method: DELETE
+order: 4000

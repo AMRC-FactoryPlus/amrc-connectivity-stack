@@ -1,0 +1,10 @@
+$kind: http-request
+url: "{{scheme}}://i3x.{{domain}}/v1/objects/value"
+method: POST
+body:
+  type: json
+  content: |-
+    {
+      "elementIds": ["<id>", "<id>"]
+    }
+order: 3000

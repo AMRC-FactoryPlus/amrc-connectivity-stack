@@ -105,6 +105,7 @@ spec:
               value: git.{{ .Release.Namespace }}.svc.cluster.local
             - name: REALM
               value: {{ .Values.identity.realm | required "values.identity.realm is required!" }}
+{{ include "amrc-connectivity-stack.oidc-env" . | indent 12 }}
             - name: HTTP_API_URL
               value: {{ .Values.acs.secure | ternary "https" "http" }}://git.{{ .Values.acs.baseUrl }}
             - name: DIRECTORY_URL

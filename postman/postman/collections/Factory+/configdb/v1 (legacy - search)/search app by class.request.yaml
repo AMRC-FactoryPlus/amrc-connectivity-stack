@@ -1,0 +1,6 @@
+$kind: http-request
+url: '{{scheme}}://configdb.{{domain}}/v1/app/:app/class/:class/search'
+method: GET
+queryParams:
+  '@group': group_id
+order: 2000

@@ -1,0 +1,4 @@
+$kind: http-request
+url: '{{scheme}}://git.{{domain}}/ping'
+method: GET
+order: 6000

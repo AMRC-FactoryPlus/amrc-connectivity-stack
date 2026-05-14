@@ -108,6 +108,7 @@ spec:
               value: configdb.{{ .Release.Namespace }}.svc.cluster.local
             - name: REALM
               value: {{ .Values.identity.realm | required "values.identity.realm is required!" }}
+{{ include "amrc-connectivity-stack.oidc-env" . | indent 12 }}
             - name: DEVICE_UUID
               value: 36861e8d-9152-40c4-8f08-f51c2d7e3c25
             - name: SPARKPLUG_ADDRESS

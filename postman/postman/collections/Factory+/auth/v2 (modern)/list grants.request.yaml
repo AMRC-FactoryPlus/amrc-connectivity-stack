@@ -1,0 +1,4 @@
+$kind: http-request
+url: '{{scheme}}://auth.{{domain}}/v2/grant'
+method: GET
+order: 14000

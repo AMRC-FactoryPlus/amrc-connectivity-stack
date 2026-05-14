@@ -1,0 +1,4 @@
+$kind: http-request
+url: '{{scheme}}://directory.{{domain}}/v1/address/:group'
+method: GET
+order: 2000

@@ -1,0 +1,4 @@
+$kind: http-request
+url: '{{scheme}}://configdb.{{domain}}/v1/app/:app/config-schema'
+method: GET
+order: 5000

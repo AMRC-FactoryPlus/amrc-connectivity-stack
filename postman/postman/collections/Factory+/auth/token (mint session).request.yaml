@@ -1,0 +1,5 @@
+$kind: http-request
+description: Mint an opaque F+ session token. Authenticate with Basic/Negotiate; the token then represents your identity to THIS service only. Not needed for JWT callers - the JWT itself acts as the token.
+url: "{{scheme}}://auth.{{domain}}/token"
+method: POST
+order: 4000

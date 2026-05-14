@@ -1,0 +1,3 @@
+$kind: collection
+description: Sparkplug device/node registry. Lists running devices, their history, service advertisements, alerts, schemas, and inter-object links.
+order: 4000

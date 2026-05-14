@@ -1,0 +1,4 @@
+$kind: http-request
+url: '{{scheme}}://clusters.{{domain}}/ping'
+method: GET
+order: 7000

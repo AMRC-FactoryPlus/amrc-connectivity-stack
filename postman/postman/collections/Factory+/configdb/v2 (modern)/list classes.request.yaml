@@ -1,0 +1,5 @@
+$kind: http-request
+description: Members of Class.Class.
+url: '{{scheme}}://configdb.{{domain}}/v2/class'
+method: GET
+order: 6000

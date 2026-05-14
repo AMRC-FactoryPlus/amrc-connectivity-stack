@@ -1,0 +1,6 @@
+$kind: collection
+description: |-
+  Git repository hosting (git-http-backend over HTTP) plus storage management.
+
+  The /git/:group/:repo/* and /uuid/:uuid/* paths serve the git smart HTTP protocol (clone/push/fetch) - they aren't useful in Postman, use `git` itself. The /v1 endpoints are for storage management.
+order: 7000

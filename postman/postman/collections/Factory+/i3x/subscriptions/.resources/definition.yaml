@@ -1,0 +1,3 @@
+$kind: collection
+description: Live value subscriptions. Stream via SSE or poll via sync.
+order: 3000

@@ -1,0 +1,3 @@
+$kind: collection
+description: Objects + classes + per-app configuration documents.
+order: 1000

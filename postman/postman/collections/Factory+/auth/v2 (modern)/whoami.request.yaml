@@ -1,0 +1,6 @@
+$kind: http-request
+description: Returns the full identity record for the calling principal. With a Keycloak JWT, fp_principal_uuid is used to
+  look up the record.
+url: '{{scheme}}://auth.{{domain}}/v2/whoami'
+method: GET
+order: 1000

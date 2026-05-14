@@ -1,0 +1,10 @@
+$kind: http-request
+url: "{{scheme}}://i3x.{{domain}}/v1/subscriptions/sync"
+method: POST
+body:
+  type: json
+  content: |-
+    {
+      "subscriptionId": "<id>"
+    }
+order: 7000

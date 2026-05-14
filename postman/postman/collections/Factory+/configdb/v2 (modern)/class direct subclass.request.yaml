@@ -1,0 +1,4 @@
+$kind: http-request
+url: '{{scheme}}://configdb.{{domain}}/v2/class/:class/direct/subclass'
+method: GET
+order: 13000

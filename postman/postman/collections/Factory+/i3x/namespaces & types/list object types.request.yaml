@@ -1,0 +1,4 @@
+$kind: http-request
+url: '{{scheme}}://i3x.{{domain}}/v1/objecttypes'
+method: GET
+order: 2000

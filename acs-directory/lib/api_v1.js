@@ -230,7 +230,14 @@ export default class API {
     }
 
     acl (principal) {
-        return this.fplus.Auth.fetch_auth_acl("kerberos", principal);
+        /* `principal` is whatever the auth middleware put on req.auth -
+         * a Kerberos UPN for Basic / Negotiate / opaque-token callers,
+         * a principal UUID for JWT callers. Pick the identity type from
+         * the shape: hard-coding "kerberos" 404s on a UUID input and
+         * the resulting NotifyError crashes the webapi pod. */
+        const type = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+            .test(principal) ? "uuid" : "kerberos";
+        return this.fplus.Auth.fetch_auth_acl(type, principal);
     }
 
     async alert_list (active_only, req, res) {

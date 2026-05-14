@@ -143,25 +143,165 @@ curl -H "Authorization: Bearer $JWT" \
     "https://i3x.<acs-base>/v1/things/<uuid>"
 ```
 
+## Which services accept JWTs
+
+Every F+ service that picks up the new `lib/js-service-api` accepts
+JWTs by default on the `Authorization: Bearer` header. On a current
+deployment that's:
+
+- `acs-auth` (with the caveat that `req.auth` is the principal UUID
+  when authenticated via JWT - identity-resolution endpoints handle
+  this internally)
+- `acs-configdb`
+- `acs-directory`
+- `acs-cmdesc`
+- `acs-files`
+- `acs-git`
+- `acs-cluster-manager` (clusters subdomain)
+- `acs-i3x`
+
+The chart wires `OIDC_DISCOVERY_URL` into all eight services via the
+shared `amrc-connectivity-stack.oidc-env` helper, so opting a new
+service in is a single-line include in its deployment template.
+
 ## How services validate the JWT
 
-Every F+ service that uses `lib/js-service-api` accepts JWTs on the
-`Authorization: Bearer` header. The middleware:
+The auth middleware in `lib/js-service-api`:
 
 1. Notices the token is a JWT (3 base64url segments with a JWT
    header), as opposed to the existing opaque session tokens which
    have no dots.
 2. Lazily fetches the configured Keycloak's JWKS via
-   `OIDC_DISCOVERY_URL` (set by the chart).
-3. Validates signature, issuer, and expiry.
-4. Reads `fp_principal_uuid` from the JWT and sets `req.auth` to it.
+   `OIDC_DISCOVERY_URL` (the URL is set by the chart). The fetch is
+   on first JWT seen, not at service start - so Keycloak being
+   unavailable at boot doesn't break the service.
+3. Validates signature, issuer, and expiry against the realm's
+   public keys. `jose` handles JWKS caching and `kid` rotation
+   internally.
+4. Reads `fp_principal_uuid` from the JWT and sets `req.auth` to
+   that UUID. Existing ACL logic on `req.auth` is unchanged: the
+   service-client and auth-service both normalise UUID and UPN
+   inputs so the same ACL pipeline runs regardless of which auth
+   path the caller used.
 5. Stashes the raw JWT in an AsyncLocalStorage scope so the
-   service-client can forward it on outbound calls to other F+
-   services. Existing ACL logic on `req.auth` is unchanged.
+   service-client can forward it on outbound calls (see below).
 
 If `OIDC_DISCOVERY_URL` is unset (openid disabled in the chart) the
 middleware simply doesn't accept JWTs - opaque tokens, Basic, and
 Negotiate continue working as before.
+
+## Identity forwarding on outbound calls
+
+When a JWT-authenticated request inside an F+ service makes outbound
+calls to other F+ services, `lib/js-service-client` forwards the
+same JWT verbatim. Application code is unchanged: where you would
+have written
+
+```js
+await fplus.ConfigDB.get_config(app, object);
+```
+
+the service-client picks up the inbound JWT from AsyncLocalStorage
+and sends it on the downstream HTTP request as `Authorization:
+Bearer <same JWT>`. The downstream service validates the JWT itself
+and runs ACLs against the original user's principal.
+
+What this means in practice: when acs-i3x receives a third-party
+request and fans out to ConfigDB / Directory / Influx, the user's
+identity is preserved end-to-end. No token-exchange step. No
+per-service token cache. No special "on-behalf-of" plumbing in
+service handlers.
+
+If there's no JWT in scope (an existing Kerberos- or Basic-
+authenticated request), service-client keeps doing exactly what it
+did before: negotiate Kerberos, mint a per-service opaque session
+token, reuse for the request lifetime.
+
+## Verifying it on a cluster
+
+After a fresh deploy, the [JWT auth test playbook](../plans/2026-05-13-jwt-auth-test-playbook.md)
+walks through end-to-end verification: confirming the Keycloak
+client is provisioned, the env var is set on every service,
+obtaining a JWT, hitting i3x as yourself, watching identity forward
+through to ConfigDB in the logs, and regression-testing the existing
+auth methods.
+
+## Requirements
+
+- ACS **v5.2.0-i3x.6 or newer** (the JWT auth feature shipped on that
+  release). Older releases reject Keycloak JWTs and fall back to
+  Basic / Negotiate / opaque Bearer.
+- `openid.enabled: true` in your Helm values (the default).
+- Operators upgrading from an older release: `helm upgrade` is
+  sufficient. service-setup will provision the `acs-cli` client
+  automatically and wire `OIDC_DISCOVERY_URL` into every F+ service.
+
+## Troubleshooting
+
+### `401 Unauthorized` on every request
+
+The JWT isn't reaching validation. Check, in order:
+
+1. Token has Bearer prefix on the wire (`Authorization: Bearer <jwt>`,
+   not `Authorization: <jwt>`).
+2. Token hasn't expired:
+   ```sh
+   echo "$JWT" | cut -d. -f2 | base64 -d 2>/dev/null | jq .exp
+   ```
+3. Issuer in the JWT matches what the service expects:
+   ```sh
+   echo "$JWT" | cut -d. -f2 | base64 -d 2>/dev/null | jq .iss
+   kubectl exec -n <ns> deploy/<service> -- env | grep OIDC_DISCOVERY_URL
+   ```
+4. Service can reach Keycloak:
+   ```sh
+   kubectl exec -n <ns> deploy/<service> -- \
+     wget -qO- "$OIDC_DISCOVERY_URL" | jq .jwks_uri
+   ```
+5. Service log shows the actual rejection reason:
+   ```sh
+   kubectl logs -n <ns> deploy/<service> --tail=50 | grep -iE "auth|jwt"
+   ```
+
+### `403 Forbidden`
+
+Auth succeeded; you don't have permission. Hit `/v2/whoami/uuid` on
+auth to confirm the principal UUID, then `/v2/acl/<that-uuid>` to see
+your grants. The principal exists but lacks the right grant for the
+resource you're hitting.
+
+### Service has no `OIDC_DISCOVERY_URL`
+
+Means the chart upgrade didn't apply the new helper to that
+deployment, or the deployment template was missed when the helper
+was added. Confirm with:
+
+```sh
+for d in auth configdb directory i3x cmdesc files git cluster-manager; do
+  v=$(kubectl get deploy -n <ns> $d \
+    -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="OIDC_DISCOVERY_URL")].value}')
+  echo "$d: ${v:-<MISSING>}"
+done
+```
+
+A missing entry on a service that exists in the cluster needs a
+chart fix (add `{{ include "amrc-connectivity-stack.oidc-env" . | indent 12 }}`
+to its env block) and a redeploy.
+
+### Browser-built bundles fail to compile with `node:async_hooks`
+
+If you import service-client into a browser-bundled app (acs-admin
+via Vite, or anything similar), make sure you're on lib/js-service-client
+≥ 1.6.0. Earlier versions did a static `import` of `node:async_hooks`
+which fails when bundling for the browser; the current version uses
+a dynamic import with a no-op stub for browser callers.
+
+### Keycloak is down at service start
+
+Services start fine; JWKS is fetched lazily on the first JWT seen.
+Any incoming JWT request during a Keycloak outage gets a 401 with a
+network-error log; normal behaviour resumes when Keycloak is back.
+Cold-start order is not load-bearing.
 
 ## What's deliberately out of scope
 

@@ -18,6 +18,26 @@ Most of the components deployed by ACS are implementations of the core component
 * [Edge clusters: Bootstrap process](docs/architecture/edge-management/edge-bootstrap.md)
 * [Internal Git server](./docs/services/git-server.md)
 
+## Authentication
+
+ACS services accept three forms of authentication on HTTP endpoints:
+
+* **Kerberos (Negotiate / Basic)** for service-to-service and
+  cluster-internal callers - the historical path, still the default
+  for anything authenticated by a keytab.
+* **OAuth / OIDC tokens** for web applications signing users in
+  through Keycloak. See [Connecting OAuth applications](docs/services/oauth-clients.md)
+  for adding your own OIDC client (Grafana is the reference example).
+* **Direct Keycloak JWT** for human users or scripts hitting an ACS
+  API directly with Postman, curl, or any tool that isn't a full
+  OAuth web app. See [Direct API access with a Keycloak JWT](docs/services/cli-and-jwt.md)
+  for the Authorization Code + PKCE flow, plus a [ready-to-import
+  Postman collection](postman/) covering every HTTP-facing F+
+  service.
+
+All three are accepted on the same `Authorization` header; services
+detect the scheme on the wire and validate accordingly.
+
 ## Future work
 
 These are proposals for potential future work.

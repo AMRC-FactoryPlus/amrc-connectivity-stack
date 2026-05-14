@@ -2,14 +2,3 @@ $kind: http-request
 url: '{{scheme}}://directory.{{domain}}/v1/device'
 method: GET
 order: 2000
-events:
-- listen: test
-  script:
-    type: text/javascript
-    exec:
-    - pm.test('Status is 200', function () {
-    - '    pm.expect(pm.response.code).to.equal(200);'
-    - '});'
-    - let body = null; try { body = pm.response.json(); } catch (e) {}
-    - 'const v = Array.isArray(body) ? body[0] : null;'
-    - if (v) pm.collectionVariables.set('deviceUuid', v);

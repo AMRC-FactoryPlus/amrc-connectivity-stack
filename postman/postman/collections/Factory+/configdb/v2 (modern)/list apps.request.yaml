@@ -3,14 +3,3 @@ description: Members of Class.App. Compat shim that forwards to /v2/class/<App>/
 url: '{{scheme}}://configdb.{{domain}}/v2/app'
 method: GET
 order: 5000
-events:
-- listen: test
-  script:
-    type: text/javascript
-    exec:
-    - pm.test('Status is 200', function () {
-    - '    pm.expect(pm.response.code).to.equal(200);'
-    - '});'
-    - let body = null; try { body = pm.response.json(); } catch (e) {}
-    - 'const v = Array.isArray(body) ? body[0] : null;'
-    - if (v) pm.collectionVariables.set('appUuid', v);

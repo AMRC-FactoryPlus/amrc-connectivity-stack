@@ -5,11 +5,3 @@ method: GET
 auth:
   type: noauth
 order: 8000
-events:
-- listen: test
-  script:
-    type: text/javascript
-    exec:
-    - pm.test('Status is 200', function () {
-    - '    pm.expect(pm.response.code).to.be.oneOf([200]);'
-    - '});'

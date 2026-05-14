@@ -55,47 +55,13 @@ requests for the rest of the SSO session without re-authenticating.
 Every request inherits the collection-level OAuth, so just open any
 folder and click **Send**.
 
+Requests with placeholders (`:uuid`, `:app`, `:object`, etc.) expose
+them in the **Path Variables** table below the URL bar - fill those
+in rather than editing the raw URL.
+
 The `info` folder's pings opt out of auth so you can smoke-test
 reachability before getting a token. (i3x's `/v1/info` is the only
 non-ping that's publicly routed.)
-
-## Running the whole collection
-
-Right-click the collection → **Run collection** (or hit the play arrow
-next to its name). The Collection Runner sends every GET in order,
-executes its test scripts, and shows pass/fail per-request.
-
-A collection-level pre-request script skips anything that isn't a GET,
-so POST/PUT/PATCH/DELETE requests stay in the collection (useful for
-ad-hoc manual use) but never fire during a Run. You'll see them
-listed as "skipped" in the Runner output, with the skip reason in the
-console (`[skip] POST <name>`).
-
-## Test scripts and live data
-
-Each GET request has tests attached that assert the response status
-is what we expect from an authenticated admin. There's no hand-coded
-list of UUIDs - the collection chains itself:
-
-1. **List endpoints set collection variables.** `auth/v2/whoami (uuid
-   only)` runs first and stashes the caller's UUID into
-   `principalUuid`. Other list endpoints follow the same pattern:
-   `list devices` sets `deviceUuid`, `list classes` sets `classUuid`,
-   etc.
-2. **Get-by-id endpoints reference those variables.** `get principal`'s
-   URL is `/v2/principal/{{principalUuid}}` rather than a hardcoded
-   UUID, so it works against any cluster.
-3. **Assertions are strict by default.** Lists expect 200. Get-by-id
-   requests expect 200 or 404 (404 only if the upstream list returned
-   empty / wasn't run). Anything else - 401, 403, 5xx, 400 - fails.
-
-The variables show up under the collection's **Variables** tab with
-empty initial values; they get populated as the run progresses. Open
-that tab during a run to watch them fill in.
-
-If a get-by-id test fails because a variable is empty, the failure
-message points you at the upstream list endpoint that should have
-populated it.
 
 ## Switching clusters
 

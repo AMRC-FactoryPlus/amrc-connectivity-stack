@@ -150,11 +150,11 @@ export class APIv2 {
             .every(p => acl(p, klass, true));
         if (!ok) return res.status(403).end();
 
-        const members = await this.model.class_lookup(klass, "membership");
-        const subclasses = await this.model.class_lookup(klass, "subclasses");
+        const members = await this.model.class_lookup(klass, "all_membership");
+        const subclasses = await this.model.class_lookup(klass, "all_subclass");
 
         if (!members && !subclasses)
-            return res.status(404);
+            return res.status(404).end();
 
         return res.status(200).json({ members, subclasses });
     }

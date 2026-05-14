@@ -62,8 +62,14 @@ non-ping that's publicly routed.)
 ## Running the whole collection
 
 Right-click the collection → **Run collection** (or hit the play arrow
-next to its name). The Collection Runner sends every request in order,
+next to its name). The Collection Runner sends every GET in order,
 executes its test scripts, and shows pass/fail per-request.
+
+A collection-level pre-request script skips anything that isn't a GET,
+so POST/PUT/PATCH/DELETE requests stay in the collection (useful for
+ad-hoc manual use) but never fire during a Run. You'll see them
+listed as "skipped" in the Runner output, with the skip reason in the
+console (`[skip] POST <name>`).
 
 ## Test scripts and live data
 

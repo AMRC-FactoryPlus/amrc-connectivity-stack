@@ -64,6 +64,18 @@ export interface MetricMeta {
 }
 
 /**
+ * One UNS-source descendant captured before a device subtree is rebuilt,
+ * so replaceDeviceSubtree can re-graft it under its original parent if
+ * that parent survives in the new tree.
+ */
+interface UnsCapture {
+    id: string;
+    obj: I3xObject;
+    parentId: string;
+    meta: MetricMeta | undefined;
+}
+
+/**
  * Origin of a node in the tree.
  *  - "config" : derived from ConfigDB (DeviceInformation originMap,
  *               ISA-95 hierarchy, device-level objects).
@@ -236,6 +248,181 @@ export class ObjectTree {
     /** Test-facing inspector for a node's origin. */
     getNodeSource(elementId: string): NodeSource | undefined {
         return this.snapshot.sources.get(elementId);
+    }
+
+    /* ---- Synchronous per-device / per-schema mutations ----
+     *
+     * Used by the reactive pipeline (lib/refresh.ts) to splice changes
+     * into the live snapshot in place, instead of rebuilding the whole
+     * tree on every ConfigDB event. All methods are synchronous — no
+     * awaits between writes — so readers see consistent state between
+     * event-loop turns, same atomicity guarantee as the swap path.
+     */
+
+    /**
+     * Add a device and its full subtree (including ISA-95 ancestors and
+     * metric tree from the originMap) to the live snapshot.
+     */
+    addDevice(uuid: string, devInfo: any, info: any): void {
+        this.buildDeviceInSnapshot(uuid, devInfo, info, this.snapshot);
+    }
+
+    /**
+     * Remove a device, its entire descendant subtree (config and UNS
+     * alike), and any ISA-95 ancestor that becomes childless as a
+     * result.
+     */
+    removeDevice(uuid: string): void {
+        const target = this.snapshot;
+        const device = target.objects.get(uuid);
+        if (!device) return;
+
+        const ancestors = this.collectIsa95Ancestors(device, target);
+
+        this.removeSubtree(uuid, target);
+        if (device.parentId !== null) {
+            target.children.get(device.parentId)?.delete(uuid);
+        }
+
+        this.cleanupOrphanAncestors(ancestors, target);
+    }
+
+    /**
+     * Replace a device's config-source subtree from a new DeviceInformation
+     * config, preserving UNS-discovered descendants whose parents survive
+     * the rebuild. The device's elementId is stable (its ConfigDB UUID).
+     */
+    replaceDeviceSubtree(uuid: string, devInfo: any, info: any): void {
+        const target = this.snapshot;
+        const oldDevice = target.objects.get(uuid);
+        if (!oldDevice) {
+            this.addDevice(uuid, devInfo, info);
+            return;
+        }
+
+        const oldAncestors = this.collectIsa95Ancestors(oldDevice, target);
+        const unsCaptures = this.captureUnsDescendants(uuid, target);
+
+        this.removeSubtree(uuid, target);
+        if (oldDevice.parentId !== null) {
+            target.children.get(oldDevice.parentId)?.delete(uuid);
+        }
+        this.cleanupOrphanAncestors(oldAncestors, target);
+
+        this.buildDeviceInSnapshot(uuid, devInfo, info, target);
+
+        // Re-graft UNS descendants whose parent now exists in the new tree
+        for (const cap of unsCaptures) {
+            if (!target.objects.has(cap.parentId)) continue; // orphan
+            if (target.objects.has(cap.id)) continue;         // superseded by config
+            target.objects.set(cap.id, cap.obj);
+            target.sources.set(cap.id, "uns");
+            if (cap.meta) target.metricMeta.set(cap.id, cap.meta);
+            if (!target.children.has(cap.parentId)) {
+                target.children.set(cap.parentId, new Set());
+            }
+            target.children.get(cap.parentId)!.add(cap.id);
+        }
+    }
+
+    /** Update only the device's displayName. */
+    updateDeviceName(uuid: string, displayName: string): void {
+        const obj = this.snapshot.objects.get(uuid);
+        if (obj) obj.displayName = displayName;
+    }
+
+    /** Create or replace an ObjectType in the live snapshot. */
+    addObjectType(uuid: string, schema: any, info: any): void {
+        this.buildObjectTypeInSnapshot(uuid, schema, info, this.snapshot);
+    }
+
+    /** Update an ObjectType in place. Equivalent to addObjectType. */
+    updateObjectType(uuid: string, schema: any, info: any): void {
+        this.buildObjectTypeInSnapshot(uuid, schema, info, this.snapshot);
+    }
+
+    /** Remove an ObjectType. Doesn't touch objects that reference it. */
+    removeObjectType(uuid: string): void {
+        this.snapshot.objectTypes.delete(uuid);
+    }
+
+    /* ---- mutation helpers ---- */
+
+    /** Walk up the parent chain, collecting ISA-95 ancestor IDs. */
+    private collectIsa95Ancestors(obj: I3xObject, target: TreeSnapshot): string[] {
+        const out: string[] = [];
+        let parentId = obj.parentId;
+        while (parentId !== null && parentId !== "/") {
+            out.push(parentId);
+            const parent = target.objects.get(parentId);
+            if (!parent) break;
+            parentId = parent.parentId;
+        }
+        return out;
+    }
+
+    /**
+     * Walk the given ISA-95 ancestor chain bottom-up, removing each node
+     * that has no remaining children. Stops at the first node that still
+     * has children (e.g. parent of another device).
+     */
+    private cleanupOrphanAncestors(ancestors: string[], target: TreeSnapshot): void {
+        for (const ancestorId of ancestors) {
+            const childSet = target.children.get(ancestorId);
+            if (childSet && childSet.size > 0) break;
+            const ancestor = target.objects.get(ancestorId);
+            if (!ancestor) continue;
+            target.objects.delete(ancestorId);
+            target.sources.delete(ancestorId);
+            target.children.delete(ancestorId);
+            if (ancestor.parentId !== null) {
+                target.children.get(ancestor.parentId)?.delete(ancestorId);
+            }
+        }
+    }
+
+    /** Recursively remove a subtree from `target`. */
+    private removeSubtree(id: string, target: TreeSnapshot): void {
+        const childIds = target.children.get(id);
+        if (childIds) {
+            for (const childId of childIds) {
+                this.removeSubtree(childId, target);
+            }
+            target.children.delete(id);
+        }
+        target.objects.delete(id);
+        target.sources.delete(id);
+        target.metricMeta.delete(id);
+    }
+
+    /**
+     * Pre-order walk of the subtree rooted at `rootId`, collecting every
+     * UNS-source node with its original parent pointer. Pre-order means
+     * parents appear before children in the result, which is what
+     * replaceDeviceSubtree's re-graft loop relies on.
+     */
+    private captureUnsDescendants(rootId: string, target: TreeSnapshot): UnsCapture[] {
+        const out: UnsCapture[] = [];
+        const visit = (id: string) => {
+            const childIds = target.children.get(id);
+            if (!childIds) return;
+            for (const childId of childIds) {
+                if (target.sources.get(childId) === "uns") {
+                    const obj = target.objects.get(childId);
+                    if (obj && obj.parentId !== null) {
+                        out.push({
+                            id: childId,
+                            obj,
+                            parentId: obj.parentId,
+                            meta: target.metricMeta.get(childId),
+                        });
+                    }
+                }
+                visit(childId);
+            }
+        };
+        visit(rootId);
+        return out;
     }
 
     isReady(): boolean {

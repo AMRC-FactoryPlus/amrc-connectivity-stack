@@ -33,6 +33,13 @@ declare module "@amrc-factoryplus/rx-client" {
     export const Interfaces: any;
 }
 
+declare module "@amrc-factoryplus/rx-util" {
+    export function cacheSeq(opts: any): (arg: any) => any;
+    export function shareLatest(...args: any[]): any;
+    export const Response: any;
+    export function rx(...args: any[]): any;
+}
+
 declare module "@amrc-factoryplus/service-api" {
     export class WebAPI {
         constructor(opts: any);

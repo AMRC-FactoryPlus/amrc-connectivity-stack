@@ -497,4 +497,115 @@ describe("ObjectTree", () => {
             expect(tree.getObject(dev1)).toBeDefined();
         });
     });
+
+    describe("refreshFromSnapshot (pipeline path)", () => {
+        // Build a PipelineSnapshot directly, bypassing HTTP. Mirrors the
+        // shape that lib/refresh.ts produces from notify-v2 watches.
+        function snapshot(opts: {
+            dev1: string; dev2: string;
+            class1: string; class2: string;
+            schema1: any; schema2: any;
+            instance1: string; instance2: string;
+        }) {
+            const mkDevInfo = (schemaUuid: string, instanceUuid: string, sparkplugName: string) => ({
+                schema: schemaUuid,
+                sparkplugName,
+                originMap: {
+                    Schema_UUID: schemaUuid,
+                    Instance_UUID: instanceUuid,
+                    Device_Information: {
+                        Schema_UUID: "2dd093e9-1450-44c5-be8c-c0d78e48219b",
+                        ISA95_Hierarchy: {
+                            Schema_UUID: HIERARCHY_SCHEMA_UUID,
+                            Enterprise: { Value: "AMRC" },
+                            Site: { Value: "F2050" },
+                        },
+                    },
+                },
+            });
+            // The pipeline collects every Schema_UUID referenced in the
+            // device originMaps and watches each one — so the snapshot
+            // includes the nested DeviceInformation + Hierarchy schemas
+            // (returned null by the real ConfigDB in this test fixture).
+            const DEVICE_INFO_SCHEMA = "2dd093e9-1450-44c5-be8c-c0d78e48219b";
+            return {
+                devices: new Map([
+                    [opts.dev1, { devInfo: mkDevInfo(opts.class1, opts.instance1, "Dev1"), info: { name: "Device 1" } }],
+                    [opts.dev2, { devInfo: mkDevInfo(opts.class2, opts.instance2, "Dev2"), info: { name: "Device 2" } }],
+                ]),
+                schemas: new Map<string, { schema: any; info: any }>([
+                    [opts.class1, { schema: opts.schema1, info: { name: "CNC Machine" } }],
+                    [opts.class2, { schema: opts.schema2, info: { name: "Robot" } }],
+                    [DEVICE_INFO_SCHEMA, { schema: null, info: null }],
+                    [HIERARCHY_SCHEMA_UUID, { schema: null, info: null }],
+                ]),
+            };
+        }
+
+        it("produces the same Objects and ObjectTypes as the HTTP loadDevices path", async () => {
+            // Build one tree via the HTTP path
+            const fplusHttp = createMockFplus();
+            const opts = setupMockDevices(fplusHttp);
+            const treeHttp = makeTree(fplusHttp);
+            await treeHttp.init();
+
+            // Build a second tree via the pipeline path
+            const treeP = makeTree();
+            await treeP.init(); // empty bootstrap
+            treeP.refreshFromSnapshot(snapshot(opts));
+
+            // Same set of object IDs
+            const httpIds = new Set(treeHttp.getObjects().map(o => o.elementId));
+            const pIds = new Set(treeP.getObjects().map(o => o.elementId));
+            expect(pIds).toEqual(httpIds);
+
+            // Same set of ObjectType IDs
+            const httpTypeIds = new Set(treeHttp.getObjectTypes().map(t => t.elementId));
+            const pTypeIds = new Set(treeP.getObjectTypes().map(t => t.elementId));
+            expect(pTypeIds).toEqual(httpTypeIds);
+
+            // Same device-level metadata for each device
+            for (const dev of [opts.dev1, opts.dev2]) {
+                const a = treeHttp.getObject(dev)!;
+                const b = treeP.getObject(dev)!;
+                expect(b.typeElementId).toBe(a.typeElementId);
+                expect(b.displayName).toBe(a.displayName);
+                expect(b.parentId).toBe(a.parentId);
+            }
+        });
+
+        it("atomically swaps the snapshot — no HTTP calls made", () => {
+            const fplus = createMockFplus();
+            const opts = setupMockDevices(fplus);
+            const tree = makeTree(fplus);
+
+            // Reset call counts after construction
+            fplus.ConfigDB.class_members.mockClear();
+            fplus.ConfigDB.get_config.mockClear();
+
+            tree.refreshFromSnapshot(snapshot(opts));
+
+            // refreshFromSnapshot must not hit the network
+            expect(fplus.ConfigDB.class_members).not.toHaveBeenCalled();
+            expect(fplus.ConfigDB.get_config).not.toHaveBeenCalled();
+
+            // Tree state matches the pipeline input
+            expect(tree.getObject(opts.dev1)).toBeDefined();
+            expect(tree.getObject(opts.dev2)).toBeDefined();
+            expect(tree.getObjectType(opts.class1)).toBeDefined();
+            expect(tree.getObjectType(opts.class2)).toBeDefined();
+        });
+
+        it("skips devices whose devInfo is null (entry inaccessible)", async () => {
+            const tree = makeTree();
+            await tree.init();
+            tree.refreshFromSnapshot({
+                devices: new Map([
+                    ["dev-missing", { devInfo: null, info: null }],
+                ]),
+                schemas: new Map(),
+            });
+            expect(tree.getObject("dev-missing")).toBeUndefined();
+        });
+    });
 });

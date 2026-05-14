@@ -43,6 +43,17 @@ interface ObjectTreeOpts {
     namespaceUri: string;
 }
 
+/**
+ * Input to refreshFromSnapshot — pre-fetched ConfigDB state from the
+ * reactive pipeline. Keys are the corresponding ConfigDB object UUIDs.
+ * `devInfo`/`info`/`schema` are config bodies (or null when the entry is
+ * missing or inaccessible).
+ */
+export interface PipelineSnapshot {
+    devices: Map<string, { devInfo: any; info: any }>;
+    schemas: Map<string, { schema: any; info: any }>;
+}
+
 /** InfluxDB query metadata for a leaf metric object. */
 export interface MetricMeta {
     topLevelInstanceUuid: string;
@@ -126,6 +137,22 @@ export class ObjectTree {
         // discarded by the swap; the next UNS message per topic rebuilds them.
         const next = emptySnapshot();
         await this.loadDevices(next);
+        this.snapshot = next;
+    }
+
+    /**
+     * Rebuild the snapshot from configs already fetched by the reactive
+     * pipeline. Same atomic-swap semantics as refresh(), but no HTTP — the
+     * caller has done the fetching via notify-v2 watches.
+     */
+    refreshFromSnapshot(input: PipelineSnapshot): void {
+        const next = emptySnapshot();
+        for (const [uuid, { devInfo, info }] of input.devices) {
+            this.buildDeviceInSnapshot(uuid, devInfo, info, next);
+        }
+        for (const [schemaUuid, { schema, info }] of input.schemas) {
+            this.buildObjectTypeInSnapshot(schemaUuid, schema, info, next);
+        }
         this.snapshot = next;
     }
 
@@ -578,56 +605,7 @@ export class ObjectTree {
                 this.fplus.ConfigDB.get_config(INFO_APP_UUID, uuid).catch(() => null),
             ]);
 
-            if (!devInfo) {
-                this.log("loadDevices: no DeviceInformation config for %s, skipping", uuid);
-                continue;
-            }
-
-            // Schema_UUID from the DeviceInformation config
-            const schemaUuid = devInfo.schema ?? devInfo.originMap?.Schema_UUID;
-            if (!schemaUuid) {
-                this.log("loadDevices: no Schema_UUID for %s, skipping", uuid);
-                continue;
-            }
-            schemaUuids.add(schemaUuid);
-
-            // Find ISA-95 hierarchy by searching for the Hierarchy-v1 Schema_UUID
-            const hierarchyObj = this.findBySchemaUuid(devInfo.originMap, HIERARCHY_SCHEMA_UUID);
-            const isa95Segments = hierarchyObj ? this.extractIsa95Segments(hierarchyObj) : [];
-
-            if (isa95Segments.length === 0) {
-                // Default to <namespace>/Unknown for devices without ISA-95
-                isa95Segments.push(this.namespaceName, "Unknown");
-                this.log("loadDevices: no ISA-95 for %s, placing under Unknown", uuid);
-            } else {
-                this.log("loadDevices: ISA-95 hierarchy for %s: %o", uuid, isa95Segments);
-            }
-
-            // Display name: prefer Info app name, then sparkplugName from config
-            const displayName = nameInfo?.name ?? devInfo.sparkplugName ?? uuid;
-
-            // Create the device object — initially at "/" (re-parented below if ISA-95 exists)
-            const obj = toI3xObject(
-                uuid,
-                displayName,
-                schemaUuid,
-                "/",
-                true,
-            );
-            target.objects.set(uuid, obj);
-
-            // Place under ISA-95 hierarchy if available
-            if (isa95Segments.length > 0) {
-                this.ensureIsa95Hierarchy(isa95Segments, uuid, target);
-            }
-
-            // Build the full metric tree from the originMap
-            if (devInfo.originMap) {
-                this.buildTreeFromOriginMap(devInfo.originMap, uuid, uuid, "", target);
-                this.collectSchemaUuids(devInfo.originMap, schemaUuids);
-                this.log("loadDevices: built metric tree for %s, children=%d",
-                    uuid, target.children.get(uuid)?.size ?? 0);
-            }
+            this.buildDeviceInSnapshot(uuid, devInfo, nameInfo, target, schemaUuids);
         }
 
         // For each unique schema, get its JSON schema definition and create ObjectType
@@ -640,19 +618,89 @@ export class ObjectTree {
                 this.fplus.ConfigDB.get_config(CONFIG_SCHEMA_APP_UUID, schemaUuid).catch(() => null),
                 this.fplus.ConfigDB.get_config(INFO_APP_UUID, schemaUuid).catch(() => null),
             ]);
-            const displayName = info?.name ?? schema?.title ?? schemaUuid;
-            const objType = toI3xObjectType(
-                schemaUuid,
-                displayName,
-                this.namespaceUri,
-                schemaUuid,
-                schema ?? {},
-            );
-            target.objectTypes.set(schemaUuid, objType);
-            this.log("loadDevices: created ObjectType %s (%s)", schemaUuid, displayName);
+            this.buildObjectTypeInSnapshot(schemaUuid, schema, info, target);
         }
 
         this.log("loadDevices: complete, devices=%d types=%d",
             target.objects.size, target.objectTypes.size);
+    }
+
+    /**
+     * Place one device (and its metric subtree) into `target` from a
+     * pre-fetched DeviceInformation + Info config. Mirrors the per-device
+     * logic in loadDevices() but takes the configs as arguments instead
+     * of fetching them. `schemaUuids` accumulates every Schema_UUID
+     * referenced from the device's originMap, so callers can create the
+     * matching ObjectTypes afterwards.
+     */
+    private buildDeviceInSnapshot(
+        uuid: string,
+        devInfo: any,
+        nameInfo: any,
+        target: TreeSnapshot,
+        schemaUuids?: Set<string>,
+    ): void {
+        if (!devInfo) {
+            this.log("buildDevice: no DeviceInformation for %s, skipping", uuid);
+            return;
+        }
+
+        const schemaUuid = devInfo.schema ?? devInfo.originMap?.Schema_UUID;
+        if (!schemaUuid) {
+            this.log("buildDevice: no Schema_UUID for %s, skipping", uuid);
+            return;
+        }
+        schemaUuids?.add(schemaUuid);
+
+        // Find ISA-95 hierarchy by searching for the Hierarchy-v1 Schema_UUID
+        const hierarchyObj = this.findBySchemaUuid(devInfo.originMap, HIERARCHY_SCHEMA_UUID);
+        const isa95Segments = hierarchyObj ? this.extractIsa95Segments(hierarchyObj) : [];
+
+        if (isa95Segments.length === 0) {
+            // Default to <namespace>/Unknown for devices without ISA-95
+            isa95Segments.push(this.namespaceName, "Unknown");
+            this.log("buildDevice: no ISA-95 for %s, placing under Unknown", uuid);
+        } else {
+            this.log("buildDevice: ISA-95 hierarchy for %s: %o", uuid, isa95Segments);
+        }
+
+        const displayName = nameInfo?.name ?? devInfo.sparkplugName ?? uuid;
+
+        const obj = toI3xObject(uuid, displayName, schemaUuid, "/", true);
+        target.objects.set(uuid, obj);
+
+        if (isa95Segments.length > 0) {
+            this.ensureIsa95Hierarchy(isa95Segments, uuid, target);
+        }
+
+        if (devInfo.originMap) {
+            this.buildTreeFromOriginMap(devInfo.originMap, uuid, uuid, "", target);
+            if (schemaUuids) this.collectSchemaUuids(devInfo.originMap, schemaUuids);
+            this.log("buildDevice: built metric tree for %s, children=%d",
+                uuid, target.children.get(uuid)?.size ?? 0);
+        }
+    }
+
+    /**
+     * Create or replace an ObjectType in `target` from a pre-fetched
+     * ConfigSchema + Info config. Idempotent: a second call with the
+     * same schemaUuid replaces the entry.
+     */
+    private buildObjectTypeInSnapshot(
+        schemaUuid: string,
+        schema: any,
+        info: any,
+        target: TreeSnapshot,
+    ): void {
+        const displayName = info?.name ?? schema?.title ?? schemaUuid;
+        const objType = toI3xObjectType(
+            schemaUuid,
+            displayName,
+            this.namespaceUri,
+            schemaUuid,
+            schema ?? {},
+        );
+        target.objectTypes.set(schemaUuid, objType);
+        this.log("buildObjectType: %s (%s)", schemaUuid, displayName);
     }
 }

@@ -69,7 +69,7 @@ upgrade didn't pick up the helper. Re-run the upgrade.)
 
 ## 3. Get a JWT as yourself via Postman
 
-Follow [docs/services/cli-and-jwt.md](../services/cli-and-jwt.md)
+Follow [docs/auth/cli-and-jwt.md](../auth/cli-and-jwt.md)
 "Postman: Authorization Code + PKCE". After logging in, click
 **Use Token** and copy the access token from Postman's token detail
 view for the next step.

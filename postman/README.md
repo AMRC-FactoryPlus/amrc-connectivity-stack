@@ -103,9 +103,11 @@ Either way, please keep:
 
 ## See also
 
-- [`docs/services/cli-and-jwt.md`](../docs/services/cli-and-jwt.md) -
-  how the JWT flow works end-to-end and how to use it from curl /
-  Device Authorization Grant for headless scripts.
-- [`docs/services/oauth-clients.md`](../docs/services/oauth-clients.md) -
-  configuring new OIDC clients for web applications (different use
-  case from this collection - this one's for direct API access).
+- [`docs/auth/`](../docs/auth/) - the auth section. Start with the
+  [overview](../docs/auth/README.md), then drill into:
+  - [Direct API access with a Keycloak JWT](../docs/auth/cli-and-jwt.md) -
+    the flow this collection uses (Auth Code + PKCE, plus curl via
+    Device Authorization Grant for headless scripts).
+  - [Connecting OAuth applications](../docs/auth/oauth-clients.md) -
+    configuring new OIDC clients for web applications (different use
+    case from this collection - that one's for first-party web apps).

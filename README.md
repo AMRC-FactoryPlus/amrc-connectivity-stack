@@ -20,23 +20,17 @@ Most of the components deployed by ACS are implementations of the core component
 
 ## Authentication
 
-ACS services accept three forms of authentication on HTTP endpoints:
+ACS services accept three auth schemes on HTTP endpoints: Kerberos
+for cluster-internal traffic, the OIDC web flow for browser-based
+sign-in, and direct Keycloak JWTs for scripting / Postman / curl.
+See [docs/auth/](docs/auth/) for the full picture, including:
 
-* **Kerberos (Negotiate / Basic)** for service-to-service and
-  cluster-internal callers - the historical path, still the default
-  for anything authenticated by a keytab.
-* **OAuth / OIDC tokens** for web applications signing users in
-  through Keycloak. See [Connecting OAuth applications](docs/services/oauth-clients.md)
-  for adding your own OIDC client (Grafana is the reference example).
-* **Direct Keycloak JWT** for human users or scripts hitting an ACS
-  API directly with Postman, curl, or any tool that isn't a full
-  OAuth web app. See [Direct API access with a Keycloak JWT](docs/services/cli-and-jwt.md)
-  for the Authorization Code + PKCE flow, plus a [ready-to-import
-  Postman collection](postman/) covering every HTTP-facing F+
-  service.
-
-All three are accepted on the same `Authorization` header; services
-detect the scheme on the wire and validate accordingly.
+- [Connecting OAuth applications](docs/auth/oauth-clients.md) (web
+  apps - the Grafana reference setup).
+- [Direct API access with a Keycloak JWT](docs/auth/cli-and-jwt.md)
+  (Postman, curl, scripts).
+- A [ready-to-import Postman collection](postman/) covering every
+  HTTP-facing F+ service with OAuth pre-configured.
 
 ## Future work
 

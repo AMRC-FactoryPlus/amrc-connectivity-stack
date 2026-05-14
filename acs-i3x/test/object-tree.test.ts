@@ -608,4 +608,139 @@ describe("ObjectTree", () => {
             expect(tree.getObject("dev-missing")).toBeUndefined();
         });
     });
+
+    describe("UNS node origin and preservation across swap", () => {
+        // Builds a fresh tree with one device, then UNS-discovers a metric
+        // chain under that device. Returns the tree plus identifiers.
+        async function treeWithUnsDiscoveredChild() {
+            const fplus = createMockFplus();
+            const dev1 = "dev-uuid-uns";
+            const schemaA = "schema-uns-a";
+
+            fplus.ConfigDB.class_members.mockResolvedValue([dev1]);
+            fplus.ConfigDB.get_config.mockImplementation(
+                (appUuid: string, objectUuid: string) => {
+                    if (appUuid === DEVICE_INFORMATION_APP_UUID && objectUuid === dev1)
+                        return Promise.resolve({
+                            schema: schemaA,
+                            sparkplugName: "TestDevice",
+                            originMap: {
+                                Schema_UUID: schemaA,
+                                Instance_UUID: dev1,
+                                Device_Information: {
+                                    Schema_UUID: "2dd093e9-1450-44c5-be8c-c0d78e48219b",
+                                    ISA95_Hierarchy: {
+                                        Schema_UUID: HIERARCHY_SCHEMA_UUID,
+                                        Enterprise: { Value: "TestOrg" },
+                                    },
+                                },
+                            },
+                        });
+                    if (appUuid === CONFIG_SCHEMA_APP_UUID && objectUuid === schemaA)
+                        return Promise.resolve({ type: "object" });
+                    return Promise.resolve(null);
+                },
+            );
+
+            const tree = makeTree(fplus);
+            await tree.init();
+
+            // UNS discovers Axes/X/Position under the device. Axes and X
+            // are composition; Position is a leaf metric.
+            const axes = "axes-uns-uuid";
+            const axisX = "axis-x-uns-uuid";
+            const leaf = tree.addCompositionFromUns(
+                [dev1, axes, axisX],
+                [schemaA, "schema-axes", "schema-axis", "schema-position"],
+                ["Axes", "X", "Position"],
+            );
+            return { fplus, tree, dev1, axes, axisX, leaf: leaf! };
+        }
+
+        it("tags config-derived nodes 'config' and UNS-discovered nodes 'uns'", async () => {
+            const { tree, dev1, axes, axisX, leaf } = await treeWithUnsDiscoveredChild();
+
+            expect(tree.getNodeSource(dev1)).toBe("config");
+            expect(tree.getNodeSource(axes)).toBe("uns");
+            expect(tree.getNodeSource(axisX)).toBe("uns");
+            expect(tree.getNodeSource(leaf)).toBe("uns");
+        });
+
+        it("preserves UNS subtree across a refresh that keeps the device", async () => {
+            const { fplus, tree, dev1, axes, axisX, leaf } = await treeWithUnsDiscoveredChild();
+
+            expect(tree.getObject(axes)).toBeDefined();
+
+            // Refresh with the same device set — UNS subtree must survive
+            await tree.refresh();
+
+            expect(tree.getObject(dev1)).toBeDefined();
+            expect(tree.getObject(axes)).toBeDefined();
+            expect(tree.getObject(axisX)).toBeDefined();
+            expect(tree.getObject(leaf)).toBeDefined();
+            // And origin is still uns
+            expect(tree.getNodeSource(axes)).toBe("uns");
+            expect(tree.getNodeSource(leaf)).toBe("uns");
+
+            // Confirm we didn't hit an unrelated assertion
+            expect(fplus.ConfigDB.class_members).toHaveBeenCalled();
+        });
+
+        it("drops orphaned UNS nodes when the parent device is removed", async () => {
+            const { fplus, tree, dev1, axes, leaf } = await treeWithUnsDiscoveredChild();
+
+            // Device disappears from ConfigDB class membership
+            fplus.ConfigDB.class_members.mockResolvedValue([]);
+            await tree.refresh();
+
+            expect(tree.getObject(dev1)).toBeUndefined();
+            expect(tree.getObject(axes)).toBeUndefined();
+            expect(tree.getObject(leaf)).toBeUndefined();
+        });
+
+        it("config supersedes UNS when DeviceInformation catches up", async () => {
+            const { tree, dev1, axes } = await treeWithUnsDiscoveredChild();
+
+            expect(tree.getNodeSource(axes)).toBe("uns");
+
+            // The device's DeviceInformation is now updated to declare
+            // Axes natively (same Instance_UUID, so same elementId).
+            const schemaA = "schema-uns-a";
+            tree.refreshFromSnapshot({
+                devices: new Map([
+                    [dev1, {
+                        devInfo: {
+                            schema: schemaA,
+                            sparkplugName: "TestDevice",
+                            originMap: {
+                                Schema_UUID: schemaA,
+                                Instance_UUID: dev1,
+                                Device_Information: {
+                                    Schema_UUID: "2dd093e9-1450-44c5-be8c-c0d78e48219b",
+                                    ISA95_Hierarchy: {
+                                        Schema_UUID: HIERARCHY_SCHEMA_UUID,
+                                        Enterprise: { Value: "TestOrg" },
+                                    },
+                                },
+                                Axes: {
+                                    Schema_UUID: "schema-axes",
+                                    Instance_UUID: axes,
+                                    AnotherMetric: {
+                                        Schema_UUID: "schema-leaf",
+                                        Sparkplug_Type: "Float",
+                                    },
+                                },
+                            },
+                        },
+                        info: { name: "TestDevice" },
+                    }],
+                ]),
+                schemas: new Map(),
+            });
+
+            // Axes is now config-derived (config wins)
+            expect(tree.getObject(axes)).toBeDefined();
+            expect(tree.getNodeSource(axes)).toBe("config");
+        });
+    });
 });

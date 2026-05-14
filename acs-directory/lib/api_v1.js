@@ -12,6 +12,16 @@ function fqdn_split (fqdn) {
     return fqdn.match(/([^.]*)\.(.*)/).slice(1);
 }
 
+/* Express 4 does not forward rejected promises from async route
+ * handlers to the error middleware: they surface as unhandled rejections
+ * and (with the current Node default) terminate the process. Wrap every
+ * async handler so a pg error (e.g. a malformed UUID in :uuid or :type)
+ * becomes a 5xx response instead of crashing the pod. */
+function wrap (handler) {
+    return (req, res, next) => Promise.resolve(handler(req, res, next))
+        .catch(next);
+}
+
 /* Grr. Specifying security by changing URL scheme is just stupid. */
 const _tlsmap = [
     ["http", "https"],
@@ -45,22 +55,27 @@ export default class API {
         //    apiSpec: spec,
         //}));
 
-        api.get("/search", this.search.bind(this));
+        /* bind + wrap: every async handler must go through wrap() so a
+         * thrown error reaches the express error middleware rather than
+         * propagating out as an unhandled rejection. */
+        const h = (method, ...args) => wrap(this[method].bind(this, ...args));
 
-        api.get("/address", this.addr_groups.bind(this));
-        api.get("/address/:group", this.addr_group.bind(this));
-        api.get("/address/:group/:node", this.addr_node.bind(this));
-        api.get("/address/:group/:node/:device", this.addr_device.bind(this));
+        api.get("/search", h("search"));
 
-        api.get("/device", this.devices.bind(this));
-        api.get("/device/:device", this.device.bind(this));
-        api.get("/device/:device/history", this.history.bind(this));
+        api.get("/address", h("addr_groups"));
+        api.get("/address/:group", h("addr_group"));
+        api.get("/address/:group/:node", h("addr_node"));
+        api.get("/address/:group/:node/:device", h("addr_device"));
 
-        api.get("/schema", this.schemas.bind(this));
-        api.get("/schema/:schema/devices", this.schema_devices.bind(this));
+        api.get("/device", h("devices"));
+        api.get("/device/:device", h("device"));
+        api.get("/device/:device/history", h("history"));
 
-        api.get("/service", this.services.bind(this));
-        api.get("/service/:service", this.service_providers.bind(this));
+        api.get("/schema", h("schemas"));
+        api.get("/schema/:schema/devices", h("schema_devices"));
+
+        api.get("/service", h("services"));
+        api.get("/service/:service", h("service_providers"));
 
         api.route("/service/:service/advertisment")
             .get((req,res) => res.status(403))
@@ -73,25 +88,25 @@ export default class API {
             .put((req,res) => res.status(403));
         /* Delete unimplemented for now. */
         //    .delete(this.service_advert_del.bind(this));
-        
+
         /* XXX These are ALPHA.
          *  - It may be better for the list endpoints to return just a
          *  list of UUIDs rather than the full info.
          *  - We need to index the Links too, or this is a bit useless.
          */
-        api.get("/alert", this.alert_list.bind(this, false));
-        api.get("/alert/active", this.alert_list.bind(this, true));
-        api.get("/alert/type/:type", this.alert_list.bind(this, false));
-        api.get("/alert/type/:type/active", this.alert_list.bind(this, true));
-        api.get("/alert/:uuid", this.alert_single.bind(this));
+        api.get("/alert", h("alert_list", false));
+        api.get("/alert/active", h("alert_list", true));
+        api.get("/alert/type/:type", h("alert_list", false));
+        api.get("/alert/type/:type/active", h("alert_list", true));
+        api.get("/alert/:uuid", h("alert_single"));
 
-        const ll = this.link_list.bind(this);
+        const ll = h("link_list");
         api.get("/link", ll);
         api.get("/link/device/:device", ll);
         api.get("/link/source/:source", ll);
         api.get("/link/relation/:relation", ll);
         api.get("/link/target/:target", ll);
-        api.get("/link/:uuid", this.link_single.bind(this));
+        api.get("/link/:uuid", h("link_single"));
     }
 
     async search(req, res) {
@@ -307,6 +322,9 @@ export default class API {
         const auth = this.fplus.Auth;
 
         const link = await this.model.link_by_uuid(uuid);
+
+        /* XXX timing attack (matches alert_single) */
+        if (link == null) return res.status(404).end();
 
         const ck = (p, o) => auth.check_acl(req.auth, p, o, true);
         const ok = await ck(Perm.Read_Link_Relation, link.relation)

@@ -1,4 +1,4 @@
 $kind: http-request
-url: '{{scheme}}://files.{{domain}}/v1/storage'
+url: '{{scheme}}://files.{{domain}}/v1/file'
 method: GET
 order: 1000

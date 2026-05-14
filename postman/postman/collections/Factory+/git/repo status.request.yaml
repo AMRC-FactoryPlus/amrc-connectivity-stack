@@ -1,4 +1,15 @@
 $kind: http-request
-url: "{{scheme}}://git.{{domain}}/v1/status/:uuid"
+url: '{{scheme}}://git.{{domain}}/v1/status/:uuid'
 method: GET
 order: 2000
+events:
+- listen: test
+  script:
+    type: text/javascript
+    exec:
+    - pm.test('No 5xx server error', function () {
+    - '    pm.expect(pm.response.code).to.be.below(500);'
+    - '});'
+    - pm.test('Auth succeeded', function () {
+    - '    pm.expect(pm.response.code).to.not.equal(401);'
+    - '});'

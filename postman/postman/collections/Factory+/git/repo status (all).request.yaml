@@ -1,5 +1,16 @@
 $kind: http-request
 description: Status across all repos.
-url: "{{scheme}}://git.{{domain}}/v1/status"
+url: '{{scheme}}://git.{{domain}}/v1/status'
 method: GET
 order: 1000
+events:
+- listen: test
+  script:
+    type: text/javascript
+    exec:
+    - pm.test('No 5xx server error', function () {
+    - '    pm.expect(pm.response.code).to.be.below(500);'
+    - '});'
+    - pm.test('Auth succeeded', function () {
+    - '    pm.expect(pm.response.code).to.not.equal(401);'
+    - '});'

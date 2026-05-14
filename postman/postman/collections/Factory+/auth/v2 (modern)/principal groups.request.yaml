@@ -1,5 +1,16 @@
 $kind: http-request
 description: Recursive group membership for a principal (used by the SPI for the fp_groups claim).
-url: "{{scheme}}://auth.{{domain}}/v2/principal/:uuid/groups"
+url: '{{scheme}}://auth.{{domain}}/v2/principal/:uuid/groups'
 method: GET
 order: 5000
+events:
+- listen: test
+  script:
+    type: text/javascript
+    exec:
+    - pm.test('No 5xx server error', function () {
+    - '    pm.expect(pm.response.code).to.be.below(500);'
+    - '});'
+    - pm.test('Auth succeeded', function () {
+    - '    pm.expect(pm.response.code).to.not.equal(401);'
+    - '});'

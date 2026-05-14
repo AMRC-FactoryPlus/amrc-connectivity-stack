@@ -1,6 +1,17 @@
 $kind: http-request
-url: "{{scheme}}://auth.{{domain}}/authz/principal/find"
+url: '{{scheme}}://auth.{{domain}}/authz/principal/find'
 method: GET
 queryParams:
   kerberos: user@REALM
 order: 2000
+events:
+- listen: test
+  script:
+    type: text/javascript
+    exec:
+    - pm.test('No 5xx server error', function () {
+    - '    pm.expect(pm.response.code).to.be.below(500);'
+    - '});'
+    - pm.test('Auth succeeded', function () {
+    - '    pm.expect(pm.response.code).to.not.equal(401);'
+    - '});'

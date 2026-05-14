@@ -1,0 +1,11 @@
+$kind: http-request
+url: "{{scheme}}://configdb.{{domain}}/v2/app/:app/object/:object"
+method: PUT
+body:
+  type: json
+  content: |-
+    {
+      "name": "Example",
+      "key": "value"
+    }
+order: 19000

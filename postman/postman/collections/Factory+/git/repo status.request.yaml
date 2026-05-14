@@ -1,0 +1,4 @@
+$kind: http-request
+url: "{{scheme}}://git.{{domain}}/v1/status/:uuid"
+method: GET
+order: 2000

@@ -1,0 +1,13 @@
+# Use this workspace to collaborate
+workspace:
+  id: ef33dc78-c11b-4018-bbae-60ae54c2b160
+
+localResources:
+  collections:
+    - ../Factory+.postman_collection.json
+
+# Each entry here maps a local resource to one or more corresponding objects in Postman Cloud
+
+cloudResources:
+  collections:
+    ../postman/collections/Factory+: f0a017e9-7fa1-4cf1-acfe-c5e9d56fab37

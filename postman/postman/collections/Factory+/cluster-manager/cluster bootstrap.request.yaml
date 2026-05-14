@@ -1,0 +1,5 @@
+$kind: http-request
+description: Returns the bootstrap manifest to apply to a new edge cluster.
+url: "{{scheme}}://clusters.{{domain}}/v1/cluster/:cluster/bootstrap"
+method: GET
+order: 2000

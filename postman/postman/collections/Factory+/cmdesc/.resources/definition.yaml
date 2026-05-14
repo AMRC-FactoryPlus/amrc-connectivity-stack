@@ -1,0 +1,3 @@
+$kind: collection
+description: Command Escalation. POST a Sparkplug command (write metric) to an edge node or device by address. The body is the metric to write.
+order: 5000

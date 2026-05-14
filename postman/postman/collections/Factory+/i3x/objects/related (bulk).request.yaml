@@ -1,0 +1,10 @@
+$kind: http-request
+url: "{{scheme}}://i3x.{{domain}}/v1/objects/related"
+method: POST
+body:
+  type: json
+  content: |-
+    {
+      "elementIds": ["<id>"]
+    }
+order: 5000

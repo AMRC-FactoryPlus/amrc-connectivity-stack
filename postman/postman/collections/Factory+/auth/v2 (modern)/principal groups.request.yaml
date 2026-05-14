@@ -1,0 +1,5 @@
+$kind: http-request
+description: Recursive group membership for a principal (used by the SPI for the fp_groups claim).
+url: "{{scheme}}://auth.{{domain}}/v2/principal/:uuid/groups"
+method: GET
+order: 5000

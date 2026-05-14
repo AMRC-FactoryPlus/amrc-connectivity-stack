@@ -1,0 +1,4 @@
+$kind: http-request
+url: "{{scheme}}://configdb.{{domain}}/v2/object/rank"
+method: GET
+order: 4000

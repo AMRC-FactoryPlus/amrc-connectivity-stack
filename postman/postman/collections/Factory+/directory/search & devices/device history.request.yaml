@@ -1,0 +1,4 @@
+$kind: http-request
+url: "{{scheme}}://directory.{{domain}}/v1/device/:device/history"
+method: GET
+order: 4000

@@ -1,0 +1,4 @@
+$kind: http-request
+url: "{{scheme}}://auth.{{domain}}/v2/principal"
+method: GET
+order: 3000

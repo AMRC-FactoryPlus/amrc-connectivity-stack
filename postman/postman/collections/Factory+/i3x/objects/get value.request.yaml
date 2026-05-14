@@ -1,0 +1,4 @@
+$kind: http-request
+url: "{{scheme}}://i3x.{{domain}}/v1/objects/:elementId/value"
+method: GET
+order: 7000

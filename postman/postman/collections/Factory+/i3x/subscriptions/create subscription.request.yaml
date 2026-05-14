@@ -1,0 +1,11 @@
+$kind: http-request
+url: "{{scheme}}://i3x.{{domain}}/v1/subscriptions"
+method: POST
+body:
+  type: json
+  content: |-
+    {
+      "elementIds": ["<id>"],
+      "ttlMs": 300000
+    }
+order: 1000

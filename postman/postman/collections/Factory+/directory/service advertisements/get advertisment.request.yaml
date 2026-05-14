@@ -1,0 +1,4 @@
+$kind: http-request
+url: "{{scheme}}://directory.{{domain}}/v1/service/:service/advertisment"
+method: GET
+order: 3000

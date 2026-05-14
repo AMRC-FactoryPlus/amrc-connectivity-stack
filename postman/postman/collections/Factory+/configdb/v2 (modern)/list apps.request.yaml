@@ -1,0 +1,5 @@
+$kind: http-request
+description: Members of Class.App. Compat shim that forwards to /v2/class/<App>/member.
+url: "{{scheme}}://configdb.{{domain}}/v2/app"
+method: GET
+order: 5000

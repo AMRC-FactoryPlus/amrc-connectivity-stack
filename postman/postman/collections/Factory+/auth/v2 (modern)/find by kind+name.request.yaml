@@ -1,0 +1,4 @@
+$kind: http-request
+url: "{{scheme}}://auth.{{domain}}/v2/identity/:kind/:name"
+method: GET
+order: 11000

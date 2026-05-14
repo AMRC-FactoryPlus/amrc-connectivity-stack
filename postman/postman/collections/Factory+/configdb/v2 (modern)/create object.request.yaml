@@ -1,0 +1,11 @@
+$kind: http-request
+url: "{{scheme}}://configdb.{{domain}}/v2/object"
+method: POST
+body:
+  type: json
+  content: |-
+    {
+      "class": "<class-uuid>",
+      "uuid": "<optional-explicit-uuid>"
+    }
+order: 2000

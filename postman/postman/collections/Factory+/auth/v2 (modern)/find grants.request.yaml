@@ -1,0 +1,10 @@
+$kind: http-request
+url: "{{scheme}}://auth.{{domain}}/v2/grant/find"
+method: POST
+body:
+  type: json
+  content: |-
+    {
+      "principal": "<uuid>"
+    }
+order: 19000

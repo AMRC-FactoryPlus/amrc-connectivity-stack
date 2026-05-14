@@ -1,0 +1,4 @@
+$kind: http-request
+url: "{{scheme}}://i3x.{{domain}}/v1/subscriptions/list"
+method: POST
+order: 2000

@@ -1,0 +1,6 @@
+$kind: http-request
+url: "{{scheme}}://cmdesc.{{domain}}/ping"
+method: GET
+auth:
+  type: noauth
+order: 4000

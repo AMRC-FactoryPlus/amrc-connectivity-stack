@@ -9,9 +9,6 @@ events:
   script:
     type: text/javascript
     exec:
-    - pm.test('No 5xx server error', function () {
-    - '    pm.expect(pm.response.code).to.be.below(500);'
-    - '});'
-    - pm.test('Auth succeeded', function () {
-    - '    pm.expect(pm.response.code).to.not.equal(401);'
+    - pm.test('Status is 200 / 404', function () {
+    - '    pm.expect(pm.response.code).to.be.oneOf([200, 404]);'
     - '});'

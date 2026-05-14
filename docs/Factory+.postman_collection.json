@@ -1,0 +1,3134 @@
+{
+	"info": {
+		"_postman_id": "f0a017e9-7fa1-4cf1-acfe-c5e9d56fab37",
+		"name": "Factory+",
+		"description": "Factory+ HTTP API collection for the AMRC Connectivity Stack.\n\n**Authentication.** All requests inherit OAuth 2.0 (Authorization Code with PKCE) against the cluster's Keycloak `acs-cli` public client. Click the collection's Authorization tab \u2192 Get New Access Token to obtain a JWT, then Use Token. Pings explicitly opt out via per-request `noauth`.\n\n**Setup.** Set the `scheme` (http/https) and `domain` (the ACS base hostname) collection variables to your deployment. Every request URL derives from those plus the per-service subdomain - no other configuration needed.\n\n**Coverage.** All HTTP-facing F+ services on the cluster: auth, configdb, directory, cmdesc, files, git, cluster-manager (clusters subdomain), i3x. Services not listed here (monitor, historians, edge agents, etc.) speak only Sparkplug/MQTT and have no HTTP surface to test.\n\n**Requires** the JWT auth feature deployed (v5.2.0-i3x.6 or newer). Older ACS releases reject Keycloak JWTs and need Basic/Negotiate auth instead.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"auth": {
+		"type": "oauth2",
+		"oauth2": [
+			{
+				"key": "tokenName",
+				"value": "Factory+ ({{domain}})",
+				"type": "string"
+			},
+			{
+				"key": "grant_type",
+				"value": "authorization_code_with_pkce",
+				"type": "string"
+			},
+			{
+				"key": "authUrl",
+				"value": "{{scheme}}://openid.{{domain}}/realms/factory_plus/protocol/openid-connect/auth",
+				"type": "string"
+			},
+			{
+				"key": "accessTokenUrl",
+				"value": "{{scheme}}://openid.{{domain}}/realms/factory_plus/protocol/openid-connect/token",
+				"type": "string"
+			},
+			{
+				"key": "refreshTokenUrl",
+				"value": "{{scheme}}://openid.{{domain}}/realms/factory_plus/protocol/openid-connect/token",
+				"type": "string"
+			},
+			{
+				"key": "clientId",
+				"value": "acs-cli",
+				"type": "string"
+			},
+			{
+				"key": "challengeAlgorithm",
+				"value": "S256",
+				"type": "string"
+			},
+			{
+				"key": "scope",
+				"value": "openid",
+				"type": "string"
+			},
+			{
+				"key": "redirect_uri",
+				"value": "https://oauth.pstmn.io/v1/callback",
+				"type": "string"
+			},
+			{
+				"key": "client_authentication",
+				"value": "body",
+				"type": "string"
+			},
+			{
+				"key": "addTokenTo",
+				"value": "header",
+				"type": "string"
+			}
+		]
+	},
+	"variable": [
+		{
+			"key": "scheme",
+			"value": "https",
+			"description": "http for local/dev clusters, https for production"
+		},
+		{
+			"key": "domain",
+			"value": "acs.example.com",
+			"description": "ACS deployment base hostname (matches acs.baseUrl in the Helm chart)"
+		}
+	],
+	"item": [
+		{
+			"name": "info",
+			"item": [
+				{
+					"name": "auth ping",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{scheme}}://auth.{{domain}}/ping",
+							"protocol": "{{scheme}}",
+							"host": [
+								"auth",
+								"{{domain}}"
+							],
+							"path": [
+								"ping"
+							]
+						},
+						"auth": {
+							"type": "noauth"
+						}
+					}
+				},
+				{
+					"name": "configdb ping",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{scheme}}://configdb.{{domain}}/ping",
+							"protocol": "{{scheme}}",
+							"host": [
+								"configdb",
+								"{{domain}}"
+							],
+							"path": [
+								"ping"
+							]
+						},
+						"auth": {
+							"type": "noauth"
+						}
+					}
+				},
+				{
+					"name": "directory ping",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{scheme}}://directory.{{domain}}/ping",
+							"protocol": "{{scheme}}",
+							"host": [
+								"directory",
+								"{{domain}}"
+							],
+							"path": [
+								"ping"
+							]
+						},
+						"auth": {
+							"type": "noauth"
+						}
+					}
+				},
+				{
+					"name": "cmdesc ping",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{scheme}}://cmdesc.{{domain}}/ping",
+							"protocol": "{{scheme}}",
+							"host": [
+								"cmdesc",
+								"{{domain}}"
+							],
+							"path": [
+								"ping"
+							]
+						},
+						"auth": {
+							"type": "noauth"
+						}
+					}
+				},
+				{
+					"name": "files ping",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{scheme}}://files.{{domain}}/ping",
+							"protocol": "{{scheme}}",
+							"host": [
+								"files",
+								"{{domain}}"
+							],
+							"path": [
+								"ping"
+							]
+						},
+						"auth": {
+							"type": "noauth"
+						}
+					}
+				},
+				{
+					"name": "git ping",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{scheme}}://git.{{domain}}/ping",
+							"protocol": "{{scheme}}",
+							"host": [
+								"git",
+								"{{domain}}"
+							],
+							"path": [
+								"ping"
+							]
+						},
+						"auth": {
+							"type": "noauth"
+						}
+					}
+				},
+				{
+					"name": "clusters ping",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{scheme}}://clusters.{{domain}}/ping",
+							"protocol": "{{scheme}}",
+							"host": [
+								"clusters",
+								"{{domain}}"
+							],
+							"path": [
+								"ping"
+							]
+						},
+						"auth": {
+							"type": "noauth"
+						}
+					}
+				},
+				{
+					"name": "i3x info",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{scheme}}://i3x.{{domain}}/v1/info",
+							"protocol": "{{scheme}}",
+							"host": [
+								"i3x",
+								"{{domain}}"
+							],
+							"path": [
+								"v1",
+								"info"
+							]
+						},
+						"description": "i3x's public /v1/info endpoint. Returns spec version + capability flags.",
+						"auth": {
+							"type": "noauth"
+						}
+					}
+				}
+			],
+			"description": "Public health checks. No auth required - useful for smoke-testing reachability before doing anything else."
+		},
+		{
+			"name": "auth",
+			"item": [
+				{
+					"name": "v2 (modern)",
+					"item": [
+						{
+							"name": "whoami",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://auth.{{domain}}/v2/whoami",
+									"protocol": "{{scheme}}",
+									"host": [
+										"auth",
+										"{{domain}}"
+									],
+									"path": [
+										"v2",
+										"whoami"
+									]
+								},
+								"description": "Returns the full identity record for the calling principal. With a Keycloak JWT, fp_principal_uuid is used to look up the record."
+							}
+						},
+						{
+							"name": "whoami (uuid only)",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://auth.{{domain}}/v2/whoami/uuid",
+									"protocol": "{{scheme}}",
+									"host": [
+										"auth",
+										"{{domain}}"
+									],
+									"path": [
+										"v2",
+										"whoami",
+										"uuid"
+									]
+								}
+							}
+						},
+						{
+							"name": "list principals",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://auth.{{domain}}/v2/principal",
+									"protocol": "{{scheme}}",
+									"host": [
+										"auth",
+										"{{domain}}"
+									],
+									"path": [
+										"v2",
+										"principal"
+									]
+								}
+							}
+						},
+						{
+							"name": "get principal",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://auth.{{domain}}/v2/principal/:uuid",
+									"protocol": "{{scheme}}",
+									"host": [
+										"auth",
+										"{{domain}}"
+									],
+									"path": [
+										"v2",
+										"principal",
+										":uuid"
+									]
+								}
+							}
+						},
+						{
+							"name": "principal groups",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://auth.{{domain}}/v2/principal/:uuid/groups",
+									"protocol": "{{scheme}}",
+									"host": [
+										"auth",
+										"{{domain}}"
+									],
+									"path": [
+										"v2",
+										"principal",
+										":uuid",
+										"groups"
+									]
+								},
+								"description": "Recursive group membership for a principal (used by the SPI for the fp_groups claim)."
+							}
+						},
+						{
+							"name": "principal identity",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://auth.{{domain}}/v2/principal/:uuid/:kind",
+									"protocol": "{{scheme}}",
+									"host": [
+										"auth",
+										"{{domain}}"
+									],
+									"path": [
+										"v2",
+										"principal",
+										":uuid",
+										":kind"
+									]
+								},
+								"description": "Identity record of a given kind (kerberos, sparkplug, etc.) for a principal."
+							}
+						},
+						{
+							"name": "put principal identity",
+							"request": {
+								"method": "PUT",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://auth.{{domain}}/v2/principal/:uuid/:kind",
+									"protocol": "{{scheme}}",
+									"host": [
+										"auth",
+										"{{domain}}"
+									],
+									"path": [
+										"v2",
+										"principal",
+										":uuid",
+										":kind"
+									]
+								},
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"name\": \"user@REALM\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								}
+							}
+						},
+						{
+							"name": "delete principal id",
+							"request": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://auth.{{domain}}/v2/principal/:uuid/:kind",
+									"protocol": "{{scheme}}",
+									"host": [
+										"auth",
+										"{{domain}}"
+									],
+									"path": [
+										"v2",
+										"principal",
+										":uuid",
+										":kind"
+									]
+								}
+							}
+						},
+						{
+							"name": "list identity kinds",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://auth.{{domain}}/v2/identity",
+									"protocol": "{{scheme}}",
+									"host": [
+										"auth",
+										"{{domain}}"
+									],
+									"path": [
+										"v2",
+										"identity"
+									]
+								}
+							}
+						},
+						{
+							"name": "list by kind",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://auth.{{domain}}/v2/identity/:kind",
+									"protocol": "{{scheme}}",
+									"host": [
+										"auth",
+										"{{domain}}"
+									],
+									"path": [
+										"v2",
+										"identity",
+										":kind"
+									]
+								}
+							}
+						},
+						{
+							"name": "find by kind+name",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://auth.{{domain}}/v2/identity/:kind/:name",
+									"protocol": "{{scheme}}",
+									"host": [
+										"auth",
+										"{{domain}}"
+									],
+									"path": [
+										"v2",
+										"identity",
+										":kind",
+										":name"
+									]
+								}
+							}
+						},
+						{
+							"name": "get ACL by UUID",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://auth.{{domain}}/v2/acl/:principal",
+									"protocol": "{{scheme}}",
+									"host": [
+										"auth",
+										"{{domain}}"
+									],
+									"path": [
+										"v2",
+										"acl",
+										":principal"
+									]
+								}
+							}
+						},
+						{
+							"name": "get ACL by Kerberos",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://auth.{{domain}}/v2/acl/kerberos/:upn",
+									"protocol": "{{scheme}}",
+									"host": [
+										"auth",
+										"{{domain}}"
+									],
+									"path": [
+										"v2",
+										"acl",
+										"kerberos",
+										":upn"
+									]
+								}
+							}
+						},
+						{
+							"name": "list grants",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://auth.{{domain}}/v2/grant",
+									"protocol": "{{scheme}}",
+									"host": [
+										"auth",
+										"{{domain}}"
+									],
+									"path": [
+										"v2",
+										"grant"
+									]
+								}
+							}
+						},
+						{
+							"name": "new grant",
+							"request": {
+								"method": "POST",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://auth.{{domain}}/v2/grant",
+									"protocol": "{{scheme}}",
+									"host": [
+										"auth",
+										"{{domain}}"
+									],
+									"path": [
+										"v2",
+										"grant"
+									]
+								},
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"principal\": \"<uuid>\",\n  \"permission\": \"<uuid>\",\n  \"target\": \"<uuid>\",\n  \"plural\": false\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								}
+							}
+						},
+						{
+							"name": "get grant",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://auth.{{domain}}/v2/grant/:uuid",
+									"protocol": "{{scheme}}",
+									"host": [
+										"auth",
+										"{{domain}}"
+									],
+									"path": [
+										"v2",
+										"grant",
+										":uuid"
+									]
+								}
+							}
+						},
+						{
+							"name": "update grant",
+							"request": {
+								"method": "PUT",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://auth.{{domain}}/v2/grant/:uuid",
+									"protocol": "{{scheme}}",
+									"host": [
+										"auth",
+										"{{domain}}"
+									],
+									"path": [
+										"v2",
+										"grant",
+										":uuid"
+									]
+								},
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"principal\": \"<uuid>\",\n  \"permission\": \"<uuid>\",\n  \"target\": \"<uuid>\",\n  \"plural\": false\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								}
+							}
+						},
+						{
+							"name": "delete grant",
+							"request": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://auth.{{domain}}/v2/grant/:uuid",
+									"protocol": "{{scheme}}",
+									"host": [
+										"auth",
+										"{{domain}}"
+									],
+									"path": [
+										"v2",
+										"grant",
+										":uuid"
+									]
+								}
+							}
+						},
+						{
+							"name": "find grants",
+							"request": {
+								"method": "POST",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://auth.{{domain}}/v2/grant/find",
+									"protocol": "{{scheme}}",
+									"host": [
+										"auth",
+										"{{domain}}"
+									],
+									"path": [
+										"v2",
+										"grant",
+										"find"
+									]
+								},
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"principal\": \"<uuid>\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "legacy v1",
+					"item": [
+						{
+							"name": "get ACL (?principal=)",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://auth.{{domain}}/authz/acl",
+									"protocol": "{{scheme}}",
+									"host": [
+										"auth",
+										"{{domain}}"
+									],
+									"path": [
+										"authz",
+										"acl"
+									],
+									"query": [
+										{
+											"key": "principal",
+											"value": "user@REALM"
+										},
+										{
+											"key": "permission",
+											"value": "<uuid>"
+										}
+									]
+								}
+							}
+						},
+						{
+							"name": "find principal",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://auth.{{domain}}/authz/principal/find",
+									"protocol": "{{scheme}}",
+									"host": [
+										"auth",
+										"{{domain}}"
+									],
+									"path": [
+										"authz",
+										"principal",
+										"find"
+									],
+									"query": [
+										{
+											"key": "kerberos",
+											"value": "user@REALM"
+										}
+									]
+								}
+							}
+						},
+						{
+							"name": "get principal",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://auth.{{domain}}/authz/principal/:uuid",
+									"protocol": "{{scheme}}",
+									"host": [
+										"auth",
+										"{{domain}}"
+									],
+									"path": [
+										"authz",
+										"principal",
+										":uuid"
+									]
+								}
+							}
+						}
+					],
+					"description": "Kept for the service-client + older callers. New code should use /v2."
+				},
+				{
+					"name": "load dump",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{scheme}}://auth.{{domain}}/load",
+							"protocol": "{{scheme}}",
+							"host": [
+								"auth",
+								"{{domain}}"
+							],
+							"path": [
+								"load"
+							]
+						},
+						"description": "Bulk-load a dump file. Restricted to privileged callers.",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"version\": 1,\n  \"objects\": []\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					}
+				},
+				{
+					"name": "token (mint session)",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{scheme}}://auth.{{domain}}/token",
+							"protocol": "{{scheme}}",
+							"host": [
+								"auth",
+								"{{domain}}"
+							],
+							"path": [
+								"token"
+							]
+						},
+						"description": "Mint an opaque F+ session token. Authenticate with Basic/Negotiate; the token then represents your identity to THIS service only. Not needed for JWT callers - the JWT itself acts as the token."
+					}
+				}
+			],
+			"description": "Factory+ auth service.\n\n/v2/* is the modern API and should be preferred. /authz/* and /authn/* are legacy compat surfaces kept for older clients (notably the service-client library before it was updated). /load is dump loading. /token mints opaque session tokens (not needed when using JWTs)."
+		},
+		{
+			"name": "configdb",
+			"item": [
+				{
+					"name": "v2 (modern)",
+					"item": [
+						{
+							"name": "list objects",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://configdb.{{domain}}/v2/object",
+									"protocol": "{{scheme}}",
+									"host": [
+										"configdb",
+										"{{domain}}"
+									],
+									"path": [
+										"v2",
+										"object"
+									]
+								}
+							}
+						},
+						{
+							"name": "create object",
+							"request": {
+								"method": "POST",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://configdb.{{domain}}/v2/object",
+									"protocol": "{{scheme}}",
+									"host": [
+										"configdb",
+										"{{domain}}"
+									],
+									"path": [
+										"v2",
+										"object"
+									]
+								},
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"class\": \"<class-uuid>\",\n  \"uuid\": \"<optional-explicit-uuid>\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								}
+							}
+						},
+						{
+							"name": "delete object",
+							"request": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://configdb.{{domain}}/v2/object/:object",
+									"protocol": "{{scheme}}",
+									"host": [
+										"configdb",
+										"{{domain}}"
+									],
+									"path": [
+										"v2",
+										"object",
+										":object"
+									]
+								}
+							}
+						},
+						{
+							"name": "object ranks",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://configdb.{{domain}}/v2/object/rank",
+									"protocol": "{{scheme}}",
+									"host": [
+										"configdb",
+										"{{domain}}"
+									],
+									"path": [
+										"v2",
+										"object",
+										"rank"
+									]
+								}
+							}
+						},
+						{
+							"name": "list apps",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://configdb.{{domain}}/v2/app",
+									"protocol": "{{scheme}}",
+									"host": [
+										"configdb",
+										"{{domain}}"
+									],
+									"path": [
+										"v2",
+										"app"
+									]
+								},
+								"description": "Members of Class.App. Compat shim that forwards to /v2/class/<App>/member."
+							}
+						},
+						{
+							"name": "list classes",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://configdb.{{domain}}/v2/class",
+									"protocol": "{{scheme}}",
+									"host": [
+										"configdb",
+										"{{domain}}"
+									],
+									"path": [
+										"v2",
+										"class"
+									]
+								},
+								"description": "Members of Class.Class."
+							}
+						},
+						{
+							"name": "class info",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://configdb.{{domain}}/v2/class/:class",
+									"protocol": "{{scheme}}",
+									"host": [
+										"configdb",
+										"{{domain}}"
+									],
+									"path": [
+										"v2",
+										"class",
+										":class"
+									]
+								}
+							}
+						},
+						{
+							"name": "class members (eff)",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://configdb.{{domain}}/v2/class/:class/member",
+									"protocol": "{{scheme}}",
+									"host": [
+										"configdb",
+										"{{domain}}"
+									],
+									"path": [
+										"v2",
+										"class",
+										":class",
+										"member"
+									]
+								},
+								"description": "All effective members (transitive via subclass)."
+							}
+						},
+						{
+							"name": "class direct members",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://configdb.{{domain}}/v2/class/:class/direct/member",
+									"protocol": "{{scheme}}",
+									"host": [
+										"configdb",
+										"{{domain}}"
+									],
+									"path": [
+										"v2",
+										"class",
+										":class",
+										"direct",
+										"member"
+									]
+								},
+								"description": "Direct members only."
+							}
+						},
+						{
+							"name": "add direct member",
+							"request": {
+								"method": "PUT",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://configdb.{{domain}}/v2/class/:class/direct/member/:object",
+									"protocol": "{{scheme}}",
+									"host": [
+										"configdb",
+										"{{domain}}"
+									],
+									"path": [
+										"v2",
+										"class",
+										":class",
+										"direct",
+										"member",
+										":object"
+									]
+								}
+							}
+						},
+						{
+							"name": "remove direct member",
+							"request": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://configdb.{{domain}}/v2/class/:class/direct/member/:object",
+									"protocol": "{{scheme}}",
+									"host": [
+										"configdb",
+										"{{domain}}"
+									],
+									"path": [
+										"v2",
+										"class",
+										":class",
+										"direct",
+										"member",
+										":object"
+									]
+								}
+							}
+						},
+						{
+							"name": "class subclasses",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://configdb.{{domain}}/v2/class/:class/subclass",
+									"protocol": "{{scheme}}",
+									"host": [
+										"configdb",
+										"{{domain}}"
+									],
+									"path": [
+										"v2",
+										"class",
+										":class",
+										"subclass"
+									]
+								},
+								"description": "All effective subclasses (transitive)."
+							}
+						},
+						{
+							"name": "class direct subclass",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://configdb.{{domain}}/v2/class/:class/direct/subclass",
+									"protocol": "{{scheme}}",
+									"host": [
+										"configdb",
+										"{{domain}}"
+									],
+									"path": [
+										"v2",
+										"class",
+										":class",
+										"direct",
+										"subclass"
+									]
+								}
+							}
+						},
+						{
+							"name": "add direct subclass",
+							"request": {
+								"method": "PUT",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://configdb.{{domain}}/v2/class/:class/direct/subclass/:object",
+									"protocol": "{{scheme}}",
+									"host": [
+										"configdb",
+										"{{domain}}"
+									],
+									"path": [
+										"v2",
+										"class",
+										":class",
+										"direct",
+										"subclass",
+										":object"
+									]
+								}
+							}
+						},
+						{
+							"name": "remove direct subclass",
+							"request": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://configdb.{{domain}}/v2/class/:class/direct/subclass/:object",
+									"protocol": "{{scheme}}",
+									"host": [
+										"configdb",
+										"{{domain}}"
+									],
+									"path": [
+										"v2",
+										"class",
+										":class",
+										"direct",
+										"subclass",
+										":object"
+									]
+								}
+							}
+						},
+						{
+							"name": "list app objects",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://configdb.{{domain}}/v2/app/:app/object",
+									"protocol": "{{scheme}}",
+									"host": [
+										"configdb",
+										"{{domain}}"
+									],
+									"path": [
+										"v2",
+										"app",
+										":app",
+										"object"
+									]
+								}
+							}
+						},
+						{
+							"name": "list app by class",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://configdb.{{domain}}/v2/app/:app/class/:class",
+									"protocol": "{{scheme}}",
+									"host": [
+										"configdb",
+										"{{domain}}"
+									],
+									"path": [
+										"v2",
+										"app",
+										":app",
+										"class",
+										":class"
+									]
+								}
+							}
+						},
+						{
+							"name": "get config",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://configdb.{{domain}}/v2/app/:app/object/:object",
+									"protocol": "{{scheme}}",
+									"host": [
+										"configdb",
+										"{{domain}}"
+									],
+									"path": [
+										"v2",
+										"app",
+										":app",
+										"object",
+										":object"
+									]
+								}
+							}
+						},
+						{
+							"name": "put config",
+							"request": {
+								"method": "PUT",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://configdb.{{domain}}/v2/app/:app/object/:object",
+									"protocol": "{{scheme}}",
+									"host": [
+										"configdb",
+										"{{domain}}"
+									],
+									"path": [
+										"v2",
+										"app",
+										":app",
+										"object",
+										":object"
+									]
+								},
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"name\": \"Example\",\n  \"key\": \"value\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								}
+							}
+						},
+						{
+							"name": "patch config",
+							"request": {
+								"method": "PATCH",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://configdb.{{domain}}/v2/app/:app/object/:object",
+									"protocol": "{{scheme}}",
+									"host": [
+										"configdb",
+										"{{domain}}"
+									],
+									"path": [
+										"v2",
+										"app",
+										":app",
+										"object",
+										":object"
+									]
+								},
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"key\": \"new-value\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								}
+							}
+						},
+						{
+							"name": "delete config",
+							"request": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://configdb.{{domain}}/v2/app/:app/object/:object",
+									"protocol": "{{scheme}}",
+									"host": [
+										"configdb",
+										"{{domain}}"
+									],
+									"path": [
+										"v2",
+										"app",
+										":app",
+										"object",
+										":object"
+									]
+								}
+							}
+						}
+					],
+					"description": "Objects + classes + per-app configuration documents."
+				},
+				{
+					"name": "v1 (legacy / search)",
+					"item": [
+						{
+							"name": "search app",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://configdb.{{domain}}/v1/app/:app/search",
+									"protocol": "{{scheme}}",
+									"host": [
+										"configdb",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"app",
+										":app",
+										"search"
+									],
+									"query": [
+										{
+											"key": "name",
+											"value": "example"
+										}
+									]
+								}
+							}
+						},
+						{
+							"name": "search app by class",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://configdb.{{domain}}/v1/app/:app/class/:class/search",
+									"protocol": "{{scheme}}",
+									"host": [
+										"configdb",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"app",
+										":app",
+										"class",
+										":class",
+										"search"
+									],
+									"query": [
+										{
+											"key": "@group",
+											"value": "group_id"
+										}
+									]
+								}
+							}
+						},
+						{
+							"name": "get config (v1)",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://configdb.{{domain}}/v1/app/:app/object/:object",
+									"protocol": "{{scheme}}",
+									"host": [
+										"configdb",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"app",
+										":app",
+										"object",
+										":object"
+									]
+								}
+							}
+						},
+						{
+							"name": "put config (v1)",
+							"request": {
+								"method": "PUT",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://configdb.{{domain}}/v1/app/:app/object/:object",
+									"protocol": "{{scheme}}",
+									"host": [
+										"configdb",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"app",
+										":app",
+										"object",
+										":object"
+									]
+								},
+								"body": {
+									"mode": "raw",
+									"raw": "{}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								}
+							}
+						},
+						{
+							"name": "app config-schema",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://configdb.{{domain}}/v1/app/:app/config-schema",
+									"protocol": "{{scheme}}",
+									"host": [
+										"configdb",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"app",
+										":app",
+										"config-schema"
+									]
+								}
+							}
+						},
+						{
+							"name": "put app schema",
+							"request": {
+								"method": "PUT",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://configdb.{{domain}}/v1/app/:app/config-schema",
+									"protocol": "{{scheme}}",
+									"host": [
+										"configdb",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"app",
+										":app",
+										"config-schema"
+									]
+								},
+								"body": {
+									"mode": "raw",
+									"raw": "{}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								}
+							}
+						},
+						{
+							"name": "load dump",
+							"request": {
+								"method": "POST",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://configdb.{{domain}}/v1/load",
+									"protocol": "{{scheme}}",
+									"host": [
+										"configdb",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"load"
+									]
+								},
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"version\": 1,\n  \"objects\": []\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								}
+							}
+						}
+					],
+					"description": "Compatibility surface that mostly forwards to v2. Search lives only here."
+				}
+			],
+			"description": "Configuration store. /v2 is the modern API; /v1 is a compatibility forwarder for legacy clients. Prefer /v2."
+		},
+		{
+			"name": "directory",
+			"item": [
+				{
+					"name": "search & devices",
+					"item": [
+						{
+							"name": "search",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://directory.{{domain}}/v1/search",
+									"protocol": "{{scheme}}",
+									"host": [
+										"directory",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"search"
+									]
+								}
+							}
+						},
+						{
+							"name": "list devices",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://directory.{{domain}}/v1/device",
+									"protocol": "{{scheme}}",
+									"host": [
+										"directory",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"device"
+									]
+								}
+							}
+						},
+						{
+							"name": "get device",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://directory.{{domain}}/v1/device/:device",
+									"protocol": "{{scheme}}",
+									"host": [
+										"directory",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"device",
+										":device"
+									]
+								}
+							}
+						},
+						{
+							"name": "device history",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://directory.{{domain}}/v1/device/:device/history",
+									"protocol": "{{scheme}}",
+									"host": [
+										"directory",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"device",
+										":device",
+										"history"
+									]
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "addresses",
+					"item": [
+						{
+							"name": "groups",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://directory.{{domain}}/v1/address",
+									"protocol": "{{scheme}}",
+									"host": [
+										"directory",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"address"
+									]
+								}
+							}
+						},
+						{
+							"name": "nodes in group",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://directory.{{domain}}/v1/address/:group",
+									"protocol": "{{scheme}}",
+									"host": [
+										"directory",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"address",
+										":group"
+									]
+								}
+							}
+						},
+						{
+							"name": "devices on node",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://directory.{{domain}}/v1/address/:group/:node",
+									"protocol": "{{scheme}}",
+									"host": [
+										"directory",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"address",
+										":group",
+										":node"
+									]
+								}
+							}
+						},
+						{
+							"name": "device by addr",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://directory.{{domain}}/v1/address/:group/:node/:device",
+									"protocol": "{{scheme}}",
+									"host": [
+										"directory",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"address",
+										":group",
+										":node",
+										":device"
+									]
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "schemas",
+					"item": [
+						{
+							"name": "list schemas",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://directory.{{domain}}/v1/schema",
+									"protocol": "{{scheme}}",
+									"host": [
+										"directory",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"schema"
+									]
+								}
+							}
+						},
+						{
+							"name": "schema devices",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://directory.{{domain}}/v1/schema/:schema/devices",
+									"protocol": "{{scheme}}",
+									"host": [
+										"directory",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"schema",
+										":schema",
+										"devices"
+									]
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "service advertisements",
+					"item": [
+						{
+							"name": "list services",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://directory.{{domain}}/v1/service",
+									"protocol": "{{scheme}}",
+									"host": [
+										"directory",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"service"
+									]
+								}
+							}
+						},
+						{
+							"name": "service providers",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://directory.{{domain}}/v1/service/:service",
+									"protocol": "{{scheme}}",
+									"host": [
+										"directory",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"service",
+										":service"
+									]
+								}
+							}
+						},
+						{
+							"name": "get advertisment",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://directory.{{domain}}/v1/service/:service/advertisment",
+									"protocol": "{{scheme}}",
+									"host": [
+										"directory",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"service",
+										":service",
+										"advertisment"
+									]
+								}
+							}
+						},
+						{
+							"name": "put advertisment",
+							"request": {
+								"method": "PUT",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://directory.{{domain}}/v1/service/:service/advertisment",
+									"protocol": "{{scheme}}",
+									"host": [
+										"directory",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"service",
+										":service",
+										"advertisment"
+									]
+								},
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"service\": \"<service-uuid>\",\n  \"url\": \"https://...\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								}
+							}
+						},
+						{
+							"name": "put advert (proxy)",
+							"request": {
+								"method": "PUT",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://directory.{{domain}}/v1/service/:service/advertisment/:owner",
+									"protocol": "{{scheme}}",
+									"host": [
+										"directory",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"service",
+										":service",
+										"advertisment",
+										":owner"
+									]
+								}
+							}
+						},
+						{
+							"name": "del advertisment",
+							"request": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://directory.{{domain}}/v1/service/:service/advertisment",
+									"protocol": "{{scheme}}",
+									"host": [
+										"directory",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"service",
+										":service",
+										"advertisment"
+									]
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "alerts",
+					"item": [
+						{
+							"name": "list alerts",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://directory.{{domain}}/v1/alert",
+									"protocol": "{{scheme}}",
+									"host": [
+										"directory",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"alert"
+									]
+								}
+							}
+						},
+						{
+							"name": "active alerts",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://directory.{{domain}}/v1/alert/active",
+									"protocol": "{{scheme}}",
+									"host": [
+										"directory",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"alert",
+										"active"
+									]
+								}
+							}
+						},
+						{
+							"name": "alerts by type",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://directory.{{domain}}/v1/alert/type/:type",
+									"protocol": "{{scheme}}",
+									"host": [
+										"directory",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"alert",
+										"type",
+										":type"
+									]
+								}
+							}
+						},
+						{
+							"name": "active by type",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://directory.{{domain}}/v1/alert/type/:type/active",
+									"protocol": "{{scheme}}",
+									"host": [
+										"directory",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"alert",
+										"type",
+										":type",
+										"active"
+									]
+								}
+							}
+						},
+						{
+							"name": "get alert",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://directory.{{domain}}/v1/alert/:uuid",
+									"protocol": "{{scheme}}",
+									"host": [
+										"directory",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"alert",
+										":uuid"
+									]
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "links",
+					"item": [
+						{
+							"name": "list links",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://directory.{{domain}}/v1/link",
+									"protocol": "{{scheme}}",
+									"host": [
+										"directory",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"link"
+									]
+								}
+							}
+						},
+						{
+							"name": "by device",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://directory.{{domain}}/v1/link/device/:device",
+									"protocol": "{{scheme}}",
+									"host": [
+										"directory",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"link",
+										"device",
+										":device"
+									]
+								}
+							}
+						},
+						{
+							"name": "by source",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://directory.{{domain}}/v1/link/source/:source",
+									"protocol": "{{scheme}}",
+									"host": [
+										"directory",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"link",
+										"source",
+										":source"
+									]
+								}
+							}
+						},
+						{
+							"name": "by relation",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://directory.{{domain}}/v1/link/relation/:relation",
+									"protocol": "{{scheme}}",
+									"host": [
+										"directory",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"link",
+										"relation",
+										":relation"
+									]
+								}
+							}
+						},
+						{
+							"name": "by target",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://directory.{{domain}}/v1/link/target/:target",
+									"protocol": "{{scheme}}",
+									"host": [
+										"directory",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"link",
+										"target",
+										":target"
+									]
+								}
+							}
+						},
+						{
+							"name": "get link",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://directory.{{domain}}/v1/link/:uuid",
+									"protocol": "{{scheme}}",
+									"host": [
+										"directory",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"link",
+										":uuid"
+									]
+								}
+							}
+						}
+					]
+				}
+			],
+			"description": "Sparkplug device/node registry. Lists running devices, their history, service advertisements, alerts, schemas, and inter-object links."
+		},
+		{
+			"name": "cmdesc",
+			"item": [
+				{
+					"name": "by node",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{scheme}}://cmdesc.{{domain}}/v1/address/:group/:node",
+							"protocol": "{{scheme}}",
+							"host": [
+								"cmdesc",
+								"{{domain}}"
+							],
+							"path": [
+								"v1",
+								"address",
+								":group",
+								":node"
+							]
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Node Control/Reboot\",\n  \"value\": true\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					}
+				},
+				{
+					"name": "by device",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{scheme}}://cmdesc.{{domain}}/v1/address/:group/:node/:device",
+							"protocol": "{{scheme}}",
+							"host": [
+								"cmdesc",
+								"{{domain}}"
+							],
+							"path": [
+								"v1",
+								"address",
+								":group",
+								":node",
+								":device"
+							]
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Setpoint\",\n  \"value\": 42\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					}
+				}
+			],
+			"description": "Command Escalation. POST a Sparkplug command (write metric) to an edge node or device by address. The body is the metric to write."
+		},
+		{
+			"name": "files",
+			"item": [
+				{
+					"name": "list storage",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{scheme}}://files.{{domain}}/v1/storage",
+							"protocol": "{{scheme}}",
+							"host": [
+								"files",
+								"{{domain}}"
+							],
+							"path": [
+								"v1",
+								"storage"
+							]
+						}
+					}
+				},
+				{
+					"name": "get file",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{scheme}}://files.{{domain}}/v1/storage/:uuid",
+							"protocol": "{{scheme}}",
+							"host": [
+								"files",
+								"{{domain}}"
+							],
+							"path": [
+								"v1",
+								"storage",
+								":uuid"
+							]
+						}
+					}
+				},
+				{
+					"name": "put file",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"url": {
+							"raw": "{{scheme}}://files.{{domain}}/v1/storage/:uuid",
+							"protocol": "{{scheme}}",
+							"host": [
+								"files",
+								"{{domain}}"
+							],
+							"path": [
+								"v1",
+								"storage",
+								":uuid"
+							]
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "<file body>"
+						}
+					}
+				},
+				{
+					"name": "post file",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{scheme}}://files.{{domain}}/v1/storage",
+							"protocol": "{{scheme}}",
+							"host": [
+								"files",
+								"{{domain}}"
+							],
+							"path": [
+								"v1",
+								"storage"
+							]
+						},
+						"description": "Upload as a new file - server assigns a UUID.",
+						"body": {
+							"mode": "raw",
+							"raw": "<file body>"
+						}
+					}
+				}
+			],
+			"description": "Blob store. Each file is keyed by UUID. ACL is enforced per-file."
+		},
+		{
+			"name": "git",
+			"item": [
+				{
+					"name": "repo status (all)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{scheme}}://git.{{domain}}/v1/status",
+							"protocol": "{{scheme}}",
+							"host": [
+								"git",
+								"{{domain}}"
+							],
+							"path": [
+								"v1",
+								"status"
+							]
+						},
+						"description": "Status across all repos."
+					}
+				},
+				{
+					"name": "repo status",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{scheme}}://git.{{domain}}/v1/status/:uuid",
+							"protocol": "{{scheme}}",
+							"host": [
+								"git",
+								"{{domain}}"
+							],
+							"path": [
+								"v1",
+								"status",
+								":uuid"
+							]
+						}
+					}
+				},
+				{
+					"name": "list storage",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{scheme}}://git.{{domain}}/v1/storage",
+							"protocol": "{{scheme}}",
+							"host": [
+								"git",
+								"{{domain}}"
+							],
+							"path": [
+								"v1",
+								"storage"
+							]
+						}
+					}
+				},
+				{
+					"name": "delete storage",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{scheme}}://git.{{domain}}/v1/storage/:uuid",
+							"protocol": "{{scheme}}",
+							"host": [
+								"git",
+								"{{domain}}"
+							],
+							"path": [
+								"v1",
+								"storage",
+								":uuid"
+							]
+						},
+						"description": "Remove a repo's on-disk storage (does not delete the ConfigDB entry)."
+					}
+				}
+			],
+			"description": "Git repository hosting (git-http-backend over HTTP) plus storage management.\n\nThe /git/:group/:repo/* and /uuid/:uuid/* paths serve the git smart HTTP protocol (clone/push/fetch) - they aren't useful in Postman, use `git` itself. The /v1 endpoints are for storage management."
+		},
+		{
+			"name": "cluster-manager",
+			"item": [
+				{
+					"name": "cluster status",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{scheme}}://clusters.{{domain}}/v1/cluster/:cluster/status",
+							"protocol": "{{scheme}}",
+							"host": [
+								"clusters",
+								"{{domain}}"
+							],
+							"path": [
+								"v1",
+								"cluster",
+								":cluster",
+								"status"
+							]
+						}
+					}
+				},
+				{
+					"name": "cluster bootstrap",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{scheme}}://clusters.{{domain}}/v1/cluster/:cluster/bootstrap",
+							"protocol": "{{scheme}}",
+							"host": [
+								"clusters",
+								"{{domain}}"
+							],
+							"path": [
+								"v1",
+								"cluster",
+								":cluster",
+								"bootstrap"
+							]
+						},
+						"description": "Returns the bootstrap manifest to apply to a new edge cluster."
+					}
+				},
+				{
+					"name": "set bootstrap URL",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{scheme}}://clusters.{{domain}}/v1/cluster/:cluster/bootstrap-url",
+							"protocol": "{{scheme}}",
+							"host": [
+								"clusters",
+								"{{domain}}"
+							],
+							"path": [
+								"v1",
+								"cluster",
+								":cluster",
+								"bootstrap-url"
+							]
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"url\": \"https://...\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					}
+				},
+				{
+					"name": "seal secret",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"url": {
+							"raw": "{{scheme}}://clusters.{{domain}}/v1/cluster/:cluster/secret/:namespace/:name/:key",
+							"protocol": "{{scheme}}",
+							"host": [
+								"clusters",
+								"{{domain}}"
+							],
+							"path": [
+								"v1",
+								"cluster",
+								":cluster",
+								"secret",
+								":namespace",
+								":name",
+								":key"
+							]
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "<plaintext secret>"
+						}
+					}
+				},
+				{
+					"name": "seal secret (dry-run)",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"url": {
+							"raw": "{{scheme}}://clusters.{{domain}}/v1/cluster/:cluster/secret/:namespace/:name/:key",
+							"protocol": "{{scheme}}",
+							"host": [
+								"clusters",
+								"{{domain}}"
+							],
+							"path": [
+								"v1",
+								"cluster",
+								":cluster",
+								"secret",
+								":namespace",
+								":name",
+								":key"
+							],
+							"query": [
+								{
+									"key": "dryrun",
+									"value": "true"
+								}
+							]
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "<plaintext secret>"
+						}
+					}
+				},
+				{
+					"name": "delete sealed secret",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{scheme}}://clusters.{{domain}}/v1/cluster/:cluster/secret/:namespace/:name/:key",
+							"protocol": "{{scheme}}",
+							"host": [
+								"clusters",
+								"{{domain}}"
+							],
+							"path": [
+								"v1",
+								"cluster",
+								":cluster",
+								"secret",
+								":namespace",
+								":name",
+								":key"
+							]
+						}
+					}
+				},
+				{
+					"name": "delete sealed (dry-run)",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{scheme}}://clusters.{{domain}}/v1/cluster/:cluster/secret/:namespace/:name/:key",
+							"protocol": "{{scheme}}",
+							"host": [
+								"clusters",
+								"{{domain}}"
+							],
+							"path": [
+								"v1",
+								"cluster",
+								":cluster",
+								"secret",
+								":namespace",
+								":name",
+								":key"
+							],
+							"query": [
+								{
+									"key": "dryrun",
+									"value": "true"
+								}
+							]
+						}
+					}
+				}
+			],
+			"description": "Edge Cluster Manager. Cluster provisioning, bootstrap manifests, sealed secret management for edge clusters."
+		},
+		{
+			"name": "i3x",
+			"item": [
+				{
+					"name": "namespaces & types",
+					"item": [
+						{
+							"name": "list namespaces",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://i3x.{{domain}}/v1/namespaces",
+									"protocol": "{{scheme}}",
+									"host": [
+										"i3x",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"namespaces"
+									]
+								}
+							}
+						},
+						{
+							"name": "list object types",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://i3x.{{domain}}/v1/objecttypes",
+									"protocol": "{{scheme}}",
+									"host": [
+										"i3x",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"objecttypes"
+									]
+								}
+							}
+						},
+						{
+							"name": "get object type",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://i3x.{{domain}}/v1/objecttypes/:elementId",
+									"protocol": "{{scheme}}",
+									"host": [
+										"i3x",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"objecttypes",
+										":elementId"
+									]
+								}
+							}
+						},
+						{
+							"name": "query object types",
+							"request": {
+								"method": "POST",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://i3x.{{domain}}/v1/objecttypes/query",
+									"protocol": "{{scheme}}",
+									"host": [
+										"i3x",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"objecttypes",
+										"query"
+									]
+								},
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"filter\": {}\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								}
+							}
+						},
+						{
+							"name": "list relationship types",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://i3x.{{domain}}/v1/relationshiptypes",
+									"protocol": "{{scheme}}",
+									"host": [
+										"i3x",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"relationshiptypes"
+									]
+								}
+							}
+						},
+						{
+							"name": "get relationship type",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://i3x.{{domain}}/v1/relationshiptypes/:elementId",
+									"protocol": "{{scheme}}",
+									"host": [
+										"i3x",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"relationshiptypes",
+										":elementId"
+									]
+								}
+							}
+						},
+						{
+							"name": "query relationship types",
+							"request": {
+								"method": "POST",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://i3x.{{domain}}/v1/relationshiptypes/query",
+									"protocol": "{{scheme}}",
+									"host": [
+										"i3x",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"relationshiptypes",
+										"query"
+									]
+								},
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"filter\": {}\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "objects",
+					"item": [
+						{
+							"name": "list objects",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://i3x.{{domain}}/v1/objects",
+									"protocol": "{{scheme}}",
+									"host": [
+										"i3x",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"objects"
+									]
+								}
+							}
+						},
+						{
+							"name": "list (filtered)",
+							"request": {
+								"method": "POST",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://i3x.{{domain}}/v1/objects/list",
+									"protocol": "{{scheme}}",
+									"host": [
+										"i3x",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"objects",
+										"list"
+									]
+								},
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"filter\": {}\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								}
+							}
+						},
+						{
+							"name": "bulk values",
+							"request": {
+								"method": "POST",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://i3x.{{domain}}/v1/objects/value",
+									"protocol": "{{scheme}}",
+									"host": [
+										"i3x",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"objects",
+										"value"
+									]
+								},
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"elementIds\": [\"<id>\", \"<id>\"]\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								}
+							}
+						},
+						{
+							"name": "bulk history",
+							"request": {
+								"method": "POST",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://i3x.{{domain}}/v1/objects/history",
+									"protocol": "{{scheme}}",
+									"host": [
+										"i3x",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"objects",
+										"history"
+									]
+								},
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"elementIds\": [\"<id>\"],\n  \"from\": \"2026-05-01T00:00:00Z\",\n  \"to\": \"2026-05-14T00:00:00Z\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								}
+							}
+						},
+						{
+							"name": "related (bulk)",
+							"request": {
+								"method": "POST",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://i3x.{{domain}}/v1/objects/related",
+									"protocol": "{{scheme}}",
+									"host": [
+										"i3x",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"objects",
+										"related"
+									]
+								},
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"elementIds\": [\"<id>\"]\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								}
+							}
+						},
+						{
+							"name": "get object",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://i3x.{{domain}}/v1/objects/:elementId",
+									"protocol": "{{scheme}}",
+									"host": [
+										"i3x",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"objects",
+										":elementId"
+									]
+								}
+							}
+						},
+						{
+							"name": "get value",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://i3x.{{domain}}/v1/objects/:elementId/value",
+									"protocol": "{{scheme}}",
+									"host": [
+										"i3x",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"objects",
+										":elementId",
+										"value"
+									]
+								}
+							}
+						},
+						{
+							"name": "get history",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://i3x.{{domain}}/v1/objects/:elementId/history",
+									"protocol": "{{scheme}}",
+									"host": [
+										"i3x",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"objects",
+										":elementId",
+										"history"
+									],
+									"query": [
+										{
+											"key": "from",
+											"value": "2026-05-01T00:00:00Z"
+										},
+										{
+											"key": "to",
+											"value": "2026-05-14T00:00:00Z"
+										}
+									]
+								}
+							}
+						},
+						{
+							"name": "get related",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://i3x.{{domain}}/v1/objects/:elementId/related",
+									"protocol": "{{scheme}}",
+									"host": [
+										"i3x",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"objects",
+										":elementId",
+										"related"
+									]
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "subscriptions",
+					"item": [
+						{
+							"name": "create subscription",
+							"request": {
+								"method": "POST",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://i3x.{{domain}}/v1/subscriptions",
+									"protocol": "{{scheme}}",
+									"host": [
+										"i3x",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"subscriptions"
+									]
+								},
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"elementIds\": [\"<id>\"],\n  \"ttlMs\": 300000\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								}
+							}
+						},
+						{
+							"name": "list",
+							"request": {
+								"method": "POST",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://i3x.{{domain}}/v1/subscriptions/list",
+									"protocol": "{{scheme}}",
+									"host": [
+										"i3x",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"subscriptions",
+										"list"
+									]
+								}
+							}
+						},
+						{
+							"name": "register",
+							"request": {
+								"method": "POST",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://i3x.{{domain}}/v1/subscriptions/register",
+									"protocol": "{{scheme}}",
+									"host": [
+										"i3x",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"subscriptions",
+										"register"
+									]
+								},
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"subscriptionId\": \"<id>\",\n  \"elementIds\": [\"<id>\"]\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								}
+							}
+						},
+						{
+							"name": "unregister",
+							"request": {
+								"method": "POST",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://i3x.{{domain}}/v1/subscriptions/unregister",
+									"protocol": "{{scheme}}",
+									"host": [
+										"i3x",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"subscriptions",
+										"unregister"
+									]
+								},
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"subscriptionId\": \"<id>\",\n  \"elementIds\": [\"<id>\"]\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								}
+							}
+						},
+						{
+							"name": "delete",
+							"request": {
+								"method": "POST",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://i3x.{{domain}}/v1/subscriptions/delete",
+									"protocol": "{{scheme}}",
+									"host": [
+										"i3x",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"subscriptions",
+										"delete"
+									]
+								},
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"subscriptionIds\": [\"<id>\"]\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								}
+							}
+						},
+						{
+							"name": "stream (SSE)",
+							"request": {
+								"method": "POST",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://i3x.{{domain}}/v1/subscriptions/stream",
+									"protocol": "{{scheme}}",
+									"host": [
+										"i3x",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"subscriptions",
+										"stream"
+									]
+								},
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"subscriptionId\": \"<id>\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								}
+							}
+						},
+						{
+							"name": "sync (poll)",
+							"request": {
+								"method": "POST",
+								"header": [],
+								"url": {
+									"raw": "{{scheme}}://i3x.{{domain}}/v1/subscriptions/sync",
+									"protocol": "{{scheme}}",
+									"host": [
+										"i3x",
+										"{{domain}}"
+									],
+									"path": [
+										"v1",
+										"subscriptions",
+										"sync"
+									]
+								},
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"subscriptionId\": \"<id>\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								}
+							}
+						}
+					],
+					"description": "Live value subscriptions. Stream via SSE or poll via sync."
+				}
+			],
+			"description": "i3X v1 REST/SSE API. Northbound surface for third-party REST clients - this is the primary consumer of the new JWT auth flow.\n\n/v1/info is public; all other endpoints require a JWT."
+		}
+	]
+}

@@ -18,6 +18,11 @@ cluster-manager, git, i3x).
 > [oauth-clients.md](./oauth-clients.md)) and not for service-to-service
 > calls (those use the cluster-local Kerberos identity).
 
+> **In a hurry?** Import [`docs/Factory+.postman_collection.json`](../Factory+.postman_collection.json)
+> into Postman. It has the OAuth config pre-baked plus 120+ requests
+> covering every F+ HTTP service. Set the `domain` collection variable
+> to your cluster's base hostname and you're done.
+
 ## How it works at a glance
 
 ```

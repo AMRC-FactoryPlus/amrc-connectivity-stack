@@ -1,7 +1,18 @@
 $kind: http-request
-url: "{{scheme}}://i3x.{{domain}}/v1/objects/:elementId/history"
+url: '{{scheme}}://i3x.{{domain}}/v1/objects/:elementId/history'
 method: GET
 queryParams:
-  from: 2026-05-01T00:00:00Z
-  to: 2026-05-14T00:00:00Z
+  from: 2026-05-01 00:00:00+00:00
+  to: 2026-05-14 00:00:00+00:00
 order: 8000
+events:
+- listen: test
+  script:
+    type: text/javascript
+    exec:
+    - pm.test('No 5xx server error', function () {
+    - '    pm.expect(pm.response.code).to.be.below(500);'
+    - '});'
+    - pm.test('Auth succeeded', function () {
+    - '    pm.expect(pm.response.code).to.not.equal(401);'
+    - '});'

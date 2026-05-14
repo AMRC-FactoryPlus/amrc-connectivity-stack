@@ -1,5 +1,16 @@
 $kind: http-request
 description: Members of Class.App. Compat shim that forwards to /v2/class/<App>/member.
-url: "{{scheme}}://configdb.{{domain}}/v2/app"
+url: '{{scheme}}://configdb.{{domain}}/v2/app'
 method: GET
 order: 5000
+events:
+- listen: test
+  script:
+    type: text/javascript
+    exec:
+    - pm.test('No 5xx server error', function () {
+    - '    pm.expect(pm.response.code).to.be.below(500);'
+    - '});'
+    - pm.test('Auth succeeded', function () {
+    - '    pm.expect(pm.response.code).to.not.equal(401);'
+    - '});'

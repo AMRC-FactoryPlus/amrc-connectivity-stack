@@ -1,4 +1,15 @@
 $kind: http-request
-url: "{{scheme}}://auth.{{domain}}/v2/grant"
+url: '{{scheme}}://auth.{{domain}}/v2/grant'
 method: GET
 order: 14000
+events:
+- listen: test
+  script:
+    type: text/javascript
+    exec:
+    - pm.test('No 5xx server error', function () {
+    - '    pm.expect(pm.response.code).to.be.below(500);'
+    - '});'
+    - pm.test('Auth succeeded', function () {
+    - '    pm.expect(pm.response.code).to.not.equal(401);'
+    - '});'

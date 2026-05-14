@@ -1,4 +1,15 @@
 $kind: http-request
-url: "{{scheme}}://directory.{{domain}}/v1/service/:service/advertisment"
+url: '{{scheme}}://directory.{{domain}}/v1/service/:service/advertisment'
 method: GET
 order: 3000
+events:
+- listen: test
+  script:
+    type: text/javascript
+    exec:
+    - pm.test('No 5xx server error', function () {
+    - '    pm.expect(pm.response.code).to.be.below(500);'
+    - '});'
+    - pm.test('Auth succeeded', function () {
+    - '    pm.expect(pm.response.code).to.not.equal(401);'
+    - '});'

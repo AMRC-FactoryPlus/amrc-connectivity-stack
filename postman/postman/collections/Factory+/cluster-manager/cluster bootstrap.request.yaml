@@ -1,5 +1,16 @@
 $kind: http-request
 description: Returns the bootstrap manifest to apply to a new edge cluster.
-url: "{{scheme}}://clusters.{{domain}}/v1/cluster/:cluster/bootstrap"
+url: '{{scheme}}://clusters.{{domain}}/v1/cluster/:cluster/bootstrap'
 method: GET
 order: 2000
+events:
+- listen: test
+  script:
+    type: text/javascript
+    exec:
+    - pm.test('No 5xx server error', function () {
+    - '    pm.expect(pm.response.code).to.be.below(500);'
+    - '});'
+    - pm.test('Auth succeeded', function () {
+    - '    pm.expect(pm.response.code).to.not.equal(401);'
+    - '});'

@@ -29,6 +29,9 @@ export class Auth {
     async resolve_upn (upn, maproot) {
         if (this.is_root(upn))
             return maproot;
-        return this.auth.resolve_identity("kerberos", upn);
+        /* resolve_principal handles both Kerberos UPNs (pre-JWT
+         * callers) and UUID-form principals (JWT callers) via
+         * decode_principal, returning the same UUID-or-null result. */
+        return this.auth.resolve_principal(upn);
     }
 }

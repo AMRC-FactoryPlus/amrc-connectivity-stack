@@ -16,3 +16,4 @@ node_modules/
 /.claude/worktrees/
 /.claude/scheduled_tasks.lock
 /.env.worktree
+.grepai/

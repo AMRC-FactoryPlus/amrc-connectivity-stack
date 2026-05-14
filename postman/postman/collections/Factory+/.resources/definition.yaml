@@ -1,30 +1,48 @@
 $kind: collection
-description: |-
-  Factory+ HTTP API collection for the AMRC Connectivity Stack.
-
-  **Authentication.** All requests inherit OAuth 2.0 (Authorization Code with PKCE) against the cluster's Keycloak `acs-cli` public client. Click the collection's Authorization tab → Get New Access Token to obtain a JWT, then Use Token. Pings explicitly opt out via per-request `noauth`.
-
-  **Setup.** Set the `scheme` (http/https) and `domain` (the ACS base hostname) collection variables to your deployment. Every request URL derives from those plus the per-service subdomain - no other configuration needed.
-
-  **Coverage.** All HTTP-facing F+ services on the cluster: auth, configdb, directory, cmdesc, files, git, cluster-manager (clusters subdomain), i3x. Services not listed here (monitor, historians, edge agents, etc.) speak only Sparkplug/MQTT and have no HTTP surface to test.
-
-  **Requires** the JWT auth feature deployed (v5.2.0-i3x.6 or newer). Older ACS releases reject Keycloak JWTs and need Basic/Negotiate auth instead.
+description: "Factory+ HTTP API collection for the AMRC Connectivity Stack.\n\n**Authentication.** All requests inherit OAuth\
+  \ 2.0 (Authorization Code with PKCE) against the cluster's Keycloak `acs-cli` public client. Click the collection's Authorization\
+  \ tab \u2192 Get New Access Token to obtain a JWT, then Use Token. Pings explicitly opt out via per-request `noauth`.\n\n\
+  **Setup.** Set the `scheme` (http/https) and `domain` (the ACS base hostname) collection variables to your deployment. Every\
+  \ request URL derives from those plus the per-service subdomain - no other configuration needed.\n\n**Coverage.** All HTTP-facing\
+  \ F+ services on the cluster: auth, configdb, directory, cmdesc, files, git, cluster-manager (clusters subdomain), i3x.\
+  \ Services not listed here (monitor, historians, edge agents, etc.) speak only Sparkplug/MQTT and have no HTTP surface to\
+  \ test.\n\n**Requires** the JWT auth feature deployed (v5.2.0-i3x.6 or newer). Older ACS releases reject Keycloak JWTs and\
+  \ need Basic/Negotiate auth instead."
 variables:
   scheme: https
   domain: acs.example.com
+  principalUuid: ''
+  grantUuid: ''
+  identityKind: ''
+  appUuid: ''
+  classUuid: ''
+  objectUuid: ''
+  deviceUuid: ''
+  serviceUuid: ''
+  alertUuid: ''
+  linkUuid: ''
+  schemaUuid: ''
+  addressGroup: ''
+  addressNode: ''
+  addressDevice: ''
+  fileUuid: ''
+  gitStorageUuid: ''
+  i3xObjectTypeId: ''
+  i3xRelTypeId: ''
+  i3xObjectId: ''
 auth:
-  - id: 8c04df04-f9a4-40bd-8ed0-316b571211fe
-    type: oauth2
-    name: oauth2 auth
-    credentials:
-      tokenName: Factory+ ({{domain}})
-      grant_type: authorization_code_with_pkce
-      authUrl: "{{scheme}}://openid.{{domain}}/realms/factory_plus/protocol/openid-connect/auth"
-      accessTokenUrl: "{{scheme}}://openid.{{domain}}/realms/factory_plus/protocol/openid-connect/token"
-      refreshTokenUrl: "{{scheme}}://openid.{{domain}}/realms/factory_plus/protocol/openid-connect/token"
-      clientId: acs-cli
-      challengeAlgorithm: S256
-      scope: openid
-      redirect_uri: https://oauth.pstmn.io/v1/callback
-      client_authentication: body
-      addTokenTo: header
+- id: 8c04df04-f9a4-40bd-8ed0-316b571211fe
+  type: oauth2
+  name: oauth2 auth
+  credentials:
+    tokenName: Factory+ ({{domain}})
+    grant_type: authorization_code_with_pkce
+    authUrl: '{{scheme}}://openid.{{domain}}/realms/factory_plus/protocol/openid-connect/auth'
+    accessTokenUrl: '{{scheme}}://openid.{{domain}}/realms/factory_plus/protocol/openid-connect/token'
+    refreshTokenUrl: '{{scheme}}://openid.{{domain}}/realms/factory_plus/protocol/openid-connect/token'
+    clientId: acs-cli
+    challengeAlgorithm: S256
+    scope: openid
+    redirect_uri: https://oauth.pstmn.io/v1/callback
+    client_authentication: body
+    addTokenTo: header

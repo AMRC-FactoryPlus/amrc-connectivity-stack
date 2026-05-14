@@ -1,6 +1,6 @@
 $kind: http-request
 description: Recursive group membership for a principal (used by the SPI for the fp_groups claim).
-url: '{{scheme}}://auth.{{domain}}/v2/principal/:uuid/groups'
+url: '{{scheme}}://auth.{{domain}}/v2/principal/{{principalUuid}}/groups'
 method: GET
 order: 5000
 events:
@@ -8,6 +8,10 @@ events:
   script:
     type: text/javascript
     exec:
-    - pm.test('Status is 200 / 404', function () {
+    - pm.test('Status is 200 (or 404 if upstream list empty)', function () {
     - '    pm.expect(pm.response.code).to.be.oneOf([200, 404]);'
+    - '});'
+    - pm.test('Got a real principalUuid from upstream list', function () {
+    - '    pm.expect(pm.collectionVariables.get(''principalUuid''),'
+    - '        ''no principalUuid - check the upstream list endpoint'').to.not.be.empty;'
     - '});'

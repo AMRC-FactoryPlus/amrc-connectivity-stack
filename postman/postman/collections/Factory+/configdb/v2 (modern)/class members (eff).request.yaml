@@ -1,6 +1,6 @@
 $kind: http-request
 description: All effective members (transitive via subclass).
-url: '{{scheme}}://configdb.{{domain}}/v2/class/:class/member'
+url: '{{scheme}}://configdb.{{domain}}/v2/class/{{classUuid}}/member'
 method: GET
 order: 8000
 events:
@@ -8,6 +8,10 @@ events:
   script:
     type: text/javascript
     exec:
-    - pm.test('Status is 200 / 404', function () {
+    - pm.test('Status is 200 (or 404 if upstream list empty)', function () {
     - '    pm.expect(pm.response.code).to.be.oneOf([200, 404]);'
+    - '});'
+    - pm.test('Got a real classUuid from upstream list', function () {
+    - '    pm.expect(pm.collectionVariables.get(''classUuid''),'
+    - '        ''no classUuid - check the upstream list endpoint'').to.not.be.empty;'
     - '});'

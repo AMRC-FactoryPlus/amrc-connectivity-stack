@@ -64,6 +64,18 @@ export interface MetricMeta {
 }
 
 /**
+ * Origin of a node in the tree.
+ *  - "config" : derived from ConfigDB (DeviceInformation originMap,
+ *               ISA-95 hierarchy, device-level objects).
+ *  - "uns"    : discovered at runtime from a UNS MQTT message and
+ *               not (yet) represented in any DeviceInformation config.
+ *
+ * Tracked in a parallel map on the snapshot so the API/wire shape
+ * I3xObject stays clean.
+ */
+export type NodeSource = "config" | "uns";
+
+/**
  * All mutable tree state, bundled so refresh() can build a new snapshot
  * off to the side and swap it in with a single synchronous assignment.
  * Readers running between event-loop turns see either the old or new
@@ -74,6 +86,7 @@ interface TreeSnapshot {
     objects: Map<string, I3xObject>;
     children: Map<string, Set<string>>;
     metricMeta: Map<string, MetricMeta>;
+    sources: Map<string, NodeSource>;
 }
 
 function emptySnapshot(): TreeSnapshot {
@@ -82,6 +95,7 @@ function emptySnapshot(): TreeSnapshot {
         objects: new Map(),
         children: new Map(),
         metricMeta: new Map(),
+        sources: new Map(),
     };
 }
 
@@ -130,22 +144,27 @@ export class ObjectTree {
     }
 
     async refresh(): Promise<void> {
-        // Build the new tree off to the side, then swap it in atomically so
-        // in-flight API reads see either the old or new snapshot, never a
-        // partial one. UNS-driven writes via addCompositionFromUns continue
-        // to land on the live (old) snapshot during the rebuild and are
-        // discarded by the swap; the next UNS message per topic rebuilds them.
+        // Build the new tree off to the side, port UNS-discovered nodes
+        // from the old snapshot, then swap atomically. In-flight API
+        // reads see either the old or new snapshot, never a partial one.
+        // UNS-driven writes via addCompositionFromUns continue to land on
+        // the live (old) snapshot during the rebuild and are picked up by
+        // preserveUnsNodes when the swap happens.
+        const old = this.snapshot;
         const next = emptySnapshot();
         await this.loadDevices(next);
+        this.preserveUnsNodes(old, next);
         this.snapshot = next;
     }
 
     /**
      * Rebuild the snapshot from configs already fetched by the reactive
-     * pipeline. Same atomic-swap semantics as refresh(), but no HTTP — the
-     * caller has done the fetching via notify-v2 watches.
+     * pipeline. Same atomic-swap and UNS-preservation semantics as
+     * refresh(), but no HTTP — the caller has done the fetching via
+     * notify-v2 watches.
      */
     refreshFromSnapshot(input: PipelineSnapshot): void {
+        const old = this.snapshot;
         const next = emptySnapshot();
         for (const [uuid, { devInfo, info }] of input.devices) {
             this.buildDeviceInSnapshot(uuid, devInfo, info, next);
@@ -153,7 +172,70 @@ export class ObjectTree {
         for (const [schemaUuid, { schema, info }] of input.schemas) {
             this.buildObjectTypeInSnapshot(schemaUuid, schema, info, next);
         }
+        this.preserveUnsNodes(old, next);
         this.snapshot = next;
+    }
+
+    /**
+     * Carry UNS-discovered nodes from `old` into `next`. For every node
+     * already present in `next` (i.e. every config-derived parent that
+     * survives the rebuild), find UNS-source children of that node in
+     * `old` and copy their subtrees into `next`. UNS-source nodes whose
+     * parents are no longer in `next` (e.g. their device was removed)
+     * are silently dropped — they're orphans.
+     *
+     * Config-derived nodes with the same elementId in both snapshots are
+     * already in `next` from the build, so an UNS-discovered node that
+     * has since been added to the device's DeviceInformation config
+     * automatically becomes config-source (config wins).
+     */
+    private preserveUnsNodes(old: TreeSnapshot, next: TreeSnapshot): void {
+        // Walk every node in `next` and look for UNS-source children of
+        // it in `old` that aren't already in `next`. We must enqueue any
+        // newly-copied UNS nodes so we pick up nested UNS subtrees.
+        const queue: string[] = [...next.objects.keys()];
+        while (queue.length > 0) {
+            const parentId = queue.shift()!;
+            const oldChildren = old.children.get(parentId);
+            if (!oldChildren) continue;
+            for (const childId of oldChildren) {
+                if (next.objects.has(childId)) continue;
+                if (old.sources.get(childId) !== "uns") continue;
+                this.copyUnsSubtree(childId, old, next);
+                queue.push(childId);
+            }
+        }
+    }
+
+    /** Recursively copy a UNS-source subtree from `old` to `next`. */
+    private copyUnsSubtree(id: string, old: TreeSnapshot, next: TreeSnapshot): void {
+        const obj = old.objects.get(id);
+        if (!obj) return;
+
+        next.objects.set(id, obj);
+        next.sources.set(id, "uns");
+
+        if (obj.parentId !== null) {
+            if (!next.children.has(obj.parentId)) {
+                next.children.set(obj.parentId, new Set());
+            }
+            next.children.get(obj.parentId)!.add(id);
+        }
+
+        const meta = old.metricMeta.get(id);
+        if (meta) next.metricMeta.set(id, meta);
+
+        const oldChildren = old.children.get(id);
+        if (oldChildren) {
+            for (const childId of oldChildren) {
+                this.copyUnsSubtree(childId, old, next);
+            }
+        }
+    }
+
+    /** Test-facing inspector for a node's origin. */
+    getNodeSource(elementId: string): NodeSource | undefined {
+        return this.snapshot.sources.get(elementId);
     }
 
     isReady(): boolean {
@@ -291,6 +373,7 @@ export class ObjectTree {
                     true,           // isComposition
                 );
                 target.objects.set(elementId, obj);
+                target.sources.set(elementId, "config");
 
                 if (!target.children.has(parentId)) {
                     target.children.set(parentId, new Set());
@@ -329,9 +412,9 @@ export class ObjectTree {
         metricSegments: string[],
         isa95Segments?: string[],
     ): string | null {
-        // Mutate the live snapshot directly. If a refresh is in flight,
-        // these writes land on the soon-to-be-discarded old snapshot and
-        // will be re-applied by the next UNS message on this topic.
+        // Mutate the live snapshot directly. Nodes added here are tagged
+        // source:"uns"; preserveUnsNodes() carries them across atomic
+        // refreshes as long as their parent survives in the new snapshot.
         const target = this.snapshot;
 
         // Since f46612c5, Instance_UUID === ConfigDB object UUID,
@@ -388,6 +471,7 @@ export class ObjectTree {
                     !isLeaf,  // isComposition: true for branches, false for leaves
                 );
                 target.objects.set(elementId, obj);
+                target.sources.set(elementId, "uns");
 
                 // Track parent -> children
                 if (!target.children.has(parentId)) {
@@ -512,6 +596,7 @@ export class ObjectTree {
                     !isLeaf,
                 );
                 target.objects.set(elementId, obj);
+                target.sources.set(elementId, "config");
 
                 if (!target.children.has(parentId)) {
                     target.children.set(parentId, new Set());
@@ -668,6 +753,7 @@ export class ObjectTree {
 
         const obj = toI3xObject(uuid, displayName, schemaUuid, "/", true);
         target.objects.set(uuid, obj);
+        target.sources.set(uuid, "config");
 
         if (isa95Segments.length > 0) {
             this.ensureIsa95Hierarchy(isa95Segments, uuid, target);

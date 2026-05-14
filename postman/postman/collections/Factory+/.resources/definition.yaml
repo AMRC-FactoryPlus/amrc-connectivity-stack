@@ -46,3 +46,15 @@ auth:
     redirect_uri: https://oauth.pstmn.io/v1/callback
     client_authentication: body
     addTokenTo: header
+events:
+- listen: prerequest
+  script:
+    type: text/javascript
+    exec:
+    - // Collection Runner only fires GET requests.
+    - // Mutating verbs (POST/PUT/PATCH/DELETE) stay in the collection
+    - // for manual use; they're skipped during a Run.
+    - if (pm.request.method !== 'GET') {
+    - '    console.log(`[skip] ${pm.request.method} ${pm.info.requestName}`);'
+    - '    pm.execution.skipRequest();'
+    - '}'

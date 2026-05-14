@@ -1,4 +1,4 @@
 $kind: http-request
-url: '{{scheme}}://files.{{domain}}/v1/storage/:uuid'
+url: '{{scheme}}://files.{{domain}}/v1/file/:uuid'
 method: GET
 order: 2000

@@ -26,6 +26,7 @@ import {
 } from "./constants.js";
 import { ObjectTree, PipelineSnapshot } from "./object-tree.js";
 import { I3xRag } from "./rag/i3x-rag.js";
+import { applyDiff } from "./diff.js";
 
 /** Minimal duck-typed shape we need from an immutable.js Set. */
 interface ImmSetLike<T> {
@@ -107,38 +108,37 @@ export class ObjectTreeRefresh {
             }),
         );
 
-        // A `pending` slot coalesces emissions during an in-flight rebuild
-        // — the latest emission wins, intermediate ones are discarded.
-        let inFlight = false;
-        let pending: PipelineSnapshot | null = null;
-
-        const apply = async (first: PipelineSnapshot) => {
-            inFlight = true;
-            try {
-                let next: PipelineSnapshot | null = first;
-                while (next) {
-                    const emission = next;
-                    next = null;
-                    await this.objectTree.refreshFromSnapshot(emission);
-                    this.i3xRag.rebuild();
-                    this.log("object tree refreshed: nodes=%d",
-                        this.i3xRag.nodeCount());
-                    if (pending) {
-                        next = pending;
-                        pending = null;
-                    }
-                }
-            } catch (err) {
-                console.error("Failed to refresh object tree:", err);
-            } finally {
-                inFlight = false;
-            }
-        };
+        // The first emission seeds the tree via the swap path
+        // (refreshFromSnapshot), so it picks up the UNS-preservation
+        // logic and matches whatever the HTTP bootstrap built. Every
+        // subsequent emission is diffed against the previous and
+        // dispatched as per-device / per-schema mutations.
+        let prev: PipelineSnapshot | null = null;
 
         pipeline$.subscribe({
             next: (emission: PipelineSnapshot) => {
-                if (inFlight) { pending = emission; return; }
-                void apply(emission);
+                try {
+                    if (prev === null) {
+                        this.objectTree.refreshFromSnapshot(emission);
+                    } else {
+                        applyDiff(prev, emission, this.objectTree);
+                    }
+                    this.i3xRag.rebuild();
+                    this.log("object tree refreshed: nodes=%d",
+                        this.i3xRag.nodeCount());
+                    prev = emission;
+                } catch (err) {
+                    console.error(
+                        "Pipeline apply failed, falling back to full rebuild:",
+                        err);
+                    try {
+                        this.objectTree.refreshFromSnapshot(emission);
+                        this.i3xRag.rebuild();
+                        prev = emission;
+                    } catch (err2) {
+                        console.error("Full-rebuild fallback also failed:", err2);
+                    }
+                }
             },
             error: (err: unknown) =>
                 console.error("ConfigDB pipeline errored:", err),

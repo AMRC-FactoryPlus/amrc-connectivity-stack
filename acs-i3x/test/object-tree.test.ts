@@ -743,4 +743,135 @@ describe("ObjectTree", () => {
             expect(tree.getNodeSource(axes)).toBe("config");
         });
     });
+
+    describe("incremental mutations (pipeline fast-path)", () => {
+        const SCHEMA_UUID = "schema-mut-1";
+        const DEV_INFO_SCHEMA = "2dd093e9-1450-44c5-be8c-c0d78e48219b";
+
+        function mkDevInfo(uuid: string, sparkplugName: string, extra: Record<string, any> = {}) {
+            return {
+                schema: SCHEMA_UUID,
+                sparkplugName,
+                originMap: {
+                    Schema_UUID: SCHEMA_UUID,
+                    Instance_UUID: uuid,
+                    Device_Information: {
+                        Schema_UUID: DEV_INFO_SCHEMA,
+                        ISA95_Hierarchy: {
+                            Schema_UUID: HIERARCHY_SCHEMA_UUID,
+                            Enterprise: { Value: "ACME" },
+                            Site: { Value: "Plant1" },
+                        },
+                    },
+                    ...extra,
+                },
+            };
+        }
+
+        async function emptyTree() {
+            const tree = makeTree();
+            await tree.init();
+            return tree;
+        }
+
+        it("addDevice places the device under its ISA-95 hierarchy", async () => {
+            const tree = await emptyTree();
+            tree.addDevice("dev-A", mkDevInfo("dev-A", "Device A"), { name: "Device A" });
+
+            const dev = tree.getObject("dev-A");
+            expect(dev).toBeDefined();
+            expect(dev!.displayName).toBe("Device A");
+            expect(dev!.parentId).not.toBe("/"); // re-parented under ISA-95
+            expect(tree.getNodeSource("dev-A")).toBe("config");
+        });
+
+        it("removeDevice removes the device, descendants, and orphan ISA-95 ancestors", async () => {
+            const tree = await emptyTree();
+            tree.addDevice("dev-A", mkDevInfo("dev-A", "Device A"), { name: "Device A" });
+
+            const dev = tree.getObject("dev-A")!;
+            const isa95Parent = dev.parentId!;
+
+            tree.removeDevice("dev-A");
+
+            expect(tree.getObject("dev-A")).toBeUndefined();
+            // ISA-95 parent was the only path to dev-A → should be gone
+            expect(tree.getObject(isa95Parent)).toBeUndefined();
+        });
+
+        it("removeDevice keeps ISA-95 ancestors that still have other children", async () => {
+            const tree = await emptyTree();
+            tree.addDevice("dev-A", mkDevInfo("dev-A", "Device A"), { name: "Device A" });
+            tree.addDevice("dev-B", mkDevInfo("dev-B", "Device B"), { name: "Device B" });
+
+            const isa95Parent = tree.getObject("dev-A")!.parentId!;
+            // Both devices share the same ISA-95 path
+            expect(tree.getObject("dev-B")!.parentId).toBe(isa95Parent);
+
+            tree.removeDevice("dev-A");
+
+            expect(tree.getObject("dev-A")).toBeUndefined();
+            expect(tree.getObject("dev-B")).toBeDefined();
+            expect(tree.getObject(isa95Parent)).toBeDefined();
+        });
+
+        it("replaceDeviceSubtree preserves UNS descendants under surviving parents", async () => {
+            const tree = await emptyTree();
+            tree.addDevice("dev-A", mkDevInfo("dev-A", "Device A"), { name: "Device A" });
+
+            // UNS adds a child under the device
+            const unsChild = "uns-child-1";
+            tree.addCompositionFromUns(
+                ["dev-A", unsChild],
+                [SCHEMA_UUID, "child-schema"],
+                ["AdHocMetric"],
+            );
+            expect(tree.getNodeSource(unsChild)).toBe("uns");
+
+            // Replace with a new DeviceInformation that adds a real child
+            tree.replaceDeviceSubtree("dev-A",
+                mkDevInfo("dev-A", "Device A v2", {
+                    Spec_Metric: { Schema_UUID: "spec", Sparkplug_Type: "Float" },
+                }),
+                { name: "Device A v2" });
+
+            // Device survives, UNS child survives (parent dev-A still exists)
+            expect(tree.getObject("dev-A")).toBeDefined();
+            expect(tree.getObject("dev-A")!.displayName).toBe("Device A v2");
+            expect(tree.getObject(unsChild)).toBeDefined();
+            expect(tree.getNodeSource(unsChild)).toBe("uns");
+        });
+
+        it("updateDeviceName mutates only the displayName", async () => {
+            const tree = await emptyTree();
+            tree.addDevice("dev-A", mkDevInfo("dev-A", "Device A"), { name: "Device A" });
+
+            const childCount = tree.getChildElementIds("dev-A").length;
+            tree.updateDeviceName("dev-A", "Renamed");
+
+            const dev = tree.getObject("dev-A")!;
+            expect(dev.displayName).toBe("Renamed");
+            // Subtree untouched
+            expect(tree.getChildElementIds("dev-A").length).toBe(childCount);
+        });
+
+        it("addObjectType / updateObjectType / removeObjectType", async () => {
+            const tree = await emptyTree();
+
+            tree.addObjectType("schema-X", { type: "object", title: "X-v1" }, { name: "Schema X" });
+            let t = tree.getObjectType("schema-X");
+            expect(t).toBeDefined();
+            expect(t!.displayName).toBe("Schema X");
+
+            tree.updateObjectType("schema-X",
+                { type: "object", title: "X-v2" },
+                { name: "Schema X v2" });
+            t = tree.getObjectType("schema-X");
+            expect(t!.displayName).toBe("Schema X v2");
+            expect((t!.schema as any).title).toBe("X-v2");
+
+            tree.removeObjectType("schema-X");
+            expect(tree.getObjectType("schema-X")).toBeUndefined();
+        });
+    });
 });

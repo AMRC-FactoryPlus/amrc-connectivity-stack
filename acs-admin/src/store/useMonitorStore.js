@@ -6,7 +6,15 @@ import { defineStore } from 'pinia'
 import { useI3xClient } from '@composables/useI3xClient.js'
 
 function generateClientId () {
-  return 'acs-admin-' + crypto.randomUUID()
+  // crypto.randomUUID is only available in secure contexts (HTTPS /
+  // localhost). On plain http deployments the API is undefined, so
+  // fall back to a Math.random-derived id. This identifier is only a
+  // session handle for the i3x subscription registry — not security
+  // critical — so a weaker generator is fine.
+  const uuid = (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
+    ? crypto.randomUUID()
+    : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`
+  return 'acs-admin-' + uuid
 }
 
 const MAX_TREND_POINTS = 60

@@ -4,6 +4,7 @@
 
 import { UUIDs } from '@amrc-factoryplus/service-client'
 import { useServiceClientStore } from '@store/serviceClientStore.js'
+import { openI3xStream } from '@composables/useI3xSSE.js'
 
 async function request (client, opts) {
   const res = await client.Fetch.fetch({
@@ -128,6 +129,31 @@ export function useI3xClient () {
     async getBaseUrl () {
       const url = await c().service_url(UUIDs.Service.i3x)
       return new URL('v1', url).toString().replace(/\/$/, '')
+    },
+
+    /**
+     * Open an authenticated SSE stream against i3x's subscriptions/stream
+     * endpoint. Resolves the service URL and a Bearer token via the
+     * service-client (same path Fetch.fetch uses), then opens an SSE
+     * connection with the token in the Authorization header.
+     *
+     * Returns a controller with .close(). If the token expires mid-
+     * stream, fetchEventSource's auto-reconnect will fail; the caller
+     * should treat that as a signal to re-open the stream from scratch.
+     */
+    async streamSubscription (clientId, subscriptionId, onMessage, onClose) {
+      const client = c()
+      const serviceUrl = await client.service_url(UUIDs.Service.i3x)
+      const token = await client.Fetch.service_token(serviceUrl)
+      const baseUrl = new URL('v1', serviceUrl).toString().replace(/\/$/, '')
+      return openI3xStream(
+        baseUrl,
+        { Authorization: `Bearer ${token}` },
+        clientId,
+        subscriptionId,
+        onMessage,
+        onClose,
+      )
     },
   }
 }

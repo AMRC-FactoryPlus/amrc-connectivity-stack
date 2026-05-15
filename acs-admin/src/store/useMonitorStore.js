@@ -4,7 +4,6 @@
 
 import { defineStore } from 'pinia'
 import { useI3xClient } from '@composables/useI3xClient.js'
-import { openI3xStream } from '@composables/useI3xSSE.js'
 
 function generateClientId () {
   return 'acs-admin-' + crypto.randomUUID()
@@ -102,9 +101,7 @@ export const useMonitorStore = defineStore('monitor', {
       const i3x = useI3xClient()
       this.streaming = true
 
-      const baseUrl = await i3x.getBaseUrl()
-      this._streamController = openI3xStream(
-        baseUrl,
+      this._streamController = await i3x.streamSubscription(
         this.clientId,
         this.subscriptionId,
         (items) => this._handleStreamData(items),

@@ -250,4 +250,8 @@ data:
       - service: !u UUIDs.Service.DataAccess
         url: !acs "http://data-access.${namespace}.svc.${k8sdomain}"
 {{ end }}
+{{ if .Values.i3x.enabled }}
+      - service: !u UUIDs.Service.i3x
+        url: !acs "http://i3x.${namespace}.svc.${k8sdomain}"
+{{ end }}
 {{ end }}

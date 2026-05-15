@@ -39,6 +39,8 @@ spec:
               value: /config/krb5-conf/krb5.conf
             - name: CLIENT_KEYTAB
               value: /keytabs/client
+            - name: VERBOSE
+              value: ALL
             - name: SERVER_KEYTAB
               value: /keytabs/server
             - name: HOSTNAME

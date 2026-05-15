@@ -96,14 +96,15 @@ export const useMonitorStore = defineStore('monitor', {
       this.dialogOpen = false
     },
 
-    _startStream () {
+    async _startStream () {
       if (this.streaming || !this.subscriptionId) return
 
       const i3x = useI3xClient()
       this.streaming = true
 
+      const baseUrl = await i3x.getBaseUrl()
       this._streamController = openI3xStream(
-        i3x.baseUrl,
+        baseUrl,
         this.clientId,
         this.subscriptionId,
         (items) => this._handleStreamData(items),

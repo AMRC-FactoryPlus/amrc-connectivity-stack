@@ -30,6 +30,10 @@ grants:
       !u UUIDs.App.Registration: false
       !u UUIDs.App.ConfigSchema: false
       !u UUIDs.App.Info: false
+      # Device originMap (Schema_UUID, Instance_UUID, ISA-95 hierarchy,
+      # metric tree) — i3x reads this for every device in the Device
+      # class to build the object tree.
+      !u UUIDs.App.DeviceInformation: false
 
     # Read ConfigDB: list class members and subclasses
     !u ConfigDB.Perm.ReadMembers: null

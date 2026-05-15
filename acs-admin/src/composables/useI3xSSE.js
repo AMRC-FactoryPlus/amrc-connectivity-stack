@@ -4,12 +4,24 @@
 
 import { fetchEventSource } from '@microsoft/fetch-event-source'
 
-export function openI3xStream (baseUrl, clientId, subscriptionId, onMessage, onClose) {
+/**
+ * Open an SSE stream against i3x's /v1/subscriptions/stream endpoint.
+ *
+ * `headers` should include any auth headers the caller wants on the
+ * request (e.g. `Authorization: Bearer <token>` resolved via the
+ * service-client). fetchEventSource reuses the same headers across
+ * reconnects, so if the token expires mid-stream the reconnect will
+ * fail — callers handling long-lived streams should plan a refresh.
+ */
+export function openI3xStream (baseUrl, headers, clientId, subscriptionId, onMessage, onClose) {
   const ctrl = new AbortController()
 
   fetchEventSource(`${baseUrl}/subscriptions/stream`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...headers,
+    },
     body: JSON.stringify({ clientId, subscriptionId }),
     signal: ctrl.signal,
 

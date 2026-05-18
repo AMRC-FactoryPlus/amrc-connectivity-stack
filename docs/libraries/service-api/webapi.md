@@ -1,10 +1,11 @@
 # WebAPI
 
-This module is a HTTP framework wrapper built on top of Express with custom
+This module is a thin HTTP framework wrapper built on top of Express to standardise
 - logging
 - authentication
 - error handling
 - route setup
+across F+ services. This prevents every F+ service from inventing its own setup. 
 
 It is essentially a reusable "web API server scaffold". 
 
@@ -84,6 +85,8 @@ This is a simple health check "public" route.
 
 
 ## Cache-Control middleware
+This section adds HTTP caching headers to responses. Why? Without cache headers, browsers and proxies decide caching behaviour themselves or avoid caching entirely. This middleware explicitly tells clients "You may cache this GET response for N seconds". 
+
 ```
 if (this.max_age) {
     const cc = `max-age=${this.max_age}`;
@@ -105,10 +108,10 @@ This prevents caching POST/PUT responses.
 ## 404 handler (catch-all)
 `app.use((req, res, next) => next(new APIError(404)));`
 
-If no route matches: 
+If no route matches (fallback middleware): 
 - create 404 error
 - forward to error handler
-
+This middleware guarantees unmatched routes become 404.
 
 ## Error handling middleware
 `app.use((err, req, res, next) => {`
@@ -126,5 +129,52 @@ const st =
     : err instanceof ServiceError   ? 503
     : 500;
 ```
-Meaning: 
-- `APIError` -> use provided 
+Why custom `APIErro`?: 
+- preserves HTTP status cleanly
+-  `throw new Error('Not found')` would become generic 500.
+- instead `new APIError(404)` contains 
+```
+{
+    message: "Not Found",
+    status: 404
+} 
+```
+
+#### `headerSent` check
+```
+if (res.headersSent) return next(err);
+```
+This is a critical Express safety pattern. 
+
+#### HTTP server creation
+```
+this.http = http.createServer(app);
+```
+This is lower-level Node integration:
+- creates TCP socket listener
+- HTTP parser
+- connection management
+- keepalive handling 
+- delegates requests to Express
+
+## Method `run()`
+`this.http.listen(this.port);`
+Before `listen()`:
+- routes exist
+- middleware exist
+- server configured 
+BUT:
+- no socket open
+- no requests configured
+After `listen()`:
+- OS binds port
+- process accepts HTTP connections
+
+## Method `ping()`
+Simple health endpoint. Why health endpoints matter?
+Used by:
+- Kubernetes
+- Docker healthchecks
+- load balancers 
+- uptime monitors
+- orchestration systems

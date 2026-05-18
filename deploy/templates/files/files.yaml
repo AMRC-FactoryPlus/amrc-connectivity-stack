@@ -21,6 +21,9 @@ spec:
         component: files
         factory-plus.service: files
     spec:
+      securityContext:
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
       {{- with .Values.acs.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}

@@ -70,4 +70,6 @@ grants:
       !u Files.App.Config: false
     !u ConfigDB.Perm.WriteConfig:
       !u Files.App.Config: false
+    !u ConfigDB.Perm.ReadMembers:
+      !u Files.Class.File: false
 

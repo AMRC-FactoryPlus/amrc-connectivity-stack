@@ -1,12 +1,23 @@
 /* ACS Keycloak SPI
- * Production KerberosAuthenticator: JAAS Krb5LoginModule + JGSS.
+ * Production KerberosAuthenticator: thin sync wrapper around the
+ * Factory+ Java service client's FPGssClientKeytab.
  *
- * Logs in once at construction time with the configured principal and
- * keytab; reuses the resulting Subject for every subsequent SPNEGO
- * token generation. JAAS handles ticket renewal under the hood.
+ * lib/java-service-client already implements the keytab login,
+ * GSSCredential caching, lifetime-aware refresh and retry-on-fault
+ * pattern (see FPGssPrincipal._withCreds). We delegate to it rather
+ * than duplicating the logic in the SPI - this is the wiring the
+ * original "Phase 4" TODOs in the SPI source point at.
  *
- * Thread-safety: each spnegoTokenFor call creates a fresh GSSContext
- * but reuses the immutable Subject; Subject.doAs is thread-safe.
+ * The lib API is RxJava-based; the SPI surface is plain synchronous
+ * method calls. We bridge with Single.blockingGet(). Each SPNEGO
+ * token request mints one fresh GSSContext (one-shot SPNEGO), which
+ * is correct for the HTTP "Authorization: Negotiate <token>" flow.
+ *
+ * FPGssProvider's constructor parameter is an FPServiceClient that is
+ * only consulted by the verify*() server-side paths (which we never
+ * exercise from this SPI), so we pass null. If a future change starts
+ * using the verify paths from here it will NPE loudly rather than
+ * silently misbehaving.
  *
  * Copyright 2026 University of Sheffield AMRC
  */
@@ -15,52 +26,25 @@ package uk.co.amrc.app.factoryplus.keycloak;
 
 import org.ietf.jgss.GSSContext;
 import org.ietf.jgss.GSSException;
-import org.ietf.jgss.GSSManager;
-import org.ietf.jgss.GSSName;
-import org.ietf.jgss.Oid;
 
-import javax.security.auth.Subject;
-import javax.security.auth.login.AppConfigurationEntry;
-import javax.security.auth.login.Configuration;
-import javax.security.auth.login.LoginContext;
-import javax.security.auth.login.LoginException;
 import java.net.URI;
-import java.security.PrivilegedAction;
 import java.util.Base64;
-import java.util.HashMap;
-import java.util.Map;
+
+import uk.co.amrc.factoryplus.gss.FPGssClient;
+import uk.co.amrc.factoryplus.gss.FPGssProvider;
 
 public class JaasKerberosAuthenticator implements KerberosAuthenticator {
 
-    private static final String SPNEGO_OID = "1.3.6.1.5.5.2";
-    private static final String JAAS_ENTRY = "factoryplus-spi-client-keytab";
-
-    private final String principal;
-    private final String keytabPath;
-    private final Subject subject;
+    private final FPGssClient client;
 
     public JaasKerberosAuthenticator(String principal, String keytabPath) {
-        this.principal = principal;
-        this.keytabPath = keytabPath;
-        this.subject = login();
+        FPGssProvider provider = new FPGssProvider(null);
+        this.client = provider.clientWithKeytab(principal, keytabPath);
+        /* Force the initial JAAS login to happen now so misconfiguration
+         * surfaces at SPI bootstrap, not on the first user sign-in. */
+        primeCredentials();
     }
 
-    private Subject login() {
-        Configuration config = inlineKrb5Config(principal, keytabPath);
-        Subject subj = new Subject();
-        try {
-            LoginContext ctx = new LoginContext(JAAS_ENTRY, subj, null, config);
-            ctx.login();
-        }
-        catch (LoginException e) {
-            throw new FactoryPlusAuthException(
-                "Kerberos login failed for " + principal
-                    + " with keytab " + keytabPath, e);
-        }
-        return subj;
-    }
-
-    @SuppressWarnings({"deprecation", "removal"}) // Subject.doAs deprecated in JDK 23+
     @Override
     public String spnegoTokenFor(URI target) {
         String host = target.getHost();
@@ -71,49 +55,62 @@ public class JaasKerberosAuthenticator implements KerberosAuthenticator {
         }
         String hostbasedService = "HTTP@" + host;
 
-        PrivilegedAction<String> action = () -> {
-            try {
-                GSSManager mgr = GSSManager.getInstance();
-                Oid spnego = new Oid(SPNEGO_OID);
-                GSSName serverName = mgr.createName(hostbasedService,
-                    GSSName.NT_HOSTBASED_SERVICE);
-                GSSContext ctx = mgr.createContext(serverName, spnego, null,
-                    GSSContext.DEFAULT_LIFETIME);
-                try {
-                    byte[] token = ctx.initSecContext(new byte[0], 0, 0);
-                    return Base64.getEncoder().encodeToString(token);
-                }
-                finally {
-                    ctx.dispose();
-                }
-            }
-            catch (GSSException e) {
-                throw new FactoryPlusAuthException(
-                    "SPNEGO token generation failed for " + hostbasedService, e);
-            }
-        };
-        return Subject.doAs(subject, action);
+        try {
+            return client.createContextHB(hostbasedService)
+                .map(JaasKerberosAuthenticator::oneShotSpnego)
+                .blockingGet();
+        }
+        catch (RuntimeException e) {
+            Throwable cause = unwrap(e);
+            throw new FactoryPlusAuthException(
+                "SPNEGO token generation failed for " + hostbasedService, cause);
+        }
     }
 
-    private static Configuration inlineKrb5Config(String principal, String keytab) {
-        return new Configuration() {
-            @Override
-            public AppConfigurationEntry[] getAppConfigurationEntry(String name) {
-                if (!JAAS_ENTRY.equals(name)) return null;
-                Map<String, String> opts = new HashMap<>();
-                opts.put("doNotPrompt", "true");
-                opts.put("storeKey", "false");
-                opts.put("isInitiator", "true");
-                opts.put("principal", principal);
-                opts.put("useKeyTab", "true");
-                opts.put("keyTab", keytab);
-                return new AppConfigurationEntry[] {
-                    new AppConfigurationEntry(
-                        "com.sun.security.auth.module.Krb5LoginModule",
-                        AppConfigurationEntry.LoginModuleControlFlag.REQUIRED,
-                        opts)
-                };
+    /* Build a SPNEGO initial token from a freshly-created GSSContext.
+     * The context is one-shot: Kerberos completes in a single
+     * initSecContext call so we never need to round-trip with the
+     * server. The context is disposed before we return. */
+    private static String oneShotSpnego(GSSContext ctx) throws GSSException {
+        try {
+            byte[] token = ctx.initSecContext(new byte[0], 0, 0);
+            return Base64.getEncoder().encodeToString(token);
+        }
+        finally {
+            ctx.dispose();
+        }
+    }
+
+    /* Trigger the lib's lazy login at construction time, so a bad
+     * principal/keytab fails the SPI bootstrap rather than the first
+     * end-user request. We deliberately throw a clear exception type. */
+    private void primeCredentials() {
+        try {
+            client.createContextHB("HTTP@localhost")
+                .map(ctx -> { ctx.dispose(); return true; })
+                .blockingGet();
+        }
+        catch (RuntimeException e) {
+            /* A successful KDC interaction may still fail to issue a
+             * service ticket for HTTP/localhost because no such
+             * principal exists - that's fine, we just wanted the TGT.
+             * The lib will have cached the GSSCredential by now. Only
+             * re-throw if the TGT itself could not be obtained. */
+            Throwable cause = unwrap(e);
+            if (cause instanceof javax.security.auth.login.LoginException) {
+                throw new FactoryPlusAuthException(
+                    "Kerberos login failed at SPI bootstrap", cause);
             }
-        };
+            /* Any GSSException at this stage is downstream of a
+             * successful login; swallow. */
+        }
+    }
+
+    /* The lib wraps checked exceptions inside RuntimeException via
+     * RxJava's Exceptions.propagate. Peel the wrapper off so callers
+     * see the real Kerberos/GSS cause. */
+    private static Throwable unwrap(Throwable t) {
+        Throwable cause = t.getCause();
+        return cause != null ? cause : t;
     }
 }

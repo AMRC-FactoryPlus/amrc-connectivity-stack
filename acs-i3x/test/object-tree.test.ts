@@ -10,7 +10,7 @@ import { createMockFplus } from "./helpers/mock-services.js";
 const DEVICE_CLASS_UUID = "18773d6d-a70d-443a-b29a-3f1583195290";
 const DEVICE_INFORMATION_APP_UUID = "a98ffed5-c613-4e70-bfd3-efeee250ade5";
 const INFO_APP_UUID = "64a8bfa9-7772-45c4-9d1a-9e6290690957";
-const CONFIG_SCHEMA_APP_UUID = "dbd8a535-52ba-4f6e-b4f8-9b71aefe09d3";
+const SCHEMA_APP_UUID = "b16e85fb-53c2-49f9-8d83-cdf6763304ba";
 const HIERARCHY_SCHEMA_UUID = "84ac3397-f3a2-440a-99e5-5bb9f6a75091";
 
 const NS_NAME = "Factory+";
@@ -81,8 +81,8 @@ function setupMockDevices(fplus: ReturnType<typeof createMockFplus>) {
                 if (objectUuid === dev1) return Promise.resolve({ name: "Device 1" });
                 if (objectUuid === dev2) return Promise.resolve({ name: "Device 2" });
             }
-            // ConfigSchema app — JSON schema definitions
-            if (appUuid === CONFIG_SCHEMA_APP_UUID) {
+            // Schema app — JSON schema definitions
+            if (appUuid === SCHEMA_APP_UUID) {
                 if (objectUuid === schema1uuid) return Promise.resolve(schema1);
                 if (objectUuid === schema2uuid) return Promise.resolve(schema2);
             }
@@ -304,7 +304,7 @@ describe("ObjectTree", () => {
                                 },
                             },
                         });
-                    if (appUuid === CONFIG_SCHEMA_APP_UUID && objectUuid === schemaA)
+                    if (appUuid === SCHEMA_APP_UUID && objectUuid === schemaA)
                         return Promise.resolve(schemaDef);
                     return Promise.resolve(null);
                 },
@@ -636,7 +636,7 @@ describe("ObjectTree", () => {
                                 },
                             },
                         });
-                    if (appUuid === CONFIG_SCHEMA_APP_UUID && objectUuid === schemaA)
+                    if (appUuid === SCHEMA_APP_UUID && objectUuid === schemaA)
                         return Promise.resolve({ type: "object" });
                     return Promise.resolve(null);
                 },

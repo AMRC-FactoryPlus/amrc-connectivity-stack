@@ -6,7 +6,7 @@
  * ObjectTree refresh — reactive pipeline driven by ConfigDB notify-v2.
  *
  * Subscribes to: the Device class members, each device's DeviceInformation
- * and Info configs, and each referenced schema's ConfigSchema and Info
+ * and Info configs, and each referenced schema's Schema and Info
  * configs. Combines them into a single emission stream and asks
  * ObjectTree to rebuild from that pre-fetched state. notify-v2 multiplexes
  * all WATCH requests over one shared WebSocket, and the per-config watch
@@ -22,7 +22,7 @@ import {
     DEVICE_INFORMATION_APP_UUID,
     DEVICE_CLASS_UUID,
     INFO_APP_UUID,
-    CONFIG_SCHEMA_APP_UUID,
+    SCHEMA_APP_UUID,
 } from "./constants.js";
 import { ObjectTree, PipelineSnapshot } from "./object-tree.js";
 import { I3xRag } from "./rag/i3x-rag.js";
@@ -74,7 +74,7 @@ export class ObjectTreeRefresh {
 
         const watch_schema = (uuid: string): rx.Observable<{ uuid: string; schema: any; info: any }> =>
             rx.combineLatest([
-                watch_config(`${CONFIG_SCHEMA_APP_UUID}:${uuid}`) as rx.Observable<any>,
+                watch_config(`${SCHEMA_APP_UUID}:${uuid}`) as rx.Observable<any>,
                 watch_config(`${INFO_APP_UUID}:${uuid}`) as rx.Observable<any>,
             ]).pipe(rx.map(([schema, info]) => ({ uuid, schema, info })));
 

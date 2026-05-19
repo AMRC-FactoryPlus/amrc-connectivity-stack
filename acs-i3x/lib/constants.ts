@@ -14,6 +14,6 @@ export const RelType = {
 
 // ConfigDB UUIDs consumed by the object tree loader and notify subscriptions.
 export const DEVICE_CLASS_UUID            = "18773d6d-a70d-443a-b29a-3f1583195290";
-export const CONFIG_SCHEMA_APP_UUID       = "dbd8a535-52ba-4f6e-b4f8-9b71aefe09d3";
+export const SCHEMA_APP_UUID              = "b16e85fb-53c2-49f9-8d83-cdf6763304ba";
 export const INFO_APP_UUID                = "64a8bfa9-7772-45c4-9d1a-9e6290690957";
 export const DEVICE_INFORMATION_APP_UUID  = "a98ffed5-c613-4e70-bfd3-efeee250ade5";

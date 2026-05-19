@@ -1,0 +1,6 @@
+$kind: http-request
+url: "{{scheme}}://clusters.{{domain}}/v1/cluster/:cluster/secret/:namespace/:name/:key"
+method: DELETE
+queryParams:
+  dryrun: "true"
+order: 7000

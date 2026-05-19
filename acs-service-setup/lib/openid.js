@@ -234,7 +234,12 @@ class OpenIDSetup {
 
     async ensure_client (name, spec) {
         const root = this.redirect_root(name);
-        const secret = await this.read_secret(name);
+        // Public clients have no client secret. Used by Postman, CLI
+        // tools and any other native/SPA flow that can't keep one.
+        // Such clients MUST use PKCE; we enforce S256 on the client
+        // attributes below.
+        const publicClient = !!spec.publicClient;
+        const secret = publicClient ? undefined : await this.read_secret(name);
         // Each of these has an auto-derived default keyed off `root`
         // (i.e. `<proto>://<name>.<acs.baseUrl>`) which is right for
         // any application served at that canonical host. Apps served
@@ -248,11 +253,10 @@ class OpenIDSetup {
             name: spec.name ?? name,
             enabled: true,
             protocol: "openid-connect",
-            publicClient: false,
-            standardFlowEnabled: true,
-            directAccessGrantsEnabled: false,
+            publicClient,
+            standardFlowEnabled: spec.standardFlowEnabled ?? true,
+            directAccessGrantsEnabled: spec.directAccessGrantsEnabled ?? false,
             serviceAccountsEnabled: false,
-            secret,
             rootUrl: spec.rootUrl ?? root,
             baseUrl: spec.baseUrl ?? root,
             redirectUris: spec.redirectUris
@@ -268,8 +272,20 @@ class OpenIDSetup {
                 // one until the next refresh attempt. Picked up from
                 // upstream PR #443.
                 "backchannel.logout.session.required": "true",
+                // Public clients have no secret, so the authorization
+                // code grant relies on PKCE to prove the same caller
+                // initiated and completed the flow. S256 is the only
+                // method we ever want; "plain" defeats the point.
+                ...(publicClient ? { "pkce.code.challenge.method": "S256" } : {}),
+                // RFC 8628 device authorization (used by headless
+                // CLIs). Enabled per-client because Keycloak gates the
+                // device endpoint on this attribute.
+                ...(spec.deviceAuthorizationFlowEnabled
+                    ? { "oauth2.device.authorization.grant.enabled": "true" }
+                    : {}),
             },
         };
+        if (secret !== undefined) desired.secret = secret;
 
         let client = await this.find_client(name);
         if (!client) {

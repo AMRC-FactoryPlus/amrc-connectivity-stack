@@ -1,0 +1,3 @@
+$kind: collection
+description: Blob store. Each file is keyed by UUID. ACL is enforced per-file.
+order: 6000

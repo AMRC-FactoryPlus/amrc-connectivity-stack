@@ -1,0 +1,8 @@
+$kind: http-request
+description: Upload as a new file - server assigns a UUID.
+url: "{{scheme}}://files.{{domain}}/v1/file"
+method: POST
+body:
+  type: text
+  content: <file body>
+order: 4000

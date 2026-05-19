@@ -18,6 +18,20 @@ Most of the components deployed by ACS are implementations of the core component
 * [Edge clusters: Bootstrap process](docs/architecture/edge-management/edge-bootstrap.md)
 * [Internal Git server](./docs/services/git-server.md)
 
+## Authentication
+
+ACS services accept three auth schemes on HTTP endpoints: Kerberos
+for cluster-internal traffic, the OIDC web flow for browser-based
+sign-in, and direct Keycloak JWTs for scripting / Postman / curl.
+See [docs/auth/](docs/auth/) for the full picture, including:
+
+- [Connecting OAuth applications](docs/auth/oauth-clients.md) (web
+  apps - the Grafana reference setup).
+- [Direct API access with a Keycloak JWT](docs/auth/cli-and-jwt.md)
+  (Postman, curl, scripts).
+- A [ready-to-import Postman collection](postman/) covering every
+  HTTP-facing F+ service with OAuth pre-configured.
+
 ## Future work
 
 These are proposals for potential future work.

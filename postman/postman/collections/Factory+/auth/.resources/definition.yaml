@@ -1,0 +1,6 @@
+$kind: collection
+description: |-
+  Factory+ auth service.
+
+  /v2/* is the modern API and should be preferred. /authz/* and /authn/* are legacy compat surfaces kept for older clients (notably the service-client library before it was updated). /load is dump loading. /token mints opaque session tokens (not needed when using JWTs).
+order: 2000

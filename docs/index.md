@@ -34,7 +34,12 @@
    - [File Service](./services/file-service.md)
    - [Git Server](./services/git-server.md)
    - [Notify v2](./services/notify-v2.md)
-   - [Connecting OAuth applications](./services/oauth-clients.md)
+- Authentication
+   - [Overview](./auth/README.md)
+   - [Connecting OAuth applications](./auth/oauth-clients.md)
+   - [Direct API access with a Keycloak JWT (Postman / curl)](./auth/cli-and-jwt.md)
+- Tools
+   - [Factory+ Postman collection](../postman/)
 
 
 

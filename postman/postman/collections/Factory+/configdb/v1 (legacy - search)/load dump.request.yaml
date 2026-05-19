@@ -1,0 +1,11 @@
+$kind: http-request
+url: "{{scheme}}://configdb.{{domain}}/v1/load"
+method: POST
+body:
+  type: json
+  content: |-
+    {
+      "version": 1,
+      "objects": []
+    }
+order: 7000

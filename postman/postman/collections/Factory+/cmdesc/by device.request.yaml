@@ -1,0 +1,11 @@
+$kind: http-request
+url: "{{scheme}}://cmdesc.{{domain}}/v1/address/:group/:node/:device"
+method: POST
+body:
+  type: json
+  content: |-
+    {
+      "name": "Setpoint",
+      "value": 42
+    }
+order: 2000

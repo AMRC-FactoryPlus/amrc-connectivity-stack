@@ -1,0 +1,4 @@
+$kind: http-request
+url: '{{scheme}}://i3x.{{domain}}/v1/relationshiptypes'
+method: GET
+order: 5000

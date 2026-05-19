@@ -62,6 +62,7 @@
           <h3 class="text-lg font-bold tracking-tight">{{$route.meta.name}}</h3>
         </div>
         <div class="flex items-center justify-center">
+          <MonitorButton/>
           <SidebarTrigger/>
           <Button title="Toggle fullscreen" variant="ghost" size="icon" @click="l.toggleFullscreen"><i class="fa-solid fa-expand"></i></Button>
           <Button class="ml-3" variant="link" size="icon" @click="logout">Logout</Button>
@@ -74,6 +75,7 @@
         <NewDeviceDialog/>
         <NewConnectionDialog/>
         <NewBridgeDialog/>
+        <MonitorDialog/>
         <RouterView/>
       </main>
     </SidebarInset>
@@ -99,6 +101,9 @@ import NewEdgeDeploymentDialog from '@components/EdgeManager/Nodes/NewEdgeDeploy
 import NewConnectionDialog from '@components/EdgeManager/Connections/NewConnectionDialog.vue'
 import NewDeviceDialog from '@components/EdgeManager/Devices/NewDeviceDialog.vue'
 import NewBridgeDialog from '@components/Bridges/NewBridgeDialog.vue'
+import MonitorButton from '@components/MonitorButton.vue'
+import MonitorDialog from '@components/MonitorDialog.vue'
+import { useMonitorStore } from '@store/useMonitorStore.js'
 import { ACS_VERSION } from '@/lib/version.js'
 
 export default {
@@ -155,6 +160,8 @@ export default {
     Toaster,
     NewConnectionDialog,
     NewBridgeDialog,
+    MonitorButton,
+    MonitorDialog,
   },
 
   watch: {
@@ -174,6 +181,13 @@ export default {
   },
 
   async mounted () {
+    window.addEventListener('beforeunload', (e) => {
+      const monitor = useMonitorStore()
+      if (monitor.hasItems) {
+        e.preventDefault()
+        monitor.cleanup()
+      }
+    })
 
     // Check if opts exists in local storage
     if (localStorage.getItem('opts')) {

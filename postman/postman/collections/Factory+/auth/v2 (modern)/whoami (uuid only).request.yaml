@@ -1,0 +1,4 @@
+$kind: http-request
+url: '{{scheme}}://auth.{{domain}}/v2/whoami/uuid'
+method: GET
+order: 2000

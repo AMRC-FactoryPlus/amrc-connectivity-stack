@@ -1,0 +1,11 @@
+$kind: http-request
+url: "{{scheme}}://i3x.{{domain}}/v1/subscriptions/unregister"
+method: POST
+body:
+  type: json
+  content: |-
+    {
+      "subscriptionId": "<id>",
+      "elementIds": ["<id>"]
+    }
+order: 4000

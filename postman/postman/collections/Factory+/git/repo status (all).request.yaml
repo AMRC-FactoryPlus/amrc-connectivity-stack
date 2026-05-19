@@ -1,0 +1,5 @@
+$kind: http-request
+description: Status across all repos.
+url: '{{scheme}}://git.{{domain}}/v1/status'
+method: GET
+order: 1000

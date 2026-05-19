@@ -1,0 +1,5 @@
+$kind: http-request
+description: All effective members (transitive via subclass).
+url: '{{scheme}}://configdb.{{domain}}/v2/class/:class/member'
+method: GET
+order: 8000

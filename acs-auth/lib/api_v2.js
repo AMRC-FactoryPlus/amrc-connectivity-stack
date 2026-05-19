@@ -274,17 +274,26 @@ export class APIv2 {
     }
 
     /* There is no auth check here; any authenticated user can look up
-     * their own identities. This will only look up based on Kerberos
-     * auth identity. */
+     * their own identities. Resolves req.auth to a principal UUID
+     * regardless of how the caller authenticated: a JWT puts the UUID
+     * straight on req.auth (the JWT branch in service-api uses
+     * fp_principal_uuid as the principal); Basic/Negotiate put a
+     * Kerberos UPN there which needs a kerberos -> uuid lookup. */
+
+    async _whoami_uuid (req) {
+        return valid_uuid(req.auth)
+            ? req.auth
+            : await this.data.find_kerberos(req.auth);
+    }
 
     async id_whoami (req, res) {
-        const uuid = await this.data.find_kerberos(req.auth);
+        const uuid = await this._whoami_uuid(req);
         if (!uuid) fail(404);
         return this._id_get_all(this.data.root, uuid, res);
     }
 
     async id_whoami_uuid (req, res) {
-        const uuid = await this.data.find_kerberos(req.auth);
+        const uuid = await this._whoami_uuid(req);
         if (!uuid) fail(404);
         return res.status(200).json(uuid);
     }

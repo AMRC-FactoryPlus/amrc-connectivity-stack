@@ -1,0 +1,3 @@
+$kind: collection
+description: Configuration store. /v2 is the modern API; /v1 is a compatibility forwarder for legacy clients. Prefer /v2.
+order: 3000

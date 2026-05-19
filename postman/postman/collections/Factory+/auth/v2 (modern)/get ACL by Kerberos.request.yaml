@@ -1,0 +1,4 @@
+$kind: http-request
+url: '{{scheme}}://auth.{{domain}}/v2/acl/kerberos/:upn'
+method: GET
+order: 13000

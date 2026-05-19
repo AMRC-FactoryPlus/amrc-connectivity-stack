@@ -188,20 +188,27 @@ export class DataFlow {
     });
 
     /** Track the targets for a given principal and permission.
-     * @param upn A principal's UPN
+     * Accepts either a principal UUID directly (the shape JWT
+     * callers produce - fp_principal_uuid lands in req.auth as a
+     * UUID string) or a Kerberos UPN (the shape Basic/Negotiate
+     * callers produce - resolved via track_kerberos).
+     * @param input A principal UUID or Kerberos UPN
      * @param perm A permission UUID
      * @returns A seq of iSets of targets
      */
-    track_targets (upn, perm) {
+    track_targets (input, perm) {
+        const principal$ = valid_uuid(input)
+            ? rx.of(input)
+            : this.track_kerberos(input);
         return rxx.rx(
-            this.track_kerberos(upn),
+            principal$,
             rx.mergeMap(p => p ? this.acl_for(p) : rx.of([])),
             rx.map(acl => imm.Seq(acl)
                 .filter(e => e.permission == perm)
                 .map(e => e.target)
                 .toSet()),
-            rx.tap(ptd => 
-                this.log("Permitted %s for %s: %o", perm, upn, ptd.toJS())));
+            rx.tap(ptd =>
+                this.log("Permitted %s for %s: %o", perm, input, ptd.toJS())));
     }
 
     /** Track a permission, including wildcards.

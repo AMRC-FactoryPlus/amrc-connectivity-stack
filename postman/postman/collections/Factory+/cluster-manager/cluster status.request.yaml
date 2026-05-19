@@ -1,0 +1,4 @@
+$kind: http-request
+url: '{{scheme}}://clusters.{{domain}}/v1/cluster/:cluster/status'
+method: GET
+order: 1000

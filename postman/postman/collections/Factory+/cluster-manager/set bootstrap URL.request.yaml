@@ -1,0 +1,10 @@
+$kind: http-request
+url: "{{scheme}}://clusters.{{domain}}/v1/cluster/:cluster/bootstrap-url"
+method: POST
+body:
+  type: json
+  content: |-
+    {
+      "url": "https://..."
+    }
+order: 3000

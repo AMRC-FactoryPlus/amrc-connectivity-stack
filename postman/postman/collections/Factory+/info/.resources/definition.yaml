@@ -1,0 +1,3 @@
+$kind: collection
+description: Public health checks. No auth required - useful for smoke-testing reachability before doing anything else.
+order: 1000

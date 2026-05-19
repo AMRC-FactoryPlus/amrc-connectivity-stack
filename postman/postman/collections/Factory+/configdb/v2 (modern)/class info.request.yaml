@@ -1,0 +1,4 @@
+$kind: http-request
+url: '{{scheme}}://configdb.{{domain}}/v2/class/:class'
+method: GET
+order: 7000

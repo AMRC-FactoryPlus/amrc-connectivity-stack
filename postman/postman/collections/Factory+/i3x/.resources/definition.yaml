@@ -1,0 +1,6 @@
+$kind: collection
+description: |-
+  i3X v1 REST/SSE API. Northbound surface for third-party REST clients - this is the primary consumer of the new JWT auth flow.
+
+  /v1/info is public; all other endpoints require a JWT.
+order: 9000

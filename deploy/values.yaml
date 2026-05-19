@@ -223,6 +223,28 @@ serviceSetup:
         enabled: true
         name: Grafana
         redirectPath: /login/generic_oauth
+      # Postman / curl / scripted-API client. Public (no client secret)
+      # so it can be configured directly in Postman without keeping a
+      # secret out of source control; PKCE S256 is enforced by
+      # service-setup so the grant is still secure. Authorization Code
+      # is for human users (Postman opens a browser to log in). Device
+      # Authorization (RFC 8628) is for headless CLIs. ROPC stays off:
+      # it's deprecated in OAuth 2.1 and unnecessary.
+      acs-cli:
+        enabled: true
+        name: ACS CLI
+        publicClient: true
+        standardFlowEnabled: true
+        deviceAuthorizationFlowEnabled: true
+        directAccessGrantsEnabled: false
+        redirectUris:
+          - https://oauth.pstmn.io/v1/callback
+          - http://localhost/*
+          - http://127.0.0.1/*
+        webOrigins:
+          - https://oauth.pstmn.io
+        postLogoutRedirectUris:
+          - https://oauth.pstmn.io/v1/callback
 
 edgeHelm:
   enabled: true
@@ -303,6 +325,17 @@ clusterManager:
     # -- The repository of the Clusters component
     repository: acs-cluster-manager
   verbosity: "ALL,!service,!token"
+
+i3x:
+  # -- Whether or not to enable the i3X service
+  enabled: true
+  image:
+    # -- The repository of the i3X service
+    repository: acs-i3x
+  # -- The minimum log level for the i3X service
+  logLevel: info
+  # -- Override the i3X namespace URI (defaults to https://<baseUrl>/i3x)
+  # namespaceUri: https://example.com/i3x
 
 admin:
   # -- Whether or not to enable the Admin component

@@ -1,0 +1,12 @@
+$kind: http-request
+description: Bulk-load a dump file. Restricted to privileged callers.
+url: "{{scheme}}://auth.{{domain}}/load"
+method: POST
+body:
+  type: json
+  content: |-
+    {
+      "version": 1,
+      "objects": []
+    }
+order: 3000

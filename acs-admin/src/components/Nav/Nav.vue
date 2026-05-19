@@ -23,6 +23,12 @@ const sidebarNavItems: Item[] = [
         auth: false
     },
     {
+        title: 'Explorer',
+        href: '/explorer',
+        icon: 'compass',
+        auth: true
+    },
+    {
         title: 'Live Activity',
         href: '/activity',
         icon: 'table-cells',

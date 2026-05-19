@@ -1,0 +1,4 @@
+$kind: http-request
+url: '{{scheme}}://cmdesc.{{domain}}/ping'
+method: GET
+order: 4000

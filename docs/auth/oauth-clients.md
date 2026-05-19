@@ -17,6 +17,11 @@ speaks OIDC.
 > internal tool to ACS authentication. Not edge agents - those still
 > use Kerberos/Sparkplug.
 
+> **Looking to call an ACS API directly with curl or Postman as
+> yourself?** See [cli-and-jwt.md](./cli-and-jwt.md) - that path
+> uses the pre-provisioned `acs-cli` Keycloak client and doesn't
+> require setting up a new application.
+
 ## How OIDC fits into ACS
 
 ```

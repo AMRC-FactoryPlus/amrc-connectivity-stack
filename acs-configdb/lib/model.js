@@ -646,7 +646,7 @@ export default class Model extends EventEmitter {
                     join all_membership m on m.id = c.object
                 where c.app = $1
                     and m.class = $2
-            `, [app_id, klass]);
+            `, [app_id, class_id]);
         });
     }
 

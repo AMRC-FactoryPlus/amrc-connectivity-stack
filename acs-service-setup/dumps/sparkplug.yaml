@@ -1,5 +1,5 @@
 # ACS-specific deployment decisions
-#-REQUIRE: auth
+#-REQUIRE: auth metadb
 ---
 service: !u UUIDs.Service.ConfigDB
 version: 2
@@ -19,10 +19,15 @@ objects:
         - !u UUIDs.Permission.CmdEsc.Rebirth
 
   !u Auth.Class.ClientRole:
+    # XXX There is some confusion here between 'an object with a
+    # Sparkplug Node address' and 'an object which is authorised to use
+    # its Node address to publish data'. The former is ⊂ Principal and ⊂
+    # SparkplugEntity but only the latter is ∈ ClientRole.
     !u ACS.Group.SparkplugNode:
       name: "Sparkplug Node"
       subclassOf:
         - !u Auth.Class.Principal
+        - !u MetaDB.Class.SparkplugEntity
     # _Active Edge Agent_ is created by helm.js.
     !u ACS.Group.SparkplugReader:
       name: "Sparkplug global reader"

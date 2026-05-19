@@ -178,31 +178,26 @@ export default class MQTTClient {
      */
     private writeMetrics(payload: MetricPayload, topic: string, customProperties: UnsMetricCustomProperties) {
         const unsTopic = new UnsTopic(topic, customProperties);
-        let metricTimestamp: Date
-        if (payload.timestamp) {
-            metricTimestamp = new Date(payload.timestamp);
-        } else if (payload.timestamp) {
-            // Metrics might not have a timestamp so use the packet timestamp if we have it.
-            metricTimestamp = new Date(payload.timestamp);
-        } else {
-            // No timestamp can be found on the metric or the payload, just use the current time instead.
-            metricTimestamp = new Date();
-        }
 
-        this.writeToInfluxDB(unsTopic, payload.value, metricTimestamp, customProperties.Unit, customProperties.Type);
+        // Prefer nanosecond precision when available. timestampNs is a numeric
+        // string (JSON has no bigint) set by the UNS ingester for sources that
+        // supply sub-millisecond timestamps. Fall back to the millisecond Date
+        // for sources that have not yet been updated.
+        const payloadTimestamp: Date | bigint = payload.timestampNs != null
+            ? BigInt(payload.timestampNs)
+            : payload.timestamp
+                ? new Date(payload.timestamp)
+                : new Date();
+
+        this.writeToInfluxDB(unsTopic, payload.value, payloadTimestamp, customProperties.Unit, customProperties.Type);
 
         // Handle the batched metrics
         payload.batch?.forEach((metric) => {
-            let metricTimestamp: Date
-            if (metric.timestamp) {
-                metricTimestamp = new Date(metric.timestamp);
-            } else if (payload.timestamp) {
-                // Metrics might not have a timestamp so use the packet timestamp if we have it.
-                metricTimestamp = new Date(payload.timestamp);
-            } else {
-                // No timestamp can be found on the metric or the payload, just use the current time instead.
-                metricTimestamp = new Date();
-            }
+            const metricTimestamp: Date | bigint = metric.timestampNs != null
+                ? BigInt(metric.timestampNs)
+                : metric.timestamp
+                    ? new Date(metric.timestamp)
+                    : payloadTimestamp;
             // Send each metric to InfluxDB
             this.writeToInfluxDB(unsTopic, metric.value, metricTimestamp, customProperties.Unit, customProperties.Type);
         });
@@ -212,14 +207,21 @@ export default class MQTTClient {
      * Writes metric values to InfluxDB using the metric timestamp.
      * @param topic Topic the metric was published on.
      * @param value Metric value to write to InfluxDB.
-     * @param timestamp Timestamp from the metric to write to influx.
+     * @param timestamp Timestamp from the metric. Either a BigInt of
+     *     nanoseconds since epoch, or a Date for ms-precision sources.
      * @param unit The metric unit from the MQTTv5 custom properties.
      * @param type The Metric type from the MQTTv5 custom properties.
      */
-    writeToInfluxDB(topic: UnsTopic, value: string, timestamp: Date, unit: string, type: string) {
+    writeToInfluxDB(topic: UnsTopic, value: string, timestamp: Date | bigint, unit: string, type: string) {
         if (value === null) {
             return;
         }
+
+        // InfluxDB client accepts string timestamps in line protocol format,
+        // which handles nanosecond values that exceed Number.MAX_SAFE_INTEGER.
+        const influxTimestamp = typeof timestamp === "bigint"
+            ? timestamp.toString()
+            : timestamp;
 
         writeApi.useDefaultTags({
             topLevelInstance: topic.GetTopLevelInstance(),
@@ -253,7 +255,7 @@ export default class MQTTClient {
                 writeApi.writePoint(
                     new Point(`${topic.GetMetricName()}:i`)
                         .intField('value', numVal)
-                        .timestamp(timestamp)
+                        .timestamp(influxTimestamp)
                 );
                 break;
             case "UInt8":
@@ -269,7 +271,7 @@ export default class MQTTClient {
                 writeApi.writePoint(
                     new Point(`${topic.GetMetricName()}:u`)
                         .uintField('value', numVal)
-                        .timestamp(timestamp)
+                        .timestamp(influxTimestamp)
                 );
                 break;
             case "Float":
@@ -283,7 +285,7 @@ export default class MQTTClient {
                 writeApi.writePoint(
                     new Point(`${topic.GetMetricName()}:d`)
                         .floatField('value', numVal)
-                        .timestamp(timestamp)
+                        .timestamp(influxTimestamp)
                 );
                 break;
             case "Boolean":
@@ -294,13 +296,13 @@ export default class MQTTClient {
                 writeApi.writePoint(
                     new Point(`${topic.GetMetricName()}:b`)
                         .booleanField('value', value)
-                        .timestamp(timestamp));
+                        .timestamp(influxTimestamp));
                 break;
             default:
                 writeApi.writePoint(
                     new Point(`${topic.GetMetricName()}:s`)
                         .stringField('value', value)
-                        .timestamp(timestamp));
+                        .timestamp(influxTimestamp));
                 break;
 
         }

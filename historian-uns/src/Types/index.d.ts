@@ -3,6 +3,7 @@
  */
 interface MetricPayload {
     timestamp: string,
+    timestampNs?: string,
     value: string
     batch?: MetricPayload[]
 }

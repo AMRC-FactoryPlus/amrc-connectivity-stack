@@ -398,7 +398,10 @@ export default class MQTTClient {
                 logger.error(`Metric ${metric.alias} is unknown for ${topic.address.group}/${topic.address.node}/${topic.address.device}`);
             }
 
-            const metricTimestamp = metric.timestamp ?? payload.timestamp;
+            // Prefer nanosecond precision when available, falling back to the
+            // millisecond Date for sources that have not yet been updated.
+            const metricTimestamp = metric.timestampNs ?? payload.timestampNs
+                ?? metric.timestamp ?? payload.timestamp;
             // Send each metric to InfluxDB
             this.writeToInfluxDB(birth, topic, metric.value, metricTimestamp)
         });
@@ -409,14 +412,21 @@ export default class MQTTClient {
      * @param birth Birth certificate for device.
      * @param topic Topic the metric was published on.
      * @param value Metric value to write to InfluxDB.
-     * @param timestamp Timestamp from the metric to write to influx.
+     * @param timestamp Timestamp from the metric. Either a BigInt of
+     *     nanoseconds since epoch, or a Date for ms-precision sources.
      */
-    writeToInfluxDB(birth, topic: Topic, value, timestamp: Date) {
+    writeToInfluxDB(birth, topic: Topic, value, timestamp: Date | bigint) {
         if (value === null) return;
         if (birth.transient) {
             logger.debug(`Metric ${birth.name} is transient, not writing to InfluxDB`);
             return;
         }
+
+        // InfluxDB client accepts string timestamps in line protocol format,
+        // which handles nanosecond values that exceed Number.MAX_SAFE_INTEGER.
+        const influxTimestamp = typeof timestamp === "bigint"
+            ? timestamp.toString()
+            : timestamp;
 
         // Get the value after the last /
         let metricName = birth.name.split('/').pop();
@@ -454,7 +464,7 @@ export default class MQTTClient {
                 writeApi.writePoint(
                     new Point(`${metricName}:i`)
                         .intField('value', numVal)
-                        .timestamp(timestamp)
+                        .timestamp(influxTimestamp)
                 );
                 break;
             case "UInt8":
@@ -470,7 +480,7 @@ export default class MQTTClient {
                 writeApi.writePoint(
                     new Point(`${metricName}:u`)
                         .uintField('value', numVal)
-                        .timestamp(timestamp)
+                        .timestamp(influxTimestamp)
                 );
                 break;
             case "Float":
@@ -484,7 +494,7 @@ export default class MQTTClient {
                 writeApi.writePoint(
                     new Point(`${metricName}:d`)
                         .floatField('value', numVal)
-                        .timestamp(timestamp)
+                        .timestamp(influxTimestamp)
                 );
                 break;
             case "Boolean":
@@ -495,13 +505,13 @@ export default class MQTTClient {
                 writeApi.writePoint(
                     new Point(`${metricName}:b`)
                         .booleanField('value', value)
-                        .timestamp(timestamp));
+                        .timestamp(influxTimestamp));
                 break;
             default:
                 writeApi.writePoint(
                     new Point(`${metricName}:s`)
                         .stringField('value', value)
-                        .timestamp(timestamp));
+                        .timestamp(influxTimestamp));
                 break;
 
         }

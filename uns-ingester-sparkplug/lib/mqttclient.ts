@@ -11,6 +11,9 @@ import Long from "long";
 interface UnsMetric {
     value: string,
     timestamp: Date,
+    /** Nanoseconds since epoch as a numeric string. JSON has no bigint, so
+     *  this is serialised as a string for the historian to parse back. */
+    timestampNs?: string,
     batch?: UnsMetric[]
 }
 
@@ -453,9 +456,17 @@ export default class MQTTClient {
             let payload: UnsMetric;
             // if theirs more than one of the same metric from the same sparkplug payload, add the values to the batch array.
             if (metricContainers.length > 1) {
-                const sortedMetricContainers = metricContainers.sort((a, b) => a.metric.timestamp - b.metric.timestamp);
+                // Sort by nanosecond timestamp when available, falling back to
+                // the millisecond Date. BigInt comparison returns -1/0/1 to
+                // satisfy the sort comparator contract.
+                const sortedMetricContainers = metricContainers.sort((a, b) => {
+                    const aNs = a.metric.timestampNs ?? BigInt(a.metric.timestamp.getTime()) * 1_000_000n;
+                    const bNs = b.metric.timestampNs ?? BigInt(b.metric.timestamp.getTime()) * 1_000_000n;
+                    return aNs < bNs ? -1 : aNs > bNs ? 1 : 0;
+                });
                 payload = {
-                    timestamp: new Date(sortedMetricContainers[0].metric.timestamp),
+                    timestamp: sortedMetricContainers[0].metric.timestamp,
+                    timestampNs: sortedMetricContainers[0].metric.timestampNs?.toString(),
                     value: sortedMetricContainers[0].metric.value,
                     batch: []
                 }
@@ -463,13 +474,15 @@ export default class MQTTClient {
                 sortedMetricContainers.shift();
                 sortedMetricContainers.forEach(metricContainer => {
                     payload.batch.push({
-                        timestamp: new Date(metricContainer.metric.timestamp),
+                        timestamp: metricContainer.metric.timestamp,
+                        timestampNs: metricContainer.metric.timestampNs?.toString(),
                         value: metricContainer.metric.value
                     });
                 });
             } else {
                 payload = {
-                    timestamp: new Date(metricContainers[0].metric.timestamp),
+                    timestamp: metricContainers[0].metric.timestamp,
+                    timestampNs: metricContainers[0].metric.timestampNs?.toString(),
                     value: metricContainers[0].metric.value
                 };
             }

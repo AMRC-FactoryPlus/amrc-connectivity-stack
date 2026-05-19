@@ -22,7 +22,7 @@ import {
     RelType,
     HIERARCHY_SCHEMA_UUID,
     DEVICE_CLASS_UUID,
-    CONFIG_SCHEMA_APP_UUID,
+    SCHEMA_APP_UUID,
     INFO_APP_UUID,
     DEVICE_INFORMATION_APP_UUID,
 } from "./constants.js";
@@ -887,7 +887,7 @@ export class ObjectTree {
 
             this.log("loadDevices: fetching schema definition %s", schemaUuid);
             const [schema, info] = await Promise.all([
-                this.fplus.ConfigDB.get_config(CONFIG_SCHEMA_APP_UUID, schemaUuid).catch(() => null),
+                this.fplus.ConfigDB.get_config(SCHEMA_APP_UUID, schemaUuid).catch(() => null),
                 this.fplus.ConfigDB.get_config(INFO_APP_UUID, schemaUuid).catch(() => null),
             ]);
             this.buildObjectTypeInSnapshot(schemaUuid, schema, info, target);
@@ -956,7 +956,7 @@ export class ObjectTree {
 
     /**
      * Create or replace an ObjectType in `target` from a pre-fetched
-     * ConfigSchema + Info config. Idempotent: a second call with the
+     * Schema + Info config. Idempotent: a second call with the
      * same schemaUuid replaces the entry.
      */
     private buildObjectTypeInSnapshot(

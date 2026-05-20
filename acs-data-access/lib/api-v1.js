@@ -381,7 +381,8 @@ export class APIv1 {
     );
 
     if (!dataset) return fail(this.log, 404, `Dataset not found for ${dataset_uuid}.`);
-    return res.status(200).json(dataset);
+    const {from, to, ...def} = dataset;
+    return res.status(200).json(def);
   } 
   
 

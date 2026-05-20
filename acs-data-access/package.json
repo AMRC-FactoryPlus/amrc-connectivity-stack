@@ -16,6 +16,7 @@
     "@amrc-factoryplus/service-client": "file:../lib/js-service-client",
     "@dotenvx/dotenvx": "^1.39.0",
     "@influxdata/influxdb-client": "^1.35.0",
+    "deep-equal": "^2.2.3",
     "express": "^4.21.2",
     "rxjs": "^7.8.2",
     "stream-size": "^0.0.6",

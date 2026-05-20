@@ -347,58 +347,75 @@ export class DataAccessNotify {
     );
   }
 
+
+  _structure_resource_state(sess, uuid) {
+      if (!valid_uuid(uuid)) return;
+
+      return this.data.allowed_valid_datasets(
+          sess.principal,
+          Constants.Perm.EditDataset
+      ).pipe(
+          rx.map(datasets => datasets.get(uuid)),
+
+          rx.filter(Boolean),
+
+          rx.map(dataset_def => {
+              const { from, to, ...body } = dataset_def;
+              return body;
+          }),
+
+          rx.distinctUntilChanged(deep_equal),
+
+          rxu.shareLatest(),
+      );
+  }
+
   structure_uuid(sess, uuid) {
-    if (!valid_uuid(uuid)) return; 
-
-    return this.data.allowed_all_datasets(
-      sess.principal,
-      Constants.Perm.EditDataset
-    ).pipe(
-      rx.map(datasets =>
-        datasets.get(uuid)
-      ),
-
-      rx.distinctUntilChanged(deep_equal),
-
-      rxu.shareLatest(),
-
-      rx.map(dataset_def => {
-        const {from, to, ...body} = dataset_def;
-        return {
-          status: 200,
-          response: { body }
-        }
-      }),
+    return this._structure_resource_state(sess, uuid)
+    .pipe(
+      rx.map(body => ({
+        status: 200,
+        response: {body}
+      })),
     );
   }
 
   structure_search(sess) {
-    return this.data.allowed_all_datasets(
-      sess.principal,
-      Constants.Perm.EditDataset
-    ).pipe(
-      rx.map(datasets => {
+      const dataset_uuids = this.data
+          .allowed_all_dataset_uuids(
+              sess.principal,
+              Constants.Perm.EditDataset
+          )
+          .pipe(
+              rx.switchMap(uuids => {
+                  const list = uuids.toArray?.() ?? [];
 
-        let result = IMap();
+                  if (list.length === 0)
+                      return rx.of(IMap());
 
-        datasets.forEach(
-          (dataset, dataset_uuid) => {
+                  return rx.combineLatest(
+                      list.map(uuid =>
+                          this._structure_resource_state(sess, uuid).pipe(
+                              rx.map(body => [
+                                  uuid,
+                                  {
+                                      status: 200,
+                                      body,
+                                  }
+                              ])
+                          )
+                      )
+                  ).pipe(
+                      rx.map(entries => IMap(entries))
+                  );
+              }),
 
-            result = result.set(
-              dataset_uuid,
-              {
-                uuid: dataset_uuid,
-                structure:
-                  dataset.structure,
-              }
-            );
-          }
-        );
+              rxu.shareLatest()
+          );
 
-        return result;
-      }),
-
-      rxu.shareLatest()
-    );
+      return this._build_search_source(dataset_uuids);
   }
+
+
+
 }

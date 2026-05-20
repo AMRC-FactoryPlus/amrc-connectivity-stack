@@ -340,7 +340,9 @@ export class DataAccessNotify {
     ).pipe(
       rx.map(data => ({
         status: 200,
-        body: data
+        response: {
+          body: data
+        }
       }))
     );
   }
@@ -356,19 +358,17 @@ export class DataAccessNotify {
         datasets.get(uuid)
       ),
 
-      rx.distinctUntilChanged(
-        (a, b) =>
-          JSON.stringify(a) ===
-          JSON.stringify(b)
-      ),
+      rx.distinctUntilChanged(deep_equal),
 
       rxu.shareLatest(),
 
-      rx.map(data => ({
-        status: 200,
-        body: data
-      }))
-      
+      rx.map(dataset_def => {
+        const {from, to, ...body} = dataset_def;
+        return {
+          status: 200,
+          response: { body }
+        }
+      }),
     );
   }
 

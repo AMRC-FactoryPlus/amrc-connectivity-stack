@@ -328,8 +328,9 @@ export class APIv1 {
             res,
             {},
         );
-
-        res.end();
+        if (!res.writableEnded) {
+          res.end();
+        }
        }catch (err) {
         this.log(err);
         return fail(this.log, 500);

@@ -5,8 +5,10 @@ This module is a thin HTTP framework wrapper built on top of Express to standard
 - authentication
 - error handling
 - route setup
-across F+ services. This prevents every F+ service from inventing its own setup. 
 
+across F+ services.
+
+This prevents every F+ service from inventing its own setup. 
 It is essentially a reusable "web API server scaffold". 
 
 ## Configuration (instance vars)
@@ -27,7 +29,7 @@ It is essentially a reusable "web API server scaffold".
 ```
 - Creates an authentication handler
 - Passes all options (`opts`) into it
-- Overrides logging so auth logs go through request-specific logger if available. 
+- Overrides logging so auth logs go through request-specific logger if available
 
 
 ## Method `init()`
@@ -38,63 +40,67 @@ This is a server construction pipeline. This is the most important function. It 
 - error handling
 
 1. Sets up CORS
-`app.use(cors({ credentials: true, maxAge: 86400 }));`
-Enables:
-- Cross-origin requests
-- Cookies/credentials allowed
-- Preflight cache of 24 hours
-2. Parses body of the appropriate type: `json` or `raw`
-Supports both:
-- normal JSON (`application/json`)
-- JSON Patch / Merge Path (`application/merge-path+json`)
-3. Request logging middleware
-`app.use((req, res, next) => {...`
-This is a custom logging layer. It creates:
-    - A per-request log buffer
-        `let buf = [];` -> so logs are collected not immediately printed. 
-    - Request-scoped logger
-        `req.log = (...args) => buf.push(args);`
-            so, that inside route handlers can do `req.log("something...")`
-    - failure helper
+    ```
+        app.use(cors({ credentials: true, maxAge: 86400 }));
+    ```
+    Enables:
+    - Cross-origin requests
+    - Cookies/credentials allowed
+    - Preflight cache of 24 hours
+2. Parses body of the appropriate type: `json` or `raw`.
+    Supports both:
+    - normal JSON (`application/json`)
+    - JSON Patch / Merge Path (`application/merge-path+json`)
+3. Requests logging middleware
+    ```
+        app.use((req, res, next) => {
+            let buf = [];
+            req.log = (...args) => buf.push(args);
+            ...
+    ```
+    This is a custom logging layer. It creates:
+    - A per-request log buffer `let buf = [];`, so logs are collected not immediately printed. 
+    - Request-scoped logger `req.log = (...args) => buf.push(args);`, so that inside route handlers can do `req.log("something...")`
+    - Failure helper
         ```
-        req.fail = (status, ...args) => {
-            req.log(...args);
-            throw {status};
-        };
+            req.fail = (status, ...args) => {
+                req.log(...args);
+                throw {status};
+            };
         ```
-    - when response completes flushes buffer to global logger
-        ```
+    
+    When response completes, it flushes buffer to global logger.     This ensures logs are grouped per request.  
+    ```
         res.on("finish", () => {
             req.log("<<< %s %s", res.statusCode, res.getHeader("Content-Type"));
             buf.forEach(a => this.log(...a));
         });
-        ```
-    This ensures logs are grouped per request.  
-
+    ```
+    
 
 ## Authentication middleware
-`this.auth.setup(app);`
-
-This injects custom authentication (`FplusHttpAuth`) into Express. 
+`this.auth.setup(app);` - this injects custom authentication (`FplusHttpAuth`) into Express. 
 
 
 ## Ping endpoint
-`app.get("/ping", this.ping.bind(this));`
-
-This is a simple health check "public" route. 
+`app.get("/ping", this.ping.bind(this));` - this is a simple "public" health check route. 
 
 
 ## Cache-Control middleware
-This section adds HTTP caching headers to responses. Why? Without cache headers, browsers and proxies decide caching behaviour themselves or avoid caching entirely. This middleware explicitly tells clients "You may cache this GET response for N seconds". 
+This section adds HTTP caching headers to responses.
+
+**Why?** 
+
+Without cache headers, browsers and proxies decide caching behaviour themselves or avoid caching entirely. This middleware explicitly tells clients "You may cache this GET response for N seconds". 
 
 ```
-if (this.max_age) {
-    const cc = `max-age=${this.max_age}`;
-    app.use((req, res, next) => {
-        if (req.method == "GET")
-            res.header("Cache-Control", cc);
-        next();
-    });
+    if (this.max_age) {
+        const cc = `max-age=${this.max_age}`;
+        app.use((req, res, next) => {
+            if (req.method == "GET")
+                res.header("Cache-Control", cc);
+            next();
+        });
 }
 ```
 
@@ -103,76 +109,76 @@ This prevents caching POST/PUT responses.
 
 
 ## Route registration 
-`this.routes(app);` this expects the app to have routes. This means that `WebAPI` is just a shell; real functionality is injected. 
+`this.routes(app);` - this expects the app to have routes. This means that `WebAPI` is just a shell; real functionality is injected. 
 
 ## 404 handler (catch-all)
-`app.use((req, res, next) => next(new APIError(404)));`
+`app.use((req, res, next) => next(new APIError(404)));` - this middleware guarantees unmatched routes become 404.
 
 If no route matches (fallback middleware): 
 - create 404 error
 - forward to error handler
-This middleware guarantees unmatched routes become 404.
+
 
 ## Error handling middleware
-`app.use((err, req, res, next) => {`
-This is Express's global error handler. 
-1. logs error `console.error(err);`
-2. avoids double responses 
-```
-if (res.headersSent)
-    return next(err);
-```
-3. Decide status code
-```
-const st =
-    err instanceof APIError         ? err.status
-    : err instanceof ServiceError   ? 503
-    : 500;
-```
-Why custom `APIErro`?: 
+`app.use((err, req, res, next) => {` - this is Express's global error handler. 
+- logs error `console.error(err);`
+- avoids double responses 
+    ```
+        if (res.headersSent)
+            return next(err);
+    ```
+    This is a critical Express safety pattern.
+- decides status code
+    ```
+        const st =
+            err instanceof APIError         ? err.status
+            : err instanceof ServiceError   ? 503
+            : 500;
+    ```
+    
+**Why** custom `APIError`?: 
 - preserves HTTP status cleanly
--  `throw new Error('Not found')` would become generic 500.
+-  `throw new Error('Not found')` would become generic 500
 - instead `new APIError(404)` contains 
-```
-{
-    message: "Not Found",
-    status: 404
-} 
-```
+    ```
+        {
+            message: "Not Found",
+            status: 404
+        } 
+    ```
 
-#### `headerSent` check
-```
-if (res.headersSent) return next(err);
-```
-This is a critical Express safety pattern. 
 
 #### HTTP server creation
-```
-this.http = http.createServer(app);
-```
 This is lower-level Node integration:
 - creates TCP socket listener
 - HTTP parser
 - connection management
 - keepalive handling 
 - delegates requests to Express
+```
+this.http = http.createServer(app);
+```
 
 ## Method `run()`
 `this.http.listen(this.port);`
+
 Before `listen()`:
 - routes exist
 - middleware exist
 - server configured 
+
 BUT:
 - no socket open
 - no requests configured
+
 After `listen()`:
 - OS binds port
 - process accepts HTTP connections
 
 ## Method `ping()`
-Simple health endpoint. Why health endpoints matter?
-Used by:
+Simple health endpoint.
+
+**Why** health endpoints matter? -> Used by:
 - Kubernetes
 - Docker healthchecks
 - load balancers 

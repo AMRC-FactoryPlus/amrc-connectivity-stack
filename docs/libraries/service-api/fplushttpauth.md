@@ -63,75 +63,83 @@ This is the main middleware. This method:
 ## Method `auth_basic(ctx)`
 1. Retrieves credentials
 
-    Converts ASCII to Binary (base64 decode). 
+    Converts ASCII to Binary (base64 decode). E.g., `dXNlcjpwYXNz` is split into `user` and `pass`.
     ```
         const [, user, pass] = atob(ctx.creds).match(/^([^:]+):(.+)/);
     ```
-    E.g., `dXNlcjpwYXNz` is split into `user` and `pass`.
-
-
+    
 2. Normalizes username (adds `@realm`)
-```
-const client = user.includes("@") ? user : `${user}@${this.realm}`;
-```
+    ```
+        const client = user.includes("@") ? user : `${user}@${this.realm}`;
+    ```
 3. Verifies password with Kerberos
-```
-await GSS.verifyCredentials(client, pass, {
-    keytab: `FILE:${this.keytab}`,
-    serverPrincipal: this.principal,
-});
-```
-- It uses Kerberos infrastructure to validate username+password using server's secret key stored in `keytab` file. "Use Kerberos infrastructure to verify that client+password is valid in the realm, and that I (the server) am authorized to do this check."
-- Server keytab is used as trust anchor
+    ```
+        await GSS.verifyCredentials(client, pass, {
+            keytab: `FILE:${this.keytab}`,
+            serverPrincipal: this.principal,
+        });
+    ```
+    It uses Kerberos infrastructure to validate `username+password` using server's secret key stored in `keytab` file. -> "Use Kerberos infrastructure to verify that **client+password** is valid in the realm, and that I (the server) am authorised to do this check". The Server `keytab` is used as a trust anchor.
 
 
 ## Method `auth_gssapi(ctx)`
 This is browser/enterprise SSO.
 1. Decodes token
-`const cli_tok = Buffer.from(ctx.creds, "base64");`
+    ```
+        const cli_tok = Buffer.from(ctx.creds, "base64");
+    ```
 2. Sets up Kerberos server context
-```
-    GSS.setKeytabPath(this.keytab);
-    const srv_ctx = GSS.createServerContext();
-```
+    ```
+        GSS.setKeytabPath(this.keytab);
+        const srv_ctx = GSS.createServerContext();
+    ```
 3. Processes the token
-`const srv_tok = await GSS.acceptSecContext(srv_ctx, cli_tok);`
-This advances Kerberos handshake. 
-4. Gets client identity 
-`const client = srv_ctx.clientName();`
+    
+    This advances Kerberos handshake.
+    ```
+        const srv_tok = await GSS.acceptSecContext(srv_ctx, cli_tok);
+    ```
+    
+4. Gets client identity
+    ```
+        const client = srv_ctx.clientName();
+    ```
 5. Responds with continuation token
-`ctx.res.header("WWW-Authenticate", "Negotiate " + srv_tok);`
+    ```
+        ctx.res.header("WWW-Authenticate", "Negotiate " + srv_tok);
+    ```
 
 
 ## Method `auth_bearer(ctx)`
-1. Looks up the bearer token from the `Map` of `this.tokens`
-`const client = this.tokens.get(creds);` -> `{principal, expiry}`
+1. Looks up the bearer token from the `this.tokens` map, which returns `{principal, expiry}`
+    ```
+        const client = this.tokens.get(creds);
+    ```
+    
 2. Checks for token expiry
 3. Returns `client.principal`
 
 
-## Method `token(req, res)` handler for `POST /token`
-Only works in `req.auth` exists, i.o., already authenticated via Basic or Kerberos.
-1. Generates 528-bit random base64 encoded token
-`const token = crypto.randomBytes(66).toString("base64");`
+## Method `token(req, res)`
+This is a handler for `POST /token` route. It only works if `req.auth` exists, i.o., already authenticated via **Basic** or **Kerberos**.
+This method does: 
+- Generates 528-bit random base64 encoded token
+    ```
+        const token = crypto.randomBytes(66).toString("base64");
+    ```
 2. Stores the token in `this.tokens` map
-```
-this.tokens.set(token, {
-    principal: req.auth,
-    expiry: Date.now() + this.session_length,
-});
-```
+    ```
+        this.tokens.set(token, {
+            principal: req.auth,
+            expiry: Date.now() + this.session_length,
+        });
+    ```
 3. Returns `token` and its `expiry`
-`return res.json({ token, expiry });`
+    ```
+        return res.json({ token, expiry });
+    ```
 
-
-Overall request flow:
-1. login with Basic/Kerberos: `Authorization: Basic ...`
--> auth_basic
--> req.auth = user@realm
-
-2. then, call `/token`
--> returns `{token}`
-3. later requests use Bearer token `Authorization: Bearer <token>`
--> auth_bearer
--> req.auth restored
+## Overall request flow
+- First login with **Basic** or **Kerberos** which sets `req.auth` to **user@realm**.
+- Then, call `/token` which returns Bearer `{token}`.
+- Later requests use the Bearer token (`Authorization: Bearer <token>`)

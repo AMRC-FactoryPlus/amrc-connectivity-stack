@@ -584,6 +584,7 @@ export default {
         description: `Are you sure you want to delete ${path}? This action cannot be undone.`,
         duration: 5000,
         closeButton: true,
+        pauseOnHover: true,
         action: {
           label: 'Delete',
           onClick: () => {
@@ -591,12 +592,14 @@ export default {
               this.deleteObject(val)
               toast.success('Success!', {
                 description: 'The object has been deleted successfully.',
+                pauseOnHover: true,
               })
             }
             catch (err) {
               console.error('Failed to delete object:', err)
               toast.error('Unable to delete object', {
                 description: 'There was a problem deleting the object.',
+                pauseOnHover: true,
                 action: {
                   label: 'Try again',
                   onClick: () => this.maybeDeleteObject(val),
@@ -1002,14 +1005,14 @@ export default {
       if (!file) return
 
       if (file.size > 5 * 1024 * 1024) {
-        toast.error('CSV file is too large', { description: 'Maximum file size is 5 MB.' })
+        toast.error('CSV file is too large', { description: 'Maximum file size is 5 MB.', pauseOnHover: true })
         this.$refs.csvFileInput.value = ''
         return
       }
 
       const reader = new FileReader()
       reader.onerror = () => {
-        toast.error('Failed to read file')
+        toast.error('Failed to read file', { pauseOnHover: true })
       }
       reader.onload = (e) => {
         const csvString = e.target.result
@@ -1041,13 +1044,14 @@ export default {
         if (csvSchemaType && deviceSchemaType && csvSchemaType !== deviceSchemaType) {
           toast.error('CSV Schema Type does not match device Schema Type', {
             description: `CSV Schema Type: ${csvSchemaType}, Device Schema Type: ${deviceSchemaType}`,
+            pauseOnHover: true,
           })
           this.$refs.csvFileInput.value = ''
           return
         }
 
         if (rows.length === 0) {
-          toast.error('No data rows found in CSV')
+          toast.error('No data rows found in CSV', { pauseOnHover: true })
           return
         }
 
@@ -1071,7 +1075,7 @@ export default {
       this.model = JSON.parse(JSON.stringify(this.model))
 
       if (result.applied > 0) {
-        toast.success(`${result.applied} metric${result.applied === 1 ? '' : 's'} updated from CSV`)
+        toast.success(`${result.applied} metric${result.applied === 1 ? '' : 's'} updated from CSV`, { pauseOnHover: true })
       }
 
       if (result.applied > 0) {
@@ -1081,8 +1085,11 @@ export default {
       if (result.skipped > 0) {
         toast.warning(`${result.skipped} row${result.skipped === 1 ? '' : 's'} skipped`, {
           description: 'Paths not found in schema.',
+          pauseOnHover: true,
         })
       }
+
+      toast.warning("Test message", { pauseOnHover: true })
 
       this.markDirty()
       this.groupRerenderTrigger = +new Date()
@@ -1105,6 +1112,7 @@ export default {
       this.csvParsedData = null
       toast.info('CSV imported', {
         description: 'Review changes and save manually.',
+        pauseOnHover: true,
       })
     },
 
@@ -1124,6 +1132,7 @@ export default {
         // Show validation errors to the user
         toast.error('Validation failed', {
           description: 'The origin map contains errors that need to be fixed.',
+          pauseOnHover: true,
           action: {
             label: 'View Errors',
             onClick: () => {
@@ -1135,14 +1144,16 @@ export default {
               firstErrors.forEach(error => {
                 toast.error('Validation Error', {
                   description: error,
-                  duration: 5000
+                  duration: 5000,
+                  pauseOnHover: true,
                 });
               });
 
               if (validation.errors.length > 3) {
                 toast.error('Additional Errors', {
                   description: `${validation.errors.length - 3} more errors found. Check the console for details.`,
-                  duration: 5000
+                  duration: 5000,
+                  pauseOnHover: true,
                 });
               }
             }
@@ -1163,11 +1174,11 @@ export default {
 
         this.loading = false
         this.isDirty = false
-        toast.success('Origin Map updated successfully')
+        toast.success('Origin Map updated successfully', { pauseOnHover: true })
       }
       catch (err) {
         this.loading = false
-        toast.error('Unable to update Origin Map')
+        toast.error('Unable to update Origin Map', { pauseOnHover: true })
         console.error(err)
       }
     },

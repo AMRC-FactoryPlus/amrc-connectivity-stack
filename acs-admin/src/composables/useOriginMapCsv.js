@@ -3,6 +3,7 @@
  */
 
 import Papa from 'papaparse';
+// No 'set' export from vue in Vue 3. Use plain assignment; reactivity is handled by the parent component's set helper if needed.
 
 const RESERVED_KEYS = ['Schema_UUID', 'Instance_UUID', 'patternProperties', '$meta', 'required'];
 
@@ -77,25 +78,46 @@ function collectMetricRows(schema, model, pathSegments = []) {
     return rows;
 }
 
-export function applyCsvToModel(rows, model, schema) {
+/**
+ * Apply CSV rows to the model, using a set function for reactivity.
+ * @param {Array} rows - CSV rows
+ * @param {Object} model - The model to mutate
+ * @param {Object} schema - The schema
+ * @param {Function} setFn - (optional) function(path, value, obj, delimiter) to set nested properties reactively
+ */
+export function applyCsvToModel(rows, model, schema, setFn) {
     let applied = 0;
     let skipped = 0;
 
     function getMetricSchema(schema, segments) {
         let currentSchema = schema;
-        for (const segment of segments) {
-            if (!currentSchema || !currentSchema.properties || !(segment in currentSchema.properties)) {
+        for (let i = 0; i < segments.length; i++) {
+            const segment = segments[i];
+            if (!currentSchema) {
+                console.warn('getMetricSchema: schema is null at segment', segment, segments);
+                return null;
+            }
+            // Handle patternProperties (arrays)
+            if (currentSchema.patternProperties) {
+                const regexKey = Object.keys(currentSchema.patternProperties)[0];
+                currentSchema = currentSchema.patternProperties[regexKey];
+                continue;
+            }
+            if (!currentSchema.properties || !(segment in currentSchema.properties)) {
+                console.warn('getMetricSchema: segment not found in properties', segment, segments, currentSchema);
                 return null;
             }
             currentSchema = currentSchema.properties[segment];
         }
         // If this is a metric, return the merged allOf properties
         if (currentSchema && currentSchema.allOf) {
+            console.debug('getMetricSchema: found metric schema for', segments, currentSchema);
             return {
                 ...currentSchema.allOf[0]?.properties,
                 ...currentSchema.allOf[1]?.properties,
             };
         }
+        console.warn('getMetricSchema: did not find allOf for', segments, currentSchema);
         return null;
     }
 
@@ -103,17 +125,33 @@ export function applyCsvToModel(rows, model, schema) {
         const segments = tagPath.split('/');
         let current = model;
         let found = true;
+        let pathSoFar = [];
 
         // Traverse or create the path in the model
+
         for (let i = 0; i < segments.length; i++) {
             const segment = segments[i];
+            pathSoFar.push(segment);
             if (current == null || typeof current !== 'object') {
                 found = false;
                 break;
             }
             if (!(segment in current)) {
-                // Only create the metric object at the leaf
-                if (i === segments.length - 1 && schema) {
+                // If not at the leaf, create the parent object
+                if (i < segments.length - 1) {
+                    if (typeof setFn === 'function') {
+                        setFn(pathSoFar.join('.'), {}, model, '.');
+                    } else {
+                        current[segment] = {};
+                    }
+                    // After creating, update current to point to the new parent object
+                    let temp = model;
+                    for (let j = 0; j <= i; j++) {
+                        temp = temp[segments[j]];
+                    }
+                    current = temp;
+                } else if (i === segments.length - 1 && schema) {
+                    // Only create the metric object at the leaf
                     const metricSchema = getMetricSchema(schema, segments);
                     if (metricSchema) {
                         // Create the metric object with default values from schema
@@ -125,21 +163,35 @@ export function applyCsvToModel(rows, model, schema) {
                                 newMetric[key] = metricSchema[key].enum[0];
                             }
                         });
-                        current[segment] = newMetric;
+                        if (typeof setFn === 'function') {
+                            setFn(pathSoFar.join('.'), newMetric, model, '.');
+                        } else {
+                            current[segment] = newMetric;
+                        }
+                        // After creating, update current to point to the new metric object
+                        let temp = model;
+                        for (let j = 0; j <= i; j++) {
+                            temp = temp[segments[j]];
+                        }
+                        current = temp;
+                        console.debug('applyCsvToModel: created metric in model for', tagPath, newMetric);
                     } else {
                         found = false;
+                        console.warn('applyCsvToModel: could not find metric schema for', tagPath, segments);
                         break;
                     }
                 } else {
                     found = false;
                     break;
                 }
+            } else {
+                current = current[segment];
             }
-            current = current[segment];
         }
 
         if (!found || current == null || typeof current !== 'object') {
             skipped++;
+            console.warn('applyCsvToModel: skipped row for', tagPath, segments);
             continue;
         }
 
@@ -162,6 +214,7 @@ export function applyCsvToModel(rows, model, schema) {
 
         applied++;
     }
+    // ...existing code...
 
     return { applied, skipped };
 }

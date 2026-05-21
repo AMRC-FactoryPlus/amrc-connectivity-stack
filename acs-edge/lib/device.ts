@@ -6,6 +6,7 @@ import { log } from "./helpers/log.js";
 import { SparkplugNode } from "./sparkplugNode.js";
 import {
     Metrics,
+    parseNsTimestampFromPayload,
     parseTimeStampFromPayload,
     parseValueFromPayload,
     processJSONBatchedPayload,
@@ -420,11 +421,17 @@ export class Device {
                                 (newVal || newVal == 0)
                                 && (metric.value !== newVal)
                             ) {
-                                // If timestamp is provided in data package
+                                // Extract timestamps from the payload if provided.
+                                // timestampNs takes precedence for sub-ms precision;
+                                // timestamp is the ms fallback.
                                 const timestamp = parseTimeStampFromPayload(obj[addr],
                                     metric,
                                     this._payloadFormat,
                                     this._delimiter
+                                );
+                                const timestampNs = parseNsTimestampFromPayload(obj[addr],
+                                    metric,
+                                    this._payloadFormat
                                 );
 
                                 // Update the metric value and push it to the array of changed metrics
@@ -432,7 +439,8 @@ export class Device {
                                     ...(this._metrics.setValueByAddrPath(addr,
                                         path,
                                         newVal,
-                                        timestamp))
+                                        timestamp,
+                                        timestampNs))
                                 });
                             }
                         }

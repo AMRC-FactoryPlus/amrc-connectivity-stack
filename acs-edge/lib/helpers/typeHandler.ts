@@ -234,6 +234,16 @@ export interface nestedMetricIndex {
     [index: string]: metricIndex
 }
 
+/* Captured once at startup to align hrtime with wall clock.
+ * Date.now() is millisecond-precision so absolute accuracy is ±1ms,
+ * but relative precision between events is genuinely nanosecond.
+ * process.hrtime.bigint() is monotonic so timestamps never go backwards. */
+const HRTIME_OFFSET = BigInt(Date.now()) * 1_000_000n - process.hrtime.bigint();
+
+function now_ns(): bigint {
+    return process.hrtime.bigint() + HRTIME_OFFSET;
+}
+
 export class Metrics {
     #array: sparkplugMetric[]
     #addrIndex: metricArrIndex
@@ -302,7 +312,7 @@ export class Metrics {
     setValueByName(name: string, value: sparkplugValue, timestamp?: number, timestampNs?: bigint) {
         this.#array[this.#nameIndex[name]].value = value;
         this.#array[this.#nameIndex[name]].timestamp = timestamp || Date.now();
-        this.#array[this.#nameIndex[name]].timestampNs = timestampNs;
+        this.#array[this.#nameIndex[name]].timestampNs = timestampNs ?? (timestamp ? undefined : now_ns());
         this.#array[this.#nameIndex[name]].isNull = (value === null);
         return this.#array[this.#nameIndex[name]]
     }
@@ -310,7 +320,7 @@ export class Metrics {
     setValueByIndex(index: number, value: sparkplugValue, timestamp?: number, timestampNs?: bigint) {
         this.#array[index].value = value;
         this.#array[index].timestamp = timestamp || Date.now();
-        this.#array[index].timestampNs = timestampNs;
+        this.#array[index].timestampNs = timestampNs ?? (timestamp ? undefined : now_ns());
         this.#array[index].isNull = (value === null);
         return this.#array[index];
     }
@@ -328,7 +338,7 @@ export class Metrics {
     setValueByAlias(alias: number, value: sparkplugValue, timestamp?: number, timestampNs?: bigint) {
         this.#array[this.#aliasIndex[alias]].value = value;
         this.#array[this.#aliasIndex[alias]].timestamp = timestamp || Date.now();
-        this.#array[this.#aliasIndex[alias]].timestampNs = timestampNs;
+        this.#array[this.#aliasIndex[alias]].timestampNs = timestampNs ?? (timestamp ? undefined : now_ns());
         this.#array[this.#aliasIndex[alias]].isNull = (value === null)
         return this.#array[this.#aliasIndex[alias]];
     }
@@ -352,7 +362,7 @@ export class Metrics {
     setValueByAddrPath(addr: string, path: string, value: sparkplugValue, timestamp?: number, timestampNs?: bigint) {
         this.#array[this.#addrPathIndex[addr][path]].value = value;
         this.#array[this.#addrPathIndex[addr][path]].timestamp = timestamp || Date.now();
-        this.#array[this.#addrPathIndex[addr][path]].timestampNs = timestampNs;
+        this.#array[this.#addrPathIndex[addr][path]].timestampNs = timestampNs ?? (timestamp ? undefined : now_ns());
         this.#array[this.#addrPathIndex[addr][path]].isNull = (value === null)
         return this.#array[this.#addrPathIndex[addr][path]];
     }
@@ -620,6 +630,43 @@ export function parseTimeStampFromPayload(msg: any, metric: sparkplugMetric, pay
 
         default:
             return undefined;
+    }
+}
+
+/**
+ * Extracts a nanosecond-precision timestamp from a JSON payload.
+ * The field must be named "timestampNs" and must be a numeric string
+ * (not a number) to avoid float64 precision loss — nanosecond epoch
+ * values exceed Number.MAX_SAFE_INTEGER.
+ * Currently only supports JSON payloads; other formats return undefined.
+ * @param msg Raw message from device connection
+ * @param metric The metric being processed
+ * @param payloadFormat Payload format string
+ */
+export function parseNsTimestampFromPayload(msg: any, metric: sparkplugMetric, payloadFormat: serialisationType | string): bigint | undefined {
+    if (payloadFormat !== serialisationType.JSON) return undefined;
+
+    let payload: any;
+    try {
+        if (typeof msg == "string") {
+            payload = JSON.parse(msg);
+        } else if (Buffer.isBuffer(msg)) {
+            payload = JSON.parse(msg.toString());
+        } else {
+            payload = msg;
+        }
+    } catch (e: any) {
+        return undefined;
+    }
+
+    const raw = payload?.timestampNs;
+    if (raw == null) return undefined;
+
+    try {
+        return BigInt(raw);
+    } catch {
+        log(`Failed to parse timestampNs value as BigInt: ${raw}`);
+        return undefined;
     }
 }
 

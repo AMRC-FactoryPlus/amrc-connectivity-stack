@@ -907,18 +907,21 @@ export default {
     },
 
     set (path, toValue, onObject, delimiter = '.') {
-      let schema  = onObject  // a moving reference to internal objects within obj
-      const pList = path.split(delimiter)
-      const len   = pList.length
+      let schema = onObject; // a moving reference to internal objects within obj
+      const pList = path.split(delimiter);
+      const len = pList.length;
 
       for (let i = 0; i < len - 1; i++) {
-        const elem = pList[i]
-        if (!schema[elem]) schema[elem] = {}
-        schema = schema[elem]
+        const elem = pList[i];
+        // If the property does not exist or is not an object, create it as a plain object
+        if (!Object.prototype.hasOwnProperty.call(schema, elem) || typeof schema[elem] !== 'object' || schema[elem] === null) {
+          schema[elem] = {};
+        }
+        schema = schema[elem];
       }
 
-      // Direct assignment works in Vue 3
-      schema[pList[len - 1]] = toValue
+      // Direct assignment works in Vue 3 for reactive objects
+      schema[pList[len - 1]] = toValue;
     },
 
     unset (path, onObject) {
@@ -1060,8 +1063,12 @@ export default {
 
     applyParsedCsv () {
       if (!this.csvParsedData) return { applied: 0, skipped: 0 }
+      
       // Pass the schema to applyCsvToModel so missing metrics can be created
-      const result = applyCsvToModel(this.csvParsedData, this.model, this.schema)
+      const result = applyCsvToModel(this.csvParsedData, this.model, this.schema, this.set)
+
+      // Force model replacement to trigger Vue reactivity
+      this.model = JSON.parse(JSON.stringify(this.model))
 
       if (result.applied > 0) {
         toast.success(`${result.applied} metric${result.applied === 1 ? '' : 's'} updated from CSV`)

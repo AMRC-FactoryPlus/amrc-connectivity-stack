@@ -3,7 +3,7 @@
   -->
 
 <template>
-  <Toaster rich-colors class="pointer-events-auto"/>
+  <Toaster visible-toasts="5" rich-colors class="pointer-events-auto"/>
   <SidebarProvider>
     <Sidebar v-if="!l.fullscreen && s.loaded" class="bg-white dark:bg-slate-800 z-20">
       <SidebarHeader class="border-b h-16">

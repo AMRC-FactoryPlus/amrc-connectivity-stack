@@ -1,5 +1,5 @@
 # Notify
-This implements a WebSocket-based notification API for Factory+ Service HTTP API. 
+This module implements a WebSocket-based notification API for Factory+ Service HTTP API. 
 - Accpets WebSocket clients 
 - Authenticates them using a Bearer token
 - Lets clients create subscriptions

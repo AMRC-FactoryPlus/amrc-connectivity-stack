@@ -221,8 +221,11 @@ export class SparkplugNode extends (
                     // ms timestamp (or fall back to now). Encode as an
                     // unsigned Long so the protobuf encoder writes a full
                     // uint64 without precision loss.
-                    const ns = metric.timestampNs
-                        ?? normalizeToNanos(metric.timestamp ?? Date.now());
+                    const rawTs = metric.timestamp;
+                    const msTs = Long.isLong(rawTs)
+                        ? BigInt((rawTs as Long).toString())
+                        : (rawTs ?? Date.now());
+                    const ns = metric.timestampNs ?? normalizeToNanos(msTs);
 
                     // Create basic metric object
                     const newMetric: sparkplugMetric = {

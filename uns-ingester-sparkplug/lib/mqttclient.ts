@@ -10,8 +10,20 @@ import Long from "long";
 
 interface UnsMetric {
     value: string,
-    timestamp: Date,
+    timestamp: string,
     batch?: UnsMetric[]
+}
+
+/**
+ * Convert a nanosecond BigInt to an ISO 8601 string with nanosecond
+ * precision, e.g. "2026-05-28T15:46:56.100923659Z". Falls back to
+ * millisecond precision when no nanosecond value is available.
+ */
+function ns_to_iso(ns: bigint): string {
+    const ms = ns / 1_000_000n;
+    const subMs = ns % 1_000_000n;
+    const date = new Date(Number(ms));
+    return date.toISOString().slice(0, -1) + subMs.toString().padStart(6, '0') + 'Z';
 }
 
 interface UnsMetricCustomProperties {
@@ -453,9 +465,16 @@ export default class MQTTClient {
             let payload: UnsMetric;
             // if theirs more than one of the same metric from the same sparkplug payload, add the values to the batch array.
             if (metricContainers.length > 1) {
-                const sortedMetricContainers = metricContainers.sort((a, b) => a.metric.timestamp - b.metric.timestamp);
+                // Sort by nanosecond timestamp when available, falling back to
+                // the millisecond Date. BigInt comparison returns -1/0/1 to
+                // satisfy the sort comparator contract.
+                const sortedMetricContainers = metricContainers.sort((a, b) => {
+                    const aNs = a.metric.timestampNs ?? BigInt(a.metric.timestamp.getTime()) * 1_000_000n;
+                    const bNs = b.metric.timestampNs ?? BigInt(b.metric.timestamp.getTime()) * 1_000_000n;
+                    return aNs < bNs ? -1 : aNs > bNs ? 1 : 0;
+                });
                 payload = {
-                    timestamp: new Date(sortedMetricContainers[0].metric.timestamp),
+                    timestamp: ns_to_iso(sortedMetricContainers[0].metric.timestampNs ?? BigInt(sortedMetricContainers[0].metric.timestamp.getTime()) * 1_000_000n),
                     value: sortedMetricContainers[0].metric.value,
                     batch: []
                 }
@@ -463,13 +482,13 @@ export default class MQTTClient {
                 sortedMetricContainers.shift();
                 sortedMetricContainers.forEach(metricContainer => {
                     payload.batch.push({
-                        timestamp: new Date(metricContainer.metric.timestamp),
+                        timestamp: ns_to_iso(metricContainer.metric.timestampNs ?? BigInt(metricContainer.metric.timestamp.getTime()) * 1_000_000n),
                         value: metricContainer.metric.value
                     });
                 });
             } else {
                 payload = {
-                    timestamp: new Date(metricContainers[0].metric.timestamp),
+                    timestamp: ns_to_iso(metricContainers[0].metric.timestampNs ?? BigInt(metricContainers[0].metric.timestamp.getTime()) * 1_000_000n),
                     value: metricContainers[0].metric.value
                 };
             }

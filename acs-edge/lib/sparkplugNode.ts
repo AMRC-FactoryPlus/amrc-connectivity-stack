@@ -4,12 +4,30 @@
 
 import {EventEmitter} from "events";
 import {v5 as uuidv5} from "uuid";
+import Long from "long";
 
 import {ServiceClient} from "@amrc-factoryplus/utilities";
 
 import {log, logf} from "./helpers/log.js";
 import {metricIndex, Metrics, sparkplugConfig, sparkplugDataType, sparkplugMetric, sparkplugPayload,} from "./helpers/typeHandler.js";
 import * as UUIDs from "./uuids.js";
+
+/* Timestamps below this value are treated as milliseconds and converted
+ * to nanoseconds. Mirrors the same threshold in js-service-client. */
+const NS_THRESHOLD = 1_000_000_000_000_000n;
+const MS_TO_NS     = 1_000_000n;
+
+/* Normalise a ms or ns number/bigint to nanoseconds as a BigInt. */
+function normalizeToNanos(ts: number | bigint): bigint {
+    const n = BigInt(ts);
+    return n < NS_THRESHOLD ? n * MS_TO_NS : n;
+}
+
+/* Convert a nanosecond BigInt to an unsigned Long for the Sparkplug
+ * protobuf encoder, which uses Long for uint64 fields. */
+function ns_to_long(ns: bigint): Long {
+    return Long.fromString(ns.toString(), true);
+}
 
 class InstanceBuilder {
     #uuid: string
@@ -198,11 +216,21 @@ export class SparkplugNode extends (
                         metric.isNull = true;
                     }
 
-                    if (metric.timestamp === undefined) metric.timestamp = Date.now();
+                    // Resolve to nanoseconds. Use timestampNs when the driver
+                    // has supplied sub-ms precision; otherwise normalise the
+                    // ms timestamp (or fall back to now). Encode as an
+                    // unsigned Long so the protobuf encoder writes a full
+                    // uint64 without precision loss.
+                    const rawTs = metric.timestamp;
+                    const msTs = Long.isLong(rawTs)
+                        ? BigInt((rawTs as Long).toString())
+                        : (rawTs ?? Date.now());
+                    const ns = metric.timestampNs ?? normalizeToNanos(msTs);
 
                     // Create basic metric object
                     const newMetric: sparkplugMetric = {
-                        timestamp: metric.timestamp,
+                        timestamp: ns_to_long(ns),
+                        timestampNs: ns,
                         value: metric.value,
                         alias: metric.alias,
                         type: metric.type,
@@ -224,7 +252,7 @@ export class SparkplugNode extends (
             })
         );
         const payload: sparkplugPayload = {
-            timestamp: Date.now(),
+            timestamp: ns_to_long(normalizeToNanos(Date.now())),
             metrics: newMetrics,
         };
         if (birth) payload.uuid = UUIDs.Special.FactoryPlus;
@@ -299,7 +327,7 @@ export class SparkplugNode extends (
      * @param {string} deviceId The name of the device we are publishing on behalf of
      */
     async publishDDeath(deviceId: string) {
-        this.#client.publishDeviceDeath(deviceId, {timestamp: Date.now()});
+        this.#client.publishDeviceDeath(deviceId, {timestamp: ns_to_long(normalizeToNanos(Date.now()))});
         log(`💀 DDEATH published for ${deviceId}`);
     }
 
@@ -310,7 +338,7 @@ export class SparkplugNode extends (
     async #publishNData(metrics: sparkplugMetric | sparkplugMetric[]) {
         // Create payload
         let payload = {
-            timestamp: Date.now(),
+            timestamp: ns_to_long(normalizeToNanos(Date.now())),
             metrics: (Array.isArray(metrics) ? metrics : [metrics])
         };
         // Publish NDATA

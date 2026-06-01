@@ -1,135 +1,162 @@
+import { ZipArchive } from "archiver";
+import { PassThrough } from "stream";
+import { once } from "events";
+import pLimit from "p-limit";
 
-import {InfluxDB, flux} from '@influxdata/influxdb-client';
-import {csv_escape} from './utils.js';
-
-export class InfluxReader{
-    constructor(opts){
+export class InfluxReader {
+    constructor(opts) {
         this.log = opts.debug.bound("influxReader");
+
         this.influx_bucket = opts.influx_bucket;
         this.influx_org = opts.influx_org;
-        this.influx_query_api = opts.influx_client.getQueryApi(opts.influx_org);
+
+        this.influx_query_api =
+            opts.influx_client.getQueryApi(
+                this.influx_org
+            );
+
+        this.limit = pLimit(4);
     }
 
-    async stream_dataset_data(device_sources, writable, meta = {}) {
+    exportDevices(deviceSources, meta = {}) {
+        const archive = new ZipArchive({
+            zlib: {
+                level: 0,
+            },
+        });
 
-        const measurementFilter = meta.measurement
-            ? `|> filter(fn: (r) => r._measurement == "${meta.measurement}")`
-            : ``;
+        archive.on("warning", err => {
+            this.log("archive warning", err);
+        });
 
-        // =====================================================
-        // Device + per-device session filtering
-        // =====================================================
+        archive.on("error", err => {
+            this.log("archive error", err);
+            archive.destroy(err);
+        });
 
-        const deviceConditions = device_sources.map(src => {
+        this.#appendDevices(
+            archive,
+            deviceSources,
+            meta
+        ).catch(err => {
+            archive.destroy(err);
+        });
 
-            const timeParts = [];
+        return archive;
+    }
 
-            if (src.from) {
-                timeParts.push(`r._time >= time(v: "${src.from}")`);
+    async #appendDevices(archive, deviceSources, meta) {
+        for (const source of deviceSources) {
+            await this.limit(() =>
+                new Promise((resolve, reject) => {
+                    const csvStream = new PassThrough({
+                        highWaterMark: 1024 * 1024,
+                    });
+
+                    archive.append(csvStream, {
+                        name: `${source.device_uuid}.csv`,
+                    });
+
+                    this.#streamDevice(source, csvStream, meta)
+                        .then(resolve)
+                        .catch(reject);
+                })
+            );
+        }
+
+        await new Promise((resolve, reject) => {
+            archive.once("error", reject);
+            archive.once("close", resolve);
+            archive.finalize();
+        });
+    }
+
+    async #streamDevice(
+        source,
+        writable,
+        meta
+    ) {
+        const query =
+            this.#buildFluxQuery(
+                source,
+                meta
+            );
+
+        this.log(
+            "streaming",
+            source.device_uuid
+        );
+
+        const response =
+            this.influx_query_api.response(query);
+
+        try {
+            for await (
+                const chunk of response.iterateLines()
+            ) {
+                if (
+                    !writable.write(
+                        chunk + "\n"
+                    )
+                ) {
+                    await once(
+                        writable,
+                        "drain"
+                    );
+                }
             }
 
-            if (src.to) {
-                timeParts.push(`r._time <= time(v: "${src.to}")`);
-            }
+            writable.end();
 
-            const timeExpr = timeParts.length
-                ? ` and ${timeParts.join(" and ")}`
+            await once(
+                writable,
+                "finish"
+            );
+        }
+        catch (err) {
+            writable.destroy(err);
+            throw err;
+        }
+    }
+
+    #buildFluxQuery(
+        source,
+        meta = {}
+    ) {
+        const start =
+            source.from ??
+            "1970-01-01T00:00:00Z";
+
+        const stop =
+            source.to ??
+            "2100-01-01T00:00:00Z";
+
+        const measurementFilter =
+            meta.measurement
+                ? `
+                |> filter(
+                    fn: (r) =>
+                        r._measurement ==
+                        "${meta.measurement}"
+                )
+            `
                 : "";
 
-            return `(r.topLevelInstance == "${src.device_uuid}"${timeExpr})`;
+        return `
+            from(bucket: "${this.influx_bucket}")
 
-        }).join(" or ");
-
-        // =====================================================
-        // Global bounds
-        // =====================================================
-
-        const froms = device_sources
-            .map(s => s.from)
-            .filter(Boolean)
-            .sort();
-
-        const tos = device_sources
-            .map(s => s.to)
-            .filter(Boolean)
-            .sort();
-
-        const globalFrom = froms.length
-            ? froms[0]
-            : "0";
-
-        const globalTo = tos.length
-            ? tos[tos.length - 1]
-            : null;
-
-        const rangeClause = globalTo
-            ? `|> range(start: time(v: "${globalFrom}"), stop: time(v: "${globalTo}"))`
-            : `|> range(start: ${globalFrom})`;
-
-        // =====================================================
-        // QUERY
-        // =====================================================
-
-        const query = `
-        from(bucket: "${this.influx_bucket}")
-
-            ${rangeClause}
-
-            |> filter(fn: (r) => ${deviceConditions})
+            |> range(
+                start: time(v: "${start}"),
+                stop: time(v: "${stop}")
+            )
 
             ${measurementFilter}
 
-            |> map(fn: (r) => ({
-                r with
-                column_name:
-                    if exists r.path and r.path != ""
-                    then r.device + ":" + r.path + ":" + r._measurement
-                    else r.device + ":" + r._measurement
-            }))
-
-            // IMPORTANT:
-            // remove grouping before pivot
-            |> group()
-
-            |> pivot(
-                rowKey: ["_time", "unit"],
-                columnKey: ["column_name"],
-                valueColumn: "_value"
+            |> filter(
+                fn: (r) =>
+                    r.topLevelInstance ==
+                    "${source.device_uuid}"
             )
-
-            |> sort(columns: ["_time"], desc: false)
         `;
-
-        return this._stream_influx_csv(query, writable);
-    }
-
-    async _stream_influx_csv(query, writable) {
-        return new Promise((resolve, reject) => {
-            let headersWritten = false;
-
-            this.influx_query_api.queryRows(query, {
-                next: (row, tableMeta) => {
-                    const obj = tableMeta.toObject(row);
-
-                    // Write headers once
-                    if (!headersWritten) {
-                        writable.write(
-                            Object.keys(obj).join(",") + "\n"
-                        );
-                        headersWritten = true;
-                    }
-
-                    const csvRow = Object.values(obj)
-                        .map(v => csv_escape(v))
-                        .join(",");
-
-                    writable.write(csvRow + "\n");
-                },
-
-                error: reject,
-
-                complete: resolve,
-            });
-        });
     }
 }

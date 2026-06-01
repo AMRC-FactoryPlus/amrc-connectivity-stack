@@ -10,11 +10,20 @@ import Long from "long";
 
 interface UnsMetric {
     value: string,
-    timestamp: Date,
-    /** Nanoseconds since epoch as a numeric string. JSON has no bigint, so
-     *  this is serialised as a string for the historian to parse back. */
-    timestampNs?: string,
+    timestamp: string,
     batch?: UnsMetric[]
+}
+
+/**
+ * Convert a nanosecond BigInt to an ISO 8601 string with nanosecond
+ * precision, e.g. "2026-05-28T15:46:56.100923659Z". Falls back to
+ * millisecond precision when no nanosecond value is available.
+ */
+function ns_to_iso(ns: bigint): string {
+    const ms = ns / 1_000_000n;
+    const subMs = ns % 1_000_000n;
+    const date = new Date(Number(ms));
+    return date.toISOString().slice(0, -1) + subMs.toString().padStart(6, '0') + 'Z';
 }
 
 interface UnsMetricCustomProperties {
@@ -465,8 +474,7 @@ export default class MQTTClient {
                     return aNs < bNs ? -1 : aNs > bNs ? 1 : 0;
                 });
                 payload = {
-                    timestamp: sortedMetricContainers[0].metric.timestamp,
-                    timestampNs: sortedMetricContainers[0].metric.timestampNs?.toString(),
+                    timestamp: ns_to_iso(sortedMetricContainers[0].metric.timestampNs ?? BigInt(sortedMetricContainers[0].metric.timestamp.getTime()) * 1_000_000n),
                     value: sortedMetricContainers[0].metric.value,
                     batch: []
                 }
@@ -474,15 +482,13 @@ export default class MQTTClient {
                 sortedMetricContainers.shift();
                 sortedMetricContainers.forEach(metricContainer => {
                     payload.batch.push({
-                        timestamp: metricContainer.metric.timestamp,
-                        timestampNs: metricContainer.metric.timestampNs?.toString(),
+                        timestamp: ns_to_iso(metricContainer.metric.timestampNs ?? BigInt(metricContainer.metric.timestamp.getTime()) * 1_000_000n),
                         value: metricContainer.metric.value
                     });
                 });
             } else {
                 payload = {
-                    timestamp: metricContainers[0].metric.timestamp,
-                    timestampNs: metricContainers[0].metric.timestampNs?.toString(),
+                    timestamp: ns_to_iso(metricContainers[0].metric.timestampNs ?? BigInt(metricContainers[0].metric.timestamp.getTime()) * 1_000_000n),
                     value: metricContainers[0].metric.value
                 };
             }

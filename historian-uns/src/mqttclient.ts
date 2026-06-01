@@ -171,6 +171,23 @@ export default class MQTTClient {
     }
 
     /**
+     * Parse an ISO 8601 timestamp string to nanoseconds since epoch.
+     * Handles both standard millisecond precision ("...56.100Z") and
+     * nanosecond precision ("...56.100923659Z") produced by the UNS ingester.
+     */
+    private parse_iso_ns(iso: string): bigint {
+        const match = iso.match(/^(.+)\.(\d+)Z$/);
+        if (!match) {
+            return BigInt(new Date(iso).getTime()) * 1_000_000n;
+        }
+        const [, base, frac] = match;
+        const secMs = new Date(base + 'Z').getTime();
+        // Pad or truncate fractional digits to exactly 9 (nanoseconds within second)
+        const fracNs = BigInt(frac.padEnd(9, '0').slice(0, 9));
+        return BigInt(secMs / 1000) * 1_000_000_000n + fracNs;
+    }
+
+    /**
      * Writes all metrics in a UNS MQTT payload to InfluxDB
      * @param payload The payload from the MQTT packet.
      * @param topic The topic the payload was received on.
@@ -179,25 +196,17 @@ export default class MQTTClient {
     private writeMetrics(payload: MetricPayload, topic: string, customProperties: UnsMetricCustomProperties) {
         const unsTopic = new UnsTopic(topic, customProperties);
 
-        // Prefer nanosecond precision when available. timestampNs is a numeric
-        // string (JSON has no bigint) set by the UNS ingester for sources that
-        // supply sub-millisecond timestamps. Fall back to the millisecond Date
-        // for sources that have not yet been updated.
-        const payloadTimestamp: Date | bigint = payload.timestampNs != null
-            ? BigInt(payload.timestampNs)
-            : payload.timestamp
-                ? new Date(payload.timestamp)
-                : new Date();
+        const payloadTimestamp: bigint = payload.timestamp
+            ? this.parse_iso_ns(payload.timestamp)
+            : BigInt(Date.now()) * 1_000_000n;
 
         this.writeToInfluxDB(unsTopic, payload.value, payloadTimestamp, customProperties.Unit, customProperties.Type);
 
         // Handle the batched metrics
         payload.batch?.forEach((metric) => {
-            const metricTimestamp: Date | bigint = metric.timestampNs != null
-                ? BigInt(metric.timestampNs)
-                : metric.timestamp
-                    ? new Date(metric.timestamp)
-                    : payloadTimestamp;
+            const metricTimestamp: bigint = metric.timestamp
+                ? this.parse_iso_ns(metric.timestamp)
+                : payloadTimestamp;
             // Send each metric to InfluxDB
             this.writeToInfluxDB(unsTopic, metric.value, metricTimestamp, customProperties.Unit, customProperties.Type);
         });
@@ -207,21 +216,18 @@ export default class MQTTClient {
      * Writes metric values to InfluxDB using the metric timestamp.
      * @param topic Topic the metric was published on.
      * @param value Metric value to write to InfluxDB.
-     * @param timestamp Timestamp from the metric. Either a BigInt of
-     *     nanoseconds since epoch, or a Date for ms-precision sources.
+     * @param timestamp Nanoseconds since epoch as a BigInt.
      * @param unit The metric unit from the MQTTv5 custom properties.
      * @param type The Metric type from the MQTTv5 custom properties.
      */
-    writeToInfluxDB(topic: UnsTopic, value: string, timestamp: Date | bigint, unit: string, type: string) {
+    writeToInfluxDB(topic: UnsTopic, value: string, timestamp: bigint, unit: string, type: string) {
         if (value === null) {
             return;
         }
 
         // InfluxDB client accepts string timestamps in line protocol format,
         // which handles nanosecond values that exceed Number.MAX_SAFE_INTEGER.
-        const influxTimestamp = typeof timestamp === "bigint"
-            ? timestamp.toString()
-            : timestamp;
+        const influxTimestamp = timestamp.toString();
 
         writeApi.useDefaultTags({
             topLevelInstance: topic.GetTopLevelInstance(),

@@ -315,7 +315,7 @@ export class APIv1 {
 
     try {
         // Resolve dataset tree
-        const resolved = await this._resolve_dataset(dataset_uuid);
+        const resolved_sources = await this._resolve_dataset(dataset_uuid);
 
         res.setHeader("Content-Type", "text/csv");
         res.setHeader(
@@ -323,14 +323,21 @@ export class APIv1 {
             `attachment; filename="${dataset_uuid}.csv"`
         );
 
-        await this.influxReader.stream_dataset_data(
-            resolved,
-            res,
-            {},
+        const zipStream = this.influxReader.exportDevices(resolved_sources);
+
+
+        res.setHeader(
+          "Content-Type",
+          "application/zip"
         );
-        if (!res.writableEnded) {
-          res.end();
-        }
+
+        res.setHeader(
+          "Content-Disposition",
+          `attachment; filename=${dataset_uuid}.zip`
+        );
+
+        zipStream.pipe(res);
+
        }catch (err) {
         this.log(err);
         return fail(this.log, 500);

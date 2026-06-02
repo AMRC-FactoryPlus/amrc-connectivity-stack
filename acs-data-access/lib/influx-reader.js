@@ -120,10 +120,6 @@ export class InfluxReader {
     }
 
 
-// ,result,table,_start,_stop,_time,_value,_field,_measurement,device,group,node,topLevelInstance,topLevelSchema,unit,usesInstances,usesSchemas
-
-// _time, _value, _measurement, device, unit
-
     #buildFluxQuery(
         source,
         meta = {}

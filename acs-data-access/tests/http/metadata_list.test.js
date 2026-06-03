@@ -89,10 +89,11 @@ describe('GET /metadata', () => {
 
 
         const res = await test_fplus.DataAccess.get_metadata_list();
-        expect(res).toEqual([]);
+
 
         await deleteGrant(grant_uuid);
-
+        
+        expect(res).toEqual([]);
     });
 
     test('User has correct Read permission to one dataset', async () => {
@@ -108,9 +109,10 @@ describe('GET /metadata', () => {
         await sleep(1000);
 
         const res = await test_fplus.DataAccess.get_metadata_list();
-        expect(res).toContain(dataset_uuid);
 
         await deleteGrant(grant_uuid);
+
+        expect(res).toContain(dataset_uuid);
 
     });
 
@@ -135,13 +137,13 @@ describe('GET /metadata', () => {
         await sleep(1000);
 
         const res = await test_fplus.DataAccess.get_metadata_list();
-        expect(res).toHaveLength(datasets.length);
-        expect(res).toEqual(expect.arrayContaining(datasets));
 
         // Revoke grants
         for(let grant of grants){
             await deleteGrant(grant);
         }
+        expect(res).toHaveLength(datasets.length);
+        expect(res).toEqual(expect.arrayContaining(datasets));
     });
 
     test('Multiple datasets, some readable', async () => {
@@ -174,14 +176,13 @@ describe('GET /metadata', () => {
 
 
         const res = await test_fplus.DataAccess.get_metadata_list();
-        expect(res).toHaveLength(1);
-        expect(res).toContain(datasets.Readable);
-
 
         // Revoke grants
         for(let grant of grants){
             await deleteGrant(grant);
         }
+        expect(res).toHaveLength(1);
+        expect(res).toContain(datasets.Readable);
     });
 
     test('Multiple (simple SRC) datasets with Read permissions, invalid ones must be excluded', async () => {
@@ -223,9 +224,6 @@ describe('GET /metadata', () => {
 
         const res = await test_fplus.DataAccess.get_metadata_list();
 
-        expect(res).toHaveLength(2);
-        expect(res).not.toContain(invalid_dataset);
-
         await sleep(1000);
 
         // ==== remove invalid config ======
@@ -236,18 +234,23 @@ describe('GET /metadata', () => {
         for (let uuid of grants){
             await deleteGrant(uuid);
         }
+        expect(res).toHaveLength(2);
+        expect(res).not.toContain(invalid_dataset);
     }, 30000);
 
-
-    test('Invalid Union dataset composed of only Src datasets', async () => {
-        const invalid_union_dataset = Test_Uuids.Union_Datasets.TestDoublesUnionDataset;
+    /**
+     * Invalid union dataset is not returned. 
+     * But the child datasets should still be returned as long as they are valid on their own.
+     */
+    test('Invalid (Parent) Union dataset composed of only Src datasets', async () => {
+        const invalid_parent_dataset = Test_Uuids.Union_Datasets.TestDoublesUnionDataset;
         const child_datasets = [
             Test_Uuids.Src_Datasets.TestDeviceDataset,
             Test_Uuids.Src_Datasets.TestDoubleDeviceDataset
         ];
 
         const datasets = [
-            invalid_union_dataset,
+            invalid_parent_dataset,
             ...child_datasets
         ];
 
@@ -269,7 +272,7 @@ describe('GET /metadata', () => {
         // ---- Make Union dataset invalid
         await addConfig(
             Constants.App.SparkplugSrc,
-            invalid_union_dataset,
+            invalid_parent_dataset,
             {
                 "source": Test_Uuids.Devices.Node2_TestDoubleDevice
             }
@@ -279,23 +282,251 @@ describe('GET /metadata', () => {
 
 
         const res = await test_fplus.DataAccess.get_metadata_list();
-        console.log(res);
-
-        
-        expect(res).toHaveLength(child_datasets.length);
-        expect(res).not.toContain(invalid_union_dataset);
-
 
         // ---- Make Union dataset valid again
         await removeConfig(
             Constants.App.SparkplugSrc,
-            invalid_union_dataset
+            invalid_parent_dataset
         );
 
         // ==== Revoke grants ====
         for (let uuid of grants){
             await deleteGrant(uuid);
         }
+        expect(res).toHaveLength(child_datasets.length);
+        expect(res).not.toContain(invalid_parent_dataset);
+
+    }, 30000);
+
+    /**
+     * Union dataset composed of:
+     *  > SessionNode2DoubleDataset:
+     *      > Node2_TestDoubleDeviceDataset - source dataset
+     *  > TestDoublesUnionDataset: 
+     *      > TestDeviceDataset - source dataset
+     *      > TestDoubleDeviceDataset - source dataset
+     */
+
+    test('Invalid (Parent) Union dataset composed of Session and Union', async () => {
+
+        const invalid_parent_dataset = Test_Uuids.Union_Datasets.TestNestedUnionDataset;
+        const child_datasets = [
+            Test_Uuids.Session_Datasets.SessionNode2DoubleDataset,
+            Test_Uuids.Union_Datasets.TestDoublesUnionDataset
+        ];
+
+        const datasets = [
+            invalid_parent_dataset,
+            ...child_datasets
+        ];
+
+        // ---- add READ grants ---
+        const grants = [];
+        for (let uuid of datasets){
+            const read_grant = await addGrant(
+                TEST_PRINCIPAL,
+                Constants.Perm.ReadDataset,
+                uuid,
+                false
+            );
+            grants.push(read_grant);
+        }
+
+        await sleep(1000);
+
+
+        // ---- Make Union dataset invalid
+        await addConfig(
+            Constants.App.SparkplugSrc,
+            invalid_parent_dataset,
+            {
+                "source": Test_Uuids.Devices.Node2_TestDoubleDevice
+            }
+        );
+
+        await sleep(500);
+
+
+        const res = await test_fplus.DataAccess.get_metadata_list();
+
+        // ---- Make Union dataset valid again
+        await removeConfig(
+            Constants.App.SparkplugSrc,
+            invalid_parent_dataset
+        );
+
+        // ==== Revoke grants ====
+        for (let uuid of grants){
+            await deleteGrant(uuid);
+        }
+        expect(res).toHaveLength(child_datasets.length);
+        expect(res).not.toContain(invalid_parent_dataset);
+    }, 30000);
+
+
+    test('Invalid (Parent) Session dataset composed of Union', async () => {
+        const invalid_parent_dataset = Test_Uuids.Session_Datasets.TestSessionAllDataset;
+        const child_datasets = [Test_Uuids.Union_Datasets.TestUnionAllDataset];
+
+        const datasets = [
+            invalid_parent_dataset,
+            ...child_datasets
+        ];
+
+        // ---- add READ grants ---
+        const grants = [];
+        for (let uuid of datasets){
+            const read_grant = await addGrant(
+                TEST_PRINCIPAL,
+                Constants.Perm.ReadDataset,
+                uuid,
+                false
+            );
+            grants.push(read_grant);
+        }
+
+        await sleep(1000);
+
+
+        // ---- Make Union dataset invalid
+        await addConfig(
+            Constants.App.SparkplugSrc,
+            invalid_parent_dataset,
+            {
+                "source": Test_Uuids.Devices.Node2_TestDoubleDevice
+            }
+        );
+
+        await sleep(500);
+
+        const res = await test_fplus.DataAccess.get_metadata_list();
+        
+        // ---- Make Union dataset valid again
+        await removeConfig(
+            Constants.App.SparkplugSrc,
+            invalid_parent_dataset
+        );
+
+        // ==== Revoke grants ====
+        for (let uuid of grants){
+            await deleteGrant(uuid);
+        }
+
+        expect(res).toHaveLength(child_datasets.length);
+        expect(res).not.toContain(invalid_parent_dataset);
+
+    }, 30000);
+
+
+
+    test('Invalid Child (SRC) makes Parent (Union) invalid too', async () => {
+        const invalid_child_dataset = Test_Uuids.Src_Datasets.TestDeviceDataset;
+        const parent_dataset = Test_Uuids.Union_Datasets.TestUnionAllDataset;
+
+        const datasets = [
+            invalid_child_dataset,
+            parent_dataset
+        ];
+
+        // ---- add READ grants ---
+        const grants = [];
+        for (let uuid of datasets){
+            const read_grant = await addGrant(
+                TEST_PRINCIPAL,
+                Constants.Perm.ReadDataset,
+                uuid,
+                false
+            );
+            grants.push(read_grant);
+        }
+
+        await sleep(1000);
+
+
+        // ---- Make Union dataset invalid
+        await addConfig(
+            Constants.App.SessionLimits,
+            invalid_child_dataset,
+            {
+                "source": "invalid",
+                "from": "invalid",
+                "to": "invalid"
+            }
+        );
+
+        await sleep(500);
+
+
+        const res = await test_fplus.DataAccess.get_metadata_list();
+
+        // ---- Make Union dataset valid again
+        await removeConfig(
+            Constants.App.SessionLimits,
+            invalid_child_dataset
+        );
+
+        // ==== Revoke grants ====
+        for (let uuid of grants){
+            await deleteGrant(uuid);
+        }
+
+        expect(res).toHaveLength(0);
+
+    }, 30000);
+
+
+
+
+    test.only('Invalid Child (Union) makes Parent (Session) invalid too', async () => {
+        const invalid_child_dataset = Test_Uuids.Union_Datasets.TestUnionAllDataset;
+        const parent_dataset = Test_Uuids.Session_Datasets.TestSessionAllDataset;
+
+        const datasets = [
+            invalid_child_dataset,
+            parent_dataset
+        ];
+
+        // ---- add READ grants ---
+        const grants = [];
+        for (let uuid of datasets){
+            const read_grant = await addGrant(
+                TEST_PRINCIPAL,
+                Constants.Perm.ReadDataset,
+                uuid,
+                false
+            );
+            grants.push(read_grant);
+        }
+
+        await sleep(1000);
+
+
+        // ---- Make Union dataset invalid
+        await addConfig(
+            Constants.App.SparkplugSrc,
+            invalid_child_dataset,
+            {
+                "source": "invalid"
+            }
+        );
+
+        await sleep(500);
+
+
+        const res = await test_fplus.DataAccess.get_metadata_list();
+
+        // ---- Make Union dataset valid again
+        await removeConfig(
+            Constants.App.SparkplugSrc,
+            invalid_child_dataset
+        );
+
+        // ==== Revoke grants ====
+        for (let uuid of grants){
+            await deleteGrant(uuid);
+        }
+
+        expect(res).toHaveLength(0);
 
     }, 30000);
 });

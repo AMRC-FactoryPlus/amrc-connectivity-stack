@@ -8,13 +8,12 @@ function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-describe('GET /metadata', () => {
+describe('GET /structure', () => {
     const TEST_PRINCIPAL=process.env.TEST_HUMAN_UUID;
 
     let test_fplus; 
     let admin_fplus;
     let ALL_GRANTS = [];
-
 
     beforeEach(async () => {
         admin_fplus = new ServiceClient({
@@ -81,34 +80,14 @@ describe('GET /metadata', () => {
     }
 
     test('Datasets exist but user has no permissions', async () => {
-        const res = await test_fplus.DataAccess.get_metadata_list();
+        const res = await test_fplus.DataAccess.get_structure_list();
         expect(res).toEqual([]);
     });
 
-    test('User has irrelevant permission to one dataset', async () => {
+    test('User has unrelated permission to one dataset', async () => {
         const dataset_uuid = Test_Uuids.Src_Datasets.TestDeviceDataset;
         
-        // Grant unrelated EditDataset permission to the user
-        const grant_uuid = await addGrant(
-            TEST_PRINCIPAL,
-            Constants.Perm.EditDataset,
-            dataset_uuid,
-            false
-        );
-        await sleep(1000);
-
-
-        const res = await test_fplus.DataAccess.get_metadata_list();
-
-        await deleteGrant(grant_uuid);
-        
-        expect(res).toEqual([]);
-    });
-
-    test('User has relevant permission to one dataset', async () => {
-        const dataset_uuid = Test_Uuids.Src_Datasets.TestDeviceDataset;
-
-        // Grant correct permission
+        // Grant unrelated permission to the user
         const grant_uuid = await addGrant(
             TEST_PRINCIPAL,
             Constants.Perm.ReadDataset,
@@ -117,7 +96,26 @@ describe('GET /metadata', () => {
         );
         await sleep(1000);
 
-        const res = await test_fplus.DataAccess.get_metadata_list();
+        const res = await test_fplus.DataAccess.get_structure_list();
+
+        await deleteGrant(grant_uuid);
+        
+        expect(res).toEqual([]);
+    });
+
+    test('User has correct permission to one dataset', async () => {
+        const dataset_uuid = Test_Uuids.Src_Datasets.TestDeviceDataset;
+
+        // Grant correct permission
+        const grant_uuid = await addGrant(
+            TEST_PRINCIPAL,
+            Constants.Perm.EditDataset,
+            dataset_uuid,
+            false
+        );
+        await sleep(1000);
+
+        const res = await test_fplus.DataAccess.get_structure_list();
 
         await deleteGrant(grant_uuid);
 
@@ -125,18 +123,20 @@ describe('GET /metadata', () => {
 
     });
 
-    test('User has relevant permission to multiple datasets', async () => {
+    test('User has correct permission to multiple datasets', async () => {
         const datasets = [
             Test_Uuids.Src_Datasets.TestDeviceDataset, 
-            Test_Uuids.Session_Datasets.TestSessionAllDataset
+            Test_Uuids.Session_Datasets.TestSessionAllDataset,
         ];
 
-        // Add read grants
+
+        // Add grants
         let grants = [];
+        
         for (let dataset_uuid of datasets){
             const grant_uuid = await addGrant(
                 TEST_PRINCIPAL,
-                Constants.Perm.ReadDataset,
+                Constants.Perm.EditDataset,
                 dataset_uuid,
                 false
             )
@@ -145,7 +145,7 @@ describe('GET /metadata', () => {
 
         await sleep(1000);
 
-        const res = await test_fplus.DataAccess.get_metadata_list();
+        const res = await test_fplus.DataAccess.get_structure_list();
 
         // Revoke grants
         for(let grant of grants){
@@ -157,44 +157,46 @@ describe('GET /metadata', () => {
 
     test('Multiple datasets, some have relevant permission', async () => {
         const datasets = {
-            Readable: Test_Uuids.Src_Datasets.TestDeviceDataset, 
-            Unreadable: Test_Uuids.Session_Datasets.TestSessionAllDataset
+            Relevant: Test_Uuids.Src_Datasets.TestDeviceDataset, 
+            Irrelevant: Test_Uuids.Session_Datasets.TestSessionAllDataset
         };
 
         // ======== add grants ======
         let grants = [];
-        const read_grant = await addGrant(
-            TEST_PRINCIPAL,
-            Constants.Perm.ReadDataset,
-            datasets.Readable,
-            false
-        );
-        grants.push(read_grant);
-
-        const edit_grant = await addGrant(
+        const relevant_grant = await addGrant(
             TEST_PRINCIPAL,
             Constants.Perm.EditDataset,
-            datasets.Unreadable,
+            datasets.Relevant,
             false
         );
-        grants.push(edit_grant);
+        grants.push(relevant_grant);
+
+        const irrelevant_grant = await addGrant(
+            TEST_PRINCIPAL,
+            Constants.Perm.ReadDataset,
+            datasets.Irrelevant,
+            false
+        );
+        grants.push(irrelevant_grant);
 
         await sleep(1000);
 
         // =========================
 
 
-        const res = await test_fplus.DataAccess.get_metadata_list();
+        const res = await test_fplus.DataAccess.get_structure_list();
 
         // Revoke grants
         for(let grant of grants){
             await deleteGrant(grant);
         }
         expect(res).toHaveLength(1);
-        expect(res).toContain(datasets.Readable);
+        expect(res).toContain(datasets.Relevant);
+        expect(res).not.toContain(datasets.Irrelevant);
     });
 
-    test('Multiple (simple SRC) datasets with Read permissions, invalid ones must be excluded', async () => {
+
+    test('Multiple (simple SRC) datasets with relevant permissions, invalid ones must be invcluded', async () => {
         const datasets = [
             Test_Uuids.Src_Datasets.TestDeviceDataset,
             Test_Uuids.Src_Datasets.Node2_TestDoubleDeviceDataset,
@@ -205,13 +207,13 @@ describe('GET /metadata', () => {
         // ----- add grants ---
         const grants = [];
         for (let uuid of datasets){
-            const read_grant = await addGrant(
+            const relevant_grant = await addGrant(
                 TEST_PRINCIPAL,
-                Constants.Perm.ReadDataset,
+                Constants.Perm.EditDataset,
                 uuid,
                 false
             );
-            grants.push(read_grant);
+            grants.push(relevant_grant);
         }
 
         await sleep(1000);
@@ -233,7 +235,7 @@ describe('GET /metadata', () => {
 
         // =========================
 
-        const res = await test_fplus.DataAccess.get_metadata_list();
+        const res = await test_fplus.DataAccess.get_structure_list();
 
         await sleep(1000);
 
@@ -245,12 +247,12 @@ describe('GET /metadata', () => {
         for (let uuid of grants){
             await deleteGrant(uuid);
         }
-        expect(res).toHaveLength(2);
-        expect(res).not.toContain(invalid_dataset);
+        expect(res).toHaveLength(datasets.length);
+        expect(res).toEqual(expect.arrayContaining(datasets));
     }, 30000);
 
 
-    test('Invalid Parent (Union) composed of only SRC does not invalidate children', async () => {
+    test('Invalid Parent (Union) composed of only SRC - all included', async () => {
         const invalid_parent_dataset = Test_Uuids.Union_Datasets.TestDoublesUnionDataset;
         const invalid_structure = Constants.App.SparkplugSrc;
         
@@ -264,16 +266,16 @@ describe('GET /metadata', () => {
             ...child_datasets
         ];
 
-        // ---- add READ grants ---
+        // ---- add grants ---
         const grants = [];
         for (let uuid of datasets){
-            const read_grant = await addGrant(
+            const relevant_grant = await addGrant(
                 TEST_PRINCIPAL,
-                Constants.Perm.ReadDataset,
+                Constants.Perm.EditDataset,
                 uuid,
                 false
             );
-            grants.push(read_grant);
+            grants.push(relevant_grant);
         }
 
         await sleep(1000);
@@ -291,7 +293,7 @@ describe('GET /metadata', () => {
         await sleep(500);
 
 
-        const res = await test_fplus.DataAccess.get_metadata_list();
+        const res = await test_fplus.DataAccess.get_structure_list();
 
         // ---- Make Union dataset valid again
         await removeConfig(
@@ -303,13 +305,12 @@ describe('GET /metadata', () => {
         for (let uuid of grants){
             await deleteGrant(uuid);
         }
-        expect(res).toHaveLength(child_datasets.length);
-        expect(res).not.toContain(invalid_parent_dataset);
+        expect(res).toHaveLength(datasets.length);
+        expect(res).toEqual(expect.arrayContaining(datasets));
 
     }, 30000);
 
-
-    test('Invalid Parent (Union) composed of Session and Union does NOT invalidate children', async () => {
+    test('Invalid Parent (Union) composed of Session and Union - all included', async () => {
 
         const invalid_parent_dataset = Test_Uuids.Union_Datasets.TestNestedUnionDataset;
         const invalid_structure = Constants.App.SparkplugSrc;
@@ -324,16 +325,16 @@ describe('GET /metadata', () => {
             ...child_datasets
         ];
 
-        // ---- add READ grants ---
+        // ---- add grants ---
         const grants = [];
         for (let uuid of datasets){
-            const read_grant = await addGrant(
+            const relevant_grant = await addGrant(
                 TEST_PRINCIPAL,
-                Constants.Perm.ReadDataset,
+                Constants.Perm.EditDataset,
                 uuid,
                 false
             );
-            grants.push(read_grant);
+            grants.push(relevant_grant);
         }
 
         await sleep(1000);
@@ -351,7 +352,7 @@ describe('GET /metadata', () => {
         await sleep(500);
 
 
-        const res = await test_fplus.DataAccess.get_metadata_list();
+        const res = await test_fplus.DataAccess.get_structure_list();
 
         // ---- Make Union dataset valid again
         await removeConfig(
@@ -363,12 +364,12 @@ describe('GET /metadata', () => {
         for (let uuid of grants){
             await deleteGrant(uuid);
         }
-        expect(res).toHaveLength(child_datasets.length);
-        expect(res).not.toContain(invalid_parent_dataset);
+        expect(res).toHaveLength(datasets.length);
+        expect(res).toEqual(expect.arrayContaining(datasets));
     }, 30000);
 
 
-    test('Invalid Parent (Session) dataset composed of (Union) child does NOT invalidate children', async () => {
+    test('Invalid Parent (Session) dataset composed of (Union) - all included', async () => {
         const invalid_parent_dataset = Test_Uuids.Session_Datasets.TestSessionAllDataset;
         const invalid_structure = Constants.App.SparkplugSrc;
 
@@ -379,16 +380,16 @@ describe('GET /metadata', () => {
             ...child_datasets
         ];
 
-        // ---- add READ grants ---
+        // ---- add  grants ---
         const grants = [];
         for (let uuid of datasets){
-            const read_grant = await addGrant(
+            const relevant_grant = await addGrant(
                 TEST_PRINCIPAL,
-                Constants.Perm.ReadDataset,
+                Constants.Perm.EditDataset,
                 uuid,
                 false
             );
-            grants.push(read_grant);
+            grants.push(relevant_grant);
         }
 
         await sleep(1000);
@@ -405,7 +406,7 @@ describe('GET /metadata', () => {
 
         await sleep(500);
 
-        const res = await test_fplus.DataAccess.get_metadata_list();
+        const res = await test_fplus.DataAccess.get_structure_list();
         
         // ---- Make Union dataset valid again
         await removeConfig(
@@ -418,14 +419,12 @@ describe('GET /metadata', () => {
             await deleteGrant(uuid);
         }
 
-        expect(res).toHaveLength(child_datasets.length);
-        expect(res).not.toContain(invalid_parent_dataset);
+        expect(res).toHaveLength(datasets.length);
+        expect(res).toEqual(expect.arrayContaining(datasets));
 
     }, 30000);
 
-
-
-    test('Invalid Child (SRC) invalidates Parent (Union)', async () => {
+    test('Invalid Child (SRC) invalidates Parent (Union) - all included', async () => {
         const invalid_child_dataset = Test_Uuids.Src_Datasets.TestDeviceDataset;
         const invalid_structure = Constants.App.SessionLimits;
 
@@ -436,16 +435,16 @@ describe('GET /metadata', () => {
             parent_dataset
         ];
 
-        // ---- add READ grants ---
+        // ---- add  grants ---
         const grants = [];
         for (let uuid of datasets){
-            const read_grant = await addGrant(
+            const relevant_grant = await addGrant(
                 TEST_PRINCIPAL,
-                Constants.Perm.ReadDataset,
+                Constants.Perm.EditDataset,
                 uuid,
                 false
             );
-            grants.push(read_grant);
+            grants.push(relevant_grant);
         }
 
         await sleep(1000);
@@ -465,7 +464,7 @@ describe('GET /metadata', () => {
         await sleep(500);
 
 
-        const res = await test_fplus.DataAccess.get_metadata_list();
+        const res = await test_fplus.DataAccess.get_structure_list();
 
         // ---- Make Union dataset valid again
         await removeConfig(
@@ -478,14 +477,12 @@ describe('GET /metadata', () => {
             await deleteGrant(uuid);
         }
 
-        expect(res).toHaveLength(0);
+        expect(res).toHaveLength(datasets.length);
+        expect(res).toEqual(expect.arrayContaining(datasets));
 
     }, 30000);
 
-
-
-
-    test('Invalid Child (Union) invalidates Parent (Session)', async () => {
+    test('Invalid Child (Union) invalidates Parent (Session) - all included', async () => {
         const invalid_child_dataset = Test_Uuids.Union_Datasets.TestUnionAllDataset;
         const invalid_structure = Constants.App.SparkplugSrc;
         const parent_dataset = Test_Uuids.Session_Datasets.TestSessionAllDataset;
@@ -495,16 +492,16 @@ describe('GET /metadata', () => {
             parent_dataset
         ];
 
-        // ---- add READ grants ---
+        // ---- add  grants ---
         const grants = [];
         for (let uuid of datasets){
-            const read_grant = await addGrant(
+            const relevant_grant = await addGrant(
                 TEST_PRINCIPAL,
-                Constants.Perm.ReadDataset,
+                Constants.Perm.EditDataset,
                 uuid,
                 false
             );
-            grants.push(read_grant);
+            grants.push(relevant_grant);
         }
 
         await sleep(1000);
@@ -522,7 +519,7 @@ describe('GET /metadata', () => {
         await sleep(500);
 
 
-        const res = await test_fplus.DataAccess.get_metadata_list();
+        const res = await test_fplus.DataAccess.get_structure_list();
 
         // ---- Make Union dataset valid again
         await removeConfig(
@@ -535,10 +532,10 @@ describe('GET /metadata', () => {
             await deleteGrant(uuid);
         }
 
-        expect(res).toHaveLength(0);
+        expect(res).toHaveLength(datasets.length);
+        expect(res).toEqual(expect.arrayContaining(datasets));
 
     }, 30000);
-
 
 
     test('Invalid Child (Session) invalidates Parent (Union)', async () => {
@@ -554,16 +551,16 @@ describe('GET /metadata', () => {
             valid_child_dataset
         ];
 
-        // ---- add READ grants ---
+        // ---- add  grants ---
         const grants = [];
         for (let uuid of datasets){
-            const read_grant = await addGrant(
+            const relevant_grant = await addGrant(
                 TEST_PRINCIPAL,
-                Constants.Perm.ReadDataset,
+                Constants.Perm.EditDataset,
                 uuid,
                 false
             );
-            grants.push(read_grant);
+            grants.push(relevant_grant);
         }
 
         await sleep(1000);
@@ -581,7 +578,7 @@ describe('GET /metadata', () => {
         await sleep(500);
 
 
-        const res = await test_fplus.DataAccess.get_metadata_list();
+        const res = await test_fplus.DataAccess.get_structure_list();
 
         // ---- Make Union dataset valid again
         await removeConfig(
@@ -594,11 +591,8 @@ describe('GET /metadata', () => {
             await deleteGrant(uuid);
         }
 
-        expect(res).not.toContain(parent_dataset);
-        expect(res).not.toContain(invalid_child_dataset);
-        expect(res).toContain(valid_child_dataset);
+        expect(res).toHaveLength(datasets.length);
+        expect(res).toEqual(expect.arrayContaining(datasets));
 
     }, 30000);
 });
-
-

@@ -11,7 +11,7 @@ import { APIError } from "@amrc-factoryplus/service-api";
 import { ServiceError } from "@amrc-factoryplus/service-client";
 import { retryBackoff } from "@amrc-factoryplus/rx-util";
 import { DataAccess as Constants } from "./constants.js";
-import { valid_uuid } from "./validate.js";
+import { valid_uuid, valid_datetime } from "./validate.js";
 import { csv_escape, maxDate, minDate } from './utils.js';
 
 
@@ -455,13 +455,54 @@ export class APIv1 {
    * @param {*} res 
    * @returns new dataset's UUID - JSON string 
    */
+
+  _validate_config(config, structure){
+    if(structure === Constants.App.SparkplugSrc){
+      const source = config.source;
+      if(!source)
+        return fail(this.log, 422, `req.body.config for SparkplugSrc structure type ${structure} must contain "source" field.`);
+
+      if(!valid_uuid(source))
+        return fail(this.log, 422, `req.body.config.source uuid is invalid.`);
+      
+    }
+    else if(structure === Constants.App.SessionLimits){
+      const {to, from, source} = config;
+
+      if(!to || !from || !source)
+        return fail(this.log, 422, `req.body.config for SessionLimits type must contain "source", "to" and "from" fields.`);
+
+      if(!valid_uuid(source)) 
+        return fail(this.log, 422, `req.body.config.source uuid is invalid.`);
+
+      if(!valid_datetime(to))
+        return fail(this.log, 422, `req.body.config.to datetime format is invalid.`);
+
+      if(!valid_datetime(from))
+        return fail(this.log, 422, `req.body.config.from datetime format is invalid.`);
+    }
+    else if(structure === Constants.App.UnionComponents){
+      if(!Array.isArray(config))
+        return fail(this.log, 422, `req.body.config must be array []`);
+
+      for(let src of config){
+        if (!valid_uuid(src))
+          return fail(this.log, 422. `${src} is invalid UUID`);
+      }
+    }
+    else{
+      return fail(this.log, 404, `Unknown structure type ${structure}`);
+    }
+  }
+
   async structure_create(req, res){
     const {structure, config} = req.body;
 
     if(!structure) return fail(this.log, 422, `Structure not provided in request body.`);
     if(!valid_uuid(structure)) return fail(this.log, 422, `Structure uuid ${structure} is invalid.`);
 
-    if(!config) return fail(this.log, 422, `Config not provided in request body.`)
+    if(!config) return fail(this.log, 422, `Config not provided in request body.`);
+    this._validate_config(config, structure);
 
     const ok = await this.auth.check_acl(
       req.auth,

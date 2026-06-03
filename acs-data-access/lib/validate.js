@@ -34,3 +34,17 @@ export function valid_grant (grant) {
     if (!valid_uuid(grant.target)) return false;
     return (grant.plural === true || grant.plural === false);
 }
+
+
+export function valid_datetime(datetime_str){
+    // 1. Check the exact string format using RegEx
+    const regex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+    if (!regex.test(datetime_str)) return false;
+
+    // 2. Check if the calendar date and time are physically valid
+    const timestamp = Date.parse(datetime_str);
+    if (isNaN(timestamp)) return false;
+
+    // 3. Ensure it matches the original string (prevents date rolling like Feb 30 -> Mar 2)
+    return new Date(timestamp).toISOString() === datetime_str;
+}

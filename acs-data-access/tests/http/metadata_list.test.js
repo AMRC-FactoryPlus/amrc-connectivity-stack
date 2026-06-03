@@ -240,9 +240,9 @@ describe('GET /metadata', () => {
 
     /**
      * Invalid union dataset is not returned. 
-     * But the child datasets should still be returned as long as they are valid on their own.
+     * But the child datasets should still be returned as long as they are valid on their own and have ReadDataset permission.
      */
-    test('Invalid (Parent) Union dataset composed of only Src datasets', async () => {
+    test('Invalid Parent (Union) composed of only SRC does not invalidate children', async () => {
         const invalid_parent_dataset = Test_Uuids.Union_Datasets.TestDoublesUnionDataset;
         const child_datasets = [
             Test_Uuids.Src_Datasets.TestDeviceDataset,
@@ -307,7 +307,7 @@ describe('GET /metadata', () => {
      *      > TestDoubleDeviceDataset - source dataset
      */
 
-    test('Invalid (Parent) Union dataset composed of Session and Union', async () => {
+    test('Invalid Parent (Union) composed of Session and Union does NOT invalidate children', async () => {
 
         const invalid_parent_dataset = Test_Uuids.Union_Datasets.TestNestedUnionDataset;
         const child_datasets = [
@@ -364,7 +364,7 @@ describe('GET /metadata', () => {
     }, 30000);
 
 
-    test('Invalid (Parent) Session dataset composed of Union', async () => {
+    test('Invalid Parent (Session) dataset composed of (Union) child does NOT invalidate children', async () => {
         const invalid_parent_dataset = Test_Uuids.Session_Datasets.TestSessionAllDataset;
         const child_datasets = [Test_Uuids.Union_Datasets.TestUnionAllDataset];
 
@@ -419,7 +419,7 @@ describe('GET /metadata', () => {
 
 
 
-    test('Invalid Child (SRC) makes Parent (Union) invalid too', async () => {
+    test('Invalid Child (SRC) invalidates Parent (Union)', async () => {
         const invalid_child_dataset = Test_Uuids.Src_Datasets.TestDeviceDataset;
         const parent_dataset = Test_Uuids.Union_Datasets.TestUnionAllDataset;
 
@@ -477,7 +477,7 @@ describe('GET /metadata', () => {
 
 
 
-    test.only('Invalid Child (Union) makes Parent (Session) invalid too', async () => {
+    test('Invalid Child (Union) invalidates Parent (Session)', async () => {
         const invalid_child_dataset = Test_Uuids.Union_Datasets.TestUnionAllDataset;
         const parent_dataset = Test_Uuids.Session_Datasets.TestSessionAllDataset;
 
@@ -527,6 +527,65 @@ describe('GET /metadata', () => {
         }
 
         expect(res).toHaveLength(0);
+
+    }, 30000);
+
+
+
+    test.only('Invalid Child (Session) invalidates Parent (Union)', async () => {
+        const invalid_child_dataset = Test_Uuids.Session_Datasets.SessionNode2DoubleDataset;
+        const valid_child_dataset = Test_Uuids.Union_Datasets.TestDoublesUnionDataset;
+        const parent_dataset = Test_Uuids.Union_Datasets.TestNestedUnionDataset;
+
+        const datasets = [
+            invalid_child_dataset,
+            parent_dataset,
+            valid_child_dataset
+        ];
+
+        // ---- add READ grants ---
+        const grants = [];
+        for (let uuid of datasets){
+            const read_grant = await addGrant(
+                TEST_PRINCIPAL,
+                Constants.Perm.ReadDataset,
+                uuid,
+                false
+            );
+            grants.push(read_grant);
+        }
+
+        await sleep(1000);
+
+
+        // ---- Make Union dataset invalid
+        await addConfig(
+            Constants.App.SparkplugSrc,
+            invalid_child_dataset,
+            {
+                "source": "invalid"
+            }
+        );
+
+        await sleep(500);
+
+
+        const res = await test_fplus.DataAccess.get_metadata_list();
+        console.log(res);
+        // ---- Make Union dataset valid again
+        await removeConfig(
+            Constants.App.SparkplugSrc,
+            invalid_child_dataset
+        );
+
+        // ==== Revoke grants ====
+        for (let uuid of grants){
+            await deleteGrant(uuid);
+        }
+
+        expect(res).not.toContain(parent_dataset);
+        expect(res).not.toContain(invalid_child_dataset);
+        expect(res).toContain(valid_child_dataset);
 
     }, 30000);
 });

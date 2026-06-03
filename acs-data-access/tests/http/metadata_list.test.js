@@ -1,6 +1,6 @@
 import {ServiceClient} from "@amrc-factoryplus/service-client";
 import process from "node:process";
-import {beforeAll, describe, expect, test} from 'vitest';
+import {afterAll, beforeAll, beforeEach, describe, expect, test} from 'vitest';
 import { DataAccess as Constants } from "../../lib/constants.js";
 import {Test_Uuids} from '../temp_uuids.js';
 
@@ -11,28 +11,39 @@ function sleep(ms) {
 describe('GET /metadata', () => {
     let test_fplus; 
     let admin_fplus;
-    let TEST_PRINCIPAL;
+    const TEST_PRINCIPAL=process.env.TEST_HUMAN_UUID;
+
+    let ALL_GRANTS = [];
 
     beforeAll(async () => {
-        TEST_PRINCIPAL = "bbbca528-3099-47c9-ab25-e95e1ea06e93";
-
         admin_fplus = new ServiceClient({
             directory_url: process.env.DIRECTORY_URL,
             username: process.env.ADMIN_USERNAME,
             password: process.env.ADMIN_PASSWORD,
             verbose: 'ALL'
         });
+    });
 
-
+    
+    beforeEach(async () => {
         test_fplus = new ServiceClient({
             directory_url: process.env.DIRECTORY_URL,
             username: process.env.TEST_HUMAN_USERNAME,
             password: process.env.TEST_HUMAN_PASSWORD,
             verbose: 'ALL'
         });
-
+        await sleep(1000); // 
     });
 
+
+    // Clean up grants if not removed in case of failure.
+    afterAll(async () => {
+        if(ALL_GRANTS.length > 0){
+            for (let grant of ALL_GRANTS){
+                await deleteGrant(grant);
+            }
+        }
+    });
 
 
     async function addGrant(principal, permission, target, plural){
@@ -42,24 +53,25 @@ describe('GET /metadata', () => {
             target,
             plural
         });
-
+        ALL_GRANTS.push(grant_uuid);
         return grant_uuid;
     }
 
     async function deleteGrant(grant_uuid){
         await admin_fplus.Auth.delete_grant(grant_uuid)
+        ALL_GRANTS = ALL_GRANTS.filter(uuid => uuid !== grant_uuid);
     }
 
-    async function makeInvalid(dataset_uuid, app){
-        
+    async function addConfig(app, obj, config){
+        await admin_fplus.ConfigDB.put_config( app, obj, config );
     }
 
-    async function makeValid(dataset_uuid, app){
-
+    async function removeConfig(app, obj){
+        await admin_fplus.ConfigDB.delete_config( app, obj );
     }
 
     test('Datasets exist but user has no permissions', async () => {
-        const res = await fplus.DataAccess.get_metadata_list();
+        const res = await test_fplus.DataAccess.get_metadata_list();
         expect(res).toEqual([]);
     });
 
@@ -73,14 +85,14 @@ describe('GET /metadata', () => {
             dataset_uuid,
             false
         );
-        
         await sleep(1000);
+
 
         const res = await test_fplus.DataAccess.get_metadata_list();
         expect(res).toEqual([]);
 
         await deleteGrant(grant_uuid);
-        await sleep(1000);
+
     });
 
     test('User has correct Read permission to one dataset', async () => {
@@ -100,7 +112,6 @@ describe('GET /metadata', () => {
 
         await deleteGrant(grant_uuid);
 
-        await sleep(100);
     });
 
     test('User has correct permission to multiple datasets', async () => {
@@ -131,8 +142,6 @@ describe('GET /metadata', () => {
         for(let grant of grants){
             await deleteGrant(grant);
         }
-        
-        await sleep(100);
     });
 
     test('Multiple datasets, some readable', async () => {
@@ -173,8 +182,6 @@ describe('GET /metadata', () => {
         for(let grant of grants){
             await deleteGrant(grant);
         }
-        
-        await sleep(100);
     });
 
     test('Multiple (simple SRC) datasets with Read permissions, invalid ones must be excluded', async () => {
@@ -205,7 +212,7 @@ describe('GET /metadata', () => {
         const invalid_dataset = datasets[0];
 
         // make dataset invalid
-        await admin_fplus.ConfigDB.put_config(
+        await addConfig(
             Constants.App.UnionComponents,
             invalid_dataset,
             []
@@ -222,11 +229,7 @@ describe('GET /metadata', () => {
         await sleep(1000);
 
         // ==== remove invalid config ======
-        await admin_fplus.ConfigDB.delete_config(
-            Constants.App.SparkplugSrc,
-            invalid_dataset
-        );
-
+        await removeConfig(Constants.App.SparkplugSrc, invalid_dataset);
         await sleep(500);
 
         // ==== Revoke grants ====
@@ -236,7 +239,7 @@ describe('GET /metadata', () => {
     }, 30000);
 
 
-    test.only('Invalid Union dataset composed of only Src datasets', async () => {
+    test('Invalid Union dataset composed of only Src datasets', async () => {
         const invalid_union_dataset = Test_Uuids.Union_Datasets.TestDoublesUnionDataset;
         const child_datasets = [
             Test_Uuids.Src_Datasets.TestDeviceDataset,
@@ -264,7 +267,7 @@ describe('GET /metadata', () => {
 
 
         // ---- Make Union dataset invalid
-        await admin_fplus.ConfigDB.put_config(
+        await addConfig(
             Constants.App.SparkplugSrc,
             invalid_union_dataset,
             {
@@ -284,7 +287,7 @@ describe('GET /metadata', () => {
 
 
         // ---- Make Union dataset valid again
-        await admin_fplus.ConfigDB.delete_config(
+        await removeConfig(
             Constants.App.SparkplugSrc,
             invalid_union_dataset
         );

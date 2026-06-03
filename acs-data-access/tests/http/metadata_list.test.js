@@ -9,23 +9,21 @@ function sleep(ms) {
 }
 
 describe('GET /metadata', () => {
-    let test_fplus; 
-    let admin_fplus;
     const TEST_PRINCIPAL=process.env.TEST_HUMAN_UUID;
 
+    let test_fplus; 
+    let admin_fplus;
     let ALL_GRANTS = [];
 
-    beforeAll(async () => {
+
+    beforeEach(async () => {
         admin_fplus = new ServiceClient({
             directory_url: process.env.DIRECTORY_URL,
             username: process.env.ADMIN_USERNAME,
             password: process.env.ADMIN_PASSWORD,
             verbose: 'ALL'
         });
-    });
 
-    
-    beforeEach(async () => {
         test_fplus = new ServiceClient({
             directory_url: process.env.DIRECTORY_URL,
             username: process.env.TEST_HUMAN_USERNAME,
@@ -38,15 +36,18 @@ describe('GET /metadata', () => {
 
     // Clean up grants if not removed in case of failure.
     afterAll(async () => {
-        if(ALL_GRANTS.length > 0){
-            for (let grant of ALL_GRANTS){
-                await deleteGrant(grant);
-            }
+        for (let grant of ALL_GRANTS){
+            await deleteGrant(grant);
         }
     });
 
 
     async function addGrant(principal, permission, target, plural){
+        if(!principal ||
+            !permission ||
+            !target
+        ) return;
+
         const grant_uuid = await admin_fplus.Auth.add_grant({
             principal,
             permission,
@@ -58,15 +59,24 @@ describe('GET /metadata', () => {
     }
 
     async function deleteGrant(grant_uuid){
+        if(!grant_uuid) return;
+
         await admin_fplus.Auth.delete_grant(grant_uuid)
         ALL_GRANTS = ALL_GRANTS.filter(uuid => uuid !== grant_uuid);
     }
 
     async function addConfig(app, obj, config){
+        if(!app ||
+            !obj || 
+            !config
+        ) return;
+
         await admin_fplus.ConfigDB.put_config( app, obj, config );
     }
 
     async function removeConfig(app, obj){
+        if(!app || !obj) return;
+
         await admin_fplus.ConfigDB.delete_config( app, obj );
     }
 
@@ -89,7 +99,6 @@ describe('GET /metadata', () => {
 
 
         const res = await test_fplus.DataAccess.get_metadata_list();
-
 
         await deleteGrant(grant_uuid);
         
@@ -210,11 +219,13 @@ describe('GET /metadata', () => {
         // ---------------------
 
         
-        const invalid_dataset = datasets[0];
+        const invalid_dataset = Test_Uuids.Src_Datasets.TestDeviceDataset;
+        const invalid_structure = Constants.App.UnionComponents;
+
 
         // make dataset invalid
         await addConfig(
-            Constants.App.UnionComponents,
+            invalid_structure,
             invalid_dataset,
             []
         );
@@ -227,7 +238,7 @@ describe('GET /metadata', () => {
         await sleep(1000);
 
         // ==== remove invalid config ======
-        await removeConfig(Constants.App.SparkplugSrc, invalid_dataset);
+        await removeConfig(invalid_structure, invalid_dataset);
         await sleep(500);
 
         // ==== Revoke grants ====
@@ -238,12 +249,11 @@ describe('GET /metadata', () => {
         expect(res).not.toContain(invalid_dataset);
     }, 30000);
 
-    /**
-     * Invalid union dataset is not returned. 
-     * But the child datasets should still be returned as long as they are valid on their own and have ReadDataset permission.
-     */
+
     test('Invalid Parent (Union) composed of only SRC does not invalidate children', async () => {
         const invalid_parent_dataset = Test_Uuids.Union_Datasets.TestDoublesUnionDataset;
+        const invalid_structure = Constants.App.SparkplugSrc;
+        
         const child_datasets = [
             Test_Uuids.Src_Datasets.TestDeviceDataset,
             Test_Uuids.Src_Datasets.TestDoubleDeviceDataset
@@ -271,7 +281,7 @@ describe('GET /metadata', () => {
 
         // ---- Make Union dataset invalid
         await addConfig(
-            Constants.App.SparkplugSrc,
+            invalid_structure,
             invalid_parent_dataset,
             {
                 "source": Test_Uuids.Devices.Node2_TestDoubleDevice
@@ -285,7 +295,7 @@ describe('GET /metadata', () => {
 
         // ---- Make Union dataset valid again
         await removeConfig(
-            Constants.App.SparkplugSrc,
+            invalid_structure,
             invalid_parent_dataset
         );
 
@@ -298,18 +308,12 @@ describe('GET /metadata', () => {
 
     }, 30000);
 
-    /**
-     * Union dataset composed of:
-     *  > SessionNode2DoubleDataset:
-     *      > Node2_TestDoubleDeviceDataset - source dataset
-     *  > TestDoublesUnionDataset: 
-     *      > TestDeviceDataset - source dataset
-     *      > TestDoubleDeviceDataset - source dataset
-     */
 
     test('Invalid Parent (Union) composed of Session and Union does NOT invalidate children', async () => {
 
         const invalid_parent_dataset = Test_Uuids.Union_Datasets.TestNestedUnionDataset;
+        const invalid_structure = Constants.App.SparkplugSrc;
+
         const child_datasets = [
             Test_Uuids.Session_Datasets.SessionNode2DoubleDataset,
             Test_Uuids.Union_Datasets.TestDoublesUnionDataset
@@ -337,7 +341,7 @@ describe('GET /metadata', () => {
 
         // ---- Make Union dataset invalid
         await addConfig(
-            Constants.App.SparkplugSrc,
+            invalid_structure,
             invalid_parent_dataset,
             {
                 "source": Test_Uuids.Devices.Node2_TestDoubleDevice
@@ -351,7 +355,7 @@ describe('GET /metadata', () => {
 
         // ---- Make Union dataset valid again
         await removeConfig(
-            Constants.App.SparkplugSrc,
+            invalid_structure,
             invalid_parent_dataset
         );
 
@@ -366,6 +370,8 @@ describe('GET /metadata', () => {
 
     test('Invalid Parent (Session) dataset composed of (Union) child does NOT invalidate children', async () => {
         const invalid_parent_dataset = Test_Uuids.Session_Datasets.TestSessionAllDataset;
+        const invalid_structure = Constants.App.SparkplugSrc;
+
         const child_datasets = [Test_Uuids.Union_Datasets.TestUnionAllDataset];
 
         const datasets = [
@@ -390,7 +396,7 @@ describe('GET /metadata', () => {
 
         // ---- Make Union dataset invalid
         await addConfig(
-            Constants.App.SparkplugSrc,
+            invalid_structure,
             invalid_parent_dataset,
             {
                 "source": Test_Uuids.Devices.Node2_TestDoubleDevice
@@ -403,7 +409,7 @@ describe('GET /metadata', () => {
         
         // ---- Make Union dataset valid again
         await removeConfig(
-            Constants.App.SparkplugSrc,
+            invalid_structure,
             invalid_parent_dataset
         );
 
@@ -421,6 +427,8 @@ describe('GET /metadata', () => {
 
     test('Invalid Child (SRC) invalidates Parent (Union)', async () => {
         const invalid_child_dataset = Test_Uuids.Src_Datasets.TestDeviceDataset;
+        const invalid_structure = Constants.App.SessionLimits;
+
         const parent_dataset = Test_Uuids.Union_Datasets.TestUnionAllDataset;
 
         const datasets = [
@@ -445,7 +453,7 @@ describe('GET /metadata', () => {
 
         // ---- Make Union dataset invalid
         await addConfig(
-            Constants.App.SessionLimits,
+            invalid_structure,
             invalid_child_dataset,
             {
                 "source": "invalid",
@@ -461,7 +469,7 @@ describe('GET /metadata', () => {
 
         // ---- Make Union dataset valid again
         await removeConfig(
-            Constants.App.SessionLimits,
+            invalid_structure,
             invalid_child_dataset
         );
 
@@ -479,6 +487,7 @@ describe('GET /metadata', () => {
 
     test('Invalid Child (Union) invalidates Parent (Session)', async () => {
         const invalid_child_dataset = Test_Uuids.Union_Datasets.TestUnionAllDataset;
+        const invalid_structure = Constants.App.SparkplugSrc;
         const parent_dataset = Test_Uuids.Session_Datasets.TestSessionAllDataset;
 
         const datasets = [
@@ -503,7 +512,7 @@ describe('GET /metadata', () => {
 
         // ---- Make Union dataset invalid
         await addConfig(
-            Constants.App.SparkplugSrc,
+            invalid_structure,
             invalid_child_dataset,
             {
                 "source": "invalid"
@@ -517,7 +526,7 @@ describe('GET /metadata', () => {
 
         // ---- Make Union dataset valid again
         await removeConfig(
-            Constants.App.SparkplugSrc,
+            invalid_structure,
             invalid_child_dataset
         );
 
@@ -532,8 +541,10 @@ describe('GET /metadata', () => {
 
 
 
-    test.only('Invalid Child (Session) invalidates Parent (Union)', async () => {
+    test('Invalid Child (Session) invalidates Parent (Union)', async () => {
         const invalid_child_dataset = Test_Uuids.Session_Datasets.SessionNode2DoubleDataset;
+        const invalid_structure = Constants.App.SparkplugSrc;
+
         const valid_child_dataset = Test_Uuids.Union_Datasets.TestDoublesUnionDataset;
         const parent_dataset = Test_Uuids.Union_Datasets.TestNestedUnionDataset;
 
@@ -560,7 +571,7 @@ describe('GET /metadata', () => {
 
         // ---- Make Union dataset invalid
         await addConfig(
-            Constants.App.SparkplugSrc,
+            invalid_structure,
             invalid_child_dataset,
             {
                 "source": "invalid"
@@ -571,10 +582,10 @@ describe('GET /metadata', () => {
 
 
         const res = await test_fplus.DataAccess.get_metadata_list();
-        console.log(res);
+
         // ---- Make Union dataset valid again
         await removeConfig(
-            Constants.App.SparkplugSrc,
+            invalid_structure,
             invalid_child_dataset
         );
 

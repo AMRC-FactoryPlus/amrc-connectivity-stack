@@ -24,18 +24,33 @@
           <Input v-model="localModel.Path" :placeholder="pathPlaceholder" :icon="pathIcon"/>
         </Control>
         <Control v-if="isStatic" label="Static Value" :help="schema.properties.Value.description">
-          <Select v-if="isa95Level && isa95Options.length"
+          <Combobox v-if="isa95Level && isa95Options.length"
               :model-value="localModel.Value"
-              @update:model-value="on_isa95_select">
-            <SelectTrigger>
-              <SelectValue :placeholder="`Select ${isa95Level}`"/>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem v-for="opt in isa95Options" :key="opt.uuid" :value="opt.name">
+              @update:model-value="on_isa95_select"
+              :reset-search-term-on-select="true"
+          >
+            <ComboboxAnchor class="w-full relative flex items-center">
+              <ComboboxInput
+                  :display-value="(v) => v ?? ''"
+                  :placeholder="`Select ${isa95Level}...`"
+                  class="pr-8 bg-white"
+              />
+              <ComboboxTrigger class="absolute right-2">
+                <i class="fa-solid fa-chevron-down text-xs text-gray-400"/>
+              </ComboboxTrigger>
+            </ComboboxAnchor>
+            <ComboboxList class="w-[var(--reka-popper-anchor-width)]">
+              <ComboboxEmpty>No results</ComboboxEmpty>
+              <ComboboxItem
+                  v-for="opt in isa95Options"
+                  :key="opt.uuid"
+                  :value="opt.name"
+                  :text-value="`${opt.name} ${opt.aliases.join(' ')}`"
+              >
                 {{ opt.name }}
-              </SelectItem>
-            </SelectContent>
-          </Select>
+              </ComboboxItem>
+            </ComboboxList>
+          </Combobox>
           <Input v-else v-model="localModel.Value" placeholder="Value" icon="i-cursor"/>
         </Control>
         <Control label="Type" :help="schema.properties.Sparkplug_Type.description">
@@ -139,6 +154,10 @@ import { Button } from '@/components/ui/button'
 import { useConnectionStore } from '@/store/useConnectionStore'
 import { useDriverStore }     from '@/store/useDriverStore'
 import { useISA95Store, ISA95_LEVELS } from '@/store/useISA95Store.js'
+import {
+  Combobox, ComboboxAnchor, ComboboxEmpty,
+  ComboboxInput, ComboboxItem, ComboboxList, ComboboxTrigger,
+} from '@/components/ui/combobox'
 
 export default {
   name: 'SparkplugMetric',
@@ -161,6 +180,13 @@ export default {
     SelectItem,
     SelectTrigger,
     SelectValue,
+    Combobox,
+    ComboboxAnchor,
+    ComboboxEmpty,
+    ComboboxInput,
+    ComboboxItem,
+    ComboboxList,
+    ComboboxTrigger,
     Control,
     LinkUserDialog,
     GroupList,
@@ -300,10 +326,7 @@ export default {
 
       console.log('isa95Options', { level: this.isa95Level, parent_level, parent_value, data: this.isa95.data })
 
-      // No parent selected yet — show all nodes at this level so the user
-      // can set levels in any order. When a parent is set, filter to its
-      // children only.
-      if (!parent_value) return this.isa95.data.filter(n => n.level === this.isa95Level)
+      if (!parent_value) return []
   
       const parent_node = this.isa95.find_by_name(parent_level, parent_value)
       console.log('parent_node', parent_node)

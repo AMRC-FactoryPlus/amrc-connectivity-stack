@@ -50,7 +50,45 @@ export class APIv1 {
       .get(this.structure_uuid.bind(this))
       .put(this.structure_update.bind(this));
 
+
+    api.route("/delete/:uuid")
+      .get(this.delete_dataset.bind(this));
+
     return api;
+  }
+
+  async delete_dataset(req, res){
+    const dataset_uuid = req.params.uuid;
+    if(!dataset_uuid) return this.fail(this.log, 422, `No req.params.uuid`);
+    if(!valid_uuid(dataset_uuid)) return this.fail(this.log, 422, `Invalid uuid ${dataset_uuid}`);
+    
+    const ok = await this.auth.check_acl(
+      req.auth,
+      Constants.Perm.DeleteDataset,
+      dataset_uuid,
+      true,
+    );
+    
+    if (!ok) return fail(this.log, 403, `You don't have DELETE permissions for ${dataset_uuid}`);
+
+
+    this.log(`Data Access /delete/${dataset_uuid} is called`);
+
+    // remove all subclass relationships
+    const subclasses = await this.cdb.class_subclasses(dataset_uuid);
+    for(let s of subclasses){
+      await this.cdb.class_remove_subclass(dataset_uuid, s);
+    }
+    
+    // delete the dataset object 
+    try{
+      await this.cdb.delete_object(dataset_uuid);
+    }catch(err){
+      this.log("CANT DELETE CONFIGDB OBJECT");
+      this.log(err);
+    }
+
+    return res.status(200).json(dataset_uuid);
   }
 
   /** GET. Returns a list of Dataset UUIDs that the client has READ_DATASET access to.
@@ -547,9 +585,11 @@ export class APIv1 {
 
     const structure = req.body.structure;
     if(!structure) return fail(this.log, 422, `Structure not provided`);
+    if(!valid_uuid(structure)) return fail(this.log, 422, `Structure uuid is invalid`);
 
     const new_config = req.body.config;
     if(!new_config) return fail(this.log, 422, `Config not provided`);
+    this._validate_config(new_config, structure);
 
     const ok = await this.auth.check_acl(
       req.auth,

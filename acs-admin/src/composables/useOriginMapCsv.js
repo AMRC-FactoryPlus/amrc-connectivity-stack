@@ -29,7 +29,7 @@ function nodeType(prop) {
  * @param {string[]} pathSegments - Accumulated path segments for the tag path
  * @returns {Array<{tagPath: string, metricSchema: object, modelValues: object}>}
  */
-function collectMetricRows(schema, model, pathSegments = []) {
+function collectMetricRows(schema, model, pathSegments = [], inPlaceholder = false) {
     const rows = [];
 
     if (!schema?.properties) return rows;
@@ -58,7 +58,7 @@ function collectMetricRows(schema, model, pathSegments = []) {
             });
         } else if (type === 'object') {
             // Recurse into the child object
-            rows.push(...collectMetricRows(prop, model?.[key], currentPath));
+            rows.push(...collectMetricRows(prop, model?.[key], currentPath, inPlaceholder));
         } else if (type === 'schemaArray' && prop.patternProperties) {
             // For arrays, walk each instance in the model if present, otherwise just walk the schema
             const regexKey = Object.keys(prop.patternProperties)[0];
@@ -66,11 +66,13 @@ function collectMetricRows(schema, model, pathSegments = []) {
             const modelArray = model?.[key] || {};
             // If there are instances in the model, walk them
             for (const instanceKey of Object.keys(modelArray)) {
-                rows.push(...collectMetricRows(schemaForArray, modelArray[instanceKey], [...currentPath, instanceKey]));
+                rows.push(...collectMetricRows(schemaForArray, modelArray[instanceKey], [...currentPath, instanceKey], false));
             }
-            // Also add a row for the pattern itself if no instances exist
-            if (Object.keys(modelArray).length === 0) {
-                rows.push(...collectMetricRows(schemaForArray, undefined, [...currentPath, '<new>']));
+            // Add a placeholder row for the pattern when no instances exist, but only if we are
+            // not already generating placeholder rows — prevents infinite recursion when nested
+            // schemaArray properties have no model data.
+            if (Object.keys(modelArray).length === 0 && !inPlaceholder) {
+                rows.push(...collectMetricRows(schemaForArray, undefined, [...currentPath, '<new>'], true));
             }
         }
     }

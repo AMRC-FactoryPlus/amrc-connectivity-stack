@@ -24,7 +24,9 @@
           <Input v-model="localModel.Path" :placeholder="pathPlaceholder" :icon="pathIcon"/>
         </Control>
         <Control v-if="isStatic" label="Static Value" :help="schema.properties.Value.description">
-          <Select v-if="isa95Level && isa95Options.length" v-model="localModel.Value">
+          <Select v-if="isa95Level && isa95Options.length"
+              :model-value="localModel.Value"
+              @update:model-value="on_isa95_select">
             <SelectTrigger>
               <SelectValue :placeholder="`Select ${isa95Level}`"/>
             </SelectTrigger>
@@ -400,6 +402,23 @@ export default {
         this.isToggling = false;
       }, 100);
     },
+    /* Handle selection of an ISA-95 hierarchy value. Sets the local value
+     * and clears all levels below this one in the full originMap so the
+     * hierarchy stays consistent. */
+    on_isa95_select (new_value) {
+      this.localModel.Value = new_value
+
+      const level_index = ISA95_LEVELS.indexOf(this.isa95Level)
+      const hierarchy = this.model?.Device_Information?.ISA95_Hierarchy
+      if (!hierarchy) return
+
+      for (const level of ISA95_LEVELS.slice(level_index + 1)) {
+        if (hierarchy[level]?.Value !== undefined) {
+          delete hierarchy[level].Value
+        }
+      }
+    },
+
     isValidType (val, options) {
       return options.some(e => e.value === val)
     },

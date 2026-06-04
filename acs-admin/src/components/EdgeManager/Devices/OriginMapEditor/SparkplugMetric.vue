@@ -24,7 +24,17 @@
           <Input v-model="localModel.Path" :placeholder="pathPlaceholder" :icon="pathIcon"/>
         </Control>
         <Control v-if="isStatic" label="Static Value" :help="schema.properties.Value.description">
-          <Input v-model="localModel.Value" placeholder="Value" icon="i-cursor"/>
+          <Select v-if="isa95Level && isa95Options.length" v-model="localModel.Value">
+            <SelectTrigger>
+              <SelectValue :placeholder="`Select ${isa95Level}`"/>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem v-for="opt in isa95Options" :key="opt.uuid" :value="opt.name">
+                {{ opt.name }}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+          <Input v-else v-model="localModel.Value" placeholder="Value" icon="i-cursor"/>
         </Control>
         <Control label="Type" :help="schema.properties.Sparkplug_Type.description">
           <Select v-model="localModel.Sparkplug_Type">
@@ -125,15 +135,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import DetailCard from '@components/DetailCard.vue'
 import { Button } from '@/components/ui/button'
 import { useConnectionStore } from '@/store/useConnectionStore'
-import { useDriverStore } from '@/store/useDriverStore'
+import { useDriverStore }     from '@/store/useDriverStore'
+import { useISA95Store, ISA95_LEVELS } from '@/store/useISA95Store.js'
 
 export default {
   name: 'SparkplugMetric',
 
   setup() {
     return {
-      conn: useConnectionStore(),
+      conn:  useConnectionStore(),
       driver: useDriverStore(),
+      isa95: useISA95Store(),
     }
   },
 
@@ -251,12 +263,62 @@ export default {
       // This handles cases where any part of the path is missing
       return this.driverInfo?.presentation?.path?.hidden === true
     },
+
+    /* Which ISA-95 level this metric represents, or null if it isn't one.
+     * Detection is based on the metric path: the parent key must be
+     * 'ISA95_Hierarchy' and the leaf key must be one of the five level names. */
+    isa95Level () {
+      const path = this.selectedMetric?.path
+      if (!path || path.length < 2) return null
+      const leaf   = path[path.length - 1]
+      const parent = path[path.length - 2]
+      if (parent === 'ISA95_Hierarchy' && ISA95_LEVELS.includes(leaf))
+        return leaf
+      return null
+    },
+
+    /* Valid options for the dropdown at the current ISA-95 level.
+     * For Enterprise this is all enterprises; for lower levels it is the
+     * children of whichever parent node is currently selected. */
+    isa95Options () {
+      if (!this.isa95Level) return []
+
+      const level_index = ISA95_LEVELS.indexOf(this.isa95Level)
+
+      if (level_index === 0) {
+        return this.isa95.enterprises
+      }
+
+      const parent_level = ISA95_LEVELS[level_index - 1]
+      const parent_value = this.model
+        ?.Device_Information
+        ?.ISA95_Hierarchy
+        ?.[parent_level]
+        ?.Value
+
+      console.log('isa95Options', { level: this.isa95Level, parent_level, parent_value, data: this.isa95.data })
+
+      // No parent selected yet — show all nodes at this level so the user
+      // can set levels in any order. When a parent is set, filter to its
+      // children only.
+      if (!parent_value) return this.isa95.data.filter(n => n.level === this.isa95Level)
+  
+      const parent_node = this.isa95.find_by_name(parent_level, parent_value)
+      console.log('parent_node', parent_node)
+
+      const children = this.isa95.children_of(parent_node.uuid)
+
+      console.log('children', {raw_children: parent_node.children, resolved: children, all_data: this.isa95.data})
+
+      return children
+    },
   },
 
   mounted() {
     // Start the stores
     this.conn.start()
     this.driver.start()
+    this.isa95.start()
   },
 
   watch: {

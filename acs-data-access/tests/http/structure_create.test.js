@@ -78,10 +78,10 @@ describe('POST /structure', () => {
         ALL_GRANTS = ALL_GRANTS.filter(uuid => uuid !== grant_uuid);
     }
 
-    async function deleteConfigDBObj(obj_uuid){
-        if(!obj_uuid) return;
+    async function deleteDataset(uuid){
+        if(!uuid) return;
 
-        await admin_fplus.ConfigDB.delete_object(obj_uuid);
+        await admin_fplus.DataAccess.delete_dataset(uuid);
     }
 
 
@@ -165,7 +165,7 @@ describe('POST /structure', () => {
     });
 
 
-    test.only.each(ALL_VALID_BODY_CASES)('Create - case %#', async (testCase) => {
+    test.each(ALL_VALID_BODY_CASES)('Create - case %#', async (testCase) => {
         
         let grants = [];
         
@@ -173,7 +173,7 @@ describe('POST /structure', () => {
         const grant_uuid = await addGrant(
             TEST_PRINCIPAL,
             Constants.Perm.CreateDataset,
-            test.structure,
+            testCase.structure,
             false
         );
         grants.push(grant_uuid);
@@ -200,29 +200,125 @@ describe('POST /structure', () => {
                         false
                     );
             grants.push(g);
+            await sleep(1000);
         }
 
-  
-        await sleep(1000);
-
-        const obj_uuid = await test_fplus.DataAccess.create_dataset(
+        const dataset_uuid = await test_fplus.DataAccess.create_dataset(
                 testCase.structure,
                 testCase.config
         );
 
-        console.log("HERE IS THE NEW OBJECT CREATED: ", obj_uuid);
-
+        console.log("HERE IS THE NEW OBJECT CREATED: ", dataset_uuid);
+        
         for(let grant of grants){
             await deleteGrant(grant);
             await sleep(1000);
         }
 
-        await deleteConfigDBObj(obj_uuid);
+        // await deleteConfigDBObj(obj_uuid);
+        await deleteDataset(dataset_uuid);
         await sleep(1000);
 
-        expect(obj_uuid).not.toBe(undefined);
+        expect(dataset_uuid).not.toBe(undefined);
     }, 30000);
 
 
+    // /* =============================================== */
+    // /* -------- Test subclass relationships ---------- */
+    // /* =============================================== */
+    test('Session dataset becomes subclass of its source dataset', async () => {
+        const testCase = Temp_Data.Valid_Body.Session;
+        // 1. grants: CreateDataset and IncludeInSession for src
+        let grants = [];
     
+        const create_grant = await addGrant(
+            TEST_PRINCIPAL,
+            Constants.Perm.CreateDataset,
+            testCase.structure,
+            false
+        );
+        grants.push(create_grant);
+
+        await sleep(1000);
+
+        const scnd_lvl_grant = await addGrant(
+            TEST_PRINCIPAL, 
+            testCase.secondLevelPerm,
+            testCase.config.source,
+            false
+        );
+
+        grants.push(scnd_lvl_grant);
+        await sleep(3000);
+
+        // 2. dataset_uuid = create session dataset 
+        const dataset_uuid = await test_fplus.DataAccess.create_dataset(testCase.structure, testCase.config);
+
+        // 3. query the source's subclasses
+        const subclasses = await admin_fplus.ConfigDB.class_subclasses(testCase.config.source);
+
+        // 4. revoke grants
+        for(let grant of grants){
+            await deleteGrant(grant);
+            await sleep(1000);
+        }
+
+        // 5. Delete dataset
+        await deleteDataset(dataset_uuid);
+
+
+        // 6. assert source's subclasses include new dataset_uuid
+        expect(subclasses).toContainEqual(dataset_uuid);
+    }, 30000);
+
+    test('Union dataset becomes superclass of its sources ', async () => {
+        const testCase = Temp_Data.Valid_Body.Union;
+        // 1. grants: CreateDataset and UseInUnion for src
+        let grants = [];
+    
+        const create_grant = await addGrant(
+            TEST_PRINCIPAL,
+            Constants.Perm.CreateDataset,
+            testCase.structure,
+            false
+        );
+        grants.push(create_grant);
+
+        await sleep(500);
+        for (const s of testCase.config){
+            const g = await addGrant(
+                TEST_PRINCIPAL, 
+                testCase.secondLevelPerm,
+                s,
+                false
+            );
+            grants.push(g);
+            await sleep(100);
+        }
+        
+
+        // 2. dataset_uuid = create dataset 
+        const dataset_uuid = await test_fplus.DataAccess.create_dataset(testCase.structure, testCase.config);
+
+        await sleep(1000);
+
+        // 3. query the dataset's subclasses
+        const subclasses = await admin_fplus.ConfigDB.class_subclasses(dataset_uuid);
+
+        await sleep(500);
+
+
+        // 4. revoke grants
+        for(let grant of grants){
+            await deleteGrant(grant);
+            await sleep(1000);
+        }
+
+        // 5. delete dataset
+        await deleteDataset(dataset_uuid);
+        
+        // 6. assert new dataset's subclasses include all the config sources
+        expect(subclasses).toEqual(expect.arrayContaining(testCase.config));
+
+    }, 30000);   
 });

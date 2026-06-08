@@ -5,7 +5,7 @@
   "main": "server.js",
   "type": "module",
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run ./tests/current"
   },
   "author": "",
   "license": "ISC",

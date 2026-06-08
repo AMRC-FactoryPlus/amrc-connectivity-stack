@@ -113,20 +113,18 @@ spec:
     - HTTP/git.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
   secret: git-keytabs/server
 {{- end }}
-
 ---
-{{- if .Values.dataAccess.enabled }}
+{{- if .Values.openid.enabled }}
 apiVersion: factoryplus.app.amrc.co.uk/v1
 kind: KerberosKey
 metadata:
-  name: http.data-access
+  name: http.openid
   namespace: {{ .Release.Namespace }}
 spec:
   type: Random
-  principal: HTTP/data-access.{{ .Release.Namespace }}.svc.cluster.local@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
-  secret: data-access-keytabs/server
+  principal: HTTP/openid.{{ .Release.Namespace }}.svc.cluster.local@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
   additionalPrincipals:
-    - HTTP/data-access.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+    - HTTP/openid.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
 {{- end }}
 ---
 {{- if .Values.dataAccess.enabled }}

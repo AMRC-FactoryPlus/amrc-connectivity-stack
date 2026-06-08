@@ -2,7 +2,7 @@ import {ServiceClient} from "@amrc-factoryplus/service-client";
 import process from "node:process";
 import {afterAll, beforeAll, beforeEach, describe, expect, test} from 'vitest';
 import { DataAccess as Constants } from "../../lib/constants.js";
-import {Test_Uuids} from '../temp_data.js';
+import * as Temp_Data from '../temp_data.js';
 
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));

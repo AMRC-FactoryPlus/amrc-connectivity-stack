@@ -60,7 +60,7 @@ export class APIv1 {
   async delete_dataset(req, res){
     const dataset_uuid = req.params.uuid;
     if(!dataset_uuid) return fail(this.log, 422, `No req.params.uuid`);
-    if(!valid_uuid(dataset_uuid)) return this.fail(this.log, 422, `Invalid uuid ${dataset_uuid}`);
+    if(!valid_uuid(dataset_uuid)) return fail(this.log, 422, `Invalid uuid ${dataset_uuid}`);
     
     const ok = await this.auth.check_acl(
       req.auth,

@@ -121,6 +121,8 @@ objects:
       name: "Use for session"
     !u DataAccess.Perm.EditDataset:
       name: "Edit dataset"
+    !u DataAccess.Perm.DeleteDataset:
+      name: "Delete dataset"
     !u DataAccess.Perm.UseSparkplug:
       name: "Use Sparkplug data"
 

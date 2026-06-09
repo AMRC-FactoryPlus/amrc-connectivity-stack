@@ -158,6 +158,7 @@ import { useConnectionStore } from '@store/useConnectionStore.js'
 import _ from 'lodash'
 import NewObjectOverlayForm from './NewObjectOverlayForm.vue'
 import { updateEdgeAgentConfig } from '@/utils/edgeAgentConfigUpdater'
+import { ISA95_LEVELS } from '@/store/useISA95Store.js'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { generateCsv, downloadCsv, parseCsv, applyCsvToModel } from '@/composables/useOriginMapCsv.js'
 import Papa from 'papaparse'
@@ -275,11 +276,14 @@ export default {
       immediate: true,
       handler(newOriginMap) {
         console.debug('Origin map changed:', newOriginMap)
-        // If the origin map is null or undefined, reset our model
         if (newOriginMap === null || newOriginMap === undefined) {
           console.debug('Resetting origin map model')
           this.resetModel()
-          // Trigger a re-render of the schema group
+          this.groupRerenderTrigger = +new Date()
+        } else if (!this.isDirty) {
+          // Accept external updates (e.g. from the ISA-95 sidebar panel)
+          // when there are no unsaved local changes in the editor.
+          this.model = newOriginMap
           this.groupRerenderTrigger = +new Date()
         }
       }
@@ -886,6 +890,46 @@ export default {
 
     markDirty () {
       this.isDirty = true
+    },
+
+    /* Called by Device.vue when the ISA-95 sidebar panel selects a value.
+     * Applies the mutation directly to this.model (the object that gets
+     * saved) rather than relying on device.deviceInformation.originMap,
+     * which may be a different reference after a Pinia store refresh.
+     * Also clears all lower hierarchy levels and triggers a tree re-render. */
+    applyISA95Selection ({ level, value, level_index }) {
+      if (!this.model.Device_Information) this.model.Device_Information = {}
+      if (!this.model.Device_Information.ISA95_Hierarchy) this.model.Device_Information.ISA95_Hierarchy = {}
+
+      const hierarchy = this.model.Device_Information.ISA95_Hierarchy
+
+      if (!hierarchy[level]) hierarchy[level] = {}
+      hierarchy[level].Value = value
+      if (!hierarchy[level].Sparkplug_Type)
+        hierarchy[level].Sparkplug_Type = 'String'
+
+      /* Clear all levels below the one just set.
+       * Use null rather than delete: the save uses a JSON merge patch, where
+       * absent keys are preserved (not deleted).  Setting Value to null is the
+       * RFC 7396 signal that tells ConfigDB to delete that key. */
+      for (const lower of ISA95_LEVELS.slice(level_index + 1)) {
+        if (hierarchy[lower] !== undefined) {
+          if (!hierarchy[lower]) hierarchy[lower] = {}
+          hierarchy[lower].Value = null
+        }
+      }
+
+      /* For fresh devices that have no originMap yet, wire device.deviceInformation.originMap
+       * to this.model so the ISA-95 panel's display (which reads from the device prop)
+       * stays in sync with what we will actually save.  Once the user saves, Pinia
+       * refreshes the store with the real saved reference, and the two stay aligned
+       * via the existing originMap watcher. */
+      if (this.device?.deviceInformation && !this.device.deviceInformation.originMap) {
+        this.device.deviceInformation.originMap = this.model
+      }
+
+      this.isDirty = true
+      this.groupRerenderTrigger = +new Date()
     },
 
     resetModel() {

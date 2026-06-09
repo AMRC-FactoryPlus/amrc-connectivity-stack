@@ -61,7 +61,7 @@
                 </div>
             </template>
         </EmptyState>
-        <OriginMapEditor :device="device" :device-schema="schema" v-else></OriginMapEditor>
+        <OriginMapEditor ref="originMapEditor" :device="device" :device-schema="schema" v-else></OriginMapEditor>
       </div>
 
       <!-- Sidebar -->
@@ -135,6 +135,8 @@
                 :value="connection?.name"
             />
           </div>
+          <!-- ISA-95 Hierarchy section -->
+          <ISA95HierarchyPanel :device="device" :schema="schema" @change="on_isa95_change"/>
         </div>
       </div>
     </div>
@@ -159,7 +161,8 @@ import { useSchemaStore } from '@store/useSchemaStore.js'
 import ChangeSchemaDialog from '@components/EdgeManager/Devices/ChangeSchemaDialog.vue'
 import { useConnectionStore } from '@store/useConnectionStore.js'
 import ChangeConnectionDialog from '@components/EdgeManager/Devices/ChangeConnectionDialog.vue'
-import OriginMapEditor from '@components/EdgeManager/Devices/OriginMapEditor/OriginMapEditor.vue'
+import OriginMapEditor      from '@components/EdgeManager/Devices/OriginMapEditor/OriginMapEditor.vue'
+import ISA95HierarchyPanel  from '@components/EdgeManager/Devices/ISA95HierarchyPanel.vue'
 
 export default {
   components: {
@@ -179,6 +182,7 @@ export default {
     SidebarDetail,
     ChangeSchemaDialog,
     ChangeConnectionDialog,
+    ISA95HierarchyPanel,
   },
 
   setup () {
@@ -291,6 +295,10 @@ export default {
         this.robotBeep = null
         this.currentMessageIndex = 0  // Reset the index when stopping
       }
+    },
+
+    on_isa95_change (payload) {
+      this.$refs.originMapEditor?.applyISA95Selection(payload)
     },
 
     handleSchemaChanged(schemaUuid) {

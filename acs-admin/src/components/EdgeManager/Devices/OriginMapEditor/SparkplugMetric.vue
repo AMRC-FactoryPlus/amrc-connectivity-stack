@@ -436,8 +436,9 @@ export default {
       if (!hierarchy) return
 
       for (const level of ISA95_LEVELS.slice(level_index + 1)) {
-        if (hierarchy[level]?.Value !== undefined) {
-          delete hierarchy[level].Value
+        if (hierarchy[level] !== undefined) {
+          if (!hierarchy[level]) hierarchy[level] = {}
+          hierarchy[level].Value = null
         }
       }
     },

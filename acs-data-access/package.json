@@ -18,7 +18,7 @@
     "@influxdata/influxdb-client": "^1.35.0",
     "archiver": "^8.0.0",
     "deep-equal": "^2.2.3",
-    "express": "^4.21.2",
+    "express": "^5.0.1",
     "p-limit": "^7.3.0",
     "rxjs": "^7.8.2",
     "stream": "^0.0.3",

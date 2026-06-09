@@ -14,7 +14,6 @@ import { DataAccess as Constants } from "./constants.js";
 import { valid_uuid, valid_datetime } from "./validate.js";
 import { csv_escape, maxDate, minDate } from './utils.js';
 
-
 function fail(log, status, message) {
     log(message);
     throw new APIError(status);
@@ -50,7 +49,6 @@ export class APIv1 {
       .get(this.structure_uuid.bind(this))
       .put(this.structure_update.bind(this));
 
-
     api.route("/delete/:uuid")
       .get(this.delete_dataset.bind(this));
 
@@ -71,22 +69,18 @@ export class APIv1 {
     
     if (!ok) return fail(this.log, 403, `You don't have DELETE permissions for ${dataset_uuid}`);
 
-
-    this.log(`Data Access /delete/${dataset_uuid} is called`);
+    this.log(`Delete dataset called by ${req.auth} for ${dataset_uuid}`);
 
     // remove all subclass relationships
-    const subclasses = await this.cdb.class_subclasses(dataset_uuid);
-    for(let s of subclasses){
-      await this.cdb.class_remove_subclass(dataset_uuid, s);
-    }
     
-    // delete the dataset object 
-    try{
-      await this.cdb.delete_object(dataset_uuid);
-    }catch(err){
-      this.log("CANT DELETE CONFIGDB OBJECT");
-      this.log(err);
+    const subclasses = await this.cdb.class_subclasses(dataset_uuid);
+    if(subclasses){
+      for(let s of subclasses){
+        await this.cdb.class_remove_subclass(dataset_uuid, s);
+      }
     }
+
+    await this.cdb.delete_object(dataset_uuid);
 
     return res.status(200).json(dataset_uuid);
   }
@@ -525,7 +519,7 @@ export class APIv1 {
 
       for(let src of config){
         if (!valid_uuid(src))
-          return fail(this.log, 422. `${src} is invalid UUID`);
+          return fail(this.log, 422, `${src} is invalid UUID`);
       }
     }
     else{
@@ -581,6 +575,7 @@ export class APIv1 {
 
   async structure_update(req, res){
     const dataset_uuid = req.params.uuid;
+    if(!dataset_uuid) return fail(this.log, 422, `Dataset uuid not provided`);
     if(!valid_uuid(dataset_uuid)) return fail(this.log, 422, `Invalid uuid ${dataset_uuid}`);
 
     const structure = req.body.structure;

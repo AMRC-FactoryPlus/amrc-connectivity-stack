@@ -159,5 +159,7 @@ grants:
       !u DataAccess.Class.Dataset: true
     !u ConfigDB.Perm.ReadSubclasses:
       !u DataAccess.Class.Dataset: true
+    !u ConfigDB.Perm.DeleteObject:
+      !u DataAccess.Class.Dataset: true
 
 

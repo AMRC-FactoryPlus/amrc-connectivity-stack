@@ -342,8 +342,12 @@ export class APIv1 {
     );
 
     if (!ok) {
-        return fail(this.log, 403);
+        return fail(this.log, 403, `Unauthorised to read ${dataset_uuid}`);
     }
+
+    const meta = req.body?.measurement 
+      ? { measurement: req.body?.measurement } 
+      : undefined;
 
     try {
         // Resolve dataset tree
@@ -355,7 +359,7 @@ export class APIv1 {
             `attachment; filename="${dataset_uuid}.csv"`
         );
 
-        const zipStream = this.influxReader.exportDevices(resolved_sources);
+        const zipStream = this.influxReader.exportDevices(resolved_sources, meta);
 
 
         res.setHeader(

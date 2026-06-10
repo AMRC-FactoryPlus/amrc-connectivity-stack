@@ -1,6 +1,7 @@
 import { config } from "rxjs";
 import { DataAccess as Constants } from "../lib/constants.js";
 
+
 export const Test_Uuids = {
     Devices: { 
         TestDevice: "5880686f-13f9-4089-b236-825d002bc911",
@@ -28,7 +29,15 @@ export const Test_Uuids = {
     Session_Datasets: {
         SessionNode2DoubleDataset: "811da559-727b-4808-8d99-c31f90520966",
         TestSessionAllDataset: "74cac8a1-88a6-4b08-b297-a3c05a388ec5",
-    }
+    },
+    Mes: {
+        MesDataset: '586205bf-81c6-4091-9d2c-f3c0465ebdc4',
+        MesEquipment: '4c93ddc1-e610-4efe-91e3-a355f9ba1a09',
+        MesOperation: 'bd0354eb-b8f7-4bd9-8407-0588e545603c',
+        MesProduct: '4a089748-b26b-4f12-8f1a-164bfba97809',
+        MesWorkorder: 'b416e44c-c57e-4486-9431-64c425f1b2c6',
+        App: 'af178f0c-3b1e-44f2-9724-5cf06e8fd056'
+    },
 }
 
 export const Valid_Body = {

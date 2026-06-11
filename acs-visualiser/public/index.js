@@ -37,7 +37,7 @@ class FPlusVis {
         vis.run();
         for (const { mqtt } of clients) {
             mqtt.on("packet", vis.make_active.bind(vis));
-            mqtt.on("graph", vis.reset_graph.bind(vis));
+            mqtt.on("graph", vis.reset_soon.bind(vis));
             mqtt.on("schema", u => icons.request_icon(u));
             mqtt.run();
         }

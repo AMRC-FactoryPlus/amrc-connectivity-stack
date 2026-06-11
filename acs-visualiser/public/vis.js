@@ -11,6 +11,7 @@ const TURN = 2*Math.PI;
 const HALF = Math.PI;
 const QUARTER = Math.PI/2;
 const FADEOUT = 15000;
+const RESET_DELAY = 250;
 
 function fade (expires, now) {
     const rv = 0.2 + Math.min(0.8, Math.max(0, (expires - now)/FADEOUT));
@@ -155,10 +156,9 @@ export default class Vis {
         const ctx = this.ctx;
 
         for (const n of graph.children) {
-            if (!n.centre) {
-                console.log("No centre for %o", n);
+            /* Nodes added since the last re-layout have no position yet. */
+            if (!n.centre)
                 continue;
-            }
             if (n.is_cmd) 
                 ctx.strokeStyle = Style.CMD;
             else 
@@ -281,6 +281,16 @@ export default class Vis {
         const segment = TURN / this.graph.leaves;
         const ring = this.radius * 0.8 / this.graph.maxdepth;
         this.pick_centres(this.graph, 0, 0, segment, ring);
+    }
+
+    /* A full re-layout per graph change is too expensive when a BIRTH
+     * storm adds many nodes at once; coalesce the requests instead. */
+    reset_soon () {
+        if (this.reset_timer) return;
+        this.reset_timer = setTimeout(() => {
+            this.reset_timer = null;
+            this.reset_graph();
+        }, RESET_DELAY);
     }
 
     make_active (path, style, stopping) {

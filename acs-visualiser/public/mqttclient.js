@@ -122,6 +122,10 @@ export default class MQTTClient extends EventEmitter {
     check_for_schema (message, node) {
         node.seen_birth = true;
 
+        /* Decoding a BIRTH payload is expensive, and the schema is
+         * not expected to change across rebirths. */
+        if (node.schema) return;
+
         const payload = SpB.decodePayload(message);
         if (payload.uuid != FactoryPlus)
             return;

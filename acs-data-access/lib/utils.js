@@ -1,3 +1,10 @@
+import { APIError } from "@amrc-factoryplus/service-api";
+export function fail(log, status, message) {
+    log(message);
+    throw new APIError(status);
+}
+
+
 export function csv_escape(value) {
     if (value == null) return "";
 
@@ -36,3 +43,4 @@ export function minDate(a, b) {
     ? a
     : b
 }
+

@@ -16,7 +16,6 @@ describe('GET /delete/:uuid', () => {
     let admin_fplus;
     let ALL_GRANTS = [];
 
-    let dataset_to_be_deleted; 
 
     beforeEach(async () => {
         admin_fplus = new ServiceClient({
@@ -43,11 +42,6 @@ describe('GET /delete/:uuid', () => {
             password: process.env.ADMIN_PASSWORD,
             verbose: 'ALL'
         });
-
-
-        dataset_to_be_deleted = await admin_fplus.DataAccess.create_dataset(Constants.App.SparkplugSrc, Temp_Data.Valid_Body.SRC.config);
-
-        console.log(`Created new dataset ${dataset_to_be_deleted}`);
     });
 
     // Clean up grants if not removed in case of failure.
@@ -83,24 +77,32 @@ describe('GET /delete/:uuid', () => {
 
 
     test('Successful deletion', async () => {
+        const dataset_uuid = await admin_fplus.DataAccess.create_dataset(Constants.App.SparkplugSrc, Temp_Data.Valid_Body.SRC.config);
+
+        await sleep(4000);
+
         const grant = await addGrant(
             TEST_PRINCIPAL,
             Constants.Perm.DeleteDataset,
-            dataset_to_be_deleted, 
+            dataset_uuid, 
             false
         );
 
-        await sleep(10000);
+        await sleep(4000);
 
-        const deleted = await test_fplus.DataAccess.delete_dataset(dataset_to_be_deleted);
+        const deleted = await test_fplus.DataAccess.delete_dataset(dataset_uuid);
+        
+        await sleep(4000);
 
         await deleteGrant(grant);
 
-        expect(deleted).toBe(dataset_to_be_deleted);
+        expect(deleted).toBe(dataset_uuid);
 
     }, 30000);
 
     test('Irrelevant permission', async () => {
+        const dataset_to_be_deleted = Temp_Data.Test_Uuids.Src_Datasets.Node2_TestDoubleDeviceDataset;
+        
         const grant = await addGrant(
             TEST_PRINCIPAL,
             Constants.Perm.EditDataset,
@@ -116,7 +118,7 @@ describe('GET /delete/:uuid', () => {
             expect.fail('Expected to throw');
         }
         catch (err) {
-            expect(err.status).not.toBe(200); 
+            expect(err.status).toBe(403); 
         }
 
         await deleteGrant(grant);
@@ -131,7 +133,7 @@ describe('GET /delete/:uuid', () => {
             expect.fail('Expected to throw');
         }
         catch (err) {
-            expect(err.status).not.toBe(200); 
+            expect(err.status).toBe(422); 
         }
     }, 30000);
 });

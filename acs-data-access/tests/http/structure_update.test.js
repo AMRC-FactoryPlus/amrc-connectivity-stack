@@ -139,7 +139,7 @@ describe('PUT /structure', () => {
             expect.fail('Expected to throw');
         }
         catch (err) {
-            expect(err.status).not.toBe(200); 
+            expect(err.status).toBe(403); 
         }
         await deleteGrant(grant);
     });
@@ -156,7 +156,7 @@ describe('PUT /structure', () => {
             expect.fail('Expected to throw');
         }
         catch (err) {
-            expect(err.status).not.toBe(200); 
+            expect(err.status).toBe(422); 
         }
     });
 
@@ -167,10 +167,10 @@ describe('PUT /structure', () => {
                 testCase.structure,
                 testCase.config
             );
-            expect.fail('Expected create_dataset to throw');
+            expect.fail('Expected to throw');
 
         } catch (err) {
-            expect(err.status).not.toBe(200);
+            expect(err.status).toBe(422);
         }
     }, 30000);
 

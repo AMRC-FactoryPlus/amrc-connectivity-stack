@@ -91,10 +91,11 @@ describe('GET /metadata/:uuid', () => {
 
         try {
             const res = await test_fplus.DataAccess.get_single_metadata(testCase);
+
             expect.fail('Expected to throw');
         }
         catch (err) {
-            expect(err.status).not.toBe(200); 
+            expect(err.status).toBe(403); 
         }
     });
 
@@ -113,7 +114,7 @@ describe('GET /metadata/:uuid', () => {
             expect.fail('Expected to throw');
         }
         catch (err) {
-            expect(err.status).not.toBe(200); 
+            expect(err.status).toBe(403); 
         }
         finally{
             await deleteGrant(grant);
@@ -129,7 +130,7 @@ describe('GET /metadata/:uuid', () => {
             expect.fail('Expected to throw');
         }
         catch (err) {
-            expect(err.status).not.toBe(200); 
+            expect(err.status).toBe(422); 
         }
     });
 
@@ -147,7 +148,6 @@ describe('GET /metadata/:uuid', () => {
 
         await sleep(3600);
 
-        const res_valid = await test_fplus.DataAccess.get_single_metadata(testCase);
 
         // make testCase invalid
         await addConfig(
@@ -155,14 +155,9 @@ describe('GET /metadata/:uuid', () => {
             testCase,
             []
         );
-        await sleep(3600);
+        await sleep(4000);
 
-        try{
-            await test_fplus.DataAccess.get_single_metadata(testCase);
-            expect.fail('Expected to throw');
-        }catch(err){
-            expect(err.status).not.toBe(200);
-        }
+        const res = await test_fplus.DataAccess.get_single_metadata(testCase);
 
         // make testCase valid 
         await removeConfig(invalidApp, testCase);        
@@ -170,8 +165,7 @@ describe('GET /metadata/:uuid', () => {
         // revoke grant
         await deleteGrant(grant);
 
-        expect(res_valid).toHaveProperty('uuid');
-
+        expect(res).toEqual({});
     }, 40000);
 
 
@@ -197,8 +191,6 @@ describe('GET /metadata/:uuid', () => {
         await sleep(3600);
 
         const res = await test_fplus.DataAccess.get_single_metadata(testCase);
-
-        console.log(res);
 
         await deleteGrant(grant);
         
@@ -235,8 +227,6 @@ describe('GET /metadata/:uuid', () => {
         await sleep(3600);
 
         const res = await test_fplus.DataAccess.get_single_metadata(testCase);
-
-        console.log(res);
 
         await deleteGrant(grant);
 
@@ -287,8 +277,6 @@ describe('GET /metadata/:uuid', () => {
         await sleep(3600);
 
         const res = await test_fplus.DataAccess.get_single_metadata(testCase);
-
-        console.log(res);
 
         await deleteGrant(grant);
 

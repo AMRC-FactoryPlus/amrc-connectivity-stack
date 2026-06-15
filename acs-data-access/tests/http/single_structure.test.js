@@ -86,7 +86,7 @@ describe('GET /structure/:uuid', () => {
         await admin_fplus.ConfigDB.delete_config( app, obj );
     }
 
-    test('Dataset exist but no permission', async () => {
+    test('Dataset exists but no permission', async () => {
         const testCase = Temp_Data.Test_Uuids.Src_Datasets.TestDeviceDataset;
 
         try {
@@ -94,7 +94,7 @@ describe('GET /structure/:uuid', () => {
             expect.fail('Expected to throw');
         }
         catch (err) {
-            expect(err.status).not.toBe(200); 
+            expect(err.status).toBe(403); 
         }
     });
 
@@ -113,7 +113,7 @@ describe('GET /structure/:uuid', () => {
             expect.fail('Expected to throw');
         }
         catch (err) {
-            expect(err.status).not.toBe(200); 
+            expect(err.status).toBe(403); 
         }
         finally{
             await deleteGrant(grant);
@@ -128,7 +128,7 @@ describe('GET /structure/:uuid', () => {
             expect.fail('Expected to throw');
         }
         catch (err) {
-            expect(err.status).not.toBe(200); 
+            expect(err.status).toBe(422); 
         }
     });
 
@@ -147,7 +147,6 @@ describe('GET /structure/:uuid', () => {
 
         await sleep(3600);
 
-
         // make testCase invalid
         await addConfig(
             invalidApp,
@@ -156,12 +155,9 @@ describe('GET /structure/:uuid', () => {
         );
         await sleep(3600);
 
-
         const res_invalid = await test_fplus.DataAccess.get_single_structure(testCase);
         await sleep(1000);
  
-
-
         await removeConfig(invalidApp, testCase);        
         await deleteGrant(grant);
 
@@ -171,9 +167,8 @@ describe('GET /structure/:uuid', () => {
 
     }, 40000);
 
-    test('SRC', async () => {
+    test('SRC format', async () => {
         const testCase = Temp_Data.Test_Uuids.Src_Datasets.Node2_TestDoubleDeviceDataset;
-
 
         // Grant
         const grant = await addGrant(
@@ -194,6 +189,57 @@ describe('GET /structure/:uuid', () => {
         expect(res.structure).toEqual(Constants.App.SparkplugSrc);
         expect(res.config).not.toBe(null);
         expect(res.config).toHaveProperty('source');
+    }, 40000);
+
+    test('Session format', async () => {
+        const testCase = Temp_Data.Test_Uuids.Session_Datasets.SessionNode2DoubleDataset;
+
+        // Grant
+        const grant = await addGrant(
+            TEST_PRINCIPAL,
+            Constants.Perm.EditDataset,
+            testCase,
+            false
+        );
+
+        await sleep(3600);
+
+        const res = await test_fplus.DataAccess.get_single_structure(testCase);
+        console.log(res);
+
+    
+        await deleteGrant(grant);
+
+        expect(res.structure).toEqual(Constants.App.SessionLimits);
+        expect(res.config).not.toBe(null);
+        expect(res.config).toHaveProperty('source');
+        expect(res.config).toHaveProperty('from');
+        expect(res.config).toHaveProperty('to');
+    }, 40000);
+
+
+    test('Union format', async () => {
+        const testCase = Temp_Data.Test_Uuids.Union_Datasets.TestUnionAllDataset;
+
+        // Grant
+        const grant = await addGrant(
+            TEST_PRINCIPAL,
+            Constants.Perm.EditDataset,
+            testCase,
+            false
+        );
+
+        await sleep(3600);
+
+        const res = await test_fplus.DataAccess.get_single_structure(testCase);
+        console.log(res);
+
+    
+        await deleteGrant(grant);
+
+        expect(res.structure).toEqual(Constants.App.UnionComponents);
+        expect(res.config).not.toBe(null);
+        expect(res.config).toBeInstanceOf(Array);
     }, 40000);
 
 });

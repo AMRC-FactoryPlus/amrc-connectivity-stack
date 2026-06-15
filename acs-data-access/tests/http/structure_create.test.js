@@ -86,21 +86,21 @@ describe('POST /structure', () => {
 
 
 
-    test('User has no CreateDataset permission', async () => {
+    test('No permission', async () => {
         try {
             await test_fplus.DataAccess.create_dataset(
                 Temp_Data.Valid_Body.SRC.structure,
                 Temp_Data.Valid_Body.SRC.config
             );
 
-            expect.fail('Expected create_dataset to throw');
+            expect.fail('Expected to throw');
         }
         catch (err) {
-            expect(err.status).not.toBe(200); 
+            expect(err.status).toBe(403); 
         }
     });
 
-    test('User has CreateDataset permission for irrelevant structure', async () => {
+    test('Correct permission for irrelevant structure', async () => {
         const irrelevant_structure = Constants.App.SessionLimits;
 
         const irrelevant_grant = await addGrant(
@@ -109,7 +109,7 @@ describe('POST /structure', () => {
             irrelevant_structure,
             false
         );
-        await sleep(500);
+        await sleep(4000);
 
         try {
             await test_fplus.DataAccess.create_dataset(
@@ -117,10 +117,10 @@ describe('POST /structure', () => {
                 Temp_Data.Valid_Body.Session.config
             );
 
-            expect.fail('Expected create_dataset to throw');
+            expect.fail('Expected to throw');
         }
         catch (err) {
-            expect(err.status).not.toBe(200); 
+            expect(err.status).toBe(403); 
         }
 
         await deleteGrant(irrelevant_grant);
@@ -132,11 +132,11 @@ describe('POST /structure', () => {
         try {
 
             await test_fplus.DataAccess.create_dataset(testCase.structure, testCase.config);
-            expect.fail('Expected create_dataset to throw');
+            expect.fail('Expected to throw');
 
         } catch (err) {
 
-            expect(err.status).not.toBe(200);
+            expect(err.status).toBe(422);
         }
     });
 
@@ -160,12 +160,12 @@ describe('POST /structure', () => {
             await deleteGrant(grant);
         } catch(err){
             console.log(err);
-            expect(err.status).not.toBe(200);
+            expect(err.status).toBe(403);
         }
     });
 
 
-    test.each(ALL_VALID_BODY_CASES)('Create - case %#', async (testCase) => {
+    test.each(ALL_VALID_BODY_CASES)('Successful create - case %#', async (testCase) => {
         
         let grants = [];
         
@@ -178,7 +178,7 @@ describe('POST /structure', () => {
         );
         grants.push(grant_uuid);
 
-        await sleep(500);
+        await sleep(4000);
 
 
         if(testCase.structure === Constants.App.UnionComponents){
@@ -200,24 +200,19 @@ describe('POST /structure', () => {
                         false
                     );
             grants.push(g);
-            await sleep(1000);
         }
+        await sleep(4000);
 
         const dataset_uuid = await test_fplus.DataAccess.create_dataset(
                 testCase.structure,
                 testCase.config
         );
-
-        console.log("HERE IS THE NEW OBJECT CREATED: ", dataset_uuid);
+        await sleep(2000);
         
         for(let grant of grants){
             await deleteGrant(grant);
-            await sleep(1000);
         }
-
-        // await deleteConfigDBObj(obj_uuid);
         await deleteDataset(dataset_uuid);
-        await sleep(1000);
 
         expect(dataset_uuid).not.toBe(undefined);
     }, 30000);
@@ -239,7 +234,7 @@ describe('POST /structure', () => {
         );
         grants.push(create_grant);
 
-        await sleep(1000);
+        await sleep(4000);
 
         const scnd_lvl_grant = await addGrant(
             TEST_PRINCIPAL, 
@@ -249,10 +244,11 @@ describe('POST /structure', () => {
         );
 
         grants.push(scnd_lvl_grant);
-        await sleep(3000);
+        await sleep(4000);
 
         // 2. dataset_uuid = create session dataset 
         const dataset_uuid = await test_fplus.DataAccess.create_dataset(testCase.structure, testCase.config);
+        await sleep(2000);
 
         // 3. query the source's subclasses
         const subclasses = await admin_fplus.ConfigDB.class_subclasses(testCase.config.source);
@@ -260,7 +256,6 @@ describe('POST /structure', () => {
         // 4. revoke grants
         for(let grant of grants){
             await deleteGrant(grant);
-            await sleep(1000);
         }
 
         // 5. Delete dataset
@@ -284,7 +279,8 @@ describe('POST /structure', () => {
         );
         grants.push(create_grant);
 
-        await sleep(500);
+        await sleep(4000);
+
         for (const s of testCase.config){
             const g = await addGrant(
                 TEST_PRINCIPAL, 
@@ -293,27 +289,22 @@ describe('POST /structure', () => {
                 false
             );
             grants.push(g);
-            await sleep(100);
         }
-        
+        await sleep(4000);
 
         // 2. dataset_uuid = create dataset 
         const dataset_uuid = await test_fplus.DataAccess.create_dataset(testCase.structure, testCase.config);
 
-        await sleep(1000);
+        await sleep(2000);
 
         // 3. query the dataset's subclasses
         const subclasses = await admin_fplus.ConfigDB.class_subclasses(dataset_uuid);
-
-        await sleep(500);
 
 
         // 4. revoke grants
         for(let grant of grants){
             await deleteGrant(grant);
-            await sleep(1000);
         }
-
         // 5. delete dataset
         await deleteDataset(dataset_uuid);
         

@@ -1,8 +1,0 @@
-{
-  "dependencies": {
-    "@microsoft/fetch-event-source": "^2.0.1",
-    "cytoscape": "^3.33.4",
-    "echarts": "^6.0.0",
-    "vue-echarts": "^8.0.1"
-  }
-}

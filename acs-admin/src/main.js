@@ -27,6 +27,7 @@ import ApplicationObjectEditor from "@pages/ConfigDB/Applications/ApplicationObj
 import ObjectPage from "@pages/ConfigDB/Objects/ObjectPage.vue";
 import Files from "@pages/Files/Files.vue";
 import Bridges from "@pages/Bridges/Bridges.vue";
+import DataAccess from '@pages/DataAccess/DataAccess.vue';
 
 // Create an event bus
 window.events = mitt()
@@ -150,6 +151,14 @@ const routes = [
     meta: {
       name: 'Bridges',
       icon: 'arrow-down-up-across-line'
+    }
+  },
+  {
+    path: '/data-access',
+    component: DataAccess,
+    meta: {
+      name: 'Data Access',
+      icon: 'database'
     }
   }
 ]

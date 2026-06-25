@@ -81,6 +81,12 @@ const sidebarNavItems: Item[] = [
     href: '/schemas',
     icon: 'shapes',
     auth: true
+  },
+  {
+    title: 'Data Access',
+    href: '/data-access',
+    icon: 'database',
+    auth: true
   }
 ]
 </script>

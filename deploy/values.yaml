@@ -570,3 +570,16 @@ influxdb2:
 
 cert-manager:
   fullnameOverride: "cert-manager"
+
+opensearch:
+  enabled: true
+  persistence:
+    enabled: true
+  singleNode: true
+
+  extraEnvs:
+    - name: OPENSEARCH_INITIAL_ADMIN_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: opensearch-secret
+          key: opensearch-password

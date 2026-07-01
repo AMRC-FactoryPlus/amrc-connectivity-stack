@@ -36,3 +36,7 @@ dependencies:
     repository: https://opensearch-project.github.io/helm-charts/
     version: 3.7.0
     condition: opensearch.enabled
+  - name: openmetadata
+    repository: https://helm.open-metadata.org/
+    version: 1.13.1
+    condition: openmetadata.enabled

@@ -11,5 +11,8 @@ dependencies:
 - name: cert-manager
   repository: https://charts.jetstack.io
   version: v1.14.4
-digest: sha256:0c6fd4a51ef2b5a1ce99e72ade9a967d91793fa52d7f1969ef6cb7e5fbb4e143
-generated: "2026-04-13T11:01:47.894885542+01:00"
+- name: opensearch
+  repository: https://opensearch-project.github.io/helm-charts/
+  version: 3.7.0
+digest: sha256:2360ecbc193652302de129fd5f198554e9da129d362772572a07c20416e4c982
+generated: "2026-06-29T13:41:28.492203212+01:00"

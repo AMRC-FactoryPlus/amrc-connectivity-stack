@@ -155,7 +155,7 @@
     </TabsContent>
   </Tabs>
 
-  <NewDatasetDialog ref="newDatasetDialog" @saved="on_dataset_saved"/>
+  <NewDatasetDialogTest ref="newDatasetDialog" @saved="on_dataset_saved"/>
 </template>
 
 <script>
@@ -172,6 +172,7 @@ import { useDialog } from '@/composables/useDialog'
 import { toast } from 'vue-sonner'
 import { metadataColumns, structureColumns, structure_label } from './datasetColumns.ts'
 import NewDatasetDialog from '@components/DataAccess/NewDatasetDialog.vue'
+import NewDatasetDialogTest from '@components/DataAccess/NewDatasetDialogTest.vue'
 import streamSaver from 'streamsaver'
 
 function formatDate (dateStr) {
@@ -191,6 +192,7 @@ export default {
         Button, Skeleton,
         DataTableSearchable, SidebarDetail, EmptyState,
         NewDatasetDialog,
+        NewDatasetDialogTest
     },
 
     setup () {
@@ -243,19 +245,19 @@ export default {
             this.$refs.newDatasetDialog.open(null)
         },
 
-        edit_dataset (structure) {
-            this.$refs.newDatasetDialog.open(structure)
+        edit_dataset (existingDataset) {
+            this.$refs.newDatasetDialog.open(existingDataset)
         },
 
-        delete_dataset (structure) {
-            const name = structure.name ?? structure.uuid
+        delete_dataset (dataset) {
+            const name = dataset.name ?? dataset.uuid
             useDialog({
                 title: 'Delete Dataset',
                 message: `Are you sure you want to delete the dataset "${name}"? This action cannot be undone.`,
                 confirmText: 'Delete',
                 onConfirm: async () => {
                     try {
-                        await this.s.client.DataAccess.delete_dataset(structure.uuid)
+                        await this.s.client.DataAccess.delete_dataset(dataset.uuid)
                         toast.success('Dataset deleted')
                         if (this.selectedStructure.uuid === structure.uuid) {
                             this.selectedStructure = {}

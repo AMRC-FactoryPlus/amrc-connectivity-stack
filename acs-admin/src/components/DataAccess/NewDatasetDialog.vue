@@ -252,7 +252,7 @@ export default {
             error_message: '',
 
             structure_options: [
-                { value: STRUCTURE_APPS.SPARKPLUG, label: 'Sparkplug Source', desc: 'All data from a Sparkplug device' },
+                { value: STRUCTURE_APPS.SPARKPLUG, label: 'Sparkplug Source',  desc: 'All data from a Sparkplug device' },
                 { value: STRUCTURE_APPS.SESSION,   label: 'Session',           desc: 'A time-bounded slice of a Sparkplug dataset' },
                 { value: STRUCTURE_APPS.UNION,     label: 'Union',             desc: 'A combination of multiple datasets' },
             ],

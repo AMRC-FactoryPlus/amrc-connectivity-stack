@@ -44,6 +44,7 @@
         <template v-if="structure_type === STRUCTURE_APPS.SPARKPLUG">
           <div class="flex flex-col gap-1">
             <label class="text-sm font-medium">Sparkplug Device / Node UUID <span class="text-red-500">*</span></label>
+            <!-- This might be redundant. If not, this could be dropdown with possible sources searchable -->
             <Input v-model="sparkplug_source" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" class="font-mono text-sm"/>
             <p class="text-xs text-gray-500">The UUID of the Sparkplug Device or Node whose data this dataset covers.</p>
           </div>
@@ -113,7 +114,7 @@
                 <SelectContent>
                   <SelectGroup>
                     <SelectItem
-                      v-for="ds in all_datasets_for_union"
+                      v-for="ds in filtered_datasets_for_union"
                       :key="ds.uuid"
                       :value="ds.uuid"
                     >
@@ -122,7 +123,7 @@
                         <span class="text-xs text-gray-400 font-mono">{{ ds.uuid }}</span>
                       </div>
                     </SelectItem>
-                    <div v-if="all_datasets_for_union.length === 0" class="px-2 py-2 text-sm text-gray-400">
+                    <div v-if="filtered_datasets_for_union.length === 0" class="px-2 py-2 text-sm text-gray-400">
                       No datasets available
                     </div>
                   </SelectGroup>
@@ -227,6 +228,7 @@ export default {
     },
 
     computed: {
+        // This should come from a service call, as we may have permission to see datasets, but not use them in our own session
         sparkplug_datasets () {
             return this.da.structures
                 .filter(s => s.structure === STRUCTURE_APPS.SPARKPLUG)
@@ -236,11 +238,16 @@ export default {
                 }))
         },
 
+        // This should come from a service call, as we may have permission to see datasets, but not use them in a union
         all_datasets_for_union () {
             return this.da.structures.map(s => ({
                 uuid: s.uuid,
                 name: this.da.datasets.find(d => d.uuid === s.uuid)?.name ?? null,
             }))
+        },
+
+        filtered_datasets_for_union () {
+            return this.all_datasets_for_union.filter(ds => !this.union_components.includes(ds.uuid))
         },
 
         session_source_label () {

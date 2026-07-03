@@ -54,28 +54,40 @@
         <template v-if="structure_type === STRUCTURE_APPS.SESSION">
           <div class="flex flex-col gap-1">
             <label class="text-sm font-medium">Source Sparkplug Dataset <span class="text-red-500">*</span></label>
-            <Select v-model="session_source">
-              <SelectTrigger>
-                <SelectValue>{{ session_source_label }}</SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem
-                    v-for="ds in sparkplug_datasets"
-                    :key="ds.uuid"
-                    :value="ds.uuid"
-                  >
-                    <div class="flex flex-col">
-                      <span class="font-medium">{{ ds.name ?? ds.uuid }}</span>
-                      <span class="text-xs text-gray-400 font-mono">{{ ds.uuid }}</span>
-                    </div>
-                  </SelectItem>
-                  <div v-if="sparkplug_datasets.length === 0" class="px-2 py-2 text-sm text-gray-400">
-                    No Sparkplug datasets available
-                  </div>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
+            <Popover v-model:open="session_source_open">
+              <PopoverTrigger as-child>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  :aria-expanded="!!session_source_open"
+                  class="flex-1 justify-between"
+                >
+                  {{ session_source_label }}
+                  <i class="fa-solid fa-chevron-down ml-2 h-4 w-4 shrink-0 opacity-50"></i>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent class="w-[--reka-popover-trigger-width] p-0">
+                <Command>
+                  <CommandInput placeholder="Search datasets..." />
+                  <CommandList>
+                    <CommandEmpty>No datasets found.</CommandEmpty>
+                    <CommandGroup>
+                      <CommandItem
+                        v-for="ds in sparkplug_datasets"
+                        :key="ds.uuid"
+                        :value="ds.name ? `${ds.name} ${ds.uuid}` : ds.uuid"
+                        @select="select_session_source(ds.uuid)"
+                      >
+                        <div class="flex flex-col">
+                          <span class="font-medium">{{ ds.name ?? ds.uuid }}</span>
+                          <span class="text-xs text-gray-400 font-mono">{{ ds.uuid }}</span>
+                        </div>
+                      </CommandItem>
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
             <p class="text-xs text-gray-500">The Sparkplug dataset that this session is sliced from.</p>
           </div>
 
@@ -107,28 +119,41 @@
             <label class="text-sm font-medium">Component Datasets</label>
             <p class="text-xs text-gray-500">Add one or more datasets to combine into this union. An empty union is valid.</p>
             <div v-for="(comp, idx) in union_components" :key="idx" class="flex gap-2 items-center">
-              <Select v-model="union_components[idx]" class="flex-1">
-                <SelectTrigger>
-                  <SelectValue>{{ component_label(union_components[idx]) }}</SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectItem
-                      v-for="ds in filtered_datasets_for_union"
-                      :key="ds.uuid"
-                      :value="ds.uuid"
-                    >
-                      <div class="flex flex-col">
-                        <span class="font-medium">{{ ds.name ?? ds.uuid }}</span>
-                        <span class="text-xs text-gray-400 font-mono">{{ ds.uuid }}</span>
-                      </div>
-                    </SelectItem>
-                    <div v-if="filtered_datasets_for_union.length === 0" class="px-2 py-2 text-sm text-gray-400">
-                      No datasets available
-                    </div>
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
+              <Popover v-model:open="union_select_open[idx]">
+                <PopoverTrigger as-child>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    :aria-expanded="!!union_select_open[idx]"
+                    class="flex-1 justify-between"
+                  >
+                    {{ component_label(union_components[idx]) }}
+                    <i class="fa-solid fa-chevron-down ml-2 h-4 w-4 shrink-0 opacity-50"></i>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent class="w-[--reka-popover-trigger-width] p-0">
+                  <Command>
+                    <CommandInput placeholder="Search datasets..." />
+                    <CommandList>
+                      <CommandEmpty>No datasets found.</CommandEmpty>
+                      <CommandGroup>
+                        <CommandItem
+                          v-for="ds in filtered_datasets_for_union(idx)"
+                          :key="ds.uuid"
+                          :value="ds.name ? `${ds.name} ${ds.uuid}` : ds.uuid"
+                          @select="select_union_component(idx, ds.uuid)"
+                        >
+                          <div class="flex flex-col">
+                            <span class="font-medium">{{ ds.name ?? ds.uuid }}</span>
+                            <span class="text-xs text-gray-400 font-mono">{{ ds.uuid }}</span>
+                          </div>
+                        </CommandItem>
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+
               <Button variant="ghost" size="icon" @click="remove_component(idx)">
                 <i class="fa-solid fa-trash text-gray-400"></i>
               </Button>
@@ -156,11 +181,13 @@
 </template>
 
 <script>
-import { ref, computed } from 'vue'
+import { cn } from '@/lib/utils'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@components/ui/dialog'
 import { Button } from '@components/ui/button'
 import { Input } from '@components/ui/input'
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@components/ui/select'
+import { Combobox, ComboboxAnchor, ComboboxEmpty, ComboboxGroup, ComboboxInput, ComboboxItem, ComboboxList } from '@/components/ui/combobox'
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useServiceClientStore } from '@store/serviceClientStore.js'
 import { useDataAccessStore } from '@store/useDataAccessStore.js'
 import { UUIDs } from '@amrc-factoryplus/service-client'
@@ -182,9 +209,11 @@ export default {
     emits: ['saved'],
 
     components: {
-        Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
-        Button, Input,
-        Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue,
+      Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+      Button, Input,
+      Combobox, ComboboxAnchor, ComboboxEmpty, ComboboxGroup, ComboboxInput, ComboboxItem, ComboboxList,
+      Popover, PopoverTrigger, PopoverContent,
+      Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem
     },
 
     setup () {
@@ -193,6 +222,7 @@ export default {
             da: useDataAccessStore(),
             STRUCTURE_APPS,
             structure_label,
+            cn
         }
     },
 
@@ -210,11 +240,13 @@ export default {
 
             // Session fields
             session_source: '',
+            session_source_open: false,
             session_from: '',
             session_to: '',
 
             // Union fields
             union_components: [],
+            union_select_open: [],
 
             is_submitting: false,
             error_message: '',
@@ -244,10 +276,6 @@ export default {
                 uuid: s.uuid,
                 name: this.da.datasets.find(d => d.uuid === s.uuid)?.name ?? null,
             }))
-        },
-
-        filtered_datasets_for_union () {
-            return this.all_datasets_for_union.filter(ds => !this.union_components.includes(ds.uuid))
         },
 
         session_source_label () {
@@ -305,9 +333,11 @@ export default {
             this.structure_type = STRUCTURE_APPS.SPARKPLUG
             this.sparkplug_source = ''
             this.session_source = ''
+            this.session_source_open = false
             this.session_from = ''
             this.session_to = ''
             this.union_components = []
+            this.union_select_open = []
             this.is_submitting = false
             this.error_message = ''
         },
@@ -323,6 +353,7 @@ export default {
                 this.session_to = config.to ?? ''
             } else if (structure.structure === STRUCTURE_APPS.UNION) {
                 this.union_components = Array.isArray(config) ? [...config] : []
+                this.union_select_open = this.union_components.map(() => false)
             }
         },
 
@@ -346,12 +377,29 @@ export default {
             return null
         },
 
+        select_session_source (uuid) {
+            this.session_source = uuid
+            this.session_source_open = false
+        },
+
+        filtered_datasets_for_union (idx) {
+            return this.all_datasets_for_union.filter(ds =>
+                !this.union_components.some((c, i) => i !== idx && c === ds.uuid))
+        },
+
         add_component () {
             this.union_components.push('')
+            this.union_select_open.push(false)
         },
 
         remove_component (idx) {
             this.union_components.splice(idx, 1)
+            this.union_select_open.splice(idx, 1)
+        },
+
+        select_union_component (idx, uuid) {
+            this.union_components[idx] = uuid
+            this.union_select_open[idx] = false
         },
 
         component_label (uuid) {

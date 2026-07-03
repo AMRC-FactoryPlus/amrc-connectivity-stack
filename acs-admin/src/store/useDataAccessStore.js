@@ -12,7 +12,7 @@ export const useDataAccessStore = defineStore('data-access', {
         structures: [],  // from search_structure — editable datasets
         loading: true,
         ready: false,
-        rxsub: null,
+        metadataSub: null,
         structureSub: null,
     }),
 
@@ -24,13 +24,12 @@ export const useDataAccessStore = defineStore('data-access', {
 
             const da = useServiceClientStore().client.DataAccess
 
-            this.rxsub = da.search_metadata().subscribe({
+            this.metadataSub = da.search_metadata().subscribe({
                 next: map => {
                     this.datasets = map ? map.valueSeq().toArray() : []
                     this.loading = false
                     this.ready = true
-                    console.log(map?.toJS())
-                    console.log(this.datasets)
+                    console.log("Metadata map:", map?.toJS())
                 },
                 error: err => {
                     console.error('DataAccess metadata subscription error:', err)
@@ -41,7 +40,10 @@ export const useDataAccessStore = defineStore('data-access', {
 
             this.structureSub = da.search_structure().subscribe({
                 next: map => {
-                    this.structures = map ? map.valueSeq().toArray() : []
+                    this.structures = map
+                        ? map.entrySeq().map(([uuid, v]) => ({ ...v, uuid })).toArray()
+                        : []
+                    console.log("Structure map:", map?.toJS())
                 },
                 error: err => {
                     console.error('DataAccess structure subscription error:', err)
@@ -50,7 +52,7 @@ export const useDataAccessStore = defineStore('data-access', {
         },
 
         stop () {
-            this.rxsub?.unsubscribe()
+            this.metadataSub?.unsubscribe()
             this.structureSub?.unsubscribe()
             this.$reset()
         },

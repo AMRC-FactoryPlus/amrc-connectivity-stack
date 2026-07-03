@@ -43,10 +43,10 @@
         <!-- ─── Sparkplug Source fields ─── -->
         <template v-if="structure_type === STRUCTURE_APPS.SPARKPLUG">
           <div class="flex flex-col gap-1">
-            <label class="text-sm font-medium">Sparkplug Device / Node UUID <span class="text-red-500">*</span></label>
+            <label class="text-sm font-medium">Sparkplug Device UUID <span class="text-red-500">*</span></label>
             <!-- This might be redundant. If not, this could be dropdown with possible sources searchable -->
             <Input v-model="sparkplug_source" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" class="font-mono text-sm"/>
-            <p class="text-xs text-gray-500">The UUID of the Sparkplug Device or Node whose data this dataset covers.</p>
+            <p class="text-xs text-gray-500">The UUID of the Sparkplug Device whose data this dataset covers.</p>
           </div>
         </template>
 
@@ -252,7 +252,7 @@ export default {
             error_message: '',
 
             structure_options: [
-                { value: STRUCTURE_APPS.SPARKPLUG, label: 'Sparkplug Source', desc: 'All data from a Sparkplug device or node' },
+                { value: STRUCTURE_APPS.SPARKPLUG, label: 'Sparkplug Source', desc: 'All data from a Sparkplug device' },
                 { value: STRUCTURE_APPS.SESSION,   label: 'Session',           desc: 'A time-bounded slice of a Sparkplug dataset' },
                 { value: STRUCTURE_APPS.UNION,     label: 'Union',             desc: 'A combination of multiple datasets' },
             ],

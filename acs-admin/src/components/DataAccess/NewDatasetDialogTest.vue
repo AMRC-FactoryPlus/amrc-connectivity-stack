@@ -261,6 +261,7 @@ export default {
         uuid: s.uuid,
         name: this.da.datasets.find(d => d.uuid === s.uuid)?.name ?? null,
       }))
+      .sort((a, b) => (a.name ?? a.uuid).localeCompare(b.name ?? b.uuid))
     },
 
     can_submit() {

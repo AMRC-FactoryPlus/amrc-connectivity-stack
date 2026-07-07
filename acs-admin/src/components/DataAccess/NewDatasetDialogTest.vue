@@ -25,8 +25,8 @@
           <label class="text-sm font-medium">Component Datasets</label>
           <p class="text-xs text-gray-500">Add one or more datasets to include. Cannot be empty. Time limits may be
             imposed, in which case a Session Dataset will be created.</p>
-          <div v-for="(comp, idx) in dataset_components" :key="idx" class="flex gap-2 items-center pb-2 mb-4">
-            <div class="flex-1 flex flex-col gap-2">
+          <div v-for="(comp, idx) in dataset_components" :key="idx" class="flex gap-2 border-r-2 items-center pb-2 mb-4 hover:bg-gray-50">
+            <div class="flex-1 flex flex-col gap-2 border-l-2 p-2">
               <Popover v-model:open="dataset_components_source_open[idx]" class="flex-1">
                 <PopoverTrigger as-child>
                   <Button variant="outline" role="combobox" :aria-expanded="!!dataset_components_source_open[idx]"
@@ -55,7 +55,7 @@
               </Popover>
               <div class="flex gap-4 align-center justify-between items-center">
                 <div class="flex-1">
-                  <div class="w-full text-center">From</div>
+                  <div class="w-full text-center border-b mb-1">From</div>
                   <div class="flex gap-2">
                     <Popover v-model:open="dataset_components_from_open[idx]">
                       <PopoverTrigger as-child>
@@ -89,6 +89,7 @@
                         step="1"
                         default-value="10:30"
                         class="bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
+                        inputClass="hover:bg-gray-100 cursor-pointer"
                       />
                     </div>
                   </div>
@@ -96,7 +97,7 @@
                 <!-- <Input v-model="dataset_components[idx].from" placeholder="2026-07-03T12:00:00.000Z" class="text-sm" /> -->
                 <span>-</span>
                 <div class="flex-1">
-                  <div class="w-full text-center">To</div>
+                  <div class="w-full text-center border-b mb-1">To</div>
                   <div class="flex gap-2">
                     <Popover v-model:open="dataset_components_to_open[idx]">
                       <PopoverTrigger as-child>
@@ -122,7 +123,7 @@
                         />
                       </PopoverContent>
                     </Popover>
-                    <div class="w-[90px]">
+                    <div class="w-[90px] hover:bg-gray-100 cursor-pointer">
                       <Input
                         type="time"
                         v-model="dataset_components[idx].to_time"
@@ -130,6 +131,7 @@
                         step="1"
                         default-value="10:30"
                         class="bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
+                        inputClass="hover:bg-gray-100 cursor-pointer"
                       />
                     </div>
                   </div>

@@ -411,6 +411,7 @@ export default {
 
       try {
         // The Dialog allows the user to build a Dataset which may contain multiple Datasets.
+        let created_uuid = null
         if (this.dataset_components.length > 1) {
           // A Union Dataset is required to combine the components.
           // This logic needs to assess the requirements and build each Dataset (if required).
@@ -425,7 +426,12 @@ export default {
             }
             if (is_valid_iso(comp.from) && is_valid_iso(comp.to)) {
               // Session to create
-              const uuid = await this.s.client.DataAccess.create_dataset(STRUCTURE_APPS.SESSION, comp)
+              const config = {
+                source: comp.source,
+                from: comp.from,
+                to: comp.to,
+              }
+              const uuid = await this.s.client.DataAccess.create_dataset(STRUCTURE_APPS.SESSION, config)
               // We want to push the UUID of the newly created Session Dataset into the component_uuids array.
               component_uuids.push(uuid)
 
@@ -444,12 +450,13 @@ export default {
           }
 
           // All components are now ready, create the Union Dataset.
-          const uuid = await this.s.client.DataAccess.create_dataset(STRUCTURE_APPS.UNION, component_uuids)
+          console.log("Creating Union Dataset with components:", component_uuids, STRUCTURE_APPS.UNION)
+          created_uuid = await this.s.client.DataAccess.create_dataset(STRUCTURE_APPS.UNION, component_uuids)
 
-          console.log("Union Dataset saved with uuid:", uuid)
+          console.log("Union Dataset saved with uuid:", created_uuid)
           console.log("Awaiting put config...")
           // Set the name via ConfigDB Info app
-          await this.s.client.ConfigDB.put_config(UUIDs.App.Info, uuid, {
+          await this.s.client.ConfigDB.put_config(UUIDs.App.Info, created_uuid, {
               name: this.name.trim(),
           })
         } else if (this.dataset_components.length === 1) {
@@ -458,16 +465,23 @@ export default {
           console.log("Processing only component:", comp)
           if (is_valid_iso(comp.from) && is_valid_iso(comp.to)) {
             // Session to create
-            const uuid = await this.s.client.DataAccess.create_dataset(STRUCTURE_APPS.SESSION, comp)
+            const config = {
+              source: comp.source,
+              from: comp.from,
+              to: comp.to,
+            }
+            created_uuid = await this.s.client.DataAccess.create_dataset(STRUCTURE_APPS.SESSION, config)
 
-            console.log("Session Dataset saved with uuid:", uuid)
+            console.log("Session Dataset saved with uuid:", created_uuid)
             console.log("Awaiting put config...")
             // Set the name via ConfigDB Info app
-            await this.s.client.ConfigDB.put_config(UUIDs.App.Info, uuid, {
+            await this.s.client.ConfigDB.put_config(UUIDs.App.Info, created_uuid, {
               name: this.name.trim(),
             })
           } else {
             // No need to make a new Dataset that is just a copy of an existing one.
+            this.error_message = "Single component must have valid 'from' and 'to' timestamps to create a Session Dataset."
+            throw new Error(this.error_message)
           }
         } else {
           this.error_message = 'No valid components to create a dataset.'
@@ -475,7 +489,7 @@ export default {
         }
 
         toast.success(this.is_edit ? 'Dataset updated' : 'Dataset created')
-        this.$emit('saved', uuid)
+        this.$emit('saved', created_uuid)
         this.close()
       } catch (err) {
         console.error('Dataset save failed:', err)

@@ -256,7 +256,14 @@ class OpenIDSetup {
             publicClient,
             standardFlowEnabled: spec.standardFlowEnabled ?? true,
             directAccessGrantsEnabled: spec.directAccessGrantsEnabled ?? false,
-            serviceAccountsEnabled: false,
+            // Enables the OAuth client-credentials grant (Keycloak
+            // "service account") for machine-to-machine consumers, e.g.
+            // an unattended kiosk fetching a Grafana JWT. Keycloak only
+            // supports service accounts on confidential clients, so
+            // this cannot be combined with publicClient. A pure
+            // service client should also set standardFlowEnabled:
+            // false - it has no browser login to redirect.
+            serviceAccountsEnabled: !publicClient && !!spec.serviceAccountsEnabled,
             rootUrl: spec.rootUrl ?? root,
             baseUrl: spec.baseUrl ?? root,
             redirectUris: spec.redirectUris

@@ -56,7 +56,12 @@ public class FactoryPlusUserStorageProviderFactory
     static final String CONFIG_KRB_PRINCIPAL      = "auth.principal";
     static final String CONFIG_KRB_KEYTAB_PATH    = "auth.keytab.path";
     static final String CONFIG_DEFAULT_REALM      = "default.realm";
-    static final String DEFAULT_TIMEOUT_SECONDS   = "5";
+    /* Must stay below Keycloak's 3-second ServicesUtils.timeBoundOne
+     * hard limit on user-storage lookups. With a longer value our own
+     * timeout can never fire: Keycloak interrupts the thread first and
+     * the admin sees an opaque InterruptedException instead of a clean
+     * timeout naming the F+ auth service. */
+    static final String DEFAULT_TIMEOUT_SECONDS   = "2";
     static final String DEFAULT_CACHE_TTL_SECONDS = "60";
 
     private static final List<ProviderConfigProperty> CONFIG_PROPERTIES =
@@ -73,7 +78,10 @@ public class FactoryPlusUserStorageProviderFactory
             .property()
                 .name(CONFIG_TIMEOUT_SECONDS)
                 .label("Request timeout (seconds)")
-                .helpText("Per-request timeout for F+ auth calls.")
+                .helpText("Per-request timeout for F+ auth calls. Keep "
+                    + "this below 3 seconds: Keycloak hard-kills user "
+                    + "storage lookups at 3s, so a longer value here "
+                    + "never takes effect.")
                 .type(ProviderConfigProperty.STRING_TYPE)
                 .defaultValue(DEFAULT_TIMEOUT_SECONDS)
                 .add()

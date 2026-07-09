@@ -183,7 +183,11 @@ class OpenIDSetup {
             parentId: realmUuid,
             config: {
                 "auth.url":             [this.auth_internal_url],
-                "auth.timeout.seconds": ["5"],
+                // Must stay below Keycloak's 3s hard limit on user
+                // storage lookups; a longer value never takes effect
+                // and slow F+ auth calls surface as an opaque
+                // InterruptedException instead of a clean timeout.
+                "auth.timeout.seconds": ["2"],
                 "cache.ttl.seconds":    ["60"],
                 // Disable Keycloak's per-user attribute cache for this
                 // federation. With the default (DEFAULT, cache forever)

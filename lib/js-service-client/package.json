@@ -19,6 +19,7 @@
     "sparkplug-payload": "^1.0.3"
   },
   "optionalDependencies": {
+    "@amrc-factoryplus/gssapi": "^2.1.0",
     "got-fetch": "^5.1.8",
     "gssapi.js": "^2.0.1"
   },

@@ -83,6 +83,36 @@ Setting `openid.enabled` to `false` will skip Keycloak, but Grafana then
 has no interactive login other than the local emergency admin account,
 which remains reachable at `/login?disableLoginForm=false`.
 
+### Grafana upgraded from v10 to v13
+
+The bundled Grafana image moves from 10.0.1 to 13.1.0. Grafana 10.x
+left support in 2024, so this catches up two majors of security fixes,
+and the newer `auth.jwt` support is what lets machine-to-machine
+consumers sign in with tokens (see below).
+
+Three upstream Grafana changes are worth knowing about when upgrading
+an existing installation:
+
+- Dashboards are migrated to Grafana's new dashboard schema as they are
+  used, and the migration is one-way: once v13 has written to the
+  Grafana database you cannot return to the previous image without
+  losing dashboards. Snapshot the Grafana PersistentVolume before
+  upgrading if the dashboards matter.
+- Support for AngularJS plugins has been removed (disabled by default
+  in Grafana 11, gone entirely in 12). Grafana's built-in panels are
+  unaffected and legacy Graph/Table panels are migrated automatically,
+  but any third-party Angular panel or data source plugin will no
+  longer render. Audit your dashboards for these before upgrading.
+- Links that deep-link a single panel changed format in Grafana 11
+  (`?viewPanel=5` became `?viewPanel=panel-5-…`), so bookmarks and
+  kiosk URLs pointing at individual panels need re-copying from the new
+  UI. Links to whole dashboards, including kiosk-mode links, are
+  unchanged.
+
+Also removed upstream, though ACS does not deploy either: the image
+renderer plugin and legacy alerting. If you added one of those to your
+own installation, migrate off it before upgrading.
+
 ### Machine-to-machine OIDC clients
 
 Clients declared under `serviceSetup.config.openidClients` may now set

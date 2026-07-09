@@ -1110,7 +1110,7 @@ export default {
     },
 
     applyParsedCsv () {
-      if (!this.csvParsedData) return { applied: 0, skipped: 0 }
+      if (!this.csvParsedData) return { applied: 0, skipped: 0, ignored: 0 }
       
       // Pass the schema to applyCsvToModel so missing metrics can be created
       const result = applyCsvToModel(this.csvParsedData, this.model, this.schema, this.set)
@@ -1129,6 +1129,13 @@ export default {
       if (result.skipped > 0) {
         toast.warning(`${result.skipped} row${result.skipped === 1 ? '' : 's'} skipped`, {
           description: 'Paths not found in schema.',
+          pauseOnHover: true,
+        })
+      }
+
+      if (result.ignored > 0) {
+        toast.warning(`${result.ignored} ISA-95 row${result.ignored === 1 ? '' : 's'} ignored`, {
+          description: 'Set the hierarchy in the ISA-95 Hierarchy panel.',
           pauseOnHover: true,
         })
       }

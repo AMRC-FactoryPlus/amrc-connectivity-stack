@@ -3,9 +3,23 @@
  */
 
 import Papa from 'papaparse';
+import { ISA95_HIERARCHY_KEY } from '@/store/useISA95Store.js';
 // No 'set' export from vue in Vue 3. Use plain assignment; reactivity is handled by the parent component's set helper if needed.
 
 const RESERVED_KEYS = ['Schema_UUID', 'Instance_UUID', 'patternProperties', '$meta', 'required'];
+
+/**
+ * Read the value at a path of segments, without creating anything along the
+ * way. Returns undefined if any segment is missing.
+ */
+function valueAt(obj, segments) {
+    let current = obj;
+    for (const segment of segments) {
+        if (current == null || typeof current !== 'object') return undefined;
+        current = current[segment];
+    }
+    return current;
+}
 
 /**
  * Determine the node type of a schema property.
@@ -86,10 +100,14 @@ function collectMetricRows(schema, model, pathSegments = [], inPlaceholder = fal
  * @param {Object} model - The model to mutate
  * @param {Object} schema - The schema
  * @param {Function} setFn - (optional) function(path, value, obj, delimiter) to set nested properties reactively
+ * @returns {{applied: number, skipped: number, ignored: number}} skipped counts
+ *   rows whose path is absent from the schema; ignored counts ISA-95 hierarchy
+ *   rows whose value the CSV tried to change.
  */
 export function applyCsvToModel(rows, model, schema, setFn) {
     let applied = 0;
     let skipped = 0;
+    let ignored = 0;
 
     function getMetricSchema(schema, segments) {
         let currentSchema = schema;
@@ -125,6 +143,19 @@ export function applyCsvToModel(rows, model, schema, setFn) {
 
     for (const { tagPath, fields } of rows) {
         const segments = tagPath.split('/');
+
+        // The ISA-95 hierarchy is a controlled vocabulary, managed exclusively
+        // by ISA95HierarchyPanel. Never let free-text CSV values write to it.
+        // Skip before traversal so we don't create the parent objects either.
+        if (segments.includes(ISA95_HIERARCHY_KEY)) {
+            // Only report rows where the CSV would actually have changed the
+            // value, so an unmodified round-trip stays quiet.
+            const csvValue = String(fields.Value ?? '').trim();
+            const modelValue = String(valueAt(model, segments)?.Value ?? '');
+            if (csvValue !== modelValue) ignored++;
+            continue;
+        }
+
         let current = model;
         let found = true;
         let pathSoFar = [];
@@ -218,7 +249,7 @@ export function applyCsvToModel(rows, model, schema, setFn) {
     }
     // ...existing code...
 
-    return { applied, skipped };
+    return { applied, skipped, ignored };
 }
 
 /**

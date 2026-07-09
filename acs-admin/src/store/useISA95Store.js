@@ -12,6 +12,11 @@ import { UUIDs }        from '@amrc-factoryplus/service-client'
 import { useServiceClientStore } from '@/store/serviceClientStore.js'
 import { serviceClientReady }    from '@store/useServiceClientReady.js'
 
+/* The Device Information schema key holding the ISA-95 level metrics. These
+ * are a controlled vocabulary: they are written only via ISA95HierarchyPanel,
+ * never by free-text entry. */
+export const ISA95_HIERARCHY_KEY = 'ISA95_Hierarchy'
+
 /* Ordered list of ISA-95 levels, matching the metric key names used in the
  * Device Information schema (spaces included). */
 export const ISA95_LEVELS = [

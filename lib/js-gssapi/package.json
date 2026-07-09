@@ -1,0 +1,31 @@
+{
+  "name": "@amrc-factoryplus/gssapi",
+  "version": "2.1.0",
+  "description": "GSSAPI bindings for Node.js. AMRC fork of gssapi.js without credential delegation.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist/index.js",
+    "dist/index.d.ts",
+    "CMakeLists.txt",
+    "src/*"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "github:AMRC-FactoryPlus/amrc-connectivity-stack",
+    "directory": "lib/js-gssapi"
+  },
+  "scripts": {
+    "install": "cmake-js compile"
+  },
+  "author": "Jesper Alf Dam <jdam@vitalimages.com>",
+  "contributors": [
+    "AMRC <factoryplus@amrc.co.uk>"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "bindings": "^1.5.0",
+    "cmake-js": "^6.1.0",
+    "node-addon-api": "^1.7.2"
+  }
+}

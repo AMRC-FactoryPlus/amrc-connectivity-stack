@@ -27,6 +27,15 @@ export const ISA95_LEVELS = [
     'Work Unit',
 ]
 
+/* ConfigDB class holding the nodes at each level. */
+export const ISA95_LEVEL_CLASSES = {
+    'Enterprise':  UUIDs.Class.ISA95Enterprise,
+    'Site':        UUIDs.Class.ISA95Site,
+    'Area':        UUIDs.Class.ISA95Area,
+    'Work Center': UUIDs.Class.ISA95WorkCenter,
+    'Work Unit':   UUIDs.Class.ISA95WorkUnit,
+}
+
 export const useISA95Store = defineStore('isa95', {
     state: () => ({
         data:   [],
@@ -50,6 +59,10 @@ export const useISA95Store = defineStore('isa95', {
                 .filter(Boolean)
         },
 
+        /* Nodes whose children list includes the given UUID. */
+        parents_of: (state) => (uuid) =>
+            state.data.filter(n => n.children.includes(uuid)),
+
         /* Find a node at a given level by its canonical name or an alias. */
         find_by_name: (state) => (level, name) =>
             state.data.find(n =>
@@ -65,16 +78,8 @@ export const useISA95Store = defineStore('isa95', {
             await serviceClientReady()
             const cdb = useServiceClientStore().client.ConfigDB
 
-            const level_classes = {
-                'Enterprise':  UUIDs.Class.ISA95Enterprise,
-                'Site':        UUIDs.Class.ISA95Site,
-                'Area':        UUIDs.Class.ISA95Area,
-                'Work Center': UUIDs.Class.ISA95WorkCenter,
-                'Work Unit':   UUIDs.Class.ISA95WorkUnit,
-            }
-
             const member_obs = Object.fromEntries(
-                Object.entries(level_classes).map(([level, class_uuid]) => [
+                Object.entries(ISA95_LEVEL_CLASSES).map(([level, class_uuid]) => [
                     level,
                     cdb.watch_members(class_uuid),
                 ])

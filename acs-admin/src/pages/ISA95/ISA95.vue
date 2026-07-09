@@ -16,6 +16,10 @@
       @row-click="e => nodeClick(e.original)"
     >
       <template #toolbar-right>
+        <Button variant="outline" class="gap-2" @click="importFromDevices">
+          <i class="fa-solid fa-file-import"></i>
+          <span>Import from Devices</span>
+        </Button>
         <Button class="gap-2" @click="newNode">
           <i class="fa-solid fa-plus"></i>
           <span>New Node</span>
@@ -163,6 +167,9 @@ export default {
     },
     editNode() {
       window.events.emit('show-new-isa95-node-dialog', this.selectedNode)
+    },
+    importFromDevices() {
+      window.events.emit('show-isa95-import-dialog')
     },
     deleteNode() {
       const node = this.selectedNode;

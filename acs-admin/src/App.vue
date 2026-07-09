@@ -76,6 +76,7 @@
         <NewConnectionDialog/>
         <NewBridgeDialog/>
         <NewISA95NodeDialog/>
+        <ImportISA95Dialog/>
         <MonitorDialog/>
         <RouterView/>
       </main>
@@ -103,6 +104,7 @@ import NewConnectionDialog from '@components/EdgeManager/Connections/NewConnecti
 import NewDeviceDialog from '@components/EdgeManager/Devices/NewDeviceDialog.vue'
 import NewBridgeDialog from '@components/Bridges/NewBridgeDialog.vue'
 import NewISA95NodeDialog from '@components/ISA95/NewISA95NodeDialog.vue'
+import ImportISA95Dialog from '@components/ISA95/ImportISA95Dialog.vue'
 import MonitorButton from '@components/MonitorButton.vue'
 import MonitorDialog from '@components/MonitorDialog.vue'
 import { useMonitorStore } from '@store/useMonitorStore.js'
@@ -163,6 +165,7 @@ export default {
     NewConnectionDialog,
     NewBridgeDialog,
     NewISA95NodeDialog,
+    ImportISA95Dialog,
     MonitorButton,
     MonitorDialog,
   },

@@ -10,10 +10,14 @@ export const useDataAccessStore = defineStore('data-access', {
     state: () => ({
         datasets: [],    // from search_metadata — readable datasets
         structures: [],  // from search_structure — editable datasets
+        union_sources: [],   // from watch_union_sources_list — datasets permitted for use in a Union
+        session_sources: [], // from watch_session_sources_list — datasets permitted for use as a Session source
         loading: true,
         ready: false,
         metadataSub: null,
         structureSub: null,
+        unionSourcesSub: null,
+        sessionSourcesSub: null,
     }),
 
     actions: {
@@ -49,11 +53,31 @@ export const useDataAccessStore = defineStore('data-access', {
                     console.error('DataAccess structure subscription error:', err)
                 },
             })
+
+            this.unionSourcesSub = da.watch_union_sources_list().subscribe({
+                next: uuids => {
+                    this.union_sources = uuids ?? []
+                },
+                error: err => {
+                    console.error('DataAccess union sources subscription error:', err)
+                },
+            })
+
+            this.sessionSourcesSub = da.watch_session_sources_list().subscribe({
+                next: uuids => {
+                    this.session_sources = uuids ?? []
+                },
+                error: err => {
+                    console.error('DataAccess session sources subscription error:', err)
+                },
+            })
         },
 
         stop () {
             this.metadataSub?.unsubscribe()
             this.structureSub?.unsubscribe()
+            this.unionSourcesSub?.unsubscribe()
+            this.sessionSourcesSub?.unsubscribe()
             this.$reset()
         },
     },

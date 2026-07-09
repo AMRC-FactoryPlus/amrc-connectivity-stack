@@ -27,6 +27,7 @@ import ApplicationObjectEditor from "@pages/ConfigDB/Applications/ApplicationObj
 import ObjectPage from "@pages/ConfigDB/Objects/ObjectPage.vue";
 import Files from "@pages/Files/Files.vue";
 import Bridges from "@pages/Bridges/Bridges.vue";
+import ISA95 from "@pages/ISA95/ISA95.vue";
 
 // Create an event bus
 window.events = mitt()
@@ -150,6 +151,14 @@ const routes = [
     meta: {
       name: 'Bridges',
       icon: 'arrow-down-up-across-line'
+    }
+  },
+  {
+    path: '/isa95',
+    component: ISA95,
+    meta: {
+      name: 'ISA-95',
+      icon: 'sitemap'
     }
   }
 ]

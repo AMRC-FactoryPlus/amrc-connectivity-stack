@@ -83,6 +83,19 @@ Setting `openid.enabled` to `false` will skip Keycloak, but Grafana then
 has no interactive login other than the local emergency admin account,
 which remains reachable at `/login?disableLoginForm=false`.
 
+### Machine-to-machine OIDC clients
+
+Clients declared under `serviceSetup.config.openidClients` may now set
+`serviceAccountsEnabled: true`, which turns on the OAuth
+client-credentials grant so an unattended consumer, such as a display
+wall or a scheduled job, can exchange its generated client secret for a
+token without a human login. Such a client should normally also set
+`standardFlowEnabled: false`, as it has no browser session to redirect.
+Keycloak only supports service accounts on confidential clients, so the
+flag is ignored on a client marked `publicClient`.
+
+This is off unless asked for, and existing clients are unaffected.
+
 ### Two new services are exposed by default
 
 `i3x` and `data-access` are both enabled by default, and each publishes
@@ -128,17 +141,40 @@ are no longer free-text fields on a device. They are selected from a
 vocabulary of ConfigDB objects, which prevents the inconsistent spelling
 of site and area names that free text allowed.
 
-**Nothing seeds the vocabulary for you.** The bundled dump creates only
-the five level classes and the vocabulary application. Until you create
-your own Enterprise, Site and lower-level objects and link them together
-with the `ISA95Vocabulary` application, the hierarchy dropdowns on a
-device will be empty and the hierarchy cannot be set. Free-text values
-already saved against existing devices remain in the origin map, but
-will not correspond to any vocabulary entry.
+The vocabulary is managed from the new **ISA-95** page in the Manager,
+where hierarchy nodes can be created, renamed, given alternative names
+(aliases) and pruned. A node cannot be deleted while it still has
+children, so a hierarchy is dismantled from the bottom up rather than
+leaving orphaned nodes behind.
 
-CSV import ignores the ISA-95 columns for the same reason. They are
-still present in an exported CSV, but editing them and re-importing will
-not change the hierarchy; use the ISA-95 Hierarchy panel instead.
+Nothing seeds the vocabulary automatically: the bundled dump creates
+only the five level classes and the vocabulary application. Until nodes
+exist, the hierarchy dropdowns on a device are empty and the hierarchy
+cannot be set.
+
+**If you are upgrading an installation that already has hierarchy values
+typed against its devices,** use "Import from Devices" on the ISA-95
+page rather than retyping them. This reads the values already saved on
+every device, shows you what it proposes to create, and builds the
+vocabulary to match. Names that differ only in case or spelling from an
+existing node are attached to that node as aliases, so a device keeps
+resolving against the vocabulary without being edited. Devices are never
+modified by the import. Values that sit below a missing level (an Area
+on a device with no Site, say) cannot be placed in the tree; they are
+reported and left alone.
+
+The import is deliberately a manual action rather than something that
+runs on upgrade. Nodes are derived from device values, which the import
+does not rewrite, so a migration that ran automatically would recreate
+any node you had pruned every time the chart was upgraded. Run it when
+you choose to, prune what you do not want, and the result stays as you
+left it. You can run it again at any time to pick up devices added
+later.
+
+CSV import ignores the ISA-95 columns for the same reason the metric
+tree hides them. They are still present in an exported CSV, but editing
+them and re-importing will not change the hierarchy; use the ISA-95
+Hierarchy panel on the device, or the ISA-95 page, instead.
 
 ### MetaDB is present but disabled
 

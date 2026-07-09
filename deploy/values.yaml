@@ -218,6 +218,20 @@ serviceSetup:
     #   redirectUris            (list of full URLs)
     #   webOrigins              (list of origins)
     #   postLogoutRedirectUris  (list of full URLs)
+    #
+    # Machine-to-machine clients: set `serviceAccountsEnabled: true` to
+    # enable the OAuth client-credentials grant (Keycloak "service
+    # account") so an unattended consumer - a kiosk, a scheduled job -
+    # can exchange the generated client_secret for tokens with no
+    # human login. Such clients are necessarily confidential (ignored
+    # if publicClient is set) and should also set
+    # `standardFlowEnabled: false`: they have no browser flow, so no
+    # redirect URIs are ever exercised. Example:
+    #   polyptic-kiosk:
+    #     enabled: true
+    #     name: Polyptic kiosk
+    #     serviceAccountsEnabled: true
+    #     standardFlowEnabled: false
     openidClients:
       grafana:
         enabled: true

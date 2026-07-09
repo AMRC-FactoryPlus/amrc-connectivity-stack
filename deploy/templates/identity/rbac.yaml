@@ -12,11 +12,18 @@ kind: ClusterRole
 metadata:
   name: krb-keys-operator
 rules:
+  # localsecrets is included because the operator registers a
+  # LocalSecret handler unconditionally, and the CRD arrives on the
+  # central cluster as soon as the first edge cluster is provisioned
+  # (it ships in the edge-cluster chart's crds/). Without this rule
+  # kopf's watch crash-loops with a 403 from that point on. The edge
+  # chart (edge-cluster/templates/krb-keys.yaml) already grants the
+  # same set.
   -   apiGroups: [factoryplus.app.amrc.co.uk]
-      resources: [kerberos-keys]
+      resources: [kerberos-keys, localsecrets]
       verbs: [list, get, watch, patch]
   -   apiGroups: [factoryplus.app.amrc.co.uk]
-      resources: [kerberos-keys/status]
+      resources: [kerberos-keys/status, localsecrets/status]
       verbs: [list, get, create, update, delete, watch, patch]
   -   apiGroups: [""]
       resources: [secrets]

@@ -8,6 +8,147 @@ chronological order.
 These changes have not been released yet, but are likely to appear in
 the next release.
 
+## v6.0.0
+
+This is a major release. It changes the Sparkplug timestamp format, the
+way users log in to Grafana, and two ConfigDB permissions. None of these
+are backwards compatible. Please read this whole section before
+upgrading a production installation.
+
+Note that v4 and v5 were not documented here; this section describes the
+changes from v5.1.0.
+
+### Nanosecond timestamps: upgrade central services before edge agents
+
+Sparkplug payload and metric timestamps now hold **nanoseconds** since
+the epoch, in the same `uint64` field that previously held milliseconds.
+The UNS JSON `timestamp` field is likewise now an ISO-8601 string with
+nanosecond precision, for example `2026-05-28T15:46:56.100923659Z`
+rather than `2026-05-28T15:46:56.100Z`.
+
+Components from this release read a timestamp below 1e15 as milliseconds
+and convert it, so a v6 central service can consume data from a v5 edge
+agent. **The reverse is not true.** A v5 historian reading from a v6
+edge agent will interpret a nanosecond value as milliseconds and store
+points dated tens of millions of years in the future. Upgrade the
+central services first, then the edge agents.
+
+Two further consequences:
+
+- The Sparkplug B specification defines this field as milliseconds. Any
+  external, non-ACS consumer that reads ACS Sparkplug payloads directly
+  will misinterpret the new values, and any consumer of the UNS topics
+  with a strict RFC 3339 parser may reject the extra digits of
+  precision.
+- Existing InfluxDB data is unaffected and needs no migration. Both
+  historians already wrote at nanosecond precision, so stored timestamps
+  and measurement names are unchanged.
+
+### Grafana now authenticates through Keycloak
+
+Previously Grafana sat behind a Traefik `basic-auth` middleware and
+trusted a proxied header (`auth.proxy`). This release deploys Keycloak
+as an OIDC provider and Grafana authenticates against it. The
+`grafana.grafana.ini.auth.proxy` values have been removed, and Grafana's
+own login form is hidden: users sign in via a "Factory+" SSO button.
+
+Keycloak itself validates credentials against Kerberos, and Kerberos
+authentication is otherwise unchanged. Edge agents, the Manager and the
+other central services continue to authenticate exactly as they did.
+
+On upgrade you must:
+
+- Create a DNS record for the new `openid.<acs.baseUrl>` host and ensure
+  your TLS certificate covers it.
+- Grant Grafana roles through Factory+ permissions. Roles are no longer
+  held in Grafana. Add principals to the groups listed under
+  `serviceSetup.config.grafanaPermissions`; anyone without a grant
+  becomes a Viewer, and revoking a grant demotes the user at their next
+  login. The maximum role is now Admin, as Grafana Admin is no longer
+  assigned.
+- Check that your existing Grafana users can still reach their accounts.
+  Dashboards and the Grafana database are preserved across the upgrade,
+  but federated logins now arrive with the Kerberos UPN as their
+  username. Where that differs from the username a v5 proxy login
+  created, the user may be given a fresh Viewer account instead of
+  reclaiming the old one.
+
+The Keycloak deployment uses the custom `acs-keycloak` image, which has
+the Factory+ storage provider built in. Stock upstream Keycloak will not
+work. The Keycloak admin password, the client secrets and the Keycloak
+database are all created automatically; there is no manual realm or
+client configuration to do.
+
+Setting `openid.enabled` to `false` will skip Keycloak, but Grafana then
+has no interactive login other than the local emergency admin account,
+which remains reachable at `/login?disableLoginForm=false`.
+
+### Two new services are exposed by default
+
+`i3x` and `data-access` are both enabled by default, and each publishes
+an external host: `i3x.<acs.baseUrl>` and `data-access.<acs.baseUrl>`.
+Add DNS records and extend your TLS certificate to cover them, or set
+`i3x.enabled` or `dataAccess.enabled` to `false`. The i3X service
+depends on Keycloak, so do not disable `openid` while leaving `i3x`
+enabled.
+
+### ConfigDB permission changes
+
+Adding a subclass relationship now requires the `WriteSuperclasses`
+permission on the target class, where previously `ReadSubclasses` was
+enough. The accounts shipped with ACS are updated automatically, but
+**any local principal that creates subclasses must be granted the new
+permission**, otherwise those writes will start returning 403.
+
+The Files service now also requires `ReadMembers` on the file class,
+without which file operations fail with permission errors.
+
+Both grants are applied by the service-setup Job, which runs
+automatically as part of `helm upgrade`.
+
+### ConfigDB version 1 dumps are no longer accepted
+
+Support for the version 1 dump format has been removed. Any dumps you
+maintain outside this repository must be converted to version 2.
+
+### Service registration has moved into the Helm chart
+
+Service URLs used to be registered from a fixed dump baked into the
+service-setup image. They are now generated by the chart and gated on
+each service's `enabled` flag, so only the services you actually deploy
+are advertised in the Directory. No change to your values file is
+needed, and no stale registrations need clearing out. The Directory
+database picks up a new schema version automatically on startup, which
+makes the `device` column of a service advertisement optional.
+
+### The ISA-95 hierarchy is now a controlled vocabulary
+
+The five ISA-95 levels (Enterprise, Site, Area, Work Centre, Work Unit)
+are no longer free-text fields on a device. They are selected from a
+vocabulary of ConfigDB objects, which prevents the inconsistent spelling
+of site and area names that free text allowed.
+
+**Nothing seeds the vocabulary for you.** The bundled dump creates only
+the five level classes and the vocabulary application. Until you create
+your own Enterprise, Site and lower-level objects and link them together
+with the `ISA95Vocabulary` application, the hierarchy dropdowns on a
+device will be empty and the hierarchy cannot be set. Free-text values
+already saved against existing devices remain in the origin map, but
+will not correspond to any vocabulary entry.
+
+CSV import ignores the ISA-95 columns for the same reason. They are
+still present in an exported CSV, but editing them and re-importing will
+not change the hierarchy; use the ISA-95 Hierarchy panel instead.
+
+### MetaDB is present but disabled
+
+This release includes the first parts of the MetaDB, an RDF-backed
+reimplementation of the ConfigDB. It ships disabled and its integration
+is not yet complete, so it should not be enabled on a production
+installation. Turning on `metadb.asConfigDB` repoints the Directory's
+ConfigDB advertisement at the MetaDB and requires `configdb.enabled` to
+be `false`; there is no migration of existing ConfigDB content into it.
+
 ## v3.4.0
 
 ### Unified Namespace & Historian

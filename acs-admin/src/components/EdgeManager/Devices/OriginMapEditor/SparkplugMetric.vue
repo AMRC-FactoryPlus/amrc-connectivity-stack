@@ -24,7 +24,34 @@
           <Input v-model="localModel.Path" :placeholder="pathPlaceholder" :icon="pathIcon"/>
         </Control>
         <Control v-if="isStatic" label="Static Value" :help="schema.properties.Value.description">
-          <Input v-model="localModel.Value" placeholder="Value" icon="i-cursor"/>
+          <Combobox v-if="isa95Level && isa95Options.length"
+              :model-value="localModel.Value"
+              @update:model-value="on_isa95_select"
+              :reset-search-term-on-select="true"
+          >
+            <ComboboxAnchor class="w-full relative flex items-center">
+              <ComboboxInput
+                  :display-value="(v) => v ?? ''"
+                  :placeholder="`Select ${isa95Level}...`"
+                  class="pr-8 bg-white"
+              />
+              <ComboboxTrigger class="absolute right-2">
+                <i class="fa-solid fa-chevron-down text-xs text-gray-400"/>
+              </ComboboxTrigger>
+            </ComboboxAnchor>
+            <ComboboxList class="w-[var(--reka-popper-anchor-width)]">
+              <ComboboxEmpty>No results</ComboboxEmpty>
+              <ComboboxItem
+                  v-for="opt in isa95Options"
+                  :key="opt.uuid"
+                  :value="opt.name"
+                  :text-value="`${opt.name} ${opt.aliases.join(' ')}`"
+              >
+                {{ opt.name }}
+              </ComboboxItem>
+            </ComboboxList>
+          </Combobox>
+          <Input v-else v-model="localModel.Value" placeholder="Value" icon="i-cursor"/>
         </Control>
         <Control label="Type" :help="schema.properties.Sparkplug_Type.description">
           <Select v-model="localModel.Sparkplug_Type">
@@ -125,15 +152,21 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import DetailCard from '@components/DetailCard.vue'
 import { Button } from '@/components/ui/button'
 import { useConnectionStore } from '@/store/useConnectionStore'
-import { useDriverStore } from '@/store/useDriverStore'
+import { useDriverStore }     from '@/store/useDriverStore'
+import { useISA95Store, ISA95_LEVELS } from '@/store/useISA95Store.js'
+import {
+  Combobox, ComboboxAnchor, ComboboxEmpty,
+  ComboboxInput, ComboboxItem, ComboboxList, ComboboxTrigger,
+} from '@/components/ui/combobox'
 
 export default {
   name: 'SparkplugMetric',
 
   setup() {
     return {
-      conn: useConnectionStore(),
+      conn:  useConnectionStore(),
       driver: useDriverStore(),
+      isa95: useISA95Store(),
     }
   },
 
@@ -147,6 +180,13 @@ export default {
     SelectItem,
     SelectTrigger,
     SelectValue,
+    Combobox,
+    ComboboxAnchor,
+    ComboboxEmpty,
+    ComboboxInput,
+    ComboboxItem,
+    ComboboxList,
+    ComboboxTrigger,
     Control,
     LinkUserDialog,
     GroupList,
@@ -251,12 +291,59 @@ export default {
       // This handles cases where any part of the path is missing
       return this.driverInfo?.presentation?.path?.hidden === true
     },
+
+    /* Which ISA-95 level this metric represents, or null if it isn't one.
+     * Detection is based on the metric path: the parent key must be
+     * 'ISA95_Hierarchy' and the leaf key must be one of the five level names. */
+    isa95Level () {
+      const path = this.selectedMetric?.path
+      if (!path || path.length < 2) return null
+      const leaf   = path[path.length - 1]
+      const parent = path[path.length - 2]
+      if (parent === 'ISA95_Hierarchy' && ISA95_LEVELS.includes(leaf))
+        return leaf
+      return null
+    },
+
+    /* Valid options for the dropdown at the current ISA-95 level.
+     * For Enterprise this is all enterprises; for lower levels it is the
+     * children of whichever parent node is currently selected. */
+    isa95Options () {
+      if (!this.isa95Level) return []
+
+      const level_index = ISA95_LEVELS.indexOf(this.isa95Level)
+
+      if (level_index === 0) {
+        return this.isa95.enterprises
+      }
+
+      const parent_level = ISA95_LEVELS[level_index - 1]
+      const parent_value = this.model
+        ?.Device_Information
+        ?.ISA95_Hierarchy
+        ?.[parent_level]
+        ?.Value
+
+      console.log('isa95Options', { level: this.isa95Level, parent_level, parent_value, data: this.isa95.data })
+
+      if (!parent_value) return []
+  
+      const parent_node = this.isa95.find_by_name(parent_level, parent_value)
+      console.log('parent_node', parent_node)
+
+      const children = this.isa95.children_of(parent_node.uuid)
+
+      console.log('children', {raw_children: parent_node.children, resolved: children, all_data: this.isa95.data})
+
+      return children
+    },
   },
 
   mounted() {
     // Start the stores
     this.conn.start()
     this.driver.start()
+    this.isa95.start()
   },
 
   watch: {
@@ -338,6 +425,24 @@ export default {
         this.isToggling = false;
       }, 100);
     },
+    /* Handle selection of an ISA-95 hierarchy value. Sets the local value
+     * and clears all levels below this one in the full originMap so the
+     * hierarchy stays consistent. */
+    on_isa95_select (new_value) {
+      this.localModel.Value = new_value
+
+      const level_index = ISA95_LEVELS.indexOf(this.isa95Level)
+      const hierarchy = this.model?.Device_Information?.ISA95_Hierarchy
+      if (!hierarchy) return
+
+      for (const level of ISA95_LEVELS.slice(level_index + 1)) {
+        if (hierarchy[level] !== undefined) {
+          if (!hierarchy[level]) hierarchy[level] = {}
+          hierarchy[level].Value = null
+        }
+      }
+    },
+
     isValidType (val, options) {
       return options.some(e => e.value === val)
     },

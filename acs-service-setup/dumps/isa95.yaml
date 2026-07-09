@@ -1,0 +1,53 @@
+service: !u UUIDs.Service.ConfigDB
+version: 2
+objects:
+  !u ConfigDB.Class.R2Class:
+    !u UUIDs.Class.ISA95Level:
+      name: "ISA-95 hierarchy level"
+
+  !u UUIDs.Class.ISA95Level:
+    !u UUIDs.Class.ISA95Enterprise:
+      name: "ISA-95 Enterprise"
+    !u UUIDs.Class.ISA95Site:
+      name: "ISA-95 Site"
+    !u UUIDs.Class.ISA95Area:
+      name: "ISA-95 Area"
+    !u UUIDs.Class.ISA95WorkCenter:
+      name: "ISA-95 Work Center"
+    !u UUIDs.Class.ISA95WorkUnit:
+      name: "ISA-95 Work Unit"
+
+  !u UUIDs.Class.App:
+    !u UUIDs.App.ISA95Vocabulary:
+      name: "ISA-95 vocabulary"
+      subclassOf:
+        - !u MetaDB.Class.ConfigEntry
+
+configs:
+  !u UUIDs.App.ConfigSchema:
+    !u UUIDs.App.ISA95Vocabulary:
+      type: object
+      properties:
+        aliases:
+          type: array
+          items:
+            type: string
+          description: "Alternative labels that resolve to this node's canonical name"
+        children:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: "UUIDs of the next-level ISA-95 nodes under this node"
+      additionalProperties: false
+---
+service: !u UUIDs.Service.Authentication
+version: 2
+grants:
+  # Any authenticated principal can read the vocabulary (needed by the
+  # Manager UI to populate ISA-95 dropdowns for device configurers).
+  # Administrators already have full ConfigDB access via ACS.PermGroup.ConfigDB,
+  # which covers WriteConfig and ManageObjects on ISA-95 objects.
+  !u Auth.Class.Principal:
+    !u UUIDs.Permission.ConfigDB.ReadConfig:
+      !u UUIDs.App.ISA95Vocabulary: false

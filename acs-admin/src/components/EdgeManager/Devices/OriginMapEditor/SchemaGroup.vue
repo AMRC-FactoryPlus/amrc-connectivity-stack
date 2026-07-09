@@ -116,7 +116,6 @@ import { SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar'
 import { ChevronRight } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-
 export default {
   name: 'SchemaGroup',
 
@@ -903,9 +902,11 @@ export default {
   computed: {
     filteredKeys() {
       // Get all keys that aren't reserved words in the order they appear in the schema
-      // We use Object.keys to get the keys in the order they were defined in the schema
+      // We use Object.keys to get the keys in the order they were defined in the schema.
+      // ISA95_Hierarchy is always hidden from the tree — it is managed exclusively via
+      // the dedicated ISA-95 Hierarchy panel in the device sidebar.
       const allKeys = Object.keys(this.schema.properties).filter(e =>
-        !['patternProperties', '$meta', 'Schema_UUID', 'Instance_UUID', 'required'].includes(e)
+        !['patternProperties', '$meta', 'Schema_UUID', 'Instance_UUID', 'required', 'ISA95_Hierarchy'].includes(e)
       );
 
       // If not filtering, return all keys in their original order

@@ -63,6 +63,12 @@ const sidebarNavItems: Item[] = [
     href: '/bridges',
     icon: 'arrow-down-up-across-line',
     auth: true
+  },
+  {
+    title: 'ISA-95',
+    href: '/isa95',
+    icon: 'sitemap',
+    auth: true
   }
 ]
 </script>

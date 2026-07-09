@@ -255,13 +255,25 @@ export default {
         }))
     },
 
-    // This should come from a service call, as we may have permission to see datasets, but not use them in a union
+    // All datasets known to the ConfigDB, regardless of whether we are allowed to include them
+    // in a Union. Used to resolve names for uuids we already hold (e.g. when editing an
+    // existing Union whose components we may no longer be permitted to add).
     all_datasets_for_union() {
       return this.da.structures.map(s => ({
         uuid: s.uuid,
         name: this.da.datasets.find(d => d.uuid === s.uuid)?.name ?? null,
       }))
       .sort((a, b) => (a.name ?? a.uuid).localeCompare(b.name ?? b.uuid))
+    },
+
+    // The subset of all_datasets_for_union that the current principal is actually permitted to
+    // use as a component source: either embedded directly in a Union (INCLUDE_IN_UNION) or
+    // wrapped in a Session (USE_FOR_SESSION) before being embedded. These are distinct
+    // permissions from being able to read/edit a dataset, and are provided by the Data Access
+    // service (backed by the Auth service), not derived from ConfigDB visibility alone.
+    permitted_datasets_for_union() {
+      const allowed_uuids = new Set([...this.da.union_sources, ...this.da.session_sources])
+      return this.all_datasets_for_union.filter(ds => allowed_uuids.has(ds.uuid))
     },
 
     can_submit() {
@@ -356,7 +368,7 @@ export default {
     },
 
     filtered_datasets_for_component(idx) {
-      return this.all_datasets_for_union.filter(ds =>
+      return this.permitted_datasets_for_union.filter(ds =>
         !this.dataset_components.some((c, i) => i !== idx && c.source === ds.uuid && c.from == "" && c.to == ""))
     },
 
